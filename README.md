@@ -24,9 +24,9 @@ verifies the reordering of messages to create more optimized implementations tha
 - Supports any number of participants.
 - Choreographic programming with DSL parser and automatic projection.
 - Effect handler system with multiple implementations (in-memory, distributed).
-- Production-ready RumpsteakHandler with session state tracking.
+- RumpsteakHandler with session state tracking.
 - Middleware support (tracing, retry, metrics, fault injection).
-- WebAssembly (WASM) support for browser-based protocols.
+- WebAssembly support for browser-based protocols.
 
 ## Usage
 
@@ -74,7 +74,7 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The choreography macro generates role types, message types, and session types automatically. The effect handler system decouples protocol logic from transport—use `InMemoryHandler` for testing or `RumpsteakHandler` for production. See `docs/` for comprehensive guides.
+The choreography macro generates role types, message types, and session types automatically. The effect handler system decouples protocol logic from transport. Use `InMemoryHandler` for testing or `RumpsteakHandler` for production. See `docs/` for guides.
 
 ## Structure
 
@@ -86,13 +86,13 @@ HTTP cache case study backed by Redis.
 
 Choreographic programming layer for global protocol specification with automatic projection to local session types. Includes a Pest-based DSL parser for `.choreography` files with support for protocol composition, guards, annotations, and parameterized roles.
 
-A transport-agnostic effect handler system, with `InMemoryHandler` for testing and `RumpsteakHandler` for production distributed execution. The effect handler system also provides middleware support for tracing, retry, metrics, and fault injection. Session state tracking provides metadata for debugging and monitoring. The system works seamlessly in browser environments with WebAssembly support. Comprehensive guides are available in the `docs/` directory.
+A transport-agnostic effect handler system, with `InMemoryHandler` for testing and `RumpsteakHandler` for production distributed execution. The effect handler system also provides middleware support for tracing, retry, metrics, and fault injection. Session state tracking provides metadata for debugging and monitoring. The system works in browser environments with WebAssembly support. Guides available in the `docs/` directory.
 
 *This is the primary extension of the original version with significant enhancements.*
 
 #### `examples/`
 
-Many examples of using Rumpsteak from popular protocols. *Updated to use new APIs*. Includes `wasm-ping-pong/` demonstrating browser-based protocols.
+Examples of using Rumpsteak from popular protocols (updated to use new APIs). Includes `wasm-ping-pong/` demonstrating browser-based protocols.
 
 #### `fsm/`
 
@@ -104,7 +104,7 @@ Crate for procedural macros used within Rumpsteak's API.
 
 ## WebAssembly Support
 
-Supports compilation to WebAssembly, allowing the core session types and choreography system to run in browser environments. Both the effect handlers and platform-agnostic runtime abstraction work seamlessly in WASM, enabling you to implement custom network transports using `ChoreoHandler` with WebSockets, WebRTC, or other browser APIs. The `examples/wasm-ping-pong/` directory contains a working example.
+Supports compilation to WebAssembly, allowing the core session types and choreography system to run in browser environments. Both the effect handlers and platform-agnostic runtime abstraction work in WASM, enabling you to implement custom network transports using `ChoreoHandler` with WebSockets, WebRTC, or other browser APIs. The `examples/wasm-ping-pong/` directory contains a working example.
 
 To get started, run `cd examples/wasm-ping-pong && ./build.sh` (or `wasm-pack build --target web`).
 
