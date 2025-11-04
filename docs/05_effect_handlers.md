@@ -37,6 +37,10 @@ The `send` method transmits a message to another role. The `recv` method waits f
 
 The `Endpoint` associated type holds connection state. Different handlers use different endpoint types.
 
+### Send bounds and portability
+
+The trait requires messages (`Serialize + Send + Sync` for `send`, `DeserializeOwned + Send` for `recv`) and handler futures (`F: Future + Send` in `with_timeout`) to be `Send`. This matches the requirements of the runtimes we target (tokio on native, single-thread executors on WASM) and keeps middleware stacks interchangeable between single- and multi-threaded deployments. Even on WASM the bounds remain, so code that is written for browsers compiles unchanged for native binaries that move work across threads.
+
 ## Built-in Handlers
 
 ### InMemoryHandler
@@ -268,4 +272,3 @@ let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
 The `interpret` function walks the effect tree and calls handler methods for each operation. The result contains received messages and execution status.
-

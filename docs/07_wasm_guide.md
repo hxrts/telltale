@@ -111,6 +111,10 @@ pub async fn run_distributed_protocol() -> Result<(), JsValue> {
 
 SimpleChannel uses futures::channel::mpsc which is WASM-compatible. For distributed WASM applications, implement custom channels using browser APIs.
 
+### Async traits in WASM
+
+The handler traits continue to use the `async_trait` macro rather than native `async fn` in traits. This keeps the traits object-safe (needed for middleware stacks such as `Trace<Retry<H>>`) and lets us share a single implementation strategy across native and WASM targets. The generated futures are still `Send`, so handlers that run under multithreaded executors behave the same way as handlers compiled for single-threaded WASM.
+
 ## Custom Network Transport
 
 InMemoryHandler works for single-context protocols. Real distributed WASM applications need network transport.
@@ -280,4 +284,3 @@ File system access uses browser APIs which differ from native file operations.
 The examples/wasm-ping-pong directory contains a complete working example.
 
 See the build script for compilation details and the README for deployment instructions.
-

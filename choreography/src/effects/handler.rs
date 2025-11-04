@@ -92,6 +92,14 @@ pub type Result<T> = std::result::Result<T, ChoreographyError>;
 ///
 /// - `Role`: The type representing protocol participants
 /// - `Endpoint`: The connection state for this protocol execution
+///
+/// # Async implementation notes
+///
+/// We deliberately use the `async_trait` macro here so the trait stays object-safe,
+/// which lets middleware stacks (e.g. `Trace<Retry<H>>`) erase handlers behind trait
+/// objects. The macro also enforces `Send` on all returned futures, so the bounds on
+/// methods like [`with_timeout`](ChoreoHandler::with_timeout) apply equally to native
+/// multithreaded runtimes and single-threaded WASM builds.
 #[async_trait]
 pub trait ChoreoHandler: Send {
     /// The role type for this choreography
