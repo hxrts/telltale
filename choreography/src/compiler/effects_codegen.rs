@@ -244,7 +244,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 // Check if branches have guards - if so, generate guard evaluation
                 // Otherwise, generate code that takes the first valid branch
                 let has_guards = branches.iter().any(|b| b.guard.is_some());
-                
+
                 if has_guards {
                     // Generate guard evaluation logic
                     let guard_checks: Vec<TokenStream> = branches
@@ -265,9 +265,12 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                             }
                         })
                         .collect();
-                    
+
                     // Generate a choice selection expression using guards
-                    let first_label = branches.first().map(|b| b.label.to_string()).unwrap_or_default();
+                    let first_label = branches
+                        .first()
+                        .map(|b| b.label.to_string())
+                        .unwrap_or_default();
                     quote! {
                         .choose(Role::#choice_role_name, {
                             // Evaluate guards to determine which branch to choose
@@ -278,7 +281,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 } else if let Some(first_branch) = branches.first() {
                     // No guards - default to first branch or allow runtime decision
                     let label_str = first_branch.label.to_string();
-                    
+
                     quote! {
                         .choose(Role::#choice_role_name, Label(#label_str))
                         .branch(Role::#choice_role_name, vec![#(#branch_programs),*])

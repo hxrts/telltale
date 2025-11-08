@@ -1,7 +1,7 @@
 // Integration tests for RumpsteakHandler with SimpleChannel
 
 use rumpsteak_choreography::effects::{
-    handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
+    handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel},
     ChoreoHandler,
 };
 use serde::{Deserialize, Serialize};
@@ -529,6 +529,59 @@ async fn test_error_recovery() {
     // Verify error message is informative
     let err = result.unwrap_err();
     assert!(err.to_string().contains("No channel registered"));
+}
+
+#[tokio::test]
+async fn test_dynamic_session_flow() {
+    use rumpsteak_choreography::effects::Label;
+
+    let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
+    let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);
+
+    let (alice_channel, bob_channel) = SimpleChannel::pair();
+    alice_endpoint.register_session(
+        TestRole::Bob,
+        RumpsteakSession::from_simple_channel(alice_channel),
+    );
+    bob_endpoint.register_session(
+        TestRole::Alice,
+        RumpsteakSession::from_simple_channel(bob_channel),
+    );
+
+    let mut alice_handler = RumpsteakHandler::<TestRole, TestMessage>::new();
+    let mut bob_handler = RumpsteakHandler::<TestRole, TestMessage>::new();
+
+    let msg = TestMessage {
+        content: "dynamic session".to_string(),
+    };
+
+    alice_handler
+        .send(&mut alice_endpoint, TestRole::Bob, &msg)
+        .await
+        .expect("dynamic send should succeed");
+
+    let received: TestMessage = bob_handler
+        .recv(&mut bob_endpoint, TestRole::Alice)
+        .await
+        .expect("dynamic recv should succeed");
+
+    assert_eq!(received.content, "dynamic session");
+
+    let label = Label("dynamic_path");
+    bob_handler
+        .choose(&mut bob_endpoint, TestRole::Alice, label)
+        .await
+        .expect("dynamic choose should succeed");
+
+    let offered = alice_handler
+        .offer(&mut alice_endpoint, TestRole::Bob)
+        .await
+        .expect("dynamic offer should succeed");
+
+    assert_eq!(offered.0, "dynamic_path");
+
+    let alice_meta = alice_endpoint.get_metadata(&TestRole::Bob).unwrap();
+    assert!(alice_meta.operation_count >= 2);
 }
 
 #[tokio::test]

@@ -34,6 +34,10 @@ choreography.rs: Protocol demonstrating choice constructs.
 
 wasm-ping-pong: Browser-based ping-pong protocol. See examples/wasm-ping-pong/README.md for details.
 
+`RumpsteakEndpoint` supports either `register_channel` (SimpleChannel) or
+`register_session`. Use `RumpsteakSession::from_sink_stream` when an example
+needs to speak over WebSockets or other custom transports.
+
 ## Common Patterns
 
 ### Request-Response
@@ -234,4 +238,3 @@ cd examples/wasm-ping-pong
 ```
 
 See individual example files for detailed documentation.
-

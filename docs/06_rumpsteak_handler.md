@@ -126,6 +126,14 @@ pub fn register_channel<T>(&mut self, peer: R, channel: T)
 Register a channel with a peer role.
 
 ```rust
+pub fn register_session(&mut self, peer: R, session: RumpsteakSession)
+```
+Register a dynamically dispatched session (for example one produced via
+`RumpsteakSession::from_simple_channel` or
+`RumpsteakSession::from_sink_stream`). Use this when you need additional
+transport logic such as WebSockets, recording, or custom middleware stacks.
+
+```rust
 pub fn has_channel(&self, peer: &R) -> bool
 ```
 Check if a channel exists for a peer.
@@ -225,6 +233,21 @@ Send raw bytes.
 pub async fn recv(&mut self) -> Result<Vec<u8>, String>
 ```
 Receive raw bytes.
+
+### RumpsteakSession Builders
+
+```rust
+RumpsteakSession::from_simple_channel(channel: SimpleChannel)
+```
+Wraps a legacy channel in the new dynamic session API.
+
+```rust
+RumpsteakSession::from_sink_stream(sender, receiver)
+```
+Accepts any async sink/stream pair carrying `Vec<u8>` payloads (e.g. WebSocket/
+Fetch bridges, QUIC streams, etc.) and exposes them to the handler. This is the
+recommended entry point for custom transports; once wrapped, call
+`endpoint.register_session(peer, session)`.
 
 ### SessionMetadata
 

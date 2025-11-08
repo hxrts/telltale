@@ -255,56 +255,72 @@ Type annotations are:
 
 #### 10. Parameterized Roles
 
-Roles can be parameterized to represent role arrays or families of participants.
+**Status: ✅ Fully Implemented**
 
-**Simple parameterized role:**
+Roles can be parameterized to represent role arrays or families of participants. The system supports concrete array sizes, concrete indices, and symbolic parameters.
+
+**Concrete array with indexed access:**
 ```rust
 choreography WorkerPool {
-    roles: Master, Worker[N]
-    
-    Master -> Worker[0]: Task
-}
-```
-
-**Concrete indexed roles:**
-```rust
-choreography IndexedWorkers {
     roles: Master, Worker[3]
     
-    Master -> Worker[0]: Task1
-    Master -> Worker[1]: Task2
-    Master -> Worker[2]: Task3
+    Master -> Worker[0]: Task
+    Worker[0] -> Master: Result
 }
 ```
 
-**Multiple parameterized roles:**
+**Multiple indexed workers:**
 ```rust
-choreography MultiParam {
-    roles: Coordinator, Worker[N], Monitor[M]
+choreography MultipleWorkers {
+    roles: Coordinator, Worker[5]
     
-    Coordinator -> Worker[i]: Start
-    Worker[i] -> Monitor[j]: Report
+    Coordinator -> Worker[0]: Init
+    Coordinator -> Worker[1]: Init
+    Coordinator -> Worker[2]: Init
+    Worker[0] -> Coordinator: Done
 }
 ```
 
-**In control structures:**
+**Symbolic parameters:**
 ```rust
-choreography ParameterizedLoop {
-    roles: Master, Worker[N]
+choreography SymbolicParam {
+    roles: Leader, Follower[N]
     
-    loop (count: N) {
-        Master -> Worker[i]: Work
-        Worker[i] -> Master: Result
-    }
+    Leader -> Follower[i]: Command
+    Follower[i] -> Leader: Ack
 }
 ```
 
-Parameterized roles support:
-- Concrete indices (e.g., `Worker[3]` declares Worker with 3 instances)
-- Symbolic parameters (e.g., `Worker[N]` where N is a parameter)
-- Index expressions in role references (e.g., `Worker[i]`, `Worker[0]`)
-- Use in all protocol constructs (send, choice, loop, parallel)
-- Multiple independent role families in the same protocol
+**Features:**
+- ✅ Concrete array sizes (e.g., `Worker[3]` declares an array of 3 workers)
+- ✅ Concrete indices (e.g., `Worker[0]`, `Worker[1]`)
+- ✅ Symbolic parameters (e.g., `Worker[N]` where N is a parameter)
+- ✅ Symbolic indices (e.g., `Worker[i]` in protocol statements)
+- ✅ Full validation with role family matching
+- ✅ Projection to local types for each role
+- ✅ Multiple independent role families
+
+**Example Usage:**
+```rust
+use rumpsteak_choreography::compiler::{parse_dsl, project};
+
+let dsl = r#"
+choreography Test {
+    roles: Coordinator, Worker[3]
+    
+    Coordinator -> Worker[0]: Task
+    Worker[0] -> Coordinator: Result
+}
+"#;
+
+let choreo = parse_dsl(dsl)?;
+choreo.validate()?;
+
+for role in &choreo.roles {
+    let local_type = project(&choreo, role)?;
+    // Use local_type for code generation
+}
+```
 
 #### 11. Macro Support for Inline Protocols
 

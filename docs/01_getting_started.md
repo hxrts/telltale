@@ -10,7 +10,21 @@ rumpsteak-aura = { git = "https://github.com/hxrts/rumpsteak-aura" }
 rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura" }
 ```
 
-Note on dependencies: `rumpsteak-aura` provides core session types and the foundation for type-safe distributed protocols. `rumpsteak-choreography` provides the choreographic DSL, effect handler system, and automatic projection. Both are needed for choreographic programming. If you only need core session types without choreographies, you can depend on just `rumpsteak-aura`.
+### Understanding the Crates
+
+Rumpsteak-Aura is organized as a Cargo workspace with several crates:
+
+- **`rumpsteak-aura`**: Core session types library (located in the root `src/` directory). Provides fundamental primitives for type-safe asynchronous communication, channels, and role definitions.
+
+- **`rumpsteak-choreography`**: Choreographic programming layer (located in `choreography/`). Provides the DSL parser, automatic projection, effect handler system, and runtime support.
+
+- **`rumpsteak-fsm`**: Optional finite state machine support for advanced session type verification.
+
+- **`rumpsteak-macros`**: Procedural macros used internally.
+
+**For most users**: You need both `rumpsteak-aura` and `rumpsteak-choreography`. The core library provides session types, while the choreography layer provides the high-level DSL and effect system.
+
+**For advanced users**: If you only need low-level session types without choreographies, you can depend on just `rumpsteak-aura`.
 
 For WASM support, add the wasm feature:
 
@@ -72,6 +86,25 @@ Messages are data exchanged between roles. They must implement serde's `Serializ
 ### Effect Handlers
 
 Handlers interpret choreographic effects into actual communication. Different handlers provide different transports (in-memory, session-typed channels, WebSockets).
+
+With `RumpsteakHandler`, you can either register the built-in `SimpleChannel` pairs:
+
+```rust
+let (client_ch, server_ch) = SimpleChannel::pair();
+client_endpoint.register_channel(Role::Server, client_ch);
+server_endpoint.register_channel(Role::Client, server_ch);
+```
+
+or wrap your own sink/stream transports:
+
+```rust
+use rumpsteak_choreography::effects::RumpsteakSession;
+
+let ws_session = RumpsteakSession::from_sink_stream(websocket_writer, websocket_reader);
+client_endpoint.register_session(Role::Server, ws_session);
+```
+
+Both options integrate with the same handler.
 
 ### Projection
 

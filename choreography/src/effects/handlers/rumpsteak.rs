@@ -1,96 +1,37 @@
 // Rumpsteak session-typed effect handler
 //
-// Implements integration with Rumpsteak's session-typed channels for choreographic effects.
+// This handler provides a unified abstraction over bidirectional channels
+// and dynamically dispatched session objects. Users can keep using the
+// legacy SimpleChannel transport or register custom session interpreters
+// through the RumpsteakSession wrapper.
+//
+// Key pieces:
+// - SimpleChannel: thin wrapper around rumpsteak bidirectional channels.
+// - SessionTypeDynamic: async trait (object safe via BoxFuture) that lets any
+//   session state expose send/recv/choose/offer operations.
+// - RumpsteakSession: boxed dynamic session with metadata integration.
+// - RumpsteakEndpoint: tracks per-peer channels/sessions plus metadata.
+// - RumpsteakHandler: implements ChoreoHandler over either transport.
+
 use async_trait::async_trait;
-use futures::channel::mpsc;
-use futures::{Sink, SinkExt, Stream, StreamExt};
+use futures::{channel::mpsc, future::BoxFuture, SinkExt, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::time::Duration;
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData, time::Duration};
 
 use crate::effects::{ChoreoHandler, ChoreographyError, Label, Result, RoleId};
-use rumpsteak_aura::{Message, Role, Route};
+use rumpsteak_aura::{
+    channel::{Bidirectional, Pair},
+    Message, Role,
+};
 
-/// Simple bidirectional channel for basic message passing
-///
-/// This is a simplified channel type for Phase 1 implementation.
-/// Phase 2 will integrate with full Rumpsteak session types.
-///
-/// Note: This does not implement Clone. Channels should be unique per endpoint
-/// and managed via the take/put pattern in SessionChannelBundle.
-pub struct SimpleChannel {
-    /// Sender for outgoing messages
-    sender: mpsc::UnboundedSender<Vec<u8>>,
-    /// Receiver for incoming messages
-    receiver: mpsc::UnboundedReceiver<Vec<u8>>,
-}
-
-impl SimpleChannel {
-    /// Create a pair of connected channels
-    pub fn pair() -> (Self, Self) {
-        let (tx1, rx1) = mpsc::unbounded();
-        let (tx2, rx2) = mpsc::unbounded();
-
-        (
-            SimpleChannel {
-                sender: tx1,
-                receiver: rx2,
-            },
-            SimpleChannel {
-                sender: tx2,
-                receiver: rx1,
-            },
-        )
-    }
-
-    /// Send a message
-    pub async fn send(&mut self, msg: Vec<u8>) -> std::result::Result<(), String> {
-        self.sender
-            .send(msg)
-            .await
-            .map_err(|e| format!("Send failed: {}", e))
-    }
-
-    /// Receive a message
-    pub async fn recv(&mut self) -> std::result::Result<Vec<u8>, String> {
-        self.receiver
-            .next()
-            .await
-            .ok_or_else(|| "Channel closed".to_string())
-    }
-}
-
-/// Session state wrapper for tracking session type progression
-///
-/// This wraps a session-typed channel (Send<>, Receive<>, etc.) and tracks
-/// its current state for proper progression through the protocol.
-///
-/// Phase 2 Note: Full Rumpsteak session type integration would require:
-/// - Storing heterogeneous session types (Send<A,M1,S1>, Receive<B,M2,S2>, etc.)
-/// - Progressing types through operations (Send<R,M,S> -> S)
-/// - Managing lifetime parameters
-/// - Type-safe branch selection for choices
-///
-/// Current implementation uses SimpleChannel as a baseline.
-pub struct SessionState {
-    /// The underlying channel (can be SimpleChannel or Rumpsteak session type)
-    channel: Box<dyn Any + Send + Sync>,
-    /// Type identifier for safe downcasting
-    type_id: TypeId,
-    /// Optional metadata about the session state
-    metadata: SessionMetadata,
-}
-
-/// Metadata about a session state
+/// Metadata describing the evolution of a session with a peer.
 #[derive(Debug, Clone)]
 pub struct SessionMetadata {
-    /// Human-readable description of current state
+    /// Human-readable description of the last state/operation.
     pub state_description: String,
-    /// Whether this session has completed
+    /// Whether the session has reached its terminal state.
     pub is_complete: bool,
-    /// Number of operations performed on this session
+    /// Number of operations performed on this session.
     pub operation_count: usize,
 }
 
@@ -104,395 +45,469 @@ impl Default for SessionMetadata {
     }
 }
 
-impl SessionState {
-    /// Create a new session state from a channel
-    pub fn new<T: Any + Send + Sync + 'static>(channel: T) -> Self {
-        Self {
-            type_id: TypeId::of::<T>(),
-            channel: Box::new(channel),
-            metadata: SessionMetadata::default(),
-        }
+/// Simple bidirectional channel used for backward compatibility.
+type SimpleChannelInner =
+    Bidirectional<mpsc::UnboundedSender<Vec<u8>>, mpsc::UnboundedReceiver<Vec<u8>>>;
+#[derive(Debug)]
+pub struct SimpleChannel {
+    inner: SimpleChannelInner,
+}
+
+impl SimpleChannel {
+    /// Create a pair of connected channels.
+    pub fn pair() -> (Self, Self) {
+        let (left, right) = SimpleChannelInner::pair();
+        (Self { inner: left }, Self { inner: right })
     }
 
-    /// Create with metadata
-    pub fn with_metadata<T: Any + Send + Sync + 'static>(
-        channel: T,
-        metadata: SessionMetadata,
-    ) -> Self {
-        Self {
-            type_id: TypeId::of::<T>(),
-            channel: Box::new(channel),
-            metadata,
-        }
+    /// Send raw bytes across the channel.
+    pub async fn send(&mut self, msg: Vec<u8>) -> std::result::Result<(), String> {
+        self.inner
+            .send(msg)
+            .await
+            .map_err(|e| format!("Send failed: {e}"))
     }
 
-    /// Get the type ID
-    pub fn type_id(&self) -> TypeId {
-        self.type_id
-    }
-
-    /// Check if this matches a specific type
-    pub fn is_type<T: Any + 'static>(&self) -> bool {
-        self.type_id == TypeId::of::<T>()
-    }
-
-    /// Try to downcast to a specific type
-    pub fn downcast<T: Any + 'static>(self) -> std::result::Result<T, Box<dyn Any + Send + Sync>> {
-        if self.type_id == TypeId::of::<T>() {
-            self.channel.downcast::<T>().map(|b| *b)
-        } else {
-            Err(self.channel)
-        }
-    }
-
-    /// Get metadata
-    pub fn metadata(&self) -> &SessionMetadata {
-        &self.metadata
-    }
-
-    /// Update metadata
-    pub fn update_metadata(&mut self, f: impl FnOnce(&mut SessionMetadata)) {
-        f(&mut self.metadata);
-    }
-
-    /// Mark an operation performed
-    pub fn mark_operation(&mut self, description: &str) {
-        self.metadata.operation_count += 1;
-        self.metadata.state_description = description.to_string();
-    }
-
-    /// Mark session as complete
-    pub fn mark_complete(&mut self) {
-        self.metadata.is_complete = true;
-        self.metadata.state_description = "Complete".to_string();
+    /// Receive raw bytes from the channel.
+    pub async fn recv(&mut self) -> std::result::Result<Vec<u8>, String> {
+        self.inner
+            .next()
+            .await
+            .ok_or_else(|| "Channel closed".to_string())
     }
 }
 
-/// Type-erased channel wrapper for heterogeneous session type storage
-///
-/// Wraps a session-typed channel in a way that can be stored in a HashMap
-/// while maintaining type safety through downcasting.
-struct ChannelBox {
-    /// The actual channel, type-erased as Box<dyn Any>
-    inner: Box<dyn Any + Send + Sync>,
-    /// TypeId for safe downcasting
-    #[allow(dead_code)]
-    type_id: TypeId,
+/// Result of executing a session operation.
+#[derive(Debug)]
+pub struct SessionUpdate<T> {
+    pub output: T,
+    pub description: Option<String>,
+    pub is_complete: bool,
 }
 
-impl ChannelBox {
-    /// Create a new channel box from a typed channel
-    fn new<T: Any + Send + Sync + 'static>(channel: T) -> Self {
+impl<T> SessionUpdate<T> {
+    pub fn new(output: T) -> Self {
         Self {
-            type_id: TypeId::of::<T>(),
-            inner: Box::new(channel),
+            output,
+            description: None,
+            is_complete: false,
         }
     }
 
-    /// Attempt to downcast to a specific channel type
-    #[allow(dead_code)]
-    fn downcast_ref<T: Any + 'static>(&self) -> Option<&T> {
-        if self.type_id == TypeId::of::<T>() {
-            self.inner.downcast_ref::<T>()
-        } else {
-            None
-        }
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
     }
 
-    /// Attempt to downcast to a mutable reference
-    #[allow(dead_code)]
-    fn downcast_mut<T: Any + 'static>(&mut self) -> Option<&mut T> {
-        if self.type_id == TypeId::of::<T>() {
-            self.inner.downcast_mut::<T>()
-        } else {
-            None
+    pub fn mark_complete(mut self) -> Self {
+        self.is_complete = true;
+        self
+    }
+}
+
+/// Dynamic session trait used by RumpsteakSession.
+pub trait SessionTypeDynamic: Send {
+    /// Identify the underlying session for diagnostics.
+    fn type_name(&self) -> &'static str;
+
+    /// Send a serialized message.
+    fn send(&mut self, _data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+        unsupported("send", self.type_name())
+    }
+
+    /// Receive a serialized message.
+    fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
+        unsupported("recv", self.type_name())
+    }
+
+    /// Make a choice/selection.
+    fn choose(&mut self, _label: &str) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+        unsupported("choose", self.type_name())
+    }
+
+    /// Offer a branch selection.
+    fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
+        unsupported("offer", self.type_name())
+    }
+}
+
+fn unsupported<T>(
+    operation: &'static str,
+    name: &'static str,
+) -> BoxFuture<'static, Result<SessionUpdate<T>>> {
+    Box::pin(async move {
+        Err(ChoreographyError::ProtocolViolation(format!(
+            "{name} does not support {operation} operations"
+        )))
+    })
+}
+
+/// Generic session backed by independent sink/stream pairs.
+struct SinkStreamSession<S, R> {
+    sender: S,
+    receiver: R,
+    label: &'static str,
+}
+
+impl<S, R> SinkStreamSession<S, R> {
+    fn new(sender: S, receiver: R, label: &'static str) -> Self {
+        Self {
+            sender,
+            receiver,
+            label,
         }
     }
 }
 
-/// Bundle of session-typed channels indexed by role
-///
-/// Stores heterogeneous session types in a type-safe manner using type erasure.
-/// Each role maps to a channel with its current session state.
-///
-/// Phase 2 Enhancement: Now tracks session state metadata for each channel,
-/// enabling visibility into session progression and state.
-pub struct SessionChannelBundle<RoleKey>
+impl<S, R> SessionTypeDynamic for SinkStreamSession<S, R>
 where
-    RoleKey: Eq + std::hash::Hash + Clone,
+    S: futures::Sink<Vec<u8>> + Unpin + Send,
+    S::Error: std::fmt::Display + Send + 'static,
+    R: futures::Stream<Item = Vec<u8>> + Unpin + Send,
 {
-    /// Map from role to type-erased channel
-    channels: HashMap<RoleKey, ChannelBox>,
-    /// Map from role to session metadata
-    session_metadata: HashMap<RoleKey, SessionMetadata>,
-}
-
-impl<RoleKey> SessionChannelBundle<RoleKey>
-where
-    RoleKey: Eq + std::hash::Hash + Clone,
-{
-    /// Create a new empty channel bundle
-    pub fn new() -> Self {
-        Self {
-            channels: HashMap::new(),
-            session_metadata: HashMap::new(),
-        }
+    fn type_name(&self) -> &'static str {
+        self.label
     }
 
-    /// Register a session-typed channel for a role
-    ///
-    /// The channel type T should be a Rumpsteak session type like:
-    /// - Send<'q, Q, R, L, S>
-    /// - Receive<'q, Q, R, L, S>
-    /// - End
-    pub fn register<T: Any + Send + Sync + 'static>(&mut self, role: RoleKey, channel: T) {
-        self.channels.insert(role.clone(), ChannelBox::new(channel));
-        self.session_metadata
-            .insert(role, SessionMetadata::default());
+    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+        let sender = &mut self.sender;
+        Box::pin(async move {
+            sender
+                .send(data)
+                .await
+                .map_err(|e| ChoreographyError::Transport(format!("Channel send failed: {e}")))?;
+            Ok(SessionUpdate::new(()).with_description("Send"))
+        })
     }
 
-    /// Register with metadata
-    pub fn register_with_metadata<T: Any + Send + Sync + 'static>(
-        &mut self,
-        role: RoleKey,
-        channel: T,
-        metadata: SessionMetadata,
-    ) {
-        self.channels.insert(role.clone(), ChannelBox::new(channel));
-        self.session_metadata.insert(role, metadata);
+    fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
+        let receiver = &mut self.receiver;
+        Box::pin(async move {
+            let bytes = receiver.next().await.ok_or_else(|| {
+                ChoreographyError::Transport("Channel closed while receiving".into())
+            })?;
+            Ok(SessionUpdate::new(bytes).with_description("Recv"))
+        })
     }
 
-    /// Take a channel for a role, removing it from the bundle
-    ///
-    /// This is used to perform session type operations which consume and return new states.
-    /// After taking a channel, use `put_channel` to store the new state.
-    pub fn take_channel(&mut self, role: &RoleKey) -> Option<Box<dyn Any + Send + Sync>> {
-        self.channels.remove(role).map(|b| b.inner)
+    fn choose(&mut self, label: &str) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+        let sender = &mut self.sender;
+        let data = label.to_string();
+        Box::pin(async move {
+            let bytes = bincode::serialize(&data).map_err(|e| {
+                ChoreographyError::Transport(format!("Label serialization failed: {e}"))
+            })?;
+            sender
+                .send(bytes)
+                .await
+                .map_err(|e| ChoreographyError::Transport(format!("Channel send failed: {e}")))?;
+            Ok(SessionUpdate::new(()).with_description("Choose"))
+        })
     }
 
-    /// Put a channel back for a role
-    ///
-    /// Used after session operations to store the new session state.
-    pub fn put_channel<T: Any + Send + Sync + 'static>(&mut self, role: RoleKey, channel: T) {
-        self.channels.insert(role, ChannelBox::new(channel));
-    }
-
-    /// Get metadata for a role's session
-    pub fn get_metadata(&self, role: &RoleKey) -> Option<&SessionMetadata> {
-        self.session_metadata.get(role)
-    }
-
-    /// Update metadata for a role's session
-    pub fn update_metadata(&mut self, role: &RoleKey, f: impl FnOnce(&mut SessionMetadata)) {
-        if let Some(metadata) = self.session_metadata.get_mut(role) {
-            f(metadata);
-        }
-    }
-
-    /// Mark an operation performed on a role's session
-    pub fn mark_operation(&mut self, role: &RoleKey, description: &str) {
-        self.update_metadata(role, |m| {
-            m.operation_count += 1;
-            m.state_description = description.to_string();
-        });
-    }
-
-    /// Check if a channel is registered for a role
-    pub fn has_channel(&self, role: &RoleKey) -> bool {
-        self.channels.contains_key(role)
-    }
-
-    /// Remove a channel for a role
-    pub fn remove(&mut self, role: &RoleKey) -> bool {
-        self.session_metadata.remove(role);
-        self.channels.remove(role).is_some()
-    }
-
-    /// Get all session metadata (for debugging/monitoring)
-    pub fn all_metadata(&self) -> Vec<(RoleKey, &SessionMetadata)> {
-        self.session_metadata
-            .iter()
-            .map(|(k, v)| (k.clone(), v))
-            .collect()
+    fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
+        let receiver = &mut self.receiver;
+        Box::pin(async move {
+            let bytes = receiver.next().await.ok_or_else(|| {
+                ChoreographyError::Transport("Channel closed while waiting for choice".into())
+            })?;
+            let label: String = bincode::deserialize(&bytes).map_err(|e| {
+                ChoreographyError::Transport(format!("Label deserialization failed: {e}"))
+            })?;
+            Ok(SessionUpdate::new(label).with_description("Offer"))
+        })
     }
 }
 
-// Note: SessionChannelBundle does not implement Clone because channels
-// cannot be safely cloned. Each endpoint should have its own bundle.
+/// SimpleSession reuses SimpleChannel but routes operations through the
+/// dynamic trait so that session-typed channels and legacy transport share
+/// the same machinery.
+struct SimpleSession {
+    channel: SimpleChannel,
+}
 
-impl<RoleKey> Default for SessionChannelBundle<RoleKey>
-where
-    RoleKey: Eq + std::hash::Hash + Clone,
-{
-    fn default() -> Self {
-        Self::new()
+impl SimpleSession {
+    fn new(channel: SimpleChannel) -> Self {
+        Self { channel }
     }
 }
 
-/// Rumpsteak endpoint wrapper that provides access to session-typed channels
-///
-/// Manages session-typed channels for communication with other roles.
-/// Each endpoint contains a bundle of channels, one for each connected peer.
+impl SessionTypeDynamic for SimpleSession {
+    fn type_name(&self) -> &'static str {
+        "SimpleSession"
+    }
+
+    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+        let channel = &mut self.channel;
+        Box::pin(async move {
+            channel.send(data).await.map_err(|e| {
+                ChoreographyError::Transport(format!("SimpleSession send failed: {e}"))
+            })?;
+            Ok(SessionUpdate::new(()).with_description("Send"))
+        })
+    }
+
+    fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
+        let channel = &mut self.channel;
+        Box::pin(async move {
+            let bytes = channel.recv().await.map_err(|e| {
+                ChoreographyError::Transport(format!("SimpleSession recv failed: {e}"))
+            })?;
+            Ok(SessionUpdate::new(bytes).with_description("Recv"))
+        })
+    }
+
+    fn choose(&mut self, label: &str) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+        let channel = &mut self.channel;
+        let label = label.to_string();
+        Box::pin(async move {
+            let bytes = bincode::serialize(&label).map_err(|e| {
+                ChoreographyError::Transport(format!("Label serialization failed: {e}"))
+            })?;
+            channel.send(bytes).await.map_err(|e| {
+                ChoreographyError::Transport(format!("SimpleSession choose failed: {e}"))
+            })?;
+            Ok(SessionUpdate::new(()).with_description("Choose"))
+        })
+    }
+
+    fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
+        let channel = &mut self.channel;
+        Box::pin(async move {
+            let bytes = channel.recv().await.map_err(|e| {
+                ChoreographyError::Transport(format!("SimpleSession offer failed: {e}"))
+            })?;
+            let label: String = bincode::deserialize(&bytes).map_err(|e| {
+                ChoreographyError::Transport(format!("Label deserialization failed: {e}"))
+            })?;
+            Ok(SessionUpdate::new(label).with_description("Offer"))
+        })
+    }
+}
+
+/// Wrapper around a dynamic session object.
+pub struct RumpsteakSession {
+    inner: Box<dyn SessionTypeDynamic>,
+}
+
+impl Debug for RumpsteakSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RumpsteakSession")
+            .field("session", &self.type_name())
+            .finish()
+    }
+}
+
+impl RumpsteakSession {
+    pub fn new(inner: Box<dyn SessionTypeDynamic>) -> Self {
+        Self { inner }
+    }
+
+    pub fn from_simple_channel(channel: SimpleChannel) -> Self {
+        Self::new(Box::new(SimpleSession::new(channel)))
+    }
+
+    /// Build a session from independent sink/stream transports.
+    pub fn from_sink_stream<S, R>(sender: S, receiver: R) -> Self
+    where
+        S: futures::Sink<Vec<u8>> + Unpin + Send + 'static,
+        S::Error: std::fmt::Display + Send + 'static,
+        R: futures::Stream<Item = Vec<u8>> + Unpin + Send + 'static,
+    {
+        let label = std::any::type_name::<S>();
+        Self::new(Box::new(SinkStreamSession::new(sender, receiver, label)))
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        self.inner.type_name()
+    }
+
+    pub async fn send(&mut self, data: Vec<u8>) -> Result<SessionUpdate<()>> {
+        self.inner.send(data).await
+    }
+
+    pub async fn recv(&mut self) -> Result<SessionUpdate<Vec<u8>>> {
+        self.inner.recv().await
+    }
+
+    pub async fn choose(&mut self, label: &str) -> Result<SessionUpdate<()>> {
+        self.inner.choose(label).await
+    }
+
+    pub async fn offer(&mut self) -> Result<SessionUpdate<String>> {
+        self.inner.offer().await
+    }
+}
+
+enum ChannelState {
+    Simple(SimpleChannel),
+    Session(RumpsteakSession),
+}
+
+struct ChannelRecord {
+    state: ChannelState,
+    metadata: SessionMetadata,
+}
+
+/// Endpoint that manages per-peer channels/sessions plus metadata.
 pub struct RumpsteakEndpoint<R>
 where
-    R: Role + Eq + std::hash::Hash + Clone,
+    R: Role + Eq + std::hash::Hash + Clone + Debug,
 {
-    /// Bundle of session-typed channels
-    channels: SessionChannelBundle<R>,
-    /// The local role this endpoint represents
     local_role: R,
+    channels: HashMap<R, ChannelRecord>,
 }
 
 impl<R> RumpsteakEndpoint<R>
 where
-    R: Role + Eq + std::hash::Hash + Clone,
+    R: Role + Eq + std::hash::Hash + Clone + Debug,
 {
-    /// Create a new endpoint for a role
     pub fn new(local_role: R) -> Self {
         Self {
-            channels: SessionChannelBundle::new(),
             local_role,
+            channels: HashMap::new(),
         }
     }
 
-    /// Register a session-typed channel with a peer role
-    ///
-    /// # Example
-    /// ```ignore
-    /// let mut endpoint = RumpsteakEndpoint::new(alice);
-    /// endpoint.register_channel(bob, send_channel);
-    /// ```
-    pub fn register_channel<T: Any + Send + Sync + 'static>(&mut self, peer: R, channel: T) {
-        self.channels.register(peer, channel);
+    /// Register a legacy SimpleChannel for a peer.
+    pub fn register_channel(&mut self, peer: R, channel: SimpleChannel) {
+        tracing::debug!(?peer, "Registering SimpleChannel session");
+        self.channels.insert(
+            peer,
+            ChannelRecord {
+                state: ChannelState::Simple(channel),
+                metadata: SessionMetadata::default(),
+            },
+        );
     }
 
-    /// Take a channel for a peer, removing it from the endpoint
-    ///
-    /// Used to perform session type operations that consume channels.
-    /// After the operation, use `put_channel` to store the new state.
-    pub fn take_channel(&mut self, peer: &R) -> Option<Box<dyn Any + Send + Sync>> {
-        self.channels.take_channel(peer)
+    /// Register a dynamic session for a peer.
+    pub fn register_session(&mut self, peer: R, session: RumpsteakSession) {
+        tracing::debug!(peer = ?peer, session = session.type_name(), "Registering dynamic session");
+        self.channels.insert(
+            peer,
+            ChannelRecord {
+                state: ChannelState::Session(session),
+                metadata: SessionMetadata::default(),
+            },
+        );
     }
 
-    /// Put a channel back for a peer
-    ///
-    /// Used after session operations to store the new session state.
-    pub fn put_channel<T: Any + Send + Sync + 'static>(&mut self, peer: R, channel: T) {
-        self.channels.put_channel(peer, channel);
-    }
-
-    /// Check if a channel is registered for a peer
-    pub fn has_channel(&self, peer: &R) -> bool {
-        self.channels.has_channel(peer)
-    }
-
-    /// Remove a channel for a peer
-    pub fn close_channel(&mut self, peer: &R) -> bool {
-        tracing::debug!("Closing channel");
+    fn take_record(&mut self, peer: &R) -> Option<ChannelRecord> {
         self.channels.remove(peer)
     }
 
-    /// Close all channels gracefully
-    ///
-    /// This should be called when shutting down the endpoint to ensure
-    /// all resources are properly released.
+    fn put_record(&mut self, peer: R, record: ChannelRecord) {
+        self.channels.insert(peer, record);
+    }
+
+    pub fn has_channel(&self, peer: &R) -> bool {
+        self.channels.contains_key(peer)
+    }
+
+    pub fn close_channel(&mut self, peer: &R) -> bool {
+        self.channels.remove(peer).is_some()
+    }
+
     pub fn close_all_channels(&mut self) -> usize {
-        let all_peers: Vec<R> = self
-            .channels
-            .all_metadata()
-            .into_iter()
-            .map(|(peer, _)| peer)
-            .collect();
-
-        let count = all_peers.len();
-        for peer in all_peers {
-            self.close_channel(&peer);
-        }
-
-        tracing::info!(closed = count, "Closed all channels");
+        let count = self.channels.len();
+        self.channels.clear();
         count
     }
 
-    /// Check if all channels are closed
     pub fn is_all_closed(&self) -> bool {
-        self.channels.all_metadata().is_empty()
+        self.channels.is_empty()
     }
 
-    /// Get count of active channels
     pub fn active_channel_count(&self) -> usize {
-        self.channels.all_metadata().len()
+        self.channels.len()
     }
 
-    /// Get the local role
     pub fn local_role(&self) -> &R {
         &self.local_role
     }
 
-    /// Mark an operation performed on a peer's session
-    pub fn mark_operation(&mut self, peer: &R, operation: &str) {
-        self.channels.mark_operation(peer, operation);
-    }
-
-    /// Get metadata for a peer's session
     pub fn get_metadata(&self, peer: &R) -> Option<&SessionMetadata> {
-        self.channels.get_metadata(peer)
+        self.channels.get(peer).map(|record| &record.metadata)
     }
 
-    /// Get all session metadata (for debugging/monitoring)
     pub fn all_metadata(&self) -> Vec<(R, &SessionMetadata)> {
-        self.channels.all_metadata()
+        self.channels
+            .iter()
+            .map(|(peer, record)| (peer.clone(), &record.metadata))
+            .collect()
     }
 }
 
-// Note: RumpsteakEndpoint does not implement Clone because the channel
-// bundle contains unique channels that cannot be safely cloned.
-
 impl<R> Drop for RumpsteakEndpoint<R>
 where
-    R: Role + Eq + std::hash::Hash + Clone,
+    R: Role + Eq + std::hash::Hash + Clone + Debug,
 {
     fn drop(&mut self) {
-        let active_count = self.active_channel_count();
-        if active_count > 0 {
-            tracing::warn!(
-                active_channels = active_count,
-                "RumpsteakEndpoint dropped with active channels - closing them"
-            );
+        let active = self.active_channel_count();
+        if active > 0 {
+            tracing::warn!(active, "Endpoint dropped with active channels; closing");
             self.close_all_channels();
         }
     }
 }
 
-/// Handler that interprets effects using Rumpsteak's session-typed channels
+/// Effect handler backed by Rumpsteak sessions.
 pub struct RumpsteakHandler<R, M> {
     _phantom: PhantomData<(R, M)>,
 }
 
-impl<R, M> RumpsteakHandler<R, M> {
+impl<R, M> RumpsteakHandler<R, M>
+where
+    R: Role + Eq + std::hash::Hash + Clone + Debug,
+{
     pub fn new() -> Self {
         Self {
             _phantom: PhantomData,
         }
     }
+
+    async fn with_channel_operation<T, F, Fut>(
+        ep: &mut RumpsteakEndpoint<R>,
+        peer: &R,
+        default_description: &str,
+        f: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(ChannelState) -> Fut,
+        Fut: std::future::Future<Output = Result<(T, ChannelState, Option<String>, bool)>>,
+    {
+        let mut record = ep.take_record(peer).ok_or_else(|| {
+            ChoreographyError::Transport(format!("No channel registered for peer: {:?}", peer))
+        })?;
+
+        let (result, next_state, description, completed) = f(record.state).await?;
+        record.state = next_state;
+        record.metadata.operation_count += 1;
+        record.metadata.state_description =
+            description.unwrap_or_else(|| default_description.to_string());
+        if completed {
+            record.metadata.is_complete = true;
+        }
+
+        ep.put_record(peer.clone(), record);
+        Ok(result)
+    }
 }
 
-impl<R, M> Default for RumpsteakHandler<R, M> {
+impl<R, M> Default for RumpsteakHandler<R, M>
+where
+    R: Role + Eq + std::hash::Hash + Clone + Debug,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Helper trait to get routes from roles
-pub trait HasRoute<R: RoleId>: Route<R> {
-    type RouteType: Stream<Item = Self::Message> + Sink<Self::Message> + Unpin;
-
-    fn get_route_mut(&mut self) -> &mut Self::RouteType;
-}
-
 #[async_trait]
 impl<R, M> ChoreoHandler for RumpsteakHandler<R, M>
 where
-    R: Role<Message = M> + Send + Sync + RoleId + 'static,
+    R: Role<Message = M> + Send + Sync + RoleId + Eq + std::hash::Hash + Clone + Debug + 'static,
     M: Message<Box<dyn std::any::Any + Send>> + Send + Sync + 'static,
 {
     type Role = R;
@@ -504,34 +519,29 @@ where
         to: Self::Role,
         msg: &Msg,
     ) -> Result<()> {
-        // Serialize the message
         let serialized = bincode::serialize(msg)
-            .map_err(|e| ChoreographyError::Transport(format!("Serialization failed: {}", e)))?;
-        tracing::debug!(?to, size = serialized.len(), "Sending message");
+            .map_err(|e| ChoreographyError::Transport(format!("Serialization failed: {e}")))?;
 
-        // Take the channel for this peer
-        let channel_box = ep.take_channel(&to).ok_or_else(|| {
-            ChoreographyError::Transport(format!("No channel registered for role: {:?}", to))
-        })?;
-
-        // Downcast to SimpleChannel
-        let mut channel = *channel_box.downcast::<SimpleChannel>().map_err(|_| {
-            ChoreographyError::Transport(
-                "Failed to downcast channel - wrong channel type".to_string(),
-            )
-        })?;
-
-        // Send the serialized message
-        channel
-            .send(serialized)
-            .await
-            .map_err(|e| ChoreographyError::Transport(format!("Send failed: {}", e)))?;
-
-        // Put the channel back and mark operation
-        ep.put_channel(to, channel);
-        ep.channels.mark_operation(&to, "Send");
-
-        Ok(())
+        Self::with_channel_operation(ep, &to, "Send", |state| async move {
+            match state {
+                ChannelState::Simple(mut channel) => {
+                    channel.send(serialized).await.map_err(|e| {
+                        ChoreographyError::Transport(format!("SimpleChannel send failed: {e}"))
+                    })?;
+                    Ok(((), ChannelState::Simple(channel), None, false))
+                }
+                ChannelState::Session(mut session) => {
+                    let update = session.send(serialized).await?;
+                    Ok((
+                        (),
+                        ChannelState::Session(session),
+                        update.description,
+                        update.is_complete,
+                    ))
+                }
+            }
+        })
+        .await
     }
 
     async fn recv<Msg: DeserializeOwned + Send>(
@@ -539,37 +549,32 @@ where
         ep: &mut Self::Endpoint,
         from: Self::Role,
     ) -> Result<Msg> {
-        tracing::debug!(?from, "Receiving message");
-
-        // Take the channel for this peer
-        let channel_box = ep.take_channel(&from).ok_or_else(|| {
-            ChoreographyError::Transport(format!("No channel registered for role: {:?}", from))
-        })?;
-
-        // Downcast to SimpleChannel
-        let mut channel = *channel_box.downcast::<SimpleChannel>().map_err(|_| {
-            ChoreographyError::Transport(
-                "Failed to downcast channel - wrong channel type".to_string(),
-            )
-        })?;
-
-        // Receive the serialized message
-        let serialized = channel
-            .recv()
-            .await
-            .map_err(|e| ChoreographyError::Transport(format!("Receive failed: {}", e)))?;
-
-        tracing::debug!(?from, size = serialized.len(), "Received message");
-
-        // Deserialize the message
-        let msg: Msg = bincode::deserialize(&serialized)
-            .map_err(|e| ChoreographyError::Transport(format!("Deserialization failed: {}", e)))?;
-
-        // Put the channel back and mark operation
-        ep.put_channel(from, channel);
-        ep.channels.mark_operation(&from, "Recv");
-
-        Ok(msg)
+        Self::with_channel_operation(ep, &from, "Recv", |state| async move {
+            match state {
+                ChannelState::Simple(mut channel) => {
+                    let serialized = channel.recv().await.map_err(|e| {
+                        ChoreographyError::Transport(format!("SimpleChannel recv failed: {e}"))
+                    })?;
+                    let msg = bincode::deserialize(&serialized).map_err(|e| {
+                        ChoreographyError::Transport(format!("Deserialization failed: {e}"))
+                    })?;
+                    Ok((msg, ChannelState::Simple(channel), None, false))
+                }
+                ChannelState::Session(mut session) => {
+                    let update = session.recv().await?;
+                    let msg = bincode::deserialize(&update.output).map_err(|e| {
+                        ChoreographyError::Transport(format!("Deserialization failed: {e}"))
+                    })?;
+                    Ok((
+                        msg,
+                        ChannelState::Session(session),
+                        update.description,
+                        update.is_complete,
+                    ))
+                }
+            }
+        })
+        .await
     }
 
     async fn choose(
@@ -578,73 +583,58 @@ where
         who: Self::Role,
         label: Label,
     ) -> Result<()> {
-        tracing::debug!(?who, ?label, "Choosing branch");
-
-        // Take the channel for this peer
-        let channel_box = ep.take_channel(&who).ok_or_else(|| {
-            ChoreographyError::Transport(format!("No channel registered for role: {:?}", who))
-        })?;
-
-        // Downcast to SimpleChannel
-        let mut channel = *channel_box.downcast::<SimpleChannel>().map_err(|_| {
-            ChoreographyError::Transport(
-                "Failed to downcast channel - wrong channel type".to_string(),
-            )
-        })?;
-
-        // Serialize and send the label
-        let serialized = bincode::serialize(&label.0).map_err(|e| {
-            ChoreographyError::Transport(format!("Label serialization failed: {}", e))
-        })?;
-
-        channel
-            .send(serialized)
-            .await
-            .map_err(|e| ChoreographyError::Transport(format!("Choice send failed: {}", e)))?;
-
-        // Put the channel back and mark operation
-        ep.put_channel(who, channel);
-        ep.mark_operation(&who, "Choose");
-
-        Ok(())
+        let label_str = label.0.to_string();
+        Self::with_channel_operation(ep, &who, "Choose", |state| async move {
+            match state {
+                ChannelState::Simple(mut channel) => {
+                    let serialized = bincode::serialize(&label_str).map_err(|e| {
+                        ChoreographyError::Transport(format!("Label serialization failed: {e}"))
+                    })?;
+                    channel.send(serialized).await.map_err(|e| {
+                        ChoreographyError::Transport(format!("Choice send failed: {e}"))
+                    })?;
+                    Ok(((), ChannelState::Simple(channel), None, false))
+                }
+                ChannelState::Session(mut session) => {
+                    let update = session.choose(&label_str).await?;
+                    Ok((
+                        (),
+                        ChannelState::Session(session),
+                        update.description,
+                        update.is_complete,
+                    ))
+                }
+            }
+        })
+        .await
     }
 
     async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
-        tracing::debug!(?from, "Offering choice");
-
-        // Take the channel for this peer
-        let channel_box = ep.take_channel(&from).ok_or_else(|| {
-            ChoreographyError::Transport(format!("No channel registered for role: {:?}", from))
-        })?;
-
-        // Downcast to SimpleChannel
-        let mut channel = *channel_box.downcast::<SimpleChannel>().map_err(|_| {
-            ChoreographyError::Transport(
-                "Failed to downcast channel - wrong channel type".to_string(),
-            )
-        })?;
-
-        // Receive the serialized label
-        let serialized = channel
-            .recv()
-            .await
-            .map_err(|e| ChoreographyError::Transport(format!("Choice receive failed: {}", e)))?;
-
-        // Deserialize the label
-        let label_string: String = bincode::deserialize(&serialized).map_err(|e| {
-            ChoreographyError::Transport(format!("Label deserialization failed: {}", e))
-        })?;
-
-        tracing::debug!(?from, label = ?label_string, "Received choice");
-
-        // Put the channel back and mark operation
-        ep.put_channel(from, channel);
-        ep.mark_operation(&from, "Offer");
-
-        // Convert String to &'static str by leaking (labels are small and long-lived)
-        let label_str: &'static str = Box::leak(label_string.into_boxed_str());
-
-        Ok(Label(label_str))
+        Self::with_channel_operation(ep, &from, "Offer", |state| async move {
+            match state {
+                ChannelState::Simple(mut channel) => {
+                    let serialized = channel.recv().await.map_err(|e| {
+                        ChoreographyError::Transport(format!("Choice receive failed: {e}"))
+                    })?;
+                    let label_string: String = bincode::deserialize(&serialized).map_err(|e| {
+                        ChoreographyError::Transport(format!("Label deserialization failed: {e}"))
+                    })?;
+                    let leaked: &'static str = Box::leak(label_string.into_boxed_str());
+                    Ok((Label(leaked), ChannelState::Simple(channel), None, false))
+                }
+                ChannelState::Session(mut session) => {
+                    let update = session.offer().await?;
+                    let leaked: &'static str = Box::leak(update.output.into_boxed_str());
+                    Ok((
+                        Label(leaked),
+                        ChannelState::Session(session),
+                        update.description,
+                        update.is_complete,
+                    ))
+                }
+            }
+        })
+        .await
     }
 
     async fn with_timeout<F, T>(

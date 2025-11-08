@@ -53,16 +53,19 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 }
 
 /// Parse choreography from DSL string
+///
+/// Note: DSL string parsing with full support for parameterized roles is now available
+/// in the `rumpsteak-choreography` crate. The macro in that crate (`rumpsteak_choreography::choreography!`)
+/// provides complete integration. This stub remains for backwards compatibility.
 fn choreography_from_dsl_string(_dsl: String) -> Result<TokenStream> {
-    // This is a placeholder implementation
-    // In a full implementation, this would:
-    // 1. Use the choreography parser from rumpsteak-choreography
-    // 2. Project to local types for each role
-    // 3. Generate code for the session types
-    // For now, we'll return a compile-time note
-
+    let _ = _dsl;
     Ok(quote! {
-        compile_error!("Full DSL parser integration is planned. For now, use the explicit syntax without string literals.");
+        compile_error!(
+            "DSL string parsing with parameterized roles support is available through the rumpsteak_choreography crate.\n\
+             Use: rumpsteak_choreography::choreography! instead of rumpsteak_macros::choreography!\n\
+             \n\
+             Or use the explicit macro syntax without string literals for basic protocols."
+        );
     })
 }
 

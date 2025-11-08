@@ -91,6 +91,17 @@ impl Role {
         }
     }
 
+    /// Create a role array with a concrete size (e.g., Worker[3])
+    pub fn array(name: Ident, size: usize) -> Self {
+        let size_token: TokenStream = size.to_string().parse().unwrap();
+        Role {
+            name,
+            index: None,
+            param: None,
+            array_size: Some(size_token),
+        }
+    }
+
     /// Check if this role has an index
     pub fn is_indexed(&self) -> bool {
         self.index.is_some()
@@ -109,5 +120,34 @@ impl Role {
     /// Check if this is a role array (declared with size like Worker[N])
     pub fn is_array(&self) -> bool {
         self.array_size.is_some()
+    }
+
+    /// Check if this role instance matches the given role family
+    ///
+    /// For parameterized roles, this checks if the base name matches,
+    /// ignoring specific indices. For example:
+    /// - `Worker[0]` matches `Worker[N]`
+    /// - `Worker[i]` matches `Worker[N]`
+    /// - `Worker[1]` matches `Worker[3]` (if Worker[3] is the array declaration)
+    /// - `Client` only matches `Client` (exact match for non-parameterized)
+    pub fn matches_family(&self, family: &Role) -> bool {
+        // Names must match
+        if self.name != family.name {
+            return false;
+        }
+
+        // If the family is an array declaration (has array_size), any instance matches
+        if family.is_array() {
+            // Instance can have concrete index, symbolic param, or neither
+            return self.is_indexed() || self.param.is_some() || !self.is_array();
+        }
+
+        // If the family has a param (symbolic like Worker[N]), indexed instances match
+        if family.param.is_some() && (self.is_indexed() || self.param.is_some()) {
+            return true;
+        }
+
+        // Otherwise, require exact match
+        self == family
     }
 }

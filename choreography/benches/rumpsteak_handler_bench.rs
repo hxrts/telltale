@@ -40,15 +40,14 @@ impl rumpsteak_aura::Message<Box<dyn std::any::Any + Send>> for BenchMessage {
 
 fn bench_send_recv_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("send_recv_throughput");
+    let runtime = Runtime::new().unwrap();
 
     for size in [128, 1024, 4096, 16384, 65536].iter() {
         group.throughput(Throughput::Bytes(*size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter(|| {
-                let rt = Runtime::new().unwrap();
-                rt.block_on(async {
-                    // Setup
+                runtime.block_on(async {
                     let mut alice_ep = RumpsteakEndpoint::new(BenchRole::Alice);
                     let mut bob_ep = RumpsteakEndpoint::new(BenchRole::Bob);
 
@@ -59,7 +58,6 @@ fn bench_send_recv_throughput(c: &mut Criterion) {
                     let mut alice_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
                     let mut bob_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
 
-                    // Benchmark
                     let msg = BenchMessage {
                         data: vec![0u8; size],
                     };
@@ -82,11 +80,10 @@ fn bench_send_recv_throughput(c: &mut Criterion) {
 }
 
 fn bench_choice_overhead(c: &mut Criterion) {
+    let runtime = Runtime::new().unwrap();
     c.bench_function("choice_selection", |b| {
         b.iter(|| {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async {
-                // Setup
+            runtime.block_on(async {
                 let mut alice_ep = RumpsteakEndpoint::new(BenchRole::Alice);
                 let mut bob_ep = RumpsteakEndpoint::new(BenchRole::Bob);
 
@@ -97,7 +94,6 @@ fn bench_choice_overhead(c: &mut Criterion) {
                 let mut alice_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
                 let mut bob_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
 
-                // Benchmark
                 let label = Label("option_a");
 
                 alice_handler
@@ -116,13 +112,12 @@ fn bench_choice_overhead(c: &mut Criterion) {
 
 fn bench_sequential_messages(c: &mut Criterion) {
     let mut group = c.benchmark_group("sequential_messages");
+    let runtime = Runtime::new().unwrap();
 
     for count in [10, 50, 100].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             b.iter(|| {
-                let rt = Runtime::new().unwrap();
-                rt.block_on(async {
-                    // Setup
+                runtime.block_on(async {
                     let mut alice_ep = RumpsteakEndpoint::new(BenchRole::Alice);
                     let mut bob_ep = RumpsteakEndpoint::new(BenchRole::Bob);
 
@@ -133,7 +128,6 @@ fn bench_sequential_messages(c: &mut Criterion) {
                     let mut alice_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
                     let mut bob_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
 
-                    // Benchmark
                     let msg = BenchMessage {
                         data: vec![0u8; 1024],
                     };
@@ -158,11 +152,10 @@ fn bench_sequential_messages(c: &mut Criterion) {
 }
 
 fn bench_metadata_tracking_overhead(c: &mut Criterion) {
+    let runtime = Runtime::new().unwrap();
     c.bench_function("metadata_tracking", |b| {
         b.iter(|| {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async {
-                // Setup
+            runtime.block_on(async {
                 let mut alice_ep = RumpsteakEndpoint::new(BenchRole::Alice);
                 let mut bob_ep = RumpsteakEndpoint::new(BenchRole::Bob);
 
@@ -173,7 +166,6 @@ fn bench_metadata_tracking_overhead(c: &mut Criterion) {
                 let mut alice_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
                 let mut bob_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
 
-                // Benchmark - message with metadata checks
                 let msg = BenchMessage {
                     data: vec![0u8; 1024],
                 };
@@ -183,16 +175,14 @@ fn bench_metadata_tracking_overhead(c: &mut Criterion) {
                     .await
                     .unwrap();
 
-                // Access metadata
-                let _meta = alice_ep.get_metadata(&BenchRole::Bob);
+                let _ = alice_ep.get_metadata(&BenchRole::Bob);
 
                 let _received: BenchMessage = bob_handler
                     .recv(&mut bob_ep, BenchRole::Alice)
                     .await
                     .unwrap();
 
-                // Access metadata
-                let _meta = bob_ep.get_metadata(&BenchRole::Alice);
+                let _ = bob_ep.get_metadata(&BenchRole::Alice);
             })
         });
     });

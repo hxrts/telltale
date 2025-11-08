@@ -14,4 +14,4 @@ pub mod rumpsteak;
 // Re-export handler types for convenience
 pub use in_memory::InMemoryHandler;
 pub use recording::{RecordedEvent, RecordingHandler};
-pub use rumpsteak::{HasRoute, RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
+pub use rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel};

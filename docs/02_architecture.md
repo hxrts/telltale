@@ -222,20 +222,47 @@ The projection algorithm can be extended for domain-specific optimizations. Over
 
 Add new code generation backends to target different session type libraries or languages. The AST and LocalType representations are language-agnostic.
 
-## Module Organization
+## Workspace Organization
+
+Rumpsteak-Aura is organized as a Cargo workspace with multiple crates:
 
 ```
-rumpsteak-aura/              Core session types library
-choreography/                Choreographic extensions
-  ├── src/
-  │   ├── ast/              AST definitions
-  │   ├── compiler/         Parser, projection, codegen
-  │   ├── effects/          Effect system
-  │   │   ├── handlers/    Handler implementations
-  │   │   └── middleware/  Middleware implementations
-  │   └── runtime.rs        Platform abstraction
-  ├── tests/                Integration tests
-  └── examples/             Example protocols
+rumpsteak-aura/
+├── src/                     Core session types library (rumpsteak-aura crate)
+│   ├── lib.rs              Session type primitives, channels, roles
+│   ├── channel.rs          Async channel implementations
+│   └── serialize.rs        Serialization support
+├── choreography/            Choreographic programming extensions
+│   ├── src/
+│   │   ├── ast/            AST definitions
+│   │   ├── compiler/       Parser, projection, codegen
+│   │   ├── effects/        Effect system
+│   │   │   ├── handlers/  Handler implementations
+│   │   │   └── middleware/ Middleware implementations
+│   │   └── runtime.rs      Platform abstraction
+│   ├── tests/              Integration tests
+│   └── examples/           Example protocols
+├── fsm/                     Finite state machine support
+│   └── src/                FSM types and subtyping verification
+├── macros/                  Procedural macros
+│   └── src/                choreography! and other macros
+├── caching/                 HTTP cache case study
+│   └── src/                Redis-backed cache example
+├── examples/                Additional examples
+│   └── wasm-ping-pong/     WASM browser example
+└── docs/                    Documentation
 ```
 
-The choreography crate extends the Rumpsteak library with high-level protocol specification.
+### Crate Responsibilities
+
+**rumpsteak-aura** (root `src/`): Foundation session types library providing core primitives for type-safe asynchronous communication. This is the base dependency for all other crates.
+
+**rumpsteak-choreography**: High-level choreographic programming layer with DSL parser, automatic projection, effect handlers, and runtime support. Builds on top of rumpsteak-aura.
+
+**rumpsteak-fsm**: Finite state machine support for session types, including DOT parsing and subtyping verification. Optional dependency for advanced use cases.
+
+**rumpsteak-macros**: Procedural macros used by both rumpsteak-aura and rumpsteak-choreography.
+
+**caching**: Example application demonstrating real-world usage with Redis and HTTP caching.
+
+This workspace structure follows standard Rust conventions where the root crate provides core functionality and workspace members extend it with specialized capabilities.

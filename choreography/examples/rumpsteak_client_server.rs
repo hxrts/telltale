@@ -4,7 +4,7 @@
 // a client and server using Rumpsteak's session-typed channels.
 
 use rumpsteak_choreography::effects::{
-    handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
+    handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel},
     ChoreoHandler,
 };
 use serde::{Deserialize, Serialize};
@@ -53,8 +53,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create bidirectional channels
     let (client_ch, server_ch) = SimpleChannel::pair();
-    client_ep.register_channel(Role::Server, client_ch);
-    server_ep.register_channel(Role::Client, server_ch);
+    client_ep.register_session(
+        Role::Server,
+        RumpsteakSession::from_simple_channel(client_ch),
+    );
+    server_ep.register_session(
+        Role::Client,
+        RumpsteakSession::from_simple_channel(server_ch),
+    );
 
     // Create handlers
     let mut client_handler = RumpsteakHandler::<Role, Message>::new();

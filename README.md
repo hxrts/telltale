@@ -74,15 +74,17 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The choreography macro generates role types, message types, and session types automatically. The effect handler system decouples protocol logic from transport. Use `InMemoryHandler` for testing or `RumpsteakHandler` for production. See `docs/` for guides.
+The choreography macro generates role types, message types, and session types automatically. The effect handler system decouples protocol logic from transport. Use `InMemoryHandler` for testing or `RumpsteakHandler` for production. `RumpsteakHandler` now accepts either the built-in `SimpleChannel` pairs via `register_channel` **or** any custom sink/stream transport via `RumpsteakSession::from_sink_stream` + `register_session`, so you can drop in WebSockets, QUIC streams, or other runtimes without writing a new handler. See `docs/` for guides.
 
-## Structure
+## Workspace Structure
 
-#### `caching/`
+This project is organized as a Cargo workspace with multiple crates:
 
-HTTP cache case study backed by Redis.
+#### `src/` - Core Session Types (`rumpsteak-aura`)
 
-#### `choreography/`
+The foundation library providing core session type primitives, async channels, role definitions, and serialization support. This is the base dependency for all other crates and implements the fundamental session types theory.
+
+#### `choreography/` - Choreographic Programming (`rumpsteak-choreography`)
 
 Choreographic programming layer for global protocol specification with automatic projection to local session types. Includes a Pest-based DSL parser for `.choreography` files with support for protocol composition, guards, annotations, and parameterized roles.
 
@@ -90,17 +92,21 @@ A transport-agnostic effect handler system, with `InMemoryHandler` for testing a
 
 *This is the primary extension of the original version with significant enhancements.*
 
-#### `examples/`
+#### `fsm/` - Finite State Machines (`rumpsteak-fsm`)
 
-Examples of using Rumpsteak from popular protocols (updated to use new APIs). Includes `wasm-ping-pong/` demonstrating browser-based protocols.
+Finite state machine support for session types, including DOT parsing and subtyping verification. Optional dependency for advanced session type analysis.
 
-#### `fsm/`
+#### `macros/` - Procedural Macros (`rumpsteak-macros`)
 
-Finite state machine support for session types, including DOT parsing and subtyping verification.
+Procedural macros used by both the core library and choreography crate, including the `choreography!` macro for inline protocol definitions.
 
-#### `macros/`
+#### `caching/` - Example Application
 
-Crate for procedural macros used within Rumpsteak's API.
+HTTP cache case study backed by Redis, demonstrating real-world usage of Rumpsteak with distributed caching protocols.
+
+#### `examples/` - Protocol Examples
+
+Examples of using Rumpsteak from popular protocols (updated to use new APIs). Includes `wasm-ping-pong/` demonstrating browser-based protocols running in WebAssembly.
 
 ## WebAssembly Support
 

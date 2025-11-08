@@ -71,15 +71,23 @@ impl Protocol {
                 to,
                 continuation,
                 ..
-            } => from == role || to == role || continuation.mentions_role(role),
+            } => {
+                from.matches_family(role)
+                    || to.matches_family(role)
+                    || continuation.mentions_role(role)
+            }
             Protocol::Broadcast {
                 from,
                 to_all,
                 continuation,
                 ..
-            } => from == role || to_all.contains(role) || continuation.mentions_role(role),
+            } => {
+                from.matches_family(role)
+                    || to_all.iter().any(|r| r.matches_family(role))
+                    || continuation.mentions_role(role)
+            }
             Protocol::Choice { role: r, branches } => {
-                r == role || branches.iter().any(|b| b.protocol.mentions_role(role))
+                r.matches_family(role) || branches.iter().any(|b| b.protocol.mentions_role(role))
             }
             Protocol::Loop { body, .. } => body.mentions_role(role),
             Protocol::Parallel { protocols } => protocols.iter().any(|p| p.mentions_role(role)),
@@ -89,6 +97,9 @@ impl Protocol {
     }
 
     pub(crate) fn validate(&self, roles: &[Role]) -> Result<(), ValidationError> {
+        // Helper to check if a role instance matches any declared role family
+        let role_is_declared = |r: &Role| roles.iter().any(|declared| r.matches_family(declared));
+
         match self {
             Protocol::Send {
                 from,
@@ -96,10 +107,10 @@ impl Protocol {
                 continuation,
                 ..
             } => {
-                if !roles.contains(from) {
+                if !role_is_declared(from) {
                     return Err(ValidationError::UndefinedRole(from.name.to_string()));
                 }
-                if !roles.contains(to) {
+                if !role_is_declared(to) {
                     return Err(ValidationError::UndefinedRole(to.name.to_string()));
                 }
                 continuation.validate(roles)
@@ -110,18 +121,18 @@ impl Protocol {
                 continuation,
                 ..
             } => {
-                if !roles.contains(from) {
+                if !role_is_declared(from) {
                     return Err(ValidationError::UndefinedRole(from.name.to_string()));
                 }
                 for to in to_all {
-                    if !roles.contains(to) {
+                    if !role_is_declared(to) {
                         return Err(ValidationError::UndefinedRole(to.name.to_string()));
                     }
                 }
                 continuation.validate(roles)
             }
             Protocol::Choice { role, branches } => {
-                if !roles.contains(role) {
+                if !role_is_declared(role) {
                     return Err(ValidationError::UndefinedRole(role.name.to_string()));
                 }
                 // Validate each branch starts with the choosing role sending

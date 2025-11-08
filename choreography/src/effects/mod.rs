@@ -24,7 +24,7 @@ pub use interpreter::interpret;
 
 // Re-export handler implementations for convenience
 pub use handlers::{InMemoryHandler, RecordedEvent, RecordingHandler};
-pub use handlers::{HasRoute, RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
+pub use handlers::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel};
 
 // Re-export middleware for convenience
 pub use middleware::{Metrics, Retry, Trace};

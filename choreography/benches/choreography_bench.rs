@@ -238,7 +238,9 @@ fn bench_validation(c: &mut Criterion) {
 fn bench_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling");
 
-    for num_interactions in [2, 5, 10, 20].iter() {
+    // Keep the iteration counts small so the benchmark remains fast but
+    // still highlights how projection time grows with additional sends.
+    for num_interactions in [2, 4, 8, 16].iter() {
         let alice = Role::new(format_ident!("Alice"));
         let bob = Role::new(format_ident!("Bob"));
 

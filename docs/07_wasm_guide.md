@@ -93,10 +93,14 @@ pub async fn run_distributed_protocol() -> Result<(), JsValue> {
     let mut alice_ep = RumpsteakEndpoint::new(Role::Alice);
     let mut bob_ep = RumpsteakEndpoint::new(Role::Bob);
     
-    // Create channels (SimpleChannel works in WASM)
+    // Option 1: use SimpleChannel (works natively and in WASM)
     let (alice_ch, bob_ch) = SimpleChannel::pair();
     alice_ep.register_channel(Role::Bob, alice_ch);
     bob_ep.register_channel(Role::Alice, bob_ch);
+
+    // Option 2: wrap browser transports directly
+    // let ws_session = RumpsteakSession::from_sink_stream(ws_writer, ws_reader);
+    // alice_ep.register_session(Role::Bob, ws_session);
     
     // Create handler
     let mut handler = RumpsteakHandler::new();
@@ -152,7 +156,9 @@ impl WebSocketHandler {
 }
 ```
 
-Implement the ChoreoHandler trait methods to send and receive over the WebSocket.
+With the Phase 3 handler you can skip the custom `ChoreoHandler`—wrap this
+`WebSocketHandler` with `RumpsteakSession::from_sink_stream` and register it on
+the endpoint instead.
 
 For HTTP-based protocols, use the fetch API:
 

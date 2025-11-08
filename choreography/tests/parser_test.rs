@@ -56,23 +56,35 @@ choreography Broadcast {
         "Failed to parse broadcast: {:?}",
         result.err()
     );
-    
+
     // Verify the broadcast is correctly parsed with to_all populated
     let choreo = result.unwrap();
     assert_eq!(choreo.roles.len(), 3);
-    
+
     // Check that the protocol is a Broadcast with correct to_all field
     use rumpsteak_choreography::ast::Protocol;
     match &choreo.protocol {
-        Protocol::Broadcast { from, to_all, message, .. } => {
+        Protocol::Broadcast {
+            from,
+            to_all,
+            message,
+            ..
+        } => {
             assert_eq!(from.name.to_string(), "Leader");
             assert_eq!(message.name.to_string(), "Start");
             // to_all should contain Worker1 and Worker2 (all roles except Leader)
-            assert_eq!(to_all.len(), 2, "Broadcast should target all roles except sender");
+            assert_eq!(
+                to_all.len(),
+                2,
+                "Broadcast should target all roles except sender"
+            );
             let recipient_names: Vec<String> = to_all.iter().map(|r| r.name.to_string()).collect();
             assert!(recipient_names.contains(&"Worker1".to_string()));
             assert!(recipient_names.contains(&"Worker2".to_string()));
-            assert!(!recipient_names.contains(&"Leader".to_string()), "Sender should not be in to_all");
+            assert!(
+                !recipient_names.contains(&"Leader".to_string()),
+                "Sender should not be in to_all"
+            );
         }
         _ => panic!("Expected Protocol::Broadcast, got {:?}", choreo.protocol),
     }

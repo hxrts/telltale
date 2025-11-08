@@ -227,11 +227,11 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
                                                     .trim_start_matches('[')
                                                     .trim_end_matches(']');
 
-                                                // Try to parse as integer for concrete index
-                                                if let Ok(idx) = param_str.parse::<usize>() {
-                                                    Role::indexed(
+                                                // Try to parse as integer for array size
+                                                if let Ok(size) = param_str.parse::<usize>() {
+                                                    Role::array(
                                                         format_ident!("{}", role_name),
-                                                        idx,
+                                                        size,
                                                     )
                                                 } else {
                                                     // Parse as symbolic parameter
@@ -392,7 +392,7 @@ fn parse_role_ref(
     pair: pest::iterators::Pair<Rule>,
     declared_roles: &HashSet<String>,
     input: &str,
-) -> std::result::Result<Ident, ParseError> {
+) -> std::result::Result<Role, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -407,22 +407,38 @@ fn parse_role_ref(
         });
     }
 
-    // For now, we construct the identifier including the index if present
-    // In a full implementation, this would be handled differently
+    // Check if there's an index
     if let Some(index_pair) = inner.next() {
         if index_pair.as_rule() == Rule::role_index {
             let index_str = index_pair.as_str();
             let index_str = index_str.trim_start_matches('[').trim_end_matches(']');
-            // Create a combined identifier like Worker_0 or Worker_i
-            return Ok(format_ident!(
-                "{}_{}",
-                role_name,
-                index_str.replace(".", "_")
-            ));
+
+            // Try to parse as a concrete number
+            if let Ok(index) = index_str.parse::<usize>() {
+                // Concrete index like Worker[0]
+                return Ok(Role {
+                    name: format_ident!("{}", role_name),
+                    index: Some(index),
+                    param: None,
+                    array_size: None,
+                });
+            } else {
+                // Symbolic parameter like Worker[i] or Worker[N]
+                let param_tokens: TokenStream = index_str.parse().unwrap_or_else(|_| {
+                    quote::quote! { #index_str }
+                });
+                return Ok(Role {
+                    name: format_ident!("{}", role_name),
+                    index: None,
+                    param: Some(param_tokens.clone()),
+                    array_size: None,
+                });
+            }
         }
     }
 
-    Ok(format_ident!("{}", role_name))
+    // Simple role without index
+    Ok(Role::new(format_ident!("{}", role_name)))
 }
 
 /// Parse send statement: A -> B: Message(payload)
@@ -470,15 +486,21 @@ fn parse_choice_stmt(
     let mut inner = pair.into_inner();
 
     let role_pair = inner.next().unwrap();
-    let role_str = role_pair.as_str();
-    let role_span = role_pair.as_span();
-    if !declared_roles.contains(role_str) {
-        return Err(ParseError::UndefinedRole {
-            role: role_str.to_string(),
-            span: ErrorSpan::from_pest_span(role_span, input),
-        });
-    }
-    let role = format_ident!("{}", role_str);
+    let role = if role_pair.as_rule() == Rule::ident {
+        // Simple identifier without indexing
+        let role_name = role_pair.as_str();
+        let role_span = role_pair.as_span();
+        if !declared_roles.contains(role_name) {
+            return Err(ParseError::UndefinedRole {
+                role: role_name.to_string(),
+                span: ErrorSpan::from_pest_span(role_span, input),
+            });
+        }
+        Role::new(format_ident!("{}", role_name))
+    } else {
+        // Role reference (potentially with indexing)
+        parse_role_ref(role_pair, declared_roles, input)?
+    };
 
     let mut branches = Vec::new();
     for branch_pair in inner {
@@ -707,16 +729,16 @@ fn parse_message(
 #[derive(Debug, Clone)]
 enum Statement {
     Send {
-        from: Ident,
-        to: Ident,
+        from: Role,
+        to: Role,
         message: MessageSpec,
     },
     Broadcast {
-        from: Ident,
+        from: Role,
         message: MessageSpec,
     },
     Choice {
-        role: Ident,
+        role: Role,
         branches: Vec<ChoiceBranch>,
     },
     Loop {
@@ -768,8 +790,8 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
     for statement in inlined.iter().rev() {
         current = match statement {
             Statement::Send { from, to, message } => Protocol::Send {
-                from: Role::new(from.clone()),
-                to: Role::new(to.clone()),
+                from: from.clone(),
+                to: to.clone(),
                 message: MessageType {
                     name: message.name.clone(),
                     type_annotation: message.type_annotation.clone(),
@@ -779,15 +801,14 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
             },
             Statement::Broadcast { from, message } => {
                 // Resolve to all roles except the sender
-                let from_role = Role::new(from.clone());
                 let to_all = roles
                     .iter()
-                    .filter(|r| r.name != *from)
+                    .filter(|r| r.name != from.name)
                     .cloned()
                     .collect();
-                
+
                 Protocol::Broadcast {
-                    from: from_role,
+                    from: from.clone(),
                     to_all,
                     message: MessageType {
                         name: message.name.clone(),
@@ -798,7 +819,7 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
                 }
             }
             Statement::Choice { role, branches } => Protocol::Choice {
-                role: Role::new(role.clone()),
+                role: role.clone(),
                 branches: branches
                     .iter()
                     .map(|b| Branch {
@@ -891,33 +912,29 @@ fn inline_calls(statements: &[Statement]) -> Vec<Statement> {
 /// Parse a choreographic protocol from a token stream (for macro use)
 /// This is a compatibility function that wraps the string parser
 pub fn parse_choreography(input: TokenStream) -> Result<Choreography> {
-    // For macro invocation, we expect a string literal containing the choreography DSL
-    // For now, return a simple example to maintain compatibility
-    let _ = input; // Consume input
+    use syn::LitStr;
 
-    // This would parse the actual DSL from the token stream
-    // For full implementation, we'd extract the string from the token stream
+    // Try to parse as a string literal (for DSL syntax)
+    if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
+        // Parse the DSL string
+        let dsl_content = lit_str.value();
+        return parse_choreography_str(&dsl_content).map_err(|e| {
+            syn::Error::new(lit_str.span(), format!("Choreography parse error: {}", e))
+        });
+    }
 
-    // Return a simple example for now
-    let roles = vec![Role::new(format_ident!("A")), Role::new(format_ident!("B"))];
-
-    let protocol = Protocol::Send {
-        from: roles[0].clone(),
-        to: roles[1].clone(),
-        message: MessageType {
-            name: format_ident!("Message"),
-            type_annotation: None,
-            payload: None,
-        },
-        continuation: Box::new(Protocol::End),
-    };
-
-    Ok(Choreography {
-        name: format_ident!("ExampleProtocol"),
-        roles,
-        protocol,
-        attrs: Default::default(),
-    })
+    // If not a string literal, return an error with helpful message
+    Err(syn::Error::new(
+        proc_macro2::Span::call_site(),
+        "choreography! macro expects a string literal containing the choreography DSL.\n\
+         Example usage:\n\
+         choreography! { r#\"\n\
+         choreography MyProtocol {\n\
+             roles: Alice, Bob\n\
+             Alice -> Bob: Hello\n\
+         }\n\
+         \"# }",
+    ))
 }
 
 /// Parse a choreography from a file
@@ -982,7 +999,7 @@ mod tests {
         let input = r#"
 choreography SimpleSend {
     roles: Alice, Bob
-    
+
     Alice -> Bob: Hello
 }
 "#;
@@ -1000,9 +1017,9 @@ choreography SimpleSend {
         let input = r#"
 choreography Negotiation {
     roles: Buyer, Seller
-    
+
     Buyer -> Seller: Offer
-    
+
     choice Seller {
         accept: {
             Seller -> Buyer: Accept
@@ -1026,7 +1043,7 @@ choreography Negotiation {
         let input = r#"
 choreography Invalid {
     roles: Alice
-    
+
     Alice -> Bob: Hello
 }
 "#;
@@ -1047,7 +1064,7 @@ choreography Invalid {
         let input = r#"
 choreography Invalid {
     roles: Alice, Bob, Alice
-    
+
     Alice -> Bob: Hello
 }
 "#;
@@ -1068,7 +1085,7 @@ choreography Invalid {
         let input = r#"
 choreography LoopProtocol {
     roles: Client, Server
-    
+
     loop (count: 3) {
         Client -> Server: Request
         Server -> Client: Response
