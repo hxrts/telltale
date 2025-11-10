@@ -26,7 +26,7 @@ pub struct ErrorSpan {
 }
 
 impl ErrorSpan {
-    /// Create an ErrorSpan from a Pest span
+    /// Create an `ErrorSpan` from a Pest span
     fn from_pest_span(span: pest::Span, input: &str) -> Self {
         let (line, column) = span.start_pos().line_col();
         let (line_end, column_end) = span.end_pos().line_col();
@@ -44,12 +44,13 @@ impl ErrorSpan {
     }
 
     /// Format the error with context
+    #[must_use] 
     pub fn format_error(&self, message: &str) -> String {
         let line_num_width = self.line.to_string().len().max(3);
         let mut output = String::new();
 
         // Error message
-        output.push_str(&format!("\n{}\n", message));
+        output.push_str(&format!("\n{message}\n"));
 
         // Location
         output.push_str(&format!(
@@ -76,7 +77,7 @@ impl ErrorSpan {
             self.snippet.len() - self.column + 1
         };
         let underline = "^".repeat(underline_len);
-        output.push_str(&format!("{}{}\n", spaces, underline));
+        output.push_str(&format!("{spaces}{underline}\n"));
 
         output
     }
@@ -115,7 +116,7 @@ pub enum ParseError {
 
 /// Format Pest errors nicely
 fn format_pest_error(err: &pest::error::Error<Rule>) -> String {
-    format!("\nParse error:\n{}", err)
+    format!("\nParse error:\n{err}")
 }
 
 /// Parse an annotation into a key-value pair
@@ -163,7 +164,7 @@ fn parse_annotation(
                                     }
                                 }
                                 if !arg_val.is_empty() {
-                                    values.push(format!("{}={}", arg_key, arg_val));
+                                    values.push(format!("{arg_key}={arg_val}"));
                                 } else if !arg_key.is_empty() {
                                     values.push(arg_key);
                                 }
@@ -248,8 +249,7 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
                                                                 span, input,
                                                             ),
                                                             message: format!(
-                                                                "Invalid role parameter: {}",
-                                                                param_str
+                                                                "Invalid role parameter: {param_str}"
                                                             ),
                                                         });
                                                     }
@@ -519,7 +519,7 @@ fn parse_choice_stmt(
                 guard = Some(syn::parse_str::<TokenStream>(guard_expr).map_err(|e| {
                     ParseError::Syntax {
                         span: ErrorSpan::from_pest_span(guard_span, input),
-                        message: format!("Invalid guard expression: {}", e),
+                        message: format!("Invalid guard expression: {e}"),
                     }
                 })?);
                 // Body comes after guard
@@ -572,7 +572,7 @@ fn parse_loop_stmt(
                     // Parse as TokenStream for symbolic count
                     let token_stream = syn::parse_str::<TokenStream>(count_str).map_err(|e| {
                         ParseError::InvalidCondition {
-                            message: format!("Invalid count: {}", e),
+                            message: format!("Invalid count: {e}"),
                             span: ErrorSpan::from_pest_span(span, input),
                         }
                     })?;
@@ -603,7 +603,7 @@ fn parse_loop_stmt(
                 // Parse as TokenStream for Custom condition
                 let token_stream = syn::parse_str::<TokenStream>(custom_str).map_err(|e| {
                     ParseError::InvalidCondition {
-                        message: format!("Invalid custom condition: {}", e),
+                        message: format!("Invalid custom condition: {e}"),
                         span: ErrorSpan::from_pest_span(span, input),
                     }
                 })?;
@@ -919,7 +919,7 @@ pub fn parse_choreography(input: TokenStream) -> Result<Choreography> {
         // Parse the DSL string
         let dsl_content = lit_str.value();
         return parse_choreography_str(&dsl_content).map_err(|e| {
-            syn::Error::new(lit_str.span(), format!("Choreography parse error: {}", e))
+            syn::Error::new(lit_str.span(), format!("Choreography parse error: {e}"))
         });
     }
 
@@ -962,6 +962,7 @@ pub fn parse_dsl(input: &str) -> std::result::Result<Choreography, ParseError> {
 
 // Example of how the macro would work
 #[doc(hidden)]
+#[must_use] 
 pub fn choreography_macro(input: TokenStream) -> TokenStream {
     let choreography = match parse_choreography(input) {
         Ok(c) => c,
@@ -996,13 +997,13 @@ mod tests {
 
     #[test]
     fn test_parse_simple_send() {
-        let input = r#"
+        let input = r"
 choreography SimpleSend {
     roles: Alice, Bob
 
     Alice -> Bob: Hello
 }
-"#;
+";
 
         let result = parse_choreography_str(input);
         assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
@@ -1014,7 +1015,7 @@ choreography SimpleSend {
 
     #[test]
     fn test_parse_with_choice() {
-        let input = r#"
+        let input = r"
 choreography Negotiation {
     roles: Buyer, Seller
 
@@ -1029,7 +1030,7 @@ choreography Negotiation {
         }
     }
 }
-"#;
+";
 
         let result = parse_choreography_str(input);
         assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
@@ -1040,13 +1041,13 @@ choreography Negotiation {
 
     #[test]
     fn test_parse_undefined_role() {
-        let input = r#"
+        let input = r"
 choreography Invalid {
     roles: Alice
 
     Alice -> Bob: Hello
 }
-"#;
+";
 
         let result = parse_choreography_str(input);
         assert!(result.is_err());
@@ -1061,13 +1062,13 @@ choreography Invalid {
 
     #[test]
     fn test_parse_duplicate_role() {
-        let input = r#"
+        let input = r"
 choreography Invalid {
     roles: Alice, Bob, Alice
 
     Alice -> Bob: Hello
 }
-"#;
+";
 
         let result = parse_choreography_str(input);
         assert!(result.is_err());
@@ -1082,7 +1083,7 @@ choreography Invalid {
 
     #[test]
     fn test_parse_loop() {
-        let input = r#"
+        let input = r"
 choreography LoopProtocol {
     roles: Client, Server
 
@@ -1091,7 +1092,7 @@ choreography LoopProtocol {
         Server -> Client: Response
     }
 }
-"#;
+";
 
         let result = parse_choreography_str(input);
         assert!(result.is_ok(), "Failed to parse: {:?}", result.err());

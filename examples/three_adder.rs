@@ -51,7 +51,7 @@ async fn adder_a(role: &mut A) -> Result<()> {
         let (Add(y), s) = s.receive().await?;
         let s = s.send(Add(y)).await?;
         let (Sum(z), s) = s.receive().await?;
-        println!("{} + {} = {}", x, y, z);
+        println!("{x} + {y} = {z}");
         assert_eq!(z, 5);
         Ok(((), s))
     })
@@ -65,7 +65,7 @@ async fn adder_b(role: &mut B) -> Result<()> {
         let s = s.send(Add(x)).await?;
         let s = s.send(Add(y)).await?;
         let (Sum(z), s) = s.receive().await?;
-        println!("{} + {} = {}", x, y, z);
+        println!("{x} + {y} = {z}");
         assert_eq!(z, 5);
         Ok(((), s))
     })

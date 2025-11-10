@@ -452,10 +452,7 @@ fn parse_expression(
     }
 
     let mut outputs = outputs.into_iter().peekable();
-    let output = match outputs.next() {
-        Some(output) => output,
-        None => return Some(None),
-    };
+    let Some(output) = outputs.next() else { return Some(None) };
 
     if outputs.peek().is_some() {
         for output in outputs {
@@ -526,7 +523,7 @@ fn parse_parameters<E: Expression>(tokens: &mut Lexer) -> Option<Option<Paramete
 
         let parameter = parse_parameter(tokens)?;
         if !parameters.push_parameter(parameter.inner) {
-            tokens.push_err(parameter.span, TransitionError::MixedParameters.into())
+            tokens.push_err(parameter.span, TransitionError::MixedParameters.into());
         }
     }
 
@@ -537,12 +534,9 @@ pub(super) fn parse<E: Expression>(tokens: &mut Lexer) -> Option<Transition<Stri
     let role = tokens.expect_next_if(TokenId::Identifier)?;
     let role = role.map(Token::into_identifier);
 
-    let action = match tokens.next_if(TokenId::Question) {
-        Some(_) => Action::Input,
-        None => {
-            tokens.expect_next_if(TokenId::Bang)?;
-            Action::Output
-        }
+    let action = if tokens.next_if(TokenId::Question).is_some() { Action::Input } else {
+        tokens.expect_next_if(TokenId::Bang)?;
+        Action::Output
     };
 
     let label = tokens.expect_next_if(TokenId::Identifier)?;

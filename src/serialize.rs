@@ -6,7 +6,7 @@
 #![cfg(feature = "serialize")]
 
 use crate::{Branch, End, FromState, Receive, Role, Select, Send};
-use rumpsteak_fsm::{Action, Fsm, Message, StateIndex, Transition};
+use rumpsteak_aura_fsm::{Action, Fsm, Message, StateIndex, Transition};
 use std::{
     any::{type_name, TypeId},
     collections::{hash_map::Entry, HashMap},
@@ -164,6 +164,7 @@ impl<Q: Role + 'static, R: 'static, C: SerializeChoices> Serialize for Branch<'s
     }
 }
 
+#[must_use] 
 pub fn serialize<S: FromState<'static> + Serialize>() -> Fsm<Type, Type, Infallible> {
     let mut serializer = Serializer {
         fsm: Fsm::new(Type::new::<S::Role>()),

@@ -120,7 +120,7 @@ cat > index.html << 'EOF'
 </head>
 <body>
     <div class="container">
-        <h1>🥩 Rumpsteak WASM Demo</h1>
+        <h1>Rumpsteak WASM Demo</h1>
         <div class="description">
             <p>This demo showcases Rumpsteak's choreographic programming running in WebAssembly.</p>
             <p>The protocol implements a simple two-party interaction where Alice sends a message to Bob,
@@ -161,31 +161,31 @@ cat > index.html << 'EOF'
             
             try {
                 const message = messageInput.value || "Hello from the browser!";
-                log('🚀 Starting protocol execution...', 'info');
-                log(`📤 Alice will send: "${message}"`);
+                log('Starting protocol execution...', 'info');
+                log(`Alice will send: "${message}"`);
                 
                 // Note: In a real application, Alice and Bob would run in separate contexts
                 // For this demo, we're running them sequentially to show the concept
                 
-                log('👤 Running Alice\'s protocol...');
+                log('Running Alice\'s protocol...');
                 const aliceResult = await run_alice(message);
-                log(`✅ Alice received response: "${aliceResult}"`);
+                log(`Alice received response: "${aliceResult}"`);
                 
-                log('👤 Running Bob\'s protocol...');
+                log('Running Bob\'s protocol...');
                 const bobResult = await run_bob();
-                log(`✅ Bob received: "${bobResult}"`);
+                log(`Bob received: "${bobResult}"`);
                 
                 log('');
-                log('🎉 Protocol completed successfully!');
+                log('Protocol completed successfully!');
                 log('');
-                log('💡 This demonstrates:');
+                log('This demonstrates:');
                 log('  • Session types working in WASM');
                 log('  • Effect handlers in the browser');
                 log('  • Type-safe message passing');
                 log('  • Choreographic programming');
                 
             } catch (error) {
-                log(`❌ Error: ${error}`, 'error');
+                log(`Error: ${error}`, 'error');
                 console.error(error);
             } finally {
                 runButton.disabled = false;
@@ -195,7 +195,7 @@ cat > index.html << 'EOF'
         async function initialize() {
             try {
                 await init();
-                log('✅ WASM module loaded successfully');
+                log('WASM module loaded successfully');
                 log('Ready to run protocol!\n');
                 runButton.addEventListener('click', runProtocol);
             } catch (error) {
@@ -210,11 +210,11 @@ cat > index.html << 'EOF'
 </html>
 EOF
 
-echo -e "\n${GREEN}✓ Build complete!${NC}"
+echo -e "\n${GREEN}Build complete!${NC}"
 echo -e "\nTo test the example:"
 echo -e "  1. Start a local server:"
 echo -e "     ${YELLOW}python3 -m http.server 8000${NC}"
 echo -e "  2. Open your browser to:"
 echo -e "     ${YELLOW}http://localhost:8000${NC}"
-echo -e "\n${GREEN}Have fun with WASM session types! 🥩${NC}"
+echo -e "\n${GREEN}Have fun with WASM session types!${NC}"
 

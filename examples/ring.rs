@@ -68,7 +68,7 @@ fn main() {
     let Roles(mut a, mut b, mut c) = Roles::default();
 
     let input = (1, 2, 3);
-    println!("input = {:?}", input);
+    println!("input = {input:?}");
 
     let output = executor::block_on(async {
         try_join!(
@@ -78,5 +78,5 @@ fn main() {
         )
         .unwrap()
     });
-    println!("output = {:?}", output);
+    println!("output = {output:?}");
 }

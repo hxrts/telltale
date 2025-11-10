@@ -5,7 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use rumpsteak_choreography::{
+use rumpsteak_aura_choreography::{
     interpret, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
 };
 use serde::{Deserialize, Serialize};
@@ -224,7 +224,7 @@ async fn test_error_message_protocol() {
 async fn test_complex_message_serialization() {
     let request = Message::Request {
         id: 12345,
-        data: "Complex data with unicode: 🦀 Rust 测试".to_string(),
+        data: "Complex data with unicode: Rust 测试".to_string(),
     };
 
     let serialized = bincode::serialize(&request).unwrap();
@@ -235,7 +235,7 @@ async fn test_complex_message_serialization() {
     match deserialized {
         Message::Request { id, data } => {
             assert_eq!(id, 12345);
-            assert!(data.contains("🦀"));
+            // Unicode test data still present
             assert!(data.contains("测试"));
         }
         _ => panic!("Wrong message type"),

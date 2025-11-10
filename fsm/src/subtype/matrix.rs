@@ -52,7 +52,7 @@ impl<T: Debug> Debug for Matrix<T> {
             .map(|left| (0..self.dimensions.right).map(move |right| &self[Pair::new(left, right)]));
 
         write(matrix, f, |vector, f| {
-            write(vector, f, |value, f| write!(f, "{:?}", value))
+            write(vector, f, |value, f| write!(f, "{value:?}"))
         })
     }
 }

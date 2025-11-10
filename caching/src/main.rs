@@ -119,7 +119,7 @@ impl Response {
     }
 }
 
-/// A cached response entry with its ETag.
+/// A cached response entry with its `ETag`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Entry {
     etag: Vec<u8>,
@@ -264,6 +264,6 @@ async fn try_main() -> Result<()> {
 #[tokio::main]
 async fn main() {
     if let Err(err) = try_main().await {
-        eprintln!("Error: {}", err);
+        eprintln!("Error: {err}");
     }
 }

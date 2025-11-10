@@ -20,7 +20,7 @@ pub fn optional_attribute<T: Parse>(attrs: &[Attribute], ident: &str) -> Result<
         if output.is_some() {
             return Err(Error::new_spanned(
                 attr,
-                format_args!("duplicate #[{}(...)] attribute", ident),
+                format_args!("duplicate #[{ident}(...)] attribute"),
             ));
         }
 
@@ -35,5 +35,5 @@ pub fn optional_attribute<T: Parse>(attrs: &[Attribute], ident: &str) -> Result<
 /// Returns an error if the attribute is not present or appears multiple times.
 pub fn attribute<T: Parse>(attrs: &[Attribute], ident: &str, span: Span) -> Result<T> {
     optional_attribute(attrs, ident)?
-        .ok_or_else(|| Error::new(span, format_args!("expected #[{}(...)] attribute", ident)))
+        .ok_or_else(|| Error::new(span, format_args!("expected #[{ident}(...)] attribute")))
 }

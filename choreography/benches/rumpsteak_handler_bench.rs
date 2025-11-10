@@ -1,7 +1,7 @@
 // Performance benchmarks for RumpsteakHandler
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use rumpsteak_choreography::effects::{
+use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
     ChoreoHandler, Label,
 };
@@ -42,7 +42,7 @@ fn bench_send_recv_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("send_recv_throughput");
     let runtime = Runtime::new().unwrap();
 
-    for size in [128, 1024, 4096, 16384, 65536].iter() {
+    for size in &[128, 1024, 4096, 16384, 65536] {
         group.throughput(Throughput::Bytes(*size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
@@ -71,7 +71,7 @@ fn bench_send_recv_throughput(c: &mut Criterion) {
                         .recv(&mut bob_ep, BenchRole::Alice)
                         .await
                         .unwrap();
-                })
+                });
             });
         });
     }
@@ -105,7 +105,7 @@ fn bench_choice_overhead(c: &mut Criterion) {
                     .offer(&mut bob_ep, BenchRole::Alice)
                     .await
                     .unwrap();
-            })
+            });
         });
     });
 }
@@ -114,7 +114,7 @@ fn bench_sequential_messages(c: &mut Criterion) {
     let mut group = c.benchmark_group("sequential_messages");
     let runtime = Runtime::new().unwrap();
 
-    for count in [10, 50, 100].iter() {
+    for count in &[10, 50, 100] {
         group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
             b.iter(|| {
                 runtime.block_on(async {
@@ -143,7 +143,7 @@ fn bench_sequential_messages(c: &mut Criterion) {
                             .await
                             .unwrap();
                     }
-                })
+                });
             });
         });
     }
@@ -183,7 +183,7 @@ fn bench_metadata_tracking_overhead(c: &mut Criterion) {
                     .unwrap();
 
                 let _ = bob_ep.get_metadata(&BenchRole::Alice);
-            })
+            });
         });
     });
 }

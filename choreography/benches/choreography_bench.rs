@@ -8,8 +8,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use quote::format_ident;
-use rumpsteak_choreography::{
-    ast::*,
+use rumpsteak_aura_choreography::{
+    ast::{Choreography, Role, Protocol, MessageType, Condition, Branch},
     compiler::{codegen::generate_session_type, projection::project},
     effects::{interpret, NoOpHandler, Program},
 };
@@ -130,12 +130,12 @@ fn bench_projection(c: &mut Criterion) {
 
     group.bench_function("simple_protocol", |b| {
         let alice = Role::new(format_ident!("Alice"));
-        b.iter(|| project(black_box(&simple), &alice))
+        b.iter(|| project(black_box(&simple), &alice));
     });
 
     group.bench_function("complex_protocol", |b| {
         let alice = Role::new(format_ident!("Alice"));
-        b.iter(|| project(black_box(&complex), &alice))
+        b.iter(|| project(black_box(&complex), &alice));
     });
 
     group.finish();
@@ -149,21 +149,21 @@ fn bench_analysis(c: &mut Criterion) {
     let complex = create_complex_choreography();
 
     group.bench_function("validate_simple", |b| {
-        b.iter(|| black_box(&simple).validate())
+        b.iter(|| black_box(&simple).validate());
     });
 
     group.bench_function("validate_complex", |b| {
-        b.iter(|| black_box(&complex).validate())
+        b.iter(|| black_box(&complex).validate());
     });
 
     group.bench_function("mentions_role_simple", |b| {
         let alice = Role::new(format_ident!("Alice"));
-        b.iter(|| black_box(&simple).protocol.mentions_role(&alice))
+        b.iter(|| black_box(&simple).protocol.mentions_role(&alice));
     });
 
     group.bench_function("mentions_role_complex", |b| {
         let alice = Role::new(format_ident!("Alice"));
-        b.iter(|| black_box(&complex).protocol.mentions_role(&alice))
+        b.iter(|| black_box(&complex).protocol.mentions_role(&alice));
     });
 
     group.finish();
@@ -182,11 +182,11 @@ fn bench_codegen(c: &mut Criterion) {
     let complex_local = project(&complex, &alice).unwrap();
 
     group.bench_function("generate_simple", |b| {
-        b.iter(|| generate_session_type(&alice, black_box(&simple_local), "SimpleBench"))
+        b.iter(|| generate_session_type(&alice, black_box(&simple_local), "SimpleBench"));
     });
 
     group.bench_function("generate_complex", |b| {
-        b.iter(|| generate_session_type(&alice, black_box(&complex_local), "ComplexBench"))
+        b.iter(|| generate_session_type(&alice, black_box(&complex_local), "ComplexBench"));
     });
 
     group.finish();
@@ -205,7 +205,7 @@ fn bench_effects(c: &mut Criterion) {
                 let mut endpoint = ();
                 interpret(&mut handler, &mut endpoint, black_box(program)).await
             })
-        })
+        });
     });
 
     group.finish();
@@ -220,15 +220,15 @@ fn bench_validation(c: &mut Criterion) {
     let program = create_effect_program();
 
     group.bench_function("validate_simple_choreography", |b| {
-        b.iter(|| black_box(&simple).validate())
+        b.iter(|| black_box(&simple).validate());
     });
 
     group.bench_function("validate_complex_choreography", |b| {
-        b.iter(|| black_box(&complex).validate())
+        b.iter(|| black_box(&complex).validate());
     });
 
     group.bench_function("validate_effect_program", |b| {
-        b.iter(|| black_box(&program).validate())
+        b.iter(|| black_box(&program).validate());
     });
 
     group.finish();
@@ -240,7 +240,7 @@ fn bench_scaling(c: &mut Criterion) {
 
     // Keep the iteration counts small so the benchmark remains fast but
     // still highlights how projection time grows with additional sends.
-    for num_interactions in [2, 4, 8, 16].iter() {
+    for num_interactions in &[2, 4, 8, 16] {
         let alice = Role::new(format_ident!("Alice"));
         let bob = Role::new(format_ident!("Bob"));
 
@@ -266,7 +266,7 @@ fn bench_scaling(c: &mut Criterion) {
             };
         }
 
-        let bench_name = format!("ScalingBench{}", num_interactions);
+        let bench_name = format!("ScalingBench{num_interactions}");
         let choreography = Choreography {
             name: syn::parse_str::<syn::Ident>(&bench_name).unwrap(),
             roles: vec![alice, bob],
@@ -279,7 +279,7 @@ fn bench_scaling(c: &mut Criterion) {
             &choreography,
             |b, choreo| {
                 let alice = Role::new(format_ident!("Alice"));
-                b.iter(|| project(black_box(choreo), &alice))
+                b.iter(|| project(black_box(choreo), &alice));
             },
         );
     }

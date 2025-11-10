@@ -5,8 +5,8 @@
 
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use rumpsteak_choreography::ast::{Branch, Choreography, Condition, MessageType, Protocol, Role};
-use rumpsteak_choreography::compiler::{analyze, project};
+use rumpsteak_aura_choreography::ast::{Branch, Choreography, Condition, MessageType, Protocol, Role};
+use rumpsteak_aura_choreography::compiler::{analyze, project};
 use std::collections::HashMap;
 
 // Helper to create identifiers
@@ -390,7 +390,7 @@ fn test_projection_consistency() {
     let bob_local = project(&choreography, &bob).expect("Bob projection");
 
     // Verify projections are well-formed
-    use rumpsteak_choreography::ast::LocalType;
+    use rumpsteak_aura_choreography::ast::LocalType;
 
     match alice_local {
         LocalType::Send { .. } => (), // Alice sends

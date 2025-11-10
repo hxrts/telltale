@@ -1,23 +1,23 @@
 //! Direct test of parameterized roles parsing without using the proc macro
 
-use rumpsteak_choreography::compiler::{parse_dsl, project};
+use rumpsteak_aura_choreography::compiler::{parse_dsl, project};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dsl = r#"
+    let dsl = r"
     choreography TestParamRoles {
         roles: Coordinator, Worker[3]
 
         Coordinator -> Worker[0]: Task
         Worker[0] -> Coordinator: Result
     }
-    "#;
+    ";
 
     println!("Parsing choreography with parameterized roles...\n");
 
     // Parse the choreography
     let choreography = parse_dsl(dsl)?;
 
-    println!("✓ Successfully parsed choreography: {}", choreography.name);
+    println!("Successfully parsed choreography: {}", choreography.name);
     println!("  Roles:");
     for role in &choreography.roles {
         if let Some(size) = &role.array_size {
@@ -31,10 +31,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Validate
     choreography.validate()?;
-    println!("\n✓ Choreography validated successfully");
+    println!("\nChoreography validated successfully");
 
     // Project to local types
-    println!("\n✓ Projecting to local types:");
+    println!("\nProjecting to local types:");
     for role in &choreography.roles {
         match project(&choreography, role) {
             Ok(local_type) => {
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n🎉 Parameterized roles support is working!");
+    println!("\nParameterized roles support is working!");
 
     Ok(())
 }

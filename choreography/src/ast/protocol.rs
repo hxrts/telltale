@@ -1,6 +1,6 @@
 // Protocol AST definitions
 
-use super::*;
+use super::{Role, MessageType, ValidationError};
 use proc_macro2::{Ident, TokenStream};
 
 /// Protocol specification using choreographic constructs
@@ -64,6 +64,7 @@ pub enum Condition {
 }
 
 impl Protocol {
+    #[must_use] 
     pub fn mentions_role(&self, role: &Role) -> bool {
         match self {
             Protocol::Send {

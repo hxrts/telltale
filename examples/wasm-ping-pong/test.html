@@ -58,7 +58,7 @@
                 // Initialize the WASM module
                 await init();
                 wasmInit();
-                output.innerHTML += '<span class="success">✓ WASM module initialized successfully</span>\n\n';
+                output.innerHTML += '<span class="success">WASM module initialized successfully</span>\n\n';
                 
                 output.innerHTML += 'Starting ping-pong protocol...\n';
                 
@@ -72,10 +72,10 @@
                 const bobResult = await run_bob('Hello from Bob!');
                 output.innerHTML += `<span class="success">Bob sent: ${bobResult}</span>\n`;
                 
-                output.innerHTML += '\n<span class="success">✓ Protocol completed successfully!</span>\n';
+                output.innerHTML += '\n<span class="success">Protocol completed successfully!</span>\n';
                 
             } catch (error) {
-                output.innerHTML += `\n<span class="error">✗ Error: ${error}</span>\n`;
+                output.innerHTML += `\n<span class="error">Error: ${error}</span>\n`;
                 console.error('Error running ping-pong:', error);
             }
         };

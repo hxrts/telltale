@@ -146,9 +146,9 @@ impl<R: Display, N: Display> Display for Prefix<'_, R, N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut transitions = self.iter();
         if let Some(transition) = transitions.next() {
-            write!(f, "{}", transition)?;
+            write!(f, "{transition}")?;
             for transition in transitions {
-                write!(f, " . {}", transition)?;
+                write!(f, " . {transition}")?;
             }
 
             return Ok(());

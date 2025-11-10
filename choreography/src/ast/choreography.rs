@@ -1,6 +1,6 @@
 // Choreography struct definition and validation
 
-use super::*;
+use super::{Role, Protocol, ValidationError};
 use proc_macro2::Ident;
 use std::collections::HashMap;
 

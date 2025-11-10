@@ -217,7 +217,6 @@ fn reduce<R: Eq, N: Eq>(prefixes: &mut Pair<Prefix<R, N>>) -> bool {
             Some(Some(i)) => {
                 prefixes.left.remove_first();
                 prefixes.right.remove(i);
-                continue;
             }
             Some(None) => break,
             None => return false,
@@ -245,7 +244,7 @@ fn reduce<R: Eq, N: Eq>(prefixes: &mut Pair<Prefix<R, N>>) -> bool {
 /// # Example
 ///
 /// ```rust,ignore
-/// use rumpsteak_fsm::subtype::is_subtype;
+/// use rumpsteak_aura_fsm::subtype::is_subtype;
 ///
 /// let implementation = /* ... */;
 /// let specification = /* ... */;
@@ -259,9 +258,7 @@ pub fn is_subtype<R: Eq, N: Eq>(
     right: &Fsm<R, N, Infallible>,
     visits: usize,
 ) -> bool {
-    if left.role() != right.role() {
-        panic!("FSMs are for different roles");
-    }
+    assert!(!(left.role() != right.role()), "FSMs are for different roles");
 
     let sizes = Pair::new(left.size().0, right.size().0);
     let mut visitor = SubtypeVisitor {

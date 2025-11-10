@@ -104,9 +104,9 @@ fn main() {
     let pool = ThreadPool::new().unwrap();
 
     let input = (1, 2);
-    println!("input = {:?}", input);
+    println!("input = {input:?}");
 
-    let (_, _, output) = executor::block_on(async {
+    let ((), (), output) = executor::block_on(async {
         try_join!(
             spawn(&pool, async move { source(&mut s, input).await }),
             spawn(&pool, async move { kernel(&mut k).await }),
@@ -115,6 +115,6 @@ fn main() {
         .unwrap()
     });
 
-    println!("output = {:?}", output);
+    println!("output = {output:?}");
     assert_eq!(input, output);
 }

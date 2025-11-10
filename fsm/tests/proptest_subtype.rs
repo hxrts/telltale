@@ -40,8 +40,8 @@ mod unit_tests {
     /// construct test FSMs programmatically.
     ///
     /// Future work: If FSM construction is made public, add tests for:
-    /// - Reflexivity: is_subtype(fsm, fsm) == true
-    /// - Transitivity: is_subtype(a, b) && is_subtype(b, c) => is_subtype(a, c)
+    /// - Reflexivity: `is_subtype(fsm`, fsm) == true
+    /// - Transitivity: `is_subtype(a`, b) && `is_subtype(b`, c) => `is_subtype(a`, c)
     /// - Consistency: repeated calls give same result
 
     #[test]

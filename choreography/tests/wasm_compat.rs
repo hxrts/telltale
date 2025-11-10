@@ -5,7 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use rumpsteak_choreography::{
+use rumpsteak_aura_choreography::{
     interpret, Effect, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
 };
 use serde::{Deserialize, Serialize};

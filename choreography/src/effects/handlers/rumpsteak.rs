@@ -55,6 +55,7 @@ pub struct SimpleChannel {
 
 impl SimpleChannel {
     /// Create a pair of connected channels.
+    #[must_use] 
     pub fn pair() -> (Self, Self) {
         let (left, right) = SimpleChannelInner::pair();
         (Self { inner: left }, Self { inner: right })
@@ -105,7 +106,7 @@ impl<T> SessionUpdate<T> {
     }
 }
 
-/// Dynamic session trait used by RumpsteakSession.
+/// Dynamic session trait used by `RumpsteakSession`.
 pub trait SessionTypeDynamic: Send {
     /// Identify the underlying session for diagnostics.
     fn type_name(&self) -> &'static str;
@@ -219,7 +220,7 @@ where
     }
 }
 
-/// SimpleSession reuses SimpleChannel but routes operations through the
+/// `SimpleSession` reuses `SimpleChannel` but routes operations through the
 /// dynamic trait so that session-typed channels and legacy transport share
 /// the same machinery.
 struct SimpleSession {
@@ -299,10 +300,12 @@ impl Debug for RumpsteakSession {
 }
 
 impl RumpsteakSession {
+    #[must_use] 
     pub fn new(inner: Box<dyn SessionTypeDynamic>) -> Self {
         Self { inner }
     }
 
+    #[must_use] 
     pub fn from_simple_channel(channel: SimpleChannel) -> Self {
         Self::new(Box::new(SimpleSession::new(channel)))
     }
@@ -318,6 +321,7 @@ impl RumpsteakSession {
         Self::new(Box::new(SinkStreamSession::new(sender, receiver, label)))
     }
 
+    #[must_use] 
     pub fn type_name(&self) -> &'static str {
         self.inner.type_name()
     }
@@ -369,7 +373,7 @@ where
         }
     }
 
-    /// Register a legacy SimpleChannel for a peer.
+    /// Register a legacy `SimpleChannel` for a peer.
     pub fn register_channel(&mut self, peer: R, channel: SimpleChannel) {
         tracing::debug!(?peer, "Registering SimpleChannel session");
         self.channels.insert(
@@ -461,6 +465,7 @@ impl<R, M> RumpsteakHandler<R, M>
 where
     R: Role + Eq + std::hash::Hash + Clone + Debug,
 {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             _phantom: PhantomData,
@@ -478,7 +483,7 @@ where
         Fut: std::future::Future<Output = Result<(T, ChannelState, Option<String>, bool)>>,
     {
         let mut record = ep.take_record(peer).ok_or_else(|| {
-            ChoreographyError::Transport(format!("No channel registered for peer: {:?}", peer))
+            ChoreographyError::Transport(format!("No channel registered for peer: {peer:?}"))
         })?;
 
         let (result, next_state, description, completed) = f(record.state).await?;

@@ -267,20 +267,14 @@ pub(super) fn parse<E: Expression>(tokens: &mut Lexer) -> Option<Fsm<String, Str
     for (from, to, transition) in transitions {
         let span = from.span.merge(&to.span);
 
-        let from = match states.get(&from.inner) {
-            Some(&from) => from,
-            None => {
-                tokens.push_err(from.span, FsmError::UndefinedState.into());
-                continue;
-            }
+        let Some(&from) = states.get(&from.inner) else {
+            tokens.push_err(from.span, FsmError::UndefinedState.into());
+            continue;
         };
 
-        let to = match states.get(&to.inner) {
-            Some(&to) => to,
-            None => {
-                tokens.push_err(to.span, FsmError::UndefinedState.into());
-                continue;
-            }
+        let Some(&to) = states.get(&to.inner) else {
+            tokens.push_err(to.span, FsmError::UndefinedState.into());
+            continue;
         };
 
         if let Err(err) = fsm.add_transition(from, to, transition) {

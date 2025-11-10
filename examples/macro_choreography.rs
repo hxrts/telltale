@@ -12,7 +12,7 @@
 // - Static analysis of choreographic programs
 
 use futures::executor;
-use rumpsteak_choreography::{
+use rumpsteak_aura_choreography::{
     interpret, InterpretResult, Label, Metrics, NoOpHandler, Program, RecordingHandler, Result,
 };
 use serde::{Deserialize, Serialize};
@@ -101,9 +101,9 @@ async fn run_program<H>(
     name: &str,
 ) -> Result<InterpretResult<ProtocolMessage>>
 where
-    H: rumpsteak_choreography::ChoreoHandler<Role = Role>,
+    H: rumpsteak_aura_choreography::ChoreoHandler<Role = Role>,
 {
-    println!("  {}: Executing protocol", name);
+    println!("  {name}: Executing protocol");
     interpret(handler, endpoint, program).await
 }
 
@@ -170,8 +170,8 @@ fn analyze_protocols() {
         ("Choice", choice_prog),
     ] {
         match prog.validate() {
-            Ok(()) => println!("  {} protocol validated", name),
-            Err(e) => println!("  {} protocol error: {}", name, e),
+            Ok(()) => println!("  {name} protocol validated"),
+            Err(e) => println!("  {name} protocol error: {e}"),
         }
     }
 }
@@ -193,7 +193,7 @@ async fn run_simple_two_phase() {
             println!("    2. Vote phase - received from both participants");
             println!("    3. Decision phase - commit sent to both");
         }
-        Err(e) => println!("  Failed: {}", e),
+        Err(e) => println!("  Failed: {e}"),
     }
 }
 
@@ -216,7 +216,7 @@ async fn run_with_choice() {
             println!("    • commit: Send Commit to all participants");
             println!("    • abort: Send Abort to all participants");
         }
-        Err(e) => println!("  Failed: {}", e),
+        Err(e) => println!("  Failed: {e}"),
     }
 }
 
@@ -285,7 +285,7 @@ async fn run_with_metrics() {
             );
             println!("    • Errors encountered: {}", handler.error_count());
         }
-        Err(e) => println!("  Failed: {}", e),
+        Err(e) => println!("  Failed: {e}"),
     }
 }
 

@@ -117,9 +117,9 @@ fn main() {
     let Roles(mut s, mut r) = Roles::default();
 
     let input = (1, 2);
-    println!("input = {:?}", input);
+    println!("input = {input:?}");
 
-    let (_, output) =
+    let ((), output) =
         executor::block_on(async { try_join!(sender(&mut s, input), receiver(&mut r)).unwrap() });
-    println!("output = {:?}", output);
+    println!("output = {output:?}");
 }

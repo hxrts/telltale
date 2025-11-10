@@ -11,7 +11,7 @@
 // - Composing handlers with middleware (Trace, Metrics, Retry)
 
 use futures::executor;
-use rumpsteak_choreography::{
+use rumpsteak_aura_choreography::{
     interpret, InterpretResult, Label, Metrics, NoOpHandler, Program, RecordingHandler, Result,
     Retry, Trace,
 };
@@ -108,9 +108,9 @@ async fn run_program<H>(
     name: &str,
 ) -> Result<InterpretResult<Message>>
 where
-    H: rumpsteak_choreography::ChoreoHandler<Role = Role>,
+    H: rumpsteak_aura_choreography::ChoreoHandler<Role = Role>,
 {
-    println!("{}: Starting choreography", name);
+    println!("{name}: Starting choreography");
     interpret(handler, endpoint, program).await
 }
 
@@ -153,7 +153,7 @@ fn analyze_programs() {
     ];
 
     for (name, prog) in programs {
-        println!("\n{} protocol:", name);
+        println!("\n{name} protocol:");
         println!("  • Send operations: {}", prog.send_count());
         println!("  • Receive operations: {}", prog.recv_count());
         println!("  • Roles involved: {:?}", prog.roles_involved());
@@ -162,7 +162,7 @@ fn analyze_programs() {
         println!("  • Total effects: {}", prog.effects.len());
 
         if let Err(e) = prog.validate() {
-            println!("  Validation error: {}", e);
+            println!("  Validation error: {e}");
         } else {
             println!("  Validation passed");
         }
@@ -186,7 +186,7 @@ async fn run_with_recording() {
                 println!("    {}. {:?}", i + 1, event);
             }
         }
-        Err(e) => println!("Execution failed: {}", e),
+        Err(e) => println!("Execution failed: {e}"),
     }
 }
 
@@ -204,7 +204,7 @@ async fn run_with_noop() {
             println!("Protocol structure validated");
             println!("  Final state: {:?}", interp_result.final_state);
         }
-        Err(e) => println!("Validation failed: {}", e),
+        Err(e) => println!("Validation failed: {e}"),
     }
 }
 
@@ -226,7 +226,7 @@ async fn run_with_tracing() {
             );
             println!("  (Check logs with RUST_LOG=debug for detailed traces)");
         }
-        Err(e) => println!("Execution failed: {}", e),
+        Err(e) => println!("Execution failed: {e}"),
     }
 }
 
@@ -244,7 +244,7 @@ async fn run_with_metrics() {
         Ok(interp_result) => {
             println!("Execution completed: {:?}", interp_result.final_state);
         }
-        Err(e) => println!("Execution failed: {}", e),
+        Err(e) => println!("Execution failed: {e}"),
     }
 
     println!("\nCollected metrics:");
@@ -271,7 +271,7 @@ async fn run_with_retry() {
             );
             println!("  (Retries up to 3 times on failure with 100ms base delay)");
         }
-        Err(e) => println!("Execution failed after retries: {}", e),
+        Err(e) => println!("Execution failed after retries: {e}"),
     }
 }
 

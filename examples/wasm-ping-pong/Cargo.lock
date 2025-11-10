@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura"
-version = "0.1.1-aura"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -522,7 +522,7 @@ dependencies = [
  "hex",
  "proc-macro2",
  "quote",
- "rumpsteak-macros",
+ "rumpsteak-aura-macros",
  "serde",
  "syn",
  "thiserror",
@@ -536,8 +536,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-choreography"
-version = "0.1.1-aura"
+name = "rumpsteak-aura-choreography"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -552,7 +552,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rumpsteak-aura",
- "rumpsteak-macros",
+ "rumpsteak-aura-macros",
  "serde",
  "syn",
  "thiserror",
@@ -566,8 +566,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-macros"
-version = "0.1.1-aura"
+name = "rumpsteak-aura-macros"
+version = "0.2.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -983,7 +983,7 @@ dependencies = [
  "console_error_panic_hook",
  "futures",
  "rumpsteak-aura",
- "rumpsteak-choreography",
+ "rumpsteak-aura-choreography",
  "serde",
  "tracing",
  "tracing-wasm",

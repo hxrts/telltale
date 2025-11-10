@@ -1,7 +1,7 @@
 //! Proxy role implementation.
 //!
 //! The proxy role coordinates between the client, cache, and origin server
-//! to implement HTTP caching with ETag support.
+//! to implement HTTP caching with `ETag` support.
 
 use crate::{
     cache::{Cache, Load, Lock, Locked, Remove, Store, Unlock},

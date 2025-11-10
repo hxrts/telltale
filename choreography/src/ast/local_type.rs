@@ -1,6 +1,6 @@
 // Local session types after projection
 
-use super::*;
+use super::{Role, MessageType};
 use proc_macro2::Ident;
 
 /// Local session type after projection
@@ -53,6 +53,7 @@ pub enum LocalType {
 
 impl LocalType {
     /// Check if this type is well-formed
+    #[must_use] 
     pub fn is_well_formed(&self) -> bool {
         self.check_well_formed(&mut vec![])
     }

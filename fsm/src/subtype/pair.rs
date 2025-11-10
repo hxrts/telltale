@@ -32,7 +32,7 @@ impl<T> Pair<T> {
 
     /// Swaps the left and right values.
     pub fn swap(&mut self) {
-        mem::swap(&mut self.left, &mut self.right)
+        mem::swap(&mut self.left, &mut self.right);
     }
 
     /// Zips this pair with another, creating a pair of tuples.

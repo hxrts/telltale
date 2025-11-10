@@ -3,7 +3,7 @@
 // This example demonstrates a simple request-response protocol between
 // a client and server using Rumpsteak's session-typed channels.
 
-use rumpsteak_choreography::effects::{
+use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel},
     ChoreoHandler,
 };
@@ -76,11 +76,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Server receives request
     let received_req: Message = server_handler.recv(&mut server_ep, Role::Client).await?;
     if let Message::Request(text) = received_req {
-        println!("Server: Received request: {}", text);
+        println!("Server: Received request: {text}");
 
         // Server sends response
         println!("Server: Sending response...");
-        let response = Message::Response(format!("Echo: {}", text));
+        let response = Message::Response(format!("Echo: {text}"));
         server_handler
             .send(&mut server_ep, Role::Client, &response)
             .await?;
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Client receives response
     let received_resp: Message = client_handler.recv(&mut client_ep, Role::Server).await?;
     if let Message::Response(text) = received_resp {
-        println!("Client: Received response: {}", text);
+        println!("Client: Received response: {text}");
     }
 
     // Display session metadata

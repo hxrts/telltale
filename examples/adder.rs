@@ -65,19 +65,19 @@ async fn client(role: &mut C) -> Result<()> {
         let s = s.select(Add(2)).await?;
         let s = s.send(Add(3)).await?;
         let (Sum(f), s) = s.receive().await?;
-        println!("1 + 2 + 3 = {}", f);
+        println!("1 + 2 + 3 = {f}");
         assert_eq!(f, 6);
 
         let s = s.select(Add(4)).await?;
         let s = s.send(Add(5)).await?;
         let (Sum(f), s) = s.receive().await?;
-        println!("1 + 4 + 5 = {}", f);
+        println!("1 + 4 + 5 = {f}");
         assert_eq!(f, 10);
 
         let s = s.select(Add(6)).await?;
         let s = s.send(Add(7)).await?;
         let (Sum(f), s) = s.receive().await?;
-        println!("1 + 6 + 7 = {}", f);
+        println!("1 + 6 + 7 = {f}");
         assert_eq!(f, 14);
 
         let s = s.select(Bye).await?;

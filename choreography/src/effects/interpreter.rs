@@ -154,8 +154,7 @@ impl<M> Interpreter<M> {
                     .find(|(branch_label, _)| branch_label == &label)
                     .ok_or_else(|| {
                         ChoreographyError::ProtocolViolation(format!(
-                            "No branch found for label {:?}",
-                            label
+                            "No branch found for label {label:?}"
                         ))
                     })?;
 
@@ -334,7 +333,7 @@ impl<T: ChoreoHandler> ChoreoHandlerExt for T {}
 
 /// Utilities for testing and simulation
 pub mod testing {
-    use super::*;
+    use super::{async_trait, RoleId, ChoreoHandler, Serialize, Result, DeserializeOwned, ChoreographyError};
     use std::collections::VecDeque;
 
     /// A mock handler that records operations and provides scripted responses

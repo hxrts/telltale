@@ -1628,7 +1628,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "rumpsteak-aura"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1643,6 +1643,7 @@ dependencies = [
  "proptest",
  "quote",
  "rand 0.8.5",
+ "rumpsteak-aura-choreography",
  "rumpsteak-aura-fsm",
  "rumpsteak-aura-macros",
  "serde",
@@ -1661,7 +1662,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-choreography"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -1697,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-fsm"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "argh",
  "atty",
@@ -1713,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-macros"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "proc-macro2",
  "quote",

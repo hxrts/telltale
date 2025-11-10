@@ -1,5 +1,5 @@
 use argh::FromArgs;
-use rumpsteak_fsm::{
+use rumpsteak_aura_fsm::{
     dot::{self, ParseErrors},
     subtype, Fsm,
 };
@@ -18,10 +18,7 @@ struct ColorChoice(termcolor::ColorChoice);
 
 impl ColorChoice {
     fn auto() -> Self {
-        match atty::is(atty::Stream::Stdout) {
-            true => Self(termcolor::ColorChoice::Auto),
-            false => Self(termcolor::ColorChoice::Never),
-        }
+        if atty::is(atty::Stream::Stdout) { Self(termcolor::ColorChoice::Auto) } else { Self(termcolor::ColorChoice::Never) }
     }
 }
 
@@ -64,7 +61,7 @@ struct Options {
 }
 
 fn error(message: impl Display, err: impl Error) -> ! {
-    eprintln!("{}: {}\n", message, err);
+    eprintln!("{message}: {err}\n");
     exit(1)
 }
 
@@ -73,7 +70,7 @@ fn read_file(path: &str) -> String {
         Ok(contents) => contents,
         Err(err) => {
             let err = io::Error::from(err.kind());
-            error(format_args!("Error opening '{}'", path), err);
+            error(format_args!("Error opening '{path}'"), err);
         }
     }
 }
@@ -81,7 +78,7 @@ fn read_file(path: &str) -> String {
 fn unwrap_fsm<R, N, E>(fsm: Result<Fsm<R, N, E>, ParseErrors>, path: &str) -> Fsm<R, N, E> {
     match fsm {
         Ok(fsm) => fsm,
-        Err(err) => error(format_args!("Error parsing '{}'", path), err),
+        Err(err) => error(format_args!("Error parsing '{path}'"), err),
     }
 }
 
@@ -106,15 +103,12 @@ fn main() {
         let is_subtype = subtype::is_subtype(&left, &right, options.visits);
         write!(&mut stdout, "{}. left ", i + 1).expect("failed to write to stdout");
 
-        match is_subtype {
-            true => {
-                set_color(&mut stdout, Color::Green).expect("failed to set color");
-                write!(&mut stdout, "IS").expect("failed to write to stdout");
-            }
-            false => {
-                set_color(&mut stdout, Color::Red).expect("failed to set color");
-                write!(&mut stdout, "IS NOT").expect("failed to write to stdout");
-            }
+        if is_subtype {
+            set_color(&mut stdout, Color::Green).expect("failed to set color");
+            write!(&mut stdout, "IS").expect("failed to write to stdout");
+        } else {
+            set_color(&mut stdout, Color::Red).expect("failed to set color");
+            write!(&mut stdout, "IS NOT").expect("failed to write to stdout");
         }
 
         stdout.reset().expect("failed to reset stdout color");

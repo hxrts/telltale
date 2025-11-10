@@ -12,7 +12,7 @@ use proc_macro2::{Ident, TokenStream};
 ///
 /// ```ignore
 /// use quote::format_ident;
-/// use rumpsteak_choreography::Role;
+/// use rumpsteak_aura_choreography::Role;
 ///
 /// // Simple role
 /// let client = Role::new(format_ident!("Client"));
@@ -38,10 +38,10 @@ impl PartialEq for Role {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && self.index == other.index
-            && self.param.as_ref().map(|t| t.to_string())
-                == other.param.as_ref().map(|t| t.to_string())
-            && self.array_size.as_ref().map(|t| t.to_string())
-                == other.array_size.as_ref().map(|t| t.to_string())
+            && self.param.as_ref().map(std::string::ToString::to_string)
+                == other.param.as_ref().map(std::string::ToString::to_string)
+            && self.array_size.as_ref().map(std::string::ToString::to_string)
+                == other.array_size.as_ref().map(std::string::ToString::to_string)
     }
 }
 
@@ -62,6 +62,7 @@ impl std::hash::Hash for Role {
 
 impl Role {
     /// Create a new simple role with the given name
+    #[must_use] 
     pub fn new(name: Ident) -> Self {
         Role {
             name,
@@ -72,6 +73,7 @@ impl Role {
     }
 
     /// Create a new indexed role (e.g., Worker with index 0)
+    #[must_use] 
     pub fn indexed(name: Ident, index: usize) -> Self {
         Role {
             name,
@@ -82,6 +84,7 @@ impl Role {
     }
 
     /// Create a parameterized role with symbolic parameter (e.g., Worker[N])
+    #[must_use] 
     pub fn parameterized(name: Ident, param: TokenStream) -> Self {
         Role {
             name,
@@ -92,6 +95,7 @@ impl Role {
     }
 
     /// Create a role array with a concrete size (e.g., Worker[3])
+    #[must_use] 
     pub fn array(name: Ident, size: usize) -> Self {
         let size_token: TokenStream = size.to_string().parse().unwrap();
         Role {
@@ -103,21 +107,25 @@ impl Role {
     }
 
     /// Check if this role has an index
+    #[must_use] 
     pub fn is_indexed(&self) -> bool {
         self.index.is_some()
     }
 
     /// Generate a Rust identifier for this role
+    #[must_use] 
     pub fn to_ident(&self) -> Ident {
         self.name.clone()
     }
 
     /// Check if this role is parameterized (has either index or param)
+    #[must_use] 
     pub fn is_parameterized(&self) -> bool {
         self.index.is_some() || self.param.is_some()
     }
 
     /// Check if this is a role array (declared with size like Worker[N])
+    #[must_use] 
     pub fn is_array(&self) -> bool {
         self.array_size.is_some()
     }
@@ -130,6 +138,7 @@ impl Role {
     /// - `Worker[i]` matches `Worker[N]`
     /// - `Worker[1]` matches `Worker[3]` (if Worker[3] is the array declaration)
     /// - `Client` only matches `Client` (exact match for non-parameterized)
+    #[must_use] 
     pub fn matches_family(&self, family: &Role) -> bool {
         // Names must match
         if self.name != family.name {

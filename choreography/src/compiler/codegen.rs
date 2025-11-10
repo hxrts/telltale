@@ -5,6 +5,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
 /// Generate Rumpsteak session type definitions from a local type
+#[must_use] 
 pub fn generate_session_type(
     role: &Role,
     local_type: &LocalType,
@@ -171,6 +172,7 @@ fn generate_choice_enum(branches: &[(Ident, LocalType)], _is_select: bool) -> To
 }
 
 /// Generate complete Rumpsteak code from a choreography
+#[must_use] 
 pub fn generate_choreography_code(
     name: &str,
     roles: &[Role],
@@ -237,6 +239,7 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
 }
 
 /// Generate implementation functions for each role
+#[must_use] 
 pub fn generate_role_implementations(
     role: &Role,
     local_type: &LocalType,
@@ -325,8 +328,11 @@ fn generate_implementation_body(local_type: &LocalType) -> TokenStream {
 }
 
 /// Generate helper functions and types for the choreography
+#[must_use] 
 pub fn generate_helpers(_name: &str, messages: &[MessageType]) -> TokenStream {
-    let message_enum = if !messages.is_empty() {
+    let message_enum = if messages.is_empty() {
+        quote! {}
+    } else {
         let variants = messages.iter().map(|msg| {
             let name = &msg.name;
             quote! { #name(#name) }
@@ -338,8 +344,6 @@ pub fn generate_helpers(_name: &str, messages: &[MessageType]) -> TokenStream {
                 #(#variants),*
             }
         }
-    } else {
-        quote! {}
     };
 
     let message_structs = messages.iter().map(|msg| {

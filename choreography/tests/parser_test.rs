@@ -1,17 +1,17 @@
 // Comprehensive tests for the choreographic DSL parser
 
-use rumpsteak_choreography::compiler::parser::{parse_choreography_str, ParseError};
+use rumpsteak_aura_choreography::compiler::parser::{parse_choreography_str, ParseError};
 
 #[test]
 fn test_parse_simple_protocol() {
-    let input = r#"
+    let input = r"
 choreography PingPong {
     roles: Alice, Bob
     
     Alice -> Bob: Ping
     Bob -> Alice: Pong
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
@@ -23,7 +23,7 @@ choreography PingPong {
 
 #[test]
 fn test_parse_three_party_protocol() {
-    let input = r#"
+    let input = r"
 choreography ThreeParty {
     roles: Alice, Bob, Carol
     
@@ -31,7 +31,7 @@ choreography ThreeParty {
     Bob -> Carol: Forward
     Carol -> Alice: Response
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -42,13 +42,13 @@ choreography ThreeParty {
 
 #[test]
 fn test_parse_broadcast() {
-    let input = r#"
+    let input = r"
 choreography Broadcast {
     roles: Leader, Worker1, Worker2
     
     Leader ->* : Start
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -62,7 +62,7 @@ choreography Broadcast {
     assert_eq!(choreo.roles.len(), 3);
 
     // Check that the protocol is a Broadcast with correct to_all field
-    use rumpsteak_choreography::ast::Protocol;
+    use rumpsteak_aura_choreography::ast::Protocol;
     match &choreo.protocol {
         Protocol::Broadcast {
             from,
@@ -92,7 +92,7 @@ choreography Broadcast {
 
 #[test]
 fn test_parse_choice_two_branches() {
-    let input = r#"
+    let input = r"
 choreography Choice {
     roles: A, B
     
@@ -107,7 +107,7 @@ choreography Choice {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -115,7 +115,7 @@ choreography Choice {
 
 #[test]
 fn test_parse_choice_three_branches() {
-    let input = r#"
+    let input = r"
 choreography ThreeWayChoice {
     roles: Client, Server
     
@@ -131,7 +131,7 @@ choreography ThreeWayChoice {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -139,7 +139,7 @@ choreography ThreeWayChoice {
 
 #[test]
 fn test_parse_nested_choice() {
-    let input = r#"
+    let input = r"
 choreography NestedChoice {
     roles: A, B, C
     
@@ -160,7 +160,7 @@ choreography NestedChoice {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -168,7 +168,7 @@ choreography NestedChoice {
 
 #[test]
 fn test_parse_loop_with_count() {
-    let input = r#"
+    let input = r"
 choreography LoopCount {
     roles: Client, Server
     
@@ -177,7 +177,7 @@ choreography LoopCount {
         Server -> Client: Response
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -185,7 +185,7 @@ choreography LoopCount {
 
 #[test]
 fn test_parse_loop_with_role_decides() {
-    let input = r#"
+    let input = r"
 choreography LoopRoleDecides {
     roles: Client, Server
     
@@ -194,7 +194,7 @@ choreography LoopRoleDecides {
         Server -> Client: Response
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -218,7 +218,7 @@ choreography LoopCustom {
 
 #[test]
 fn test_parse_loop_without_condition() {
-    let input = r#"
+    let input = r"
 choreography InfiniteLoop {
     roles: A, B
     
@@ -226,7 +226,7 @@ choreography InfiniteLoop {
         A -> B: Tick
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -234,7 +234,7 @@ choreography InfiniteLoop {
 
 #[test]
 fn test_parse_parallel() {
-    let input = r#"
+    let input = r"
 choreography Parallel {
     roles: A, B, C, D
     
@@ -244,7 +244,7 @@ choreography Parallel {
         C -> D: Msg2
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -252,7 +252,7 @@ choreography Parallel {
 
 #[test]
 fn test_parse_recursive() {
-    let input = r#"
+    let input = r"
 choreography Recursive {
     roles: A, B
     
@@ -260,7 +260,7 @@ choreography Recursive {
         A -> B: Data
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -268,7 +268,7 @@ choreography Recursive {
 
 #[test]
 fn test_parse_complex_protocol() {
-    let input = r#"
+    let input = r"
 choreography ComplexProtocol {
     roles: Buyer, Seller, Shipper
     
@@ -294,7 +294,7 @@ choreography ComplexProtocol {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -306,13 +306,13 @@ choreography ComplexProtocol {
 
 #[test]
 fn test_parse_with_payload() {
-    let input = r#"
+    let input = r"
 choreography WithPayload {
     roles: A, B
     
     A -> B: Message(data: String)
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -322,13 +322,13 @@ choreography WithPayload {
 
 #[test]
 fn test_error_undefined_role_in_send() {
-    let input = r#"
+    let input = r"
 choreography Invalid {
     roles: Alice
     
     Alice -> Bob: Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -344,7 +344,7 @@ choreography Invalid {
 
 #[test]
 fn test_error_undefined_role_in_choice() {
-    let input = r#"
+    let input = r"
 choreography Invalid {
     roles: Alice
     
@@ -354,7 +354,7 @@ choreography Invalid {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -369,7 +369,7 @@ choreography Invalid {
 
 #[test]
 fn test_error_undefined_role_in_loop_decides() {
-    let input = r#"
+    let input = r"
 choreography Invalid {
     roles: Alice
     
@@ -377,7 +377,7 @@ choreography Invalid {
         Alice -> Alice: Msg
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -392,13 +392,13 @@ choreography Invalid {
 
 #[test]
 fn test_error_duplicate_role() {
-    let input = r#"
+    let input = r"
 choreography Invalid {
     roles: Alice, Bob, Alice
     
     Alice -> Bob: Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -413,11 +413,11 @@ choreography Invalid {
 
 #[test]
 fn test_error_no_roles() {
-    let input = r#"
+    let input = r"
 choreography Invalid {
     Alice -> Bob: Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -425,13 +425,13 @@ choreography Invalid {
 
 #[test]
 fn test_error_invalid_syntax() {
-    let input = r#"
+    let input = r"
 choreography Invalid {
     roles: A, B
     
     A -> -> B: Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -439,7 +439,7 @@ choreography Invalid {
 
 #[test]
 fn test_parse_with_comments() {
-    let input = r#"
+    let input = r"
 // This is a comment
 choreography CommentTest {
     roles: Alice, Bob  // Inline comment
@@ -448,7 +448,7 @@ choreography CommentTest {
        comment */
     Alice -> Bob: Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -460,12 +460,12 @@ choreography CommentTest {
 
 #[test]
 fn test_parse_whitespace_variations() {
-    let input = r#"
+    let input = r"
 choreography   WhitespaceTest   {
     roles:Alice,Bob
     Alice->Bob:Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -473,11 +473,11 @@ choreography   WhitespaceTest   {
 
 #[test]
 fn test_empty_protocol_body() {
-    let input = r#"
+    let input = r"
 choreography Empty {
     roles: A, B
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -485,13 +485,13 @@ choreography Empty {
 
 #[test]
 fn test_parse_role_names_with_underscores() {
-    let input = r#"
+    let input = r"
 choreography UnderscoreRoles {
     roles: Alice_Client, Bob_Server
     
     Alice_Client -> Bob_Server: Request
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -499,14 +499,14 @@ choreography UnderscoreRoles {
 
 #[test]
 fn test_parse_role_names_with_numbers() {
-    let input = r#"
+    let input = r"
 choreography NumericRoles {
     roles: Worker1, Worker2, Worker3
     
     Worker1 -> Worker2: Data
     Worker2 -> Worker3: Forward
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -514,7 +514,7 @@ choreography NumericRoles {
 
 #[test]
 fn test_parse_sequence_of_sends() {
-    let input = r#"
+    let input = r"
 choreography Sequence {
     roles: A, B, C, D
     
@@ -523,7 +523,7 @@ choreography Sequence {
     C -> D: Msg3
     D -> A: Msg4
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
@@ -531,16 +531,16 @@ choreography Sequence {
 
 #[test]
 fn test_integration_with_projection() {
-    use rumpsteak_choreography::compiler::projection;
+    use rumpsteak_aura_choreography::compiler::projection;
 
-    let input = r#"
+    let input = r"
 choreography TwoParty {
     roles: Client, Server
     
     Client -> Server: Request
     Server -> Client: Response
 }
-"#;
+";
 
     let choreo = parse_choreography_str(input).expect("Failed to parse");
 
@@ -558,14 +558,14 @@ choreography TwoParty {
 
 #[test]
 fn test_integration_validation() {
-    let input = r#"
+    let input = r"
 choreography ValidProtocol {
     roles: A, B
     
     A -> B: Hello
     B -> A: World
 }
-"#;
+";
 
     let choreo = parse_choreography_str(input).expect("Failed to parse");
 
@@ -581,13 +581,13 @@ choreography ValidProtocol {
 #[test]
 fn test_error_message_quality() {
     // This test verifies that error messages include helpful span information
-    let input = r#"
+    let input = r"
 choreography Example {
     roles: Alice, Bob
     
     Alice -> Charlie: Hello
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -611,20 +611,20 @@ choreography Example {
     assert!(err_msg.contains("Alice -> Charlie: Hello"));
 
     // Should have visual indicator (underline)
-    assert!(err_msg.contains("^"));
+    assert!(err_msg.contains('^'));
 }
 
 #[test]
 fn test_error_span_precision() {
     // Test that the span precisely identifies the error location
-    let input = r#"
+    let input = r"
 choreography Test {
     roles: Alice, Bob
     
     Alice -> UnknownRole: Message
     Bob -> Alice: Response
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
@@ -643,7 +643,7 @@ choreography Test {
 
 #[test]
 fn test_parse_protocol_composition_simple() {
-    let input = r#"
+    let input = r"
 choreography CompositionExample {
     roles: Alice, Bob
     
@@ -655,7 +655,7 @@ choreography CompositionExample {
     call Handshake
     Alice -> Bob: Data
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -670,7 +670,7 @@ choreography CompositionExample {
 
 #[test]
 fn test_parse_protocol_composition_multiple_defs() {
-    let input = r#"
+    let input = r"
 choreography MultipleProtocols {
     roles: A, B, C
     
@@ -690,7 +690,7 @@ choreography MultipleProtocols {
     call Step2
     call Step3
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -702,7 +702,7 @@ choreography MultipleProtocols {
 
 #[test]
 fn test_parse_protocol_composition_nested_calls() {
-    let input = r#"
+    let input = r"
 choreography NestedCalls {
     roles: Alice, Bob
     
@@ -718,7 +718,7 @@ choreography NestedCalls {
     
     call Outer
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -730,7 +730,7 @@ choreography NestedCalls {
 
 #[test]
 fn test_parse_protocol_composition_in_choice() {
-    let input = r#"
+    let input = r"
 choreography CallInChoice {
     roles: Client, Server
     
@@ -753,7 +753,7 @@ choreography CallInChoice {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -765,7 +765,7 @@ choreography CallInChoice {
 
 #[test]
 fn test_parse_protocol_composition_in_loop() {
-    let input = r#"
+    let input = r"
 choreography CallInLoop {
     roles: A, B
     
@@ -778,7 +778,7 @@ choreography CallInLoop {
         call Exchange
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -790,20 +790,20 @@ choreography CallInLoop {
 
 #[test]
 fn test_error_undefined_protocol_call() {
-    let input = r#"
+    let input = r"
 choreography UndefinedCall {
     roles: A, B
     
     call NonExistent
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        rumpsteak_choreography::compiler::parser::ParseError::UndefinedProtocol { .. }
+        rumpsteak_aura_choreography::compiler::parser::ParseError::UndefinedProtocol { .. }
     ));
 
     let err_msg = err.to_string();
@@ -813,7 +813,7 @@ choreography UndefinedCall {
 
 #[test]
 fn test_error_duplicate_protocol_def() {
-    let input = r#"
+    let input = r"
 choreography DuplicateDef {
     roles: A, B
     
@@ -825,14 +825,14 @@ choreography DuplicateDef {
         A -> B: Second
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        rumpsteak_choreography::compiler::parser::ParseError::DuplicateProtocol { .. }
+        rumpsteak_aura_choreography::compiler::parser::ParseError::DuplicateProtocol { .. }
     ));
 
     let err_msg = err.to_string();
@@ -844,7 +844,7 @@ choreography DuplicateDef {
 
 #[test]
 fn test_parse_choice_with_guard() {
-    let input = r#"
+    let input = r"
 choreography GuardExample {
     roles: Client, Server
     
@@ -857,7 +857,7 @@ choreography GuardExample {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -869,7 +869,7 @@ choreography GuardExample {
 
 #[test]
 fn test_parse_choice_with_multiple_guards() {
-    let input = r#"
+    let input = r"
 choreography MultiGuards {
     roles: A, B
     
@@ -885,7 +885,7 @@ choreography MultiGuards {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -897,7 +897,7 @@ choreography MultiGuards {
 
 #[test]
 fn test_parse_guard_with_complex_expression() {
-    let input = r#"
+    let input = r"
 choreography ComplexGuard {
     roles: Client, Server
     
@@ -910,7 +910,7 @@ choreography ComplexGuard {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -922,7 +922,7 @@ choreography ComplexGuard {
 
 #[test]
 fn test_parse_guard_in_nested_choice() {
-    let input = r#"
+    let input = r"
 choreography NestedGuard {
     roles: A, B, C
     
@@ -943,7 +943,7 @@ choreography NestedGuard {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -959,14 +959,14 @@ choreography NestedGuard {
 
 #[test]
 fn test_parse_simple_annotation() {
-    let input = r#"
+    let input = r"
 @optimize
 choreography Simple {
     roles: A, B
     
     A -> B: Msg
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -982,14 +982,14 @@ choreography Simple {
 
 #[test]
 fn test_parse_annotation_with_args() {
-    let input = r#"
+    let input = r"
 @optimize(inline, buffer_size=1024)
 choreography WithArgs {
     roles: A, B
     
     A -> B: Msg
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1007,7 +1007,7 @@ choreography WithArgs {
 
 #[test]
 fn test_parse_multiple_annotations() {
-    let input = r#"
+    let input = r"
 @optimize(inline)
 @verify(deadlock_free)
 @parallel
@@ -1017,7 +1017,7 @@ choreography MultiAnnotated {
     A -> B: Msg1
     B -> C: Msg2
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1034,7 +1034,7 @@ choreography MultiAnnotated {
 
 #[test]
 fn test_parse_statement_annotations() {
-    let input = r#"
+    let input = r"
 choreography StatementAnnotations {
     roles: A, B
     
@@ -1044,7 +1044,7 @@ choreography StatementAnnotations {
     @buffered(size=10)
     B -> A: Response
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1056,7 +1056,7 @@ choreography StatementAnnotations {
 
 #[test]
 fn test_parse_verification_annotation() {
-    let input = r#"
+    let input = r"
 @verify(deadlock_free, liveness)
 choreography Verified {
     roles: A, B
@@ -1064,7 +1064,7 @@ choreography Verified {
     A -> B: Start
     B -> A: Ack
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1086,14 +1086,14 @@ choreography Verified {
 
 #[test]
 fn test_parse_message_with_type() {
-    let input = r#"
+    let input = r"
 choreography TypedMessages {
     roles: A, B
     
     A -> B: Request<String>
     B -> A: Response<i32>
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1105,13 +1105,13 @@ choreography TypedMessages {
 
 #[test]
 fn test_parse_message_with_multiple_types() {
-    let input = r#"
+    let input = r"
 choreography MultiTyped {
     roles: A, B
     
     A -> B: Data<String, i32, bool>
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1123,14 +1123,14 @@ choreography MultiTyped {
 
 #[test]
 fn test_parse_message_with_generic_types() {
-    let input = r#"
+    let input = r"
 choreography Generics {
     roles: A, B
     
     A -> B: Container<Vec<String>>
     B -> A: Result<i32, Error>
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1142,14 +1142,14 @@ choreography Generics {
 
 #[test]
 fn test_parse_message_with_type_and_payload() {
-    let input = r#"
+    let input = r"
 choreography TypedWithPayload {
     roles: A, B
     
     A -> B: Request<String>(data)
     B -> A: Response<i32>(result)
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1161,14 +1161,14 @@ choreography TypedWithPayload {
 
 #[test]
 fn test_parse_message_with_path_types() {
-    let input = r#"
+    let input = r"
 choreography PathTypes {
     roles: A, B
     
     A -> B: Data<std::string::String>
     B -> A: Result<std::vec::Vec<i32>>
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1184,13 +1184,13 @@ choreography PathTypes {
 
 #[test]
 fn test_parse_parameterized_role() {
-    let input = r#"
+    let input = r"
 choreography WorkerPool {
     roles: Master, Worker[N]
     
     Master -> Worker[0]: Task
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1206,7 +1206,7 @@ choreography WorkerPool {
 
 #[test]
 fn test_parse_concrete_indexed_role() {
-    let input = r#"
+    let input = r"
 choreography IndexedWorkers {
     roles: Master, Worker[3]
     
@@ -1214,7 +1214,7 @@ choreography IndexedWorkers {
     Master -> Worker[1]: Task2
     Master -> Worker[2]: Task3
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1226,14 +1226,14 @@ choreography IndexedWorkers {
 
 #[test]
 fn test_parse_multiple_parameterized_roles() {
-    let input = r#"
+    let input = r"
 choreography MultiParam {
     roles: Coordinator, Worker[N], Monitor[M]
     
     Coordinator -> Worker[i]: Start
     Worker[i] -> Monitor[j]: Report
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1248,7 +1248,7 @@ choreography MultiParam {
 
 #[test]
 fn test_parse_parameterized_role_in_choice() {
-    let input = r#"
+    let input = r"
 choreography ParameterizedChoice {
     roles: Master, Worker[N]
     
@@ -1261,7 +1261,7 @@ choreography ParameterizedChoice {
         }
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(
@@ -1273,7 +1273,7 @@ choreography ParameterizedChoice {
 
 #[test]
 fn test_parse_parameterized_role_loop() {
-    let input = r#"
+    let input = r"
 choreography ParameterizedLoop {
     roles: Master, Worker[N]
     
@@ -1282,7 +1282,7 @@ choreography ParameterizedLoop {
         Worker[i] -> Master: Result
     }
 }
-"#;
+";
 
     let result = parse_choreography_str(input);
     assert!(

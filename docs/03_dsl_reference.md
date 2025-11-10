@@ -255,7 +255,7 @@ Type annotations are:
 
 #### 10. Parameterized Roles
 
-**Status: ✅ Fully Implemented**
+**Status: Fully Implemented**
 
 Roles can be parameterized to represent role arrays or families of participants. The system supports concrete array sizes, concrete indices, and symbolic parameters.
 
@@ -292,13 +292,13 @@ choreography SymbolicParam {
 ```
 
 **Features:**
-- ✅ Concrete array sizes (e.g., `Worker[3]` declares an array of 3 workers)
-- ✅ Concrete indices (e.g., `Worker[0]`, `Worker[1]`)
-- ✅ Symbolic parameters (e.g., `Worker[N]` where N is a parameter)
-- ✅ Symbolic indices (e.g., `Worker[i]` in protocol statements)
-- ✅ Full validation with role family matching
-- ✅ Projection to local types for each role
-- ✅ Multiple independent role families
+- Concrete array sizes (e.g., `Worker[3]` declares an array of 3 workers)
+- Concrete indices (e.g., `Worker[0]`, `Worker[1]`)
+- Symbolic parameters (e.g., `Worker[N]` where N is a parameter)
+- Symbolic indices (e.g., `Worker[i]` in protocol statements)
+- Full validation with role family matching
+- Projection to local types for each role
+- Multiple independent role families
 
 **Example Usage:**
 ```rust

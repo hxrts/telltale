@@ -18,7 +18,7 @@ use std::fmt::{self, Display, Formatter};
 /// # Example
 ///
 /// ```rust
-/// use rumpsteak_fsm::{Fsm, Dot};
+/// use rumpsteak_aura_fsm::{Fsm, Dot};
 ///
 /// let fsm: Fsm<&str, &str, &str> = Fsm::new("Client");
 /// let dot = Dot::new(&fsm);
@@ -33,7 +33,7 @@ impl<'a, R, N, E> Dot<'a, R, N, E> {
     }
 }
 
-impl<'a, R: Display, N: Display, E: Display> Display for Dot<'a, R, N, E> {
+impl<R: Display, N: Display, E: Display> Display for Dot<'_, R, N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "digraph \"{}\" {{", self.0.role())?;
         let (states, transitions) = self.0.size();
@@ -52,7 +52,7 @@ impl<'a, R: Display, N: Display, E: Display> Display for Dot<'a, R, N, E> {
 
         for (from, to, transition) in self.0.transitions() {
             let (from, to) = (from.index(), to.index());
-            writeln!(f, "    {} -> {} [label=\"{}\"];", from, to, transition)?;
+            writeln!(f, "    {from} -> {to} [label=\"{transition}\"];")?;
         }
 
         write!(f, "}}")

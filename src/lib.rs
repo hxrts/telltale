@@ -149,21 +149,21 @@ impl<'r, R: Role> FromState<'r> for End<'r, R> {
     }
 }
 
-impl<'r, R: Role> End<'r, R> {
+impl<R: Role> End<'_, R> {
     /// Consume the End state and seal the role
     pub fn seal(self) {
         self.state.role.seal();
     }
 }
 
-impl<'r, R: Role> Drop for End<'r, R> {
+impl<R: Role> Drop for End<'_, R> {
     fn drop(&mut self) {
         // Seal the role when End is dropped
         self.state.role.seal();
     }
 }
 
-impl<'r, R: Role> private::Session for End<'r, R> {}
+impl<R: Role> private::Session for End<'_, R> {}
 
 impl<'r, R: Role> Session<'r> for End<'r, R> {}
 
@@ -293,7 +293,7 @@ where
     }
 }
 
-impl<'q, Q: Role, R, C> private::Session for Select<'q, Q, R, C> {}
+impl<Q: Role, R, C> private::Session for Select<'_, Q, R, C> {}
 
 impl<'q, Q: Role, R, C> Session<'q> for Select<'q, Q, R, C> {}
 
@@ -339,7 +339,7 @@ where
     }
 }
 
-impl<'q, Q: Role, R, C> private::Session for Branch<'q, Q, R, C> {}
+impl<Q: Role, R, C> private::Session for Branch<'_, Q, R, C> {}
 
 impl<'q, Q: Role, R, C> Session<'q> for Branch<'q, Q, R, C> {}
 
@@ -364,11 +364,9 @@ impl Drop for SessionGuard {
             // In debug mode, panic if the session was not properly completed
             #[cfg(debug_assertions)]
             {
-                if !std::thread::panicking() {
-                    panic!(
+                assert!(std::thread::panicking(), 
                         "Session dropped without completing! This indicates a protocol violation."
                     );
-                }
             }
         }
     }

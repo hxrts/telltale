@@ -6,7 +6,7 @@
 // 3. The round-trip preserves the FSM structure
 
 #[cfg(feature = "parsing")]
-use rumpsteak_fsm::dot::{parse, Dot};
+use rumpsteak_aura_fsm::dot::{parse, Dot};
 
 #[cfg(feature = "parsing")]
 #[test]
@@ -35,7 +35,7 @@ fn test_simple_adder_client_parse() {
             assert_eq!(states, 4, "should have 4 states");
             assert_eq!(transitions, 3, "should have 3 transitions");
         }
-        Err(e) => panic!("Failed to parse DOT file: {}", e),
+        Err(e) => panic!("Failed to parse DOT file: {e}"),
     }
 
     // Verify there are no more FSMs
@@ -69,7 +69,7 @@ fn test_simple_adder_server_parse() {
             assert_eq!(states, 4, "should have 4 states");
             assert_eq!(transitions, 3, "should have 3 transitions");
         }
-        Err(e) => panic!("Failed to parse DOT file: {}", e),
+        Err(e) => panic!("Failed to parse DOT file: {e}"),
     }
 
     // Verify there are no more FSMs
@@ -146,9 +146,9 @@ digraph B {
 #[cfg(feature = "parsing")]
 #[test]
 fn test_empty_fsm() {
-    let dot_content = r#"digraph Empty {
+    let dot_content = r"digraph Empty {
   0;
-}"#;
+}";
 
     let mut fsms = parse(dot_content);
     let fsm = fsms

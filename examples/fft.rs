@@ -162,14 +162,14 @@ where
 
 struct Vector<'a>(&'a [Complex32]);
 
-impl<'a> Display for Vector<'a> {
+impl Display for Vector<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "[")?;
 
         if !self.0.is_empty() {
             writeln!(f)?;
             for x in self.0 {
-                writeln!(f, "    {:.3},", x)?;
+                writeln!(f, "    {x:.3},")?;
             }
         }
 

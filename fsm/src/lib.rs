@@ -16,7 +16,7 @@
 //! # Example
 //!
 //! ```rust
-//! use rumpsteak_fsm::{Fsm, Action, Message, Transition};
+//! use rumpsteak_aura_fsm::{Fsm, Action, Message, Transition};
 //!
 //! let mut fsm: Fsm<&str, &str, ()> = Fsm::new("Client");
 //! let s0 = fsm.add_state();
@@ -74,7 +74,7 @@ impl Action {
     /// Returns the dual action.
     ///
     /// The dual of Input is Output and vice versa.
-    fn dual(&self) -> Self {
+    fn dual(self) -> Self {
         match self {
             Self::Input => Self::Output,
             Self::Output => Self::Input,
@@ -181,21 +181,9 @@ pub enum BinaryOp {
 impl Operator for BinaryOp {
     fn associativity(&self) -> Associativity {
         match self {
-            Self::LAnd => Associativity::Left,
-            Self::LOr => Associativity::Left,
-            Self::Equal => Associativity::Left,
-            Self::NotEqual => Associativity::Left,
-            Self::Less => Associativity::Left,
-            Self::Greater => Associativity::Left,
-            Self::LessEqual => Associativity::Left,
-            Self::GreaterEqual => Associativity::Left,
-            Self::Add => Associativity::Left,
-            Self::Subtract => Associativity::Left,
-            Self::Multiply => Associativity::Left,
-            Self::Divide => Associativity::Left,
-            Self::And => Associativity::Left,
-            Self::Xor => Associativity::Left,
-            Self::Or => Associativity::Left,
+            Self::LAnd | Self::LOr | Self::Equal | Self::NotEqual | Self::Less | Self::Greater 
+            | Self::LessEqual | Self::GreaterEqual | Self::Add | Self::Subtract | Self::Multiply 
+            | Self::Divide | Self::And | Self::Xor | Self::Or => Associativity::Left,
         }
     }
 
@@ -203,16 +191,10 @@ impl Operator for BinaryOp {
         match self {
             Self::LAnd => 11,
             Self::LOr => 12,
-            Self::Equal => 7,
-            Self::NotEqual => 7,
-            Self::Less => 6,
-            Self::Greater => 6,
-            Self::LessEqual => 6,
-            Self::GreaterEqual => 6,
-            Self::Add => 4,
-            Self::Subtract => 4,
-            Self::Multiply => 3,
-            Self::Divide => 3,
+            Self::Equal | Self::NotEqual => 7,
+            Self::Less | Self::Greater | Self::LessEqual | Self::GreaterEqual => 6,
+            Self::Add | Self::Subtract => 4,
+            Self::Multiply | Self::Divide => 3,
             Self::And => 8,
             Self::Xor => 9,
             Self::Or => 10,
@@ -287,19 +269,19 @@ impl<N: Display> Expression<N> {
         precedence: usize,
     ) -> fmt::Result {
         match self {
-            Self::Name(name) => write!(f, "{}", name),
-            Self::Boolean(boolean) => write!(f, "{}", boolean),
-            Self::Number(number) => write!(f, "{}", number),
+            Self::Name(name) => write!(f, "{name}"),
+            Self::Boolean(boolean) => write!(f, "{boolean}"),
+            Self::Number(number) => write!(f, "{number}"),
             Self::Unary(op, expression) => {
                 self.fmt_bracketed(f, associativity, precedence, op, |f| {
-                    write!(f, "{}", op)?;
+                    write!(f, "{op}")?;
                     expression.fmt_inner(f, Associativity::Left, op.precedence())
                 })
             }
             Self::Binary(op, left, right) => {
                 self.fmt_bracketed(f, associativity, precedence, op, |f| {
                     left.fmt_inner(f, Associativity::Right, op.precedence())?;
-                    write!(f, " {} ", op)?;
+                    write!(f, " {op} ")?;
                     right.fmt_inner(f, Associativity::Left, op.precedence())
                 })
             }
@@ -339,7 +321,7 @@ impl<N: Display, E: Display> Display for NamedParameter<N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.name, self.sort)?;
         if let Some(refinement) = &self.refinement {
-            write!(f, "{{{}}}", refinement)?;
+            write!(f, "{{{refinement}}}")?;
         }
 
         Ok(())
@@ -367,6 +349,7 @@ impl<N, E> Default for Parameters<N, E> {
 
 impl<N, E> Parameters<N, E> {
     /// Returns true if there are no parameters.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         match self {
             Parameters::Unnamed(parameters) => parameters.is_empty(),
@@ -380,9 +363,9 @@ impl<N: Display, E: Display> Display for Parameters<N, E> {
         fn fmt<T: Display>(values: &[T], f: &mut Formatter<'_>) -> fmt::Result {
             let mut values = values.iter();
             if let Some(value) = values.next() {
-                write!(f, "{}", value)?;
+                write!(f, "{value}")?;
                 for value in values {
-                    write!(f, ", {}", value)?;
+                    write!(f, ", {value}")?;
                 }
             }
 
@@ -432,9 +415,9 @@ impl<N: Display, E: Display> Display for Message<N, E> {
 
         let mut assignments = self.assignments.iter();
         if let Some((name, refinement)) = assignments.next() {
-            write!(f, "[{}: {}", name, refinement)?;
+            write!(f, "[{name}: {refinement}")?;
             for (name, refinement) in assignments {
-                write!(f, ", {}: {}", name, refinement)?;
+                write!(f, ", {name}: {refinement}")?;
             }
 
             write!(f, "]")?;
@@ -539,6 +522,7 @@ impl<R, N, E> Clone for TransitionRef<'_, R, N, E> {
 
 impl<R: Clone, N: Clone, E: Clone> TransitionRef<'_, R, N, E> {
     /// Converts this transition reference to an owned transition.
+    #[must_use] 
     pub fn to_owned(&self) -> Transition<R, N, E> {
         Transition::new(self.role.clone(), self.action, self.message.clone())
     }
@@ -617,7 +601,7 @@ impl<R, N, E> Fsm<R, N, E> {
                         TransitionRef::new(&choices.role, choices.action, edge.weight());
                     (source, target, transition)
                 }
-                _ => unreachable!(),
+                State::End => unreachable!(),
             }
         })
     }
@@ -637,7 +621,7 @@ impl<R, N, E> Fsm<R, N, E> {
                         TransitionRef::new(&choices.role, choices.action, edge.weight());
                     (StateIndex(edge.target()), transition)
                 }
-                _ => unreachable!(),
+                State::End => unreachable!(),
             })
     }
 
@@ -736,6 +720,7 @@ impl<R, N, E> Fsm<R, N, E> {
     /// # Panics
     ///
     /// Panics if any transition is not with the specified peer role.
+    #[must_use]
     pub fn dual(&self, role: R) -> Self
     where
         R: Clone + Debug + Eq,

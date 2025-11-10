@@ -6,10 +6,10 @@
 // 3. Improved parallel branch merging with conflict detection
 
 use quote::{format_ident, quote};
-use rumpsteak_choreography::ast::{
+use rumpsteak_aura_choreography::ast::{
     protocol::Condition, Branch, Choreography, LocalType, MessageType, Protocol, Role,
 };
-use rumpsteak_choreography::compiler::projection::project;
+use rumpsteak_aura_choreography::compiler::projection::project;
 use std::collections::HashMap;
 
 #[test]
@@ -48,7 +48,7 @@ fn test_local_choice_without_send() {
             assert_eq!(branches[0].0.to_string(), "option1");
             assert_eq!(branches[1].0.to_string(), "option2");
         }
-        _ => panic!("Expected LocalChoice, got: {:?}", projected),
+        _ => panic!("Expected LocalChoice, got: {projected:?}"),
     }
 }
 
@@ -92,7 +92,7 @@ fn test_loop_with_condition() {
             // Body should be a Send
             assert!(matches!(*body, LocalType::Send { .. }));
         }
-        _ => panic!("Expected Loop, got: {:?}", alice_proj),
+        _ => panic!("Expected Loop, got: {alice_proj:?}"),
     }
 }
 
@@ -242,7 +242,7 @@ fn test_mixed_choice_communicated_vs_local() {
             assert_eq!(to, bob, "Select should be to Bob");
             assert_eq!(branches.len(), 2, "Should have both branches");
         }
-        _ => panic!("Expected Select, got: {:?}", alice_proj),
+        _ => panic!("Expected Select, got: {alice_proj:?}"),
     }
 
     // Bob should get Branch (receives choice)
@@ -252,7 +252,7 @@ fn test_mixed_choice_communicated_vs_local() {
             assert_eq!(from, alice, "Branch should be from Alice");
             assert_eq!(branches.len(), 2, "Should have both branches");
         }
-        _ => panic!("Expected Branch, got: {:?}", bob_proj),
+        _ => panic!("Expected Branch, got: {bob_proj:?}"),
     }
 }
 

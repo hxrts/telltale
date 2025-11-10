@@ -123,7 +123,7 @@ async fn try_run(role: &mut Cache, redis: &RedisClient) -> Result<()> {
                             None => {
                                 assert_eq!(wrap(redis.del(key).await)?, RedisValue::Integer(1));
                             }
-                        };
+                        }
                     }
 
                     assert_eq!(wrap(redis.del(&lock).await)?, RedisValue::Integer(1));

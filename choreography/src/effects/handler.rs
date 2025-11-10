@@ -14,7 +14,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_choreography::{ChoreoHandler, Label};
+//! use rumpsteak_aura_choreography::{ChoreoHandler, Label};
 //!
 //! #[async_trait]
 //! impl ChoreoHandler for MyHandler {
@@ -246,6 +246,7 @@ pub struct NoOpHandler<R: RoleId> {
 
 impl<R: RoleId> NoOpHandler<R> {
     /// Create a new no-op handler
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             _phantom: std::marker::PhantomData,

@@ -3,7 +3,7 @@
 // This example demonstrates a negotiation protocol between a buyer, seller, and broker.
 // The broker facilitates the negotiation by coordinating offers and acceptances.
 
-use rumpsteak_choreography::effects::{
+use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
     ChoreoHandler, Label,
 };
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let offer_from_broker: Message = seller_handler.recv(&mut seller_ep, Role::Broker).await?;
     if let Message::Offer { item, price } = offer_from_broker {
-        println!("  Seller received: {} at ${}", item, price);
+        println!("  Seller received: {item} at ${price}");
 
         // Seller makes counter-offer
         println!("\nPhase 3: Seller makes counter-offer");
@@ -122,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let counter_from_broker: Message = buyer_handler.recv(&mut buyer_ep, Role::Broker).await?;
     if let Message::Counter { item, price } = counter_from_broker {
-        println!("  Buyer received counter: {} at ${}", item, price);
+        println!("  Buyer received counter: {item} at ${price}");
 
         // Buyer makes choice: accept or reject
         println!("\nPhase 5: Buyer makes decision");
@@ -153,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let _confirmation: Message = seller_handler.recv(&mut seller_ep, Role::Broker).await?;
         println!("  Seller: Sale confirmed!");
-        println!("\n🎉 Negotiation successful!");
+        println!("\nNegotiation successful!");
     } else {
         println!("  Broker: Negotiation failed");
         let reject_msg = Message::Reject;
@@ -163,7 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let _rejection: Message = seller_handler.recv(&mut seller_ep, Role::Broker).await?;
         println!("  Seller: Offer rejected");
-        println!("\n❌ Negotiation failed");
+        println!("\nNegotiation failed");
     }
 
     // Display session metadata

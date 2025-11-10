@@ -87,7 +87,7 @@ async fn ring_a(role: &mut A, mut input: i32) -> Result<Infallible> {
     try_session(role, |mut s: RingA<'_, _>| async {
         let max_rounds = max_rounds();
         for round in 0..max_rounds {
-            println!("A (round {}): {}", round, input);
+            println!("A (round {round}): {input}");
             let x = input % 100; // Keep values small to prevent overflow
             s = match s.send(Add(x)).await?.branch().await? {
                 RingAChoice::Add(Add(y), s) => {
@@ -100,10 +100,9 @@ async fn ring_a(role: &mut A, mut input: i32) -> Result<Infallible> {
                 }
             };
         }
-        println!("A: Completed {} rounds, final value: {}", max_rounds, input);
+        println!("A: Completed {max_rounds} rounds, final value: {input}");
         println!(
-            "Note: Session types are infinite - limited to {} rounds for testing",
-            max_rounds
+            "Note: Session types are infinite - limited to {max_rounds} rounds for testing"
         );
         unreachable!()
     })
@@ -114,7 +113,7 @@ async fn ring_b(role: &mut B, mut input: i32) -> Result<Infallible> {
     try_session(role, |mut s: RingB<'_, _>| async {
         let max_rounds = max_rounds();
         for round in 0..max_rounds {
-            println!("B (round {}): {}", round, input);
+            println!("B (round {round}): {input}");
             let x = input % 100; // Keep values small to prevent overflow
             s = if x > 0 {
                 let s = s.select(Add(x)).await?;
@@ -128,7 +127,7 @@ async fn ring_b(role: &mut B, mut input: i32) -> Result<Infallible> {
                 s
             };
         }
-        println!("B: Completed {} rounds, final value: {}", max_rounds, input);
+        println!("B: Completed {max_rounds} rounds, final value: {input}");
         unreachable!()
     })
     .await
@@ -138,7 +137,7 @@ async fn ring_c(role: &mut C, mut input: i32) -> Result<Infallible> {
     try_session(role, |mut s: RingC<'_, _>| async {
         let max_rounds = max_rounds();
         for round in 0..max_rounds {
-            println!("C (round {}): {}", round, input);
+            println!("C (round {round}): {input}");
             let x = input % 100; // Keep values small to prevent overflow
             s = match s.branch().await? {
                 RingCChoice::Add(Add(y), s_recv) => {
@@ -153,7 +152,7 @@ async fn ring_c(role: &mut C, mut input: i32) -> Result<Infallible> {
                 }
             };
         }
-        println!("C: Completed {} rounds, final value: {}", max_rounds, input);
+        println!("C: Completed {max_rounds} rounds, final value: {input}");
         unreachable!()
     })
     .await

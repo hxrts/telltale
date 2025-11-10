@@ -55,17 +55,14 @@ struct Builder<'a, R, N, E> {
     variables: &'a mut usize,
 }
 
-impl<'a, R: Clone, N: Clone, E: Clone> Builder<'a, R, N, E> {
+impl<R: Clone, N: Clone, E: Clone> Builder<'_, R, N, E> {
     fn variable(&mut self, state: StateIndex) -> usize {
         let variable = &mut self.looped[state.index()];
-        match variable {
-            Some(variable) => *variable,
-            None => {
-                let next = *self.variables;
-                *variable = Some(next);
-                *self.variables += 1;
-                next
-            }
+        if let Some(variable) = variable { *variable } else {
+            let next = *self.variables;
+            *variable = Some(next);
+            *self.variables += 1;
+            next
         }
     }
 
@@ -97,20 +94,20 @@ impl<R: Display, N: Display, E: Display> Display for Local<R, N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::End => write!(f, "end"),
-            Self::Recursion(variable) => write!(f, "X{}", variable),
-            Self::Variable(variable, ty) => write!(f, "rec X{} . {}", variable, ty),
+            Self::Recursion(variable) => write!(f, "X{variable}"),
+            Self::Variable(variable, ty) => write!(f, "rec X{variable} . {ty}"),
             Self::Transitions(transitions) => {
                 assert!(!transitions.is_empty());
 
                 if let [(transition, ty)] = transitions.as_slice() {
-                    return write!(f, "{}; {}", transition, ty);
+                    return write!(f, "{transition}; {ty}");
                 }
 
                 let (transition, ty) = &transitions[0];
-                write!(f, "[{}; {}", transition, ty)?;
+                write!(f, "[{transition}; {ty}")?;
 
                 for (transition, ty) in &transitions[1..] {
-                    write!(f, ", {}; {}", transition, ty)?;
+                    write!(f, ", {transition}; {ty}")?;
                 }
 
                 write!(f, "]")

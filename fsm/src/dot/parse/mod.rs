@@ -33,7 +33,7 @@ trait Token<'a>: Logos<'a> {
         // This pattern allows extracting the enum discriminant without pattern matching,
         // which is useful for generic parsing logic that needs to compare token types
         // without knowing their specific variant data.
-        unsafe { *(self as *const _ as *const _) }
+        unsafe { *std::ptr::from_ref(self).cast() }
     }
 }
 
@@ -164,7 +164,7 @@ impl<'a, T: Token<'a>, E> Lexer<'a, T, E> {
 
 impl<'a, T: Token<'a>, E: PushError> PushError for Lexer<'a, T, E> {
     fn push_err(&mut self, span: Span, err: ParseError) {
-        self.errors.push_err(span, err)
+        self.errors.push_err(span, err);
     }
 }
 
@@ -262,22 +262,19 @@ struct ParseIter<'a, E: transition::Expression> {
     phantom: PhantomData<E>,
 }
 
-impl<'a, E: transition::Expression> Iterator for ParseIter<'a, E> {
+impl<E: transition::Expression> Iterator for ParseIter<'_, E> {
     type Item = Result<Fsm<String, String, E>, ParseErrors>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.tokens.peek().inner {
-            fsm::Token::Eoi => None,
-            _ => {
-                let fsm = fsm::parse(&mut self.tokens);
-                self.tokens.finish();
-                let errors = self.tokens.take_errors();
-                if !errors.is_empty() {
-                    return Some(Err(errors));
-                }
-
-                Some(Ok(fsm.unwrap()))
+        if self.tokens.peek().inner == fsm::Token::Eoi { None } else {
+            let fsm = fsm::parse(&mut self.tokens);
+            self.tokens.finish();
+            let errors = self.tokens.take_errors();
+            if !errors.is_empty() {
+                return Some(Err(errors));
             }
+
+            Some(Ok(fsm.unwrap()))
         }
     }
 }

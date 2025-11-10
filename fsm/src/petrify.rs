@@ -24,7 +24,7 @@ impl<'a, R, N, E> Petrify<'a, R, N, E> {
     }
 }
 
-impl<'a, R: Display, N: Display, E> Display for Petrify<'a, R, N, E> {
+impl<R: Display, N: Display, E> Display for Petrify<'_, R, N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, ".outputs")?;
         writeln!(f, ".state graph")?;

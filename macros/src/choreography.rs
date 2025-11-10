@@ -19,7 +19,7 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
     // First, try to parse as a string literal (for inline DSL)
     if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
         // Use the DSL parser
-        return choreography_from_dsl_string(lit_str.value());
+        return Ok(choreography_from_dsl_string(lit_str.value()));
     }
 
     // Otherwise, fall back to syn-based parsing
@@ -55,18 +55,18 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 /// Parse choreography from DSL string
 ///
 /// Note: DSL string parsing with full support for parameterized roles is now available
-/// in the `rumpsteak-choreography` crate. The macro in that crate (`rumpsteak_choreography::choreography!`)
+/// in the `rumpsteak-choreography` crate. The macro in that crate (`rumpsteak_aura_choreography::choreography!`)
 /// provides complete integration. This stub remains for backwards compatibility.
-fn choreography_from_dsl_string(_dsl: String) -> Result<TokenStream> {
-    let _ = _dsl;
-    Ok(quote! {
+fn choreography_from_dsl_string(dsl: String) -> proc_macro2::TokenStream {
+    drop(dsl); // Explicitly consume parameter
+    quote! {
         compile_error!(
-            "DSL string parsing with parameterized roles support is available through the rumpsteak_choreography crate.\n\
-             Use: rumpsteak_choreography::choreography! instead of rumpsteak_macros::choreography!\n\
+            "DSL string parsing with parameterized roles support is available through the rumpsteak_aura_choreography crate.\n\
+             Use: rumpsteak_aura_choreography::choreography! instead of rumpsteak_macros::choreography!\n\
              \n\
              Or use the explicit macro syntax without string literals for basic protocols."
         );
-    })
+    }
 }
 
 /// Protocol definition from the DSL
@@ -211,11 +211,11 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
         }
 
         // For simplicity, just use first route for bidirectional channel
-        let route = if !routes.is_empty() {
+        let route = if routes.is_empty() {
+            quote! {}
+        } else {
             let other = &role_names[(i + 1) % role_names.len()];
             quote! { #[route(#other)] }
-        } else {
-            quote! {}
         };
 
         role_structs.push(quote! {
@@ -288,7 +288,7 @@ fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
     // For each role, generate its session type
     for role in &protocol.roles {
         let role_name = &role.name;
-        let session_type = project_role(protocol, role)?;
+        let session_type = project_role(protocol, role);
 
         let session_type_name = quote::format_ident!("{}Session", role_name);
         types.extend(quote! {
@@ -301,7 +301,7 @@ fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
 }
 
 /// Project the protocol to a specific role's session type
-fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
+fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStream {
     let mut type_expr = quote! { ::rumpsteak_aura::End };
 
     // Process interactions in reverse order to build the type
@@ -406,12 +406,13 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
         }
     }
 
-    Ok(type_expr)
+    type_expr
 }
 
 /// Generate setup function
 fn generate_setup_function(protocol: &ProtocolDef) -> TokenStream {
     let _n = protocol.roles.len();
+    #[allow(clippy::no_effect_underscore_binding)] // For future use
     let _protocol_name = &protocol.name;
 
     quote! {

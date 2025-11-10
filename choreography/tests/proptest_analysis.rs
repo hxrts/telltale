@@ -8,8 +8,8 @@
 
 use proptest::prelude::*;
 use quote::{format_ident, quote};
-use rumpsteak_choreography::ast::{Branch, Choreography, MessageType, Protocol, Role};
-use rumpsteak_choreography::compiler::analysis::analyze;
+use rumpsteak_aura_choreography::ast::{Branch, Choreography, MessageType, Protocol, Role};
+use rumpsteak_aura_choreography::compiler::analysis::analyze;
 use std::collections::HashMap;
 
 // Reuse strategies from projection tests
@@ -224,7 +224,7 @@ proptest! {
                 let total_activity = info.sends + info.receives + info.choices;
                 assert!(
                     total_activity > 0,
-                    "Active role {:?} should have some activity", role
+                    "Active role {role:?} should have some activity"
                 );
             }
         }
@@ -237,7 +237,7 @@ proptest! {
 
         let unused_roles: Vec<_> = result.warnings.iter()
             .filter_map(|w| {
-                if let rumpsteak_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) = w {
+                if let rumpsteak_aura_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) = w {
                     Some(r)
                 } else {
                     None
@@ -426,7 +426,7 @@ mod unit_tests {
 
         // Charlie should be warned as unused
         let has_unused_warning = result.warnings.iter().any(|w| {
-            matches!(w, rumpsteak_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) if *r == charlie)
+            matches!(w, rumpsteak_aura_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) if *r == charlie)
         });
 
         assert!(has_unused_warning, "Unused role should generate warning");

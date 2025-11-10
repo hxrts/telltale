@@ -9,6 +9,7 @@ use quote::{format_ident, quote};
 use std::collections::HashSet;
 
 /// Generate effect-based protocol implementation
+#[must_use] 
 pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
     let protocol_name = &choreography.name;
     let roles = generate_role_enum(&choreography.roles);
@@ -17,7 +18,7 @@ pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
     let endpoint_type = generate_endpoint_type(protocol_name);
 
     quote! {
-        use rumpsteak_choreography::{
+        use rumpsteak_aura_choreography::{
             ChoreoHandler, Result, Label, Program, Effect,
             interpret, InterpretResult, ProgramMessage
         };
@@ -174,7 +175,7 @@ fn generate_program_builder(protocol: &Protocol, role: &Role) -> TokenStream {
     let program_effects = generate_program_effects(protocol, role);
 
     quote! {
-        use rumpsteak_choreography::{Program, Effect, Label};
+        use rumpsteak_aura_choreography::{Program, Effect, Label};
 
         Program::new()
             #program_effects

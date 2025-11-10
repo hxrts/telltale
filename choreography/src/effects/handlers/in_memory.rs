@@ -52,7 +52,7 @@ impl<R: RoleId> InMemoryHandler<R> {
         let mut channels = self
             .channels
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         channels
             .entry((from, to))
             .or_insert_with(unbounded)
@@ -65,7 +65,7 @@ impl<R: RoleId> InMemoryHandler<R> {
         let mut channels = self
             .channels
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         channels.remove(&(from, to)).map(|(_, rx)| rx)
     }
 
@@ -75,7 +75,7 @@ impl<R: RoleId> InMemoryHandler<R> {
         let mut channels = self
             .choice_channels
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         channels
             .entry((from, to))
             .or_insert_with(unbounded)
@@ -88,7 +88,7 @@ impl<R: RoleId> InMemoryHandler<R> {
         let mut channels = self
             .choice_channels
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         channels.remove(&(from, to)).map(|(_, rx)| rx)
     }
 }
@@ -143,7 +143,7 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
             let mut channels = self
                 .channels
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some((tx, _)) = channels.remove(&(from, self.role)) {
                 channels.insert((from, self.role), (tx, receiver));
             }
@@ -192,7 +192,7 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
             let mut channels = self
                 .choice_channels
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some((tx, _)) = channels.remove(&(from, self.role)) {
                 channels.insert((from, self.role), (tx, receiver));
             }

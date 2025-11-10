@@ -1,6 +1,6 @@
 // Integration tests for RumpsteakHandler with SimpleChannel
 
-use rumpsteak_choreography::effects::{
+use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel},
     ChoreoHandler,
 };
@@ -149,7 +149,7 @@ async fn test_multiple_messages() {
     // Send multiple messages
     for i in 0..5 {
         let msg = TestMessage {
-            content: format!("Message {}", i),
+            content: format!("Message {i}"),
         };
 
         alice_handler
@@ -162,7 +162,7 @@ async fn test_multiple_messages() {
             .await
             .expect("Bob should receive message");
 
-        assert_eq!(received.content, format!("Message {}", i));
+        assert_eq!(received.content, format!("Message {i}"));
     }
 }
 
@@ -230,7 +230,7 @@ async fn test_large_message() {
 
 #[tokio::test]
 async fn test_choice_selection() {
-    use rumpsteak_choreography::effects::Label;
+    use rumpsteak_aura_choreography::effects::Label;
 
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
@@ -266,7 +266,7 @@ async fn test_choice_selection() {
 
 #[tokio::test]
 async fn test_multiple_choices() {
-    use rumpsteak_choreography::effects::Label;
+    use rumpsteak_aura_choreography::effects::Label;
 
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
@@ -299,15 +299,14 @@ async fn test_multiple_choices() {
 
         assert_eq!(
             received_label.0, choice_str,
-            "Bob should receive choice: {}",
-            choice_str
+            "Bob should receive choice: {choice_str}"
         );
     }
 }
 
 #[tokio::test]
 async fn test_choice_with_messages() {
-    use rumpsteak_choreography::effects::Label;
+    use rumpsteak_aura_choreography::effects::Label;
 
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
@@ -416,7 +415,7 @@ async fn test_session_state_tracking() {
     assert_eq!(bob_meta.state_description, "Recv");
 
     // Perform choice operation
-    use rumpsteak_choreography::effects::Label;
+    use rumpsteak_aura_choreography::effects::Label;
     let choice_label = Label("option_a");
     alice_handler
         .choose(&mut alice_endpoint, TestRole::Bob, choice_label)
@@ -533,7 +532,7 @@ async fn test_error_recovery() {
 
 #[tokio::test]
 async fn test_dynamic_session_flow() {
-    use rumpsteak_choreography::effects::Label;
+    use rumpsteak_aura_choreography::effects::Label;
 
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
     let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);

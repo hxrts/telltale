@@ -35,14 +35,14 @@ impl<R: RoleId> RecordingHandler<R> {
     pub fn events(&self) -> Vec<RecordedEvent<R>> {
         self.events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
 
     pub fn clear(&self) {
         self.events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
     }
 }
@@ -60,7 +60,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
     ) -> Result<()> {
         self.events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(RecordedEvent::Send {
                 from: self.role,
                 to,
@@ -76,7 +76,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
     ) -> Result<M> {
         self.events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(RecordedEvent::Recv {
                 from,
                 to: self.role,
@@ -95,7 +95,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
     ) -> Result<()> {
         self.events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(RecordedEvent::Choose { at, label });
         Ok(())
     }
@@ -103,7 +103,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
     async fn offer(&mut self, _ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
         self.events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(RecordedEvent::Offer {
                 from,
                 to: self.role,

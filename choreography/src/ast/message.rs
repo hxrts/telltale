@@ -11,7 +11,7 @@ use proc_macro2::{Ident, TokenStream};
 ///
 /// ```ignore
 /// use quote::{format_ident, quote};
-/// use rumpsteak_choreography::MessageType;
+/// use rumpsteak_aura_choreography::MessageType;
 ///
 /// // Simple message without payload
 /// let ping = MessageType {
@@ -40,10 +40,10 @@ pub struct MessageType {
 impl PartialEq for MessageType {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.type_annotation.as_ref().map(|ts| ts.to_string())
-                == other.type_annotation.as_ref().map(|ts| ts.to_string())
-            && self.payload.as_ref().map(|ts| ts.to_string())
-                == other.payload.as_ref().map(|ts| ts.to_string())
+            && self.type_annotation.as_ref().map(std::string::ToString::to_string)
+                == other.type_annotation.as_ref().map(std::string::ToString::to_string)
+            && self.payload.as_ref().map(std::string::ToString::to_string)
+                == other.payload.as_ref().map(std::string::ToString::to_string)
     }
 }
 
@@ -63,6 +63,7 @@ impl std::hash::Hash for MessageType {
 
 impl MessageType {
     /// Generate a Rust type identifier for this message
+    #[must_use] 
     pub fn to_ident(&self) -> Ident {
         self.name.clone()
     }

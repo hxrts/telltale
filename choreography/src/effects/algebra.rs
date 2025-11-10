@@ -59,6 +59,7 @@ pub struct Program<R: RoleId, M> {
 
 impl<R: RoleId, M> Program<R, M> {
     /// Create a new empty program
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             effects: Vec::new(),
@@ -103,6 +104,7 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Add a parallel composition effect
+    #[must_use] 
     pub fn parallel(mut self, programs: Vec<Program<R, M>>) -> Self {
         self.effects.push(Effect::Parallel { programs });
         self
@@ -118,6 +120,7 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Add a loop effect
+    #[must_use] 
     pub fn loop_n(mut self, iterations: usize, body: Program<R, M>) -> Self {
         self.effects.push(Effect::Loop {
             iterations: Some(iterations),
@@ -127,6 +130,7 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Add an infinite loop effect (or until break)
+    #[must_use] 
     pub fn loop_inf(mut self, body: Program<R, M>) -> Self {
         self.effects.push(Effect::Loop {
             iterations: None,
@@ -142,22 +146,26 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Extend this program with another program
+    #[must_use] 
     pub fn then(mut self, other: Program<R, M>) -> Self {
         self.effects.extend(other.effects);
         self
     }
 
     /// Create a program that executes multiple programs in parallel
+    #[must_use] 
     pub fn par(programs: Vec<Program<R, M>>) -> Self {
         Self::new().parallel(programs)
     }
 
     /// Check if the program is empty
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.effects.is_empty()
     }
 
     /// Get the length of the program (number of effects)
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.effects.len()
     }
@@ -172,6 +180,7 @@ impl<R: RoleId, M> Default for Program<R, M> {
 /// Program analysis utilities
 impl<R: RoleId, M> Program<R, M> {
     /// Get all roles involved in this program
+    #[must_use] 
     pub fn roles_involved(&self) -> HashSet<R> {
         let mut roles = HashSet::new();
         self.collect_roles(&mut roles);
@@ -220,6 +229,7 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Count the number of send operations
+    #[must_use] 
     pub fn send_count(&self) -> usize {
         self.effects
             .iter()
@@ -232,13 +242,14 @@ impl<R: RoleId, M> Program<R, M> {
                     .unwrap_or(0),
                 Effect::Loop { body, .. } => body.send_count(),
                 Effect::Timeout { body, .. } => body.send_count(),
-                Effect::Parallel { programs } => programs.iter().map(|p| p.send_count()).sum(),
+                Effect::Parallel { programs } => programs.iter().map(Program::send_count).sum(),
                 _ => 0,
             })
             .sum()
     }
 
     /// Count the number of receive operations
+    #[must_use] 
     pub fn recv_count(&self) -> usize {
         self.effects
             .iter()
@@ -251,13 +262,14 @@ impl<R: RoleId, M> Program<R, M> {
                     .unwrap_or(0),
                 Effect::Loop { body, .. } => body.recv_count(),
                 Effect::Timeout { body, .. } => body.recv_count(),
-                Effect::Parallel { programs } => programs.iter().map(|p| p.recv_count()).sum(),
+                Effect::Parallel { programs } => programs.iter().map(Program::recv_count).sum(),
                 _ => 0,
             })
             .sum()
     }
 
     /// Check if the program has any timeout effects
+    #[must_use] 
     pub fn has_timeouts(&self) -> bool {
         self.effects
             .iter()
@@ -265,6 +277,7 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Check if the program has any parallel effects
+    #[must_use] 
     pub fn has_parallel(&self) -> bool {
         self.effects
             .iter()
@@ -315,7 +328,7 @@ pub enum ProgramError {
 impl std::fmt::Display for ProgramError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProgramError::InvalidStructure(msg) => write!(f, "Invalid program structure: {}", msg),
+            ProgramError::InvalidStructure(msg) => write!(f, "Invalid program structure: {msg}"),
             ProgramError::UnbalancedCommunication => {
                 write!(f, "Unbalanced send/receive operations")
             }

@@ -7,7 +7,7 @@
 // - Complex protocol scenarios
 
 use futures::executor;
-use rumpsteak_choreography::{
+use rumpsteak_aura_choreography::{
     interpret, Label, Metrics, NoOpHandler, Program, RecordingHandler, Retry, Trace,
 };
 use serde::{Deserialize, Serialize};

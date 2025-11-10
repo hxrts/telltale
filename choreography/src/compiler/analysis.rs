@@ -40,6 +40,7 @@ pub struct CommunicationGraph {
 }
 
 /// Analyze a choreography for correctness properties
+#[must_use] 
 pub fn analyze(choreography: &Choreography) -> AnalysisResult {
     let mut analyzer = Analyzer::new(choreography);
     analyzer.analyze()
@@ -355,6 +356,7 @@ fn has_communication(protocol: &Protocol) -> bool {
 }
 
 /// Generate a DOT graph visualization of the communication pattern
+#[must_use] 
 pub fn generate_dot_graph(comm_graph: &CommunicationGraph) -> String {
     let mut dot = String::from("digraph G {\n");
     dot.push_str("  rankdir=LR;\n");
