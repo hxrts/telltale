@@ -6,8 +6,8 @@ Add Rumpsteak to your project (using the Aura fork):
 
 ```toml
 [dependencies]
-rumpsteak-aura = { git = "https://github.com/hxrts/rumpsteak-aura" }
-rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura" }
+rumpsteak-aura = "0.2"
+rumpsteak-choreography = "0.2"
 ```
 
 ### Understanding the Crates
@@ -29,7 +29,7 @@ Rumpsteak-Aura is organized as a Cargo workspace with several crates:
 For WASM support, add the wasm feature:
 
 ```toml
-rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura", features = ["wasm"] }
+rumpsteak-choreography = { version = "0.2", features = ["wasm"] }
 ```
 
 ## Creating a Choreography

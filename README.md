@@ -34,13 +34,13 @@ This is the Aura fork of Rumpsteak with enhanced choreographic programming suppo
 
 ```toml
 [dependencies]
-rumpsteak-aura = { git = "https://github.com/hxrts/rumpsteak-aura" }
+rumpsteak-aura = "0.2"
 ```
 
 For choreographic programming:
 ```toml
 [dependencies]
-rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura" }
+rumpsteak-choreography = "0.2"
 ```
 
 ## Example
