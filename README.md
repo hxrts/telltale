@@ -40,7 +40,7 @@ rumpsteak-aura = "0.2"
 For choreographic programming:
 ```toml
 [dependencies]
-rumpsteak-choreography = "0.2"
+rumpsteak-aura-choreography = "0.2"
 ```
 
 ## Example

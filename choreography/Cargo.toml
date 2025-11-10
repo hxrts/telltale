@@ -1,5 +1,5 @@
 [package]
-name = "rumpsteak-choreography"
+name = "rumpsteak-aura-choreography"
 version = "0.2.0"
 authors = ["Zak Cutner <me@zakcutner.uk>", "Aura Team"]
 edition = "2021"
@@ -16,7 +16,7 @@ bench = false
 
 [dependencies]
 rumpsteak-aura = { path = "..", version = "0.2.0" }
-rumpsteak-macros = { path = "../macros", version = "0.2.0" }
+rumpsteak-aura-macros = { path = "../macros", version = "0.2.0" }
 futures = { workspace = true }
 async-trait = { workspace = true }
 async-recursion = { workspace = true }

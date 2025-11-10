@@ -19,8 +19,8 @@ futures = { workspace = true }
 time = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
-rumpsteak-fsm = { path = "fsm", version = "0.2.0", optional = true }
-rumpsteak-macros = { path = "macros", version = "0.2.0" }
+rumpsteak-aura-fsm = { path = "fsm", version = "0.2.0", optional = true }
+rumpsteak-aura-macros = { path = "macros", version = "0.2.0" }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -47,11 +47,11 @@ rand = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
-rumpsteak-choreography = { path = "choreography", version = "0.2.0" }
+rumpsteak-aura-choreography = { path = "choreography", version = "0.2.0" }
 futures = { workspace = true, features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { workspace = true }
-rumpsteak-fsm = { path = "fsm", features = ["subtyping"] }
+rumpsteak-aura-fsm = { path = "fsm", features = ["subtyping"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "time"] }
 proptest = { workspace = true }
@@ -60,7 +60,7 @@ tracing-subscriber = { workspace = true }
 
 [features]
 default = []
-serialize = ["rumpsteak-fsm", "rumpsteak-macros/serialize"]
+serialize = ["rumpsteak-aura-fsm", "rumpsteak-aura-macros/serialize"]
 test-utils = ["rand"]
 wasm = ["getrandom/js"]
 

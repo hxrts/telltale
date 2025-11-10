@@ -1,5 +1,5 @@
 [package]
-name = "rumpsteak-macros"
+name = "rumpsteak-aura-macros"
 version = "0.2.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2021"

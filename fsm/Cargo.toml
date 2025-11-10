@@ -1,5 +1,5 @@
 [package]
-name = "rumpsteak-fsm"
+name = "rumpsteak-aura-fsm"
 version = "0.2.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2021"
