@@ -27,7 +27,7 @@ pub use effects::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
 pub use runtime::{spawn, spawn_local};
 
 // Re-export macros from rumpsteak-macros
-pub use rumpsteak_macros::choreography;
+pub use rumpsteak_aura_macros::choreography;
 
 #[cfg(test)]
 mod tests {

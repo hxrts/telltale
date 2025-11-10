@@ -5,7 +5,7 @@
 pub mod channel;
 pub mod serialize;
 
-pub use rumpsteak_macros::{session, Message, Role, Roles};
+pub use rumpsteak_aura_macros::{session, Message, Role, Roles};
 
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use std::{
