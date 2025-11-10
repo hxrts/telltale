@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-choreography"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -567,7 +567,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-macros"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -221,6 +221,7 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
         role_structs.push(quote! {
             #[derive(::rumpsteak_aura::Role)]
             #[message(Label)]
+            #[allow(dead_code)]
             pub struct #role(#route Channel);
         });
     }
@@ -232,6 +233,7 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
 
         /// Roles tuple for protocol setup
         #[derive(::rumpsteak_aura::Roles)]
+        #[allow(dead_code)]
         pub struct Roles(#(#role_names),*);
     }
 }
@@ -256,11 +258,13 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
             if let Some(ty) = payload {
                 quote! {
                     #[derive(Clone, Debug)]
+                    #[allow(dead_code)]
                     pub struct #name(pub #ty);
                 }
             } else {
                 quote! {
                     #[derive(Clone, Debug)]
+                    #[allow(dead_code)]
                     pub struct #name;
                 }
             }
@@ -275,6 +279,7 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
 
         /// Message enum for the protocol
         #[derive(::rumpsteak_aura::Message)]
+        #[allow(dead_code)]
         pub enum Label {
             #(#message_names(#message_names)),*
         }

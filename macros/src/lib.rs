@@ -18,6 +18,9 @@ mod role;
 mod roles;
 mod session;
 
+#[cfg(test)]
+mod test_dead_code;
+
 /// Derives the `Message` trait for message types.
 ///
 /// For structs, implements the identity conversion. For enums, implements
