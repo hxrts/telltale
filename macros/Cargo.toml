@@ -1,6 +1,6 @@
 [package]
 name = "rumpsteak-macros"
-version = "0.1.1-aura"
+version = "0.2.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2021"
 description = "Procedural macros for Rumpsteak session types (Aura flavored)."
