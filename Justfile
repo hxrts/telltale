@@ -49,4 +49,15 @@ book: summary
 
 # Serve locally with live reload
 serve: summary
-    mdbook serve --open
+    #!/usr/bin/env bash
+    # Try to serve on the default port, fallback to next available port if in use
+    for port in 3000 3001 3002 3003 3004 3005; do
+        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "Starting mdbook server on http://localhost:$port"
+            mdbook serve --port $port --open
+            exit 0
+        fi
+    done
+    # If we get here, all ports are in use, just show the error
+    echo "Error: All ports 3000-3005 are already in use" >&2
+    exit 1
