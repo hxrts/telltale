@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(size) = &role.array_size {
             println!("    - {} (array size: {})", role.name, quote::quote!(#size));
         } else if role.index.is_some() {
-            println!("    - {}[{}]", role.name, role.index.unwrap());
+            println!("    - {}[{}]", role.name, role.index.as_ref().unwrap());
         } else {
             println!("    - {}", role.name);
         }

@@ -1,6 +1,7 @@
 // Projection from global choreographies to local session types
 
-use crate::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role};
+use crate::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role, RoleParam, RoleIndex, RoleRange, RangeExpr};
+use std::collections::HashMap;
 
 /// Project a choreography to a local session type for a specific role
 pub fn project(choreography: &Choreography, role: &Role) -> Result<LocalType, ProjectionError> {
@@ -22,20 +23,182 @@ pub enum ProjectionError {
 
     #[error("Recursive variable {0} not in scope")]
     UnboundVariable(String),
+
+    #[error("Dynamic role {role} requires runtime context for projection")]
+    DynamicRoleProjection { role: String },
+
+    #[error("Symbolic role parameter '{param}' not bound in context")]
+    UnboundSymbolic { param: String },
+
+    #[error("Range role index cannot be projected to concrete local type")]
+    RangeProjection,
+
+    #[error("Wildcard role index requires specialized projection context")]
+    WildcardProjection,
 }
 
 /// Context for projection algorithm
-///
-/// Note: Future enhancements may include:
-/// - `choreography: &'a Choreography` for global validation during projection
-/// - `rec_env: HashMap<String, LocalType>` for memoizing recursive projections
 struct ProjectionContext<'a> {
     role: &'a Role,
+    /// Bindings for symbolic role parameters (e.g., N -> 5)
+    role_bindings: HashMap<String, u32>,
+    /// Bindings for symbolic index variables (e.g., i -> 2) 
+    #[allow(dead_code)]
+    index_bindings: HashMap<String, u32>,
 }
 
 impl<'a> ProjectionContext<'a> {
     fn new(_choreography: &'a Choreography, role: &'a Role) -> Self {
-        ProjectionContext { role }
+        ProjectionContext { 
+            role,
+            role_bindings: HashMap::new(),
+            index_bindings: HashMap::new(),
+        }
+    }
+
+    /// Create a new context with dynamic role bindings
+    #[allow(dead_code)]
+    fn with_bindings(
+        _choreography: &'a Choreography, 
+        role: &'a Role,
+        role_bindings: HashMap<String, u32>,
+        index_bindings: HashMap<String, u32>,
+    ) -> Self {
+        ProjectionContext { 
+            role,
+            role_bindings,
+            index_bindings,
+        }
+    }
+
+    /// Check if this projection role matches the given protocol role
+    fn role_matches(&self, protocol_role: &Role) -> Result<bool, ProjectionError> {
+        // First check for exact name match
+        if self.role.name != protocol_role.name {
+            return Ok(false);
+        }
+
+        // If both are simple roles, they match
+        if !self.role.is_parameterized() && !protocol_role.is_parameterized() {
+            return Ok(true);
+        }
+
+        // Handle dynamic role matching
+        self.matches_dynamic_role(protocol_role)
+    }
+
+    /// Check if the projection role matches a dynamic protocol role
+    fn matches_dynamic_role(&self, protocol_role: &Role) -> Result<bool, ProjectionError> {
+        match (&self.role.param, &protocol_role.param) {
+            // Static vs Static: must have same count
+            (Some(RoleParam::Static(self_count)), Some(RoleParam::Static(proto_count))) => {
+                Ok(self_count == proto_count)
+            }
+            // Static vs Symbolic: resolve symbolic and compare
+            (Some(RoleParam::Static(self_count)), Some(RoleParam::Symbolic(sym_name))) => {
+                if let Some(&resolved_count) = self.role_bindings.get(sym_name) {
+                    Ok(*self_count == resolved_count)
+                } else {
+                    Err(ProjectionError::UnboundSymbolic { 
+                        param: sym_name.clone() 
+                    })
+                }
+            }
+            // Symbolic vs Static: resolve symbolic and compare
+            (Some(RoleParam::Symbolic(sym_name)), Some(RoleParam::Static(proto_count))) => {
+                if let Some(&resolved_count) = self.role_bindings.get(sym_name) {
+                    Ok(resolved_count == *proto_count)
+                } else {
+                    Err(ProjectionError::UnboundSymbolic { 
+                        param: sym_name.clone() 
+                    })
+                }
+            }
+            // Symbolic vs Symbolic: resolve both and compare
+            (Some(RoleParam::Symbolic(self_sym)), Some(RoleParam::Symbolic(proto_sym))) => {
+                let self_resolved = self.role_bindings.get(self_sym)
+                    .ok_or_else(|| ProjectionError::UnboundSymbolic { 
+                        param: self_sym.clone() 
+                    })?;
+                let proto_resolved = self.role_bindings.get(proto_sym)
+                    .ok_or_else(|| ProjectionError::UnboundSymbolic { 
+                        param: proto_sym.clone() 
+                    })?;
+                Ok(self_resolved == proto_resolved)
+            }
+            // Runtime roles require special handling
+            (_, Some(RoleParam::Runtime)) | (Some(RoleParam::Runtime), _) => {
+                Err(ProjectionError::DynamicRoleProjection { 
+                    role: protocol_role.name.to_string() 
+                })
+            }
+            // One parameterized, one not: no match
+            (Some(_), None) | (None, Some(_)) => Ok(false),
+            // Both None: already handled above
+            (None, None) => Ok(true),
+        }
+    }
+
+    /// Check if the projection role matches a specific index of a protocol role
+    #[allow(dead_code)]
+    fn matches_role_index(&self, protocol_role: &Role) -> Result<bool, ProjectionError> {
+        // First check if the base role names match
+        if self.role.name != protocol_role.name {
+            return Ok(false);
+        }
+
+        match (&self.role.index, &protocol_role.index) {
+            // Both have concrete indices
+            (Some(RoleIndex::Concrete(self_idx)), Some(RoleIndex::Concrete(proto_idx))) => {
+                Ok(self_idx == proto_idx)
+            }
+            // Self has concrete index, protocol has symbolic
+            (Some(RoleIndex::Concrete(self_idx)), Some(RoleIndex::Symbolic(sym_name))) => {
+                if let Some(&resolved_idx) = self.index_bindings.get(sym_name) {
+                    Ok(*self_idx == resolved_idx)
+                } else {
+                    Err(ProjectionError::UnboundSymbolic { 
+                        param: sym_name.clone() 
+                    })
+                }
+            }
+            // Self has symbolic index, protocol has concrete
+            (Some(RoleIndex::Symbolic(sym_name)), Some(RoleIndex::Concrete(proto_idx))) => {
+                if let Some(&resolved_idx) = self.index_bindings.get(sym_name) {
+                    Ok(resolved_idx == *proto_idx)
+                } else {
+                    Err(ProjectionError::UnboundSymbolic { 
+                        param: sym_name.clone() 
+                    })
+                }
+            }
+            // Protocol has wildcard: self matches if it has any index
+            (Some(_), Some(RoleIndex::Wildcard)) => Ok(true),
+            // Protocol has range: check if self's index is in range
+            (Some(RoleIndex::Concrete(self_idx)), Some(RoleIndex::Range(range))) => {
+                self.index_in_range(*self_idx, range)
+            }
+            // Other combinations require more complex handling
+            _ => Ok(false),
+        }
+    }
+
+    /// Check if an index is within a range
+    #[allow(dead_code)]
+    fn index_in_range(&self, index: u32, range: &RoleRange) -> Result<bool, ProjectionError> {
+        let start = match &range.start {
+            RangeExpr::Concrete(val) => *val,
+            RangeExpr::Symbolic(sym) => *self.index_bindings.get(sym)
+                .ok_or_else(|| ProjectionError::UnboundSymbolic { param: sym.clone() })?,
+        };
+
+        let end = match &range.end {
+            RangeExpr::Concrete(val) => *val,
+            RangeExpr::Symbolic(sym) => *self.index_bindings.get(sym)
+                .ok_or_else(|| ProjectionError::UnboundSymbolic { param: sym.clone() })?,
+        };
+
+        Ok(index >= start && index < end)
     }
 
     fn project_protocol(&mut self, protocol: &Protocol) -> Result<LocalType, ProjectionError> {
@@ -45,6 +208,7 @@ impl<'a> ProjectionContext<'a> {
                 to,
                 message,
                 continuation,
+                ..
             } => self.project_send(from, to, message, continuation),
 
             Protocol::Broadcast {
@@ -52,11 +216,13 @@ impl<'a> ProjectionContext<'a> {
                 to_all,
                 message,
                 continuation,
+                ..
             } => self.project_broadcast(from, to_all, message, continuation),
 
             Protocol::Choice {
                 role: choice_role,
                 branches,
+                ..
             } => self.project_choice(choice_role, branches),
 
             Protocol::Loop { condition, body } => self.project_loop(condition.as_ref(), body),
@@ -87,14 +253,17 @@ impl<'a> ProjectionContext<'a> {
         message: &MessageType,
         continuation: &Protocol,
     ) -> Result<LocalType, ProjectionError> {
-        if self.role == from {
+        let is_sender = self.role_matches(from)?;
+        let is_receiver = self.role_matches(to)?;
+
+        if is_sender {
             // We are the sender
             Ok(LocalType::Send {
                 to: to.clone(),
                 message: message.clone(),
                 continuation: Box::new(self.project_protocol(continuation)?),
             })
-        } else if self.role == to {
+        } else if is_receiver {
             // We are the receiver
             Ok(LocalType::Receive {
                 from: from.clone(),
@@ -125,7 +294,18 @@ impl<'a> ProjectionContext<'a> {
         message: &MessageType,
         continuation: &Protocol,
     ) -> Result<LocalType, ProjectionError> {
-        if self.role == from {
+        let is_sender = self.role_matches(from)?;
+        
+        // Check if we are a recipient using dynamic role matching
+        let mut is_receiver = false;
+        for to_role in to_all {
+            if self.role_matches(to_role)? {
+                is_receiver = true;
+                break;
+            }
+        }
+
+        if is_sender {
             // We are broadcasting - need to send to each recipient
             let mut current = self.project_protocol(continuation)?;
 
@@ -139,7 +319,7 @@ impl<'a> ProjectionContext<'a> {
             }
 
             Ok(current)
-        } else if to_all.contains(self.role) {
+        } else if is_receiver {
             // We are receiving the broadcast
             Ok(LocalType::Receive {
                 from: from.clone(),
@@ -169,7 +349,9 @@ impl<'a> ProjectionContext<'a> {
         choice_role: &Role,
         branches: &[Branch],
     ) -> Result<LocalType, ProjectionError> {
-        if self.role == choice_role {
+        let is_choice_maker = self.role_matches(choice_role)?;
+        
+        if is_choice_maker {
             // We make the choice
             // Check if this is a communicated choice (branches start with Send)
             let first_sends = branches
@@ -223,7 +405,7 @@ impl<'a> ProjectionContext<'a> {
 
             for branch in branches {
                 if let Protocol::Send { from, to, .. } = &branch.protocol {
-                    if self.role == to {
+                    if self.role_matches(to)? {
                         receives_choice = true;
                         sender = Some(from.clone());
                         break;

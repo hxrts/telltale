@@ -22,6 +22,7 @@ fn create_simple_choreography() -> Choreography {
 
     Choreography {
         name: format_ident!("SimpleBench"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol: Protocol::Send {
             from: alice.clone(),
@@ -31,6 +32,9 @@ fn create_simple_choreography() -> Choreography {
                 type_annotation: None,
                 payload: None,
             },
+            annotations: HashMap::new(),
+            from_annotations: HashMap::new(),
+            to_annotations: HashMap::new(),
             continuation: Box::new(Protocol::Send {
                 from: bob,
                 to: alice,
@@ -39,6 +43,9 @@ fn create_simple_choreography() -> Choreography {
                     type_annotation: None,
                     payload: None,
                 },
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
                 continuation: Box::new(Protocol::End),
             }),
         },
@@ -54,6 +61,7 @@ fn create_complex_choreography() -> Choreography {
 
     Choreography {
         name: format_ident!("ComplexBench"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone(), charlie.clone()],
         protocol: Protocol::Loop {
             condition: Some(Condition::Count(5)),
@@ -65,8 +73,12 @@ fn create_complex_choreography() -> Choreography {
                     type_annotation: None,
                     payload: None,
                 },
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
                 continuation: Box::new(Protocol::Choice {
                     role: bob.clone(),
+                    annotations: HashMap::new(),
                     branches: vec![
                         Branch {
                             label: format_ident!("Accept"),
@@ -79,6 +91,9 @@ fn create_complex_choreography() -> Choreography {
                                     type_annotation: None,
                                     payload: None,
                                 },
+                                annotations: HashMap::new(),
+                                from_annotations: HashMap::new(),
+                                to_annotations: HashMap::new(),
                                 continuation: Box::new(Protocol::End),
                             },
                         },
@@ -93,6 +108,9 @@ fn create_complex_choreography() -> Choreography {
                                     type_annotation: None,
                                     payload: None,
                                 },
+                                annotations: HashMap::new(),
+                                from_annotations: HashMap::new(),
+                                to_annotations: HashMap::new(),
                                 continuation: Box::new(Protocol::End),
                             },
                         },
@@ -262,6 +280,9 @@ fn bench_scaling(c: &mut Criterion) {
                     type_annotation: None,
                     payload: None,
                 },
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
                 continuation: Box::new(protocol),
             };
         }
@@ -269,6 +290,7 @@ fn bench_scaling(c: &mut Criterion) {
         let bench_name = format!("ScalingBench{num_interactions}");
         let choreography = Choreography {
             name: syn::parse_str::<syn::Ident>(&bench_name).unwrap(),
+            namespace: None,
             roles: vec![alice, bob],
             protocol,
             attrs: HashMap::new(),

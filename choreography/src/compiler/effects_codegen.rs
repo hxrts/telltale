@@ -8,6 +8,38 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashSet;
 
+/// Generate annotation-aware effect metadata for a protocol node
+fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) -> TokenStream {
+    let annotations = protocol.get_annotations();
+    
+    if annotations.is_empty() {
+        return quote! {};
+    }
+
+    let metadata_items: Vec<TokenStream> = annotations
+        .iter()
+        .map(|(key, value)| {
+            match key.as_str() {
+                "priority" => {
+                    quote! { .with_priority(#value.parse().unwrap_or(0)) }
+                }
+                "timeout" => {
+                    quote! { .with_timeout(std::time::Duration::from_secs(#value.parse().unwrap_or(30))) }
+                }
+                "retry" => {
+                    quote! { .with_retry(#value.parse().unwrap_or(1)) }
+                }
+                _ => {
+                    // Generic annotation - add as metadata
+                    quote! { .with_annotation(#key, #value) }
+                }
+            }
+        })
+        .collect();
+
+    quote! { #(#metadata_items)* }
+}
+
 /// Generate effect-based protocol implementation
 #[must_use] 
 pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
@@ -194,6 +226,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             to,
             message,
             continuation,
+            ..
         } => {
             let continuation_effects = generate_program_effects(continuation, role);
 
@@ -201,18 +234,22 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 // This role is sending
                 let message_type = &message.name;
                 let to_ident = &to.name;
+                let send_metadata = generate_effect_metadata_from_annotations(protocol, role);
 
                 quote! {
                     .send(Role::#to_ident, #message_type::default())
+                    #send_metadata
                     #continuation_effects
                 }
             } else if to == role {
                 // This role is receiving
                 let message_type = &message.name;
                 let from_ident = &from.name;
+                let recv_metadata = generate_effect_metadata_from_annotations(protocol, role);
 
                 quote! {
                     .recv::<#message_type>(Role::#from_ident)
+                    #recv_metadata
                     #continuation_effects
                 }
             } else {
@@ -223,6 +260,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         Protocol::Choice {
             role: choice_role,
             branches,
+            ..
         } => {
             // Generate Branch effect with all possible continuations
             let choice_role_name = &choice_role.name;
@@ -375,6 +413,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             to_all,
             message,
             continuation,
+            ..
         } => {
             let continuation_effects = generate_program_effects(continuation, role);
             let message_type = &message.name;
@@ -448,6 +487,7 @@ mod tests {
     fn test_generate_simple_protocol() {
         let choreography = Choreography {
             name: format_ident!("SimpleProtocol"),
+            namespace: None,
             roles: vec![
                 Role::new(format_ident!("Client")),
                 Role::new(format_ident!("Server")),

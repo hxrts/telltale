@@ -6,15 +6,27 @@ COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
 // Top-level choreography definition
 choreography = {
-    SOI ~ annotation* ~ "choreography" ~ ident ~ "{" ~ roles_decl ~ protocol_defs? ~ protocol_body ~ "}" ~ EOI
+    SOI ~ annotation* ~ namespace_decl? ~ "choreography" ~ ident ~ "{" ~ roles_decl ~ protocol_defs? ~ protocol_body ~ "}" ~ EOI
 }
 
+// Namespace declaration (optional)
+namespace_decl = { "#[" ~ "namespace" ~ "=" ~ string ~ "]" }
+
 // Annotations (for optimization hints, verification, etc.)
-annotation = { "@" ~ ident ~ annotation_args? }
+annotation = { "@" ~ ident ~ annotation_args? | "[" ~ annotation_list ~ "]" }
 annotation_args = { "(" ~ annotation_arg_list? ~ ")" }
 annotation_arg_list = { annotation_arg ~ ("," ~ annotation_arg)* }
 annotation_arg = { ident ~ ("=" ~ annotation_value)? }
-annotation_value = { string | integer | ident }
+annotation_value = { string | integer | boolean | ident }
+
+// Enhanced annotation support for statements and roles
+annotation_list = { annotation_item ~ ("," ~ annotation_item)* }
+annotation_item = { "@" ~ ident ~ ("=" ~ annotation_value)? }
+
+// Role annotation items (without @ prefix since role_annotations already has it)
+role_annotation_list = { role_annotation_item ~ ("," ~ role_annotation_item)* }
+role_annotation_item = { ident ~ ("=" ~ annotation_value)? }
+boolean = { "true" | "false" }
 
 // Protocol definitions (sub-protocols)
 protocol_defs = { protocol_def+ }
@@ -23,10 +35,11 @@ protocol_def = {
 }
 
 // Role declarations
-roles_decl = { "roles" ~ ":" ~ role_list }
+roles_decl = { "roles" ~ ":" ~ role_list ~ ";"? }
 role_list = { role_decl ~ ("," ~ role_decl)* }
 role_decl = { ident ~ role_param? }
-role_param = { "[" ~ (integer | ident) ~ "]" }
+role_param = { "[" ~ role_param_expr ~ "]" }
+role_param_expr = { integer | ident | "*" } // "*" for runtime-determined count
 
 // Protocol body (sequence of statements)
 protocol_body = { statement* }
@@ -43,16 +56,21 @@ annotated_stmt = {
 // Protocol call statement
 call_stmt = { "call" ~ ident }
 
-// Send statement: A -> B: Message(payload)
-send_stmt = { role_ref ~ "->" ~ role_ref ~ ":" ~ message }
+// Send statement: A[@annotations] -> B: Message(payload) or A -> B[@annotations]: Message(payload)
+send_stmt = { annotated_role ~ "->" ~ annotated_role ~ ":" ~ message ~ ";"? }
 
-// Broadcast statement: A ->* : Message(payload)
-broadcast_stmt = { role_ref ~ "->*" ~ ":" ~ message }
+// Broadcast statement: A[@annotations] ->* : Message(payload)
+broadcast_stmt = { annotated_role ~ "->*" ~ ":" ~ message ~ ";"? }
+
+// Role with optional annotations
+annotated_role = { role_ref ~ role_annotations? }
+role_annotations = { "[" ~ "@" ~ role_annotation_list ~ "]" }
 
 // Role reference (can be simple or indexed)
 role_ref = { ident ~ role_index? }
 role_index = { "[" ~ role_index_expr ~ "]" }
-role_index_expr = { (!("]") ~ ANY)+ }
+role_index_expr = { range_expr | integer | ident | "*" }
+range_expr = { (integer | ident) ~ ".." ~ (integer | ident) }
 
 // Choice statement
 choice_stmt = {

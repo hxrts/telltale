@@ -20,6 +20,7 @@ fn test_local_choice_without_send() {
 
     let choreo = Choreography {
         name: format_ident!("LocalChoiceTest"),
+        namespace: None,
         roles: vec![alice.clone()],
         protocol: Protocol::Choice {
             role: alice.clone(),
@@ -35,6 +36,7 @@ fn test_local_choice_without_send() {
                     protocol: Protocol::End,
                 },
             ],
+            annotations: HashMap::new(),
         },
         attrs: HashMap::new(),
     };
@@ -61,6 +63,7 @@ fn test_loop_with_condition() {
 
     let choreo = Choreography {
         name: format_ident!("LoopConditionTest"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol: Protocol::Loop {
             condition: Some(Condition::Count(5)),
@@ -69,10 +72,14 @@ fn test_loop_with_condition() {
                 to: bob.clone(),
                 message: MessageType {
                     name: format_ident!("Data"),
+        
                     type_annotation: None,
                     payload: Some(quote! { String }),
                 },
                 continuation: Box::new(Protocol::End),
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
             }),
         },
         attrs: HashMap::new(),
@@ -106,6 +113,7 @@ fn test_parallel_no_conflict() {
 
     let choreo = Choreography {
         name: format_ident!("ParallelNoConflict"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone(), charlie.clone()],
         protocol: Protocol::Parallel {
             protocols: vec![
@@ -114,20 +122,28 @@ fn test_parallel_no_conflict() {
                     to: bob.clone(),
                     message: MessageType {
                         name: format_ident!("Msg1"),
+        
                         type_annotation: None,
                         payload: Some(quote! { String }),
                     },
                     continuation: Box::new(Protocol::End),
+                    annotations: HashMap::new(),
+                    from_annotations: HashMap::new(),
+                    to_annotations: HashMap::new(),
                 },
                 Protocol::Send {
                     from: alice.clone(),
                     to: charlie.clone(),
                     message: MessageType {
                         name: format_ident!("Msg2"),
+        
                         type_annotation: None,
                         payload: Some(quote! { i32 }),
                     },
                     continuation: Box::new(Protocol::End),
+                    annotations: HashMap::new(),
+                    from_annotations: HashMap::new(),
+                    to_annotations: HashMap::new(),
                 },
             ],
         },
@@ -157,6 +173,7 @@ fn test_parallel_with_conflict() {
 
     let choreo = Choreography {
         name: format_ident!("ParallelConflict"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol: Protocol::Parallel {
             protocols: vec![
@@ -165,20 +182,28 @@ fn test_parallel_with_conflict() {
                     to: bob.clone(),
                     message: MessageType {
                         name: format_ident!("Msg1"),
+        
                         type_annotation: None,
                         payload: Some(quote! { String }),
                     },
                     continuation: Box::new(Protocol::End),
+                    annotations: HashMap::new(),
+                    from_annotations: HashMap::new(),
+                    to_annotations: HashMap::new(),
                 },
                 Protocol::Send {
                     from: alice.clone(),
                     to: bob.clone(), // Same recipient - conflict!
                     message: MessageType {
                         name: format_ident!("Msg2"),
+        
                         type_annotation: None,
                         payload: Some(quote! { i32 }),
                     },
                     continuation: Box::new(Protocol::End),
+                    annotations: HashMap::new(),
+                    from_annotations: HashMap::new(),
+                    to_annotations: HashMap::new(),
                 },
             ],
         },
@@ -198,6 +223,7 @@ fn test_mixed_choice_communicated_vs_local() {
 
     let choreo = Choreography {
         name: format_ident!("CommunicatedChoice"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol: Protocol::Choice {
             role: alice.clone(),
@@ -210,10 +236,14 @@ fn test_mixed_choice_communicated_vs_local() {
                         to: bob.clone(),
                         message: MessageType {
                             name: format_ident!("Data"),
+        
                             type_annotation: None,
                             payload: Some(quote! { String }),
                         },
                         continuation: Box::new(Protocol::End),
+                        annotations: HashMap::new(),
+                        from_annotations: HashMap::new(),
+                        to_annotations: HashMap::new(),
                     },
                 },
                 Branch {
@@ -224,13 +254,18 @@ fn test_mixed_choice_communicated_vs_local() {
                         to: bob.clone(),
                         message: MessageType {
                             name: format_ident!("NoData"),
+        
                             type_annotation: None,
                             payload: Some(quote! { () }),
                         },
                         continuation: Box::new(Protocol::End),
+                        annotations: HashMap::new(),
+                        from_annotations: HashMap::new(),
+                        to_annotations: HashMap::new(),
                     },
                 },
             ],
+            annotations: HashMap::new(),
         },
         attrs: HashMap::new(),
     };
@@ -264,6 +299,7 @@ fn test_loop_without_condition() {
 
     let choreo = Choreography {
         name: format_ident!("LoopNoCondition"),
+        namespace: None,
         roles: vec![alice.clone()],
         protocol: Protocol::Loop {
             condition: None,

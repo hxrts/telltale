@@ -15,9 +15,9 @@ pub use analysis::{
     ParticipationInfo,
 };
 pub use codegen::{
-    generate_choreography_code, generate_helpers, generate_role_implementations,
+    generate_choreography_code, generate_choreography_code_with_namespacing, generate_helpers, generate_role_implementations,
     generate_session_type,
 };
 pub use effects_codegen::generate_effects_protocol;
-pub use parser::{choreography_macro, parse_choreography, parse_choreography_file, parse_dsl};
+pub use parser::{choreography_macro, parse_choreography, parse_choreography_file, parse_choreography_str, parse_dsl};
 pub use projection::{project, ProjectionError};

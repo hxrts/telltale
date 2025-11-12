@@ -117,6 +117,7 @@ impl<'a> Analyzer<'a> {
                 to,
                 message,
                 continuation,
+                ..
             } => {
                 if let Some(stats) = self.role_stats.get_mut(from) {
                     stats.sends += 1;
@@ -135,6 +136,7 @@ impl<'a> Analyzer<'a> {
                 to_all,
                 message,
                 continuation,
+                ..
             } => {
                 if let Some(stats) = self.role_stats.get_mut(from) {
                     stats.sends += to_all.len();
@@ -152,7 +154,7 @@ impl<'a> Analyzer<'a> {
                 self.analyze_protocol(continuation);
             }
 
-            Protocol::Choice { role, branches } => {
+            Protocol::Choice { role, branches, .. } => {
                 if let Some(stats) = self.role_stats.get_mut(role) {
                     stats.choices += 1;
                 }

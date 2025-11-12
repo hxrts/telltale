@@ -47,11 +47,18 @@ fn test_simple_two_party_protocol() {
             to: alice.clone(),
             message: msg("Pong"),
             continuation: Box::new(Protocol::End),
+            annotations: HashMap::new(),
+            from_annotations: HashMap::new(),
+            to_annotations: HashMap::new(),
         }),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("PingPong"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -97,12 +104,22 @@ fn test_three_party_protocol() {
                 to: alice.clone(),
                 message: msg("End"),
                 continuation: Box::new(Protocol::End),
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
             }),
+            annotations: HashMap::new(),
+            from_annotations: HashMap::new(),
+            to_annotations: HashMap::new(),
         }),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("ThreeParty"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone(), carol.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -125,10 +142,13 @@ fn test_broadcast_protocol() {
         to_all: vec![bob.clone(), carol.clone()],
         message: msg("Announcement"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("Broadcast"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone(), carol.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -150,6 +170,9 @@ fn test_choice_protocol() {
         to: bob.clone(),
         message: msg("Accept"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let reject_branch = Protocol::Send {
@@ -157,6 +180,9 @@ fn test_choice_protocol() {
         to: bob.clone(),
         message: msg("Reject"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let protocol = Protocol::Choice {
@@ -173,10 +199,12 @@ fn test_choice_protocol() {
                 protocol: reject_branch,
             },
         ],
+        annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("Choice"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -197,6 +225,9 @@ fn test_loop_protocol() {
         to: bob.clone(),
         message: msg("Ping"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let protocol = Protocol::Loop {
@@ -206,6 +237,7 @@ fn test_loop_protocol() {
 
     let choreography = Choreography {
         name: ident("Loop"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -227,6 +259,9 @@ fn test_parallel_protocol() {
         to: bob.clone(),
         message: msg("Msg1"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let branch2 = Protocol::Send {
@@ -234,6 +269,9 @@ fn test_parallel_protocol() {
         to: alice.clone(),
         message: msg("Msg2"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let protocol = Protocol::Parallel {
@@ -242,6 +280,7 @@ fn test_parallel_protocol() {
 
     let choreography = Choreography {
         name: ident("Parallel"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone(), carol.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -265,6 +304,9 @@ fn test_recursive_protocol() {
         to: bob.clone(),
         message: msg("Data"),
         continuation: Box::new(Protocol::Var(var_label.clone())),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let protocol = Protocol::Rec {
@@ -274,6 +316,7 @@ fn test_recursive_protocol() {
 
     let choreography = Choreography {
         name: ident("Recursive"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -294,6 +337,9 @@ fn test_complex_negotiation() {
         to: buyer.clone(),
         message: msg("Accept"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let counter = Protocol::Send {
@@ -301,6 +347,9 @@ fn test_complex_negotiation() {
         to: buyer.clone(),
         message: msg("CounterOffer"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choice = Protocol::Choice {
@@ -317,6 +366,7 @@ fn test_complex_negotiation() {
                 protocol: counter,
             },
         ],
+        annotations: HashMap::new(),
     };
 
     let protocol = Protocol::Send {
@@ -324,10 +374,14 @@ fn test_complex_negotiation() {
         to: seller.clone(),
         message: msg("Offer"),
         continuation: Box::new(choice),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("Negotiation"),
+        namespace: None,
         roles: vec![buyer.clone(), seller.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -351,10 +405,14 @@ fn test_invalid_choreography_missing_role() {
         to: carol.clone(), // Carol not in roles list
         message: msg("Msg"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("Invalid"),
+        namespace: None,
         roles: vec![alice, bob], // Carol missing!
         protocol,
         attrs: HashMap::new(),
@@ -377,10 +435,14 @@ fn test_projection_consistency() {
         to: bob.clone(),
         message: msg("Data"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("TwoParty"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol,
         attrs: HashMap::new(),
@@ -418,11 +480,18 @@ fn test_analysis_detects_roles() {
             to: carol.clone(),
             message: msg("Fwd"),
             continuation: Box::new(Protocol::End),
+            annotations: HashMap::new(),
+            from_annotations: HashMap::new(),
+            to_annotations: HashMap::new(),
         }),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("Forward"),
+        namespace: None,
         roles: vec![alice, bob, carol],
         protocol,
         attrs: HashMap::new(),
@@ -444,10 +513,14 @@ fn test_message_with_payload() {
         to: bob.clone(),
         message: msg_with_payload("Request", "u32"),
         continuation: Box::new(Protocol::End),
+        annotations: HashMap::new(),
+        from_annotations: HashMap::new(),
+        to_annotations: HashMap::new(),
     };
 
     let choreography = Choreography {
         name: ident("WithPayload"),
+        namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol,
         attrs: HashMap::new(),

@@ -26,16 +26,19 @@ fn message_strategy() -> impl Strategy<Value = MessageType> {
     prop_oneof![
         Just(MessageType {
             name: format_ident!("Request"),
+        
             type_annotation: None,
             payload: Some(quote! { String }),
         }),
         Just(MessageType {
             name: format_ident!("Response"),
+        
             type_annotation: None,
             payload: Some(quote! { i32 }),
         }),
         Just(MessageType {
             name: format_ident!("Data"),
+        
             type_annotation: None,
             payload: Some(quote! { Vec<u8> }),
         }),
@@ -63,6 +66,9 @@ fn simple_protocol_strategy() -> impl Strategy<Value = Protocol> {
                             to,
                             message: msg,
                             continuation: Box::new(cont),
+                            annotations: HashMap::new(),
+                            from_annotations: HashMap::new(),
+                            to_annotations: HashMap::new(),
                         }
                     }
                 }),
@@ -91,9 +97,13 @@ fn simple_protocol_strategy() -> impl Strategy<Value = Protocol> {
                                         to: other.clone(),
                                         message: msg,
                                         continuation: Box::new(Protocol::End),
+                                        annotations: HashMap::new(),
+                                        from_annotations: HashMap::new(),
+                                        to_annotations: HashMap::new(),
                                     },
                                 })
                                 .collect(),
+                            annotations: HashMap::new(),
                         })
                     }
                 ),
@@ -120,7 +130,7 @@ fn extract_roles(protocol: &Protocol) -> Vec<Role> {
                 }
                 collect_roles(continuation, roles);
             }
-            Protocol::Choice { role, branches } => {
+            Protocol::Choice { role, branches, .. } => {
                 if !roles.contains(role) {
                     roles.push(role.clone());
                 }
@@ -152,6 +162,7 @@ fn choreography_strategy() -> impl Strategy<Value = Choreography> {
         let roles = extract_roles(&protocol);
         Choreography {
             name: format_ident!("TestChoreography"),
+        namespace: None,
             roles,
             protocol,
             attrs: HashMap::new(),
@@ -268,6 +279,7 @@ proptest! {
 
         let choreo = Choreography {
             name: format_ident!("LinearProtocol"),
+        namespace: None,
             roles: vec![from.clone(), to.clone()],
             protocol: Protocol::Send {
                 from: from.clone(),
@@ -278,11 +290,18 @@ proptest! {
                     to: from.clone(),
                     message: MessageType {
                         name: format_ident!("Ack"),
+        
                         type_annotation: None,
                         payload: Some(quote! { () }),
                     },
                     continuation: Box::new(Protocol::End),
+                    annotations: HashMap::new(),
+                    from_annotations: HashMap::new(),
+                    to_annotations: HashMap::new(),
                 }),
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
             },
             attrs: HashMap::new(),
         };
@@ -301,6 +320,7 @@ proptest! {
     fn end_only_no_activity(roles in prop::collection::vec(role_strategy(), 1..5)) {
         let choreo = Choreography {
             name: format_ident!("EndOnly"),
+        namespace: None,
             roles: roles.clone(),
             protocol: Protocol::End,
             attrs: HashMap::new(),
@@ -326,12 +346,16 @@ proptest! {
 
         let choreo = Choreography {
             name: format_ident!("WithCommunication"),
+        namespace: None,
             roles: vec![from.clone(), to.clone()],
             protocol: Protocol::Send {
                 from,
                 to,
                 message: msg,
                 continuation: Box::new(Protocol::End),
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
             },
             attrs: HashMap::new(),
         };
@@ -373,16 +397,21 @@ mod unit_tests {
 
         let choreo = Choreography {
             name: format_ident!("TwoParty"),
+        namespace: None,
             roles: vec![alice.clone(), bob.clone()],
             protocol: Protocol::Send {
                 from: alice.clone(),
                 to: bob.clone(),
                 message: MessageType {
                     name: format_ident!("Hello"),
+        
                     type_annotation: None,
                     payload: Some(quote! { String }),
                 },
                 continuation: Box::new(Protocol::End),
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
             },
             attrs: HashMap::new(),
         };
@@ -408,16 +437,21 @@ mod unit_tests {
 
         let choreo = Choreography {
             name: format_ident!("ThreeParty"),
+        namespace: None,
             roles: vec![alice.clone(), bob.clone(), charlie.clone()],
             protocol: Protocol::Send {
                 from: alice,
                 to: bob,
                 message: MessageType {
                     name: format_ident!("Hello"),
+        
                     type_annotation: None,
                     payload: Some(quote! { String }),
                 },
                 continuation: Box::new(Protocol::End),
+                annotations: HashMap::new(),
+                from_annotations: HashMap::new(),
+                to_annotations: HashMap::new(),
             },
             attrs: HashMap::new(),
         };

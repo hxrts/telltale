@@ -32,6 +32,40 @@ choreography MyProtocol {
 }
 ```
 
+### Namespaces
+
+Choreographies can be namespaced to avoid conflicts when multiple protocols are defined in the same crate:
+
+```rust
+choreography! {
+    #[namespace = "threshold_ceremony"]
+    ThresholdProtocol {
+        roles: Coordinator, Signers[*];
+        Coordinator -> Signers[*]: Request;
+    }
+}
+```
+
+This generates the protocol within a `threshold_ceremony` module. Multiple choreographies with different namespaces can coexist:
+
+```rust
+choreography! {
+    #[namespace = "consensus"]
+    ConsensusProtocol {
+        roles: Leader, Followers[N];
+        // protocol body
+    }
+}
+
+choreography! {
+    #[namespace = "recovery"]  
+    RecoveryProtocol {
+        roles: Requester, Guardians[*];
+        // protocol body
+    }
+}
+```
+
 ### Supported Constructs
 
 #### 1. Send Statement
@@ -152,63 +186,59 @@ Protocol definitions are:
 - Can be nested (protocols can call other protocols)
 - Can be used within choice branches, loops, etc.
 
-#### 8. Annotations
+#### 8. Enhanced Annotations
 
-Annotations provide hints for optimization, verification, and other meta-information about choreographies and statements.
-
-**Choreography-level annotations:**
-```rust
-@optimize
-choreography Simple {
-    roles: A, B
-    A -> B: Msg
-}
-```
-
-**With arguments:**
-```rust
-@optimize(inline, buffer_size=1024)
-choreography Optimized {
-    roles: A, B
-    A -> B: Msg
-}
-```
-
-**Multiple annotations:**
-```rust
-@optimize(inline)
-@verify(deadlock_free)
-@parallel
-choreography Production {
-    roles: A, B, C
-    A -> B: Start
-    B -> C: Forward
-}
-```
+Annotations provide meta-information for optimization, verification, cost analysis, and other protocol properties. The system supports both statement-level and role-specific annotations.
 
 **Statement-level annotations:**
 ```rust
-choreography Annotated {
-    roles: A, B
+choreography EnhancedProtocol {
+    roles: A, B, C;
     
-    @critical
-    A -> B: ImportantMsg
+    [@cost = 100, @priority = "high"]
+    A -> B: ImportantMessage;
     
-    @buffered(size=10)
-    B -> A: Response
+    [@timeout = 5000, @retry = 3]
+    B -> C: RetriableMessage;
 }
 ```
 
-Annotations are stored in the `Choreography.attrs` HashMap as key-value pairs:
-- Simple annotations (`@optimize`) map to `"true"`
-- Annotations with arguments (`@optimize(inline, buffer_size=1024)`) map to `"inline,buffer_size=1024"`
+**Role-specific annotations:**
+```rust
+choreography RoleAnnotatedProtocol {
+    roles: Coordinator, Worker[*];
+    
+    Coordinator[@cost = 200] -> Worker[*]: BroadcastMessage;
+    Worker[i][@priority = "low"] -> Coordinator: Response;
+}
+```
 
-**Common annotation types:**
-- `@optimize` - Performance optimization hints (inline, buffer_size, etc.)
-- `@verify` - Verification properties (deadlock_free, liveness, etc.)
-- `@parallel` - Enable parallel execution
-- `@critical` - Mark critical sections
-- `@buffered` - Buffering configuration
+**Multiple annotation types:**
+```rust
+choreography FullyAnnotated {
+    roles: Client, Server, Database;
+    
+    [@critical, @audit_log = "true"]
+    Client -> Server: AuthRequest;
+    
+    Server[@timeout = 1000] -> Database[@cost = 50]: Query;
+    
+    [@buffered, @compress = "gzip"] 
+    Database -> Server: QueryResult;
+}
+```
+
+**Supported annotation keys:**
+- `@cost` - Execution cost (integer value)
+- `@priority` - Priority level ("high", "medium", "low")  
+- `@timeout` - Timeout in milliseconds (integer)
+- `@retry` - Retry count (integer)
+- `@critical` - Mark critical operations (boolean)
+- `@buffered` - Enable message buffering (boolean)
+- `@audit_log` - Enable audit logging (boolean)
+- `@compress` - Compression type (string value)
+
+Annotations are accessible through the generated code and can be used by runtime systems for optimization, monitoring, and policy enforcement.
 
 #### 9. Type Annotations for Messages
 
@@ -253,78 +283,84 @@ Type annotations are:
 - Can be nested generics with arbitrary depth
 - Support standard Rust type syntax including paths
 
-#### 10. Parameterized Roles
+#### 10. Dynamic Role Count Support
 
-**Status: Fully Implemented**
+The system supports dynamic role parameterization for runtime-determined participant counts, enabling threshold protocols, consensus algorithms, and other scenarios with variable participants.
 
-Roles can be parameterized to represent role arrays or families of participants. The system supports concrete array sizes, concrete indices, and symbolic parameters.
-
-**Concrete array with indexed access:**
+**Runtime-determined role counts:**
 ```rust
-choreography WorkerPool {
-    roles: Master, Worker[3]
+choreography ThresholdProtocol {
+    roles: Coordinator, Signers[*];
     
-    Master -> Worker[0]: Task
-    Worker[0] -> Master: Result
+    Coordinator -> Signers[*]: Request;
+    Signers[0..threshold] -> Coordinator: Response;
 }
 ```
 
-**Multiple indexed workers:**
+**Symbolic parameters for compile-time flexibility:**
 ```rust
-choreography MultipleWorkers {
-    roles: Coordinator, Worker[5]
+choreography ConsensusProtocol {
+    roles: Leader, Followers[N];
     
-    Coordinator -> Worker[0]: Init
-    Coordinator -> Worker[1]: Init
-    Coordinator -> Worker[2]: Init
-    Worker[0] -> Coordinator: Done
+    Leader -> Followers[*]: Proposal;
+    Followers[i] -> Leader: Vote;
 }
 ```
 
-**Symbolic parameters:**
+**Range-based role selection:**
 ```rust
-choreography SymbolicParam {
-    roles: Leader, Follower[N]
+choreography PartialBroadcast {
+    roles: Broadcaster, Receivers[*];
     
-    Leader -> Follower[i]: Command
-    Follower[i] -> Leader: Ack
+    Broadcaster -> Receivers[0..count]: Message;
+    Receivers[0..threshold] -> Broadcaster: Ack;
 }
 ```
 
-**Features:**
-- Concrete array sizes (e.g., `Worker[3]` declares an array of 3 workers)
-- Concrete indices (e.g., `Worker[0]`, `Worker[1]`)
-- Symbolic parameters (e.g., `Worker[N]` where N is a parameter)
-- Symbolic indices (e.g., `Worker[i]` in protocol statements)
-- Full validation with role family matching
-- Projection to local types for each role
-- Multiple independent role families
-
-**Example Usage:**
+**Static arrays (existing functionality):**
 ```rust
-use rumpsteak_choreography::compiler::{parse_dsl, project};
+choreography StaticWorkers {
+    roles: Master, Worker[3];
+    
+    Master -> Worker[0]: Task1;
+    Master -> Worker[1]: Task2;
+    Worker[0] -> Master: Result1;
+}
+```
+
+**Dynamic role features:**
+- Runtime role counts (`Worker[*]`)
+- Symbolic parameters (`Worker[N]`) 
+- Range expressions (`Worker[0..threshold]`)
+- Wildcard references (`Worker[*]`)
+- Security constraints with overflow protection (max 10,000 roles)
+- Comprehensive runtime validation
+
+**Runtime binding example:**
+```rust
+use rumpsteak_choreography::compiler::{parse_choreography_str, generate_choreography_code_with_dynamic_roles};
 
 let dsl = r#"
-choreography Test {
-    roles: Coordinator, Worker[3]
-    
-    Coordinator -> Worker[0]: Task
-    Worker[0] -> Coordinator: Result
+choreography Threshold {
+    roles: Coordinator, Signers[*];
+    Coordinator -> Signers[*]: Request;
 }
 "#;
 
-let choreo = parse_dsl(dsl)?;
-choreo.validate()?;
+let choreo = parse_choreography_str(dsl)?;
+let code = generate_choreography_code_with_dynamic_roles(&choreo, &local_types);
 
-for role in &choreo.roles {
-    let local_type = project(&choreo, role)?;
-    // Use local_type for code generation
-}
+// Generated code includes ThresholdRuntime for role binding:
+let mut runtime = ThresholdRuntime::new();
+runtime.bind_role_count("Signers", 5)?; // 5 signers
+runtime.map_signers_instances(vec!["alice", "bob", "charlie", "dave", "eve"])?;
 ```
+
+The system provides comprehensive security through bounds checking, preventing overflow attacks and ensuring memory safety.
 
 #### 11. Macro Support for Inline Protocols
 
-The `choreography!` procedural macro enables embedding choreographic protocols directly in Rust code.
+The `choreography!` procedural macro enables embedding choreographic protocols directly in Rust code with full support for namespaces, annotations, and dynamic roles.
 
 **Basic usage:**
 ```rust
@@ -332,24 +368,54 @@ use rumpsteak_macros::choreography;
 
 choreography! {
     PingPong {
-        roles: Alice, Bob
+        roles: Alice, Bob;
         
-        Alice -> Bob: Ping
-        Bob -> Alice: Pong
+        Alice -> Bob: Ping;
+        Bob -> Alice: Pong;
     }
 }
 ```
 
-**String literal syntax (DSL integration):**
+**Namespaced protocols:**
+```rust
+choreography! {
+    #[namespace = "secure_messaging"]
+    EncryptedProtocol {
+        roles: Sender, Receiver;
+        
+        [@encrypt = "aes256"]
+        Sender -> Receiver: SecureMessage;
+    }
+}
+```
+
+**Dynamic roles with annotations:**
+```rust
+choreography! {
+    #[namespace = "consensus"]
+    ByzantineFaultTolerant {
+        roles: Leader, Replicas[*];
+        
+        [@phase = "prepare", @timeout = 5000]
+        Leader -> Replicas[*]: Prepare;
+        
+        Replicas[0..quorum] -> Leader: PrepareOk;
+    }
+}
+```
+
+**String literal syntax:**
 ```rust
 choreography! {
     r#"
+    #[namespace = "example"]
     choreography Example {
-        roles: A, B, C
+        roles: A, B, C;
         
-        A -> B: Request
-        B -> C: Forward
-        C -> A: Response
+        [@cost = 100]
+        A -> B: Request;
+        B -> C: Forward;
+        C -> A: Response;
     }
     "#
 }

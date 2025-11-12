@@ -21,6 +21,7 @@ proptest! {
     fn projection_completes(role in simple_role_strategy()) {
         let choreo = Choreography {
             name: format_ident!("Simple"),
+        namespace: None,
             roles: vec![role.clone()],
             protocol: Protocol::End,
             attrs: HashMap::new(),
@@ -36,6 +37,7 @@ fn test_end_projection() {
     let alice = Role::new(format_ident!("Alice"));
     let choreo = Choreography {
         name: format_ident!("EndOnly"),
+        namespace: None,
         roles: vec![alice.clone()],
         protocol: Protocol::End,
         attrs: HashMap::new(),

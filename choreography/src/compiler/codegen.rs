@@ -1,8 +1,122 @@
 // Code generation from projected local types to Rumpsteak session types
 
-use crate::ast::{LocalType, MessageType, Role};
+use crate::ast::{Choreography, LocalType, MessageType, Protocol, Role};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
+use std::collections::HashMap;
+
+/// Generate documentation comments from annotations
+fn generate_annotation_docs(annotations: &HashMap<String, String>) -> TokenStream {
+    if annotations.is_empty() {
+        return quote! {};
+    }
+
+    let doc_lines: Vec<TokenStream> = annotations
+        .iter()
+        .map(|(key, value)| {
+            if value == "true" {
+                quote! { #[doc = concat!("@", #key)] }
+            } else {
+                quote! { #[doc = concat!("@", #key, ": ", #value)] }
+            }
+        })
+        .collect();
+
+    quote! { #(#doc_lines)* }
+}
+
+/// Generate metadata structure for annotations
+fn generate_annotation_metadata(name: &str, annotations: &HashMap<String, String>) -> TokenStream {
+    if annotations.is_empty() {
+        return quote! {};
+    }
+
+    let metadata_name = format_ident!("{}Annotations", name);
+    let annotation_fields: Vec<TokenStream> = annotations
+        .iter()
+        .map(|(key, _value)| {
+            let field_name = format_ident!("{}", key.to_lowercase());
+            quote! {
+                pub #field_name: &'static str,
+            }
+        })
+        .collect();
+
+    let annotation_values: Vec<TokenStream> = annotations
+        .iter()
+        .map(|(key, value)| {
+            let field_name = format_ident!("{}", key.to_lowercase());
+            quote! {
+                #field_name: #value,
+            }
+        })
+        .collect();
+
+    quote! {
+        /// Generated annotation metadata
+        #[derive(Debug, Clone, Copy)]
+        pub struct #metadata_name {
+            #(#annotation_fields)*
+        }
+
+        impl #metadata_name {
+            pub const INSTANCE: Self = Self {
+                #(#annotation_values)*
+            };
+        }
+    }
+}
+
+/// Generate attributes from specific annotation keys
+#[allow(dead_code)]
+fn generate_annotation_attributes(annotations: &HashMap<String, String>) -> TokenStream {
+    let mut attrs = Vec::new();
+
+    // Handle common annotation patterns
+    if let Some(priority) = annotations.get("priority") {
+        attrs.push(quote! { #[priority = #priority] });
+    }
+
+    if let Some(timeout) = annotations.get("timeout") {
+        attrs.push(quote! { #[timeout = #timeout] });
+    }
+
+    if annotations.get("async").map_or(false, |v| v == "true") {
+        attrs.push(quote! { #[async_trait] });
+    }
+
+    if let Some(retry_count) = annotations.get("retry") {
+        attrs.push(quote! { #[retry = #retry_count] });
+    }
+
+    quote! { #(#attrs)* }
+}
+
+/// Generate runtime annotation accessor for a protocol node
+fn generate_runtime_annotation_access(name: &str, protocol: &Protocol) -> TokenStream {
+    let fn_name = format_ident!("get_{}_annotations", name.to_lowercase());
+    let all_annotations = protocol.get_annotations();
+    
+    if all_annotations.is_empty() {
+        return quote! {};
+    }
+
+    let annotation_map: Vec<TokenStream> = all_annotations
+        .iter()
+        .map(|(key, value)| {
+            quote! { map.insert(#key.to_string(), #value.to_string()); }
+        })
+        .collect();
+
+    quote! {
+        /// Get runtime annotations for this protocol node
+        pub fn #fn_name() -> std::collections::HashMap<String, String> {
+            let mut map = std::collections::HashMap::new();
+            #(#annotation_map)*
+            map
+        }
+    }
+}
 
 /// Generate Rumpsteak session type definitions from a local type
 #[must_use] 
@@ -361,5 +475,309 @@ pub fn generate_helpers(_name: &str, messages: &[MessageType]) -> TokenStream {
 
         type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
         type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+    }
+}
+
+/// Generate complete code from a choreography, with namespace support and annotations
+#[must_use] 
+pub fn generate_choreography_code_with_namespacing(
+    choreo: &Choreography, 
+    local_types: &[(Role, LocalType)]
+) -> TokenStream {
+    let inner_code = generate_choreography_code_with_annotations(
+        &choreo.name.to_string(),
+        &choreo.roles,
+        local_types,
+        choreo
+    );
+    
+    // Generate choreography-level annotation metadata
+    let choreo_docs = generate_annotation_docs(choreo.get_attributes());
+    let choreo_metadata = generate_annotation_metadata(&choreo.name.to_string(), choreo.get_attributes());
+    
+    match &choreo.namespace {
+        Some(ns) => {
+            let ns_ident = format_ident!("{}", ns);
+            quote! {
+                #choreo_docs
+                pub mod #ns_ident {
+                    use super::*;
+                    
+                    #choreo_metadata
+                    #inner_code
+                }
+            }
+        }
+        None => {
+            quote! {
+                #choreo_docs
+                #choreo_metadata
+                #inner_code
+            }
+        }
+    }
+}
+
+/// Generate complete Rumpsteak code from a choreography with annotation support
+#[must_use] 
+pub fn generate_choreography_code_with_annotations(
+    name: &str,
+    roles: &[Role],
+    local_types: &[(Role, LocalType)],
+    choreo: &Choreography,
+) -> TokenStream {
+    let role_struct_defs = generate_role_structs(roles);
+    let session_type_defs = local_types
+        .iter()
+        .map(|(role, local_type)| generate_session_type(role, local_type, name));
+
+    // Generate runtime annotation accessors for the protocol
+    let protocol_annotation_access = generate_runtime_annotation_access(name, &choreo.protocol);
+    
+    // Generate metadata for roles with annotations
+    let role_metadata: Vec<TokenStream> = roles
+        .iter()
+        .filter(|role| role.index.is_some() || role.param.is_some())
+        .map(|role| {
+            let mut role_annotations = HashMap::new();
+            if role.index.is_some() {
+                role_annotations.insert("indexed".to_string(), "true".to_string());
+            }
+            if role.param.is_some() {
+                role_annotations.insert("parameterized".to_string(), "true".to_string());
+            }
+            generate_annotation_metadata(&role.name.to_string(), &role_annotations)
+        })
+        .collect();
+
+    quote! {
+        #role_struct_defs
+        #(#session_type_defs)*
+        #protocol_annotation_access
+        #(#role_metadata)*
+        
+        /// Protocol annotation summary
+        pub mod annotations {
+            use super::*;
+            use std::collections::HashMap;
+            
+            /// Get all annotations in the protocol
+            pub fn get_all_protocol_annotations() -> HashMap<String, HashMap<String, String>> {
+                let mut all_annotations = HashMap::new();
+                // This would be populated dynamically based on the protocol structure
+                all_annotations
+            }
+        }
+    }
+}
+
+/// Generate dynamic role support structures for runtime role management
+pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream {
+    let dynamic_roles: Vec<_> = choreography.roles.iter()
+        .filter(|role| role.is_dynamic() || role.is_symbolic())
+        .collect();
+        
+    if dynamic_roles.is_empty() {
+        return quote! {};
+    }
+    
+    let choreo_name = &choreography.name;
+    let runtime_struct_name = format_ident!("{}Runtime", choreo_name);
+    
+    // Generate DeviceId type alias (assuming this exists in the runtime)
+    let device_id_type = quote! { 
+        type DeviceId = String; // This should be imported from the runtime system
+    };
+    
+    // Generate role binding validation functions
+    let validation_functions = dynamic_roles.iter().map(|role| {
+        let role_name = &role.name;
+        let validation_fn_name = format_ident!("validate_{}_count", role_name.to_string().to_lowercase());
+        
+        quote! {
+            /// Validate role count for runtime bounds checking
+            pub fn #validation_fn_name(count: u32) -> Result<(), String> {
+                use crate::ast::role::{MAX_ROLE_COUNT, RoleValidationError};
+                
+                if count > MAX_ROLE_COUNT {
+                    return Err(format!("Role count {} exceeds maximum {}", count, MAX_ROLE_COUNT));
+                }
+                
+                if count == 0 {
+                    return Err("Role count cannot be zero".to_string());
+                }
+                
+                Ok(())
+            }
+        }
+    });
+    
+    // Generate role mapping functions
+    let mapping_functions = dynamic_roles.iter().map(|role| {
+        let role_name = &role.name;
+        let map_fn_name = format_ident!("map_{}_instances", role_name.to_string().to_lowercase());
+        let get_fn_name = format_ident!("get_{}_device", role_name.to_string().to_lowercase());
+        
+        quote! {
+            /// Map role instances to device IDs
+            pub fn #map_fn_name(&mut self, instances: Vec<DeviceId>) -> Result<(), String> {
+                let role_name = stringify!(#role_name);
+                
+                // Validate instance count
+                if let Some(expected_count) = self.role_counts.get(role_name) {
+                    if instances.len() != *expected_count as usize {
+                        return Err(format!(
+                            "Expected {} instances for role {}, got {}",
+                            expected_count, role_name, instances.len()
+                        ));
+                    }
+                }
+                
+                // Store mappings with bounds checking
+                for (index, device_id) in instances.into_iter().enumerate() {
+                    if index > crate::ast::role::MAX_ROLE_INDEX as usize {
+                        return Err(format!("Role index {} exceeds maximum", index));
+                    }
+                    
+                    let key = format!("{}[{}]", role_name, index);
+                    self.role_mappings.insert(key, device_id);
+                }
+                
+                Ok(())
+            }
+            
+            /// Get device ID for a specific role instance
+            pub fn #get_fn_name(&self, index: u32) -> Option<&DeviceId> {
+                if index > crate::ast::role::MAX_ROLE_INDEX {
+                    return None;
+                }
+                
+                let key = format!("{}[{}]", stringify!(#role_name), index);
+                self.role_mappings.get(&key)
+            }
+        }
+    });
+
+    quote! {
+        /// Dynamic protocol runtime for managing role bindings and device mappings
+        pub struct #runtime_struct_name {
+            /// Role count bindings (role_name -> count)
+            role_counts: std::collections::HashMap<String, u32>,
+            /// Role to device mappings (role[index] -> device_id)
+            role_mappings: std::collections::HashMap<String, DeviceId>,
+            /// Index bindings for symbolic variables (var_name -> value)
+            index_bindings: std::collections::HashMap<String, u32>,
+        }
+        
+        impl #runtime_struct_name {
+            /// Create a new runtime manager
+            pub fn new() -> Self {
+                Self {
+                    role_counts: std::collections::HashMap::new(),
+                    role_mappings: std::collections::HashMap::new(),
+                    index_bindings: std::collections::HashMap::new(),
+                }
+            }
+            
+            /// Bind a symbolic role parameter to a concrete count
+            pub fn bind_role_count(&mut self, role_name: &str, count: u32) -> Result<(), String> {
+                // Validate count bounds
+                if count > crate::ast::role::MAX_ROLE_COUNT {
+                    return Err(format!("Role count {} exceeds maximum {}", count, crate::ast::role::MAX_ROLE_COUNT));
+                }
+                
+                if count == 0 {
+                    return Err("Role count cannot be zero".to_string());
+                }
+                
+                self.role_counts.insert(role_name.to_string(), count);
+                Ok(())
+            }
+            
+            /// Bind a symbolic index variable to a concrete value
+            pub fn bind_index(&mut self, var_name: &str, value: u32) -> Result<(), String> {
+                if value > crate::ast::role::MAX_ROLE_INDEX {
+                    return Err(format!("Index {} exceeds maximum {}", value, crate::ast::role::MAX_ROLE_INDEX));
+                }
+                
+                self.index_bindings.insert(var_name.to_string(), value);
+                Ok(())
+            }
+            
+            /// Get the count for a role
+            pub fn get_role_count(&self, role_name: &str) -> Option<u32> {
+                self.role_counts.get(role_name).copied()
+            }
+            
+            /// Get the value for an index variable
+            pub fn get_index_binding(&self, var_name: &str) -> Option<u32> {
+                self.index_bindings.get(var_name).copied()
+            }
+            
+            /// Resolve a role expression to concrete device IDs
+            pub fn resolve_role_targets(&self, role_expr: &str) -> Result<Vec<DeviceId>, String> {
+                // Parse role expression like "Worker[*]", "Worker[0..3]", "Worker[i]"
+                if let Some(wildcard_pos) = role_expr.find("[*]") {
+                    let role_name = &role_expr[..wildcard_pos];
+                    
+                    // Get all instances of this role
+                    if let Some(count) = self.role_counts.get(role_name) {
+                        let mut targets = Vec::new();
+                        for i in 0..*count {
+                            if let Some(device_id) = self.get_device_by_role_and_index(role_name, i) {
+                                targets.push(device_id.clone());
+                            }
+                        }
+                        return Ok(targets);
+                    }
+                }
+                
+                // Handle range expressions, concrete indices, symbolic variables, etc.
+                // This is a simplified implementation - a full parser would be more robust
+                Err(format!("Unsupported role expression: {}", role_expr))
+            }
+            
+            /// Get device ID by role name and index
+            fn get_device_by_role_and_index(&self, role_name: &str, index: u32) -> Option<&DeviceId> {
+                let key = format!("{}[{}]", role_name, index);
+                self.role_mappings.get(&key)
+            }
+            
+            #(#validation_functions)*
+            #(#mapping_functions)*
+        }
+        
+        impl Default for #runtime_struct_name {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+        
+        #device_id_type
+    }
+}
+
+/// Generate enhanced choreography code with dynamic role support
+pub fn generate_choreography_code_with_dynamic_roles(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+) -> TokenStream {
+    let name = choreography.name.to_string();
+    let base_code = generate_choreography_code(&name, &choreography.roles, local_types);
+    let dynamic_support = generate_dynamic_role_support(choreography);
+    
+    if dynamic_support.is_empty() {
+        base_code
+    } else {
+        quote! {
+            #base_code
+            
+            /// Dynamic role management
+            pub mod dynamic {
+                use super::*;
+                
+                #dynamic_support
+            }
+        }
     }
 }

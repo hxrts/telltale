@@ -26,5 +26,9 @@ pub use choreography::Choreography;
 pub use local_type::LocalType;
 pub use message::MessageType;
 pub use protocol::{Branch, Condition, Protocol};
-pub use role::Role;
+pub use role::{
+    Role, RoleParam, RoleIndex, RoleRange, RangeExpr,
+    RoleValidationError, RoleValidationResult, RoleBoundsChecker,
+    MAX_ROLE_COUNT, MAX_ROLE_INDEX, MAX_RANGE_SIZE
+};
 pub use validation::ValidationError;
