@@ -71,19 +71,13 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install mdBook
-        run: |
-          mkdir -p ~/.cargo/bin
-          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.40/mdbook-v0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory ~/.cargo/bin
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - name: Install mdbook-mermaid
-        run: cargo install mdbook-mermaid
-      - name: Install just
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.cargo/bin
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: Build documentation
-        run: just book
-      - name: Check for broken links
+        run: nix develop --command just book
+      - name: Check documentation built
         run: |
           if [ -d docs/book ]; then
             echo "Documentation built successfully"
