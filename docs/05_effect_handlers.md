@@ -77,7 +77,7 @@ Provides production-ready session-typed channels. Uses the core Rumpsteak librar
 
 This handler enforces session types at runtime and provides strong guarantees about protocol compliance.
 
-See `06_rumpsteak_handler.md` for complete documentation.
+See [Using Rumpsteak Handlers](06_rumpsteak_handler.md) for complete documentation.
 
 ### RecordingHandler
 
@@ -256,7 +256,7 @@ Use middleware to add logging, metrics, retries, or fault injection to any handl
 
 InMemoryHandler and RumpsteakHandler both work in WASM environments using futures channels.
 
-For WASM network communication, implement a custom handler using web-sys WebSocket or fetch APIs. See `07_wasm_guide.md` for details.
+For WASM network communication, implement a custom handler using web-sys WebSocket or fetch APIs. See [WASM Guide](07_wasm_guide.md) for details.
 
 ## Effect Interpretation
 

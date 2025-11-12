@@ -14,34 +14,33 @@ The architecture has four main layers:
 ## Component Diagram
 
 ```mermaid
-%%{init: {'theme':'default', 'themeVariables': {'lineWidth': 1}}}%%
 graph TB
     subgraph Input["Developer Input (Compile-Time)"]
         DSL["Choreography DSL<br/>Global Protocol Specification"]
     end
-    
+
     subgraph Layer1["Layer 1: Parsing & AST Construction"]
         Parser["Parser<br/>(Pest Grammar)"]
         AST["AST<br/>Choreography + Protocol Tree"]
     end
-    
+
     subgraph Layer2["Layer 2: Projection"]
         Proj["Projection Algorithm"]
         LT["Local Types<br/>(Per Role)"]
     end
-    
+
     subgraph Layer3["Layer 3: Code Generation"]
         CodeGen["Code Generator"]
         Session["Generated Session Types"]
         Effects["Generated Effect Programs"]
     end
-    
+
     subgraph Layer4["Layer 4: Runtime Execution"]
         Handler["Effect Handler<br/>(InMemory / Rumpsteak)"]
         Transport["Transport Layer<br/>(Channels / Network)"]
         Exec["Running Protocol"]
     end
-    
+
     DSL --> Parser
     Parser --> AST
     AST --> Proj
@@ -230,7 +229,7 @@ The runtime module provides platform-specific async primitives. Native targets u
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See `05_effect_handlers.md` for details.
+Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](05_effect_handlers.md) for details.
 
 ### Middleware
 

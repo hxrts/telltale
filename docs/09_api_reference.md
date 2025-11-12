@@ -295,7 +295,7 @@ Constructor:
 pub fn new() -> Self
 ```
 
-Requires RumpsteakEndpoint for connection management. See 06_rumpsteak_handler.md for complete API.
+Requires RumpsteakEndpoint for connection management. See [Using Rumpsteak Handlers](06_rumpsteak_handler.md) for complete API.
 
 ### RecordingHandler
 

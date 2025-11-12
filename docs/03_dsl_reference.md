@@ -1,5 +1,5 @@
 
-# Choreographic DSL Parser Architecture
+# Choreographic DSL Parser
 
 ## Current Status
 
@@ -17,10 +17,10 @@ The choreographic DSL follows this syntax:
 ```rust
 choreography MyProtocol {
     roles: Alice, Bob, Carol
-    
+
     Alice -> Bob: Greeting
     Bob -> Alice: Response
-    
+
     choice Alice {
         continue: {
             Alice -> Carol: Data
@@ -58,7 +58,7 @@ choreography! {
 }
 
 choreography! {
-    #[namespace = "recovery"]  
+    #[namespace = "recovery"]
     RecoveryProtocol {
         roles: Requester, Guardians[*];
         // protocol body
@@ -162,17 +162,17 @@ Define and reuse protocol fragments
 ```rust
 choreography Main {
     roles: A, B, C
-    
+
     protocol Handshake {
         A -> B: Hello
         B -> A: Hi
     }
-    
+
     protocol DataTransfer {
         A -> B: Data
         B -> A: Ack
     }
-    
+
     call Handshake
     call DataTransfer
     A -> C: Done
@@ -194,10 +194,10 @@ Annotations provide meta-information for optimization, verification, cost analys
 ```rust
 choreography EnhancedProtocol {
     roles: A, B, C;
-    
+
     [@cost = 100, @priority = "high"]
     A -> B: ImportantMessage;
-    
+
     [@timeout = 5000, @retry = 3]
     B -> C: RetriableMessage;
 }
@@ -207,7 +207,7 @@ choreography EnhancedProtocol {
 ```rust
 choreography RoleAnnotatedProtocol {
     roles: Coordinator, Worker[*];
-    
+
     Coordinator[@cost = 200] -> Worker[*]: BroadcastMessage;
     Worker[i][@priority = "low"] -> Coordinator: Response;
 }
@@ -217,20 +217,20 @@ choreography RoleAnnotatedProtocol {
 ```rust
 choreography FullyAnnotated {
     roles: Client, Server, Database;
-    
+
     [@critical, @audit_log = "true"]
     Client -> Server: AuthRequest;
-    
+
     Server[@timeout = 1000] -> Database[@cost = 50]: Query;
-    
-    [@buffered, @compress = "gzip"] 
+
+    [@buffered, @compress = "gzip"]
     Database -> Server: QueryResult;
 }
 ```
 
 **Supported annotation keys:**
 - `@cost` - Execution cost (integer value)
-- `@priority` - Priority level ("high", "medium", "low")  
+- `@priority` - Priority level ("high", "medium", "low")
 - `@timeout` - Timeout in milliseconds (integer)
 - `@retry` - Retry count (integer)
 - `@critical` - Mark critical operations (boolean)
@@ -248,7 +248,7 @@ Messages can include explicit type annotations to specify the types of data bein
 ```rust
 choreography TypedMessages {
     roles: A, B
-    
+
     A -> B: Request<String>
     B -> A: Response<i32>
 }
@@ -291,7 +291,7 @@ The system supports dynamic role parameterization for runtime-determined partici
 ```rust
 choreography ThresholdProtocol {
     roles: Coordinator, Signers[*];
-    
+
     Coordinator -> Signers[*]: Request;
     Signers[0..threshold] -> Coordinator: Response;
 }
@@ -301,7 +301,7 @@ choreography ThresholdProtocol {
 ```rust
 choreography ConsensusProtocol {
     roles: Leader, Followers[N];
-    
+
     Leader -> Followers[*]: Proposal;
     Followers[i] -> Leader: Vote;
 }
@@ -311,7 +311,7 @@ choreography ConsensusProtocol {
 ```rust
 choreography PartialBroadcast {
     roles: Broadcaster, Receivers[*];
-    
+
     Broadcaster -> Receivers[0..count]: Message;
     Receivers[0..threshold] -> Broadcaster: Ack;
 }
@@ -321,7 +321,7 @@ choreography PartialBroadcast {
 ```rust
 choreography StaticWorkers {
     roles: Master, Worker[3];
-    
+
     Master -> Worker[0]: Task1;
     Master -> Worker[1]: Task2;
     Worker[0] -> Master: Result1;
@@ -330,7 +330,7 @@ choreography StaticWorkers {
 
 **Dynamic role features:**
 - Runtime role counts (`Worker[*]`)
-- Symbolic parameters (`Worker[N]`) 
+- Symbolic parameters (`Worker[N]`)
 - Range expressions (`Worker[0..threshold]`)
 - Wildcard references (`Worker[*]`)
 - Security constraints with overflow protection (max 10,000 roles)
@@ -369,7 +369,7 @@ use rumpsteak_macros::choreography;
 choreography! {
     PingPong {
         roles: Alice, Bob;
-        
+
         Alice -> Bob: Ping;
         Bob -> Alice: Pong;
     }
@@ -382,7 +382,7 @@ choreography! {
     #[namespace = "secure_messaging"]
     EncryptedProtocol {
         roles: Sender, Receiver;
-        
+
         [@encrypt = "aes256"]
         Sender -> Receiver: SecureMessage;
     }
@@ -395,10 +395,10 @@ choreography! {
     #[namespace = "consensus"]
     ByzantineFaultTolerant {
         roles: Leader, Replicas[*];
-        
+
         [@phase = "prepare", @timeout = 5000]
         Leader -> Replicas[*]: Prepare;
-        
+
         Replicas[0..quorum] -> Leader: PrepareOk;
     }
 }
@@ -411,7 +411,7 @@ choreography! {
     #[namespace = "example"]
     choreography Example {
         roles: A, B, C;
-        
+
         [@cost = 100]
         A -> B: Request;
         B -> C: Forward;
@@ -611,7 +611,7 @@ See `choreography/examples/error_demo.rs` for more examples.
 let input = r#"
 choreography PingPong {
     roles: Alice, Bob
-    
+
     Alice -> Bob: Ping
     Bob -> Alice: Pong
 }
@@ -627,9 +627,9 @@ assert_eq!(choreo.roles.len(), 2);
 let input = r#"
 choreography Negotiation {
     roles: Buyer, Seller
-    
+
     Buyer -> Seller: Offer
-    
+
     choice Seller {
         accept: {
             Seller -> Buyer: Accept
@@ -650,21 +650,21 @@ let choreo = parse_choreography_str(input)?;
 let input = r#"
 choreography ECommerce {
     roles: Buyer, Seller, Shipper
-    
+
     Buyer -> Seller: Inquiry
     Seller -> Buyer: Quote
-    
+
     choice Buyer {
         order: {
             Buyer -> Seller: Order
             Seller -> Shipper: ShipRequest
             Shipper -> Buyer: Tracking
-            
+
             loop (decides: Buyer) {
                 Buyer -> Shipper: StatusCheck
                 Shipper -> Buyer: StatusUpdate
             }
-            
+
             Shipper -> Buyer: Delivered
             Buyer -> Seller: Confirmation
         }

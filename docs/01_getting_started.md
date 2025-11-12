@@ -67,7 +67,7 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The `InMemoryHandler` provides local message passing for testing. See `06_rumpsteak_handler.md` for production handlers.
+The `InMemoryHandler` provides local message passing for testing. See [Using Rumpsteak Handlers](06_rumpsteak_handler.md) for production handlers.
 
 ## Core Concepts
 
