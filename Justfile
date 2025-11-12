@@ -50,10 +50,14 @@ book: summary
 # Serve locally with live reload
 serve: summary
     #!/usr/bin/env bash
+    # Trap SIGINT (Ctrl+C) for graceful shutdown
+    trap 'echo -e "\nShutting down mdbook server..."; exit 0' INT
+
     # Try to serve on the default port, fallback to next available port if in use
     for port in 3000 3001 3002 3003 3004 3005; do
         if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
             echo "Starting mdbook server on http://localhost:$port"
+            echo "Press Ctrl+C to stop the server"
             mdbook serve --port $port --open
             exit 0
         fi
