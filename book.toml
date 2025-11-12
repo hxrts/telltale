@@ -9,3 +9,9 @@ build-dir = "docs/book"
 
 [output.html]
 preferred-dark-theme = "rust"
+
+[output.html.playground]
+editable = false
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

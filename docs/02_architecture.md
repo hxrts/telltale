@@ -13,24 +13,36 @@ The architecture has four main layers:
 
 ## Component Diagram
 
-```
-Choreography DSL
-       ↓
-    Parser
-       ↓
-  AST (Choreography, Protocol)
-       ↓
-   Projection
-       ↓
-  LocalType per Role
-       ↓
-  Code Generation
-       ↓
-Session Types + Effect Programs
-       ↓
-Effect Interpreter + Handler
-       ↓
-   Execution
+```mermaid
+graph TD
+    DSL["Choreography DSL"]
+    Parser["Parser"]
+    AST["AST<br/>(Choreography, Protocol)"]
+    Projection["Projection"]
+    LocalType["LocalType per Role"]
+    CodeGen["Code Generation"]
+    SessionTypes["Session Types +<br/>Effect Programs"]
+    EffectInterp["Effect Interpreter +<br/>Handler"]
+    Execution["Execution"]
+    
+    DSL --> Parser
+    Parser --> AST
+    AST --> Projection
+    Projection --> LocalType
+    LocalType --> CodeGen
+    CodeGen --> SessionTypes
+    SessionTypes --> EffectInterp
+    EffectInterp --> Execution
+    
+    style DSL fill:#e1f5ff
+    style Parser fill:#e1f5ff
+    style AST fill:#fff3e0
+    style Projection fill:#f3e5f5
+    style LocalType fill:#f3e5f5
+    style CodeGen fill:#e8f5e9
+    style SessionTypes fill:#e8f5e9
+    style EffectInterp fill:#fce4ec
+    style Execution fill:#fce4ec
 ```
 
 ## Core Components

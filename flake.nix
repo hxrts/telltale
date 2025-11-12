@@ -26,6 +26,7 @@
           wasm-pack
           wasm-bindgen-cli
           mdbook
+          mdbook-mermaid
           just
           coreutils
           findutils
