@@ -9,15 +9,7 @@ build-dir = "docs/book"
 
 [output.html]
 preferred-dark-theme = "rust"
-additional-html-head = """
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<script>
-if (typeof mermaid !== 'undefined') {
-    mermaid.initialize({ startOnLoad: true, theme: 'default' });
-    mermaid.contentLoaded();
-}
-</script>
-"""
+theme = "theme"
 
 [output.html.playground]
 editable = false

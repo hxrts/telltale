@@ -1,0 +1,38 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="{{{book.description}}}">
+<title>{{page.title}} - {{book.title}}</title>
+
+<!-- Favicon -->
+<link rel="icon" href="favicon.svg">
+<link rel="shortcut icon" href="favicon.png">
+
+<!-- Font -->
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/general.css">
+<link rel="stylesheet" href="css/chrome.css">
+<link rel="stylesheet" href="css/print.css" media="print">
+<link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+<link rel="stylesheet" href="fonts/fonts.css">
+
+<!-- Highlight -->
+<link rel="stylesheet id="highlight-css" href="highlight.css">
+<link rel="stylesheet id="tomorrow-night-css" href="tomorrow-night.css" disabled>
+<link rel="stylesheet id="ayu-highlight-css" href="ayu-highlight.css" disabled>
+
+<!-- Custom -->
+{{#if book.extra.custom_css ~}}
+{{#each book.extra.custom_css ~}}
+<link rel="stylesheet" href="{{this}}">
+{{/each ~}}
+{{/if ~}}
+
+<!-- Mermaid from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        mermaid.contentLoaded();
+    }
+</script>
