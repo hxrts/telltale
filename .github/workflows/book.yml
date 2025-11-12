@@ -2,7 +2,7 @@ name: Build and Deploy Book
 
 on:
   push:
-    branches: [master]
+    branches: [main]
 
 jobs:
   deploy:
