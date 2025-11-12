@@ -1,6 +1,6 @@
 [package]
 name = "rumpsteak-aura-fsm"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2021"
 description = "Session types for asynchronous communication between multiple parties (Aura flavored)."
