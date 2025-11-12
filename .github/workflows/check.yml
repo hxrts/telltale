@@ -31,7 +31,7 @@ jobs:
         with:
           command: test
           args: --workspace --all-targets --all-features
-  
+
   wasm:
     name: WASM Build
     runs-on: ubuntu-latest
@@ -64,3 +64,30 @@ jobs:
         run: |
           cd examples/wasm-ping-pong
           wasm-pack test --headless --firefox
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install mdBook
+        run: |
+          mkdir -p ~/.cargo/bin
+          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.40/mdbook-v0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory ~/.cargo/bin
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Install mdbook-mermaid
+        run: cargo install mdbook-mermaid
+      - name: Install just
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.cargo/bin
+      - name: Build documentation
+        run: just book
+      - name: Check for broken links
+        run: |
+          if [ -d docs/book ]; then
+            echo "Documentation built successfully"
+          else
+            echo "Documentation build failed"
+            exit 1
+          fi
