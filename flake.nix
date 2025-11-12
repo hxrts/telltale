@@ -31,7 +31,6 @@
           findutils
           gawk
           gnused
-          grep
         ];
 
         buildInputs = with pkgs; [
