@@ -45,6 +45,7 @@ summary:
 
 # Build the book after regenerating the summary
 book: summary
+    @mdbook-mermaid install . > /dev/null 2>&1 || true
     mdbook build
 
 # Serve locally with live reload

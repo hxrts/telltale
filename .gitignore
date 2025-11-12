@@ -41,3 +41,7 @@ work/
 
 # Generated documentation
 /docs/book/
+-e 
+# mdbook-mermaid generated files
+mermaid.min.js
+mermaid-init.js
