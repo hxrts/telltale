@@ -1643,6 +1643,7 @@ dependencies = [
  "proptest",
  "quote",
  "rand 0.8.5",
+ "rumpsteak-aura-choreography",
  "rumpsteak-aura-fsm",
  "rumpsteak-aura-macros",
  "serde",

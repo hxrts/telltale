@@ -47,6 +47,7 @@ rand = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+rumpsteak-aura-choreography = { path = "choreography", version = "0.3.0" }
 futures = { workspace = true, features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { workspace = true }
