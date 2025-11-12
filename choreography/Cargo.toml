@@ -1,7 +1,7 @@
 [package]
 name = "rumpsteak-aura-choreography"
 version = "0.3.0"
-authors = ["Zak Cutner <me@zakcutner.uk>", "Aura Team"]
+authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
 description = "Choreographic programming for Rumpsteak - effect-based distributed protocols"

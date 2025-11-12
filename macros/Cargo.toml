@@ -1,7 +1,7 @@
 [package]
 name = "rumpsteak-aura-macros"
 version = "0.3.0"
-authors = ["Zak Cutner <me@zakcutner.uk>"]
+authors = ["Sam Hart"]
 edition = "2021"
 description = "Procedural macros for Rumpsteak session types (Aura flavored)."
 readme = "../README.md"
