@@ -63,7 +63,7 @@ jobs:
       - name: Test WASM example (headless)
         run: |
           cd examples/wasm-ping-pong
-          wasm-pack test --headless --firefox
+          wasm-pack test --headless --chrome
 
   docs:
     name: Documentation
