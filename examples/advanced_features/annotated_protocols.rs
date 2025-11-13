@@ -9,39 +9,39 @@ choreography! {
     #[namespace = "annotated_example"]
     CostAwareProtocol {
         roles: Client, Server, Database;
-        
-        // High-priority authentication with cost tracking
+
+        // Statement-level annotations: apply to the entire interaction
         [@priority = "high", @cost = 100, @timeout = 2000]
         Client -> Server: AuthRequest;
-        
-        // Server queries database with cost and timeout constraints
+
+        // Role-specific annotations: Server[@timeout] on sender, Database[@cost] on receiver
         Server[@timeout = 1000] -> Database[@cost = 50]: UserQuery;
-        
-        // Database responds with compressed data
+
+        // Statement-level annotations: compression and buffering for the message
         [@compress = "gzip", @buffered]
         Database -> Server: UserData;
-        
-        // Critical operation with audit logging
+
+        // Statement-level annotations: critical operation with audit logging
         [@critical, @audit_log = "true", @cost = 200]
         Server -> Client: AuthResponse;
-        
+
         choice Client {
             continue: {
-                // Low-cost data request with retry capability
+                // Statement-level annotations: cost tracking and retry policy
                 [@cost = 25, @retry = 3]
                 Client -> Server: DataRequest;
-                
-                // Server processes with medium priority
+
+                // Role-specific annotation: Server[@priority] on sender only
                 Server[@priority = "medium"] -> Database: DataQuery;
-                
-                // Efficient data transfer
+
+                // Statement-level annotations: buffering and timeout for transfer
                 [@buffered, @timeout = 5000]
                 Database -> Server: DataResult;
-                
+
                 Server -> Client: DataResponse;
             }
             disconnect: {
-                // Cleanup operation
+                // Statement-level annotation: cost of cleanup
                 [@cost = 10]
                 Client -> Server: Disconnect;
             }
@@ -50,22 +50,22 @@ choreography! {
 }
 
 choreography! {
-    #[namespace = "microservice_example"]  
+    #[namespace = "microservice_example"]
     MicroserviceOrchestration {
         roles: Gateway, Services[*], Database;
-        
-        // Load-balanced request distribution
+
+        // Statement-level annotations: load balancing strategy and timeout
         [@load_balance = "round_robin", @timeout = 1000]
         Gateway -> Services[*]: WorkRequest;
-        
-        // Services process with different priorities
+
+        // Role-specific annotations: Services[i][@priority] on sender, Database[@cost] on receiver
         Services[i][@priority = "low"] -> Database[@cost = 30]: Query;
-        
-        // Database responds with caching hints
+
+        // Statement-level annotations: caching and compression hints
         [@cache_ttl = 300, @compress = "lz4"]
         Database -> Services[i]: QueryResult;
-        
-        // Services aggregate with retry logic
+
+        // Statement-level annotations: retry policy and timeout for aggregation
         [@retry = 2, @timeout = 3000]
         Services[0..available] -> Gateway: WorkResult;
     }
@@ -75,7 +75,7 @@ fn main() {
     println!("Enhanced Annotations Example");
     println!("============================");
     println!();
-    
+
     println!("CostAwareProtocol annotations:");
     println!("- @cost: Tracks execution cost for billing/optimization");
     println!("- @priority: Sets operation priority (high/medium/low)");
@@ -86,13 +86,13 @@ fn main() {
     println!("- @buffered: Enables message buffering");
     println!("- @retry: Sets retry count for fault tolerance");
     println!();
-    
+
     println!("MicroserviceOrchestration annotations:");
     println!("- @load_balance: Specifies load balancing strategy");
     println!("- @cache_ttl: Sets cache time-to-live in seconds");
     println!("- Role-specific timeouts and costs for fine-grained control");
     println!();
-    
+
     println!("These annotations can be used by:");
     println!("- Runtime systems for optimization and resource management");
     println!("- Monitoring tools for observability and alerting");
