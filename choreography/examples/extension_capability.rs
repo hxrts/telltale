@@ -3,14 +3,12 @@
 //! This example demonstrates a role-specific extension that validates
 //! capabilities before allowing operations.
 
-use rumpsteak_aura_choreography::effects::{
-    ExtensibleHandler, ExtensionEffect, ExtensionRegistry, Program, RoleId,
-};
+use rumpsteak_aura_choreography::effects::{ExtensionEffect, Program};
 use std::any::{Any, TypeId};
 
 // Define roles
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum Role {
+pub enum Role {
     Alice,
     Bob,
 }
@@ -31,11 +29,9 @@ impl ExtensionEffect for ValidateCapability {
         "ValidateCapability"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         // Only the role being validated participates in this extension
-        // This requires unsafe transmute or a different approach
-        // For now, return empty vec (global) as a simplification
-        vec![]
+        vec![Box::new(self.role)]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -67,8 +63,8 @@ impl ExtensionEffect for ChargeFlowCost {
         "ChargeFlowCost"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
-        vec![]
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        vec![Box::new(self.role)]
     }
 
     fn as_any(&self) -> &dyn Any {

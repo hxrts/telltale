@@ -34,11 +34,13 @@ where
 /// dispatch extension effects to registered handlers.
 pub async fn interpret_extensible<H, R, M>(
     handler: &mut H,
-    endpoint: &mut H::Endpoint,
+    endpoint: &mut <H as ExtensibleHandler>::Endpoint,
     program: Program<R, M>,
 ) -> Result<InterpretResult<M>>
 where
-    H: ChoreoHandler<Role = R> + ExtensibleHandler<Endpoint = H::Endpoint> + Send,
+    H: ChoreoHandler<Role = R, Endpoint = <H as ExtensibleHandler>::Endpoint>
+        + ExtensibleHandler
+        + Send,
     R: RoleId,
     M: ProgramMessage + Serialize + DeserializeOwned + 'static,
 {
@@ -364,11 +366,13 @@ impl<M> ExtensibleInterpreter<M> {
     async fn run<H, R>(
         &mut self,
         handler: &mut H,
-        endpoint: &mut H::Endpoint,
+        endpoint: &mut <H as ExtensibleHandler>::Endpoint,
         program: Program<R, M>,
     ) -> Result<InterpretResult<M>>
     where
-        H: ChoreoHandler<Role = R> + ExtensibleHandler<Endpoint = H::Endpoint> + Send,
+        H: ChoreoHandler<Role = R, Endpoint = <H as ExtensibleHandler>::Endpoint>
+            + ExtensibleHandler
+            + Send,
         R: RoleId,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
@@ -400,11 +404,13 @@ impl<M> ExtensibleInterpreter<M> {
     async fn execute_effect<H, R>(
         &mut self,
         handler: &mut H,
-        endpoint: &mut H::Endpoint,
+        endpoint: &mut <H as ExtensibleHandler>::Endpoint,
         effect: Effect<R, M>,
     ) -> Result<()>
     where
-        H: ChoreoHandler<Role = R> + ExtensibleHandler<Endpoint = H::Endpoint> + Send,
+        H: ChoreoHandler<Role = R, Endpoint = <H as ExtensibleHandler>::Endpoint>
+            + ExtensibleHandler
+            + Send,
         R: RoleId,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {

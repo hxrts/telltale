@@ -3,9 +3,7 @@
 //! This example demonstrates how to create and use a basic extension
 //! that logs events during choreography execution.
 
-use rumpsteak_aura_choreography::effects::{
-    ExtensibleHandler, ExtensionEffect, ExtensionError, ExtensionRegistry, Program,
-};
+use rumpsteak_aura_choreography::effects::{ExtensionEffect, Program};
 use std::any::{Any, TypeId};
 
 // Define a simple logging extension
@@ -31,7 +29,7 @@ impl ExtensionEffect for LogEvent {
         "LogEvent"
     }
 
-    fn participating_roles<R: rumpsteak_aura_choreography::effects::RoleId>(&self) -> Vec<R> {
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         // Global extension - all roles should log
         vec![]
     }

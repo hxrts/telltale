@@ -40,8 +40,8 @@ use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 ///
 /// Roles are typically generated as enums per choreography, but any type
 /// implementing the required traits can serve as a role identifier.
-pub trait RoleId: Copy + Eq + std::hash::Hash + Debug + Send + Sync {}
-impl<T: Copy + Eq + std::hash::Hash + Debug + Send + Sync> RoleId for T {}
+pub trait RoleId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {}
+impl<T: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static> RoleId for T {}
 
 /// Labels identify branches in internal/external choice
 ///

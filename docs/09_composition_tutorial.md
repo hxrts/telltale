@@ -76,9 +76,9 @@ impl ExtensionEffect for ValidateCapability {
         "ValidateCapability"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
-        // Role-specific extension
-        vec![]  // Simplified for tutorial
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        // Role-specific extension - only this role participates
+        vec![Box::new(self.role)]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -116,7 +116,7 @@ impl ExtensionEffect for LogEvent {
         "LogEvent"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         vec![]  // Global - all roles log
     }
 

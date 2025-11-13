@@ -20,7 +20,7 @@ All extensions implement the `ExtensionEffect` trait:
 pub trait ExtensionEffect: Send + Sync + Debug {
     fn type_id(&self) -> TypeId;
     fn type_name(&self) -> &'static str;
-    fn participating_roles<R: RoleId>(&self) -> Vec<R>;
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>>;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn clone_box(&self) -> Box<dyn ExtensionEffect>;
@@ -29,9 +29,46 @@ pub trait ExtensionEffect: Send + Sync + Debug {
 
 **Key features**:
 - `TypeId`-based discrimination (compile-time type safety)
-- Role participation for projection semantics
+- Type-erased role participation for projection semantics (object-safe)
 - Type-safe downcasting via `Any` trait
 - Cloneable for effect algebra operations
+
+**Design Rationale: Type Erasure with Type Safety**:
+
+The trait uses `Vec<Box<dyn Any>>` for role information instead of a generic method like `participating_roles<R: RoleId>(&self) -> Vec<R>`. This design choice balances two critical requirements:
+
+1. **Object Safety**: Rust traits with generic methods cannot be used as trait objects (`Box<dyn ExtensionEffect>`). Since extensions are stored as `Box<dyn ExtensionEffect>` in the effect algebra, the trait must be object-safe.
+
+2. **Third-Party Projection**: Extension authors need to specify which roles participate in their extensions for proper projection. Without this capability, extensions cannot be projected to specific roles.
+
+**How Type Safety is Maintained**:
+
+Despite type erasure, the system remains type-safe through Rust's `Any` trait downcasting:
+
+```rust
+// Extension author boxes their specific role type
+fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    vec![Box::new(self.role)]  // Role type known at extension definition
+}
+
+// Effect algebra safely downcasts back to the choreography's role type
+for role_any in ext.participating_role_ids() {
+    if let Some(role) = role_any.downcast_ref::<R>() {  // Type-safe downcast
+        roles.insert(*role);
+    }
+    // Mismatched types are safely ignored (downcast fails)
+}
+```
+
+**Type Safety Guarantees**:
+
+- Extensions can only be created with concrete role types known at compile time
+- Downcasting uses `TypeId` checks internally (no unsafe casting)
+- Type mismatches result in the role being silently skipped (fail-safe behavior)
+- Extension handlers use `TypeId` for type-safe dispatch to the correct handler
+- No runtime type confusion is possible - incompatible types simply don't match
+
+This approach provides **runtime flexibility** (extensions work with any role type) while maintaining **compile-time safety** (role types are checked where they're defined and used).
 
 ### Extension Registry
 
@@ -45,7 +82,7 @@ registry.register::<MyExtension, _>(|endpoint, ext| {
         let my_ext = ext.as_any()
             .downcast_ref::<MyExtension>()
             .ok_or(ExtensionError::TypeMismatch { ... })?;
-        
+
         // Handle extension logic
         endpoint.do_something(my_ext)?;
         Ok(())
@@ -65,27 +102,27 @@ Extensions integrate naturally with the effect algebra:
 
 ```rust
 let program = Program::new()
-    .ext(ValidateCapability { 
-        capability: "send".into(), 
-        role: Alice 
+    .ext(ValidateCapability {
+        capability: "send".into(),
+        role: Alice
     })
     .send(Bob, Message("hello"))
-    .ext(LogEvent { 
-        event: "message_sent".into() 
+    .ext(LogEvent {
+        event: "message_sent".into()
     })
     .end();
 ```
 
 ## Projection Semantics
 
-Extensions project based on `participating_roles()`:
+Extensions project based on `participating_role_ids()`, which returns type-erased role values.
 
 ### Global Extensions
 
-Empty roles vector → appears in all projections:
+Empty vector → appears in all projections:
 
 ```rust
-fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
     vec![]  // Global - all roles see this
 }
 ```
@@ -94,15 +131,259 @@ Example: Logging events that all roles should record.
 
 ### Role-Specific Extensions
 
-Non-empty roles → appears only in specified projections:
+Non-empty vector with boxed roles → appears only in specified projections:
 
 ```rust
-fn participating_roles<R: RoleId>(&self) -> Vec<R> {
-    vec![self.role]  // Only this role sees it
+fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    vec![Box::new(self.role)]  // Only this role sees it
 }
 ```
 
 Example: Capability validation for a specific role.
+
+### Multi-Role Extensions
+
+Multiple roles can participate in an extension:
+
+```rust
+fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    vec![
+        Box::new(Role::Alice),
+        Box::new(Role::Bob),
+    ]
+}
+```
+
+Example: A coordination extension that only Alice and Bob need to handle.
+
+### Type Erasure and Downcasting
+
+The effect algebra internally downcasts type-erased roles back to the concrete role type:
+
+```rust
+// In algebra.rs collect_roles()
+for role_any in ext.participating_role_ids() {
+    if let Some(role) = role_any.downcast_ref::<R>() {
+        roles.insert(*role);
+    }
+}
+```
+
+This approach maintains object safety while allowing third-party extensions to specify participating roles for projection.
+
+## Implementing Projection in Your Extensions
+
+As a third-party developer, you can fully control how your extensions project to different roles. Here's a comprehensive guide:
+
+### Design Pattern 1: Global Extensions
+
+If your extension should be visible to all roles in the choreography:
+
+```rust
+#[derive(Clone, Debug)]
+pub struct AuditLog {
+    pub action: String,
+    pub timestamp: u64,
+}
+
+impl ExtensionEffect for AuditLog {
+    // ... type_id, type_name, etc.
+
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        vec![]  // Empty = global, all roles see this
+    }
+
+    // ... remaining trait methods
+}
+```
+
+**Use cases**: Logging, metrics, global invariants, debugging
+
+### Design Pattern 2: Single Role Extensions
+
+If your extension applies to a specific role:
+
+```rust
+#[derive(Clone, Debug)]
+pub struct ValidatePermission {
+    pub permission: String,
+    pub role: MyRole,  // Store the role
+}
+
+impl ExtensionEffect for ValidatePermission {
+    // ... type_id, type_name, etc.
+
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        vec![Box::new(self.role)]  // Only this role participates
+    }
+
+    // ... remaining trait methods
+}
+```
+
+**Use cases**: Role-specific validation, authorization, local state updates
+
+### Design Pattern 3: Multi-Role Extensions
+
+If multiple specific roles need to handle your extension:
+
+```rust
+#[derive(Clone, Debug)]
+pub struct ConsensusRound {
+    pub round: u32,
+    pub participants: Vec<NodeId>,
+}
+
+impl ExtensionEffect for ConsensusRound {
+    // ... type_id, type_name, etc.
+
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        // Box each participant
+        self.participants
+            .iter()
+            .map(|p| Box::new(*p) as Box<dyn Any>)
+            .collect()
+    }
+
+    // ... remaining trait methods
+}
+```
+
+**Use cases**: Consensus protocols, quorum operations, multi-party computation
+
+### Design Pattern 4: Conditional Projection
+
+If participation depends on extension state:
+
+```rust
+#[derive(Clone, Debug)]
+pub struct OptionalNotification {
+    pub message: String,
+    pub notify_role: Option<Role>,
+}
+
+impl ExtensionEffect for OptionalNotification {
+    // ... type_id, type_name, etc.
+
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        if let Some(role) = self.notify_role {
+            vec![Box::new(role)]
+        } else {
+            vec![]  // Global if no specific role
+        }
+    }
+
+    // ... remaining trait methods
+}
+```
+
+**Use cases**: Conditional notifications, optional observers, dynamic routing
+
+### Important Constraints
+
+When implementing `participating_role_ids()`:
+
+1. **Type Matching**: Boxed roles must match the choreography's role type `R: RoleId`
+2. **Static Bounds**: Role types must be `'static` (required for `Any`)
+3. **Copy/Clone**: Roles should be `Copy` or cheap to clone
+4. **Consistency**: The same extension value should always return the same roles
+
+### Complete Example
+
+Here's a complete extension with proper projection:
+
+```rust
+use rumpsteak_aura_choreography::effects::*;
+use std::any::{Any, TypeId};
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ServiceRole {
+    Gateway,
+    AuthService,
+    Database,
+}
+
+#[derive(Clone, Debug)]
+pub struct RateLimitCheck {
+    pub service: ServiceRole,
+    pub limit: u32,
+}
+
+impl ExtensionEffect for RateLimitCheck {
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    fn type_name(&self) -> &'static str {
+        "RateLimitCheck"
+    }
+
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        // Only the service being rate-limited needs to check
+        vec![Box::new(self.service)]
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+        Box::new(self.clone())
+    }
+}
+
+// Usage in a choreography:
+fn api_request_protocol() -> Program<ServiceRole, Message> {
+    Program::new()
+        // Gateway rate limits incoming requests
+        .ext(RateLimitCheck {
+            service: ServiceRole::Gateway,
+            limit: 1000,
+        })
+        .send(ServiceRole::Gateway, ServiceRole::AuthService, AuthRequest)
+        // AuthService rate limits token generation
+        .ext(RateLimitCheck {
+            service: ServiceRole::AuthService,
+            limit: 100,
+        })
+        .send(ServiceRole::AuthService, ServiceRole::Database, QueryUser)
+        .end()
+}
+```
+
+### Projection Behavior
+
+Given the above choreography:
+
+**Gateway's projection:**
+```rust
+// Gateway sees:
+ext(RateLimitCheck { service: Gateway, limit: 1000 })  // ✓ Participates
+send(AuthService, AuthRequest)
+// (AuthService rate limit skipped - not Gateway's concern)
+```
+
+**AuthService's projection:**
+```rust
+// AuthService sees:
+// (Gateway rate limit skipped - not AuthService's concern)
+recv(Gateway, AuthRequest)
+ext(RateLimitCheck { service: AuthService, limit: 100 })  // ✓ Participates
+send(Database, QueryUser)
+```
+
+**Database's projection:**
+```rust
+// Database sees:
+// (Both rate limits skipped - not Database's concern)
+recv(AuthService, QueryUser)
+```
+
+This gives you full control over which roles execute which extension logic during projection.
 
 ### Ordering
 
@@ -139,7 +420,7 @@ pub struct ExtensibleWrapper<H: ChoreoHandler> {
 impl<H: ChoreoHandler> ExtensibleWrapper<H> {
     pub fn new(base: H) -> Self {
         let mut registry = ExtensionRegistry::new();
-        
+
         // Register your extensions
         registry.register::<MyExtension, _>(|ep, ext| {
             Box::pin(async move {
@@ -147,7 +428,7 @@ impl<H: ChoreoHandler> ExtensibleWrapper<H> {
                 Ok(())
             })
         });
-        
+
         Self { base, registry }
     }
 }
@@ -155,7 +436,7 @@ impl<H: ChoreoHandler> ExtensibleWrapper<H> {
 #[async_trait]
 impl<H: ChoreoHandler> ExtensibleHandler for ExtensibleWrapper<H> {
     type Endpoint = H::Endpoint;
-    
+
     fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint> {
         &self.registry
     }
@@ -166,13 +447,13 @@ impl<H: ChoreoHandler> ExtensibleHandler for ExtensibleWrapper<H> {
 impl<H: ChoreoHandler> ChoreoHandler for ExtensibleWrapper<H> {
     type Role = H::Role;
     type Endpoint = H::Endpoint;
-    
+
     async fn send<M: Serialize + Send + Sync>(
         &mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M
     ) -> Result<()> {
         self.base.send(ep, to, msg).await
     }
-    
+
     // ... delegate other methods
 }
 ```
@@ -204,11 +485,11 @@ pub struct DomainHandler {
 impl DomainHandler {
     pub fn new(role: Role) -> Self {
         let mut registry = ExtensionRegistry::new();
-        
+
         // Register domain extensions
         registry.register::<ValidateCapability, _>(/* ... */);
         registry.register::<ChargeFlowCost, _>(/* ... */);
-        
+
         Self { role, registry, /* ... */ }
     }
 }
@@ -233,11 +514,11 @@ impl ExtensionEffect for RoundRobinMetadata {
     // Implementation...
 }
 
-pub fn round_robin<R, M>(roles: Vec<R>, task: M) -> Program<R, M> 
-where R: RoleId, M: Clone 
+pub fn round_robin<R, M>(roles: Vec<R>, task: M) -> Program<R, M>
+where R: RoleId, M: Clone
 {
     let mut program = Program::new();
-    
+
     for (i, role) in roles.iter().enumerate() {
         program = program
             .ext(RoundRobinMetadata {
@@ -250,7 +531,7 @@ where R: RoleId, M: Clone
                 task.clone()
             );
     }
-    
+
     program
 }
 ```
@@ -263,13 +544,13 @@ where R: RoleId, M: Clone
 use round_robin::{round_robin, RoundRobinMetadata};
 
 let protocol = Program::new()
-    .ext(ValidateCapability { 
-        capability: "coordinate".into(), 
-        role: Coordinator 
+    .ext(ValidateCapability {
+        capability: "coordinate".into(),
+        role: Coordinator
     })
     .then(round_robin(workers, Task::new()))
-    .ext(LogEvent { 
-        event: "round_robin_complete".into() 
+    .ext(LogEvent {
+        event: "round_robin_complete".into()
     });
 ```
 

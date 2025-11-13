@@ -2,7 +2,7 @@
 
 ## Installation
 
-Add Rumpsteak to your project (using the Aura fork):
+Add Rumpsteak to your project using the Aura fork.
 
 ```toml
 [dependencies]
@@ -10,33 +10,34 @@ rumpsteak-aura = "*"
 rumpsteak-aura-choreography = "*"
 ```
 
+This adds the core session types library and the choreographic programming layer.
+
 ### Understanding the Crates
 
-Rumpsteak-Aura is organized as a Cargo workspace with several crates:
+Rumpsteak-Aura is organized as a Cargo workspace with several crates.
 
-- **`rumpsteak-aura`**: Core session types library (located in the root `src/` directory). Provides fundamental primitives for type-safe asynchronous communication, channels, and role definitions.
+- The `rumpsteak-aura` crate is the core session types library. It is located in the root `src/` directory. This crate provides fundamental primitives for type-safe asynchronous communication, channels, and role definitions.
+- The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It is located in `choreography/`. This crate provides the DSL parser, automatic projection, effect handler system, and runtime support.
+- The `rumpsteak-aura-fsm` crate provides optional finite state machine support. This crate enables advanced session type verification.
+- The `rumpsteak-aura-macros` crate contains procedural macros used internally.
 
-- **`rumpsteak-aura-choreography`**: Choreographic programming layer (located in `choreography/`). Provides the DSL parser, automatic projection, effect handler system, and runtime support.
+Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography`. The core library provides session types. The choreography layer provides the high-level DSL and effect system.
 
-- **`rumpsteak-aura-fsm`**: Optional finite state machine support for advanced session type verification.
+Advanced users who only need low-level session types can depend on just `rumpsteak-aura`. This excludes choreography features.
 
-- **`rumpsteak-aura-macros`**: Procedural macros used internally.
-
-**For most users**: You need both `rumpsteak-aura` and `rumpsteak-aura-choreography`. The core library provides session types, while the choreography layer provides the high-level DSL and effect system.
-
-**For advanced users**: If you only need low-level session types without choreographies, you can depend on just `rumpsteak-aura`.
-
-For WASM support, add the wasm feature:
+For WASM support, add the wasm feature.
 
 ```toml
 rumpsteak-aura-choreography = { version = "*", features = ["wasm"] }
 ```
 
+This enables compilation to WebAssembly targets.
+
 ## Creating a Choreography
 
 This example shows a simple ping-pong protocol between two roles.
 
-Define the choreography using the DSL parser:
+Define the choreography using the DSL parser.
 
 ```rust
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
@@ -52,15 +53,14 @@ let choreography_str = r#"
 let choreography = parse_choreography_str(choreography_str)?;
 ```
 
-The parser generates the AST representation which can be used for projection and code generation.
+The parser generates the AST representation. This representation can be used for projection and code generation.
 
-Run the protocol using the effect system:
+Run the protocol using the effect system.
 
 ```rust
 use rumpsteak_aura_choreography::{InMemoryHandler, Program, interpret, RoleId};
 use serde::{Serialize, Deserialize};
 
-// Define roles that implement RoleId
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum Role {
     Alice,
@@ -73,14 +73,12 @@ impl RoleId for Role {
     }
 }
 
-// Define messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum Message {
     Ping,
     Pong,
 }
 
-// Create the program
 let mut handler = InMemoryHandler::new(Role::Alice);
 let program = Program::new()
     .send(Role::Bob, Message::Ping)
@@ -97,21 +95,23 @@ The `InMemoryHandler` provides local message passing for testing. See [Using Rum
 
 ### Choreographies
 
-A choreography specifies a distributed protocol from a global viewpoint. Each role sees only their local behavior after projection.
+A choreography specifies a distributed protocol from a global viewpoint. Projection transforms the global view into local behavior for each role.
 
 ### Roles
 
-Roles are participants in the protocol. They send and receive messages according to their projected session type.
+Roles are participants in the protocol. Each role sends and receives messages according to their projected session type.
 
 ### Messages
 
-Messages are data exchanged between roles. They must implement serde's `Serialize` and `Deserialize`.
+Messages are data exchanged between roles. They must implement `Serialize` and `Deserialize` from the serde library.
 
 ### Effect Handlers
 
-Handlers interpret choreographic effects into actual communication. Different handlers provide different transports (in-memory, session-typed channels, WebSockets).
+Handlers interpret choreographic effects into actual communication. Different handlers provide different transports.
 
-With `RumpsteakHandler`, you can either register the built-in `SimpleChannel` pairs:
+The `InMemoryHandler` provides local testing. The `RumpsteakHandler` provides channel-based communication. WebSocket handlers provide network communication.
+
+The `RumpsteakHandler` supports two patterns. You can register built-in `SimpleChannel` pairs.
 
 ```rust
 let (client_ch, server_ch) = SimpleChannel::pair();
@@ -119,7 +119,9 @@ client_endpoint.register_channel(Role::Server, client_ch);
 server_endpoint.register_channel(Role::Client, server_ch);
 ```
 
-or wrap your own sink/stream transports:
+Both endpoints now communicate through the channel pair.
+
+Alternatively, you can wrap your own sink and stream transports.
 
 ```rust
 use rumpsteak_aura_choreography::effects::RumpsteakSession;
@@ -132,4 +134,4 @@ Both options integrate with the same handler.
 
 ### Projection
 
-The system projects global choreographies into local session types. Each role gets a type-safe API for their part of the protocol.
+The system projects global choreographies into local session types. Each role gets a type-safe API for their part of the protocol. This ensures communication follows the choreography specification.

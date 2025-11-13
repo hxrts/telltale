@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 /// A choreographic effect that can be performed by a role
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Effect<R: RoleId, M> {
     /// Send a message to another role
     Send { to: R, msg: M },
@@ -68,6 +68,47 @@ pub enum Effect<R: RoleId, M> {
 
     /// End of program
     End,
+}
+
+impl<R: RoleId, M: Clone> Clone for Effect<R, M> {
+    fn clone(&self) -> Self {
+        match self {
+            Effect::Send { to, msg } => Effect::Send {
+                to: *to,
+                msg: msg.clone(),
+            },
+            Effect::Recv { from, msg_type } => Effect::Recv {
+                from: *from,
+                msg_type,
+            },
+            Effect::Choose { at, label } => Effect::Choose {
+                at: *at,
+                label: *label,
+            },
+            Effect::Offer { from } => Effect::Offer { from: *from },
+            Effect::Branch {
+                choosing_role,
+                branches,
+            } => Effect::Branch {
+                choosing_role: *choosing_role,
+                branches: branches.clone(),
+            },
+            Effect::Loop { iterations, body } => Effect::Loop {
+                iterations: *iterations,
+                body: body.clone(),
+            },
+            Effect::Timeout { at, dur, body } => Effect::Timeout {
+                at: *at,
+                dur: *dur,
+                body: body.clone(),
+            },
+            Effect::Parallel { programs } => Effect::Parallel {
+                programs: programs.clone(),
+            },
+            Effect::Extension(ext) => Effect::Extension(ext.clone_box()),
+            Effect::End => Effect::End,
+        }
+    }
 }
 
 /// A choreographic program as a sequence of effects
@@ -312,8 +353,13 @@ impl<R: RoleId, M> Program<R, M> {
                     }
                 }
                 Effect::Extension(ext) => {
-                    for role in ext.participating_roles::<R>() {
-                        roles.insert(role);
+                    // Extensions may specify participating roles through type-erased values
+                    let role_ids = ext.participating_role_ids();
+                    for role_any in role_ids {
+                        // Try to downcast each type-erased role back to R
+                        if let Some(role) = role_any.downcast_ref::<R>() {
+                            roles.insert(*role);
+                        }
                     }
                 }
                 Effect::End => {}

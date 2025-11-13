@@ -8,4 +8,6 @@
 - [Using Rumpsteak Handlers](06_rumpsteak_handler.md)
 - [WASM Guide](07_wasm_guide.md)
 - [Examples](08_examples.md)
-- [API Reference](09_api_reference.md)
+- [Extension Architecture](08_extension_architecture.md)
+- [Composition Tutorial](09_composition_tutorial.md)
+- [API Reference](10_api_reference.md)

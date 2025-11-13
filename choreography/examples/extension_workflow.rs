@@ -40,8 +40,8 @@ impl ExtensionEffect for ValidateCapability {
         "ValidateCapability"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
-        vec![] // Simplified for example
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        vec![Box::new(self.role)]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -72,8 +72,8 @@ impl ExtensionEffect for ChargeFlowCost {
         "ChargeFlowCost"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
-        vec![]
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        vec![Box::new(self.role)]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -111,7 +111,7 @@ impl ExtensionEffect for LogEvent {
         "LogEvent"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         vec![] // Global
     }
 
@@ -143,7 +143,7 @@ impl ExtensionEffect for RecordMetric {
         "RecordMetric"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         vec![]
     }
 
@@ -167,7 +167,6 @@ impl ExtensionEffect for RecordMetric {
 struct WorkflowHandler {
     role: Role,
     registry: ExtensionRegistry<()>,
-    capabilities: Vec<String>,
     budget: Arc<Mutex<u32>>,
     metrics: Arc<Mutex<Vec<(String, u64)>>>,
 }
@@ -277,7 +276,6 @@ impl WorkflowHandler {
         Self {
             role,
             registry,
-            capabilities,
             budget,
             metrics,
         }
@@ -360,6 +358,24 @@ impl ChoreoHandler for WorkflowHandler {
 // Choreography Definition
 // ============================================================================
 
+// Helper to demonstrate all log levels
+fn _example_log_levels() -> Program<Role, String> {
+    Program::new()
+        .ext(LogEvent {
+            message: "This is an info message".into(),
+            level: LogLevel::Info,
+        })
+        .ext(LogEvent {
+            message: "This is a warning message".into(),
+            level: LogLevel::Warn,
+        })
+        .ext(LogEvent {
+            message: "This is an error message".into(),
+            level: LogLevel::Error,
+        })
+        .end()
+}
+
 fn authentication_workflow() -> Program<Role, String> {
     Program::new()
         // Protocol start
@@ -379,6 +395,10 @@ fn authentication_workflow() -> Program<Role, String> {
         .ext(ChargeFlowCost {
             cost: 100,
             role: Role::Client,
+        })
+        .ext(LogEvent {
+            message: "High cost operation - check budget".into(),
+            level: LogLevel::Warn,
         })
         .send(Role::Server, "auth_request".into())
         // Server validates and queries database
@@ -429,9 +449,9 @@ fn authentication_workflow() -> Program<Role, String> {
 
 #[tokio::main]
 async fn main() {
-    println!("=".repeat(60));
+    println!("{}", "=".repeat(60));
     println!("Extension Workflow Example: Authentication Protocol");
-    println!("=".repeat(60));
+    println!("{}", "=".repeat(60));
     println!();
 
     // Create handler with capabilities and budget
@@ -456,7 +476,7 @@ async fn main() {
     match interpret_extensible(&mut handler, &mut endpoint, program).await {
         Ok(result) => {
             println!();
-            println!("=".repeat(60));
+            println!("{}", "=".repeat(60));
             match result.final_state {
                 InterpreterState::Completed => {
                     println!("✅ Protocol completed successfully");
@@ -476,7 +496,7 @@ async fn main() {
             for (metric, value) in handler.collected_metrics() {
                 println!("  {} = {}", metric, value);
             }
-            println!("=".repeat(60));
+            println!("{}", "=".repeat(60));
         }
         Err(e) => {
             println!("\n❌ Error: {}", e);

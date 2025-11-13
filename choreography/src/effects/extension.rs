@@ -6,8 +6,6 @@
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 
-use crate::effects::RoleId;
-
 /// Trait for type-safe extension effects
 ///
 /// Extension effects are domain-specific effects that extend the core
@@ -77,14 +75,31 @@ pub trait ExtensionEffect: Send + Sync + Debug {
     ///
     /// # Projection Semantics
     ///
-    /// - Non-empty vec: Extension appears only in projections for listed roles
+    /// Returns a vector of type-erased roles (`Box<dyn Any>`). Each role should
+    /// be a value of type `R: RoleId`. During projection, these will be downcast
+    /// back to the concrete role type.
+    ///
     /// - Empty vec: Extension appears in all role projections (global effect)
+    /// - Non-empty: Extension appears only in specified role projections
     ///
-    /// # Ordering
+    /// # Example
     ///
-    /// Extensions appear in projections in the same order as the global
-    /// choreography, maintaining happens-before relationships.
-    fn participating_roles<R: RoleId>(&self) -> Vec<R>;
+    /// ```ignore
+    /// fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    ///     vec![Box::new(self.role)]
+    /// }
+    /// ```
+    ///
+    /// For global extensions, return an empty vec:
+    ///
+    /// ```ignore
+    /// fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    ///     vec![]
+    /// }
+    /// ```
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        vec![] // Default: global extensions
+    }
 
     /// Downcast to `&dyn Any` for type-safe casting
     fn as_any(&self) -> &dyn Any;

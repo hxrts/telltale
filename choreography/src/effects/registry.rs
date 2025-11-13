@@ -20,7 +20,9 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Handlers return `Result<(), ExtensionError>` and must handle
 /// their extension type or return an error.
 pub type ExtensionHandler<E> = Box<
-    dyn Fn(&mut E, &dyn ExtensionEffect) -> BoxFuture<'_, Result<(), ExtensionError>> + Send + Sync,
+    dyn for<'a> Fn(&'a mut E, &'a dyn ExtensionEffect) -> BoxFuture<'a, Result<(), ExtensionError>>
+        + Send
+        + Sync,
 >;
 
 /// Registry of extension handlers for a choreography handler
@@ -73,7 +75,10 @@ impl<E: Endpoint> ExtensionRegistry<E> {
     pub fn register<Ext, F>(&mut self, handler: F)
     where
         Ext: ExtensionEffect + 'static,
-        F: Fn(&mut E, &dyn ExtensionEffect) -> BoxFuture<'_, Result<(), ExtensionError>>
+        F: for<'a> Fn(
+                &'a mut E,
+                &'a dyn ExtensionEffect,
+            ) -> BoxFuture<'a, Result<(), ExtensionError>>
             + Send
             + Sync
             + 'static,

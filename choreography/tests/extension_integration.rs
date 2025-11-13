@@ -19,7 +19,7 @@ impl ExtensionEffect for TestExtension {
         "TestExtension"
     }
 
-    fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         vec![]
     }
 
@@ -202,7 +202,7 @@ fn test_extension_type_checking() {
         fn type_name(&self) -> &'static str {
             "OtherExtension"
         }
-        fn participating_roles<R: RoleId>(&self) -> Vec<R> {
+        fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
             vec![]
         }
         fn as_any(&self) -> &dyn Any {
