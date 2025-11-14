@@ -3,6 +3,9 @@
 //! This is a case study demonstrating Rumpsteak's session types for implementing
 //! an HTTP caching proxy. The proxy uses session types to coordinate between:
 //! - Client: Receives HTTP requests
+
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
 //! - Proxy: Coordinates caching logic
 //! - Cache: Manages Redis-backed cache storage
 //! - Origin: Forwards requests to upstream server

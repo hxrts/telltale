@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Example: Capability validation extension for choreographies
 //!
 //! This example demonstrates a role-specific extension that validates

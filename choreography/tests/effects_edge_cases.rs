@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Edge case testing for the effects system
 //
 // This test module covers:

@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Programmatic Choreography Construction with Algebraic Effects
 //
 // This example demonstrates building complex choreographic protocols programmatically

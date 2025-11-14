@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Choreographic Programming Example
 //
 // This example demonstrates the free algebra approach to choreographic programming,

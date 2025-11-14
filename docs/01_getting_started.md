@@ -37,23 +37,21 @@ This enables compilation to WebAssembly targets.
 
 This example shows a simple ping-pong protocol between two roles.
 
-Define the choreography using the DSL parser.
+Define the choreography using the `choreography!` macro.
 
 ```rust
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use rumpsteak_aura_choreography::choreography;
 
-let choreography_str = r#"
-    choreography PingPong {
-        roles: Alice, Bob;
-        Alice -> Bob: Ping;
-        Bob -> Alice: Pong;
+choreography! {
+    PingPong {
+        roles: Alice, Bob
+        Alice -> Bob: Ping
+        Bob -> Alice: Pong
     }
-"#;
-
-let choreography = parse_choreography_str(choreography_str)?;
+}
 ```
 
-The parser generates the AST representation. This representation can be used for projection and code generation.
+The macro automatically generates role types, message types, and session types. This is the recommended approach for most use cases. For advanced scenarios requiring runtime parsing, see [Choreographic DSL Parser](03_choreographic_dsl.md).
 
 Run the protocol using the effect system.
 

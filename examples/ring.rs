@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 use futures::{channel::mpsc, executor, try_join};
 use rumpsteak_aura::{session, try_session, End, Message, Receive, Role, Roles, Send};
 use std::{error::Error, result};

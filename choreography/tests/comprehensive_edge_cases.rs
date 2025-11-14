@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Comprehensive edge case testing for new functionality
 //!
 //! This module tests critical edge cases and boundary conditions for:

@@ -70,69 +70,69 @@ debug = true
 [profile.bench]
 debug = true
 
-[workspace]
-members = ["caching", "fsm", "macros", "choreography"]
-exclude = ["examples/wasm-ping-pong"]
+# [workspace]
+# members = ["caching", "fsm", "macros", "choreography"]
+# exclude = ["examples/wasm-ping-pong"]
 
-# Shared dependencies across workspace members
-[workspace.dependencies]
+# Shared dependencies across workspace members (now handled by main Aura workspace)
+# [workspace.dependencies]
 # Core async/concurrency
-futures = "0.3"
-tokio = { version = "1.35", features = ["full"] }
-async-trait = "0.1"
-async-recursion = "1.0"
+# futures = "0.3"
+# tokio = { version = "1.35", features = ["full"] }
+# async-trait = "0.1"
+# async-recursion = "1.0"
 
 # WASM support
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
-wasm-timer = "0.2"
-getrandom = { version = "0.2", features = ["js"] }
+# wasm-bindgen = "0.2"
+# wasm-bindgen-futures = "0.4"
+# wasm-timer = "0.2"
+# getrandom = { version = "0.2", features = ["js"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-bincode = "1.3"
-time = { version = "0.3", features = ["serde"] }
-base64 = "0.21"
-hex = "0.4"
-uuid = { version = "1.6", features = ["v4", "serde", "js"] }
+# serde = { version = "1.0", features = ["derive"] }
+# bincode = "1.3"
+# time = { version = "0.3", features = ["serde"] }
+# base64 = "0.21"
+# hex = "0.4"
+# uuid = { version = "1.6", features = ["v4", "serde", "js"] }
 
 # Error handling
-thiserror = "1.0"
-anyhow = "1.0"
+# thiserror = "1.0"
+# anyhow = "1.0"
 
 # Proc macros
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "2.0", features = ["full", "extra-traits"] }
+# proc-macro2 = "1.0"
+# quote = "1.0"
+# syn = { version = "2.0", features = ["full", "extra-traits"] }
 
 # Logging/tracing
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# tracing = "0.1"
+# tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Utilities
-rand = "0.8"
+# rand = "0.8"
 
 # Parsing
-pest = "2.7"
-pest_derive = "2.7"
+# pest = "2.7"
+# pest_derive = "2.7"
 
 # Testing
-criterion = "0.3"
-proptest = "1.4"
-tempfile = "3.2"
+# criterion = "0.3"
+# proptest = "1.4"
+# tempfile = "3.2"
 
 # Align with Aura project standards
-[workspace.lints.clippy]
-disallowed_methods = "deny"
-disallowed_types = "deny"
-missing_docs_in_private_items = "allow"
-too_many_arguments = "warn"
-type_complexity = "warn"
-unwrap_used = "warn"
-expect_used = "warn"
+# [workspace.lints.clippy]
+# disallowed_methods = "deny"
+# disallowed_types = "deny"
+# missing_docs_in_private_items = "allow"
+# too_many_arguments = "warn"
+# type_complexity = "warn"
+# unwrap_used = "warn"
+# expect_used = "warn"
 
 # Advanced features examples integrated into new_features_demo.rs
 
-[workspace.lints.rust]
-unsafe_code = "deny"
-missing_docs = "warn"
+# [workspace.lints.rust]
+# unsafe_code = "deny"
+# missing_docs = "warn"

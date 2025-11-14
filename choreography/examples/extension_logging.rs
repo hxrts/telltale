@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Example: Simple logging extension for choreographies
 //!
 //! This example demonstrates how to create and use a basic extension

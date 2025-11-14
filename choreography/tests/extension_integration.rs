@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Integration tests for the extension system
 
 use rumpsteak_aura_choreography::effects::*;

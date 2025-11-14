@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Adapted from: Stay safe under panic: Rust programming with affine MPST
 //
 // global protocol Proto(role A, role C, role S)

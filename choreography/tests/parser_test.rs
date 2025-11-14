@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Comprehensive tests for the choreographic DSL parser
 
 use rumpsteak_aura_choreography::compiler::parser::{parse_choreography_str, ParseError};

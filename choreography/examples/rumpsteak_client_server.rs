@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Client-Server protocol example using RumpsteakHandler
 //
 // This example demonstrates a simple request-response protocol between

@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Performance benchmarks for enhanced choreography features
 //!
 //! This benchmark suite measures the performance impact of new features:

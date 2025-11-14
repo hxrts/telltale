@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Three-party negotiation protocol example using RumpsteakHandler
 //
 // This example demonstrates a negotiation protocol between a buyer, seller, and broker.

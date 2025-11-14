@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Complete workflow example with multiple extension types
 //!
 //! This example demonstrates a realistic authentication workflow using:

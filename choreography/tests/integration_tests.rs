@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Integration tests for enhanced choreography features
 //!
 //! This module tests the integration of all enhanced features:

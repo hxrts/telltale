@@ -1,4 +1,6 @@
 #![allow(clippy::type_complexity)]
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
 
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},

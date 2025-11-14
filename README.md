@@ -1,6 +1,6 @@
-# Rumpsteak (Aura)
+# Rumpsteak (Aura) ♨️
 
-**This is a fork of Zak Cutner's [Rumpsteak](https://github.com/zakcutner/rumpsteak) library, which adds a choreographic programming DSL which generates session typed code with an effect API.**
+Where did the grotesque name come from? The session type system is forked from Zak Cutner's [Rumpsteak](https://github.com/zakcutner/rumpsteak) library. This is an experiment in projecting session types from a global viewpoint. So I've added a choreographic programming DSL which generates session typed code into an effect API.**
 
 [![Crate](https://img.shields.io/crates/v/rumpsteak-aura)](https://crates.io/crates/rumpsteak-aura)
 [![Docs](https://docs.rs/rumpsteak-aura/badge.svg)](https://docs.rs/rumpsteak-aura)

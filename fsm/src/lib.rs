@@ -8,6 +8,9 @@
 //! # Main Components
 //!
 //! - [`Fsm`] - Core FSM representation with states and transitions
+
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
 //! - [`Local`] - Local type representation (textual session types)
 //! - [`Dot`] - DOT format export for visualization
 //! - [`Petrify`] - Petrify format export for Petri net tools

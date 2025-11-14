@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // WASM compatibility tests for choreography system
 //
 // These tests verify that core choreographic programming features

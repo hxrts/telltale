@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Complete test demonstrating parameterized roles functionality
 
 use rumpsteak_aura_choreography::compiler::{parse_dsl, project};

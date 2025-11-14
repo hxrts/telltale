@@ -1,5 +1,6 @@
 # Summary
 
+- [Background](00_background.md)
 - [Getting Started](01_getting_started.md)
 - [Architecture](02_architecture.md)
 - [Choreographic DSL Parser](03_choreographic_dsl.md)

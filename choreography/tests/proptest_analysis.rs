@@ -6,6 +6,9 @@
 // 3. Deadlock detection is consistent
 // 4. Warnings are valid and actionable
 
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 use proptest::prelude::*;
 use quote::{format_ident, quote};
 use rumpsteak_aura_choreography::ast::{Branch, Choreography, MessageType, Protocol, Role};

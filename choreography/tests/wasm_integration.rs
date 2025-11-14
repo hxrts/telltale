@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // WASM integration test - Full protocol execution
 //
 // This test demonstrates a complete two-party protocol executing in WASM,

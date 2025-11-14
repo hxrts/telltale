@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Debug parameterized roles parsing
 
 use rumpsteak_aura_choreography::compiler::parse_dsl;

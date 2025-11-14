@@ -9,6 +9,9 @@
 //! - `#[session]` - Transform session type definitions with lifetime parameters
 //! - `choreography!` - Define protocols from choreographic descriptions
 
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 use proc_macro::TokenStream;
 
 mod choreography;

@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Tests for dynamic role functionality
 //!
 //! This module tests the comprehensive dynamic role support including:

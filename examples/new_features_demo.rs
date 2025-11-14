@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Comprehensive demonstration of new rumpsteak-aura choreography features
 //!
 //! This example demonstrates all the new functionality we've added:

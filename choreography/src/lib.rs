@@ -8,6 +8,9 @@
 //! participant. This includes an effect handler system that decouples protocol
 //! logic from transport implementation.
 
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 pub mod ast;
 pub mod compiler;
 pub mod effects;

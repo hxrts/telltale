@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 //! Direct test of parameterized roles parsing without using the proc macro
 
 use rumpsteak_aura_choreography::compiler::{parse_dsl, project};

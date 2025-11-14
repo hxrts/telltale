@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 // Tests for enhanced projection patterns
 //
 // This test suite verifies the 3 new projection patterns:
