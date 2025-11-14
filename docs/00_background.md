@@ -41,16 +41,13 @@ Choreographic programming takes the global types concept further. Instead of jus
 choreography! {
     Calculator {
         roles: Alice, Bob
-        let x = Alice.input()
-        Alice -> Bob: x
-        let result = Bob.compute(x)
-        Bob -> Alice: result
-        Alice.output(result)
+        Alice -> Bob: Value
+        Bob -> Alice: Result
     }
 }
 ```
 
-This choreography specifies both communication and computation. The system projects it into separate programs for Alice and Bob. Alice's program inputs a value, sends it, receives the result, and outputs it. Bob's program receives a value, computes on it, and sends back the result.
+This choreography specifies the communication protocol. The system projects it into separate programs for Alice and Bob. Alice's program sends a value and receives a result. Bob's program receives a value and sends back a result.
 
 Choreographic programming eliminates the need to manually coordinate distributed implementations. The global specification ensures all participants agree on the protocol. Type checking at the choreographic level prevents distributed system errors.
 

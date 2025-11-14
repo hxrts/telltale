@@ -1,4 +1,4 @@
-# Choreographic DSL Parser
+# Choreographic DSL
 
 ## Current Status
 
@@ -8,23 +8,25 @@ The parser module is located in `choreography/src/compiler/parser.rs`. It provid
 
 The parser translates choreographic protocol specifications from a high-level DSL. The output is the internal AST representation including `Choreography` and `Protocol` types.
 
-## Choreographic DSL Syntax
+## DSL Syntax
 
 The choreographic DSL follows this syntax.
 
 ```rust
-choreography MyProtocol {
-    roles: Alice, Bob, Carol
+choreography! {
+    MyProtocol {
+        roles: Alice, Bob, Carol
 
-    Alice -> Bob: Greeting
-    Bob -> Alice: Response
+        Alice -> Bob: Greeting
+        Bob -> Alice: Response
 
-    choice Alice {
-        continue: {
-            Alice -> Carol: Data
-        }
-        stop: {
-            Alice -> Bob: Done
+        choice Alice {
+            continue: {
+                Alice -> Carol: Data
+            }
+            stop: {
+                Alice -> Bob: Done
+            }
         }
     }
 }
@@ -37,42 +39,38 @@ This example shows role declarations, message passing, and choice constructs.
 Choreographies can be namespaced to avoid conflicts. Multiple protocols in the same crate can use different namespaces.
 
 ```rust
-let threshold_dsl = r#"
+choreography! {
     #[namespace = "threshold_ceremony"]
-    choreography ThresholdProtocol {
-        roles: Coordinator, Signers[*];
-        Coordinator -> Signers[*]: Request;
+    ThresholdProtocol {
+        roles: Coordinator, Signers[*]
+        Coordinator -> Signers[*]: Request
     }
-"#;
-let choreo = parse_choreography_str(threshold_dsl)?;
+}
 ```
 
 This generates the protocol within a `threshold_ceremony` module.
 
-Multiple choreographies with different namespaces can coexist. Parse them separately and use the namespace for code generation.
+Multiple choreographies with different namespaces can coexist in the same crate.
 
 ```rust
-let consensus_dsl = r#"
+choreography! {
     #[namespace = "consensus"]
-    choreography ConsensusProtocol {
-        roles: Leader, Followers[N];
+    ConsensusProtocol {
+        roles: Leader, Followers[N]
         // protocol body
     }
-"#;
+}
 
-let recovery_dsl = r#"
+choreography! {
     #[namespace = "recovery"]
-    choreography RecoveryProtocol {
-        roles: Requester, Guardians[*];
+    RecoveryProtocol {
+        roles: Requester, Guardians[*]
         // protocol body
     }
-"#;
-
-let consensus_choreo = parse_choreography_str(consensus_dsl)?;
-let recovery_choreo = parse_choreography_str(recovery_dsl)?;
+}
 ```
 
-Each choreography is parsed independently.
+Each choreography is defined independently with its own namespace.
 
 ### Supported Constructs
 
@@ -196,22 +194,24 @@ Recursive protocols enable unbounded repetition with labeled recursion points.
 Define and reuse protocol fragments.
 
 ```rust
-choreography Main {
-    roles: A, B, C
+choreography! {
+    Main {
+        roles: A, B, C
 
-    protocol Handshake {
-        A -> B: Hello
-        B -> A: Hi
+        protocol Handshake {
+            A -> B: Hello
+            B -> A: Hi
+        }
+
+        protocol DataTransfer {
+            A -> B: Data
+            B -> A: Ack
+        }
+
+        call Handshake
+        call DataTransfer
+        A -> C: Done
     }
-
-    protocol DataTransfer {
-        A -> B: Data
-        B -> A: Ack
-    }
-
-    call Handshake
-    call DataTransfer
-    A -> C: Done
 }
 ```
 
@@ -224,15 +224,11 @@ Annotations provide meta-information for optimization and verification. The syst
 Statement-level annotations attach metadata to protocol actions.
 
 ```rust
-choreography EnhancedProtocol {
-    roles: A, B, C;
+[@cost = 100, @priority = "high"]
+A -> B: ImportantMessage
 
-    [@cost = 100, @priority = "high"]
-    A -> B: ImportantMessage;
-
-    [@timeout = 5000, @retry = 3]
-    B -> C: RetriableMessage;
-}
+[@timeout = 5000, @retry = 3]
+B -> C: RetriableMessage
 ```
 
 These annotations specify cost and timeout values.
@@ -240,12 +236,8 @@ These annotations specify cost and timeout values.
 Role-specific annotations attach metadata to individual roles.
 
 ```rust
-choreography RoleAnnotatedProtocol {
-    roles: Coordinator, Worker[*];
-
-    Coordinator[@cost = 200] -> Worker[*]: BroadcastMessage;
-    Worker[i][@priority = "low"] -> Coordinator: Response;
-}
+Coordinator[@cost = 200] -> Worker[*]: BroadcastMessage
+Worker[i][@priority = "low"] -> Coordinator: Response
 ```
 
 The coordinator role has a cost annotation.
@@ -253,17 +245,13 @@ The coordinator role has a cost annotation.
 Multiple annotation types can be combined.
 
 ```rust
-choreography FullyAnnotated {
-    roles: Client, Server, Database;
+[@critical, @audit_log = "true"]
+Client -> Server: AuthRequest
 
-    [@critical, @audit_log = "true"]
-    Client -> Server: AuthRequest;
+Server[@timeout = 1000] -> Database[@cost = 50]: Query
 
-    Server[@timeout = 1000] -> Database[@cost = 50]: Query;
-
-    [@buffered, @compress = "gzip"]
-    Database -> Server: QueryResult;
-}
+[@buffered, @compress = "gzip"]
+Database -> Server: QueryResult
 ```
 
 Annotations are accessible through the generated code. Runtime systems can use them for optimization, monitoring, and policy enforcement.
@@ -277,12 +265,8 @@ Messages can include explicit type annotations. This specifies the types of data
 Simple types use single type parameters.
 
 ```rust
-choreography TypedMessages {
-    roles: A, B
-
-    A -> B: Request<String>
-    B -> A: Response<i32>
-}
+A -> B: Request<String>
+B -> A: Response<i32>
 ```
 
 The request carries a String. The response carries an i32.
@@ -329,11 +313,13 @@ The system supports dynamic role parameterization. Participant counts can be det
 Runtime-determined role counts use the wildcard syntax.
 
 ```rust
-choreography ThresholdProtocol {
-    roles: Coordinator, Signers[*];
+choreography! {
+    ThresholdProtocol {
+        roles: Coordinator, Signers[*]
 
-    Coordinator -> Signers[*]: Request;
-    Signers[0..threshold] -> Coordinator: Response;
+        Coordinator -> Signers[*]: Request
+        Signers[0..threshold] -> Coordinator: Response
+    }
 }
 ```
 
@@ -342,11 +328,13 @@ The number of signers is determined at runtime.
 Symbolic parameters provide compile-time flexibility.
 
 ```rust
-choreography ConsensusProtocol {
-    roles: Leader, Followers[N];
+choreography! {
+    ConsensusProtocol {
+        roles: Leader, Followers[N]
 
-    Leader -> Followers[*]: Proposal;
-    Followers[i] -> Leader: Vote;
+        Leader -> Followers[*]: Proposal
+        Followers[i] -> Leader: Vote
+    }
 }
 ```
 
@@ -355,11 +343,13 @@ The parameter N is resolved during code generation.
 Range-based role selection targets subsets of roles.
 
 ```rust
-choreography PartialBroadcast {
-    roles: Broadcaster, Receivers[*];
+choreography! {
+    PartialBroadcast {
+        roles: Broadcaster, Receivers[*]
 
-    Broadcaster -> Receivers[0..count]: Message;
-    Receivers[0..threshold] -> Broadcaster: Ack;
+        Broadcaster -> Receivers[0..count]: Message
+        Receivers[0..threshold] -> Broadcaster: Ack
+    }
 }
 ```
 
@@ -368,12 +358,14 @@ Only roles in the specified range participate.
 Static arrays use fixed counts.
 
 ```rust
-choreography StaticWorkers {
-    roles: Master, Worker[3];
+choreography! {
+    StaticWorkers {
+        roles: Master, Worker[3]
 
-    Master -> Worker[0]: Task1;
-    Master -> Worker[1]: Task2;
-    Worker[0] -> Master: Result1;
+        Master -> Worker[0]: Task1
+        Master -> Worker[1]: Task2
+        Worker[0] -> Master: Result1
+    }
 }
 ```
 
@@ -607,17 +599,14 @@ See `choreography/examples/error_demo.rs` for more examples.
 ### Simple Two-Party Protocol
 
 ```rust
-let input = r#"
-choreography PingPong {
-    roles: Alice, Bob
+choreography! {
+    PingPong {
+        roles: Alice, Bob
 
-    Alice -> Bob: Ping
-    Bob -> Alice: Pong
+        Alice -> Bob: Ping
+        Bob -> Alice: Pong
+    }
 }
-"#;
-
-let choreo = parse_choreography_str(input)?;
-assert_eq!(choreo.roles.len(), 2);
 ```
 
 This creates a simple ping-pong protocol.
@@ -625,24 +614,22 @@ This creates a simple ping-pong protocol.
 ### Protocol with Choice
 
 ```rust
-let input = r#"
-choreography Negotiation {
-    roles: Buyer, Seller
+choreography! {
+    Negotiation {
+        roles: Buyer, Seller
 
-    Buyer -> Seller: Offer
+        Buyer -> Seller: Offer
 
-    choice Seller {
-        accept: {
-            Seller -> Buyer: Accept
-        }
-        reject: {
-            Seller -> Buyer: Reject
+        choice Seller {
+            accept: {
+                Seller -> Buyer: Accept
+            }
+            reject: {
+                Seller -> Buyer: Reject
+            }
         }
     }
 }
-"#;
-
-let choreo = parse_choreography_str(input)?;
 ```
 
 The seller chooses to accept or reject.
@@ -650,35 +637,33 @@ The seller chooses to accept or reject.
 ### Complex E-Commerce Protocol
 
 ```rust
-let input = r#"
-choreography ECommerce {
-    roles: Buyer, Seller, Shipper
+choreography! {
+    ECommerce {
+        roles: Buyer, Seller, Shipper
 
-    Buyer -> Seller: Inquiry
-    Seller -> Buyer: Quote
+        Buyer -> Seller: Inquiry
+        Seller -> Buyer: Quote
 
-    choice Buyer {
-        order: {
-            Buyer -> Seller: Order
-            Seller -> Shipper: ShipRequest
-            Shipper -> Buyer: Tracking
+        choice Buyer {
+            order: {
+                Buyer -> Seller: Order
+                Seller -> Shipper: ShipRequest
+                Shipper -> Buyer: Tracking
 
-            loop (decides: Buyer) {
-                Buyer -> Shipper: StatusCheck
-                Shipper -> Buyer: StatusUpdate
+                loop (decides: Buyer) {
+                    Buyer -> Shipper: StatusCheck
+                    Shipper -> Buyer: StatusUpdate
+                }
+
+                Shipper -> Buyer: Delivered
+                Buyer -> Seller: Confirmation
             }
-
-            Shipper -> Buyer: Delivered
-            Buyer -> Seller: Confirmation
-        }
-        cancel: {
-            Buyer -> Seller: Cancel
+            cancel: {
+                Buyer -> Seller: Cancel
+            }
         }
     }
 }
-"#;
-
-let choreo = parse_choreography_str(input)?;
 ```
 
 This protocol includes choice, loops, and multiple roles.

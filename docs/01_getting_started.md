@@ -56,19 +56,13 @@ The macro automatically generates role types, message types, and session types. 
 Run the protocol using the effect system.
 
 ```rust
-use rumpsteak_aura_choreography::{InMemoryHandler, Program, interpret, RoleId};
+use rumpsteak_aura_choreography::{InMemoryHandler, Program, interpret};
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Role {
     Alice,
     Bob,
-}
-
-impl RoleId for Role {
-    fn name(&self) -> String {
-        format!("{:?}", self)
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

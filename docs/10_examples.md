@@ -43,10 +43,14 @@ The `wasm-ping-pong` example runs in browsers. It shows browser-based ping-pong 
 Client sends request to server. Server processes and sends response back.
 
 ```rust
-let program = Program::new()
-    .send(Role::Server, Request { query: "data" })
-    .recv::<Response>(Role::Server)
-    .end();
+choreography! {
+    RequestResponse {
+        roles: Client, Server
+        
+        Client -> Server: Request
+        Server -> Client: Response
+    }
+}
 ```
 
 Use this pattern for synchronous operations. Client waits for server response.
@@ -56,25 +60,39 @@ Use this pattern for synchronous operations. Client waits for server response.
 One role decides between branches. Other roles react to the decision.
 
 ```rust
-let program = Program::new()
-    .choose(Role::Server, Label("accept"))
-    .send(Role::Server, Confirmation)
-    .end();
+choreography! {
+    ChoicePattern {
+        roles: Client, Server
+        
+        choice Server {
+            accept: {
+                Server -> Client: Confirmation
+            }
+            reject: {
+                Server -> Client: Rejection
+            }
+        }
+    }
+}
 ```
 
-The chooser calls choose with a label. Other participants use offer to learn the choice.
+The deciding role chooses which branch to execute. Other participants react accordingly.
 
 ### Sequential Messages
 
 Send multiple messages in sequence. Each message may depend on previous responses.
 
 ```rust
-let program = Program::new()
-    .send(Role::Peer, Message1)
-    .recv::<Ack>(Role::Peer)
-    .send(Role::Peer, Message2)
-    .recv::<Ack>(Role::Peer)
-    .end();
+choreography! {
+    SequentialMessages {
+        roles: Client, Server
+        
+        Client -> Server: Message1
+        Server -> Client: Ack
+        Client -> Server: Message2
+        Server -> Client: Ack
+    }
+}
 ```
 
 This pattern provides acknowledgment after each step.
@@ -84,12 +102,16 @@ This pattern provides acknowledgment after each step.
 Three or more roles coordinate. Messages flow between different pairs.
 
 ```rust
-let program = Program::new()
-    .recv::<Offer>(Role::Buyer)
-    .send(Role::Seller, Offer)
-    .recv::<Response>(Role::Seller)
-    .send(Role::Buyer, Response)
-    .end();
+choreography! {
+    MultiPartyCoordination {
+        roles: Buyer, Coordinator, Seller
+        
+        Buyer -> Coordinator: Offer
+        Coordinator -> Seller: Offer
+        Seller -> Coordinator: Response
+        Coordinator -> Buyer: Response
+    }
+}
 ```
 
 The coordinator role mediates between other participants.
@@ -99,13 +121,16 @@ The coordinator role mediates between other participants.
 Repeat protocol steps. Loop condition determines when to stop.
 
 ```rust
-let loop_body = Program::new()
-    .send(Role::Server, Request)
-    .recv::<Response>(Role::Server);
-
-let program = Program::new()
-    .with_loop(loop_body, 5)
-    .end();
+choreography! {
+    LoopPattern {
+        roles: Client, Server
+        
+        loop (count: 5) {
+            Client -> Server: Request
+            Server -> Client: Response
+        }
+    }
+}
 ```
 
 Use loops for batch processing or iterative protocols. This example repeats 5 times.
@@ -115,36 +140,40 @@ Use loops for batch processing or iterative protocols. This example repeats 5 ti
 Execute independent protocol branches concurrently.
 
 ```rust
-let branch1 = Program::new()
-    .send(Role::Worker1, Task)
-    .end();
-
-let branch2 = Program::new()
-    .send(Role::Worker2, Task)
-    .end();
-
-let program = Program::new()
-    .parallel(vec![branch1, branch2])
-    .end();
+choreography! {
+    ParallelPattern {
+        roles: Coordinator, Worker1, Worker2
+        
+        parallel {
+            Coordinator -> Worker1: Task
+        |
+            Coordinator -> Worker2: Task
+        }
+    }
+}
 ```
 
 Branches must not conflict. Different recipients allow parallel execution.
 
 ### Timeout Protection
 
-Wrap operations with timeouts to handle unresponsive peers.
+Use annotations to specify timeouts for handling unresponsive peers.
 
 ```rust
-let inner = Program::new()
-    .recv::<Message>(Role::Peer)
-    .end();
-
-let program = Program::new()
-    .with_timeout(Role::Self_, Duration::from_secs(5), inner)
-    .end();
+choreography! {
+    TimeoutPattern {
+        roles: Client, Server
+        
+        [@timeout = 5000]
+        Client -> Server: Request
+        
+        [@timeout = 5000]
+        Server -> Client: Response
+    }
+}
 ```
 
-The operation fails with Timeout error if duration elapses.
+The operation fails with timeout error if duration elapses. Timeout annotations are in milliseconds.
 
 ## Testing Patterns
 

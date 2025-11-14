@@ -1,20 +1,18 @@
 # Extension Architecture
 
-The extension system enables domain-specific choreographic effects while maintaining type safety and algebraic effects composition.
+The extension system enables domain-specific choreographic effects. Extensions maintain type safety and compose with algebraic effects.
 
 ## Overview
 
-Extensions are typed algebraic effects that participate in the full effect lifecycle:
-- **Construction**: Type-safe extension creation
-- **Projection**: Role-based extension filtering
-- **Interpretation**: Handler dispatch and execution
-- **Composition**: Cross-crate extension reuse
+Extensions are typed algebraic effects. They participate in the full effect lifecycle. This includes construction, projection, interpretation, and composition.
+
+Type-safe extension creation happens at construction time. Role-based filtering occurs during projection. Handler dispatch executes at interpretation time. Cross-crate reuse enables composition.
 
 ## Core Concepts
 
 ### ExtensionEffect Trait
 
-All extensions implement the `ExtensionEffect` trait:
+All extensions implement the `ExtensionEffect` trait.
 
 ```rust
 pub trait ExtensionEffect: Send + Sync + Debug {
@@ -27,52 +25,23 @@ pub trait ExtensionEffect: Send + Sync + Debug {
 }
 ```
 
-**Key features**:
-- `TypeId`-based discrimination (compile-time type safety)
-- Type-erased role participation for projection semantics (object-safe)
-- Type-safe downcasting via `Any` trait
-- Cloneable for effect algebra operations
+The trait provides `TypeId`-based discrimination for compile-time type safety. Type-erased role participation enables projection semantics while maintaining object safety. Type-safe downcasting uses the `Any` trait. Extension cloning supports effect algebra operations.
 
-**Design Rationale: Type Erasure with Type Safety**:
+The trait uses `Vec<Box<dyn Any>>` for role information. This design balances object safety with third-party projection needs. Generic methods prevent trait objects. Extensions store as `Box<dyn ExtensionEffect>` in the effect algebra. Object-safe traits are required.
 
-The trait uses `Vec<Box<dyn Any>>` for role information instead of a generic method like `participating_roles<R: RoleId>(&self) -> Vec<R>`. This design choice balances two critical requirements:
-
-1. **Object Safety**: Rust traits with generic methods cannot be used as trait objects (`Box<dyn ExtensionEffect>`). Since extensions are stored as `Box<dyn ExtensionEffect>` in the effect algebra, the trait must be object-safe.
-
-2. **Third-Party Projection**: Extension authors need to specify which roles participate in their extensions for proper projection. Without this capability, extensions cannot be projected to specific roles.
-
-**How Type Safety is Maintained**:
-
-Despite type erasure, the system remains type-safe through Rust's `Any` trait downcasting:
+Type safety persists despite erasure. Rust's `Any` trait provides safe downcasting. Extensions box their specific role types. The effect algebra downcasts back to the choreography's role type. Mismatched types fail downcast and are skipped.
 
 ```rust
-// Extension author boxes their specific role type
 fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-    vec![Box::new(self.role)]  // Role type known at extension definition
-}
-
-// Effect algebra safely downcasts back to the choreography's role type
-for role_any in ext.participating_role_ids() {
-    if let Some(role) = role_any.downcast_ref::<R>() {  // Type-safe downcast
-        roles.insert(*role);
-    }
-    // Mismatched types are safely ignored (downcast fails)
+    vec![Box::new(self.role)]
 }
 ```
 
-**Type Safety Guarantees**:
-
-- Extensions can only be created with concrete role types known at compile time
-- Downcasting uses `TypeId` checks internally (no unsafe casting)
-- Type mismatches result in the role being silently skipped (fail-safe behavior)
-- Extension handlers use `TypeId` for type-safe dispatch to the correct handler
-- No runtime type confusion is possible - incompatible types simply don't match
-
-This approach provides **runtime flexibility** (extensions work with any role type) while maintaining **compile-time safety** (role types are checked where they're defined and used).
+Runtime flexibility combines with compile-time safety. Extensions work with any role type. Role types check at definition and use sites. No runtime type confusion occurs.
 
 ### Extension Registry
 
-The `ExtensionRegistry<E>` provides type-safe handler dispatch:
+The `ExtensionRegistry<E>` provides type-safe handler dispatch.
 
 ```rust
 let mut registry = ExtensionRegistry::new();
@@ -82,23 +51,18 @@ registry.register::<MyExtension, _>(|endpoint, ext| {
         let my_ext = ext.as_any()
             .downcast_ref::<MyExtension>()
             .ok_or(ExtensionError::TypeMismatch { ... })?;
-
-        // Handle extension logic
+        
         endpoint.do_something(my_ext)?;
         Ok(())
     })
 });
 ```
 
-**Features**:
-- Fail-fast on unknown extensions
-- Type-safe handler registration
-- Registry merging for composition
-- Zero overhead when empty
+The registry fails fast on unknown extensions. Type-safe registration prevents errors. Registries merge for composition. Empty registries have zero overhead.
 
 ### Effect Integration
 
-Extensions integrate naturally with the effect algebra:
+Extensions integrate with the effect algebra.
 
 ```rust
 let program = Program::new()
@@ -113,37 +77,39 @@ let program = Program::new()
     .end();
 ```
 
+Extensions appear before and after communication operations. The effect algebra maintains execution order.
+
 ## Projection Semantics
 
-Extensions project based on `participating_role_ids()`, which returns type-erased role values.
+Extensions project based on `participating_role_ids()`. The method returns type-erased role values.
 
 ### Global Extensions
 
-Empty vector → appears in all projections:
+An empty vector makes an extension appear in all projections.
 
 ```rust
 fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-    vec![]  // Global - all roles see this
+    vec![]
 }
 ```
 
-Example: Logging events that all roles should record.
+Logging events use global extensions. All roles record the events.
 
 ### Role-Specific Extensions
 
-Non-empty vector with boxed roles → appears only in specified projections:
+A non-empty vector with boxed roles restricts projection.
 
 ```rust
 fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-    vec![Box::new(self.role)]  // Only this role sees it
+    vec![Box::new(self.role)]
 }
 ```
 
-Example: Capability validation for a specific role.
+Capability validation uses role-specific extensions. Only the specified role sees the extension.
 
 ### Multi-Role Extensions
 
-Multiple roles can participate in an extension:
+Multiple roles participate by boxing each role.
 
 ```rust
 fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
@@ -154,14 +120,13 @@ fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
 }
 ```
 
-Example: A coordination extension that only Alice and Bob need to handle.
+Coordination extensions target specific role subsets. Only Alice and Bob handle this extension.
 
 ### Type Erasure and Downcasting
 
-The effect algebra internally downcasts type-erased roles back to the concrete role type:
+The effect algebra downcasts type-erased roles to concrete types.
 
 ```rust
-// In algebra.rs collect_roles()
 for role_any in ext.participating_role_ids() {
     if let Some(role) = role_any.downcast_ref::<R>() {
         roles.insert(*role);
@@ -169,15 +134,15 @@ for role_any in ext.participating_role_ids() {
 }
 ```
 
-This approach maintains object safety while allowing third-party extensions to specify participating roles for projection.
+This maintains object safety. Third-party extensions specify participating roles for projection.
 
-## Implementing Projection in Your Extensions
+## Implementing Projection
 
-As a third-party developer, you can fully control how your extensions project to different roles. Here's a comprehensive guide:
+Extension developers control projection to different roles. Four design patterns cover common cases.
 
-### Design Pattern 1: Global Extensions
+### Pattern 1: Global Extensions
 
-If your extension should be visible to all roles in the choreography:
+Global extensions are visible to all roles.
 
 ```rust
 #[derive(Clone, Debug)]
@@ -187,45 +152,37 @@ pub struct AuditLog {
 }
 
 impl ExtensionEffect for AuditLog {
-    // ... type_id, type_name, etc.
-
     fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![]  // Empty = global, all roles see this
+        vec![]
     }
-
-    // ... remaining trait methods
 }
 ```
 
-**Use cases**: Logging, metrics, global invariants, debugging
+An empty vector makes the extension global. Logging, metrics, and global invariants use this pattern.
 
-### Design Pattern 2: Single Role Extensions
+### Pattern 2: Single Role Extensions
 
-If your extension applies to a specific role:
+Single role extensions apply to one specific role.
 
 ```rust
 #[derive(Clone, Debug)]
 pub struct ValidatePermission {
     pub permission: String,
-    pub role: MyRole,  // Store the role
+    pub role: MyRole,
 }
 
 impl ExtensionEffect for ValidatePermission {
-    // ... type_id, type_name, etc.
-
     fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![Box::new(self.role)]  // Only this role participates
+        vec![Box::new(self.role)]
     }
-
-    // ... remaining trait methods
 }
 ```
 
-**Use cases**: Role-specific validation, authorization, local state updates
+The extension stores the target role. Only that role participates. Validation, authorization, and local state updates use this pattern.
 
-### Design Pattern 3: Multi-Role Extensions
+### Pattern 3: Multi-Role Extensions
 
-If multiple specific roles need to handle your extension:
+Multiple specific roles handle multi-role extensions.
 
 ```rust
 #[derive(Clone, Debug)]
@@ -235,25 +192,20 @@ pub struct ConsensusRound {
 }
 
 impl ExtensionEffect for ConsensusRound {
-    // ... type_id, type_name, etc.
-
     fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        // Box each participant
         self.participants
             .iter()
             .map(|p| Box::new(*p) as Box<dyn Any>)
             .collect()
     }
-
-    // ... remaining trait methods
 }
 ```
 
-**Use cases**: Consensus protocols, quorum operations, multi-party computation
+Each participant gets boxed. Consensus protocols, quorum operations, and multi-party computation use this pattern.
 
-### Design Pattern 4: Conditional Projection
+### Pattern 4: Conditional Projection
 
-If participation depends on extension state:
+Participation can depend on extension state.
 
 ```rust
 #[derive(Clone, Debug)]
@@ -263,34 +215,27 @@ pub struct OptionalNotification {
 }
 
 impl ExtensionEffect for OptionalNotification {
-    // ... type_id, type_name, etc.
-
     fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
         if let Some(role) = self.notify_role {
             vec![Box::new(role)]
         } else {
-            vec![]  // Global if no specific role
+            vec![]
         }
     }
-
-    // ... remaining trait methods
 }
 ```
 
-**Use cases**: Conditional notifications, optional observers, dynamic routing
+The extension becomes global when no specific role is set. Conditional notifications, optional observers, and dynamic routing use this pattern.
 
-### Important Constraints
+## Implementation Constraints
 
-When implementing `participating_role_ids()`:
+Four constraints apply when implementing `participating_role_ids()`.
 
-1. **Type Matching**: Boxed roles must match the choreography's role type `R: RoleId`
-2. **Static Bounds**: Role types must be `'static` (required for `Any`)
-3. **Copy/Clone**: Roles should be `Copy` or cheap to clone
-4. **Consistency**: The same extension value should always return the same roles
+Boxed roles must match the choreography's role type `R: RoleId`. Role types must be `'static` for `Any` compatibility. Roles should be `Copy` or cheap to clone. The same extension value must always return the same roles.
 
-### Complete Example
+## Complete Example
 
-Here's a complete extension with proper projection:
+This example shows proper projection implementation.
 
 ```rust
 use rumpsteak_aura_choreography::effects::*;
@@ -313,197 +258,179 @@ impl ExtensionEffect for RateLimitCheck {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
-
+    
     fn type_name(&self) -> &'static str {
         "RateLimitCheck"
     }
-
+    
     fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        // Only the service being rate-limited needs to check
         vec![Box::new(self.service)]
     }
-
+    
     fn as_any(&self) -> &dyn Any {
         self
     }
-
+    
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
-
+    
     fn clone_box(&self) -> Box<dyn ExtensionEffect> {
         Box::new(self.clone())
     }
 }
+```
 
-// Usage in a choreography:
+The service being rate-limited performs the check. Other services do not see this extension in their projection.
+
+### Usage Example
+
+The extension integrates into choreography programs.
+
+```rust
 fn api_request_protocol() -> Program<ServiceRole, Message> {
     Program::new()
-        // Gateway rate limits incoming requests
         .ext(RateLimitCheck {
             service: ServiceRole::Gateway,
             limit: 1000,
         })
-        .send(ServiceRole::Gateway, ServiceRole::AuthService, AuthRequest)
-        // AuthService rate limits token generation
+        .send(ServiceRole::AuthService, AuthRequest)
         .ext(RateLimitCheck {
             service: ServiceRole::AuthService,
             limit: 100,
         })
-        .send(ServiceRole::AuthService, ServiceRole::Database, QueryUser)
+        .send(ServiceRole::Database, TokenQuery)
         .end()
 }
 ```
 
-### Projection Behavior
+Each service checks its own rate limit. The Gateway projection includes only the Gateway rate limit. The AuthService projection includes only the AuthService rate limit.
 
-Given the above choreography:
+## Projection Behavior
 
-**Gateway's projection:**
-```rust
-// Gateway sees:
-ext(RateLimitCheck { service: Gateway, limit: 1000 })  // ✓ Participates
-send(AuthService, AuthRequest)
-// (AuthService rate limit skipped - not Gateway's concern)
-```
-
-**AuthService's projection:**
-```rust
-// AuthService sees:
-// (Gateway rate limit skipped - not AuthService's concern)
-recv(Gateway, AuthRequest)
-ext(RateLimitCheck { service: AuthService, limit: 100 })  // ✓ Participates
-send(Database, QueryUser)
-```
-
-**Database's projection:**
-```rust
-// Database sees:
-// (Both rate limits skipped - not Database's concern)
-recv(AuthService, QueryUser)
-```
-
-This gives you full control over which roles execute which extension logic during projection.
-
-### Ordering
-
-Extensions maintain happens-before relationships:
+Extensions project to participating roles only. Consider a three-role choreography with Alice, Bob, and Charlie.
 
 ```rust
-// Global choreography
-ext(ValidateCap(Alice))     // Alice sees this
-send(Alice, Bob, msg)       // Both see this
-ext(LogEvent("sent"))       // Both see this
-
-// Alice's projection
-ext(ValidateCap(Alice))     // ✓ Appears first
-send(Bob, msg)              // ✓ Then send
-ext(LogEvent("sent"))       // ✓ Then log
-
-// Bob's projection
-recv(Alice, msg)            // ✓ Receive
-ext(LogEvent("sent"))       // ✓ Then log (ValidateCap skipped)
+Program::new()
+    .ext(LogEvent { message: "start" })
+    .ext(ValidateCapability { role: Alice, cap: "send" })
+    .send(Bob, Message)
+    .ext(AuditLog { action: "sent" })
+    .end()
 ```
+
+Alice's projection includes all extensions. Bob's projection includes `LogEvent` and `AuditLog` but not `ValidateCapability`. Charlie's projection includes `LogEvent` and `AuditLog` but not `ValidateCapability`.
+
+The extension before `send` appears in Alice's projection only. Global extensions appear in all projections.
+
+## Extension Ordering
+
+Extensions maintain source order in projections. Consider this program.
+
+```rust
+Program::new()
+    .ext(Ext1)
+    .ext(Ext2)
+    .send(Alice, Msg)
+    .ext(Ext3)
+    .end()
+```
+
+Alice's projection preserves the order. Ext1 executes first, then Ext2, then send, then Ext3. The handler processes extensions in definition order.
 
 ## Handler Patterns
 
+Three patterns integrate extensions with handlers. Each pattern serves different needs.
+
 ### Pattern 1: Wrapper Handler
 
-Wrap an existing handler with extension support:
+A wrapper handler adds extension support to existing handlers.
 
 ```rust
-pub struct ExtensibleWrapper<H: ChoreoHandler> {
+pub struct ExtensibleWrapper<H> {
     base: H,
     registry: ExtensionRegistry<H::Endpoint>,
 }
 
-impl<H: ChoreoHandler> ExtensibleWrapper<H> {
-    pub fn new(base: H) -> Self {
-        let mut registry = ExtensionRegistry::new();
-
-        // Register your extensions
-        registry.register::<MyExtension, _>(|ep, ext| {
-            Box::pin(async move {
-                // Handle extension
-                Ok(())
-            })
-        });
-
+impl<H> ExtensibleWrapper<H> {
+    pub fn new(base: H, registry: ExtensionRegistry<H::Endpoint>) -> Self {
         Self { base, registry }
     }
 }
 
-#[async_trait]
 impl<H: ChoreoHandler> ExtensibleHandler for ExtensibleWrapper<H> {
     type Endpoint = H::Endpoint;
-
+    
     fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint> {
         &self.registry
     }
 }
 
-// Delegate ChoreoHandler methods to base
-#[async_trait]
 impl<H: ChoreoHandler> ChoreoHandler for ExtensibleWrapper<H> {
     type Role = H::Role;
     type Endpoint = H::Endpoint;
-
-    async fn send<M: Serialize + Send + Sync>(
-        &mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M
-    ) -> Result<()> {
+    
+    async fn send<M>(&mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M) -> Result<()>
+    where M: Serialize + Send + Sync {
         self.base.send(ep, to, msg).await
     }
-
-    // ... delegate other methods
 }
 ```
 
+The wrapper delegates choreographic operations to the base handler. Extensions use the separate registry. This enables adding extensions to any existing handler.
+
 ### Pattern 2: Registry Composition
 
-Combine multiple registries:
+Multiple registries merge for composition.
 
 ```rust
-let mut combined = ExtensionRegistry::new();
-combined.merge(capability_registry);
-combined.merge(logging_registry);
-combined.merge(metrics_registry);
+let mut registry = ExtensionRegistry::new();
+registry.merge(auth_registry);
+registry.merge(logging_registry);
+registry.merge(metrics_registry);
 ```
+
+Each domain provides its own registry. Merging combines all extension handlers. Duplicate registrations are detected at merge time.
 
 ### Pattern 3: Domain-Specific Handler
 
-Create handlers with built-in extension support:
+Domain handlers embed extension support directly.
 
 ```rust
 pub struct DomainHandler {
     role: Role,
     registry: ExtensionRegistry<()>,
-    // Domain-specific state
-    capabilities: CapabilityStore,
-    budget: FlowBudget,
+    capabilities: Vec<String>,
+    budget: Arc<Mutex<u64>>,
 }
 
 impl DomainHandler {
-    pub fn new(role: Role) -> Self {
+    pub fn new(role: Role, caps: Vec<String>) -> Self {
         let mut registry = ExtensionRegistry::new();
-
-        // Register domain extensions
-        registry.register::<ValidateCapability, _>(/* ... */);
-        registry.register::<ChargeFlowCost, _>(/* ... */);
-
-        Self { role, registry, /* ... */ }
+        
+        registry.register::<ValidateCapability, _>(move |_ep, ext| {
+            Box::pin(async move {
+                // Extension handling logic
+                Ok(())
+            })
+        });
+        
+        Self { role, registry, capabilities: caps, budget: Arc::new(Mutex::new(1000)) }
     }
 }
 ```
 
+The handler owns its extensions. Domain-specific state integrates with extension handling. This pattern suits applications with fixed extension sets.
+
 ## Cross-Crate Composition
 
-Extensions enable reusable choreographic primitives:
+Extensions compose across crate boundaries. Crate A defines reusable primitives. Crate B uses those primitives.
 
-### Crate A: Define Primitive
+### Defining Primitives
+
+A library crate exports extension types.
 
 ```rust
-// round_robin/src/lib.rs
-
 #[derive(Clone, Debug)]
 pub struct RoundRobinMetadata {
     pub participant_count: usize,
@@ -511,146 +438,122 @@ pub struct RoundRobinMetadata {
 }
 
 impl ExtensionEffect for RoundRobinMetadata {
-    // Implementation...
+    // Implementation
 }
 
-pub fn round_robin<R, M>(roles: Vec<R>, task: M) -> Program<R, M>
-where R: RoleId, M: Clone
-{
-    let mut program = Program::new();
-
-    for (i, role) in roles.iter().enumerate() {
-        program = program
-            .ext(RoundRobinMetadata {
-                participant_count: roles.len(),
-                current_index: i,
-            })
-            .send(
-                role.clone(),
-                roles[(i + 1) % roles.len()].clone(),
-                task.clone()
-            );
-    }
-
-    program
+pub fn round_robin<R: RoleId>(participants: Vec<R>) -> Program<R, ()> {
+    Program::new()
+        .ext(RoundRobinMetadata {
+            participant_count: participants.len(),
+            current_index: 0,
+        })
+        .end()
 }
 ```
 
-### Crate B: Use Primitive
+The crate provides both the extension type and helper functions. Users can combine these with their own extensions.
+
+### Using Primitives
+
+Application crates import and use extensions.
 
 ```rust
-// my_app/src/main.rs
+use my_library::extensions::{RoundRobinMetadata, round_robin};
 
-use round_robin::{round_robin, RoundRobinMetadata};
-
-let protocol = Program::new()
-    .ext(ValidateCapability {
-        capability: "coordinate".into(),
-        role: Coordinator
-    })
-    .then(round_robin(workers, Task::new()))
-    .ext(LogEvent {
-        event: "round_robin_complete".into()
-    });
+let program = round_robin(vec![Alice, Bob, Charlie])
+    .then(Program::new()
+        .ext(CustomExtension { /* app-specific */ })
+        .send(Alice, Message)
+        .end()
+    );
 ```
+
+Extensions from different crates compose freely. The type system ensures safety.
 
 ## Error Handling
 
+Extension errors follow fail-fast semantics. Unknown extensions cause immediate failure. Type mismatches produce clear error messages.
+
 ### Fail-Fast Semantics
 
-Unknown extensions cause immediate errors:
+Unregistered extensions terminate execution.
 
 ```rust
-// If MyExtension is not registered:
-handler.extension_registry()
-    .handle(endpoint, ext)
-    .await
-    // Returns: ExtensionError::HandlerNotRegistered
+match interpret_extensible(&mut handler, &mut ep, program).await {
+    Err(ChoreographyError::Extension(ExtensionError::UnknownExtension { type_name })) => {
+        eprintln!("Extension {} not registered", type_name);
+    }
+    _ => {}
+}
 ```
+
+Registration happens before protocol execution. This catches configuration errors early.
 
 ### Type Mismatch Detection
 
-Downcasting failures are caught:
+Downcasts validate extension types.
 
 ```rust
-let my_ext = ext.as_any()
-    .downcast_ref::<MyExtension>()
+let validated = ext.as_any()
+    .downcast_ref::<ValidateCapability>()
     .ok_or(ExtensionError::TypeMismatch {
-        expected: "MyExtension",
+        expected: "ValidateCapability",
         actual: ext.type_name(),
     })?;
 ```
 
+Type mismatches produce descriptive errors. The expected and actual type names appear in the error.
+
 ### Error Propagation
 
-Extension errors propagate through the interpreter:
+Extension errors propagate through the interpreter.
 
 ```rust
-match interpret_extensible(&mut handler, &mut endpoint, program).await {
-    Ok(result) => match result.final_state {
-        InterpreterState::Completed => { /* success */ }
-        InterpreterState::Failed(msg) => { /* extension failed */ }
-        InterpreterState::Timeout => { /* timeout */ }
-    }
-    Err(e) => { /* handler error */ }
+pub enum ExtensionError {
+    UnknownExtension { type_name: &'static str },
+    TypeMismatch { expected: &'static str, actual: &'static str },
+    ExecutionFailed { type_name: &'static str, error: String },
 }
 ```
 
+Each error variant provides context. Handlers can distinguish between different failure modes.
+
 ## Performance
 
-### Zero Overhead
+Extension overhead varies by usage pattern. Design decisions affect runtime cost.
 
-Programs without extensions have no overhead:
-- No registry lookups
-- No extension checks
-- Same performance as base interpreter
+### Zero Overhead Cases
 
-### Minimal Overhead
+Empty registries incur no cost. Programs without extensions run at baseline speed. The interpreter checks for extensions before dispatching.
 
-Programs with extensions:
-- Single `TypeId` comparison per extension
-- One `HashMap` lookup per extension type
-- Async function call overhead
+### Minimal Overhead Cases
+
+Extension dispatch uses `TypeId` comparison. This operation is fast. Dynamic dispatch for handlers adds minimal cost. Most overhead comes from extension logic itself.
 
 ### Optimization Tips
 
-1. **Batch Extensions**: Group related extensions
-2. **Use Global Extensions Sparingly**: They appear in all projections
-3. **Minimize Extension Data**: Keep extension structs small
-4. **Reuse Registries**: Build once, use many times
+Register extensions once and reuse the registry. Avoid cloning extension data unnecessarily. Keep extension state small. Use `Copy` types for roles when possible.
 
 ## Best Practices
 
+Follow these practices when designing extensions and handlers.
+
 ### Extension Design
 
-1. **Single Responsibility**: One extension, one concern
-2. **Immutable Data**: Extensions should be value types
-3. **Clear Semantics**: Document projection behavior
-4. **Type Names**: Use descriptive type names for debugging
+Keep extensions focused on single concerns. Use global extensions sparingly. Prefer role-specific extensions for targeted behavior. Document which roles should handle your extension.
 
 ### Handler Design
 
-1. **Validate Early**: Check extension data on receipt
-2. **Clear Errors**: Provide actionable error messages
-3. **Idempotent**: Extensions should be safely retryable
-4. **Document Requirements**: What state/capabilities needed?
+Register all required extensions upfront. Provide clear error messages for failures. Use wrapper handlers to add extensions incrementally. Test extension handlers independently.
 
 ### Testing
 
-1. **Unit Test Extensions**: Test extension implementation
-2. **Test Registration**: Verify handlers are registered
-3. **Test Projection**: Verify role participation logic
-4. **Integration Tests**: Test full choreography execution
+Test extension projection behavior. Verify correct role participation. Check error handling for unregistered extensions. Test extension composition across crates.
 
 ## Examples
 
-See:
-- [Logging Extension](../choreography/examples/extension_logging.rs)
-- [Capability Validation](../choreography/examples/extension_capability.rs)
-- [Integration Tests](../choreography/tests/extension_integration.rs)
+Complete examples demonstrate extension usage. See the `choreography/examples/` directory. The `extension_workflow.rs` example shows composition patterns. The `extension_capability.rs` example demonstrates validation. The `extension_logging.rs` example shows global extensions.
 
 ## Next Steps
 
-- [Composition Tutorial](09_composition_tutorial.md)
-- [Effect Handlers](06_rumpsteak_handler.md)
-- [Testing Choreographies](07_testing.md)
+Learn choreographic projection in [Choreographic Projection Patterns](04_projection.md). Understand effect handlers in [Effect Handlers](05_effect_handlers.md). Build complete applications with [Composition Tutorial](08_extension_guide.md).
