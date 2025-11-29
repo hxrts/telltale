@@ -45,3 +45,10 @@ work/
 # mdbook-mermaid generated files
 /docs/mermaid.min.js
 /docs/mermaid-init.js
+
+# Lean build artifacts
+/lean/.lake/
+/lean/artifacts/*.json
+
+# Log files
+*.log

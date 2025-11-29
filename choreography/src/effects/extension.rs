@@ -26,7 +26,7 @@ use std::fmt::Debug;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```text
 /// #[derive(Clone, Debug)]
 /// pub struct ValidateCapability {
 ///     pub capability: String,
@@ -84,7 +84,7 @@ pub trait ExtensionEffect: Send + Sync + Debug {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```text
     /// fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
     ///     vec![Box::new(self.role)]
     /// }
@@ -92,7 +92,7 @@ pub trait ExtensionEffect: Send + Sync + Debug {
     ///
     /// For global extensions, return an empty vec:
     ///
-    /// ```ignore
+    /// ```text
     /// fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
     ///     vec![]
     /// }

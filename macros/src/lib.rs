@@ -28,7 +28,7 @@ mod session;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```text
 /// #[derive(Message)]
 /// enum Label {
 ///     Hello(Hello),
@@ -49,7 +49,7 @@ pub fn message(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```text
 /// #[derive(Role)]
 /// #[message(Label)]
 /// struct Client(#[route(Server)] Channel);
@@ -67,7 +67,7 @@ pub fn role(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```text
 /// #[derive(Roles)]
 /// struct MyRoles(Client, Server);
 /// ```
@@ -85,7 +85,7 @@ pub fn roles(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```text
 /// #[session]
 /// type ClientSession = Send<Server, Hello, Receive<Server, Goodbye, End>>;
 /// ```
@@ -103,7 +103,7 @@ pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```text
 /// choreography! {
 ///     protocol Simple {
 ///         roles: Client, Server;

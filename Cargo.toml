@@ -69,7 +69,7 @@ debug = true
 debug = true
 
 [workspace]
-members = ["caching", "fsm", "macros", "choreography"]
+members = ["caching", "fsm", "macros", "choreography", "lean-exporter"]
 exclude = ["examples/wasm-ping-pong", "external-macro-demo"]
 
 # Shared dependencies across workspace members

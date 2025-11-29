@@ -32,7 +32,7 @@ pub type ExtensionHandler<E> = Box<
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```text
 /// let mut registry = ExtensionRegistry::new();
 /// registry.register::<ValidateCapability, _>(|ep, ext| {
 ///     Box::pin(async move {

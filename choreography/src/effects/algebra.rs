@@ -222,7 +222,7 @@ impl<R: RoleId, M> Program<R, M> {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```text
     /// Program::new()
     ///     .ext(ValidateCapability { capability: "send".into(), role: Alice })
     ///     .send(Bob, Message("hello"))

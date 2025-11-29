@@ -8,6 +8,11 @@ ci-dry-run:
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
+    # Lean verification (sample + extended)
+    just rumpsteak-lean-check
+    just rumpsteak-lean-check-extended
+    # Negative check: intentional mismatch must fail
+    just rumpsteak-lean-check-failing
 
 # Generate docs/SUMMARY.md from Markdown files in docs/ and subfolders
 summary:
@@ -77,3 +82,52 @@ serve: summary
     # If we get here, all ports are in use, just show the error
     echo "Error: All ports 3000-3005 are already in use" >&2
     exit 1
+
+# Test Lean installation
+lean-test:
+    @echo "Testing Lean installation..."
+    @lean --version
+    @lake --version
+
+# Initialize Lean project if not already initialized
+lean-init:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f lean/lakefile.lean ]; then
+        echo "Initializing Lean project..."
+        cd lean && lake init rumpsteak_lean math
+        echo "Lean project initialized!"
+    else
+        echo "Lean project already initialized"
+    fi
+
+rumpsteak-lean-check: lean-init
+    # Export rust choreography data, build the Lean runner, and verify three roles with logs
+    mkdir -p lean/artifacts
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-sample.choreo --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-sample.choreo --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-sample.choreo --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
+    lake --dir lean build rumpsteak_runner
+    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-chef.json --log lean/artifacts/runner-chef.log --json-log lean/artifacts/runner-chef.json
+    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-sous.json --log lean/artifacts/runner-sous.log --json-log lean/artifacts/runner-sous.json
+    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-baker.json --log lean/artifacts/runner-baker.log --json-log lean/artifacts/runner-baker.json
+
+rumpsteak-lean-check-extended: lean-init
+    # Extended scenario with looped service and dessert fan-out
+    mkdir -p lean/artifacts
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-extended.choreo --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-extended.choreo --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-extended.choreo --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
+    lake --dir lean build rumpsteak_runner
+    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
+    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
+    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-baker.json --log lean/artifacts/runner-extended-baker.log --json-log lean/artifacts/runner-extended-baker.json
+
+# Intentional failure fixture: labels mismatch.
+rumpsteak-lean-check-failing: lean-init
+    mkdir -p lean/artifacts
+    cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-failing.choreo --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
+    # Corrupt the exported program to introduce a label mismatch (no python required)
+    perl -0pi -e 's/"label": "Pong"/"label": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
+    lake --dir lean build rumpsteak_runner
+    ! ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-failing-choreography.json --program lean/artifacts/lean-failing-program-chef.json --log lean/artifacts/runner-failing-chef.log --json-log lean/artifacts/runner-failing-chef.json

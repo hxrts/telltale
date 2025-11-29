@@ -1,0 +1,6 @@
+choreography MinimalFail {
+    roles: Chef, SousChef
+
+    Chef -> SousChef: Ping
+    SousChef -> Chef: Pong
+}

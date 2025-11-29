@@ -13,7 +13,7 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```text
 //! use rumpsteak_aura_choreography::{ChoreoHandler, Label};
 //!
 //! #[async_trait]

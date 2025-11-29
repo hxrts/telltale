@@ -6,17 +6,28 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
   };
-
-  outputs = { self, nixpkgs, rust-overlay, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
-        overlays = [ (import rust-overlay) ];
+        overlays = [
+          (import rust-overlay)
+        ];
         pkgs = import nixpkgs {
           inherit system overlays;
         };
 
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+          ];
           targets = [ "wasm32-unknown-unknown" ];
         };
 
@@ -32,13 +43,17 @@
           findutils
           gawk
           gnused
+          lean4
         ];
 
-        buildInputs = with pkgs; [
-          openssl
-        ] ++ lib.optionals stdenv.isDarwin [
-          libiconv
-        ];
+        buildInputs =
+          with pkgs;
+          [
+            openssl
+          ]
+          ++ lib.optionals stdenv.isDarwin [
+            libiconv
+          ];
 
       in
       {
@@ -47,11 +62,9 @@
 
           shellHook = ''
             echo "Rumpsteak Aura development environment"
-            echo "Rust version: $(rustc --version)"
-            echo "Cargo version: $(cargo --version)"
-            echo "WASM target: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
-            echo "wasm-pack: $(wasm-pack --version 2>/dev/null || echo 'installed')"
-            echo "mdBook dev environment ready."
+            echo "Rust: $(rustc --version)"
+            echo "Lean: $(lean --version 2>/dev/null || echo 'available')"
+            echo "WASM: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
           '';
         };
 
@@ -70,9 +83,13 @@
           meta = with pkgs.lib; {
             description = "Session types for asynchronous communication between multiple parties - Aura fork for threshold cryptography choreographies";
             homepage = "https://github.com/aura-project/rumpsteak-aura";
-            license = with licenses; [ mit asl20 ];
+            license = with licenses; [
+              mit
+              asl20
+            ];
             maintainers = [ ];
           };
         };
-      });
+      }
+    );
 }

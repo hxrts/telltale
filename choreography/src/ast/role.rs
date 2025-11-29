@@ -86,7 +86,7 @@ pub enum RangeExpr {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```text
 /// use quote::format_ident;
 /// use rumpsteak_aura_choreography::{Role, RoleParam};
 ///
