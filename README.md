@@ -28,6 +28,7 @@ verifies the reordering of messages to create more optimized implementations tha
 - RumpsteakHandler with session state tracking.
 - Middleware support (tracing, retry, metrics, fault injection).
 - WebAssembly support for browser-based protocols.
+- Formal verification of choreographic projection using Lean 4.
 
 ## Usage
 
@@ -114,6 +115,10 @@ Finite state machine support for session types, including DOT parsing and subtyp
 
 Procedural macros used by both the core library and choreography crate, including the `choreography!` macro for inline protocol definitions.
 
+#### `lean-exporter/` - Lean Verification Exporter
+
+Exports choreography ASTs and projected programs to JSON for formal verification in Lean 4. Used by the verification pipeline to validate projection correctness, duality, and subtyping invariants.
+
 #### `caching/` - Example Application
 
 HTTP cache case study backed by Redis, demonstrating real-world usage of Rumpsteak with distributed caching protocols.
@@ -127,6 +132,17 @@ Examples of using Rumpsteak from popular protocols (updated to use new APIs). In
 Supports compilation to WebAssembly, allowing the core session types and choreography system to run in browser environments. Both the effect handlers and platform-agnostic runtime abstraction work in WASM, enabling you to implement custom network transports using `ChoreoHandler` with WebSockets, WebRTC, or other browser APIs. The `examples/wasm-ping-pong/` directory contains a working example.
 
 To get started, run `cd examples/wasm-ping-pong && ./build.sh` (or `wasm-pack build --target web`).
+
+## Formal Verification
+
+Choreographic projection correctness is verified using Lean 4 theorem proving. The verification pipeline validates:
+
+- **Projection correctness**: Local types accurately represent each role's view of the global protocol
+- **Duality**: Send/receive pairs are properly matched between communicating roles
+- **Subtyping invariants**: Asynchronous message reordering preserves causal dependencies
+- **Effect conformance**: Generated effect programs match their projected session types
+
+The `lean/` directory contains Lean proof modules, and `lean-exporter` serializes Rust choreography ASTs to JSON for verification. Run the full pipeline with `just rumpsteak-lean-check` (requires Nix). See `docs/13_lean_verification.md` for details.
 
 ## License
 
