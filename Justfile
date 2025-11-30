@@ -128,7 +128,7 @@ rumpsteak-lean-check-extended: lean-init
 rumpsteak-lean-check-failing: lean-init
     mkdir -p lean/artifacts
     cargo run --manifest-path lean-exporter/Cargo.toml -- --input lean/choreo/lean-failing.choreo --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
-    # Corrupt the exported program to introduce a label mismatch (no python required)
+    # Corrupt the exported program to introduce a label mismatch
     perl -0pi -e 's/"label": "Pong"/"label": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
     lake --dir lean build rumpsteak_runner
     ! ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-failing-choreography.json --program lean/artifacts/lean-failing-program-chef.json --log lean/artifacts/runner-failing-chef.log --json-log lean/artifacts/runner-failing-chef.json
