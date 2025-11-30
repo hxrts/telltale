@@ -18,10 +18,14 @@ This command runs the full CI-equivalent sweep: Rust fmt, clippy, tests, Lean sa
 
 ## What is being verified
 
-`Rumpsteak.Choreography` checks that roles and actions decode and reference only declared roles. The predicates `hasUniqueRoles` and `hasValidActions` rule out duplicate roles and dangling endpoints before projection begins. Each action is a triple `(origin, destination, label)`; membership tests are done with `DecidableEq` on strings.  
-`Rumpsteak.Projection` builds per-role `LocalType` traces. Lemma `subLabelsOf_refl` proves `subLabelsOf lt lt = true`, using `List.all_eq_true` and `List.any_eq_true` to show every projected label witnesses itself. A label failure in the runner therefore means the exporter produced a label absent from the projection for that role.  
-`Rumpsteak.Program` maps exported effects (`Effect.send`, `Effect.recv`) into `LocalAction` values. The map is a homomorphism from the JSON schema to the projection domain, so equality checks are meaningful without coercions.  
-`Rumpsteak.Subtyping` defines order checks with `DecidableEq`. `isSubsequence` is a structural recursion that skips super-sequence heads until a match; `isSubtype` pairs it with a length guard. Lemmas `isSubsequence_refl` and `isSubtype_refl` show a projected trace always passes its own order check; only exporter reordering or omission can fail.  
+`Rumpsteak.Choreography` checks that roles and actions decode and reference only declared roles. The predicates `hasUniqueRoles` and `hasValidActions` rule out duplicate roles and dangling endpoints before projection begins. Each action is a triple `(origin, destination, label)`; membership tests are done with `DecidableEq` on strings.
+
+`Rumpsteak.Projection` builds per-role `LocalType` traces. Lemma `subLabelsOf_refl` proves `subLabelsOf lt lt = true`, using `List.all_eq_true` and `List.any_eq_true` to show every projected label witnesses itself. A label failure in the runner therefore means the exporter produced a label absent from the projection for that role.
+
+`Rumpsteak.Program` maps exported effects (`Effect.send`, `Effect.recv`) into `LocalAction` values. The map is a homomorphism from the JSON schema to the projection domain, so equality checks are meaningful without coercions.
+
+`Rumpsteak.Subtyping` defines order checks with `DecidableEq`. `isSubsequence` is a structural recursion that skips super-sequence heads until a match; `isSubtype` pairs it with a length guard. Lemmas `isSubsequence_refl` and `isSubtype_refl` show a projected trace always passes its own order check; only exporter reordering or omission can fail.
+
 `Rumpsteak.Runner` applies three invariants per branch: (1) membership: every exported action must appear in the projection, (2) order: exported actions must be a subsequence of the projection, (3) labels: exported labels must be contained in the projection labels. Failures report the branch name plus the specific missing or out-of-order actions.
 
 ### Core Lean predicates (notation)
