@@ -44,7 +44,7 @@ def isSubtype (sub sup : LocalType) : Bool :=
 ```
 These definitions are the exact predicates the runner enforces. `subLabelsOf` is symmetric in label matching; `isSubsequence` is asymmetric and enforces ordering; `isSubtype` combines length and ordering to reject reordered or longer traces.
 
-### Proven lemmas (sketch)
+### Proven lemmas (sketch with file references)
 
 ```lean
 theorem subLabelsOf_refl (lt : LocalType) : subLabelsOf lt lt = true := by
@@ -57,6 +57,8 @@ theorem isSubtype_refl (lt : LocalType) : isSubtype lt lt = true := by
   simp [isSubtype, isSubsequence_refl]
 ```
 `subLabelsOf_refl` uses the standard `all_eq_true` and `any_eq_true` characterizations to witness each element by itself. `isSubsequence_refl` and `isSubtype_refl` are structural inductions showing the order check is reflexive. These lemmas ensure that only differences between exporter output and projection can trigger failures.
+
+`subLabelsOf_refl` is defined in `lean/Rumpsteak/Projection.lean`. `isSubsequence_refl` and `isSubtype_refl` are in `lean/Rumpsteak/Subtyping.lean`. Each lemma relies only on decidable equality and induction, keeping the runner checks total and terminating.
 
 Failure reporting lists the branch name, missing actions, ordering mismatches, or unexpected labels.
 

@@ -74,7 +74,7 @@ def parseString (json : Json) : Except String String :=
   | Except.ok s => Except.ok s
   | Except.error _ => Except.error "Expected JSON string"
 
-/-- Choreography parsing --/
+/-- Choreography parsing -/
 def parseRoles (json : Json) : Except String (List Role) := do
   let arr ← getField json "roles" >>= parseArray
   arr.toList.mapM (fun j => do
@@ -96,7 +96,7 @@ def parseChoreography (json : Json) : Except String Choreography := do
   let actions ← parseActions json
   pure { roles := roles, actions := actions }
 
-/-- Program parsing --/
+/-- Program parsing -/
 def parseEffect (json : Json) : Except String Effect := do
   let kind ← getField json "kind" >>= parseString
   let partner ← getField json "partner" >>= parseString
@@ -124,12 +124,12 @@ def parseProgramExport (json : Json) : Except String ProgramExport := do
   let programs ← branchesArr.toList.mapM parseBranch
   pure { role, programs }
 
-/-- IO helper --/
+/-- IO helper -/
 def readJsonFile (path : System.FilePath) : IO (Except String Json) := do
   let content ← IO.FS.readFile path
   pure (Json.parse content)
 
-/-- Validation --/
+/-- Validation -/
 def evaluateBranch (branch : ProgramBranch) (projected : List LocalAction) : BranchResult :=
   let exported := branch.effects.map effectToLocalAction
   let missing := exported.filter (fun a => !projected.any (· == a))
@@ -175,7 +175,7 @@ def writeJsonLog (path : System.FilePath) (role : String) (results : List Branch
     ]
   IO.FS.writeFile path (payload.pretty ++ "\n")
 
-/-- Runner orchestration --/
+/-- Runner orchestration -/
 def runPaths (chPath progPath : System.FilePath) (logPath : Option System.FilePath := none) (jsonLog : Option System.FilePath := none) : IO UInt32 := do
   let choreoJson ← readJsonFile chPath
   match choreoJson with
