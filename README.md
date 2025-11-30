@@ -135,7 +135,7 @@ To get started, run `cd examples/wasm-ping-pong && ./build.sh` (or `wasm-pack bu
 
 ## Formal Verification
 
-Choreographic projection correctness is verified using Lean 4 theorem proving. The verification pipeline validates:
+Choreographic projection correctness is verified using Lean. The verification pipeline validates:
 
 - **Projection correctness**: Local types accurately represent each role's view of the global protocol
 - **Duality**: Send/receive pairs are properly matched between communicating roles
