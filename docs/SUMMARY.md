@@ -7,7 +7,7 @@
 - [Choreographic Projection Patterns](04_projection.md)
 - [Effect Handlers](05_effect_handlers.md)
 - [Using Rumpsteak Handlers](06_rumpsteak_handler.md)
-- [DSL Extensions Part 1: Runtime Effect System  ](07_effect_extensions.md)
+- [DSL Extensions Part 1: Runtime Effect System](07_effect_extensions.md)
 - [Syntax Extensions in Rumpsteak-Aura](08_syntax_extensions.md)
 - [Composition Tutorial](09_extension_guide.md)
 - [WASM Guide](10_wasm_guide.md)

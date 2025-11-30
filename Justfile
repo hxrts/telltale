@@ -8,6 +8,7 @@ ci-dry-run:
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
+    just book
     # Lean verification (sample + extended)
     just rumpsteak-lean-check
     just rumpsteak-lean-check-extended

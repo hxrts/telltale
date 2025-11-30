@@ -1,4 +1,4 @@
-# DSL Extensions Part 1: Runtime Effect System  
+# DSL Extensions Part 1: Runtime Effect System
 
 The extension system enables domain-specific choreographic effects. This is Part 1 of the DSL extension guide, covering the runtime effect system that handles execution-time extensions like logging, validation, and metrics.
 
