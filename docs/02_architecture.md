@@ -58,7 +58,7 @@ graph TB
 
 ### AST Module
 
-The AST module is located in `choreography/src/ast/`. It represents choreographies as data structures.
+The AST module is located in `rust/choreography/src/ast/`. It represents choreographies as data structures.
 
 The main type is `Choreography`.
 
@@ -112,7 +112,7 @@ Protocol is a recursive tree structure. It includes support for annotations at m
 
 ### Parser Module
 
-The parser module is located in `choreography/src/compiler/parser.rs`. It converts DSL text into AST using the Pest parser generator.
+The parser module is located in `rust/choreography/src/compiler/parser.rs`. It converts DSL text into AST using the Pest parser generator.
 
 The parser validates role declarations. It builds the protocol tree from the input text.
 
@@ -127,7 +127,7 @@ The parser performs syntactic validation and basic semantic checks.
 
 ### Projection Module
 
-The projection module is located in `choreography/src/compiler/projection.rs`. Projection transforms a global protocol into a local view for each role.
+The projection module is located in `rust/choreography/src/compiler/projection.rs`. Projection transforms a global protocol into a local view for each role.
 
 The algorithm determines what each participant should do.
 
@@ -139,7 +139,7 @@ Projection handles merging parallel branches. It also detects conflicts between 
 
 ### Code Generation Module
 
-The codegen module is located in `choreography/src/compiler/codegen.rs`. It converts local types into Rust session types and effect programs.
+The codegen module is located in `rust/choreography/src/compiler/codegen.rs`. It converts local types into Rust session types and effect programs.
 
 The generator creates compile-time type-safe protocol implementations.
 
@@ -155,7 +155,7 @@ The generator creates session types and role structs. It supports dynamic roles 
 
 ### Effect System
 
-The effect system is located in `choreography/src/effects/`. It decouples protocol logic from transport.
+The effect system is located in `rust/choreography/src/effects/`. It decouples protocol logic from transport.
 
 Protocols are represented as effect programs. Handlers interpret these programs.
 
@@ -292,30 +292,34 @@ Add new code generation backends to target different session type libraries. The
 
 ## Workspace Organization
 
-Rumpsteak-Aura is organized as a Cargo workspace with multiple crates.
+Rumpsteak-Aura is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory.
 
 ```
 rumpsteak-aura/
-├── src/                    Core session types library (rumpsteak-aura crate)
-│   ├── lib.rs              Session type primitives, channels, roles
-│   ├── channel.rs          Async channel implementations
-│   └── serialize.rs        Serialization support
-├── choreography/           Choreographic programming extensions
-│   ├── src/
-│   │   ├── ast/            AST definitions
-│   │   ├── compiler/       Parser, projection, codegen
-│   │   ├── effects/        Effect system
-│   │   │   ├── handlers/   Handler implementations
-│   │   │   └── middleware/ Middleware implementations
-│   │   └── runtime.rs      Platform abstraction
-│   ├── tests/              Integration tests
-│   └── examples/           Example protocols
-├── fsm/                    Finite state machine support
-│   └── src/                FSM types and subtyping verification
-├── macros/                 Procedural macros
-│   └── src/                choreography! and other macros
-├── caching/                HTTP cache case study
-│   └── src/                Redis-backed cache example
+├── rust/                   All Rust crates
+│   ├── src/                Core session types library (rumpsteak-aura crate)
+│   │   ├── lib.rs          Session type primitives, channels, roles
+│   │   ├── channel.rs      Async channel implementations
+│   │   └── serialize.rs    Serialization support
+│   ├── choreography/       Choreographic programming extensions
+│   │   ├── src/
+│   │   │   ├── ast/        AST definitions
+│   │   │   ├── compiler/   Parser, projection, codegen
+│   │   │   ├── effects/    Effect system
+│   │   │   │   ├── handlers/   Handler implementations
+│   │   │   │   └── middleware/ Middleware implementations
+│   │   │   └── runtime.rs  Platform abstraction
+│   │   ├── tests/          Integration tests
+│   │   └── examples/       Example protocols
+│   ├── types/              Core types (GlobalType, LocalTypeR, Label)
+│   ├── theory/             Session type algorithms
+│   ├── codegen/            Rust code generation
+│   ├── lean-bridge/        Lean interop and validation
+│   ├── fsm/                Finite state machine support
+│   ├── macros/             Procedural macros
+│   ├── lean-exporter/      Lean export utilities
+│   └── caching/            HTTP cache case study
+├── lean/                   Lean 4 verification code
 ├── examples/               Additional examples
 │   └── wasm-ping-pong/     WASM browser example
 └── docs/                   Documentation
@@ -323,7 +327,7 @@ rumpsteak-aura/
 
 ### Crate Responsibilities
 
-The `rumpsteak-aura` crate is in the root `src/` directory. It provides foundation session types for type-safe asynchronous communication. This is the base dependency for all other crates.
+The `rumpsteak-aura` crate is in `rust/src/`. It provides foundation session types for type-safe asynchronous communication. This is the base dependency for all other crates.
 
 The `rumpsteak-aura-choreography` crate provides the high-level choreographic programming layer. It includes the DSL parser, automatic projection, effect handlers, and runtime support. It builds on top of rumpsteak-aura.
 

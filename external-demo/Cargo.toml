@@ -9,8 +9,8 @@ edition = "2021"
 [dependencies]
 # Re-export all rumpsteak-aura functionality
 rumpsteak-aura = { path = ".." }
-rumpsteak-aura-choreography = { path = "../choreography" }
-rumpsteak-aura-macros = { path = "../macros" }
+rumpsteak-aura-choreography = { path = "../rust/choreography" }
+rumpsteak-aura-macros = { path = "../rust/macros" }
 
 # Import our proc macros from the separate crate
 external-demo-macros = { path = "../external-demo-macros" }

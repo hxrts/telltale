@@ -14,3 +14,5 @@
 - [Examples](11_examples.md)
 - [API Reference](12_api_reference.md)
 - [Lean Verification](13_lean_verification.md)
+- [Lean-Rust Bridge](14_lean_rust_bridge.md)
+- [Crate Architecture](99_architecture.md)

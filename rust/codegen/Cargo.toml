@@ -1,0 +1,26 @@
+[package]
+name = "rumpsteak-codegen"
+version = "0.7.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Code generation from session types to Rust"
+readme = "../../README.md"
+repository = "https://github.com/aura-project/rumpsteak-aura"
+license = "MIT OR Apache-2.0"
+keywords = ["session", "types", "codegen", "rust"]
+categories = ["development-tools"]
+
+[lib]
+bench = false
+
+[dependencies]
+rumpsteak-types = { path = "../types", version = "0.7.0" }
+rumpsteak-theory = { path = "../theory", version = "0.7.0" }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

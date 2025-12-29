@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -e
+
+# Rust Style Guide Pre-commit Hook
+# Runs quick checks before allowing commit
+#
+# To install:
+#   git config core.hooksPath .githooks
+#
+# To bypass (use sparingly):
+#   git commit --no-verify
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+echo "Running pre-commit checks..."
+
+# 1. Format check (fast)
+echo -n "Checking formatting... "
+if cargo fmt --all -- --check 2>/dev/null; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${RED}FAILED${NC}"
+    echo "Run 'cargo fmt --all' to fix formatting"
+    exit 1
+fi
+
+# 2. Clippy on workspace (catches most issues)
+echo -n "Running clippy... "
+if cargo clippy --workspace --all-targets --all-features -- -D warnings 2>/dev/null; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${RED}FAILED${NC}"
+    echo "Run 'cargo clippy --workspace --all-targets --all-features' to see issues"
+    exit 1
+fi
+
+# 3. Quick compile check
+echo -n "Checking compilation... "
+if cargo check --workspace --all-targets --all-features 2>/dev/null; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${RED}FAILED${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Pre-commit checks passed!${NC}"
+echo ""
+echo "Tip: Run './scripts/lint-check.sh' for comprehensive style guide checks"

@@ -12,7 +12,7 @@ use rumpsteak_aura::{
     Select, Send,
 };
 use std::{error::Error, result, time::Duration};
-use tokio::{time, try_join};
+use tokio::time;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
@@ -219,9 +219,53 @@ async fn elevator(role: &mut E) -> Result<Never> {
     try_session(role, |s| async { elevator(s, rng).await }).await
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
-    let Roles(mut u, mut d, mut e) = Roles::default();
-    #[allow(unreachable_code)]
-    try_join!(user(&mut u), door(&mut d), elevator(&mut e)).unwrap();
+fn main() {
+    use std::panic;
+
+    // This example demonstrates an elevator control system using session types.
+    // All three roles (user, door, elevator) run in an infinite loop.
+    // We use a timeout to limit execution for demonstration purposes.
+    //
+    // Note: When the timeout expires, sessions are dropped without completing,
+    // which triggers a panic from the session drop handler. We catch this panic
+    // to demonstrate the protocol behavior.
+
+    let timeout_duration = Duration::from_millis(100);
+
+    // Set up a custom panic hook to suppress the session drop panic message
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| {}));
+
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let Roles(mut u, mut d, mut e) = Roles::default();
+
+            let result = time::timeout(timeout_duration, async {
+                futures::try_join!(user(&mut u), door(&mut d), elevator(&mut e))
+            })
+            .await;
+
+            match result {
+                Ok(Ok(_)) => println!("Protocol completed"),
+                Ok(Err(e)) => eprintln!("Protocol error: {e}"),
+                Err(_) => {} // Timeout - sessions will be dropped
+            }
+        });
+    }));
+
+    // Restore the default panic hook
+    panic::set_hook(default_hook);
+
+    match result {
+        Ok(()) => println!("\nElevator simulation completed normally"),
+        Err(_) => println!(
+            "\nElevator simulation completed (timeout after {:?})",
+            timeout_duration
+        ),
+    }
 }

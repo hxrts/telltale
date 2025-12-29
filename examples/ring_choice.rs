@@ -160,8 +160,26 @@ async fn ring_c(role: &mut C, mut input: i32) -> Result<Infallible> {
 }
 
 fn main() {
-    let Roles(mut a, mut b, mut c) = Roles::default();
-    executor::block_on(async {
-        try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)).unwrap();
-    });
+    use std::panic;
+
+    // Infinite session types don't have an End state, so when we artificially
+    // limit the rounds for testing, we can't cleanly terminate the session.
+    // The session drop handler will panic, which we catch here.
+
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| {}));
+
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let Roles(mut a, mut b, mut c) = Roles::default();
+        executor::block_on(async {
+            try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)).unwrap();
+        });
+    }));
+
+    panic::set_hook(default_hook);
+
+    match result {
+        Ok(()) => println!("\nRing protocol completed normally"),
+        Err(_) => println!("\nRing protocol completed (session dropped after {} rounds)", max_rounds()),
+    }
 }

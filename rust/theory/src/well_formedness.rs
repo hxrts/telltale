@@ -1,0 +1,248 @@
+//! Well-Formedness Validation for Session Types
+//!
+//! This module provides validation predicates for global and local types.
+//! Well-formedness ensures that types are syntactically valid and can be
+//! used for protocol verification.
+//!
+//! # Well-Formedness Criteria
+//!
+//! ## Global Types
+//! - All recursion variables are bound
+//! - Each communication has at least one branch
+//! - Sender and receiver are different in each communication
+//! - Types are guarded (no immediate recursion)
+//!
+//! ## Local Types
+//! - All recursion variables are bound
+//! - Each choice has at least one branch
+//! - Types are guarded
+
+use rumpsteak_types::{GlobalType, LocalTypeR};
+use thiserror::Error;
+
+/// Errors during well-formedness validation
+#[derive(Debug, Clone, Error)]
+pub enum ValidationError {
+    /// Unbound type variable
+    #[error("unbound type variable '{0}'")]
+    UnboundVariable(String),
+
+    /// Empty branches in communication/choice
+    #[error("empty branches not allowed")]
+    EmptyBranches,
+
+    /// Self-communication detected
+    #[error("self-communication: role '{0}' cannot send to itself")]
+    SelfCommunication(String),
+
+    /// Unguarded recursion
+    #[error("unguarded recursion: μ-binder must be followed by communication")]
+    UnguardedRecursion,
+
+    /// Multiple errors
+    #[error("multiple validation errors: {}", .0.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", "))]
+    Multiple(Vec<ValidationError>),
+}
+
+/// Result of validation
+pub type ValidationResult = Result<(), ValidationError>;
+
+/// Validate a global type for well-formedness.
+///
+/// Checks all well-formedness criteria and returns the first error found,
+/// or Ok(()) if the type is well-formed.
+///
+/// # Examples
+///
+/// ```
+/// use rumpsteak_theory::validate_global;
+/// use rumpsteak_types::{GlobalType, Label};
+///
+/// // Well-formed protocol
+/// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+/// assert!(validate_global(&g).is_ok());
+///
+/// // Self-communication is not allowed
+/// let bad = GlobalType::send("A", "A", Label::new("msg"), GlobalType::End);
+/// assert!(validate_global(&bad).is_err());
+/// ```
+pub fn validate_global(g: &GlobalType) -> ValidationResult {
+    let mut errors = Vec::new();
+
+    if !g.all_vars_bound() {
+        // Find unbound variables
+        for var in g.free_vars() {
+            errors.push(ValidationError::UnboundVariable(var));
+        }
+    }
+
+    if !g.all_comms_non_empty() {
+        errors.push(ValidationError::EmptyBranches);
+    }
+
+    if !g.no_self_comm() {
+        if let Some(role) = find_self_comm(g) {
+            errors.push(ValidationError::SelfCommunication(role));
+        }
+    }
+
+    if !g.is_guarded() {
+        errors.push(ValidationError::UnguardedRecursion);
+    }
+
+    match errors.len() {
+        0 => Ok(()),
+        1 => Err(errors.pop().unwrap()),
+        _ => Err(ValidationError::Multiple(errors)),
+    }
+}
+
+fn find_self_comm(g: &GlobalType) -> Option<String> {
+    match g {
+        GlobalType::Comm {
+            sender,
+            receiver,
+            branches,
+        } => {
+            if sender == receiver {
+                Some(sender.clone())
+            } else {
+                branches.iter().find_map(|(_, cont)| find_self_comm(cont))
+            }
+        }
+        GlobalType::Mu { body, .. } => find_self_comm(body),
+        _ => None,
+    }
+}
+
+/// Validate a local type for well-formedness.
+///
+/// # Examples
+///
+/// ```
+/// use rumpsteak_theory::validate_local;
+/// use rumpsteak_types::{LocalTypeR, Label};
+///
+/// // Well-formed local type
+/// let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
+/// assert!(validate_local(&lt).is_ok());
+///
+/// // Unbound variable is not well-formed
+/// let bad = LocalTypeR::var("unbound");
+/// assert!(validate_local(&bad).is_err());
+/// ```
+pub fn validate_local(lt: &LocalTypeR) -> ValidationResult {
+    let mut errors = Vec::new();
+
+    if !lt.all_vars_bound() {
+        for var in lt.free_vars() {
+            errors.push(ValidationError::UnboundVariable(var));
+        }
+    }
+
+    if !lt.all_choices_non_empty() {
+        errors.push(ValidationError::EmptyBranches);
+    }
+
+    if !lt.is_guarded() {
+        errors.push(ValidationError::UnguardedRecursion);
+    }
+
+    match errors.len() {
+        0 => Ok(()),
+        1 => Err(errors.pop().unwrap()),
+        _ => Err(ValidationError::Multiple(errors)),
+    }
+}
+
+/// Check if a global type is well-formed (returns bool).
+#[must_use]
+pub fn is_well_formed_global(g: &GlobalType) -> bool {
+    g.well_formed()
+}
+
+/// Check if a local type is well-formed (returns bool).
+#[must_use]
+pub fn is_well_formed_local(lt: &LocalTypeR) -> bool {
+    lt.well_formed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rumpsteak_types::Label;
+
+    #[test]
+    fn test_validate_global_simple() {
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        assert!(validate_global(&g).is_ok());
+    }
+
+    #[test]
+    fn test_validate_global_recursive() {
+        let g = GlobalType::mu(
+            "t",
+            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
+        );
+        assert!(validate_global(&g).is_ok());
+    }
+
+    #[test]
+    fn test_validate_global_unbound_var() {
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("unbound"));
+        let result = validate_global(&g);
+        assert!(matches!(result, Err(ValidationError::UnboundVariable(_))));
+    }
+
+    #[test]
+    fn test_validate_global_self_comm() {
+        let g = GlobalType::send("A", "A", Label::new("msg"), GlobalType::End);
+        let result = validate_global(&g);
+        assert!(matches!(result, Err(ValidationError::SelfCommunication(_))));
+    }
+
+    #[test]
+    fn test_validate_global_unguarded() {
+        let g = GlobalType::mu("t", GlobalType::var("t"));
+        let result = validate_global(&g);
+        assert!(matches!(result, Err(ValidationError::UnguardedRecursion)));
+    }
+
+    #[test]
+    fn test_validate_local_simple() {
+        let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
+        assert!(validate_local(&lt).is_ok());
+    }
+
+    #[test]
+    fn test_validate_local_recursive() {
+        let lt = LocalTypeR::mu(
+            "t",
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("t")),
+        );
+        assert!(validate_local(&lt).is_ok());
+    }
+
+    #[test]
+    fn test_validate_local_unbound_var() {
+        let lt = LocalTypeR::var("unbound");
+        let result = validate_local(&lt);
+        assert!(matches!(result, Err(ValidationError::UnboundVariable(_))));
+    }
+
+    #[test]
+    fn test_validate_local_unguarded() {
+        let lt = LocalTypeR::mu("t", LocalTypeR::var("t"));
+        let result = validate_local(&lt);
+        assert!(matches!(result, Err(ValidationError::UnguardedRecursion)));
+    }
+
+    #[test]
+    fn test_is_well_formed() {
+        let good = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let bad = GlobalType::send("A", "A", Label::new("msg"), GlobalType::End);
+
+        assert!(is_well_formed_global(&good));
+        assert!(!is_well_formed_global(&bad));
+    }
+}

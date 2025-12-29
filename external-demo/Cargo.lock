@@ -569,7 +569,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "rumpsteak-aura"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -581,6 +581,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rumpsteak-aura-macros",
+ "rumpsteak-types",
  "serde",
  "syn",
  "thiserror",
@@ -595,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-choreography"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -613,6 +614,8 @@ dependencies = [
  "regex",
  "rumpsteak-aura",
  "rumpsteak-aura-macros",
+ "rumpsteak-theory",
+ "rumpsteak-types",
  "serde",
  "syn",
  "thiserror",
@@ -628,11 +631,27 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-macros"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "rumpsteak-theory"
+version = "0.7.0"
+dependencies = [
+ "rumpsteak-types",
+ "thiserror",
+]
+
+[[package]]
+name = "rumpsteak-types"
+version = "0.7.0"
+dependencies = [
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

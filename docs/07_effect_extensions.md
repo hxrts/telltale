@@ -554,7 +554,7 @@ Test extension projection behavior. Verify correct role participation. Check err
 
 ## Examples
 
-Complete examples demonstrate extension usage. See the `choreography/examples/` directory. The `extension_workflow.rs` example shows composition patterns. The `extension_capability.rs` example demonstrates validation. The `extension_logging.rs` example shows global extensions.
+Complete examples demonstrate extension usage. See the `rust/choreography/examples/` directory. The `extension_workflow.rs` example shows composition patterns. The `extension_capability.rs` example demonstrates validation. The `extension_logging.rs` example shows global extensions.
 
 ## Next Steps
 

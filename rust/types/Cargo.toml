@@ -1,0 +1,22 @@
+[package]
+name = "rumpsteak-types"
+version = "0.7.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Core session types for Rumpsteak - matching Lean definitions"
+readme = "../../README.md"
+repository = "https://github.com/aura-project/rumpsteak-aura"
+license = "MIT OR Apache-2.0"
+keywords = ["session", "types", "mpst", "protocol"]
+categories = ["data-structures"]
+
+[lib]
+bench = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

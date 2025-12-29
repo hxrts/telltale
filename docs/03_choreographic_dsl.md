@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The parser module is located in `choreography/src/compiler/parser.rs`. It provides an implementation of a choreographic DSL parser. The parser uses the Pest parser generator.
+The parser module is located in `rust/choreography/src/compiler/parser.rs`. It provides an implementation of a choreographic DSL parser. The parser uses the Pest parser generator.
 
 ## Overview
 
@@ -592,7 +592,7 @@ This shows Alice declared twice.
 
 Error types include `ParseError::UndefinedRole` for roles used but not declared. `ParseError::DuplicateRole` handles roles declared more than once. `ParseError::UndefinedProtocol` catches protocols called but not defined. `ParseError::DuplicateProtocol` detects protocols defined multiple times. `ParseError::Syntax` reports grammar or syntax violations. `ParseError::InvalidCondition` handles loop condition problems. `ParseError::InvalidMessage` reports message format issues. `ParseError::Pest` captures low-level parsing errors.
 
-See `choreography/examples/error_demo.rs` for more examples.
+See `rust/choreography/examples/error_demo.rs` for more examples.
 
 ## Examples
 

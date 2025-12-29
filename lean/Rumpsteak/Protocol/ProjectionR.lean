@@ -133,40 +133,6 @@ private theorem sizeOf_list_eq_of_perm {α : Type} [SizeOf α] {l1 l2 : List α}
 
 /- Merge two local types if they are compatible. -/
 mutual
-  def LocalTypeR.merge (t1 t2 : LocalTypeR) : Option LocalTypeR :=
-    match t1, t2 with
-    | .end, .end => some .end
-    | .var v1, .var v2 => if v1 == v2 then some (.var v1) else none
-
-    | .send p1 branches1, .send p2 branches2 =>
-      if p1 != p2 then none
-      else do
-        let bs1 := LocalTypeR.sortBranches branches1
-        let bs2 := LocalTypeR.sortBranches branches2
-        let mergedBranches ← LocalTypeR.mergeSendSorted bs1 bs2
-        some (.send p1 mergedBranches)
-
-    | .recv p1 branches1, .recv p2 branches2 =>
-      if p1 != p2 then none
-      else do
-        let bs1 := LocalTypeR.sortBranches branches1
-        let bs2 := LocalTypeR.sortBranches branches2
-        let mergedBranches ← LocalTypeR.mergeRecvSorted bs1 bs2
-        some (.recv p1 mergedBranches)
-
-    | .mu v1 body1, .mu v2 body2 =>
-      if v1 != v2 then none
-      else do
-        let mergedBody ← LocalTypeR.merge body1 body2
-        some (.mu v1 mergedBody)
-
-    | _, _ => none
-  termination_by sizeOf t1 + sizeOf t2
-  decreasing_by
-    all_goals
-      simp_wf
-      apply Nat.add_lt_add <;> exact Nat.lt_add_of_pos_left (by simp [Nat.one_add])
-
   /-- Internal helper: merge two *sorted* send-branch lists. -/
   def LocalTypeR.mergeSendSorted
       (bs1 bs2 : List (Label × LocalTypeR)) : Option (List (Label × LocalTypeR)) :=
@@ -256,6 +222,40 @@ mutual
           apply Nat.add_lt_add
           · exact sizeOf_tail_lt_cons (l1, c1) r1
           · exact sizeOf_tail_lt_cons (l2, c2) r2
+
+  def LocalTypeR.merge (t1 t2 : LocalTypeR) : Option LocalTypeR :=
+    match t1, t2 with
+    | .end, .end => some .end
+    | .var v1, .var v2 => if v1 = v2 then some (.var v1) else none
+
+    | .send p1 branches1, .send p2 branches2 =>
+      if p1 != p2 then none
+      else do
+        let bs1 := LocalTypeR.sortBranches branches1
+        let bs2 := LocalTypeR.sortBranches branches2
+        let mergedBranches ← LocalTypeR.mergeSendSorted bs1 bs2
+        some (.send p1 mergedBranches)
+
+    | .recv p1 branches1, .recv p2 branches2 =>
+      if p1 != p2 then none
+      else do
+        let bs1 := LocalTypeR.sortBranches branches1
+        let bs2 := LocalTypeR.sortBranches branches2
+        let mergedBranches ← LocalTypeR.mergeRecvSorted bs1 bs2
+        some (.recv p1 mergedBranches)
+
+    | .mu v1 body1, .mu v2 body2 =>
+      if v1 != v2 then none
+      else do
+        let mergedBody ← LocalTypeR.merge body1 body2
+        some (.mu v1 mergedBody)
+
+    | _, _ => none
+  termination_by sizeOf t1 + sizeOf t2
+  decreasing_by
+    all_goals
+      simp_wf
+      apply Nat.add_lt_add <;> exact Nat.lt_add_of_pos_left (by simp [Nat.one_add])
 end
 
 /-- Merge branches for internal choice (send/select).

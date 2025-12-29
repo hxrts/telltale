@@ -1,5 +1,8 @@
 import Rumpsteak.Protocol.LocalTypeR
 import Rumpsteak.Protocol.ProjectionR
+import Init.Data.List.Sort.Lemmas
+import Init.Data.Order.Lemmas
+import Init.Data.Option.Lemmas
 
 /-! # Rumpsteak.Proofs.Projection.Merging
 
@@ -30,24 +33,122 @@ open Rumpsteak.Protocol.LocalTypeR
 open Rumpsteak.Protocol.GlobalType (Label)
 open Rumpsteak.Protocol.ProjectionR
 
+attribute [local instance] boolRelToRel
+
 /-! ## Canonical Form -/
 
-/-- Canonicalize a local type by sorting every branch list (and recursively canonicalizing
-    continuations). This matches the ordering used internally by `LocalTypeR.merge`. -/
-def canonical (t : LocalTypeR) : LocalTypeR :=
-  LocalTypeR.recOn
-    (motive_1 := fun _ => LocalTypeR)
-    (motive_2 := fun _ => List (Label × LocalTypeR))
-    (motive_3 := fun _ => Label × LocalTypeR)
-    t
-    .end
-    (fun partner _branches ihBranches => .send partner (LocalTypeR.sortBranches ihBranches))
-    (fun partner _branches ihBranches => .recv partner (LocalTypeR.sortBranches ihBranches))
-    (fun v _body ihBody => .mu v ihBody)
-    (fun v => .var v)
-    []
-    (fun head _tail ihHead ihTail => ihHead :: ihTail)
-    (fun fst _snd ihSnd => (fst, ihSnd))
+/- Canonicalize a local type by sorting every branch list (and recursively canonicalizing
+   continuations). This matches the ordering used internally by `LocalTypeR.merge`. -/
+/-! ### Termination helpers -/
+
+private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+    sizeOf (x :: l) = 1 + sizeOf x + sizeOf l := by
+  simp [sizeOf, List._sizeOf_1]
+
+private theorem sizeOf_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+    sizeOf (a, b) = 1 + sizeOf a + sizeOf b := by
+  simp [sizeOf, Prod._sizeOf_1]
+
+private theorem sizeOf_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
+    sizeOf b < sizeOf (a, b) := by
+  have hk : 0 < 1 + sizeOf a := by
+    simpa [Nat.one_add] using (Nat.succ_pos (sizeOf a))
+  have h : sizeOf b < (1 + sizeOf a) + sizeOf b :=
+    Nat.lt_add_of_pos_left (n := sizeOf b) (k := 1 + sizeOf a) hk
+  simpa [sizeOf_prod] using h
+
+private theorem sizeOf_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+    sizeOf x < sizeOf (x :: l) := by
+  have h1 : sizeOf x < 1 + sizeOf x := by
+    simpa [Nat.one_add] using (Nat.lt_succ_self (sizeOf x))
+  have h2 : 1 + sizeOf x ≤ 1 + sizeOf x + sizeOf l := Nat.le_add_right _ _
+  have h : sizeOf x < 1 + sizeOf x + sizeOf l := Nat.lt_of_lt_of_le h1 h2
+  simpa [sizeOf_cons] using h
+
+private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
+    sizeOf l < sizeOf (x :: l) := by
+  have hk : 0 < 1 + sizeOf x := by
+    simpa [Nat.one_add] using (Nat.succ_pos (sizeOf x))
+  have h : sizeOf l < (1 + sizeOf x) + sizeOf l :=
+    Nat.lt_add_of_pos_left (n := sizeOf l) (k := 1 + sizeOf x) hk
+  simpa [sizeOf_cons] using h
+
+private theorem sizeOf_list_eq_of_perm {α : Type} [SizeOf α] {l1 l2 : List α} (p : l1.Perm l2) :
+    sizeOf l1 = sizeOf l2 := by
+  induction p with
+  | nil =>
+    simp [sizeOf, List._sizeOf_1]
+  | cons x p ih =>
+    simpa [sizeOf_cons, ih, Nat.add_assoc]
+  | swap x y l =>
+    simp [sizeOf_cons, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+  | trans p1 p2 ih1 ih2 =>
+    exact ih1.trans ih2
+
+@[simp] private theorem sizeOf_sortBranches (bs : List (Label × LocalTypeR)) :
+    sizeOf (LocalTypeR.sortBranches bs) = sizeOf bs := by
+  have p : (LocalTypeR.sortBranches bs).Perm bs := by
+    simpa [LocalTypeR.sortBranches] using (List.mergeSort_perm bs LocalTypeR.branchLe)
+  simpa using sizeOf_list_eq_of_perm p
+
+private theorem add_lt_add_succ_succ (a b : Nat) : a + b < a + 1 + (b + 1) := by
+  have h1 : a + b < a + (b + 1) := by
+    exact Nat.add_lt_add_left (Nat.lt_succ_self b) _
+  have h2 : a + (b + 1) ≤ a + 1 + (b + 1) := by
+    exact Nat.add_le_add_right (Nat.le_succ a) _
+  exact Nat.lt_of_lt_of_le h1 h2
+
+private theorem add_lt_add_succ_succ' {a b : Nat} : a + b < a + 1 + (b + 1) :=
+  add_lt_add_succ_succ a b
+
+/-! ### Canonicalization -/
+
+mutual
+  /-- Canonicalize a local type by sorting branch lists and canonicalizing continuations. -/
+  def canonical (t : LocalTypeR) : LocalTypeR :=
+    match t with
+    | .end => .end
+    | .var v => .var v
+    | .mu v body => .mu v (canonical body)
+    | .send partner branches =>
+      let bs := LocalTypeR.sortBranches branches
+      .send partner (canonicalBranches bs)
+    | .recv partner branches =>
+      let bs := LocalTypeR.sortBranches branches
+      .recv partner (canonicalBranches bs)
+  termination_by sizeOf t
+  decreasing_by
+    all_goals
+      simp_wf
+      apply Nat.lt_add_of_pos_left
+      simp [Nat.one_add]
+
+  /-- Canonicalize every continuation in a branch list, preserving order. -/
+  def canonicalBranches (bs : List (Label × LocalTypeR)) : List (Label × LocalTypeR) :=
+    match bs with
+    | [] => []
+    | (l, t) :: rest => (l, canonical t) :: canonicalBranches rest
+  termination_by sizeOf bs
+  decreasing_by
+    all_goals
+      first
+        | -- Recursive call to `canonical` on the continuation.
+          have h1 : sizeOf t < sizeOf (l, t) := sizeOf_snd_lt_prod l t
+          have h2 : sizeOf (l, t) < sizeOf ((l, t) :: rest) := sizeOf_head_lt_cons (l, t) rest
+          exact Nat.lt_trans h1 h2
+        | -- Recursive call to `canonicalBranches` on the tail.
+          exact sizeOf_tail_lt_cons (l, t) rest
+end
+
+private theorem canonicalBranches_eq_map (bs : List (Label × LocalTypeR)) :
+    canonicalBranches bs = bs.map (fun b => (b.1, canonical b.2)) := by
+  induction bs with
+  | nil =>
+    simp [canonicalBranches]
+  | cons head tail ih =>
+    cases head with
+    | mk l t =>
+      simp [canonicalBranches, ih]
 
 /-! ## Claims -/
 
@@ -112,6 +213,99 @@ private theorem AllBranches.of_perm
   have hb' : b ∈ bs2 := (List.Perm.mem_iff hperm).1 hb
   exact h b hb'
 
+private theorem mergeRecvSorted_comm
+    (bs1 bs2 : List (Label × LocalTypeR))
+    (ih : AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) bs1) :
+    LocalTypeR.mergeRecvSorted bs1 bs2 = LocalTypeR.mergeRecvSorted bs2 bs1 := by
+  cases bs1 with
+  | nil =>
+    cases bs2 <;> simp [LocalTypeR.mergeRecvSorted]
+  | cons head1 tail1 =>
+    cases bs2 with
+    | nil =>
+      simp [LocalTypeR.mergeRecvSorted]
+    | cons head2 tail2 =>
+      cases head1 with
+      | mk l1 c1 =>
+        cases head2 with
+        | mk l2 c2 =>
+          by_cases h12 : l1.name < l2.name
+          · have h21 : ¬ l2.name < l1.name := String.lt_asymm h12
+            have ihTail :
+                AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) tail1 := by
+              intro b hb
+              exact ih b (by simp [hb])
+            have hRest := mergeRecvSorted_comm tail1 ((l2, c2) :: tail2) ihTail
+            simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest]
+          · by_cases h21 : l2.name < l1.name
+            · have hRest := mergeRecvSorted_comm ((l1, c1) :: tail1) tail2 ih
+              simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest]
+            · by_cases hEq : l1 = l2
+              · subst hEq
+                have hCont : LocalTypeR.merge c1 c2 = LocalTypeR.merge c2 c1 :=
+                  (ih (l1, c1) (by exact List.Mem.head _)) c2
+                have ihTail :
+                    AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) tail1 := by
+                  intro b hb
+                  exact ih b (by simp [hb])
+                have hRest := mergeRecvSorted_comm tail1 tail2 ihTail
+                simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont, hRest]
+              · have hEq' : l2 ≠ l1 := fun h => hEq h.symm
+                simpa [LocalTypeR.mergeRecvSorted, h12, h21, hEq, hEq']
+  termination_by sizeOf bs1 + sizeOf bs2
+  decreasing_by
+    all_goals
+      simp_wf
+      simp (config := { failIfUnchanged := false })
+      first
+        | -- Left list shrinks (drop head of `bs1`).
+          simpa [*] using (sizeOf_tail_lt_cons head1 tail1)
+        | -- Right list shrinks (drop head of `bs2`).
+          simpa [*] using (sizeOf_tail_lt_cons head2 tail2)
+        | -- Right list shrinks (alternative names).
+          simpa [*] using (sizeOf_tail_lt_cons head tail)
+        | -- Both lists shrink.
+          apply Nat.add_lt_add
+          · first
+            | simpa [*] using (sizeOf_tail_lt_cons head1 tail1)
+            | simpa [*] using (sizeOf_tail_lt_cons head tail)
+          · first
+            | simpa [*] using (sizeOf_tail_lt_cons head2 tail2)
+            | simpa [*] using (sizeOf_tail_lt_cons head tail)
+
+private theorem mergeSendSorted_comm :
+    ∀ (bs1 bs2 : List (Label × LocalTypeR)),
+      AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) bs1 →
+      LocalTypeR.mergeSendSorted bs1 bs2 = LocalTypeR.mergeSendSorted bs2 bs1 := by
+  intro bs1
+  induction bs1 with
+  | nil =>
+    intro bs2 _ih
+    cases bs2 <;> simp [LocalTypeR.mergeSendSorted]
+  | cons head tail ihTail =>
+    intro bs2 ih
+    cases bs2 with
+    | nil =>
+      simp [LocalTypeR.mergeSendSorted]
+    | cons head2 tail2 =>
+      cases head with
+      | mk l1 c1 =>
+        cases head2 with
+        | mk l2 c2 =>
+          by_cases hLabel : l1 = l2
+          · subst hLabel
+            have hCont : LocalTypeR.merge c1 c2 = LocalTypeR.merge c2 c1 :=
+              (ih (l1, c1) (by simp)) c2
+            have ihTail' :
+                AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) tail := by
+              intro b hb
+              exact ih b (by simp [hb])
+            have hRest := ihTail tail2 ihTail'
+            simpa [LocalTypeR.mergeSendSorted, hCont, hRest]
+          ·
+            have hLabel' : ¬ l2 = l1 := fun h => hLabel h.symm
+            simpa [LocalTypeR.mergeSendSorted, hLabel, hLabel']
+
 private theorem mergeSendSorted_self
     (bs : List (Label × LocalTypeR))
     (ih : AllBranches (fun t => LocalTypeR.merge t t = some (canonical t)) bs) :
@@ -171,7 +365,7 @@ theorem merge_self : MergeSelf := by
           LocalTypeR.mergeSendSorted bs bs =
             some (bs.map fun (l, t) => (l, canonical t)) :=
         mergeSendSorted_self bs ihSorted
-      simp [canonical, LocalTypeR.merge, LocalTypeR.mergeSendBranches, bs, hSendSorted])
+      simp [canonical, canonicalBranches_eq_map, LocalTypeR.merge, bs, hSendSorted])
     (fun partner branches ihBranches => by
       let bs := LocalTypeR.sortBranches branches
       have hperm : bs.Perm branches := by
@@ -183,7 +377,7 @@ theorem merge_self : MergeSelf := by
           LocalTypeR.mergeRecvSorted bs bs =
             some (bs.map fun (l, t) => (l, canonical t)) :=
         mergeRecvSorted_self bs ihSorted
-      simp [canonical, LocalTypeR.merge, LocalTypeR.mergeRecvBranches, bs, hRecvSorted])
+      simp [canonical, canonicalBranches_eq_map, LocalTypeR.merge, bs, hRecvSorted])
     (fun v body ihBody => by
       simp [canonical, LocalTypeR.merge, ihBody])
     (fun v => by simp [canonical, LocalTypeR.merge])
@@ -221,38 +415,10 @@ theorem merge_commutative : MergeCommutative := by
             have ihSorted :
                 AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) bs1 :=
               AllBranches.of_perm _ hperm ihBranches
-            -- Prove commutativity of `mergeSendSorted` by list recursion.
             have hSend :
                 LocalTypeR.mergeSendSorted bs1 bs2 = LocalTypeR.mergeSendSorted bs2 bs1 := by
-              revert bs2
-              induction bs1 with
-              | nil =>
-                intro bs2
-                cases bs2 <;> simp [LocalTypeR.mergeSendSorted]
-              | cons head tail ihTail =>
-                intro bs2
-                cases bs2 with
-                | nil =>
-                  simp [LocalTypeR.mergeSendSorted]
-                | cons head2 tail2 =>
-                  cases head with
-                  | mk l1 c1 =>
-                    cases head2 with
-                    | mk l2 c2 =>
-                      by_cases hLabel : l1 = l2
-                      · subst hLabel
-                        have hCont :
-                            LocalTypeR.merge c1 c2 = LocalTypeR.merge c2 c1 :=
-                          (ihSorted (l1, c1) (by simp)) c2
-                        have ihTail' :
-                            AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) tail := by
-                          intro b hb
-                          exact ihSorted b (by simp [hb])
-                        have hRest :=
-                          ihTail (ihSorted := ihTail') tail2
-                        simpa [LocalTypeR.mergeSendSorted, hCont, hRest]
-                      · simpa [LocalTypeR.mergeSendSorted, hLabel]
-            simp [LocalTypeR.merge, LocalTypeR.mergeSendBranches, bs1, bs2, hSend]
+              exact mergeSendSorted_comm bs1 bs2 ihSorted
+            simp [LocalTypeR.merge, bs1, bs2, hSend]
           · have hPartner' : partner2 ≠ partner := fun h => hPartner (Eq.symm h)
             simp [LocalTypeR.merge, hPartner, hPartner']
         | _ =>
@@ -272,56 +438,10 @@ theorem merge_commutative : MergeCommutative := by
                 AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) bs1 :=
               AllBranches.of_perm _ hperm ihBranches
             have hRecv :
-                LocalTypeR.mergeRecvSorted bs1 bs2 = LocalTypeR.mergeRecvSorted bs2 bs1 := by
-              revert bs2
-              induction bs1 with
-              | nil =>
-                intro bs2
-                simp [LocalTypeR.mergeRecvSorted]
-              | cons head tail ihTail =>
-                intro bs2
-                cases bs2 with
-                | nil =>
-                  simp [LocalTypeR.mergeRecvSorted]
-                | cons head2 tail2 =>
-                  cases head with
-                  | mk l1 c1 =>
-                    cases head2 with
-                    | mk l2 c2 =>
-                      by_cases h12 : l1.name < l2.name
-                      · have h21 : ¬ l2.name < l1.name := String.lt_asymm h12
-                        have ihTail' :
-                            AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) tail := by
-                          intro b hb
-                          exact ihSorted b (by simp [hb])
-                        have hRest :=
-                          ihTail (ihSorted := ihTail') ((l2, c2) :: tail2)
-                        -- Swap uses the opposite branch (since `h21`).
-                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest]
-                      · by_cases h21 : l2.name < l1.name
-                        · have ihTail' :
-                              AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) ((l1, c1) :: tail) :=
-                            ihSorted
-                          have hRest :=
-                            -- Recurse by dropping `l2` on the left (swap case drops `l1`).
-                            ihTail (ihSorted := ihTail') tail2 ((l1, c1) :: tail)
-                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest]
-                        · -- Equal label names (or incomparable): require full label equality.
-                          by_cases hEq : l1 = l2
-                          · subst hEq
-                            have hCont :
-                                LocalTypeR.merge c1 c2 = LocalTypeR.merge c2 c1 :=
-                              (ihSorted (l1, c1) (by simp)) c2
-                            have ihTail' :
-                                AllBranches (fun t => ∀ u, LocalTypeR.merge t u = LocalTypeR.merge u t) tail := by
-                              intro b hb
-                              exact ihSorted b (by simp [hb])
-                            have hRest :=
-                              ihTail (ihSorted := ihTail') tail2
-                            simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont, hRest]
-                          · have hEq' : l2 ≠ l1 := fun h => hEq h.symm
-                            simpa [LocalTypeR.mergeRecvSorted, h12, h21, hEq, hEq']
-            simp [LocalTypeR.merge, LocalTypeR.mergeRecvBranches, bs1, bs2, hRecv]
+                LocalTypeR.mergeRecvSorted bs1 bs2 = LocalTypeR.mergeRecvSorted bs2 bs1 :=
+              by
+                exact mergeRecvSorted_comm bs1 bs2 ihSorted
+            simp [LocalTypeR.merge, bs1, bs2, hRecv]
           · have hPartner' : partner2 ≠ partner := fun h => hPartner (Eq.symm h)
             simp [LocalTypeR.merge, hPartner, hPartner']
         | _ =>
@@ -340,12 +460,397 @@ theorem merge_commutative : MergeCommutative := by
           simp [LocalTypeR.merge])
       (fun v => by
         intro t2
-        cases t2 <;> simp [LocalTypeR.merge])
+        cases t2 with
+        | var a =>
+          by_cases h : v = a
+          · subst h
+            simp [LocalTypeR.merge]
+          · have h' : a ≠ v := fun h2 => h h2.symm
+            simp [LocalTypeR.merge, h, h']
+        | _ =>
+          simp [LocalTypeR.merge])
       (AllBranches.nil _)
       (fun head tail ihHead ihTail =>
         AllBranches.cons _ head tail ihHead ihTail)
       (fun _fst _snd ihSnd => ihSnd)
   exact ht1 t1 t2
+
+/-! ### Associativity helper lemmas -/
+
+private theorem branchLe_trans (a b c : Label × LocalTypeR) :
+    LocalTypeR.branchLe a b = true →
+    LocalTypeR.branchLe b c = true →
+    LocalTypeR.branchLe a c = true := by
+  intro hab hbc
+  have hab' : a.1.name ≤ b.1.name := by
+    simpa [LocalTypeR.branchLe] using hab
+  have hbc' : b.1.name ≤ c.1.name := by
+    simpa [LocalTypeR.branchLe] using hbc
+  have hac : a.1.name ≤ c.1.name := Std.le_trans hab' hbc'
+  simpa [LocalTypeR.branchLe, hac]
+
+private theorem branchLe_total (a b : Label × LocalTypeR) :
+    (LocalTypeR.branchLe a b || LocalTypeR.branchLe b a) = true := by
+  by_cases hab : a.1.name ≤ b.1.name
+  · simp [LocalTypeR.branchLe, hab]
+  · have hba : b.1.name ≤ a.1.name := by
+      have ht : a.1.name ≤ b.1.name ∨ b.1.name ≤ a.1.name :=
+        Std.le_total (a := a.1.name) (b := b.1.name)
+      cases ht with
+      | inl h => exact (False.elim (hab h))
+      | inr h => exact h
+    simp [LocalTypeR.branchLe, hab, hba]
+
+private theorem pairwise_sortBranches (bs : List (Label × LocalTypeR)) :
+    (LocalTypeR.sortBranches bs).Pairwise LocalTypeR.branchLe := by
+  simpa [LocalTypeR.sortBranches] using
+    (List.sorted_mergeSort (le := LocalTypeR.branchLe)
+      (trans := branchLe_trans) (total := branchLe_total) bs)
+
+private theorem sortBranches_eq_of_pairwise
+    (bs : List (Label × LocalTypeR))
+    (h : bs.Pairwise LocalTypeR.branchLe) :
+    LocalTypeR.sortBranches bs = bs := by
+  simpa [LocalTypeR.sortBranches] using
+    (List.mergeSort_of_sorted (le := LocalTypeR.branchLe) (l := bs) h)
+
+private theorem mergeSendSorted_map_fst :
+    ∀ {bs1 bs2 rest : List (Label × LocalTypeR)},
+      LocalTypeR.mergeSendSorted bs1 bs2 = some rest →
+      rest.map Prod.fst = bs1.map Prod.fst := by
+  intro bs1 bs2 rest h
+  induction bs1 generalizing bs2 rest with
+  | nil =>
+    cases bs2 with
+    | nil =>
+      have : rest = [] := by
+        simpa [LocalTypeR.mergeSendSorted] using h
+      simp [this]
+    | cons head2 tail2 =>
+      cases (by simpa [LocalTypeR.mergeSendSorted] using h : False)
+  | cons head tail ih =>
+    cases bs2 with
+    | nil =>
+      cases (by simpa [LocalTypeR.mergeSendSorted] using h : False)
+    | cons head2 tail2 =>
+      cases head with
+      | mk l1 c1 =>
+        cases head2 with
+        | mk l2 c2 =>
+          by_cases hLabel : l1 = l2
+          · subst hLabel
+            cases hCont : LocalTypeR.merge c1 c2 with
+            | none =>
+              cases (by simpa [LocalTypeR.mergeSendSorted, hCont] using h : False)
+            | some mergedCont =>
+              cases hRest : LocalTypeR.mergeSendSorted tail tail2 with
+              | none =>
+                cases (by simpa [LocalTypeR.mergeSendSorted, hCont, hRest] using h : False)
+              | some restTail =>
+                have hEq : (l1, mergedCont) :: restTail = rest := by
+                  simpa [LocalTypeR.mergeSendSorted, hCont, hRest] using h
+                have ihEq : restTail.map Prod.fst = tail.map Prod.fst :=
+                  ih (bs2 := tail2) (rest := restTail) hRest
+                rw [← hEq]
+                simp [ihEq]
+          · cases (by simpa [LocalTypeR.mergeSendSorted, hLabel] using h : False)
+
+private theorem mergeSendSorted_pairwise
+    {bs1 bs2 rest : List (Label × LocalTypeR)}
+    (hSorted : bs1.Pairwise LocalTypeR.branchLe)
+    (h : LocalTypeR.mergeSendSorted bs1 bs2 = some rest) :
+    rest.Pairwise LocalTypeR.branchLe := by
+  induction bs1 generalizing bs2 rest with
+  | nil =>
+    cases bs2 with
+    | nil =>
+      have : rest = [] := by
+        simpa [LocalTypeR.mergeSendSorted] using h
+      simp [this]
+    | cons head2 tail2 =>
+      cases (by simpa [LocalTypeR.mergeSendSorted] using h : False)
+  | cons head tail ih =>
+    cases bs2 with
+    | nil =>
+      cases (by simpa [LocalTypeR.mergeSendSorted] using h : False)
+    | cons head2 tail2 =>
+      cases head with
+      | mk l1 c1 =>
+        cases head2 with
+        | mk l2 c2 =>
+          cases hSorted with
+          | cons hRel hTail =>
+            by_cases hLabel : l1 = l2
+            · subst hLabel
+              cases hCont : LocalTypeR.merge c1 c2 with
+              | none =>
+                cases (by simpa [LocalTypeR.mergeSendSorted, hCont] using h : False)
+              | some mergedCont =>
+                cases hRest : LocalTypeR.mergeSendSorted tail tail2 with
+                | none =>
+                  cases (by simpa [LocalTypeR.mergeSendSorted, hCont, hRest] using h : False)
+                | some restTail =>
+                  have hEq : (l1, mergedCont) :: restTail = rest := by
+                    simpa [LocalTypeR.mergeSendSorted, hCont, hRest] using h
+                  have hTailPair : restTail.Pairwise LocalTypeR.branchLe :=
+                    ih (bs2 := tail2) (rest := restTail) hTail hRest
+                  have hHeadRel :
+                      ∀ b ∈ restTail, LocalTypeR.branchLe (l1, mergedCont) b = true := by
+                    intro b hb
+                    have hbFstInRestTail : b.1 ∈ restTail.map Prod.fst :=
+                      List.mem_map_of_mem (f := Prod.fst) hb
+                    have hFstEq : restTail.map Prod.fst = tail.map Prod.fst :=
+                      mergeSendSorted_map_fst (bs1 := tail) (bs2 := tail2) (rest := restTail) hRest
+                    have hbFstInTail : b.1 ∈ tail.map Prod.fst := by
+                      simpa [hFstEq] using hbFstInRestTail
+                    rcases (List.mem_map.1 hbFstInTail) with ⟨a', ha', ha'Eq⟩
+                    have hName : l1.name ≤ b.1.name := by
+                      have hName' : l1.name ≤ a'.1.name := by
+                        have hLe : LocalTypeR.branchLe (l1, c1) a' = true := hRel a' ha'
+                        simpa [LocalTypeR.branchLe] using hLe
+                      simpa [ha'Eq] using hName'
+                    simpa [LocalTypeR.branchLe, hName]
+                  -- Reassemble `Pairwise` for the whole result.
+                  rw [← hEq]
+                  exact List.Pairwise.cons hHeadRel hTailPair
+            · cases (by simpa [LocalTypeR.mergeSendSorted, hLabel] using h : False)
+
+private def MergeAssocAt (t : LocalTypeR) : Prop :=
+  ∀ u v,
+    (LocalTypeR.merge t u).bind (fun m => LocalTypeR.merge m v) =
+    (LocalTypeR.merge u v).bind (fun m => LocalTypeR.merge t m)
+
+private theorem option_bind_comm {α β γ : Type} (oa : Option α) (ob : Option β) (f : α → β → Option γ) :
+    oa.bind (fun a => ob.bind (fun b => f a b)) =
+    ob.bind (fun b => oa.bind (fun a => f a b)) := by
+  cases oa <;> cases ob <;> rfl
+
+private theorem mergeSendSorted_assoc :
+    ∀ (bs1 bs2 bs3 : List (Label × LocalTypeR)),
+      AllBranches MergeAssocAt bs1 →
+      (LocalTypeR.mergeSendSorted bs1 bs2).bind (fun m12 => LocalTypeR.mergeSendSorted m12 bs3) =
+      (LocalTypeR.mergeSendSorted bs2 bs3).bind (fun m23 => LocalTypeR.mergeSendSorted bs1 m23) := by
+  intro bs1 bs2 bs3 ih
+  induction bs1 generalizing bs2 bs3 with
+  | nil =>
+    cases bs2 with
+    | nil =>
+      cases bs3 <;> simp [LocalTypeR.mergeSendSorted]
+    | cons head2 tail2 =>
+      cases bs3 with
+      | nil =>
+        simp [LocalTypeR.mergeSendSorted]
+      | cons head3 tail3 =>
+        -- LHS is `none`; show RHS is `none` by case splitting on the first merge.
+        cases h23 : LocalTypeR.mergeSendSorted (head2 :: tail2) (head3 :: tail3) with
+        | none =>
+          simp [LocalTypeR.mergeSendSorted, h23]
+        | some m23 =>
+          have hFst :
+              m23.map Prod.fst = (head2 :: tail2).map Prod.fst :=
+            mergeSendSorted_map_fst (bs1 := head2 :: tail2) (bs2 := head3 :: tail3) (rest := m23) h23
+          cases m23 with
+          | nil =>
+            cases (by simpa using hFst : False)
+          | cons _ _ =>
+            simp [LocalTypeR.mergeSendSorted, h23]
+  | cons head tail ihTail =>
+    cases bs2 with
+    | nil =>
+      cases bs3 <;> simp [LocalTypeR.mergeSendSorted]
+    | cons head2 tail2 =>
+      cases bs3 with
+      | nil =>
+        -- RHS is `none`; show LHS is `none` by case splitting on the first merge.
+        cases h12 : LocalTypeR.mergeSendSorted (head :: tail) (head2 :: tail2) with
+        | none =>
+          simp [LocalTypeR.mergeSendSorted, h12]
+        | some a =>
+          have hFst :
+              a.map Prod.fst = (head :: tail).map Prod.fst :=
+            mergeSendSorted_map_fst (bs1 := head :: tail) (bs2 := head2 :: tail2) (rest := a) h12
+          cases a with
+          | nil =>
+            cases (by simpa using hFst : False)
+          | cons _ _ =>
+            simp [LocalTypeR.mergeSendSorted, h12]
+      | cons head3 tail3 =>
+        cases head with
+        | mk l1 c1 =>
+          cases head2 with
+          | mk l2 c2 =>
+            cases head3 with
+            | mk l3 c3 =>
+              have ihHead : MergeAssocAt c1 := ih (l1, c1) (by simp)
+              have ihTailBranches : AllBranches MergeAssocAt tail := by
+                intro b hb
+                exact ih b (by simp [hb])
+              by_cases h12 : l1 = l2
+              · subst h12
+                by_cases h13 : l1 = l3
+                · subst h13
+                  have swapL :
+                      ∀ merged12,
+                        (LocalTypeR.mergeSendSorted tail tail2).bind (fun rest12 =>
+                            (LocalTypeR.merge merged12 c3).bind (fun merged123 =>
+                                (LocalTypeR.mergeSendSorted rest12 tail3).bind (fun rest123 =>
+                                    some ((l1, merged123) :: rest123)))) =
+                          (LocalTypeR.merge merged12 c3).bind (fun merged123 =>
+                            (LocalTypeR.mergeSendSorted tail tail2).bind (fun rest12 =>
+                                (LocalTypeR.mergeSendSorted rest12 tail3).bind (fun rest123 =>
+                                    some ((l1, merged123) :: rest123)))) := by
+                    intro merged12
+                    simpa using
+                      (option_bind_comm
+                        (oa := LocalTypeR.mergeSendSorted tail tail2)
+                        (ob := LocalTypeR.merge merged12 c3)
+                        (f := fun rest12 merged123 =>
+                          (LocalTypeR.mergeSendSorted rest12 tail3).bind (fun rest123 =>
+                            some ((l1, merged123) :: rest123))))
+
+                  have swapR :
+                      ∀ merged23,
+                        (LocalTypeR.mergeSendSorted tail2 tail3).bind (fun rest23 =>
+                            (LocalTypeR.merge c1 merged23).bind (fun merged123 =>
+                                (LocalTypeR.mergeSendSorted tail rest23).bind (fun rest123 =>
+                                    some ((l1, merged123) :: rest123)))) =
+                          (LocalTypeR.merge c1 merged23).bind (fun merged123 =>
+                            (LocalTypeR.mergeSendSorted tail2 tail3).bind (fun rest23 =>
+                                (LocalTypeR.mergeSendSorted tail rest23).bind (fun rest123 =>
+                                    some ((l1, merged123) :: rest123)))) := by
+                    intro merged23
+                    simpa using
+                      (option_bind_comm
+                        (oa := LocalTypeR.mergeSendSorted tail2 tail3)
+                        (ob := LocalTypeR.merge c1 merged23)
+                        (f := fun rest23 merged123 =>
+                          (LocalTypeR.mergeSendSorted tail rest23).bind (fun rest123 =>
+                            some ((l1, merged123) :: rest123))))
+
+                  let head123Left :=
+                    (LocalTypeR.merge c1 c2).bind (fun m12 => LocalTypeR.merge m12 c3)
+                  let tail123Left :=
+                    (LocalTypeR.mergeSendSorted tail tail2).bind (fun m12 => LocalTypeR.mergeSendSorted m12 tail3)
+                  let head123Right :=
+                    (LocalTypeR.merge c2 c3).bind (fun m23 => LocalTypeR.merge c1 m23)
+                  let tail123Right :=
+                    (LocalTypeR.mergeSendSorted tail2 tail3).bind (fun m23 => LocalTypeR.mergeSendSorted tail m23)
+
+                  have hTailEq : tail123Left = tail123Right :=
+                    ihTail (bs2 := tail2) (bs3 := tail3) ihTailBranches
+                  have hHeadEq : head123Left = head123Right := by
+                    simpa [head123Left, head123Right, MergeAssocAt] using ihHead c2 c3
+
+                  have hLhs :
+                      (LocalTypeR.mergeSendSorted ((l1, c1) :: tail) ((l1, c2) :: tail2)).bind
+                          (fun m12 => LocalTypeR.mergeSendSorted m12 ((l1, c3) :: tail3)) =
+                        head123Left.bind (fun merged123 =>
+                          tail123Left.bind (fun rest123 => some ((l1, merged123) :: rest123))) := by
+                    calc
+                      (LocalTypeR.mergeSendSorted ((l1, c1) :: tail) ((l1, c2) :: tail2)).bind
+                          (fun m12 => LocalTypeR.mergeSendSorted m12 ((l1, c3) :: tail3))
+                          =
+                          (LocalTypeR.merge c1 c2).bind (fun merged12 =>
+                            (LocalTypeR.mergeSendSorted tail tail2).bind (fun rest12 =>
+                              (LocalTypeR.merge merged12 c3).bind (fun merged123 =>
+                                (LocalTypeR.mergeSendSorted rest12 tail3).bind (fun rest123 =>
+                                  some ((l1, merged123) :: rest123))))) := by
+                            simp [LocalTypeR.mergeSendSorted]
+                      _ =
+                          (LocalTypeR.merge c1 c2).bind (fun merged12 =>
+                            (LocalTypeR.merge merged12 c3).bind (fun merged123 =>
+                              (LocalTypeR.mergeSendSorted tail tail2).bind (fun rest12 =>
+                                (LocalTypeR.mergeSendSorted rest12 tail3).bind (fun rest123 =>
+                                  some ((l1, merged123) :: rest123))))) := by
+                            simp [swapL]
+                      _ =
+                          ((LocalTypeR.merge c1 c2).bind (fun merged12 => LocalTypeR.merge merged12 c3)).bind
+                            (fun merged123 =>
+                              (LocalTypeR.mergeSendSorted tail tail2).bind (fun rest12 =>
+                                (LocalTypeR.mergeSendSorted rest12 tail3).bind (fun rest123 =>
+                                  some ((l1, merged123) :: rest123))))) := by
+                            rw [← Option.bind_assoc]
+                      _ =
+                          head123Left.bind (fun merged123 =>
+                            tail123Left.bind (fun rest123 => some ((l1, merged123) :: rest123))) := by
+                            -- Factor the tail triple-merge under the `merged123` binder.
+                            simp [head123Left, tail123Left]
+                            rw [← Option.bind_assoc]
+
+                  have hRhs :
+                      (LocalTypeR.mergeSendSorted ((l1, c2) :: tail2) ((l1, c3) :: tail3)).bind
+                          (fun m23 => LocalTypeR.mergeSendSorted ((l1, c1) :: tail) m23) =
+                        head123Right.bind (fun merged123 =>
+                          tail123Right.bind (fun rest123 => some ((l1, merged123) :: rest123))) := by
+                    calc
+                      (LocalTypeR.mergeSendSorted ((l1, c2) :: tail2) ((l1, c3) :: tail3)).bind
+                          (fun m23 => LocalTypeR.mergeSendSorted ((l1, c1) :: tail) m23)
+                          =
+                          (LocalTypeR.merge c2 c3).bind (fun merged23 =>
+                            (LocalTypeR.mergeSendSorted tail2 tail3).bind (fun rest23 =>
+                              (LocalTypeR.merge c1 merged23).bind (fun merged123 =>
+                                (LocalTypeR.mergeSendSorted tail rest23).bind (fun rest123 =>
+                                  some ((l1, merged123) :: rest123))))) := by
+                            simp [LocalTypeR.mergeSendSorted]
+                      _ =
+                          (LocalTypeR.merge c2 c3).bind (fun merged23 =>
+                            (LocalTypeR.merge c1 merged23).bind (fun merged123 =>
+                              (LocalTypeR.mergeSendSorted tail2 tail3).bind (fun rest23 =>
+                                (LocalTypeR.mergeSendSorted tail rest23).bind (fun rest123 =>
+                                  some ((l1, merged123) :: rest123))))) := by
+                            simp [swapR]
+                      _ =
+                          ((LocalTypeR.merge c2 c3).bind (fun merged23 => LocalTypeR.merge c1 merged23)).bind
+                            (fun merged123 =>
+                              (LocalTypeR.mergeSendSorted tail2 tail3).bind (fun rest23 =>
+                                (LocalTypeR.mergeSendSorted tail rest23).bind (fun rest123 =>
+                                  some ((l1, merged123) :: rest123))))) := by
+                            rw [← Option.bind_assoc]
+                      _ =
+                          head123Right.bind (fun merged123 =>
+                            tail123Right.bind (fun rest123 => some ((l1, merged123) :: rest123))) := by
+                            simp [head123Right, tail123Right]
+                            rw [← Option.bind_assoc]
+
+                  -- Finish by rewriting both sides to the canonical forms and using the IH equalities.
+                  rw [hLhs, hRhs, hHeadEq, hTailEq]
+                  rfl
+                · -- Head labels match in bs1/bs2 but not with bs3: both sides fail.
+                  cases h12' : LocalTypeR.mergeSendSorted ((l1, c1) :: tail) ((l1, c2) :: tail2) with
+                  | none =>
+                    simp [LocalTypeR.mergeSendSorted, h13, h12']
+                  | some val =>
+                    have hFst : val.map Prod.fst = ((l1, c1) :: tail).map Prod.fst :=
+                      mergeSendSorted_map_fst (bs1 := (l1, c1) :: tail) (bs2 := (l1, c2) :: tail2) (rest := val) h12'
+                    cases val with
+                    | nil =>
+                      cases (by simpa using hFst : False)
+                    | cons vHead vTail =>
+                      have hHeadOpt := congrArg List.head? hFst
+                      have hv : vHead.1 = l1 := by
+                        simpa using hHeadOpt
+                      have hv' : ¬vHead.1 = l3 := by
+                        intro hEq
+                        exact h13 (hv ▸ hEq)
+                      simp [LocalTypeR.mergeSendSorted, h12', hv', h13]
+              · -- Head labels differ between bs1 and bs2: both sides fail.
+                cases h23 : LocalTypeR.mergeSendSorted ((l2, c2) :: tail2) ((l3, c3) :: tail3) with
+                | none =>
+                  simp [LocalTypeR.mergeSendSorted, h12, h23]
+                | some m23 =>
+                  have hFst : m23.map Prod.fst = ((l2, c2) :: tail2).map Prod.fst :=
+                    mergeSendSorted_map_fst (bs1 := (l2, c2) :: tail2) (bs2 := (l3, c3) :: tail3) (rest := m23) h23
+                  cases m23 with
+                  | nil =>
+                    cases (by simpa using hFst : False)
+                  | cons mHead mTail =>
+                    have hHeadOpt := congrArg List.head? hFst
+                    have hm : mHead.1 = l2 := by
+                      simpa using hHeadOpt
+                    have hm' : ¬l1 = mHead.1 := by
+                      intro hEq
+                      exact h12 (hEq.trans hm)
+                    simp [LocalTypeR.mergeSendSorted, h23, h12, hm']
 
 theorem merge_associative : MergeAssociative := by
   intro t1 t2 t3

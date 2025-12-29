@@ -9,9 +9,7 @@ Where did the grotesque name come from? The session type system is forked from Z
 [![License](https://img.shields.io/crates/l/rumpsteak-aura)](LICENSE)
 
 Rumpsteak is a Rust framework for _safely_ and _efficiently_ implementing
-[message-passing](https://doc.rust-lang.org/book/ch16-02-message-passing.html)
-[asynchronous](https://rust-lang.github.io/async-book/) programs. It uses
-multiparty session types to statically guarantee the absence of communication errors such as deadlocks and asynchronous subtyping to allow optimizing communications.
+message-passing asynchronous programs. It uses multiparty session types to statically guarantee the absence of communication errors such as deadlocks and asynchronous subtyping to allow optimizing communications.
 
 Multiparty session types (MPST) verify the safety of message-passing protocols, as described in [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
 Asynchronous subtyping, introduced for MPST in [Precise Subtyping for

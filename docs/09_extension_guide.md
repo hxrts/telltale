@@ -478,4 +478,4 @@ Integration tests verify protocol execution. Unit tests check extension registra
 
 ## Next Steps
 
-Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](07_effect_extensions.md). Explore advanced examples in `choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Rumpsteak Handlers](06_rumpsteak_handler.md).
+Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](07_effect_extensions.md). Explore advanced examples in `rust/choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Rumpsteak Handlers](06_rumpsteak_handler.md).

@@ -134,7 +134,8 @@ where
         + Route<R3, Route = Channel>
         + Role<Message = Value>,
 {
-    let angle = |k| (-2.0 * PI * Complex::i() * k as f32 / 8.0).exp();
+    #[allow(clippy::as_conversions)]
+    let angle = |k: usize| (-2.0 * PI * Complex::i() * (k as f32) / 8.0).exp();
     let angles = [angle(0), angle(2 * (i % 2)), angle(i % 4)];
 
     let op = |j: usize| match i & (1 << j) {

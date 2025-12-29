@@ -13,14 +13,22 @@ categories = ["asynchronous", "concurrency"]
 
 [lib]
 bench = false
+path = "rust/src/lib.rs"
+
+[lints]
+workspace = true
 
 [dependencies]
 futures = { workspace = true }
 time = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
-rumpsteak-aura-macros = { path = "macros", version = "0.7.0" }
-rumpsteak-aura-fsm = { path = "fsm", version = "0.7.0", optional = true }
+rumpsteak-aura-macros = { path = "rust/macros", version = "0.7.0" }
+rumpsteak-aura-fsm = { path = "rust/fsm", version = "0.7.0", optional = true }
+rumpsteak-types = { path = "rust/types", version = "0.7.0" }
+rumpsteak-theory = { path = "rust/theory", version = "0.7.0", optional = true }
+rumpsteak-codegen = { path = "rust/codegen", version = "0.7.0", optional = true }
+rumpsteak-lean-bridge = { path = "rust/lean-bridge", version = "0.7.0", optional = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -55,12 +63,20 @@ tokio = { workspace = true, features = ["macros", "rt", "time"] }
 proptest = { workspace = true }
 anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
+# For examples
+rumpsteak-theory = { path = "rust/theory", version = "0.7.0" }
+rumpsteak-lean-bridge = { path = "rust/lean-bridge", version = "0.7.0" }
+serde_json = "1.0"
 
 [features]
 default = []
 serialize = ["rumpsteak-aura-macros/serialize", "rumpsteak-aura-fsm"]
 test-utils = ["rand"]
 wasm = ["getrandom/js"]
+theory = ["rumpsteak-theory"]
+codegen = ["rumpsteak-codegen"]
+lean-bridge = ["rumpsteak-lean-bridge"]
+full = ["theory", "codegen", "lean-bridge", "rumpsteak-aura-fsm"]
 
 [profile.release]
 debug = true
@@ -69,8 +85,8 @@ debug = true
 debug = true
 
 [workspace]
-members = ["caching", "fsm", "macros", "choreography", "lean-exporter"]
-exclude = ["examples/wasm-ping-pong", "external-macro-demo"]
+members = ["rust/caching", "rust/fsm", "rust/macros", "rust/choreography", "rust/lean-exporter", "rust/types", "rust/theory", "rust/codegen", "rust/lean-bridge"]
+exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members
 [workspace.dependencies]
@@ -121,3 +137,63 @@ pest_derive = "2.7"
 criterion = "0.3"
 proptest = "1.4"
 tempfile = "3.2"
+
+# ============================================================================
+# Workspace Lints (Rust Style Guide)
+# See work/style_guide_rust.md for rationale
+# ============================================================================
+
+[workspace.lints.rust]
+# Safety: error handling
+unused_must_use = "deny"
+# unused_results = "warn"  # Enable when ready
+
+# Clarity
+# missing_docs = "warn"  # Enable when documentation is more complete
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+# === SAFETY: Error Handling ===
+# Style guide: Never ignore a Result
+let_underscore_must_use = "deny"
+must_use_candidate = "warn"
+
+# === SAFETY: Documentation ===
+# Style guide: Comments explain rationale, constraints, and invariants
+missing_safety_doc = "deny"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+
+# === SAFETY: Type Correctness ===
+# Style guide: Prefer explicitly-sized integers
+as_conversions = "warn"
+cast_possible_truncation = "warn"
+cast_sign_loss = "warn"
+cast_possible_wrap = "warn"
+
+# === APIS: Usability ===
+# Style guide: Avoid bool parameters, use enums
+fn_params_excessive_bools = "warn"
+
+# === PERFORMANCE: Memory ===
+# Style guide: Allocate intentionally
+vec_init_then_push = "warn"
+large_stack_arrays = "warn"
+inefficient_to_string = "warn"
+needless_collect = "warn"
+
+# === CLARITY: Function Shape ===
+# Style guide: Keep functions small enough to fit on one screen
+too_many_arguments = "warn"
+too_many_lines = "warn"
+cognitive_complexity = "warn"
+needless_pass_by_value = "warn"
+trivially_copy_pass_by_ref = "warn"
+
+# === INTENTIONALLY ALLOWED ===
+# These are permitted project-wide
+module_name_repetitions = "allow"
+
+# Note: unwrap_used and expect_used are controlled per-crate:
+# - Library crates: should deny (use proper error handling)
+# - Test/example code: may allow (convenience)

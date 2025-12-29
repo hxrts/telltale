@@ -1,0 +1,306 @@
+//! Protocol message envelope for structured message passing
+//!
+//! Envelopes wrap protocol messages with metadata for routing,
+//! debugging, and simulation purposes.
+
+use serde::{Deserialize, Serialize};
+
+/// A protocol message envelope containing metadata and payload.
+///
+/// Envelopes provide a standard wrapper for messages that includes
+/// routing information and can be inspected without deserializing
+/// the payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtocolEnvelope {
+    /// Name of the protocol this message belongs to.
+    pub protocol: String,
+    /// Role sending the message.
+    pub from_role: String,
+    /// Role index if the sender is a parameterized role.
+    pub from_index: Option<u32>,
+    /// Role receiving the message.
+    pub to_role: String,
+    /// Role index if the receiver is a parameterized role.
+    pub to_index: Option<u32>,
+    /// Type name of the message payload.
+    pub message_type: String,
+    /// Sequence number for ordering (per sender-receiver pair).
+    pub sequence: u64,
+    /// Timestamp when the message was created (nanoseconds since epoch).
+    pub timestamp_ns: u64,
+    /// Correlation ID for tracing across roles.
+    pub correlation_id: Option<String>,
+    /// The serialized message payload.
+    pub payload: Vec<u8>,
+}
+
+impl ProtocolEnvelope {
+    /// Create a new envelope builder.
+    #[must_use]
+    pub fn builder() -> EnvelopeBuilder {
+        EnvelopeBuilder::default()
+    }
+
+    /// Get the payload size in bytes.
+    #[must_use]
+    pub fn payload_size(&self) -> usize {
+        self.payload.len()
+    }
+
+    /// Check if this envelope is for a specific protocol.
+    #[must_use]
+    pub fn is_protocol(&self, name: &str) -> bool {
+        self.protocol == name
+    }
+
+    /// Check if this envelope is from a specific role.
+    #[must_use]
+    pub fn is_from(&self, role: &str) -> bool {
+        self.from_role == role
+    }
+
+    /// Check if this envelope is to a specific role.
+    #[must_use]
+    pub fn is_to(&self, role: &str) -> bool {
+        self.to_role == role
+    }
+
+    /// Create a routing key for this envelope (useful for message queues).
+    #[must_use]
+    pub fn routing_key(&self) -> String {
+        match (&self.from_index, &self.to_index) {
+            (Some(fi), Some(ti)) => {
+                format!(
+                    "{}.{}[{}].{}[{}]",
+                    self.protocol, self.from_role, fi, self.to_role, ti
+                )
+            }
+            (Some(fi), None) => {
+                format!(
+                    "{}.{}[{}].{}",
+                    self.protocol, self.from_role, fi, self.to_role
+                )
+            }
+            (None, Some(ti)) => {
+                format!(
+                    "{}.{}.{}[{}]",
+                    self.protocol, self.from_role, self.to_role, ti
+                )
+            }
+            (None, None) => {
+                format!("{}.{}.{}", self.protocol, self.from_role, self.to_role)
+            }
+        }
+    }
+
+    /// Serialize the envelope to bytes.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, EnvelopeError> {
+        bincode::serialize(self).map_err(|e| EnvelopeError::Serialization(e.to_string()))
+    }
+
+    /// Deserialize an envelope from bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, EnvelopeError> {
+        bincode::deserialize(bytes).map_err(|e| EnvelopeError::Deserialization(e.to_string()))
+    }
+}
+
+/// Builder for creating protocol envelopes.
+#[derive(Debug, Default)]
+pub struct EnvelopeBuilder {
+    protocol: Option<String>,
+    from_role: Option<String>,
+    from_index: Option<u32>,
+    to_role: Option<String>,
+    to_index: Option<u32>,
+    message_type: Option<String>,
+    sequence: u64,
+    correlation_id: Option<String>,
+    payload: Vec<u8>,
+}
+
+impl EnvelopeBuilder {
+    /// Set the protocol name.
+    #[must_use]
+    pub fn protocol(mut self, protocol: impl Into<String>) -> Self {
+        self.protocol = Some(protocol.into());
+        self
+    }
+
+    /// Set the sender role.
+    #[must_use]
+    pub fn sender(mut self, role: impl Into<String>) -> Self {
+        self.from_role = Some(role.into());
+        self
+    }
+
+    /// Set the sender role index.
+    #[must_use]
+    pub fn sender_index(mut self, index: u32) -> Self {
+        self.from_index = Some(index);
+        self
+    }
+
+    /// Set the receiver role.
+    #[must_use]
+    pub fn recipient(mut self, role: impl Into<String>) -> Self {
+        self.to_role = Some(role.into());
+        self
+    }
+
+    /// Set the receiver role index.
+    #[must_use]
+    pub fn recipient_index(mut self, index: u32) -> Self {
+        self.to_index = Some(index);
+        self
+    }
+
+    /// Set the message type name.
+    #[must_use]
+    pub fn message_type(mut self, msg_type: impl Into<String>) -> Self {
+        self.message_type = Some(msg_type.into());
+        self
+    }
+
+    /// Set the sequence number.
+    #[must_use]
+    pub fn sequence(mut self, seq: u64) -> Self {
+        self.sequence = seq;
+        self
+    }
+
+    /// Set the correlation ID.
+    #[must_use]
+    pub fn correlation_id(mut self, id: impl Into<String>) -> Self {
+        self.correlation_id = Some(id.into());
+        self
+    }
+
+    /// Set the payload bytes directly.
+    #[must_use]
+    pub fn payload(mut self, payload: Vec<u8>) -> Self {
+        self.payload = payload;
+        self
+    }
+
+    /// Serialize a message as the payload.
+    pub fn payload_from<T: Serialize>(mut self, msg: &T) -> Result<Self, EnvelopeError> {
+        self.payload =
+            bincode::serialize(msg).map_err(|e| EnvelopeError::Serialization(e.to_string()))?;
+        Ok(self)
+    }
+
+    /// Build the envelope.
+    pub fn build(self) -> Result<ProtocolEnvelope, EnvelopeError> {
+        let protocol = self
+            .protocol
+            .ok_or(EnvelopeError::MissingField("protocol"))?;
+        let from_role = self
+            .from_role
+            .ok_or(EnvelopeError::MissingField("from_role"))?;
+        let to_role = self.to_role.ok_or(EnvelopeError::MissingField("to_role"))?;
+        let message_type = self
+            .message_type
+            .ok_or(EnvelopeError::MissingField("message_type"))?;
+
+        let timestamp_ns = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+
+        Ok(ProtocolEnvelope {
+            protocol,
+            from_role,
+            from_index: self.from_index,
+            to_role,
+            to_index: self.to_index,
+            message_type,
+            sequence: self.sequence,
+            timestamp_ns,
+            correlation_id: self.correlation_id,
+            payload: self.payload,
+        })
+    }
+}
+
+/// Errors that can occur when working with envelopes.
+#[derive(Debug, thiserror::Error)]
+pub enum EnvelopeError {
+    /// A required field was not set.
+    #[error("Missing required field: {0}")]
+    MissingField(&'static str),
+
+    /// Serialization failed.
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    /// Deserialization failed.
+    #[error("Deserialization error: {0}")]
+    Deserialization(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_envelope_builder() {
+        let envelope = ProtocolEnvelope::builder()
+            .protocol("TestProtocol")
+            .sender("Client")
+            .recipient("Server")
+            .message_type("Request")
+            .sequence(1)
+            .payload(vec![1, 2, 3])
+            .build()
+            .unwrap();
+
+        assert_eq!(envelope.protocol, "TestProtocol");
+        assert_eq!(envelope.from_role, "Client");
+        assert_eq!(envelope.to_role, "Server");
+        assert_eq!(envelope.message_type, "Request");
+        assert_eq!(envelope.sequence, 1);
+        assert_eq!(envelope.payload, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_routing_key() {
+        let envelope = ProtocolEnvelope::builder()
+            .protocol("Proto")
+            .sender("A")
+            .recipient("B")
+            .message_type("Msg")
+            .build()
+            .unwrap();
+
+        assert_eq!(envelope.routing_key(), "Proto.A.B");
+
+        let indexed = ProtocolEnvelope::builder()
+            .protocol("Proto")
+            .sender("Worker")
+            .sender_index(0)
+            .recipient("Manager")
+            .message_type("Msg")
+            .build()
+            .unwrap();
+
+        assert_eq!(indexed.routing_key(), "Proto.Worker[0].Manager");
+    }
+
+    #[test]
+    fn test_envelope_roundtrip() {
+        let original = ProtocolEnvelope::builder()
+            .protocol("Test")
+            .sender("A")
+            .recipient("B")
+            .message_type("Msg")
+            .payload(vec![1, 2, 3, 4, 5])
+            .build()
+            .unwrap();
+
+        let bytes = original.to_bytes().unwrap();
+        let restored = ProtocolEnvelope::from_bytes(&bytes).unwrap();
+
+        assert_eq!(original.protocol, restored.protocol);
+        assert_eq!(original.payload, restored.payload);
+    }
+}

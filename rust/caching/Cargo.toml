@@ -1,0 +1,31 @@
+[package]
+name = "caching"
+version = "0.0.0"
+authors = ["Sam Hart"]
+edition = "2021"
+description = "Session types for asynchronous communication between multiple parties."
+readme = "../../README.md"
+repository = "https://github.com/zakcutner/rumpsteak"
+license = "MIT"
+keywords = ["async", "deadlock", "safety", "session", "types"]
+categories = ["asynchronous", "concurrency"]
+publish = false
+
+[dependencies]
+argh = "0.1"
+bincode = { workspace = true }
+bytes = { version = "1.0", features = ["serde"] }
+fred = "3.0"
+futures = { workspace = true }
+http-serde = "1.0"
+rand = { workspace = true }
+rumpsteak-aura = { path = "../.." }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tracing = { workspace = true }
+tracing-futures = "0.2"
+tracing-subscriber = { workspace = true }
+
+[dependencies.hyper]
+version = "0.14"
+features = ["client", "http1", "http2", "server", "tcp"]

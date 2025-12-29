@@ -1,0 +1,30 @@
+# clippy.toml
+# Rust Style Guide conformance settings for Rumpsteak-Aura
+# See work/style_guide_rust.md for rationale
+
+# Limit function cognitive complexity (style guide: keep functions small)
+cognitive-complexity-threshold = 25
+
+# Enforce explicit integer sizes in public APIs
+avoid-breaking-exported-api = false
+
+# Limit type complexity for readability
+type-complexity-threshold = 250
+
+# Maximum lines per function (style guide: fit on one screen)
+too-many-lines-threshold = 100
+
+# Maximum arguments per function (style guide: prefer options structs)
+too-many-arguments-threshold = 7
+
+# Disallow certain types in public APIs
+# Uncomment when ready to enforce:
+# disallowed-types = [
+#     { path = "std::collections::HashMap", reason = "Use BTreeMap for determinism" },
+# ]
+
+# Disallow certain methods
+# Uncomment when ready to enforce:
+# disallowed-methods = [
+#     { path = "std::option::Option::unwrap", reason = "Use expect() with context or proper error handling" },
+# ]

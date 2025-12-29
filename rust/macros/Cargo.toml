@@ -1,0 +1,22 @@
+[package]
+name = "rumpsteak-aura-macros"
+version = "0.7.0"
+authors = ["Sam Hart"]
+edition = "2021"
+description = "Procedural macros for Rumpsteak session types (Aura flavored)."
+readme = "../../README.md"
+repository = "https://github.com/aura-project/rumpsteak-aura"
+license = "MIT"
+keywords = ["async", "deadlock", "safety", "session", "types"]
+categories = ["asynchronous", "concurrency"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["parsing"] }
+
+[features]
+serialize = []

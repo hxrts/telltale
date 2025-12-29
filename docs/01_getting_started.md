@@ -16,8 +16,8 @@ This adds the core session types library and the choreographic programming layer
 
 Rumpsteak-Aura is organized as a Cargo workspace with several crates.
 
-- The `rumpsteak-aura` crate is the core session types library. It is located in the root `src/` directory. This crate provides fundamental primitives for type-safe asynchronous communication, channels, and role definitions.
-- The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It is located in `choreography/`. This crate provides the DSL parser, automatic projection, effect handler system, and runtime support.
+- The `rumpsteak-aura` crate is the core session types library. It is located in `rust/src/`. This crate provides fundamental primitives for type-safe asynchronous communication, channels, and role definitions.
+- The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It is located in `rust/choreography/`. This crate provides the DSL parser, automatic projection, effect handler system, and runtime support.
 - The `rumpsteak-aura-fsm` crate provides optional finite state machine support. This crate enables advanced session type verification.
 - The `rumpsteak-aura-macros` crate contains procedural macros used internally.
 

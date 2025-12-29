@@ -1,0 +1,22 @@
+[package]
+name = "rumpsteak-theory"
+version = "0.7.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Session type theory algorithms - projection, merge, subtyping"
+readme = "../../README.md"
+repository = "https://github.com/aura-project/rumpsteak-aura"
+license = "MIT OR Apache-2.0"
+keywords = ["session", "types", "mpst", "projection", "subtyping"]
+categories = ["algorithms"]
+
+[lib]
+bench = false
+
+[dependencies]
+rumpsteak-types = { path = "../types", version = "0.7.0" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
