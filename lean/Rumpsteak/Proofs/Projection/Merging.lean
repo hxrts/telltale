@@ -775,7 +775,8 @@ private theorem mergeSendSorted_assoc :
                             tail123Left.bind (fun rest123 => some ((l1, merged123) :: rest123))) := by
                             -- Factor the tail triple-merge under the `merged123` binder.
                             simp [head123Left, tail123Left]
-                            rw [← Option.bind_assoc]
+                            cases hx : ((LocalTypeR.merge c1 c2).bind fun merged12 => LocalTypeR.merge merged12 c3) <;>
+                              simp [hx, Option.bind_assoc]
 
                   have hRhs :
                       (LocalTypeR.mergeSendSorted ((l1, c2) :: tail2) ((l1, c3) :: tail3)).bind
@@ -810,7 +811,8 @@ private theorem mergeSendSorted_assoc :
                           head123Right.bind (fun merged123 =>
                             tail123Right.bind (fun rest123 => some ((l1, merged123) :: rest123))) := by
                             simp [head123Right, tail123Right]
-                            rw [← Option.bind_assoc]
+                            cases hx : ((LocalTypeR.merge c2 c3).bind fun merged23 => LocalTypeR.merge c1 merged23) <;>
+                              simp [hx, Option.bind_assoc]
 
                   -- Finish by rewriting both sides to the canonical forms and using the IH equalities.
                   rw [hLhs, hRhs, hHeadEq, hTailEq]

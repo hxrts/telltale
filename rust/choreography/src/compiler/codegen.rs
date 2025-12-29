@@ -780,9 +780,11 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 
             /// Bind a symbolic role parameter to a concrete count
             pub fn bind_role_count(&mut self, role_name: &str, count: u32) -> Result<(), String> {
+                const MAX_ROLE_COUNT: u32 = 1024;
+
                 // Validate count bounds
-                if count > crate::ast::role::MAX_ROLE_COUNT {
-                    return Err(format!("Role count {} exceeds maximum {}", count, crate::ast::role::MAX_ROLE_COUNT));
+                if count > MAX_ROLE_COUNT {
+                    return Err(format!("Role count {} exceeds maximum {}", count, MAX_ROLE_COUNT));
                 }
 
                 if count == 0 {
@@ -795,8 +797,10 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 
             /// Bind a symbolic index variable to a concrete value
             pub fn bind_index(&mut self, var_name: &str, value: u32) -> Result<(), String> {
-                if value > crate::ast::role::MAX_ROLE_INDEX {
-                    return Err(format!("Index {} exceeds maximum {}", value, crate::ast::role::MAX_ROLE_INDEX));
+                const MAX_ROLE_INDEX: u32 = 1023;
+
+                if value > MAX_ROLE_INDEX {
+                    return Err(format!("Index {} exceeds maximum {}", value, MAX_ROLE_INDEX));
                 }
 
                 self.index_bindings.insert(var_name.to_string(), value);
