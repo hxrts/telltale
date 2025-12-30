@@ -136,4 +136,10 @@ pub enum ExtensionError {
         expected: &'static str,
         actual: &'static str,
     },
+
+    #[error("Handler already registered for extension type: {type_name}")]
+    DuplicateHandler { type_name: &'static str },
+
+    #[error("Cannot merge registries: duplicate handler for {type_name}")]
+    MergeConflict { type_name: &'static str },
 }

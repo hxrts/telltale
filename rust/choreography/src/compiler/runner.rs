@@ -229,10 +229,12 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
             quote! {
                 // External choice - receive branch selection from #from
+                // TODO(protocol-errors): Replace panic with proper error type
+                // See: https://github.com/aura-project/rumpsteak-aura/issues/new
                 let label = adapter.offer(#from_role).await?;
                 match label {
                     #(#match_arms)*
-                    _ => panic!("Unexpected branch label: {}", label),
+                    _ => panic!("Protocol violation: unexpected branch label '{}' from {}", label, stringify!(#from_role)),
                 }
             }
         }
@@ -387,8 +389,10 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 }
             } else {
                 quote! {
-                    // Recursive variable (unbound)
-                    panic!("Unbound recursive variable: {}", #label_str);
+                    // Recursive variable (unbound) - this indicates a code generator bug
+                    // The variable should have been bound by a Mu construct
+                    panic!("Internal error: unbound recursive variable '{}'. \
+                           This is a bug in the protocol code generator.", #label_str);
                 }
             }
         }
@@ -399,9 +403,9 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
             quote! {
                 // Timeout after #duration ms
-                // Note: Timeout handling requires the adapter error type to implement
-                // From<TimeoutError> or similar. This generated code uses unwrap_or_else
-                // with a panic as a fallback. Override for production use.
+                // TODO(protocol-errors): Replace panic with proper timeout error
+                // The adapter error type should implement From<TimeoutError> for production use
+                // See: https://github.com/aura-project/rumpsteak-aura/issues/new
                 let timeout_result = tokio::time::timeout(
                     std::time::Duration::from_millis(#timeout_ms),
                     async {
@@ -414,7 +418,8 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                     Ok(inner_result) => inner_result?,
                     Err(_elapsed) => panic!(
                         "Protocol timeout: operation exceeded {} ms. \
-                         Implement proper timeout error handling for production.",
+                         To handle timeouts gracefully, implement From<tokio::time::error::Elapsed> \
+                         for your adapter's error type.",
                         #timeout_ms
                     ),
                 }

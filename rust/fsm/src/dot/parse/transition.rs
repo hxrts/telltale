@@ -187,6 +187,8 @@ impl super::TokenId for TokenId {
 pub enum TransitionError {
     #[error("cannot mix named and unnamed parameters")]
     MixedParameters,
+    #[error("refinements are not yet supported")]
+    RefinementsNotSupported,
     #[error(transparent)]
     Expression(#[from] ExpressionError),
 }
@@ -549,8 +551,9 @@ pub(super) fn parse<E: Expression>(tokens: &mut Lexer) -> Option<Transition<Stri
     let (mut parameters, assignments) = (None, Default::default());
     if tokens.next_if(TokenId::LeftRound).is_some() {
         parameters = parse_parameters(tokens)?;
-        if tokens.next_if(TokenId::LeftSquare).is_some() {
-            unimplemented!("refinements are not yet implemented");
+        if let Some(bracket) = tokens.next_if(TokenId::LeftSquare) {
+            tokens.push_err(bracket.span, TransitionError::RefinementsNotSupported.into());
+            return None;
         }
     }
 

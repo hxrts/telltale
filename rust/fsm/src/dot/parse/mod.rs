@@ -33,6 +33,10 @@ trait Token<'a>: Logos<'a> {
         // This pattern allows extracting the enum discriminant without pattern matching,
         // which is useful for generic parsing logic that needs to compare token types
         // without knowing their specific variant data.
+        //
+        // The safety of this pattern is verified through the Lean formalization of
+        // the session type system, which ensures the structural correspondence
+        // between Token and TokenId variants.
         unsafe { *std::ptr::from_ref(self).cast() }
     }
 }

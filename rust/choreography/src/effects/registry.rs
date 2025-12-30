@@ -50,7 +50,7 @@ pub type ExtensionHandler<E> = Box<
 /// });
 /// ```
 pub struct ExtensionRegistry<E: Endpoint> {
-    handlers: HashMap<TypeId, ExtensionHandler<E>>,
+    handlers: HashMap<TypeId, (ExtensionHandler<E>, &'static str)>,
 }
 
 impl<E: Endpoint> ExtensionRegistry<E> {
@@ -69,10 +69,10 @@ impl<E: Endpoint> ExtensionRegistry<E> {
     /// The handler receives `&dyn ExtensionEffect` and must downcast to `Ext`.
     /// The registry ensures the handler is only called for `Ext` instances.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if a handler is already registered for type `Ext`.
-    pub fn register<Ext, F>(&mut self, handler: F)
+    /// Returns `ExtensionError::DuplicateHandler` if a handler is already registered for type `Ext`.
+    pub fn register<Ext, F>(&mut self, handler: F) -> Result<(), ExtensionError>
     where
         Ext: ExtensionEffect + 'static,
         F: for<'a> Fn(
@@ -84,13 +84,12 @@ impl<E: Endpoint> ExtensionRegistry<E> {
             + 'static,
     {
         let type_id = TypeId::of::<Ext>();
+        let type_name = std::any::type_name::<Ext>();
         if self.handlers.contains_key(&type_id) {
-            panic!(
-                "Extension handler already registered for type: {}",
-                std::any::type_name::<Ext>()
-            );
+            return Err(ExtensionError::DuplicateHandler { type_name });
         }
-        self.handlers.insert(type_id, Box::new(handler));
+        self.handlers.insert(type_id, (Box::new(handler), type_name));
+        Ok(())
     }
 
     /// Handle an extension effect
@@ -108,7 +107,7 @@ impl<E: Endpoint> ExtensionRegistry<E> {
         let type_id = extension.type_id();
 
         match self.handlers.get(&type_id) {
-            Some(handler) => handler(endpoint, extension).await,
+            Some((handler, _type_name)) => handler(endpoint, extension).await,
             None => Err(ExtensionError::HandlerNotRegistered {
                 type_name: extension.type_name(),
             }),
@@ -123,16 +122,17 @@ impl<E: Endpoint> ExtensionRegistry<E> {
 
     /// Merge another registry into this one
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if there are overlapping extension types.
-    pub fn merge(&mut self, other: ExtensionRegistry<E>) {
-        for (type_id, handler) in other.handlers {
+    /// Returns `ExtensionError::MergeConflict` if there are overlapping extension types.
+    pub fn merge(&mut self, other: ExtensionRegistry<E>) -> Result<(), ExtensionError> {
+        for (type_id, (handler, type_name)) in other.handlers {
             if self.handlers.contains_key(&type_id) {
-                panic!("Cannot merge: duplicate extension type");
+                return Err(ExtensionError::MergeConflict { type_name });
             }
-            self.handlers.insert(type_id, handler);
+            self.handlers.insert(type_id, (handler, type_name));
         }
+        Ok(())
     }
 }
 
