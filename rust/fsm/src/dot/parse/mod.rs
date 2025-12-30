@@ -1,6 +1,13 @@
 #![cfg(feature = "parsing")]
 
+/// FSM-level token parser
+///
+/// Exposes Token and TokenId for testing the unsafe discriminant pattern.
 pub mod fsm;
+
+/// Transition label parser
+///
+/// Exposes Token and TokenId for testing the unsafe discriminant pattern.
 pub mod transition;
 
 use self::fsm::FsmError;

@@ -55,6 +55,7 @@ pub fn is_dual(t1: &LocalTypeR, t2: &LocalTypeR) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use rumpsteak_types::Label;
 
     #[test]
@@ -67,15 +68,12 @@ mod tests {
         let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
         let recv = dual(&send);
 
-        match recv {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "msg");
-                assert_eq!(branches[0].1, LocalTypeR::End);
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(recv, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "msg");
+            assert_eq!(branches[0].1, LocalTypeR::End);
+        });
     }
 
     #[test]
@@ -83,13 +81,10 @@ mod tests {
         let recv = LocalTypeR::recv("A", Label::new("data"), LocalTypeR::End);
         let send = dual(&recv);
 
-        match send {
-            LocalTypeR::Send { partner, branches } => {
-                assert_eq!(partner, "A");
-                assert_eq!(branches.len(), 1);
-            }
-            _ => panic!("Expected Send"),
-        }
+        assert_matches!(send, LocalTypeR::Send { partner, branches } => {
+            assert_eq!(partner, "A");
+            assert_eq!(branches.len(), 1);
+        });
     }
 
     #[test]
@@ -100,13 +95,10 @@ mod tests {
         );
         let d = dual(&t);
 
-        match d {
-            LocalTypeR::Mu { var, body } => {
-                assert_eq!(var, "loop");
-                assert!(matches!(body.as_ref(), LocalTypeR::Recv { .. }));
-            }
-            _ => panic!("Expected Mu"),
-        }
+        assert_matches!(d, LocalTypeR::Mu { var, body } => {
+            assert_eq!(var, "loop");
+            assert_matches!(body.as_ref(), LocalTypeR::Recv { .. });
+        });
     }
 
     #[test]
@@ -142,12 +134,9 @@ mod tests {
         );
         let d = dual(&t);
 
-        match d {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 2);
-            }
-            _ => panic!("Expected Recv choice"),
-        }
+        assert_matches!(d, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 2);
+        });
     }
 }

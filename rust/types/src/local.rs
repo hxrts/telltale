@@ -379,6 +379,7 @@ impl LocalTypeR {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use crate::PayloadSort;
 
     #[test]
@@ -407,14 +408,11 @@ mod tests {
         let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
         let recv = send.dual();
 
-        match recv {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "msg");
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(recv, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "msg");
+        });
     }
 
     #[test]
@@ -426,13 +424,10 @@ mod tests {
         );
         let unfolded = lt.unfold();
 
-        match unfolded {
-            LocalTypeR::Send { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert!(matches!(branches[0].1, LocalTypeR::Mu { .. }));
-            }
-            _ => panic!("Expected Send after unfold"),
-        }
+        assert_matches!(unfolded, LocalTypeR::Send { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_matches!(branches[0].1, LocalTypeR::Mu { .. });
+        });
     }
 
     #[test]

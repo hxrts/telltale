@@ -115,7 +115,10 @@ impl GrammarComposer {
     }
 
     /// Inject extension rules into the base grammar
-    #[allow(dead_code)]
+    ///
+    /// Part of the extensible grammar system; will be used when dynamic
+    /// grammar composition is enabled for parser extensions.
+    #[allow(dead_code)] // Part of extensible grammar system (WIP)
     fn inject_extension_rules(
         &self,
         mut base_grammar: String,
@@ -216,7 +219,10 @@ impl GrammarComposer {
     }
 
     /// Extract statement rule names from extension grammar
-    #[allow(dead_code)]
+    ///
+    /// Part of the extensible grammar system; superseded by
+    /// `extract_extension_statements_optimized` for performance.
+    #[allow(dead_code)] // Superseded by optimized version
     fn extract_extension_statements(
         &self,
         extension_rules: &str,
@@ -260,7 +266,10 @@ impl GrammarComposer {
     }
 
     /// Validate that the base grammar has the required extension points
-    #[allow(dead_code)]
+    ///
+    /// Part of the extensible grammar system; will be used when dynamic
+    /// grammar validation is enabled for parser extensions.
+    #[allow(dead_code)] // Part of extensible grammar system (WIP)
     fn validate_base_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
         let required_rules = [
             "annotated_stmt = {",
@@ -304,7 +313,10 @@ impl GrammarComposer {
     }
 
     /// Validate the composed grammar for common issues
-    #[allow(dead_code)]
+    ///
+    /// Part of the extensible grammar system; will be used when dynamic
+    /// grammar validation is enabled for parser extensions.
+    #[allow(dead_code)] // Part of extensible grammar system (WIP)
     fn validate_composed_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
         // Check for duplicate rule names
         let mut rule_names = HashSet::new();

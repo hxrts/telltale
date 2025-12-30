@@ -143,7 +143,10 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
             quote! {
                 // Send to #to
-                let msg: #msg_type = Default::default(); // TODO: user provides message
+                // TODO(message-provisioning): Currently uses Default::default() for message values.
+                // Users should provide actual message content through a callback or builder pattern.
+                // See: protocol state machine should call user-provided message factory.
+                let msg: #msg_type = Default::default();
                 adapter.send(#to_role, msg).await?;
                 #cont
             }
@@ -299,7 +302,9 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                             #loop_body
                             // Check if role signals continuation
                             let _ = #role_str; // Role that decides: role_str
-                            // TODO: integrate with choice mechanism
+                            // TODO(loop-choice): Role-controlled loops need integration with the
+                            // choice mechanism. The controlling role should send a "continue/break"
+                            // choice that other participants observe to decide loop termination.
                             break;
                         }
                     }
@@ -342,11 +347,15 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 }
                 None => {
                     quote! {
-                        // Unbounded loop
+                        // Unbounded loop - runs until explicitly broken
+                        // TODO(loop-termination): Unbounded loops currently break immediately.
+                        // For correct semantics, loops need a termination condition from:
+                        // - A controlling role's choice (see TODO(loop-choice))
+                        // - A user-provided predicate function
+                        // - Protocol-level termination signals
                         loop {
                             #loop_body
-                            // TODO: termination condition
-                            break;
+                            break; // Placeholder: should check termination condition
                         }
                     }
                 }
@@ -455,15 +464,19 @@ fn generate_role_id(role: &Role) -> TokenStream {
                 }
             }
             RoleIndex::Wildcard => {
-                // Wildcard roles need special handling at call site
+                // TODO(wildcard-roles): Wildcard roles (e.g., "Worker[*]") should be expanded
+                // at code generation time to handle all matching participants. Currently
+                // falls back to a simple RoleId which won't correctly broadcast/multicast.
                 quote! {
-                    RoleId::new(#name) // TODO: handle wildcard at call site
+                    RoleId::new(#name) // Placeholder: wildcards need expansion to role set
                 }
             }
             RoleIndex::Range(_) => {
-                // Range roles need special handling at call site
+                // TODO(range-roles): Range roles (e.g., "Worker[0..n]") should be expanded
+                // to iterate over the specified range. Currently falls back to a simple
+                // RoleId which won't correctly handle the range semantics.
                 quote! {
-                    RoleId::new(#name) // TODO: handle range at call site
+                    RoleId::new(#name) // Placeholder: ranges need iteration loop
                 }
             }
         }
@@ -563,11 +576,16 @@ pub fn generate_output_types(roles: &[Role]) -> TokenStream {
             let name = &role.name;
             let output_name = format_ident!("{}Output", name);
 
+            // TODO(output-fields): Output structs should contain fields for:
+            // - Final values of received messages
+            // - Computed results from protocol execution
+            // - Choice paths taken (for protocols with branching)
+            // Currently empty - users get no data back from protocol execution.
             quote! {
                 /// Output from running the #name role
                 #[derive(Debug, Default)]
                 pub struct #output_name {
-                    // TODO: Add fields based on protocol structure
+                    // Fields will be added based on protocol structure
                 }
             }
         })

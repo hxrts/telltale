@@ -395,13 +395,16 @@ impl ExtensionDiscovery {
 }
 
 /// Wrapper to make extensions cloneable for registry management
+///
+/// Note: Some fields are stored for future use when dynamic grammar injection
+/// is fully implemented. Currently only `priority` is used.
 #[derive(Debug, Clone)]
 struct ClonableExtensionWrapper {
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Stored for future dynamic grammar support
     id: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Stored for future dynamic grammar support
     rules: Vec<String>,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Stored for future dynamic grammar support
     grammar: String,
     priority: u32,
 }
@@ -444,9 +447,12 @@ impl GrammarExtension for ClonableExtensionWrapper {
 }
 
 /// Placeholder extension for loaded extensions
+///
+/// Used when loading extensions from configuration; the name is stored
+/// for error messages and debugging.
 #[derive(Debug, Clone)]
 struct PlaceholderExtension {
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Stored for error messages and debugging
     name: String,
     priority: u32,
 }

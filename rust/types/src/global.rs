@@ -419,6 +419,7 @@ impl GlobalType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_simple_protocol() {
@@ -465,20 +466,13 @@ mod tests {
             GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
         );
         let unfolded = g.unfold();
-        match unfolded {
-            GlobalType::Comm {
-                sender,
-                receiver,
-                branches,
-            } => {
-                assert_eq!(sender, "A");
-                assert_eq!(receiver, "B");
-                assert_eq!(branches.len(), 1);
-                // Continuation should be the original recursive type
-                assert!(matches!(branches[0].1, GlobalType::Mu { .. }));
-            }
-            _ => panic!("Expected Comm after unfold"),
-        }
+        assert_matches!(unfolded, GlobalType::Comm { sender, receiver, branches } => {
+            assert_eq!(sender, "A");
+            assert_eq!(receiver, "B");
+            assert_eq!(branches.len(), 1);
+            // Continuation should be the original recursive type
+            assert_matches!(branches[0].1, GlobalType::Mu { .. });
+        });
     }
 
     #[test]

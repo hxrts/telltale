@@ -261,6 +261,7 @@ impl From<&LocalTypeR> for LocalTypeRDB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_alpha_equivalent_global_types() {
@@ -325,18 +326,13 @@ mod tests {
         assert_eq!(db1, db2);
 
         // Check the structure: innermost var should have index 0
-        match db1 {
-            GlobalTypeDB::Rec(outer) => match *outer {
-                GlobalTypeDB::Rec(inner) => match *inner {
-                    GlobalTypeDB::Comm { ref branches, .. } => {
-                        assert!(matches!(branches[0].1, GlobalTypeDB::Var(0)));
-                    }
-                    _ => panic!("Expected Comm"),
-                },
-                _ => panic!("Expected inner Rec"),
-            },
-            _ => panic!("Expected outer Rec"),
-        }
+        assert_matches!(db1, GlobalTypeDB::Rec(outer) => {
+            assert_matches!(*outer, GlobalTypeDB::Rec(inner) => {
+                assert_matches!(*inner, GlobalTypeDB::Comm { ref branches, .. } => {
+                    assert_matches!(branches[0].1, GlobalTypeDB::Var(0));
+                });
+            });
+        });
     }
 
     #[test]
@@ -353,22 +349,13 @@ mod tests {
         let db = GlobalTypeDB::from(&g);
 
         // The variable x should have index 1 (one level out)
-        match db {
-            GlobalTypeDB::Rec(outer) => match *outer {
-                GlobalTypeDB::Rec(inner) => match *inner {
-                    GlobalTypeDB::Comm { ref branches, .. } => {
-                        assert!(
-                            matches!(branches[0].1, GlobalTypeDB::Var(1)),
-                            "Expected Var(1), got {:?}",
-                            branches[0].1
-                        );
-                    }
-                    _ => panic!("Expected Comm"),
-                },
-                _ => panic!("Expected inner Rec"),
-            },
-            _ => panic!("Expected outer Rec"),
-        }
+        assert_matches!(db, GlobalTypeDB::Rec(outer) => {
+            assert_matches!(*outer, GlobalTypeDB::Rec(inner) => {
+                assert_matches!(*inner, GlobalTypeDB::Comm { ref branches, .. } => {
+                    assert_matches!(branches[0].1, GlobalTypeDB::Var(1));
+                });
+            });
+        });
     }
 
     #[test]
@@ -404,13 +391,10 @@ mod tests {
 
         let db = GlobalTypeDB::from(&g).normalize();
 
-        match db {
-            GlobalTypeDB::Comm { branches, .. } => {
-                assert_eq!(branches[0].0.name, "a");
-                assert_eq!(branches[1].0.name, "b");
-            }
-            _ => panic!("Expected Comm"),
-        }
+        assert_matches!(db, GlobalTypeDB::Comm { branches, .. } => {
+            assert_eq!(branches[0].0.name, "a");
+            assert_eq!(branches[1].0.name, "b");
+        });
     }
 
     #[test]
@@ -421,12 +405,9 @@ mod tests {
         let db = GlobalTypeDB::from(&g);
 
         // Unbound variables get index 0 (beyond empty env)
-        match db {
-            GlobalTypeDB::Comm { ref branches, .. } => {
-                assert!(matches!(branches[0].1, GlobalTypeDB::Var(0)));
-            }
-            _ => panic!("Expected Comm"),
-        }
+        assert_matches!(db, GlobalTypeDB::Comm { ref branches, .. } => {
+            assert_matches!(branches[0].1, GlobalTypeDB::Var(0));
+        });
     }
 
     #[test]
@@ -443,27 +424,14 @@ mod tests {
 
         let db = LocalTypeRDB::from(&t);
 
-        match db {
-            LocalTypeRDB::Rec(body) => match *body {
-                LocalTypeRDB::Send {
-                    ref partner,
-                    ref branches,
-                } => {
-                    assert_eq!(partner, "B");
-                    match &branches[0].1 {
-                        LocalTypeRDB::Recv {
-                            partner,
-                            branches: recv_branches,
-                        } => {
-                            assert_eq!(partner, "A");
-                            assert!(matches!(recv_branches[0].1, LocalTypeRDB::Var(0)));
-                        }
-                        _ => panic!("Expected Recv"),
-                    }
-                }
-                _ => panic!("Expected Send"),
-            },
-            _ => panic!("Expected Rec"),
-        }
+        assert_matches!(db, LocalTypeRDB::Rec(body) => {
+            assert_matches!(*body, LocalTypeRDB::Send { ref partner, ref branches } => {
+                assert_eq!(partner, "B");
+                assert_matches!(&branches[0].1, LocalTypeRDB::Recv { partner, branches: recv_branches } => {
+                    assert_eq!(partner, "A");
+                    assert_matches!(recv_branches[0].1, LocalTypeRDB::Var(0));
+                });
+            });
+        });
     }
 }

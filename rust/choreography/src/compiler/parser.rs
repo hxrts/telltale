@@ -397,7 +397,9 @@ fn parse_role_param(
     input: &str,
 ) -> std::result::Result<RoleParam, ParseError> {
     let mut inner = pair.into_inner();
-    let param_expr = inner.next().unwrap();
+    let param_expr = inner
+        .next()
+        .expect("grammar: role_param must contain role_param_expr");
 
     match param_expr.as_rule() {
         Rule::role_param_expr => {
@@ -432,7 +434,9 @@ fn parse_role_index(
     input: &str,
 ) -> std::result::Result<RoleIndex, ParseError> {
     let mut inner = pair.into_inner();
-    let index_expr = inner.next().unwrap();
+    let index_expr = inner
+        .next()
+        .expect("grammar: role_index must contain role_index_expr");
 
     match index_expr.as_rule() {
         Rule::role_index_expr => {
@@ -499,8 +503,12 @@ fn parse_range_expr(
 ) -> std::result::Result<RoleIndex, ParseError> {
     let pair_span = pair.as_span();
     let mut inner = pair.into_inner();
-    let start_expr = inner.next().unwrap();
-    let end_expr = inner.next().unwrap();
+    let start_expr = inner
+        .next()
+        .expect("grammar: range_expr must have start expression");
+    let end_expr = inner
+        .next()
+        .expect("grammar: range_expr must have end expression");
 
     let start = match start_expr.as_rule() {
         Rule::integer => {
@@ -671,7 +679,9 @@ pub fn parse_choreography_str_with_topologies(
                                 for role_decl in role_pair.into_inner() {
                                     if let Rule::role_decl = role_decl.as_rule() {
                                         let mut inner_role = role_decl.into_inner();
-                                        let role_ident = inner_role.next().unwrap();
+                                        let role_ident = inner_role
+                                            .next()
+                                            .expect("grammar: role_decl must have identifier");
                                         let role_name = role_ident.as_str().trim();
                                         let span = role_ident.as_span();
 
@@ -708,7 +718,9 @@ pub fn parse_choreography_str_with_topologies(
                         for protocol_def in inner.into_inner() {
                             if let Rule::protocol_def = protocol_def.as_rule() {
                                 let mut def_inner = protocol_def.into_inner();
-                                let proto_name_pair = def_inner.next().unwrap();
+                                let proto_name_pair = def_inner
+                                    .next()
+                                    .expect("grammar: protocol_def must have name");
                                 let proto_name = proto_name_pair.as_str();
                                 let proto_span = proto_name_pair.as_span();
 
@@ -719,7 +731,9 @@ pub fn parse_choreography_str_with_topologies(
                                     });
                                 }
 
-                                let body_pair = def_inner.next().unwrap();
+                                let body_pair = def_inner
+                                    .next()
+                                    .expect("grammar: protocol_def must have body");
                                 let body = parse_protocol_body(
                                     body_pair,
                                     &declared_roles,
@@ -774,11 +788,15 @@ fn parse_inline_topologies(
             let mut topo_inner = inner.into_inner();
 
             // Get topology name
-            let name_pair = topo_inner.next().unwrap();
+            let name_pair = topo_inner
+                .next()
+                .expect("grammar: inline_topology must have name");
             let name = name_pair.as_str().to_string();
 
             // Parse topology body
-            let body_pair = topo_inner.next().unwrap();
+            let body_pair = topo_inner
+                .next()
+                .expect("grammar: inline_topology must have body");
             let topology = parse_topology_body_inline(body_pair, input)?;
 
             topologies.push(super::codegen::InlineTopology { name, topology });
@@ -1025,7 +1043,9 @@ pub fn parse_choreography_str_with_extensions(
                                 for role_decl in role_pair.into_inner() {
                                     if let Rule::role_decl = role_decl.as_rule() {
                                         let mut inner_role = role_decl.into_inner();
-                                        let role_ident = inner_role.next().unwrap();
+                                        let role_ident = inner_role
+                                            .next()
+                                            .expect("grammar: role_decl must have identifier");
                                         let role_name = role_ident.as_str().trim();
                                         let span = role_ident.as_span();
 
@@ -1064,7 +1084,9 @@ pub fn parse_choreography_str_with_extensions(
                         for protocol_def in inner.into_inner() {
                             if let Rule::protocol_def = protocol_def.as_rule() {
                                 let mut def_inner = protocol_def.into_inner();
-                                let proto_name_pair = def_inner.next().unwrap();
+                                let proto_name_pair = def_inner
+                                    .next()
+                                    .expect("grammar: protocol_def must have name");
                                 let proto_name = proto_name_pair.as_str();
                                 let proto_span = proto_name_pair.as_span();
 
@@ -1075,7 +1097,9 @@ pub fn parse_choreography_str_with_extensions(
                                     });
                                 }
 
-                                let body_pair = def_inner.next().unwrap();
+                                let body_pair = def_inner
+                                    .next()
+                                    .expect("grammar: protocol_def must have body");
                                 let body = parse_protocol_body(
                                     body_pair,
                                     &declared_roles,
@@ -1154,11 +1178,15 @@ fn parse_statement(
         let mut annotations = HashMap::new();
 
         // Parse all annotations
-        let mut stmt_pair = inner.next().unwrap();
+        let mut stmt_pair = inner
+            .next()
+            .expect("grammar: annotated_stmt must have content");
         while stmt_pair.as_rule() == Rule::annotation {
             let annotation_map = parse_annotations(stmt_pair)?;
             annotations.extend(annotation_map);
-            stmt_pair = inner.next().unwrap();
+            stmt_pair = inner
+                .next()
+                .expect("grammar: annotated_stmt must have statement after annotations");
         }
 
         // Parse the statement and add annotations
@@ -1231,7 +1259,9 @@ fn parse_role_ref(
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let role_ident = inner.next().unwrap();
+    let role_ident = inner
+        .next()
+        .expect("grammar: role_ref must have identifier");
     let role_name = role_ident.as_str().trim();
 
     // Check if the base role name is declared
@@ -1268,7 +1298,9 @@ fn parse_annotated_role(
     let mut inner = pair.into_inner();
 
     // First part should be role_ref
-    let role_ref_pair = inner.next().unwrap();
+    let role_ref_pair = inner
+        .next()
+        .expect("grammar: annotated_role must have role_ref");
     let role = parse_role_ref(role_ref_pair, declared_roles, input)?;
 
     // Check for optional role_annotations
@@ -1291,13 +1323,22 @@ fn parse_send_stmt(
 ) -> std::result::Result<Statement, ParseError> {
     let mut inner = pair.into_inner();
 
-    let from_pair = inner.next().unwrap();
+    let from_pair = inner
+        .next()
+        .expect("grammar: send_stmt must have sender role");
     let from = parse_annotated_role(from_pair, declared_roles, input)?;
 
-    let to_pair = inner.next().unwrap();
+    let to_pair = inner
+        .next()
+        .expect("grammar: send_stmt must have receiver role");
     let to = parse_annotated_role(to_pair, declared_roles, input)?;
 
-    let message = parse_message(inner.next().unwrap(), input)?;
+    let message = parse_message(
+        inner
+            .next()
+            .expect("grammar: send_stmt must have message"),
+        input,
+    )?;
 
     Ok(Statement::Send {
         from,
@@ -1317,10 +1358,17 @@ fn parse_broadcast_stmt(
 ) -> std::result::Result<Statement, ParseError> {
     let mut inner = pair.into_inner();
 
-    let from_pair = inner.next().unwrap();
+    let from_pair = inner
+        .next()
+        .expect("grammar: broadcast_stmt must have sender role");
     let from = parse_annotated_role(from_pair, declared_roles, input)?;
 
-    let message = parse_message(inner.next().unwrap(), input)?;
+    let message = parse_message(
+        inner
+            .next()
+            .expect("grammar: broadcast_stmt must have message"),
+        input,
+    )?;
 
     Ok(Statement::Broadcast {
         from,
@@ -1339,7 +1387,9 @@ fn parse_choice_stmt(
 ) -> std::result::Result<Statement, ParseError> {
     let mut inner = pair.into_inner();
 
-    let role_pair = inner.next().unwrap();
+    let role_pair = inner
+        .next()
+        .expect("grammar: choice_stmt must have choosing role");
     let role = if role_pair.as_rule() == Rule::ident {
         // Simple identifier without indexing
         let role_name = role_pair.as_str().trim();
@@ -1360,16 +1410,27 @@ fn parse_choice_stmt(
     for branch_pair in inner {
         if let Rule::choice_branch = branch_pair.as_rule() {
             let mut branch_inner = branch_pair.into_inner();
-            let label = format_ident!("{}", branch_inner.next().unwrap().as_str());
+            let label = format_ident!(
+                "{}",
+                branch_inner
+                    .next()
+                    .expect("grammar: choice_branch must have label")
+                    .as_str()
+            );
 
             // Check for optional guard
             let mut guard = None;
-            let next_item = branch_inner.next().unwrap();
+            let next_item = branch_inner
+                .next()
+                .expect("grammar: choice_branch must have body or guard");
             let body = if let Rule::guard = next_item.as_rule() {
                 // Parse guard expression
                 let guard_span = next_item.as_span();
                 let mut guard_inner = next_item.into_inner();
-                let guard_expr = guard_inner.next().unwrap().as_str();
+                let guard_expr = guard_inner
+                    .next()
+                    .expect("grammar: guard must have expression")
+                    .as_str();
                 guard = Some(syn::parse_str::<TokenStream>(guard_expr).map_err(|e| {
                     ParseError::Syntax {
                         span: ErrorSpan::from_pest_span(guard_span, input),
@@ -1378,7 +1439,9 @@ fn parse_choice_stmt(
                 })?);
                 // Body comes after guard
                 parse_protocol_body(
-                    branch_inner.next().unwrap(),
+                    branch_inner
+                        .next()
+                        .expect("grammar: choice_branch with guard must have body"),
                     declared_roles,
                     input,
                     protocol_defs,
@@ -1420,7 +1483,9 @@ fn parse_loop_stmt(
             Rule::count_condition => {
                 let span = item.as_span();
                 let mut cond_inner = item.into_inner();
-                let count_pair = cond_inner.next().unwrap();
+                let count_pair = cond_inner
+                    .next()
+                    .expect("grammar: count_condition must have value");
                 let count_str = count_pair.as_str();
 
                 // Try to parse as integer, otherwise treat as variable
@@ -1439,7 +1504,9 @@ fn parse_loop_stmt(
             }
             Rule::role_decides_condition => {
                 let mut cond_inner = item.into_inner();
-                let role_pair = cond_inner.next().unwrap();
+                let role_pair = cond_inner
+                    .next()
+                    .expect("grammar: role_decides_condition must have role");
                 let role_str = role_pair.as_str().trim();
                 let role_span = role_pair.as_span();
                 if !declared_roles.contains(role_str) {
@@ -1455,7 +1522,10 @@ fn parse_loop_stmt(
             Rule::custom_condition => {
                 let span = item.as_span();
                 let mut cond_inner = item.into_inner();
-                let custom_str = cond_inner.next().unwrap().as_str();
+                let custom_str = cond_inner
+                    .next()
+                    .expect("grammar: custom_condition must have expression")
+                    .as_str();
                 // Remove quotes from string
                 let custom_str = custom_str.trim_matches('"');
                 // Parse as TokenStream for Custom condition
@@ -1470,7 +1540,9 @@ fn parse_loop_stmt(
             Rule::fuel_condition => {
                 let span = item.as_span();
                 let mut cond_inner = item.into_inner();
-                let fuel_pair = cond_inner.next().unwrap();
+                let fuel_pair = cond_inner
+                    .next()
+                    .expect("grammar: fuel_condition must have value");
                 let fuel_str = fuel_pair.as_str();
 
                 // Try to parse as integer, otherwise treat as variable
@@ -1490,7 +1562,9 @@ fn parse_loop_stmt(
             Rule::yield_after_condition => {
                 let span = item.as_span();
                 let mut cond_inner = item.into_inner();
-                let yield_pair = cond_inner.next().unwrap();
+                let yield_pair = cond_inner
+                    .next()
+                    .expect("grammar: yield_after_condition must have value");
                 let yield_str = yield_pair.as_str();
 
                 // Try to parse as integer, otherwise treat as variable
@@ -1509,7 +1583,10 @@ fn parse_loop_stmt(
             }
             Rule::yield_when_condition => {
                 let mut cond_inner = item.into_inner();
-                let when_str = cond_inner.next().unwrap().as_str();
+                let when_str = cond_inner
+                    .next()
+                    .expect("grammar: yield_when_condition must have value")
+                    .as_str();
                 // Remove quotes from string
                 let when_str = when_str.trim_matches('"');
                 condition = Some(Condition::YieldWhen(when_str.to_string()));
@@ -1557,8 +1634,21 @@ fn parse_rec_stmt(
 ) -> std::result::Result<Statement, ParseError> {
     let mut inner = pair.into_inner();
 
-    let label = format_ident!("{}", inner.next().unwrap().as_str());
-    let body = parse_protocol_body(inner.next().unwrap(), declared_roles, input, protocol_defs)?;
+    let label = format_ident!(
+        "{}",
+        inner
+            .next()
+            .expect("grammar: rec_stmt must have label")
+            .as_str()
+    );
+    let body = parse_protocol_body(
+        inner
+            .next()
+            .expect("grammar: rec_stmt must have body"),
+        declared_roles,
+        input,
+        protocol_defs,
+    )?;
 
     Ok(Statement::Rec { label, body })
 }
@@ -1571,7 +1661,9 @@ fn parse_call_stmt(
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
     let mut inner = pair.into_inner();
-    let proto_name_pair = inner.next().unwrap();
+    let proto_name_pair = inner
+        .next()
+        .expect("grammar: call_stmt must have protocol name");
     let proto_name = proto_name_pair.as_str();
     let span = proto_name_pair.as_span();
 
@@ -1599,7 +1691,13 @@ fn parse_message(
     let _span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let name = format_ident!("{}", inner.next().unwrap().as_str());
+    let name = format_ident!(
+        "{}",
+        inner
+            .next()
+            .expect("grammar: message must have name")
+            .as_str()
+    );
 
     let mut type_annotation = None;
     let mut payload = None;

@@ -322,6 +322,7 @@ impl MemoizedProjector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_project_end() {
@@ -336,15 +337,12 @@ mod tests {
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let local = project(&g, "A").unwrap();
 
-        match local {
-            LocalTypeR::Send { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "msg");
-                assert_eq!(branches[0].1, LocalTypeR::End);
-            }
-            _ => panic!("Expected Send"),
-        }
+        assert_matches!(local, LocalTypeR::Send { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "msg");
+            assert_eq!(branches[0].1, LocalTypeR::End);
+        });
     }
 
     #[test]
@@ -353,14 +351,11 @@ mod tests {
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let local = project(&g, "B").unwrap();
 
-        match local {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "A");
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "msg");
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(local, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "A");
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "msg");
+        });
     }
 
     #[test]
@@ -386,21 +381,15 @@ mod tests {
 
         // A sees internal choice
         let a_local = project(&g, "A").unwrap();
-        match a_local {
-            LocalTypeR::Send { branches, .. } => {
-                assert_eq!(branches.len(), 2);
-            }
-            _ => panic!("Expected Send"),
-        }
+        assert_matches!(a_local, LocalTypeR::Send { branches, .. } => {
+            assert_eq!(branches.len(), 2);
+        });
 
         // B sees external choice
         let b_local = project(&g, "B").unwrap();
-        match b_local {
-            LocalTypeR::Recv { branches, .. } => {
-                assert_eq!(branches.len(), 2);
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(b_local, LocalTypeR::Recv { branches, .. } => {
+            assert_eq!(branches.len(), 2);
+        });
     }
 
     #[test]
@@ -412,19 +401,13 @@ mod tests {
         );
 
         let a_local = project(&g, "A").unwrap();
-        match a_local {
-            LocalTypeR::Mu { var, body } => {
-                assert_eq!(var, "t");
-                match body.as_ref() {
-                    LocalTypeR::Send { partner, branches } => {
-                        assert_eq!(partner, "B");
-                        assert!(matches!(branches[0].1, LocalTypeR::Var(ref v) if v == "t"));
-                    }
-                    _ => panic!("Expected Send in body"),
-                }
-            }
-            _ => panic!("Expected Mu"),
-        }
+        assert_matches!(a_local, LocalTypeR::Mu { var, body } => {
+            assert_eq!(var, "t");
+            assert_matches!(body.as_ref(), LocalTypeR::Send { partner, branches } => {
+                assert_eq!(partner, "B");
+                assert_matches!(&branches[0].1, LocalTypeR::Var(v) if v == "t");
+            });
+        });
     }
 
     #[test]
@@ -493,14 +476,11 @@ mod tests {
         );
 
         let c_local = project(&g, "C").unwrap();
-        match c_local {
-            LocalTypeR::Send { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "msg");
-            }
-            _ => panic!("Expected Send"),
-        }
+        assert_matches!(c_local, LocalTypeR::Send { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "msg");
+        });
     }
 
     #[test]
@@ -527,16 +507,13 @@ mod tests {
         );
 
         let c_local = project(&g, "C").unwrap();
-        match c_local {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 2);
-                let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
-                assert!(labels.contains(&"x"));
-                assert!(labels.contains(&"y"));
-            }
-            _ => panic!("Expected Recv with merged branches"),
-        }
+        assert_matches!(c_local, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 2);
+            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            assert!(labels.contains(&"x"));
+            assert!(labels.contains(&"y"));
+        });
     }
 
     // ========================================================================

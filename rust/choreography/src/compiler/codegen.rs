@@ -69,7 +69,10 @@ fn generate_annotation_metadata(name: &str, annotations: &HashMap<String, String
 }
 
 /// Generate attributes from specific annotation keys
-#[allow(dead_code)]
+///
+/// Reserved for future annotation-to-attribute mapping when code generation
+/// supports priority, timeout, and async annotations on generated types.
+#[allow(dead_code)] // Reserved for future annotation support
 fn generate_annotation_attributes(annotations: &HashMap<String, String>) -> TokenStream {
     let mut attrs = Vec::new();
 

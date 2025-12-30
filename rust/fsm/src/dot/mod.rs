@@ -3,7 +3,12 @@
 //! This module provides both export to and parsing from the DOT graph format.
 //! DOT files can be visualized using Graphviz tools.
 
-mod parse;
+/// Parser module for DOT format
+///
+/// The submodules expose Token and TokenId types for testing the unsafe
+/// discriminant transmute pattern.
+#[cfg(feature = "parsing")]
+pub mod parse;
 
 #[cfg(feature = "parsing")]
 pub use self::parse::{parse, parse_with_refinements, ParseErrors};

@@ -365,6 +365,7 @@ pub fn can_merge(t1: &LocalTypeR, t2: &LocalTypeR) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_merge_identical_end() {
@@ -390,14 +391,11 @@ mod tests {
         let t2 = LocalTypeR::send("B", Label::new("x"), LocalTypeR::End);
 
         let result = merge(&t1, &t2).unwrap();
-        match result {
-            LocalTypeR::Send { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "x");
-            }
-            _ => panic!("Expected Send"),
-        }
+        assert_matches!(result, LocalTypeR::Send { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "x");
+        });
     }
 
     #[test]
@@ -456,16 +454,13 @@ mod tests {
         let t2 = LocalTypeR::recv("A", Label::new("y"), LocalTypeR::End);
 
         let result = merge(&t1, &t2).unwrap();
-        match result {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "A");
-                assert_eq!(branches.len(), 2);
-                let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
-                assert!(labels.contains(&"x"));
-                assert!(labels.contains(&"y"));
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(result, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "A");
+            assert_eq!(branches.len(), 2);
+            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            assert!(labels.contains(&"x"));
+            assert!(labels.contains(&"y"));
+        });
     }
 
     #[test]
@@ -483,17 +478,13 @@ mod tests {
         );
 
         let result = merge(&t1, &t2).unwrap();
-        match result {
-            LocalTypeR::Recv { branches, .. } => {
-                assert_eq!(branches.len(), 1);
-                // Continuation should be merged (same as input since identical)
-                match &branches[0].1 {
-                    LocalTypeR::Send { partner, .. } => assert_eq!(partner, "B"),
-                    _ => panic!("Expected Send continuation"),
-                }
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(result, LocalTypeR::Recv { branches, .. } => {
+            assert_eq!(branches.len(), 1);
+            // Continuation should be merged (same as input since identical)
+            assert_matches!(&branches[0].1, LocalTypeR::Send { partner, .. } => {
+                assert_eq!(partner, "B");
+            });
+        });
     }
 
     #[test]
@@ -515,17 +506,14 @@ mod tests {
         };
 
         let result = merge(&t1, &t2).unwrap();
-        match result {
-            LocalTypeR::Recv { partner, branches } => {
-                assert_eq!(partner, "A");
-                assert_eq!(branches.len(), 3);
-                let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
-                assert!(labels.contains(&"x"));
-                assert!(labels.contains(&"y"));
-                assert!(labels.contains(&"z"));
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(result, LocalTypeR::Recv { partner, branches } => {
+            assert_eq!(partner, "A");
+            assert_eq!(branches.len(), 3);
+            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            assert!(labels.contains(&"x"));
+            assert!(labels.contains(&"y"));
+            assert!(labels.contains(&"z"));
+        });
     }
 
     // =========================================================================
@@ -555,13 +543,10 @@ mod tests {
         ];
 
         let result = merge_all(&types).unwrap();
-        match result {
-            LocalTypeR::Send { branches, .. } => {
-                assert_eq!(branches.len(), 1);
-                assert_eq!(branches[0].0.name, "x");
-            }
-            _ => panic!("Expected Send"),
-        }
+        assert_matches!(result, LocalTypeR::Send { branches, .. } => {
+            assert_eq!(branches.len(), 1);
+            assert_eq!(branches[0].0.name, "x");
+        });
     }
 
     #[test]
@@ -586,12 +571,9 @@ mod tests {
         ];
 
         let result = merge_all(&types).unwrap();
-        match result {
-            LocalTypeR::Recv { branches, .. } => {
-                assert_eq!(branches.len(), 3);
-            }
-            _ => panic!("Expected Recv"),
-        }
+        assert_matches!(result, LocalTypeR::Recv { branches, .. } => {
+            assert_eq!(branches.len(), 3);
+        });
     }
 
     // =========================================================================
