@@ -707,25 +707,8 @@ private theorem mergeRecvSorted_mem_fst
   decreasing_by
     all_goals
       simp_wf
-      first
-        | -- Left list shrinks.
-          have h1 : tail1.length < bs1.length := by
-            simpa [hbs1] using Nat.lt_succ_self tail1.length
-          have hlt : tail1.length + bs2.length < bs1.length + bs2.length :=
-            Nat.add_lt_add_right h1 bs2.length
-          simpa [hbs2] using hlt
-        | -- Right list shrinks.
-          have h2 : tail2.length < bs2.length := by
-            simpa [hbs2] using Nat.lt_succ_self tail2.length
-          have hlt : bs1.length + tail2.length < bs1.length + bs2.length :=
-            Nat.add_lt_add_left bs1.length h2
-          simpa [hbs1] using hlt
-        | -- Both lists shrink.
-          have h1 : tail1.length < bs1.length := by
-            simpa [hbs1] using Nat.lt_succ_self tail1.length
-          have h2 : tail2.length < bs2.length := by
-            simpa [hbs2] using Nat.lt_succ_self tail2.length
-          exact Nat.add_lt_add h1 h2
+      simp (config := { failIfUnchanged := false }) [hbs1, hbs2]
+      try omega
 
 private theorem mergeRecvSorted_pairwise
     {bs1 bs2 rest : List (Label × LocalTypeR)}
@@ -733,35 +716,41 @@ private theorem mergeRecvSorted_pairwise
     (hSorted2 : bs2.Pairwise LocalTypeR.branchLe)
     (h : LocalTypeR.mergeRecvSorted bs1 bs2 = some rest) :
     rest.Pairwise LocalTypeR.branchLe := by
-  cases bs1 with
+  cases hbs1 : bs1 with
   | nil =>
     have hEq : bs2 = rest := by
-      simpa [LocalTypeR.mergeRecvSorted] using h
+      simpa [hbs1, LocalTypeR.mergeRecvSorted] using h
     simpa [hEq] using hSorted2
   | cons head1 tail1 =>
-    cases bs2 with
+    cases hbs2 : bs2 with
     | nil =>
       have hEq : head1 :: tail1 = rest := by
-        simpa [LocalTypeR.mergeRecvSorted] using h
-      simpa [hEq] using hSorted1
+        simpa [hbs1, hbs2, LocalTypeR.mergeRecvSorted] using h
+      simpa [hbs1, hEq] using hSorted1
     | cons head2 tail2 =>
+      have hCons : LocalTypeR.mergeRecvSorted (head1 :: tail1) (head2 :: tail2) = some rest := by
+        simpa [hbs1, hbs2] using h
+      have hSorted1' : (head1 :: tail1).Pairwise LocalTypeR.branchLe := by
+        simpa [hbs1] using hSorted1
+      have hSorted2' : (head2 :: tail2).Pairwise LocalTypeR.branchLe := by
+        simpa [hbs2] using hSorted2
       cases head1 with
       | mk l1 c1 =>
         cases head2 with
         | mk l2 c2 =>
-          cases hSorted1 with
+          cases hSorted1' with
           | cons hRel1 hTail1 =>
-            cases hSorted2 with
+            cases hSorted2' with
             | cons hRel2 hTail2 =>
               by_cases h12 : l1.name < l2.name
               · have h21 : ¬ l2.name < l1.name := String.lt_asymm h12
                 cases hRest : LocalTypeR.mergeRecvSorted tail1 ((l2, c2) :: tail2) with
                 | none =>
                   cases (by
-                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using h : False)
+                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using hCons : False)
                 | some restTail =>
                   have hEq : (l1, c1) :: restTail = rest := by
-                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using h
+                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using hCons
                   have hTailPair : restTail.Pairwise LocalTypeR.branchLe :=
                     mergeRecvSorted_pairwise
                       (bs1 := tail1) (bs2 := (l2, c2) :: tail2) (rest := restTail)
@@ -806,10 +795,10 @@ private theorem mergeRecvSorted_pairwise
                 · cases hRest : LocalTypeR.mergeRecvSorted ((l1, c1) :: tail1) tail2 with
                   | none =>
                     cases (by
-                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using h : False)
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using hCons : False)
                   | some restTail =>
                     have hEq : (l2, c2) :: restTail = rest := by
-                      simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using h
+                      simpa [LocalTypeR.mergeRecvSorted, h12, h21, hRest] using hCons
                     have hTailPair : restTail.Pairwise LocalTypeR.branchLe :=
                       mergeRecvSorted_pairwise
                         (bs1 := (l1, c1) :: tail1) (bs2 := tail2) (rest := restTail)
@@ -855,15 +844,15 @@ private theorem mergeRecvSorted_pairwise
                     cases hCont : LocalTypeR.merge c1 c2 with
                     | none =>
                       cases (by
-                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont] using h : False)
+                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont] using hCons : False)
                     | some mergedCont =>
                       cases hRest : LocalTypeR.mergeRecvSorted tail1 tail2 with
                       | none =>
                         cases (by
-                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont, hRest] using h : False)
+                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont, hRest] using hCons : False)
                       | some restTail =>
                         have hEq : (l1, mergedCont) :: restTail = rest := by
-                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont, hRest] using h
+                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, hCont, hRest] using hCons
                         have hTailPair : restTail.Pairwise LocalTypeR.branchLe :=
                           mergeRecvSorted_pairwise
                             (bs1 := tail1) (bs2 := tail2) (rest := restTail) hTail1 hTail2 hRest
@@ -897,25 +886,13 @@ private theorem mergeRecvSorted_pairwise
                         rw [← hEq]
                         exact List.Pairwise.cons hHeadRel hTailPair
                   · cases (by
-                      simpa [LocalTypeR.mergeRecvSorted, h12, h21, hEqLab] using h : False)
+                      simpa [LocalTypeR.mergeRecvSorted, h12, h21, hEqLab] using hCons : False)
   termination_by bs1.length + bs2.length
   decreasing_by
     all_goals
       simp_wf
-      simp (config := { failIfUnchanged := false })
-      first
-        | -- Left list shrinks.
-          simpa using Nat.add_lt_add_right (a := tail1.length) (b := (head1 :: tail1).length)
-            (by simp) _
-        | -- Right list shrinks.
-          simpa using Nat.add_lt_add_left (c := (head1 :: tail1).length)
-            (a := tail2.length) (b := (head2 :: tail2).length) (by simp)
-        | -- Both lists shrink.
-          have h1 : tail1.length < (head1 :: tail1).length := by
-            simpa using Nat.lt_succ_self tail1.length
-          have h2 : tail2.length < (head2 :: tail2).length := by
-            simpa using Nat.lt_succ_self tail2.length
-          exact Nat.add_lt_add h1 h2
+      simp (config := { failIfUnchanged := false }) [hbs1, hbs2]
+      try omega
 
 private theorem mergeSendSorted_pairwise
     {bs1 bs2 rest : List (Label × LocalTypeR)}
@@ -986,6 +963,22 @@ private theorem option_bind_comm {α β γ : Type} (oa : Option α) (ob : Option
     oa.bind (fun a => ob.bind (fun b => f a b)) =
     ob.bind (fun b => oa.bind (fun a => f a b)) := by
   cases oa <;> cases ob <;> rfl
+
+@[simp] private theorem option_bind_some_id {α : Type} (x : Option α) :
+    x.bind (fun a => some a) = x := by
+  cases x <;> rfl
+
+@[simp] private theorem option_bind_const_none {α β : Type} (x : Option α) :
+    x.bind (fun _ => (none : Option β)) = none := by
+  cases x <;> rfl
+
+@[simp] private theorem mergeRecvSorted_nil_left (bs : List (Label × LocalTypeR)) :
+    LocalTypeR.mergeRecvSorted [] bs = some bs := by
+  simp [LocalTypeR.mergeRecvSorted]
+
+@[simp] private theorem mergeRecvSorted_nil_right (bs : List (Label × LocalTypeR)) :
+    LocalTypeR.mergeRecvSorted bs [] = some bs := by
+  cases bs <;> simp [LocalTypeR.mergeRecvSorted]
 
 private theorem mergeSendSorted_assoc :
     ∀ (bs1 bs2 bs3 : List (Label × LocalTypeR)),
@@ -1183,12 +1176,11 @@ private theorem mergeSendSorted_assoc :
                         simp [LocalTypeR.mergeSendSorted, hm'']
                     simp [hLhsNone, h23, hSecond]
 
-private theorem mergeRecvSorted_assoc :
-    ∀ (bs1 bs2 bs3 : List (Label × LocalTypeR)),
-      AllBranches MergeAssocAt bs1 →
-      (LocalTypeR.mergeRecvSorted bs1 bs2).bind (fun m12 => LocalTypeR.mergeRecvSorted m12 bs3) =
-      (LocalTypeR.mergeRecvSorted bs2 bs3).bind (fun m23 => LocalTypeR.mergeRecvSorted bs1 m23) := by
-  intro bs1 bs2 bs3 ih
+private theorem mergeRecvSorted_assoc
+    (bs1 bs2 bs3 : List (Label × LocalTypeR))
+    (ih : AllBranches MergeAssocAt bs1) :
+    (LocalTypeR.mergeRecvSorted bs1 bs2).bind (fun m12 => LocalTypeR.mergeRecvSorted m12 bs3) =
+    (LocalTypeR.mergeRecvSorted bs2 bs3).bind (fun m23 => LocalTypeR.mergeRecvSorted bs1 m23) := by
   cases bs1 with
   | nil =>
     simp [LocalTypeR.mergeRecvSorted]
@@ -1219,8 +1211,23 @@ private theorem mergeRecvSorted_assoc :
                   -- Head of `bs1` is the smallest: peel it off and use IH on the tail.
                   have hRec :=
                     mergeRecvSorted_assoc tail1 ((l2, c2) :: tail2) ((l3, c3) :: tail3) ihTail1
-                  -- Both sides build the same head and reduce to the recursive equation on the tails.
-                  simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, Option.bind_assoc, hRec]
+                  -- Bind the recursive associativity equation with `cons` to match the outer head `l1`.
+                  have hRec' :=
+                    congrArg
+                      (fun x => x.bind (fun rest => some ((l1, c1) :: rest)))
+                      hRec
+
+                  -- Normalize the `bs2`/`bs3` head comparison to unfold the RHS bind.
+                  by_cases h23 : l2.name < l3.name
+                  · have h32 : ¬ l3.name < l2.name := String.lt_asymm h23
+                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h23, h32, Option.bind_assoc] using hRec'
+                  · by_cases h32 : l3.name < l2.name
+                    · simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h23, h32, Option.bind_assoc] using hRec'
+                    · by_cases hEq23 : l2 = l3
+                      · subst hEq23
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h23, h32, Option.bind_assoc] using hRec'
+                      · have hEq23' : l3 ≠ l2 := fun h => hEq23 h.symm
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h23, h32, hEq23, hEq23', Option.bind_assoc] using hRec'
                 · by_cases h31 : l3.name < l1.name
                   · -- Head of `bs3` is the smallest: peel it off and recurse on `bs3` tail.
                     have hRec :=
@@ -1228,7 +1235,11 @@ private theorem mergeRecvSorted_assoc :
                     -- `l3.name < l2.name` follows from `l3.name < l1.name < l2.name`.
                     have h32 : l3.name < l2.name := Std.lt_of_lt_of_le h31 (Std.le_of_lt h12)
                     have h23 : ¬ l2.name < l3.name := String.lt_asymm h32
-                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, Option.bind_assoc, hRec]
+                    have hRec' :=
+                      congrArg
+                        (fun x => x.bind (fun rest => some ((l3, c3) :: rest)))
+                        hRec
+                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, Option.bind_assoc] using hRec'
                   · -- `l1.name` and `l3.name` are equal (since neither is less): merge them.
                     have h32 : l3.name < l2.name := by
                       -- From `¬ l1.name < l3.name`, we can derive `l3.name ≤ l1.name`;
@@ -1249,22 +1260,30 @@ private theorem mergeRecvSorted_assoc :
                     · subst hEq13
                       cases hCont : LocalTypeR.merge c1 c3 with
                       | none =>
-                        simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, hCont]
+                        simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, hCont, Option.bind_assoc]
                       | some merged13 =>
                         have hRec :=
                           mergeRecvSorted_assoc tail1 ((l2, c2) :: tail2) tail3 ihTail1
                         -- Both sides merge the shared label `l1` (from bs1/bs3) and recurse on tails.
-                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, hCont, Option.bind_assoc, hRec]
+                        have hRec' :=
+                          congrArg
+                            (fun x => x.bind (fun rest => some ((l1, merged13) :: rest)))
+                            hRec
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, hCont, Option.bind_assoc] using hRec'
                     · -- Label mismatch at equal name: both sides fail.
                       have hEq13' : l3 ≠ l1 := fun h => hEq13 h.symm
-                      simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, hEq13, hEq13']
+                      simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, hEq13, hEq13', Option.bind_assoc]
               · by_cases h21 : l2.name < l1.name
                 · by_cases h23 : l2.name < l3.name
                   · -- Head of `bs2` is the smallest: peel it off and recurse on `bs2` tail.
                     have hRec :=
                       mergeRecvSorted_assoc ((l1, c1) :: tail1) tail2 ((l3, c3) :: tail3) ih
                     have h32 : ¬ l3.name < l2.name := String.lt_asymm h23
-                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, Option.bind_assoc, hRec]
+                    have hRec' :=
+                      congrArg
+                        (fun x => x.bind (fun rest => some ((l2, c2) :: rest)))
+                        hRec
+                    simpa [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, Option.bind_assoc] using hRec'
                   · by_cases h32 : l3.name < l2.name
                     · -- Head of `bs3` is the smallest: peel it off and recurse on `bs3` tail.
                       have hRec :=
@@ -1272,7 +1291,11 @@ private theorem mergeRecvSorted_assoc :
                       -- `l3.name < l1.name` from `l3.name < l2.name < l1.name`.
                       have h31 : l3.name < l1.name := Std.lt_of_lt_of_le h32 (Std.le_of_lt h21)
                       have h13 : ¬ l1.name < l3.name := String.lt_asymm h31
-                      simpa [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, h31, h13, Option.bind_assoc, hRec]
+                      have hRec' :=
+                        congrArg
+                          (fun x => x.bind (fun rest => some ((l3, c3) :: rest)))
+                          hRec
+                      simpa [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, h31, h13, Option.bind_assoc] using hRec'
                     · -- `l2.name` and `l3.name` are equal: merge them.
                       have h31 : l3.name < l1.name := by
                         have hLe : l3.name ≤ l2.name := by
@@ -1311,12 +1334,9 @@ private theorem mergeRecvSorted_assoc :
                         simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hCont, Option.bind_assoc, hRec]
                     · by_cases h31 : l3.name < l1.name
                       · -- Head of `bs3` is smaller.
-                        have h32 : l3.name < l2.name := by
-                          -- `l3.name < l1.name = l2.name`
-                          simpa using h31
-                        have h23 : ¬ l2.name < l3.name := String.lt_asymm h32
-                        have hRec := mergeRecvSorted_assoc ((l1, c1) :: tail1) ((l2, c2) :: tail2) tail3 ih
-                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h32, h23, Option.bind_assoc, hRec]
+                        have hRec :=
+                          mergeRecvSorted_assoc ((l1, c1) :: tail1) ((l1, c2) :: tail2) tail3 ih
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, Option.bind_assoc, hRec]
                       · -- All head names are equal.
                         by_cases hEq13 : l1 = l3
                         · subst hEq13
@@ -1339,20 +1359,8 @@ private theorem mergeRecvSorted_assoc :
                           simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hEq13, hEq13']
                   · have hEq12' : l2 ≠ l1 := fun h => hEq12 h.symm
                     simp [LocalTypeR.mergeRecvSorted, h12, h21, hEq12, hEq12']
-  termination_by sizeOf bs1 + sizeOf bs2 + sizeOf bs3
-  decreasing_by
-    all_goals
-      simp_wf
-      simp (config := { failIfUnchanged := false })
-      first
-        | -- Left list shrinks.
-          simpa [*] using (sizeOf_tail_lt_cons head1 tail1)
-        | -- Middle list shrinks.
-          simpa [*] using (sizeOf_tail_lt_cons head2 tail2)
-        | -- Right list shrinks.
-          simpa [*] using (sizeOf_tail_lt_cons head3 tail3)
-        | -- Both lists shrink.
-          apply Nat.add_lt_add_left (sizeOf_tail_lt_cons head3 tail3) (sizeOf ((head1 :: tail1)) + sizeOf ((head2 :: tail2)))
+termination_by sizeOf bs1 + sizeOf bs2 + sizeOf bs3
+decreasing_by all_goals (simp_wf; omega)
 
 theorem merge_associative : MergeAssociative := by
   intro t1 t2 t3
