@@ -1314,14 +1314,19 @@ private theorem mergeRecvSorted_assoc
                       · subst hEq23
                         cases hCont : LocalTypeR.merge c2 c3 with
                         | none =>
-                          -- When merge c2 c3 fails, both sides should be none
-                          sorry
+                          -- When merge c2 c3 fails, both sides are none
+                          simp [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, h31, h13, hCont, Option.bind_assoc]
                         | some merged23 =>
                           have hRec :=
                             mergeRecvSorted_assoc ((l1, c1) :: tail1) tail2 tail3 ih
-                          sorry
+                          have hRec' :=
+                            congrArg
+                              (fun x => x.bind (fun rest => some ((l2, merged23) :: rest)))
+                              hRec
+                          simpa [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, h31, h13, hCont, Option.bind_assoc] using hRec'
                       · have hEq23' : l3 ≠ l2 := fun h => hEq23 h.symm
-                        sorry
+                        -- Label mismatch: both sides fail
+                        simp [LocalTypeR.mergeRecvSorted, h12, h21, h23, h32, h31, h13, hEq23, hEq23', Option.bind_assoc]
                 · -- `l1.name` and `l2.name` are equal: merge them (or fail).
                   by_cases hEq12 : l1 = l2
                   · subst hEq12
@@ -1329,37 +1334,68 @@ private theorem mergeRecvSorted_assoc
                     · have h31 : ¬ l3.name < l1.name := String.lt_asymm h13
                       cases hCont : LocalTypeR.merge c1 c2 with
                       | none =>
-                        sorry
+                        -- When merge c1 c2 fails, both sides fail
+                        simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hCont, Option.bind_assoc]
                       | some merged12 =>
                         have hRec := mergeRecvSorted_assoc tail1 tail2 ((l3, c3) :: tail3) ihTail1
-                        sorry
+                        have hRec' :=
+                          congrArg
+                            (fun x => x.bind (fun rest => some ((l1, merged12) :: rest)))
+                            hRec
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hCont, Option.bind_assoc] using hRec'
                     · by_cases h31 : l3.name < l1.name
                       · -- Head of `bs3` is smaller.
                         have hRec :=
                           mergeRecvSorted_assoc ((l1, c1) :: tail1) ((l1, c2) :: tail2) tail3 ih
-                        sorry
+                        have hRec' :=
+                          congrArg
+                            (fun x => x.bind (fun rest => some ((l3, c3) :: rest)))
+                            hRec
+                        -- l3 < l2 = l1
+                        have h32 : l3.name < l2.name := h31
+                        have h23 : ¬ l2.name < l3.name := String.lt_asymm h32
+                        simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, h23, h32, Option.bind_assoc] using hRec'
                       · -- All head names are equal.
                         by_cases hEq13 : l1 = l3
                         · subst hEq13
                           cases hCont12 : LocalTypeR.merge c1 c2 with
                           | none =>
-                            sorry
+                            -- When merge c1 c2 fails, both sides fail
+                            simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hCont12, Option.bind_assoc]
                           | some merged12 =>
                             cases hCont23 : LocalTypeR.merge c2 c3 with
                             | none =>
-                              sorry
+                              -- When merge c2 c3 fails but c1 c2 succeeds
+                              simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hCont12, hCont23, Option.bind_assoc]
                             | some merged23 =>
                               -- Use associativity of continuation merge at `c1`.
                               have hContAssoc :
                                   (LocalTypeR.merge c1 c2).bind (fun m12 => LocalTypeR.merge m12 c3) =
                                   (LocalTypeR.merge c2 c3).bind (fun m23 => LocalTypeR.merge c1 m23) := by
-                                sorry
+                                -- This is exactly what ihHead says
+                                exact ihHead c2 c3
                               have hRec := mergeRecvSorted_assoc tail1 tail2 tail3 ihTail1
-                              sorry
+                              -- Need to combine hContAssoc with hRec to get the full equation
+                              cases hMerge123 : (LocalTypeR.merge c1 c2).bind (fun m12 => LocalTypeR.merge m12 c3) with
+                              | none =>
+                                rw [hContAssoc] at hMerge123
+                                simp only [hCont12, hCont23, Option.some_bind] at hMerge123 ⊢
+                                simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hMerge123, Option.bind_assoc]
+                              | some merged123 =>
+                                rw [hContAssoc] at hMerge123
+                                simp only [hCont12, hCont23, Option.some_bind] at hMerge123 ⊢
+                                have hRec' :=
+                                  congrArg
+                                    (fun x => x.bind (fun rest => some ((l1, merged123) :: rest)))
+                                    hRec
+                                simp only [hCont12, hCont23, Option.some_bind, hMerge123] at hRec' ⊢
+                                simpa [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, Option.bind_assoc] using hRec'
                         · have hEq13' : l3 ≠ l1 := fun h => hEq13 h.symm
-                          sorry
+                          -- Label mismatch at equal names: both sides fail
+                          simp [LocalTypeR.mergeRecvSorted, h12, h21, h13, h31, hEq13, hEq13', Option.bind_assoc]
                   · have hEq12' : l2 ≠ l1 := fun h => hEq12 h.symm
-                    sorry
+                    -- Label mismatch at equal names: both sides fail
+                    simp [LocalTypeR.mergeRecvSorted, h12, h21, hEq12, hEq12', Option.bind_assoc]
 termination_by sizeOf bs1 + sizeOf bs2 + sizeOf bs3
 decreasing_by
   all_goals
@@ -1382,7 +1418,7 @@ decreasing_by
         apply Nat.add_lt_add_of_le_of_lt
         exact Nat.le_refl _
         exact sizeOf_tail_lt_cons (l3, c3) tail3
-      | -- Multiple lists shrink - use transitivity
+      | -- Multiple lists shrink - use transitivity (tail1 shrinks)
         apply Nat.lt_of_lt_of_le
         · apply Nat.add_lt_add_of_lt_of_le
           apply Nat.add_lt_add_of_lt_of_le
@@ -1390,7 +1426,32 @@ decreasing_by
           exact Nat.le_refl _
           exact Nat.le_refl _
         · exact Nat.le_refl _
-      | sorry
+      | -- tail1 and tail2 both shrink
+        apply Nat.add_lt_add_of_lt_of_le
+        apply Nat.add_lt_add
+        exact sizeOf_tail_lt_cons (l1, c1) tail1
+        exact sizeOf_tail_lt_cons (l2, c2) tail2
+        exact Nat.le_refl _
+      | -- tail1 and tail3 both shrink
+        apply Nat.add_lt_add_of_lt_of_lt
+        apply Nat.add_lt_add_of_lt_of_le
+        exact sizeOf_tail_lt_cons (l1, c1) tail1
+        exact Nat.le_refl _
+        exact sizeOf_tail_lt_cons (l3, c3) tail3
+      | -- tail2 and tail3 both shrink
+        apply Nat.add_lt_add_of_le_of_lt
+        apply Nat.add_lt_add_of_le_of_lt
+        exact Nat.le_refl _
+        exact sizeOf_tail_lt_cons (l2, c2) tail2
+        exact sizeOf_tail_lt_cons (l3, c3) tail3
+      | -- All three shrink
+        apply Nat.add_lt_add
+        apply Nat.add_lt_add
+        exact sizeOf_tail_lt_cons (l1, c1) tail1
+        exact sizeOf_tail_lt_cons (l2, c2) tail2
+        exact sizeOf_tail_lt_cons (l3, c3) tail3
+      | -- Fallback: try omega
+        omega
 
 theorem merge_associative : MergeAssociative := by
   intro t1 t2 t3
@@ -1403,11 +1464,70 @@ theorem merge_associative : MergeAssociative := by
       t1
       (by
         -- Base case for `.end`: prove MergeAssocAt .end
+        -- For t = .end: merge .end x = none for all x ≠ .end
+        -- So LHS = none.bind _ = none for u ≠ .end
+        -- And RHS = (merge u v).bind (merge .end ·) = none because merge .end (non-end) = none
         intro u v
         show (LocalTypeR.merge .end u).bind (fun m => LocalTypeR.merge m v) =
              (LocalTypeR.merge u v).bind (fun m => LocalTypeR.merge .end m)
-        cases u <;> cases v <;> try simp [LocalTypeR.merge]
-        all_goals sorry)
+        match u with
+        | .end => cases v <;> simp [LocalTypeR.merge]
+        | .send p1 bs1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match v with
+          | .end => simp [LocalTypeR.merge]
+          | .send p2 bs2 =>
+            simp only [LocalTypeR.merge]
+            -- RHS: (merge (.send p1 bs1) (.send p2 bs2)).bind (merge .end ·)
+            -- If merge succeeds, result is .send, and merge .end (.send ...) = none
+            by_cases hp : p1 = p2
+            · simp only [hp, beq_self_eq_true, ↓reduceIte]
+              cases h : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) <;>
+                simp [Option.bind, LocalTypeR.merge]
+            · simp [hp, bne_iff_ne, Option.bind]
+          | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .var _ => simp [LocalTypeR.merge, Option.bind]
+        | .recv p1 bs1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match v with
+          | .end => simp [LocalTypeR.merge]
+          | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .recv p2 bs2 =>
+            simp only [LocalTypeR.merge]
+            by_cases hp : p1 = p2
+            · simp only [hp, beq_self_eq_true, ↓reduceIte]
+              cases h : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) <;>
+                simp [Option.bind, LocalTypeR.merge]
+            · simp [hp, bne_iff_ne, Option.bind]
+          | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .var _ => simp [LocalTypeR.merge, Option.bind]
+        | .mu x1 body1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match v with
+          | .end => simp [LocalTypeR.merge]
+          | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .mu x2 body2 =>
+            simp only [LocalTypeR.merge]
+            by_cases hx : x1 = x2
+            · simp only [hx, beq_self_eq_true, ↓reduceIte]
+              cases h : LocalTypeR.merge body1 body2 <;>
+                simp [Option.bind, LocalTypeR.merge]
+            · simp [hx, bne_iff_ne, Option.bind]
+          | .var _ => simp [LocalTypeR.merge, Option.bind]
+        | .var x1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match v with
+          | .end => simp [LocalTypeR.merge]
+          | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .var x2 =>
+            simp only [LocalTypeR.merge]
+            by_cases hx : x1 = x2
+            · simp [hx, Option.bind, LocalTypeR.merge]
+            · simp [hx, Option.bind])
       (fun partner branches1 ihBranches => by
         intro u v
         cases u with
@@ -1465,7 +1585,22 @@ theorem merge_associative : MergeAssociative := by
                       (LocalTypeR.mergeSendSorted bs1 bs2).bind (fun m12 =>
                         (LocalTypeR.mergeSendSorted m12 bs3).bind (fun m123 =>
                           some (.send partner m123))) := by
-                  sorry
+                  -- Unfold first merge
+                  simp only [LocalTypeR.merge, bs1, bs2, bs3, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                  simp only [Option.bind_eq_bind, Option.bind_some]
+                  conv_lhs =>
+                    rw [Option.bind_assoc]
+                  -- Case split on whether the first merge succeeds
+                  cases hMerge12 : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches branches1)
+                                                              (LocalTypeR.sortBranches branches2) with
+                  | none => simp [Option.bind]
+                  | some m12 =>
+                    simp only [Option.bind]
+                    -- Now use hSort12 to rewrite sortBranches m12 = m12
+                    have hSortM12 : LocalTypeR.sortBranches m12 = m12 := hSort12 hMerge12
+                    simp only [LocalTypeR.merge, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                    simp only [Option.bind_eq_bind, Option.bind_some]
+                    rw [hSortM12]
 
                 have hR :
                     (LocalTypeR.merge (.send partner branches2) (.send partner branches3)).bind
@@ -1473,13 +1608,71 @@ theorem merge_associative : MergeAssociative := by
                       (LocalTypeR.mergeSendSorted bs2 bs3).bind (fun m23 =>
                         (LocalTypeR.mergeSendSorted bs1 m23).bind (fun m123 =>
                           some (.send partner m123))) := by
-                  sorry
+                  simp only [LocalTypeR.merge, bs1, bs2, bs3, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                  simp only [Option.bind_eq_bind, Option.bind_some]
+                  conv_lhs =>
+                    rw [Option.bind_assoc]
+                  cases hMerge23 : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches branches2)
+                                                              (LocalTypeR.sortBranches branches3) with
+                  | none => simp [Option.bind]
+                  | some m23 =>
+                    simp only [Option.bind]
+                    have hSortM23 : LocalTypeR.sortBranches m23 = m23 := hSort23 hMerge23
+                    simp only [LocalTypeR.merge, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                    simp only [Option.bind_eq_bind, Option.bind_some]
+                    rw [hSortM23]
 
-                sorry
-              · sorry
-            · sorry
-          | _ => sorry
-        | _ => sorry)
+                -- Now use hL, hR, and hAssoc to complete the proof
+                simp only [MergeAssocAt]
+                intro u v
+                -- Here u = .send partner branches2, v = .send partner branches3
+                -- (But wait, we're in the induction for branches1)
+                -- Actually we need to be careful: this is proving MergeAssocAt (.send partner branches1)
+                -- which means we're proving for all u, v:
+                --   (merge (.send partner branches1) u).bind (merge · v) = (merge u v).bind (merge (.send partner branches1) ·)
+                -- But we've only set up for u = .send partner branches2, v = .send partner branches3
+                -- That's actually handled by the structure - we're inside the by_cases for partner2 = partner3 = partner
+                rw [hL, hR]
+                -- Now need: (mergeSendSorted bs1 bs2).bind ... = (mergeSendSorted bs2 bs3).bind ...
+                -- This is exactly hAssoc
+                exact hAssoc
+              · -- partner ≠ partner3: Both sides reduce to none
+                simp only [MergeAssocAt]
+                intro u v
+                -- Here partner = partner2 but partner ≠ partner3
+                -- merge (.send partner bs) (.send partner3 bs') = none
+                simp only [LocalTypeR.merge, bne_iff_ne, Ne.symm hP13, ↓reduceIte, Option.none_bind]
+                -- RHS: merge (.send partner2 bs2) (.send partner3 bs3) = none (since partner2 = partner ≠ partner3)
+                simp only [bne_iff_ne, Ne.symm hP13, ↓reduceIte, Option.none_bind]
+            · -- partner ≠ partner2: merge t u = none
+              simp only [MergeAssocAt]
+              intro u v
+              simp only [LocalTypeR.merge, bne_iff_ne, Ne.symm hP12, ↓reduceIte, Option.none_bind]
+              -- RHS: merge (.send partner2 bs2) v returns (.send partner2 ...) or none
+              -- Either way, merge (.send partner bs1) (.send partner2 ...) = none since partner ≠ partner2
+              cases v with
+              | send partner3 branches3 =>
+                simp only [LocalTypeR.merge, Option.bind]
+                by_cases hP23 : partner2 = partner3
+                · subst hP23
+                  cases h : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches branches2)
+                                                        (LocalTypeR.sortBranches branches3) with
+                  | none => simp [Option.bind]
+                  | some merged =>
+                    simp only [↓reduceIte, Option.some_bind]
+                    simp only [LocalTypeR.merge, bne_iff_ne, hP12, ↓reduceIte]
+                · simp only [bne_iff_ne, Ne.symm hP23, ↓reduceIte, Option.none_bind]
+              | _ => simp [LocalTypeR.merge, Option.bind]
+          | _ => -- v is not send
+            simp only [MergeAssocAt]
+            intro u v
+            simp only [LocalTypeR.merge, Option.none_bind]
+            cases v <;> simp [LocalTypeR.merge, Option.bind]
+        | _ => -- u is not send
+          simp only [MergeAssocAt]
+          intro u v
+          simp only [LocalTypeR.merge, Option.none_bind]
+          cases v <;> simp [LocalTypeR.merge, Option.bind])
       (fun partner branches1 ihBranches => by
         intro u v
         cases u with
@@ -1534,7 +1727,26 @@ theorem merge_associative : MergeAssociative := by
                       (LocalTypeR.mergeRecvSorted bs1 bs2).bind (fun m12 =>
                         (LocalTypeR.mergeRecvSorted m12 bs3).bind (fun m123 =>
                           some (.recv partner m123))) := by
-                  sorry
+                  -- Unfold first merge
+                  simp only [LocalTypeR.merge, bs1, bs2, bs3, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                  simp only [Option.bind_eq_bind, Option.bind_some]
+                  conv_lhs =>
+                    rw [Option.bind_assoc]
+                  -- Case split on whether the first merge succeeds
+                  cases hMerge12 : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches branches1)
+                                                              (LocalTypeR.sortBranches branches2) with
+                  | none => simp [Option.bind]
+                  | some m12 =>
+                    simp only [Option.bind]
+                    -- Use hSort12 to simplify: sortBranches m12 = m12
+                    have hSortM12 : LocalTypeR.sortBranches m12 = m12 := hSort12 hMerge12
+                    -- The first merge gives .recv partner (sortBranches m12) = .recv partner m12
+                    simp only [LocalTypeR.merge, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                    simp only [Option.bind_eq_bind, Option.bind_some]
+                    -- In the inner merge, sortBranches (sortBranches m12) = sortBranches m12 = m12
+                    rw [hSortM12]
+                    -- And sortBranches on the result is also idempotent
+                    -- Now both sides should match
 
                 have hR :
                     (LocalTypeR.merge (.recv partner branches2) (.recv partner branches3)).bind
@@ -1542,23 +1754,255 @@ theorem merge_associative : MergeAssociative := by
                       (LocalTypeR.mergeRecvSorted bs2 bs3).bind (fun m23 =>
                         (LocalTypeR.mergeRecvSorted bs1 m23).bind (fun m123 =>
                           some (.recv partner m123))) := by
-                  sorry
+                  simp only [LocalTypeR.merge, bs1, bs2, bs3, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                  simp only [Option.bind_eq_bind, Option.bind_some]
+                  conv_lhs =>
+                    rw [Option.bind_assoc]
+                  cases hMerge23 : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches branches2)
+                                                              (LocalTypeR.sortBranches branches3) with
+                  | none => simp [Option.bind]
+                  | some m23 =>
+                    simp only [Option.bind]
+                    have hSortM23 : LocalTypeR.sortBranches m23 = m23 := hSort23 hMerge23
+                    simp only [LocalTypeR.merge, beq_self_eq_true, ↓reduceIte, bne_self_eq_false]
+                    simp only [Option.bind_eq_bind, Option.bind_some]
+                    rw [hSortM23]
 
-                sorry
-              · sorry
-            · sorry
-          | _ => sorry
-        | _ => sorry)
+                -- Use hL, hR, and hAssoc to complete the proof
+                simp only [MergeAssocAt]
+                intro u v
+                rw [hL, hR]
+                exact hAssoc
+              · -- partner ≠ partner3: Both sides reduce to none
+                simp only [MergeAssocAt]
+                intro u v
+                simp only [LocalTypeR.merge, bne_iff_ne, Ne.symm hP13, ↓reduceIte, Option.none_bind]
+                simp only [bne_iff_ne, Ne.symm hP13, ↓reduceIte, Option.none_bind]
+            · -- partner ≠ partner2: merge t u = none
+              simp only [MergeAssocAt]
+              intro u v
+              simp only [LocalTypeR.merge, bne_iff_ne, Ne.symm hP12, ↓reduceIte, Option.none_bind]
+              cases v with
+              | recv partner3 branches3 =>
+                simp only [LocalTypeR.merge, Option.bind]
+                by_cases hP23 : partner2 = partner3
+                · subst hP23
+                  cases h : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches branches2)
+                                                        (LocalTypeR.sortBranches branches3) with
+                  | none => simp [Option.bind]
+                  | some merged =>
+                    simp only [↓reduceIte, Option.some_bind, LocalTypeR.merge, bne_iff_ne, hP12, ↓reduceIte]
+                · simp only [bne_iff_ne, Ne.symm hP23, ↓reduceIte, Option.none_bind]
+              | _ => simp [LocalTypeR.merge, Option.bind]
+          | _ => -- v is not recv
+            simp only [MergeAssocAt]
+            intro u v
+            simp only [LocalTypeR.merge, Option.none_bind]
+            cases v <;> simp [LocalTypeR.merge, Option.bind]
+        | _ => -- u is not recv
+          simp only [MergeAssocAt]
+          intro u v
+          simp only [LocalTypeR.merge, Option.none_bind]
+          cases v <;> simp [LocalTypeR.merge, Option.bind])
       (fun v body ihBody => by
+        -- Inductive case for `.mu v body`: prove MergeAssocAt (.mu v body)
         intro u w
-        cases u <;> cases w <;> try simp only [MergeAssocAt, LocalTypeR.merge, ihBody, Option.bind, Option.none_bind]
-        all_goals sorry)
+        show (LocalTypeR.merge (.mu v body) u).bind (fun m => LocalTypeR.merge m w) =
+             (LocalTypeR.merge u w).bind (fun m => LocalTypeR.merge (.mu v body) m)
+        match u with
+        | .end => simp [LocalTypeR.merge, Option.bind]
+        | .send _ _ =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          cases w <;> simp [LocalTypeR.merge, Option.bind]
+        | .recv _ _ =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          cases w <;> simp [LocalTypeR.merge, Option.bind]
+        | .var _ =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          cases w <;> simp [LocalTypeR.merge, Option.bind]
+        | .mu v' body' =>
+          match w with
+          | .end =>
+            simp only [LocalTypeR.merge, Option.bind]
+            by_cases hv : v = v'
+            · simp [hv, Option.bind]
+            · simp [hv, bne_iff_ne, Option.bind]
+          | .send _ _ =>
+            simp only [LocalTypeR.merge, Option.bind]
+            by_cases hv : v = v'
+            · simp [hv, Option.bind]
+            · simp [hv, bne_iff_ne, Option.bind]
+          | .recv _ _ =>
+            simp only [LocalTypeR.merge, Option.bind]
+            by_cases hv : v = v'
+            · simp [hv, Option.bind]
+            · simp [hv, bne_iff_ne, Option.bind]
+          | .var _ =>
+            simp only [LocalTypeR.merge, Option.bind]
+            by_cases hv : v = v'
+            · simp [hv, Option.bind]
+            · simp [hv, bne_iff_ne, Option.bind]
+          | .mu v'' body'' =>
+            simp only [LocalTypeR.merge, Option.bind]
+            by_cases hv : v = v'
+            · subst hv
+              by_cases hv'' : v = v''
+              · subst hv''
+                -- Both u and w have the same variable as t
+                -- merge (.mu v body) (.mu v body') = if merge body body' succeeds
+                -- then .mu v (merged_body), else none
+                simp only [beq_self_eq_true, ↓reduceIte, bne_self_eq_false, Option.bind_eq_bind]
+                -- Use ihBody: MergeAssocAt body
+                -- ihBody says: (merge body u).bind (merge · w) = (merge u w).bind (merge body ·)
+                -- Apply with u = body', w = body''
+                have hBodyAssoc := ihBody body' body''
+                -- We need to show the mu-wrapped version
+                cases hM12 : LocalTypeR.merge body body' with
+                | none =>
+                  simp only [Option.none_bind]
+                  cases hM23 : LocalTypeR.merge body' body'' with
+                  | none => simp [Option.bind]
+                  | some m23 =>
+                    simp only [Option.some_bind]
+                    -- LHS = none, need RHS = none
+                    -- RHS = merge body m23
+                    -- From hBodyAssoc: (merge body body').bind (merge · body'') = (merge body' body'').bind (merge body ·)
+                    -- LHS of hBodyAssoc = none.bind _ = none
+                    -- RHS of hBodyAssoc = (some m23).bind (merge body ·) = merge body m23
+                    -- So merge body m23 = none
+                    have : (LocalTypeR.merge body body').bind (fun m => LocalTypeR.merge m body'') =
+                           (LocalTypeR.merge body' body'').bind (fun m => LocalTypeR.merge body m) := hBodyAssoc
+                    simp only [hM12, hM23, Option.none_bind, Option.some_bind] at this
+                    simp [this]
+                | some m12 =>
+                  simp only [Option.some_bind]
+                  cases hM23 : LocalTypeR.merge body' body'' with
+                  | none =>
+                    simp only [Option.none_bind]
+                    -- From hBodyAssoc:
+                    have : (LocalTypeR.merge body body').bind (fun m => LocalTypeR.merge m body'') =
+                           (LocalTypeR.merge body' body'').bind (fun m => LocalTypeR.merge body m) := hBodyAssoc
+                    simp only [hM12, hM23, Option.some_bind, Option.none_bind] at this
+                    simp [this]
+                  | some m23 =>
+                    simp only [Option.some_bind]
+                    have : (LocalTypeR.merge body body').bind (fun m => LocalTypeR.merge m body'') =
+                           (LocalTypeR.merge body' body'').bind (fun m => LocalTypeR.merge body m) := hBodyAssoc
+                    simp only [hM12, hM23, Option.some_bind] at this
+                    cases hM123 : LocalTypeR.merge m12 body'' with
+                    | none =>
+                      simp only [Option.none_bind]
+                      -- From this: merge m12 body'' = merge body m23
+                      -- So merge body m23 = none
+                      rw [← this]
+                      simp [hM123]
+                    | some m123 =>
+                      simp only [Option.some_bind]
+                      -- From this: merge m12 body'' = merge body m23
+                      -- Both are some m123
+                      have hEq : LocalTypeR.merge m12 body'' = LocalTypeR.merge body m23 := this
+                      simp only [hM123] at hEq
+                      simp [hEq]
+              · -- v ≠ v'': u merges with t, but w has different var
+                simp only [beq_self_eq_true, ↓reduceIte, bne_self_eq_false, bne_iff_ne, hv'', ↓reduceIte]
+                simp only [Option.bind_eq_bind, Option.none_bind]
+                cases hM12 : LocalTypeR.merge body body' with
+                | none => simp [Option.bind]
+                | some m12 => simp [Option.bind]
+            · -- v ≠ v': merge (.mu v body) (.mu v' body') = none
+              simp only [bne_iff_ne, hv, ↓reduceIte, Option.none_bind]
+              by_cases hv' : v' = v''
+              · subst hv'
+                simp only [beq_self_eq_true, ↓reduceIte, Option.bind_eq_bind]
+                cases hM23 : LocalTypeR.merge body' body'' with
+                | none => simp [Option.bind]
+                | some m23 =>
+                  simp only [Option.some_bind]
+                  simp only [LocalTypeR.merge, bne_iff_ne, hv, ↓reduceIte]
+              · simp [bne_iff_ne, hv', Option.bind])
       (fun v => by
+        -- Base case for `.var v`: prove MergeAssocAt (.var v)
+        -- merge (.var v) (.var a) = some (.var v) if v = a, else none
         intro u w
         show (LocalTypeR.merge (.var v) u).bind (fun m => LocalTypeR.merge m w) =
              (LocalTypeR.merge u w).bind (fun m => LocalTypeR.merge (.var v) m)
-        cases u <;> cases w <;> try simp [LocalTypeR.merge]
-        all_goals sorry)
+        match u with
+        | .end =>
+          -- u = .end: LHS = (merge (.var v) .end).bind _ = none.bind _ = none
+          -- RHS = (merge .end w).bind (merge (.var v) ·)
+          simp only [LocalTypeR.merge, Option.none_bind]
+          cases w <;> simp [LocalTypeR.merge, Option.bind]
+        | .send p1 bs1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match w with
+          | .end => simp [LocalTypeR.merge]
+          | .send p2 bs2 =>
+            simp only [LocalTypeR.merge]
+            by_cases hp : p1 = p2
+            · simp only [hp, beq_self_eq_true, ↓reduceIte]
+              cases h : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) <;>
+                simp [Option.bind, LocalTypeR.merge]
+            · simp [hp, bne_iff_ne, Option.bind]
+          | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .var _ => simp [LocalTypeR.merge, Option.bind]
+        | .recv p1 bs1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match w with
+          | .end => simp [LocalTypeR.merge]
+          | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .recv p2 bs2 =>
+            simp only [LocalTypeR.merge]
+            by_cases hp : p1 = p2
+            · simp only [hp, beq_self_eq_true, ↓reduceIte]
+              cases h : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) <;>
+                simp [Option.bind, LocalTypeR.merge]
+            · simp [hp, bne_iff_ne, Option.bind]
+          | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .var _ => simp [LocalTypeR.merge, Option.bind]
+        | .mu x1 body1 =>
+          simp only [LocalTypeR.merge, Option.none_bind]
+          match w with
+          | .end => simp [LocalTypeR.merge]
+          | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+          | .mu x2 body2 =>
+            simp only [LocalTypeR.merge]
+            by_cases hx : x1 = x2
+            · simp only [hx, beq_self_eq_true, ↓reduceIte]
+              cases h : LocalTypeR.merge body1 body2 <;> simp [Option.bind, LocalTypeR.merge]
+            · simp [hx, bne_iff_ne, Option.bind]
+          | .var _ => simp [LocalTypeR.merge, Option.bind]
+        | .var a =>
+          -- merge (.var v) (.var a) = some (.var v) if v = a, else none
+          simp only [LocalTypeR.merge]
+          by_cases hva : v = a
+          · subst hva
+            -- u = .var v, need to handle all w cases
+            match w with
+            | .end => simp [LocalTypeR.merge]
+            | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+            | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+            | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+            | .var b =>
+              by_cases hvb : v = b
+              · simp [hvb, LocalTypeR.merge, Option.bind]
+              · simp [hvb, LocalTypeR.merge, Option.bind]
+          · -- v ≠ a, so merge (.var v) (.var a) = none
+            simp only [hva, ↓reduceIte, Option.none_bind]
+            match w with
+            | .end => simp [LocalTypeR.merge]
+            | .send _ _ => simp [LocalTypeR.merge, Option.bind]
+            | .recv _ _ => simp [LocalTypeR.merge, Option.bind]
+            | .mu _ _ => simp [LocalTypeR.merge, Option.bind]
+            | .var b =>
+              by_cases hab : a = b
+              · subst hab
+                -- a = b, so merge (.var a) (.var a) = some (.var a)
+                -- RHS = (some (.var a)).bind (merge (.var v) ·) = merge (.var v) (.var a)
+                -- But v ≠ a, so merge (.var v) (.var a) = none
+                simp [LocalTypeR.merge, Option.bind, hva]
+              · simp [hab, LocalTypeR.merge, Option.bind])
       (AllBranches.nil _)
       (fun head tail ihHead ihTail =>
         AllBranches.cons _ head tail ihHead ihTail)
