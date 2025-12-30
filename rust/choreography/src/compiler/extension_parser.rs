@@ -28,6 +28,10 @@ impl ExtensionParser {
     }
 
     /// Register an extension with both grammar and parsing support
+    ///
+    /// Note: Grammar extensions are fully supported and registered with the grammar composer.
+    /// Statement parsers are accepted but not currently stored. Extension parsing passes
+    /// through the standard parser - full extension statement dispatch is a planned feature.
     pub fn register_extension<G, P>(&mut self, grammar_ext: G, _statement_parser: P)
     where
         G: crate::extensions::GrammarExtension + 'static,
@@ -36,9 +40,9 @@ impl ExtensionParser {
         // Register grammar extension (this also registers the grammar rules for rule mapping)
         self.grammar_composer.register_extension(grammar_ext);
 
-        // TODO: Register statement parser - need to add method to GrammarComposer
-        // or expose the extension registry
-        // self.extension_registry.register_parser(statement_parser, extension_id);
+        // Statement parser registration is accepted but not stored.
+        // Full extension statement dispatch will require extending GrammarComposer
+        // to track parsers alongside grammar rules.
     }
 
     /// Parse a choreography string with extension support (optimized)
@@ -67,45 +71,22 @@ impl ExtensionParser {
         Ok(choreography)
     }
 
-    /// Process a protocol tree to handle extension statements
-    #[allow(dead_code)]
-    fn process_extensions(
-        &self,
-        protocol: Protocol,
-        _input: &str,
-        _roles: &[Role],
-    ) -> Result<Protocol, ExtensionParseError> {
-        // This is a simplified approach for now
-        // In a full implementation, we would need to:
-        // 1. Parse with the composed grammar
-        // 2. Identify extension statements in the parse tree
-        // 3. Dispatch to appropriate extension parsers
-
-        // For now, just return the protocol unchanged
-        // TODO: Implement full extension parsing
-
-        Ok(protocol)
-    }
-
-    /// Optimized version of process_extensions with reduced allocations
+    /// Process a protocol tree to identify and dispatch extension statements.
+    ///
+    /// Currently a pass-through - returns the protocol unchanged.
+    /// Full extension statement dispatch will be implemented when extension parsing
+    /// requirements are finalized. The implementation will:
+    /// 1. Parse with the composed grammar
+    /// 2. Identify extension statements in the parse tree
+    /// 3. Dispatch to registered extension parsers
     fn process_extensions_optimized(
         &mut self,
         protocol: Protocol,
         _input: &str,
         _roles: &[Role],
     ) -> Result<Protocol, ExtensionParseError> {
-        // This is a simplified approach for now
-        // In a full implementation, we would need to:
-        // 1. Parse with the composed grammar
-        // 2. Identify extension statements in the parse tree
-        // 3. Dispatch to appropriate extension parsers
-
-        // Use pre-allocated annotation cache to reduce allocations
-        // when processing extension annotations
-
-        // For now, just return the protocol unchanged
-        // TODO: Implement full extension parsing with optimization
-
+        // Currently a pass-through. Extension statements are identified
+        // by the grammar composer but not yet dispatched to parsers.
         Ok(protocol)
     }
 
@@ -123,7 +104,8 @@ impl ExtensionParser {
     pub fn extension_stats(&self) -> ExtensionStats {
         ExtensionStats {
             grammar_extensions: self.grammar_composer.extension_count(),
-            statement_parsers: 0, // TODO: Statement parsers not tracked yet
+            // Statement parsers are not stored separately (see register_extension doc)
+            statement_parsers: 0,
         }
     }
 }

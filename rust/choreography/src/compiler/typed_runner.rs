@@ -452,8 +452,6 @@ mod tests {
             name: Ident::new(name, proc_macro2::Span::call_site()),
             index: None,
             param: None,
-            legacy_index: None,
-            legacy_param: None,
             array_size: None,
         }
     }

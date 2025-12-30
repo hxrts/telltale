@@ -794,8 +794,6 @@ mod tests {
             name: Ident::new(name, Span::call_site()),
             param: None,
             index: None,
-            legacy_index: None,
-            legacy_param: None,
             array_size: None,
         }
     }

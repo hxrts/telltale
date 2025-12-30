@@ -107,9 +107,7 @@ pub struct Role {
     pub param: Option<RoleParam>,
     /// Optional index for role references
     pub index: Option<RoleIndex>,
-    /// Legacy fields for backward compatibility
-    pub legacy_index: Option<usize>,
-    pub legacy_param: Option<TokenStream>,
+    /// Array size for code generation (e.g., for `Worker[N]`)
     pub array_size: Option<TokenStream>,
 }
 
@@ -119,15 +117,6 @@ impl PartialEq for Role {
         self.name == other.name
             && self.param == other.param
             && self.index == other.index
-            && self.legacy_index == other.legacy_index
-            && self
-                .legacy_param
-                .as_ref()
-                .map(std::string::ToString::to_string)
-                == other
-                    .legacy_param
-                    .as_ref()
-                    .map(std::string::ToString::to_string)
             && self
                 .array_size
                 .as_ref()
@@ -146,10 +135,6 @@ impl std::hash::Hash for Role {
         self.name.hash(state);
         self.param.hash(state);
         self.index.hash(state);
-        self.legacy_index.hash(state);
-        if let Some(param) = &self.legacy_param {
-            param.to_string().hash(state);
-        }
         if let Some(size) = &self.array_size {
             size.to_string().hash(state);
         }
@@ -164,8 +149,6 @@ impl Role {
             name,
             param: None,
             index: None,
-            legacy_index: None,
-            legacy_param: None,
             array_size: None,
         }
     }
@@ -177,8 +160,6 @@ impl Role {
             name,
             param: Some(param),
             index: None,
-            legacy_index: None,
-            legacy_param: None,
             array_size: None,
         }
     }
@@ -190,8 +171,6 @@ impl Role {
             name,
             param: None,
             index: Some(index),
-            legacy_index: None,
-            legacy_param: None,
             array_size: None,
         }
     }
@@ -203,41 +182,33 @@ impl Role {
             name,
             param: Some(param),
             index: Some(index),
-            legacy_index: None,
-            legacy_param: None,
             array_size: None,
         }
     }
 
-    // Legacy methods for backward compatibility
-
-    /// Create a new indexed role (e.g., Worker with index 0) - LEGACY
+    /// Create a new indexed role (e.g., Worker with index 0)
     #[must_use]
     pub fn indexed(name: Ident, index: usize) -> Self {
         Role {
             name,
             param: None,
             index: Some(RoleIndex::Concrete(index as u32)),
-            legacy_index: Some(index),
-            legacy_param: None,
             array_size: None,
         }
     }
 
-    /// Create a parameterized role with symbolic parameter (e.g., Worker[N]) - LEGACY
+    /// Create a parameterized role with symbolic parameter (e.g., Worker[N])
     #[must_use]
     pub fn parameterized(name: Ident, param: TokenStream) -> Self {
         Role {
             name,
             param: Some(RoleParam::Symbolic(param.to_string())),
             index: None,
-            legacy_index: None,
-            legacy_param: Some(param.clone()),
             array_size: Some(param),
         }
     }
 
-    /// Create a role array with a concrete size (e.g., Worker[3]) - LEGACY
+    /// Create a role array with a concrete size (e.g., Worker[3])
     #[must_use]
     pub fn array(name: Ident, size: usize) -> Self {
         let size_token: TokenStream = size.to_string().parse().unwrap();
@@ -245,8 +216,6 @@ impl Role {
             name,
             param: Some(RoleParam::Static(size as u32)),
             index: None,
-            legacy_index: None,
-            legacy_param: None,
             array_size: Some(size_token),
         }
     }
@@ -254,7 +223,7 @@ impl Role {
     /// Check if this role has an index
     #[must_use]
     pub fn is_indexed(&self) -> bool {
-        self.index.is_some() || self.legacy_index.is_some()
+        self.index.is_some()
     }
 
     /// Generate a Rust identifier for this role
@@ -266,10 +235,7 @@ impl Role {
     /// Check if this role is parameterized (has either index or param)
     #[must_use]
     pub fn is_parameterized(&self) -> bool {
-        self.index.is_some()
-            || self.param.is_some()
-            || self.legacy_index.is_some()
-            || self.legacy_param.is_some()
+        self.index.is_some() || self.param.is_some()
     }
 
     /// Check if this is a role array (declared with size like Worker[N])

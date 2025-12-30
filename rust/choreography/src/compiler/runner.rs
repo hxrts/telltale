@@ -191,15 +191,19 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 })
                 .collect();
 
+            // Get the first variant for default choice
+            let first_variant = branches.first().map(|(label, _)| label.clone());
+
             quote! {
                 // Internal choice - select branch to send to #to
-                #[derive(Debug)]
+                #[derive(Debug, Clone, Copy)]
                 enum Choice {
                     #(#choice_variants),*
                 }
 
-                // User must provide choice selection logic
-                let choice: Choice = todo!("User provides choice selection");
+                // Default to first variant. Override this logic in production code.
+                // Consider using a ChoiceProvider callback for runtime decisions.
+                let choice: Choice = Choice::#first_variant;
                 match choice {
                     #(#match_arms)*
                 }
@@ -255,15 +259,18 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 })
                 .collect();
 
+            // Get the first variant for default choice
+            let first_variant = branches.first().map(|(label, _)| label.clone());
+
             quote! {
                 // Local choice - no communication
-                #[derive(Debug)]
+                #[derive(Debug, Clone, Copy)]
                 enum LocalChoice {
                     #(#choice_variants),*
                 }
 
-                // User must provide local choice logic
-                let choice: LocalChoice = todo!("User provides local choice");
+                // Default to first variant. Override this logic in production code.
+                let choice: LocalChoice = LocalChoice::#first_variant;
                 match choice {
                     #(#match_arms)*
                 }
@@ -391,14 +398,26 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
             let timeout_body = generate_runner_body(body, ctx);
 
             quote! {
-                // Timeout after #duration
-                tokio::time::timeout(
+                // Timeout after #duration ms
+                // Note: Timeout handling requires the adapter error type to implement
+                // From<TimeoutError> or similar. This generated code uses unwrap_or_else
+                // with a panic as a fallback. Override for production use.
+                let timeout_result = tokio::time::timeout(
                     std::time::Duration::from_millis(#timeout_ms),
                     async {
                         #timeout_body
                         Ok::<_, A::Error>(())
                     }
-                ).await.map_err(|_| todo!("timeout error"))?;
+                ).await;
+
+                match timeout_result {
+                    Ok(inner_result) => inner_result?,
+                    Err(_elapsed) => panic!(
+                        "Protocol timeout: operation exceeded {} ms. \
+                         Implement proper timeout error handling for production.",
+                        #timeout_ms
+                    ),
+                }
             }
         }
 

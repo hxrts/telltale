@@ -28,6 +28,7 @@ pub mod de_bruijn;
 mod global;
 mod label;
 mod local;
+pub mod merge;
 mod role;
 
 pub use action::{Action, LocalAction};
@@ -37,4 +38,5 @@ pub use contentable::{Contentable, ContentableError};
 pub use global::{GlobalType, PayloadSort};
 pub use label::Label;
 pub use local::LocalTypeR;
+pub use merge::{can_merge, merge, merge_all, MergeError, MergeResult};
 pub use role::{Role, RoleSet};
