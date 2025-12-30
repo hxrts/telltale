@@ -191,10 +191,22 @@ theorem progress : Progress := by
         exact ⟨rp, hrp, hproc_form⟩
       exact send_can_reduce c rp.role receiver label value cont hget
     | recv sender branches =>
-      -- This is the hard case: need to show message is available
-      -- By global type structure, the sender has sent or will send
-      -- For synchronous semantics without queues, this would require
-      -- showing sender and receiver are paired
+      -- TODO: Receive case - the hardest part of the progress proof
+      --
+      -- Strategy outline (following Yoshida & Gheri Theorem 2):
+      -- 1. By well-typedness, the receiver's type is ?sender{lᵢ.Tᵢ}
+      -- 2. The global type has a matching comm(sender, receiver, {lᵢ.Gᵢ})
+      -- 3. Case split on sender's process state:
+      --    a. If sender has matching send: can reduce via [Send]+[Recv]
+      --    b. If sender is blocked on recv: apply IH to show sender can progress
+      --    c. If sender is terminated: contradiction (global type says comm pending)
+      -- 4. Key insight: the global type G ensures a send/recv pair exists
+      --
+      -- Required lemmas:
+      -- - `global_type_comm_exists`: If p : ?q{...}, global has comm(q,p,...)
+      -- - `sender_has_matching_send`: Well-typed sender with !p{l.T} is send process
+      -- - `queue_has_message_or_sender_will_send`: Either message in queue or
+      --   sender process is send (by well-formedness of the global type)
       sorry
     | cond b p q =>
       have hget : c.getProcess rp.role = some (.cond b p q) := by
@@ -209,16 +221,34 @@ theorem progress : Progress := by
         exact ⟨rp, hrp, hproc_form⟩
       exact rec_can_reduce c rp.role x body hget
     | par p q =>
-      -- Parallel at process level: not handled in our semantics
-      -- Well-typed configurations shouldn't have bare par processes
+      -- TODO: Parallel at process level
+      --
+      -- This case should be ruled out by the typing judgment.
+      -- Our WellTyped relation doesn't have a case for Process.par,
+      -- so a well-typed process in empty context cannot be a par.
+      --
+      -- Required: Show WellTyped [] (.par p q) lt is uninhabited
+      -- by cases on the WellTyped constructors (none match par).
       sorry
   | inr hqueue =>
-    -- All processes terminated but queues not empty
-    -- This is an "orphan message" situation
-    -- In a well-typed config, this shouldn't happen
-    -- The proof requires showing that:
-    -- 1. If all procs are terminated, no messages should be pending
-    -- 2. Well-typedness ensures sent messages are received
+    -- TODO: Orphan messages case - prove this is impossible for well-typed configs
+    --
+    -- If all processes are terminated but queues are non-empty, we have
+    -- "orphan messages" - sent messages that will never be received.
+    --
+    -- Strategy:
+    -- 1. By well-typedness, each process type matches its projected local type
+    -- 2. Global type well-formedness ensures balanced send/recv
+    -- 3. If process p sent message m to q, then:
+    --    - p's local type had a send action
+    --    - q's local type has a matching recv action
+    --    - Since q is terminated (type end), it must have consumed the recv
+    -- 4. Therefore, the message must have been received - contradiction
+    --
+    -- Required lemmas:
+    -- - `terminated_has_end_type`: isTerminated p → WellTyped Γ p .end
+    -- - `send_recv_balance`: Well-formed global types have matching sends/recvs
+    -- - `queue_empty_when_all_terminated`: Well-typed + all terminated → queues empty
     sorry
 
 /-! ## Partial Claims Bundle -/

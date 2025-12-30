@@ -289,10 +289,18 @@ theorem projection_after_send (g g' : GlobalType) (sender receiver : String)
       have hss : (s == sender) = false := by simp only [beq_eq_false_iff_ne]; exact hsender
       simp only [hss, false_and, ↓reduceIte] at hcons
   | rec t body =>
-    -- Recursion case: unfold and apply recursively
+    -- TODO: Recursion case for projection_after_send
+    --
+    -- Strategy:
+    -- 1. GlobalType.consume unfolds μt.body to body[μt.body/t] first
+    -- 2. Then applies consume to the unfolded type
+    -- 3. Need to show: projectR (body[...].consume...) sender = contType
+    --
+    -- This requires:
+    -- - Lemma about projection commuting with substitution
+    -- - Induction hypothesis on the unfolded global type
+    -- - Showing the recursion structure is preserved
     simp only [GlobalType.consume] at hcons
-    -- g.consume unfolds to (body.substitute t g).consume
-    -- Need to apply IH on the unfolded type
     sorry
 
 /-- Projection is preserved for non-participating roles.
@@ -305,7 +313,22 @@ theorem projection_preserved_other (g g' : GlobalType) (sender receiver role : S
     (hne1 : role ≠ sender)
     (hne2 : role ≠ receiver)
     : projectR g' role = projectR g role := by
-  -- Non-participants have unchanged projections
+  -- TODO: Projection preservation for non-participants
+  --
+  -- Strategy:
+  -- 1. By cases on global type structure
+  -- 2. For comm(s,r,branches): role ∉ {s,r}, so projection uses merge
+  -- 3. consume selects one branch continuation g'
+  -- 4. Show: merge of all branches ↾ role = g' ↾ role
+  --    (because role's projection is the same in all branches - merge property)
+  --
+  -- Key insight: If role is not involved in the communication,
+  -- all branches must have compatible projections (by well-formedness),
+  -- so consuming any branch gives the same projection for role.
+  --
+  -- Required lemmas:
+  -- - `merge_projection_eq`: merge succeeds iff all projections equal
+  -- - `consume_selects_branch`: consume returns a branch continuation
   sorry
 
 /-- Helper: Get the projected type for a role from a well-typed config. -/
@@ -352,8 +375,18 @@ theorem subject_reduction_send (g : GlobalType) (c : Configuration)
   -- - For other roles, projections are preserved or subtyped
   cases hcons : g.consume role receiver label with
   | none =>
-    -- If consumption fails, we use the same global type with sorry
-    -- This case needs more sophisticated handling
+    -- TODO: Handle consumption failure case
+    --
+    -- If g.consume fails, it means the global type doesn't have a
+    -- matching communication at the top level. This could happen if:
+    -- 1. g is a recursion that needs unfolding first
+    -- 2. g doesn't have the expected structure (shouldn't happen for well-typed)
+    --
+    -- Strategy: Show this case is impossible for well-typed configs
+    -- by showing that hproj (projecting to a send type) implies
+    -- g must have consumable structure.
+    --
+    -- Required: `projection_send_implies_consumable`
     use g
     constructor
     · exact GlobalTypeReducesStar.refl g
@@ -364,20 +397,33 @@ theorem subject_reduction_send (g : GlobalType) (c : Configuration)
     · -- g reduces to g' in one step
       exact GlobalTypeReducesStar.step g g' g'
         (GlobalTypeReduces.comm role receiver _ label g' (by
-          -- Need to show branches.find? ... = some (label, g')
-          -- This follows from hcons
+          -- TODO: Extract branch witness from consume success
+          --
+          -- hcons : g.consume role receiver label = some g'
+          -- Need: ∃ branches, g = comm role receiver branches ∧
+          --       branches.find? (·.1.name == label.name) = some (label, g')
+          --
+          -- Strategy: Invert the consume definition to extract the branch list
+          -- and the find? result that produced g'.
           sorry))
         (GlobalTypeReducesStar.refl g')
-    · -- The reduced config is well-typed against g'
+    · -- TODO: Show reduced configuration is well-typed
+      --
+      -- Strategy:
+      -- 1. After enqueue: queues change, processes unchanged (enqueue_processes lemma)
+      -- 2. After setProcess: sender has continuation type
+      -- 3. For sender role: projection_after_send gives projectR g' role = contType
+      -- 4. For other roles: projection_preserved_other shows their types unchanged
+      -- 5. Queue well-formedness: the enqueued message matches global type evolution
+      --
+      -- Required lemmas:
+      -- - configWellTyped_setProcess (have it)
+      -- - configWellTyped_enqueue: enqueuing matching message preserves typing
+      -- - projection_preserved_other (defined above, needs proof)
       unfold Reduces.reduceSendConfig
-      -- After enqueue, processes are unchanged
-      -- After setProcess, the sender has the continuation type
-      -- By projection_after_send, projectR g' role = contType
       have hproj' : projectR g' role = .ok contType := by
         rw [heq] at hproj
         exact projection_after_send g g' role receiver label contType hproj hcons
-      -- Now use configWellTyped_setProcess
-      -- But we also need to handle the enqueue and other roles
       sorry
 
 /-- Subject reduction for conditional case.
@@ -434,14 +480,30 @@ theorem subject_reduction : SubjectReduction := by
     exact subject_reduction_send g c role receiver label value cont hwt hget
 
   | recv c role sender branches msg cont hget hdeq hfind =>
-    -- Receive case: select the matching branch
+    -- TODO: Receive case for subject reduction
+    --
+    -- Strategy:
+    -- 1. The receiver's type is ?sender{lᵢ.Tᵢ} (from wellTyped_role_has_projection)
+    -- 2. The message label matches some lⱼ (from hfind)
+    -- 3. The selected continuation has type Tⱼ (from hall at index j)
+    -- 4. The global type evolves by consuming this receive
+    --
+    -- Key insight: Unlike send, receive doesn't change the global type
+    -- immediately (the message was already in transit). The global type
+    -- evolution happened when the corresponding send occurred.
+    --
+    -- For async semantics with queues:
+    -- - The message consumption just removes from queue
+    -- - The receiver's type evolves to the branch type
+    --
+    -- Required lemmas:
+    -- - `find_index_of_branch`: hfind gives the branch index
+    -- - `hall_at_index`: hall j gives WellTyped for the selected branch
     use g
     constructor
     · exact GlobalTypeReducesStar.refl g
-    · -- Need to show the selected continuation is well-typed
-      obtain ⟨lt, hproj, hwt_proc⟩ := wellTyped_role_has_projection g c role _ hwt hget
+    · obtain ⟨lt, hproj, hwt_proc⟩ := wellTyped_role_has_projection g c role _ hwt hget
       obtain ⟨types, heq, hlen, hall, hlabel⟩ := wellTyped_recv_inversion [] sender branches lt hwt_proc
-      -- The selected continuation has the matching type
       sorry
 
   | cond c role b p q hget =>

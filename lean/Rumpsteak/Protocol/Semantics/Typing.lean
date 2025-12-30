@@ -329,16 +329,24 @@ theorem wellTyped_weaken (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x 
   | @rec Γ' y body bodyType hwt ih =>
     simp only [Process.freeVars, List.mem_filter, bne_iff_ne, ne_eq, decide_eq_true_eq] at hfree
     apply WellTyped.rec
+    -- TODO: Weakening for recursion case
+    --
     -- Need: WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
+    --
+    -- Strategy:
+    -- 1. If x = y: The inner binding shadows x, so adding x to context is irrelevant
+    --    Use: ((Γ.extend x s).extend y bodyType) ≃ (Γ.extend y bodyType) for lookups
+    -- 2. If x ≠ y: Apply context exchange then use IH
+    --    Exchange: ((Γ.extend x s).extend y bodyType) ≃ ((Γ.extend y bodyType).extend x s)
+    --    Then apply ih with the extended context
+    --
+    -- Required lemmas:
+    -- - `extend_shadow`: (Γ.extend x s).extend x t ≃ Γ.extend x t (for typing)
+    -- - `wellTyped_exchange`: Context exchange preserves typing
     by_cases hxy : x = y
-    · -- If x = y, the inner binding shadows, so we can use weakening differently
-      subst hxy
-      -- hwt : WellTyped (Γ'.extend y bodyType) body bodyType
-      -- We need (Γ.extend y s).extend y bodyType = just the inner one shadowing
-      -- Actually Γ' = Γ here since we're weakening
+    · subst hxy
       sorry
-    · -- x ≠ y
-      sorry
+    · sorry
   | @var Γ' y t' hlookup =>
     simp only [Process.freeVars, List.mem_singleton] at hfree
     apply WellTyped.var
@@ -363,17 +371,24 @@ theorem wellTyped_exchange (Γ : TypingContext) (p : Process) (t : LocalTypeR)
   | rec ih =>
     apply WellTyped.rec
     rename_i z body bodyType _
+    -- TODO: Exchange lemma for recursion case
+    --
+    -- Need to show that swapping x and y bindings preserves typing
+    -- when adding a third binding z for the rec body.
+    --
+    -- Cases:
+    -- 1. z = x: innermost z shadows x, effectively removes x from consideration
+    -- 2. z = y: innermost z shadows y, effectively removes y from consideration
+    -- 3. z ≠ x ∧ z ≠ y: apply exchange recursively, then use ih
+    --
+    -- Required: `extend_shadow` and recursive application of exchange
     by_cases hzx : z = x
     · subst hzx
-      -- z = x, so the innermost binding shadows x
-      -- The context becomes ((Γ.extend y u).extend x s).extend x bodyType
-      -- which is essentially (Γ.extend y u).extend x bodyType (x shadows)
       sorry
     · by_cases hzy : z = y
       · subst hzy
         sorry
-      · -- z ≠ x and z ≠ y, so we can apply exchange at the deeper level
-        sorry
+      · sorry
   | var hlookup =>
     apply WellTyped.var
     rename_i z t'
@@ -433,23 +448,27 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     exact WellTyped.cond (ihp Γ s hq) (ihq Γ s hq)
   | @rec Γ' y body bodyType hwt_body ih =>
     simp only [Process.substitute]
+    -- TODO: Substitution lemma for recursion
+    --
+    -- Two cases based on whether y shadows x:
+    -- 1. y = x: The rec binding shadows x, so substitution is identity on body
+    --    Result is (.rec y body) which should be typed at (.rec y bodyType)
+    --    Need to show the original typing still holds (x not free in body)
+    --
+    -- 2. y ≠ x: Apply context exchange then IH
+    --    hwt_body : WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
+    --    Exchange to: WellTyped ((Γ.extend y bodyType).extend x s) body bodyType
+    --    Apply ih with context (Γ.extend y bodyType)
+    --    Need hq weakened: WellTyped (Γ.extend y bodyType) q s
+    --
+    -- Required lemmas:
+    -- - wellTyped_exchange (proven above, has sorries)
+    -- - wellTyped_weaken (proven above, has sorries)
     by_cases hxy : y == x
-    · -- Variable y shadows x, substitution is identity on body
-      simp only [hxy, ↓reduceIte]
-      -- The typing context Γ'.extend y bodyType = Γ.extend x s doesn't directly apply
-      -- We need to show WellTyped Γ (.rec y body) (.rec y bodyType)
-      -- Since y == x, the inner binding shadows the outer one
-      -- This case is subtle - we need weakening/context manipulation
+    · simp only [hxy, ↓reduceIte]
       sorry
-    · -- Variable y doesn't shadow x
-      simp only [hxy, ↓reduceIte]
+    · simp only [hxy, ↓reduceIte]
       apply WellTyped.rec
-      -- Need: WellTyped (Γ.extend y bodyType) (body.substitute x q) bodyType
-      -- We have hwt_body : WellTyped (Γ'.extend y bodyType) body bodyType
-      -- where Γ' = Γ.extend x s
-      -- So hwt_body : WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
-      -- We can reorder the context: (Γ.extend y bodyType).extend x s
-      -- Then apply IH with Γ.extend y bodyType
       sorry
   | @var Γ' y t' hlookup =>
     simp only [Process.substitute]
