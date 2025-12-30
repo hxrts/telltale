@@ -182,7 +182,7 @@ impl WorkflowHandler {
 
         // Register capability validation
         let caps = capabilities.clone();
-        registry.register::<ValidateCapability, _>(move |_ep, ext| {
+        let _ = registry.register::<ValidateCapability, _>(move |_ep, ext| {
             let caps = caps.clone();
             Box::pin(async move {
                 let validate = ext.as_any().downcast_ref::<ValidateCapability>().ok_or(
@@ -209,7 +209,7 @@ impl WorkflowHandler {
 
         // Register flow cost tracking
         let budget_ref = budget.clone();
-        registry.register::<ChargeFlowCost, _>(move |_ep, ext| {
+        let _ = registry.register::<ChargeFlowCost, _>(move |_ep, ext| {
             let budget = budget_ref.clone();
             Box::pin(async move {
                 let cost = ext.as_any().downcast_ref::<ChargeFlowCost>().ok_or(
@@ -237,7 +237,7 @@ impl WorkflowHandler {
         });
 
         // Register logging
-        registry.register::<LogEvent, _>(|_ep, ext| {
+        let _ = registry.register::<LogEvent, _>(|_ep, ext| {
             Box::pin(async move {
                 let log = ext.as_any().downcast_ref::<LogEvent>().ok_or(
                     ExtensionError::TypeMismatch {
@@ -257,7 +257,7 @@ impl WorkflowHandler {
 
         // Register metrics
         let metrics_ref = metrics.clone();
-        registry.register::<RecordMetric, _>(move |_ep, ext| {
+        let _ = registry.register::<RecordMetric, _>(move |_ep, ext| {
             let metrics = metrics_ref.clone();
             Box::pin(async move {
                 let metric = ext.as_any().downcast_ref::<RecordMetric>().ok_or(

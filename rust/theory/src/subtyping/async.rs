@@ -345,7 +345,6 @@ fn check_orphan_free(lt: &LocalTypeR, pending_sends: &mut Vec<(String, String)>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
 
     #[test]
     fn test_siso_decompose_end() {

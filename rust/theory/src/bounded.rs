@@ -346,7 +346,6 @@ fn unfold_bounded_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use rumpsteak_types::Label;
 
     fn ping_pong_recursive() -> LocalTypeR {
