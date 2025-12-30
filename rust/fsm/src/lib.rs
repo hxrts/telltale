@@ -5,16 +5,19 @@
 //! support for DOT parsing, local type representations, subtyping verification,
 //! and Petrify output format.
 //!
+//! # Features
+//!
+//! - `parsing` - DOT format parsing support
+//! - `subtyping` - Asynchronous subtyping verification algorithm
+//! - `convert` - Conversion to/from rumpsteak-types
+//!
 //! # Main Components
 //!
 //! - [`Fsm`] - Core FSM representation with states and transitions
-
-#![allow(clippy::unwrap_used)]
-#![allow(clippy::expect_used)]
 //! - [`Local`] - Local type representation (textual session types)
 //! - [`Dot`] - DOT format export for visualization
 //! - [`Petrify`] - Petrify format export for Petri net tools
-//! - [`subtype`] - Asynchronous subtyping verification
+//! - [`subtype`] - Asynchronous subtyping verification (requires `subtyping` feature)
 //!
 //! # Example
 //!
@@ -33,10 +36,15 @@
 //! fsm.add_transition(s0, s1, transition).unwrap();
 //! ```
 
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 pub mod dot;
 pub mod local;
 pub mod mermaid;
 pub mod petrify;
+
+#[cfg(feature = "subtyping")]
 pub mod subtype;
 
 #[cfg(feature = "convert")]
@@ -48,6 +56,9 @@ pub use self::{
     mermaid::{Mermaid, MermaidConfig, MermaidDirection, MermaidStateDiagram, NodeStyle},
     petrify::Petrify,
 };
+
+#[cfg(feature = "subtyping")]
+pub use self::subtype::is_subtype;
 
 use petgraph::{graph::NodeIndex, visit::EdgeRef, Graph};
 use std::{

@@ -69,12 +69,46 @@ serde_json = "1.0"
 
 [features]
 default = []
-serialize = ["rumpsteak-aura-macros/serialize", "rumpsteak-aura-fsm"]
+
+# Serialization support for session types
+serialize = ["rumpsteak-aura-macros/serialize"]
+
+# Testing utilities (random generation, etc.)
 test-utils = ["rand"]
+
+# WebAssembly support
 wasm = ["getrandom/js"]
+
+# Session type theory algorithms (projection, merge, duality, etc.)
 theory = ["rumpsteak-theory"]
+
+# Granular theory features (require theory feature)
+theory-async-subtyping = ["theory", "rumpsteak-theory/async-subtyping"]
+theory-bounded = ["theory", "rumpsteak-theory/bounded"]
+
+# Lean verification bridge
 lean-bridge = ["rumpsteak-lean-bridge"]
-full = ["theory", "lean-bridge", "rumpsteak-aura-fsm"]
+lean-runner = ["lean-bridge", "rumpsteak-lean-bridge/runner"]
+
+# FSM support with sub-features
+fsm = ["rumpsteak-aura-fsm"]
+fsm-parsing = ["fsm", "rumpsteak-aura-fsm/parsing"]
+fsm-subtyping = ["fsm", "rumpsteak-aura-fsm/subtyping"]
+fsm-convert = ["fsm", "rumpsteak-aura-fsm/convert"]
+
+# All optional features
+full = [
+    "theory",
+    "theory-async-subtyping",
+    "theory-bounded",
+    "lean-bridge",
+    "lean-runner",
+    "fsm",
+    "fsm-parsing",
+    "fsm-subtyping",
+    "fsm-convert",
+    "serialize",
+]
 
 [profile.release]
 debug = true
@@ -136,6 +170,7 @@ pest_derive = "2.7"
 criterion = "0.3"
 proptest = "1.4"
 tempfile = "3.2"
+assert_matches = "1.5"
 
 # ============================================================================
 # Workspace Lints (Rust Style Guide)

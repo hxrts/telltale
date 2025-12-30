@@ -8,8 +8,10 @@
 //! The algorithm checks if one protocol can safely replace another by exploring
 //! the state space and verifying that all message sequences are compatible with
 //! the given bound on visits.
-
-#![cfg(feature = "subtyping")]
+//!
+//! # Feature
+//!
+//! This module requires the `subtyping` feature to be enabled.
 
 mod matrix;
 mod pair;

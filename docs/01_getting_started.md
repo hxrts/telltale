@@ -30,7 +30,77 @@ The `rumpsteak-aura` crate is the main facade. It re-exports types from the othe
 
 Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography`. The facade provides session types. The choreography layer provides the high-level DSL.
 
-For WASM support, enable the wasm feature.
+### Feature Flags
+
+The workspace provides granular feature flags to control dependencies and functionality.
+
+#### Root Crate (`rumpsteak-aura`)
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `serialize` | no | Serialization support for session types |
+| `test-utils` | no | Testing utilities (random generation) |
+| `wasm` | no | WebAssembly support |
+| `theory` | no | Session type algorithms via `rumpsteak-theory` |
+| `theory-async-subtyping` | no | POPL 2021 asynchronous subtyping algorithm |
+| `theory-bounded` | no | Bounded recursion strategies |
+| `lean-bridge` | no | Lean verification bridge (JSON export/import) |
+| `lean-runner` | no | LeanRunner for invoking Lean binary |
+| `fsm` | no | FSM support via `rumpsteak-aura-fsm` |
+| `fsm-parsing` | no | DOT format parsing for FSMs |
+| `fsm-subtyping` | no | Asynchronous subtyping verification |
+| `fsm-convert` | no | Conversion between FSM and core types |
+| `full` | no | Enable all optional features |
+
+#### Theory Crate (`rumpsteak-theory`)
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `projection` | **yes** | Global to local type projection |
+| `duality` | **yes** | Dual type computation |
+| `merge` | **yes** | Local type merging |
+| `well-formedness` | **yes** | Type validation |
+| `bounded` | **yes** | Bounded recursion strategies |
+| `async-subtyping` | **yes** | POPL 2021 asynchronous subtyping |
+| `sync-subtyping` | **yes** | Synchronous subtyping |
+
+#### FSM Crate (`rumpsteak-aura-fsm`)
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `parsing` | no | DOT format parsing (brings in `logos`, `bitvec`) |
+| `subtyping` | no | Asynchronous subtyping verification |
+| `convert` | no | Conversion to/from `rumpsteak-types` |
+
+#### Choreography Crate (`rumpsteak-aura-choreography`)
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `test-utils` | no | Testing utilities (random, fault injection) |
+| `wasm` | no | WebAssembly support |
+
+#### Lean Bridge Crate (`rumpsteak-lean-bridge`)
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `runner` | **yes** | LeanRunner for invoking Lean binary |
+| `cli` | no | Command-line interface binary |
+
+#### Example: Minimal Dependencies
+
+```toml
+# Just the core runtime, no algorithms
+rumpsteak-aura = { version = "0.7", default-features = false }
+```
+
+#### Example: Full Feature Set
+
+```toml
+# Everything enabled
+rumpsteak-aura = { version = "0.7", features = ["full"] }
+```
+
+For WASM support, enable the wasm feature on the choreography crate.
 
 ```toml
 rumpsteak-aura-choreography = { version = "0.7", features = ["wasm"] }

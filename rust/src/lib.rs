@@ -11,9 +11,43 @@
 //!
 //! # Feature Flags
 //!
-//! - `theory` - Include session type algorithms (projection, merge, subtyping)
-//! - `lean-bridge` - Include Lean verification bridge
-//! - `full` - All optional features
+//! ## Core Features
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | `serialize` | Enable serialization support for session types |
+//! | `test-utils` | Testing utilities (random generation, etc.) |
+//! | `wasm` | WebAssembly support |
+//!
+//! ## Theory Features
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | `theory` | Session type algorithms (projection, merge, duality, etc.) |
+//! | `theory-async-subtyping` | POPL 2021 asynchronous subtyping algorithm |
+//! | `theory-bounded` | Bounded recursion strategies |
+//!
+//! ## Lean Verification
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | `lean-bridge` | Lean verification bridge (JSON export/import) |
+//! | `lean-runner` | LeanRunner for invoking Lean binary |
+//!
+//! ## FSM Features
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | `fsm` | FSM support for session types |
+//! | `fsm-parsing` | DOT format parsing |
+//! | `fsm-subtyping` | Asynchronous subtyping verification |
+//! | `fsm-convert` | Conversion to/from rumpsteak-types |
+//!
+//! ## Meta Features
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | `full` | Enable all optional features |
 
 pub mod channel;
 pub mod serialize;

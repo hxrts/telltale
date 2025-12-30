@@ -106,6 +106,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
+name = "assert_matches"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
+
+[[package]]
 name = "async-recursion"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1096,7 +1102,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lean-exporter"
-version = "0.1.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "rumpsteak-aura-choreography",
@@ -1895,6 +1901,7 @@ dependencies = [
 name = "rumpsteak-theory"
 version = "0.7.0"
 dependencies = [
+ "assert_matches",
  "proptest",
  "rumpsteak-types",
  "thiserror",
@@ -1916,6 +1923,7 @@ dependencies = [
 name = "rumpsteak-types"
 version = "0.7.0"
 dependencies = [
+ "assert_matches",
  "proptest",
  "serde",
  "serde_json",

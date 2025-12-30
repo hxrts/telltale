@@ -16,8 +16,9 @@ path = "src/bin/main.rs"
 required-features = ["cli"]
 
 [features]
-default = []
+default = ["runner"]
 cli = ["clap"]
+runner = []  # Enable LeanRunner for invoking Lean binary
 
 [dependencies]
 rumpsteak-types = { path = "../types", version = "0.7.0" }

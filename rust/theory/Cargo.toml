@@ -20,3 +20,21 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
+assert_matches = { workspace = true }
+
+[features]
+default = ["projection", "duality", "merge", "well-formedness", "bounded", "async-subtyping", "sync-subtyping"]
+
+# Core algorithms (included by default)
+projection = []
+duality = []
+merge = []
+well-formedness = []
+
+# Optional advanced algorithms
+async-subtyping = []   # POPL 2021 asynchronous subtyping
+sync-subtyping = []    # Synchronous subtyping
+bounded = []           # Bounded recursion strategies
+
+# All features
+full = ["projection", "duality", "merge", "well-formedness", "async-subtyping", "sync-subtyping", "bounded"]
