@@ -26,7 +26,7 @@ pub mod well_formedness;
 pub use bounded::{bound_recursion, unfold_bounded, BoundingStrategy};
 pub use duality::{dual, is_dual};
 pub use merge::{can_merge, merge, merge_all, MergeError};
-pub use projection::{project, ProjectionError};
+pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
 pub use subtyping::{
     async_subtype, orphan_free, siso_decompose, sync_subtype, AsyncSubtypeError, InputTree,
     OutputTree, SisoSegment, SyncSubtypeError,

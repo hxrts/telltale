@@ -48,8 +48,13 @@
 
 pub mod export;
 pub mod import;
+pub mod runner;
 pub mod validate;
+
+#[cfg(test)]
+pub mod test_utils;
 
 pub use export::{global_to_json, local_to_json};
 pub use import::{json_to_global, json_to_local, ImportError};
+pub use runner::{BranchResult, LeanRunner, LeanRunnerError, LeanValidationResult};
 pub use validate::{ValidationResult, Validator};

@@ -2,7 +2,7 @@
 
 ## Installation
 
-Add Rumpsteak to your project using the Aura fork.
+Add Rumpsteak-Aura to your project dependencies.
 
 ```toml
 [dependencies]
@@ -10,25 +10,30 @@ rumpsteak-aura = "*"
 rumpsteak-aura-choreography = "*"
 ```
 
-This adds the core session types library and the choreographic programming layer.
+This adds the main facade crate and the choreographic programming layer.
 
 ### Understanding the Crates
 
-Rumpsteak-Aura is organized as a Cargo workspace with several crates.
+Rumpsteak-Aura is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence.
 
-- The `rumpsteak-aura` crate is the core session types library. It is located in `rust/src/`. This crate provides fundamental primitives for type-safe asynchronous communication, channels, and role definitions.
-- The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It is located in `rust/choreography/`. This crate provides the DSL parser, automatic projection, effect handler system, and runtime support.
-- The `rumpsteak-aura-fsm` crate provides optional finite state machine support. This crate enables advanced session type verification.
-- The `rumpsteak-aura-macros` crate contains procedural macros used internally.
+The `rumpsteak-types` crate contains core type definitions. It provides `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. These types match the Lean definitions exactly.
 
-Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography`. The core library provides session types. The choreography layer provides the high-level DSL and effect system.
+The `rumpsteak-theory` crate contains pure algorithms. It provides projection, merge, subtyping, and well-formedness checks. This crate has no IO or parsing dependencies.
 
-Advanced users who only need low-level session types can depend on just `rumpsteak-aura`. This excludes choreography features.
+The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It provides the DSL parser, effect handlers, and code generation.
 
-For WASM support, add the wasm feature.
+The `rumpsteak-aura-fsm` crate provides optional finite state machine support. Use it for visualization and alternative subtyping algorithms.
+
+The `rumpsteak-lean-bridge` crate enables cross-validation with Lean. It provides JSON import and export functions.
+
+The `rumpsteak-aura` crate is the main facade. It re-exports types from the other crates with feature flags.
+
+Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography`. The facade provides session types. The choreography layer provides the high-level DSL.
+
+For WASM support, enable the wasm feature.
 
 ```toml
-rumpsteak-aura-choreography = { version = "*", features = ["wasm"] }
+rumpsteak-aura-choreography = { version = "0.7", features = ["wasm"] }
 ```
 
 This enables compilation to WebAssembly targets.
@@ -81,7 +86,7 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The `InMemoryHandler` provides local message passing for testing. See [Using Rumpsteak Handlers](06_rumpsteak_handler.md) for production handlers.
+The `InMemoryHandler` provides local message passing for testing. See [Using Rumpsteak Handlers](07_rumpsteak_handler.md) for production handlers.
 
 ## Core Concepts
 

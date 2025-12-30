@@ -9,8 +9,10 @@ use futures::channel::mpsc::{UnboundedSender, UnboundedReceiver};
 use serde::{Deserialize, Serialize};
 
 // Type definitions for the generated code
+#[allow(dead_code)]
 type Channel = channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
+#[allow(dead_code)]
 #[derive(Message)]
 enum Label {
     SecureRequest(SecureRequest),
@@ -18,7 +20,7 @@ enum Label {
 }
 
 // Message type definitions for secure communication
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SecureRequest {
     pub request_id: String,
     pub operation: String,
@@ -26,7 +28,7 @@ pub struct SecureRequest {
     pub timestamp: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SecureResponse {
     pub request_id: String,
     pub status: ResponseStatus,
@@ -34,8 +36,9 @@ pub struct SecureResponse {
     pub timestamp: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum ResponseStatus {
+    #[default]
     Success,
     Unauthorized,
     ServerError,

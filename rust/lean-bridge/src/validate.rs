@@ -5,6 +5,7 @@
 
 use crate::export::{global_to_json, local_to_json};
 use crate::import::{json_to_global, json_to_local, ImportError};
+use crate::runner::LeanRunner;
 use rumpsteak_types::{GlobalType, LocalTypeR};
 use serde_json::Value;
 use thiserror::Error;
@@ -126,6 +127,61 @@ impl Validator {
                 "Subtyping mismatch: Rust={}, Lean={}",
                 rust_result, lean_result
             ))
+        }
+    }
+
+    /// Validate a program against a choreography using the Lean runner.
+    ///
+    /// This invokes the actual Lean verification binary to check that
+    /// the exported program matches the projected local type.
+    ///
+    /// # Arguments
+    ///
+    /// * `choreography_json` - The choreography in Lean-compatible JSON format
+    /// * `program_json` - The program export in Lean-compatible JSON format
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Lean runner is unavailable or fails.
+    pub fn validate_projection_with_lean(
+        &self,
+        choreography_json: &Value,
+        program_json: &Value,
+    ) -> Result<ValidationResult, ValidateError> {
+        let runner = match &self.lean_path {
+            Some(path) => LeanRunner::with_binary_path(path)
+                .map_err(|e| ValidateError::LeanExecutionFailed(e.to_string()))?,
+            None => {
+                LeanRunner::new().map_err(|e| ValidateError::LeanExecutionFailed(e.to_string()))?
+            }
+        };
+
+        match runner.validate(choreography_json, program_json) {
+            Ok(result) => {
+                if result.success {
+                    Ok(ValidationResult::Valid)
+                } else {
+                    let msgs: Vec<String> = result
+                        .branches
+                        .iter()
+                        .filter(|b| !b.status)
+                        .map(|b| format!("{}: {}", b.name, b.message))
+                        .collect();
+                    Ok(ValidationResult::Invalid(msgs.join("; ")))
+                }
+            }
+            Err(e) => Err(ValidateError::LeanExecutionFailed(e.to_string())),
+        }
+    }
+
+    /// Check if the Lean runner is available.
+    ///
+    /// Returns true if the Lean binary exists at the expected path.
+    #[must_use]
+    pub fn lean_available(&self) -> bool {
+        match &self.lean_path {
+            Some(path) => std::path::Path::new(path).exists(),
+            None => LeanRunner::is_available(),
         }
     }
 }

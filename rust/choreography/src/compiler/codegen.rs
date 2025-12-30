@@ -593,6 +593,7 @@ pub fn generate_choreography_code_with_namespacing(
             let ns_ident = format_ident!("{}", ns);
             quote! {
                 #choreo_docs
+                #[allow(dead_code, unused_imports, unused_variables)]
                 pub mod #ns_ident {
                     use super::*;
 
@@ -604,8 +605,13 @@ pub fn generate_choreography_code_with_namespacing(
         None => {
             quote! {
                 #choreo_docs
-                #choreo_metadata
-                #inner_code
+                #[allow(dead_code, unused_imports, unused_variables)]
+                mod __generated_choreography {
+                    use super::*;
+                    #choreo_metadata
+                    #inner_code
+                }
+                pub use __generated_choreography::*;
             }
         }
     }
@@ -882,5 +888,450 @@ pub fn generate_choreography_code_with_dynamic_roles(
                 #dynamic_support
             }
         }
+    }
+}
+
+// ============================================================================
+// Topology Integration Code Generation
+// ============================================================================
+
+use crate::topology::{Location, Topology, TopologyMode};
+
+/// Parsed inline topology definition for code generation
+#[derive(Debug, Clone)]
+pub struct InlineTopology {
+    /// Name of the topology (e.g., "Dev", "Prod")
+    pub name: String,
+    /// The topology configuration
+    pub topology: Topology,
+}
+
+/// Generate topology-aware protocol handlers
+///
+/// This generates:
+/// - `Protocol::handler(role)` - Creates a TopologyHandler with local mode
+/// - `Protocol::with_topology(topo, role)` - Creates a TopologyHandler with custom topology
+/// - Named topology constants for inline definitions
+#[must_use]
+pub fn generate_topology_integration(
+    choreography: &Choreography,
+    inline_topologies: &[InlineTopology],
+) -> TokenStream {
+    let _protocol_name = &choreography.name;
+
+    // Collect role names for validation
+    let role_names: Vec<&Ident> = choreography.roles.iter().map(|r| &r.name).collect();
+    let role_name_strs: Vec<String> = role_names.iter().map(|r| r.to_string()).collect();
+
+    // Generate handler method
+    let handler_method = generate_handler_method();
+
+    // Generate with_topology method
+    let with_topology_method = generate_with_topology_method();
+
+    // Generate topology constants
+    let topology_constants = generate_topology_constants(inline_topologies, &role_name_strs);
+
+    // Generate role name validation
+    let valid_roles_array = quote! {
+        const VALID_ROLES: &[&str] = &[#(#role_name_strs),*];
+    };
+
+    quote! {
+        /// Topology integration for the #protocol_name_str protocol
+        pub mod topology {
+            use super::*;
+            use ::rumpsteak_aura_choreography::topology::{
+                Location, Topology, TopologyBuilder, TopologyHandler, TopologyMode,
+            };
+
+            #valid_roles_array
+
+            /// Validate that a role name is part of this protocol
+            pub fn validate_role(role: &str) -> Result<(), String> {
+                if VALID_ROLES.contains(&role) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "Unknown role '{}' - valid roles are: {:?}",
+                        role, VALID_ROLES
+                    ))
+                }
+            }
+
+            #handler_method
+            #with_topology_method
+            #topology_constants
+        }
+    }
+}
+
+/// Generate the `handler(role)` method that returns a local TopologyHandler
+fn generate_handler_method() -> TokenStream {
+    quote! {
+        /// Create a handler for this protocol with local-mode topology.
+        ///
+        /// This is suitable for testing and single-process execution where
+        /// all roles run in the same process using in-memory channels.
+        ///
+        /// # Arguments
+        ///
+        /// * `role` - The role name this handler will act as
+        ///
+        /// # Example
+        ///
+        /// ```ignore
+        /// let handler = MyProtocol::handler("Alice");
+        /// ```
+        pub fn handler(role: impl Into<String>) -> Result<TopologyHandler, String> {
+            let role_str = role.into();
+            validate_role(&role_str)?;
+            Ok(TopologyHandler::local(role_str))
+        }
+    }
+}
+
+/// Generate the `with_topology(topo, role)` method
+fn generate_with_topology_method() -> TokenStream {
+    quote! {
+        /// Create a handler for this protocol with a custom topology.
+        ///
+        /// This allows specifying where each role is deployed, enabling
+        /// distributed execution across multiple processes or machines.
+        ///
+        /// # Arguments
+        ///
+        /// * `topology` - The topology configuration
+        /// * `role` - The role name this handler will act as
+        ///
+        /// # Example
+        ///
+        /// ```ignore
+        /// let topology = Topology::builder()
+        ///     .local_role("Alice")
+        ///     .remote_role("Bob", "192.168.1.10:8080")
+        ///     .build();
+        ///
+        /// let handler = MyProtocol::with_topology(topology, "Alice")?;
+        /// ```
+        pub fn with_topology(
+            topology: Topology,
+            role: impl Into<String>,
+        ) -> Result<TopologyHandler, String> {
+            let role_str = role.into();
+            validate_role(&role_str)?;
+
+            // Validate topology against protocol roles
+            let validation = topology.validate(VALID_ROLES);
+            if !validation.is_valid() {
+                return Err(format!("Topology validation failed: {:?}", validation));
+            }
+
+            Ok(TopologyHandler::new(topology, role_str))
+        }
+    }
+}
+
+/// Generate named topology constants from inline definitions
+fn generate_topology_constants(
+    inline_topologies: &[InlineTopology],
+    role_names: &[String],
+) -> TokenStream {
+    if inline_topologies.is_empty() {
+        return quote! {};
+    }
+
+    let constants: Vec<TokenStream> = inline_topologies
+        .iter()
+        .map(|topo| {
+            let _const_name = format_ident!("{}", topo.name.to_uppercase());
+            let fn_name = format_ident!("{}", topo.name.to_lowercase());
+            let handler_fn_name = format_ident!("{}_handler", topo.name.to_lowercase());
+
+            // Generate the topology builder calls
+            let builder_calls = generate_topology_builder(&topo.topology, role_names);
+
+            quote! {
+                /// Pre-configured topology: #const_name
+                pub fn #fn_name() -> Topology {
+                    #builder_calls
+                }
+
+                /// Get handler for the #const_name topology
+                pub fn #handler_fn_name(role: impl Into<String>) -> Result<TopologyHandler, String> {
+                    with_topology(#fn_name(), role)
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        /// Pre-configured topologies for this protocol
+        pub mod topologies {
+            use super::*;
+
+            #(#constants)*
+        }
+    }
+}
+
+/// Generate topology builder code from a Topology
+fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> TokenStream {
+    let mut builder_calls = Vec::new();
+
+    // Add mode if specified
+    if let Some(ref mode) = topology.mode {
+        let mode_call = match mode {
+            TopologyMode::Local => quote! { .mode(TopologyMode::Local) },
+            TopologyMode::PerRole => quote! { .mode(TopologyMode::PerRole) },
+            TopologyMode::Kubernetes(ns) => {
+                quote! { .mode(TopologyMode::Kubernetes(#ns.to_string())) }
+            }
+            TopologyMode::Consul(dc) => {
+                quote! { .mode(TopologyMode::Consul(#dc.to_string())) }
+            }
+        };
+        builder_calls.push(mode_call);
+    }
+
+    // Add role locations
+    for (role, location) in &topology.locations {
+        let location_call = match location {
+            Location::Local => quote! { .local_role(#role) },
+            Location::Remote(endpoint) => quote! { .remote_role(#role, #endpoint) },
+            Location::Colocated(peer) => quote! { .colocated_role(#role, #peer) },
+        };
+        builder_calls.push(location_call);
+    }
+
+    // Add constraints
+    for constraint in &topology.constraints {
+        let constraint_call = match constraint {
+            crate::topology::TopologyConstraint::Colocated(r1, r2) => {
+                quote! { .colocated(#r1, #r2) }
+            }
+            crate::topology::TopologyConstraint::Separated(r1, r2) => {
+                quote! { .separated(#r1, #r2) }
+            }
+            crate::topology::TopologyConstraint::Pinned(role, loc) => {
+                let loc_expr = match loc {
+                    Location::Local => quote! { Location::Local },
+                    Location::Remote(ep) => quote! { Location::Remote(#ep.to_string()) },
+                    Location::Colocated(p) => quote! { Location::Colocated(#p.to_string()) },
+                };
+                quote! { .pinned(#role, #loc_expr) }
+            }
+            crate::topology::TopologyConstraint::Region(role, region) => {
+                quote! { .region(#role, #region) }
+            }
+        };
+        builder_calls.push(constraint_call);
+    }
+
+    if builder_calls.is_empty() {
+        quote! {
+            TopologyBuilder::new().build()
+        }
+    } else {
+        quote! {
+            TopologyBuilder::new()
+                #(#builder_calls)*
+                .build()
+        }
+    }
+}
+
+/// Generate complete choreography code with topology integration
+#[must_use]
+pub fn generate_choreography_code_with_topology(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+    inline_topologies: &[InlineTopology],
+) -> TokenStream {
+    let name = choreography.name.to_string();
+    let base_code = generate_choreography_code(&name, &choreography.roles, local_types);
+    let topology_code = generate_topology_integration(choreography, inline_topologies);
+
+    // Generate runner code with topology awareness
+    let runner_code = super::runner::generate_all_runners(&name, &choreography.roles, local_types);
+
+    quote! {
+        #base_code
+        #runner_code
+        #topology_code
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{Choreography, Protocol};
+
+    fn create_test_choreography() -> Choreography {
+        use quote::format_ident;
+
+        Choreography {
+            name: format_ident!("TestProtocol"),
+            namespace: None,
+            roles: vec![
+                Role::new(format_ident!("Alice")),
+                Role::new(format_ident!("Bob")),
+            ],
+            protocol: Protocol::End,
+            attrs: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_generate_topology_integration_basic() {
+        let choreography = create_test_choreography();
+        let inline_topologies = vec![];
+
+        let tokens = generate_topology_integration(&choreography, &inline_topologies);
+        let code = tokens.to_string();
+
+        // Should generate the topology module
+        assert!(code.contains("pub mod topology"));
+        // Should contain role validation
+        assert!(code.contains("VALID_ROLES"));
+        // Should contain handler function
+        assert!(code.contains("pub fn handler"));
+        // Should contain with_topology function
+        assert!(code.contains("pub fn with_topology"));
+    }
+
+    #[test]
+    fn test_generate_topology_integration_with_inline_topologies() {
+        let choreography = create_test_choreography();
+
+        let dev_topology = Topology::builder()
+            .mode(TopologyMode::Local)
+            .local_role("Alice")
+            .local_role("Bob")
+            .build();
+
+        let prod_topology = Topology::builder()
+            .remote_role("Alice", "alice.prod:8080")
+            .remote_role("Bob", "bob.prod:8081")
+            .build();
+
+        let inline_topologies = vec![
+            InlineTopology {
+                name: "Dev".to_string(),
+                topology: dev_topology,
+            },
+            InlineTopology {
+                name: "Prod".to_string(),
+                topology: prod_topology,
+            },
+        ];
+
+        let tokens = generate_topology_integration(&choreography, &inline_topologies);
+        let code = tokens.to_string();
+
+        // Should generate topology constants module
+        assert!(code.contains("pub mod topologies"));
+        // Should generate dev topology function
+        assert!(code.contains("pub fn dev"));
+        // Should generate prod topology function
+        assert!(code.contains("pub fn prod"));
+        // Should generate handler functions for each
+        assert!(code.contains("dev_handler"));
+        assert!(code.contains("prod_handler"));
+    }
+
+    #[test]
+    fn test_generate_handler_method() {
+        let tokens = generate_handler_method();
+        let code = tokens.to_string();
+
+        assert!(code.contains("pub fn handler"));
+        assert!(code.contains("TopologyHandler :: local"));
+        assert!(code.contains("validate_role"));
+    }
+
+    #[test]
+    fn test_generate_with_topology_method() {
+        let tokens = generate_with_topology_method();
+        let code = tokens.to_string();
+
+        assert!(code.contains("pub fn with_topology"));
+        assert!(code.contains("TopologyHandler :: new"));
+        assert!(code.contains("topology . validate"));
+    }
+
+    #[test]
+    fn test_generate_topology_builder_local_mode() {
+        let topology = Topology::builder().mode(TopologyMode::Local).build();
+
+        let tokens =
+            generate_topology_builder(&topology, &["Alice".to_string(), "Bob".to_string()]);
+        let code = tokens.to_string();
+
+        assert!(code.contains("TopologyMode :: Local"));
+    }
+
+    #[test]
+    fn test_generate_topology_builder_with_roles() {
+        let topology = Topology::builder()
+            .local_role("Alice")
+            .remote_role("Bob", "localhost:8080")
+            .build();
+
+        let tokens =
+            generate_topology_builder(&topology, &["Alice".to_string(), "Bob".to_string()]);
+        let code = tokens.to_string();
+
+        assert!(code.contains("local_role"));
+        assert!(code.contains("remote_role"));
+        assert!(code.contains("localhost:8080"));
+    }
+
+    #[test]
+    fn test_generate_topology_builder_with_constraints() {
+        let topology = Topology::builder()
+            .local_role("Alice")
+            .local_role("Bob")
+            .colocated("Alice", "Bob")
+            .separated("Alice", "Carol")
+            .build();
+
+        let tokens = generate_topology_builder(
+            &topology,
+            &["Alice".to_string(), "Bob".to_string(), "Carol".to_string()],
+        );
+        let code = tokens.to_string();
+
+        assert!(code.contains("colocated"));
+        assert!(code.contains("separated"));
+    }
+
+    #[test]
+    fn test_generate_choreography_code_with_topology() {
+        let choreography = create_test_choreography();
+        let local_types = vec![
+            (
+                Role::new(format_ident!("Alice")),
+                crate::ast::LocalType::End,
+            ),
+            (Role::new(format_ident!("Bob")), crate::ast::LocalType::End),
+        ];
+        let inline_topologies = vec![];
+
+        let tokens = generate_choreography_code_with_topology(
+            &choreography,
+            &local_types,
+            &inline_topologies,
+        );
+        let code = tokens.to_string();
+
+        // Should contain role definitions
+        assert!(code.contains("Alice") || code.contains("Roles"));
+        // Should contain topology integration
+        assert!(code.contains("pub mod topology"));
     }
 }

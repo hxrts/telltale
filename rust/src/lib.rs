@@ -12,7 +12,6 @@
 //! # Feature Flags
 //!
 //! - `theory` - Include session type algorithms (projection, merge, subtyping)
-//! - `codegen` - Include code generation utilities
 //! - `lean-bridge` - Include Lean verification bridge
 //! - `full` - All optional features
 
@@ -26,9 +25,6 @@ pub use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 // Re-export optional crates
 #[cfg(feature = "theory")]
 pub use rumpsteak_theory as theory;
-
-#[cfg(feature = "codegen")]
-pub use rumpsteak_codegen as codegen;
 
 #[cfg(feature = "lean-bridge")]
 pub use rumpsteak_lean_bridge as lean_bridge;

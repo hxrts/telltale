@@ -27,8 +27,9 @@ pub use choice_analysis::{
     ChoiceAnalyzer, ChoiceId, ChoiceKnowledge, KnowledgeSource,
 };
 pub use codegen::{
-    generate_choreography_code, generate_choreography_code_with_namespacing, generate_helpers,
-    generate_role_implementations, generate_session_type,
+    generate_choreography_code, generate_choreography_code_with_namespacing,
+    generate_choreography_code_with_topology, generate_helpers, generate_role_implementations,
+    generate_session_type, generate_topology_integration, InlineTopology,
 };
 pub use concurrency::{
     generate_batch_recv, generate_batch_send, generate_broadcast, generate_collection,
@@ -49,7 +50,7 @@ pub use grammar::{GrammarComposer, GrammarComposerBuilder, GrammarCompositionErr
 pub use merge::{can_merge, merge, merge_all, MergeError};
 pub use parser::{
     choreography_macro, parse_choreography, parse_choreography_file, parse_choreography_str,
-    parse_dsl,
+    parse_choreography_str_with_topologies, parse_dsl, ParsedChoreographyWithTopologies,
 };
 pub use projection::{project, ProjectionError};
 pub use runner::{generate_all_runners, generate_execute_as, generate_runner_fn};

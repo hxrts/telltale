@@ -215,7 +215,9 @@ choreography! {
 }
 ```
 
-Protocol definitions are defined before the main protocol body. They are inlined at call sites with no runtime overhead. Protocols can be called multiple times. Nesting is supported where protocols can call other protocols. Protocols can be used within choice branches and loops.
+Protocol definitions appear before the main protocol body. They are inlined at call sites with no runtime overhead. Protocols can be called multiple times.
+
+Nesting is supported. Protocols can call other protocols. Protocols can be used within choice branches and loops.
 
 #### 8. Enhanced Annotations
 
@@ -256,7 +258,9 @@ Database -> Server: QueryResult
 
 Annotations are accessible through the generated code. Runtime systems can use them for optimization, monitoring, and policy enforcement.
 
-Supported annotation keys include `@cost` for execution cost. Use `@priority` for priority levels. The `@timeout` key specifies timeout in milliseconds. The `@retry` key sets retry count. Mark critical operations with `@critical`. Enable buffering with `@buffered`. Use `@audit_log` for audit logging. The `@compress` key specifies compression type.
+Supported annotation keys include `@cost` for execution cost and `@priority` for priority levels. The `@timeout` key specifies timeout in milliseconds. The `@retry` key sets retry count.
+
+Mark critical operations with `@critical`. Enable buffering with `@buffered`. Use `@audit_log` for audit logging. The `@compress` key specifies compression type.
 
 #### 9. Type Annotations for Messages
 
@@ -371,7 +375,9 @@ choreography! {
 
 This creates exactly 3 worker roles.
 
-Dynamic role features include runtime role counts using `Worker[*]`. Symbolic parameters use `Worker[N]`. Range expressions use `Worker[0..threshold]`. Wildcard references use `Worker[*]`. Security constraints prevent overflow with a maximum of 10,000 roles. Comprehensive runtime validation ensures safety.
+Dynamic role features include runtime role counts using `Worker[*]` and symbolic parameters using `Worker[N]`. Range expressions use `Worker[0..threshold]`. Wildcard references use `Worker[*]`.
+
+Security constraints prevent overflow with a maximum of 10,000 roles. Comprehensive runtime validation ensures safety.
 
 Runtime binding example shows how to use dynamic roles.
 
@@ -474,7 +480,9 @@ Error Types include `ParseError` variants. Syntax errors include location inform
 
 The parse pipeline transforms input through several stages.
 
-Input String is parsed by Pest Grammar. This produces a Parse Tree of Pest Pairs. Statement AST Construction builds intermediate structures. Role Validation checks all roles are declared. Protocol AST Generation creates the final tree. The Choreography Object is returned.
+The input string is parsed by the Pest grammar. This produces a parse tree of Pest pairs. Statement AST construction builds intermediate structures.
+
+Role validation checks that all roles are declared. Protocol AST generation creates the final tree. The Choreography object is returned.
 
 ## API
 
@@ -556,7 +564,9 @@ Whitespace includes spaces, tabs, and newlines. It is ignored and can be used fr
 
 The parser performs validations during parsing.
 
-Role Declaration validation ensures all used roles are declared in the `roles:` section. Role Uniqueness validation prevents roles from being declared multiple times. Syntax Correctness validation ensures all statements follow the grammar. Non-Empty Roles validation requires at least one role declaration.
+Role declaration validation ensures all used roles are declared in the `roles:` section. Role uniqueness validation prevents roles from being declared multiple times.
+
+Syntax correctness validation ensures all statements follow the grammar. Non-empty roles validation requires at least one role declaration.
 
 Additional semantic validation is performed by the `choreography.validate()` method after parsing.
 
@@ -590,7 +600,9 @@ Duplicate role declaration 'Alice'
 
 This shows Alice declared twice.
 
-Error types include `ParseError::UndefinedRole` for roles used but not declared. `ParseError::DuplicateRole` handles roles declared more than once. `ParseError::UndefinedProtocol` catches protocols called but not defined. `ParseError::DuplicateProtocol` detects protocols defined multiple times. `ParseError::Syntax` reports grammar or syntax violations. `ParseError::InvalidCondition` handles loop condition problems. `ParseError::InvalidMessage` reports message format issues. `ParseError::Pest` captures low-level parsing errors.
+Error types include `ParseError::UndefinedRole` for roles used but not declared and `ParseError::DuplicateRole` for roles declared more than once. The `ParseError::UndefinedProtocol` variant catches protocols called but not defined. The `ParseError::DuplicateProtocol` variant detects protocols defined multiple times.
+
+The `ParseError::Syntax` variant reports grammar or syntax violations. The `ParseError::InvalidCondition` variant handles loop condition problems. The `ParseError::InvalidMessage` variant reports message format issues. The `ParseError::Pest` variant captures low-level parsing errors.
 
 See `rust/choreography/examples/error_demo.rs` for more examples.
 

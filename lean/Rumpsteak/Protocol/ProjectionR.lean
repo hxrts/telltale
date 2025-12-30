@@ -242,7 +242,8 @@ mutual
         let bs1 := LocalTypeR.sortBranches branches1
         let bs2 := LocalTypeR.sortBranches branches2
         let mergedBranches ← LocalTypeR.mergeRecvSorted bs1 bs2
-        some (.recv p1 mergedBranches)
+        -- Canonicalize the merged branch list (sorting is idempotent when already sorted).
+        some (.recv p1 (LocalTypeR.sortBranches mergedBranches))
 
     | .mu v1 body1, .mu v2 body2 =>
       if v1 != v2 then none

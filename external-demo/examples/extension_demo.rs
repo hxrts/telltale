@@ -13,8 +13,10 @@ use proc_macro2::TokenStream;
 use rumpsteak_aura::*;
 
 // Type definitions for the generated code
+#[allow(dead_code)]
 type Channel = channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
+#[allow(dead_code)]
 #[derive(Message)]
 enum Label {
     Hello(HelloMsg),
@@ -24,20 +26,22 @@ enum Label {
     CancelMsg(CancelMessage),
 }
 
+use serde::{Deserialize, Serialize};
+
 // Message type definitions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HelloMsg;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SimpleMessage;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskMessage;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResultMessage;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CancelMessage;
 use rumpsteak_aura_choreography::{
     ast::{LocalType, Role},
@@ -147,8 +151,8 @@ fn demo_extension_discovery() -> Result<(), Box<dyn std::error::Error>> {
     discovery.check_compatibility(&["logging".to_string(), "monitoring".to_string()])?;
     println!("   Extensions are compatible");
 
-    // Create configured registry
-    let registry = discovery.create_registry(&["monitoring".to_string()])?;
+    // Create configured registry with resolved dependencies
+    let registry = discovery.create_registry(&resolved)?;
     println!("   Created registry with resolved dependencies");
     println!(
         "   Registry contains {} grammar extensions",
@@ -356,6 +360,7 @@ impl GrammarExtension for LowPriorityExtension {
 }
 
 // Simple protocol extension for demonstration
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct DemoProtocolExtension;
 

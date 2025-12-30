@@ -89,8 +89,6 @@ pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalTy
 
     quote! {
         #fn_signature {
-            use ::rumpsteak_aura_choreography::runtime::{ChoreographicAdapter, ProtocolContext, RoleId};
-
             #ctx_creation
 
             #body
@@ -521,8 +519,6 @@ pub fn generate_execute_as(
             role: #role_enum_name,
             adapter: &mut A,
         ) -> Result<(), A::Error> {
-            use ::rumpsteak_aura_choreography::runtime::{ChoreographicAdapter, ProtocolContext};
-
             let _protocol = #protocol_str;
 
             match role {
@@ -582,8 +578,10 @@ pub fn generate_all_runners(
 
     quote! {
         /// Generated runner functions for protocol execution
+        #[allow(dead_code, unused_imports, unused_variables)]
         pub mod runners {
             use super::*;
+            use ::rumpsteak_aura_choreography::runtime::{ChoreographicAdapter, ProtocolContext, RoleId};
 
             #output_types
 

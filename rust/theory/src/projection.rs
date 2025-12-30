@@ -16,8 +16,34 @@
 //!   - Otherwise: `merge(Gᵢ↓r)` (non-participant merges branches)
 //! - `(μt.G)↓r = μt.(G↓r)`
 //! - `t↓r = t`
+//!
+//! # Memoization
+//!
+//! For large protocols or repeated projections, use `MemoizedProjector` to cache
+//! results by content ID:
+//!
+//! ```
+//! use rumpsteak_theory::projection::MemoizedProjector;
+//! use rumpsteak_types::{GlobalType, Label};
+//!
+//! let mut projector = MemoizedProjector::new();
+//! let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+//!
+//! // First call computes and caches
+//! let a_view = projector.project(&global, "A").unwrap();
+//!
+//! // Second call uses cached result
+//! let a_view_again = projector.project(&global, "A").unwrap();
+//! assert_eq!(a_view, a_view_again);
+//!
+//! // Check cache metrics
+//! let metrics = projector.metrics();
+//! assert_eq!(metrics.hits, 1);
+//! assert_eq!(metrics.misses, 1);
+//! ```
 
 use crate::merge::{merge_all, MergeError};
+use rumpsteak_types::content_store::{CacheMetrics, KeyedContentStore};
 use rumpsteak_types::{GlobalType, Label, LocalTypeR};
 use thiserror::Error;
 
@@ -177,6 +203,122 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
         .collect()
 }
 
+// ============================================================================
+// Memoized Projection
+// ============================================================================
+
+/// A memoized projector that caches projection results by content ID.
+///
+/// Use this for large protocols or when projecting the same global type
+/// multiple times. The cache key is `(ContentId(global), role)`, so
+/// α-equivalent types share cache entries.
+///
+/// # Examples
+///
+/// ```
+/// use rumpsteak_theory::projection::MemoizedProjector;
+/// use rumpsteak_types::{GlobalType, Label};
+///
+/// let mut projector = MemoizedProjector::new();
+///
+/// let global = GlobalType::mu("t",
+///     GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t"))
+/// );
+///
+/// // Project for all roles
+/// for role in &["A", "B"] {
+///     let local = projector.project(&global, role).unwrap();
+///     println!("{}: {:?}", role, local);
+/// }
+///
+/// // Check metrics
+/// let metrics = projector.metrics();
+/// println!("Cache: {} hits, {} misses", metrics.hits, metrics.misses);
+/// ```
+#[derive(Debug, Clone)]
+pub struct MemoizedProjector {
+    cache: KeyedContentStore<GlobalType, String, Result<LocalTypeR, ProjectionError>>,
+}
+
+impl Default for MemoizedProjector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemoizedProjector {
+    /// Create a new memoized projector with empty cache.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            cache: KeyedContentStore::new(),
+        }
+    }
+
+    /// Create a memoized projector with pre-allocated cache capacity.
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            cache: KeyedContentStore::with_capacity(capacity),
+        }
+    }
+
+    /// Project a global type onto a role, using cached result if available.
+    ///
+    /// On cache miss, computes the projection and caches the result.
+    /// On cache hit, returns the cached result directly.
+    pub fn project(&mut self, global: &GlobalType, role: &str) -> ProjectionResult {
+        let role_key = role.to_string();
+
+        // Check if already cached
+        if let Some(result) = self.cache.get(global, &role_key) {
+            return result.clone();
+        }
+
+        // Compute and cache
+        let result = project(global, role);
+        self.cache.insert(global, role_key, result.clone());
+        result
+    }
+
+    /// Project a global type onto all its roles, using cached results.
+    pub fn project_all(
+        &mut self,
+        global: &GlobalType,
+    ) -> Result<Vec<(String, LocalTypeR)>, ProjectionError> {
+        let roles = global.roles();
+        roles
+            .into_iter()
+            .map(|role| {
+                let local = self.project(global, &role)?;
+                Ok((role, local))
+            })
+            .collect()
+    }
+
+    /// Get cache performance metrics.
+    #[must_use]
+    pub fn metrics(&self) -> CacheMetrics {
+        self.cache.metrics()
+    }
+
+    /// Clear the cache.
+    pub fn clear(&mut self) {
+        self.cache.clear();
+    }
+
+    /// Get the number of cached entries.
+    #[must_use]
+    pub fn cache_size(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Reset cache metrics to zero.
+    pub fn reset_metrics(&self) {
+        self.cache.reset_metrics();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,9 +441,14 @@ mod tests {
     }
 
     #[test]
-    fn test_project_three_party_merge() {
+    fn test_project_three_party_merge_sends_different_labels_fails() {
         // A -> B: {l1. C -> B: x. end, l2. C -> B: y. end}
-        // From C's perspective, it should merge the two branches
+        // From C's perspective, this is INVALID because:
+        // - C is not involved in the A->B choice
+        // - But C must send different labels (x vs y) depending on that choice
+        // - This violates the merge rule: sends must have identical label sets
+        //
+        // This matches Lean's `mergeSendSorted` semantics.
         let g = GlobalType::comm(
             "A",
             "B",
@@ -317,15 +464,207 @@ mod tests {
             ],
         );
 
-        let c_local = project(&g, "C").unwrap();
+        let result = project(&g, "C");
+        assert!(
+            result.is_err(),
+            "Projection should fail: C cannot choose different sends based on unseen choice"
+        );
+    }
 
-        // C should see: !B{x.end, y.end} (merged from both branches)
+    #[test]
+    fn test_project_three_party_merge_sends_same_label_succeeds() {
+        // A -> B: {l1. C -> B: msg. end, l2. C -> B: msg. end}
+        // From C's perspective, this IS VALID because:
+        // - C sends the same message (msg) regardless of which branch was taken
+        // - The merge succeeds because both branches have identical label sets
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (
+                    Label::new("l1"),
+                    GlobalType::send("C", "B", Label::new("msg"), GlobalType::End),
+                ),
+                (
+                    Label::new("l2"),
+                    GlobalType::send("C", "B", Label::new("msg"), GlobalType::End),
+                ),
+            ],
+        );
+
+        let c_local = project(&g, "C").unwrap();
         match c_local {
             LocalTypeR::Send { partner, branches } => {
                 assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 2);
+                assert_eq!(branches.len(), 1);
+                assert_eq!(branches[0].0.name, "msg");
             }
-            _ => panic!("Expected Send with merged branches"),
+            _ => panic!("Expected Send"),
         }
+    }
+
+    #[test]
+    fn test_project_three_party_merge_recvs_different_labels_succeeds() {
+        // A -> B: {l1. B -> C: x. end, l2. B -> C: y. end}
+        // From C's perspective, this IS VALID because:
+        // - C receives from B in both branches
+        // - Recv merge unions the label sets: ?B{x.end, y.end}
+        //
+        // This matches Lean's `mergeRecvSorted` semantics.
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (
+                    Label::new("l1"),
+                    GlobalType::send("B", "C", Label::new("x"), GlobalType::End),
+                ),
+                (
+                    Label::new("l2"),
+                    GlobalType::send("B", "C", Label::new("y"), GlobalType::End),
+                ),
+            ],
+        );
+
+        let c_local = project(&g, "C").unwrap();
+        match c_local {
+            LocalTypeR::Recv { partner, branches } => {
+                assert_eq!(partner, "B");
+                assert_eq!(branches.len(), 2);
+                let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+                assert!(labels.contains(&"x"));
+                assert!(labels.contains(&"y"));
+            }
+            _ => panic!("Expected Recv with merged branches"),
+        }
+    }
+
+    // ========================================================================
+    // MemoizedProjector tests
+    // ========================================================================
+
+    #[test]
+    fn test_memoized_projector_basic() {
+        let mut projector = MemoizedProjector::new();
+
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+        // First call (cache miss)
+        let a1 = projector.project(&g, "A").unwrap();
+
+        // Second call (cache hit)
+        let a2 = projector.project(&g, "A").unwrap();
+
+        assert_eq!(a1, a2);
+
+        let metrics = projector.metrics();
+        assert_eq!(metrics.misses, 1);
+        assert_eq!(metrics.hits, 1);
+    }
+
+    #[test]
+    fn test_memoized_projector_alpha_equivalence() {
+        let mut projector = MemoizedProjector::new();
+
+        // Two α-equivalent types
+        let g1 = GlobalType::mu(
+            "x",
+            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")),
+        );
+        let g2 = GlobalType::mu(
+            "y",
+            GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("y")),
+        );
+
+        // First type (miss)
+        let result1 = projector.project(&g1, "A").unwrap();
+
+        // α-equivalent type should hit cache
+        let result2 = projector.project(&g2, "A").unwrap();
+
+        assert_eq!(result1, result2);
+
+        let metrics = projector.metrics();
+        assert_eq!(metrics.misses, 1);
+        assert_eq!(metrics.hits, 1);
+    }
+
+    #[test]
+    fn test_memoized_projector_different_roles() {
+        let mut projector = MemoizedProjector::new();
+
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+        // Different roles have different projections
+        let a_proj = projector.project(&g, "A").unwrap();
+        let b_proj = projector.project(&g, "B").unwrap();
+
+        assert!(matches!(a_proj, LocalTypeR::Send { .. }));
+        assert!(matches!(b_proj, LocalTypeR::Recv { .. }));
+
+        // Both should be cache misses (different keys)
+        let metrics = projector.metrics();
+        assert_eq!(metrics.misses, 2);
+        assert_eq!(metrics.hits, 0);
+
+        // Now they should both hit
+        projector.project(&g, "A").unwrap();
+        projector.project(&g, "B").unwrap();
+
+        let metrics = projector.metrics();
+        assert_eq!(metrics.hits, 2);
+    }
+
+    #[test]
+    fn test_memoized_projector_project_all() {
+        let mut projector = MemoizedProjector::new();
+
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+        let projections = projector.project_all(&g).unwrap();
+        assert_eq!(projections.len(), 2);
+
+        // Calling again should use cache
+        projector.project_all(&g).unwrap();
+
+        let metrics = projector.metrics();
+        assert_eq!(metrics.hits, 2);
+        assert_eq!(metrics.misses, 2);
+    }
+
+    #[test]
+    fn test_memoized_projector_clear() {
+        let mut projector = MemoizedProjector::new();
+
+        let g = GlobalType::End;
+        projector.project(&g, "A").unwrap();
+        assert_eq!(projector.cache_size(), 1);
+
+        projector.clear();
+        assert_eq!(projector.cache_size(), 0);
+    }
+
+    #[test]
+    fn test_memoized_projector_error_cached() {
+        let mut projector = MemoizedProjector::new();
+
+        // Empty branches cause projection error
+        let g = GlobalType::Comm {
+            sender: "A".to_string(),
+            receiver: "B".to_string(),
+            branches: vec![],
+        };
+
+        // First call (miss, error)
+        let result1 = projector.project(&g, "A");
+        assert!(result1.is_err());
+
+        // Second call (hit, same error)
+        let result2 = projector.project(&g, "A");
+        assert!(result2.is_err());
+
+        let metrics = projector.metrics();
+        assert_eq!(metrics.misses, 1);
+        assert_eq!(metrics.hits, 1);
     }
 }

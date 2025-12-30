@@ -756,7 +756,9 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
         // This is lenient - strict mode would reject this
         (LocalType::End, other) | (other, LocalType::End) => Ok(other.clone()),
 
-        // Send with same target - merge into Select if messages differ
+        // Send with same target - must have same message (Lean: mergeSendSorted)
+        // A non-participant cannot choose which message to send based on a choice
+        // they didn't observe. Different messages cause merge to fail.
         (
             LocalType::Send {
                 to: to1,
@@ -778,14 +780,12 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
                     continuation: Box::new(merged_cont),
                 })
             } else {
-                // Different messages - create a Select with both options
-                Ok(LocalType::Select {
-                    to: to1.clone(),
-                    branches: vec![
-                        (msg1.name.clone(), *cont1.clone()),
-                        (msg2.name.clone(), *cont2.clone()),
-                    ],
-                })
+                // Different messages - this is an error for sends
+                // Non-participant cannot choose based on unseen choice
+                Err(ProjectionError::MergeFailure(format!(
+                    "cannot merge sends with different messages: '{}' vs '{}'",
+                    msg1.name, msg2.name
+                )))
             }
         }
 
@@ -848,7 +848,7 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
             })
         }
 
-        // Merge Branch with Branch from same source
+        // Merge Branch with Branch from same source (recv semantics - union labels)
         (
             LocalType::Branch {
                 from: from1,
@@ -859,7 +859,7 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
                 branches: br2,
             },
         ) if from1 == from2 => {
-            let merged_branches = merge_branches(br1, br2)?;
+            let merged_branches = merge_branch_branches(br1, br2)?;
             Ok(LocalType::Branch {
                 from: from1.clone(),
                 branches: merged_branches,
@@ -892,7 +892,8 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
             })
         }
 
-        // Select with same target - merge branches
+        // Select with same target - must have identical label sets (send semantics)
+        // A non-participant cannot choose which option to select based on an unseen choice
         (
             LocalType::Select {
                 to: to1,
@@ -903,27 +904,9 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
                 branches: br2,
             },
         ) if to1 == to2 => {
-            let merged_branches = merge_branches(br1, br2)?;
+            let merged_branches = merge_select_branches(br1, br2)?;
             Ok(LocalType::Select {
                 to: to1.clone(),
-                branches: merged_branches,
-            })
-        }
-
-        // Branch with same source - merge branches
-        (
-            LocalType::Branch {
-                from: from1,
-                branches: br1,
-            },
-            LocalType::Branch {
-                from: from2,
-                branches: br2,
-            },
-        ) if from1 == from2 => {
-            let merged_branches = merge_branches(br1, br2)?;
-            Ok(LocalType::Branch {
-                from: from1.clone(),
                 branches: merged_branches,
             })
         }
@@ -974,8 +957,52 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
     }
 }
 
-/// Merge two sets of labeled branches.
-fn merge_branches(
+/// Merge two sets of labeled branches for Select types (send semantics).
+///
+/// Select merge requires IDENTICAL label sets. This matches Lean's `mergeSendSorted`
+/// semantics: a non-participant cannot choose which option to select based on
+/// an unseen choice.
+fn merge_select_branches(
+    branches1: &[(proc_macro2::Ident, LocalType)],
+    branches2: &[(proc_macro2::Ident, LocalType)],
+) -> Result<Vec<(proc_macro2::Ident, LocalType)>, ProjectionError> {
+    // Sort both branch lists for comparison
+    let mut sorted1: Vec<_> = branches1.to_vec();
+    let mut sorted2: Vec<_> = branches2.to_vec();
+    sorted1.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+    sorted2.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+
+    // Must have same number of branches
+    if sorted1.len() != sorted2.len() {
+        return Err(ProjectionError::MergeFailure(format!(
+            "select branch count mismatch: {} vs {}",
+            sorted1.len(),
+            sorted2.len()
+        )));
+    }
+
+    // Each branch must have the same label, merge continuations
+    let mut result = Vec::with_capacity(sorted1.len());
+    for ((label1, cont1), (label2, cont2)) in sorted1.iter().zip(sorted2.iter()) {
+        if label1 != label2 {
+            return Err(ProjectionError::MergeFailure(format!(
+                "select branch label mismatch: '{}' vs '{}'",
+                label1, label2
+            )));
+        }
+        let merged_cont = merge_local_types(cont1, cont2)?;
+        result.push((label1.clone(), merged_cont));
+    }
+
+    Ok(result)
+}
+
+/// Merge two sets of labeled branches for Branch types (recv semantics).
+///
+/// Branch merge UNIONS label sets. This matches Lean's `mergeRecvSorted`
+/// semantics: a non-participant can receive any label regardless of which
+/// branch was taken.
+fn merge_branch_branches(
     branches1: &[(proc_macro2::Ident, LocalType)],
     branches2: &[(proc_macro2::Ident, LocalType)],
 ) -> Result<Vec<(proc_macro2::Ident, LocalType)>, ProjectionError> {

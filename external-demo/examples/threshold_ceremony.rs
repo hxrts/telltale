@@ -10,8 +10,10 @@ use futures::channel::mpsc::{UnboundedSender, UnboundedReceiver};
 use serde::{Deserialize, Serialize};
 
 // Type definitions for the generated code
+#[allow(dead_code)]
 type Channel = channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
+#[allow(dead_code)]
 #[derive(Message)]
 enum Label {
     InitiateCeremony(InitiateCeremony),
@@ -22,7 +24,7 @@ enum Label {
 }
 
 // Message types for the threshold signing ceremony
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct InitiateCeremony {
     pub ceremony_id: String,
     pub message_hash: Vec<u8>,
@@ -31,7 +33,7 @@ pub struct InitiateCeremony {
     pub timeout_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SigningCommitment {
     pub ceremony_id: String,
     pub participant_id: String,
@@ -39,7 +41,7 @@ pub struct SigningCommitment {
     pub proof_of_knowledge: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CommitmentAggregation {
     pub ceremony_id: String,
     pub aggregated_commitments: Vec<u8>,
@@ -47,7 +49,7 @@ pub struct CommitmentAggregation {
     pub ready_to_sign: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SignatureShare {
     pub ceremony_id: String,
     pub participant_id: String,
@@ -55,7 +57,7 @@ pub struct SignatureShare {
     pub share_index: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FinalSignature {
     pub ceremony_id: String,
     pub aggregated_signature: Vec<u8>,

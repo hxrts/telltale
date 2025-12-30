@@ -14,8 +14,10 @@ use rumpsteak_aura_choreography::{
 use serde::{Deserialize, Serialize};
 
 // Type definitions for the generated code
+#[allow(dead_code)]
 type Channel = channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
+#[allow(dead_code)]
 #[derive(Message)]
 enum Label {
     Ping(Ping),
@@ -23,13 +25,13 @@ enum Label {
 }
 
 // Message type definitions
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Ping {
     pub sequence: u32,
     pub timestamp: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pong {
     pub sequence: u32,
     pub response_time: u64,

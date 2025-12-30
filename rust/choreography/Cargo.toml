@@ -39,6 +39,7 @@ pest_derive = { workspace = true }
 regex = { workspace = true }
 lazy_static = { workspace = true }
 toml = { workspace = true }
+sha2 = { workspace = true }
 
 # Optional dependencies
 rand = { workspace = true, optional = true }

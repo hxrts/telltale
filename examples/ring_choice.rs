@@ -180,6 +180,9 @@ fn main() {
 
     match result {
         Ok(()) => println!("\nRing protocol completed normally"),
-        Err(_) => println!("\nRing protocol completed (session dropped after {} rounds)", max_rounds()),
+        Err(_) => println!(
+            "\nRing protocol completed (session dropped after {} rounds)",
+            max_rounds()
+        ),
     }
 }

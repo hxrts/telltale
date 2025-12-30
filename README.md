@@ -140,7 +140,7 @@ Choreographic projection correctness is verified using Lean. The verification pi
 - **Subtyping invariants**: Asynchronous message reordering preserves causal dependencies
 - **Effect conformance**: Generated effect programs match their projected session types
 
-The `lean/` directory contains Lean proof modules, and `lean-exporter` serializes Rust choreography ASTs to JSON for verification. Run the full pipeline with `just rumpsteak-lean-check` (requires Nix). See `docs/13_lean_verification.md` for details.
+The `lean/` directory contains Lean proof modules, and `lean-exporter` serializes Rust choreography ASTs to JSON for verification. Run the full pipeline with `just rumpsteak-lean-check` (requires Nix). See `docs/14_lean_verification.md` for details.
 
 ## License
 

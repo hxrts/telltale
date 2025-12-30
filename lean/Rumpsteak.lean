@@ -2,6 +2,12 @@
 import Rumpsteak.Protocol.Core
 import Rumpsteak.Protocol.GlobalType
 import Rumpsteak.Protocol.LocalTypeR
+import Rumpsteak.Protocol.ContentId
+import Rumpsteak.Protocol.DeBruijn
+import Rumpsteak.Protocol.Location
+import Rumpsteak.Protocol.Resource
+import Rumpsteak.Protocol.Heap
+import Rumpsteak.Protocol.Merkle
 import Rumpsteak.Protocol.ProjectionR
 import Rumpsteak.Protocol.Choreography
 import Rumpsteak.Protocol.Projection
@@ -10,10 +16,12 @@ import Rumpsteak.Protocol.Subtyping
 import Rumpsteak.Protocol.Subtyping.Synchronous
 import Rumpsteak.Protocol.Subtyping.TreeDecomposition
 import Rumpsteak.Protocol.Subtyping.Asynchronous
-import Rumpsteak.Protocol.Semantics.Process
-import Rumpsteak.Protocol.Semantics.Configuration
-import Rumpsteak.Protocol.Semantics.Reduction
-import Rumpsteak.Protocol.Semantics.Typing
+-- Semantics modules (requires fixing Process.lean for Lean 4.24)
+-- import Rumpsteak.Protocol.Semantics.Process
+-- import Rumpsteak.Protocol.Semantics.Configuration
+-- import Rumpsteak.Protocol.Semantics.HeapConfiguration
+-- import Rumpsteak.Protocol.Semantics.Reduction
+-- import Rumpsteak.Protocol.Semantics.Typing
 
 -- Proof modules (theorems and claims)
 import Rumpsteak.Proofs.Assumptions

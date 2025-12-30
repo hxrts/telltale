@@ -15,9 +15,11 @@ pub mod ast;
 pub mod compiler;
 pub mod effects;
 pub mod extensions;
+pub mod heap;
 pub mod runtime;
 pub mod simulation;
 pub mod testing;
+pub mod topology;
 pub mod tracing;
 
 // Re-export runtime adapter types
@@ -46,12 +48,24 @@ pub use extensions::{
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
 };
 pub use runtime::{spawn, spawn_local};
+pub use topology::{
+    parse_topology, ByteMessage, InMemoryChannelTransport, Location, ParsedTopology, Topology,
+    TopologyBuilder, TopologyConstraint, TopologyHandler, TopologyHandlerBuilder,
+    TopologyLoadError, TopologyMode, TopologyParseError, TopologyValidation, Transport,
+    TransportError, TransportFactory, TransportMessage, TransportResult, TransportType,
+};
+
+// Re-export heap types for resource management
+pub use heap::{
+    ChannelState, Direction, Heap, HeapCommitment, HeapError, MerkleProof, MerkleTree,
+    Message as HeapMessage, MessagePayload, ProofStep, Resource, ResourceId,
+};
 
 // Re-export simulation types for protocol testing
 pub use simulation::{
     BlockedOn, Checkpoint, Clock, InMemoryTransport, MockClock, NullObserver, ProtocolEnvelope,
     ProtocolObserver, ProtocolStateMachine, RecordingObserver, Rng, SeededRng, SimulatedTransport,
-    StepInput, StepOutput, SystemClock, TransportError,
+    StepInput, StepOutput, SystemClock,
 };
 
 // Re-export macros from rumpsteak-macros

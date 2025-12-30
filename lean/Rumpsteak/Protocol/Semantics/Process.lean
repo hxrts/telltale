@@ -1,3 +1,5 @@
+import Rumpsteak.Protocol.GlobalType
+
 /-! # Rumpsteak.Protocol.Semantics.Process
 
 Process expressions for operational semantics.
@@ -25,11 +27,9 @@ The following definitions form the semantic interface for proofs:
 - Substitution and free variable operations
 -/
 
-import Rumpsteak.Protocol.GlobalType
-
 namespace Rumpsteak.Protocol.Semantics.Process
 
-open Rumpsteak.Protocol.GlobalType (Sort Label)
+open Rumpsteak.Protocol.GlobalType (PayloadSort Label)
 
 /-- Runtime values that can be sent in messages. -/
 inductive Value where
@@ -67,7 +67,7 @@ inductive Process where
   /-- Conditional: if b then P else Q -/
   | cond : Bool → Process → Process → Process
   /-- Recursive process: μX.P -/
-  | rec : String → Process → Process
+  | recurse : String → Process → Process
   /-- Process variable: X -/
   | var : String → Process
   /-- Parallel composition: P | Q -/
@@ -80,7 +80,7 @@ def Process.freeVars : Process → List String
   | .send _ _ _ p => p.freeVars
   | .recv _ branches => branches.bind fun (_, p) => p.freeVars
   | .cond _ p q => p.freeVars ++ q.freeVars
-  | .rec x p => p.freeVars.filter (· != x)
+  | .recurse x p => p.freeVars.filter (· != x)
   | .var x => [x]
   | .par p q => p.freeVars ++ q.freeVars
 
@@ -94,11 +94,11 @@ def Process.substitute (proc : Process) (varName : String) (replacement : Proces
     .recv role (branches.map fun (l, p) => (l, p.substitute varName replacement))
   | .cond b p q =>
     .cond b (p.substitute varName replacement) (q.substitute varName replacement)
-  | .rec x p =>
+  | .recurse x p =>
     if x == varName then
-      .rec x p  -- Variable is shadowed
+      .recurse x p  -- Variable is shadowed
     else
-      .rec x (p.substitute varName replacement)
+      .recurse x (p.substitute varName replacement)
   | .var x =>
     if x == varName then replacement else .var x
   | .par p q =>
@@ -106,7 +106,7 @@ def Process.substitute (proc : Process) (varName : String) (replacement : Proces
 
 /-- Unfold one level of recursion: μX.P ↦ P[μX.P/X] -/
 def Process.unfold : Process → Process
-  | p@(.rec x body) => body.substitute x p
+  | p@(.recurse x body) => body.substitute x p
   | p => p
 
 /-- Check if a process is closed (no free variables). -/
@@ -125,7 +125,7 @@ def Process.size : Process → Nat
   | .send _ _ _ p => 1 + p.size
   | .recv _ branches => 1 + branches.foldl (fun acc (_, p) => acc + p.size) 0
   | .cond _ p q => 1 + p.size + q.size
-  | .rec _ p => 1 + p.size
+  | .recurse _ p => 1 + p.size
   | .var _ => 1
   | .par p q => 1 + p.size + q.size
 

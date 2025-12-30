@@ -276,7 +276,7 @@ This abstraction makes the core library portable. The same code runs on servers 
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](05_effect_handlers.md) for details.
+Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](06_effect_handlers.md) for details.
 
 ### Middleware
 
@@ -292,47 +292,53 @@ Add new code generation backends to target different session type libraries. The
 
 ## Workspace Organization
 
-Rumpsteak-Aura is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory.
+Rumpsteak-Aura is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory. The crate structure mirrors the Lean formalization.
 
 ```
 rumpsteak-aura/
 ├── rust/                   All Rust crates
-│   ├── src/                Core session types library (rumpsteak-aura crate)
-│   │   ├── lib.rs          Session type primitives, channels, roles
-│   │   ├── channel.rs      Async channel implementations
-│   │   └── serialize.rs    Serialization support
-│   ├── choreography/       Choreographic programming extensions
-│   │   ├── src/
-│   │   │   ├── ast/        AST definitions
-│   │   │   ├── compiler/   Parser, projection, codegen
-│   │   │   ├── effects/    Effect system
-│   │   │   │   ├── handlers/   Handler implementations
-│   │   │   │   └── middleware/ Middleware implementations
-│   │   │   └── runtime.rs  Platform abstraction
-│   │   ├── tests/          Integration tests
-│   │   └── examples/       Example protocols
-│   ├── types/              Core types (GlobalType, LocalTypeR, Label)
-│   ├── theory/             Session type algorithms
-│   ├── codegen/            Rust code generation
-│   ├── lean-bridge/        Lean interop and validation
-│   ├── fsm/                Finite state machine support
-│   ├── macros/             Procedural macros
-│   ├── lean-exporter/      Lean export utilities
-│   └── caching/            HTTP cache case study
+│   ├── src/                Facade crate (rumpsteak-aura)
+│   ├── types/              Core types (rumpsteak-types)
+│   │   └── src/
+│   │       ├── global.rs   GlobalType (matches Lean)
+│   │       ├── local.rs    LocalTypeR (matches Lean)
+│   │       ├── label.rs    Label, PayloadSort
+│   │       └── action.rs   Action, LocalAction
+│   ├── theory/             Session type algorithms (rumpsteak-theory)
+│   │   └── src/
+│   │       ├── projection.rs   Global to local projection
+│   │       ├── merge.rs        Branch merging
+│   │       ├── subtyping/      Sync and async subtyping
+│   │       ├── duality.rs      Dual type computation
+│   │       └── bounded.rs      Bounded recursion
+│   ├── choreography/       DSL and effects (rumpsteak-aura-choreography)
+│   │   └── src/
+│   │       ├── ast/        Extended AST definitions
+│   │       ├── compiler/   Parser, projection, codegen
+│   │       ├── effects/    Effect handlers and middleware
+│   │       └── runtime/    Platform abstraction
+│   ├── lean-bridge/        Lean validation (rumpsteak-lean-bridge)
+│   │   └── src/
+│   │       ├── export.rs   Rust to JSON export
+│   │       ├── import.rs   JSON to Rust import
+│   │       └── runner.rs   Lean binary invocation
+│   ├── fsm/                FSM visualization (rumpsteak-aura-fsm)
+│   └── macros/             Procedural macros (rumpsteak-aura-macros)
 ├── lean/                   Lean 4 verification code
-├── examples/               Additional examples
-│   └── wasm-ping-pong/     WASM browser example
+├── examples/               Example protocols
 └── docs/                   Documentation
 ```
 
 ### Crate Responsibilities
 
-The `rumpsteak-aura` crate is in `rust/src/`. It provides foundation session types for type-safe asynchronous communication. This is the base dependency for all other crates.
+The `rumpsteak-types` crate contains core type definitions. It provides `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. These types match the Lean definitions exactly. This crate has no internal dependencies.
 
-The `rumpsteak-aura-choreography` crate provides the high-level choreographic programming layer. It includes the DSL parser, automatic projection, effect handlers, and runtime support. It builds on top of rumpsteak-aura.
+The `rumpsteak-theory` crate contains pure algorithms. It provides projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `rumpsteak-types`.
 
-The `rumpsteak-aura-fsm` crate provides finite state machine support for session types. It includes DOT parsing and subtyping verification. This is an optional dependency for advanced use cases.
+The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It includes the DSL parser, effect handlers, code generation, and runtime support.
 
-The `rumpsteak-aura-macros` crate contains procedural macros. These macros are used by both rumpsteak-aura and rumpsteak-aura-choreography.
+The `rumpsteak-lean-bridge` crate provides Lean integration. It exports Rust types to JSON and imports JSON from Lean. It includes a runner for invoking the Lean verification binary.
 
-The `caching` crate is an example application. It demonstrates real-world usage with Redis and HTTP caching.
+The `rumpsteak-aura-fsm` crate provides finite state machine support. Use it for visualization with DOT and Mermaid formats. FSM-based subtyping is also available.
+
+The `rumpsteak-aura` crate is the main facade. It re-exports types from other crates with feature flags. Most users import from this crate.

@@ -138,7 +138,7 @@ LocalType::LocalChoice {
 
 Alice makes a local decision.
 
-The key difference is between `LocalChoice` and `Select`. Select indicates communicated choice where the selection is sent to another role. LocalChoice indicates local decision with no communication.
+The key difference is between `LocalChoice` and `Select`. The `Select` variant indicates communicated choice where the selection is sent to another role. The `LocalChoice` variant indicates local decision with no communication.
 
 ### 4. Loop with Conditions
 
@@ -166,7 +166,7 @@ LocalType::Loop {
 
 The count condition is maintained.
 
-Supported conditions include `Condition::Count(n)` for fixed iteration count. Use `Condition::RoleDecides(role)` for loops controlled by a role. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally.
+Supported conditions include `Condition::Count(n)` for fixed iteration count and `Condition::RoleDecides(role)` for loops controlled by a role. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally.
 
 ### 5. Parallel Composition
 
@@ -220,7 +220,9 @@ Err(ProjectionError::InconsistentParallel)
 
 Cannot send to same recipient in parallel.
 
-Conflict detection rules prevent invalid projections. Multiple sends to the same role create a conflict. Multiple receives from the same role create a conflict. Multiple selects to the same role create a conflict. Multiple branches from the same role create a conflict. Operations on different roles are allowed.
+Conflict detection rules prevent invalid projections. Multiple sends to the same role create a conflict. Multiple receives from the same role create a conflict.
+
+Multiple selects to the same role create a conflict. Multiple branches from the same role create a conflict. Operations on different roles are allowed.
 
 ## Projection Rules Summary
 
@@ -231,6 +233,16 @@ When all branches start with send operations, the projection is `Select`. This i
 ### Receiver's View
 
 When the role receives the choice, the projection is `Branch`. When the role is not involved, continuations are merged.
+
+### Merge Semantics
+
+When a role is not involved in a choice, the projections of all branches must be merged. The merge algorithm follows precise semantics based on whether the role sends or receives.
+
+Send merge requires identical label sets. A non-participant cannot choose which message to send based on a choice they did not observe. If a role sends different messages in different branches, projection fails.
+
+Receive merge unions label sets. A non-participant can receive any message regardless of which branch was taken. Different incoming messages in different branches are combined into a single receive with multiple labels.
+
+This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `ProjectionR.lean`.
 
 ### Parallel Composition
 
@@ -331,7 +343,9 @@ LocalType::Send {
 
 Each instance executes independently with its own index.
 
-Dynamic role projection has these constraints. Wildcard broadcast `Workers[*]` requires all instances. Range selection `Workers[0..n]` requires subset determination at runtime. Index semantics `Workers[i]` preserve independence. Validation ensures safe dynamic role usage. Code generation includes runtime checks.
+Dynamic role projection has these constraints. Wildcard broadcast `Workers[*]` requires all instances. Range selection `Workers[0..n]` requires subset determination at runtime.
+
+Index semantics `Workers[i]` preserve independence. Validation ensures safe dynamic role usage. Code generation includes runtime checks.
 
 ## Implementation Notes
 

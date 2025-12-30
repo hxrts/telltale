@@ -215,6 +215,7 @@ pub struct AuraAnnotatedSend {
     pub annotations: HashMap<String, String>,
 }
 
+#[allow(clippy::cmp_owned)]
 impl ProtocolExtension for AuraAnnotatedSend {
     fn type_name(&self) -> &'static str {
         "AuraAnnotatedSend"

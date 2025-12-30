@@ -17,6 +17,7 @@ use syn::{
 #[derive(Debug, Clone)]
 pub struct EffectHandlerConfig {
     pub trait_name: Path,
+    #[allow(dead_code)]
     pub error_type: Option<Path>,
     pub mock_handler: HandlerVariant,
     pub real_handler: HandlerVariant,

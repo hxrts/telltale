@@ -22,13 +22,22 @@
 //! The merge operation `T₁ ⊔ T₂` is defined as:
 //!
 //! 1. `end ⊔ end = end`
-//! 2. `!q{lᵢ.Tᵢ} ⊔ !q{l'ⱼ.T'ⱼ} = !q{(lᵢ.Tᵢ) ∪ (l'ⱼ.T'ⱼ)}` if continuations with same labels are compatible
-//! 3. `?p{lᵢ.Tᵢ} ⊔ ?p{l'ⱼ.T'ⱼ} = ?p{(lᵢ.Tᵢ) ∪ (l'ⱼ.T'ⱼ)}` if continuations with same labels are compatible
+//! 2. `!q{lᵢ.Tᵢ} ⊔ !q{l'ⱼ.T'ⱼ} = !q{merged}` **only if label sets are identical**
+//!    (Lean: `mergeSendSorted` - non-participant cannot choose based on unseen choice)
+//! 3. `?p{lᵢ.Tᵢ} ⊔ ?p{l'ⱼ.T'ⱼ} = ?p{(lᵢ.Tᵢ) ∪ (l'ⱼ.T'ⱼ)}` (labels are unioned)
+//!    (Lean: `mergeRecvSorted` - non-participant can receive any label)
 //! 4. `μt.T ⊔ μt.T' = μt.(T ⊔ T')` if T and T' use the same variable
 //! 5. `t ⊔ t = t` for type variables
 //!
 //! The merge fails if the types have incompatible structure (different partners,
 //! conflicting labels with different continuations, etc.).
+//!
+//! # Key Difference: Send vs Recv
+//!
+//! - **Send merge**: Requires IDENTICAL label sets. A non-participant cannot decide
+//!   which message to send based on a choice they didn't observe.
+//! - **Recv merge**: UNIONS label sets. A non-participant can handle any incoming
+//!   message regardless of which branch was taken.
 
 use crate::ast::global_type::Label;
 use crate::ast::local_type::LocalTypeR;
@@ -65,6 +74,15 @@ pub enum MergeError {
     /// Merge of these types is not defined
     #[error("cannot merge incompatible types")]
     IncompatibleTypes,
+
+    /// Send branches have different label sets (not allowed for internal choice)
+    /// Lean correspondence: `mergeSendSorted` returns `none` when labels differ
+    #[error("send branch label mismatch: cannot merge sends with different labels '{left}' vs '{right}'")]
+    SendLabelMismatch { left: String, right: String },
+
+    /// Send branches have different number of labels
+    #[error("send branch count mismatch: {left} labels vs {right} labels")]
+    SendBranchCountMismatch { left: usize, right: usize },
 }
 
 /// Result type for merge operations
@@ -83,17 +101,22 @@ pub type MergeResult = Result<LocalTypeR, MergeError>;
 /// use rumpsteak_aura_choreography::ast::local_type::LocalTypeR;
 /// use rumpsteak_aura_choreography::ast::global_type::Label;
 ///
-/// // Merging identical types yields the same type
+/// // Merging identical sends yields the same type
 /// let t1 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
 /// let t2 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
 /// let merged = merge(&t1, &t2).unwrap();
 /// assert_eq!(merged, t1);
 ///
-/// // Merging sends with different labels creates a choice
+/// // Merging sends with different labels FAILS (non-participant cannot choose)
 /// let t1 = LocalTypeR::send("B", Label::new("yes"), LocalTypeR::End);
 /// let t2 = LocalTypeR::send("B", Label::new("no"), LocalTypeR::End);
+/// assert!(merge(&t1, &t2).is_err()); // SendLabelMismatch
+///
+/// // Merging recvs with different labels succeeds (unions labels)
+/// let t1 = LocalTypeR::recv("A", Label::new("x"), LocalTypeR::End);
+/// let t2 = LocalTypeR::recv("A", Label::new("y"), LocalTypeR::End);
 /// let merged = merge(&t1, &t2).unwrap();
-/// // merged = !B{yes.end, no.end}
+/// // merged = ?A{x.end, y.end}
 /// ```
 pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
     // Fast path: identical types
@@ -113,7 +136,8 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
             Err(MergeError::EndMismatch(other.clone()))
         }
 
-        // Rule 2: !q{branches₁} ⊔ !q{branches₂} = !q{branches₁ ∪ branches₂}
+        // Rule 2: !q{branches₁} ⊔ !q{branches₂} = !q{merged}
+        // Send merge requires IDENTICAL label sets (Lean: mergeSendSorted)
         (
             LocalTypeR::Send {
                 partner: p1,
@@ -130,7 +154,7 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
                     found: p2.clone(),
                 });
             }
-            let merged_branches = merge_branches(b1, b2)?;
+            let merged_branches = merge_send_branches(b1, b2)?;
             Ok(LocalTypeR::Send {
                 partner: p1.clone(),
                 branches: merged_branches,
@@ -138,6 +162,7 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
         }
 
         // Rule 3: ?p{branches₁} ⊔ ?p{branches₂} = ?p{branches₁ ∪ branches₂}
+        // Recv merge UNIONS label sets (Lean: mergeRecvSorted)
         (
             LocalTypeR::Recv {
                 partner: p1,
@@ -154,7 +179,7 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
                     found: p2.clone(),
                 });
             }
-            let merged_branches = merge_branches(b1, b2)?;
+            let merged_branches = merge_recv_branches(b1, b2)?;
             Ok(LocalTypeR::Recv {
                 partner: p1.clone(),
                 branches: merged_branches,
@@ -205,11 +230,66 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
     }
 }
 
-/// Merge two sets of labeled branches.
+/// Merge two sets of labeled branches for Send types.
+///
+/// Send merge requires IDENTICAL label sets. This matches Lean's `mergeSendSorted`
+/// semantics: a non-participant cannot choose which message to send based on
+/// a choice they didn't observe.
+///
+/// For labels that appear in both sets (which must be all of them),
+/// their continuations must be mergeable.
+fn merge_send_branches(
+    branches1: &[(Label, LocalTypeR)],
+    branches2: &[(Label, LocalTypeR)],
+) -> Result<Vec<(Label, LocalTypeR)>, MergeError> {
+    // Sort both branch lists for comparison
+    let mut sorted1: Vec<_> = branches1.to_vec();
+    let mut sorted2: Vec<_> = branches2.to_vec();
+    sorted1.sort_by(|a, b| a.0.name.cmp(&b.0.name));
+    sorted2.sort_by(|a, b| a.0.name.cmp(&b.0.name));
+
+    // Must have same number of branches
+    if sorted1.len() != sorted2.len() {
+        return Err(MergeError::SendBranchCountMismatch {
+            left: sorted1.len(),
+            right: sorted2.len(),
+        });
+    }
+
+    // Each branch must have the same label, merge continuations
+    let mut result = Vec::with_capacity(sorted1.len());
+    for ((label1, cont1), (label2, cont2)) in sorted1.iter().zip(sorted2.iter()) {
+        if label1.name != label2.name {
+            return Err(MergeError::SendLabelMismatch {
+                left: label1.name.clone(),
+                right: label2.name.clone(),
+            });
+        }
+        // Labels match - verify sorts match and merge continuations
+        if label1.sort != label2.sort {
+            return Err(MergeError::IncompatibleContinuations {
+                label: label1.name.clone(),
+            });
+        }
+        let merged_cont =
+            merge(cont1, cont2).map_err(|_| MergeError::IncompatibleContinuations {
+                label: label1.name.clone(),
+            })?;
+        result.push((label1.clone(), merged_cont));
+    }
+
+    Ok(result)
+}
+
+/// Merge two sets of labeled branches for Recv types.
+///
+/// Recv merge UNIONS label sets. This matches Lean's `mergeRecvSorted`
+/// semantics: a non-participant can handle any incoming message regardless
+/// of which branch was taken.
 ///
 /// For labels that appear in both sets, their continuations must be mergeable.
 /// Labels that appear in only one set are included as-is.
-fn merge_branches(
+fn merge_recv_branches(
     branches1: &[(Label, LocalTypeR)],
     branches2: &[(Label, LocalTypeR)],
 ) -> Result<Vec<(Label, LocalTypeR)>, MergeError> {
@@ -293,23 +373,18 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_sends_different_labels() {
-        // !B{yes.end} ⊔ !B{no.end} = !B{yes.end, no.end}
+    fn test_merge_sends_different_labels_fails() {
+        // !B{yes.end} ⊔ !B{no.end} = ERROR (send labels must be identical)
+        // Lean correspondence: mergeSendSorted returns none when labels differ
         let t1 = LocalTypeR::send("B", Label::new("yes"), LocalTypeR::End);
         let t2 = LocalTypeR::send("B", Label::new("no"), LocalTypeR::End);
 
-        let result = merge(&t1, &t2).unwrap();
-
-        match result {
-            LocalTypeR::Send { partner, branches } => {
-                assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 2);
-                let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
-                assert!(labels.contains(&"yes"));
-                assert!(labels.contains(&"no"));
-            }
-            _ => panic!("Expected Send"),
-        }
+        let result = merge(&t1, &t2);
+        assert!(
+            matches!(result, Err(MergeError::SendLabelMismatch { .. })),
+            "Send merge with different labels should fail: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -411,20 +486,56 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_all() {
+    fn test_merge_all_sends_same_label() {
+        // Sends with same label can be merged
         let types = vec![
-            LocalTypeR::send("B", Label::new("a"), LocalTypeR::End),
-            LocalTypeR::send("B", Label::new("b"), LocalTypeR::End),
-            LocalTypeR::send("B", Label::new("c"), LocalTypeR::End),
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+            LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
         ];
 
         let result = merge_all(&types).unwrap();
 
         match result {
             LocalTypeR::Send { branches, .. } => {
-                assert_eq!(branches.len(), 3);
+                assert_eq!(branches.len(), 1);
+                assert_eq!(branches[0].0.name, "msg");
             }
             _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_merge_all_sends_different_labels_fails() {
+        // Sends with different labels should fail
+        let types = vec![
+            LocalTypeR::send("B", Label::new("a"), LocalTypeR::End),
+            LocalTypeR::send("B", Label::new("b"), LocalTypeR::End),
+        ];
+
+        let result = merge_all(&types);
+        assert!(
+            result.is_err(),
+            "merge_all with different send labels should fail"
+        );
+    }
+
+    #[test]
+    fn test_merge_all_recvs_different_labels() {
+        // Recvs with different labels can be merged (unions labels)
+        let types = vec![
+            LocalTypeR::recv("A", Label::new("a"), LocalTypeR::End),
+            LocalTypeR::recv("A", Label::new("b"), LocalTypeR::End),
+            LocalTypeR::recv("A", Label::new("c"), LocalTypeR::End),
+        ];
+
+        let result = merge_all(&types).unwrap();
+
+        match result {
+            LocalTypeR::Recv { branches, .. } => {
+                assert_eq!(branches.len(), 3);
+            }
+            _ => panic!("Expected Recv"),
         }
     }
 
@@ -437,17 +548,29 @@ mod tests {
     #[test]
     fn test_can_merge() {
         let t1 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
-        let t2 = LocalTypeR::send("B", Label::new("other"), LocalTypeR::End);
-        let t3 = LocalTypeR::recv("B", Label::new("msg"), LocalTypeR::End);
+        let t2 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End); // same label
+        let t3 = LocalTypeR::send("B", Label::new("other"), LocalTypeR::End); // different label
+        let t4 = LocalTypeR::recv("B", Label::new("msg"), LocalTypeR::End);
 
+        // Same labels - can merge
         assert!(can_merge(&t1, &t2));
+        // Different labels for sends - cannot merge
         assert!(!can_merge(&t1, &t3));
+        // Send vs Recv - cannot merge
+        assert!(!can_merge(&t1, &t4));
     }
 
     #[test]
-    fn test_merge_nested_sends() {
-        // !B{a.!C{x.end}} ⊔ !B{b.!C{y.end}}
-        // = !B{a.!C{x.end}, b.!C{y.end}}
+    fn test_can_merge_recv_different_labels() {
+        // Recvs with different labels CAN be merged
+        let t1 = LocalTypeR::recv("A", Label::new("x"), LocalTypeR::End);
+        let t2 = LocalTypeR::recv("A", Label::new("y"), LocalTypeR::End);
+        assert!(can_merge(&t1, &t2));
+    }
+
+    #[test]
+    fn test_merge_nested_sends_different_labels_fails() {
+        // !B{a.!C{x.end}} ⊔ !B{b.!C{y.end}} = ERROR (outer labels differ)
         let t1 = LocalTypeR::send(
             "B",
             Label::new("a"),
@@ -459,18 +582,70 @@ mod tests {
             LocalTypeR::send("C", Label::new("y"), LocalTypeR::End),
         );
 
+        let result = merge(&t1, &t2);
+        assert!(
+            result.is_err(),
+            "Nested sends with different outer labels should fail"
+        );
+    }
+
+    #[test]
+    fn test_merge_nested_sends_same_outer_label() {
+        // !B{a.!C{x.end}} ⊔ !B{a.!C{x.end}} = !B{a.!C{x.end}}
+        let t1 = LocalTypeR::send(
+            "B",
+            Label::new("a"),
+            LocalTypeR::send("C", Label::new("x"), LocalTypeR::End),
+        );
+        let t2 = LocalTypeR::send(
+            "B",
+            Label::new("a"),
+            LocalTypeR::send("C", Label::new("x"), LocalTypeR::End),
+        );
+
         let result = merge(&t1, &t2).unwrap();
 
         match result {
             LocalTypeR::Send { partner, branches } => {
                 assert_eq!(partner, "B");
-                assert_eq!(branches.len(), 2);
+                assert_eq!(branches.len(), 1);
+                assert_eq!(branches[0].0.name, "a");
                 // Check nested structure preserved
-                for (_, cont) in &branches {
-                    assert!(matches!(cont, LocalTypeR::Send { partner, .. } if partner == "C"));
+                match &branches[0].1 {
+                    LocalTypeR::Send { partner, .. } => assert_eq!(partner, "C"),
+                    _ => panic!("Expected nested Send"),
                 }
             }
             _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_merge_nested_recvs_different_labels() {
+        // ?A{a.?B{x.end}} ⊔ ?A{b.?B{y.end}} = ?A{a.?B{x.end}, b.?B{y.end}}
+        let t1 = LocalTypeR::recv(
+            "A",
+            Label::new("a"),
+            LocalTypeR::recv("B", Label::new("x"), LocalTypeR::End),
+        );
+        let t2 = LocalTypeR::recv(
+            "A",
+            Label::new("b"),
+            LocalTypeR::recv("B", Label::new("y"), LocalTypeR::End),
+        );
+
+        let result = merge(&t1, &t2).unwrap();
+
+        match result {
+            LocalTypeR::Recv { partner, branches } => {
+                assert_eq!(partner, "A");
+                assert_eq!(branches.len(), 2);
+                // Check nested structure preserved
+                for (_, cont) in &branches {
+                    assert!(matches!(cont, LocalTypeR::Recv { partner, .. } if partner == "B"));
+                }
+            }
+            _ => panic!("Expected Recv"),
         }
     }
 

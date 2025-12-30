@@ -21,12 +21,19 @@
 //! - "Precise Subtyping for Asynchronous Multiparty Sessions" (Ghilezan et al., POPL 2021)
 
 mod action;
+pub mod content_id;
+pub mod content_store;
+pub mod contentable;
+pub mod de_bruijn;
 mod global;
 mod label;
 mod local;
 mod role;
 
 pub use action::{Action, LocalAction};
+pub use content_id::{ContentId, ContentIdSha256, Hasher, Sha256Hasher};
+pub use content_store::{CacheMetrics, ContentStore, KeyedContentStore};
+pub use contentable::{Contentable, ContentableError};
 pub use global::{GlobalType, PayloadSort};
 pub use label::Label;
 pub use local::LocalTypeR;

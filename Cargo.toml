@@ -27,7 +27,6 @@ rumpsteak-aura-macros = { path = "rust/macros", version = "0.7.0" }
 rumpsteak-aura-fsm = { path = "rust/fsm", version = "0.7.0", optional = true }
 rumpsteak-types = { path = "rust/types", version = "0.7.0" }
 rumpsteak-theory = { path = "rust/theory", version = "0.7.0", optional = true }
-rumpsteak-codegen = { path = "rust/codegen", version = "0.7.0", optional = true }
 rumpsteak-lean-bridge = { path = "rust/lean-bridge", version = "0.7.0", optional = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
@@ -74,9 +73,8 @@ serialize = ["rumpsteak-aura-macros/serialize", "rumpsteak-aura-fsm"]
 test-utils = ["rand"]
 wasm = ["getrandom/js"]
 theory = ["rumpsteak-theory"]
-codegen = ["rumpsteak-codegen"]
 lean-bridge = ["rumpsteak-lean-bridge"]
-full = ["theory", "codegen", "lean-bridge", "rumpsteak-aura-fsm"]
+full = ["theory", "lean-bridge", "rumpsteak-aura-fsm"]
 
 [profile.release]
 debug = true
@@ -85,7 +83,7 @@ debug = true
 debug = true
 
 [workspace]
-members = ["rust/caching", "rust/fsm", "rust/macros", "rust/choreography", "rust/lean-exporter", "rust/types", "rust/theory", "rust/codegen", "rust/lean-bridge"]
+members = ["rust/caching", "rust/fsm", "rust/macros", "rust/choreography", "rust/lean-exporter", "rust/types", "rust/theory", "rust/lean-bridge", "rust/transport-tcp"]
 exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members
@@ -128,6 +126,7 @@ rand = "0.8"
 regex = "1.10"
 lazy_static = "1.4"
 toml = "0.8"
+sha2 = "0.10"
 
 # Parsing
 pest = "2.7"

@@ -627,6 +627,358 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
         .map(|(choreo, _)| choreo)
 }
 
+/// Parsed choreography with inline topologies
+#[derive(Debug)]
+pub struct ParsedChoreographyWithTopologies {
+    /// The choreography definition
+    pub choreography: Choreography,
+    /// Inline topology definitions (if any)
+    pub inline_topologies: Vec<super::codegen::InlineTopology>,
+}
+
+/// Parse a choreographic protocol from a string, including inline topologies
+pub fn parse_choreography_str_with_topologies(
+    input: &str,
+) -> std::result::Result<ParsedChoreographyWithTopologies, ParseError> {
+    let pairs = ChoreographyParser::parse(Rule::choreography, input).map_err(Box::new)?;
+
+    let mut name = format_ident!("Unnamed");
+    let mut namespace: Option<String> = None;
+    let mut roles = Vec::new();
+    let mut declared_roles = HashSet::new();
+    let mut protocol_defs: HashMap<String, Vec<Statement>> = HashMap::new();
+    let mut statements = Vec::new();
+    let mut attrs: HashMap<String, String> = HashMap::new();
+    let mut inline_topologies = Vec::new();
+
+    for pair in pairs {
+        if pair.as_rule() == Rule::choreography {
+            for inner in pair.into_inner() {
+                match inner.as_rule() {
+                    Rule::namespace_decl => {
+                        namespace = Some(parse_namespace_decl(inner, input)?);
+                    }
+                    Rule::annotation => {
+                        let annotation_map = parse_annotations(inner)?;
+                        attrs.extend(annotation_map);
+                    }
+                    Rule::ident => {
+                        name = format_ident!("{}", inner.as_str());
+                    }
+                    Rule::roles_decl => {
+                        for role_pair in inner.into_inner() {
+                            if let Rule::role_list = role_pair.as_rule() {
+                                for role_decl in role_pair.into_inner() {
+                                    if let Rule::role_decl = role_decl.as_rule() {
+                                        let mut inner_role = role_decl.into_inner();
+                                        let role_ident = inner_role.next().unwrap();
+                                        let role_name = role_ident.as_str().trim();
+                                        let span = role_ident.as_span();
+
+                                        let role = if let Some(param_pair) = inner_role.next() {
+                                            if param_pair.as_rule() == Rule::role_param {
+                                                match parse_role_param(param_pair, role_name, input)
+                                                {
+                                                    Ok(param) => Role::with_param(
+                                                        format_ident!("{}", role_name),
+                                                        param,
+                                                    ),
+                                                    Err(e) => return Err(e),
+                                                }
+                                            } else {
+                                                Role::new(format_ident!("{}", role_name))
+                                            }
+                                        } else {
+                                            Role::new(format_ident!("{}", role_name))
+                                        };
+
+                                        if !declared_roles.insert(role_name.to_string()) {
+                                            return Err(ParseError::DuplicateRole {
+                                                role: role_name.to_string(),
+                                                span: ErrorSpan::from_pest_span(span, input),
+                                            });
+                                        }
+                                        roles.push(role);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rule::protocol_defs => {
+                        for protocol_def in inner.into_inner() {
+                            if let Rule::protocol_def = protocol_def.as_rule() {
+                                let mut def_inner = protocol_def.into_inner();
+                                let proto_name_pair = def_inner.next().unwrap();
+                                let proto_name = proto_name_pair.as_str();
+                                let proto_span = proto_name_pair.as_span();
+
+                                if protocol_defs.contains_key(proto_name) {
+                                    return Err(ParseError::DuplicateProtocol {
+                                        protocol: proto_name.to_string(),
+                                        span: ErrorSpan::from_pest_span(proto_span, input),
+                                    });
+                                }
+
+                                let body_pair = def_inner.next().unwrap();
+                                let body = parse_protocol_body(
+                                    body_pair,
+                                    &declared_roles,
+                                    input,
+                                    &protocol_defs,
+                                )?;
+                                protocol_defs.insert(proto_name.to_string(), body);
+                            }
+                        }
+                    }
+                    Rule::protocol_body => {
+                        statements =
+                            parse_protocol_body(inner, &declared_roles, input, &protocol_defs)?;
+                    }
+                    Rule::inline_topologies => {
+                        inline_topologies = parse_inline_topologies(inner, input)?;
+                    }
+                    Rule::EOI => {}
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if roles.is_empty() {
+        return Err(ParseError::EmptyChoreography);
+    }
+
+    let protocol = convert_statements_to_protocol(&statements, &roles);
+
+    Ok(ParsedChoreographyWithTopologies {
+        choreography: Choreography {
+            name,
+            namespace,
+            roles,
+            protocol,
+            attrs,
+        },
+        inline_topologies,
+    })
+}
+
+/// Parse inline topology definitions
+fn parse_inline_topologies(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<Vec<super::codegen::InlineTopology>, ParseError> {
+    let mut topologies = Vec::new();
+
+    for inner in pair.into_inner() {
+        if inner.as_rule() == Rule::inline_topology {
+            let mut topo_inner = inner.into_inner();
+
+            // Get topology name
+            let name_pair = topo_inner.next().unwrap();
+            let name = name_pair.as_str().to_string();
+
+            // Parse topology body
+            let body_pair = topo_inner.next().unwrap();
+            let topology = parse_topology_body_inline(body_pair, input)?;
+
+            topologies.push(super::codegen::InlineTopology { name, topology });
+        }
+    }
+
+    Ok(topologies)
+}
+
+/// Parse a topology body from inline definition
+fn parse_topology_body_inline(
+    pair: pest::iterators::Pair<Rule>,
+    _input: &str,
+) -> std::result::Result<crate::topology::Topology, ParseError> {
+    use crate::topology::Topology;
+
+    let mut topology = Topology::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::topology_mode => {
+                topology.mode = Some(parse_topology_mode_inline(inner)?);
+            }
+            Rule::topology_mappings => {
+                for mapping in inner.into_inner() {
+                    if mapping.as_rule() == Rule::topology_mapping {
+                        let (role, location) = parse_topology_mapping_inline(mapping)?;
+                        topology.locations.insert(role, location);
+                    }
+                }
+            }
+            Rule::topology_constraints => {
+                for constraint in inner.into_inner() {
+                    if constraint.as_rule() == Rule::constraint_decl {
+                        if let Ok(c) = parse_constraint_inline(constraint) {
+                            topology.constraints.push(c);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(topology)
+}
+
+fn parse_topology_mode_inline(
+    pair: pest::iterators::Pair<Rule>,
+) -> std::result::Result<crate::topology::TopologyMode, ParseError> {
+    use crate::topology::TopologyMode;
+
+    for inner in pair.into_inner() {
+        if inner.as_rule() == Rule::topology_mode_value {
+            let mode_inner = inner.into_inner().next();
+            return match mode_inner {
+                Some(p) => match p.as_rule() {
+                    Rule::kubernetes_mode => {
+                        let namespace = p.into_inner().next().map(|i| i.as_str()).unwrap_or("");
+                        Ok(TopologyMode::Kubernetes(namespace.to_string()))
+                    }
+                    Rule::consul_mode => {
+                        let datacenter = p.into_inner().next().map(|i| i.as_str()).unwrap_or("");
+                        Ok(TopologyMode::Consul(datacenter.to_string()))
+                    }
+                    _ => {
+                        let s = p.as_str();
+                        match s {
+                            "local" => Ok(TopologyMode::Local),
+                            "per_role" => Ok(TopologyMode::PerRole),
+                            _ => Ok(TopologyMode::Local),
+                        }
+                    }
+                },
+                None => Ok(TopologyMode::Local),
+            };
+        }
+    }
+    Ok(crate::topology::TopologyMode::Local)
+}
+
+fn parse_topology_mapping_inline(
+    pair: pest::iterators::Pair<Rule>,
+) -> std::result::Result<(String, crate::topology::Location), ParseError> {
+    use crate::topology::Location;
+
+    let mut inner = pair.into_inner();
+    let role = inner
+        .next()
+        .map(|p| p.as_str().to_string())
+        .unwrap_or_default();
+    let location = inner
+        .next()
+        .map(|p| parse_location_inline(p))
+        .transpose()?
+        .unwrap_or(Location::Local);
+
+    Ok((role, location))
+}
+
+fn parse_location_inline(
+    pair: pest::iterators::Pair<Rule>,
+) -> std::result::Result<crate::topology::Location, ParseError> {
+    use crate::topology::Location;
+
+    let inner = pair.into_inner().next();
+    match inner {
+        Some(p) => match p.as_rule() {
+            Rule::local_location => Ok(Location::Local),
+            Rule::colocated_location => {
+                let peer = p.into_inner().next().map(|i| i.as_str()).unwrap_or("");
+                Ok(Location::Colocated(peer.to_string()))
+            }
+            Rule::endpoint => Ok(Location::Remote(p.as_str().to_string())),
+            _ => {
+                let s = p.as_str();
+                if s == "local" {
+                    Ok(Location::Local)
+                } else {
+                    Ok(Location::Remote(s.to_string()))
+                }
+            }
+        },
+        None => Ok(Location::Local),
+    }
+}
+
+fn parse_constraint_inline(
+    pair: pest::iterators::Pair<Rule>,
+) -> std::result::Result<crate::topology::TopologyConstraint, ParseError> {
+    use crate::topology::TopologyConstraint;
+
+    let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan {
+            line: 1,
+            column: 1,
+            line_end: 1,
+            column_end: 1,
+            snippet: String::new(),
+        },
+        message: "empty constraint".to_string(),
+    })?;
+
+    match inner.as_rule() {
+        Rule::colocated_constraint => {
+            let mut idents = inner.into_inner();
+            let r1 = idents
+                .next()
+                .map(|p| p.as_str().to_string())
+                .unwrap_or_default();
+            let r2 = idents
+                .next()
+                .map(|p| p.as_str().to_string())
+                .unwrap_or_default();
+            Ok(TopologyConstraint::Colocated(r1, r2))
+        }
+        Rule::separated_constraint => {
+            let roles: Vec<String> = inner
+                .into_inner()
+                .flat_map(|p| p.into_inner())
+                .map(|p| p.as_str().to_string())
+                .collect();
+            if roles.len() >= 2 {
+                Ok(TopologyConstraint::Separated(
+                    roles[0].clone(),
+                    roles[1].clone(),
+                ))
+            } else {
+                Ok(TopologyConstraint::Separated(String::new(), String::new()))
+            }
+        }
+        Rule::pinned_constraint => {
+            let mut inner_iter = inner.into_inner();
+            let role = inner_iter
+                .next()
+                .map(|p| p.as_str().to_string())
+                .unwrap_or_default();
+            let location = inner_iter
+                .next()
+                .map(|p| parse_location_inline(p))
+                .transpose()?
+                .unwrap_or(crate::topology::Location::Local);
+            Ok(TopologyConstraint::Pinned(role, location))
+        }
+        Rule::region_constraint => {
+            let mut idents = inner.into_inner();
+            let role = idents
+                .next()
+                .map(|p| p.as_str().to_string())
+                .unwrap_or_default();
+            let region = idents
+                .next()
+                .map(|p| p.as_str().to_string())
+                .unwrap_or_default();
+            Ok(TopologyConstraint::Region(role, region))
+        }
+        _ => Ok(TopologyConstraint::Colocated(String::new(), String::new())),
+    }
+}
+
 /// Parse a choreographic protocol from a string with extension support
 pub fn parse_choreography_str_with_extensions(
     input: &str,
@@ -1114,6 +1466,53 @@ fn parse_loop_stmt(
                     }
                 })?;
                 condition = Some(Condition::Custom(token_stream));
+            }
+            Rule::fuel_condition => {
+                let span = item.as_span();
+                let mut cond_inner = item.into_inner();
+                let fuel_pair = cond_inner.next().unwrap();
+                let fuel_str = fuel_pair.as_str();
+
+                // Try to parse as integer, otherwise treat as variable
+                if let Ok(fuel) = fuel_str.parse::<usize>() {
+                    condition = Some(Condition::Fuel(fuel));
+                } else {
+                    // Parse as TokenStream for symbolic fuel
+                    let token_stream = syn::parse_str::<TokenStream>(fuel_str).map_err(|e| {
+                        ParseError::InvalidCondition {
+                            message: format!("Invalid fuel value: {e}"),
+                            span: ErrorSpan::from_pest_span(span, input),
+                        }
+                    })?;
+                    condition = Some(Condition::Custom(token_stream));
+                }
+            }
+            Rule::yield_after_condition => {
+                let span = item.as_span();
+                let mut cond_inner = item.into_inner();
+                let yield_pair = cond_inner.next().unwrap();
+                let yield_str = yield_pair.as_str();
+
+                // Try to parse as integer, otherwise treat as variable
+                if let Ok(n) = yield_str.parse::<usize>() {
+                    condition = Some(Condition::YieldAfter(n));
+                } else {
+                    // Parse as TokenStream for symbolic yield_after
+                    let token_stream = syn::parse_str::<TokenStream>(yield_str).map_err(|e| {
+                        ParseError::InvalidCondition {
+                            message: format!("Invalid yield_after value: {e}"),
+                            span: ErrorSpan::from_pest_span(span, input),
+                        }
+                    })?;
+                    condition = Some(Condition::Custom(token_stream));
+                }
+            }
+            Rule::yield_when_condition => {
+                let mut cond_inner = item.into_inner();
+                let when_str = cond_inner.next().unwrap().as_str();
+                // Remove quotes from string
+                let when_str = when_str.trim_matches('"');
+                condition = Some(Condition::YieldWhen(when_str.to_string()));
             }
             Rule::protocol_body => {
                 body = parse_protocol_body(item, declared_roles, input, protocol_defs)?;
@@ -1905,5 +2304,202 @@ choreography LoopProtocol {
 
         let result = parse_choreography_str(input);
         assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_parse_loop_fuel() {
+        let input = r#"
+choreography FuelProtocol {
+    roles: Client, Server
+
+    loop (fuel: 5) {
+        Client -> Server: Request
+        Server -> Client: Response
+    }
+}
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse fuel loop: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_parse_loop_yield_after() {
+        let input = r#"
+choreography YieldAfterProtocol {
+    roles: Client, Server
+
+    loop (yield_after: 10) {
+        Client -> Server: Request
+        Server -> Client: Response
+    }
+}
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse yield_after loop: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_parse_loop_yield_when() {
+        let input = r#"
+choreography YieldWhenProtocol {
+    roles: Client, Server
+
+    loop (yield_when: "done") {
+        Client -> Server: Request
+        Server -> Client: Response
+    }
+}
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse yield_when loop: {:?}",
+            result.err()
+        );
+    }
+
+    // ==========================================
+    // Inline Topology Tests
+    // ==========================================
+
+    #[test]
+    fn test_parse_choreography_with_inline_topology() {
+        let input = r#"
+choreography PingPong {
+    roles: Alice, Bob
+
+    Alice -> Bob: Ping
+    Bob -> Alice: Pong
+}
+
+topology Dev {
+    mode: local
+}
+"#;
+
+        let result = parse_choreography_str_with_topologies(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse with inline topology: {:?}",
+            result.err()
+        );
+
+        let parsed = result.unwrap();
+        assert_eq!(parsed.choreography.name.to_string(), "PingPong");
+        assert_eq!(parsed.inline_topologies.len(), 1);
+        assert_eq!(parsed.inline_topologies[0].name, "Dev");
+    }
+
+    #[test]
+    fn test_parse_choreography_with_multiple_inline_topologies() {
+        let input = r#"
+choreography ThreeWay {
+    roles: Alice, Bob, Carol
+
+    Alice -> Bob: Hello
+    Bob -> Carol: Forward
+    Carol -> Alice: Ack
+}
+
+topology Dev {
+    mode: local
+}
+
+topology Prod {
+    Alice: alice.prod.internal:8080
+    Bob: bob.prod.internal:8081
+    Carol: carol.prod.internal:8082
+}
+"#;
+
+        let result = parse_choreography_str_with_topologies(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse with multiple topologies: {:?}",
+            result.err()
+        );
+
+        let parsed = result.unwrap();
+        assert_eq!(parsed.choreography.name.to_string(), "ThreeWay");
+        assert_eq!(parsed.inline_topologies.len(), 2);
+        assert_eq!(parsed.inline_topologies[0].name, "Dev");
+        assert_eq!(parsed.inline_topologies[1].name, "Prod");
+
+        // Verify Dev topology mode
+        use crate::topology::TopologyMode;
+        assert_eq!(
+            parsed.inline_topologies[0].topology.mode,
+            Some(TopologyMode::Local)
+        );
+
+        // Verify Prod topology locations
+        use crate::topology::Location;
+        assert_eq!(
+            parsed.inline_topologies[1].topology.get_location("Alice"),
+            Location::Remote("alice.prod.internal:8080".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_choreography_with_topology_constraints() {
+        let input = r#"
+choreography Constrained {
+    roles: A, B, C
+
+    A -> B: M1
+    B -> C: M2
+}
+
+topology WithConstraints {
+    A: localhost:8080
+    B: localhost:8081
+    C: localhost:8082
+
+    constraints {
+        colocated: A, B
+        separated: A, C
+    }
+}
+"#;
+
+        let result = parse_choreography_str_with_topologies(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse with topology constraints: {:?}",
+            result.err()
+        );
+
+        let parsed = result.unwrap();
+        assert_eq!(parsed.inline_topologies.len(), 1);
+        assert_eq!(parsed.inline_topologies[0].topology.constraints.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_choreography_without_inline_topology() {
+        let input = r#"
+choreography Simple {
+    roles: A, B
+
+    A -> B: Message
+}
+"#;
+
+        let result = parse_choreography_str_with_topologies(input);
+        assert!(result.is_ok());
+
+        let parsed = result.unwrap();
+        assert_eq!(parsed.choreography.name.to_string(), "Simple");
+        assert!(parsed.inline_topologies.is_empty());
     }
 }
