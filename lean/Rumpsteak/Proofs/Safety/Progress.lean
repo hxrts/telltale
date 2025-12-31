@@ -89,7 +89,7 @@ standard results from the session type literature (Yoshida & Gheri). -/
 axiom terminated_config_queues_empty (g : GlobalType) (c : Configuration)
     (hwt : ConfigWellTyped g c)
     (hterm : c.processes.all (fun rp => rp.process.isTerminated))
-    : c.queues.all (fun q => q.messages.isEmpty)
+    : c.queues.all (fun (_, q) => q.isEmpty)
 
 /-- Recv progress axiom: if a receiver is waiting, some role can reduce.
 

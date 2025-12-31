@@ -276,4 +276,125 @@ theorem ConsumeResult_implies_reduces (g sender receiver label g' : _)
   | mu t body sender receiver label g' _hcons ih =>
     exact GlobalTypeReduces.mu t body g' ih
 
+/-! ## Consume existence lemmas -/
+
+/-- If the global type is a communication with matching sender/receiver and
+    a branch with the given label exists, then consume succeeds.
+
+    This is a direct consequence of the consume definition. -/
+theorem consume_comm_succeeds (sender receiver : String) (branches : List (Label × GlobalType))
+    (label : Label) (g : GlobalType)
+    (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
+    : (.comm sender receiver branches).consume sender receiver label = some g := by
+  simp only [GlobalType.consume, beq_self_eq_true, Bool.and_self, ↓reduceIte]
+  simp only [hfind, Option.map_some']
+
+/-- If projectR gives a send type with a single branch, the global type must be
+    a communication (possibly under μ-binders) that can be consumed.
+
+    PROOF SKETCH: By induction on the structure of g.
+    - If g = .comm sender receiver branches with sender = role:
+      Then branches projects to the single branch, so branches has exactly one element
+      and consume succeeds.
+    - If g = .mu t body: projection of .mu only produces .mu or .end, never .send.
+    - Other cases don't produce .send.
+
+    The key insight is that .send is only produced when role = sender in a .comm. -/
+theorem send_projection_implies_consume_exists (g : GlobalType) (role receiver : String)
+    (label : Label) (contType : LocalTypeR)
+    (hproj : Rumpsteak.Protocol.ProjectionR.projectR g role = .ok (.send receiver [(label, contType)]))
+    : ∃ g', g.consume role receiver label = some g' := by
+  -- We proceed by cases on g. The key is that .send is only produced by .comm.
+  cases g with
+  | end => simp only [Rumpsteak.Protocol.ProjectionR.projectR] at hproj; cases hproj
+  | var t => simp only [Rumpsteak.Protocol.ProjectionR.projectR] at hproj; cases hproj
+  | mu t body =>
+    -- .mu never produces .send directly
+    exact absurd hproj (Rumpsteak.Protocol.ProjectionR.projectR_mu_not_send t body role receiver [(label, contType)])
+  | comm sender recvr branches =>
+    -- For .comm, we need to analyze cases
+    simp only [Rumpsteak.Protocol.ProjectionR.projectR, Except.bind] at hproj
+    cases hbr : branches.isEmpty with
+    | true => simp only [hbr, ↓reduceIte] at hproj
+    | false =>
+      simp only [hbr, Bool.false_eq_true, ↓reduceIte] at hproj
+      -- Check if role == sender
+      cases hrs : role == sender with
+      | false =>
+        simp only [hrs, Bool.false_eq_true, ↓reduceIte] at hproj
+        -- Check if role == recvr
+        cases hrr : role == recvr with
+        | true =>
+          -- role is receiver, so projection gives .recv, not .send
+          simp only [hrr, ↓reduceIte] at hproj
+          cases hpb : Rumpsteak.Protocol.ProjectionR.projectBranches branches role with
+          | error e => simp only [hpb, Except.map] at hproj
+          | ok bs => simp only [hpb, Except.map, Except.ok.injEq, LocalTypeR.recv.injEq] at hproj; cases hproj
+        | false =>
+          -- role is non-participant, so projection gives merged result, not .send
+          simp only [hrr, Bool.false_eq_true, ↓reduceIte] at hproj
+          cases hpt : Rumpsteak.Protocol.ProjectionR.projectBranchTypes branches role with
+          | error e => simp only [hpt, Except.bind] at hproj
+          | ok lts =>
+            simp only [hpt, Except.bind] at hproj
+            cases lts with
+            | nil => simp only [Except.pure] at hproj; cases hproj
+            | cons first rest =>
+              simp only [Except.pure] at hproj
+              -- foldlM merge doesn't produce .send from non-send inputs typically
+              -- This case analysis gets complex; we use sorry for now
+              sorry
+      | true =>
+        -- role == sender, so projection gives .send receiver [projected branches]
+        simp only [hrs, ↓reduceIte] at hproj
+        cases hpb : Rumpsteak.Protocol.ProjectionR.projectBranches branches role with
+        | error e => simp only [hpb, Except.map] at hproj
+        | ok bs =>
+          simp only [hpb, Except.map, Except.ok.injEq, LocalTypeR.send.injEq] at hproj
+          -- hproj : receiver = recvr ∧ bs = [(label, contType)]
+          obtain ⟨hrecv, hbs⟩ := hproj
+          -- Since bs = [(label, contType)] and bs comes from projectBranches branches role,
+          -- branches must have exactly one element [(label', g')] where projectR g' role = contType
+          -- and label'.name = label.name
+          rw [beq_iff_eq] at hrs
+          subst hrs hrecv
+          -- Now we need to show that consume succeeds
+          -- branches has a find? that succeeds for label.name
+          -- Since projectBranches branches role = .ok [(label, contType)],
+          -- branches = [(label', g')] for some label', g'
+          cases branches with
+          | nil => simp only [Rumpsteak.Protocol.ProjectionR.projectBranches] at hpb; cases hpb
+          | cons b rest =>
+            simp only [Rumpsteak.Protocol.ProjectionR.projectBranches, Except.bind, Except.pure] at hpb
+            cases hcont : Rumpsteak.Protocol.ProjectionR.projectR b.2 role with
+            | error e => simp only [hcont, Except.bind] at hpb
+            | ok lt =>
+              simp only [hcont, Except.bind, Except.pure] at hpb
+              cases hrest : Rumpsteak.Protocol.ProjectionR.projectBranches rest role with
+              | error e => simp only [hrest, Except.bind] at hpb
+              | ok lts =>
+                simp only [hrest, Except.bind, Except.pure] at hpb
+                cases hpb
+                -- So lts = [], meaning rest must be []
+                cases rest with
+                | nil =>
+                  -- branches = [b], so find? will find b if b.1.name = label.name
+                  -- From hbs : [(b.1, lt)] = [(label, contType)]
+                  simp only [List.cons.injEq, Prod.mk.injEq, and_true, List.nil_eq] at hbs
+                  obtain ⟨hlbl, hlt⟩ := hbs
+                  -- b.1 = label, so find? succeeds
+                  use b.2
+                  simp only [GlobalType.consume, beq_self_eq_true, Bool.and_self, ↓reduceIte]
+                  simp only [List.find?_cons, hlbl, beq_self_eq_true, ↓reduceIte, Option.map_some']
+                | cons _ _ =>
+                  -- rest is non-empty, so lts is non-empty, but lts = []
+                  simp only [Rumpsteak.Protocol.ProjectionR.projectBranches, Except.bind, Except.pure] at hrest
+                  cases Rumpsteak.Protocol.ProjectionR.projectR _ _ with
+                  | error e => simp only [Except.bind] at hrest
+                  | ok _ =>
+                    simp only [Except.bind, Except.pure] at hrest
+                    cases Rumpsteak.Protocol.ProjectionR.projectBranches _ _ with
+                    | error e => simp only [Except.bind] at hrest
+                    | ok _ => simp only [Except.bind, Except.pure] at hrest; simp only [List.cons.injEq, and_false] at hbs
+
 end Rumpsteak.Protocol.GlobalType

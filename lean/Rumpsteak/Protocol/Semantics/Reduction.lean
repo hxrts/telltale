@@ -147,9 +147,10 @@ def reduceSendConfig (c : Configuration) (role receiver : String)
   let msg := { sender := role, label := label, value := value }
   (c.enqueue ch msg).setProcess role cont
 
-/-- Helper for receive reduction in propositional semantics. -/
-def receiveConfig (c : Configuration) (role : String) (cont : Process) : Configuration :=
-  c.setProcess role cont
+/-- Helper for receive reduction in propositional semantics.
+    Takes the dequeued configuration (with message removed from queue). -/
+def reduceRecvConfig (c' : Configuration) (role : String) (cont : Process) : Configuration :=
+  c'.setProcess role cont
 
 /-- Inductive reduction relation for formal proofs.
 
@@ -162,14 +163,15 @@ inductive Reduces : Configuration → Configuration → Prop where
     c.getProcess role = some (.send receiver label value cont) →
     Reduces c (reduceSendConfig c role receiver label value cont)
 
-  /-- Receive rule: dequeue and branch -/
+  /-- Receive rule: dequeue and branch.
+      NOTE: c' is the configuration after dequeue (with message removed from queue). -/
   | recv :
-    ∀ (c : Configuration) (role sender : String)
+    ∀ (c c' : Configuration) (role sender : String)
       (branches : List (Label × Process)) (msg : Message) (cont : Process),
     c.getProcess role = some (.recv sender branches) →
-    c.dequeue { sender := sender, receiver := role } = some (msg, _) →
-    branches.find? (fun (l, _) => l.name == msg.label.name) = some (_, cont) →
-    Reduces c (receiveConfig c role cont)
+    c.dequeue { sender := sender, receiver := role } = some (msg, c') →
+    branches.find? (fun (l, _) => l.name == msg.label.name) = some (msg.label, cont) →
+    Reduces c (reduceRecvConfig c' role cont)
 
   /-- Conditional rule -/
   | cond :

@@ -139,7 +139,23 @@ theorem projection_preserved_other_thm (g g' : GlobalType) (sender receiver role
 
     The continuation is well-typed against the evolved global type because:
     - By inversion, the continuation has the continuation type
-    - By projection_after_send, the evolved global type projects to this type -/
+    - By projection_after_send, the evolved global type projects to this type
+
+    ASYNCHRONOUS SEMANTICS NOTE:
+    In asynchronous semantics with explicit message queues, there is a fundamental
+    tension in the current `ConfigWellTyped` definition:
+    - After a send, the sender's process needs the CONTINUATION type
+    - The receiver's process is unchanged and still needs the RECEIVE type
+    - But g.consume changes BOTH sender and receiver projections simultaneously
+
+    The current definition requires all roles to be typed against projections of
+    a SINGLE global type. For full async semantics, one would need:
+    - Queue-aware typing that accounts for in-flight messages, OR
+    - Session subtyping allowing processes to be "behind" their expected types, OR
+    - Split global types that track send/receive independently
+
+    This axiom captures the expected behavior; proving it fully requires extending
+    the typing relation to handle intermediate queue states. -/
 axiom subject_reduction_send_ax (g : GlobalType) (c : Configuration)
     (role receiver : String) (label : Label) (value : Value) (cont : Process)
     (hwt : ConfigWellTyped g c)
@@ -158,15 +174,20 @@ axiom subject_reduction_send_ax (g : GlobalType) (c : Configuration)
     The selected branch is well-typed against the evolved global type because:
     - The message label matches a branch in the receiver's type
     - By inversion, that branch has the corresponding branch type
-    - By projection after the send (already consumed), the type matches -/
-axiom subject_reduction_recv_ax (g : GlobalType) (c : Configuration)
+    - By projection after the send (already consumed), the type matches
+
+    NOTE: For the recv case, the asynchronous gap is resolved because:
+    - The message was already sent (sender has moved on)
+    - The receiver now executes, consuming from the queue
+    - After this step, both sender and receiver have "caught up" to the evolved global type -/
+axiom subject_reduction_recv_ax (g : GlobalType) (c c' : Configuration)
     (role sender : String) (branches : List (Label × Process))
     (msg : Message) (cont : Process)
     (hwt : ConfigWellTyped g c)
     (hget : c.getProcess role = some (.recv sender branches))
-    (hdeq : c.dequeue sender role = some (msg, c))
-    (hfind : branches.find? (fun (l, _) => l.name == msg.label) = some (⟨msg.label⟩, cont))
-    : ∃ g', GlobalTypeReducesStar g g' ∧ ConfigWellTyped g' (c.setProcess role cont)
+    (hdeq : c.dequeue { sender := sender, receiver := role } = some (msg, c'))
+    (hfind : branches.find? (fun (l, _) => l.name == msg.label.name) = some (msg.label, cont))
+    : ∃ g', GlobalTypeReducesStar g g' ∧ ConfigWellTyped g' (c'.setProcess role cont)
 
 /-! ## Helper Lemmas for mapM and Projection -/
 
@@ -482,9 +503,10 @@ theorem subject_reduction : SubjectReduction := by
   | send c role receiver label value cont hget =>
     -- Send case: use subject_reduction_send
     exact subject_reduction_send g c role receiver label value cont hwt hget
-  | recv c role sender branches msg cont hget hdeq hfind =>
+  | recv c cdeq role sender branches msg cont hget hdeq hfind =>
     -- Receive case: use subject_reduction_recv_ax
-    exact subject_reduction_recv_ax g c role sender branches msg cont hwt hget hdeq hfind
+    -- cdeq is the configuration after dequeue (with message removed)
+    exact subject_reduction_recv_ax g c cdeq role sender branches msg cont hwt hget hdeq hfind
   | cond c role b p q hget =>
     -- Conditional case: use subject_reduction_cond
     refine ⟨g, GlobalTypeReducesStar.refl g, ?_⟩
