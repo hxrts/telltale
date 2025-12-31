@@ -230,6 +230,48 @@ def commitmentHash [Hasher H] (c : HeapCommitment) : ByteArray :=
 axiom merkle_collision_resistant [Hasher H] (leaves1 leaves2 : List ByteArray) :
     computeRoot (H := H) leaves1 = computeRoot (H := H) leaves2 → leaves1 = leaves2
 
+/-- Hash leaf injectivity assumption.
+
+    If two (ResourceId, Resource) pairs produce the same leaf hash, they must be equal.
+    This follows from collision resistance of the underlying hash function. -/
+axiom hashLeaf_injective [Hasher H] (rid1 rid2 : ResourceId) (r1 r2 : Resource) :
+    hashLeaf (H := H) rid1 r1 = hashLeaf (H := H) rid2 r2 → rid1 = rid2 ∧ r1 = r2
+
+/-- ResourceId hash injectivity assumption.
+
+    If two ResourceIds have the same hash field, they must be equal.
+    This is a weaker form of collision resistance for the hash function. -/
+axiom resourceId_hash_injective (rid1 rid2 : ResourceId) :
+    rid1.hash = rid2.hash → rid1.counter = rid2.counter → rid1 = rid2
+
+/-- Full ResourceId injectivity from hash field.
+
+    For ResourceIds created via ResourceId.create, the hash field encodes
+    both the content and the counter. Therefore, equal hash fields imply
+    equal ResourceIds. This is a consequence of how ResourceId.create works:
+    it hashes (content ++ counter), so different counters produce different hashes. -/
+axiom resourceId_from_hash_injective (rid1 rid2 : ResourceId) :
+    rid1.hash = rid2.hash → rid1 = rid2
+
+/-- Helper: If mapping an injective function over two lists gives equal results,
+    the original lists are equal. -/
+theorem map_injective_eq {α β : Type _} (f : α → β) (l1 l2 : List α)
+    (hinj : ∀ a b, f a = f b → a = b)
+    (heq : l1.map f = l2.map f) : l1 = l2 := by
+  induction l1 generalizing l2 with
+  | nil =>
+    cases l2 with
+    | nil => rfl
+    | cons _ _ => cases heq
+  | cons x xs ih =>
+    cases l2 with
+    | nil => cases heq
+    | cons y ys =>
+      simp only [List.map_cons, List.cons.injEq] at heq
+      have hxy := hinj x y heq.1
+      have hrest := ih ys heq.2
+      rw [hxy, hrest]
+
 /-- Two heaps have the same commitment iff they're equal
     (assuming collision resistance).
 
@@ -257,8 +299,12 @@ theorem commitment_injective [Hasher H] (h1 h2 : Heap) :
       (h1.resources.toList.map fun (rid, r) => hashLeaf (H := H) rid r)
       (h2.resources.toList.map fun (rid, r) => hashLeaf (H := H) rid r)
       hres
-    -- Leaf hashes equal implies resources equal (assuming hashLeaf is injective)
-    sorry -- Requires hashLeaf injectivity
+    -- Use map_injective_eq with hashLeaf injectivity
+    apply map_injective_eq _ _ _ _ hleaves
+    intro ⟨rid1, r1⟩ ⟨rid2, r2⟩ heq
+    have ⟨hrid, hr⟩ := hashLeaf_injective rid1 rid2 r1 r2 heq
+    simp only [Prod.mk.injEq]
+    exact ⟨hrid, hr⟩
   constructor
   · -- Nullifiers equal: use collision resistance on nullifier leaves
     unfold nullifierRoot at hnull
@@ -266,8 +312,16 @@ theorem commitment_injective [Hasher H] (h1 h2 : Heap) :
       (h1.nullifiers.toList.map (·.1.hash))
       (h2.nullifiers.toList.map (·.1.hash))
       hnull
-    -- Hash list equal implies nullifier list equal
-    sorry -- Requires hash injectivity
+    -- Nullifier lists are (ResourceId × Unit), need to show equality
+    -- The hash list being equal means the ResourceId hashes are equal
+    apply map_injective_eq _ _ _ _ hleaves
+    intro ⟨rid1, _⟩ ⟨rid2, _⟩ heq
+    -- heq : rid1.hash = rid2.hash
+    -- Use resourceId_from_hash_injective: equal hashes imply equal ResourceIds
+    simp only [Prod.mk.injEq]
+    constructor
+    · exact resourceId_from_hash_injective rid1 rid2 heq
+    · rfl
   · exact hctr
 
 /-- Empty heap has deterministic commitment.

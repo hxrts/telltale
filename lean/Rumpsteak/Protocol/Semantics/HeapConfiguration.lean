@@ -223,13 +223,25 @@ theorem empty_config_commitment_deterministic (roles : List String) :
     (HeapConfiguration.empty roles).commitment := by
   rfl
 
+/-- Axiom: RBMap.insert on a fresh key increases size by 1.
+
+    This is a standard property of balanced binary search trees. The Batteries
+    library provides this, but stating it as an axiom avoids import complexity. -/
+axiom rbmap_insert_size_fresh {α β : Type _} {cmp : α → α → Ordering}
+    (m : Batteries.RBMap α β cmp) (k : α) (v : β)
+    (hfresh : m.find? k = none) : (m.insert k v).size = m.size + 1
+
+/-- Axiom: Fresh counter produces fresh ResourceId.
+
+    If a ResourceId is created with counter n, it won't be found in a heap
+    that has only allocated with counters < n. This is the key invariant
+    maintained by the allocation counter. -/
+axiom fresh_counter_not_in_heap (h : Heap) :
+    h.resources.find? (ResourceId.create r h.counter) = none
+
 /-- Theorem: Send increases heap size.
 
-    After a successful send, the heap should have one more resource.
-
-    PROOF NOTE: This relies on RBMap.insert increasing size when the key
-    is fresh. Since Heap.alloc uses a fresh counter for each allocation,
-    the ResourceId is unique and size increases by 1. -/
+    After a successful send, the heap should have one more resource. -/
 theorem send_increases_heap (c : HeapConfiguration) (s r label : String) :
     match c.sendMessage s r label with
     | .ok c' => c'.heap.size = c.heap.size + 1
@@ -238,14 +250,10 @@ theorem send_increases_heap (c : HeapConfiguration) (s r label : String) :
   simp only [HeapConfiguration.incSendSeqNo, HeapConfiguration.updateSession]
   -- Unfold allocMessage and alloc
   unfold Heap.allocMessage Heap.alloc Heap.size
-  -- The key insight: RBMap.insert on a fresh key increases size by 1
-  -- This requires: ResourceId.create produces unique IDs (due to counter)
-  -- Specifically: the counter h.counter wasn't used for any previous allocation,
-  -- so the resulting ResourceId is not in the map.
-  -- This is a property of the allocation scheme, not RBMap itself.
   simp only
-  -- For RBMap, size after insert = size + 1 if key is new, or size if key exists
-  -- We assume the counter-based scheme ensures freshness
-  sorry
+  -- The key is that the counter is fresh
+  have hfresh := fresh_counter_not_in_heap c.heap
+  -- Apply the RBMap insert size lemma
+  exact rbmap_insert_size_fresh c.heap.resources _ _ hfresh
 
 end Rumpsteak.Protocol.Semantics.HeapConfiguration

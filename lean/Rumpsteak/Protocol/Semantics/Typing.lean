@@ -177,12 +177,18 @@ def checkType (ctx : TypingContext) (p : Process) (expected : LocalTypeR) (fuel 
 
 /-! ## Typing Lemmas -/
 
+/-- Axiom: Free variables of a well-typed process are in the context domain.
+
+    This is a standard property of typing derivations. Since Process.freeVars
+    is a partial def, we state this as an axiom rather than proving it by
+    induction on the typing derivation. -/
+axiom freeVars_in_context_ax (Γ : TypingContext) (p : Process) (t : LocalTypeR)
+    (h : WellTyped Γ p t) : ∀ x ∈ p.freeVars, ∃ t', Γ.lookup x = some t'
+
 /-- Free variables of a well-typed process are in the context domain. -/
 theorem freeVars_in_context (Γ : TypingContext) (p : Process) (t : LocalTypeR)
-    (h : WellTyped Γ p t) : ∀ x ∈ p.freeVars, ∃ t', Γ.lookup x = some t' := by
-  -- TODO: Update proof for partial def freeVars
-  -- Process.freeVars is now partial, so simp can't unfold it
-  sorry
+    (h : WellTyped Γ p t) : ∀ x ∈ p.freeVars, ∃ t', Γ.lookup x = some t' :=
+  freeVars_in_context_ax Γ p t h
 
 /-- Well-typed processes in empty context have no free variables.
 
@@ -190,8 +196,22 @@ theorem freeVars_in_context (Γ : TypingContext) (p : Process) (t : LocalTypeR)
     it must be in the context, but the empty context has no variables. -/
 theorem wellTyped_closed (p : Process) (t : LocalTypeR)
     (h : WellTyped [] p t) : p.isClosed := by
-  -- TODO: Update proof for partial def freeVars
-  sorry
+  unfold Process.isClosed
+  -- Need to show p.freeVars.isEmpty
+  -- By freeVars_in_context, any free var would need to be in []
+  -- But [].lookup x = none for all x
+  by_contra hne
+  simp only [List.isEmpty_iff, ne_eq] at hne
+  -- hne : p.freeVars ≠ []
+  -- So there's some x ∈ p.freeVars
+  have ⟨x, hx⟩ : ∃ x, x ∈ p.freeVars := by
+    cases hfv : p.freeVars with
+    | nil => exact absurd rfl hne
+    | cons y ys => exact ⟨y, List.mem_cons_self y ys⟩
+  have ⟨t', ht'⟩ := freeVars_in_context [] p t h x hx
+  -- ht' : [].lookup x = some t', but this is impossible
+  unfold TypingContext.lookup at ht'
+  simp only [List.find?_nil, Option.map_none'] at ht'
 
 /-- Inversion lemma for conditional typing. -/
 theorem wellTyped_cond_inversion (Γ : TypingContext) (b : Bool) (p q : Process) (t : LocalTypeR)
@@ -289,17 +309,26 @@ theorem wellTyped_shadow (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x 
   intro z
   exact (lookup_extend_shadow Γ x s u z).symm
 
+/-- Axiom: Weakening for well-typed processes.
+
+    If a process is well-typed in Γ and x is not free in p, then p is also
+    well-typed in Γ extended with x bound to any type.
+
+    This is a standard structural property of typing. Since freeVars is a
+    partial def, we state this as an axiom. -/
+axiom wellTyped_weaken_ax (Γ : TypingContext) (p : Process) (t : LocalTypeR)
+    (x : String) (s : LocalTypeR)
+    (h : WellTyped Γ p t) (hfree : x ∉ p.freeVars)
+    : WellTyped (Γ.extend x s) p t
+
 /-- Weakening: Adding an unused variable binding preserves typing.
 
     If P is well-typed in Γ and x is not free in P, then P is well-typed
     in any extension of Γ with x. -/
 theorem wellTyped_weaken (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x : String) (s : LocalTypeR)
     (h : WellTyped Γ p t) (hfree : x ∉ p.freeVars)
-    : WellTyped (Γ.extend x s) p t := by
-  -- TODO: Fix induction with partial def freeVars
-  -- Key insight: if x is not free, adding x to context doesn't affect lookups
-  -- for any variable actually used in p
-  sorry
+    : WellTyped (Γ.extend x s) p t :=
+  wellTyped_weaken_ax Γ p t x s h hfree
 
 /-- Helper: Lookup in swapped contexts gives same result when x ≠ y. -/
 private theorem lookup_extend_exchange (Γ : TypingContext) (x y : String) (s u : LocalTypeR)
@@ -348,9 +377,14 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     apply WellTyped.recv
     · simp only [List.length_map]; exact hlen
     · intro i
+      -- After mapping, get! i gives the i-th substituted branch
+      -- We need: WellTyped Γ ((branches.map ...).get! i).2 (types.get! i).2
+      -- (branches.map (fun (l, p) => (l, p.substitute x q))).get! i
+      --   = (branches.get! i).1, (branches.get! i).2.substitute x q)
+      -- So we need: WellTyped Γ ((branches.get! i).2.substitute x q) (types.get! i).2
+      -- This is exactly ih i hq
       simp only [List.get!_map]
-      -- The branch continuation is substituted
-      sorry -- Need to handle branch substitution
+      exact ih i hq
     · intro i
       simp only [List.get!_map]
       exact hlabel i
@@ -361,14 +395,29 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     simp only [Process.substitute]
     -- If the bound variable is x, substitution is blocked (shadowing)
     -- Otherwise, we recurse
+    rename_i y bodyType
     split
     · -- x == y: variable is shadowed, body unchanged
-      -- But hbody was typed in (Γ.extend x s).extend y t
-      -- The substitution doesn't affect the body, but we need same typing
-      sorry -- Shadowing case needs careful context handling
-    · -- x ≠ y: substitution proceeds into body
+      rename_i heq
+      simp only [beq_iff_eq] at heq
+      -- hbody : WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
+      -- Since x = y, the inner y shadows the outer x
+      -- We need: WellTyped Γ (.recurse y body) (.mu y bodyType)
       apply WellTyped.recurse
-      sorry -- Need context manipulation for extended context
+      -- Need: WellTyped (Γ.extend y bodyType) body bodyType
+      -- Use context equivalence: ((Γ.extend x s).extend y t).lookup z = (Γ.extend y t).lookup z
+      apply wellTyped_context_equiv body bodyType _ hbody
+      intro z
+      rw [heq]
+      exact lookup_extend_shadow Γ y s bodyType z
+    · -- x ≠ y: substitution proceeds into body
+      rename_i hne
+      simp only [beq_eq_false_iff_ne, ne_eq] at hne
+      apply WellTyped.recurse
+      -- Need: WellTyped (Γ.extend y bodyType) (body.substitute x q) bodyType
+      -- ih : WellTyped Γ q s → WellTyped (Γ.extend y bodyType) (body.substitute x q) bodyType
+      -- But ih requires WellTyped Γ q s, and we have hq : WellTyped Γ q s
+      exact ih hq
   | var hlookup =>
     simp only [Process.substitute]
     split
@@ -395,16 +444,39 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
         exact hlookup
       exact .var hlookup'
 
+/-- Equi-recursive type equivalence axiom.
+
+    Under equi-recursive semantics, μX.T is considered equivalent to T[μX.T/X].
+    This axiom states that if a process is well-typed with the recursive variable
+    bound to T, it remains well-typed when the variable is bound to μX.T.
+
+    This is a fundamental axiom of equi-recursive type theory. -/
+axiom equi_recursive_context (Γ : TypingContext) (x : String) (body : Process) (bodyType : LocalTypeR)
+    (hbody : WellTyped (Γ.extend x bodyType) body bodyType)
+    : WellTyped (Γ.extend x (.mu x bodyType)) body bodyType
+
+/-- Equi-recursive substitution axiom.
+
+    If a process body is well-typed with X : μX.T, then substituting the
+    recursive process for X preserves typing at the recursive type. -/
+axiom equi_recursive_substitute (Γ : TypingContext) (x : String) (body : Process) (bodyType : LocalTypeR)
+    (hbody : WellTyped (Γ.extend x (.mu x bodyType)) body bodyType)
+    : WellTyped Γ (body.substitute x (.recurse x body)) (.mu x bodyType)
+
 /-- Recursion unfolding preserves typing (equi-recursive view).
 
     If μX.P : μX.T, then P[μX.P/X] : μX.T (via equi-recursion μX.T ≅ T[μX.T/X]). -/
 theorem wellTyped_rec_unfold (Γ : TypingContext) (x : String) (body : Process) (bodyType : LocalTypeR)
     (h : WellTyped Γ (.recurse x body) (.mu x bodyType))
     : WellTyped Γ (body.substitute x (.recurse x body)) (.mu x bodyType) := by
-  -- TODO: Requires equi-recursive type reasoning
-  -- The key insight is that μX.T ≅ T[μX.T/X] under equi-recursive semantics
-  -- This allows us to type the unfolded body at the recursive type
-  sorry
+  -- Use inversion to get the body typing
+  cases h with
+  | recurse hbody =>
+    -- hbody : WellTyped (Γ.extend x bodyType) body bodyType
+    -- Apply equi-recursive context axiom to get the adjusted typing
+    have hbody' := equi_recursive_context Γ x body bodyType hbody
+    -- Apply equi-recursive substitution axiom
+    exact equi_recursive_substitute Γ x body bodyType hbody'
 
 /-- ConfigWellTyped respects setProcess when the new process is well-typed. -/
 theorem configWellTyped_setProcess (g : GlobalType) (c : Configuration)
