@@ -293,8 +293,19 @@ theorem subject_reduction_rec (g : GlobalType) (c : Configuration)
     (hget : c.getProcess role = some (.recurse x body))
     : ∃ g', GlobalTypeReducesStar g g' ∧
             ConfigWellTyped g' (c.setProcess role (body.substitute x (.recurse x body))) := by
-  -- TODO: Update for Lean 4.24 - depends on wellTyped_role_has_projection and wellTyped_rec_inversion
-  sorry
+  -- Recursion unfolding is a local step: global type doesn't change
+  refine ⟨g, GlobalTypeReducesStar.refl g, ?_⟩
+  -- Get the projected type for this role
+  obtain ⟨lt, hproj, hwt_rec⟩ := wellTyped_role_has_projection g c role _ hwt hget
+  -- By inversion, lt = μX.bodyType for some bodyType
+  obtain ⟨bodyType, hlt_eq, hwt_body⟩ := wellTyped_rec_inversion [] x body lt hwt_rec
+  -- After unfolding, the process has the same type (equi-recursive)
+  have hunfold : WellTyped [] (body.substitute x (.recurse x body)) (.mu x bodyType) := by
+    rw [hlt_eq] at hwt_rec
+    exact wellTyped_rec_unfold [] x body bodyType hwt_rec
+  -- Apply configWellTyped_setProcess
+  rw [hlt_eq] at hproj
+  exact configWellTyped_setProcess g c role _ _ hwt hproj hunfold
 
 /-- Subject reduction theorem.
 
@@ -305,8 +316,23 @@ theorem subject_reduction_rec (g : GlobalType) (c : Configuration)
     4. For cond/rec: both proven above -/
 theorem subject_reduction : SubjectReduction := by
   intro g c c' hwt hred
-  -- TODO: Update for Lean 4.24 - case analysis on Reduces needs helper lemmas
-  sorry
+  -- Case analysis on the reduction rule
+  cases hred with
+  | send c role receiver label value cont hget =>
+    -- Send case: use subject_reduction_send
+    exact subject_reduction_send g c role receiver label value cont hwt hget
+  | recv c role sender branches msg cont hget hdeq hfind =>
+    -- Receive case: need to show typing preserved after dequeue
+    -- This requires: (a) queue-type correspondence
+    --                (b) branch type matches message label
+    sorry
+  | cond c role b p q hget =>
+    -- Conditional case: use subject_reduction_cond
+    refine ⟨g, GlobalTypeReducesStar.refl g, ?_⟩
+    exact subject_reduction_cond g c role b p q hwt hget
+  | recurse c role x body hget =>
+    -- Recursion case: use subject_reduction_rec
+    exact subject_reduction_rec g c role x body hwt hget
 
 /-! ## Partial Claims Bundle -/
 

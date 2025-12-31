@@ -251,16 +251,43 @@ theorem lookup_extend_shadow (Γ : TypingContext) (x : String) (s t : LocalTypeR
   simp only [List.find?_cons]
   split <;> rfl
 
+/-- Helper: Context equivalence preserved under extension. -/
+private theorem lookup_equiv_extend {Γ1 Γ2 : TypingContext} (y : String) (ty : LocalTypeR)
+    (heq : ∀ z, Γ1.lookup z = Γ2.lookup z)
+    : ∀ z, (Γ1.extend y ty).lookup z = (Γ2.extend y ty).lookup z := by
+  intro z
+  unfold TypingContext.extend TypingContext.lookup
+  simp only [List.find?_cons]
+  split
+  · rfl
+  · exact heq z
+
+/-- Typing is preserved when contexts agree on all lookups. -/
+theorem wellTyped_context_equiv {Γ1 Γ2 : TypingContext} (p : Process) (t : LocalTypeR)
+    (heq : ∀ z, Γ1.lookup z = Γ2.lookup z)
+    (h : WellTyped Γ1 p t) : WellTyped Γ2 p t := by
+  induction h generalizing Γ2 with
+  | inaction => exact .inaction
+  | send hcont ih =>
+    exact .send (ih heq)
+  | recv hlen hall hlabel ih =>
+    exact .recv hlen (fun i => ih i heq) hlabel
+  | cond hp hq ihp ihq =>
+    exact .cond (ihp heq) (ihq heq)
+  | recurse hbody ih =>
+    exact .recurse (ih (lookup_equiv_extend _ _ heq))
+  | var hlookup =>
+    rw [← heq] at hlookup
+    exact .var hlookup
+
 /-- Typing is preserved under context shadowing: if the inner binding shadows
     an identical outer binding, typing is preserved. -/
 theorem wellTyped_shadow (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x : String) (s u : LocalTypeR)
     (h : WellTyped (Γ.extend x u) p t)
     : WellTyped ((Γ.extend x s).extend x u) p t := by
-  -- The key insight is that lookups in both contexts agree (lookup_extend_shadow).
-  -- However, induction over WellTyped requires generalizing the context parameter,
-  -- which is non-trivial due to the nested extends in the recurse case.
-  -- A full proof would need a custom induction principle or mutual induction.
-  sorry
+  apply wellTyped_context_equiv p t _ h
+  intro z
+  exact (lookup_extend_shadow Γ x s u z).symm
 
 /-- Weakening: Adding an unused variable binding preserves typing.
 
@@ -274,15 +301,24 @@ theorem wellTyped_weaken (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x 
   -- for any variable actually used in p
   sorry
 
+/-- Helper: Lookup in swapped contexts gives same result when x ≠ y. -/
+private theorem lookup_extend_exchange (Γ : TypingContext) (x y : String) (s u : LocalTypeR)
+    (hne : x ≠ y)
+    : ∀ z, ((Γ.extend x s).extend y u).lookup z = ((Γ.extend y u).extend x s).lookup z := by
+  intro z
+  unfold TypingContext.extend TypingContext.lookup
+  simp only [List.find?_cons]
+  by_cases hzy : z == y <;> by_cases hzx : z == x <;> simp only [hzy, hzx, ↓reduceIte]
+  -- z = y and z = x is impossible since x ≠ y
+  · simp only [beq_iff_eq] at hzy hzx
+    exact absurd (hzy.symm.trans hzx) hne
+
 /-- Context exchange: swapping independent bindings preserves typing. -/
 theorem wellTyped_exchange (Γ : TypingContext) (p : Process) (t : LocalTypeR)
     (x y : String) (s u : LocalTypeR) (hne : x ≠ y)
     (h : WellTyped ((Γ.extend x s).extend y u) p t)
     : WellTyped ((Γ.extend y u).extend x s) p t := by
-  -- TODO: Fix induction for compound contexts
-  -- Exchange is a standard structural property: lookup in swapped contexts
-  -- gives the same result for any variable z (since x ≠ y)
-  sorry
+  exact wellTyped_context_equiv p t (lookup_extend_exchange Γ x y s u hne) h
 
 /-- Substitution lemma for process/type.
 
@@ -296,10 +332,68 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     (hp : WellTyped (Γ.extend x s) p t)
     (hq : WellTyped Γ q s)
     : WellTyped Γ (p.substitute x q) t := by
-  -- TODO: Fix induction for compound contexts and partial substitute
-  -- The proof requires induction on the typing derivation with careful
-  -- handling of context extension and variable shadowing
-  sorry
+  -- Induction on the typing derivation
+  -- Note: Process.substitute is partial, so we rely on typing structure
+  induction hp generalizing Γ with
+  | inaction =>
+    -- inaction.substitute x q = inaction
+    simp only [Process.substitute]
+    exact .inaction
+  | send hcont ih =>
+    simp only [Process.substitute]
+    exact .send (ih hq)
+  | recv hlen hall hlabel ih =>
+    simp only [Process.substitute]
+    -- Need to show: substituted branches preserve typing
+    apply WellTyped.recv
+    · simp only [List.length_map]; exact hlen
+    · intro i
+      simp only [List.get!_map]
+      -- The branch continuation is substituted
+      sorry -- Need to handle branch substitution
+    · intro i
+      simp only [List.get!_map]
+      exact hlabel i
+  | cond hp hq ihp ihq =>
+    simp only [Process.substitute]
+    exact .cond (ihp hq) (ihq hq)
+  | recurse hbody ih =>
+    simp only [Process.substitute]
+    -- If the bound variable is x, substitution is blocked (shadowing)
+    -- Otherwise, we recurse
+    split
+    · -- x == y: variable is shadowed, body unchanged
+      -- But hbody was typed in (Γ.extend x s).extend y t
+      -- The substitution doesn't affect the body, but we need same typing
+      sorry -- Shadowing case needs careful context handling
+    · -- x ≠ y: substitution proceeds into body
+      apply WellTyped.recurse
+      sorry -- Need context manipulation for extended context
+  | var hlookup =>
+    simp only [Process.substitute]
+    split
+    · -- x == varName: return q (the replacement)
+      simp only [beq_iff_eq] at *
+      rename_i heq
+      -- hlookup : (Γ.extend x s).lookup varName = some t
+      -- Since varName == x, lookup returns s, so t = s
+      unfold TypingContext.extend TypingContext.lookup at hlookup
+      simp only [List.find?_cons, heq, beq_self_eq_true, ↓reduceIte, Option.map] at hlookup
+      injection hlookup with ht
+      rw [ht]
+      exact hq
+    · -- x ≠ varName: return .var varName unchanged
+      simp only [beq_eq_false_iff_ne, ne_eq] at *
+      rename_i hne
+      -- hlookup : (Γ.extend x s).lookup varName = some t
+      -- Since varName ≠ x, lookup looks in Γ
+      have hlookup' : Γ.lookup _ = some t := by
+        unfold TypingContext.extend TypingContext.lookup at hlookup
+        simp only [List.find?_cons] at hlookup
+        have hneq : (_ == x) = false := beq_eq_false_iff_ne.mpr (fun h => hne h.symm)
+        simp only [hneq, Bool.false_eq_true, ↓reduceIte] at hlookup
+        exact hlookup
+      exact .var hlookup'
 
 /-- Recursion unfolding preserves typing (equi-recursive view).
 

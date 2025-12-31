@@ -87,21 +87,29 @@ structure Claims where
 
 /-- Canonical form for send types.
 
-    Note: This claim as stated is too strong. A process typed at a send type
-    could be a conditional (if both branches have send type) or a variable
-    (looking up a send type from context). The true canonical forms lemma
-    requires additional assumptions (e.g., values/closed processes). -/
+    UNPROVABLE AS STATED: A process typed at a send type could be:
+    - A send process (the expected case)
+    - A conditional (if both branches have send type)
+    - A variable (if context maps it to send type)
+
+    The true canonical forms lemma requires:
+    - Empty context (rules out variables)
+    - Value restriction (rules out conditionals)
+
+    For the progress theorem, we handle each case directly instead. -/
 theorem canonical_send : CanonicalSend := by
   intro Γ p receiver label t h
-  -- TODO: The claim needs refinement - cond and var can also have send type
+  -- Counterexample: WellTyped Γ (.cond true (.send r l v p) (.send r l v p)) (.send r [(l, t)])
+  -- Both branches have send type, so the conditional has send type, but isn't a send.
   sorry
 
 /-- Canonical form for receive types.
 
-    Note: Same issue as canonical_send - the claim is too strong. -/
+    UNPROVABLE AS STATED: Same issue as canonical_send.
+    A conditional or variable can also have receive type. -/
 theorem canonical_recv : CanonicalRecv := by
   intro Γ p sender types h
-  -- TODO: The claim needs refinement - cond and var can also have recv type
+  -- Counterexample: WellTyped Γ (.cond true (.recv s bs) (.recv s bs)) (.recv s types)
   sorry
 
 /-- Deadlock freedom follows from progress. -/
@@ -214,16 +222,24 @@ theorem progress : Progress := by
   · -- All processes terminated, so some queue must be non-empty
     simp only [hproc, true_and, Bool.not_eq_true'] at hnotdone
     -- hnotdone : ¬ all queues empty
-    -- This means there's a message but no active receiver
-    -- By well-typedness, this shouldn't happen (queues should drain)
-    -- This requires showing that well-typed terminated configs have empty queues
+    -- CLAIM: Well-typed terminated configurations have empty queues
+    -- PROOF SKETCH:
+    -- 1. All processes terminated ⟹ all processes have type `end`
+    -- 2. By projection, global type must be `end` (no pending communications)
+    -- 3. Queue messages correspond to in-flight communications in global type
+    -- 4. `end` global type has no in-flight messages ⟹ queues empty
+    -- This requires: (a) typing preservation for terminated processes
+    --                (b) queue-type correspondence lemma
     sorry
   · -- Some process is not terminated
     have ⟨rp, hrp_mem, hnotterm⟩ := exists_active_process c hproc
-    -- Assume role names are unique (standard invariant for configurations)
-    -- In practice, this would be an invariant on well-formed configurations
+    -- INVARIANT: Role names are unique in well-formed configurations
+    -- This is a standard structural property that should be:
+    -- (a) Part of Configuration well-formedness, or
+    -- (b) Derived from how configurations are constructed
+    -- For now, we assume it as an axiom.
     have hunique : ∀ rp' ∈ c.processes, rp'.role = rp.role → rp' = rp := by
-      sorry -- Role uniqueness invariant
+      sorry -- Role uniqueness: each role appears exactly once
     -- Case analysis on the process type
     cases hp : rp.process with
     | inaction =>
@@ -236,12 +252,16 @@ theorem progress : Progress := by
       rw [hp] at hget
       exact send_can_reduce c rp.role receiver label value cont hget
     | recv sender branches =>
-      -- Receive requires a message in the queue
-      -- By well-typedness and global type structure, if this role expects
-      -- to receive from sender, either:
-      -- 1. There's already a message from sender in the queue, or
-      -- 2. The sender's process is a matching send (will send first)
-      -- This is the key insight from session type theory
+      -- CLAIM: A receive process can always make progress (configuration-wide)
+      -- PROOF SKETCH (Key insight from session type theory):
+      -- If role r has type ?s{...} (receive from s), then by global type structure:
+      --   Case 1: Queue from s→r is non-empty ⟹ r can dequeue (Reduces.recv)
+      --   Case 2: Queue is empty ⟹ s has type !r{...} (complementary send)
+      --     - If s is terminated ⟹ contradiction (terminated has type `end`)
+      --     - If s is not terminated with send type ⟹ s can send (Reduces.send)
+      -- Either way, SOME role can reduce, satisfying ∃ c', Reduces c c'
+      -- This requires: (a) global type duality/complementarity lemma
+      --                (b) queue correspondence with global type structure
       sorry
     | cond b p q =>
       -- Conditional can always reduce
@@ -254,14 +274,41 @@ theorem progress : Progress := by
       rw [hp] at hget
       exact rec_can_reduce c rp.role x body hget
     | var x =>
-      -- Variable in a well-typed closed process
-      -- Well-typed processes in empty context are closed (no free vars)
-      -- So a var process contradicts well-typedness
-      sorry
+      -- Variable in a well-typed closed process contradicts well-typedness
+      -- WellTyped [] (.var x) t requires [].lookup x = some t, which is impossible
+      -- Get the well-typing for this role
+      have hrpwt := hwt rp hrp_mem
+      unfold RoleProcessWellTyped at hrpwt
+      cases hproj : projectR g rp.role with
+      | error e =>
+        simp only [hproj] at hrpwt
+      | ok lt =>
+        rw [hproj] at hrpwt
+        -- hrpwt : WellTyped [] rp.process lt
+        -- After pattern match, rp.process = .var x
+        -- Use inversion: WellTyped [] (.var x) lt requires lookup to succeed
+        have hvar : WellTyped [] (.var x) lt := by rw [← hp]; exact hrpwt
+        cases hvar with
+        | var hlookup =>
+          -- hlookup : [].lookup x = some lt, but empty list has no elements
+          unfold TypingContext.lookup at hlookup
+          simp only [List.find?_nil, Option.map] at hlookup
+          cases hlookup
     | par p q =>
-      -- Parallel composition: at least one side is not terminated
-      -- Need to recurse on the non-terminated component
-      sorry
+      -- Parallel composition: WellTyped has no rule for par
+      -- So a well-typed process cannot be par - contradiction
+      have hrpwt := hwt rp hrp_mem
+      unfold RoleProcessWellTyped at hrpwt
+      cases hproj : projectR g rp.role with
+      | error e =>
+        simp only [hproj] at hrpwt
+      | ok lt =>
+        rw [hproj] at hrpwt
+        -- hrpwt : WellTyped [] rp.process lt
+        -- After pattern match, rp.process = .par p q
+        have hpar : WellTyped [] (.par p q) lt := by rw [← hp]; exact hrpwt
+        -- WellTyped has no constructor for par, so this is a contradiction
+        cases hpar
 
 /-! ## Partial Claims Bundle -/
 
