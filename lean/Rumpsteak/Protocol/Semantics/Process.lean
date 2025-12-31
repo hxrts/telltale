@@ -109,6 +109,24 @@ theorem freeVarsOfBranches_mem (branches : List (Label × Process)) (x : String)
       have ⟨i, hi, hx⟩ := ih hrest
       exact ⟨i + 1, Nat.succ_lt_succ hi, hx⟩
 
+/-- Converse: if x is in branch i's freeVars, it's in freeVarsOfBranches. -/
+theorem freeVarsOfBranches_mem_of (branches : List (Label × Process)) (x : String) (i : Nat)
+    (h : x ∈ (branches.get! i).2.freeVars)
+    : x ∈ freeVarsOfBranches branches := by
+  induction branches generalizing i with
+  | nil =>
+    simp only [List.get!_nil] at h
+    simp only [Process.freeVars, List.not_mem_nil] at h
+  | cons b rest ih =>
+    simp only [freeVarsOfBranches, List.mem_append]
+    cases i with
+    | zero =>
+      simp only [List.get!_cons_zero] at h
+      exact Or.inl h
+    | succ n =>
+      simp only [List.get!_cons_succ] at h
+      exact Or.inr (ih n h)
+
 -- Substitute a process for a variable.
 -- Uses mutual recursion to handle the nested `List (Label × Process)` case.
 mutual

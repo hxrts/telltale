@@ -347,26 +347,72 @@ theorem wellTyped_shadow (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x 
   intro z
   exact (lookup_extend_shadow Γ x s u z).symm
 
-/-- Axiom: Weakening for well-typed processes.
-
-    If a process is well-typed in Γ and x is not free in p, then p is also
-    well-typed in Γ extended with x bound to any type.
-
-    This is a standard structural property of typing. Since freeVars is a
-    partial def, we state this as an axiom. -/
-axiom wellTyped_weaken_ax (Γ : TypingContext) (p : Process) (t : LocalTypeR)
-    (x : String) (s : LocalTypeR)
-    (h : WellTyped Γ p t) (hfree : x ∉ p.freeVars)
-    : WellTyped (Γ.extend x s) p t
+/-- Helper: If x is not in freeVars, extending with x doesn't affect variable lookups. -/
+private theorem lookup_extend_fresh (Γ : TypingContext) (x y : String) (s : LocalTypeR)
+    (hne : x ≠ y) : (Γ.extend x s).lookup y = Γ.lookup y := by
+  unfold TypingContext.extend TypingContext.lookup
+  simp only [List.find?_cons]
+  have hyx : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+  simp only [hyx, Bool.false_eq_true, ↓reduceIte]
 
 /-- Weakening: Adding an unused variable binding preserves typing.
 
     If P is well-typed in Γ and x is not free in P, then P is well-typed
-    in any extension of Γ with x. -/
+    in any extension of Γ with x. Now proved since freeVars is terminating. -/
 theorem wellTyped_weaken (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x : String) (s : LocalTypeR)
     (h : WellTyped Γ p t) (hfree : x ∉ p.freeVars)
-    : WellTyped (Γ.extend x s) p t :=
-  wellTyped_weaken_ax Γ p t x s h hfree
+    : WellTyped (Γ.extend x s) p t := by
+  induction h with
+  | inaction => exact .inaction
+  | @send Γ' receiver label value cont contType _hwt ih =>
+    apply WellTyped.send
+    apply ih
+    simp only [Process.freeVars] at hfree
+    exact hfree
+  | @recv Γ' sender branches types hlen _hall _hlabels ih =>
+    apply WellTyped.recv hlen
+    · intro i
+      apply ih i
+      simp only [Process.freeVars] at hfree
+      intro hmem
+      apply hfree
+      exact freeVarsOfBranches_mem_of branches x i hmem
+    · exact _hlabels
+  | @cond Γ' b p' q' t' _hwt1 _hwt2 ih1 ih2 =>
+    apply WellTyped.cond
+    · apply ih1
+      simp only [Process.freeVars, List.mem_append] at hfree
+      exact fun h => hfree (Or.inl h)
+    · apply ih2
+      simp only [Process.freeVars, List.mem_append] at hfree
+      exact fun h => hfree (Or.inr h)
+  | @recurse Γ' y body bodyType _hwt ih =>
+    apply WellTyped.recurse
+    -- Need: WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
+    -- ih : x ∉ body.freeVars → WellTyped ((Γ'.extend y bodyType).extend x s) body bodyType
+    by_cases hxy : x = y
+    · -- x = y: the inner binding shadows x, so the extension with x is irrelevant
+      subst hxy
+      apply wellTyped_shadow Γ body bodyType x s bodyType _hwt
+    · -- x ≠ y: x is still not free after filtering
+      have hfree' : x ∉ body.freeVars := by
+        simp only [Process.freeVars, List.mem_filter, bne_iff_ne, ne_eq,
+                   decide_eq_true_eq, not_and] at hfree
+        intro hmem
+        exact hfree hmem (Ne.symm hxy)
+      -- ih gives: WellTyped ((Γ.extend y bodyType).extend x s) body bodyType
+      have hih := ih hfree'
+      -- Use context exchange to swap x and y bindings
+      apply wellTyped_context_equiv body bodyType _ hih
+      intro z
+      exact lookup_extend_exchange Γ x y s bodyType hxy z
+  | @var Γ' y t' hlookup =>
+    -- freeVars of var y is [y], so x ∉ [y] means x ≠ y
+    simp only [Process.freeVars, List.mem_singleton] at hfree
+    have hne : x ≠ y := hfree
+    apply WellTyped.var
+    rw [lookup_extend_fresh Γ x y s hne]
+    exact hlookup
 
 /-- Helper: Lookup in swapped contexts gives same result when x ≠ y. -/
 private theorem lookup_extend_exchange (Γ : TypingContext) (x y : String) (s u : LocalTypeR)
