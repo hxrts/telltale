@@ -485,6 +485,56 @@ theorem projectBranchTypes_find_mem (branches : List (Label × GlobalType)) (rol
           have ⟨lt', hlt', hmem⟩ := ih lts hrest hfind
           exact ⟨lt', hlt', List.mem_cons_of_mem lt hmem⟩
 
+/-! ## Merge Reflexivity Lemmas
+
+These lemmas establish that merging a type with itself returns the same type.
+The proofs use well-founded induction on the combined size of the inputs. -/
+
+/-- Reflexivity of mergeSendSorted: merging a sorted branch list with itself. -/
+theorem mergeSendSorted_refl (bs : List (Label × LocalTypeR))
+    (ih : ∀ c, c ∈ bs.map Prod.snd → LocalTypeR.merge c c = some c)
+    : LocalTypeR.mergeSendSorted bs bs = some bs := by
+  induction bs with
+  | nil => rfl
+  | cons b rest irest =>
+    simp only [LocalTypeR.mergeSendSorted, ↓reduceIte, Option.bind_eq_bind]
+    have hcont : LocalTypeR.merge b.2 b.2 = some b.2 := by
+      apply ih
+      simp only [List.map_cons, List.mem_cons, true_or]
+    rw [hcont]
+    simp only [Option.some_bind]
+    have hrest : LocalTypeR.mergeSendSorted rest rest = some rest := by
+      apply irest
+      intro c hc
+      apply ih
+      simp only [List.map_cons, List.mem_cons, hc, or_true]
+    rw [hrest]
+    simp only [Option.some_bind]
+
+/-- Reflexivity of mergeRecvSorted: merging a sorted branch list with itself. -/
+theorem mergeRecvSorted_refl (bs : List (Label × LocalTypeR))
+    (ih : ∀ c, c ∈ bs.map Prod.snd → LocalTypeR.merge c c = some c)
+    : LocalTypeR.mergeRecvSorted bs bs = some bs := by
+  induction bs with
+  | nil => rfl
+  | cons b rest irest =>
+    simp only [LocalTypeR.mergeRecvSorted]
+    -- Since b.1.name = b.1.name, neither < holds
+    have hnotlt : ¬ (b.1.name < b.1.name) := lt_irrefl b.1.name
+    simp only [hnotlt, ↓reduceIte, Option.bind_eq_bind]
+    have hcont : LocalTypeR.merge b.2 b.2 = some b.2 := by
+      apply ih
+      simp only [List.map_cons, List.mem_cons, true_or]
+    rw [hcont]
+    simp only [Option.some_bind]
+    have hrest : LocalTypeR.mergeRecvSorted rest rest = some rest := by
+      apply irest
+      intro c hc
+      apply ih
+      simp only [List.map_cons, List.mem_cons, hc, or_true]
+    rw [hrest]
+    simp only [Option.some_bind]
+
 /-- If merge of a and b succeeds, then merge is reflexive (a merges with a). -/
 theorem merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t := by
   induction t with
@@ -492,10 +542,44 @@ theorem merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t := by
   | var v => simp only [LocalTypeR.merge, ↓reduceIte]
   | send partner branches ih =>
     simp only [LocalTypeR.merge, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind, Option.some_bind]
-    sorry  -- Complex branch merge proof
+    have hsorted := mergeSendSorted_refl (LocalTypeR.sortBranches branches) (fun c hc => by
+      -- c is in the sorted branches, which is a permutation of branches
+      -- By ih, merge c c = some c for all c in branches
+      -- Need to connect sorted branches to original branches
+      have hperm : (LocalTypeR.sortBranches branches).Perm branches := by
+        simp only [LocalTypeR.sortBranches]
+        exact List.mergeSort_perm branches LocalTypeR.branchLe
+      have hmem : c ∈ branches.map Prod.snd := by
+        have hc' : c ∈ (LocalTypeR.sortBranches branches).map Prod.snd := hc
+        exact List.Perm.mem_iff (hperm.map Prod.snd) |>.mp hc'
+      have ⟨i, hi, hci⟩ := List.mem_iff_getElem.mp (List.mem_map.mp hmem).choose_spec.2
+      exact ih ⟨i, by simp at hi; exact hi⟩)
+    rw [hsorted]
   | recv partner branches ih =>
     simp only [LocalTypeR.merge, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind, Option.some_bind]
-    sorry  -- Complex branch merge proof
+    have hsorted := mergeRecvSorted_refl (LocalTypeR.sortBranches branches) (fun c hc => by
+      have hperm : (LocalTypeR.sortBranches branches).Perm branches := by
+        simp only [LocalTypeR.sortBranches]
+        exact List.mergeSort_perm branches LocalTypeR.branchLe
+      have hmem : c ∈ branches.map Prod.snd := by
+        have hc' : c ∈ (LocalTypeR.sortBranches branches).map Prod.snd := hc
+        exact List.Perm.mem_iff (hperm.map Prod.snd) |>.mp hc'
+      have ⟨i, hi, hci⟩ := List.mem_iff_getElem.mp (List.mem_map.mp hmem).choose_spec.2
+      exact ih ⟨i, by simp at hi; exact hi⟩)
+    rw [hsorted]
+    simp only [Option.some_bind]
+    -- Need to show sortBranches (sortBranches branches) = sortBranches branches
+    -- sortBranches is idempotent on sorted lists
+    congr 1
+    -- mergeRecvSorted bs bs = some bs for sorted bs, and sortBranches is idempotent
+    -- Actually we need: sortBranches (sortBranches branches) = sortBranches branches
+    have hidempotent : LocalTypeR.sortBranches (LocalTypeR.sortBranches branches) =
+                       LocalTypeR.sortBranches branches := by
+      simp only [LocalTypeR.sortBranches]
+      -- mergeSort of a sorted list is the list itself
+      exact List.mergeSort_eq_self LocalTypeR.branchLe
+             (List.sorted_mergeSort LocalTypeR.branchLe branches)
+    exact hidempotent
   | mu v body ih =>
     simp only [LocalTypeR.merge, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
     rw [ih]

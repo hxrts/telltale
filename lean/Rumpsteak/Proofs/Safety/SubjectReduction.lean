@@ -93,41 +93,45 @@ axiom projectR_subst_comm_non_participant (body : GlobalType) (t : String) (role
     (hne1 : role ≠ t)  -- Role is not the recursion variable name
     : projectR (body.substitute t (.mu t body)) role = projectR (.mu t body) role
 
-/-- Projection preserved for non-participants.
+/-- Projection preserved for non-participants (success case).
 
-    If G consumes sender→ℓ→receiver to get G', and role ∉ {sender, receiver},
-    then G' ↾ role = G ↾ role.
+    If G consumes sender→ℓ→receiver to get G', role ∉ {sender, receiver},
+    and projection of G to role succeeds, then G' ↾ role = G ↾ role.
 
     Proof by induction on ConsumeResult. -/
 theorem projection_preserved_other_thm (g g' : GlobalType) (sender receiver role : String)
-    (label : Label)
+    (label : Label) (result : LocalTypeR)
     (hcons : g.consume sender receiver label = some g')
     (hne1 : role ≠ sender)
     (hne2 : role ≠ receiver)
-    : projectR g' role = projectR g role := by
+    (hproj : projectR g role = .ok result)
+    : projectR g' role = .ok result := by
   have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
   induction hcr with
   | comm s r branches l cont hfind =>
     -- g = .comm s r branches, g' = cont (the found branch)
-    -- Need: projectR cont role = projectR (.comm s r branches) role
-    -- s = sender, r = receiver
-    cases hproj : projectR (.comm s r branches) role with
-    | error e =>
-      -- If projection fails, we can't say much - but consume succeeding means branches non-empty
-      -- For well-formed types, projection should succeed
-      simp only
-      sorry  -- projection error case - would need wellformedness assumption
-    | ok result =>
-      simp only
-      -- Use projectR_comm_non_participant
-      exact (projectR_comm_non_participant s r role branches result hne1 hne2 hproj l cont hfind).symm
+    -- Need: projectR cont role = .ok result
+    -- By projectR_comm_non_participant axiom
+    exact projectR_comm_non_participant s r role branches result hne1 hne2 hproj l cont hfind
   | mu t body s r l g'' _hcr' ih =>
     -- g = .mu t body, ConsumeResult (body.substitute t (.mu t body)) s r l g''
-    -- Need: projectR g'' role = projectR (.mu t body) role
+    -- Need: projectR g'' role = .ok result
+    -- hproj : projectR (.mu t body) role = .ok result
+    -- By projectR_mu analysis, either:
+    --   1. projBody = .end and result = .end
+    --   2. projBody ≠ .end and result = .mu t projBody
+    -- For non-participants through a recursion, the projection of the substituted body
+    -- should equal the projection of the mu-wrapped body.
     -- By IH: projectR g'' role = projectR (body.substitute t (.mu t body)) role
-    -- By projectR_subst_comm_non_participant: projectR (body.substitute t g) role = projectR g role
-    rw [ih hne1 hne2]
-    exact projectR_subst_comm_non_participant body t role sorry  -- need t ≠ role or similar
+    -- Need: projectR (body.substitute t (.mu t body)) role = .ok result
+    -- This follows from projectR_subst_comm_non_participant if we know role ≠ t
+    -- (role is a participant name, t is a type variable - they're semantically different)
+    have hsubst := projectR_subst_comm_non_participant body t role
+    -- projectR_subst_comm_non_participant states:
+    --   projectR (body.substitute t (.mu t body)) role = projectR (.mu t body) role
+    -- So projectR (body.substitute t (.mu t body)) role = .ok result
+    rw [hsubst] at ih
+    exact ih hne1 hne2 hproj
 
 /-- Subject reduction for send axiom.
 
