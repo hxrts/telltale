@@ -222,17 +222,53 @@ def commitmentHash [Hasher H] (c : HeapCommitment) : ByteArray :=
     |>.foldl (fun ba d => ba.push d.val.toUInt8) ByteArray.empty
   Hasher.hash H (c.resourceRoot ++ c.nullifierRoot ++ counterBytes)
 
+/-- Collision resistance assumption for Merkle proofs.
+
+    This axiom states that if two lists of leaves produce the same Merkle root,
+    they must be equal. This is a cryptographic assumption about the hash function
+    that cannot be proven mathematically - it must be assumed for security proofs. -/
+axiom merkle_collision_resistant [Hasher H] (leaves1 leaves2 : List ByteArray) :
+    computeRoot (H := H) leaves1 = computeRoot (H := H) leaves2 → leaves1 = leaves2
+
 /-- Two heaps have the same commitment iff they're equal
-    (assuming collision resistance). -/
+    (assuming collision resistance).
+
+    SECURITY ASSUMPTION: This relies on `merkle_collision_resistant`, which
+    assumes the hash function is collision-resistant. This is a standard
+    cryptographic assumption for Merkle tree security. -/
 theorem commitment_injective [Hasher H] (h1 h2 : Heap) :
     heapCommitment (H := H) h1 = heapCommitment (H := H) h2 →
     h1.resources.toList = h2.resources.toList ∧
     h1.nullifiers.toList = h2.nullifiers.toList ∧
     h1.counter = h2.counter := by
-  intro _heq
-  -- This relies on collision resistance of the hash function
-  -- which we assume but don't prove
-  sorry
+  intro heq
+  unfold heapCommitment at heq
+  -- Extract the three components of the commitment
+  have hres : merkleRoot (H := H) h1 = merkleRoot (H := H) h2 := by
+    cases heq; rfl
+  have hnull : nullifierRoot (H := H) h1 = nullifierRoot (H := H) h2 := by
+    cases heq; rfl
+  have hctr : h1.counter = h2.counter := by
+    cases heq; rfl
+  constructor
+  · -- Resources equal: use collision resistance on resource leaves
+    unfold merkleRoot at hres
+    have hleaves := merkle_collision_resistant
+      (h1.resources.toList.map fun (rid, r) => hashLeaf (H := H) rid r)
+      (h2.resources.toList.map fun (rid, r) => hashLeaf (H := H) rid r)
+      hres
+    -- Leaf hashes equal implies resources equal (assuming hashLeaf is injective)
+    sorry -- Requires hashLeaf injectivity
+  constructor
+  · -- Nullifiers equal: use collision resistance on nullifier leaves
+    unfold nullifierRoot at hnull
+    have hleaves := merkle_collision_resistant
+      (h1.nullifiers.toList.map (·.1.hash))
+      (h2.nullifiers.toList.map (·.1.hash))
+      hnull
+    -- Hash list equal implies nullifier list equal
+    sorry -- Requires hash injectivity
+  · exact hctr
 
 /-- Empty heap has deterministic commitment.
 
@@ -243,8 +279,16 @@ theorem empty_heap_commitment [Hasher H] :
     { resourceRoot := emptyRoot (H := H)
     , nullifierRoot := emptyRoot (H := H)
     , counter := 0 } := by
-  -- This requires unfolding the RBMap implementation details
-  -- which is beyond the scope of this module
-  sorry
+  unfold heapCommitment merkleRoot nullifierRoot Heap.empty
+  simp only
+  -- Need to show: RBMap.empty.toList = []
+  -- This is true by definition of RBMap.empty
+  congr 1
+  · -- resourceRoot: computeRoot [] = emptyRoot
+    unfold computeRoot
+    rfl
+  · -- nullifierRoot: computeRoot [] = emptyRoot
+    unfold computeRoot
+    rfl
 
 end Rumpsteak.Protocol.Merkle

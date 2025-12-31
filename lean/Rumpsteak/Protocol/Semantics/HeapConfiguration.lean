@@ -225,14 +225,27 @@ theorem empty_config_commitment_deterministic (roles : List String) :
 
 /-- Theorem: Send increases heap size.
 
-    After a successful send, the heap should have one more resource. -/
+    After a successful send, the heap should have one more resource.
+
+    PROOF NOTE: This relies on RBMap.insert increasing size when the key
+    is fresh. Since Heap.alloc uses a fresh counter for each allocation,
+    the ResourceId is unique and size increases by 1. -/
 theorem send_increases_heap (c : HeapConfiguration) (s r label : String) :
     match c.sendMessage s r label with
     | .ok c' => c'.heap.size = c.heap.size + 1
     | .error _ => True := by
   unfold HeapConfiguration.sendMessage
   simp only [HeapConfiguration.incSendSeqNo, HeapConfiguration.updateSession]
-  -- The alloc operation increases size by 1
+  -- Unfold allocMessage and alloc
+  unfold Heap.allocMessage Heap.alloc Heap.size
+  -- The key insight: RBMap.insert on a fresh key increases size by 1
+  -- This requires: ResourceId.create produces unique IDs (due to counter)
+  -- Specifically: the counter h.counter wasn't used for any previous allocation,
+  -- so the resulting ResourceId is not in the map.
+  -- This is a property of the allocation scheme, not RBMap itself.
+  simp only
+  -- For RBMap, size after insert = size + 1 if key is new, or size if key exists
+  -- We assume the counter-based scheme ensures freshness
   sorry
 
 end Rumpsteak.Protocol.Semantics.HeapConfiguration
