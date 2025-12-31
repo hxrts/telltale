@@ -88,7 +88,8 @@ impl<E: Endpoint> ExtensionRegistry<E> {
         if self.handlers.contains_key(&type_id) {
             return Err(ExtensionError::DuplicateHandler { type_name });
         }
-        self.handlers.insert(type_id, (Box::new(handler), type_name));
+        self.handlers
+            .insert(type_id, (Box::new(handler), type_name));
         Ok(())
     }
 

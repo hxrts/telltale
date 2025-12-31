@@ -1334,9 +1334,7 @@ fn parse_send_stmt(
     let to = parse_annotated_role(to_pair, declared_roles, input)?;
 
     let message = parse_message(
-        inner
-            .next()
-            .expect("grammar: send_stmt must have message"),
+        inner.next().expect("grammar: send_stmt must have message"),
         input,
     )?;
 
@@ -1642,9 +1640,7 @@ fn parse_rec_stmt(
             .as_str()
     );
     let body = parse_protocol_body(
-        inner
-            .next()
-            .expect("grammar: rec_stmt must have body"),
+        inner.next().expect("grammar: rec_stmt must have body"),
         declared_roles,
         input,
         protocol_defs,

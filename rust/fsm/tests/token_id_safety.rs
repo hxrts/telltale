@@ -539,11 +539,7 @@ mod stress_tests {
             );
 
             let result = parse(&dot).next();
-            assert!(
-                result.is_some(),
-                "iteration {} should produce a result",
-                i
-            );
+            assert!(result.is_some(), "iteration {} should produce a result", i);
             assert!(
                 result.unwrap().is_ok(),
                 "iteration {} should parse successfully",
@@ -561,9 +557,9 @@ mod stress_tests {
             "snake_case",
             "ALLCAPS",
             "mixedCase123",
-            "a",               // single char
-            "a1b2c3",          // alphanumeric
-            "___",             // all underscores
+            "a",      // single char
+            "a1b2c3", // alphanumeric
+            "___",    // all underscores
             "role_with_many_underscores_in_name",
         ];
 

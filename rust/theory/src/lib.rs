@@ -27,12 +27,12 @@
 //! - "Precise Subtyping for Asynchronous Multiparty Sessions" (Ghilezan et al., POPL 2021)
 
 // Core modules (feature-gated but on by default)
-#[cfg(feature = "projection")]
-pub mod projection;
 #[cfg(feature = "duality")]
 pub mod duality;
 #[cfg(feature = "merge")]
 pub mod merge;
+#[cfg(feature = "projection")]
+pub mod projection;
 #[cfg(feature = "well-formedness")]
 pub mod well_formedness;
 
@@ -44,12 +44,12 @@ pub mod bounded;
 pub mod subtyping;
 
 // Re-exports for core modules
-#[cfg(feature = "projection")]
-pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
 #[cfg(feature = "duality")]
 pub use duality::{dual, is_dual};
 #[cfg(feature = "merge")]
 pub use merge::{can_merge, merge, merge_all, MergeError};
+#[cfg(feature = "projection")]
+pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
 #[cfg(feature = "well-formedness")]
 pub use well_formedness::{validate_global, validate_local, ValidationError};
 

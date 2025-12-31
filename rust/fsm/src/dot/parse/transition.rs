@@ -552,7 +552,10 @@ pub(super) fn parse<E: Expression>(tokens: &mut Lexer) -> Option<Transition<Stri
     if tokens.next_if(TokenId::LeftRound).is_some() {
         parameters = parse_parameters(tokens)?;
         if let Some(bracket) = tokens.next_if(TokenId::LeftSquare) {
-            tokens.push_err(bracket.span, TransitionError::RefinementsNotSupported.into());
+            tokens.push_err(
+                bracket.span,
+                TransitionError::RefinementsNotSupported.into(),
+            );
             return None;
         }
     }

@@ -379,8 +379,8 @@ impl LocalTypeR {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use crate::PayloadSort;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_simple_local_type() {
