@@ -225,4 +225,55 @@ inductive GlobalTypeReducesStar : GlobalType → GlobalType → Prop where
 scoped infix:50 " ⟹ " => GlobalTypeReduces
 scoped infix:50 " ⟹* " => GlobalTypeReducesStar
 
+/-! ## Consume as an inductive relation
+
+The `consume` function is `partial def` which makes induction difficult.
+We define an inductive relation `ConsumeResult` that captures when consume succeeds,
+enabling well-founded induction on proofs. -/
+
+/-- Inductive predicate: g.consume sender receiver label = some g'.
+
+    This captures the same behavior as the partial `consume` function
+    but as a well-founded inductive relation suitable for proofs. -/
+inductive ConsumeResult : GlobalType → String → String → Label → GlobalType → Prop where
+  /-- Direct consumption of a matching communication. -/
+  | comm : ∀ (sender receiver : String) (branches : List (Label × GlobalType))
+             (label : Label) (cont : GlobalType),
+    branches.find? (fun (l, _) => l.name == label.name) = some (label, cont) →
+    ConsumeResult (.comm sender receiver branches) sender receiver label cont
+
+  /-- Consumption under μ-unfolding. -/
+  | mu : ∀ (t : String) (body : GlobalType) (sender receiver : String) (label : Label) (g' : GlobalType),
+    ConsumeResult (body.substitute t (.mu t body)) sender receiver label g' →
+    ConsumeResult (.mu t body) sender receiver label g'
+
+/-- If consume succeeds, there's a corresponding ConsumeResult derivation.
+    This is stated as an axiom because consume is partial.
+    The converse (ConsumeResult → consume succeeds) is provable by induction on ConsumeResult. -/
+axiom consume_implies_ConsumeResult (g : GlobalType) (sender receiver : String) (label : Label) (g' : GlobalType)
+    (h : g.consume sender receiver label = some g')
+    : ConsumeResult g sender receiver label g'
+
+/-- ConsumeResult implies consume succeeds. -/
+theorem ConsumeResult_implies_consume (g sender receiver label g' : _)
+    (h : ConsumeResult g sender receiver label g')
+    : g.consume sender receiver label = some g' := by
+  induction h with
+  | comm sender receiver branches label cont hfind =>
+    simp only [GlobalType.consume]
+    simp only [beq_self_eq_true, Bool.and_self, ↓reduceIte, hfind, Option.map_some']
+  | mu t body sender receiver label g' _hcons ih =>
+    simp only [GlobalType.consume]
+    exact ih
+
+/-- ConsumeResult implies GlobalTypeReduces to the result. -/
+theorem ConsumeResult_implies_reduces (g sender receiver label g' : _)
+    (h : ConsumeResult g sender receiver label g')
+    : GlobalTypeReduces g g' := by
+  induction h with
+  | comm sender receiver branches label cont hfind =>
+    exact GlobalTypeReduces.comm sender receiver branches label cont hfind
+  | mu t body sender receiver label g' _hcons ih =>
+    exact GlobalTypeReduces.mu t body g' ih
+
 end Rumpsteak.Protocol.GlobalType
