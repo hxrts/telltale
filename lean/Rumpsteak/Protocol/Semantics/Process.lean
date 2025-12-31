@@ -75,17 +75,17 @@ inductive Process where
 deriving Repr, Inhabited
 
 /-- Extract free process variables from a process. -/
-def Process.freeVars : Process → List String
+partial def Process.freeVars : Process → List String
   | .inaction => []
   | .send _ _ _ p => p.freeVars
-  | .recv _ branches => branches.bind fun (_, p) => p.freeVars
+  | .recv _ branches => branches.flatMap fun (_, p) => p.freeVars
   | .cond _ p q => p.freeVars ++ q.freeVars
   | .recurse x p => p.freeVars.filter (· != x)
   | .var x => [x]
   | .par p q => p.freeVars ++ q.freeVars
 
 /-- Substitute a process for a variable. -/
-def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=
+partial def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=
   match proc with
   | .inaction => .inaction
   | .send role label value p =>
@@ -120,7 +120,7 @@ def Process.isTerminated : Process → Bool
   | _ => false
 
 /-- Count the size of a process (for termination arguments). -/
-def Process.size : Process → Nat
+partial def Process.size : Process → Nat
   | .inaction => 1
   | .send _ _ _ p => 1 + p.size
   | .recv _ branches => 1 + branches.foldl (fun acc (_, p) => acc + p.size) 0

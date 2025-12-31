@@ -1,3 +1,6 @@
+import Rumpsteak.Protocol.Semantics.Process
+import Rumpsteak.Protocol.Semantics.Configuration
+
 /-! # Rumpsteak.Protocol.Semantics.Reduction
 
 Reduction semantics for multiparty sessions.
@@ -31,9 +34,6 @@ The following definitions form the semantic interface for proofs:
 - `step` - Decidable step function
 - `ReduceResult` - Result type for step function
 -/
-
-import Rumpsteak.Protocol.Semantics.Process
-import Rumpsteak.Protocol.Semantics.Configuration
 
 namespace Rumpsteak.Protocol.Semantics.Reduction
 
@@ -90,7 +90,7 @@ def reduceCond (c : Configuration) (role : String)
 def reduceRec (c : Configuration) (role : String)
     (x : String) (body : Process)
     : ReduceResult :=
-  let unfolded := body.substitute x (Process.rec x body)
+  let unfolded := body.substitute x (Process.recurse x body)
   let c' := c.setProcess role unfolded
   .ok c'
 
@@ -106,7 +106,7 @@ def stepProcess (c : Configuration) (rp : RoleProcess) : ReduceResult :=
     reduceRecv c rp.role sender branches
   | .cond b p q =>
     reduceCond c rp.role b p q
-  | .rec x body =>
+  | .recurse x body =>
     reduceRec c rp.role x body
   | .par _ _ => .stuck  -- Parallel handled at configuration level
 
@@ -124,19 +124,32 @@ def step (c : Configuration) : ReduceResult :=
 
 /-- Run the configuration for up to `fuel` steps. -/
 def run (c : Configuration) (fuel : Nat) : Configuration × Nat :=
-  if fuel == 0 then (c, 0)
-  else match step c with
-  | .ok c' =>
-    let (final, stepsRemaining) := run c' (fuel - 1)
-    (final, stepsRemaining)
-  | .stuck => (c, fuel)
-  | .error _ => (c, fuel)
+  match fuel with
+  | 0 => (c, 0)
+  | n + 1 =>
+    match step c with
+    | .ok c' =>
+      let (final, stepsRemaining) := run c' n
+      (final, stepsRemaining)
+    | .stuck => (c, fuel)
+    | .error _ => (c, fuel)
 
 /-- Check if the configuration can make progress. -/
 def canStep (c : Configuration) : Bool :=
   match step c with
   | .ok _ => true
   | _ => false
+
+/-- Helper for send reduction in propositional semantics. -/
+def reduceSendConfig (c : Configuration) (role receiver : String)
+    (label : Label) (value : Value) (cont : Process) : Configuration :=
+  let ch := { sender := role, receiver := receiver }
+  let msg := { sender := role, label := label, value := value }
+  (c.enqueue ch msg).setProcess role cont
+
+/-- Helper for receive reduction in propositional semantics. -/
+def receiveConfig (c : Configuration) (role : String) (cont : Process) : Configuration :=
+  c.setProcess role cont
 
 /-- Inductive reduction relation for formal proofs.
 
@@ -166,21 +179,10 @@ inductive Reduces : Configuration → Configuration → Prop where
     Reduces c (c.setProcess role (if b then p else q))
 
   /-- Recursion rule: unfold -/
-  | rec :
+  | recurse :
     ∀ (c : Configuration) (role x : String) (body : Process),
-    c.getProcess role = some (.rec x body) →
-    Reduces c (c.setProcess role (body.substitute x (.rec x body)))
-where
-  /-- Helper for send reduction -/
-  reduceSendConfig (c : Configuration) (role receiver : String)
-      (label : Label) (value : Value) (cont : Process) : Configuration :=
-    let ch := { sender := role, receiver := receiver }
-    let msg := { sender := role, label := label, value := value }
-    (c.enqueue ch msg).setProcess role cont
-
-  /-- Helper for receive reduction -/
-  receiveConfig (c : Configuration) (role : String) (cont : Process) : Configuration :=
-    c.setProcess role cont
+    c.getProcess role = some (.recurse x body) →
+    Reduces c (c.setProcess role (body.substitute x (.recurse x body)))
 
 /-- Multi-step reduction (reflexive-transitive closure). -/
 inductive ReducesStar : Configuration → Configuration → Prop where
