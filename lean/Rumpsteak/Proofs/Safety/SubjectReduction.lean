@@ -47,8 +47,31 @@ theorem mapM_result_member {α β : Type} {f : α → Except ε β}
     {xs : List α} {ys : List β} {y : β}
     (hmap : xs.mapM f = .ok ys) (hmem : y ∈ ys)
     : ∃ x ∈ xs, f x = .ok y := by
-  -- TODO: Update for Lean 4.24 - Except.pure_def and Except.bind_eq_ok deprecated
-  sorry
+  induction xs generalizing ys with
+  | nil =>
+    simp only [List.mapM_nil] at hmap
+    cases hmap
+    simp only [List.not_mem_nil] at hmem
+  | cons x xs' ih =>
+    simp only [List.mapM_cons, bind, Except.bind] at hmap
+    cases hfx : f x with
+    | error e =>
+      simp only [hfx] at hmap
+      cases hmap
+    | ok b =>
+      simp only [hfx] at hmap
+      cases hrest : xs'.mapM f with
+      | error e =>
+        simp only [hrest] at hmap
+        cases hmap
+      | ok bs =>
+        simp only [hrest] at hmap
+        cases hmap
+        cases hmem with
+        | head => exact ⟨x, List.mem_cons_self, hfx⟩
+        | tail _ htail =>
+          obtain ⟨x', hx'mem, hfx'⟩ := ih hrest htail
+          exact ⟨x', List.mem_cons_of_mem x hx'mem, hfx'⟩
 
 /-- If mapM on branches gives [(l, t)], and we find a branch with matching label,
     that branch's projection is t. -/
@@ -166,14 +189,56 @@ theorem projection_preserved_other (g g' : GlobalType) (sender receiver role : S
   -- - `consume_selects_branch`: consume returns a branch continuation
   sorry
 
+/-- Helper: find? returning some implies element is in list and satisfies predicate. -/
+private theorem find?_some_implies {α : Type _} (l : List α) (p : α → Bool) (x : α)
+    (h : l.find? p = some x)
+    : x ∈ l ∧ p x = true := by
+  induction l with
+  | nil => cases h
+  | cons y ys ih =>
+    simp only [List.find?_cons] at h
+    cases hp : p y with
+    | true =>
+      simp only [hp, ↓reduceIte, Option.some.injEq] at h
+      subst h
+      exact ⟨List.mem_cons_self, hp⟩
+    | false =>
+      simp only [hp, Bool.false_eq_true, ↓reduceIte] at h
+      have ⟨hmem, hpx⟩ := ih h
+      exact ⟨List.mem_cons_of_mem y hmem, hpx⟩
+
+/-- Helper: getProcess returns some proc implies there's a matching RoleProcess. -/
+theorem getProcess_implies_mem (c : Configuration) (role : String) (proc : Process)
+    (hget : c.getProcess role = some proc)
+    : ∃ rp ∈ c.processes, rp.role = role ∧ rp.process = proc := by
+  unfold Configuration.getProcess at hget
+  cases hfind : c.processes.find? (fun rp => rp.role == role) with
+  | none =>
+    simp only [hfind] at hget
+    cases hget
+  | some rp =>
+    simp only [hfind, Option.map, Option.some.injEq] at hget
+    have ⟨hmem, hprop⟩ := find?_some_implies _ _ _ hfind
+    simp only [beq_iff_eq] at hprop
+    exact ⟨rp, hmem, hprop, hget⟩
+
 /-- Helper: Get the projected type for a role from a well-typed config. -/
 theorem wellTyped_role_has_projection (g : GlobalType) (c : Configuration)
     (role : String) (proc : Process)
     (hwt : ConfigWellTyped g c)
     (hget : c.getProcess role = some proc)
     : ∃ lt, projectR g role = .ok lt ∧ WellTyped [] proc lt := by
-  -- TODO: Update for Lean 4.24 - ConfigWellTyped uses ∀ instead of List.all
-  sorry
+  obtain ⟨rp, hrp_mem, hrole, hproc⟩ := getProcess_implies_mem c role proc hget
+  have hrpwt := hwt rp hrp_mem
+  unfold RoleProcessWellTyped at hrpwt
+  rw [hrole] at hrpwt
+  cases hproj : projectR g role with
+  | error e =>
+    simp only [hproj] at hrpwt
+  | ok lt =>
+    rw [hproj] at hrpwt
+    subst hproc
+    exact ⟨lt, rfl, hrpwt⟩
 
 /-- Subject reduction for send case.
 
@@ -201,8 +266,15 @@ theorem subject_reduction_cond (g : GlobalType) (c : Configuration)
     (hwt : ConfigWellTyped g c)
     (hget : c.getProcess role = some (.cond b p q))
     : ConfigWellTyped g (c.setProcess role (if b then p else q)) := by
-  -- TODO: Update for Lean 4.24 - depends on wellTyped_role_has_projection
-  sorry
+  obtain ⟨lt, hproj, hwt_cond⟩ := wellTyped_role_has_projection g c role _ hwt hget
+  have ⟨hp, hq⟩ := wellTyped_cond_inversion [] b p q lt hwt_cond
+  cases b with
+  | true =>
+    simp only [↓reduceIte]
+    exact configWellTyped_setProcess g c role p lt hwt hproj hp
+  | false =>
+    simp only [Bool.false_eq_true, ↓reduceIte]
+    exact configWellTyped_setProcess g c role q lt hwt hproj hq
 
 /-- Subject reduction for recursion case.
 
