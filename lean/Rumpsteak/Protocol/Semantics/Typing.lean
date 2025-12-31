@@ -256,9 +256,10 @@ theorem lookup_extend_shadow (Γ : TypingContext) (x : String) (s t : LocalTypeR
 theorem wellTyped_shadow (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x : String) (s u : LocalTypeR)
     (h : WellTyped (Γ.extend x u) p t)
     : WellTyped ((Γ.extend x s).extend x u) p t := by
-  -- TODO: Fix induction structure for context shadowing
-  -- The key insight is that lookups in both contexts agree (lookup_extend_shadow)
-  -- Need to generalize the induction properly for compound contexts
+  -- The key insight is that lookups in both contexts agree (lookup_extend_shadow).
+  -- However, induction over WellTyped requires generalizing the context parameter,
+  -- which is non-trivial due to the nested extends in the recurse case.
+  -- A full proof would need a custom induction principle or mutual induction.
   sorry
 
 /-- Weakening: Adding an unused variable binding preserves typing.

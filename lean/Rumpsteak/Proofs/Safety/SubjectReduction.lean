@@ -83,7 +83,14 @@ theorem projection_of_single_branch {branches : List (Label × GlobalType)}
     (hfind : (l, g) ∈ branches)
     (hlabel : l.name = label.name)
     : projectR g sender = .ok contType := by
-  -- TODO: Update for Lean 4.24 - Except.pure_def and Except.bind_eq_ok deprecated
+  -- Proof sketch:
+  -- 1. mapM returning a singleton implies branches has exactly one element
+  -- 2. Since (l, g) ∈ branches and branches is a singleton, (l, g) is that element
+  -- 3. The map produces (l.name, projectR g sender) which equals (label.name, contType)
+  -- 4. Since l.name = label.name, we conclude projectR g sender = .ok contType
+  --
+  -- The full proof requires showing that a singleton mapM result implies
+  -- a singleton input, and connecting the labels through hlabel.
   sorry
 
 /-! ## Claims -/
