@@ -1,5 +1,3 @@
-#![cfg(feature = "parsing")]
-
 /// FSM-level token parser
 ///
 /// Exposes Token and TokenId for testing the unsafe discriminant pattern.

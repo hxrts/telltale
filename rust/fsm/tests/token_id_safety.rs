@@ -136,11 +136,11 @@ mod fsm_token_tests {
     #[test]
     fn test_all_tokens_in_context() {
         let source = r#"digraph Test { 0 -> 1 [label="msg"]; }"#;
-        let mut lexer = Token::lexer(source);
+        let lexer = Token::lexer(source);
 
         // Collect all tokens and verify each one
         let mut token_count = 0;
-        while let Some(token) = lexer.next() {
+        for token in lexer {
             let id = token_id(&token);
             // Verify the ID matches what we expect from the token variant
             match &token {
@@ -429,10 +429,10 @@ mod transition_token_tests {
     #[test]
     fn test_all_tokens_in_context() {
         let source = r#"Server?request(x: i32, flag: bool)"#;
-        let mut lexer = Token::lexer(source);
+        let lexer = Token::lexer(source);
 
         let mut token_count = 0;
-        while let Some(token) = lexer.next() {
+        for token in lexer {
             let id = token_id(&token);
             match &token {
                 Token::Identifier(_) => assert_eq!(id, TokenId::Identifier),
