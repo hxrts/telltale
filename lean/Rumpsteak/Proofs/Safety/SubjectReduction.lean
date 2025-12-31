@@ -149,18 +149,50 @@ theorem mapM_result_member {α β : Type} {f : α → Except ε β}
           obtain ⟨x', hx'mem, hfx'⟩ := ih hrest htail
           exact ⟨x', List.mem_cons_of_mem x hx'mem, hfx'⟩
 
+/-- Helper: mapM producing singleton means input is singleton. -/
+private theorem mapM_singleton_input {α β ε : Type} {f : α → Except ε β}
+    {xs : List α} {y : β}
+    (hmap : xs.mapM f = .ok [y])
+    : ∃ x, xs = [x] ∧ f x = .ok y := by
+  cases xs with
+  | nil =>
+    simp only [List.mapM_nil] at hmap
+    cases hmap
+  | cons x xs' =>
+    simp only [List.mapM_cons, bind, Except.bind] at hmap
+    cases hfx : f x with
+    | error e =>
+      simp only [hfx] at hmap
+      cases hmap
+    | ok b =>
+      simp only [hfx] at hmap
+      cases hrest : xs'.mapM f with
+      | error e =>
+        simp only [hrest] at hmap
+        cases hmap
+      | ok bs =>
+        simp only [hrest] at hmap
+        -- hmap : .ok (b :: bs) = .ok [y]
+        cases hmap
+        -- Now b :: bs = [y], so b = y and bs = []
+        cases xs' with
+        | nil =>
+          simp only [List.mapM_nil] at hrest
+          cases hrest
+          exact ⟨x, rfl, hfx⟩
+        | cons _ _ =>
+          -- xs' is non-empty, so bs is non-empty, contradiction with bs = []
+          simp only [List.mapM_cons, bind, Except.bind] at hrest
+          cases hfx' : f _ with
+          | error e => simp only [hfx'] at hrest; cases hrest
+          | ok _ =>
+            simp only [hfx'] at hrest
+            cases hrest' : (List.mapM f _) with
+            | error e => simp only [hrest'] at hrest; cases hrest
+            | ok bs' => simp only [hrest'] at hrest; cases hrest
+
 /-- If mapM on branches gives [(l, t)], and we find a branch with matching label,
     that branch's projection is t. -/
-/-- Axiom: mapM producing singleton implies input is singleton with matching projection. -/
-axiom projection_of_single_branch_ax {branches : List (Label × GlobalType)}
-    {sender : String} {label : Label} {contType : LocalTypeR}
-    (hmap : branches.mapM (fun (l, cont) => (projectR cont sender).map (l, ·)) =
-            .ok [(label, contType)])
-    {l : Label} {g : GlobalType}
-    (hfind : (l, g) ∈ branches)
-    (hlabel : l.name = label.name)
-    : projectR g sender = .ok contType
-
 theorem projection_of_single_branch {branches : List (Label × GlobalType)}
     {sender : String} {label : Label} {contType : LocalTypeR}
     (hmap : branches.mapM (fun (l, cont) => (projectR cont sender).map (l, ·)) =
@@ -168,8 +200,26 @@ theorem projection_of_single_branch {branches : List (Label × GlobalType)}
     {l : Label} {g : GlobalType}
     (hfind : (l, g) ∈ branches)
     (hlabel : l.name = label.name)
-    : projectR g sender = .ok contType :=
-  projection_of_single_branch_ax hmap hfind hlabel
+    : projectR g sender = .ok contType := by
+  -- Get the singleton input
+  obtain ⟨⟨l', g'⟩, hsingleton, hproj⟩ := mapM_singleton_input hmap
+  -- Since (l, g) ∈ branches and branches = [(l', g')], we have (l, g) = (l', g')
+  rw [hsingleton] at hfind
+  simp only [List.mem_singleton] at hfind
+  cases hfind
+  -- Now hproj : (projectR g sender).map (l, ·) = .ok (label, contType)
+  -- Unfold the map to get the projection result
+  simp only [Except.map] at hproj
+  cases hpg : projectR g sender with
+  | error e =>
+    simp only [hpg] at hproj
+    cases hproj
+  | ok t =>
+    simp only [hpg] at hproj
+    -- hproj : .ok (l, t) = .ok (label, contType)
+    cases hproj
+    -- l = label, t = contType
+    rfl
 
 /-! ## Claims -/
 

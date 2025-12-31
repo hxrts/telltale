@@ -1,5 +1,6 @@
 import Rumpsteak.Protocol.GlobalType
 import Rumpsteak.Protocol.Semantics.Process
+import Mathlib.Data.List.Nodup
 
 /-! # Rumpsteak.Protocol.Semantics.Configuration
 
@@ -132,6 +133,50 @@ def Configuration.activeRoles (c : Configuration) : List String :=
     | .inaction => none
     | .var _ => none
     | _ => some rp.role
+
+/-- Get all role names from a configuration. -/
+def Configuration.roleNames (c : Configuration) : List String :=
+  c.processes.map (·.role)
+
+/-- Predicate: all role names in the configuration are unique. -/
+def Configuration.hasUniqueRoles (c : Configuration) : Prop :=
+  c.roleNames.Nodup
+
+/-! ## Lemmas for hasUniqueRoles -/
+
+/-- Empty configuration from distinct role list has unique roles. -/
+theorem Configuration.empty_hasUniqueRoles (roles : List String) (h : roles.Nodup) :
+    (Configuration.empty roles).hasUniqueRoles := by
+  unfold hasUniqueRoles roleNames empty
+  simp only [List.map_map, Function.comp_def, List.map_id']
+  exact h
+
+/-- Role uniqueness: if a configuration has unique roles and two role processes have the same role,
+    they must be the same. -/
+theorem Configuration.role_uniqueness_from_hasUniqueRoles (c : Configuration)
+    (hunique : c.hasUniqueRoles) (rp1 rp2 : RoleProcess)
+    (h1 : rp1 ∈ c.processes) (h2 : rp2 ∈ c.processes) (heq : rp1.role = rp2.role)
+    : rp1 = rp2 := by
+  unfold hasUniqueRoles roleNames at hunique
+  -- c.processes.map (·.role) is a nodup list
+  -- Get the indices where rp1 and rp2 appear
+  obtain ⟨i1, hi1lt, hi1eq⟩ := List.mem_iff_getElem.mp h1
+  obtain ⟨i2, hi2lt, hi2eq⟩ := List.mem_iff_getElem.mp h2
+  -- Their roles at these positions
+  have hlen1 : i1 < (c.processes.map (·.role)).length := by simp; exact hi1lt
+  have hlen2 : i2 < (c.processes.map (·.role)).length := by simp; exact hi2lt
+  have hrole1 : (c.processes.map (·.role))[i1]'hlen1 = rp1.role := by
+    simp only [List.getElem_map, hi1eq]
+  have hrole2 : (c.processes.map (·.role))[i2]'hlen2 = rp2.role := by
+    simp only [List.getElem_map, hi2eq]
+  -- Since rp1.role = rp2.role and list is nodup, i1 = i2
+  have hi_eq : i1 = i2 := by
+    have heq' : (c.processes.map (·.role))[i1]'hlen1 = (c.processes.map (·.role))[i2]'hlen2 := by
+      rw [hrole1, hrole2, heq]
+    exact hunique.getElem_inj_iff.mp heq'
+  -- Therefore rp1 = rp2
+  subst hi_eq
+  rw [← hi1eq, ← hi2eq]
 
 /-! ## Lemmas for setProcess -/
 

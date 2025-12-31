@@ -61,68 +61,20 @@ def DeadlockFreedom : Prop :=
   ∀ (g : GlobalType) (c : Configuration),
     ConfigWellTyped g c → ¬ isStuck c
 
-/-- Canonical Forms: well-typed processes have expected structure. -/
-def CanonicalSend : Prop :=
-  ∀ (Γ : TypingContext) (p : Process) (receiver : String) (label : Label) (t : LocalTypeR),
-    WellTyped Γ p (.send receiver [(label, t)]) →
-    ∃ (value : Value) (cont : Process), p = .send receiver label value cont
-
-def CanonicalRecv : Prop :=
-  ∀ (Γ : TypingContext) (p : Process) (sender : String) (types : List (Label × LocalTypeR)),
-    WellTyped Γ p (.recv sender types) →
-    ∃ (branches : List (Label × Process)), p = .recv sender branches
-
 /-- Claims bundle for progress properties. -/
 structure Claims where
   /-- Main progress theorem -/
   progress : Progress
   /-- Deadlock freedom -/
   deadlockFreedom : DeadlockFreedom
-  /-- Canonical form for send -/
-  canonicalSend : CanonicalSend
-  /-- Canonical form for recv -/
-  canonicalRecv : CanonicalRecv
 
 /-! ## Proofs -/
-
-/-- NOTE: Canonical forms are FALSE as stated.
-
-    The claims CanonicalSend and CanonicalRecv are unprovable because:
-    - A conditional with both branches having send/recv type also has that type
-    - A variable looking up a send/recv type from context has that type
-
-    Counterexamples:
-    - WellTyped Γ (.cond true (.send r l v p) (.send r l v p)) (.send r [(l, t)])
-    - WellTyped Γ (.cond true (.recv s bs) (.recv s bs)) (.recv s types)
-
-    For the progress theorem, we handle each case directly in the proof
-    rather than relying on canonical forms. The commented-out theorems below
-    are kept for documentation purposes. -/
-
-/-- Canonical form for send types - FALSE as stated, see note above. -/
-axiom canonical_send_false : CanonicalSend
-
-/-- Canonical form for receive types - FALSE as stated, see note above. -/
-axiom canonical_recv_false : CanonicalRecv
-
--- Use the axioms to satisfy the type checker, acknowledging these are false claims
-theorem canonical_send : CanonicalSend := canonical_send_false
-theorem canonical_recv : CanonicalRecv := canonical_recv_false
 
 /-! ## Session Type Theory Axioms
 
 These axioms capture fundamental properties of multiparty session types
 that require substantial infrastructure to prove formally. They are
 standard results from the session type literature (Yoshida & Gheri). -/
-
-/-- Role uniqueness axiom: each role appears exactly once in a configuration.
-
-    This is a structural invariant on well-formed configurations.
-    In practice, configurations are constructed with unique role names,
-    and this property is preserved by all reduction rules. -/
-axiom role_uniqueness (c : Configuration) (rp1 rp2 : RoleProcess)
-    (h1 : rp1 ∈ c.processes) (h2 : rp2 ∈ c.processes) (heq : rp1.role = rp2.role)
-    : rp1 = rp2
 
 /-- Queue-type correspondence axiom: well-typed terminated configurations have empty queues.
 
@@ -259,6 +211,8 @@ theorem rec_can_reduce (c : Configuration) (role x : String) (body : Process)
        matching send/recv pairs -/
 theorem progress : Progress := by
   intro g c hwt hnotdone
+  -- Extract the unique roles property and role process typing from well-typedness
+  obtain ⟨huniqueRoles, hallwt⟩ := hwt
   -- If not done, either some process is not terminated or some queue is not empty
   unfold Configuration.isDone at hnotdone
   simp only [Bool.and_eq_true, Bool.not_eq_true'] at hnotdone
@@ -273,10 +227,10 @@ theorem progress : Progress := by
     exact absurd hempty hnotdone
   · -- Some process is not terminated
     have ⟨rp, hrp_mem, hnotterm⟩ := exists_active_process c hproc
-    -- Role uniqueness: use the role_uniqueness axiom
+    -- Role uniqueness: use the proven theorem from Configuration
     have hunique : ∀ rp' ∈ c.processes, rp'.role = rp.role → rp' = rp := by
       intro rp' hrp'_mem hrole_eq
-      exact role_uniqueness c rp' rp hrp'_mem hrp_mem hrole_eq
+      exact Configuration.role_uniqueness_from_hasUniqueRoles c huniqueRoles rp' rp hrp'_mem hrp_mem hrole_eq
     -- Case analysis on the process type
     cases hp : rp.process with
     | inaction =>
@@ -307,7 +261,7 @@ theorem progress : Progress := by
       -- Variable in a well-typed closed process contradicts well-typedness
       -- WellTyped [] (.var x) t requires [].lookup x = some t, which is impossible
       -- Get the well-typing for this role
-      have hrpwt := hwt rp hrp_mem
+      have hrpwt := hallwt rp hrp_mem
       unfold RoleProcessWellTyped at hrpwt
       cases hproj : projectR g rp.role with
       | error e =>
@@ -327,7 +281,7 @@ theorem progress : Progress := by
     | par p q =>
       -- Parallel composition: WellTyped has no rule for par
       -- So a well-typed process cannot be par - contradiction
-      have hrpwt := hwt rp hrp_mem
+      have hrpwt := hallwt rp hrp_mem
       unfold RoleProcessWellTyped at hrpwt
       cases hproj : projectR g rp.role with
       | error e =>
@@ -339,11 +293,5 @@ theorem progress : Progress := by
         have hpar : WellTyped [] (.par p q) lt := by rw [← hp]; exact hrpwt
         -- WellTyped has no constructor for par, so this is a contradiction
         cases hpar
-
-/-! ## Partial Claims Bundle -/
-
-/-- Partial claims with proven lemmas. -/
-def partialClaims : CanonicalSend ∧ CanonicalRecv :=
-  ⟨canonical_send, canonical_recv⟩
 
 end Rumpsteak.Proofs.Safety.Progress

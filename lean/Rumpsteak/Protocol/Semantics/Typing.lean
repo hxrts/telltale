@@ -107,10 +107,11 @@ def RoleProcessWellTyped (g : GlobalType) (rp : RoleProcess) : Prop :=
   | .error _ => False
 
 /-- A configuration is well-typed against a global type if:
-    1. Each role's process has the projected local type
-    2. Messages in queues are consistent with the protocol -/
+    1. All role names are unique
+    2. Each role's process has the projected local type
+    3. Messages in queues are consistent with the protocol -/
 def ConfigWellTyped (g : GlobalType) (c : Configuration) : Prop :=
-  ∀ rp ∈ c.processes, RoleProcessWellTyped g rp
+  c.hasUniqueRoles ∧ ∀ rp ∈ c.processes, RoleProcessWellTyped g rp
 
 /-! ## Decidable Type Checking -/
 
@@ -478,6 +479,17 @@ theorem wellTyped_rec_unfold (Γ : TypingContext) (x : String) (body : Process) 
     -- Apply equi-recursive substitution axiom
     exact equi_recursive_substitute Γ x body bodyType hbody'
 
+/-- setProcess preserves hasUniqueRoles (it only changes the process, not role names). -/
+theorem setProcess_preserves_hasUniqueRoles (c : Configuration) (role : String) (newProc : Process)
+    (hunique : c.hasUniqueRoles)
+    : (c.setProcess role newProc).hasUniqueRoles := by
+  unfold Configuration.hasUniqueRoles Configuration.roleNames Configuration.setProcess at *
+  simp only [List.map_map]
+  convert hunique using 2
+  ext rp
+  simp only [Function.comp_apply]
+  split <;> rfl
+
 /-- ConfigWellTyped respects setProcess when the new process is well-typed. -/
 theorem configWellTyped_setProcess (g : GlobalType) (c : Configuration)
     (role : String) (newProc : Process) (newType : LocalTypeR)
@@ -486,21 +498,24 @@ theorem configWellTyped_setProcess (g : GlobalType) (c : Configuration)
     (hprocWt : WellTyped [] newProc newType)
     : ConfigWellTyped g (c.setProcess role newProc) := by
   unfold ConfigWellTyped at *
-  intro rp hrp
-  unfold Configuration.setProcess at hrp
-  simp only [List.mem_map] at hrp
-  obtain ⟨rp', hrp', heq⟩ := hrp
-  by_cases h : rp'.role == role
-  · -- This is the role being updated
-    simp only [h, ↓reduceIte] at heq
-    subst heq
-    unfold RoleProcessWellTyped
-    simp only [beq_iff_eq] at h
-    simp only [h, hproj]
-    exact hprocWt
-  · -- Different role, preserved by setProcess
-    simp only [h] at heq
-    subst heq
-    exact hwt rp' hrp'
+  obtain ⟨hunique, hall⟩ := hwt
+  constructor
+  · exact setProcess_preserves_hasUniqueRoles c role newProc hunique
+  · intro rp hrp
+    unfold Configuration.setProcess at hrp
+    simp only [List.mem_map] at hrp
+    obtain ⟨rp', hrp', heq⟩ := hrp
+    by_cases h : rp'.role == role
+    · -- This is the role being updated
+      simp only [h, ↓reduceIte] at heq
+      subst heq
+      unfold RoleProcessWellTyped
+      simp only [beq_iff_eq] at h
+      simp only [h, hproj]
+      exact hprocWt
+    · -- Different role, preserved by setProcess
+      simp only [h] at heq
+      subst heq
+      exact hall rp' hrp'
 
 end Rumpsteak.Protocol.Semantics.Typing
