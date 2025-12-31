@@ -1,4 +1,5 @@
 import Rumpsteak.Protocol.GlobalType
+import Mathlib.Data.List.Basic
 
 /-! # Rumpsteak.Protocol.Semantics.Process
 
@@ -74,15 +75,39 @@ inductive Process where
   | par : Process → Process → Process
 deriving Repr, Inhabited
 
-/-- Extract free process variables from a process. -/
-partial def Process.freeVars : Process → List String
-  | .inaction => []
-  | .send _ _ _ p => p.freeVars
-  | .recv _ branches => branches.flatMap fun (_, p) => p.freeVars
-  | .cond _ p q => p.freeVars ++ q.freeVars
-  | .recurse x p => p.freeVars.filter (· != x)
-  | .var x => [x]
-  | .par p q => p.freeVars ++ q.freeVars
+-- Extract free process variables from a process.
+-- Uses mutual recursion to handle the nested `List (Label × Process)` case.
+mutual
+  /-- Extract free process variables from a process. -/
+  def Process.freeVars : Process → List String
+    | .inaction => []
+    | .send _ _ _ p => p.freeVars
+    | .recv _ branches => freeVarsOfBranches branches
+    | .cond _ p q => p.freeVars ++ q.freeVars
+    | .recurse x p => p.freeVars.filter (· != x)
+    | .var x => [x]
+    | .par p q => p.freeVars ++ q.freeVars
+
+  /-- Extract free variables from a list of branches. -/
+  def freeVarsOfBranches : List (Label × Process) → List String
+    | [] => []
+    | (_, p) :: rest => p.freeVars ++ freeVarsOfBranches rest
+end
+
+/-- If x is in freeVarsOfBranches, it's in some branch's freeVars. -/
+theorem freeVarsOfBranches_mem (branches : List (Label × Process)) (x : String)
+    (h : x ∈ freeVarsOfBranches branches)
+    : ∃ i, ∃ _ : i < branches.length, x ∈ (branches[i]).2.freeVars := by
+  induction branches with
+  | nil => simp only [freeVarsOfBranches, List.not_mem_nil] at h
+  | cons b rest ih =>
+    simp only [freeVarsOfBranches, List.mem_append] at h
+    cases h with
+    | inl hb =>
+      exact ⟨0, Nat.zero_lt_succ _, hb⟩
+    | inr hrest =>
+      have ⟨i, hi, hx⟩ := ih hrest
+      exact ⟨i + 1, Nat.succ_lt_succ hi, hx⟩
 
 /-- Substitute a process for a variable. -/
 partial def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=

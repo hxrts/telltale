@@ -178,18 +178,56 @@ def checkType (ctx : TypingContext) (p : Process) (expected : LocalTypeR) (fuel 
 
 /-! ## Typing Lemmas -/
 
-/-- Axiom: Free variables of a well-typed process are in the context domain.
+/-- Free variables of a well-typed process are in the context domain.
 
-    This is a standard property of typing derivations. Since Process.freeVars
-    is a partial def, we state this as an axiom rather than proving it by
-    induction on the typing derivation. -/
-axiom freeVars_in_context_ax (Γ : TypingContext) (p : Process) (t : LocalTypeR)
-    (h : WellTyped Γ p t) : ∀ x ∈ p.freeVars, ∃ t', Γ.lookup x = some t'
-
-/-- Free variables of a well-typed process are in the context domain. -/
+    Proved by induction on the typing derivation, now that freeVars is terminating.
+    The recv case requires using freeVarsOfBranches_mem to connect the mutual recursion. -/
 theorem freeVars_in_context (Γ : TypingContext) (p : Process) (t : LocalTypeR)
-    (h : WellTyped Γ p t) : ∀ x ∈ p.freeVars, ∃ t', Γ.lookup x = some t' :=
-  freeVars_in_context_ax Γ p t h
+    (h : WellTyped Γ p t) : ∀ x ∈ p.freeVars, ∃ t', Γ.lookup x = some t' := by
+  induction h with
+  | inaction =>
+    intro x hx
+    simp only [Process.freeVars, List.not_mem_nil] at hx
+  | @send Γ receiver label value cont contType _hwt ih =>
+    intro x hx
+    simp only [Process.freeVars] at hx
+    exact ih x hx
+  | @recv Γ sender branches types hlen _hall _hlabels ih =>
+    intro x hx
+    simp only [Process.freeVars] at hx
+    have ⟨i, hi, hxi⟩ := freeVarsOfBranches_mem branches x hx
+    -- ih : ∀ i, ∀ x ∈ (branches.get! i).2.freeVars, ∃ t', Γ.lookup x = some t'
+    -- Convert from branches[i] to branches.get! i
+    have hget_eq : (branches[i]).2 = (branches.get! i).2 := by
+      simp only [List.get!_eq_getD, List.getD, List.getElem?_eq_getElem hi, Option.getD_some]
+    rw [hget_eq] at hxi
+    exact ih i x hxi
+  | @cond Γ b p' q t' _hwt1 _hwt2 ih1 ih2 =>
+    intro x hx
+    simp only [Process.freeVars, List.mem_append] at hx
+    cases hx with
+    | inl hxp => exact ih1 x hxp
+    | inr hxq => exact ih2 x hxq
+  | @recurse Γ varName body bodyType _hwt ih =>
+    intro y hy
+    simp only [Process.freeVars, List.mem_filter, bne_iff_ne, ne_eq, decide_eq_true_eq] at hy
+    have ⟨hyfree, hyne⟩ := hy
+    have ⟨t', ht'⟩ := ih y hyfree
+    -- ht' : (Γ.extend varName bodyType).lookup y = some t'
+    -- Since y ≠ varName, lookup in extended context = lookup in original
+    unfold TypingContext.extend at ht'
+    simp only [TypingContext.lookup, List.find?_cons] at ht'
+    -- Check if varName == y (this is the order in the hypothesis)
+    have hneq : (varName == y) = false := by
+      simp only [beq_eq_false_iff_ne, ne_eq]
+      exact fun h => hyne h.symm
+    simp only [hneq, Bool.false_eq_true, ↓reduceIte, Option.map] at ht'
+    exact ⟨t', ht'⟩
+  | @var Γ varName varType hlookup =>
+    intro y hy
+    simp only [Process.freeVars, List.mem_singleton] at hy
+    subst hy
+    exact ⟨_, hlookup⟩
 
 /-- Well-typed processes in empty context have no free variables.
 
@@ -202,17 +240,16 @@ theorem wellTyped_closed (p : Process) (t : LocalTypeR)
   -- By freeVars_in_context, any free var would need to be in []
   -- But [].lookup x = none for all x
   by_contra hne
-  simp only [List.isEmpty_iff, ne_eq] at hne
+  simp only [List.isEmpty_iff] at hne
   -- hne : p.freeVars ≠ []
   -- So there's some x ∈ p.freeVars
-  have ⟨x, hx⟩ : ∃ x, x ∈ p.freeVars := by
-    cases hfv : p.freeVars with
-    | nil => exact absurd rfl hne
-    | cons y ys => exact ⟨y, List.mem_cons_self y ys⟩
+  have hex : ∃ x, x ∈ p.freeVars := List.exists_mem_of_ne_nil _ hne
+  obtain ⟨x, hx⟩ := hex
   have ⟨t', ht'⟩ := freeVars_in_context [] p t h x hx
   -- ht' : [].lookup x = some t', but this is impossible
   unfold TypingContext.lookup at ht'
   simp only [List.find?_nil, Option.map_none'] at ht'
+  exact Option.noConfusion ht'
 
 /-- Inversion lemma for conditional typing. -/
 theorem wellTyped_cond_inversion (Γ : TypingContext) (b : Bool) (p q : Process) (t : LocalTypeR)
@@ -297,9 +334,9 @@ theorem wellTyped_context_equiv {Γ1 Γ2 : TypingContext} (p : Process) (t : Loc
     exact .cond (ihp heq) (ihq heq)
   | recurse hbody ih =>
     exact .recurse (ih (lookup_equiv_extend _ _ heq))
-  | var hlookup =>
-    rw [← heq] at hlookup
-    exact .var hlookup
+  | @var _ x t hlookup =>
+    have hlookup' : Γ2.lookup x = some t := by rw [← heq x]; exact hlookup
+    exact .var hlookup'
 
 /-- Typing is preserved under context shadowing: if the inner binding shadows
     an identical outer binding, typing is preserved. -/
@@ -338,10 +375,21 @@ private theorem lookup_extend_exchange (Γ : TypingContext) (x y : String) (s u 
   intro z
   unfold TypingContext.extend TypingContext.lookup
   simp only [List.find?_cons]
-  by_cases hzy : z == y <;> by_cases hzx : z == x <;> simp only [hzy, hzx, ↓reduceIte]
-  -- z = y and z = x is impossible since x ≠ y
-  · simp only [beq_iff_eq] at hzy hzx
-    exact absurd (hzy.symm.trans hzx) hne
+  by_cases hzy : y = z <;> by_cases hzx : x = z
+  · -- y = z and x = z, so x = y, contradicting hne
+    exact absurd (hzx.trans hzy.symm) hne
+  · -- y = z, x ≠ z
+    subst hzy
+    have hxy : (x == y) = false := beq_eq_false_iff_ne.mpr hne
+    simp only [beq_self_eq_true, ↓reduceIte, hxy]
+  · -- y ≠ z, x = z
+    subst hzx
+    have hyx : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+    simp only [beq_self_eq_true, ↓reduceIte, hyx]
+  · -- y ≠ z, x ≠ z
+    have hyz : (y == z) = false := beq_eq_false_iff_ne.mpr hzy
+    have hxz : (x == z) = false := beq_eq_false_iff_ne.mpr hzx
+    simp only [hyz, hxz, Bool.false_eq_true, ↓reduceIte]
 
 /-- Context exchange: swapping independent bindings preserves typing. -/
 theorem wellTyped_exchange (Γ : TypingContext) (p : Process) (t : LocalTypeR)
@@ -362,88 +410,10 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     (hp : WellTyped (Γ.extend x s) p t)
     (hq : WellTyped Γ q s)
     : WellTyped Γ (p.substitute x q) t := by
-  -- Induction on the typing derivation
-  -- Note: Process.substitute is partial, so we rely on typing structure
-  induction hp generalizing Γ with
-  | inaction =>
-    -- inaction.substitute x q = inaction
-    simp only [Process.substitute]
-    exact .inaction
-  | send hcont ih =>
-    simp only [Process.substitute]
-    exact .send (ih hq)
-  | recv hlen hall hlabel ih =>
-    simp only [Process.substitute]
-    -- Need to show: substituted branches preserve typing
-    apply WellTyped.recv
-    · simp only [List.length_map]; exact hlen
-    · intro i
-      -- After mapping, get! i gives the i-th substituted branch
-      -- We need: WellTyped Γ ((branches.map ...).get! i).2 (types.get! i).2
-      -- (branches.map (fun (l, p) => (l, p.substitute x q))).get! i
-      --   = (branches.get! i).1, (branches.get! i).2.substitute x q)
-      -- So we need: WellTyped Γ ((branches.get! i).2.substitute x q) (types.get! i).2
-      -- This is exactly ih i hq
-      simp only [List.get!_map]
-      exact ih i hq
-    · intro i
-      simp only [List.get!_map]
-      exact hlabel i
-  | cond hp hq ihp ihq =>
-    simp only [Process.substitute]
-    exact .cond (ihp hq) (ihq hq)
-  | recurse hbody ih =>
-    simp only [Process.substitute]
-    -- If the bound variable is x, substitution is blocked (shadowing)
-    -- Otherwise, we recurse
-    rename_i y bodyType
-    split
-    · -- x == y: variable is shadowed, body unchanged
-      rename_i heq
-      simp only [beq_iff_eq] at heq
-      -- hbody : WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
-      -- Since x = y, the inner y shadows the outer x
-      -- We need: WellTyped Γ (.recurse y body) (.mu y bodyType)
-      apply WellTyped.recurse
-      -- Need: WellTyped (Γ.extend y bodyType) body bodyType
-      -- Use context equivalence: ((Γ.extend x s).extend y t).lookup z = (Γ.extend y t).lookup z
-      apply wellTyped_context_equiv body bodyType _ hbody
-      intro z
-      rw [heq]
-      exact lookup_extend_shadow Γ y s bodyType z
-    · -- x ≠ y: substitution proceeds into body
-      rename_i hne
-      simp only [beq_eq_false_iff_ne, ne_eq] at hne
-      apply WellTyped.recurse
-      -- Need: WellTyped (Γ.extend y bodyType) (body.substitute x q) bodyType
-      -- ih : WellTyped Γ q s → WellTyped (Γ.extend y bodyType) (body.substitute x q) bodyType
-      -- But ih requires WellTyped Γ q s, and we have hq : WellTyped Γ q s
-      exact ih hq
-  | var hlookup =>
-    simp only [Process.substitute]
-    split
-    · -- x == varName: return q (the replacement)
-      simp only [beq_iff_eq] at *
-      rename_i heq
-      -- hlookup : (Γ.extend x s).lookup varName = some t
-      -- Since varName == x, lookup returns s, so t = s
-      unfold TypingContext.extend TypingContext.lookup at hlookup
-      simp only [List.find?_cons, heq, beq_self_eq_true, ↓reduceIte, Option.map] at hlookup
-      injection hlookup with ht
-      rw [ht]
-      exact hq
-    · -- x ≠ varName: return .var varName unchanged
-      simp only [beq_eq_false_iff_ne, ne_eq] at *
-      rename_i hne
-      -- hlookup : (Γ.extend x s).lookup varName = some t
-      -- Since varName ≠ x, lookup looks in Γ
-      have hlookup' : Γ.lookup _ = some t := by
-        unfold TypingContext.extend TypingContext.lookup at hlookup
-        simp only [List.find?_cons] at hlookup
-        have hneq : (_ == x) = false := beq_eq_false_iff_ne.mpr (fun h => hne h.symm)
-        simp only [hneq, Bool.false_eq_true, ↓reduceIte] at hlookup
-        exact hlookup
-      exact .var hlookup'
+  -- TODO: This proof requires Process.substitute to be terminating.
+  -- Currently substitute is partial def, so simp/unfold don't work.
+  -- Making substitute terminating (like freeVars) would enable this proof.
+  sorry
 
 /-- Equi-recursive type equivalence axiom.
 
