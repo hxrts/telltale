@@ -132,6 +132,47 @@ theorem exists_active_process (c : Configuration)
     : ∃ rp, rp ∈ c.processes ∧ ¬ rp.process.isTerminated :=
   exists_not_terminated_in_list c.processes hproc
 
+/-- Helper: membership with predicate implies find? succeeds.
+    With uniqueness, we can show exactly which element is found. -/
+private theorem mem_implies_find? {α : Type _} (l : List α) (p : α → Bool) (x : α)
+    (hmem : x ∈ l) (hpred : p x = true)
+    (hunique : ∀ y ∈ l, p y = true → y = x)
+    : l.find? p = some x := by
+  induction l with
+  | nil => cases hmem
+  | cons y ys ih =>
+    simp only [List.find?_cons]
+    cases hmem with
+    | head =>
+      simp only [hpred, ↓reduceIte]
+    | tail _ htail =>
+      by_cases hy : p y
+      · simp only [hy, ↓reduceIte]
+        congr 1
+        exact hunique y List.mem_cons_self hy
+      · simp only [hy, Bool.false_eq_true, ↓reduceIte]
+        apply ih htail
+        intro z hz hpz
+        exact hunique z (List.mem_cons_of_mem y hz) hpz
+
+/-- Helper: If rp is in processes, getProcess returns its process.
+
+    Note: This assumes role names are unique in the configuration.
+    For a proper proof, we'd need this as an invariant on Configuration. -/
+theorem mem_getProcess (c : Configuration) (rp : RoleProcess)
+    (hmem : rp ∈ c.processes)
+    (hunique : ∀ rp' ∈ c.processes, rp'.role = rp.role → rp' = rp)
+    : c.getProcess rp.role = some rp.process := by
+  unfold Configuration.getProcess
+  have hfind : c.processes.find? (fun r => r.role == rp.role) = some rp := by
+    apply mem_implies_find?
+    · exact hmem
+    · simp only [beq_self_eq_true]
+    · intro rp' hrp' hpred
+      simp only [beq_iff_eq] at hpred
+      exact hunique rp' hrp' hpred
+  simp only [hfind, Option.map]
+
 /-- Helper: A send process can always reduce (enqueue is always possible). -/
 theorem send_can_reduce (c : Configuration) (role receiver : String)
     (label : Label) (value : Value) (cont : Process)
@@ -164,12 +205,63 @@ theorem rec_can_reduce (c : Configuration) (role x : String) (body : Process)
     3. The key insight for recv is that the global type ensures
        matching send/recv pairs -/
 theorem progress : Progress := by
-  -- TODO: Update proof for Lean 4.24 API changes
-  -- Key changes needed:
-  -- - ConfigWellTyped now uses ∀ instead of List.all
-  -- - Process.rec renamed to Process.recurse
-  -- - Various simp lemmas deprecated
-  sorry
+  intro g c hwt hnotdone
+  -- If not done, either some process is not terminated or some queue is not empty
+  unfold Configuration.isDone at hnotdone
+  simp only [Bool.and_eq_true, Bool.not_eq_true'] at hnotdone
+  -- hnotdone : ¬(all processes terminated ∧ all queues empty)
+  by_cases hproc : c.processes.all (fun rp => rp.process.isTerminated)
+  · -- All processes terminated, so some queue must be non-empty
+    simp only [hproc, true_and, Bool.not_eq_true'] at hnotdone
+    -- hnotdone : ¬ all queues empty
+    -- This means there's a message but no active receiver
+    -- By well-typedness, this shouldn't happen (queues should drain)
+    -- This requires showing that well-typed terminated configs have empty queues
+    sorry
+  · -- Some process is not terminated
+    have ⟨rp, hrp_mem, hnotterm⟩ := exists_active_process c hproc
+    -- Assume role names are unique (standard invariant for configurations)
+    -- In practice, this would be an invariant on well-formed configurations
+    have hunique : ∀ rp' ∈ c.processes, rp'.role = rp.role → rp' = rp := by
+      sorry -- Role uniqueness invariant
+    -- Case analysis on the process type
+    cases hp : rp.process with
+    | inaction =>
+      -- Contradiction: inaction is terminated (hp : rp.process = .inaction)
+      have hterm : rp.process.isTerminated = true := by rw [hp]; rfl
+      exact absurd hterm hnotterm
+    | send receiver label value cont =>
+      -- Send can always reduce (enqueue)
+      have hget := mem_getProcess c rp hrp_mem hunique
+      rw [hp] at hget
+      exact send_can_reduce c rp.role receiver label value cont hget
+    | recv sender branches =>
+      -- Receive requires a message in the queue
+      -- By well-typedness and global type structure, if this role expects
+      -- to receive from sender, either:
+      -- 1. There's already a message from sender in the queue, or
+      -- 2. The sender's process is a matching send (will send first)
+      -- This is the key insight from session type theory
+      sorry
+    | cond b p q =>
+      -- Conditional can always reduce
+      have hget := mem_getProcess c rp hrp_mem hunique
+      rw [hp] at hget
+      exact cond_can_reduce c rp.role b p q hget
+    | recurse x body =>
+      -- Recursion can always unfold
+      have hget := mem_getProcess c rp hrp_mem hunique
+      rw [hp] at hget
+      exact rec_can_reduce c rp.role x body hget
+    | var x =>
+      -- Variable in a well-typed closed process
+      -- Well-typed processes in empty context are closed (no free vars)
+      -- So a var process contradicts well-typedness
+      sorry
+    | par p q =>
+      -- Parallel composition: at least one side is not terminated
+      -- Need to recurse on the non-terminated component
+      sorry
 
 /-! ## Partial Claims Bundle -/
 
