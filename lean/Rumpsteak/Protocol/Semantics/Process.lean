@@ -109,25 +109,56 @@ theorem freeVarsOfBranches_mem (branches : List (Label × Process)) (x : String)
       have ⟨i, hi, hx⟩ := ih hrest
       exact ⟨i + 1, Nat.succ_lt_succ hi, hx⟩
 
-/-- Substitute a process for a variable. -/
-partial def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=
-  match proc with
-  | .inaction => .inaction
-  | .send role label value p =>
-    .send role label value (p.substitute varName replacement)
-  | .recv role branches =>
-    .recv role (branches.map fun (l, p) => (l, p.substitute varName replacement))
-  | .cond b p q =>
-    .cond b (p.substitute varName replacement) (q.substitute varName replacement)
-  | .recurse x p =>
-    if x == varName then
-      .recurse x p  -- Variable is shadowed
-    else
-      .recurse x (p.substitute varName replacement)
-  | .var x =>
-    if x == varName then replacement else .var x
-  | .par p q =>
-    .par (p.substitute varName replacement) (q.substitute varName replacement)
+-- Substitute a process for a variable.
+-- Uses mutual recursion to handle the nested `List (Label × Process)` case.
+mutual
+  /-- Substitute a process for a variable. -/
+  def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=
+    match proc with
+    | .inaction => .inaction
+    | .send role label value p =>
+      .send role label value (p.substitute varName replacement)
+    | .recv role branches =>
+      .recv role (substituteBranches branches varName replacement)
+    | .cond b p q =>
+      .cond b (p.substitute varName replacement) (q.substitute varName replacement)
+    | .recurse x p =>
+      if x == varName then
+        .recurse x p  -- Variable is shadowed
+      else
+        .recurse x (p.substitute varName replacement)
+    | .var x =>
+      if x == varName then replacement else .var x
+    | .par p q =>
+      .par (p.substitute varName replacement) (q.substitute varName replacement)
+
+  /-- Substitute in a list of branches. -/
+  def substituteBranches (branches : List (Label × Process)) (varName : String) (replacement : Process)
+      : List (Label × Process) :=
+    match branches with
+    | [] => []
+    | (l, p) :: rest => (l, p.substitute varName replacement) :: substituteBranches rest varName replacement
+end
+
+/-- substituteBranches preserves length. -/
+theorem substituteBranches_length (branches : List (Label × Process)) (varName : String) (replacement : Process)
+    : (substituteBranches branches varName replacement).length = branches.length := by
+  induction branches with
+  | nil => rfl
+  | cons _ _ ih => simp only [substituteBranches, List.length_cons, ih]
+
+/-- substituteBranches get! preserves label and substitutes process. -/
+theorem substituteBranches_get! (branches : List (Label × Process)) (varName : String) (replacement : Process) (i : Nat)
+    : (substituteBranches branches varName replacement).get! i =
+      ((branches.get! i).1, (branches.get! i).2.substitute varName replacement) := by
+  induction branches generalizing i with
+  | nil =>
+    simp only [substituteBranches, List.get!_nil]
+    rfl
+  | cons b rest ih =>
+    cases i with
+    | zero => simp only [substituteBranches, List.get!_cons_zero]
+    | succ n => simp only [substituteBranches, List.get!_cons_succ, ih]
 
 /-- Unfold one level of recursion: μX.P ↦ P[μX.P/X] -/
 def Process.unfold : Process → Process

@@ -410,10 +410,78 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     (hp : WellTyped (Γ.extend x s) p t)
     (hq : WellTyped Γ q s)
     : WellTyped Γ (p.substitute x q) t := by
-  -- TODO: This proof requires Process.substitute to be terminating.
-  -- Currently substitute is partial def, so simp/unfold don't work.
-  -- Making substitute terminating (like freeVars) would enable this proof.
-  sorry
+  -- Generalize the extended context to make induction work
+  generalize hΓ' : Γ.extend x s = Γ' at hp
+  induction hp generalizing Γ with
+  | inaction =>
+    simp only [Process.substitute]
+    exact .inaction
+  | @send _ receiver label value cont contType _hwt ih =>
+    simp only [Process.substitute]
+    exact .send (ih hΓ' hq)
+  | @recv _ sender branches types hlen _hall _hlabels ih =>
+    simp only [Process.substitute]
+    apply WellTyped.recv
+    · rw [substituteBranches_length]; exact hlen
+    · intro i
+      rw [substituteBranches_get!]
+      -- Need: WellTyped Γ (branches.get! i).2.substitute x q (types.get! i).2
+      -- ih i : ∀ Γ, Γ' = Γ.extend x s → WellTyped Γ q s →
+      --        WellTyped Γ (branches.get! i).2.substitute x q (types.get! i).2
+      exact ih i hΓ' hq
+    · intro i
+      rw [substituteBranches_get!]
+      -- Labels are preserved: (branches.get! i).1 = (types.get! i).1
+      exact _hlabels i
+  | @cond _ b p' q' t' _hwt1 _hwt2 ih1 ih2 =>
+    simp only [Process.substitute]
+    exact .cond (ih1 hΓ' hq) (ih2 hΓ' hq)
+  | @recurse _ varName body bodyType _hwt ih =>
+    simp only [Process.substitute]
+    split
+    · -- varName == x: variable is shadowed, body unchanged
+      rename_i heq
+      simp only [beq_iff_eq] at heq
+      apply WellTyped.recurse
+      apply wellTyped_context_equiv body bodyType _ _hwt
+      intro z
+      rw [← hΓ', heq]
+      exact lookup_extend_shadow Γ varName s bodyType z
+    · -- varName ≠ x: substitution proceeds into body
+      rename_i hne
+      simp only [beq_eq_false_iff_ne, ne_eq] at hne
+      apply WellTyped.recurse
+      -- Need: WellTyped (Γ.extend varName bodyType) (body.substitute x q) bodyType
+      -- ih requires context to be (Γ.extend x s).extend varName bodyType
+      -- We need to exchange the bindings
+      have hex := ih rfl (wellTyped_weaken Γ varName bodyType q s hq)
+      apply wellTyped_context_equiv _ _ _ hex
+      intro z
+      rw [← hΓ']
+      exact (lookup_extend_exchange Γ x varName s bodyType hne z).symm
+  | @var _ varName varType hlookup =>
+    simp only [Process.substitute]
+    split
+    · -- varName == x: return q (the replacement)
+      rename_i heq
+      simp only [beq_iff_eq] at heq
+      rw [← hΓ'] at hlookup
+      unfold TypingContext.extend TypingContext.lookup at hlookup
+      simp only [List.find?_cons, heq, beq_self_eq_true, ↓reduceIte, Option.map] at hlookup
+      injection hlookup with ht
+      rw [ht]
+      exact hq
+    · -- varName ≠ x: return .var varName unchanged
+      rename_i hne
+      simp only [beq_eq_false_iff_ne, ne_eq] at hne
+      rw [← hΓ'] at hlookup
+      have hlookup' : Γ.lookup varName = some varType := by
+        unfold TypingContext.extend TypingContext.lookup at hlookup
+        simp only [List.find?_cons] at hlookup
+        have hneq : (varName == x) = false := beq_eq_false_iff_ne.mpr hne
+        simp only [hneq, Bool.false_eq_true, ↓reduceIte] at hlookup
+        exact hlookup
+      exact .var hlookup'
 
 /-- Equi-recursive type equivalence axiom.
 
