@@ -135,21 +135,63 @@ def Configuration.activeRoles (c : Configuration) : List String :=
 
 /-! ## Lemmas for setProcess -/
 
+/-- Helper: find? preserves under map when the element is unchanged. -/
+private theorem find?_map_unchanged {α : Type _} (l : List α) (p : α → Bool) (f : α → α)
+    (hf : ∀ a, p a = true → f a = a)
+    (hfp : ∀ a, p (f a) = p a)
+    : (l.map f).find? p = l.find? p := by
+  induction l with
+  | nil => rfl
+  | cons x xs ih =>
+    simp only [List.map_cons, List.find?_cons, hfp]
+    split
+    · -- p x = true
+      rename_i hp
+      rw [hf x hp]
+    · -- p x = false
+      exact ih
+
 /-- setProcess preserves the process for other roles. -/
 theorem Configuration.setProcess_preserves_other
     (c : Configuration) (role otherRole : String) (proc : Process)
     (hne : role ≠ otherRole)
     : (c.setProcess role proc).getProcess otherRole = c.getProcess otherRole := by
-  -- TODO: Update proof for new Lean 4 List API
-  sorry
+  unfold setProcess getProcess
+  congr 1
+  apply find?_map_unchanged
+  · intro rp hp
+    simp only [beq_iff_eq] at hp
+    have : rp.role ≠ role := by rw [hp]; exact hne.symm
+    simp only [beq_eq_false_iff_ne.mpr this, Bool.false_eq_true, ↓reduceIte]
+  · intro rp
+    cases h : rp.role == role
+    · rfl
+    · rfl
+
+/-- Helper for setProcess_sets_role. -/
+private theorem setProcess_sets_role_aux (l : List RoleProcess) (role : String) (proc : Process)
+    (hexists : (l.find? (fun rp => rp.role == role)).map (·.process) ≠ none)
+    : ((l.map fun rp => if rp.role == role then { rp with process := proc } else rp).find?
+        (fun rp => rp.role == role)).map (·.process) = some proc := by
+  induction l with
+  | nil => simp only [List.find?_nil, Option.map_none, ne_eq, not_true_eq_false] at hexists
+  | cons rp rest ih =>
+    simp only [List.map_cons, List.find?_cons]
+    cases hrp : rp.role == role with
+    | true => simp only [hrp, ↓reduceIte, Option.map_some]
+    | false =>
+      simp only [hrp, Bool.false_eq_true, ↓reduceIte]
+      apply ih
+      simp only [List.find?_cons, hrp] at hexists
+      exact hexists
 
 /-- setProcess sets the process for the target role. -/
 theorem Configuration.setProcess_sets_role
     (c : Configuration) (role : String) (proc : Process)
     (hexists : c.getProcess role ≠ none)
     : (c.setProcess role proc).getProcess role = some proc := by
-  -- TODO: Update proof for new Lean 4 List API
-  sorry
+  unfold setProcess getProcess at *
+  exact setProcess_sets_role_aux c.processes role proc hexists
 
 /-- After setProcess, the processes list has the same length. -/
 theorem Configuration.setProcess_length
@@ -163,8 +205,11 @@ theorem Configuration.setProcess_mem_other
     (c : Configuration) (role : String) (proc : Process)
     (rp : RoleProcess) (hrp : rp ∈ c.processes) (hne : rp.role ≠ role)
     : rp ∈ (c.setProcess role proc).processes := by
-  -- TODO: Update proof for new Lean 4 List API
-  sorry
+  unfold setProcess
+  simp only [List.mem_map]
+  refine ⟨rp, hrp, ?_⟩
+  have h : (rp.role == role) = false := beq_eq_false_iff_ne.mpr hne
+  simp only [h, Bool.false_eq_true, ↓reduceIte]
 
 /-- setProcess preserves queues. -/
 theorem Configuration.setProcess_queues

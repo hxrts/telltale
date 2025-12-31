@@ -318,7 +318,22 @@ theorem configWellTyped_setProcess (g : GlobalType) (c : Configuration)
     (hproj : projectR g role = .ok newType)
     (hprocWt : WellTyped [] newProc newType)
     : ConfigWellTyped g (c.setProcess role newProc) := by
-  -- TODO: Update for new ConfigWellTyped definition
-  sorry
+  unfold ConfigWellTyped at *
+  intro rp hrp
+  unfold Configuration.setProcess at hrp
+  simp only [List.mem_map] at hrp
+  obtain ⟨rp', hrp', heq⟩ := hrp
+  by_cases h : rp'.role == role
+  · -- This is the role being updated
+    simp only [h, ↓reduceIte] at heq
+    subst heq
+    unfold RoleProcessWellTyped
+    simp only [beq_iff_eq] at h
+    simp only [h, hproj]
+    exact hprocWt
+  · -- Different role, preserved by setProcess
+    simp only [h] at heq
+    subst heq
+    exact hwt rp' hrp'
 
 end Rumpsteak.Protocol.Semantics.Typing

@@ -112,36 +112,45 @@ theorem deadlock_freedom_from_progress (h : Progress) : DeadlockFreedom := by
   have ⟨c', hred⟩ := h g c hwt hnotdone
   exact hnoreduce c' hred
 
+/-- Helper lemma for exists_active_process. -/
+private theorem exists_not_terminated_in_list (l : List RoleProcess)
+    (h : ¬ l.all (fun rp => rp.process.isTerminated))
+    : ∃ rp, rp ∈ l ∧ ¬ rp.process.isTerminated := by
+  induction l with
+  | nil => simp only [List.all_nil, not_true_eq_false] at h
+  | cons rp rest ih =>
+    rw [List.all_cons] at h
+    by_cases hrp : rp.process.isTerminated
+    · simp only [hrp, Bool.true_and] at h
+      obtain ⟨rp', hrp', hterm'⟩ := ih h
+      exact ⟨rp', List.mem_cons_of_mem rp hrp', hterm'⟩
+    · exact ⟨rp, List.mem_cons_self, hrp⟩
+
 /-- Helper: If not all processes are terminated, there's an active role. -/
 theorem exists_active_process (c : Configuration)
     (hproc : ¬ c.processes.all (fun rp => rp.process.isTerminated))
-    : ∃ rp, rp ∈ c.processes ∧ ¬ rp.process.isTerminated := by
-  -- TODO: Update for Lean 4.24 - push_neg tactic may need import or different approach
-  -- The proof should transform ¬(∀ x ∈ list, P x) to ∃ x ∈ list, ¬P x
-  sorry
+    : ∃ rp, rp ∈ c.processes ∧ ¬ rp.process.isTerminated :=
+  exists_not_terminated_in_list c.processes hproc
 
 /-- Helper: A send process can always reduce (enqueue is always possible). -/
 theorem send_can_reduce (c : Configuration) (role receiver : String)
     (label : Label) (value : Value) (cont : Process)
     (hrp : c.getProcess role = some (.send receiver label value cont))
     : ∃ c', Reduces c c' := by
-  -- TODO: Fix tactic for Lean 4.24
-  sorry
+  exact ⟨_, Reduces.send c role receiver label value cont hrp⟩
 
 /-- Helper: A conditional process can always reduce. -/
 theorem cond_can_reduce (c : Configuration) (role : String)
     (b : Bool) (p q : Process)
     (hrp : c.getProcess role = some (.cond b p q))
     : ∃ c', Reduces c c' := by
-  -- TODO: Fix tactic for Lean 4.24
-  sorry
+  exact ⟨_, Reduces.cond c role b p q hrp⟩
 
 /-- Helper: A recursive process can always reduce (unfold). -/
 theorem rec_can_reduce (c : Configuration) (role x : String) (body : Process)
     (hrp : c.getProcess role = some (.recurse x body))
     : ∃ c', Reduces c c' := by
-  -- TODO: Fix tactic for Lean 4.24
-  sorry
+  exact ⟨_, Reduces.recurse c role x body hrp⟩
 
 /-- Progress theorem.
 
