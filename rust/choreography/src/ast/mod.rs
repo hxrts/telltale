@@ -10,6 +10,9 @@
 /// Choreography definitions (global protocols with metadata)
 pub mod choreography;
 
+/// Conversion utilities between DSL types and theory types
+pub mod convert;
+
 /// Global types for multiparty session type protocols (extended, uses rumpsteak-types)
 pub mod global_type;
 
@@ -44,3 +47,9 @@ pub use role::{
     RoleValidationResult, MAX_RANGE_SIZE, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
 };
 pub use validation::ValidationError;
+
+// Re-export conversion utilities
+pub use convert::{
+    choreography_to_global, local_to_local_r, local_types_equivalent, protocol_to_global,
+    ConversionError, ConversionResult,
+};

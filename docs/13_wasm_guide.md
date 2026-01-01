@@ -26,7 +26,7 @@ Add the wasm feature to your dependencies:
 
 ```toml
 [dependencies]
-rumpsteak-choreography = { version = "0.1", features = ["wasm"] }
+rumpsteak-aura-choreography = { version = "0.7", features = ["wasm"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 ```
@@ -45,7 +45,7 @@ The wasm-ping-pong example demonstrates a complete browser protocol:
 
 ```rust
 use wasm_bindgen::prelude::*;
-use rumpsteak_choreography::{InMemoryHandler, Program, interpret};
+use rumpsteak_aura_choreography::{InMemoryHandler, Program, interpret};
 
 #[wasm_bindgen]
 pub async fn run_protocol(message: String) -> Result<String, JsValue> {
@@ -85,7 +85,7 @@ RumpsteakHandler now compiles for WASM. To use it with real network transport:
 
 ```rust
 use wasm_bindgen::prelude::*;
-use rumpsteak_choreography::{RumpsteakHandler, RumpsteakEndpoint, SimpleChannel};
+use rumpsteak_aura_choreography::{RumpsteakHandler, RumpsteakEndpoint, SimpleChannel};
 
 #[wasm_bindgen]
 pub async fn run_distributed_protocol() -> Result<(), JsValue> {
@@ -156,7 +156,7 @@ impl WebSocketHandler {
 }
 ```
 
-With the Phase 3 handler you can skip the custom `ChoreoHandler`—wrap this
+With the Phase 3 handler you can skip the custom `ChoreoHandler`. Wrap this
 `WebSocketHandler` with `RumpsteakSession::from_sink_stream` and register it on
 the endpoint instead.
 
@@ -181,7 +181,7 @@ The pattern is the same: implement ChoreoHandler using browser APIs for your tra
 The runtime module provides platform-specific functions:
 
 ```rust
-use rumpsteak_choreography::runtime::{spawn, spawn_local};
+use rumpsteak_aura_choreography::runtime::{spawn, spawn_local};
 
 spawn(async { /* task */ });  // Works on native and WASM
 ```

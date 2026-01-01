@@ -28,7 +28,7 @@ The `fft.rs` example shows distributed Fast Fourier Transform. Computation is di
 
 The `ring_choice.rs` example shows ring topology with choice points. Roles make decisions at each node.
 
-The `choreography.rs` example demonstrates choice constructs and branching patterns.
+The `ring_choice.rs` example demonstrates choice constructs and branching patterns in a ring topology.
 
 ### WASM
 
@@ -43,12 +43,12 @@ The `wasm-ping-pong` example runs in browsers. It shows browser‑based ping‑p
 Client sends request to server. Server processes and sends response back.
 
 ```rust
-choreography! {
-    protocol RequestResponse =
-      roles Client, Server
-      Client -> Server : Request
-      Server -> Client : Response
-}
+choreography!(r#"
+protocol RequestResponse =
+  roles Client, Server
+  Client -> Server : Request
+  Server -> Client : Response
+"#);
 ```
 
 Use this pattern for synchronous operations. Client waits for server response.
@@ -58,15 +58,15 @@ Use this pattern for synchronous operations. Client waits for server response.
 One role decides between branches. Other roles react to the decision.
 
 ```rust
-choreography! {
-    protocol ChoicePattern =
-      roles Client, Server
-      case choose Server of
-        Accept ->
-          Server -> Client : Confirmation
-        Reject ->
-          Server -> Client : Rejection
-}
+choreography!(r#"
+protocol ChoicePattern =
+  roles Client, Server
+  case choose Server of
+    Accept ->
+      Server -> Client : Confirmation
+    Reject ->
+      Server -> Client : Rejection
+"#);
 ```
 
 The deciding role chooses which branch to execute. Other participants react accordingly.
@@ -76,14 +76,14 @@ The deciding role chooses which branch to execute. Other participants react acco
 Send multiple messages in sequence. Each message may depend on previous responses.
 
 ```rust
-choreography! {
-    protocol SequentialMessages =
-      roles Client, Server
-      Client -> Server : Message1
-      Server -> Client : Ack
-      Client -> Server : Message2
-      Server -> Client : Ack
-}
+choreography!(r#"
+protocol SequentialMessages =
+  roles Client, Server
+  Client -> Server : Message1
+  Server -> Client : Ack
+  Client -> Server : Message2
+  Server -> Client : Ack
+"#);
 ```
 
 This pattern provides acknowledgment after each step.
@@ -93,14 +93,14 @@ This pattern provides acknowledgment after each step.
 Three or more roles coordinate. Messages flow between different pairs.
 
 ```rust
-choreography! {
-    protocol MultiPartyCoordination =
-      roles Buyer, Coordinator, Seller
-      Buyer -> Coordinator : Offer
-      Coordinator -> Seller : Offer
-      Seller -> Coordinator : Response
-      Coordinator -> Buyer : Response
-}
+choreography!(r#"
+protocol MultiPartyCoordination =
+  roles Buyer, Coordinator, Seller
+  Buyer -> Coordinator : Offer
+  Coordinator -> Seller : Offer
+  Seller -> Coordinator : Response
+  Coordinator -> Buyer : Response
+"#);
 ```
 
 The coordinator role mediates between other participants.
@@ -110,13 +110,13 @@ The coordinator role mediates between other participants.
 Repeat protocol steps. Loop condition determines when to stop.
 
 ```rust
-choreography! {
-    protocol LoopPattern =
-      roles Client, Server
-      loop repeat 5
-        Client -> Server : Request
-        Server -> Client : Response
-}
+choreography!(r#"
+protocol LoopPattern =
+  roles Client, Server
+  loop repeat 5
+    Client -> Server : Request
+    Server -> Client : Response
+"#);
 ```
 
 Use loops for batch processing or iterative protocols. This example repeats 5 times.
@@ -126,14 +126,14 @@ Use loops for batch processing or iterative protocols. This example repeats 5 ti
 Execute independent protocol branches concurrently via adjacent `branch` blocks.
 
 ```rust
-choreography! {
-    protocol ParallelPattern =
-      roles Coordinator, Worker1, Worker2
-      branch
-        Coordinator -> Worker1 : Task
-      branch
-        Coordinator -> Worker2 : Task
-}
+choreography!(r#"
+protocol ParallelPattern =
+  roles Coordinator, Worker1, Worker2
+  branch
+    Coordinator -> Worker1 : Task
+  branch
+    Coordinator -> Worker2 : Task
+"#);
 ```
 
 Branches must not conflict. Different recipients allow parallel execution.
@@ -143,12 +143,12 @@ Branches must not conflict. Different recipients allow parallel execution.
 Bind role counts at runtime for threshold protocols.
 
 ```rust
-choreography! {
-    protocol Threshold =
-      roles Coordinator, Signers[*]
-      Coordinator -> Signers[*] : Request
-      Signers[0..threshold] -> Coordinator : Signature
-}
+choreography!(r#"
+protocol Threshold =
+  roles Coordinator, Signers[*]
+  Coordinator -> Signers[*] : Request
+  Signers[0..threshold] -> Coordinator : Signature
+"#);
 ```
 
 The wildcard syntax `Signers[*]` defers count to runtime. Range syntax `Signers[0..threshold]` selects a subset. Generated code supports runtime validation and binding.

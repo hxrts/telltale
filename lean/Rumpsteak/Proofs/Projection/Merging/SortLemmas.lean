@@ -60,6 +60,59 @@ theorem sortBranches_eq_of_pairwise
   simpa [LocalTypeR.sortBranches] using
     (List.mergeSort_of_sorted (le := LocalTypeR.branchLe) (l := bs) h)
 
+/-- Elements are preserved by sortBranches (it's a permutation). -/
+theorem mem_sortBranches_iff (b : Label × LocalTypeR) (bs : List (Label × LocalTypeR)) :
+    b ∈ LocalTypeR.sortBranches bs ↔ b ∈ bs := by
+  simp only [LocalTypeR.sortBranches]
+  constructor
+  · exact List.mem_of_mem_mergeSort
+  · exact List.mem_mergeSort.mpr
+
+/-- The head of a sorted list is ≤ all elements in its tail. -/
+theorem head_le_of_pairwise (h : Label × LocalTypeR) (rest : List (Label × LocalTypeR))
+    (hsorted : (h :: rest).Pairwise LocalTypeR.branchLe) :
+    ∀ b ∈ rest, LocalTypeR.branchLe h b = true := by
+  intro b hb
+  -- Pairwise on h :: rest means h is related to all elements in rest
+  have hpw : List.Pairwise LocalTypeR.branchLe (h :: rest) := hsorted
+  rw [List.pairwise_cons] at hpw
+  exact hpw.1 b hb
+
+/-- If h is the head of sortBranches (h :: bs), then h ≤ all elements in bs. -/
+theorem sortBranches_head_le (h : Label × LocalTypeR) (bs : List (Label × LocalTypeR))
+    (hhead : (LocalTypeR.sortBranches (h :: bs)).head? = some h) :
+    ∀ b ∈ bs, LocalTypeR.branchLe h b = true := by
+  intro b hb
+  -- b ∈ bs implies b ∈ sortBranches (h :: bs)
+  have hb_in : b ∈ LocalTypeR.sortBranches (h :: bs) := by
+    rw [mem_sortBranches_iff]
+    exact List.mem_cons_of_mem h hb
+  -- sortBranches is sorted
+  have hsorted := pairwise_sortBranches (h :: bs)
+  -- Get the sorted list and analyze
+  match hsorted_list : LocalTypeR.sortBranches (h :: bs) with
+  | [] =>
+    -- Can't be empty since h :: bs is nonempty
+    simp only [LocalTypeR.sortBranches, List.mergeSort] at hsorted_list
+    have : (h :: bs).length > 0 := by simp
+    have : (List.mergeSort (h :: bs)).length = (h :: bs).length :=
+      List.length_mergeSort (h :: bs) (le := LocalTypeR.branchLe)
+    omega
+  | x :: rest =>
+    -- x is the head, so x = h by hhead
+    simp only [hsorted_list, List.head?_cons, Option.some.injEq] at hhead
+    subst hhead
+    -- Now hsorted : (h :: rest).Pairwise branchLe
+    rw [hsorted_list] at hsorted
+    -- b is either h or in rest
+    rw [hsorted_list] at hb_in
+    cases hb_in with
+    | head => exact branchLe_refl h
+    | tail _ hb_rest => exact head_le_of_pairwise h rest hsorted b hb_rest
+  where
+    branchLe_refl (x : Label × LocalTypeR) : LocalTypeR.branchLe x x = true := by
+      simp [LocalTypeR.branchLe]
+
 /-! ## Recv sorted merge helpers -/
 
 theorem mergeRecvSorted_comm

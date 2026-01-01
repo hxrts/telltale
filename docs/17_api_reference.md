@@ -26,11 +26,24 @@ Methods:
 ```rust
 pub fn qualified_name(&self) -> String
 pub fn validate(&self) -> Result<(), ValidationError>
+pub fn get_attributes(&self) -> &HashMap<String, String>
+pub fn get_attributes_mut(&mut self) -> &mut HashMap<String, String>
 pub fn get_attribute(&self, key: &str) -> Option<&String>
 pub fn set_attribute(&mut self, key: String, value: String)
+pub fn remove_attribute(&mut self, key: &str) -> Option<String>
 pub fn has_attribute(&self, key: &str) -> bool
+pub fn get_attribute_as<T>(&self, key: &str) -> Option<T>
+pub fn get_attribute_as_bool(&self, key: &str) -> Option<bool>
+pub fn clear_attributes(&mut self)
+pub fn attribute_count(&self) -> usize
+pub fn attribute_keys(&self) -> Vec<&String>
+pub fn validate_required_attributes(&self, required_keys: &[&str]) -> Result<(), Vec<String>>
 pub fn find_nodes_with_annotation(&self, key: &str) -> Vec<&Protocol>
+pub fn find_nodes_with_annotation_value(&self, key: &str, value: &str) -> Vec<&Protocol>
+pub fn total_annotation_count(&self) -> usize
 ```
+
+These methods manage choreography attributes and validation. They also provide annotation queries across the protocol tree.
 
 ### Protocol
 
@@ -70,6 +83,11 @@ pub enum Protocol {
         body: Box<Protocol>,
     },
     Var(Ident),
+    Extension {
+        extension: Box<dyn ProtocolExtension>,
+        continuation: Box<Protocol>,
+        annotations: HashMap<String, String>,
+    },
     End,
 }
 ```
@@ -82,6 +100,7 @@ Loop contains iteration with optional conditions.
 Parallel holds concurrent protocol execution.
 Rec defines recursion points.
 Var references recursive labels.
+Extension represents custom protocol statements.
 End terminates the protocol.
 
 Methods:
@@ -91,10 +110,23 @@ pub fn mentions_role(&self, role: &Role) -> bool
 pub fn validate(&self, roles: &[Role]) -> Result<(), ValidationError>
 pub fn get_annotations(&self) -> &HashMap<String, String>
 pub fn get_annotation(&self, key: &str) -> Option<&String>
+pub fn get_annotations_mut(&mut self) -> Option<&mut HashMap<String, String>>
 pub fn has_annotation(&self, key: &str) -> bool
 pub fn set_annotation(&mut self, key: String, value: String) -> bool
+pub fn get_annotation_as<T>(&self, key: &str) -> Option<T>
+pub fn get_annotation_as_bool(&self, key: &str) -> Option<bool>
+pub fn get_annotations_with_prefix(&self, prefix: &str) -> HashMap<String, String>
 pub fn collect_nodes_with_annotation(&self, key: &str, nodes: &mut Vec<&Protocol>)
+pub fn collect_nodes_with_annotation_value(
+    &self,
+    key: &str,
+    value: &str,
+    nodes: &mut Vec<&Protocol>,
+)
+pub fn deep_annotation_count(&self) -> usize
 ```
+
+These methods manage statement annotations and query annotation usage. They are used by validation and tooling passes.
 
 ### Branch
 
@@ -118,6 +150,9 @@ pub enum Condition {
     RoleDecides(Role),
     Count(usize),
     Custom(TokenStream),
+    Fuel(usize),
+    YieldAfter(usize),
+    YieldWhen(String),
 }
 ```
 
@@ -125,6 +160,9 @@ Loop condition specification.
 RoleDecides means a role controls iteration.
 Count specifies fixed iterations.
 Custom contains arbitrary Rust expressions.
+Fuel limits the number of iterations.
+YieldAfter yields control after a number of steps.
+YieldWhen yields control on a matching label or condition.
 
 ### LocalType
 
@@ -160,6 +198,10 @@ pub enum LocalType {
         body: Box<LocalType>,
     },
     Var(Ident),
+    Timeout {
+        duration: Duration,
+        body: Box<LocalType>,
+    },
     End,
 }
 ```
@@ -170,6 +212,7 @@ Select makes a choice and notifies others.
 Branch receives a choice from another role.
 LocalChoice is internal branching without communication.
 Loop, Rec, Var handle iteration and recursion.
+Timeout wraps a local type with a duration.
 End terminates the session.
 
 Methods:
@@ -178,6 +221,8 @@ Methods:
 pub fn is_well_formed(&self) -> bool
 ```
 
+This checks recursive structure for well formedness. It is used in validation and tests.
+
 ### Role
 
 ```rust
@@ -185,8 +230,6 @@ pub struct Role {
     pub name: Ident,
     pub param: Option<RoleParam>,
     pub index: Option<RoleIndex>,
-    pub legacy_index: Option<usize>,
-    pub legacy_param: Option<TokenStream>,
     pub array_size: Option<TokenStream>,
 }
 ```
@@ -195,7 +238,7 @@ Role identifies a protocol participant.
 Name is the role identifier.
 Param specifies role count (Static, Symbolic, or Runtime).
 Index specifies role instance (Concrete, Symbolic, Wildcard, or Range).
-Legacy fields maintain backward compatibility.
+Array_size stores a computed size for code generation.
 
 Methods:
 
@@ -203,14 +246,24 @@ Methods:
 pub fn new(name: Ident) -> Self
 pub fn with_param(name: Ident, param: RoleParam) -> Self
 pub fn with_index(name: Ident, index: RoleIndex) -> Self
+pub fn with_param_and_index(name: Ident, param: RoleParam, index: RoleIndex) -> Self
 pub fn is_indexed(&self) -> bool
 pub fn is_parameterized(&self) -> bool
 pub fn is_array(&self) -> bool
 pub fn is_dynamic(&self) -> bool
+pub fn is_symbolic(&self) -> bool
+pub fn is_wildcard(&self) -> bool
+pub fn is_range(&self) -> bool
+pub fn get_param(&self) -> Option<&RoleParam>
+pub fn get_index(&self) -> Option<&RoleIndex>
 pub fn matches_family(&self, family: &Role) -> bool
 pub fn validate(&self) -> RoleValidationResult<()>
 pub fn safe_static(name: Ident, count: u32) -> RoleValidationResult<Self>
+pub fn safe_indexed(name: Ident, index: u32) -> RoleValidationResult<Self>
+pub fn safe_range(name: Ident, start: u32, end: u32) -> RoleValidationResult<Self>
 ```
+
+These methods construct and validate roles. They also inspect role parameters and indices.
 
 ### RoleParam
 
@@ -265,6 +318,8 @@ Methods:
 pub fn to_ident(&self) -> Ident
 ```
 
+This method converts the message type name to an identifier. It is used during code generation.
+
 ## Parser API
 
 ### parse_choreography_str
@@ -299,13 +354,16 @@ Used internally by the choreography macro.
 ```rust
 pub enum ParseError {
     Pest(Box<pest::error::Error<Rule>>),
+    Layout { span: ErrorSpan, message: String },
     Syntax { span: ErrorSpan, message: String },
     UndefinedRole { role: String, span: ErrorSpan },
     DuplicateRole { role: String, span: ErrorSpan },
+    EmptyChoreography,
     InvalidMessage { message: String, span: ErrorSpan },
-    InvalidCondition { condition: String, span: ErrorSpan },
-    InvalidAnnotation { annotation: String, span: ErrorSpan },
-    RoleValidation { error: RoleValidationError, span: ErrorSpan },
+    InvalidCondition { message: String, span: ErrorSpan },
+    UndefinedProtocol { protocol: String, span: ErrorSpan },
+    DuplicateProtocol { protocol: String, span: ErrorSpan },
+    GrammarComposition(GrammarCompositionError),
 }
 ```
 
@@ -439,6 +497,8 @@ pub fn is_empty(&self) -> bool
 pub fn len(&self) -> usize
 ```
 
+These methods inspect program structure and validate the sequence. They are used by analysis and debugging tools.
+
 ### Effect
 
 ```rust
@@ -489,6 +549,8 @@ pub fn as_extension<E: ExtensionEffect + 'static>(&self) -> Option<&E>
 pub fn as_extension_mut<E: ExtensionEffect + 'static>(&mut self) -> Option<&mut E>
 pub fn extension_type_id(&self) -> Option<TypeId>
 ```
+
+These helpers inspect and extract extension payloads. They are used by interpreters and middleware.
 
 ### interpret
 
@@ -738,6 +800,8 @@ pub async fn send(&mut self, msg: Vec<u8>) -> Result<(), String>
 pub async fn recv(&mut self) -> Result<Vec<u8>, String>
 ```
 
+These methods create a channel pair and move raw bytes. They are used by the Rumpsteak handler implementation.
+
 ### RecordingHandler
 
 ```rust
@@ -817,6 +881,8 @@ pub fn handle(
 ) -> Option<BoxFuture<'static, Result<()>>>
 ```
 
+These methods register and invoke extension handlers. They are used by extensible interpreters.
+
 ### ExtensionError
 
 ```rust
@@ -857,27 +923,29 @@ Useful for WASM where Send is not required.
 ### choreography!
 
 ```rust
-choreography! {
-    protocol ProtocolName =
-      roles Role1, Role2
-      Role1 -> Role2 : Message
-}
+choreography!(r#"
+protocol ProtocolName =
+  roles Role1, Role2
+  Role1 -> Role2 : Message
+"#);
 ```
 
-Procedural macro for inline choreographies.
+Procedural macro for choreographies defined in the DSL.
 Parses the DSL and generates role types, message types, and session types.
-Supports both inline syntax and string literals.
+The macro requires a string literal input.
 
 Example:
 
 ```rust
-choreography! {
-    protocol TwoPhaseCommit =
-      roles Coordinator, Participant
-      Coordinator -> Participant : Prepare
-      Participant -> Coordinator : Vote
-}
+choreography!(r#"
+protocol TwoPhaseCommit =
+  roles Coordinator, Participant
+  Coordinator -> Participant : Prepare
+  Participant -> Coordinator : Vote
+"#);
 ```
+
+This example defines a two party commit protocol. The macro expands into generated role and session types.
 
 ## Theory API
 
@@ -962,27 +1030,33 @@ Content identifier wrapping a cryptographic hash. Parameterized by hasher type w
 Methods:
 
 ```rust
-pub fn new<T: Contentable>(value: &T) -> Self
+pub fn from_bytes(data: &[u8]) -> Self
+pub fn from_hash(hash: Vec<u8>) -> Self
 pub fn as_bytes(&self) -> &[u8]
+pub fn to_hex(&self) -> String
+pub fn algorithm(&self) -> &'static str
 ```
+
+These methods construct and inspect content identifiers. Use `from_bytes` when hashing raw canonical bytes.
 
 ### Hasher
 
 ```rust
-pub trait Hasher: Clone + Default {
+pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
     const HASH_SIZE: usize;
-    fn hash(data: &[u8]) -> Vec<u8>;
+    fn digest(data: &[u8]) -> Vec<u8>;
+    fn algorithm_name() -> &'static str;
 }
 ```
 
-Hasher trait for swappable hash algorithms. Implementations include `Sha256Hasher`, `Blake3Hasher`, and `PoseidonHasher`.
+Hasher trait for swappable hash algorithms. The default implementation is `Sha256Hasher`.
 
 ### Contentable
 
 ```rust
 pub trait Contentable {
-    fn to_cbor(&self) -> Vec<u8>;
-    fn from_cbor(data: &[u8]) -> Result<Self, ContentError>;
+    fn to_bytes(&self) -> Vec<u8>;
+    fn from_bytes(data: &[u8]) -> Result<Self, ContentableError>;
 }
 ```
 
@@ -991,9 +1065,7 @@ Trait for types that support content addressing. Implementations exist for `Glob
 ### ContentStore
 
 ```rust
-pub struct ContentStore<T: Contentable> {
-    store: BTreeMap<ContentId, T>,
-}
+pub struct ContentStore<K: Contentable, V, H: Hasher = Sha256Hasher>
 ```
 
 Content-addressed storage with deduplication.
@@ -1002,10 +1074,20 @@ Methods:
 
 ```rust
 pub fn new() -> Self
-pub fn insert(&mut self, value: T) -> ContentId
-pub fn get(&self, cid: &ContentId) -> Option<&T>
-pub fn contains(&self, cid: &ContentId) -> bool
+pub fn with_capacity(capacity: usize) -> Self
+pub fn get(&self, key: &K) -> Option<&V>
+pub fn insert(&mut self, key: &K, value: V) -> Option<V>
+pub fn get_or_insert_with<F>(&mut self, key: &K, f: F) -> &V
+pub fn contains(&self, key: &K) -> bool
+pub fn remove(&mut self, key: &K) -> Option<V>
+pub fn clear(&mut self)
+pub fn len(&self) -> usize
+pub fn is_empty(&self) -> bool
+pub fn metrics(&self) -> CacheMetrics
+pub fn reset_metrics(&self)
 ```
+
+These methods provide lookup, insertion, and cache metrics. The store uses content IDs derived from `Contentable` keys.
 
 ## Topology API
 
@@ -1014,8 +1096,8 @@ pub fn contains(&self, cid: &ContentId) -> bool
 ```rust
 pub enum Location {
     Local,
-    Remote { endpoint: String },
-    Colocated { peer: String },
+    Remote(String),
+    Colocated(String),
 }
 ```
 
@@ -1038,6 +1120,7 @@ Constraints on role placement. Colocated requires same node. Separated requires 
 
 ```rust
 pub struct Topology {
+    mode: Option<TopologyMode>,
     locations: BTreeMap<String, Location>,
     constraints: Vec<TopologyConstraint>,
 }
@@ -1049,10 +1132,17 @@ Methods:
 
 ```rust
 pub fn builder() -> TopologyBuilder
-pub fn load(path: &str) -> Result<Topology, TopologyError>
-pub fn location(&self, role: &str) -> Option<&Location>
-pub fn validate(&self, choreo: &Choreography) -> Result<(), TopologyError>
+pub fn new() -> Topology
+pub fn local_mode() -> Topology
+pub fn with_role(self, role: impl Into<String>, location: Location) -> Topology
+pub fn with_constraint(self, constraint: TopologyConstraint) -> Topology
+pub fn get_location(&self, role: &str) -> Location
+pub fn validate(&self, choreo_roles: &[&str]) -> TopologyValidation
+pub fn load(path: impl AsRef<Path>) -> Result<ParsedTopology, TopologyLoadError>
+pub fn parse(content: &str) -> Result<ParsedTopology, TopologyLoadError>
 ```
+
+These methods create and validate topology data. The load and parse helpers return `ParsedTopology` metadata.
 
 ### TopologyBuilder
 
@@ -1065,15 +1155,25 @@ Builder for constructing topologies.
 Methods:
 
 ```rust
-pub fn role(self, name: &str, endpoint: &str) -> Self
-pub fn constraint(self, constraint: TopologyConstraint) -> Self
+pub fn new() -> Self
+pub fn mode(self, mode: TopologyMode) -> Self
+pub fn local_role(self, role: impl Into<String>) -> Self
+pub fn remote_role(self, role: impl Into<String>, endpoint: impl Into<String>) -> Self
+pub fn colocated_role(self, role: impl Into<String>, peer: impl Into<String>) -> Self
+pub fn role(self, role: impl Into<String>, location: Location) -> Self
+pub fn colocated(self, r1: impl Into<String>, r2: impl Into<String>) -> Self
+pub fn separated(self, r1: impl Into<String>, r2: impl Into<String>) -> Self
+pub fn pinned(self, role: impl Into<String>, location: Location) -> Self
+pub fn region(self, role: impl Into<String>, region: impl Into<String>) -> Self
 pub fn build(self) -> Topology
 ```
 
-### ProtocolHandler
+These methods add locations and constraints to a topology builder. Call `build` to produce a `Topology`.
+
+### TopologyHandler
 
 ```rust
-pub struct ProtocolHandler<R: RoleId> { ... }
+pub struct TopologyHandler { ... }
 ```
 
 Topology-aware handler for protocol execution.
@@ -1081,9 +1181,17 @@ Topology-aware handler for protocol execution.
 Methods:
 
 ```rust
-pub fn as_role(role: &str) -> ProtocolHandlerBuilder
-pub fn from_topology(topology: Topology, role: &str) -> Self
+pub fn new(topology: Topology, role: impl Into<String>) -> Self
+pub fn from_parsed(parsed: ParsedTopology, role: impl Into<String>) -> Self
+pub async fn initialize(&self) -> TransportResult<()>
+pub async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()>
+pub async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>>
+pub fn get_location(&self, role: &str) -> Location
+pub fn is_connected(&self, role: &str) -> bool
+pub async fn close(&self) -> TransportResult<()>
 ```
+
+These methods manage topology aware transports. Initialize before sending messages when eager setup is required.
 
 ## Resource Heap API
 
@@ -1091,11 +1199,12 @@ pub fn from_topology(topology: Topology, role: &str) -> Self
 
 ```rust
 pub struct ResourceId {
-    id: ContentId,
+    pub hash: [u8; 32],
+    pub counter: u64,
 }
 ```
 
-Unique identifier for heap-allocated resources. Derived from content hash.
+Unique identifier for heap-allocated resources. Derived from content hash and allocation counter.
 
 ### Resource
 
@@ -1103,7 +1212,8 @@ Unique identifier for heap-allocated resources. Derived from content hash.
 pub enum Resource {
     Channel(ChannelState),
     Message(Message),
-    Session(LocalTypeR),
+    Session { role: String, type_hash: u64 },
+    Value { tag: String, data: Vec<u8> },
 }
 ```
 
@@ -1115,6 +1225,7 @@ Resource kinds that can be allocated on the heap.
 pub struct Heap {
     resources: BTreeMap<ResourceId, Resource>,
     nullifiers: BTreeSet<ResourceId>,
+    counter: u64,
 }
 ```
 
@@ -1124,13 +1235,20 @@ Methods:
 
 ```rust
 pub fn new() -> Self
+pub fn size(&self) -> usize
+pub fn nullified_count(&self) -> usize
+pub fn contains(&self, rid: &ResourceId) -> bool
 pub fn alloc(&self, resource: Resource) -> (ResourceId, Heap)
 pub fn consume(&self, rid: &ResourceId) -> Result<Heap, HeapError>
 pub fn read(&self, rid: &ResourceId) -> Result<&Resource, HeapError>
 pub fn is_consumed(&self, rid: &ResourceId) -> bool
-pub fn merkle_root(&self) -> [u8; 32]
-pub fn prove_inclusion(&self, rid: &ResourceId) -> InclusionProof
+pub fn is_active(&self, rid: &ResourceId) -> bool
+pub fn active_resources(&self) -> impl Iterator<Item = (&ResourceId, &Resource)>
+pub fn consumed_ids(&self) -> impl Iterator<Item = &ResourceId>
+pub fn alloc_session(&self, role: &str, type_hash: u64) -> (ResourceId, Heap)
 ```
+
+These methods allocate and consume heap resources. The iterator helpers expose active and consumed IDs for commitment generation.
 
 ### HeapError
 
@@ -1138,11 +1256,13 @@ pub fn prove_inclusion(&self, rid: &ResourceId) -> InclusionProof
 pub enum HeapError {
     NotFound(ResourceId),
     AlreadyConsumed(ResourceId),
-    InvalidProof,
+    AlreadyExists(ResourceId),
+    TypeMismatch { expected: String, got: String },
+    Other(String),
 }
 ```
 
-Errors from heap operations. NotFound indicates missing resource. AlreadyConsumed indicates double-consumption attempt.
+Errors from heap operations. NotFound indicates missing resource. AlreadyConsumed indicates double-consumption attempt. TypeMismatch and Other capture additional failure cases.
 
 ## Analysis API
 

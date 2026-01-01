@@ -727,6 +727,7 @@ fn parse_statement_inner(
         Rule::loop_stmt => parse_loop_stmt(pair, declared_roles, input, protocol_defs),
         Rule::branch_stmt => parse_branch_stmt(pair, declared_roles, input, protocol_defs),
         Rule::rec_stmt => parse_rec_stmt(pair, declared_roles, input, protocol_defs),
+        Rule::continue_stmt => parse_continue_stmt(pair),
         Rule::call_stmt => parse_call_stmt(pair, declared_roles, input, protocol_defs),
         _ => {
             let span = pair.as_span();
@@ -1142,6 +1143,21 @@ fn parse_call_stmt(
     })
 }
 
+/// Parse continue statement (recursive back-reference)
+fn parse_continue_stmt(
+    pair: pest::iterators::Pair<Rule>,
+) -> std::result::Result<Statement, ParseError> {
+    let mut inner = pair.into_inner();
+    let label_pair = inner
+        .next()
+        .expect("grammar: continue_stmt must have label");
+    let label = label_pair.as_str();
+
+    Ok(Statement::Continue {
+        label: format_ident!("{}", label),
+    })
+}
+
 /// Parse message specification
 fn parse_message(
     pair: pest::iterators::Pair<Rule>,
@@ -1223,6 +1239,10 @@ enum Statement {
     Rec {
         label: Ident,
         body: Vec<Statement>,
+    },
+    /// Recursive back-reference (continue to a rec label)
+    Continue {
+        label: Ident,
     },
     Call {
         #[allow(dead_code)]
@@ -1337,6 +1357,7 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
                 label: label.clone(),
                 body: Box::new(convert_statements_to_protocol(body, roles)),
             },
+            Statement::Continue { label } => Protocol::Var(label.clone()),
             Statement::Call { .. } => current,
         };
     }

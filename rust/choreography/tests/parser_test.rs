@@ -259,7 +259,7 @@ fn test_parse_recursive() {
     let input = r"
 protocol Recursive = {
     roles A, B
-    
+
     rec Loop {
         A -> B: Data
     }
@@ -268,6 +268,50 @@ protocol Recursive = {
 
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_parse_recursive_with_continue() {
+    let input = r"
+protocol Recursive = {
+    roles A, B
+
+    rec Loop {
+        A -> B: Ping
+        B -> A: Pong
+        continue Loop
+    }
+}
+";
+
+    let result = parse_choreography_str(input);
+    assert!(result.is_ok());
+
+    use rumpsteak_aura_choreography::ast::Protocol;
+
+    let choreo = result.unwrap();
+    // Verify the rec body contains a continue
+    match &choreo.protocol {
+        Protocol::Rec { label, body } => {
+            assert_eq!(label.to_string(), "Loop");
+            // The body should be a Send -> Send -> Var chain
+            match body.as_ref() {
+                Protocol::Send { continuation, .. } => match continuation.as_ref() {
+                    Protocol::Send { continuation, .. } => {
+                        match continuation.as_ref() {
+                            Protocol::Var(var_label) => {
+                                assert_eq!(var_label.to_string(), "Loop");
+                            }
+                            other => panic!("Expected Var, got {:?}", other),
+                        }
+                    }
+                    other => panic!("Expected Send, got {:?}", other),
+                },
+                other => panic!("Expected Send, got {:?}", other),
+            }
+        }
+        other => panic!("Expected Rec, got {:?}", other),
+    }
 }
 
 #[test]

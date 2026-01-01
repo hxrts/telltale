@@ -54,6 +54,8 @@ graph TB
     Transport --> Exec
 ```
 
+This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation and effect handler execution.
+
 ## Core Components
 
 ### AST Module
@@ -104,6 +106,11 @@ pub enum Protocol {
     Parallel { protocols: Vec<Protocol> },
     Rec { label: Ident, body: Box<Protocol> },
     Var(Ident),
+    Extension {
+        extension: Box<dyn ProtocolExtension>,
+        continuation: Box<Protocol>,
+        annotations: HashMap<String, String>,
+    },
     End,
 }
 ```
@@ -115,6 +122,7 @@ Protocol is a recursive tree structure. It includes support for annotations at m
 The parser module is located in `rust/choreography/src/compiler/parser.rs`. It converts DSL text into AST using the Pest parser generator.
 
 The parser validates role declarations. It builds the protocol tree from the input text.
+It runs a layout preprocessor before the grammar parse. This enables layout sensitive syntax with explicit braces for empty blocks.
 
 Two entry points are available.
 
@@ -147,8 +155,12 @@ The generator creates compile-time type-safe protocol implementations.
 pub fn generate_session_type(role: &Role, local_type: &LocalType, protocol_name: &str) -> TokenStream
 pub fn generate_choreography_code(name: &str, roles: &[Role], local_types: &[(Role, LocalType)]) -> TokenStream
 pub fn generate_choreography_code_with_dynamic_roles(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
+pub fn generate_choreography_code_with_namespacing(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
+pub fn generate_choreography_code_with_topology(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
 pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
-pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream
+pub fn generate_helpers(roles: &[Role]) -> TokenStream
+pub fn generate_role_implementations(roles: &[Role]) -> TokenStream
+pub fn generate_topology_integration(choreography: &Choreography) -> TokenStream
 ```
 
 The generator creates session types and role structs. It supports dynamic roles including parameterized roles and runtime management.
@@ -329,7 +341,11 @@ rumpsteak-aura/
 └── docs/                   Documentation
 ```
 
+This tree outlines the workspace layout and crate locations. It helps map each crate name to its directory.
+
 ### Crate Responsibilities
+
+This tree outlines the workspace layout. It maps each crate to a folder in the repository.
 
 The `rumpsteak-types` crate contains core type definitions. It provides `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. These types match the Lean definitions exactly. This crate has no internal dependencies.
 

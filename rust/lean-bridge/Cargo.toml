@@ -31,4 +31,5 @@ tempfile = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 rumpsteak-theory = { path = "../theory", version = "0.7.0" }
+rumpsteak-aura-choreography = { path = "../choreography", version = "0.7.0" }
 tempfile = { workspace = true }

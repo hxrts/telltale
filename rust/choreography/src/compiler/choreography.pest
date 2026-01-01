@@ -40,11 +40,15 @@ statement = _{
     | loop_stmt
     | branch_stmt
     | rec_stmt
+    | continue_stmt
     | call_stmt
 }
 
-// Protocol call statement
+// Protocol call statement (for sub-protocols in where blocks)
 call_stmt = { "call" ~ ident }
+
+// Continue statement (for recursive back-references)
+continue_stmt = { "continue" ~ ident }
 
 // Send statement
 send_stmt = { role_ref ~ "->" ~ role_ref ~ ":" ~ message }

@@ -11,28 +11,30 @@ The content addressing system provides three capabilities. It computes determini
 The `ContentId` type wraps a cryptographic hash of a value's canonical form.
 
 ```rust
-use rumpsteak_types::{ContentId, Sha256Hasher};
+use rumpsteak_types::{ContentId, Sha256Hasher, GlobalType, Label};
+use rumpsteak_types::contentable::Contentable;
 
 let g = GlobalType::comm("A", "B", vec![(Label::new("msg"), GlobalType::End)]);
-let cid = ContentId::<Sha256Hasher>::new(&g);
+let cid: ContentId<Sha256Hasher> = ContentId::from_bytes(&g.to_bytes());
 ```
 
-The content ID is computed from the DAG-CBOR serialization of the type. Two structurally equivalent types produce the same content ID.
+The content ID is computed from the canonical JSON bytes of the value. Two structurally equivalent types produce the same content ID. DAG-CBOR is a possible future encoding.
 
 ## Hasher Trait
 
 The hash algorithm is configurable through the `Hasher` trait.
 
 ```rust
-pub trait Hasher: Clone + Default {
+pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
     const HASH_SIZE: usize;
-    fn hash(data: &[u8]) -> Vec<u8>;
+    fn digest(data: &[u8]) -> Vec<u8>;
+    fn algorithm_name() -> &'static str;
 }
 ```
 
-SHA-256 is the default implementation. Other implementations are available for specific use cases.
+SHA-256 is the default implementation. Additional hashers can be implemented by users when a different tradeoff is required.
 
-The `Sha256Hasher` provides cryptographic security and broad compatibility. The `Blake3Hasher` offers faster performance for non-cryptographic use cases. The `PoseidonHasher` enables ZK circuit compatibility.
+The `Sha256Hasher` provides cryptographic security and broad compatibility. Custom hashers can target performance or proof system constraints.
 
 ## Contentable Trait
 
@@ -40,12 +42,12 @@ Types that support content addressing implement the `Contentable` trait.
 
 ```rust
 pub trait Contentable {
-    fn to_cbor(&self) -> Vec<u8>;
-    fn from_cbor(data: &[u8]) -> Result<Self, ContentError>;
+    fn to_bytes(&self) -> Vec<u8>;
+    fn from_bytes(data: &[u8]) -> Result<Self, ContentableError>;
 }
 ```
 
-The `to_cbor` method produces a canonical byte representation. The `from_cbor` method reconstructs the value from bytes.
+The `to_bytes` method produces a canonical byte representation. The `from_bytes` method reconstructs the value from bytes.
 
 Implementations exist for `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. Custom types can implement the trait for integration.
 
@@ -106,6 +108,8 @@ Cache statistics are available for performance analysis.
 let stats = cache.stats();
 println!("Hits: {}, Misses: {}", stats.hits, stats.misses);
 ```
+
+This reports cache hit and miss counts. It can be used in profiling runs.
 
 ## Content Store
 

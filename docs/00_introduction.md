@@ -40,13 +40,12 @@ The projection algorithm ensures the local types are compatible. If projection s
 Choreographic programming takes the global types concept further. Instead of just types, you write actual program logic from a global perspective. The choreography describes computations and data flow between participants. Endpoint projection generates local implementations for each participant.
 
 ```rust
-choreography! {
-    protocol Calculator = {
-        roles Alice, Bob
-        Alice -> Bob : Value
-        Bob -> Alice : Result
-    }
-}
+choreography!(r#"
+protocol Calculator =
+  roles Alice, Bob
+  Alice -> Bob : Value
+  Bob -> Alice : Result
+"#);
 ```
 
 This choreography specifies the communication protocol. The system projects it into separate programs for Alice and Bob. Alice's program sends a value and receives a result. Bob's program receives a value and sends back a result.

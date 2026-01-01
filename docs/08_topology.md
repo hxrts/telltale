@@ -26,15 +26,17 @@ Alice -> Bob: Ping  comm "Alice" "Bob"  Alice ↦ nodeA      send(nodeA, nodeB, 
                     [("Ping", end)]     Bob ↦ nodeB
 ```
 
+This diagram shows how a choreography and a topology combine at runtime. It highlights that location mapping happens after projection.
+
 ## Location Types
 
 Locations specify where a role executes.
 
 ```rust
 pub enum Location {
-    Local,                      // In-process
-    Remote { endpoint: String }, // Network endpoint
-    Colocated { peer: String },  // Same node as another role
+    Local,            // In-process
+    Remote(String),   // Network endpoint
+    Colocated(String), // Same node as another role
 }
 ```
 
@@ -46,12 +48,13 @@ A topology maps roles to locations with optional constraints.
 
 ```rust
 pub struct Topology {
+    mode: Option<TopologyMode>,
     locations: BTreeMap<String, Location>,
     constraints: Vec<TopologyConstraint>,
 }
 ```
 
-The locations field maps role names to their locations. The constraints field specifies placement requirements.
+The `mode` field stores an optional deployment mode. The `locations` field maps role names to their locations. The `constraints` field specifies placement requirements.
 
 ## Topology Constraints
 
@@ -91,14 +94,15 @@ topology TwoPhaseCommit_Prod for TwoPhaseCommit {
     ParticipantB: participant-b.prod.internal:9000
 
     constraints {
-        separated: Coordinator, ParticipantA, ParticipantB
-        region: Coordinator -> us-east-1
-        region: ParticipantA -> us-west-2
+        separated: Coordinator, ParticipantA
+        separated: Coordinator, ParticipantB
+        region: Coordinator -> us_east_1
+        region: ParticipantA -> us_west_2
     }
 }
 ```
 
-The constraints block specifies that all roles must be on different nodes and assigns regions.
+The constraints block specifies separation constraints and regions. Use multiple `separated` lines when more than two roles must be distinct.
 
 ## Built-in Modes
 
@@ -114,13 +118,19 @@ The `local` mode places all roles in the same process. This is the default for t
 
 ```
 topology MyProtocol_K8s for MyProtocol {
-    mode: kubernetes
-    namespace: my-app
-    service_pattern: "{role}-svc"
+    mode: kubernetes(my_app)
 }
 ```
 
-The `kubernetes` mode discovers services using Kubernetes API. The service pattern maps role names to service names.
+The `kubernetes` mode discovers services using the Kubernetes API. The namespace is provided in the mode value.
+
+```
+topology MyProtocol_Consul for MyProtocol {
+    mode: consul(dc1)
+}
+```
+
+The `consul` mode discovers services using the Consul API. The datacenter is provided in the mode value.
 
 Available modes include `local`, `per_role`, `kubernetes`, and `consul`.
 
@@ -141,20 +151,15 @@ This creates an in-memory handler with implicit local topology.
 Simple deployments specify peer addresses directly.
 
 ```rust
-let handler = ProtocolHandler::as_role("Alice")
-    .peer("Bob", "localhost:8081")
+let topology = Topology::builder()
+    .local_role("Alice")
+    .remote_role("Bob", "localhost:8081")
     .build();
+
+let handler = PingPong::with_topology(topology, "Alice")?;
 ```
 
-Environment variables provide an alternative source.
-
-```rust
-let handler = ProtocolHandler::as_role("Alice")
-    .peers_from_env()
-    .build();
-```
-
-This reads `ALICE_ADDR`, `BOB_ADDR` from the environment.
+This builds a topology in code and binds it to a generated protocol handler.
 
 ### Full Configuration
 
@@ -162,51 +167,57 @@ Production deployments use explicit topology objects.
 
 ```rust
 let topology = Topology::builder()
-    .role("Coordinator", "coordinator.internal:9000")
-    .role("ParticipantA", "participant-a.internal:9000")
-    .role("ParticipantB", "participant-b.internal:9000")
-    .constraint(Constraint::Separated(&[
-        "Coordinator", "ParticipantA", "ParticipantB"
-    ]))
+    .remote_role("Coordinator", "coordinator.internal:9000")
+    .remote_role("ParticipantA", "participant-a.internal:9000")
+    .remote_role("ParticipantB", "participant-b.internal:9000")
+    .separated("Coordinator", "ParticipantA")
+    .separated("Coordinator", "ParticipantB")
+    .region("Coordinator", "us_east_1")
     .build();
 
-let handler = ProtocolHandler::from_topology(topology, "Coordinator");
+let handler = TwoPhaseCommit::with_topology(topology, "Coordinator")?;
 ```
+
+This example configures explicit endpoints and constraints. It then creates a topology aware handler for a role.
 
 ### Loading from Files
 
 Topologies can be loaded from external files.
 
 ```rust
-let topology = Topology::load("deploy/prod.topology")?;
-let handler = ProtocolHandler::from_topology(topology, "Alice");
+let parsed = Topology::load("deploy/prod.topology")?;
+let handler = PingPong::with_topology(parsed.topology, "Alice")?;
 ```
 
 This supports separation of code and configuration.
 
 ## Topology Integration
 
-Topology definitions are **separate** from the choreography DSL. Define topologies in standalone `.topology` files or strings and load them at runtime.
+Topology definitions are separate from the choreography DSL. Define topologies in standalone `.topology` files or strings and load them at runtime.
 
 ```rust
-let topo = Topology::load("deploy/dev.topology")?;
-let handler = PingPong::with_topology(topo, Role::Alice);
+let parsed = Topology::load("deploy/dev.topology")?;
+let handler = PingPong::with_topology(parsed.topology, "Alice")?;
 ```
+
+This loads a topology file and binds it to a generated handler.
 
 You can also parse a topology from a string.
 
 ```rust
-use rumpsteak_aura_choreography::topology::parse_topology_str;
+use rumpsteak_aura_choreography::topology::parse_topology;
 
-let topo = parse_topology_str(r#"
-topology Dev {
+let parsed = parse_topology(r#"
+topology Dev for PingPong {
   Alice: localhost:8080
   Bob: localhost:8081
 }
 "#)?;
 
-let handler = PingPong::with_topology(topo, Role::Alice);
+let handler = PingPong::with_topology(parsed.topology, "Alice")?;
 ```
+
+This parses the DSL into a `ParsedTopology`. The `topology` field contains the `Topology` value used at runtime.
 
 ## Transport Selection
 
@@ -214,10 +225,10 @@ The topology determines which transport to use for each role pair.
 
 ```rust
 fn select_transport(topo: &Topology, from: &str, to: &str) -> Transport {
-    match (topo.location(from), topo.location(to)) {
+    match (topo.get_location(from), topo.get_location(to)) {
         (Location::Local, Location::Local) => InMemoryTransport::new(),
-        (_, Location::Remote { endpoint }) => TcpTransport::new(endpoint),
-        (_, Location::Colocated { peer }) => SharedMemoryTransport::new(peer),
+        (_, Location::Remote(endpoint)) => TcpTransport::new(endpoint),
+        (_, Location::Colocated(peer)) => SharedMemoryTransport::new(peer),
     }
 }
 ```
@@ -232,7 +243,11 @@ Topologies are validated against choreography roles.
 let choreo = parse_choreography_str(dsl)?;
 let topo = parse_topology(topo_dsl)?;
 
-topo.validate(&choreo)?;
+let roles = ["Alice", "Bob"];
+let validation = topo.topology.validate(&roles);
+if !validation.is_valid() {
+    return Err(format!("Topology validation failed: {:?}", validation).into());
+}
 ```
 
 Validation ensures all choreography roles appear in the topology. It also verifies constraints are satisfiable.
@@ -264,37 +279,38 @@ The `InMemoryHandler::new()` API remains valid. Choreographies without explicit 
 ## Usage Example
 
 ```rust
-use rumpsteak_aura_choreography::{choreography, Topology, ProtocolHandler};
+use rumpsteak_aura_choreography::{choreography, Topology};
 
-choreography! {
-    protocol Auction =
-      roles Auctioneer, Bidder1, Bidder2
-      Auctioneer -> Bidder1 : Item
-      Auctioneer -> Bidder2 : Item
-      Bidder1 -> Auctioneer : Bid
-      Bidder2 -> Auctioneer : Bid
-      Auctioneer -> Bidder1 : Result
-      Auctioneer -> Bidder2 : Result
-}
+choreography!(r#"
+protocol Auction =
+  roles Auctioneer, Bidder1, Bidder2
+  Auctioneer -> Bidder1 : Item
+  Auctioneer -> Bidder2 : Item
+  Bidder1 -> Auctioneer : Bid
+  Bidder2 -> Auctioneer : Bid
+  Auctioneer -> Bidder1 : Result
+  Auctioneer -> Bidder2 : Result
+"#);
 
 // Development topology
 let dev_topo = Topology::builder()
-    .role("Auctioneer", "localhost:9000")
-    .role("Bidder1", "localhost:9001")
-    .role("Bidder2", "localhost:9002")
+    .remote_role("Auctioneer", "localhost:9000")
+    .remote_role("Bidder1", "localhost:9001")
+    .remote_role("Bidder2", "localhost:9002")
     .build();
 
 // Production topology
 let prod_topo = Topology::builder()
-    .role("Auctioneer", "auction.prod:9000")
-    .role("Bidder1", "bidder1.prod:9000")
-    .role("Bidder2", "bidder2.prod:9000")
-    .constraint(Constraint::Separated(&["Auctioneer", "Bidder1", "Bidder2"]))
+    .remote_role("Auctioneer", "auction.prod:9000")
+    .remote_role("Bidder1", "bidder1.prod:9000")
+    .remote_role("Bidder2", "bidder2.prod:9000")
+    .separated("Auctioneer", "Bidder1")
+    .separated("Auctioneer", "Bidder2")
     .build();
 
 // Same protocol, different deployments
-let dev_handler = ProtocolHandler::from_topology(dev_topo, "Auctioneer");
-let prod_handler = ProtocolHandler::from_topology(prod_topo, "Auctioneer");
+let dev_handler = Auction::with_topology(dev_topo, "Auctioneer")?;
+let prod_handler = Auction::with_topology(prod_topo, "Auctioneer")?;
 ```
 
 This example shows the same auction protocol deployed in development and production environments.

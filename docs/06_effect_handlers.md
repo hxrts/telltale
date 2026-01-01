@@ -30,10 +30,16 @@ pub trait ChoreoHandler {
     async fn offer(
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
     ) -> Result<Label>;
+
+    async fn with_timeout<F, T>(
+        &mut self, ep: &mut Self::Endpoint, at: Self::Role, dur: Duration, body: F
+    ) -> Result<T>
+    where
+        F: Future<Output = Result<T>> + Send;
 }
 ```
 
-The trait defines four core methods.
+The trait defines four core methods and a timeout hook.
 
 The `send` method transmits a message to another role. The `recv` method waits for a message from another role. The `choose` method makes a branch selection. The `offer` method receives a branch selection.
 

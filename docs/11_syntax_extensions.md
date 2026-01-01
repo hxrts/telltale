@@ -58,6 +58,8 @@ rumpsteak-aura-choreography = { path = "../choreography" }
 external-demo-macros = { path = "../external-demo-macros" }
 ```
 
+This dependency set re-exports the core crates and the custom macro crate. It keeps the consumer crate in sync with the base APIs.
+
 **external-demo-macros/Cargo.toml** (Proc-macro crate):
 ```toml
 [lib]
@@ -69,6 +71,8 @@ proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 ```
+
+This declares a proc-macro crate that depends on the choreography crate. It also pulls in the standard macro tooling dependencies.
 
 ### 2. Re-export Pattern (external-demo)
 
@@ -87,6 +91,8 @@ pub mod aura_extensions;
 /// Full-featured choreography! macro with ALL rumpsteak-aura features
 pub use external_demo_macros::choreography;
 ```
+
+This re-exports the base APIs and the custom macro entry point. It ensures downstream crates see the same surface as rumpsteak-aura.
 
 ### 3. Extension Definition
 
@@ -121,6 +127,8 @@ pub fn register_aura_extensions(registry: &mut ExtensionRegistry) {
     let _ = registry.register_grammar(AuraGrammarExtension);
 }
 ```
+
+This defines a grammar extension and registers it in the extension registry. The rule name and priority control how it composes.
 
 ### 4. Proc-Macro Implementation (external-demo-macros)
 
@@ -157,6 +165,8 @@ pub fn choreography(input: TokenStream) -> TokenStream {
     }
 }
 ```
+
+This macro implementation delegates to the extension-aware parser and code generator. It forwards errors as compile errors.
 
 ### 4. Dynamic Role Generation
 
@@ -212,6 +222,8 @@ fn generate_aura_choreography_code(choreography: &Choreography) -> TokenStream {
 }
 ```
 
+This example shows dynamic role extraction and code generation scaffolding. It builds a role enum from the parsed choreography.
+
 ## Grammar Composition System
 
 The `GrammarComposer` provides high-performance grammar composition with caching:
@@ -230,6 +242,8 @@ let grammar = composer.compose()?; // ~3.6ms
 // Subsequent compositions (uses cache)
 let grammar2 = composer.compose()?; // ~9.3μs (387x faster!)
 ```
+
+This example composes a grammar and then hits the cache on the second call. It demonstrates the speedup from caching.
 
 ### Performance Optimizations
 
@@ -259,6 +273,8 @@ impl GrammarComposer {
 }
 ```
 
+This shows the cached path in the composer implementation. The cache avoids recomputing the composed grammar.
+
 Performance benefits:
 - **Caching**: 387x speedup for repeated compositions
 - **Memory optimization**: Pre-allocated string buffers
@@ -279,6 +295,8 @@ parser.register_extension(MyGrammarExtension, MyStatementParser);
 // Parse with extensions
 let choreography = parser.parse_with_extensions(choreography_text)?;
 ```
+
+This example constructs an extension aware parser and parses a DSL string. It uses registered grammar and statement parsers.
 
 ### Optimized Parsing
 
@@ -309,6 +327,8 @@ impl ExtensionParser {
 }
 ```
 
+This example shows a custom parse pass that augments the base parser. It runs extension logic after the core parse succeeds.
+
 ## Feature Inheritance Demonstration
 
 The system ensures 3rd party projects automatically inherit ALL rumpsteak-aura features:
@@ -316,38 +336,44 @@ The system ensures 3rd party projects automatically inherit ALL rumpsteak-aura f
 ### Choice Constructs
 
 ```rust
-choreography! {
-    protocol Example =
-      roles Alice, Bob, Charlie
-      case choose Alice of
-        Path1 ->
-          Alice -> Bob : Request
-        Path2 ->
-          Alice -> Charlie : Alternative
-}
+choreography!(r#"
+protocol Example =
+  roles Alice, Bob, Charlie
+  case choose Alice of
+    Path1 ->
+      Alice -> Bob : Request
+    Path2 ->
+      Alice -> Charlie : Alternative
+"#);
 ```
+
+This example shows choice syntax in an extended project. The macro receives the DSL as a string literal.
 
 ### Parameterized Roles
 
 ```rust
-choreography! {
-    protocol Distributed =
-      roles Worker[N], Manager, Client[3]
-      Worker[*] -> Manager : Status
-      Manager -> Client[0] : Response
-}
+choreography!(r#"
+protocol Distributed =
+  roles Worker[N], Manager, Client[3]
+  Worker[*] -> Manager : Status
+  Manager -> Client[0] : Response
+"#);
 ```
+
+This example shows parameterized roles and indexed role references. It uses the same macro entry point.
 
 ### Loop Constructs
 
 ```rust
-choreography! {
-    protocol Streaming =
-      roles Producer, Consumer
-      loop forever
-        Producer -> Consumer : Data
-}
+choreography!(r#"
+protocol Streaming =
+  roles Producer, Consumer
+  loop forever
+    Producer -> Consumer : Data
+"#);
 ```
+
+This example shows an infinite loop in a protocol. It uses the same syntax as the base DSL.
 
 ### Protocol Composition
 
@@ -376,6 +402,8 @@ let registry = ExtensionRegistry::new();
 registry.register_with_metadata(TimeoutExtension, metadata)?;
 ```
 
+This example discovers extensions and registers them with metadata. It shows both discovery and manual registration paths.
+
 ## Best Practices for 3rd Party Integration
 
 ### 1. Use Standard Parser for Maximum Compatibility
@@ -388,6 +416,8 @@ let choreography = parse_choreography_str(&input)?;
 let choreography = my_custom_parser(&input)?;
 ```
 
+This shows the recommended parsing path. Custom parsers bypass feature inheritance.
+
 ### 2. Extract Extension Data from AST
 
 ```rust
@@ -397,6 +427,8 @@ let nodes = extract_extension_nodes(&choreography.protocol, "timeout");
 // ❌ BAD: Custom parsing of extension syntax
 let extensions = parse_custom_extension_syntax(&input)?;
 ```
+
+This example compares AST extraction with custom parsing. The AST route preserves extension semantics.
 
 ### 3. Generate Dynamic Roles
 
@@ -410,6 +442,8 @@ let role_variants: Vec<_> = choreography.roles.iter()
 enum Role { Alice, Bob } // Won't work with different choreographies
 ```
 
+This shows dynamic role generation from the AST. It avoids hard coded role sets.
+
 ### 4. Proper Error Handling
 
 ```rust
@@ -422,6 +456,8 @@ let choreography = match parse_choreography_str(&input) {
     }
 };
 ```
+
+This example returns detailed parse errors. It keeps compiler diagnostics actionable.
 
 ## Testing Extension System
 
@@ -451,6 +487,8 @@ fn test_grammar_composition_performance() {
 }
 ```
 
+This test checks caching by comparing the first and second composition times. It asserts a speedup from the cached path.
+
 ### Extension Parser Tests
 
 ```rust
@@ -470,6 +508,8 @@ fn test_extension_parsing() {
 }
 ```
 
+This test exercises the extension parser with a small protocol. It checks role extraction and parse success.
+
 ### Feature Inheritance Tests
 
 ```rust
@@ -487,6 +527,8 @@ fn test_feature_inheritance() {
 }
 ```
 
+This test validates that parameterized roles survive extension parsing. It checks that the role list includes a parameter.
+
 ## Migration Guide
 
 ### From Custom DSL to Extension System
@@ -494,11 +536,13 @@ fn test_feature_inheritance() {
 Before (custom DSL):
 ```rust
 // Custom macro with limited features
-my_choreography! {
-    protocol MyProtocol =
-      A -> B : Message with_timeout 5000
-}
+my_choreography!(r#"
+protocol MyProtocol =
+  A -> B : Message with_timeout 5000
+"#);
 ```
+
+This example shows a legacy custom macro. It now expects a string literal input like the standard macro.
 
 After (extension system with full feature inheritance):
 ```rust
@@ -511,8 +555,10 @@ protocol MyProtocol =
       A -> B : QuickMessage
     Slow ->
       timeout 5000 { A -> B : SlowMessage }
-"#)
+"#);
 ```
+
+This example uses the standard macro with an extension statement. It inherits all base DSL features.
 
 ### Performance Considerations
 
@@ -551,6 +597,8 @@ let stats = parser.extension_stats();
 println!("Extensions registered: {}", stats.grammar_extensions);
 ```
 
+This snippet inspects the composed grammar and extension stats. It helps diagnose registration issues.
+
 ## Complete Example: external-demo
 
 The `external-demo` project provides a complete working example of 3rd party integration using the two-crate pattern. Key features demonstrated:
@@ -586,6 +634,8 @@ let metadata = ExtensionMetadata {
     // ...
 };
 ```
+
+This example declares extension dependencies in metadata. The registry checks these at registration time.
 
 ### Custom Validation
 

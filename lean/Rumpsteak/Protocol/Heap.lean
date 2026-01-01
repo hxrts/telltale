@@ -190,4 +190,93 @@ def stateHash (h : Heap) : Nat :=
 
 end Heap
 
+/-! ## Heap Counter Invariant
+
+The heap maintains an allocation counter that ensures all ResourceIds are unique.
+Every ResourceId in the heap was created with a counter value strictly less than
+the current counter, ensuring that `ResourceId.create r h.counter` is always fresh. -/
+
+/-- The heap counter invariant: all ResourceIds in the heap have counter < h.counter.
+
+    This invariant ensures that the current counter value always produces fresh ResourceIds.
+    It is established by `empty` and preserved by `alloc`. -/
+def HeapCounterInvariant (h : Heap) : Prop :=
+  ∀ rid, h.resources.contains rid → rid.counter < h.counter
+
+/-- Empty heap satisfies the counter invariant (vacuously true). -/
+theorem empty_counter_invariant : HeapCounterInvariant Heap.empty := by
+  intro rid hcontains
+  simp only [Heap.empty, Batteries.RBMap.contains, Batteries.RBMap.find?] at hcontains
+  simp only [Batteries.RBMap.empty, Batteries.RBMap.find?, Batteries.RBNode.find?] at hcontains
+  contradiction
+
+/-- Allocation preserves the counter invariant.
+
+    When we allocate a resource:
+    1. The new ResourceId has counter = h.counter
+    2. The new heap has counter = h.counter + 1
+    3. All old ResourceIds have counter < h.counter < h.counter + 1
+    4. The new ResourceId has counter = h.counter < h.counter + 1 -/
+theorem alloc_preserves_invariant (h : Heap) (r : Resource)
+    (hinv : HeapCounterInvariant h) :
+    let (_, h') := h.alloc r
+    HeapCounterInvariant h' := by
+  intro rid hcontains'
+  simp only [Heap.alloc] at *
+  -- h' has counter = h.counter + 1
+  -- rid is either the new ResourceId or was in h.resources
+  -- If it's new: rid.counter = h.counter < h.counter + 1
+  -- If it's old: rid.counter < h.counter < h.counter + 1
+  by_cases heq : rid = ResourceId.create r h.counter
+  · -- New ResourceId
+    subst heq
+    simp only [ResourceId.create, ResourceId.fromResource]
+    omega
+  · -- Old ResourceId - was in h.resources
+    -- We need to show rid was in h.resources (not just h'.resources)
+    -- Since h'.resources = h.resources.insert newRid r, and rid ≠ newRid,
+    -- rid must have been in h.resources
+    have hlt := hinv rid
+    -- rid.counter < h.counter < h.counter + 1
+    have hctr : rid.counter < h.counter := by
+      apply hlt
+      -- Need to show: rid was in h.resources given rid ∈ h'.resources and rid ≠ newRid
+      -- This requires RBMap lemmas about insert
+      simp only [Batteries.RBMap.contains] at hcontains' ⊢
+      -- For RBMap: if insert k v |>.find? k' = some _ and k' ≠ k, then original.find? k' = some _
+      cases hfind : h.resources.find? rid with
+      | some _ => rfl
+      | none =>
+        -- rid not in original, so it must be the newly inserted key
+        -- But rid ≠ ResourceId.create r h.counter, contradiction
+        exfalso
+        simp only [Batteries.RBMap.find?_insert] at hcontains'
+        split at hcontains'
+        · -- beq succeeds means rid = the new key
+          have : rid = ResourceId.create r h.counter := by
+            simp only [beq_iff_eq] at *
+            assumption
+          exact heq this
+        · -- beq fails, so find? uses original map
+          simp only [hfind] at hcontains'
+    omega
+
+/-- A ResourceId with the current counter is not in the heap (assuming invariant).
+
+    PROOF: If rid.counter = h.counter and all ResourceIds in heap have counter < h.counter,
+    then rid cannot be in the heap. -/
+theorem fresh_counter_not_found (h : Heap) (r : Resource)
+    (hinv : HeapCounterInvariant h) :
+    h.resources.find? (ResourceId.create r h.counter) = none := by
+  by_contra hne
+  push_neg at hne
+  cases hfind : h.resources.find? (ResourceId.create r h.counter) with
+  | none => simp only [hfind] at hne
+  | some _ =>
+    have hcontains : h.resources.contains (ResourceId.create r h.counter) := by
+      simp only [Batteries.RBMap.contains, hfind]
+    have hlt := hinv (ResourceId.create r h.counter) hcontains
+    simp only [ResourceId.create, ResourceId.fromResource] at hlt
+    omega
+
 end Rumpsteak.Protocol.Heap

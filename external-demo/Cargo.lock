@@ -617,6 +617,7 @@ dependencies = [
  "rumpsteak-theory",
  "rumpsteak-types",
  "serde",
+ "sha2",
  "syn",
  "thiserror",
  "time",
@@ -651,6 +652,8 @@ name = "rumpsteak-types"
 version = "0.7.0"
 dependencies = [
  "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
 ]
 

@@ -9,7 +9,7 @@ The `RumpsteakHandler` provides a production-ready implementation of choreograph
 ### Basic Two-Party Protocol
 
 ```rust
-use rumpsteak_choreography::effects::{
+use rumpsteak_aura_choreography::effects::{
     ChoreoHandler,
     handlers::rumpsteak::{RumpsteakHandler, RumpsteakEndpoint, SimpleChannel},
 };
@@ -65,6 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+This example creates two endpoints and connects them with a `SimpleChannel` pair. It demonstrates direct `send` and `recv` calls through the handler.
+
 ---
 
 ## Core Concepts
@@ -112,6 +114,8 @@ Messages are the data exchanged between roles. They must:
 ```rust
 impl<R: Role + Eq + Hash + Clone> RumpsteakEndpoint<R>
 ```
+
+This shows the generic bounds required by the endpoint type.
 
 #### Constructor
 ```rust
@@ -175,6 +179,8 @@ Get metadata for all sessions.
 impl<R, M> RumpsteakHandler<R, M>
 ```
 
+This shows the handler type parameters. The handler is generic over role and message types.
+
 #### Constructor
 ```rust
 pub fn new() -> Self
@@ -217,6 +223,8 @@ Execute operation with timeout.
 pub struct SimpleChannel
 ```
 
+This type wraps a bidirectional byte channel. It is the default transport for the handler.
+
 #### Constructor
 ```rust
 pub fn pair() -> (Self, Self)
@@ -244,10 +252,7 @@ Wraps a legacy channel in the new dynamic session API.
 ```rust
 RumpsteakSession::from_sink_stream(sender, receiver)
 ```
-Accepts any async sink/stream pair carrying `Vec<u8>` payloads (e.g. WebSocket/
-Fetch bridges, QUIC streams, etc.) and exposes them to the handler. This is the
-recommended entry point for custom transports; once wrapped, call
-`endpoint.register_session(peer, session)`.
+Accepts any async sink and stream pair carrying `Vec<u8>` payloads. It exposes the pair to the handler. Use this for custom transports, then call `endpoint.register_session(peer, session)`.
 
 ### SessionMetadata
 
@@ -258,6 +263,8 @@ pub struct SessionMetadata {
     pub operation_count: usize,
 }
 ```
+
+This struct records session state for a peer. It is updated as operations run.
 
 Tracks session progression:
 - `state_description`: Human-readable current state
@@ -276,6 +283,8 @@ let request = Request { query: "data".to_string() };
 handler.send(&mut endpoint, Role::Server, &request).await?;
 let response: Response = handler.recv(&mut endpoint, Role::Server).await?;
 ```
+
+This pattern sends a request and waits for a response. It is the simplest round trip flow.
 
 ### Pattern 2: Choice with Branches
 
@@ -301,6 +310,8 @@ match choice.0 {
 }
 ```
 
+This pattern uses `choose` and `offer` to coordinate a branch. The chosen label drives the receiver logic.
+
 ### Pattern 3: Sequential Messages
 
 ```rust
@@ -309,6 +320,8 @@ for item in items {
     let ack: Ack = handler.recv(&mut endpoint, Role::Peer).await?;
 }
 ```
+
+This pattern sends a batch of items with acknowledgments. Each step waits for the peer response.
 
 ### Pattern 4: Multi-Party Coordination
 
@@ -320,6 +333,8 @@ handler.send(&mut endpoint, Role::Seller, &offer).await?;
 let response: Response = handler.recv(&mut endpoint, Role::Seller).await?;
 handler.send(&mut endpoint, Role::Buyer, &response).await?;
 ```
+
+This pattern relays messages between two peers. It keeps the coordinator role in control of ordering.
 
 ### Pattern 5: Timeout Protection
 
@@ -346,17 +361,20 @@ match result {
 }
 ```
 
+This pattern wraps a receive in `with_timeout`. It distinguishes timeout errors from other failures.
 ## Best Practices
 
 ### 1. Resource Management
 
-**DO**:
+Recommended approach:
 ```rust
 // Close channels explicitly when done
 endpoint.close_all_channels();
 ```
 
-**DO**:
+This closes channels explicitly when the protocol is complete.
+
+Recommended alternative:
 ```rust
 // Use Drop to ensure cleanup
 {
@@ -365,7 +383,9 @@ endpoint.close_all_channels();
 } // Drop ensures cleanup
 ```
 
-**DON'T**:
+This relies on drop to clean up resources at scope end.
+
+Avoid:
 ```rust
 // Don't forget to clean up resources
 let mut endpoint = RumpsteakEndpoint::new(role);
@@ -373,9 +393,11 @@ let mut endpoint = RumpsteakEndpoint::new(role);
 // Forgot to close!
 ```
 
+This leaves channels open after the protocol.
+
 ### 2. Error Handling
 
-**DO**:
+Recommended approach:
 ```rust
 match handler.send(&mut ep, role, &msg).await {
     Ok(()) => { /* success */ }
@@ -389,15 +411,19 @@ match handler.send(&mut ep, role, &msg).await {
 }
 ```
 
-**DON'T**:
+This handles transport errors explicitly. It keeps other errors visible.
+
+Avoid:
 ```rust
 // Don't ignore errors
 handler.send(&mut ep, role, &msg).await.unwrap();
 ```
 
+This panics on failures and hides transport details.
+
 ### 3. Channel Setup
 
-**DO**:
+Recommended approach:
 ```rust
 // Setup all channels before starting protocol
 let (ch1, ch2) = SimpleChannel::pair();
@@ -408,16 +434,20 @@ bob_ep.register_channel(Role::Alice, ch2);
 protocol_run().await?;
 ```
 
-**DON'T**:
+This ensures channels exist before the first send.
+
+Avoid:
 ```rust
 // Don't register channels mid-protocol
 handler.send(&mut ep, role, &msg).await?; // Might not have channel!
 ep.register_channel(role, channel); // Too late!
 ```
 
+This can cause send failures when a channel is missing.
+
 ### 4. Metadata Usage
 
-**DO**:
+Recommended approach:
 ```rust
 // Use metadata for debugging and monitoring
 if let Some(meta) = endpoint.get_metadata(&peer) {
@@ -430,9 +460,11 @@ if let Some(meta) = endpoint.get_metadata(&peer) {
 }
 ```
 
+This reports progress and state for each peer. It is useful for debugging.
+
 ### 5. Testing
 
-**DO**:
+Recommended approach:
 ```rust
 #[tokio::test]
 async fn test_protocol() {
@@ -452,3 +484,5 @@ async fn test_protocol() {
     assert_eq!(received.data, vec![1, 2, 3]);
 }
 ```
+
+This sets up a local channel pair and exercises a full send and receive. It validates handler wiring in tests.

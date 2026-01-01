@@ -1,34 +1,68 @@
 # Lean Verification
 
-Lean 4 checks each exported choreography against its projected local types. The runner decodes JSON from the `rumpsteak-lean-bridge` crate, projects per-role traces, and confirms each exported branch is included in the projection by order and label.
+Rumpsteak uses Lean 4 to formally verify the correctness of choreographic projection. This chapter describes what properties are proven, what remains axiomatized, and how verification integrates with the Rust implementation.
 
-## How to run
+## Verification Strategy
 
-Use the Nix shell so Rust, Lean, and Lake match expected versions.
+The project employs a defense-in-depth approach with three layers:
 
-```bash
-nix develop --command just rumpsteak-lean-check
+1. **Formal Proofs**: Core session type theory proven in Lean
+2. **Cross-Validation**: Two independent projection implementations compared for equivalence
+3. **Property Testing**: Randomized protocols validated against the Lean binary
+
+This layered approach ensures that bugs in one layer are caught by another.
+
+## What is Formally Proven
+
+The following properties have complete proofs in `lean/Rumpsteak/Proofs/`:
+
+### Merge Operator Properties
+
+The merge operator combines local types for non-participants in choices. Proofs establish:
+
+- **Reflexivity**: `merge lt lt = lt`
+- **Commutativity**: `merge a b = merge b a`
+- **Associativity**: `merge (merge a b) c = merge a (merge b c)`
+
+These properties ensure that merge order does not affect projection results.
+
+### Subtyping and Ordering
+
+The subtyping relation ensures projected programs conform to their specifications:
+
+```lean
+theorem subLabelsOf_refl (lt : LocalType) : subLabelsOf lt lt = true := by
+  unfold subLabelsOf; simp [List.all_eq_true, List.any_eq_true]
+
+theorem isSubsequence_refl {α} [DecidableEq α] (xs : List α) :
+  isSubsequence xs xs = true := by induction xs <;> simp [isSubsequence, *]
+
+theorem isSubtype_refl (lt : LocalType) : isSubtype lt lt = true := by
+  simp [isSubtype, isSubsequence_refl]
 ```
-This command exports the sample choreography for Chef, SousChef, and Baker from `lean/choreo/lean-sample.choreo`, builds the Lean runner, and validates each role. Text and JSON logs are written in `lean/artifacts/runner-<role>.{log,json}`.
 
-```bash
-nix develop --command just ci-dry-run
-```
-This command runs the full CI-equivalent sweep: Rust fmt, clippy, tests, Lean sample, Lean extended scenario, and the intentional failing check.
+`subLabelsOf_refl` uses `all_eq_true` and `any_eq_true` to show every projected label witnesses itself. `isSubsequence_refl` and `isSubtype_refl` prove the order check is reflexive. These lemmas ensure only differences between exporter output and projection trigger failures.
 
-## What is being verified
+### Global Type Consumption
 
-`Rumpsteak.Choreography` checks that roles and actions decode and reference only declared roles. The predicates `hasUniqueRoles` and `hasValidActions` rule out duplicate roles and dangling endpoints before projection begins. Each action is a triple `(origin, destination, label)`; membership tests are done with `DecidableEq` on strings.
+Safe traversal lemmas for global type structures ensure projection terminates and produces valid results.
 
-`Rumpsteak.Projection` builds per-role `LocalType` traces. Lemma `subLabelsOf_refl` proves `subLabelsOf lt lt = true`, using `List.all_eq_true` and `List.any_eq_true` to show every projected label witnesses itself. A label failure in the runner therefore means the exporter produced a label absent from the projection for that role.
+## What is Axiomatized
 
-`Rumpsteak.Program` maps exported effects (`Effect.send`, `Effect.recv`) into `LocalAction` values. The map is a homomorphism from the JSON schema to the projection domain, so equality checks are meaningful without coercions.
+The following properties are stated as axioms but not yet proven:
 
-`Rumpsteak.Subtyping` defines order checks with `DecidableEq`. `isSubsequence` is a structural recursion that skips super-sequence heads until a match; `isSubtype` pairs it with a length guard. Lemmas `isSubsequence_refl` and `isSubtype_refl` show a projected trace always passes its own order check; only exporter reordering or omission can fail.
+| Property | Description | Impact |
+|----------|-------------|--------|
+| Subject Reduction | Type preservation during execution | Safety guarantee |
+| Progress | Well-typed programs don't deadlock | Liveness guarantee |
+| Non-participant Correctness | Merging produces valid local types | Projection soundness |
+| Merge Composition | Complex merge interactions | Edge case coverage |
 
-`Rumpsteak.Runner` applies three invariants per branch: (1) membership: every exported action must appear in the projection, (2) order: exported actions must be a subsequence of the projection, (3) labels: exported labels must be contained in the projection labels. Failures report the branch name plus the specific missing or out-of-order actions.
+These axioms represent the theoretical foundations that the implementation relies upon. They do not affect the correctness of tested protocol patterns, which are validated empirically against the Lean runner.
 
-### Core Lean predicates (notation)
+## Core Lean Predicates
+
+The runner enforces three predicates for each branch:
 
 ```lean
 def subLabelsOf (lt sup : LocalType) : Bool :=
@@ -42,38 +76,106 @@ def isSubsequence {α} [DecidableEq α] : List α → List α → Bool
 def isSubtype (sub sup : LocalType) : Bool :=
   sub.actions.length <= sup.actions.length ∧ isSubsequence sub.actions sup.actions
 ```
-These definitions are the exact predicates the runner enforces. `subLabelsOf` is symmetric in label matching; `isSubsequence` is asymmetric and enforces ordering; `isSubtype` combines length and ordering to reject reordered or longer traces.
 
-### Proven lemmas (sketch with file references)
+- **subLabelsOf**: Symmetric label matching; every exported action must appear in the projection
+- **isSubsequence**: Asymmetric ordering; exported actions must preserve projection order
+- **isSubtype**: Combines length guard with ordering to reject reordered or extended traces
 
-```lean
-theorem subLabelsOf_refl (lt : LocalType) : subLabelsOf lt lt = true := by
-  unfold subLabelsOf; simp [List.all_eq_true, List.any_eq_true]
+## Module Structure
 
-theorem isSubsequence_refl {α} [DecidableEq α] (xs : List α) :
-  isSubsequence xs xs = true := by induction xs <;> simp [isSubsequence, *]
+The Lean codebase is organized into focused modules:
 
-theorem isSubtype_refl (lt : LocalType) : isSubtype lt lt = true := by
-  simp [isSubtype, isSubsequence_refl]
+- **Rumpsteak.Choreography**: Decodes choreographies from JSON, validates roles and actions with `hasUniqueRoles` and `hasValidActions`
+- **Rumpsteak.Projection**: Builds per-role `LocalType` traces from global types
+- **Rumpsteak.Program**: Maps exported effects to `LocalAction` values as a homomorphism from JSON to the projection domain
+- **Rumpsteak.Subtyping**: Defines order checks with `DecidableEq`
+- **Rumpsteak.Runner**: Applies membership, order, and label invariants per branch
+
+## Features Without Lean Formalization
+
+The DSL includes features that extend beyond the formally verified core:
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Dynamic Roles | Parameterized role arrays `R[i]` | Runtime checks only |
+| Broadcasts | One-to-many messages | Desugars to nested sends |
+| Local Choices | Non-communicating decisions | Type-checked |
+| Parallel Composition | Concurrent branches | Structural checks |
+| Protocol Extensions | Custom DSL syntax | User-defined |
+
+These features are tested but not formally proven correct.
+
+### Recursion Model
+
+The DSL uses explicit recursion with `rec` blocks and `continue` statements:
+
+**DSL syntax:**
 ```
-`subLabelsOf_refl` uses the standard `all_eq_true` and `any_eq_true` characterizations to witness each element by itself. `isSubsequence_refl` and `isSubtype_refl` are structural inductions showing the order check is reflexive. These lemmas ensure that only differences between exporter output and projection can trigger failures.
+rec Loop {
+    A -> B: Msg
+    continue Loop
+}
+```
 
-`subLabelsOf_refl` is defined in `lean/Rumpsteak/Projection.lean`. `isSubsequence_refl` and `isSubtype_refl` are in `lean/Rumpsteak/Subtyping.lean`. Each lemma relies only on decidable equality and induction, keeping the runner checks total and terminating.
+**Theory (µ-binders):**
+```
+µX. A → B: Msg. X
+```
 
-Failure reporting lists the branch name, missing actions, ordering mismatches, or unexpected labels.
+The `continue` keyword provides explicit back-references that align with the theory's `Var` constructor. Cross-validation tests verify that recursive protocols project equivalently in both implementations.
 
-## Sample choreography
+## Running Verification
+
+Use the Nix shell to ensure Rust, Lean, and Lake versions match:
+
+```bash
+nix develop --command just rumpsteak-lean-check
+```
+
+This exports the sample choreography for Chef, SousChef, and Baker from `lean/choreo/lean-sample.choreo`, builds the Lean runner, and validates each role. Logs are written to `lean/artifacts/runner-<role>.{log,json}`.
+
+### Extended Scenario
+
+```bash
+nix develop --command just rumpsteak-lean-check-extended
+```
+
+Validates `lean/choreo/lean-extended.choreo` with two course cycles before dessert options.
+
+### Negative Testing
+
+```bash
+nix develop --command just rumpsteak-lean-check-failing
+```
+
+Exports `lean/choreo/lean-failing.choreo` with a corrupted label. The runner exits non-zero, confirming error detection works.
+
+### Full CI Sweep
+
+```bash
+nix develop --command just ci-dry-run
+```
+
+Runs Rust fmt, clippy, tests, and all Lean verification scenarios.
+
+## Sample Choreography
 
 `lean/choreo/lean-sample.choreo` models a collaborative dinner with two meal branches (pasta, tacos) and three dessert options (cake, fruit, none). The runner checks that each branch for Chef, SousChef, and Baker is a subsequence of its projection and introduces no extra labels.
 
-## Extended scenario
+## Editing Scenarios
 
-`just rumpsteak-lean-check-extended` validates `lean/choreo/lean-extended.choreo`, which adds two course cycles before dessert options. Per-role text and JSON logs are written under `lean/artifacts/runner-extended-*.{log,json}`.
+Update inputs in `lean/choreo/`. Change `--role` in the Just recipes to validate other roles. Regenerate and re-run the verification commands to test new scenarios.
 
-## Intentional failing fixture
+## Known Limitations
 
-`just rumpsteak-lean-check-failing` exports `lean/choreo/lean-failing.choreo`, then corrupts the program label to `WrongLabel`. The runner is expected to exit non-zero and print the branch error; no logs are written on failure so CI catches the status directly.
+1. **Axioms**: Safety properties (subject reduction, progress) are assumed, not proven
+2. **Recursion**: DSL implicit loops cannot be cross-validated against theory explicit µ-binders
+3. **Extensions**: Custom DSL extensions bypass formal verification
+4. **Payloads**: Type annotations on messages are not semantically verified
 
-## Editing scenarios
+## Future Work
 
-Update inputs in `lean/choreo/`. Change `--role` in the Just recipes to validate other roles. Regenerate and re-run the commands above to verify new scenarios.
+- Prove axiomatized properties in Lean
+- Unify recursion models between DSL and theory
+- Add formal verification for broadcast desugaring
+- Extend proofs to cover parallel composition

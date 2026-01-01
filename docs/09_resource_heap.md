@@ -18,17 +18,19 @@ Resources are protocol artifacts with unique identifiers.
 
 ```rust
 pub struct ResourceId {
-    id: ContentId,
+    pub hash: [u8; 32],
+    pub counter: u64,
 }
 
 pub enum Resource {
     Channel(ChannelState),
     Message(Message),
-    Session(LocalTypeR),
+    Session { role: String, type_hash: u64 },
+    Value { tag: String, data: Vec<u8> },
 }
 ```
 
-The `ResourceId` derives from the content hash of the resource. The `Resource` enum represents different kinds of heap-allocated values.
+The `ResourceId` stores a content hash and an allocation counter. The `Resource` enum represents different kinds of heap-allocated values.
 
 ## Heap Structure
 
@@ -38,7 +40,7 @@ The heap stores resources in a deterministic data structure.
 pub struct Heap {
     resources: BTreeMap<ResourceId, Resource>,
     nullifiers: BTreeSet<ResourceId>,
-    allocation_counter: u64,
+    counter: u64,
 }
 ```
 
@@ -53,10 +55,10 @@ All heap operations are pure functions returning new heap values.
 ```rust
 impl Heap {
     pub fn alloc(&self, resource: Resource) -> (ResourceId, Heap) {
-        let rid = ResourceId::new(&resource, self.allocation_counter);
+        let rid = ResourceId::from_resource(&resource, self.counter);
         let mut new_heap = self.clone();
         new_heap.resources.insert(rid.clone(), resource);
-        new_heap.allocation_counter += 1;
+        new_heap.counter += 1;
         (rid, new_heap)
     }
 }
@@ -89,6 +91,9 @@ Consumption adds the resource ID to the nullifier set. Double-consumption fails 
 ```rust
 impl Heap {
     pub fn read(&self, rid: &ResourceId) -> Result<&Resource, HeapError> {
+        if self.is_consumed(rid) {
+            return Err(HeapError::AlreadyConsumed(rid.clone()));
+        }
         self.resources.get(rid).ok_or(HeapError::NotFound(rid.clone()))
     }
 
@@ -98,7 +103,7 @@ impl Heap {
 }
 ```
 
-Reading retrieves a resource by ID. The `is_consumed` method checks the nullifier set.
+Reading retrieves a resource by ID and fails if it was consumed. The `is_consumed` method checks the nullifier set.
 
 ## Nullifier Tracking
 
@@ -117,27 +122,16 @@ Once a resource is consumed, subsequent consumption attempts fail. This provides
 The heap state can be converted to a Merkle tree for verification.
 
 ```rust
-impl Heap {
-    pub fn merkle_root(&self) -> [u8; 32] {
-        let leaves: Vec<_> = self.resources.iter()
-            .map(|(rid, res)| hash_pair(rid, res))
-            .collect();
-        compute_merkle_root(&leaves)
-    }
+use rumpsteak_aura_choreography::heap::merkle::merkle_root;
+use rumpsteak_aura_choreography::{HeapCommitment, MerkleTree};
 
-    pub fn prove_inclusion(&self, rid: &ResourceId) -> InclusionProof {
-        // Generate Merkle proof for resource
-    }
-
-    pub fn prove_exclusion(&self, rid: &ResourceId) -> ExclusionProof {
-        // Generate proof that resource is not in heap
-    }
-}
+let root = merkle_root(&heap);
+let tree = MerkleTree::from_heap(&heap);
+let proof = tree.prove(0);
+let commitment = HeapCommitment::from_heap(&heap);
 ```
 
-The Merkle root provides a compact commitment to the entire heap state. Inclusion proofs verify a resource exists. Exclusion proofs verify a resource does not exist.
-
-The nullifier set has its own Merkle tree for efficient consumption proofs.
+The Merkle root commits to the active resources in the heap. `MerkleTree::prove` generates inclusion proofs by leaf index. `HeapCommitment::from_heap` combines resource and nullifier roots with the allocation counter.
 
 ## Integration with Configuration
 
@@ -231,7 +225,9 @@ These theorems ensure allocation followed by consumption succeeds, and double-co
 pub enum HeapError {
     NotFound(ResourceId),
     AlreadyConsumed(ResourceId),
-    InvalidProof,
+    AlreadyExists(ResourceId),
+    TypeMismatch { expected: String, got: String },
+    Other(String),
 }
 ```
 
@@ -240,13 +236,14 @@ Errors provide context for debugging heap operations.
 ## Usage Example
 
 ```rust
-use rumpsteak_types::{Heap, Resource, ResourceId};
+use rumpsteak_aura_choreography::heap::merkle::merkle_root;
+use rumpsteak_aura_choreography::{Heap, HeapMessage, MerkleTree, Resource};
 
 // Create empty heap
 let heap = Heap::new();
 
 // Allocate a message
-let msg = Message::new("ping", vec![]);
+let msg = HeapMessage::new("Alice", "Bob", "ping", vec![], 0);
 let (msg_id, heap) = heap.alloc(Resource::Message(msg));
 
 // Check resource exists
@@ -260,11 +257,12 @@ assert!(heap.is_consumed(&msg_id));
 assert!(heap.consume(&msg_id).is_err());
 
 // Compute Merkle root for verification
-let root = heap.merkle_root();
-let proof = heap.prove_inclusion(&msg_id);
+let root = merkle_root(&heap);
+let tree = MerkleTree::from_heap(&heap);
+let proof = tree.prove(0);
 ```
 
-This example demonstrates allocation, consumption, and Merkle proof generation.
+This example demonstrates allocation, consumption, and Merkle proof generation. The proof uses a leaf index from the active resource list.
 
 ## ZK Compatibility
 
@@ -272,4 +270,4 @@ The heap design supports zero-knowledge proof systems.
 
 Merkle proofs enable proving resource existence without revealing the full heap. Nullifier proofs enable proving consumption without revealing which resource was consumed. The deterministic structure ensures proof verification is reproducible.
 
-The `PoseidonHasher` can be used for ZK-friendly hashing when generating circuit-compatible proofs.
+Custom hashers can be introduced for ZK-friendly hashing when generating circuit-compatible proofs.

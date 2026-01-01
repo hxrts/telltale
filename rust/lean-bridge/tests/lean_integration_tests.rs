@@ -380,3 +380,123 @@ fn test_calculator_protocol() {
         result
     );
 }
+
+// ============================================================================
+// Recursive Protocol Tests
+// ============================================================================
+
+// Note: The Lean runner uses a flat choreography format (roles + actions array),
+// not the hierarchical GlobalType format with Mu/Var. Recursive protocols are
+// validated by unrolling the first iteration of the loop body.
+//
+// Full recursive type validation happens in:
+// - rust/lean-bridge/tests/proptest_projection.rs (property-based tests)
+// - rust/lean-bridge/tests/projection_equivalence_tests.rs (DSL cross-validation)
+
+#[test]
+fn test_recursive_ping_pong_unrolled() {
+    skip_without_lean!();
+
+    // µLoop. A -> B: ping. B -> A: pong. Loop
+    // Represented as flat actions (one iteration of the loop body)
+    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping"), ("B", "A", "pong")]);
+
+    // Role A: send ping, recv pong
+    let program_a = build_program_json("A", &[("send", "B", "ping"), ("recv", "B", "pong")]);
+
+    let runner = LeanRunner::new().expect("Lean binary should exist");
+    let result = runner
+        .validate(&choreo, &program_a)
+        .expect("Recursive validation should succeed");
+
+    assert!(
+        result.success,
+        "Recursive protocol validation failed for role A: {:?}",
+        result
+    );
+}
+
+#[test]
+fn test_recursive_ping_pong_role_b() {
+    skip_without_lean!();
+
+    // Same recursive protocol, testing role B
+    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping"), ("B", "A", "pong")]);
+
+    // Role B: recv ping, send pong
+    let program_b = build_program_json("B", &[("recv", "A", "ping"), ("send", "A", "pong")]);
+
+    let runner = LeanRunner::new().expect("Lean binary should exist");
+    let result = runner
+        .validate(&choreo, &program_b)
+        .expect("Recursive validation should succeed");
+
+    assert!(
+        result.success,
+        "Recursive protocol validation failed for role B: {:?}",
+        result
+    );
+}
+
+#[test]
+fn test_recursive_choice_unrolled() {
+    skip_without_lean!();
+
+    // µLoop. A -> B: { continue. B -> A: data. Loop | stop }
+    // Unrolled as: A -> B: continue | stop, B -> A: data (for continue branch)
+    let choreo = build_choreography_json(
+        &["A", "B"],
+        &[
+            ("A", "B", "continue"),
+            ("B", "A", "data"),
+            ("A", "B", "stop"),
+        ],
+    );
+
+    // Role A chooses the continue branch
+    let program_a = build_branching_program_json(
+        "A",
+        &[(
+            "continue",
+            &[("send", "B", "continue"), ("recv", "B", "data")],
+        )],
+    );
+
+    let runner = LeanRunner::new().expect("Lean binary should exist");
+    let result = runner
+        .validate(&choreo, &program_a)
+        .expect("Recursive choice validation should succeed");
+
+    assert!(
+        result.success,
+        "Recursive choice protocol validation failed: {:?}",
+        result
+    );
+}
+
+// ============================================================================
+// CI Enforcement Tests
+// ============================================================================
+
+/// This test verifies that the Lean binary is available.
+///
+/// In CI, this test is mandatory and will fail if Lean isn't built.
+/// This ensures that Lean validation is always run in the CI pipeline.
+///
+/// To build Lean locally: `cd lean && lake build`
+/// With Nix: `nix develop --command bash -c "cd lean && lake build"`
+#[test]
+fn test_lean_binary_available_for_ci() {
+    // Use require_available() instead of skip_without_lean!() to make this mandatory
+    LeanRunner::require_available();
+
+    // Verify we can actually create a runner
+    let runner = LeanRunner::new().expect("Lean runner should be constructable after require_available()");
+
+    // Run a minimal validation to confirm the binary works
+    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "msg")]);
+    let program = build_program_json("A", &[("send", "B", "msg")]);
+
+    let result = runner.validate(&choreo, &program).expect("Lean validation should work");
+    assert!(result.success, "Basic validation should pass");
+}

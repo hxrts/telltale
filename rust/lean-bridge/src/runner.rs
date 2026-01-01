@@ -157,6 +157,36 @@ impl LeanRunner {
         Self::get_binary_path().is_some()
     }
 
+    /// Require that the Lean binary is available.
+    ///
+    /// This function is intended for CI environments where Lean tests should not
+    /// be silently skipped. It panics with instructions if the binary is missing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Lean binary is not available.
+    pub fn require_available() {
+        if !Self::is_available() {
+            panic!(
+                "\n\
+                ╔══════════════════════════════════════════════════════════════════╗\n\
+                ║  LEAN VERIFICATION REQUIRED                                       ║\n\
+                ╠══════════════════════════════════════════════════════════════════╣\n\
+                ║  The Lean binary is required but not found.                       ║\n\
+                ║                                                                   ║\n\
+                ║  To build Lean:                                                   ║\n\
+                ║    cd lean && lake build                                          ║\n\
+                ║                                                                   ║\n\
+                ║  Or with Nix:                                                     ║\n\
+                ║    nix develop --command bash -c \"cd lean && lake build\"         ║\n\
+                ║                                                                   ║\n\
+                ║  Expected path: {path}           \n\
+                ╚══════════════════════════════════════════════════════════════════╝\n",
+                path = Self::DEFAULT_BINARY_PATH
+            );
+        }
+    }
+
     /// Run validation with choreography and program JSON.
     ///
     /// The choreography JSON should have the format:

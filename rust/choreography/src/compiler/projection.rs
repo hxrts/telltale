@@ -295,16 +295,14 @@ impl<'a> ProjectionContext<'a> {
 
             if first_sends && !branches.is_empty() {
                 // Communicated choice - project as Select
+                // The Select represents the choice, and each branch's Send is part of
+                // the continuation (not skipped). This matches MPST semantics where
+                // the choice maker selects a branch AND sends the corresponding message.
                 let mut local_branches = Vec::new();
 
                 for branch in branches {
-                    // Skip the initial send (it's implied by the choice)
-                    let inner_protocol = match &branch.protocol {
-                        Protocol::Send { continuation, .. } => continuation,
-                        _ => &branch.protocol, // Won't happen due to check above
-                    };
-
-                    let local_type = self.project_protocol(inner_protocol)?;
+                    // Project the entire branch protocol including the Send
+                    let local_type = self.project_protocol(&branch.protocol)?;
                     local_branches.push((branch.label.clone(), local_type));
                 }
 

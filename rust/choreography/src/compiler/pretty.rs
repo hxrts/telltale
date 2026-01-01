@@ -117,7 +117,7 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             }
         }
         Protocol::Var(label) => {
-            write_line(out, indent, &format!("call {}", label));
+            write_line(out, indent, &format!("continue {}", label));
         }
         Protocol::Extension {
             extension,

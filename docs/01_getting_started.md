@@ -90,20 +90,24 @@ The workspace provides granular feature flags to control dependencies and functi
 
 ```toml
 # Just the core runtime, no algorithms
-rumpsteak-aura = { version = "0.7", default-features = false }
+rumpsteak-aura = { version = "*", default-features = false }
 ```
+
+This keeps the dependency surface small while enabling the core runtime.
 
 #### Example: Full Feature Set
 
 ```toml
 # Everything enabled
-rumpsteak-aura = { version = "0.7", features = ["full"] }
+rumpsteak-aura = { version = "*", features = ["full"] }
 ```
+
+This enables all optional features for the facade crate.
 
 For WASM support, enable the wasm feature on the choreography crate.
 
 ```toml
-rumpsteak-aura-choreography = { version = "0.7", features = ["wasm"] }
+rumpsteak-aura-choreography = { version = "*", features = ["wasm"] }
 ```
 
 This enables compilation to WebAssembly targets.
@@ -117,16 +121,15 @@ Define the choreography using the `choreography!` macro.
 ```rust
 use rumpsteak_aura_choreography::choreography;
 
-choreography! {
-    protocol PingPong = {
-        roles Alice, Bob
-        Alice -> Bob : Ping
-        Bob -> Alice : Pong
-    }
-}
+choreography!(r#"
+protocol PingPong =
+  roles Alice, Bob
+  Alice -> Bob : Ping
+  Bob -> Alice : Pong
+"#);
 ```
 
-The macro automatically generates role types, message types, and session types. This is the recommended approach for most use cases. For advanced scenarios requiring runtime parsing, see [Choreographic DSL Parser](03_choreographic_dsl.md).
+The macro automatically generates role types, message types, and session types. This is the recommended approach for most use cases. For advanced scenarios requiring runtime parsing, see [Choreographic DSL](03_choreographic_dsl.md).
 
 Run the protocol using the effect system.
 

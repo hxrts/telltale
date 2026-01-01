@@ -1,20 +1,24 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-//! Comprehensive demonstration of new rumpsteak-aura choreography features
+//! End-to-End Choreography Tour
 //!
-//! This example demonstrates all the new functionality:
-//! 1. Module namespace support
-//! 2. Choice syntax
-//! 3. Dynamic role count support with overflow protection
-//! 4. Range syntax for dynamic roles
-//! 5. Cross-feature integration
+//! This example provides a comprehensive tour of rumpsteak-aura's choreographic
+//! programming features, demonstrating the complete flow from DSL to local types:
+//!
+//! 1. Module namespace support - organize protocols in modules
+//! 2. Choice syntax - branching with explicit decider roles
+//! 3. Dynamic roles - runtime-determined participant counts
+//! 4. Range syntax - address subsets of dynamic roles
+//! 5. Cross-feature integration - combining all features
+//! 6. **Projection** - DSL → Parse → Project to local session types
 
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use rumpsteak_aura_choreography::compiler::projection::project;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║       Rumpsteak Aura - New Features Demonstration          ║");
+    println!("║       Rumpsteak Aura - End-to-End Choreography Tour        ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -23,8 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     demo_dynamic_roles()?;
     demo_range_syntax()?;
     demo_integration()?;
+    demo_projection()?;
 
-    println!("All new features demonstrated successfully!");
+    println!("All features demonstrated successfully!");
     Ok(())
 }
 
@@ -181,5 +186,69 @@ fn demo_integration() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • Successfully demonstrated all advanced features together");
     println!();
 
+    Ok(())
+}
+
+fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
+    println!("=== 6. End-to-End: DSL → Parse → Project ===");
+
+    // A simple protocol to demonstrate projection
+    let protocol = r#"
+        protocol RequestResponse = {
+            roles Client, Server
+
+            Client -> Server : Request
+            Server -> Client : Response
+        }
+    "#;
+
+    // Step 1: Parse the DSL
+    let choreography = parse_choreography_str(protocol)?;
+    println!("Step 1 - Parsed choreography: {}", choreography.name);
+    println!(
+        "   Roles: {:?}",
+        choreography
+            .roles
+            .iter()
+            .map(|r| &r.name)
+            .collect::<Vec<_>>()
+    );
+
+    // Step 2: Project to local types for each role
+    println!("\nStep 2 - Project to local types:");
+    for role in &choreography.roles {
+        let local_type = project(&choreography, role)?;
+        println!("\n   {} sees:", role.name);
+        println!("   {:#?}", local_type);
+    }
+
+    // Show a more complex example with choice
+    println!("\n--- Choice Protocol Projection ---");
+    let choice_protocol = r#"
+        protocol AuthFlow = {
+            roles Client, Server
+
+            Client -> Server : LoginRequest
+            choice at Server {
+                success -> {
+                    Server -> Client : AuthToken
+                }
+                failure -> {
+                    Server -> Client : AuthError
+                }
+            }
+        }
+    "#;
+
+    let auth_choreo = parse_choreography_str(choice_protocol)?;
+    println!("Parsed: {}", auth_choreo.name);
+
+    for role in &auth_choreo.roles {
+        let local_type = project(&auth_choreo, role)?;
+        println!("\n   {} local type:", role.name);
+        println!("   {:#?}", local_type);
+    }
+
+    println!();
     Ok(())
 }

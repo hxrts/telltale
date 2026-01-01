@@ -6,20 +6,22 @@ The parser module is located in `rust/choreography/src/compiler/parser.rs`. It p
 
 ## Overview
 
-The parser translates protocol specifications from a layout‑sensitive, PureScript/Elm‑inspired DSL into the internal AST (`Choreography` + `Protocol`). The DSL is **direct style**: statements are newline‑separated and indentation defines blocks.
+The parser translates protocol specifications from a layout-sensitive, PureScript or Elm inspired DSL into the internal AST (`Choreography` + `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks.
+
+Empty blocks must use `{}`. The DSL does not use an explicit `end` keyword. A protocol ends when its block ends.
 
 ## DSL Syntax
 
 ```rust
-choreography! {
-    protocol PingPong =
-      roles Alice, Bob
-      Alice -> Bob : Ping
-      Bob -> Alice : Pong
-}
+choreography!(r#"
+protocol PingPong =
+  roles Alice, Bob
+  Alice -> Bob : Ping
+  Bob -> Alice : Pong
+"#);
 ```
 
-This example shows role declarations and message passing.
+This example shows role declarations and message passing with the macro. The macro expects a string literal that contains the DSL.
 
 ### Namespaces
 
@@ -35,7 +37,7 @@ protocol ThresholdProtocol =
 "#;
 ```
 
-Multiple modules can coexist in separate files. Inside the `choreography!` macro you typically omit the module header, but it is supported in string‑based parsing.
+Multiple modules can coexist in separate files. Inside the `choreography!` macro you typically omit the module header, but it is supported in string-based parsing.
 
 ### Supported Constructs
 
@@ -78,6 +80,8 @@ choice at Client
     Client -> Server : Cancel
 ```
 
+This is equivalent to the `case choose` form. It is a lighter syntax for the same choice structure.
+
 #### 4) Loop Statement
 
 ```rust
@@ -86,25 +90,33 @@ loop decide by Client
   Server -> Client : Response
 ```
 
+This loop continues while the deciding role chooses to continue. The condition is implicit in the `decide` form.
+
 ```rust
 loop repeat 5
   A -> B : Ping
   B -> A : Pong
 ```
 
+This loop repeats a fixed number of times. The compiler records the iteration count in the AST.
+
 ```rust
 loop while "has_more_data"
   A -> B : Data
 ```
+
+This loop uses a custom condition token. The condition is preserved for tooling and extension passes.
 
 ```rust
 loop forever
   A -> B : Tick
 ```
 
+This loop has no exit condition. Use it for persistent background protocols.
+
 #### 5) Parallel Statement (branch adjacency)
 
-Parallel composition is expressed by **adjacent** `branch` blocks at the same indentation level.
+Parallel composition is expressed by adjacent `branch` blocks at the same indentation level.
 
 ```rust
 branch
@@ -121,12 +133,18 @@ A solitary `branch` is a parse error. Use `{}` for an empty branch if needed.
 ```rust
 rec Loop
   A -> B : Tick
-  call Loop
+  continue Loop
 ```
+
+This defines a recursive label `Loop` and uses `continue Loop` to jump back, modeling unbounded recursion.
 
 ```rust
 call Handshake
 ```
+
+This calls another protocol that is in scope. The call target must be defined in the same file or `where` block.
+
+**Note:** `continue` is for recursive back-references within a `rec` block; `call` is for invoking sub-protocols defined in `where` blocks.
 
 #### 7) Protocol Composition (`where` block)
 
@@ -166,6 +184,8 @@ A -> B : Msg { data : String, count : Int }
 B -> A : Result(i : Int, ok : Bool)
 ```
 
+This section shows generic parameters and payload shapes. Both `{}` and `()` forms are accepted.
+
 #### 9) Dynamic Role Count Support
 
 Dynamic role counts are supported via wildcard and symbolic parameters.
@@ -177,12 +197,16 @@ protocol ThresholdProtocol =
   Signers[0..threshold] -> Coordinator : Response
 ```
 
+This example uses a wildcard role family. It also uses a symbolic bound in the role index.
+
 ```rust
 protocol ConsensusProtocol =
   roles Leader, Followers[N]
   Leader -> Followers[*] : Proposal
   Followers[i] -> Leader : Vote
 ```
+
+This example mixes a named count with index variables. It enables parameterized protocols.
 
 ```rust
 protocol PartialBroadcast =
@@ -191,7 +215,9 @@ protocol PartialBroadcast =
   Receivers[0..threshold] -> Broadcaster : Ack
 ```
 
-#### 10) String‑based Protocol Definition
+This example shows bounded ranges for role indices. It models partial broadcasts and threshold acknowledgments.
+
+#### 10) String-based Protocol Definition
 
 ```rust
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
@@ -205,6 +231,8 @@ protocol PingPong =
 
 let choreography = parse_choreography_str(protocol)?;
 ```
+
+This parses a string into a `Choreography` AST. It is the entry point for runtime parsing.
 
 Namespaced protocols are expressed with a module header.
 
@@ -226,13 +254,13 @@ The parser builds the AST for projection, validation, and code generation.
 
 ### Parser Stack
 
-- **Layout preprocessor** converts indentation into explicit block delimiters.
-- **Pest grammar** parses the canonical (brace‑based) syntax.
-- **Parser module** constructs the AST and runs validation.
+- Layout preprocessor converts indentation into explicit block delimiters.
+- Pest grammar parses the canonical brace based syntax.
+- Parser module constructs the AST and runs validation.
 
 ### Parse Pipeline
 
-1. Preprocess layout (indentation → `{}`/`()`).
+1. Preprocess layout (indentation -> `{}`/`()`).
 2. Parse with Pest grammar.
 3. Build statements and normalize branch adjacency to `Parallel`.
 4. Validate roles and resolve `call` references.
@@ -254,6 +282,8 @@ protocol Example =
 "#)?;
 ```
 
+This example parses a DSL string into a `Choreography`. It uses `parse_choreography_str` directly.
+
 `parse_choreography_file` parses a DSL file from disk.
 
 ```rust
@@ -262,6 +292,8 @@ use rumpsteak_aura_choreography::compiler::parser::parse_choreography_file;
 
 let choreo = parse_choreography_file(Path::new("protocol.choreo"))?;
 ```
+
+This example parses a file path into a `Choreography`. The file must contain a valid DSL definition.
 
 `parse_dsl` is an alias for `parse_choreography_str`.
 
@@ -285,6 +317,8 @@ match parse_choreography_str(input) {
 }
 ```
 
+This pattern matches common parse errors. It formats diagnostics with the reported context.
+
 ## Grammar Details
 
 ### Tokens and Keywords
@@ -299,11 +333,11 @@ match parse_choreography_str(input) {
 
 ### Comments
 
-Single‑line comments use `//`. Multi‑line comments use `/* ... */`.
+Single-line comments use `//`. Multi-line comments use `/* ... */`.
 
 ### Whitespace and Layout
 
-Indentation defines blocks. Use `{}` to force an empty block or to opt out of layout. Parenthesized blocks must be non‑empty.
+Indentation defines blocks. Use `{}` to force an empty block or to opt out of layout. Parenthesized blocks must be non-empty.
 
 ## Validation
 
@@ -321,6 +355,8 @@ Undefined role 'Charlie'
                    ^^^^^^^
 ```
 
+This error indicates a role that was not declared in `roles`. The location points to the undefined identifier.
+
 Example duplicate role error:
 
 ```
@@ -331,9 +367,11 @@ Duplicate role declaration 'Alice'
                                       ^^^^^
 ```
 
+This error indicates that a role name appears more than once. The location points to the duplicate entry.
+
 ## Examples
 
-### Simple Two‑Party Protocol
+### Simple Two-Party Protocol
 
 ```rust
 protocol PingPong =
@@ -341,6 +379,8 @@ protocol PingPong =
   Alice -> Bob : Ping
   Bob -> Alice : Pong
 ```
+
+This example shows a simple two role protocol. It uses a single send and reply.
 
 ### Protocol with Choice
 
@@ -357,7 +397,9 @@ protocol Negotiation =
       Seller -> Buyer : Reject
 ```
 
-### Complex E‑Commerce Protocol
+This example shows an explicit choice decided by `Seller`. Each branch starts with a send from the deciding role.
+
+### Complex E-Commerce Protocol
 
 ```rust
 protocol ECommerce =
@@ -382,6 +424,8 @@ protocol ECommerce =
       Buyer -> Seller : Cancel
 ```
 
+This example combines choice and looping. It models a longer interaction with a buyer controlled loop.
+
 ### Parallel Example
 
 ```rust
@@ -392,6 +436,8 @@ protocol ParallelDemo =
   branch
     C -> D : Msg2
 ```
+
+This example uses adjacent `branch` blocks. Each branch defines a parallel sub protocol.
 
 ## Integration
 
@@ -407,6 +453,8 @@ for role in &choreo.roles {
     println!("Local type for {}: {:?}", role.name, local_type);
 }
 ```
+
+This projects the global protocol to a local type for each role. The result can be used for type driven code generation.
 
 ### With Code Generation
 
@@ -428,6 +476,8 @@ let code = codegen::generate_choreography_code(
 );
 ```
 
+This generates Rust code for the choreography. The generated code includes session types and role APIs.
+
 ## Testing
 
 Run parser tests with:
@@ -435,3 +485,5 @@ Run parser tests with:
 ```bash
 cargo test --package rumpsteak-aura-choreography parser
 ```
+
+This runs the parser test suite for the choreography crate. It exercises grammar and layout handling.
