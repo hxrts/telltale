@@ -633,4 +633,76 @@ theorem configWellTyped_setProcess (g : GlobalType) (c : Configuration)
       subst heq
       exact hall rp' hrp'
 
+/-! ## Queue-Type Correspondence
+
+For async semantics, we track the relationship between queue contents
+and global type state. This is essential for proving progress and
+subject reduction. These definitions follow the approach in:
+- Ghilezan et al., "Precise Subtyping for Asynchronous Multiparty Sessions" (2019)
+- Honda, Yoshida, Carbone, "Multiparty Asynchronous Session Types" (2016) -/
+
+/-- Queue invariant: messages in queues correspond to "in-flight" communications.
+
+    A message (sender→receiver, label) in the queue means sender has executed
+    a send but receiver hasn't yet processed the corresponding recv.
+    In terms of global type reduction, there exists some reduced state g'
+    where the communication has been partially processed. -/
+def QueueTypeCorrespondence (g : GlobalType) (c : Configuration) : Prop :=
+  ∀ ch : Channel, ∀ msg, msg ∈ c.getQueue ch →
+    -- The message was produced by a valid send according to the protocol
+    ∃ g', GlobalTypeReducesStar g g' ∧
+          -- The global type at that point can consume this communication
+          g'.consume ch.sender ch.receiver msg.label ≠ none
+
+/-- Projection duality: if role has recv type from sender, sender has or had send type to role.
+
+    This captures the fundamental duality property of session types:
+    every receive has a matching send. In async semantics, the send may have
+    already been executed (message in queue) or may be pending. -/
+def ProjectionDuality (g : GlobalType) : Prop :=
+  ∀ role sender branches,
+    projectR g role = .ok (.recv sender branches) →
+    ∃ senderBranches, projectR g sender = .ok (.send role senderBranches) ∨
+                       -- Or sender has already sent and advanced
+                       ∃ g', GlobalTypeReducesStar g g' ∧
+                             projectR g' sender = .ok (.send role senderBranches)
+
+/-- Extended well-typing for async configurations.
+
+    Each role is typed against a global type that may have "advanced"
+    by consuming some communications that are now in queues. This allows
+    for the sender to be ahead of the receiver in the protocol. -/
+def ConfigWellTypedAsync (g : GlobalType) (c : Configuration) : Prop :=
+  c.hasUniqueRoles ∧
+  QueueTypeCorrespondence g c ∧
+  ∀ rp ∈ c.processes, ∃ g' lt,
+    GlobalTypeReducesStar g g' ∧
+    projectR g' rp.role = .ok lt ∧
+    WellTyped [] rp.process lt
+
+/-- Empty queues trivially satisfy queue-type correspondence. -/
+theorem empty_queues_queueTypeCorrespondence (g : GlobalType) (c : Configuration)
+    (hempty : c.queuesEmpty)
+    : QueueTypeCorrespondence g c := by
+  intro ch msg hmem
+  -- hempty : c.queues.all (fun (_, q) => q.isEmpty) = true
+  -- hmem : msg ∈ c.getQueue ch
+  -- If all queues are empty, c.getQueue ch = [], so no msg ∈ it
+  unfold Configuration.queuesEmpty at hempty
+  unfold Configuration.getQueue at hmem
+  simp only [List.all_eq_true, List.isEmpty_iff] at hempty
+  -- Find the queue for ch if it exists
+  cases hfind : c.queues.find? (fun (ch', _) => ch' == ch) with
+  | none =>
+    simp only [hfind, Option.map_none', Option.getD_none, List.not_mem_nil] at hmem
+  | some pair =>
+    simp only [hfind, Option.map_some', Option.getD_some] at hmem
+    -- pair ∈ c.queues, so hempty applies
+    have hpair_mem : pair ∈ c.queues := by
+      exact List.find?_mem hfind
+    have hpair_empty : pair.2.isEmpty = true := hempty pair hpair_mem
+    simp only [List.isEmpty_iff] at hpair_empty
+    rw [hpair_empty] at hmem
+    exact False.elim (List.not_mem_nil msg hmem)
+
 end Rumpsteak.Protocol.Semantics.Typing
