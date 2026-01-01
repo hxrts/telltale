@@ -71,26 +71,21 @@ theorem dual_involutive : DualInvolutive := by
   -- The dual operation only affects the kind, and swap is involutive
   simp [LocalAction.dual, swap_involutive kind]
 
-/-- Helper: mapping a composed function over a list. -/
-theorem list_map_comp {α β γ : Type} (f : β → γ) (g : α → β) (xs : List α) :
-    xs.map (f ∘ g) = (xs.map g).map f := by
-  induction xs with
-  | nil => simp
-  | cons _ _ ih => simp [ih]
-
 /-- Proof that double-dual returns the original local type. -/
 theorem localtype_dual_involutive : LocalTypeDualInvolutive := by
   intro lt
-  simp [LocalType.dual]
-  -- Step 1: Show that map dual ∘ map dual = id on the actions list
-  have h : (lt.actions.map LocalAction.dual).map LocalAction.dual = lt.actions := by
-    rw [← list_map_comp]
-    -- Now show that map (dual ∘ dual) = map id = id
-    induction lt.actions with
-    | nil => simp
-    | cons hd tl ih =>
-      simp [dual_involutive hd, ih]
-  exact congrArg LocalType.mk h
+  simp only [LocalType.dual]
+  -- Show that dual ∘ dual = id pointwise
+  have hdual_id : ∀ a, LocalAction.dual (LocalAction.dual a) = a := dual_involutive
+  -- Apply to the list using map_map and List.map_id
+  have hmap : List.map LocalAction.dual (List.map LocalAction.dual lt.actions) = lt.actions := by
+    rw [List.map_map]
+    have : (LocalAction.dual ∘ LocalAction.dual) = id := funext hdual_id
+    simp only [this, List.map_id]
+  -- Use the fact that lt = {actions := lt.actions}
+  cases lt with
+  | mk actions =>
+    simp only [hmap]
 
 /-- Construct the claims bundle with all proven properties. -/
 def claims : Claims := ⟨swap_involutive, dual_involutive, localtype_dual_involutive⟩

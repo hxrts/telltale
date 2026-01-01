@@ -1,3 +1,6 @@
+import Rumpsteak.Protocol.LocalTypeR
+import Rumpsteak.Protocol.GlobalType
+
 /-! # Rumpsteak.Protocol.Subtyping.TreeDecomposition
 
 SISO (Single-Input-Single-Output) tree decomposition for async subtyping.
@@ -24,9 +27,6 @@ The following definitions form the semantic interface for proofs:
 - `OutputTree` - Inductive type for output prefix trees
 - `sisoDecompose` - Main decomposition function
 -/
-
-import Rumpsteak.Protocol.LocalTypeR
-import Rumpsteak.Protocol.GlobalType
 
 namespace Rumpsteak.Protocol.Subtyping.TreeDecomposition
 
@@ -84,7 +84,7 @@ partial def extractInputTree (lt : LocalTypeR) (fuel : Nat := 50) : InputTree ×
       | some (_, cont) => cont
       | none => .end
     (tree, remainder)
-  | .rec _ body => extractInputTree body (fuel - 1)
+  | .mu _ body => extractInputTree body (fuel - 1)
 
 /-- Extract the output tree from the head of a local type.
     Collects all send prefixes until a receive or end is reached. -/
@@ -106,7 +106,14 @@ partial def extractOutputTree (lt : LocalTypeR) (fuel : Nat := 50) : OutputTree 
       | some (_, cont) => cont
       | none => .end
     (tree, remainder)
-  | .rec _ body => extractOutputTree body (fuel - 1)
+  | .mu _ body => extractOutputTree body (fuel - 1)
+
+/-- Check if a LocalTypeR is an end or variable (base case for recursion). -/
+def isLocalTypeBase (lt : LocalTypeR) : Bool :=
+  match lt with
+  | .end => true
+  | .var _ => true
+  | _ => false
 
 /-- Decompose a local type into alternating SISO segments.
 
@@ -120,8 +127,8 @@ partial def sisoDecompose (lt : LocalTypeR) (fuel : Nat := 20) : List SisoSegmen
   | _ =>
     let (inputTree, afterInputs) := extractInputTree lt fuel
     let (outputTree, afterOutputs) := extractOutputTree afterInputs (fuel - 1)
-    let segment := { inputs := inputTree, outputs := outputTree }
-    if afterOutputs == .end || afterOutputs == lt then
+    let segment : SisoSegment := { inputs := inputTree, outputs := outputTree }
+    if isLocalTypeBase afterOutputs then
       [segment]
     else
       segment :: sisoDecompose afterOutputs (fuel - 1)

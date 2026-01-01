@@ -1,3 +1,6 @@
+import Rumpsteak.Protocol.LocalTypeR
+import Rumpsteak.Protocol.Subtyping.TreeDecomposition
+
 /-! # Rumpsteak.Protocol.Subtyping.Asynchronous
 
 Precise asynchronous subtyping using SISO tree decomposition.
@@ -32,9 +35,6 @@ The following definitions form the semantic interface for proofs:
 - `orphanFree` - Orphan message freedom check
 -/
 
-import Rumpsteak.Protocol.LocalTypeR
-import Rumpsteak.Protocol.Subtyping.TreeDecomposition
-
 namespace Rumpsteak.Protocol.Subtyping.Asynchronous
 
 open Rumpsteak.Protocol.LocalTypeR
@@ -44,7 +44,7 @@ open Rumpsteak.Protocol.Subtyping.TreeDecomposition
 
 /-- Compare input trees: T_in ≤ T'_in if T offers at least as many inputs.
     Input subtyping is contravariant: the subtype can accept more. -/
-partial def InputTree.subtype (sub sup : InputTree) (fuel : Nat := 50) : Bool :=
+partial def inputTreeSubtype (sub sup : InputTree) (fuel : Nat := 50) : Bool :=
   if fuel == 0 then true  -- Assume true at depth limit
   else match sub, sup with
   | .leaf, .leaf => true
@@ -54,11 +54,11 @@ partial def InputTree.subtype (sub sup : InputTree) (fuel : Nat := 50) : Bool :=
     -- Same partner and label, children must be subtypes
     p1 == p2 && l1.name == l2.name &&
     children1.length >= children2.length &&  -- Can have more input branches
-    (children1.zip children2).all fun (c1, c2) => c1.subtype c2 (fuel - 1)
+    (children1.zip children2).all fun (c1, c2) => inputTreeSubtype c1 c2 (fuel - 1)
 
 /-- Compare output trees: T_out ≤ T'_out if T offers at most as many outputs.
     Output subtyping is covariant: the subtype can send fewer messages. -/
-partial def OutputTree.subtype (sub sup : OutputTree) (fuel : Nat := 50) : Bool :=
+partial def outputTreeSubtype (sub sup : OutputTree) (fuel : Nat := 50) : Bool :=
   if fuel == 0 then true  -- Assume true at depth limit
   else match sub, sup with
   | .leaf, .leaf => true
@@ -68,11 +68,11 @@ partial def OutputTree.subtype (sub sup : OutputTree) (fuel : Nat := 50) : Bool 
     -- Same partner and label, children must be subtypes
     p1 == p2 && l1.name == l2.name &&
     children1.length <= children2.length &&  -- Can have fewer output branches
-    (children1.zip children2).all fun (c1, c2) => c1.subtype c2 (fuel - 1)
+    (children1.zip children2).all fun (c1, c2) => outputTreeSubtype c1 c2 (fuel - 1)
 
 /-- Compare SISO segments: input contravariant, output covariant. -/
-def SisoSegment.subtype (sub sup : SisoSegment) : Bool :=
-  sub.inputs.subtype sup.inputs && sub.outputs.subtype sup.outputs
+def sisoSegmentSubtype (sub sup : SisoSegment) : Bool :=
+  inputTreeSubtype sub.inputs sup.inputs && outputTreeSubtype sub.outputs sup.outputs
 
 /-! ## Orphan Message Freedom -/
 
@@ -89,7 +89,7 @@ partial def orphanFree (lt : LocalTypeR) (fuel : Nat := 50) : Bool :=
   | .var _ => true
   | .send _ branches => branches.all fun (_, cont) => orphanFree cont (fuel - 1)
   | .recv _ branches => branches.all fun (_, cont) => orphanFree cont (fuel - 1)
-  | .rec _ body => orphanFree body (fuel - 1)
+  | .mu _ body => orphanFree body (fuel - 1)
 
 /-- Check that outputs in a decomposition don't orphan messages.
     After all inputs are consumed, there should be no pending outputs. -/
@@ -120,7 +120,7 @@ def asyncSubtype (sub sup : LocalTypeR) : Bool :=
   else
     -- Check segment-by-segment subtyping
     let segmentsOk := (subSiso.zip supSiso).all fun (s1, s2) =>
-      s1.subtype s2
+      sisoSegmentSubtype s1 s2
 
     -- Check orphan freedom
     let orphanOk := checkOrphanFreedom subSiso

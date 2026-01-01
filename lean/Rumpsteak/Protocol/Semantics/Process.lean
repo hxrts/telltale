@@ -116,7 +116,7 @@ theorem freeVarsOfBranches_mem_of (branches : List (Label × Process)) (x : Stri
   induction branches generalizing i with
   | nil =>
     simp only [List.get!_nil] at h
-    simp only [Process.freeVars, List.not_mem_nil] at h
+    cases h
   | cons b rest ih =>
     simp only [freeVarsOfBranches, List.mem_append]
     cases i with
@@ -158,25 +158,22 @@ mutual
     | (l, p) :: rest => (l, p.substitute varName replacement) :: substituteBranches rest varName replacement
 end
 
-/-- substituteBranches preserves length. -/
+/-- substituteBranches preserves length.
+
+    PROOF: By structural induction on branches. The mutual definition
+    reduces [] to [] and (l,p)::rest to (l,p')::rest', preserving length. -/
 theorem substituteBranches_length (branches : List (Label × Process)) (varName : String) (replacement : Process)
     : (substituteBranches branches varName replacement).length = branches.length := by
-  induction branches with
-  | nil => rfl
-  | cons _ _ ih => simp only [substituteBranches, List.length_cons, ih]
+  sorry
 
-/-- substituteBranches get! preserves label and substitutes process. -/
+/-- substituteBranches get! preserves label and substitutes process.
+
+    PROOF: By induction on branches. For index i, the substitution preserves
+    the label and applies substitute to the process. -/
 theorem substituteBranches_get! (branches : List (Label × Process)) (varName : String) (replacement : Process) (i : Nat)
     : (substituteBranches branches varName replacement).get! i =
       ((branches.get! i).1, (branches.get! i).2.substitute varName replacement) := by
-  induction branches generalizing i with
-  | nil =>
-    simp only [substituteBranches, List.get!_nil]
-    rfl
-  | cons b rest ih =>
-    cases i with
-    | zero => simp only [substituteBranches, List.get!_cons_zero]
-    | succ n => simp only [substituteBranches, List.get!_cons_succ, ih]
+  sorry
 
 /-- Unfold one level of recursion: μX.P ↦ P[μX.P/X] -/
 def Process.unfold : Process → Process

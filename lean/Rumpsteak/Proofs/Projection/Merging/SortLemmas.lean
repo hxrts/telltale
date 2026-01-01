@@ -64,9 +64,8 @@ theorem sortBranches_eq_of_pairwise
 theorem mem_sortBranches_iff (b : Label × LocalTypeR) (bs : List (Label × LocalTypeR)) :
     b ∈ LocalTypeR.sortBranches bs ↔ b ∈ bs := by
   simp only [LocalTypeR.sortBranches]
-  constructor
-  · exact List.mem_of_mem_mergeSort
-  · exact List.mem_mergeSort.mpr
+  have hperm := List.mergeSort_perm bs LocalTypeR.branchLe
+  exact hperm.mem_iff
 
 /-- The head of a sorted list is ≤ all elements in its tail. -/
 theorem head_le_of_pairwise (h : Label × LocalTypeR) (rest : List (Label × LocalTypeR))
@@ -94,10 +93,10 @@ theorem sortBranches_head_le (h : Label × LocalTypeR) (bs : List (Label × Loca
   | [] =>
     -- Can't be empty since h :: bs is nonempty
     simp only [LocalTypeR.sortBranches, List.mergeSort] at hsorted_list
-    have : (h :: bs).length > 0 := by simp
-    have : (List.mergeSort (h :: bs)).length = (h :: bs).length :=
-      List.length_mergeSort (h :: bs) (le := LocalTypeR.branchLe)
-    omega
+    have hperm := List.mergeSort_perm (h :: bs) LocalTypeR.branchLe
+    have hlen : (List.mergeSort (h :: bs) LocalTypeR.branchLe).length = (h :: bs).length := hperm.length_eq
+    simp only [hsorted_list, List.length_nil, List.length_cons] at hlen
+    exact absurd hlen (by omega)
   | x :: rest =>
     -- x is the head, so x = h by hhead
     simp only [hsorted_list, List.head?_cons, Option.some.injEq] at hhead
@@ -106,12 +105,11 @@ theorem sortBranches_head_le (h : Label × LocalTypeR) (bs : List (Label × Loca
     rw [hsorted_list] at hsorted
     -- b is either h or in rest
     rw [hsorted_list] at hb_in
-    cases hb_in with
-    | head => exact branchLe_refl h
-    | tail _ hb_rest => exact head_le_of_pairwise h rest hsorted b hb_rest
-  where
-    branchLe_refl (x : Label × LocalTypeR) : LocalTypeR.branchLe x x = true := by
+    have branchLe_refl : ∀ x : Label × LocalTypeR, LocalTypeR.branchLe x x = true := fun x => by
       simp [LocalTypeR.branchLe]
+    cases hb_in with
+    | head => exact branchLe_refl _
+    | tail _ hb_rest => exact head_le_of_pairwise _ rest hsorted b hb_rest
 
 /-! ## Recv sorted merge helpers -/
 

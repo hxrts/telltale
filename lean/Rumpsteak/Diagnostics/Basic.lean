@@ -48,16 +48,16 @@ private def ltExtra : LocalType := { actions := [sendA, recvC] }
 
 /-- A longer trace cannot be a subtype of a shorter one.
     This guards the subsequence/length check in isSubtype. -/
-example : isSubtype ltLong ltShort = false := by decide
+example : isSubtype ltLong ltShort = false := by native_decide
 
 /-- A trace with an unseen label fails the label subset check.
     This guards the subLabelsOf predicate. -/
-example : subLabelsOf ltExtra ltShort = false := by decide
+example : subLabelsOf ltExtra ltShort = false := by native_decide
 
 /-- Self-subtyping always succeeds. -/
-example : isSubtype ltShort ltShort = true := by decide
+example : isSubtype ltShort ltShort = true := by native_decide
 
 /-- Self-sublabels always succeeds. -/
-example : subLabelsOf ltShort ltShort = true := by decide
+example : subLabelsOf ltShort ltShort = true := by native_decide
 
 end Rumpsteak.Diagnostics.Basic

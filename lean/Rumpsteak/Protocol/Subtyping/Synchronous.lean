@@ -1,3 +1,7 @@
+import Rumpsteak.Protocol.Core
+import Rumpsteak.Protocol.LocalTypeR
+import Rumpsteak.Protocol.GlobalType
+
 /-! # Rumpsteak.Protocol.Subtyping.Synchronous
 
 Synchronous subtyping for recursive local types.
@@ -26,10 +30,6 @@ The following definitions form the semantic interface for proofs:
 - `syncSubtype` - Synchronous subtyping check for LocalTypeR
 - `branchSubtype` - Helper for comparing branch lists
 -/
-
-import Rumpsteak.Protocol.Core
-import Rumpsteak.Protocol.LocalTypeR
-import Rumpsteak.Protocol.GlobalType
 
 namespace Rumpsteak.Protocol.Subtyping.Synchronous
 
@@ -105,7 +105,7 @@ partial def syncSubtype (sub sup : LocalTypeR) (fuel : Nat := 100) : Bool :=
     p1 == p2 && branchSubtypeSend branches1 branches2 (fun t1 t2 => syncSubtype t1 t2 (fuel - 1))
   | .recv p1 branches1, .recv p2 branches2 =>
     p1 == p2 && branchSubtypeRecv branches1 branches2 (fun t1 t2 => syncSubtype t1 t2 (fuel - 1))
-  | .rec v1 body1, .rec v2 body2 =>
+  | .mu v1 body1, .mu v2 body2 =>
     v1 == v2 && syncSubtype body1 body2 (fuel - 1)
   | _, _ => false
 
@@ -120,13 +120,20 @@ def syncEqual (t1 t2 : LocalTypeR) : Bool :=
 def widthSubtype (sub sup : LocalTypeR) : Bool :=
   syncSubtype sub sup
 
+/-- Check if a LocalTypeR is already unfolded (not a mu). -/
+def isLocalTypeUnfolded (lt : LocalTypeR) : Bool :=
+  match lt with
+  | .mu _ _ => false
+  | _ => true
+
 /-- Depth subtyping: recursive types can be unfolded for comparison. -/
 partial def depthSubtype (sub sup : LocalTypeR) (fuel : Nat := 10) : Bool :=
   if fuel == 0 then syncSubtype sub sup
   else
     let sub' := sub.unfold
     let sup' := sup.unfold
-    if sub' == sub && sup' == sup then
+    -- If both are already unfolded, just check sync subtype
+    if isLocalTypeUnfolded sub && isLocalTypeUnfolded sup then
       syncSubtype sub sup
     else
       depthSubtype sub' sup' (fuel - 1)

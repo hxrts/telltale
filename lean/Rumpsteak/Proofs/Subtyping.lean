@@ -67,7 +67,8 @@ theorem isSubsequence_refl : SubsequenceReflexive := by
 theorem isSubtype_refl : SubtypeReflexive := by
   intro lt
   -- isSubtype checks length and subsequence; both hold reflexively
-  simp [isSubtype, isSubsequence_refl]
+  simp only [isSubtype, Bool.and_eq_true, decide_eq_true_eq]
+  exact ⟨Nat.le_refl _, isSubsequence_refl lt.actions⟩
 
 /-- Construct the claims bundle with all proven properties. -/
 def claims : Claims := ⟨isSubsequence_refl, isSubtype_refl⟩

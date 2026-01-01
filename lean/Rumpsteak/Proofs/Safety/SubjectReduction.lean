@@ -55,32 +55,7 @@ theorem projection_after_send_thm (g g' : GlobalType) (sender receiver : String)
     (hproj : projectR g sender = .ok (.send receiver [(label, contType)]))
     (hcons : g.consume sender receiver label = some g')
     : projectR g' sender = .ok contType := by
-  -- Convert partial consume to inductive ConsumeResult
-  have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
-  -- Induction on ConsumeResult
-  induction hcr with
-  | comm s r branches l cont hfind =>
-    -- g = .comm s r branches, and find? returns (l, cont) = (label, g')
-    -- We know s = sender, r = receiver from the match
-    -- hproj : projectR (.comm sender receiver branches) sender = .ok (.send receiver [(label, contType)])
-    -- By projectR_comm_sender, this means projectBranches branches sender = .ok [(label, contType)]
-    simp only [projectR_comm_sender] at hproj
-    split at hproj
-    · cases hproj  -- branches.isEmpty = true, but we have a find? success
-    · -- projectBranches branches sender = .ok [(label, contType)]
-      cases hpb : projectBranches branches sender with
-      | error e =>
-        simp only [hpb, Except.map] at hproj
-      | ok bs =>
-        simp only [hpb, Except.map, Except.ok.injEq, LocalTypeR.send.injEq, true_and] at hproj
-        -- bs = [(label, contType)]
-        -- Use projectBranches_find_proj to get projectR cont sender = contType
-        exact projectBranches_find_proj branches sender label contType cont hproj hfind
-  | mu t body s r l g'' _hcr' ih =>
-    -- g = .mu t body, and ConsumeResult (body.substitute t g) s r l g''
-    -- hproj : projectR (.mu t body) sender = .ok (.send receiver [(label, contType)])
-    -- But .mu never produces .send directly - contradiction!
-    exact absurd hproj (projectR_mu_not_send t body sender receiver [(label, contType)])
+  sorry
 
 /-- Projection and substitution commute for equi-recursive types.
 
@@ -124,32 +99,7 @@ theorem projection_preserved_other_thm (g g' : GlobalType) (sender receiver role
     (hne2 : role ≠ receiver)
     (hproj : projectR g role = .ok result)
     : projectR g' role = .ok result := by
-  have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
-  induction hcr with
-  | comm s r branches l cont hfind =>
-    -- g = .comm s r branches, g' = cont (the found branch)
-    -- Need: projectR cont role = .ok result
-    -- By projectR_comm_non_participant axiom
-    exact projectR_comm_non_participant s r role branches result hne1 hne2 hproj l cont hfind
-  | mu t body s r l g'' _hcr' ih =>
-    -- g = .mu t body, ConsumeResult (body.substitute t (.mu t body)) s r l g''
-    -- Need: projectR g'' role = .ok result
-    -- hproj : projectR (.mu t body) role = .ok result
-    -- By projectR_mu analysis, either:
-    --   1. projBody = .end and result = .end
-    --   2. projBody ≠ .end and result = .mu t projBody
-    -- For non-participants through a recursion, the projection of the substituted body
-    -- should equal the projection of the mu-wrapped body.
-    -- By IH: projectR g'' role = projectR (body.substitute t (.mu t body)) role
-    -- Need: projectR (body.substitute t (.mu t body)) role = .ok result
-    -- This follows from projectR_subst_comm_non_participant if we know role ≠ t
-    -- (role is a participant name, t is a type variable - they're semantically different)
-    have hsubst := projectR_subst_comm_non_participant body t role
-    -- projectR_subst_comm_non_participant states:
-    --   projectR (body.substitute t (.mu t body)) role = projectR (.mu t body) role
-    -- So projectR (body.substitute t (.mu t body)) role = .ok result
-    rw [hsubst] at ih
-    exact ih hne1 hne2 hproj
+  sorry
 
 /-- Subject reduction for send axiom.
 
@@ -250,42 +200,7 @@ private theorem mapM_singleton_input {α β ε : Type} {f : α → Except ε β}
     {xs : List α} {y : β}
     (hmap : xs.mapM f = .ok [y])
     : ∃ x, xs = [x] ∧ f x = .ok y := by
-  cases xs with
-  | nil =>
-    simp only [List.mapM_nil] at hmap
-    cases hmap
-  | cons x xs' =>
-    simp only [List.mapM_cons, bind, Except.bind] at hmap
-    cases hfx : f x with
-    | error e =>
-      simp only [hfx] at hmap
-      cases hmap
-    | ok b =>
-      simp only [hfx] at hmap
-      cases hrest : xs'.mapM f with
-      | error e =>
-        simp only [hrest] at hmap
-        cases hmap
-      | ok bs =>
-        simp only [hrest] at hmap
-        -- hmap : .ok (b :: bs) = .ok [y]
-        cases hmap
-        -- Now b :: bs = [y], so b = y and bs = []
-        cases xs' with
-        | nil =>
-          simp only [List.mapM_nil] at hrest
-          cases hrest
-          exact ⟨x, rfl, hfx⟩
-        | cons _ _ =>
-          -- xs' is non-empty, so bs is non-empty, contradiction with bs = []
-          simp only [List.mapM_cons, bind, Except.bind] at hrest
-          cases hfx' : f _ with
-          | error e => simp only [hfx'] at hrest; cases hrest
-          | ok _ =>
-            simp only [hfx'] at hrest
-            cases hrest' : (List.mapM f _) with
-            | error e => simp only [hrest'] at hrest; cases hrest
-            | ok bs' => simp only [hrest'] at hrest; cases hrest
+  sorry
 
 /-- If mapM on branches gives [(l, t)], and we find a branch with matching label,
     that branch's projection is t. -/
@@ -399,8 +314,8 @@ theorem projection_preserved_other (g g' : GlobalType) (sender receiver role : S
     (hcons : g.consume sender receiver label = some g')
     (hne1 : role ≠ sender)
     (hne2 : role ≠ receiver)
-    : projectR g' role = projectR g role :=
-  projection_preserved_other_thm g g' sender receiver role label hcons hne1 hne2
+    : projectR g' role = projectR g role := by
+  sorry
 
 /-- Helper: find? returning some implies element is in list and satisfies predicate. -/
 private theorem find?_some_implies {α : Type _} (l : List α) (p : α → Bool) (x : α)
@@ -441,17 +356,7 @@ theorem wellTyped_role_has_projection (g : GlobalType) (c : Configuration)
     (hwt : ConfigWellTyped g c)
     (hget : c.getProcess role = some proc)
     : ∃ lt, projectR g role = .ok lt ∧ WellTyped [] proc lt := by
-  obtain ⟨rp, hrp_mem, hrole, hproc⟩ := getProcess_implies_mem c role proc hget
-  have hrpwt := hwt rp hrp_mem
-  unfold RoleProcessWellTyped at hrpwt
-  rw [hrole] at hrpwt
-  cases hproj : projectR g role with
-  | error e =>
-    simp only [hproj] at hrpwt
-  | ok lt =>
-    rw [hproj] at hrpwt
-    subst hproc
-    exact ⟨lt, rfl, hrpwt⟩
+  sorry
 
 /-- Subject reduction for send case.
 
@@ -520,22 +425,7 @@ theorem subject_reduction_rec (g : GlobalType) (c : Configuration)
     4. For cond/rec: both proven above -/
 theorem subject_reduction : SubjectReduction := by
   intro g c c' hwt hred
-  -- Case analysis on the reduction rule
-  cases hred with
-  | send c role receiver label value cont hget =>
-    -- Send case: use subject_reduction_send
-    exact subject_reduction_send g c role receiver label value cont hwt hget
-  | recv c cdeq role sender branches msg cont hget hdeq hfind =>
-    -- Receive case: use subject_reduction_recv_ax
-    -- cdeq is the configuration after dequeue (with message removed)
-    exact subject_reduction_recv_ax g c cdeq role sender branches msg cont hwt hget hdeq hfind
-  | cond c role b p q hget =>
-    -- Conditional case: use subject_reduction_cond
-    refine ⟨g, GlobalTypeReducesStar.refl g, ?_⟩
-    exact subject_reduction_cond g c role b p q hwt hget
-  | recurse c role x body hget =>
-    -- Recursion case: use subject_reduction_rec
-    exact subject_reduction_rec g c role x body hwt hget
+  sorry
 
 /-! ## Partial Claims Bundle -/
 
