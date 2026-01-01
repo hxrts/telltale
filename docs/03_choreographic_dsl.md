@@ -144,7 +144,7 @@ call Handshake
 
 This calls another protocol that is in scope. The call target must be defined in the same file or `where` block.
 
-**Note:** `continue` is for recursive back-references within a `rec` block; `call` is for invoking sub-protocols defined in `where` blocks.
+The `continue` keyword is for recursive back-references within a `rec` block. The `call` keyword is for invoking sub-protocols defined in `where` blocks.
 
 #### 7) Protocol Composition (`where` block)
 

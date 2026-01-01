@@ -77,9 +77,9 @@ def isSubtype (sub sup : LocalType) : Bool :=
   sub.actions.length <= sup.actions.length ∧ isSubsequence sub.actions sup.actions
 ```
 
-- **subLabelsOf**: Symmetric label matching; every exported action must appear in the projection
-- **isSubsequence**: Asymmetric ordering; exported actions must preserve projection order
-- **isSubtype**: Combines length guard with ordering to reject reordered or extended traces
+- `subLabelsOf`: Symmetric label matching. Every exported action must appear in the projection.
+- `isSubsequence`: Asymmetric ordering. Exported actions must preserve projection order.
+- `isSubtype`: Combines length guard with ordering to reject reordered or extended traces.
 
 ## Module Structure
 
