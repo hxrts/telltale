@@ -11,7 +11,7 @@ use rumpsteak_aura_choreography::compiler::runner::{
 
 /// Helper to create a simple role
 fn make_role(name: &str) -> Role {
-    Role::new(format_ident!("{}", name))
+    Role::new(format_ident!("{}", name)).unwrap()
 }
 
 /// Helper to create a message type

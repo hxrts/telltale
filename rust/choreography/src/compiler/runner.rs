@@ -8,27 +8,25 @@
 //! For a protocol with roles `Client` and `Server`, this generates:
 //!
 //! ```ignore
-//! pub async fn run_client<A: ChoreographicAdapter>(
+//! pub async fn run_client<A: ChoreographicAdapter<Role = Role>>(
 //!     adapter: &mut A,
-//!     ctx: &ProtocolContext,
 //! ) -> Result<ClientOutput, A::Error> {
 //!     // Generated from Client's local type projection
 //! }
 //!
-//! pub async fn run_server<A: ChoreographicAdapter>(
+//! pub async fn run_server<A: ChoreographicAdapter<Role = Role>>(
 //!     adapter: &mut A,
-//!     ctx: &ProtocolContext,
 //! ) -> Result<ServerOutput, A::Error> {
 //!     // Generated from Server's local type projection
 //! }
 //!
-//! pub async fn execute_as<A: ChoreographicAdapter>(
+//! pub async fn execute_as<A: ChoreographicAdapter<Role = Role>>(
 //!     role: Role,
 //!     adapter: &mut A,
 //! ) -> Result<ProtocolOutput, A::Error> {
 //!     match role {
-//!         Role::Client => run_client(adapter, &ProtocolContext::new("Protocol", "Client")).await,
-//!         Role::Server => run_server(adapter, &ProtocolContext::new("Protocol", "Server")).await,
+//!         Role::Client => run_client(adapter).await,
+//!         Role::Server => run_server(adapter).await,
 //!     }
 //! }
 //! ```
@@ -36,6 +34,7 @@
 use crate::ast::{LocalType, Role};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use std::collections::BTreeSet;
 
 /// Generate a runner function for a single role.
 ///
@@ -50,39 +49,43 @@ use quote::{format_ident, quote};
 /// A TokenStream containing the `run_{role}` function.
 #[must_use]
 pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalType) -> TokenStream {
-    let role_name = &role.name;
+    let role_name = role.name();
     let fn_name = format_ident!("run_{}", role_name.to_string().to_lowercase());
     let output_type = format_ident!("{}Output", role_name);
     let protocol_str = protocol_name;
-    let role_str = role_name.to_string();
+    let role_variant = if role.index().is_some() || role.param().is_some() {
+        quote! { Role::#role_name(index) }
+    } else {
+        quote! { Role::#role_name }
+    };
 
     // Generate the function body from local type
     let body = generate_runner_body(local_type, &mut RecursionContext::new());
 
     // Determine if this role is indexed
-    let (fn_signature, ctx_creation) = if role.index.is_some() || role.param.is_some() {
+    let (fn_signature, ctx_creation) = if role.index().is_some() || role.param().is_some() {
         // Indexed role - add index parameter
         (
             quote! {
-                pub async fn #fn_name<A: ChoreographicAdapter>(
+                pub async fn #fn_name<A: ChoreographicAdapter<Role = Role>>(
                     adapter: &mut A,
                     index: u32,
                 ) -> Result<#output_type, A::Error>
             },
             quote! {
-                let _ctx = ProtocolContext::indexed(#protocol_str, #role_str, index);
+                let _ctx = ProtocolContext::for_role(#protocol_str, #role_variant);
             },
         )
     } else {
         // Static role
         (
             quote! {
-                pub async fn #fn_name<A: ChoreographicAdapter>(
+                pub async fn #fn_name<A: ChoreographicAdapter<Role = Role>>(
                     adapter: &mut A,
                 ) -> Result<#output_type, A::Error>
             },
             quote! {
-                let _ctx = ProtocolContext::new(#protocol_str, #role_str);
+                let _ctx = ProtocolContext::for_role(#protocol_str, #role_variant);
             },
         )
     };
@@ -175,11 +178,10 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
             let match_arms: Vec<TokenStream> = branches
                 .iter()
                 .map(|(label, cont_type)| {
-                    let label_str = label.to_string();
                     let cont = generate_runner_body(cont_type, ctx);
                     quote! {
                         Choice::#label => {
-                            adapter.choose(#to_role, #label_str).await?;
+                            adapter.choose(#to_role, BranchLabel::#label).await?;
                             #cont
                         }
                     }
@@ -220,10 +222,9 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
             let match_arms: Vec<TokenStream> = branches
                 .iter()
                 .map(|(label, cont_type)| {
-                    let label_str = label.to_string();
                     let cont = generate_runner_body(cont_type, ctx);
                     quote! {
-                        #label_str => {
+                        BranchLabel::#label => {
                             #cont
                         }
                     }
@@ -237,7 +238,11 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 let label = adapter.offer(#from_role).await?;
                 match label {
                     #(#match_arms)*
-                    _ => panic!("Protocol violation: unexpected branch label '{}' from {}", label, stringify!(#from_role)),
+                    _ => panic!(
+                        "Protocol violation: unexpected branch label '{}' from {}",
+                        label.as_str(),
+                        stringify!(#from_role)
+                    ),
                 }
             }
         }
@@ -295,7 +300,7 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                     }
                 }
                 Some(crate::ast::Condition::RoleDecides(role)) => {
-                    let role_str = role.name.to_string();
+                    let role_str = role.name().to_string();
                     quote! {
                         // Loop controlled by role
                         loop {
@@ -443,51 +448,51 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
     }
 }
 
-/// Generate a RoleId expression for a role.
+/// Generate a runtime Role expression for a role.
 fn generate_role_id(role: &Role) -> TokenStream {
     use crate::ast::role::RoleIndex;
 
-    let name = role.name.to_string();
+    let name = role.name();
 
-    if let Some(ref index) = role.index {
+    if let Some(index) = role.index() {
         match index {
             RoleIndex::Concrete(n) => {
                 quote! {
-                    RoleId::indexed(#name, #n)
+                    Role::#name(#n)
                 }
             }
             RoleIndex::Symbolic(var) => {
                 // Use a runtime variable
                 let var_ident = format_ident!("{}", var);
                 quote! {
-                    RoleId::indexed(#name, #var_ident)
+                    Role::#name(#var_ident)
                 }
             }
             RoleIndex::Wildcard => {
                 // TODO(wildcard-roles): Wildcard roles (e.g., "Worker[*]") should be expanded
                 // at code generation time to handle all matching participants. Currently
-                // falls back to a simple RoleId which won't correctly broadcast/multicast.
+                // falls back to a placeholder index which won't correctly broadcast/multicast.
                 quote! {
-                    RoleId::new(#name) // Placeholder: wildcards need expansion to role set
+                    Role::#name(0) // Placeholder: wildcards need expansion to role set
                 }
             }
             RoleIndex::Range(_) => {
                 // TODO(range-roles): Range roles (e.g., "Worker[0..n]") should be expanded
                 // to iterate over the specified range. Currently falls back to a simple
-                // RoleId which won't correctly handle the range semantics.
+                // Role value which won't correctly handle the range semantics.
                 quote! {
-                    RoleId::new(#name) // Placeholder: ranges need iteration loop
+                    Role::#name(0) // Placeholder: ranges need iteration loop
                 }
             }
         }
-    } else if role.param.is_some() {
+    } else if role.param().is_some() {
         // Parameterized role - use the index parameter
         quote! {
-            RoleId::indexed(#name, index)
+            Role::#name(index)
         }
     } else {
         quote! {
-            RoleId::new(#name)
+            Role::#name
         }
     }
 }
@@ -498,42 +503,26 @@ fn generate_role_id(role: &Role) -> TokenStream {
 /// based on a runtime role value.
 #[must_use]
 pub fn generate_execute_as(
-    protocol_name: &str,
+    _protocol_name: &str,
     roles: &[Role],
     _local_types: &[(Role, LocalType)],
 ) -> TokenStream {
-    let protocol_str = protocol_name;
-    let role_enum_name = format_ident!("{}Role", protocol_name);
-
-    // Generate role enum variants
-    let role_variants: Vec<TokenStream> = roles
-        .iter()
-        .map(|role| {
-            let name = &role.name;
-            if role.index.is_some() || role.param.is_some() {
-                quote! { #name(u32) }
-            } else {
-                quote! { #name }
-            }
-        })
-        .collect();
-
     // Generate match arms
     let match_arms: Vec<TokenStream> = roles
         .iter()
         .map(|role| {
-            let name = &role.name;
+            let name = role.name();
             let fn_name = format_ident!("run_{}", name.to_string().to_lowercase());
 
-            if role.index.is_some() || role.param.is_some() {
+            if role.index().is_some() || role.param().is_some() {
                 quote! {
-                    #role_enum_name::#name(index) => {
+                    Role::#name(index) => {
                         #fn_name(adapter, index).await?;
                     }
                 }
             } else {
                 quote! {
-                    #role_enum_name::#name => {
+                    Role::#name => {
                         #fn_name(adapter).await?;
                     }
                 }
@@ -542,22 +531,14 @@ pub fn generate_execute_as(
         .collect();
 
     quote! {
-        /// Role enum for runtime dispatch
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum #role_enum_name {
-            #(#role_variants),*
-        }
-
         /// Execute the protocol as a specific role.
         ///
         /// This function dispatches to the appropriate `run_{role}` function
         /// based on the provided role.
-        pub async fn execute_as<A: ChoreographicAdapter>(
-            role: #role_enum_name,
+        pub async fn execute_as<A: ChoreographicAdapter<Role = Role>>(
+            role: Role,
             adapter: &mut A,
         ) -> Result<(), A::Error> {
-            let _protocol = #protocol_str;
-
             match role {
                 #(#match_arms)*
             }
@@ -573,7 +554,7 @@ pub fn generate_output_types(roles: &[Role]) -> TokenStream {
     let output_structs: Vec<TokenStream> = roles
         .iter()
         .map(|role| {
-            let name = &role.name;
+            let name = role.name();
             let output_name = format_ident!("{}Output", name);
 
             // TODO(output-fields): Output structs should contain fields for:
@@ -609,6 +590,13 @@ pub fn generate_all_runners(
     roles: &[Role],
     local_types: &[(Role, LocalType)],
 ) -> TokenStream {
+    let mut label_names = BTreeSet::new();
+    for (_, local_type) in local_types {
+        collect_branch_labels(local_type, &mut label_names);
+    }
+
+    let branch_label_enum = generate_branch_label_enum(&label_names);
+    let role_enum = generate_runtime_role_enum(roles);
     let output_types = generate_output_types(roles);
 
     let runner_fns: Vec<TokenStream> = local_types
@@ -619,11 +607,14 @@ pub fn generate_all_runners(
     let execute_as = generate_execute_as(protocol_name, roles, local_types);
 
     quote! {
+        #branch_label_enum
+        #role_enum
+
         /// Generated runner functions for protocol execution
         #[allow(dead_code, unused_imports, unused_variables)]
         pub mod runners {
             use super::*;
-            use ::rumpsteak_aura_choreography::runtime::{ChoreographicAdapter, ProtocolContext, RoleId};
+            use ::rumpsteak_aura_choreography::{ChoreographicAdapter, LabelId, ProtocolContext};
 
             #output_types
 
@@ -634,20 +625,164 @@ pub fn generate_all_runners(
     }
 }
 
+fn collect_branch_labels(local_type: &LocalType, labels: &mut BTreeSet<String>) {
+    match local_type {
+        LocalType::Select { branches, .. }
+        | LocalType::Branch { branches, .. }
+        | LocalType::LocalChoice { branches } => {
+            for (label, branch) in branches {
+                labels.insert(label.to_string());
+                collect_branch_labels(branch, labels);
+            }
+        }
+        LocalType::Send { continuation, .. }
+        | LocalType::Receive { continuation, .. }
+        | LocalType::Loop { body: continuation, .. }
+        | LocalType::Rec { body: continuation, .. }
+        | LocalType::Timeout { body: continuation, .. } => {
+            collect_branch_labels(continuation, labels);
+        }
+        LocalType::Var(_) | LocalType::End => {}
+    }
+}
+
+fn generate_branch_label_enum(labels: &BTreeSet<String>) -> TokenStream {
+    if labels.is_empty() {
+        return quote! {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            pub enum BranchLabel {}
+
+            impl ::rumpsteak_aura_choreography::LabelId for BranchLabel {
+                fn as_str(&self) -> &'static str {
+                    match *self {}
+                }
+
+                fn from_str(_label: &str) -> Option<Self> {
+                    None
+                }
+            }
+        };
+    }
+
+    let variants = labels.iter().map(|label| {
+        let ident = format_ident!("{}", label);
+        quote! { #ident }
+    });
+
+    let as_str_arms = labels.iter().map(|label| {
+        let ident = format_ident!("{}", label);
+        quote! { BranchLabel::#ident => #label }
+    });
+
+    let from_str_arms = labels.iter().map(|label| {
+        let ident = format_ident!("{}", label);
+        quote! { #label => Some(BranchLabel::#ident) }
+    });
+
+    quote! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum BranchLabel {
+            #(#variants),*
+        }
+
+        impl ::rumpsteak_aura_choreography::LabelId for BranchLabel {
+            fn as_str(&self) -> &'static str {
+                match self {
+                    #(#as_str_arms),*
+                }
+            }
+
+            fn from_str(label: &str) -> Option<Self> {
+                match label {
+                    #(#from_str_arms),*,
+                    _ => None,
+                }
+            }
+        }
+    }
+}
+
+fn generate_runtime_role_enum(roles: &[Role]) -> TokenStream {
+    let role_variants: Vec<TokenStream> = roles
+        .iter()
+        .map(|role| {
+            let name = role.name();
+            if role.index().is_some() || role.param().is_some() {
+                quote! { #name(u32) }
+            } else {
+                quote! { #name }
+            }
+        })
+        .collect();
+
+    let role_name_arms: Vec<TokenStream> = roles
+        .iter()
+        .map(|role| {
+            let name = role.name();
+            let role_str = role.name().to_string();
+            if role.index().is_some() || role.param().is_some() {
+                quote! {
+                    Role::#name(_) => ::rumpsteak_aura_choreography::RoleName::from_static(#role_str)
+                }
+            } else {
+                quote! {
+                    Role::#name => ::rumpsteak_aura_choreography::RoleName::from_static(#role_str)
+                }
+            }
+        })
+        .collect();
+
+    let role_index_arms: Vec<TokenStream> = roles
+        .iter()
+        .map(|role| {
+            let name = role.name();
+            if role.index().is_some() || role.param().is_some() {
+                quote! { Role::#name(index) => Some(*index) }
+            } else {
+                quote! { Role::#name => None }
+            }
+        })
+        .collect();
+
+    quote! {
+        /// Runtime role identifier for protocol dispatch and adapters.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum Role {
+            #(#role_variants),*
+        }
+
+        impl ::rumpsteak_aura_choreography::RoleId for Role {
+            type Label = BranchLabel;
+
+            fn role_name(&self) -> ::rumpsteak_aura_choreography::RoleName {
+                match self {
+                    #(#role_name_arms),*
+                }
+            }
+
+            fn role_index(&self) -> Option<u32> {
+                match self {
+                    #(#role_index_arms),*
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::Role;
 
     fn make_role(name: &str) -> Role {
-        Role::new(format_ident!("{}", name))
+        Role::new(format_ident!("{}", name)).unwrap()
     }
 
     #[test]
     fn test_generate_role_id_static() {
         let role = make_role("Client");
         let tokens = generate_role_id(&role);
-        let expected = quote! { RoleId::new("Client") };
+        let expected = quote! { Role::Client };
         assert_eq!(tokens.to_string(), expected.to_string());
     }
 

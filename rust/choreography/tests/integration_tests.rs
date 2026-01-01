@@ -89,8 +89,8 @@ fn test_dynamic_roles() {
     let leader = &choreo.roles[0];
     let followers = &choreo.roles[1];
 
-    assert_eq!(leader.name.to_string(), "Leader");
-    assert_eq!(followers.name.to_string(), "Followers");
+    assert_eq!(leader.name().to_string(), "Leader");
+    assert_eq!(followers.name().to_string(), "Followers");
     assert!(followers.is_dynamic());
 
     // Test code generation with dynamic support
@@ -147,9 +147,9 @@ fn test_complex_multi_feature_protocol() {
     let workers = &choreo.roles[1];
     let database = &choreo.roles[2];
 
-    assert_eq!(coordinator.name.to_string(), "Coordinator");
-    assert_eq!(workers.name.to_string(), "Workers");
-    assert_eq!(database.name.to_string(), "Database");
+    assert_eq!(coordinator.name().to_string(), "Coordinator");
+    assert_eq!(workers.name().to_string(), "Workers");
+    assert_eq!(database.name().to_string(), "Database");
 
     assert!(!coordinator.is_parameterized());
     assert!(workers.is_symbolic()); // Workers[N]
@@ -163,13 +163,13 @@ fn test_complex_multi_feature_protocol() {
             Ok(local_type) => {
                 // Projection succeeded - for complex protocols with dynamic roles,
                 // End might be a valid result if the role doesn't participate
-                println!("Projection succeeded for {}: {:?}", role.name, local_type);
+                println!("Projection succeeded for {}: {:?}", role.name(), local_type);
             }
             Err(projection_error) => {
                 // Expected for dynamic roles without runtime bindings
                 println!(
                     "Expected projection error for {}: {:?}",
-                    role.name, projection_error
+                    role.name(), projection_error
                 );
             }
         }

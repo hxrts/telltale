@@ -33,7 +33,7 @@ impl Choreography {
         // Check all roles are used
         for role in &self.roles {
             if !self.protocol.mentions_role(role) {
-                return Err(ValidationError::UnusedRole(role.name.to_string()));
+                return Err(ValidationError::UnusedRole(role.name().to_string()));
             }
         }
 

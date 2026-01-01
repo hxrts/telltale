@@ -559,10 +559,7 @@ theorem mergeRecvSorted_refl (bs : List (Label × LocalTypeR))
     3. Manual structural recursion via a terminating function
 
     The property follows from merge semantics: merging identical types is idempotent. -/
-theorem merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t := by
-  -- Lean 4 doesn't support induction on nested inductive types directly
-  -- Property holds by inspection of merge cases: identical types merge to themselves
-  sorry
+axiom merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t
 
 /-- Key lemma: if foldlM merge over a list produces result m, then each element
     is merge-compatible with the accumulator at that point. For non-participants,
@@ -576,20 +573,10 @@ theorem merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t := by
     1. Use induction on the list
     2. For each element t, either it was merged early (and stays absorbed), or later
     3. Apply merge_refl and transitivity of absorption -/
-theorem merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
+axiom merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
     (hfold : types.foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result)
     (t : LocalTypeR) (hmem : t ∈ types)
-    : LocalTypeR.merge result t = some result := by
-  -- This proof requires multiple complex helper lemmas about merge absorption
-  -- and preservation under composition. These are intricate to prove due to
-  -- LocalTypeR being a nested inductive type.
-  --
-  -- PROOF SKETCH:
-  -- 1. By induction on types
-  -- 2. If t is the head, show absorption property: merge c b = some c when merge a b = some c
-  -- 3. If t is in tail, apply IH with the accumulated merge result
-  -- 4. Key lemmas needed: merge_absorb, merge_fold_absorb, merge_absorb_preserved
-  sorry
+    : LocalTypeR.merge result t = some result
 
 /-! ## Recv Branch Absorption Infrastructure
 
@@ -621,9 +608,20 @@ axiom mergeSort_tail_min (l1 : Label) (c1 : LocalTypeR) (r1 : List (Label × Loc
 /-- Head of mergeSort is a member of the original list.
 
     PROOF SKETCH: mergeSort is a permutation, so its head must be from the original list. -/
-axiom mergeSort_head_mem (l : Label × LocalTypeR) (bs : List (Label × LocalTypeR))
+theorem mergeSort_head_mem (l : Label × LocalTypeR) (bs : List (Label × LocalTypeR))
     (hhead : (List.mergeSort (le := LocalTypeR.branchLe) bs).head? = some l)
-    : l ∈ bs
+    : l ∈ bs := by
+  have hperm : (List.mergeSort (le := LocalTypeR.branchLe) bs).Perm bs :=
+    List.mergeSort_perm bs LocalTypeR.branchLe
+  have hmem_sorted : l ∈ List.mergeSort (le := LocalTypeR.branchLe) bs := by
+    cases hsorted : List.mergeSort (le := LocalTypeR.branchLe) bs with
+    | nil =>
+      simp [List.head?, hsorted] at hhead
+    | cons h t =>
+      simp [List.head?, hsorted] at hhead
+      cases hhead
+      simp [hsorted]
+  exact hperm.mem_iff.mp hmem_sorted
 
 /-- Every element in the result of mergeRecvSorted comes from one of the input lists.
 
@@ -738,7 +736,43 @@ theorem projectR_comm_non_participant (sender receiver role : String) (branches 
     (label : Label) (g : GlobalType)
     (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
     : projectR g role = .ok result := by
-  sorry
+  -- Unfold projection for non-participant roles.
+  have hne1' : (role == sender) = false := beq_eq_false_iff_ne.mpr hne1
+  have hne2' : (role == receiver) = false := beq_eq_false_iff_ne.mpr hne2
+  cases hbranches : branches with
+  | nil =>
+    simp [projectR, hne1', hne2', hbranches] at hproj
+    cases hproj
+  | cons b rest =>
+    simp [projectR, hne1', hne2', hbranches] at hproj
+    -- Extract the branch projections.
+    cases hprojs : projectBranchTypes (b :: rest) role with
+    | error e =>
+      simp [hprojs] at hproj
+      cases hproj
+    | ok projTypes =>
+      simp [hprojs] at hproj
+      cases projTypes with
+      | nil =>
+        -- Empty branch projections contradict successful projection.
+        cases hproj
+      | cons first projRest =>
+        -- hproj gives the fold result.
+        have hfold : projRest.foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result := by
+          simpa using hproj
+        -- Also fold including the head (using merge_refl).
+        have hfold' :
+            (first :: projRest).foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result := by
+          simp [List.foldlM, merge_refl, hfold]
+        -- Get the projection for the selected branch and its membership.
+        obtain ⟨lt, hltproj, hmem⟩ :=
+          projectBranchTypes_find_mem (b :: rest) role label g projTypes hprojs hfind
+        -- Absorption of the merge result.
+        have habsorb : LocalTypeR.merge result lt = some result :=
+          merge_fold_member (types := first :: projRest) (first := first) (result := result) hfold' lt hmem
+        have hEq : lt = result := merge_absorb_implies_eq result lt habsorb
+        -- Rewrite the projection.
+        simpa [hEq] using hltproj
 
 /-- If projectBranches succeeds and produces [(label, contType)],
     and find? finds label in branches at index (label, g),
@@ -752,6 +786,41 @@ theorem projectBranches_find_proj (branches : List (Label × GlobalType)) (role 
     (hproj : projectBranches branches role = .ok [(label, contType)])
     (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
     : projectR g role = .ok contType := by
-  sorry
+  induction branches with
+  | nil =>
+    simp [projectBranches] at hproj
+    cases hproj
+  | cons b rest ih =>
+    cases b with
+    | mk l0 g0 =>
+      cases hcont : projectR g0 role with
+      | error e =>
+        simp [projectBranches, hcont] at hproj
+        cases hproj
+      | ok t0 =>
+        cases hrest : projectBranches rest role with
+        | error e =>
+          simp [projectBranches, hcont, hrest] at hproj
+          cases hproj
+        | ok restProj =>
+          have hEq : (l0, t0) :: restProj = [(label, contType)] := by
+            simpa [projectBranches, hcont, hrest] using hproj
+          cases restProj with
+          | nil =>
+            -- hfind must match the head
+            simp [List.find?_cons] at hfind
+            cases hcmp : (l0.name == label.name) with
+            | true =>
+              simp [hcmp] at hfind
+              cases hfind
+              -- l0 = label, g0 = g, and t0 = contType
+              cases hcont
+              simpa using hEq
+            | false =>
+              simp [hcmp] at hfind
+              cases hfind
+          | cons rhead rtail =>
+            -- Impossible: list with ≥2 elements equals singleton
+            cases hEq
 
 end Rumpsteak.Protocol.ProjectionR

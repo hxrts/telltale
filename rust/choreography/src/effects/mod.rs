@@ -16,12 +16,13 @@ pub mod registry;
 
 // Re-export core effect system types explicitly
 pub use algebra::{
-    Effect, InterpretResult, InterpreterState, Program, ProgramError, ProgramMessage,
+    Effect, InterpretResult, InterpreterState, Program, ProgramBuilder, ProgramError,
+    ProgramMessage,
 };
 pub use extension::{ExtensionEffect, ExtensionError};
 pub use handler::{
-    ChoreoHandler, ChoreoHandlerExt, ChoreographyError, ContextExt, Endpoint, Label, NoOpHandler,
-    Result, RoleId,
+    ChoreoHandler, ChoreoHandlerExt, ChoreographyError, ContextExt, Endpoint, LabelId, MessageTag,
+    NoOpHandler, Result, RoleId,
 };
 pub use interpreter::{interpret, interpret_extensible};
 pub use registry::{ExtensibleHandler, ExtensionRegistry};

@@ -188,7 +188,7 @@ impl ChoiceAnalyzer {
     /// Create a new choice analyzer
     pub fn new(roles: &[Role]) -> Self {
         Self {
-            roles: roles.iter().map(|r| r.name.to_string()).collect(),
+            roles: roles.iter().map(|r| r.name().to_string()).collect(),
             diagnostics: DiagnosticCollector::new(),
             choice_counts: HashMap::new(),
         }
@@ -261,7 +261,7 @@ impl ChoiceAnalyzer {
         branches: &[Branch],
         parent_choice: Option<&ChoiceId>,
     ) -> ChoiceKnowledge {
-        let chooser_name = chooser.name.to_string();
+        let chooser_name = chooser.name().to_string();
 
         // Get unique choice ID
         let index = *self.choice_counts.get(&chooser_name).unwrap_or(&0);
@@ -369,8 +369,8 @@ impl ChoiceAnalyzer {
                 ..
             } => {
                 messages.push(MessageInfo {
-                    from: from.name.to_string(),
-                    to: to.name.to_string(),
+                    from: from.name().to_string(),
+                    to: to.name().to_string(),
                     message_type: message.name.to_string(),
                 });
                 self.collect_messages_from_protocol(continuation, messages);
@@ -384,8 +384,8 @@ impl ChoiceAnalyzer {
             } => {
                 for to in to_all {
                     messages.push(MessageInfo {
-                        from: from.name.to_string(),
-                        to: to.name.to_string(),
+                        from: from.name().to_string(),
+                        to: to.name().to_string(),
                         message_type: message.name.to_string(),
                     });
                 }
@@ -401,8 +401,8 @@ impl ChoiceAnalyzer {
                     } = &branch.protocol
                     {
                         messages.push(MessageInfo {
-                            from: from.name.to_string(),
-                            to: to.name.to_string(),
+                            from: from.name().to_string(),
+                            to: to.name().to_string(),
                             message_type: message.name.to_string(),
                         });
                     }
@@ -559,8 +559,8 @@ impl ChoiceAnalyzer {
                 continuation,
                 ..
             } => {
-                roles.insert(from.name.to_string());
-                roles.insert(to.name.to_string());
+                roles.insert(from.name().to_string());
+                roles.insert(to.name().to_string());
                 self.collect_roles_from_protocol(continuation, roles);
             }
             Protocol::Broadcast {
@@ -569,14 +569,14 @@ impl ChoiceAnalyzer {
                 continuation,
                 ..
             } => {
-                roles.insert(from.name.to_string());
+                roles.insert(from.name().to_string());
                 for to in to_all {
-                    roles.insert(to.name.to_string());
+                    roles.insert(to.name().to_string());
                 }
                 self.collect_roles_from_protocol(continuation, roles);
             }
             Protocol::Choice { role, branches, .. } => {
-                roles.insert(role.name.to_string());
+                roles.insert(role.name().to_string());
                 for branch in branches {
                     self.collect_roles_from_protocol(&branch.protocol, roles);
                 }
@@ -785,17 +785,17 @@ pub fn analyze_choreography_choices(protocol: &Protocol, roles: &[Role]) -> Choi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::MessageType;
+    use crate::ast::{MessageType, NonEmptyVec};
     use proc_macro2::Ident;
     use proc_macro2::Span;
 
+    // Helper to create NonEmptyVec of branches from first + rest
+    fn branches(first: Branch, rest: Vec<Branch>) -> NonEmptyVec<Branch> {
+        NonEmptyVec::from_head_tail(first, rest)
+    }
+
     fn make_role(name: &str) -> Role {
-        Role {
-            name: Ident::new(name, Span::call_site()),
-            param: None,
-            index: None,
-            array_size: None,
-        }
+        Role::new(Ident::new(name, Span::call_site())).unwrap()
     }
 
     fn make_message(name: &str) -> MessageType {
@@ -817,7 +817,7 @@ mod tests {
 
         let protocol = Protocol::Choice {
             role: seller.clone(),
-            branches: vec![
+            branches: branches(
                 Branch {
                     label: Ident::new("Accept", Span::call_site()),
                     guard: None,
@@ -831,7 +831,7 @@ mod tests {
                         to_annotations: Default::default(),
                     },
                 },
-                Branch {
+                vec![Branch {
                     label: Ident::new("Reject", Span::call_site()),
                     guard: None,
                     protocol: Protocol::Send {
@@ -843,8 +843,8 @@ mod tests {
                         from_annotations: Default::default(),
                         to_annotations: Default::default(),
                     },
-                },
-            ],
+                }],
+            ),
             annotations: Default::default(),
         };
 
@@ -873,7 +873,7 @@ mod tests {
 
         let protocol = Protocol::Choice {
             role: seller.clone(),
-            branches: vec![
+            branches: branches(
                 Branch {
                     label: Ident::new("Accept", Span::call_site()),
                     guard: None,
@@ -895,7 +895,7 @@ mod tests {
                         to_annotations: Default::default(),
                     },
                 },
-                Branch {
+                vec![Branch {
                     label: Ident::new("Reject", Span::call_site()),
                     guard: None,
                     protocol: Protocol::Send {
@@ -917,8 +917,8 @@ mod tests {
                         from_annotations: Default::default(),
                         to_annotations: Default::default(),
                     },
-                },
-            ],
+                }],
+            ),
             annotations: Default::default(),
         };
 
@@ -943,7 +943,7 @@ mod tests {
 
         let protocol = Protocol::Choice {
             role: seller.clone(),
-            branches: vec![
+            branches: branches(
                 Branch {
                     label: Ident::new("Accept", Span::call_site()),
                     guard: None,
@@ -965,7 +965,7 @@ mod tests {
                         to_annotations: Default::default(),
                     },
                 },
-                Branch {
+                vec![Branch {
                     label: Ident::new("Reject", Span::call_site()),
                     guard: None,
                     protocol: Protocol::Send {
@@ -977,8 +977,8 @@ mod tests {
                         from_annotations: Default::default(),
                         to_annotations: Default::default(),
                     },
-                },
-            ],
+                }],
+            ),
             annotations: Default::default(),
         };
 
@@ -1002,7 +1002,7 @@ mod tests {
 
         let protocol = Protocol::Choice {
             role: a.clone(),
-            branches: vec![
+            branches: branches(
                 Branch {
                     label: Ident::new("Left", Span::call_site()),
                     guard: None,
@@ -1024,7 +1024,7 @@ mod tests {
                         to_annotations: Default::default(),
                     },
                 },
-                Branch {
+                vec![Branch {
                     label: Ident::new("Right", Span::call_site()),
                     guard: None,
                     protocol: Protocol::Send {
@@ -1044,8 +1044,8 @@ mod tests {
                         from_annotations: Default::default(),
                         to_annotations: Default::default(),
                     },
-                },
-            ],
+                }],
+            ),
             annotations: Default::default(),
         };
 
@@ -1149,7 +1149,7 @@ mod tests {
 
         let protocol = Protocol::Choice {
             role: seller.clone(),
-            branches: vec![
+            branches: branches(
                 Branch {
                     label: Ident::new("Accept", Span::call_site()),
                     guard: None,
@@ -1171,7 +1171,7 @@ mod tests {
                         to_annotations: Default::default(),
                     },
                 },
-                Branch {
+                vec![Branch {
                     label: Ident::new("Reject", Span::call_site()),
                     guard: None,
                     protocol: Protocol::Send {
@@ -1183,8 +1183,8 @@ mod tests {
                         from_annotations: Default::default(),
                         to_annotations: Default::default(),
                     },
-                },
-            ],
+                }],
+            ),
             annotations: Default::default(),
         };
 

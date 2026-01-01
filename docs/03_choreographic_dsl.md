@@ -217,7 +217,76 @@ protocol PartialBroadcast =
 
 This example shows bounded ranges for role indices. It models partial broadcasts and threshold acknowledgments.
 
-#### 10) String-based Protocol Definition
+#### 10) Timing Patterns
+
+Timing patterns provide constructs for building time-aware protocols. All patterns desugar to standard MPST constructs (choice, recursion) and remain verifiable in Lean.
+
+##### Timed Choice
+
+A timed choice races an operation against a timeout deadline:
+
+```rust
+protocol TimedRequest =
+  roles Client, Server
+  Client -> Server : Request
+  timed_choice at Client(5s)
+    OnTime ->
+      Server -> Client : Response
+    TimedOut ->
+      Client -> Server : Cancel
+```
+
+This desugars to a standard `Choice` with a `TimedChoice { duration }` annotation. The timeout is enforced at runtime by the effect interpreter.
+
+Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours).
+
+##### Heartbeat Pattern
+
+The heartbeat pattern models connection liveness detection:
+
+```rust
+protocol Liveness =
+  roles Alice, Bob
+  heartbeat Alice -> Bob every 1s on_missing(3) {
+    Bob -> Alice : Disconnect
+  } body {
+    Alice -> Bob : Ping
+    Bob -> Alice : Pong
+  }
+```
+
+This desugars to a recursive choice:
+
+```rust
+rec HeartbeatLoop
+  Alice -> Bob : Heartbeat
+  choice at Bob
+    Alive ->
+      // body
+      Alice -> Bob : Ping
+      Bob -> Alice : Pong
+      continue HeartbeatLoop
+    Dead ->
+      // on_missing
+      Bob -> Alice : Disconnect
+```
+
+The `on_missing(3)` parameter indicates how many missed heartbeats before declaring the sender dead. The runtime uses this for timeout calculations.
+
+##### Runtime Timeout Annotation
+
+The `@runtime_timeout` annotation provides transport-level timeout hints:
+
+```rust
+protocol TimedOps =
+  roles Client, Server
+  @runtime_timeout(5s) Client -> Server : Request
+  Server -> Client : Response
+```
+
+Unlike `timed_choice`, this annotation does **not** change the session type. It is purely a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you don't want the protocol to branch on timeout.
+
+#### 11) String-based Protocol Definition
 
 ```rust
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;

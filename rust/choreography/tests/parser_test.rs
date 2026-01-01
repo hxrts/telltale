@@ -73,7 +73,7 @@ protocol Broadcast = {
             message,
             ..
         } => {
-            assert_eq!(from.name.to_string(), "Leader");
+            assert_eq!(from.name().to_string(), "Leader");
             assert_eq!(message.name.to_string(), "Start");
             // to_all should contain Worker1 and Worker2 (all roles except Leader)
             assert_eq!(
@@ -81,7 +81,8 @@ protocol Broadcast = {
                 2,
                 "Broadcast should target all roles except sender"
             );
-            let recipient_names: Vec<String> = to_all.iter().map(|r| r.name.to_string()).collect();
+            let recipient_names: Vec<String> =
+                to_all.iter().map(|r| r.name().to_string()).collect();
             assert!(recipient_names.contains(&"Worker1".to_string()));
             assert!(recipient_names.contains(&"Worker2".to_string()));
             assert!(
@@ -598,7 +599,7 @@ protocol TwoParty = {
         assert!(
             result.is_ok(),
             "Failed to project for role {}: {:?}",
-            role.name,
+            role.name(),
             result.err()
         );
     }

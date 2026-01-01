@@ -91,13 +91,13 @@ pub enum RangeExpr {
 /// use rumpsteak_aura_choreography::{Role, RoleParam};
 ///
 /// // Simple role
-/// let client = Role::new(format_ident!("Client"));
+/// let client = Role::new(format_ident!("Client")).unwrap();
 ///
 /// // Static parameterized role
-/// let worker = Role::with_param(format_ident!("Worker"), RoleParam::Static(3));
+/// let worker = Role::with_param(format_ident!("Worker"), RoleParam::Static(3)).unwrap();
 ///
 /// // Dynamic role
-/// let dynamic_worker = Role::with_param(format_ident!("Worker"), RoleParam::Runtime);
+/// let dynamic_worker = Role::with_param(format_ident!("Worker"), RoleParam::Runtime).unwrap();
 /// ```
 #[derive(Debug, Clone)]
 pub struct Role {
@@ -142,82 +142,114 @@ impl std::hash::Hash for Role {
 }
 
 impl Role {
-    /// Create a new simple role with the given name
-    #[must_use]
-    pub fn new(name: Ident) -> Self {
+    fn new_unchecked(
+        name: Ident,
+        param: Option<RoleParam>,
+        index: Option<RoleIndex>,
+        array_size: Option<TokenStream>,
+    ) -> Self {
         Role {
             name,
-            param: None,
-            index: None,
-            array_size: None,
+            param,
+            index,
+            array_size,
         }
+    }
+
+    /// Create a new simple role with the given name
+    #[must_use]
+    pub fn new(name: Ident) -> RoleValidationResult<Self> {
+        let role = Self::new_unchecked(name, None, None, None);
+        role.validate()?;
+        Ok(role)
     }
 
     /// Create a role with a parameter (e.g., Worker[3], Worker[N], Worker[*])
     #[must_use]
-    pub fn with_param(name: Ident, param: RoleParam) -> Self {
-        Role {
-            name,
-            param: Some(param),
-            index: None,
-            array_size: None,
-        }
+    pub fn with_param(name: Ident, param: RoleParam) -> RoleValidationResult<Self> {
+        let role = Self::new_unchecked(name, Some(param), None, None);
+        role.validate()?;
+        Ok(role)
     }
 
     /// Create a role reference with an index (e.g., Worker[0], Worker[i], Worker[*])
     #[must_use]
-    pub fn with_index(name: Ident, index: RoleIndex) -> Self {
-        Role {
-            name,
-            param: None,
-            index: Some(index),
-            array_size: None,
-        }
+    pub fn with_index(name: Ident, index: RoleIndex) -> RoleValidationResult<Self> {
+        let role = Self::new_unchecked(name, None, Some(index), None);
+        role.validate()?;
+        Ok(role)
     }
 
     /// Create a role reference with both param and index
     #[must_use]
-    pub fn with_param_and_index(name: Ident, param: RoleParam, index: RoleIndex) -> Self {
-        Role {
-            name,
-            param: Some(param),
-            index: Some(index),
-            array_size: None,
-        }
+    pub fn with_param_and_index(
+        name: Ident,
+        param: RoleParam,
+        index: RoleIndex,
+    ) -> RoleValidationResult<Self> {
+        let role = Self::new_unchecked(name, Some(param), Some(index), None);
+        role.validate()?;
+        Ok(role)
     }
 
     /// Create a new indexed role (e.g., Worker with index 0)
     #[must_use]
-    pub fn indexed(name: Ident, index: usize) -> Self {
-        Role {
-            name,
-            param: None,
-            index: Some(RoleIndex::Concrete(index as u32)),
-            array_size: None,
-        }
+    pub fn indexed(name: Ident, index: usize) -> RoleValidationResult<Self> {
+        let role_index = RoleIndex::safe_concrete(index as u32)?;
+        let role = Self::new_unchecked(name, None, Some(role_index), None);
+        role.validate()?;
+        Ok(role)
     }
 
     /// Create a parameterized role with symbolic parameter (e.g., Worker[N])
     #[must_use]
-    pub fn parameterized(name: Ident, param: TokenStream) -> Self {
-        Role {
+    pub fn parameterized(name: Ident, param: TokenStream) -> RoleValidationResult<Self> {
+        let role = Self::new_unchecked(
             name,
-            param: Some(RoleParam::Symbolic(param.to_string())),
-            index: None,
-            array_size: Some(param),
-        }
+            Some(RoleParam::Symbolic(param.to_string())),
+            None,
+            Some(param),
+        );
+        role.validate()?;
+        Ok(role)
     }
 
     /// Create a role array with a concrete size (e.g., Worker[3])
     #[must_use]
-    pub fn array(name: Ident, size: usize) -> Self {
+    pub fn array(name: Ident, size: usize) -> RoleValidationResult<Self> {
         let size_token: TokenStream = size.to_string().parse().unwrap();
-        Role {
+        let role = Self::new_unchecked(
             name,
-            param: Some(RoleParam::Static(size as u32)),
-            index: None,
-            array_size: Some(size_token),
-        }
+            Some(RoleParam::safe_static(size as u32)?),
+            None,
+            Some(size_token),
+        );
+        role.validate()?;
+        Ok(role)
+    }
+
+    /// Get the role name identifier.
+    #[must_use]
+    pub fn name(&self) -> &Ident {
+        &self.name
+    }
+
+    /// Get the role parameter if it exists.
+    #[must_use]
+    pub fn param(&self) -> Option<&RoleParam> {
+        self.param.as_ref()
+    }
+
+    /// Get the role index if it exists.
+    #[must_use]
+    pub fn index(&self) -> Option<&RoleIndex> {
+        self.index.as_ref()
+    }
+
+    /// Get the array size token if it exists.
+    #[must_use]
+    pub fn array_size(&self) -> Option<&TokenStream> {
+        self.array_size.as_ref()
     }
 
     /// Check if this role has an index
@@ -357,7 +389,7 @@ impl Role {
             });
         }
 
-        Ok(Role::with_param(name, RoleParam::Static(count)))
+        Role::with_param(name, RoleParam::Static(count))
     }
 
     /// Create a safe indexed role with overflow checking
@@ -369,7 +401,7 @@ impl Role {
             });
         }
 
-        Ok(Role::with_index(name, RoleIndex::Concrete(index)))
+        Role::with_index(name, RoleIndex::Concrete(index))
     }
 
     /// Create a safe range role with overflow checking
@@ -380,7 +412,7 @@ impl Role {
         };
         range.validate()?;
 
-        Ok(Role::with_index(name, RoleIndex::Range(range)))
+        Role::with_index(name, RoleIndex::Range(range))
     }
 }
 

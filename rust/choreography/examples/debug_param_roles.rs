@@ -22,9 +22,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for role in &choreography.roles {
         println!(
             "  - Name: {}, Index: {:?}, Array_size: {:?}, Is_array: {}",
-            role.name,
-            role.index,
-            role.array_size
+            role.name(),
+            role.index(),
+            role.array_size()
                 .as_ref()
                 .map(std::string::ToString::to_string),
             role.is_array()
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nChecking mentions_role:");
     for role in &choreography.roles {
         let mentioned = choreography.protocol.mentions_role(role);
-        println!("  - {}: {}", role.name, mentioned);
+        println!("  - {}: {}", role.name(), mentioned);
     }
 
     Ok(())

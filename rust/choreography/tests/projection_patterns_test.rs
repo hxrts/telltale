@@ -10,16 +10,21 @@
 
 use quote::{format_ident, quote};
 use rumpsteak_aura_choreography::ast::{
-    protocol::Condition, Branch, Choreography, LocalType, MessageType, Protocol, Role,
+    protocol::Condition, Branch, Choreography, LocalType, MessageType, NonEmptyVec, Protocol, Role,
 };
 use rumpsteak_aura_choreography::compiler::projection::project;
 use std::collections::HashMap;
+
+// Helper to create roles
+fn role(name: &str) -> Role {
+    Role::new(format_ident!("{}", name)).unwrap()
+}
 
 #[test]
 fn test_local_choice_without_send() {
     // Test: Choice branch that doesn't start with Send
     // Should project to LocalChoice for the chooser
-    let alice = Role::new(format_ident!("Alice"));
+    let alice = role("Alice");
 
     let choreo = Choreography {
         name: format_ident!("LocalChoiceTest"),
@@ -27,18 +32,18 @@ fn test_local_choice_without_send() {
         roles: vec![alice.clone()],
         protocol: Protocol::Choice {
             role: alice.clone(),
-            branches: vec![
+            branches: NonEmptyVec::from_head_tail(
                 Branch {
                     label: format_ident!("option1"),
                     guard: None,
                     protocol: Protocol::End, // No Send - local decision
                 },
-                Branch {
+                vec![Branch {
                     label: format_ident!("option2"),
                     guard: None,
                     protocol: Protocol::End,
-                },
-            ],
+                }],
+            ),
             annotations: HashMap::new(),
         },
         attrs: HashMap::new(),
@@ -61,8 +66,8 @@ fn test_local_choice_without_send() {
 fn test_loop_with_condition() {
     // Test: Loop with a count condition
     // Should preserve condition in projected local type
-    let alice = Role::new(format_ident!("Alice"));
-    let bob = Role::new(format_ident!("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let choreo = Choreography {
         name: format_ident!("LoopConditionTest"),
@@ -110,16 +115,16 @@ fn test_loop_with_condition() {
 fn test_parallel_no_conflict() {
     // Test: Parallel branches with different recipients (no conflict)
     // Should merge successfully
-    let alice = Role::new(format_ident!("Alice"));
-    let bob = Role::new(format_ident!("Bob"));
-    let charlie = Role::new(format_ident!("Charlie"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let charlie = role("Charlie");
 
     let choreo = Choreography {
         name: format_ident!("ParallelNoConflict"),
         namespace: None,
         roles: vec![alice.clone(), bob.clone(), charlie.clone()],
         protocol: Protocol::Parallel {
-            protocols: vec![
+            protocols: NonEmptyVec::from_head_tail(
                 Protocol::Send {
                     from: alice.clone(),
                     to: bob.clone(),
@@ -134,7 +139,7 @@ fn test_parallel_no_conflict() {
                     from_annotations: HashMap::new(),
                     to_annotations: HashMap::new(),
                 },
-                Protocol::Send {
+                vec![Protocol::Send {
                     from: alice.clone(),
                     to: charlie.clone(),
                     message: MessageType {
@@ -147,8 +152,8 @@ fn test_parallel_no_conflict() {
                     annotations: HashMap::new(),
                     from_annotations: HashMap::new(),
                     to_annotations: HashMap::new(),
-                },
-            ],
+                }],
+            ),
         },
         attrs: HashMap::new(),
     };
@@ -171,15 +176,15 @@ fn test_parallel_no_conflict() {
 fn test_parallel_with_conflict() {
     // Test: Parallel branches with same recipient (conflict)
     // Should detect conflict and return error
-    let alice = Role::new(format_ident!("Alice"));
-    let bob = Role::new(format_ident!("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let choreo = Choreography {
         name: format_ident!("ParallelConflict"),
         namespace: None,
         roles: vec![alice.clone(), bob.clone()],
         protocol: Protocol::Parallel {
-            protocols: vec![
+            protocols: NonEmptyVec::from_head_tail(
                 Protocol::Send {
                     from: alice.clone(),
                     to: bob.clone(),
@@ -194,7 +199,7 @@ fn test_parallel_with_conflict() {
                     from_annotations: HashMap::new(),
                     to_annotations: HashMap::new(),
                 },
-                Protocol::Send {
+                vec![Protocol::Send {
                     from: alice.clone(),
                     to: bob.clone(), // Same recipient - conflict!
                     message: MessageType {
@@ -207,8 +212,8 @@ fn test_parallel_with_conflict() {
                     annotations: HashMap::new(),
                     from_annotations: HashMap::new(),
                     to_annotations: HashMap::new(),
-                },
-            ],
+                }],
+            ),
         },
         attrs: HashMap::new(),
     };
@@ -221,8 +226,8 @@ fn test_parallel_with_conflict() {
 #[test]
 fn test_mixed_choice_communicated_vs_local() {
     // Test: Verify that communicated choice (with Send) still works
-    let alice = Role::new(format_ident!("Alice"));
-    let bob = Role::new(format_ident!("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let choreo = Choreography {
         name: format_ident!("CommunicatedChoice"),
@@ -230,7 +235,7 @@ fn test_mixed_choice_communicated_vs_local() {
         roles: vec![alice.clone(), bob.clone()],
         protocol: Protocol::Choice {
             role: alice.clone(),
-            branches: vec![
+            branches: NonEmptyVec::from_head_tail(
                 Branch {
                     label: format_ident!("yes"),
                     guard: None,
@@ -249,7 +254,7 @@ fn test_mixed_choice_communicated_vs_local() {
                         to_annotations: HashMap::new(),
                     },
                 },
-                Branch {
+                vec![Branch {
                     label: format_ident!("no"),
                     guard: None,
                     protocol: Protocol::Send {
@@ -266,8 +271,8 @@ fn test_mixed_choice_communicated_vs_local() {
                         from_annotations: HashMap::new(),
                         to_annotations: HashMap::new(),
                     },
-                },
-            ],
+                }],
+            ),
             annotations: HashMap::new(),
         },
         attrs: HashMap::new(),
@@ -298,7 +303,7 @@ fn test_mixed_choice_communicated_vs_local() {
 fn test_loop_without_condition() {
     // Test: Loop without explicit condition
     // Should project to Loop with None condition
-    let alice = Role::new(format_ident!("Alice"));
+    let alice = role("Alice");
 
     let choreo = Choreography {
         name: format_ident!("LoopNoCondition"),

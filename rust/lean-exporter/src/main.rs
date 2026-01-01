@@ -64,7 +64,7 @@ fn main() -> Result<()> {
         roles: choreography
             .roles
             .iter()
-            .map(|role| role.name.to_string())
+            .map(|role| role.name().to_string())
             .collect(),
         actions: flatten_protocol(&choreography.protocol),
     };
@@ -72,14 +72,14 @@ fn main() -> Result<()> {
     let role = choreography
         .roles
         .iter()
-        .find(|role| role.name == config.role)
+        .find(|role| role.name().to_string() == config.role)
         .ok_or_else(|| anyhow!("Unknown role {}", config.role))?;
 
     let local_type = project(&choreography, role)?;
 
     let programs = collect_branches(&local_type);
     let program = ProgramExport {
-        role: role.name.to_string(),
+        role: role.name().to_string(),
         programs,
     };
 
@@ -161,8 +161,8 @@ fn collect_actions(protocol: &Protocol, actions: &mut Vec<SimpleAction>) {
             ..
         } => {
             actions.push(SimpleAction {
-                from: from.name.to_string(),
-                to: to.name.to_string(),
+                from: from.name().to_string(),
+                to: to.name().to_string(),
                 label: message.name.to_string(),
             });
             collect_actions(continuation, actions);
@@ -176,8 +176,8 @@ fn collect_actions(protocol: &Protocol, actions: &mut Vec<SimpleAction>) {
         } => {
             for recipient in to_all {
                 actions.push(SimpleAction {
-                    from: from.name.to_string(),
-                    to: recipient.name.to_string(),
+                    from: from.name().to_string(),
+                    to: recipient.name().to_string(),
                     label: message.name.to_string(),
                 });
             }

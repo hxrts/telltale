@@ -248,13 +248,16 @@ axiom rbmap_insert_size_fresh {α β : Type _} {cmp : α → α → Ordering}
     If a ResourceId is created with counter n, it won't be found in a heap
     that has only allocated with counters < n. This is the key invariant
     maintained by the allocation counter. -/
-axiom fresh_counter_not_in_heap (h : Heap) :
-    h.resources.find? (ResourceId.create r h.counter) = none
+theorem fresh_counter_not_in_heap (h : Heap) (r : Resource)
+    (hinv : HeapCounterInvariant h) :
+    h.resources.find? (ResourceId.create r h.counter) = none := by
+  exact fresh_counter_not_found h r hinv
 
 /-- Theorem: Send increases heap size.
 
     After a successful send, the heap should have one more resource. -/
-theorem send_increases_heap (c : HeapConfiguration) (s r label : String) :
+theorem send_increases_heap (c : HeapConfiguration) (s r label : String)
+    (hinv : HeapCounterInvariant c.heap) :
     match c.sendMessage s r label with
     | .ok c' => c'.heap.size = c.heap.size + 1
     | .error _ => True := by
@@ -264,7 +267,7 @@ theorem send_increases_heap (c : HeapConfiguration) (s r label : String) :
   unfold Heap.allocMessage Heap.alloc Heap.size
   simp only
   -- The key is that the counter is fresh
-  have hfresh := fresh_counter_not_in_heap c.heap
+  have hfresh := fresh_counter_not_in_heap c.heap _ hinv
   -- Apply the RBMap insert size lemma
   exact rbmap_insert_size_fresh c.heap.resources _ _ hfresh
 

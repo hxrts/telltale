@@ -13,7 +13,7 @@ struct TestExtension {
     value: u32,
 }
 
-impl ExtensionEffect for TestExtension {
+impl ExtensionEffect<TestRole> for TestExtension {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -22,7 +22,7 @@ impl ExtensionEffect for TestExtension {
         "TestExtension"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    fn participating_roles(&self) -> Vec<TestRole> {
         vec![]
     }
 
@@ -34,7 +34,7 @@ impl ExtensionEffect for TestExtension {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<TestRole>> {
         Box::new(self.clone())
     }
 }

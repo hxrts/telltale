@@ -34,7 +34,14 @@ impl Clock for SystemClock {
     }
 
     async fn sleep(&self, duration: Duration) {
-        tokio::time::sleep(duration).await;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            tokio::time::sleep(duration).await;
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            wasm_timer::Delay::new(duration).await.ok();
+        }
     }
 }
 

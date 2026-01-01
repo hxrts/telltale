@@ -7,7 +7,7 @@
 // the choreography compilation pipeline.
 
 use proc_macro2::{Ident, Span};
-use rumpsteak_aura_choreography::ast::{Branch, Choreography, MessageType, Protocol, Role};
+use rumpsteak_aura_choreography::ast::{Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role};
 use rumpsteak_aura_choreography::compiler::{
     generate_choreography_code_with_namespacing, parse_choreography_str,
 };
@@ -16,6 +16,11 @@ use std::collections::HashMap;
 // Helper to create identifiers
 fn ident(s: &str) -> Ident {
     Ident::new(s, Span::call_site())
+}
+
+// Helper to create roles
+fn role(name: &str) -> Role {
+    Role::new(ident(name)).unwrap()
 }
 
 // Helper to create a message type
@@ -29,8 +34,8 @@ fn msg(name: &str) -> MessageType {
 
 #[test]
 fn test_protocol_annotation_storage() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let mut protocol = Protocol::Send {
         from: alice.clone(),
@@ -72,8 +77,8 @@ fn test_protocol_annotation_storage() {
 
 #[test]
 fn test_protocol_annotation_api() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let mut protocol = Protocol::Send {
         from: alice.clone(),
@@ -115,8 +120,8 @@ fn test_protocol_annotation_api() {
 
 #[test]
 fn test_protocol_annotation_validation() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let mut protocol = Protocol::Send {
         from: alice.clone(),
@@ -145,8 +150,8 @@ fn test_protocol_annotation_validation() {
 
 #[test]
 fn test_protocol_annotation_merging() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let mut protocol1 = Protocol::Send {
         from: alice.clone(),
@@ -205,8 +210,8 @@ fn test_protocol_annotation_merging() {
 
 #[test]
 fn test_protocol_annotation_filtering() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let mut protocol = Protocol::Send {
         from: alice.clone(),
@@ -234,7 +239,7 @@ fn test_choreography_annotation_api() {
     let mut choreo = Choreography {
         name: ident("TestChoreography"),
         namespace: None,
-        roles: vec![Role::new(ident("Alice")), Role::new(ident("Bob"))],
+        roles: vec![role("Alice"), role("Bob")],
         protocol: Protocol::End,
         attrs: HashMap::new(),
     };
@@ -263,8 +268,8 @@ fn test_choreography_annotation_api() {
 
 #[test]
 fn test_protocol_traversal_with_annotations() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let _inner_protocol = Protocol::Send {
         from: alice.clone(),
@@ -321,8 +326,8 @@ fn test_protocol_traversal_with_annotations() {
 
 #[test]
 fn test_choice_annotation_support() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let branch1 = Branch {
         label: ident("accept"),
@@ -354,7 +359,7 @@ fn test_choice_annotation_support() {
 
     let mut choice = Protocol::Choice {
         role: alice.clone(),
-        branches: vec![branch1, branch2],
+        branches: NonEmptyVec::from_head_tail(branch1, vec![branch2]),
         annotations: HashMap::new(),
     };
 
@@ -369,13 +374,13 @@ fn test_choice_annotation_support() {
 
 #[test]
 fn test_broadcast_annotation_support() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
-    let carol = Role::new(ident("Carol"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let carol = role("Carol");
 
     let mut broadcast = Protocol::Broadcast {
         from: alice.clone(),
-        to_all: vec![bob.clone(), carol.clone()],
+        to_all: NonEmptyVec::from_head_tail(bob.clone(), vec![carol.clone()]),
         message: msg("Announcement"),
         continuation: Box::new(Protocol::End),
         annotations: HashMap::new(),
@@ -415,8 +420,8 @@ fn test_annotation_syntax_is_rejected() {
 
 #[test]
 fn test_code_generation_with_annotations() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let choreo = Choreography {
         name: ident("AnnotatedChoreography"),
@@ -448,8 +453,8 @@ fn test_code_generation_with_annotations() {
 
 #[test]
 fn test_annotation_different_types() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let mut protocol = Protocol::Send {
         from: alice.clone(),

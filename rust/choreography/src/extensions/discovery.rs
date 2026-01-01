@@ -228,7 +228,17 @@ impl ExtensionDiscovery {
         Ok(())
     }
 
-    /// Load extension from a directory or file
+    /// Load extension from a directory or file.
+    ///
+    /// **Note**: This method loads extension metadata from TOML files but creates
+    /// a `PlaceholderExtension` that does not provide actual grammar rules.
+    /// For production use, prefer static registration via `register_extension()`
+    /// with a concrete `GrammarExtension` implementation.
+    ///
+    /// This is primarily useful for:
+    /// - Testing extension discovery and dependency resolution
+    /// - Development workflows where grammar rules aren't needed
+    /// - Future integration with dynamic loading (not currently implemented)
     pub fn load_from_path<P: AsRef<Path>>(&mut self, path: P) -> Result<(), ParseError> {
         let path = path.as_ref();
 
@@ -446,10 +456,17 @@ impl GrammarExtension for ClonableExtensionWrapper {
     }
 }
 
-/// Placeholder extension for loaded extensions
+/// Placeholder extension for loaded extensions.
 ///
-/// Used when loading extensions from configuration; the name is stored
-/// for error messages and debugging.
+/// Used when loading extensions from configuration files. This is a stub
+/// implementation that does not provide actual grammar rules - it exists
+/// primarily for testing extension discovery and dependency resolution.
+///
+/// **For production use**, implement the `GrammarExtension` trait directly
+/// and register via `ExtensionDiscovery::register_extension()`.
+///
+/// Dynamic library loading is not currently implemented. If needed in the
+/// future, this struct could be replaced with a dynamically-loaded extension.
 #[derive(Debug, Clone)]
 struct PlaceholderExtension {
     #[allow(dead_code)] // Stored for error messages and debugging

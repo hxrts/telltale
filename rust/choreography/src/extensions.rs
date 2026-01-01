@@ -715,8 +715,8 @@ mod tests {
     fn test_parse_context() {
         use proc_macro2::Span;
         let roles = vec![
-            Role::new(proc_macro2::Ident::new("Alice", Span::call_site())),
-            Role::new(proc_macro2::Ident::new("Bob", Span::call_site())),
+            Role::new(proc_macro2::Ident::new("Alice", Span::call_site())).unwrap(),
+            Role::new(proc_macro2::Ident::new("Bob", Span::call_site())).unwrap(),
         ];
 
         let context = ParseContext {

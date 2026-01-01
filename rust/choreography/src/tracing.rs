@@ -27,16 +27,18 @@
 //! use rumpsteak_aura_choreography::tracing::{TracingAdapter, ProtocolSpan};
 //!
 //! // Wrap an adapter with tracing
-//! let traced = TracingAdapter::new(my_adapter, "MyProtocol", "Client");
+//! let traced = TracingAdapter::new(my_adapter, "MyProtocol", Role::Client);
 //!
 //! // Use the traced adapter - all operations are automatically traced
-//! traced.send(RoleId::new("Server"), message).await?;
+//! traced.send(Role::Server, message).await?;
 //! ```
 
 use async_trait::async_trait;
 use tracing::{debug, error, info, info_span, instrument, Instrument, Span};
 
-use crate::runtime::adapter::{ChoreographicAdapter, Message, RoleId};
+use crate::effects::{LabelId, RoleId};
+use crate::identifiers::RoleName;
+use crate::runtime::adapter::{ChoreographicAdapter, Message};
 
 /// Standard span field names for protocol execution.
 pub mod fields {
@@ -86,24 +88,24 @@ pub mod events {
 ///
 /// This creates a new span with standard protocol fields that can be used
 /// as the root span for protocol execution.
-pub fn protocol_span(protocol: &str, role: &str, role_index: Option<u32>) -> Span {
+pub fn protocol_span(protocol: &str, role: &RoleName, role_index: Option<u32>) -> Span {
     match role_index {
         Some(idx) => info_span!(
             "protocol.execute",
             protocol = protocol,
-            role = role,
+            role = role.as_str(),
             role_index = idx
         ),
-        None => info_span!("protocol.execute", protocol = protocol, role = role),
+        None => info_span!("protocol.execute", protocol = protocol, role = role.as_str()),
     }
 }
 
 /// Create a phase span for tracking phase execution.
-pub fn phase_span(protocol: &str, role: &str, phase: &str) -> Span {
+pub fn phase_span(protocol: &str, role: &RoleName, phase: &str) -> Span {
     info_span!(
         "protocol.phase",
         protocol = protocol,
-        role = role,
+        role = role.as_str(),
         phase = phase
     )
 }
@@ -170,6 +172,13 @@ pub fn trace_error(error: &str) {
     error!(target: "protocol.error", error = error, "protocol error");
 }
 
+fn format_role<R: RoleId>(role: R) -> String {
+    match role.role_index() {
+        Some(index) => format!("{}[{}]", role.role_name(), index),
+        None => role.role_name().to_string(),
+    }
+}
+
 /// A tracing wrapper for choreographic adapters.
 ///
 /// Wraps any `ChoreographicAdapter` to automatically add tracing instrumentation
@@ -177,27 +186,32 @@ pub fn trace_error(error: &str) {
 pub struct TracingAdapter<A> {
     inner: A,
     protocol: &'static str,
-    role: &'static str,
+    role: RoleName,
     role_index: Option<u32>,
     span: Span,
 }
 
 impl<A> TracingAdapter<A> {
     /// Create a new tracing adapter.
-    pub fn new(inner: A, protocol: &'static str, role: &'static str) -> Self {
-        let span = protocol_span(protocol, role, None);
+    pub fn new(inner: A, protocol: &'static str, role: A::Role) -> Self
+    where
+        A: ChoreographicAdapter,
+    {
+        let role_name = role.role_name();
+        let role_index = role.role_index();
+        let span = protocol_span(protocol, &role_name, role_index);
         Self {
             inner,
             protocol,
-            role,
-            role_index: None,
+            role: role_name,
+            role_index,
             span,
         }
     }
 
     /// Create a new tracing adapter for an indexed role.
-    pub fn indexed(inner: A, protocol: &'static str, role: &'static str, index: u32) -> Self {
-        let span = protocol_span(protocol, role, Some(index));
+    pub fn indexed(inner: A, protocol: &'static str, role: RoleName, index: u32) -> Self {
+        let span = protocol_span(protocol, &role, Some(index));
         Self {
             inner,
             protocol,
@@ -213,8 +227,8 @@ impl<A> TracingAdapter<A> {
     }
 
     /// Get the role name.
-    pub fn role(&self) -> &'static str {
-        self.role
+    pub fn role(&self) -> &RoleName {
+        &self.role
     }
 
     /// Get the role index (if any).
@@ -241,18 +255,19 @@ impl<A> TracingAdapter<A> {
 #[async_trait]
 impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
     type Error = A::Error;
+    type Role = A::Role;
 
     #[instrument(
         skip(self, msg),
         fields(
             protocol = self.protocol,
-            role = self.role,
-            target_role = %to,
+            role = self.role.as_str(),
+            target_role = ?to,
             message_type = std::any::type_name::<M>()
         )
     )]
-    async fn send<M: Message>(&mut self, to: RoleId, msg: M) -> Result<(), Self::Error> {
-        trace_send(&to.to_string(), std::any::type_name::<M>(), 0);
+    async fn send<M: Message>(&mut self, to: Self::Role, msg: M) -> Result<(), Self::Error> {
+        trace_send(&format_role(to), std::any::type_name::<M>(), 0);
         self.inner.send(to, msg).instrument(self.span.clone()).await
     }
 
@@ -260,19 +275,19 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
         skip(self),
         fields(
             protocol = self.protocol,
-            role = self.role,
-            source_role = %from,
+            role = self.role.as_str(),
+            source_role = ?from,
             message_type = std::any::type_name::<M>()
         )
     )]
-    async fn recv<M: Message>(&mut self, from: RoleId) -> Result<M, Self::Error> {
+    async fn recv<M: Message>(&mut self, from: Self::Role) -> Result<M, Self::Error> {
         let result = self
             .inner
-            .recv::<M>(from.clone())
+            .recv::<M>(from)
             .instrument(self.span.clone())
             .await;
         if result.is_ok() {
-            trace_recv(&from.to_string(), std::any::type_name::<M>(), 0);
+            trace_recv(&format_role(from), std::any::type_name::<M>(), 0);
         }
         result
     }
@@ -281,17 +296,17 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
         skip(self, msg),
         fields(
             protocol = self.protocol,
-            role = self.role,
+            role = self.role.as_str(),
             targets = ?to
         )
     )]
     async fn broadcast<M: Message + Clone>(
         &mut self,
-        to: &[RoleId],
+        to: &[Self::Role],
         msg: M,
     ) -> Result<(), Self::Error> {
         for target in to {
-            trace_send(&target.to_string(), std::any::type_name::<M>(), 0);
+            trace_send(&format_role(*target), std::any::type_name::<M>(), 0);
         }
         self.inner
             .broadcast(to, msg)
@@ -303,11 +318,11 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
         skip(self),
         fields(
             protocol = self.protocol,
-            role = self.role,
+            role = self.role.as_str(),
             sources = ?from
         )
     )]
-    async fn collect<M: Message>(&mut self, from: &[RoleId]) -> Result<Vec<M>, Self::Error> {
+    async fn collect<M: Message>(&mut self, from: &[Self::Role]) -> Result<Vec<M>, Self::Error> {
         let result = self
             .inner
             .collect::<M>(from)
@@ -315,23 +330,26 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
             .await;
         if result.is_ok() {
             for source in from {
-                trace_recv(&source.to_string(), std::any::type_name::<M>(), 0);
+                trace_recv(&format_role(*source), std::any::type_name::<M>(), 0);
             }
         }
         result
     }
 
     #[instrument(
-        skip(self),
+        skip(self, label),
         fields(
             protocol = self.protocol,
-            role = self.role,
-            target_role = %to,
-            choice_label = label
+            role = self.role.as_str(),
+            target_role = ?to
         )
     )]
-    async fn choose(&mut self, to: RoleId, label: &str) -> Result<(), Self::Error> {
-        trace_choose(&to.to_string(), label);
+    async fn choose(
+        &mut self,
+        to: Self::Role,
+        label: <Self::Role as RoleId>::Label,
+    ) -> Result<(), Self::Error> {
+        trace_choose(&format_role(to), label.as_str());
         self.inner
             .choose(to, label)
             .instrument(self.span.clone())
@@ -342,18 +360,21 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
         skip(self),
         fields(
             protocol = self.protocol,
-            role = self.role,
-            source_role = %from
+            role = self.role.as_str(),
+            source_role = ?from
         )
     )]
-    async fn offer(&mut self, from: RoleId) -> Result<String, Self::Error> {
+    async fn offer(
+        &mut self,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label, Self::Error> {
         let result = self
             .inner
-            .offer(from.clone())
+            .offer(from)
             .instrument(self.span.clone())
             .await;
         if let Ok(ref label) = result {
-            trace_offer(&from.to_string(), label);
+            trace_offer(&format_role(from), label.as_str());
         }
         result
     }
@@ -370,7 +391,7 @@ pub struct PhaseGuard {
 
 impl PhaseGuard {
     /// Create a new phase guard.
-    pub fn new(protocol: &'static str, role: &'static str, phase: &'static str) -> Self {
+    pub fn new(protocol: &'static str, role: &RoleName, phase: &'static str) -> Self {
         let span = phase_span(protocol, role, phase);
         // Log phase start within the span
         {
@@ -405,19 +426,23 @@ mod tests {
 
     #[test]
     fn test_protocol_span() {
-        let span = protocol_span("TestProtocol", "Client", None);
+        let span = protocol_span("TestProtocol", &RoleName::from_static("Client"), None);
         assert!(span.is_disabled() || !span.is_disabled()); // Just check it doesn't panic
     }
 
     #[test]
     fn test_protocol_span_indexed() {
-        let span = protocol_span("TestProtocol", "Worker", Some(3));
+        let span = protocol_span("TestProtocol", &RoleName::from_static("Worker"), Some(3));
         assert!(span.is_disabled() || !span.is_disabled());
     }
 
     #[test]
     fn test_phase_span() {
-        let span = phase_span("TestProtocol", "Client", "handshake");
+        let span = phase_span(
+            "TestProtocol",
+            &RoleName::from_static("Client"),
+            "handshake",
+        );
         assert!(span.is_disabled() || !span.is_disabled());
     }
 }

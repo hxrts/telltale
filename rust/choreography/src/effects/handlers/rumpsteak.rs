@@ -18,7 +18,7 @@ use futures::{channel::mpsc, future::BoxFuture, SinkExt, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, time::Duration};
 
-use crate::effects::{ChoreoHandler, ChoreographyError, Label, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreographyError, LabelId, Result, RoleId};
 use rumpsteak_aura::{
     channel::{Bidirectional, Pair},
     Message, Role,
@@ -173,10 +173,12 @@ where
     fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
         let sender = &mut self.sender;
         Box::pin(async move {
-            sender
-                .send(data)
-                .await
-                .map_err(|e| ChoreographyError::Transport(format!("Channel send failed: {e}")))?;
+            sender.send(data).await.map_err(|e| {
+                ChoreographyError::ChannelSendFailed {
+                    channel_type: "SinkStream",
+                    reason: e.to_string(),
+                }
+            })?;
             Ok(SessionUpdate::new(()).with_description("Send"))
         })
     }
@@ -185,7 +187,10 @@ where
         let receiver = &mut self.receiver;
         Box::pin(async move {
             let bytes = receiver.next().await.ok_or_else(|| {
-                ChoreographyError::Transport("Channel closed while receiving".into())
+                ChoreographyError::ChannelClosed {
+                    channel_type: "SinkStream",
+                    operation: "receive",
+                }
             })?;
             Ok(SessionUpdate::new(bytes).with_description("Recv"))
         })
@@ -196,12 +201,17 @@ where
         let data = label.to_string();
         Box::pin(async move {
             let bytes = bincode::serialize(&data).map_err(|e| {
-                ChoreographyError::Transport(format!("Label serialization failed: {e}"))
+                ChoreographyError::LabelSerializationFailed {
+                    operation: "serialization",
+                    reason: e.to_string(),
+                }
             })?;
-            sender
-                .send(bytes)
-                .await
-                .map_err(|e| ChoreographyError::Transport(format!("Channel send failed: {e}")))?;
+            sender.send(bytes).await.map_err(|e| {
+                ChoreographyError::ChannelSendFailed {
+                    channel_type: "SinkStream",
+                    reason: e.to_string(),
+                }
+            })?;
             Ok(SessionUpdate::new(()).with_description("Choose"))
         })
     }
@@ -210,10 +220,16 @@ where
         let receiver = &mut self.receiver;
         Box::pin(async move {
             let bytes = receiver.next().await.ok_or_else(|| {
-                ChoreographyError::Transport("Channel closed while waiting for choice".into())
+                ChoreographyError::ChannelClosed {
+                    channel_type: "SinkStream",
+                    operation: "offer",
+                }
             })?;
             let label: String = bincode::deserialize(&bytes).map_err(|e| {
-                ChoreographyError::Transport(format!("Label deserialization failed: {e}"))
+                ChoreographyError::LabelSerializationFailed {
+                    operation: "deserialization",
+                    reason: e.to_string(),
+                }
             })?;
             Ok(SessionUpdate::new(label).with_description("Offer"))
         })
@@ -242,7 +258,10 @@ impl SessionTypeDynamic for SimpleSession {
         let channel = &mut self.channel;
         Box::pin(async move {
             channel.send(data).await.map_err(|e| {
-                ChoreographyError::Transport(format!("SimpleSession send failed: {e}"))
+                ChoreographyError::ChannelSendFailed {
+                    channel_type: "SimpleSession",
+                    reason: e,
+                }
             })?;
             Ok(SessionUpdate::new(()).with_description("Send"))
         })
@@ -251,8 +270,11 @@ impl SessionTypeDynamic for SimpleSession {
     fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
-            let bytes = channel.recv().await.map_err(|e| {
-                ChoreographyError::Transport(format!("SimpleSession recv failed: {e}"))
+            let bytes = channel.recv().await.map_err(|_| {
+                ChoreographyError::ChannelClosed {
+                    channel_type: "SimpleSession",
+                    operation: "receive",
+                }
             })?;
             Ok(SessionUpdate::new(bytes).with_description("Recv"))
         })
@@ -263,10 +285,16 @@ impl SessionTypeDynamic for SimpleSession {
         let label = label.to_string();
         Box::pin(async move {
             let bytes = bincode::serialize(&label).map_err(|e| {
-                ChoreographyError::Transport(format!("Label serialization failed: {e}"))
+                ChoreographyError::LabelSerializationFailed {
+                    operation: "serialization",
+                    reason: e.to_string(),
+                }
             })?;
             channel.send(bytes).await.map_err(|e| {
-                ChoreographyError::Transport(format!("SimpleSession choose failed: {e}"))
+                ChoreographyError::ChannelSendFailed {
+                    channel_type: "SimpleSession",
+                    reason: e,
+                }
             })?;
             Ok(SessionUpdate::new(()).with_description("Choose"))
         })
@@ -275,11 +303,17 @@ impl SessionTypeDynamic for SimpleSession {
     fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
-            let bytes = channel.recv().await.map_err(|e| {
-                ChoreographyError::Transport(format!("SimpleSession offer failed: {e}"))
+            let bytes = channel.recv().await.map_err(|_| {
+                ChoreographyError::ChannelClosed {
+                    channel_type: "SimpleSession",
+                    operation: "offer",
+                }
             })?;
             let label: String = bincode::deserialize(&bytes).map_err(|e| {
-                ChoreographyError::Transport(format!("Label deserialization failed: {e}"))
+                ChoreographyError::LabelSerializationFailed {
+                    operation: "deserialization",
+                    reason: e.to_string(),
+                }
             })?;
             Ok(SessionUpdate::new(label).with_description("Offer"))
         })
@@ -483,7 +517,9 @@ where
         Fut: std::future::Future<Output = Result<(T, ChannelState, Option<String>, bool)>>,
     {
         let mut record = ep.take_record(peer).ok_or_else(|| {
-            ChoreographyError::Transport(format!("No channel registered for peer: {peer:?}"))
+            ChoreographyError::NoPeerChannel {
+                peer: format!("{peer:?}"),
+            }
         })?;
 
         let (result, next_state, description, completed) = f(record.state).await?;
@@ -524,14 +560,22 @@ where
         to: Self::Role,
         msg: &Msg,
     ) -> Result<()> {
-        let serialized = bincode::serialize(msg)
-            .map_err(|e| ChoreographyError::Transport(format!("Serialization failed: {e}")))?;
+        let serialized = bincode::serialize(msg).map_err(|e| {
+            ChoreographyError::MessageSerializationFailed {
+                operation: "Serialization",
+                type_name: std::any::type_name::<Msg>(),
+                reason: e.to_string(),
+            }
+        })?;
 
         Self::with_channel_operation(ep, &to, "Send", |state| async move {
             match state {
                 ChannelState::Simple(mut channel) => {
                     channel.send(serialized).await.map_err(|e| {
-                        ChoreographyError::Transport(format!("SimpleChannel send failed: {e}"))
+                        ChoreographyError::ChannelSendFailed {
+                            channel_type: "SimpleChannel",
+                            reason: e,
+                        }
                     })?;
                     Ok(((), ChannelState::Simple(channel), None, false))
                 }
@@ -557,18 +601,29 @@ where
         Self::with_channel_operation(ep, &from, "Recv", |state| async move {
             match state {
                 ChannelState::Simple(mut channel) => {
-                    let serialized = channel.recv().await.map_err(|e| {
-                        ChoreographyError::Transport(format!("SimpleChannel recv failed: {e}"))
+                    let serialized = channel.recv().await.map_err(|_| {
+                        ChoreographyError::ChannelClosed {
+                            channel_type: "SimpleChannel",
+                            operation: "receive",
+                        }
                     })?;
                     let msg = bincode::deserialize(&serialized).map_err(|e| {
-                        ChoreographyError::Transport(format!("Deserialization failed: {e}"))
+                        ChoreographyError::MessageSerializationFailed {
+                            operation: "Deserialization",
+                            type_name: std::any::type_name::<Msg>(),
+                            reason: e.to_string(),
+                        }
                     })?;
                     Ok((msg, ChannelState::Simple(channel), None, false))
                 }
                 ChannelState::Session(mut session) => {
                     let update = session.recv().await?;
                     let msg = bincode::deserialize(&update.output).map_err(|e| {
-                        ChoreographyError::Transport(format!("Deserialization failed: {e}"))
+                        ChoreographyError::MessageSerializationFailed {
+                            operation: "Deserialization",
+                            type_name: std::any::type_name::<Msg>(),
+                            reason: e.to_string(),
+                        }
                     })?;
                     Ok((
                         msg,
@@ -586,17 +641,23 @@ where
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
-        let label_str = label.0.to_string();
+        let label_str = label.as_str().to_string();
         Self::with_channel_operation(ep, &who, "Choose", |state| async move {
             match state {
                 ChannelState::Simple(mut channel) => {
                     let serialized = bincode::serialize(&label_str).map_err(|e| {
-                        ChoreographyError::Transport(format!("Label serialization failed: {e}"))
+                        ChoreographyError::LabelSerializationFailed {
+                            operation: "serialization",
+                            reason: e.to_string(),
+                        }
                     })?;
                     channel.send(serialized).await.map_err(|e| {
-                        ChoreographyError::Transport(format!("Choice send failed: {e}"))
+                        ChoreographyError::ChannelSendFailed {
+                            channel_type: "SimpleChannel",
+                            reason: e,
+                        }
                     })?;
                     Ok(((), ChannelState::Simple(channel), None, false))
                 }
@@ -614,24 +675,45 @@ where
         .await
     }
 
-    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         Self::with_channel_operation(ep, &from, "Offer", |state| async move {
             match state {
                 ChannelState::Simple(mut channel) => {
-                    let serialized = channel.recv().await.map_err(|e| {
-                        ChoreographyError::Transport(format!("Choice receive failed: {e}"))
+                    let serialized = channel.recv().await.map_err(|_| {
+                        ChoreographyError::ChannelClosed {
+                            channel_type: "SimpleChannel",
+                            operation: "offer",
+                        }
                     })?;
                     let label_string: String = bincode::deserialize(&serialized).map_err(|e| {
-                        ChoreographyError::Transport(format!("Label deserialization failed: {e}"))
+                        ChoreographyError::LabelSerializationFailed {
+                            operation: "deserialization",
+                            reason: e.to_string(),
+                        }
                     })?;
-                    let leaked: &'static str = Box::leak(label_string.into_boxed_str());
-                    Ok((Label(leaked), ChannelState::Simple(channel), None, false))
+                    let label = <Self::Role as RoleId>::Label::from_str(&label_string)
+                        .ok_or_else(|| {
+                            ChoreographyError::ProtocolViolation(format!(
+                                "Unknown label '{label_string}'"
+                            ))
+                        })?;
+                    Ok((label, ChannelState::Simple(channel), None, false))
                 }
                 ChannelState::Session(mut session) => {
                     let update = session.offer().await?;
-                    let leaked: &'static str = Box::leak(update.output.into_boxed_str());
+                    let label = <Self::Role as RoleId>::Label::from_str(&update.output)
+                        .ok_or_else(|| {
+                            ChoreographyError::ProtocolViolation(format!(
+                                "Unknown label '{}'",
+                                update.output
+                            ))
+                        })?;
                     Ok((
-                        Label(leaked),
+                        label,
                         ChannelState::Session(session),
                         update.description,
                         update.is_complete,

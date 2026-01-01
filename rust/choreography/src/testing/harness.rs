@@ -415,6 +415,10 @@ impl ProtocolTest {
         result.duration = start.elapsed();
 
         // Collect observer events
+        // Track phase start times for duration calculation
+        let mut phase_start_times: HashMap<(String, String, String), std::time::Instant> =
+            HashMap::new();
+
         let observer = self.observer.lock().unwrap();
         for event in observer.events() {
             match event {
@@ -434,18 +438,34 @@ impl ProtocolTest {
                         });
                     }
                 }
+                crate::simulation::observer::ProtocolEvent::PhaseStart {
+                    protocol,
+                    role,
+                    phase,
+                } => {
+                    // Record phase start time
+                    let key = (protocol.clone(), role.clone(), phase.clone());
+                    phase_start_times.insert(key, std::time::Instant::now());
+                }
                 crate::simulation::observer::ProtocolEvent::PhaseEnd {
                     protocol,
                     role,
                     phase,
                 } => {
                     if self.config.trace_phases {
+                        // Calculate duration from phase start
+                        let key = (protocol.clone(), role.clone(), phase.clone());
+                        let duration = phase_start_times
+                            .remove(&key)
+                            .map(|start| start.elapsed())
+                            .unwrap_or(Duration::ZERO);
+
                         result.phases.push(PhaseRecord {
                             protocol: protocol.clone(),
                             role: role.clone(),
                             phase: phase.clone(),
                             completed: true,
-                            duration: Duration::ZERO, // TODO: track actual duration
+                            duration,
                         });
                     }
                 }

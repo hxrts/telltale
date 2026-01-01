@@ -4,7 +4,7 @@
 // that can be analyzed, transformed, and interpreted separately from execution.
 
 use crate::effects::extension::ExtensionEffect;
-use crate::effects::{Label, RoleId};
+use crate::effects::{MessageTag, RoleId};
 use std::any::TypeId;
 use std::collections::HashSet;
 use std::time::Duration;
@@ -16,10 +16,13 @@ pub enum Effect<R: RoleId, M> {
     Send { to: R, msg: M },
 
     /// Receive a message from another role
-    Recv { from: R, msg_type: &'static str },
+    Recv { from: R, msg_tag: MessageTag },
 
     /// Make an internal choice and broadcast the label
-    Choose { at: R, label: Label },
+    Choose {
+        at: R,
+        label: <R as RoleId>::Label,
+    },
 
     /// Wait for an external choice from another role
     Offer { from: R },
@@ -29,7 +32,7 @@ pub enum Effect<R: RoleId, M> {
     /// Other roles use Offer to receive the label, then select matching branch
     Branch {
         choosing_role: R,
-        branches: Vec<(Label, Program<R, M>)>,
+        branches: Vec<(<R as RoleId>::Label, Program<R, M>)>,
     },
 
     /// Loop that executes body a fixed number of times or until a condition
@@ -40,10 +43,15 @@ pub enum Effect<R: RoleId, M> {
     },
 
     /// Execute a sub-program with a timeout
+    ///
+    /// If `on_timeout` is Some, executes that program when timeout occurs.
+    /// Otherwise, the handler decides what to do on timeout (typically error).
     Timeout {
         at: R,
         dur: Duration,
         body: Box<Program<R, M>>,
+        /// Optional fallback program to execute if timeout occurs
+        on_timeout: Option<Box<Program<R, M>>>,
     },
 
     /// Execute multiple programs in parallel
@@ -64,7 +72,7 @@ pub enum Effect<R: RoleId, M> {
     /// Extensions project based on `participating_roles()`:
     /// - Empty roles → appears in all projections
     /// - Non-empty → appears only in specified role projections
-    Extension(Box<dyn ExtensionEffect>),
+    Extension(Box<dyn ExtensionEffect<R>>),
 
     /// End of program
     End,
@@ -77,9 +85,9 @@ impl<R: RoleId, M: Clone> Clone for Effect<R, M> {
                 to: *to,
                 msg: msg.clone(),
             },
-            Effect::Recv { from, msg_type } => Effect::Recv {
+            Effect::Recv { from, msg_tag } => Effect::Recv {
                 from: *from,
-                msg_type,
+                msg_tag: *msg_tag,
             },
             Effect::Choose { at, label } => Effect::Choose {
                 at: *at,
@@ -97,10 +105,16 @@ impl<R: RoleId, M: Clone> Clone for Effect<R, M> {
                 iterations: *iterations,
                 body: body.clone(),
             },
-            Effect::Timeout { at, dur, body } => Effect::Timeout {
+            Effect::Timeout {
+                at,
+                dur,
+                body,
+                on_timeout,
+            } => Effect::Timeout {
                 at: *at,
                 dur: *dur,
                 body: body.clone(),
+                on_timeout: on_timeout.clone(),
             },
             Effect::Parallel { programs } => Effect::Parallel {
                 programs: programs.clone(),
@@ -114,165 +128,235 @@ impl<R: RoleId, M: Clone> Clone for Effect<R, M> {
 /// A choreographic program as a sequence of effects
 #[derive(Debug, Clone)]
 pub struct Program<R: RoleId, M> {
-    pub effects: Vec<Effect<R, M>>,
+    effects: Vec<Effect<R, M>>,
+}
+
+/// Builder for choreographic programs that enforces structural invariants.
+#[derive(Debug, Clone)]
+pub struct ProgramBuilder<R: RoleId, M> {
+    effects: Vec<Effect<R, M>>,
+    ended: bool,
 }
 
 impl<R: RoleId, M> Program<R, M> {
-    /// Create a new empty program
+    /// Create a new program builder.
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            effects: Vec::new(),
-        }
+    pub fn new() -> ProgramBuilder<R, M> {
+        ProgramBuilder::new()
     }
 
-    /// Add a send effect
-    pub fn send(mut self, to: R, msg: M) -> Self {
-        self.effects.push(Effect::Send { to, msg });
-        self
-    }
-
-    /// Add a receive effect
-    pub fn recv<T: 'static>(mut self, from: R) -> Self {
-        self.effects.push(Effect::Recv {
-            from,
-            msg_type: std::any::type_name::<T>(),
-        });
-        self
-    }
-
-    /// Add a choice effect
-    pub fn choose(mut self, at: R, label: Label) -> Self {
-        self.effects.push(Effect::Choose { at, label });
-        self
-    }
-
-    /// Add an offer effect
-    pub fn offer(mut self, from: R) -> Self {
-        self.effects.push(Effect::Offer { from });
-        self
-    }
-
-    /// Add a timeout effect
-    pub fn with_timeout(mut self, at: R, dur: Duration, body: Program<R, M>) -> Self {
-        self.effects.push(Effect::Timeout {
-            at,
-            dur,
-            body: Box::new(body),
-        });
-        self
-    }
-
-    /// Add a parallel composition effect
+    /// Create a new program builder.
     #[must_use]
-    pub fn parallel(mut self, programs: Vec<Program<R, M>>) -> Self {
-        self.effects.push(Effect::Parallel { programs });
-        self
+    pub fn builder() -> ProgramBuilder<R, M> {
+        ProgramBuilder::new()
     }
 
-    /// Add a branch effect with multiple labeled continuations
-    pub fn branch(mut self, choosing_role: R, branches: Vec<(Label, Program<R, M>)>) -> Self {
-        self.effects.push(Effect::Branch {
-            choosing_role,
-            branches,
-        });
-        self
+    /// Construct a program from effects after validation.
+    fn from_effects(effects: Vec<Effect<R, M>>) -> Result<Self, ProgramError> {
+        let program = Self { effects };
+        program.validate()?;
+        Ok(program)
     }
 
-    /// Add a loop effect
+    /// Borrow the program's effects.
     #[must_use]
-    pub fn loop_n(mut self, iterations: usize, body: Program<R, M>) -> Self {
-        self.effects.push(Effect::Loop {
-            iterations: Some(iterations),
-            body: Box::new(body),
-        });
-        self
+    pub fn effects(&self) -> &[Effect<R, M>] {
+        &self.effects
     }
 
-    /// Add an infinite loop effect (or until break)
+    /// Consume the program and return its effects.
     #[must_use]
-    pub fn loop_inf(mut self, body: Program<R, M>) -> Self {
-        self.effects.push(Effect::Loop {
-            iterations: None,
-            body: Box::new(body),
-        });
-        self
+    pub fn into_effects(self) -> Vec<Effect<R, M>> {
+        self.effects
     }
 
-    /// Mark the end of the program
-    pub fn end(mut self) -> Self {
-        self.effects.push(Effect::End);
-        self
-    }
-
-    /// Extend this program with another program
+    /// Extend this program with another program.
     #[must_use]
-    pub fn then(mut self, other: Program<R, M>) -> Self {
-        self.effects.extend(other.effects);
-        self
+    pub fn then(self, other: Program<R, M>) -> Program<R, M> {
+        let mut effects = self.effects;
+        effects.extend(other.effects);
+        Program::from_effects(effects)
+            .unwrap_or_else(|err| panic!("invalid program composition: {err}"))
     }
 
-    /// Create a program that executes multiple programs in parallel
-    #[must_use]
-    pub fn par(programs: Vec<Program<R, M>>) -> Self {
-        Self::new().parallel(programs)
-    }
-
-    /// Add a domain-specific extension effect
-    ///
-    /// # Example
-    ///
-    /// ```text
-    /// Program::new()
-    ///     .ext(ValidateCapability { capability: "send".into(), role: Alice })
-    ///     .send(Bob, Message("hello"))
-    ///     .ext(LogEvent { event: "message_sent".into() })
-    ///     .end()
-    /// ```
-    pub fn ext<E: ExtensionEffect + 'static>(mut self, extension: E) -> Self {
-        self.effects.push(Effect::Extension(Box::new(extension)));
-        self
-    }
-
-    /// Add multiple extension effects
-    pub fn exts<E: ExtensionEffect + 'static>(
-        mut self,
-        extensions: impl IntoIterator<Item = E>,
-    ) -> Self {
-        for ext in extensions {
-            self.effects.push(Effect::Extension(Box::new(ext)));
-        }
-        self
-    }
-
-    /// Check if the program is empty
+    /// Check if the program is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.effects.is_empty()
     }
 
-    /// Get the length of the program (number of effects)
+    /// Get the length of the program (number of effects).
     #[must_use]
     pub fn len(&self) -> usize {
         self.effects.len()
     }
 }
 
+impl<R: RoleId, M> ProgramBuilder<R, M> {
+    /// Create a new empty builder.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            effects: Vec::new(),
+            ended: false,
+        }
+    }
+
+    fn push(&mut self, effect: Effect<R, M>) {
+        if self.ended {
+            panic!("cannot add effects after end");
+        }
+        if matches!(effect, Effect::End) {
+            self.ended = true;
+        }
+        self.effects.push(effect);
+    }
+
+    /// Add a send effect.
+    pub fn send(mut self, to: R, msg: M) -> Self {
+        self.push(Effect::Send { to, msg });
+        self
+    }
+
+    /// Add a receive effect.
+    pub fn recv<T: 'static>(mut self, from: R) -> Self {
+        self.push(Effect::Recv {
+            from,
+            msg_tag: MessageTag::of::<T>(),
+        });
+        self
+    }
+
+    /// Add a choice effect.
+    pub fn choose(mut self, at: R, label: <R as RoleId>::Label) -> Self {
+        self.push(Effect::Choose { at, label });
+        self
+    }
+
+    /// Add an offer effect.
+    pub fn offer(mut self, from: R) -> Self {
+        self.push(Effect::Offer { from });
+        self
+    }
+
+    /// Add a timeout effect.
+    pub fn with_timeout(mut self, at: R, dur: Duration, body: Program<R, M>) -> Self {
+        self.push(Effect::Timeout {
+            at,
+            dur,
+            body: Box::new(body),
+            on_timeout: None,
+        });
+        self
+    }
+
+    /// Add a timed choice effect - races body against timeout.
+    ///
+    /// If body completes before timeout, executes body.
+    /// If timeout fires first, executes on_timeout instead.
+    /// This is the effect-level representation of timed_choice syntax.
+    pub fn with_timed_choice(
+        mut self,
+        at: R,
+        dur: Duration,
+        body: Program<R, M>,
+        on_timeout: Program<R, M>,
+    ) -> Self {
+        self.push(Effect::Timeout {
+            at,
+            dur,
+            body: Box::new(body),
+            on_timeout: Some(Box::new(on_timeout)),
+        });
+        self
+    }
+
+    /// Add a parallel composition effect.
+    #[must_use]
+    pub fn parallel(mut self, programs: Vec<Program<R, M>>) -> Self {
+        self.push(Effect::Parallel { programs });
+        self
+    }
+
+    /// Add a branch effect with multiple labeled continuations.
+    pub fn branch(
+        mut self,
+        choosing_role: R,
+        branches: Vec<(<R as RoleId>::Label, Program<R, M>)>,
+    ) -> Self {
+        self.push(Effect::Branch {
+            choosing_role,
+            branches,
+        });
+        self
+    }
+
+    /// Add a loop effect.
+    #[must_use]
+    pub fn loop_n(mut self, iterations: usize, body: Program<R, M>) -> Self {
+        self.push(Effect::Loop {
+            iterations: Some(iterations),
+            body: Box::new(body),
+        });
+        self
+    }
+
+    /// Add an infinite loop effect (or until break).
+    #[must_use]
+    pub fn loop_inf(mut self, body: Program<R, M>) -> Self {
+        self.push(Effect::Loop {
+            iterations: None,
+            body: Box::new(body),
+        });
+        self
+    }
+
+    /// Add a domain-specific extension effect.
+    pub fn ext<E: ExtensionEffect<R> + 'static>(mut self, extension: E) -> Self {
+        self.push(Effect::Extension(Box::new(extension)));
+        self
+    }
+
+    /// Add multiple extension effects.
+    pub fn exts<E: ExtensionEffect<R> + 'static>(
+        mut self,
+        extensions: impl IntoIterator<Item = E>,
+    ) -> Self {
+        for ext in extensions {
+            self.push(Effect::Extension(Box::new(ext)));
+        }
+        self
+    }
+
+    /// Mark the end of the program and finalize it.
+    pub fn end(mut self) -> Program<R, M> {
+        self.push(Effect::End);
+        self.build()
+            .unwrap_or_else(|err| panic!("invalid program: {err}"))
+    }
+
+    /// Validate and build the program without appending `End`.
+    pub fn build(self) -> Result<Program<R, M>, ProgramError> {
+        Program::from_effects(self.effects)
+    }
+}
+
 impl<R: RoleId, M> Default for Program<R, M> {
     fn default() -> Self {
-        Self::new()
+        Program::from_effects(Vec::new())
+            .unwrap_or_else(|err| panic!("invalid default program: {err}"))
     }
 }
 
 /// Extension effect helper methods
 impl<R: RoleId, M> Effect<R, M> {
     /// Create an extension effect from any type implementing `ExtensionEffect`
-    pub fn ext<E: ExtensionEffect + 'static>(extension: E) -> Self {
+    pub fn ext<E: ExtensionEffect<R> + 'static>(extension: E) -> Self {
         Effect::Extension(Box::new(extension))
     }
 
     /// Check if this is an extension effect of a specific type
-    pub fn is_extension<E: ExtensionEffect + 'static>(&self) -> bool {
+    pub fn is_extension<E: ExtensionEffect<R> + 'static>(&self) -> bool {
         match self {
             Effect::Extension(ext) => ext.type_id() == TypeId::of::<E>(),
             _ => false,
@@ -282,7 +366,7 @@ impl<R: RoleId, M> Effect<R, M> {
     /// Extract extension data with type checking
     ///
     /// Returns `Some(&E)` if this is an extension of type `E`, `None` otherwise.
-    pub fn as_extension<E: ExtensionEffect + 'static>(&self) -> Option<&E> {
+    pub fn as_extension<E: ExtensionEffect<R> + 'static>(&self) -> Option<&E> {
         match self {
             Effect::Extension(ext) => ext.as_any().downcast_ref::<E>(),
             _ => None,
@@ -290,7 +374,7 @@ impl<R: RoleId, M> Effect<R, M> {
     }
 
     /// Extract mutable extension data with type checking
-    pub fn as_extension_mut<E: ExtensionEffect + 'static>(&mut self) -> Option<&mut E> {
+    pub fn as_extension_mut<E: ExtensionEffect<R> + 'static>(&mut self) -> Option<&mut E> {
         match self {
             Effect::Extension(ext) => ext.as_any_mut().downcast_mut::<E>(),
             _ => None,
@@ -343,9 +427,17 @@ impl<R: RoleId, M> Program<R, M> {
                 Effect::Loop { body, .. } => {
                     body.collect_roles(roles);
                 }
-                Effect::Timeout { at, body, .. } => {
+                Effect::Timeout {
+                    at,
+                    body,
+                    on_timeout,
+                    ..
+                } => {
                     roles.insert(*at);
                     body.collect_roles(roles);
+                    if let Some(timeout_body) = on_timeout {
+                        timeout_body.collect_roles(roles);
+                    }
                 }
                 Effect::Parallel { programs } => {
                     for prog in programs {
@@ -353,13 +445,8 @@ impl<R: RoleId, M> Program<R, M> {
                     }
                 }
                 Effect::Extension(ext) => {
-                    // Extensions may specify participating roles through type-erased values
-                    let role_ids = ext.participating_role_ids();
-                    for role_any in role_ids {
-                        // Try to downcast each type-erased role back to R
-                        if let Some(role) = role_any.downcast_ref::<R>() {
-                            roles.insert(*role);
-                        }
+                    for role in ext.participating_roles() {
+                        roles.insert(role);
                     }
                 }
                 Effect::End => {}
@@ -380,7 +467,13 @@ impl<R: RoleId, M> Program<R, M> {
                     .max()
                     .unwrap_or(0),
                 Effect::Loop { body, .. } => body.send_count(),
-                Effect::Timeout { body, .. } => body.send_count(),
+                Effect::Timeout {
+                    body, on_timeout, ..
+                } => {
+                    let body_count = body.send_count();
+                    let timeout_count = on_timeout.as_ref().map_or(0, |p| p.send_count());
+                    body_count.max(timeout_count)
+                }
                 Effect::Parallel { programs } => programs.iter().map(Program::send_count).sum(),
                 _ => 0,
             })
@@ -400,7 +493,13 @@ impl<R: RoleId, M> Program<R, M> {
                     .max()
                     .unwrap_or(0),
                 Effect::Loop { body, .. } => body.recv_count(),
-                Effect::Timeout { body, .. } => body.recv_count(),
+                Effect::Timeout {
+                    body, on_timeout, ..
+                } => {
+                    let body_count = body.recv_count();
+                    let timeout_count = on_timeout.as_ref().map_or(0, |p| p.recv_count());
+                    body_count.max(timeout_count)
+                }
                 Effect::Parallel { programs } => programs.iter().map(Program::recv_count).sum(),
                 _ => 0,
             })
@@ -425,7 +524,7 @@ impl<R: RoleId, M> Program<R, M> {
 
     /// Validate that the program is well-formed
     pub fn validate(&self) -> Result<(), ProgramError> {
-        for effect in &self.effects {
+        for (idx, effect) in self.effects.iter().enumerate() {
             match effect {
                 Effect::Branch { branches, .. } => {
                     if branches.is_empty() {
@@ -438,14 +537,33 @@ impl<R: RoleId, M> Program<R, M> {
                     }
                 }
                 Effect::Loop { body, .. } => body.validate()?,
-                Effect::Timeout { body, .. } => body.validate()?,
+                Effect::Timeout {
+                    body, on_timeout, ..
+                } => {
+                    body.validate()?;
+                    if let Some(timeout_body) = on_timeout {
+                        timeout_body.validate()?;
+                    }
+                }
                 Effect::Parallel { programs } => {
+                    if programs.is_empty() {
+                        return Err(ProgramError::InvalidStructure(
+                            "Parallel must contain at least one program".to_string(),
+                        ));
+                    }
                     for prog in programs {
                         prog.validate()?;
                     }
                 }
                 Effect::Extension(_) => {
                     // Extensions are always valid - validation happens at runtime
+                }
+                Effect::End => {
+                    if idx + 1 != self.effects.len() {
+                        return Err(ProgramError::InvalidStructure(
+                            "End must be the final effect".to_string(),
+                        ));
+                    }
                 }
                 _ => {}
             }

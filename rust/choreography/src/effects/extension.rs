@@ -6,6 +6,8 @@
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 
+use crate::effects::RoleId;
+
 /// Trait for type-safe extension effects
 ///
 /// Extension effects are domain-specific effects that extend the core
@@ -59,7 +61,7 @@ use std::fmt::Debug;
 ///     }
 /// }
 /// ```
-pub trait ExtensionEffect: Send + Sync + Debug {
+pub trait ExtensionEffect<R: RoleId>: Send + Sync + Debug {
     /// Get the TypeId of this extension type
     ///
     /// This is used for type-safe downcasting and extension discrimination.
@@ -75,29 +77,11 @@ pub trait ExtensionEffect: Send + Sync + Debug {
     ///
     /// # Projection Semantics
     ///
-    /// Returns a vector of type-erased roles (`Box<dyn Any>`). Each role should
-    /// be a value of type `R: RoleId`. During projection, these will be downcast
-    /// back to the concrete role type.
+    /// Returns a vector of roles participating in the effect.
     ///
     /// - Empty vec: Extension appears in all role projections (global effect)
     /// - Non-empty: Extension appears only in specified role projections
-    ///
-    /// # Example
-    ///
-    /// ```text
-    /// fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-    ///     vec![Box::new(self.role)]
-    /// }
-    /// ```
-    ///
-    /// For global extensions, return an empty vec:
-    ///
-    /// ```text
-    /// fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-    ///     vec![]
-    /// }
-    /// ```
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    fn participating_roles(&self) -> Vec<R> {
         vec![] // Default: global extensions
     }
 
@@ -110,7 +94,7 @@ pub trait ExtensionEffect: Send + Sync + Debug {
     /// Clone this extension into a boxed trait object
     ///
     /// Required for cloning `Effect` enum which contains `Box<dyn ExtensionEffect>`.
-    fn clone_box(&self) -> Box<dyn ExtensionEffect>;
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<R>>;
 }
 
 /// Extension-specific errors

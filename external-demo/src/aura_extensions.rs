@@ -222,7 +222,7 @@ impl ProtocolExtension for AuraAnnotatedSend {
     }
 
     fn mentions_role(&self, role: &Role) -> bool {
-        role.name.to_string() == self.sender || role.name.to_string() == self.receiver
+        role.name().to_string() == self.sender || role.name().to_string() == self.receiver
     }
 
     fn validate(&self, roles: &[Role]) -> Result<(), ExtensionValidationError> {
@@ -266,7 +266,7 @@ impl ProtocolExtension for AuraAnnotatedSend {
         };
 
         // Check if this role is the sender
-        if role.name.to_string() == self.sender {
+        if role.name().to_string() == self.sender {
             // Sender role: Create annotated Send with message type
             Ok(LocalType::Send {
                 to: Role::new(syn::Ident::new(
@@ -278,7 +278,7 @@ impl ProtocolExtension for AuraAnnotatedSend {
             })
         }
         // Check if this role is the receiver
-        else if role.name.to_string() == self.receiver {
+        else if role.name().to_string() == self.receiver {
             // Receiver role: Create annotated Receive
             Ok(LocalType::Receive {
                 from: Role::new(syn::Ident::new(

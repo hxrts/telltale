@@ -58,7 +58,7 @@ impl<'a> ProjectionContext<'a> {
     /// Check if this projection role matches the given protocol role
     fn role_matches(&self, protocol_role: &Role) -> Result<bool, ProjectionError> {
         // First check for exact name match
-        if self.role.name != protocol_role.name {
+        if self.role.name() != protocol_role.name() {
             return Ok(false);
         }
 
@@ -73,7 +73,7 @@ impl<'a> ProjectionContext<'a> {
 
     /// Check if the projection role matches a dynamic protocol role
     fn matches_dynamic_role(&self, protocol_role: &Role) -> Result<bool, ProjectionError> {
-        match (&self.role.param, &protocol_role.param) {
+        match (self.role.param(), protocol_role.param()) {
             // Static vs Static: must have same count
             (Some(RoleParam::Static(self_count)), Some(RoleParam::Static(proto_count))) => {
                 Ok(self_count == proto_count)
@@ -115,7 +115,7 @@ impl<'a> ProjectionContext<'a> {
             // Runtime roles require special handling
             (_, Some(RoleParam::Runtime)) | (Some(RoleParam::Runtime), _) => {
                 Err(ProjectionError::DynamicRoleProjection {
-                    role: protocol_role.name.to_string(),
+                    role: protocol_role.name().to_string(),
                 })
             }
             // One parameterized, one not: no match

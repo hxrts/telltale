@@ -33,6 +33,8 @@ pub use transport::{
 use std::collections::BTreeMap;
 use std::fmt;
 
+use crate::identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
+
 /// Location specifies where a role is deployed.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Location {
@@ -40,9 +42,9 @@ pub enum Location {
     #[default]
     Local,
     /// Remote endpoint (e.g., "localhost:8080", "service.internal:9000")
-    Remote(String),
+    Remote(TopologyEndpoint),
     /// Colocated with another role on the same node (shared memory)
-    Colocated(String),
+    Colocated(RoleName),
 }
 
 impl fmt::Display for Location {
@@ -61,13 +63,13 @@ impl fmt::Display for Location {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TopologyConstraint {
     /// Two roles must be on the same node
-    Colocated(String, String),
+    Colocated(RoleName, RoleName),
     /// Two roles must be on different nodes
-    Separated(String, String),
+    Separated(RoleName, RoleName),
     /// A role must be at a specific location
-    Pinned(String, Location),
+    Pinned(RoleName, Location),
     /// A role must be in a specific region/zone
-    Region(String, String),
+    Region(RoleName, Region),
 }
 
 impl fmt::Display for TopologyConstraint {
@@ -90,9 +92,9 @@ pub enum TopologyMode {
     /// Each role in separate process
     PerRole,
     /// Discover via Kubernetes services
-    Kubernetes(String), // namespace
+    Kubernetes(Namespace), // namespace
     /// Discover via Consul
-    Consul(String), // datacenter
+    Consul(Datacenter), // datacenter
 }
 
 /// Topology maps roles to their deployment locations.
@@ -103,7 +105,7 @@ pub struct Topology {
     /// Optional mode for shorthand configuration
     pub mode: Option<TopologyMode>,
     /// Role → Location mapping
-    pub locations: BTreeMap<String, Location>,
+    pub locations: BTreeMap<RoleName, Location>,
     /// Deployment constraints
     pub constraints: Vec<TopologyConstraint>,
 }
@@ -128,8 +130,8 @@ impl Topology {
     }
 
     /// Add a role location to the topology
-    pub fn with_role(mut self, role: impl Into<String>, location: Location) -> Self {
-        self.locations.insert(role.into(), location);
+    pub fn with_role(mut self, role: RoleName, location: Location) -> Self {
+        self.locations.insert(role, location);
         self
     }
 
@@ -139,43 +141,44 @@ impl Topology {
         self
     }
 
-    /// Get the location for a role (defaults to local)
-    pub fn get_location(&self, role: &str) -> Location {
+    /// Get the location for a role.
+    pub fn get_location(&self, role: &RoleName) -> Result<Location, TopologyError> {
         match &self.mode {
-            Some(TopologyMode::Local) => Location::Local,
-            _ => self.locations.get(role).cloned().unwrap_or(Location::Local),
+            Some(TopologyMode::Local) => Ok(Location::Local),
+            _ => self
+                .locations
+                .get(role)
+                .cloned()
+                .ok_or_else(|| TopologyError::UnknownRole(role.clone())),
         }
     }
 
     /// Check if a role is local
-    pub fn is_local(&self, role: &str) -> bool {
-        match self.get_location(role) {
-            Location::Local | Location::Colocated(_) => true,
-            Location::Remote(_) => false,
+    pub fn is_local(&self, role: &RoleName) -> Result<bool, TopologyError> {
+        match self.get_location(role)? {
+            Location::Local | Location::Colocated(_) => Ok(true),
+            Location::Remote(_) => Ok(false),
         }
     }
 
     /// Get all roles defined in the topology
-    pub fn roles(&self) -> Vec<&String> {
+    pub fn roles(&self) -> Vec<&RoleName> {
         self.locations.keys().collect()
     }
 
     /// Check if topology is valid for a set of choreography roles.
     /// All referenced roles must exist in the choreography.
-    pub fn valid_for_roles(&self, choreo_roles: &[&str]) -> bool {
+    pub fn valid_for_roles(&self, choreo_roles: &[RoleName]) -> bool {
         // All topology roles must be in choreography
-        let topo_roles_ok = self
-            .locations
-            .keys()
-            .all(|r| choreo_roles.contains(&r.as_str()));
+        let topo_roles_ok = self.locations.keys().all(|r| choreo_roles.contains(r));
 
         // All constraint roles must be in choreography
         let constraints_ok = self.constraints.iter().all(|c| match c {
             TopologyConstraint::Colocated(r1, r2) | TopologyConstraint::Separated(r1, r2) => {
-                choreo_roles.contains(&r1.as_str()) && choreo_roles.contains(&r2.as_str())
+                choreo_roles.contains(r1) && choreo_roles.contains(r2)
             }
             TopologyConstraint::Pinned(r, _) | TopologyConstraint::Region(r, _) => {
-                choreo_roles.contains(&r.as_str())
+                choreo_roles.contains(r)
             }
         });
 
@@ -183,10 +186,10 @@ impl Topology {
     }
 
     /// Validate a topology against choreography roles
-    pub fn validate(&self, choreo_roles: &[&str]) -> TopologyValidation {
+    pub fn validate(&self, choreo_roles: &[RoleName]) -> TopologyValidation {
         // Check all topology roles exist
         for role in self.locations.keys() {
-            if !choreo_roles.contains(&role.as_str()) {
+            if !choreo_roles.contains(role) {
                 return TopologyValidation::UnknownRole(role.clone());
             }
         }
@@ -195,15 +198,15 @@ impl Topology {
         for c in &self.constraints {
             match c {
                 TopologyConstraint::Colocated(r1, r2) | TopologyConstraint::Separated(r1, r2) => {
-                    if !choreo_roles.contains(&r1.as_str()) {
+                    if !choreo_roles.contains(r1) {
                         return TopologyValidation::UnknownRole(r1.clone());
                     }
-                    if !choreo_roles.contains(&r2.as_str()) {
+                    if !choreo_roles.contains(r2) {
                         return TopologyValidation::UnknownRole(r2.clone());
                     }
                 }
                 TopologyConstraint::Pinned(r, _) | TopologyConstraint::Region(r, _) => {
-                    if !choreo_roles.contains(&r.as_str()) {
+                    if !choreo_roles.contains(r) {
                         return TopologyValidation::UnknownRole(r.clone());
                     }
                 }
@@ -258,10 +261,27 @@ pub enum TopologyValidation {
     /// Topology is valid
     Valid,
     /// A role referenced in topology doesn't exist in choreography
-    UnknownRole(String),
+    UnknownRole(RoleName),
     /// A constraint is violated (with reason)
     ConstraintViolation(TopologyConstraint, String),
 }
+
+/// Errors that can occur when querying topology data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TopologyError {
+    /// Requested role is not present in the topology.
+    UnknownRole(RoleName),
+}
+
+impl fmt::Display for TopologyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TopologyError::UnknownRole(role) => write!(f, "unknown role: {}", role),
+        }
+    }
+}
+
+impl std::error::Error for TopologyError {}
 
 impl TopologyValidation {
     /// Check if validation passed
@@ -289,62 +309,62 @@ impl TopologyBuilder {
     }
 
     /// Add a local role
-    pub fn local_role(mut self, role: impl Into<String>) -> Self {
-        self.topology.locations.insert(role.into(), Location::Local);
+    pub fn local_role(mut self, role: RoleName) -> Self {
+        self.topology.locations.insert(role, Location::Local);
         self
     }
 
     /// Add a remote role
-    pub fn remote_role(mut self, role: impl Into<String>, endpoint: impl Into<String>) -> Self {
+    pub fn remote_role(mut self, role: RoleName, endpoint: TopologyEndpoint) -> Self {
         self.topology
             .locations
-            .insert(role.into(), Location::Remote(endpoint.into()));
+            .insert(role, Location::Remote(endpoint));
         self
     }
 
     /// Add a colocated role
-    pub fn colocated_role(mut self, role: impl Into<String>, peer: impl Into<String>) -> Self {
+    pub fn colocated_role(mut self, role: RoleName, peer: RoleName) -> Self {
         self.topology
             .locations
-            .insert(role.into(), Location::Colocated(peer.into()));
+            .insert(role, Location::Colocated(peer));
         self
     }
 
     /// Add a role at a specific location
-    pub fn role(mut self, role: impl Into<String>, location: Location) -> Self {
-        self.topology.locations.insert(role.into(), location);
+    pub fn role(mut self, role: RoleName, location: Location) -> Self {
+        self.topology.locations.insert(role, location);
         self
     }
 
     /// Add a colocation constraint
-    pub fn colocated(mut self, r1: impl Into<String>, r2: impl Into<String>) -> Self {
+    pub fn colocated(mut self, r1: RoleName, r2: RoleName) -> Self {
         self.topology
             .constraints
-            .push(TopologyConstraint::Colocated(r1.into(), r2.into()));
+            .push(TopologyConstraint::Colocated(r1, r2));
         self
     }
 
     /// Add a separation constraint
-    pub fn separated(mut self, r1: impl Into<String>, r2: impl Into<String>) -> Self {
+    pub fn separated(mut self, r1: RoleName, r2: RoleName) -> Self {
         self.topology
             .constraints
-            .push(TopologyConstraint::Separated(r1.into(), r2.into()));
+            .push(TopologyConstraint::Separated(r1, r2));
         self
     }
 
     /// Add a pinned location constraint
-    pub fn pinned(mut self, role: impl Into<String>, location: Location) -> Self {
+    pub fn pinned(mut self, role: RoleName, location: Location) -> Self {
         self.topology
             .constraints
-            .push(TopologyConstraint::Pinned(role.into(), location));
+            .push(TopologyConstraint::Pinned(role, location));
         self
     }
 
     /// Add a region constraint
-    pub fn region(mut self, role: impl Into<String>, region: impl Into<String>) -> Self {
+    pub fn region(mut self, role: RoleName, region: Region) -> Self {
         self.topology
             .constraints
-            .push(TopologyConstraint::Region(role.into(), region.into()));
+            .push(TopologyConstraint::Region(role, region));
         self
     }
 
@@ -362,11 +382,11 @@ mod tests {
     fn test_location_display() {
         assert_eq!(Location::Local.to_string(), "local");
         assert_eq!(
-            Location::Remote("localhost:8080".into()).to_string(),
+            Location::Remote(TopologyEndpoint::new("localhost:8080").unwrap()).to_string(),
             "localhost:8080"
         );
         assert_eq!(
-            Location::Colocated("Alice".into()).to_string(),
+            Location::Colocated(RoleName::from_static("Alice")).to_string(),
             "colocated(Alice)"
         );
     }
@@ -375,43 +395,65 @@ mod tests {
     fn test_topology_builder() {
         let topology = Topology::builder()
             .mode(TopologyMode::Local)
-            .local_role("Alice")
-            .remote_role("Bob", "localhost:8080")
-            .colocated("Alice", "Carol")
+            .local_role(RoleName::from_static("Alice"))
+            .remote_role(
+                RoleName::from_static("Bob"),
+                TopologyEndpoint::new("localhost:8080").unwrap(),
+            )
+            .colocated(
+                RoleName::from_static("Alice"),
+                RoleName::from_static("Carol"),
+            )
             .build();
 
         assert_eq!(topology.mode, Some(TopologyMode::Local));
         assert_eq!(topology.locations.len(), 2);
-        assert!(topology.is_local("Alice"));
+        assert!(topology.is_local(&RoleName::from_static("Alice")).unwrap());
     }
 
     #[test]
     fn test_topology_validation() {
         let topology = Topology::builder()
-            .local_role("Alice")
-            .local_role("Bob")
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
             .build();
 
-        let roles = vec!["Alice", "Bob", "Carol"];
+        let roles = vec![
+            RoleName::from_static("Alice"),
+            RoleName::from_static("Bob"),
+            RoleName::from_static("Carol"),
+        ];
         assert!(topology.validate(&roles).is_valid());
 
-        let limited_roles = vec!["Alice"];
+        let limited_roles = vec![RoleName::from_static("Alice")];
         assert!(!topology.validate(&limited_roles).is_valid());
     }
 
     #[test]
     fn test_local_mode() {
         let topology = Topology::local_mode();
-        assert_eq!(topology.get_location("AnyRole"), Location::Local);
+        assert_eq!(
+            topology
+                .get_location(&RoleName::from_static("AnyRole"))
+                .unwrap(),
+            Location::Local
+        );
     }
 
     #[test]
     fn test_constraint_validation() {
-        let topology = Topology::builder().colocated("Alice", "Unknown").build();
+        let topology = Topology::builder()
+            .colocated(
+                RoleName::from_static("Alice"),
+                RoleName::from_static("Unknown"),
+            )
+            .build();
 
-        let roles = vec!["Alice", "Bob"];
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
         match topology.validate(&roles) {
-            TopologyValidation::UnknownRole(role) => assert_eq!(role, "Unknown"),
+            TopologyValidation::UnknownRole(role) => {
+                assert_eq!(role, RoleName::from_static("Unknown"))
+            }
             _ => panic!("Expected UnknownRole"),
         }
     }
@@ -429,8 +471,11 @@ mod tests {
         assert_eq!(parsed.name, "Dev");
         assert_eq!(parsed.for_choreography, "PingPong");
         assert_eq!(
-            parsed.topology.get_location("Alice"),
-            Location::Remote("localhost:8080".to_string())
+            parsed
+                .topology
+                .get_location(&RoleName::from_static("Alice"))
+                .unwrap(),
+            Location::Remote(TopologyEndpoint::new("localhost:8080").unwrap())
         );
     }
 
@@ -445,7 +490,13 @@ mod tests {
         let parsed = Topology::parse(input).unwrap();
         assert_eq!(parsed.topology.mode, Some(TopologyMode::Local));
         // In local mode, all roles are local
-        assert_eq!(parsed.topology.get_location("AnyRole"), Location::Local);
+        assert_eq!(
+            parsed
+                .topology
+                .get_location(&RoleName::from_static("AnyRole"))
+                .unwrap(),
+            Location::Local
+        );
     }
 
     #[test]

@@ -10,7 +10,7 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::runtime::RoleId;
+use rumpsteak_aura_choreography::RoleName;
 use rumpsteak_aura_choreography::simulation::{
     clock::{Clock, MockClock, Rng, SeededRng},
     envelope::ProtocolEnvelope,
@@ -32,18 +32,18 @@ use std::time::Duration;
 fn test_blocked_on_all_variants() {
     // Verify all BlockedOn variants exist and are distinguishable
     let send = BlockedOn::Send {
-        to: RoleId::new("Bob"),
+        to: RoleName::from_static("Bob"),
         message_type: "Request".to_string(),
     };
     let recv = BlockedOn::Recv {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         expected_types: vec!["Response".to_string()],
     };
     let choice = BlockedOn::Choice {
         branches: vec!["Accept".to_string(), "Reject".to_string()],
     };
     let offer = BlockedOn::Offer {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         branches: vec!["Accept".to_string(), "Reject".to_string()],
     };
     let complete = BlockedOn::Complete;
@@ -66,12 +66,12 @@ fn test_blocked_on_is_terminal() {
 
     // Others are not terminal
     assert!(!BlockedOn::Send {
-        to: RoleId::new("Bob"),
+        to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_terminal());
     assert!(!BlockedOn::Recv {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         expected_types: vec!["Msg".to_string()]
     }
     .is_terminal());
@@ -80,7 +80,7 @@ fn test_blocked_on_is_terminal() {
     }
     .is_terminal());
     assert!(!BlockedOn::Offer {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         branches: vec![]
     }
     .is_terminal());
@@ -89,12 +89,12 @@ fn test_blocked_on_is_terminal() {
 #[test]
 fn test_blocked_on_is_send() {
     assert!(BlockedOn::Send {
-        to: RoleId::new("Bob"),
+        to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_send());
     assert!(!BlockedOn::Recv {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         expected_types: vec![]
     }
     .is_send());
@@ -104,12 +104,12 @@ fn test_blocked_on_is_send() {
 #[test]
 fn test_blocked_on_is_recv() {
     assert!(BlockedOn::Recv {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         expected_types: vec!["Msg".to_string()]
     }
     .is_recv());
     assert!(!BlockedOn::Send {
-        to: RoleId::new("Bob"),
+        to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_recv());
@@ -124,12 +124,12 @@ fn test_blocked_on_is_choice() {
     }
     .is_choice());
     assert!(BlockedOn::Offer {
-        from: RoleId::new("Alice"),
+        from: RoleName::from_static("Alice"),
         branches: vec![]
     }
     .is_choice());
     assert!(!BlockedOn::Send {
-        to: RoleId::new("Bob"),
+        to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_choice());
@@ -140,20 +140,20 @@ fn test_blocked_on_is_choice() {
 fn test_linear_state_machine_creation() {
     let states = vec![
         BlockedOn::Send {
-            to: RoleId::new("Bob"),
+            to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
         BlockedOn::Recv {
-            from: RoleId::new("Bob"),
+            from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
         BlockedOn::Complete,
     ];
 
-    let sm = LinearStateMachine::new("TestProtocol", RoleId::new("Alice"), states.clone());
+    let sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states.clone());
 
     assert_eq!(sm.protocol_name(), "TestProtocol");
-    assert_eq!(sm.role().name, "Alice");
+    assert_eq!(sm.role().as_str(), "Alice");
     assert!(matches!(sm.blocked_on(), BlockedOn::Send { .. }));
     assert_eq!(sm.sequence(), 0);
 }
@@ -162,17 +162,17 @@ fn test_linear_state_machine_creation() {
 fn test_linear_state_machine_step_sequence() {
     let states = vec![
         BlockedOn::Send {
-            to: RoleId::new("Bob"),
+            to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
         BlockedOn::Recv {
-            from: RoleId::new("Bob"),
+            from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("TestProtocol", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
 
     // Create envelopes for testing
     let send_env = ProtocolEnvelope::builder()
@@ -216,13 +216,13 @@ fn test_linear_state_machine_step_sequence() {
 fn test_linear_state_machine_wrong_input_type() {
     let states = vec![
         BlockedOn::Send {
-            to: RoleId::new("Bob"),
+            to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("TestProtocol", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
 
     // Create a recv envelope when expecting send
     let recv_env = ProtocolEnvelope::builder()
@@ -249,7 +249,7 @@ fn test_linear_state_machine_choice_step() {
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("ChoiceProtocol", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("ChoiceProtocol", RoleName::from_static("Alice"), states);
 
     // Make a choice
     let result = sm.step(StepInput::choice("Accept"));
@@ -267,7 +267,7 @@ fn test_linear_state_machine_invalid_choice_label() {
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("ChoiceProtocol", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("ChoiceProtocol", RoleName::from_static("Alice"), states);
 
     // Invalid label should fail
     let result = sm.step(StepInput::choice("Invalid"));
@@ -278,13 +278,13 @@ fn test_linear_state_machine_invalid_choice_label() {
 fn test_linear_state_machine_offer_step() {
     let states = vec![
         BlockedOn::Offer {
-            from: RoleId::new("Alice"),
+            from: RoleName::from_static("Alice"),
             branches: vec!["Accept".to_string(), "Reject".to_string()],
         },
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("OfferProtocol", RoleId::new("Bob"), states);
+    let mut sm = LinearStateMachine::new("OfferProtocol", RoleName::from_static("Bob"), states);
 
     // Receive an offer
     let result = sm.step(StepInput::offer("Accept"));
@@ -297,13 +297,13 @@ fn test_linear_state_machine_offer_step() {
 fn test_linear_state_machine_invalid_offer_label() {
     let states = vec![
         BlockedOn::Offer {
-            from: RoleId::new("Alice"),
+            from: RoleName::from_static("Alice"),
             branches: vec!["Accept".to_string(), "Reject".to_string()],
         },
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("OfferProtocol", RoleId::new("Bob"), states);
+    let mut sm = LinearStateMachine::new("OfferProtocol", RoleName::from_static("Bob"), states);
 
     // Invalid label should fail
     let result = sm.step(StepInput::offer("Invalid"));
@@ -314,7 +314,7 @@ fn test_linear_state_machine_invalid_offer_label() {
 fn test_linear_state_machine_complete_returns_completed() {
     let states = vec![BlockedOn::Complete];
 
-    let mut sm = LinearStateMachine::new("CompleteProto", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("CompleteProto", RoleName::from_static("Alice"), states);
 
     assert!(sm.is_complete());
 
@@ -328,7 +328,7 @@ fn test_linear_state_machine_complete_returns_completed() {
 fn test_linear_state_machine_failed_returns_error() {
     let states = vec![BlockedOn::Failed("Protocol error".to_string())];
 
-    let mut sm = LinearStateMachine::new("FailedProto", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("FailedProto", RoleName::from_static("Alice"), states);
 
     assert!(sm.is_complete()); // Failed is terminal
 
@@ -345,17 +345,17 @@ fn test_linear_state_machine_failed_returns_error() {
 fn test_checkpoint_creation() {
     let states = vec![
         BlockedOn::Send {
-            to: RoleId::new("Bob"),
+            to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
         BlockedOn::Recv {
-            from: RoleId::new("Bob"),
+            from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
         BlockedOn::Complete,
     ];
 
-    let sm = LinearStateMachine::new("TestProtocol", RoleId::new("Alice"), states);
+    let sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
     let checkpoint = sm.checkpoint().unwrap();
 
     assert_eq!(checkpoint.protocol, "TestProtocol");
@@ -367,17 +367,17 @@ fn test_checkpoint_creation() {
 fn test_checkpoint_roundtrip() {
     let states = vec![
         BlockedOn::Send {
-            to: RoleId::new("Bob"),
+            to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
         BlockedOn::Recv {
-            from: RoleId::new("Bob"),
+            from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
         BlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("TestProtocol", RoleId::new("Alice"), states.clone());
+    let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states.clone());
 
     // Advance state machine
     let send_env = ProtocolEnvelope::builder()
@@ -397,7 +397,7 @@ fn test_checkpoint_roundtrip() {
     assert_eq!(checkpoint.sequence, 1);
 
     // Create new state machine and restore
-    let mut sm2 = LinearStateMachine::new("TestProtocol", RoleId::new("Alice"), states);
+    let mut sm2 = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
     sm2.restore(&checkpoint).unwrap();
 
     // Verify restored state
@@ -429,7 +429,7 @@ fn test_checkpoint_serialization() {
 fn test_checkpoint_protocol_mismatch() {
     let states = vec![BlockedOn::Complete];
 
-    let mut sm = LinearStateMachine::new("ProtocolA", RoleId::new("Alice"), states);
+    let mut sm = LinearStateMachine::new("ProtocolA", RoleName::from_static("Alice"), states);
 
     let wrong_checkpoint = Checkpoint::new("ProtocolB", "Alice", "state_0");
 
@@ -688,15 +688,15 @@ fn test_in_memory_transport_send_recv() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    client.set_role(RoleId::new("Client"));
+    client.set_role(RoleName::from_static("Client"));
 
     let mut server = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    server.set_role(RoleId::new("Server"));
+    server.set_role(RoleName::from_static("Server"));
 
     let envelope = make_envelope("Client", "Server", "Request");
-    SimulatedTransport::send(&mut client, RoleId::new("Server"), envelope).unwrap();
+    SimulatedTransport::send(&mut client, &RoleName::from_static("Server"), envelope).unwrap();
 
-    let received = SimulatedTransport::recv(&mut server, RoleId::new("Client")).unwrap();
+    let received = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
     assert_eq!(received.from_role, "Client");
     assert_eq!(received.to_role, "Server");
     assert_eq!(received.payload, vec![1, 2, 3]);
@@ -707,10 +707,10 @@ fn test_in_memory_transport_fifo_ordering() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    client.set_role(RoleId::new("Client"));
+    client.set_role(RoleName::from_static("Client"));
 
     let mut server = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    server.set_role(RoleId::new("Server"));
+    server.set_role(RoleName::from_static("Server"));
 
     // Send multiple messages
     for i in 0..5 {
@@ -723,12 +723,12 @@ fn test_in_memory_transport_fifo_ordering() {
             .payload(vec![i as u8])
             .build()
             .unwrap();
-        SimulatedTransport::send(&mut client, RoleId::new("Server"), envelope).unwrap();
+        SimulatedTransport::send(&mut client, &RoleName::from_static("Server"), envelope).unwrap();
     }
 
     // Receive in FIFO order
     for i in 0..5 {
-        let received = SimulatedTransport::recv(&mut server, RoleId::new("Client")).unwrap();
+        let received = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
         assert_eq!(received.sequence, i);
         assert_eq!(received.payload, vec![i as u8]);
     }
@@ -737,10 +737,10 @@ fn test_in_memory_transport_fifo_ordering() {
 #[test]
 fn test_in_memory_transport_no_message() {
     let mut transport = InMemoryTransport::new();
-    transport.set_role(RoleId::new("Client"));
+    transport.set_role(RoleName::from_static("Client"));
 
     // No messages for Client
-    let result = SimulatedTransport::recv(&mut transport, RoleId::new("Server"));
+    let result = SimulatedTransport::recv(&mut transport, &RoleName::from_static("Server"));
     assert!(matches!(result, Err(TransportError::NoMessage(_))));
 }
 
@@ -749,26 +749,26 @@ fn test_in_memory_transport_peek() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    client.set_role(RoleId::new("Client"));
+    client.set_role(RoleName::from_static("Client"));
 
     let mut server = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    server.set_role(RoleId::new("Server"));
+    server.set_role(RoleName::from_static("Server"));
 
     // No messages yet
-    assert!(!server.peek(RoleId::new("Client")));
+    assert!(!server.peek(&RoleName::from_static("Client")));
 
     // Send a message
     let envelope = make_envelope("Client", "Server", "Request");
-    SimulatedTransport::send(&mut client, RoleId::new("Server"), envelope).unwrap();
+    SimulatedTransport::send(&mut client, &RoleName::from_static("Server"), envelope).unwrap();
 
     // Now there's a message
-    assert!(server.peek(RoleId::new("Client")));
+    assert!(server.peek(&RoleName::from_static("Client")));
 
     // Consume it
-    let _ = SimulatedTransport::recv(&mut server, RoleId::new("Client")).unwrap();
+    let _ = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
 
     // No more messages
-    assert!(!server.peek(RoleId::new("Client")));
+    assert!(!server.peek(&RoleName::from_static("Client")));
 }
 
 #[test]
@@ -776,13 +776,13 @@ fn test_in_memory_transport_multiple_recipients() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
 
     let mut alice = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    alice.set_role(RoleId::new("Alice"));
+    alice.set_role(RoleName::from_static("Alice"));
 
     let mut bob = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    bob.set_role(RoleId::new("Bob"));
+    bob.set_role(RoleName::from_static("Bob"));
 
     let mut charlie = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    charlie.set_role(RoleId::new("Charlie"));
+    charlie.set_role(RoleName::from_static("Charlie"));
 
     // Alice sends to Bob and Charlie
     let env_bob = ProtocolEnvelope::builder()
@@ -803,15 +803,15 @@ fn test_in_memory_transport_multiple_recipients() {
         .build()
         .unwrap();
 
-    SimulatedTransport::send(&mut alice, RoleId::new("Bob"), env_bob).unwrap();
-    SimulatedTransport::send(&mut alice, RoleId::new("Charlie"), env_charlie).unwrap();
+    SimulatedTransport::send(&mut alice, &RoleName::from_static("Bob"), env_bob).unwrap();
+    SimulatedTransport::send(&mut alice, &RoleName::from_static("Charlie"), env_charlie).unwrap();
 
     // Bob gets his message
-    let bob_msg = SimulatedTransport::recv(&mut bob, RoleId::new("Alice")).unwrap();
+    let bob_msg = SimulatedTransport::recv(&mut bob, &RoleName::from_static("Alice")).unwrap();
     assert_eq!(bob_msg.payload, vec![1]);
 
     // Charlie gets his message
-    let charlie_msg = SimulatedTransport::recv(&mut charlie, RoleId::new("Alice")).unwrap();
+    let charlie_msg = SimulatedTransport::recv(&mut charlie, &RoleName::from_static("Alice")).unwrap();
     assert_eq!(charlie_msg.payload, vec![2]);
 }
 
@@ -820,14 +820,14 @@ fn test_in_memory_transport_pending_count() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    client.set_role(RoleId::new("Client"));
+    client.set_role(RoleName::from_static("Client"));
 
     assert_eq!(client.pending_count(), 0);
 
     // Send some messages
     for _ in 0..3 {
         let envelope = make_envelope("Client", "Server", "Msg");
-        SimulatedTransport::send(&mut client, RoleId::new("Server"), envelope).unwrap();
+        SimulatedTransport::send(&mut client, &RoleName::from_static("Server"), envelope).unwrap();
     }
 
     assert_eq!(client.pending_count(), 3);
@@ -849,7 +849,7 @@ fn test_in_memory_transport_thread_safe() {
         let q = Arc::clone(&queues);
         handles.push(thread::spawn(move || {
             let mut transport = InMemoryTransport::with_shared_queues(q);
-            transport.set_role(RoleId::new("Client"));
+            transport.set_role(RoleName::from_static("Client"));
 
             let envelope = ProtocolEnvelope::builder()
                 .protocol("Test")
@@ -859,7 +859,7 @@ fn test_in_memory_transport_thread_safe() {
                 .payload(vec![i])
                 .build()
                 .unwrap();
-            SimulatedTransport::send(&mut transport, RoleId::new("Server"), envelope).unwrap();
+            SimulatedTransport::send(&mut transport, &RoleName::from_static("Server"), envelope).unwrap();
         }));
     }
 
@@ -869,10 +869,10 @@ fn test_in_memory_transport_thread_safe() {
 
     // All 10 messages should be there
     let mut server = InMemoryTransport::with_shared_queues(queues);
-    server.set_role(RoleId::new("Server"));
+    server.set_role(RoleName::from_static("Server"));
 
     let mut received = vec![];
-    while let Ok(env) = SimulatedTransport::recv(&mut server, RoleId::new("Client")) {
+    while let Ok(env) = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")) {
         received.push(env.payload[0]);
     }
     received.sort();
@@ -887,7 +887,7 @@ fn test_in_memory_transport_thread_safe() {
 fn test_faulty_transport_zero_drop_rate() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    inner.set_role(RoleId::new("Client"));
+    inner.set_role(RoleName::from_static("Client"));
 
     let mut faulty = FaultyTransport::new(inner).with_drop_rate(0.0).with_seed(12345);
 
@@ -901,15 +901,15 @@ fn test_faulty_transport_zero_drop_rate() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty.send(RoleId::new("Server"), envelope).unwrap();
+        faulty.send(&RoleName::from_static("Server"), envelope).unwrap();
     }
 
     // All should be received
     let mut server = InMemoryTransport::with_shared_queues(queues);
-    server.set_role(RoleId::new("Server"));
+    server.set_role(RoleName::from_static("Server"));
 
     for i in 0u8..10 {
-        let received = SimulatedTransport::recv(&mut server, RoleId::new("Client")).unwrap();
+        let received = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
         assert_eq!(received.payload, vec![i]);
     }
 }
@@ -918,7 +918,7 @@ fn test_faulty_transport_zero_drop_rate() {
 fn test_faulty_transport_full_drop_rate() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    inner.set_role(RoleId::new("Client"));
+    inner.set_role(RoleName::from_static("Client"));
 
     let mut faulty = FaultyTransport::new(inner).with_drop_rate(1.0).with_seed(12345);
 
@@ -932,13 +932,13 @@ fn test_faulty_transport_full_drop_rate() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty.send(RoleId::new("Server"), envelope).unwrap(); // Still "succeeds" but message is dropped
+        faulty.send(&RoleName::from_static("Server"), envelope).unwrap(); // Still "succeeds" but message is dropped
     }
 
     // None should be received - check via server transport
     let mut server = InMemoryTransport::with_shared_queues(queues);
-    server.set_role(RoleId::new("Server"));
-    assert!(SimulatedTransport::recv(&mut server, RoleId::new("Client")).is_err());
+    server.set_role(RoleName::from_static("Server"));
+    assert!(SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).is_err());
 }
 
 #[test]
@@ -948,9 +948,9 @@ fn test_faulty_transport_deterministic_dropping() {
     let queues2 = Arc::new(Mutex::new(HashMap::new()));
 
     let mut inner1 = InMemoryTransport::with_shared_queues(Arc::clone(&queues1));
-    inner1.set_role(RoleId::new("Client"));
+    inner1.set_role(RoleName::from_static("Client"));
     let mut inner2 = InMemoryTransport::with_shared_queues(Arc::clone(&queues2));
-    inner2.set_role(RoleId::new("Client"));
+    inner2.set_role(RoleName::from_static("Client"));
 
     let mut faulty1 = FaultyTransport::new(inner1).with_drop_rate(0.5).with_seed(42);
     let mut faulty2 = FaultyTransport::new(inner2).with_drop_rate(0.5).with_seed(42);
@@ -964,23 +964,23 @@ fn test_faulty_transport_deterministic_dropping() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty1.send(RoleId::new("Server"), envelope.clone()).unwrap();
-        faulty2.send(RoleId::new("Server"), envelope).unwrap();
+        faulty1.send(&RoleName::from_static("Server"), envelope.clone()).unwrap();
+        faulty2.send(&RoleName::from_static("Server"), envelope).unwrap();
     }
 
     // Both should have same messages (same drop pattern)
     let mut server1 = InMemoryTransport::with_shared_queues(queues1);
-    server1.set_role(RoleId::new("Server"));
+    server1.set_role(RoleName::from_static("Server"));
     let mut server2 = InMemoryTransport::with_shared_queues(queues2);
-    server2.set_role(RoleId::new("Server"));
+    server2.set_role(RoleName::from_static("Server"));
 
     let mut received1 = vec![];
     let mut received2 = vec![];
 
-    while let Ok(env) = SimulatedTransport::recv(&mut server1, RoleId::new("Client")) {
+    while let Ok(env) = SimulatedTransport::recv(&mut server1, &RoleName::from_static("Client")) {
         received1.push(env.payload[0]);
     }
-    while let Ok(env) = SimulatedTransport::recv(&mut server2, RoleId::new("Client")) {
+    while let Ok(env) = SimulatedTransport::recv(&mut server2, &RoleName::from_static("Client")) {
         received2.push(env.payload[0]);
     }
 
@@ -993,9 +993,9 @@ fn test_faulty_transport_different_seeds_different_drops() {
     let queues2 = Arc::new(Mutex::new(HashMap::new()));
 
     let mut inner1 = InMemoryTransport::with_shared_queues(Arc::clone(&queues1));
-    inner1.set_role(RoleId::new("Client"));
+    inner1.set_role(RoleName::from_static("Client"));
     let mut inner2 = InMemoryTransport::with_shared_queues(Arc::clone(&queues2));
-    inner2.set_role(RoleId::new("Client"));
+    inner2.set_role(RoleName::from_static("Client"));
 
     let mut faulty1 = FaultyTransport::new(inner1).with_drop_rate(0.5).with_seed(111);
     let mut faulty2 = FaultyTransport::new(inner2).with_drop_rate(0.5).with_seed(222);
@@ -1009,22 +1009,22 @@ fn test_faulty_transport_different_seeds_different_drops() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty1.send(RoleId::new("Server"), envelope.clone()).unwrap();
-        faulty2.send(RoleId::new("Server"), envelope).unwrap();
+        faulty1.send(&RoleName::from_static("Server"), envelope.clone()).unwrap();
+        faulty2.send(&RoleName::from_static("Server"), envelope).unwrap();
     }
 
     let mut server1 = InMemoryTransport::with_shared_queues(queues1);
-    server1.set_role(RoleId::new("Server"));
+    server1.set_role(RoleName::from_static("Server"));
     let mut server2 = InMemoryTransport::with_shared_queues(queues2);
-    server2.set_role(RoleId::new("Server"));
+    server2.set_role(RoleName::from_static("Server"));
 
     let mut received1 = vec![];
     let mut received2 = vec![];
 
-    while let Ok(env) = SimulatedTransport::recv(&mut server1, RoleId::new("Client")) {
+    while let Ok(env) = SimulatedTransport::recv(&mut server1, &RoleName::from_static("Client")) {
         received1.push(env.payload[0]);
     }
-    while let Ok(env) = SimulatedTransport::recv(&mut server2, RoleId::new("Client")) {
+    while let Ok(env) = SimulatedTransport::recv(&mut server2, &RoleName::from_static("Client")) {
         received2.push(env.payload[0]);
     }
 
@@ -1036,7 +1036,7 @@ fn test_faulty_transport_different_seeds_different_drops() {
 fn test_faulty_transport_partial_drop_rate() {
     let queues = Arc::new(Mutex::new(HashMap::new()));
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-    inner.set_role(RoleId::new("Client"));
+    inner.set_role(RoleName::from_static("Client"));
 
     let mut faulty = FaultyTransport::new(inner).with_drop_rate(0.3).with_seed(12345);
 
@@ -1050,14 +1050,14 @@ fn test_faulty_transport_partial_drop_rate() {
             .payload(vec![(i % 256) as u8])
             .build()
             .unwrap();
-        faulty.send(RoleId::new("Server"), envelope).unwrap();
+        faulty.send(&RoleName::from_static("Server"), envelope).unwrap();
     }
 
     let mut server = InMemoryTransport::with_shared_queues(queues);
-    server.set_role(RoleId::new("Server"));
+    server.set_role(RoleName::from_static("Server"));
 
     let mut recv_count = 0;
-    while SimulatedTransport::recv(&mut server, RoleId::new("Client")).is_ok() {
+    while SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).is_ok() {
         recv_count += 1;
     }
 

@@ -34,10 +34,11 @@
 
 pub mod adapter;
 pub mod spawn;
+pub mod sync;
 
 // Re-export main types
 pub use adapter::{
     ChoiceLabel, ChoreographicAdapter, ChoreographicAdapterExt, ExecutionMetadata, Message,
-    ProtocolContext, ProtocolOutput, RoleId,
+    ProtocolContext, ProtocolOutput,
 };
 pub use spawn::{spawn, spawn_local, AsyncRuntime};

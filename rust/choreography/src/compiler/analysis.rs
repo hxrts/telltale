@@ -378,14 +378,16 @@ pub fn generate_dot_graph(comm_graph: &CommunicationGraph) -> String {
 
     // Add nodes
     for node in &comm_graph.nodes {
-        dot.push_str(&format!("  {};\n", node.name));
+        dot.push_str(&format!("  {};\n", node.name()));
     }
 
     // Add edges
     for (from, to, label) in &comm_graph.edges {
         dot.push_str(&format!(
             "  {} -> {} [label=\"{}\"];\n",
-            from.name, to.name, label
+            from.name(),
+            to.name(),
+            label
         ));
     }
 

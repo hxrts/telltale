@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
 #[cfg(feature = "test-utils")]
-use crate::effects::{ChoreoHandler, Label, Result};
+use crate::effects::{ChoreoHandler, Result, RoleId};
 
 /// Fault injection middleware for testing
 #[cfg(feature = "test-utils")]
@@ -91,12 +91,16 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
         self.inner.choose(ep, who, label).await
     }
 
-    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         self.inner.offer(ep, from).await
     }
 

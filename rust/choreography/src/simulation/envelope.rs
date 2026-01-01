@@ -5,6 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::effects::RoleId;
+use crate::identifiers::RoleName;
+
 /// A protocol message envelope containing metadata and payload.
 ///
 /// Envelopes provide a standard wrapper for messages that includes
@@ -15,11 +18,11 @@ pub struct ProtocolEnvelope {
     /// Name of the protocol this message belongs to.
     pub protocol: String,
     /// Role sending the message.
-    pub from_role: String,
+    pub from_role: RoleName,
     /// Role index if the sender is a parameterized role.
     pub from_index: Option<u32>,
     /// Role receiving the message.
-    pub to_role: String,
+    pub to_role: RoleName,
     /// Role index if the receiver is a parameterized role.
     pub to_index: Option<u32>,
     /// Type name of the message payload.
@@ -55,14 +58,14 @@ impl ProtocolEnvelope {
 
     /// Check if this envelope is from a specific role.
     #[must_use]
-    pub fn is_from(&self, role: &str) -> bool {
-        self.from_role == role
+    pub fn is_from(&self, role: &RoleName) -> bool {
+        &self.from_role == role
     }
 
     /// Check if this envelope is to a specific role.
     #[must_use]
-    pub fn is_to(&self, role: &str) -> bool {
-        self.to_role == role
+    pub fn is_to(&self, role: &RoleName) -> bool {
+        &self.to_role == role
     }
 
     /// Create a routing key for this envelope (useful for message queues).
@@ -108,9 +111,9 @@ impl ProtocolEnvelope {
 #[derive(Debug, Default)]
 pub struct EnvelopeBuilder {
     protocol: Option<String>,
-    from_role: Option<String>,
+    from_role: Option<RoleName>,
     from_index: Option<u32>,
-    to_role: Option<String>,
+    to_role: Option<RoleName>,
     to_index: Option<u32>,
     message_type: Option<String>,
     sequence: u64,
@@ -128,8 +131,16 @@ impl EnvelopeBuilder {
 
     /// Set the sender role.
     #[must_use]
-    pub fn sender(mut self, role: impl Into<String>) -> Self {
-        self.from_role = Some(role.into());
+    pub fn sender(mut self, role: RoleName) -> Self {
+        self.from_role = Some(role);
+        self
+    }
+
+    /// Set the sender role from a typed role identifier.
+    #[must_use]
+    pub fn sender_role<R: RoleId>(mut self, role: R) -> Self {
+        self.from_role = Some(role.role_name());
+        self.from_index = role.role_index();
         self
     }
 
@@ -142,8 +153,16 @@ impl EnvelopeBuilder {
 
     /// Set the receiver role.
     #[must_use]
-    pub fn recipient(mut self, role: impl Into<String>) -> Self {
-        self.to_role = Some(role.into());
+    pub fn recipient(mut self, role: RoleName) -> Self {
+        self.to_role = Some(role);
+        self
+    }
+
+    /// Set the receiver role from a typed role identifier.
+    #[must_use]
+    pub fn recipient_role<R: RoleId>(mut self, role: R) -> Self {
+        self.to_role = Some(role.role_name());
+        self.to_index = role.role_index();
         self
     }
 
@@ -193,14 +212,16 @@ impl EnvelopeBuilder {
     pub fn build(self) -> Result<ProtocolEnvelope, EnvelopeError> {
         let protocol = self
             .protocol
-            .ok_or(EnvelopeError::MissingField("protocol"))?;
+            .ok_or(EnvelopeError::MissingField(EnvelopeField::Protocol))?;
         let from_role = self
             .from_role
-            .ok_or(EnvelopeError::MissingField("from_role"))?;
-        let to_role = self.to_role.ok_or(EnvelopeError::MissingField("to_role"))?;
+            .ok_or(EnvelopeError::MissingField(EnvelopeField::FromRole))?;
+        let to_role = self
+            .to_role
+            .ok_or(EnvelopeError::MissingField(EnvelopeField::ToRole))?;
         let message_type = self
             .message_type
-            .ok_or(EnvelopeError::MissingField("message_type"))?;
+            .ok_or(EnvelopeError::MissingField(EnvelopeField::MessageType))?;
 
         let timestamp_ns = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -222,12 +243,36 @@ impl EnvelopeBuilder {
     }
 }
 
+/// Required fields for protocol envelopes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnvelopeField {
+    /// Protocol name field.
+    Protocol,
+    /// Sender role field.
+    FromRole,
+    /// Recipient role field.
+    ToRole,
+    /// Message type field.
+    MessageType,
+}
+
+impl std::fmt::Display for EnvelopeField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnvelopeField::Protocol => write!(f, "protocol"),
+            EnvelopeField::FromRole => write!(f, "from_role"),
+            EnvelopeField::ToRole => write!(f, "to_role"),
+            EnvelopeField::MessageType => write!(f, "message_type"),
+        }
+    }
+}
+
 /// Errors that can occur when working with envelopes.
 #[derive(Debug, thiserror::Error)]
 pub enum EnvelopeError {
     /// A required field was not set.
     #[error("Missing required field: {0}")]
-    MissingField(&'static str),
+    MissingField(EnvelopeField),
 
     /// Serialization failed.
     #[error("Serialization error: {0}")]
@@ -241,13 +286,14 @@ pub enum EnvelopeError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::identifiers::RoleName;
 
     #[test]
     fn test_envelope_builder() {
         let envelope = ProtocolEnvelope::builder()
             .protocol("TestProtocol")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Request")
             .sequence(1)
             .payload(vec![1, 2, 3])
@@ -255,8 +301,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(envelope.protocol, "TestProtocol");
-        assert_eq!(envelope.from_role, "Client");
-        assert_eq!(envelope.to_role, "Server");
+        assert_eq!(envelope.from_role.as_str(), "Client");
+        assert_eq!(envelope.to_role.as_str(), "Server");
         assert_eq!(envelope.message_type, "Request");
         assert_eq!(envelope.sequence, 1);
         assert_eq!(envelope.payload, vec![1, 2, 3]);
@@ -266,8 +312,8 @@ mod tests {
     fn test_routing_key() {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Proto")
-            .sender("A")
-            .recipient("B")
+            .sender(RoleName::from_static("A"))
+            .recipient(RoleName::from_static("B"))
             .message_type("Msg")
             .build()
             .unwrap();
@@ -276,9 +322,9 @@ mod tests {
 
         let indexed = ProtocolEnvelope::builder()
             .protocol("Proto")
-            .sender("Worker")
+            .sender(RoleName::from_static("Worker"))
             .sender_index(0)
-            .recipient("Manager")
+            .recipient(RoleName::from_static("Manager"))
             .message_type("Msg")
             .build()
             .unwrap();
@@ -290,8 +336,8 @@ mod tests {
     fn test_envelope_roundtrip() {
         let original = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("A")
-            .recipient("B")
+            .sender(RoleName::from_static("A"))
+            .recipient(RoleName::from_static("B"))
             .message_type("Msg")
             .payload(vec![1, 2, 3, 4, 5])
             .build()

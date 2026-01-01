@@ -167,8 +167,8 @@ fn format_role_list(roles: &[Role]) -> String {
     roles
         .iter()
         .map(|role| {
-            let mut out = role.name.to_string();
-            if let Some(param) = &role.param {
+            let mut out = role.name().to_string();
+            if let Some(param) = role.param() {
                 out.push('[');
                 out.push_str(&format_role_param(param));
                 out.push(']');
@@ -184,8 +184,8 @@ fn format_role_param(param: &RoleParam) -> String {
 }
 
 fn format_role_ref(role: &Role) -> String {
-    let mut out = role.name.to_string();
-    if let Some(index) = &role.index {
+    let mut out = role.name().to_string();
+    if let Some(index) = role.index() {
         out.push('[');
         out.push_str(&index.to_string());
         out.push(']');

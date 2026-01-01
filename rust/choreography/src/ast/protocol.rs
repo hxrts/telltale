@@ -1,8 +1,8 @@
 // Protocol AST definitions
 
-use super::{MessageType, Role, ValidationError};
+use super::annotation::Annotations;
+use super::{MessageType, NonEmptyVec, Role, ValidationError};
 use proc_macro2::{Ident, TokenStream};
-use std::collections::HashMap;
 
 /// Protocol specification using choreographic constructs
 #[derive(Debug)]
@@ -14,31 +14,31 @@ pub enum Protocol {
         message: MessageType,
         continuation: Box<Protocol>,
         /// Statement-level annotations
-        annotations: HashMap<String, String>,
+        annotations: Annotations,
         /// From role annotations
-        from_annotations: HashMap<String, String>,
+        from_annotations: Annotations,
         /// To role annotations
-        to_annotations: HashMap<String, String>,
+        to_annotations: Annotations,
     },
 
     /// Broadcast: A -> *: Message
     Broadcast {
         from: Role,
-        to_all: Vec<Role>,
+        to_all: NonEmptyVec<Role>,
         message: MessageType,
         continuation: Box<Protocol>,
         /// Statement-level annotations
-        annotations: HashMap<String, String>,
+        annotations: Annotations,
         /// From role annotations
-        from_annotations: HashMap<String, String>,
+        from_annotations: Annotations,
     },
 
     /// Choice made by a role
     Choice {
         role: Role,
-        branches: Vec<Branch>,
+        branches: NonEmptyVec<Branch>,
         /// Statement-level annotations
-        annotations: HashMap<String, String>,
+        annotations: Annotations,
     },
 
     /// Loop construct
@@ -48,7 +48,7 @@ pub enum Protocol {
     },
 
     /// Parallel composition
-    Parallel { protocols: Vec<Protocol> },
+    Parallel { protocols: NonEmptyVec<Protocol> },
 
     /// Recursive protocol with label
     Rec { label: Ident, body: Box<Protocol> },
@@ -63,7 +63,7 @@ pub enum Protocol {
         /// Continuation after this extension
         continuation: Box<Protocol>,
         /// Statement-level annotations
-        annotations: HashMap<String, String>,
+        annotations: Annotations,
     },
 
     /// Protocol termination
@@ -146,10 +146,10 @@ impl Protocol {
                 ..
             } => {
                 if !role_is_declared(from) {
-                    return Err(ValidationError::UndefinedRole(from.name.to_string()));
+                    return Err(ValidationError::UndefinedRole(from.name().to_string()));
                 }
                 if !role_is_declared(to) {
-                    return Err(ValidationError::UndefinedRole(to.name.to_string()));
+                    return Err(ValidationError::UndefinedRole(to.name().to_string()));
                 }
                 continuation.validate(roles)
             }
@@ -160,27 +160,27 @@ impl Protocol {
                 ..
             } => {
                 if !role_is_declared(from) {
-                    return Err(ValidationError::UndefinedRole(from.name.to_string()));
+                    return Err(ValidationError::UndefinedRole(from.name().to_string()));
                 }
                 for to in to_all {
                     if !role_is_declared(to) {
-                        return Err(ValidationError::UndefinedRole(to.name.to_string()));
+                        return Err(ValidationError::UndefinedRole(to.name().to_string()));
                     }
                 }
                 continuation.validate(roles)
             }
             Protocol::Choice { role, branches, .. } => {
                 if !role_is_declared(role) {
-                    return Err(ValidationError::UndefinedRole(role.name.to_string()));
+                    return Err(ValidationError::UndefinedRole(role.name().to_string()));
                 }
                 // Validate each branch starts with the choosing role sending
                 for branch in branches {
                     if let Protocol::Send { from, .. } = &branch.protocol {
                         if from != role {
-                            return Err(ValidationError::InvalidChoice(role.name.to_string()));
+                            return Err(ValidationError::InvalidChoice(role.name().to_string()));
                         }
                     } else {
-                        return Err(ValidationError::InvalidChoice(role.name.to_string()));
+                        return Err(ValidationError::InvalidChoice(role.name().to_string()));
                     }
                 }
                 Ok(())
@@ -209,7 +209,7 @@ impl Protocol {
     }
 
     /// Get statement-level annotations for this protocol node
-    pub fn get_annotations(&self) -> &HashMap<String, String> {
+    pub fn get_annotations(&self) -> &Annotations {
         match self {
             Protocol::Send { annotations, .. } => annotations,
             Protocol::Broadcast { annotations, .. } => annotations,
@@ -220,26 +220,25 @@ impl Protocol {
             | Protocol::Rec { .. }
             | Protocol::Var(_)
             | Protocol::End => {
-                // Return empty map for protocol nodes that don't have annotations yet
-                static EMPTY: std::sync::OnceLock<HashMap<String, String>> =
-                    std::sync::OnceLock::new();
-                EMPTY.get_or_init(HashMap::new)
+                // Return empty annotations for protocol nodes that don't have annotations yet
+                static EMPTY: std::sync::OnceLock<Annotations> = std::sync::OnceLock::new();
+                EMPTY.get_or_init(Annotations::new)
             }
         }
     }
 
-    /// Get a specific annotation value
-    pub fn get_annotation(&self, key: &str) -> Option<&String> {
+    /// Get a specific annotation value (backward compatibility - returns string)
+    pub fn get_annotation(&self, key: &str) -> Option<String> {
         self.get_annotations().get(key)
     }
 
     /// Check if this protocol node has a specific annotation
     pub fn has_annotation(&self, key: &str) -> bool {
-        self.get_annotations().contains_key(key)
+        self.get_annotations().has(key)
     }
 
     /// Get from-role annotations for Send/Broadcast statements
-    pub fn get_from_annotations(&self) -> Option<&HashMap<String, String>> {
+    pub fn get_from_annotations(&self) -> Option<&Annotations> {
         match self {
             Protocol::Send {
                 from_annotations, ..
@@ -251,8 +250,8 @@ impl Protocol {
         }
     }
 
-    /// Get to-role annotations for Send statements  
-    pub fn get_to_annotations(&self) -> Option<&HashMap<String, String>> {
+    /// Get to-role annotations for Send statements
+    pub fn get_to_annotations(&self) -> Option<&Annotations> {
         match self {
             Protocol::Send { to_annotations, .. } => Some(to_annotations),
             _ => None,
@@ -260,7 +259,7 @@ impl Protocol {
     }
 
     /// Get mutable reference to annotations for modification
-    pub fn get_annotations_mut(&mut self) -> Option<&mut HashMap<String, String>> {
+    pub fn get_annotations_mut(&mut self) -> Option<&mut Annotations> {
         match self {
             Protocol::Send { annotations, .. } => Some(annotations),
             Protocol::Broadcast { annotations, .. } => Some(annotations),
@@ -275,7 +274,7 @@ impl Protocol {
     }
 
     /// Get mutable reference to from-role annotations
-    pub fn get_from_annotations_mut(&mut self) -> Option<&mut HashMap<String, String>> {
+    pub fn get_from_annotations_mut(&mut self) -> Option<&mut Annotations> {
         match self {
             Protocol::Send {
                 from_annotations, ..
@@ -287,57 +286,22 @@ impl Protocol {
         }
     }
 
-    /// Get mutable reference to to-role annotations  
-    pub fn get_to_annotations_mut(&mut self) -> Option<&mut HashMap<String, String>> {
+    /// Get mutable reference to to-role annotations
+    pub fn get_to_annotations_mut(&mut self) -> Option<&mut Annotations> {
         match self {
             Protocol::Send { to_annotations, .. } => Some(to_annotations),
             _ => None,
         }
     }
 
-    /// Set a statement-level annotation
-    pub fn set_annotation(&mut self, key: String, value: String) -> bool {
+    /// Add a typed annotation
+    pub fn add_annotation(&mut self, annotation: super::annotation::ProtocolAnnotation) -> bool {
         if let Some(annotations) = self.get_annotations_mut() {
-            annotations.insert(key, value);
+            annotations.push(annotation);
             true
         } else {
             false
         }
-    }
-
-    /// Remove a statement-level annotation
-    pub fn remove_annotation(&mut self, key: &str) -> Option<String> {
-        self.get_annotations_mut()?.remove(key)
-    }
-
-    /// Set a from-role annotation
-    pub fn set_from_annotation(&mut self, key: String, value: String) -> bool {
-        if let Some(annotations) = self.get_from_annotations_mut() {
-            annotations.insert(key, value);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Set a to-role annotation
-    pub fn set_to_annotation(&mut self, key: String, value: String) -> bool {
-        if let Some(annotations) = self.get_to_annotations_mut() {
-            annotations.insert(key, value);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Remove a from-role annotation
-    pub fn remove_from_annotation(&mut self, key: &str) -> Option<String> {
-        self.get_from_annotations_mut()?.remove(key)
-    }
-
-    /// Remove a to-role annotation
-    pub fn remove_to_annotation(&mut self, key: &str) -> Option<String> {
-        self.get_to_annotations_mut()?.remove(key)
     }
 
     /// Clear all annotations on this protocol node
@@ -353,7 +317,7 @@ impl Protocol {
         }
     }
 
-    /// Get annotation as a specific type (e.g., integer, boolean)
+    /// Get annotation as a specific type (e.g., integer, boolean) - backward compat
     pub fn get_annotation_as<T>(&self, key: &str) -> Option<T>
     where
         T: std::str::FromStr,
@@ -374,13 +338,7 @@ impl Protocol {
     /// Check if annotation value matches a specific string (case-insensitive)
     pub fn annotation_matches(&self, key: &str, expected: &str) -> bool {
         self.get_annotation(key)
-            .map(|value| value.eq_ignore_ascii_case(expected))
-            .unwrap_or(false)
-    }
-
-    /// Get all annotation keys
-    pub fn annotation_keys(&self) -> Vec<&String> {
-        self.get_annotations().keys().collect()
+            .is_some_and(|value| value.eq_ignore_ascii_case(expected))
     }
 
     /// Check if any annotations are present
@@ -401,9 +359,7 @@ impl Protocol {
     pub fn merge_annotations_from(&mut self, other: &Protocol) {
         // Merge statement annotations
         if let Some(self_annotations) = self.get_annotations_mut() {
-            for (key, value) in other.get_annotations() {
-                self_annotations.insert(key.clone(), value.clone());
-            }
+            self_annotations.merge(other.get_annotations());
         }
 
         // Merge from-role annotations
@@ -411,28 +367,15 @@ impl Protocol {
             self.get_from_annotations_mut(),
             other.get_from_annotations(),
         ) {
-            for (key, value) in other_from {
-                self_from.insert(key.clone(), value.clone());
-            }
+            self_from.merge(other_from);
         }
 
         // Merge to-role annotations
         if let (Some(self_to), Some(other_to)) =
             (self.get_to_annotations_mut(), other.get_to_annotations())
         {
-            for (key, value) in other_to {
-                self_to.insert(key.clone(), value.clone());
-            }
+            self_to.merge(other_to);
         }
-    }
-
-    /// Filter annotations by key prefix
-    pub fn get_annotations_with_prefix(&self, prefix: &str) -> HashMap<String, String> {
-        self.get_annotations()
-            .iter()
-            .filter(|(key, _)| key.starts_with(prefix))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
     }
 
     /// Validate that required annotations are present

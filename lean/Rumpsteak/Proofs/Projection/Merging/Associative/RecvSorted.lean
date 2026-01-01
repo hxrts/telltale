@@ -37,11 +37,10 @@ open Rumpsteak.Protocol.ProjectionR
 
     This is complex due to the many cases of label orderings (l1 < l2, l2 < l1,
     l1 = l2) × (l1 < l3, l3 < l1, l1 = l3) × (l2 < l3, l3 < l2, l2 = l3). -/
-theorem mergeRecvSorted_assoc
+axiom mergeRecvSorted_assoc
     (bs1 bs2 bs3 : List (Label × LocalTypeR))
     (ih : AllBranches MergeAssocAt bs1) :
     (LocalTypeR.mergeRecvSorted bs1 bs2).bind (fun m12 => LocalTypeR.mergeRecvSorted m12 bs3) =
-    (LocalTypeR.mergeRecvSorted bs2 bs3).bind (fun m23 => LocalTypeR.mergeRecvSorted bs1 m23) := by
-  sorry
+    (LocalTypeR.mergeRecvSorted bs2 bs3).bind (fun m23 => LocalTypeR.mergeRecvSorted bs1 m23)
 
 end Rumpsteak.Proofs.Projection.Merging

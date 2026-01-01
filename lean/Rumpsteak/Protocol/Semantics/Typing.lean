@@ -630,6 +630,42 @@ theorem getQueue_of_mem (c : Configuration) (ch : Channel) (q : Queue)
     (hmem : (ch, q) ∈ c.queues)
     (hunique : ∀ ch' q1 q2, (ch', q1) ∈ c.queues → (ch', q2) ∈ c.queues → q1 = q2)
     : c.getQueue ch = q := by
-  sorry
+  unfold Configuration.getQueue
+  induction c.queues with
+  | nil =>
+    cases hmem
+  | cons head tail ih =>
+    cases head with
+    | mk ch' q' =>
+      simp only [List.find?_cons]
+      by_cases hch : ch' == ch
+      · -- find? hits the head
+        simp [hch]
+        have hchEq : ch' = ch := by
+          exact beq_iff_eq.mp hch
+        -- Use uniqueness to show q' = q
+        have hmem_head : (ch', q') ∈ (ch', q') :: tail := List.mem_cons_self _ _
+        have hmem_q : (ch', q) ∈ (ch', q') :: tail := by
+          simpa [hchEq] using hmem
+        have hqeq : q' = q := hunique ch' q' q hmem_head hmem_q
+        simpa [hqeq]
+      · -- find? continues in the tail
+        simp [hch] at hmem
+        -- (ch, q) must be in the tail
+        have hmem_tail : (ch, q) ∈ tail := by
+          cases hmem with
+          | head =>
+            -- head channel is different from ch
+            cases hmem
+            have : False := by
+              simpa using hch
+            exact False.elim this
+          | tail _ htail => exact htail
+        -- Apply IH on the tail with restricted uniqueness
+        have hunique_tail :
+            ∀ ch'' q1 q2, (ch'', q1) ∈ tail → (ch'', q2) ∈ tail → q1 = q2 := by
+          intro ch'' q1 q2 h1 h2
+          exact hunique ch'' q1 q2 (List.mem_cons_of_mem _ h1) (List.mem_cons_of_mem _ h2)
+        exact ih hmem_tail hunique_tail
 
 end Rumpsteak.Protocol.Semantics.Typing

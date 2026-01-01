@@ -16,6 +16,7 @@ pub mod compiler;
 pub mod effects;
 pub mod extensions;
 pub mod heap;
+pub mod identifiers;
 pub mod runtime;
 pub mod simulation;
 pub mod testing;
@@ -24,9 +25,12 @@ pub mod tracing;
 
 // Re-export runtime adapter types
 pub use runtime::{
-    ChoreographicAdapter, ChoreographicAdapterExt, Message, ProtocolContext, ProtocolOutput,
-    RoleId as AdapterRoleId,
+    ChoiceLabel, ChoreographicAdapter, ChoreographicAdapterExt, Message, ProtocolContext,
+    ProtocolOutput,
 };
+
+// Re-export typed identifiers
+pub use identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
 
 // Re-export main APIs
 pub use ast::{Choreography, MessageType, Protocol, Role};
@@ -40,7 +44,8 @@ pub use effects::middleware::{Metrics, Retry, Trace};
 pub use effects::NoOpHandler;
 pub use effects::{
     interpret, ChoreoHandler, ChoreoHandlerExt, ChoreographyError, Effect, Endpoint,
-    InterpretResult, InterpreterState, Label, Program, ProgramMessage, Result, RoleId,
+    InterpretResult, InterpreterState, LabelId, MessageTag, Program, ProgramBuilder, ProgramMessage,
+    Result, RoleId,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
 pub use effects::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
@@ -51,7 +56,7 @@ pub use extensions::{
 pub use runtime::{spawn, spawn_local};
 pub use topology::{
     parse_topology, ByteMessage, InMemoryChannelTransport, Location, ParsedTopology, Topology,
-    TopologyBuilder, TopologyConstraint, TopologyHandler, TopologyHandlerBuilder,
+    TopologyBuilder, TopologyConstraint, TopologyError, TopologyHandler, TopologyHandlerBuilder,
     TopologyLoadError, TopologyMode, TopologyParseError, TopologyValidation, Transport,
     TransportError, TransportFactory, TransportMessage, TransportResult, TransportType,
 };
@@ -146,6 +151,46 @@ pub enum CompilationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::effects::{LabelId, RoleId};
+    use crate::identifiers::RoleName;
+
+    // Simple test role type for unit tests
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    enum TestRole {
+        Alice,
+        Bob,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    enum TestLabel {
+        Test,
+    }
+
+    impl LabelId for TestLabel {
+        fn as_str(&self) -> &'static str {
+            match self {
+                TestLabel::Test => "test",
+            }
+        }
+
+        fn from_str(label: &str) -> Option<Self> {
+            match label {
+                "test" => Some(TestLabel::Test),
+                _ => None,
+            }
+        }
+    }
+
+    impl RoleId for TestRole {
+        type Label = TestLabel;
+
+        fn role_name(&self) -> RoleName {
+            match self {
+                TestRole::Alice => RoleName::from_static("Alice"),
+                TestRole::Bob => RoleName::from_static("Bob"),
+            }
+        }
+    }
 
     #[test]
     fn test_module_structure() {
@@ -156,9 +201,9 @@ mod tests {
         let _message_type: Option<MessageType> = None;
 
         // Test effect system is available
-        let _program: Option<Program<(), ()>> = None;
+        let _program: Option<Program<TestRole, String>> = None;
         let _result: Option<Result<()>> = None;
-        let _label: Option<Label> = None;
+        let _label: Option<TestLabel> = None;
     }
 
     #[test]
@@ -166,12 +211,16 @@ mod tests {
         use std::time::Duration;
 
         // Test that Program can be built using the free algebra API
-        let program = Program::new()
-            .send((), ())
-            .recv::<()>(())
-            .choose((), Label("test"))
-            .offer(())
-            .with_timeout((), Duration::from_millis(100), Program::new().end())
+        let program = Program::<TestRole, String>::new()
+            .send(TestRole::Bob, "hello".to_string())
+            .recv::<String>(TestRole::Bob)
+            .choose(TestRole::Bob, TestLabel::Test)
+            .offer(TestRole::Bob)
+            .with_timeout(
+                TestRole::Bob,
+                Duration::from_millis(100),
+                Program::new().end(),
+            )
             .parallel(vec![Program::new().end()])
             .end();
 

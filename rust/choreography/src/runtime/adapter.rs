@@ -22,20 +22,24 @@
 //! #[async_trait]
 //! impl ChoreographicAdapter for MyAdapter {
 //!     type Error = MyError;
+//!     type Role = MyRole;
 //!
-//!     async fn send<M: Message>(&mut self, to: RoleId, msg: M) -> Result<(), Self::Error> {
+//!     async fn send<M: Message>(&mut self, to: MyRole, msg: M) -> Result<(), Self::Error> {
 //!         // Send implementation
 //!     }
 //!
-//!     async fn recv<M: Message>(&mut self, from: RoleId) -> Result<M, Self::Error> {
+//!     async fn recv<M: Message>(&mut self, from: MyRole) -> Result<M, Self::Error> {
 //!         // Receive implementation
 //!     }
 //! }
 //! ```
 
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
+
+use crate::effects::{LabelId, RoleId};
+use crate::identifiers::RoleName;
 
 /// Trait for message types that can be sent/received in a choreography.
 ///
@@ -45,50 +49,6 @@ pub trait Message: Serialize + DeserializeOwned + Send + Sync + Debug + 'static 
 
 /// Blanket implementation for all types satisfying the bounds.
 impl<T: Serialize + DeserializeOwned + Send + Sync + Debug + 'static> Message for T {}
-
-/// Role identifier for choreographic protocols.
-///
-/// This is a simplified role ID that can represent both static roles
-/// and indexed roles (e.g., `Witness[0]`, `Worker[n]`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RoleId {
-    /// The base role name (e.g., "Witness", "Worker")
-    pub name: &'static str,
-    /// Optional index for parameterized roles
-    pub index: Option<u32>,
-}
-
-impl RoleId {
-    /// Create a new static (non-indexed) role.
-    #[must_use]
-    pub const fn new(name: &'static str) -> Self {
-        Self { name, index: None }
-    }
-
-    /// Create a new indexed role.
-    #[must_use]
-    pub const fn indexed(name: &'static str, index: u32) -> Self {
-        Self {
-            name,
-            index: Some(index),
-        }
-    }
-
-    /// Check if this role has an index.
-    #[must_use]
-    pub const fn is_indexed(&self) -> bool {
-        self.index.is_some()
-    }
-}
-
-impl std::fmt::Display for RoleId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.index {
-            Some(i) => write!(f, "{}[{}]", self.name, i),
-            None => write!(f, "{}", self.name),
-        }
-    }
-}
 
 /// The core adapter trait for choreographic protocol execution.
 ///
@@ -109,6 +69,8 @@ impl std::fmt::Display for RoleId {
 pub trait ChoreographicAdapter: Send {
     /// The error type for this adapter.
     type Error: std::error::Error + Send + Sync + 'static;
+    /// The role identifier type for this adapter.
+    type Role: RoleId;
 
     /// Send a message to a specific role.
     ///
@@ -120,7 +82,7 @@ pub trait ChoreographicAdapter: Send {
     /// # Errors
     ///
     /// Returns an error if the send fails (transport error, serialization, etc.)
-    async fn send<M: Message>(&mut self, to: RoleId, msg: M) -> Result<(), Self::Error>;
+    async fn send<M: Message>(&mut self, to: Self::Role, msg: M) -> Result<(), Self::Error>;
 
     /// Receive a message from a specific role.
     ///
@@ -131,7 +93,7 @@ pub trait ChoreographicAdapter: Send {
     /// # Returns
     ///
     /// The received message, or an error if receive fails.
-    async fn recv<M: Message>(&mut self, from: RoleId) -> Result<M, Self::Error>;
+    async fn recv<M: Message>(&mut self, from: Self::Role) -> Result<M, Self::Error>;
 
     /// Broadcast a message to multiple roles.
     ///
@@ -143,11 +105,11 @@ pub trait ChoreographicAdapter: Send {
     /// * `msg` - The message to send (cloned for each recipient)
     async fn broadcast<M: Message + Clone>(
         &mut self,
-        to: &[RoleId],
+        to: &[Self::Role],
         msg: M,
     ) -> Result<(), Self::Error> {
         for role in to {
-            self.send(role.clone(), msg.clone()).await?;
+            self.send(*role, msg.clone()).await?;
         }
         Ok(())
     }
@@ -163,10 +125,10 @@ pub trait ChoreographicAdapter: Send {
     /// # Returns
     ///
     /// A vector of messages in the order of the `from` roles.
-    async fn collect<M: Message>(&mut self, from: &[RoleId]) -> Result<Vec<M>, Self::Error> {
+    async fn collect<M: Message>(&mut self, from: &[Self::Role]) -> Result<Vec<M>, Self::Error> {
         let mut messages = Vec::with_capacity(from.len());
         for role in from {
-            let msg = self.recv::<M>(role.clone()).await?;
+            let msg = self.recv::<M>(*role).await?;
             messages.push(msg);
         }
         Ok(messages)
@@ -181,8 +143,12 @@ pub trait ChoreographicAdapter: Send {
     ///
     /// * `to` - The role to inform of the choice
     /// * `label` - The selected branch label
-    async fn choose(&mut self, to: RoleId, label: &str) -> Result<(), Self::Error> {
-        self.send(to, ChoiceLabel(label.to_string())).await
+    async fn choose(
+        &mut self,
+        to: Self::Role,
+        label: <Self::Role as RoleId>::Label,
+    ) -> Result<(), Self::Error> {
+        self.send(to, ChoiceLabel(label)).await
     }
 
     /// Receive a choice label from a role.
@@ -197,15 +163,39 @@ pub trait ChoreographicAdapter: Send {
     /// # Returns
     ///
     /// The label of the selected branch.
-    async fn offer(&mut self, from: RoleId) -> Result<String, Self::Error> {
-        let choice: ChoiceLabel = self.recv(from).await?;
+    async fn offer(
+        &mut self,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label, Self::Error> {
+        let choice: ChoiceLabel<<Self::Role as RoleId>::Label> = self.recv(from).await?;
         Ok(choice.0)
     }
 }
 
 /// A choice label message for internal/external choice communication.
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
-pub struct ChoiceLabel(pub String);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChoiceLabel<L: LabelId>(pub L);
+
+impl<L: LabelId> Serialize for ChoiceLabel<L> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.as_str())
+    }
+}
+
+impl<'de, L: LabelId> Deserialize<'de> for ChoiceLabel<L> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let label = String::deserialize(deserializer)?;
+        L::from_str(&label)
+            .map(ChoiceLabel)
+            .ok_or_else(|| serde::de::Error::custom("Unknown choice label"))
+    }
+}
 
 /// Extension trait for adapters with lifecycle management.
 #[async_trait]
@@ -225,7 +215,7 @@ pub struct ProtocolContext {
     /// Name of the protocol being executed
     pub protocol: &'static str,
     /// Name of the role being executed
-    pub role: &'static str,
+    pub role: RoleName,
     /// Optional role index for parameterized roles
     pub index: Option<u32>,
 }
@@ -233,7 +223,7 @@ pub struct ProtocolContext {
 impl ProtocolContext {
     /// Create a new protocol context.
     #[must_use]
-    pub const fn new(protocol: &'static str, role: &'static str) -> Self {
+    pub fn new(protocol: &'static str, role: RoleName) -> Self {
         Self {
             protocol,
             role,
@@ -243,11 +233,21 @@ impl ProtocolContext {
 
     /// Create a new indexed protocol context.
     #[must_use]
-    pub const fn indexed(protocol: &'static str, role: &'static str, index: u32) -> Self {
+    pub fn indexed(protocol: &'static str, role: RoleName, index: u32) -> Self {
         Self {
             protocol,
             role,
             index: Some(index),
+        }
+    }
+
+    /// Create a context from a role identifier.
+    #[must_use]
+    pub fn for_role<R: RoleId>(protocol: &'static str, role: R) -> Self {
+        Self {
+            protocol,
+            role: role.role_name(),
+            index: role.role_index(),
         }
     }
 }
@@ -298,21 +298,70 @@ mod tests {
 
     #[test]
     fn test_role_id_display() {
-        let static_role = RoleId::new("Client");
-        assert_eq!(static_role.to_string(), "Client");
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+        enum TestRole {
+            Client,
+            Witness(u32),
+        }
 
-        let indexed_role = RoleId::indexed("Witness", 2);
-        assert_eq!(indexed_role.to_string(), "Witness[2]");
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+        enum TestLabel {
+            Ping,
+        }
+
+        impl LabelId for TestLabel {
+            fn as_str(&self) -> &'static str {
+                match self {
+                    TestLabel::Ping => "Ping",
+                }
+            }
+
+            fn from_str(label: &str) -> Option<Self> {
+                match label {
+                    "Ping" => Some(TestLabel::Ping),
+                    _ => None,
+                }
+            }
+        }
+
+        impl RoleId for TestRole {
+            type Label = TestLabel;
+
+            fn role_name(&self) -> RoleName {
+                match self {
+                    TestRole::Client => RoleName::from_static("Client"),
+                    TestRole::Witness(_) => RoleName::from_static("Witness"),
+                }
+            }
+
+            fn role_index(&self) -> Option<u32> {
+                match self {
+                    TestRole::Witness(index) => Some(*index),
+                    _ => None,
+                }
+            }
+        }
+
+        let static_role = TestRole::Client;
+        assert_eq!(
+            static_role.role_name().as_str(),
+            "Client"
+        );
+
+        let indexed_role = TestRole::Witness(2);
+        assert_eq!(indexed_role.role_name().as_str(), "Witness");
+        assert_eq!(indexed_role.role_index(), Some(2));
     }
 
     #[test]
     fn test_protocol_context() {
-        let ctx = ProtocolContext::new("TwoBuyer", "Buyer1");
+        let ctx = ProtocolContext::new("TwoBuyer", RoleName::from_static("Buyer1"));
         assert_eq!(ctx.protocol, "TwoBuyer");
-        assert_eq!(ctx.role, "Buyer1");
+        assert_eq!(ctx.role.as_str(), "Buyer1");
         assert!(ctx.index.is_none());
 
-        let indexed_ctx = ProtocolContext::indexed("Broadcast", "Witness", 0);
+        let indexed_ctx =
+            ProtocolContext::indexed("Broadcast", RoleName::from_static("Witness"), 0);
         assert_eq!(indexed_ctx.index, Some(0));
     }
 }

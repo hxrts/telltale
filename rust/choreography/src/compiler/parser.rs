@@ -3,8 +3,8 @@
 // Full implementation using Pest grammar for parsing choreographic DSL
 
 use crate::ast::{
-    Branch, Choreography, Condition, MessageType, Protocol, RangeExpr, Role, RoleIndex, RoleParam,
-    RoleRange,
+    Annotations, Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol,
+    ProtocolAnnotation, RangeExpr, Role, RoleIndex, RoleParam, RoleRange,
 };
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
@@ -179,6 +179,17 @@ fn parse_role_param(
             span: ErrorSpan::from_pest_span(param_expr.as_span(), input),
             message: "Invalid role parameter expression".to_string(),
         }),
+    }
+}
+
+fn role_validation_error(
+    span: pest::Span<'_>,
+    input: &str,
+    error: crate::ast::RoleValidationError,
+) -> ParseError {
+    ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: format!("Role validation failed: {}", error),
     }
 }
 
@@ -422,10 +433,12 @@ pub fn parse_choreography_str_with_extensions(
 
                         if let Some(r) = header_roles {
                             roles = r;
-                            declared_roles = roles.iter().map(|r| r.name.to_string()).collect();
+                            declared_roles =
+                                roles.iter().map(|r| r.name().to_string()).collect();
                         } else if let Some(r) = body_roles {
                             roles = r;
-                            declared_roles = roles.iter().map(|r| r.name.to_string()).collect();
+                            declared_roles =
+                                roles.iter().map(|r| r.name().to_string()).collect();
                         }
 
                         if let Some(where_block) = where_pair {
@@ -505,16 +518,15 @@ fn parse_roles_from_pair(
 
                 let role = if let Some(param_pair) = inner_role.next() {
                     if param_pair.as_rule() == Rule::role_param {
-                        match parse_role_param(param_pair, role_name, input) {
-                            Ok(param) => Role::with_param(format_ident!("{}", role_name), param),
-                            Err(e) => return Err(e),
-                        }
+                        let param = parse_role_param(param_pair, role_name, input)?;
+                        Role::with_param(format_ident!("{}", role_name), param)
                     } else {
                         Role::new(format_ident!("{}", role_name))
                     }
                 } else {
                     Role::new(format_ident!("{}", role_name))
-                };
+                }
+                .map_err(|error| role_validation_error(span, input, error))?;
 
                 if !declared.insert(role_name.to_string()) {
                     return Err(ParseError::DuplicateRole {
@@ -573,7 +585,10 @@ fn parse_protocol_body(
                     });
                 }
                 let parsed_roles = parse_roles_from_pair(item, input)?;
-                declared_roles = parsed_roles.iter().map(|r| r.name.to_string()).collect();
+                declared_roles = parsed_roles
+                    .iter()
+                    .map(|r| r.name().to_string())
+                    .collect();
                 roles = Some(parsed_roles);
             }
             _ => {
@@ -710,7 +725,118 @@ fn parse_statement(
     input: &str,
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
-    parse_statement_inner(pair, declared_roles, input, protocol_defs)
+    match pair.as_rule() {
+        Rule::annotated_stmt => {
+            parse_annotated_stmt(pair, declared_roles, input, protocol_defs)
+        }
+        _ => parse_statement_inner(pair, declared_roles, input, protocol_defs),
+    }
+}
+
+/// Parse an annotated statement (e.g., @runtime_timeout(5s) Alice -> Bob: Msg)
+fn parse_annotated_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, ParseError> {
+    let mut inner = pair.into_inner();
+    let mut annotations: HashMap<String, String> = HashMap::new();
+
+    // Parse all annotations
+    while let Some(item) = inner.next() {
+        match item.as_rule() {
+            Rule::annotation => {
+                let annotation_kind = item
+                    .into_inner()
+                    .next()
+                    .expect("grammar: annotation must have kind");
+                parse_annotation_kind(annotation_kind, &mut annotations, input)?;
+            }
+            _ => {
+                // This should be the inner statement
+                let mut stmt = parse_statement_inner(item, declared_roles, input, protocol_defs)?;
+                // Apply collected annotations to the statement
+                apply_annotations_to_statement(&mut stmt, annotations);
+                return Ok(stmt);
+            }
+        }
+    }
+
+    // This shouldn't happen if grammar is correct
+    Err(ParseError::Syntax {
+        span: ErrorSpan::from_line_col(1, 1, input),
+        message: "Annotated statement missing inner statement".to_string(),
+    })
+}
+
+/// Parse an annotation kind and add to annotations map
+fn parse_annotation_kind(
+    pair: pest::iterators::Pair<Rule>,
+    annotations: &mut HashMap<String, String>,
+    input: &str,
+) -> std::result::Result<(), ParseError> {
+    let mut inner = pair.into_inner();
+    if let Some(kind) = inner.next() {
+        match kind.as_rule() {
+            Rule::runtime_timeout_annotation => {
+                // Parse @runtime_timeout(duration)
+                let duration_pair = kind
+                    .into_inner()
+                    .next()
+                    .expect("grammar: runtime_timeout must have duration");
+                let duration_ms = parse_duration(duration_pair, input)?;
+                annotations.insert("runtime_timeout".to_string(), duration_ms.to_string());
+            }
+            Rule::custom_annotation => {
+                // Parse @custom_name(args)
+                let mut custom_inner = kind.into_inner();
+                if let Some(name_pair) = custom_inner.next() {
+                    let name = name_pair.as_str().to_string();
+                    let value = custom_inner
+                        .next()
+                        .map(|p| p.as_str().to_string())
+                        .unwrap_or_default();
+                    annotations.insert(name, value);
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Apply parsed annotations to a statement
+fn apply_annotations_to_statement(stmt: &mut Statement, annotations: HashMap<String, String>) {
+    if annotations.is_empty() {
+        return;
+    }
+
+    match stmt {
+        Statement::Send {
+            annotations: stmt_annotations,
+            ..
+        } => {
+            stmt_annotations.extend(annotations);
+        }
+        Statement::Broadcast {
+            annotations: stmt_annotations,
+            ..
+        } => {
+            stmt_annotations.extend(annotations);
+        }
+        Statement::Choice {
+            annotations: stmt_annotations,
+            ..
+        } => {
+            stmt_annotations.extend(annotations);
+        }
+        // For statements without annotations field, we could wrap or extend
+        // For now, these don't support annotations
+        _ => {
+            // Could log a warning here about unsupported annotation target
+        }
+    }
 }
 
 /// Parse the actual statement (without annotations)
@@ -723,6 +849,12 @@ fn parse_statement_inner(
     match pair.as_rule() {
         Rule::send_stmt => parse_send_stmt(pair, declared_roles, input),
         Rule::broadcast_stmt => parse_broadcast_stmt(pair, declared_roles, input),
+        Rule::heartbeat_stmt => {
+            parse_heartbeat_stmt(pair, declared_roles, input, protocol_defs)
+        }
+        Rule::timed_choice_stmt => {
+            parse_timed_choice_stmt(pair, declared_roles, input, protocol_defs)
+        }
         Rule::choice_stmt => parse_choice_stmt(pair, declared_roles, input, protocol_defs),
         Rule::loop_stmt => parse_loop_stmt(pair, declared_roles, input, protocol_defs),
         Rule::branch_stmt => parse_branch_stmt(pair, declared_roles, input, protocol_defs),
@@ -765,17 +897,15 @@ fn parse_role_ref(
     if let Some(index_pair) = inner.next() {
         if index_pair.as_rule() == Rule::role_index {
             // Parse the enhanced index syntax
-            match parse_role_index(index_pair, role_name, input) {
-                Ok(index) => {
-                    return Ok(Role::with_index(format_ident!("{}", role_name), index));
-                }
-                Err(e) => return Err(e),
-            }
+            let index = parse_role_index(index_pair, role_name, input)?;
+            return Role::with_index(format_ident!("{}", role_name), index)
+                .map_err(|error| role_validation_error(span, input, error));
         }
     }
 
     // Simple role without index
-    Ok(Role::new(format_ident!("{}", role_name)))
+    Role::new(format_ident!("{}", role_name))
+        .map_err(|error| role_validation_error(span, input, error))
 }
 
 /// Parse send statement: A -> B: Message(payload)
@@ -943,6 +1073,253 @@ fn parse_choice_stmt(
         role,
         branches,
         annotations: HashMap::new(),
+    })
+}
+
+/// Parse timed choice statement
+/// Syntax: timed_choice at Alice(5s) { OnTime { ... } TimedOut { ... } }
+fn parse_timed_choice_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut role: Option<Role> = None;
+    let mut duration_ms: Option<u64> = None;
+    let mut branches = Vec::new();
+
+    let mut parse_branch = |item: pest::iterators::Pair<Rule>| -> Result<(), ParseError> {
+        let mut branch_inner = item.into_inner();
+        let label = format_ident!(
+            "{}",
+            branch_inner
+                .next()
+                .expect("grammar: choice_branch must have label")
+                .as_str()
+        );
+
+        // Check for optional guard
+        let mut guard = None;
+        let next_item = branch_inner
+            .next()
+            .expect("grammar: choice_branch must have body or guard");
+        let body = if let Rule::guard = next_item.as_rule() {
+            let guard_span = next_item.as_span();
+            let guard_expr = next_item
+                .into_inner()
+                .next()
+                .expect("grammar: guard must have expression")
+                .as_str();
+            guard = Some(syn::parse_str::<TokenStream>(guard_expr).map_err(|e| {
+                ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(guard_span, input),
+                    message: format!("Invalid guard expression: {e}"),
+                }
+            })?);
+            parse_block(
+                branch_inner
+                    .next()
+                    .expect("grammar: choice_branch with guard must have body"),
+                declared_roles,
+                input,
+                protocol_defs,
+            )?
+        } else {
+            parse_block(next_item, declared_roles, input, protocol_defs)?
+        };
+
+        branches.push(ChoiceBranch {
+            label,
+            guard,
+            statements: body,
+        });
+        Ok(())
+    };
+
+    for item in pair.into_inner() {
+        match item.as_rule() {
+            Rule::role_ref => {
+                role = Some(parse_role_ref(item, declared_roles, input)?);
+            }
+            Rule::duration => {
+                duration_ms = Some(parse_duration(item, input)?);
+            }
+            Rule::choice_block => {
+                for branch_item in item.into_inner() {
+                    match branch_item.as_rule() {
+                        Rule::choice_branch => {
+                            parse_branch(branch_item)?;
+                        }
+                        Rule::block_choice => {
+                            for nested in branch_item.into_inner() {
+                                if nested.as_rule() == Rule::choice_branch {
+                                    parse_branch(nested)?;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let role = role.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "timed_choice is missing a deciding role".to_string(),
+    })?;
+
+    let duration_ms = duration_ms.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "timed_choice is missing a duration".to_string(),
+    })?;
+
+    Ok(Statement::TimedChoice {
+        role,
+        duration_ms,
+        branches,
+    })
+}
+
+/// Parse a duration specification (e.g., "5s", "100ms", "2m")
+fn parse_duration(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<u64, ParseError> {
+    let span = pair.as_span();
+    let mut value: Option<u64> = None;
+    let mut unit: Option<&str> = None;
+
+    for item in pair.into_inner() {
+        match item.as_rule() {
+            Rule::integer => {
+                value = Some(item.as_str().parse().map_err(|_| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "Invalid duration value".to_string(),
+                })?);
+            }
+            Rule::time_unit => {
+                unit = Some(item.as_str());
+            }
+            _ => {}
+        }
+    }
+
+    let value = value.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "Duration missing numeric value".to_string(),
+    })?;
+
+    let unit = unit.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "Duration missing time unit (ms, s, m, h)".to_string(),
+    })?;
+
+    // Convert to milliseconds
+    let ms = match unit {
+        "ms" => value,
+        "s" => value.saturating_mul(1000),
+        "m" => value.saturating_mul(60_000),
+        "h" => value.saturating_mul(3_600_000),
+        _ => {
+            return Err(ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: format!("Unknown time unit: {}", unit),
+            })
+        }
+    };
+
+    Ok(ms)
+}
+
+/// Parse heartbeat statement
+/// Syntax: heartbeat Sender -> Receiver every 1s on_missing(3) { timeout_body } body { normal_body }
+fn parse_heartbeat_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, ParseError> {
+    let span = pair.as_span();
+    let mut sender: Option<Role> = None;
+    let mut receiver: Option<Role> = None;
+    let mut interval_ms: Option<u64> = None;
+    let mut on_missing_count: Option<u32> = None;
+    let mut on_missing_body: Vec<Statement> = Vec::new();
+    let mut body: Vec<Statement> = Vec::new();
+
+    for item in pair.into_inner() {
+        match item.as_rule() {
+            Rule::role_ref => {
+                // First role_ref is sender, second is receiver
+                let role = parse_role_ref(item, declared_roles, input)?;
+                if sender.is_none() {
+                    sender = Some(role);
+                } else {
+                    receiver = Some(role);
+                }
+            }
+            Rule::duration => {
+                interval_ms = Some(parse_duration(item, input)?);
+            }
+            Rule::heartbeat_on_missing => {
+                for inner in item.into_inner() {
+                    match inner.as_rule() {
+                        Rule::integer => {
+                            on_missing_count =
+                                Some(inner.as_str().parse().map_err(|_| ParseError::Syntax {
+                                    span: ErrorSpan::from_pest_span(span, input),
+                                    message: "Invalid on_missing count".to_string(),
+                                })?);
+                        }
+                        Rule::block => {
+                            on_missing_body =
+                                parse_block(inner, declared_roles, input, protocol_defs)?;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Rule::heartbeat_body => {
+                for inner in item.into_inner() {
+                    if inner.as_rule() == Rule::block {
+                        body = parse_block(inner, declared_roles, input, protocol_defs)?;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let sender = sender.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "heartbeat is missing sender role".to_string(),
+    })?;
+
+    let receiver = receiver.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "heartbeat is missing receiver role".to_string(),
+    })?;
+
+    let interval_ms = interval_ms.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "heartbeat is missing interval duration".to_string(),
+    })?;
+
+    let on_missing_count = on_missing_count.ok_or_else(|| ParseError::Syntax {
+        span: ErrorSpan::from_pest_span(span, input),
+        message: "heartbeat is missing on_missing count".to_string(),
+    })?;
+
+    Ok(Statement::Heartbeat {
+        sender,
+        receiver,
+        interval_ms,
+        on_missing_count,
+        on_missing_body,
+        body,
     })
 }
 
@@ -1225,6 +1602,23 @@ enum Statement {
         branches: Vec<ChoiceBranch>,
         annotations: HashMap<String, String>,
     },
+    /// Timed choice: actor makes a choice based on wall clock timeout.
+    /// Desugars to standard Choice with timeout annotation for code generation.
+    TimedChoice {
+        role: Role,
+        duration_ms: u64,
+        branches: Vec<ChoiceBranch>,
+    },
+    /// Heartbeat: sender sends periodic heartbeats, receiver detects absence.
+    /// Desugars to recursive choice with liveness detection.
+    Heartbeat {
+        sender: Role,
+        receiver: Role,
+        interval_ms: u64,
+        on_missing_count: u32,
+        on_missing_body: Vec<Statement>,
+        body: Vec<Statement>,
+    },
     Loop {
         condition: Option<Condition>,
         body: Vec<Statement>,
@@ -1293,9 +1687,9 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
                     payload: message.payload.clone(),
                 },
                 continuation: Box::new(current),
-                annotations: annotations.clone(),
-                from_annotations: from_annotations.clone(),
-                to_annotations: to_annotations.clone(),
+                annotations: Annotations::from_legacy_map(annotations),
+                from_annotations: Annotations::from_legacy_map(from_annotations),
+                to_annotations: Annotations::from_legacy_map(to_annotations),
             },
             Statement::Broadcast {
                 from,
@@ -1306,49 +1700,158 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
                 // Resolve to all roles except the sender
                 let to_all = roles
                     .iter()
-                    .filter(|r| r.name != from.name)
+                    .filter(|r| r.name() != from.name())
                     .cloned()
                     .collect();
 
                 Protocol::Broadcast {
                     from: from.clone(),
-                    to_all,
+                    to_all: NonEmptyVec::new(to_all)
+                        .expect("broadcast must target at least one role"),
                     message: MessageType {
                         name: message.name.clone(),
                         type_annotation: message.type_annotation.clone(),
                         payload: message.payload.clone(),
                     },
                     continuation: Box::new(current),
-                    annotations: annotations.clone(),
-                    from_annotations: from_annotations.clone(),
+                    annotations: Annotations::from_legacy_map(annotations),
+                    from_annotations: Annotations::from_legacy_map(from_annotations),
                 }
             }
             Statement::Choice {
                 role,
                 branches,
                 annotations,
-            } => Protocol::Choice {
-                role: role.clone(),
-                branches: branches
+            } => {
+                let branch_vec: Vec<_> = branches
                     .iter()
                     .map(|b| Branch {
                         label: b.label.clone(),
                         guard: b.guard.clone(),
                         protocol: convert_statements_to_protocol(&b.statements, roles),
                     })
-                    .collect(),
-                annotations: annotations.clone(),
-            },
+                    .collect();
+                Protocol::Choice {
+                    role: role.clone(),
+                    branches: NonEmptyVec::new(branch_vec)
+                        .expect("choice must have at least one branch"),
+                    annotations: Annotations::from_legacy_map(annotations),
+                }
+            }
+            // TimedChoice desugars to standard Choice with typed annotation.
+            // This preserves Lean verification (Choice is core MPST) while carrying
+            // timeout info for code generation via typed ProtocolAnnotation.
+            Statement::TimedChoice {
+                role,
+                duration_ms,
+                branches,
+            } => {
+                // Use typed annotation instead of string key-value pair
+                let annotations = Annotations::single(ProtocolAnnotation::timed_choice_ms(
+                    *duration_ms,
+                ));
+
+                let branch_vec: Vec<_> = branches
+                    .iter()
+                    .map(|b| Branch {
+                        label: b.label.clone(),
+                        guard: b.guard.clone(),
+                        protocol: convert_statements_to_protocol(&b.statements, roles),
+                    })
+                    .collect();
+
+                Protocol::Choice {
+                    role: role.clone(),
+                    branches: NonEmptyVec::new(branch_vec)
+                        .expect("timed_choice must have at least one branch"),
+                    annotations,
+                }
+            }
+            // Heartbeat desugars to recursive choice with liveness detection:
+            //   rec HeartbeatLoop {
+            //       Sender -> Receiver: Heartbeat;
+            //       choice at Receiver {
+            //           Alive { body; continue HeartbeatLoop }
+            //           Dead { on_missing_body }
+            //       }
+            //   }
+            Statement::Heartbeat {
+                sender,
+                receiver,
+                interval_ms,
+                on_missing_count,
+                on_missing_body,
+                body,
+            } => {
+                let rec_label = format_ident!("HeartbeatLoop");
+
+                // Heartbeat annotation carries runtime info (interval, on_missing_count)
+                let heartbeat_annotation =
+                    ProtocolAnnotation::heartbeat_ms(*interval_ms, *on_missing_count);
+                let annotations = Annotations::single(heartbeat_annotation);
+
+                // Build body with continue at the end
+                let mut alive_body = body.clone();
+                alive_body.push(Statement::Continue {
+                    label: rec_label.clone(),
+                });
+                let alive_protocol = convert_statements_to_protocol(&alive_body, roles);
+
+                // Build on_missing body (Dead branch)
+                let dead_protocol = convert_statements_to_protocol(on_missing_body, roles);
+
+                // Build the choice: Receiver decides Alive or Dead
+                let alive_branch = Branch {
+                    label: format_ident!("Alive"),
+                    guard: None,
+                    protocol: alive_protocol,
+                };
+                let dead_branch = Branch {
+                    label: format_ident!("Dead"),
+                    guard: None,
+                    protocol: dead_protocol,
+                };
+                let choice = Protocol::Choice {
+                    role: receiver.clone(),
+                    branches: NonEmptyVec::from_head_tail(alive_branch, vec![dead_branch]),
+                    annotations,
+                };
+
+                // Build the heartbeat send: Sender -> Receiver: Heartbeat
+                let heartbeat_send = Protocol::Send {
+                    from: sender.clone(),
+                    to: receiver.clone(),
+                    message: MessageType {
+                        name: format_ident!("Heartbeat"),
+                        type_annotation: None,
+                        payload: None,
+                    },
+                    continuation: Box::new(choice),
+                    annotations: Annotations::new(),
+                    from_annotations: Annotations::new(),
+                    to_annotations: Annotations::new(),
+                };
+
+                // Wrap in recursion
+                Protocol::Rec {
+                    label: rec_label,
+                    body: Box::new(heartbeat_send),
+                }
+            }
             Statement::Loop { condition, body } => Protocol::Loop {
                 condition: condition.clone(),
                 body: Box::new(convert_statements_to_protocol(body, roles)),
             },
-            Statement::Parallel { branches } => Protocol::Parallel {
-                protocols: branches
+            Statement::Parallel { branches } => {
+                let protocols_vec: Vec<_> = branches
                     .iter()
                     .map(|b| convert_statements_to_protocol(b, roles))
-                    .collect(),
-            },
+                    .collect();
+                Protocol::Parallel {
+                    protocols: NonEmptyVec::new(protocols_vec)
+                        .expect("parallel must have at least one branch"),
+                }
+            }
             Statement::Branch { .. } => {
                 // Branch blocks should be normalized into Parallel before conversion.
                 current
@@ -1400,6 +1903,44 @@ fn inline_calls(
                     role: role.clone(),
                     branches: new_branches,
                     annotations: HashMap::new(),
+                });
+            }
+            Statement::TimedChoice {
+                role,
+                duration_ms,
+                branches,
+            } => {
+                // Inline calls within timed choice branches
+                let mut new_branches = Vec::new();
+                for b in branches {
+                    new_branches.push(ChoiceBranch {
+                        label: b.label.clone(),
+                        guard: b.guard.clone(),
+                        statements: inline_calls(&b.statements, protocol_defs, input)?,
+                    });
+                }
+                result.push(Statement::TimedChoice {
+                    role: role.clone(),
+                    duration_ms: *duration_ms,
+                    branches: new_branches,
+                });
+            }
+            Statement::Heartbeat {
+                sender,
+                receiver,
+                interval_ms,
+                on_missing_count,
+                on_missing_body,
+                body,
+            } => {
+                // Inline calls within heartbeat bodies
+                result.push(Statement::Heartbeat {
+                    sender: sender.clone(),
+                    receiver: receiver.clone(),
+                    interval_ms: *interval_ms,
+                    on_missing_count: *on_missing_count,
+                    on_missing_body: inline_calls(on_missing_body, protocol_defs, input)?,
+                    body: inline_calls(body, protocol_defs, input)?,
                 });
             }
             Statement::Loop { condition, body } => {
@@ -1738,5 +2279,284 @@ protocol SingleBranch =
         let err = result.unwrap_err();
         let err_str = err.to_string();
         assert!(err_str.contains("parallel requires at least two adjacent branch blocks"));
+    }
+
+    #[test]
+    fn test_parse_timed_choice() {
+        let input = r#"
+protocol TimedRequest =
+  roles Alice, Bob
+  Alice -> Bob : Request
+  timed_choice at Alice(5s) {
+    OnTime -> {
+      Bob -> Alice : Response
+    }
+    TimedOut -> {
+      Alice -> Bob : Cancel
+    }
+  }
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse timed_choice: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        assert_eq!(choreo.name.to_string(), "TimedRequest");
+
+        // Verify timed_choice is desugared to Choice with typed annotation
+        match &choreo.protocol {
+            Protocol::Send { continuation, .. } => {
+                match continuation.as_ref() {
+                    Protocol::Choice { role, branches, annotations } => {
+                        assert_eq!(role.name().to_string(), "Alice");
+                        assert_eq!(branches.len(), 2);
+                        // Check that timed_choice annotation is present
+                        assert!(annotations.has_timed_choice());
+                        assert_eq!(
+                            annotations.timed_choice(),
+                            Some(std::time::Duration::from_secs(5))
+                        );
+                    }
+                    _ => panic!("Expected Choice after Send"),
+                }
+            }
+            _ => panic!("Expected Send as first protocol"),
+        }
+    }
+
+    #[test]
+    fn test_parse_timed_choice_milliseconds() {
+        let input = r#"
+protocol QuickTimeout =
+  roles Client, Server
+  timed_choice at Client(500ms) {
+    Fast -> {
+      Server -> Client : Data
+    }
+    Slow -> {
+      Client -> Server : Abort
+    }
+  }
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse timed_choice with ms: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Choice { annotations, .. } => {
+                assert!(annotations.has_timed_choice());
+                assert_eq!(
+                    annotations.timed_choice(),
+                    Some(std::time::Duration::from_millis(500))
+                );
+            }
+            _ => panic!("Expected Choice as first protocol"),
+        }
+    }
+
+    #[test]
+    fn test_parse_timed_choice_minutes() {
+        let input = r#"
+protocol LongTimeout =
+  roles A, B
+  timed_choice at A(2m) {
+    Done -> {
+      B -> A : Complete
+    }
+    Expired -> {
+      A -> B : Timeout
+    }
+  }
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Choice { annotations, .. } => {
+                // 2 minutes = 120000 ms
+                assert!(annotations.has_timed_choice());
+                assert_eq!(
+                    annotations.timed_choice(),
+                    Some(std::time::Duration::from_millis(120000))
+                );
+            }
+            _ => panic!("Expected Choice"),
+        }
+    }
+
+    #[test]
+    fn test_parse_heartbeat() {
+        let input = r#"
+protocol Liveness =
+  roles Alice, Bob
+  heartbeat Alice -> Bob every 1s on_missing(3) {
+    Bob -> Alice : Disconnect
+  } body {
+    Alice -> Bob : Data
+  }
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse heartbeat: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        assert_eq!(choreo.name.to_string(), "Liveness");
+
+        // Heartbeat desugars to: rec HeartbeatLoop { ... }
+        match &choreo.protocol {
+            Protocol::Rec { label, body } => {
+                assert_eq!(label.to_string(), "HeartbeatLoop");
+
+                // Inside: Sender -> Receiver: Heartbeat; choice at Receiver { ... }
+                match body.as_ref() {
+                    Protocol::Send { from, to, message, continuation, .. } => {
+                        assert_eq!(from.name().to_string(), "Alice");
+                        assert_eq!(to.name().to_string(), "Bob");
+                        assert_eq!(message.name.to_string(), "Heartbeat");
+
+                        // Continuation is Choice at Receiver
+                        match continuation.as_ref() {
+                            Protocol::Choice { role, branches, annotations } => {
+                                assert_eq!(role.name().to_string(), "Bob");
+                                assert_eq!(branches.len(), 2);
+                                assert_eq!(branches[0].label.to_string(), "Alive");
+                                assert_eq!(branches[1].label.to_string(), "Dead");
+
+                                // Check heartbeat annotation
+                                assert!(annotations.has_heartbeat());
+                                let (interval, on_missing) = annotations.heartbeat().unwrap();
+                                assert_eq!(interval, std::time::Duration::from_secs(1));
+                                assert_eq!(on_missing, 3);
+                            }
+                            _ => panic!("Expected Choice as continuation"),
+                        }
+                    }
+                    _ => panic!("Expected Send inside Rec"),
+                }
+            }
+            _ => panic!("Expected Rec as top-level protocol"),
+        }
+    }
+
+    #[test]
+    fn test_parse_heartbeat_milliseconds() {
+        let input = r#"
+protocol FastHeartbeat =
+  roles Client, Server
+  heartbeat Client -> Server every 500ms on_missing(5) {
+    Server -> Client : Dead
+  } body {
+    Client -> Server : Ping
+  }
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse heartbeat with ms: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { body, .. } => {
+                match body.as_ref() {
+                    Protocol::Send { continuation, .. } => {
+                        match continuation.as_ref() {
+                            Protocol::Choice { annotations, .. } => {
+                                assert!(annotations.has_heartbeat());
+                                let (interval, on_missing) = annotations.heartbeat().unwrap();
+                                assert_eq!(interval, std::time::Duration::from_millis(500));
+                                assert_eq!(on_missing, 5);
+                            }
+                            _ => panic!("Expected Choice"),
+                        }
+                    }
+                    _ => panic!("Expected Send"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_parse_runtime_timeout_annotation() {
+        let input = r#"
+protocol TimedRequest =
+  roles Client, Server
+  @runtime_timeout(5s) Client -> Server : Request
+  Server -> Client : Response
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse @runtime_timeout: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send {
+                annotations,
+                continuation,
+                ..
+            } => {
+                // Check the runtime_timeout annotation was parsed
+                assert!(annotations.has_runtime_timeout());
+                let timeout = annotations.runtime_timeout().unwrap();
+                assert_eq!(timeout, std::time::Duration::from_secs(5));
+
+                // Check continuation doesn't have the annotation
+                match continuation.as_ref() {
+                    Protocol::Send { annotations, .. } => {
+                        assert!(!annotations.has_runtime_timeout());
+                    }
+                    _ => panic!("Expected Send for Response"),
+                }
+            }
+            _ => panic!("Expected Send for Request"),
+        }
+    }
+
+    #[test]
+    fn test_parse_runtime_timeout_milliseconds() {
+        let input = r#"
+protocol QuickCheck =
+  roles A, B
+  @runtime_timeout(100ms) A -> B : Ping
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse @runtime_timeout with ms: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(annotations.has_runtime_timeout());
+                let timeout = annotations.runtime_timeout().unwrap();
+                assert_eq!(timeout, std::time::Duration::from_millis(100));
+            }
+            _ => panic!("Expected Send"),
+        }
     }
 }

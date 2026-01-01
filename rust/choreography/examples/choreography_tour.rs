@@ -117,7 +117,7 @@ fn demo_dynamic_roles() -> Result<(), Box<dyn std::error::Error>> {
     println!("Parsed dynamic role protocol:");
 
     for role in &choreo.roles {
-        print!("   • {}: ", role.name);
+        print!("   • {}: ", role.name());
         if role.is_dynamic() {
             println!("Dynamic role (runtime count)");
         } else if role.is_symbolic() {
@@ -218,7 +218,7 @@ fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nStep 2 - Project to local types:");
     for role in &choreography.roles {
         let local_type = project(&choreography, role)?;
-        println!("\n   {} sees:", role.name);
+        println!("\n   {} sees:", role.name());
         println!("   {:#?}", local_type);
     }
 
@@ -245,7 +245,7 @@ fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
 
     for role in &auth_choreo.roles {
         let local_type = project(&auth_choreo, role)?;
-        println!("\n   {} local type:", role.name);
+        println!("\n   {} local type:", role.name());
         println!("   {:#?}", local_type);
     }
 

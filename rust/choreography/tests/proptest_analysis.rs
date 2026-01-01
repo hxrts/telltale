@@ -19,10 +19,10 @@ use std::collections::HashMap;
 // Reuse strategies from projection tests
 fn role_strategy() -> impl Strategy<Value = Role> {
     prop_oneof![
-        Just(Role::new(format_ident!("Alice"))),
-        Just(Role::new(format_ident!("Bob"))),
-        Just(Role::new(format_ident!("Charlie"))),
-        Just(Role::new(format_ident!("Dave"))),
+        Just(Role::new(format_ident!("Alice")).unwrap()),
+        Just(Role::new(format_ident!("Bob")).unwrap()),
+        Just(Role::new(format_ident!("Charlie")).unwrap()),
+        Just(Role::new(format_ident!("Dave")).unwrap()),
     ]
 }
 
@@ -156,9 +156,9 @@ fn extract_roles(protocol: &Protocol) -> Vec<Role> {
 
     // Always include at least these roles to avoid empty role lists
     for role in &[
-        Role::new(format_ident!("Alice")),
-        Role::new(format_ident!("Bob")),
-        Role::new(format_ident!("Charlie")),
+        Role::new(format_ident!("Alice")).unwrap(),
+        Role::new(format_ident!("Bob")).unwrap(),
+        Role::new(format_ident!("Charlie")).unwrap(),
     ] {
         if !roles.contains(role) {
             roles.push(role.clone());
@@ -403,8 +403,8 @@ mod unit_tests {
 
     #[test]
     fn test_two_party_analysis() {
-        let alice = Role::new(format_ident!("Alice"));
-        let bob = Role::new(format_ident!("Bob"));
+        let alice = Role::new(format_ident!("Alice")).unwrap();
+        let bob = Role::new(format_ident!("Bob")).unwrap();
 
         let choreo = Choreography {
             name: format_ident!("TwoParty"),
@@ -442,9 +442,9 @@ mod unit_tests {
 
     #[test]
     fn test_unused_role_warning() {
-        let alice = Role::new(format_ident!("Alice"));
-        let bob = Role::new(format_ident!("Bob"));
-        let charlie = Role::new(format_ident!("Charlie"));
+        let alice = Role::new(format_ident!("Alice")).unwrap();
+        let bob = Role::new(format_ident!("Bob")).unwrap();
+        let charlie = Role::new(format_ident!("Charlie")).unwrap();
 
         let choreo = Choreography {
             name: format_ident!("ThreeParty"),

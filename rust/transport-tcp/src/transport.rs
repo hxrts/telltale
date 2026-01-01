@@ -3,6 +3,7 @@
 use crate::config::TcpTransportConfig;
 use crate::error::{Result, TcpTransportError};
 use async_trait::async_trait;
+use rumpsteak_aura_choreography::identifiers::RoleName;
 use rumpsteak_aura_choreography::{Transport, TransportError, TransportResult};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -270,12 +271,13 @@ use std::time::Duration;
 
 #[async_trait]
 impl Transport for TcpTransport {
-    #[instrument(skip(self, message), fields(role = %self.config.role, to = to_role, msg_len = message.len()))]
-    async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()> {
+    #[instrument(skip(self, message), fields(role = %self.config.role, to = %to_role, msg_len = message.len()))]
+    async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
+        let role_str = to_role.as_str();
         let outgoing = self.outgoing.read().await;
         let stream = outgoing
-            .get(to_role)
-            .ok_or_else(|| TransportError::UnknownRole(to_role.to_string()))?;
+            .get(role_str)
+            .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
 
         let mut stream = stream.lock().await;
 
@@ -297,20 +299,21 @@ impl Transport for TcpTransport {
         Ok(())
     }
 
-    #[instrument(skip(self), fields(role = %self.config.role, from = from_role))]
-    async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>> {
+    #[instrument(skip(self), fields(role = %self.config.role, from = %from_role))]
+    async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
+        let role_str = from_role.as_str();
         let mut incoming = self.incoming.lock().await;
         let receiver = incoming
-            .get_mut(from_role)
-            .ok_or_else(|| TransportError::UnknownRole(from_role.to_string()))?;
+            .get_mut(role_str)
+            .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
 
         let msg = receiver.recv().await.ok_or(TransportError::ChannelClosed)?;
         debug!(msg_len = msg.len(), "Message received");
         Ok(msg)
     }
 
-    fn is_connected(&self, role: &str) -> bool {
-        self.config.peers.contains_key(role)
+    fn is_connected(&self, role: &RoleName) -> bool {
+        self.config.peers.contains_key(role.as_str())
     }
 
     async fn close(&self) -> TransportResult<()> {

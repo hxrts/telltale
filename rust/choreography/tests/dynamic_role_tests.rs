@@ -26,18 +26,19 @@ use std::collections::HashMap;
 #[test]
 fn test_dynamic_role_creation() {
     // Test creating dynamic roles with various parameters
-    let worker_runtime = Role::with_param(format_ident!("Worker"), RoleParam::Runtime);
+    let worker_runtime = Role::with_param(format_ident!("Worker"), RoleParam::Runtime).unwrap();
     assert!(worker_runtime.is_dynamic());
     assert!(!worker_runtime.is_symbolic());
 
     let worker_symbolic = Role::with_param(
         format_ident!("Worker"),
         RoleParam::Symbolic("N".to_string()),
-    );
+    )
+    .unwrap();
     assert!(worker_symbolic.is_symbolic());
     assert!(!worker_symbolic.is_dynamic());
 
-    let worker_static = Role::with_param(format_ident!("Worker"), RoleParam::Static(3));
+    let worker_static = Role::with_param(format_ident!("Worker"), RoleParam::Static(3)).unwrap();
     assert!(!worker_static.is_dynamic());
     assert!(!worker_static.is_symbolic());
     assert_eq!(worker_static.get_static_count(), Some(3));
@@ -117,8 +118,8 @@ fn test_choreography_parsing_with_dynamic_roles() {
 
     // This test would require the parser to be fully implemented
     // For now, we'll test the structure manually
-    let coordinator = Role::new(format_ident!("Coordinator"));
-    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime);
+    let coordinator = Role::new(format_ident!("Coordinator")).unwrap();
+    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime).unwrap();
 
     assert!(!coordinator.is_dynamic());
     assert!(signers.is_dynamic());
@@ -127,8 +128,8 @@ fn test_choreography_parsing_with_dynamic_roles() {
 #[test]
 fn test_dynamic_role_projection() {
     // Test projection with dynamic roles
-    let coordinator = Role::new(format_ident!("Coordinator"));
-    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime);
+    let coordinator = Role::new(format_ident!("Coordinator")).unwrap();
+    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime).unwrap();
 
     // Create a simple protocol: Coordinator -> Signers[*]: Request
     let request_msg = MessageType {
@@ -212,12 +213,13 @@ fn test_role_bounds_checker() {
 #[test]
 fn test_dynamic_role_code_generation() {
     // Test code generation for choreography with dynamic roles
-    let coordinator = Role::new(format_ident!("Coordinator"));
-    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime);
+    let coordinator = Role::new(format_ident!("Coordinator")).unwrap();
+    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime).unwrap();
     let workers = Role::with_param(
         format_ident!("Workers"),
         RoleParam::Symbolic("N".to_string()),
-    );
+    )
+    .unwrap();
 
     let choreography = Choreography {
         name: format_ident!("TestProtocol"),
@@ -255,18 +257,20 @@ fn test_dynamic_role_code_generation() {
 #[test]
 fn test_runtime_role_binding() {
     // This test simulates runtime role binding
-    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime);
+    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime).unwrap();
     let workers = Role::with_param(
         format_ident!("Workers"),
         RoleParam::Symbolic("N".to_string()),
-    );
+    )
+    .unwrap();
 
     // Simulate binding symbolic parameter
     let mut role_bindings = HashMap::new();
     role_bindings.insert("N".to_string(), 5u32);
 
     // Test validation with bindings
-    let bound_workers = Role::with_param(format_ident!("Workers"), RoleParam::Static(5));
+    let bound_workers =
+        Role::with_param(format_ident!("Workers"), RoleParam::Static(5)).unwrap();
     assert_eq!(bound_workers.get_static_count(), Some(5));
 
     // Test that runtime roles require bounds checking
@@ -277,13 +281,14 @@ fn test_runtime_role_binding() {
 #[test]
 fn test_complex_dynamic_protocol() {
     // Test a complex protocol with multiple dynamic role types
-    let coordinator = Role::new(format_ident!("Coordinator"));
-    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime);
+    let coordinator = Role::new(format_ident!("Coordinator")).unwrap();
+    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime).unwrap();
     let workers = Role::with_param(
         format_ident!("Workers"),
         RoleParam::Symbolic("N".to_string()),
-    );
-    let observers = Role::with_param(format_ident!("Observers"), RoleParam::Static(3));
+    )
+    .unwrap();
+    let observers = Role::with_param(format_ident!("Observers"), RoleParam::Static(3)).unwrap();
 
     let roles = vec![coordinator, signers, workers, observers];
 
@@ -308,13 +313,16 @@ fn test_complex_dynamic_protocol() {
 #[test]
 fn test_role_family_matching() {
     // Test role family matching for different role types
-    let worker_array = Role::with_param(format_ident!("Worker"), RoleParam::Static(5));
-    let worker_instance = Role::with_index(format_ident!("Worker"), RoleIndex::Concrete(2));
+    let worker_array = Role::with_param(format_ident!("Worker"), RoleParam::Static(5)).unwrap();
+    let worker_instance =
+        Role::with_index(format_ident!("Worker"), RoleIndex::Concrete(2)).unwrap();
     let worker_symbolic = Role::with_index(
         format_ident!("Worker"),
         RoleIndex::Symbolic("i".to_string()),
-    );
-    let worker_wildcard = Role::with_index(format_ident!("Worker"), RoleIndex::Wildcard);
+    )
+    .unwrap();
+    let worker_wildcard =
+        Role::with_index(format_ident!("Worker"), RoleIndex::Wildcard).unwrap();
 
     // Test family matching
     assert!(worker_instance.matches_family(&worker_array));
@@ -322,7 +330,7 @@ fn test_role_family_matching() {
     assert!(worker_wildcard.matches_family(&worker_array));
 
     // Different role names shouldn't match
-    let client = Role::new(format_ident!("Client"));
+    let client = Role::new(format_ident!("Client")).unwrap();
     assert!(!worker_instance.matches_family(&client));
 }
 
@@ -378,7 +386,7 @@ fn test_edge_cases() {
 
     // Very large role names (shouldn't cause issues)
     let long_name = format_ident!("{}", "A".repeat(100));
-    let role_with_long_name = Role::new(long_name);
+    let role_with_long_name = Role::new(long_name).unwrap();
     assert!(role_with_long_name.validate().is_ok());
 }
 
@@ -386,8 +394,8 @@ fn test_edge_cases() {
 #[test]
 fn test_integration_dynamic_roles() {
     // Create a realistic threshold signature protocol
-    let coordinator = Role::new(format_ident!("Coordinator"));
-    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime);
+    let coordinator = Role::new(format_ident!("Coordinator")).unwrap();
+    let signers = Role::with_param(format_ident!("Signers"), RoleParam::Runtime).unwrap();
 
     let choreography = Choreography {
         name: format_ident!("ThresholdSignature"),

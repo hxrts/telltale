@@ -3,6 +3,9 @@
 //! Parses topology definitions from DSL source code.
 
 use super::{Location, Topology, TopologyConstraint, TopologyMode};
+use crate::identifiers::{
+    Datacenter, Endpoint as TopologyEndpoint, IdentifierError, Namespace, Region, RoleName,
+};
 use pest::Parser;
 use pest_derive::Parser;
 use thiserror::Error;
@@ -25,11 +28,20 @@ pub enum TopologyParseError {
 
     #[error("Invalid constraint: {0}")]
     InvalidConstraint(String),
+
+    #[error("Invalid identifier: {0}")]
+    InvalidIdentifier(IdentifierError),
 }
 
 impl From<pest::error::Error<Rule>> for TopologyParseError {
     fn from(e: pest::error::Error<Rule>) -> Self {
         TopologyParseError::ParseError(e.to_string())
+    }
+}
+
+impl From<IdentifierError> for TopologyParseError {
+    fn from(err: IdentifierError) -> Self {
+        TopologyParseError::InvalidIdentifier(err)
     }
 }
 
@@ -123,12 +135,28 @@ fn parse_mode_value(pair: pest::iterators::Pair<Rule>) -> Result<TopologyMode, T
     match inner {
         Some(p) => match p.as_rule() {
             Rule::kubernetes_mode => {
-                let namespace = p.into_inner().next().map(|i| i.as_str()).unwrap_or("");
-                Ok(TopologyMode::Kubernetes(namespace.to_string()))
+                let namespace = p
+                    .into_inner()
+                    .next()
+                    .map(|i| i.as_str())
+                    .ok_or_else(|| {
+                        TopologyParseError::InvalidConstraint(
+                            "kubernetes mode requires a namespace".to_string(),
+                        )
+                    })?;
+                Ok(TopologyMode::Kubernetes(Namespace::new(namespace)?))
             }
             Rule::consul_mode => {
-                let datacenter = p.into_inner().next().map(|i| i.as_str()).unwrap_or("");
-                Ok(TopologyMode::Consul(datacenter.to_string()))
+                let datacenter = p
+                    .into_inner()
+                    .next()
+                    .map(|i| i.as_str())
+                    .ok_or_else(|| {
+                        TopologyParseError::InvalidConstraint(
+                            "consul mode requires a datacenter".to_string(),
+                        )
+                    })?;
+                Ok(TopologyMode::Consul(Datacenter::new(datacenter)?))
             }
             _ => {
                 let s = p.as_str();
@@ -145,12 +173,13 @@ fn parse_mode_value(pair: pest::iterators::Pair<Rule>) -> Result<TopologyMode, T
 
 fn parse_topology_mapping(
     pair: pest::iterators::Pair<Rule>,
-) -> Result<(String, Location), TopologyParseError> {
+) -> Result<(RoleName, Location), TopologyParseError> {
     let mut inner = pair.into_inner();
     let role = inner
         .next()
-        .map(|p| p.as_str().to_string())
-        .unwrap_or_default();
+        .map(|p| RoleName::new(p.as_str()))
+        .transpose()?
+        .ok_or_else(|| TopologyParseError::InvalidConstraint("missing role".to_string()))?;
     let location = inner
         .next()
         .map(|p| parse_location(p))
@@ -166,16 +195,25 @@ fn parse_location(pair: pest::iterators::Pair<Rule>) -> Result<Location, Topolog
         Some(p) => match p.as_rule() {
             Rule::local_location => Ok(Location::Local),
             Rule::colocated_location => {
-                let peer = p.into_inner().next().map(|i| i.as_str()).unwrap_or("");
-                Ok(Location::Colocated(peer.to_string()))
+                let peer = p
+                    .into_inner()
+                    .next()
+                    .map(|i| RoleName::new(i.as_str()))
+                    .transpose()?
+                    .ok_or_else(|| {
+                        TopologyParseError::InvalidLocation(
+                            "colocated requires a role".to_string(),
+                        )
+                    })?;
+                Ok(Location::Colocated(peer))
             }
-            Rule::endpoint => Ok(Location::Remote(p.as_str().to_string())),
+            Rule::endpoint => Ok(Location::Remote(TopologyEndpoint::new(p.as_str())?)),
             _ => {
                 let s = p.as_str();
                 if s == "local" {
                     Ok(Location::Local)
                 } else {
-                    Ok(Location::Remote(s.to_string()))
+                    Ok(Location::Remote(TopologyEndpoint::new(s)?))
                 }
             }
         },
@@ -196,20 +234,30 @@ fn parse_constraint(
             let mut idents = inner.into_inner();
             let r1 = idents
                 .next()
-                .map(|p| p.as_str().to_string())
-                .unwrap_or_default();
+                .map(|p| RoleName::new(p.as_str()))
+                .transpose()?
+                .ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "colocated requires two roles".to_string(),
+                    )
+                })?;
             let r2 = idents
                 .next()
-                .map(|p| p.as_str().to_string())
-                .unwrap_or_default();
+                .map(|p| RoleName::new(p.as_str()))
+                .transpose()?
+                .ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "colocated requires two roles".to_string(),
+                    )
+                })?;
             Ok(TopologyConstraint::Colocated(r1, r2))
         }
         Rule::separated_constraint => {
-            let roles: Vec<String> = inner
+            let roles: Vec<RoleName> = inner
                 .into_inner()
                 .flat_map(|p| p.into_inner())
-                .map(|p| p.as_str().to_string())
-                .collect();
+                .map(|p| RoleName::new(p.as_str()))
+                .collect::<Result<Vec<_>, _>>()?;
             // For now, create pairwise separation constraints
             if roles.len() >= 2 {
                 Ok(TopologyConstraint::Separated(
@@ -226,8 +274,13 @@ fn parse_constraint(
             let mut inner_iter = inner.into_inner();
             let role = inner_iter
                 .next()
-                .map(|p| p.as_str().to_string())
-                .unwrap_or_default();
+                .map(|p| RoleName::new(p.as_str()))
+                .transpose()?
+                .ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "pinned requires a role".to_string(),
+                    )
+                })?;
             let location = inner_iter
                 .next()
                 .map(|p| parse_location(p))
@@ -239,12 +292,22 @@ fn parse_constraint(
             let mut idents = inner.into_inner();
             let role = idents
                 .next()
-                .map(|p| p.as_str().to_string())
-                .unwrap_or_default();
+                .map(|p| RoleName::new(p.as_str()))
+                .transpose()?
+                .ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "region requires a role".to_string(),
+                    )
+                })?;
             let region = idents
                 .next()
-                .map(|p| p.as_str().to_string())
-                .unwrap_or_default();
+                .map(|p| Region::new(p.as_str()))
+                .transpose()?
+                .ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "region requires a value".to_string(),
+                    )
+                })?;
             Ok(TopologyConstraint::Region(role, region))
         }
         _ => Err(TopologyParseError::InvalidConstraint(format!(
@@ -284,12 +347,18 @@ mod tests {
         let result = parse_topology(input).unwrap();
         assert_eq!(result.name, "Dev");
         assert_eq!(
-            result.topology.get_location("Alice"),
-            Location::Remote("localhost:8080".to_string())
+            result
+                .topology
+                .get_location(&RoleName::from_static("Alice"))
+                .unwrap(),
+            Location::Remote(TopologyEndpoint::new("localhost:8080").unwrap())
         );
         assert_eq!(
-            result.topology.get_location("Bob"),
-            Location::Remote("localhost:8081".to_string())
+            result
+                .topology
+                .get_location(&RoleName::from_static("Bob"))
+                .unwrap(),
+            Location::Remote(TopologyEndpoint::new("localhost:8081").unwrap())
         );
     }
 
@@ -324,7 +393,7 @@ mod tests {
         let result = parse_topology(input).unwrap();
         assert_eq!(
             result.topology.mode,
-            Some(TopologyMode::Kubernetes("myapp".to_string()))
+            Some(TopologyMode::Kubernetes(Namespace::new("myapp").unwrap()))
         );
     }
 
@@ -339,10 +408,19 @@ mod tests {
         "#;
 
         let result = parse_topology(input).unwrap();
-        assert_eq!(result.topology.get_location("Alice"), Location::Local);
         assert_eq!(
-            result.topology.get_location("Bob"),
-            Location::Colocated("Alice".to_string())
+            result
+                .topology
+                .get_location(&RoleName::from_static("Alice"))
+                .unwrap(),
+            Location::Local
+        );
+        assert_eq!(
+            result
+                .topology
+                .get_location(&RoleName::from_static("Bob"))
+                .unwrap(),
+            Location::Colocated(RoleName::from_static("Alice"))
         );
     }
 }

@@ -11,10 +11,10 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::effects::{ChoreoHandler, ChoreographyError, Label, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreographyError, Result, RoleId};
 
 type MessageChannelPair = (UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>);
-type ChoiceChannelPair = (UnboundedSender<Label>, UnboundedReceiver<Label>);
+type ChoiceChannelPair<L> = (UnboundedSender<L>, UnboundedReceiver<L>);
 
 /// In-memory handler for testing - uses tokio channels
 pub struct InMemoryHandler<R: RoleId> {
@@ -22,7 +22,7 @@ pub struct InMemoryHandler<R: RoleId> {
     // Channel map for sending/receiving messages between roles
     channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), MessageChannelPair>>>,
     // Choice channel for broadcasting/receiving choice labels
-    choice_channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair>>>,
+    choice_channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair<R::Label>>>>,
 }
 
 impl<R: RoleId> InMemoryHandler<R> {
@@ -38,7 +38,9 @@ impl<R: RoleId> InMemoryHandler<R> {
     pub fn with_channels(
         role: R,
         channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), MessageChannelPair>>>,
-        choice_channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair>>>,
+        choice_channels: std::sync::Arc<
+            std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair<R::Label>>>,
+        >,
     ) -> Self {
         Self {
             role,
@@ -71,7 +73,7 @@ impl<R: RoleId> InMemoryHandler<R> {
 
     /// Get or create a choice channel pair for broadcasting choices
     #[allow(dead_code)]
-    fn get_or_create_choice_channel(&self, from: R, to: R) -> UnboundedSender<Label> {
+    fn get_or_create_choice_channel(&self, from: R, to: R) -> UnboundedSender<R::Label> {
         let mut channels = self
             .choice_channels
             .lock()
@@ -84,7 +86,7 @@ impl<R: RoleId> InMemoryHandler<R> {
     }
 
     /// Get choice receiver for a channel pair
-    fn get_choice_receiver(&self, from: R, to: R) -> Option<UnboundedReceiver<Label>> {
+    fn get_choice_receiver(&self, from: R, to: R) -> Option<UnboundedReceiver<R::Label>> {
         let mut channels = self
             .choice_channels
             .lock()
@@ -161,17 +163,26 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
-        if who == self.role {
-            // Broadcast choice to all other roles - for simplicity, we don't implement
-            // full broadcast here since we don't know all other roles
-            tracing::trace!(?label, "InMemoryHandler: broadcasting choice");
-        }
+        // Send choice label from self.role to who via the choice channel
+        let sender = self.get_or_create_choice_channel(self.role, who);
+        sender.unbounded_send(label).map_err(|_| {
+            ChoreographyError::Transport(format!(
+                "Failed to send choice from {:?} to {:?}",
+                self.role, who
+            ))
+        })?;
+
+        tracing::trace!(?who, ?label, "InMemoryHandler: sent choice");
         Ok(())
     }
 
-    async fn offer(&mut self, _ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         tracing::trace!(?from, "InMemoryHandler: waiting for choice");
 
         // Get the choice receiver for choices from 'from' to 'self.role'

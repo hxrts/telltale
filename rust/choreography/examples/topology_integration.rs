@@ -15,6 +15,7 @@
 #![allow(clippy::expect_used)]
 
 use rumpsteak_aura_choreography::topology::{TopologyBuilder, TopologyHandler, TopologyMode};
+use rumpsteak_aura_choreography::{Namespace, RoleName, TopologyEndpoint};
 
 fn main() {
     println!("╔════════════════════════════════════════════════════════════╗");
@@ -45,16 +46,18 @@ fn main() {
 /// Demonstrate creating a local-mode handler for testing
 fn demonstrate_local_handler() {
     // In a generated protocol, this would be:
-    // let handler = MyProtocol::topology::handler("Alice")?;
+    // let handler = MyProtocol::topology::handler(Role::Alice);
 
     // For this example, we create the handler directly:
-    let handler = TopologyHandler::local("Alice");
+    let handler = TopologyHandler::local(RoleName::from_static("Alice"));
 
     println!("  Created handler for role: {}", handler.role());
     println!("  Topology mode: Local (all in-process)");
     println!(
         "  Handler location for 'Alice': {:?}",
-        handler.get_location("Alice")
+        handler
+            .get_location(&RoleName::from_static("Alice"))
+            .unwrap()
     );
 }
 
@@ -62,9 +65,15 @@ fn demonstrate_local_handler() {
 fn demonstrate_custom_topology() {
     // Build a production topology
     let topology = TopologyBuilder::new()
-        .local_role("Alice")
-        .remote_role("Bob", "192.168.1.10:8080")
-        .remote_role("Carol", "192.168.1.11:8081")
+        .local_role(RoleName::from_static("Alice"))
+        .remote_role(
+            RoleName::from_static("Bob"),
+            TopologyEndpoint::new("192.168.1.10:8080").unwrap(),
+        )
+        .remote_role(
+            RoleName::from_static("Carol"),
+            TopologyEndpoint::new("192.168.1.11:8081").unwrap(),
+        )
         .build();
 
     println!("  Topology configuration:");
@@ -73,14 +82,33 @@ fn demonstrate_custom_topology() {
     println!("    Carol:  192.168.1.11:8081");
 
     // Create handler for Alice
-    let handler = TopologyHandler::new(topology.clone(), "Alice");
+    let handler = TopologyHandler::new(topology.clone(), RoleName::from_static("Alice"));
     println!("\n  Created handler for Alice");
-    println!("    Location of Alice: {:?}", handler.get_location("Alice"));
-    println!("    Location of Bob:   {:?}", handler.get_location("Bob"));
-    println!("    Location of Carol: {:?}", handler.get_location("Carol"));
+    println!(
+        "    Location of Alice: {:?}",
+        handler
+            .get_location(&RoleName::from_static("Alice"))
+            .unwrap()
+    );
+    println!(
+        "    Location of Bob:   {:?}",
+        handler
+            .get_location(&RoleName::from_static("Bob"))
+            .unwrap()
+    );
+    println!(
+        "    Location of Carol: {:?}",
+        handler
+            .get_location(&RoleName::from_static("Carol"))
+            .unwrap()
+    );
 
     // Validate against known roles
-    let valid_roles = vec!["Alice", "Bob", "Carol"];
+    let valid_roles = vec![
+        RoleName::from_static("Alice"),
+        RoleName::from_static("Bob"),
+        RoleName::from_static("Carol"),
+    ];
     let validation = topology.validate(&valid_roles);
     println!("\n  Topology validation: {:?}", validation);
 }
@@ -97,9 +125,18 @@ fn demonstrate_preconfigured_topologies() {
     // Production topology with specific deployments
     let prod_topology = TopologyBuilder::new()
         .mode(TopologyMode::PerRole)
-        .remote_role("Alice", "alice.prod.internal:8080")
-        .remote_role("Bob", "bob.prod.internal:8081")
-        .remote_role("Carol", "carol.prod.internal:8082")
+        .remote_role(
+            RoleName::from_static("Alice"),
+            TopologyEndpoint::new("alice.prod.internal:8080").unwrap(),
+        )
+        .remote_role(
+            RoleName::from_static("Bob"),
+            TopologyEndpoint::new("bob.prod.internal:8081").unwrap(),
+        )
+        .remote_role(
+            RoleName::from_static("Carol"),
+            TopologyEndpoint::new("carol.prod.internal:8082").unwrap(),
+        )
         .build();
 
     println!("\n  Production topology:");
@@ -110,7 +147,9 @@ fn demonstrate_preconfigured_topologies() {
 
     // Kubernetes topology
     let k8s_topology = TopologyBuilder::new()
-        .mode(TopologyMode::Kubernetes("my-namespace".to_string()))
+        .mode(TopologyMode::Kubernetes(
+            Namespace::new("my-namespace").unwrap(),
+        ))
         .build();
 
     println!("\n  Kubernetes topology:");
@@ -120,12 +159,12 @@ fn demonstrate_preconfigured_topologies() {
 
 /// Demonstrate role validation
 fn demonstrate_role_validation() {
-    let valid_roles = vec!["Alice", "Bob"];
+    let valid_roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
 
     // Valid topology
     let valid_topology = TopologyBuilder::new()
-        .local_role("Alice")
-        .local_role("Bob")
+        .local_role(RoleName::from_static("Alice"))
+        .local_role(RoleName::from_static("Bob"))
         .build();
 
     let validation = valid_topology.validate(&valid_roles);
@@ -133,8 +172,8 @@ fn demonstrate_role_validation() {
 
     // Invalid topology (references unknown role)
     let invalid_topology = TopologyBuilder::new()
-        .local_role("Alice")
-        .local_role("UnknownRole")
+        .local_role(RoleName::from_static("Alice"))
+        .local_role(RoleName::from_static("UnknownRole"))
         .build();
 
     let validation = invalid_topology.validate(&valid_roles);
@@ -142,9 +181,12 @@ fn demonstrate_role_validation() {
 
     // Topology with constraints
     let constrained_topology = TopologyBuilder::new()
-        .local_role("Alice")
-        .local_role("Bob")
-        .colocated("Alice", "Bob")
+        .local_role(RoleName::from_static("Alice"))
+        .local_role(RoleName::from_static("Bob"))
+        .colocated(
+            RoleName::from_static("Alice"),
+            RoleName::from_static("Bob"),
+        )
         .build();
 
     println!("\n  Topology with constraints:");
@@ -166,36 +208,21 @@ fn demonstrate_role_validation() {
 //     use rumpsteak_aura_choreography::topology::{
 //         Location, Topology, TopologyBuilder, TopologyHandler, TopologyMode,
 //     };
+//     use rumpsteak_aura_choreography::{Namespace, RoleName, TopologyEndpoint};
 //
-//     const VALID_ROLES: &[&str] = &["Alice", "Bob"];
-//
-//     pub fn validate_role(role: &str) -> Result<(), String> {
-//         if VALID_ROLES.contains(&role) {
-//             Ok(())
-//         } else {
-//             Err(format!("Unknown role '{}' - valid roles are: {:?}", role, VALID_ROLES))
-//         }
+//     pub fn handler(role: Role) -> TopologyHandler {
+//         TopologyHandler::local(role.role_name())
 //     }
 //
-//     pub fn handler(role: impl Into<String>) -> Result<TopologyHandler, String> {
-//         let role_str = role.into();
-//         validate_role(&role_str)?;
-//         Ok(TopologyHandler::local(role_str))
-//     }
+//     pub fn with_topology(topology: Topology, role: Role) -> Result<TopologyHandler, String> {
+//         let roles = [RoleName::from_static("Alice"), RoleName::from_static("Bob")];
 //
-//     pub fn with_topology(
-//         topology: Topology,
-//         role: impl Into<String>,
-//     ) -> Result<TopologyHandler, String> {
-//         let role_str = role.into();
-//         validate_role(&role_str)?;
-//
-//         let validation = topology.validate(VALID_ROLES);
+//         let validation = topology.validate(&roles);
 //         if !validation.is_valid() {
 //             return Err(format!("Topology validation failed: {:?}", validation));
 //         }
 //
-//         Ok(TopologyHandler::new(topology, role_str))
+//         Ok(TopologyHandler::new(topology, role.role_name()))
 //     }
 //
 //     pub mod topologies {
@@ -208,19 +235,25 @@ fn demonstrate_role_validation() {
 //                 .build()
 //         }
 //
-//         pub fn dev_handler(role: impl Into<String>) -> Result<TopologyHandler, String> {
+//         pub fn dev_handler(role: Role) -> Result<TopologyHandler, String> {
 //             with_topology(dev(), role)
 //         }
 //
 //         /// Production topology
 //         pub fn prod() -> Topology {
 //             TopologyBuilder::new()
-//                 .remote_role("Alice", "alice.prod.internal:8080")
-//                 .remote_role("Bob", "bob.prod.internal:8081")
+//                 .remote_role(
+//                     RoleName::from_static("Alice"),
+//                     TopologyEndpoint::new("alice.prod.internal:8080").unwrap(),
+//                 )
+//                 .remote_role(
+//                     RoleName::from_static("Bob"),
+//                     TopologyEndpoint::new("bob.prod.internal:8081").unwrap(),
+//                 )
 //                 .build()
 //         }
 //
-//         pub fn prod_handler(role: impl Into<String>) -> Result<TopologyHandler, String> {
+//         pub fn prod_handler(role: Role) -> Result<TopologyHandler, String> {
 //             with_topology(prod(), role)
 //         }
 //     }
@@ -237,7 +270,10 @@ fn demonstrate_role_validation() {
 //
 // // Custom topology
 // let topology = Topology::builder()
-//     .remote_role("Alice", "custom-address:8080")
+//     .remote_role(
+//         RoleName::from_static("Alice"),
+//         TopologyEndpoint::new("custom-address:8080").unwrap(),
+//     )
 //     .build();
 // let handler = MyProtocol::topology::with_topology(topology, "Alice")?;
 // ```

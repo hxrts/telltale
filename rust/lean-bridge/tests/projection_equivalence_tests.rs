@@ -49,7 +49,7 @@ fn find_role<'a>(
     choreography
         .roles
         .iter()
-        .find(|r| r.name.to_string() == name)
+        .find(|r| r.name().to_string() == name)
 }
 
 /// Helper to run the cross-validation for a given DSL input and role.
@@ -429,7 +429,7 @@ fn validate_all_roles(dsl: &str) -> Vec<(String, Result<(), String>)> {
         .roles
         .iter()
         .map(|role| {
-            let name = role.name.to_string();
+            let name = role.name().to_string();
             let result = validate_projection_equivalence(dsl, &name);
             (name, result)
         })

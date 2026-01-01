@@ -1,5 +1,6 @@
 //! Error types for TCP transport.
 
+use rumpsteak_aura_choreography::identifiers::RoleName;
 use rumpsteak_aura_choreography::TransportError;
 use std::io;
 use thiserror::Error;
@@ -47,7 +48,12 @@ impl From<TcpTransportError> for TransportError {
             TcpTransportError::ConnectionFailed { peer, reason } => {
                 TransportError::ConnectionFailed(format!("{}: {}", peer, reason))
             }
-            TcpTransportError::UnknownPeer(peer) => TransportError::UnknownRole(peer),
+            TcpTransportError::UnknownPeer(peer) => {
+                // Peer names are validated at configuration time
+                TransportError::UnknownRole(
+                    RoleName::new(&peer).unwrap_or_else(|_| RoleName::from_static("unknown")),
+                )
+            }
             TcpTransportError::NotStarted => TransportError::NotReady,
             TcpTransportError::AlreadyStarted => {
                 TransportError::ConnectionFailed("Already started".to_string())

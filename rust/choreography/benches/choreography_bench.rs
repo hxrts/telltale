@@ -12,16 +12,21 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use quote::format_ident;
 use rumpsteak_aura_choreography::{
-    ast::{Branch, Choreography, Condition, MessageType, Protocol, Role},
+    ast::{Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol, Role},
     compiler::{codegen::generate_session_type, projection::project},
     effects::{interpret, NoOpHandler, Program},
 };
 use std::collections::HashMap;
 
+// Helper to create roles
+fn role(name: &str) -> Role {
+    Role::new(format_ident!("{}", name)).unwrap()
+}
+
 // Helper to create a simple choreography for benchmarking
 fn create_simple_choreography() -> Choreography {
-    let alice = Role::new(format_ident!("Alice"));
-    let bob = Role::new(format_ident!("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     Choreography {
         name: format_ident!("SimpleBench"),
@@ -58,9 +63,9 @@ fn create_simple_choreography() -> Choreography {
 
 // Create a complex choreography with choices and loops
 fn create_complex_choreography() -> Choreography {
-    let alice = Role::new(format_ident!("Alice"));
-    let bob = Role::new(format_ident!("Bob"));
-    let charlie = Role::new(format_ident!("Charlie"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let charlie = role("Charlie");
 
     Choreography {
         name: format_ident!("ComplexBench"),
@@ -82,7 +87,7 @@ fn create_complex_choreography() -> Choreography {
                 continuation: Box::new(Protocol::Choice {
                     role: bob.clone(),
                     annotations: HashMap::new(),
-                    branches: vec![
+                    branches: NonEmptyVec::from_head_tail(
                         Branch {
                             label: format_ident!("Accept"),
                             guard: None,
@@ -100,7 +105,7 @@ fn create_complex_choreography() -> Choreography {
                                 continuation: Box::new(Protocol::End),
                             },
                         },
-                        Branch {
+                        vec![Branch {
                             label: format_ident!("Reject"),
                             guard: None,
                             protocol: Protocol::Send {
@@ -116,8 +121,8 @@ fn create_complex_choreography() -> Choreography {
                                 to_annotations: HashMap::new(),
                                 continuation: Box::new(Protocol::End),
                             },
-                        },
-                    ],
+                        }],
+                    ),
                 }),
             }),
         },
@@ -150,12 +155,12 @@ fn bench_projection(c: &mut Criterion) {
     let complex = create_complex_choreography();
 
     group.bench_function("simple_protocol", |b| {
-        let alice = Role::new(format_ident!("Alice"));
+        let alice = role("Alice");
         b.iter(|| project(black_box(&simple), &alice));
     });
 
     group.bench_function("complex_protocol", |b| {
-        let alice = Role::new(format_ident!("Alice"));
+        let alice = role("Alice");
         b.iter(|| project(black_box(&complex), &alice));
     });
 
@@ -178,12 +183,12 @@ fn bench_analysis(c: &mut Criterion) {
     });
 
     group.bench_function("mentions_role_simple", |b| {
-        let alice = Role::new(format_ident!("Alice"));
+        let alice = role("Alice");
         b.iter(|| black_box(&simple).protocol.mentions_role(&alice));
     });
 
     group.bench_function("mentions_role_complex", |b| {
-        let alice = Role::new(format_ident!("Alice"));
+        let alice = role("Alice");
         b.iter(|| black_box(&complex).protocol.mentions_role(&alice));
     });
 
@@ -198,7 +203,7 @@ fn bench_codegen(c: &mut Criterion) {
     let complex = create_complex_choreography();
 
     // Project first to get local types
-    let alice = Role::new(format_ident!("Alice"));
+    let alice = role("Alice");
     let simple_local = project(&simple, &alice).unwrap();
     let complex_local = project(&complex, &alice).unwrap();
 
@@ -262,8 +267,8 @@ fn bench_scaling(c: &mut Criterion) {
     // Keep the iteration counts small so the benchmark remains fast but
     // still highlights how projection time grows with additional sends.
     for num_interactions in &[2, 4, 8, 16] {
-        let alice = Role::new(format_ident!("Alice"));
-        let bob = Role::new(format_ident!("Bob"));
+        let alice = role("Alice");
+        let bob = role("Bob");
 
         // Create a linear protocol with N send operations (responses are implicit in choreographies)
         let mut protocol = Protocol::End;
@@ -303,7 +308,7 @@ fn bench_scaling(c: &mut Criterion) {
             BenchmarkId::from_parameter(num_interactions),
             &choreography,
             |b, choreo| {
-                let alice = Role::new(format_ident!("Alice"));
+                let alice = role("Alice");
                 b.iter(|| project(black_box(choreo), &alice));
             },
         );

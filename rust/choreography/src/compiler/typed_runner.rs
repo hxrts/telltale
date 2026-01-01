@@ -202,7 +202,7 @@ pub fn generate_typed_runner(
     local_type: &LocalType,
     config: &SerializationConfig,
 ) -> TokenStream {
-    let role_name = &role.name;
+    let role_name = role.name();
     let _protocol_ident = format_ident!("{}", protocol_name);
     let _role_ident = format_ident!("{}", role_name);
 
@@ -290,7 +290,7 @@ pub fn generate_typed_runner(
     let protocol_str = protocol_name;
     let role_str = role_name.to_string();
 
-    let run_fn = if role.index.is_some() || role.param.is_some() {
+    let run_fn = if role.index().is_some() || role.param().is_some() {
         // Indexed role
         quote! {
             /// Run the protocol with typed parameters and results.
@@ -299,7 +299,11 @@ pub fn generate_typed_runner(
                 index: u32,
                 params: #params_type,
             ) -> std::result::Result<#result_type, ChoreographyError> {
-                let ctx = ProtocolContext::indexed(#protocol_str, #role_str, index);
+                let ctx = ProtocolContext::indexed(
+                    #protocol_str,
+                    ::rumpsteak_aura_choreography::RoleName::from_static(#role_str),
+                    index,
+                );
                 Self::run_impl(adapter, &ctx, params).await
             }
         }
@@ -311,7 +315,10 @@ pub fn generate_typed_runner(
                 adapter: &mut A,
                 params: #params_type,
             ) -> std::result::Result<#result_type, ChoreographyError> {
-                let ctx = ProtocolContext::new(#protocol_str, #role_str);
+                let ctx = ProtocolContext::new(
+                    #protocol_str,
+                    ::rumpsteak_aura_choreography::RoleName::from_static(#role_str),
+                );
                 Self::run_impl(adapter, &ctx, params).await
             }
         }
@@ -344,7 +351,7 @@ pub fn generate_typed_runner(
                 ctx: &ProtocolContext,
                 _params: #params_type,
             ) -> std::result::Result<#result_type, ChoreographyError> {
-                use crate::runtime::{ChoreographicAdapter, ProtocolContext, RoleId};
+                use crate::runtime::{ChoreographicAdapter, ProtocolContext};
                 use crate::effects::ChoreographyError;
 
                 let _ = ctx; // Context available for future use
@@ -448,12 +455,7 @@ mod tests {
     use proc_macro2::Ident;
 
     fn make_role(name: &str) -> Role {
-        Role {
-            name: Ident::new(name, proc_macro2::Span::call_site()),
-            index: None,
-            param: None,
-            array_size: None,
-        }
+        Role::new(Ident::new(name, proc_macro2::Span::call_site())).unwrap()
     }
 
     fn make_message(name: &str) -> MessageType {

@@ -6,11 +6,15 @@
 //! - Discovery-based transports (Kubernetes, Consul)
 
 use super::{Location, Topology, TopologyMode};
+use crate::identifiers::RoleName;
+use crate::runtime::sync::{mpsc, Mutex};
+use crate::mutex_lock;
 use async_trait::async_trait;
+#[cfg(target_arch = "wasm32")]
+use futures::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::{mpsc, Mutex};
 
 /// Errors that can occur during transport operations.
 #[derive(Debug, Error)]
@@ -31,7 +35,7 @@ pub enum TransportError {
     ChannelClosed,
 
     #[error("Unknown role: {0}")]
-    UnknownRole(String),
+    UnknownRole(RoleName),
 
     #[error("Transport not ready")]
     NotReady,
@@ -72,13 +76,13 @@ impl TransportMessage for ByteMessage {
 #[async_trait]
 pub trait Transport: Send + Sync + 'static {
     /// Send a message to a specific role.
-    async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()>;
+    async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()>;
 
     /// Receive a message from a specific role.
-    async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>>;
+    async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>>;
 
     /// Check if the transport is connected to a role.
-    fn is_connected(&self, role: &str) -> bool;
+    fn is_connected(&self, role: &RoleName) -> bool;
 
     /// Close the transport connection.
     async fn close(&self) -> TransportResult<()>;
@@ -90,18 +94,18 @@ pub trait Transport: Send + Sync + 'static {
 /// run in the same process.
 pub struct InMemoryChannelTransport {
     /// Role this transport belongs to.
-    role: String,
+    role: RoleName,
     /// Sender channels to other roles (role -> sender).
-    senders: Arc<Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>>,
+    senders: Arc<Mutex<HashMap<RoleName, mpsc::Sender<Vec<u8>>>>>,
     /// Receiver channels from other roles (role -> receiver).
-    receivers: Arc<Mutex<HashMap<String, mpsc::Receiver<Vec<u8>>>>>,
+    receivers: Arc<Mutex<HashMap<RoleName, mpsc::Receiver<Vec<u8>>>>>,
 }
 
 impl InMemoryChannelTransport {
     /// Create a new in-memory transport for a role.
-    pub fn new(role: impl Into<String>) -> Self {
+    pub fn new(role: RoleName) -> Self {
         Self {
-            role: role.into(),
+            role,
             senders: Arc::new(Mutex::new(HashMap::new())),
             receivers: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -113,52 +117,98 @@ impl InMemoryChannelTransport {
         let (tx2, rx2) = mpsc::channel(32);
 
         // Self -> Other
-        self.senders.lock().await.insert(other.role.clone(), tx1);
-        other.receivers.lock().await.insert(self.role.clone(), rx1);
+        mutex_lock!(self.senders).insert(other.role.clone(), tx1);
+        mutex_lock!(other.receivers).insert(self.role.clone(), rx1);
 
         // Other -> Self
-        other.senders.lock().await.insert(self.role.clone(), tx2);
-        self.receivers.lock().await.insert(other.role.clone(), rx2);
+        mutex_lock!(other.senders).insert(self.role.clone(), tx2);
+        mutex_lock!(self.receivers).insert(other.role.clone(), rx2);
     }
 
     /// Get the role name.
-    pub fn role(&self) -> &str {
+    pub fn role(&self) -> &RoleName {
         &self.role
     }
 }
 
 #[async_trait]
 impl Transport for InMemoryChannelTransport {
-    async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()> {
-        let senders = self.senders.lock().await;
-        let sender = senders
-            .get(to_role)
-            .ok_or_else(|| TransportError::UnknownRole(to_role.to_string()))?;
+    async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let senders = mutex_lock!(self.senders);
+            let sender = senders
+                .get(to_role)
+                .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
 
-        sender
-            .send(message)
-            .await
-            .map_err(|_| TransportError::ChannelClosed)
+            sender
+                .send(message)
+                .await
+                .map_err(|_| TransportError::ChannelClosed)
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            // Clone the sender to release the lock before awaiting
+            // futures::channel::mpsc::Sender is Clone
+            let sender = {
+                let senders = mutex_lock!(self.senders);
+                senders
+                    .get(to_role)
+                    .cloned()
+                    .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?
+            };
+
+            let mut sender = sender;
+            sender
+                .send(message)
+                .await
+                .map_err(|_| TransportError::ChannelClosed)
+        }
     }
 
-    async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>> {
-        let mut receivers = self.receivers.lock().await;
-        let receiver = receivers
-            .get_mut(from_role)
-            .ok_or_else(|| TransportError::UnknownRole(from_role.to_string()))?;
+    async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut receivers = mutex_lock!(self.receivers);
+            let receiver = receivers
+                .get_mut(from_role)
+                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
+            receiver.recv().await.ok_or(TransportError::ChannelClosed)
+        }
 
-        receiver.recv().await.ok_or(TransportError::ChannelClosed)
+        #[cfg(target_arch = "wasm32")]
+        {
+            // For WASM, we need to take the receiver out, use it, and put it back
+            // to avoid holding the lock across the await
+            let mut receiver = {
+                let mut receivers = mutex_lock!(self.receivers);
+                receivers
+                    .remove(from_role)
+                    .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?
+            };
+
+            let result = receiver.next().await;
+
+            // Put the receiver back
+            {
+                let mut receivers = mutex_lock!(self.receivers);
+                receivers.insert(from_role.clone(), receiver);
+            }
+
+            result.ok_or(TransportError::ChannelClosed)
+        }
     }
 
-    fn is_connected(&self, _role: &str) -> bool {
+    fn is_connected(&self, _role: &RoleName) -> bool {
         // For in-memory, assume always connected after setup
         // In production, this should check if we have a sender for this role
         true
     }
 
     async fn close(&self) -> TransportResult<()> {
-        self.senders.lock().await.clear();
-        self.receivers.lock().await.clear();
+        mutex_lock!(self.senders).clear();
+        mutex_lock!(self.receivers).clear();
         Ok(())
     }
 }
@@ -168,35 +218,34 @@ pub struct TransportFactory;
 
 impl TransportFactory {
     /// Create a transport for a role based on the topology.
-    pub fn create(topology: &Topology, role: &str) -> Box<dyn Transport> {
+    pub fn create(topology: &Topology, role: &RoleName) -> Box<dyn Transport> {
         match &topology.mode {
-            Some(TopologyMode::Local) | None => Box::new(InMemoryChannelTransport::new(role)),
+            Some(TopologyMode::Local) | None => Box::new(InMemoryChannelTransport::new(role.clone())),
             Some(TopologyMode::PerRole) => {
                 // For per-role mode, we'd use TCP but for now fall back to in-memory
-                Box::new(InMemoryChannelTransport::new(role))
+                Box::new(InMemoryChannelTransport::new(role.clone()))
             }
             Some(TopologyMode::Kubernetes(_namespace)) => {
                 // Placeholder: would use K8s service discovery
-                Box::new(InMemoryChannelTransport::new(role))
+                Box::new(InMemoryChannelTransport::new(role.clone()))
             }
             Some(TopologyMode::Consul(_datacenter)) => {
                 // Placeholder: would use Consul service discovery
-                Box::new(InMemoryChannelTransport::new(role))
+                Box::new(InMemoryChannelTransport::new(role.clone()))
             }
         }
     }
 
     /// Select transport type based on location.
     pub fn transport_for_location(
-        _from_role: &str,
-        to_role: &str,
+        _from_role: &RoleName,
+        to_role: &RoleName,
         topology: &Topology,
-    ) -> TransportType {
-        let location = topology.get_location(to_role);
-        match location {
-            Location::Local => TransportType::InMemory,
-            Location::Colocated(_) => TransportType::SharedMemory,
-            Location::Remote(_) => TransportType::Tcp,
+    ) -> Result<TransportType, super::TopologyError> {
+        match topology.get_location(to_role)? {
+            Location::Local => Ok(TransportType::InMemory),
+            Location::Colocated(_) => Ok(TransportType::SharedMemory),
+            Location::Remote(_) => Ok(TransportType::Tcp),
         }
     }
 }
@@ -227,44 +276,70 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_memory_transport() {
-        let alice = InMemoryChannelTransport::new("Alice");
-        let bob = InMemoryChannelTransport::new("Bob");
+        let alice = InMemoryChannelTransport::new(RoleName::from_static("Alice"));
+        let bob = InMemoryChannelTransport::new(RoleName::from_static("Bob"));
 
         alice.connect(&bob).await;
 
         // Alice sends to Bob
-        alice.send("Bob", b"Hello Bob".to_vec()).await.unwrap();
+        alice
+            .send(&RoleName::from_static("Bob"), b"Hello Bob".to_vec())
+            .await
+            .unwrap();
 
         // Bob receives from Alice
-        let msg = bob.recv("Alice").await.unwrap();
+        let msg = bob.recv(&RoleName::from_static("Alice")).await.unwrap();
         assert_eq!(msg, b"Hello Bob".to_vec());
 
         // Bob sends to Alice
-        bob.send("Alice", b"Hello Alice".to_vec()).await.unwrap();
+        bob.send(&RoleName::from_static("Alice"), b"Hello Alice".to_vec())
+            .await
+            .unwrap();
 
         // Alice receives from Bob
-        let msg = alice.recv("Bob").await.unwrap();
+        let msg = alice.recv(&RoleName::from_static("Bob")).await.unwrap();
         assert_eq!(msg, b"Hello Alice".to_vec());
     }
 
     #[test]
     fn test_transport_type_for_location() {
         let topology = Topology::builder()
-            .local_role("Alice")
-            .remote_role("Bob", "localhost:8080")
-            .colocated_role("Carol", "Alice")
+            .local_role(RoleName::from_static("Alice"))
+            .remote_role(
+                RoleName::from_static("Bob"),
+                crate::identifiers::Endpoint::new("localhost:8080").unwrap(),
+            )
+            .colocated_role(
+                RoleName::from_static("Carol"),
+                RoleName::from_static("Alice"),
+            )
             .build();
 
         assert_eq!(
-            TransportFactory::transport_for_location("Alice", "Alice", &topology),
+            TransportFactory::transport_for_location(
+                &RoleName::from_static("Alice"),
+                &RoleName::from_static("Alice"),
+                &topology
+            )
+            .unwrap(),
             TransportType::InMemory
         );
         assert_eq!(
-            TransportFactory::transport_for_location("Alice", "Bob", &topology),
+            TransportFactory::transport_for_location(
+                &RoleName::from_static("Alice"),
+                &RoleName::from_static("Bob"),
+                &topology
+            )
+            .unwrap(),
             TransportType::Tcp
         );
         assert_eq!(
-            TransportFactory::transport_for_location("Alice", "Carol", &topology),
+            TransportFactory::transport_for_location(
+                &RoleName::from_static("Alice"),
+                &RoleName::from_static("Carol"),
+                &topology
+            )
+            .unwrap(),
             TransportType::SharedMemory
         );
     }

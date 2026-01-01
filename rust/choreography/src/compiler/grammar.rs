@@ -115,19 +115,6 @@ impl GrammarComposer {
     }
 
     /// Inject extension rules into the base grammar
-    ///
-    /// Part of the extensible grammar system; will be used when dynamic
-    /// grammar composition is enabled for parser extensions.
-    #[allow(dead_code)] // Part of extensible grammar system (WIP)
-    fn inject_extension_rules(
-        &self,
-        base_grammar: String,
-        extension_rules: &str,
-    ) -> Result<String, GrammarCompositionError> {
-        self.inject_extension_rules_via_lines(base_grammar, extension_rules)
-    }
-
-    /// Optimized version of inject_extension_rules with pre-compiled patterns
     fn inject_extension_rules_optimized(
         &self,
         base_grammar: String,
@@ -162,30 +149,7 @@ impl GrammarComposer {
         Ok(composed)
     }
 
-    /// Extract statement rule names from extension grammar
-    ///
-    /// Part of the extensible grammar system; superseded by
-    /// `extract_extension_statements_optimized` for performance.
-    #[allow(dead_code)] // Superseded by optimized version
-    fn extract_extension_statements(
-        &self,
-        extension_rules: &str,
-    ) -> Result<Vec<String>, GrammarCompositionError> {
-        let mut statements = Vec::new();
-
-        for line in extension_rules.lines() {
-            let line = line.trim();
-            if line.contains("=") && line.ends_with("_stmt = {") {
-                if let Some(rule_name) = line.split('=').next() {
-                    statements.push(rule_name.trim().to_string());
-                }
-            }
-        }
-
-        Ok(statements)
-    }
-
-    /// Optimized version of extract_extension_statements
+    /// Extract statement rule names from extension grammar (optimized version)
     fn extract_extension_statements_optimized(
         &self,
         extension_rules: &str,
@@ -211,9 +175,9 @@ impl GrammarComposer {
 
     /// Validate that the base grammar has the required extension points
     ///
-    /// Part of the extensible grammar system; will be used when dynamic
-    /// grammar validation is enabled for parser extensions.
-    #[allow(dead_code)] // Part of extensible grammar system (WIP)
+    /// Note: `validate_base_grammar_cached` is preferred for production use.
+    /// This method is kept for testing and API compatibility.
+    #[cfg(test)]
     fn validate_base_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
         let required_rules = ["statement = _{", "send_stmt", "broadcast_stmt"];
 
@@ -248,9 +212,9 @@ impl GrammarComposer {
 
     /// Validate the composed grammar for common issues
     ///
-    /// Part of the extensible grammar system; will be used when dynamic
-    /// grammar validation is enabled for parser extensions.
-    #[allow(dead_code)] // Part of extensible grammar system (WIP)
+    /// Note: `validate_composed_grammar_cached` is preferred for production use.
+    /// This method is kept for testing and API compatibility.
+    #[cfg(test)]
     fn validate_composed_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
         // Check for duplicate rule names
         let mut rule_names = HashSet::new();

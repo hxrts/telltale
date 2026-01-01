@@ -283,11 +283,9 @@ async fn test_in_memory_handler_bidirectional_protocol() {
     assert_eq!(received_response, response);
 }
 
-// Note: InMemoryHandler's choose() is a stub that doesn't send through channels.
-// The offer() expects to read from channels, so choose/offer doesn't work together.
-// This test is ignored pending full choose/offer implementation in InMemoryHandler.
+// Tests that InMemoryHandler properly coordinates choose/offer through choice channels.
+// The choose() method sends the label through the choice channel, and offer() receives it.
 #[tokio::test]
-#[ignore = "InMemoryHandler choose() doesn't broadcast to choice channels"]
 async fn test_in_memory_handler_choice_protocol() {
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));

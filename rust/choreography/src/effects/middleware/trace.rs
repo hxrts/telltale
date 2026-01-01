@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::{Duration, Instant};
 use tracing::{debug, trace, warn};
 
-use crate::effects::{ChoreoHandler, Label, Result};
+use crate::effects::{ChoreoHandler, Result, RoleId};
 
 /// Tracing middleware that logs all choreographic operations
 #[derive(Clone)]
@@ -71,13 +71,17 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Trace<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
         debug!(prefix = %self.prefix, ?who, ?label, "choose");
         self.inner.choose(ep, who, label).await
     }
 
-    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         trace!(prefix = %self.prefix, ?from, "offer: waiting");
         let label = self.inner.offer(ep, from).await?;
         debug!(prefix = %self.prefix, ?from, ?label, "offer: received");

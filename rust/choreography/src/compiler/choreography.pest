@@ -34,8 +34,11 @@ block_protocol = { "{" ~ roles_decl? ~ statement* ~ "}" | "(" ~ roles_decl? ~ st
 
 // Statement types
 statement = _{
-    send_stmt
+    annotated_stmt
+    | send_stmt
     | broadcast_stmt
+    | heartbeat_stmt
+    | timed_choice_stmt
     | choice_stmt
     | loop_stmt
     | branch_stmt
@@ -43,6 +46,37 @@ statement = _{
     | continue_stmt
     | call_stmt
 }
+
+// Annotated statement - statement with prefix annotation(s)
+// Syntax: @runtime_timeout(5s) Alice -> Bob: Message
+annotated_stmt = { annotation+ ~ inner_stmt }
+annotation = { "@" ~ annotation_kind }
+annotation_kind = { runtime_timeout_annotation | custom_annotation }
+runtime_timeout_annotation = { "runtime_timeout" ~ "(" ~ duration ~ ")" }
+custom_annotation = { ident ~ ("(" ~ annotation_args ~ ")")? }
+annotation_args = { (!(")" | ",") ~ ANY)* ~ ("," ~ (!(")" | ",") ~ ANY)*)* }
+
+inner_stmt = _{
+    send_stmt
+    | broadcast_stmt
+    | choice_stmt
+    | loop_stmt
+    | branch_stmt
+    | rec_stmt
+    | call_stmt
+}
+
+// Timed choice statement - desugars to choice with timeout annotation
+// Syntax: timed_choice at Alice(5s) { OnTime { ... } TimedOut { ... } }
+timed_choice_stmt = { "timed_choice" ~ "at" ~ role_ref ~ "(" ~ duration ~ ")" ~ choice_block }
+duration = { integer ~ time_unit }
+time_unit = { "ms" | "s" | "m" | "h" }
+
+// Heartbeat statement - desugars to recursive choice with liveness detection
+// Syntax: heartbeat Sender -> Receiver every 1s on_missing(3) { timeout_body } body { normal_body }
+heartbeat_stmt = { "heartbeat" ~ role_ref ~ "->" ~ role_ref ~ "every" ~ duration ~ heartbeat_on_missing ~ heartbeat_body }
+heartbeat_on_missing = { "on_missing" ~ "(" ~ integer ~ ")" ~ block }
+heartbeat_body = { "body" ~ block }
 
 // Protocol call statement (for sub-protocols in where blocks)
 call_stmt = { "call" ~ ident }

@@ -164,7 +164,11 @@ end
     reduces [] to [] and (l,p)::rest to (l,p')::rest', preserving length. -/
 theorem substituteBranches_length (branches : List (Label × Process)) (varName : String) (replacement : Process)
     : (substituteBranches branches varName replacement).length = branches.length := by
-  sorry
+  induction branches with
+  | nil =>
+    simp [substituteBranches]
+  | cons head tail ih =>
+    simp [substituteBranches, ih]
 
 /-- substituteBranches get! preserves label and substitutes process.
 
@@ -173,7 +177,15 @@ theorem substituteBranches_length (branches : List (Label × Process)) (varName 
 theorem substituteBranches_get! (branches : List (Label × Process)) (varName : String) (replacement : Process) (i : Nat)
     : (substituteBranches branches varName replacement).get! i =
       ((branches.get! i).1, (branches.get! i).2.substitute varName replacement) := by
-  sorry
+  induction branches generalizing i with
+  | nil =>
+    cases i <;> simp [substituteBranches]
+  | cons head tail ih =>
+    cases i with
+    | zero =>
+      simp [substituteBranches]
+    | succ i =>
+      simp [substituteBranches, ih]
 
 /-- Unfold one level of recursion: μX.P ↦ P[μX.P/X] -/
 def Process.unfold : Process → Process

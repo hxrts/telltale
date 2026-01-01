@@ -7,6 +7,9 @@
 //! `rumpsteak-types` for Lean correspondence. Extended types (LocalType, Protocol)
 //! are defined here for DSL-specific features.
 
+/// Typed protocol annotations
+pub mod annotation;
+
 /// Choreography definitions (global protocols with metadata)
 pub mod choreography;
 
@@ -21,6 +24,9 @@ pub mod local_type;
 
 /// Message type definitions
 pub mod message;
+
+/// Non-empty collection utilities
+pub mod non_empty;
 
 /// Protocol combinators (global protocol constructs)
 pub mod protocol;
@@ -37,10 +43,12 @@ pub use rumpsteak_types::{
 };
 
 // Re-export DSL-specific types
+pub use annotation::{Annotations, ProtocolAnnotation};
 pub use choreography::Choreography;
 pub use global_type::GlobalType; // Extended GlobalType with DSL features
 pub use local_type::LocalType; // Extended LocalType for code generation
 pub use message::MessageType;
+pub use non_empty::{NonEmptyError, NonEmptyVec};
 pub use protocol::{Branch, Condition, Protocol};
 pub use role::{
     RangeExpr, Role, RoleBoundsChecker, RoleIndex, RoleParam, RoleRange, RoleValidationError,

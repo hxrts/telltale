@@ -237,12 +237,6 @@ impl HeapCommitment {
     }
 }
 
-/// Compute the Merkle root of a heap's resources.
-#[allow(dead_code)]
-pub fn merkle_root(heap: &Heap) -> [u8; 32] {
-    MerkleTree::from_heap(heap).root
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,7 +318,7 @@ mod tests {
         let (_, heap) = heap.alloc_channel("Alice", "Bob");
         let (_, heap) = heap.alloc_message("Alice", "Bob", "Hello", vec![], 0);
 
-        let root = merkle_root(&heap);
+        let root = MerkleTree::from_heap(&heap).root;
         assert_ne!(root, empty_root());
     }
 

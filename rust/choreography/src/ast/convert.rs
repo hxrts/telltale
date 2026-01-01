@@ -99,8 +99,8 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             let cont_global = protocol_to_global(continuation)?;
             let label = message_to_label(message);
             Ok(GlobalTypeCore::send(
-                from.name.to_string(),
-                to.name.to_string(),
+                from.name().to_string(),
+                to.name().to_string(),
                 label,
                 cont_global,
             ))
@@ -111,10 +111,6 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             branches,
             ..
         } => {
-            if branches.is_empty() {
-                return Err(ConversionError::EmptyChoice);
-            }
-
             // Extract receiver from first branch (all branches must have same receiver)
             let first_receiver = extract_receiver(&branches[0], decider)?;
 
@@ -126,7 +122,7 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             }
 
             Ok(GlobalTypeCore::comm(
-                decider.name.to_string(),
+                decider.name().to_string(),
                 first_receiver,
                 global_branches,
             ))
@@ -158,12 +154,12 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
 fn extract_receiver(branch: &Branch, decider: &super::Role) -> ConversionResult<String> {
     match &branch.protocol {
         Protocol::Send { from, to, .. } => {
-            if from.name != decider.name {
+            if from.name() != decider.name() {
                 return Err(ConversionError::InvalidChoice {
                     label: branch.label.to_string(),
                 });
             }
-            Ok(to.name.to_string())
+            Ok(to.name().to_string())
         }
         _ => Err(ConversionError::InvalidChoice {
             label: branch.label.to_string(),
@@ -185,15 +181,15 @@ fn convert_choice_branch(
             continuation,
             ..
         } => {
-            if from.name != decider.name {
+            if from.name() != decider.name() {
                 return Err(ConversionError::InvalidChoice {
                     label: branch.label.to_string(),
                 });
             }
-            if to.name.to_string() != expected_receiver {
+            if to.name().to_string() != expected_receiver {
                 return Err(ConversionError::InconsistentReceivers {
                     expected: expected_receiver.to_string(),
-                    actual: to.name.to_string(),
+                    actual: to.name().to_string(),
                     label: branch.label.to_string(),
                 });
             }
@@ -249,7 +245,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
         } => {
             let cont_r = local_to_local_r(continuation)?;
             let label = message_to_label(message);
-            Ok(LocalTypeR::send(to.name.to_string(), label, cont_r))
+            Ok(LocalTypeR::send(to.name().to_string(), label, cont_r))
         }
 
         LocalType::Receive {
@@ -259,7 +255,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
         } => {
             let cont_r = local_to_local_r(continuation)?;
             let label = message_to_label(message);
-            Ok(LocalTypeR::recv(from.name.to_string(), label, cont_r))
+            Ok(LocalTypeR::recv(from.name().to_string(), label, cont_r))
         }
 
         LocalType::Select { to, branches } => {
@@ -274,7 +270,9 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                         to: send_to,
                         message,
                         continuation,
-                    } if send_to.name == to.name && message.name.to_string() == ident.to_string() => {
+                    } if send_to.name() == to.name()
+                        && message.name.to_string() == ident.to_string() =>
+                    {
                         local_to_local_r(continuation)?
                     }
                     _ => local_to_local_r(cont)?,
@@ -283,7 +281,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                 r_branches.push((label, cont_r));
             }
             Ok(LocalTypeR::Send {
-                partner: to.name.to_string(),
+                partner: to.name().to_string(),
                 branches: r_branches,
             })
         }
@@ -300,7 +298,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                         from: recv_from,
                         message,
                         continuation,
-                    } if recv_from.name == from.name
+                    } if recv_from.name() == from.name()
                         && message.name.to_string() == ident.to_string() =>
                     {
                         local_to_local_r(continuation)?
@@ -311,7 +309,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                 r_branches.push((label, cont_r));
             }
             Ok(LocalTypeR::Recv {
-                partner: from.name.to_string(),
+                partner: from.name().to_string(),
                 branches: r_branches,
             })
         }
@@ -399,22 +397,18 @@ pub fn local_types_equivalent(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::super::annotation::Annotations;
+    use super::super::NonEmptyVec;
     use super::*;
     use proc_macro2::Ident;
     use proc_macro2::Span;
-    use std::collections::HashMap;
 
     fn ident(s: &str) -> Ident {
         Ident::new(s, Span::call_site())
     }
 
     fn role(name: &str) -> super::super::Role {
-        super::super::Role {
-            name: ident(name),
-            param: None,
-            index: None,
-            array_size: None,
-        }
+        super::super::Role::new(ident(name)).unwrap()
     }
 
     fn message(name: &str) -> MessageType {
@@ -433,9 +427,9 @@ mod tests {
             to: role("B"),
             message: message("msg"),
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::new(),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
         };
 
         let global = protocol_to_global(&protocol).unwrap();
@@ -453,9 +447,9 @@ mod tests {
                 to: role("B"),
                 message: message("msg"),
                 continuation: Box::new(Protocol::Var(ident("Loop"))),
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
             }),
         };
 
@@ -467,11 +461,11 @@ mod tests {
     fn test_broadcast_unsupported() {
         let protocol = Protocol::Broadcast {
             from: role("A"),
-            to_all: vec![role("B"), role("C")],
+            to_all: NonEmptyVec::from_head_tail(role("B"), vec![role("C")]),
             message: message("msg"),
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::new(),
-            from_annotations: HashMap::new(),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
         };
 
         let result = protocol_to_global(&protocol);

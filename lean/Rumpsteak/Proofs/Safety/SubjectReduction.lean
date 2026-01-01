@@ -55,7 +55,35 @@ theorem projection_after_send_thm (g g' : GlobalType) (sender receiver : String)
     (hproj : projectR g sender = .ok (.send receiver [(label, contType)]))
     (hcons : g.consume sender receiver label = some g')
     : projectR g' sender = .ok contType := by
-  sorry
+  have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
+  induction hcr generalizing contType with
+  | comm s r branches lbl cont hfind =>
+    -- Sender projects to a send over branches; isolate the singleton branch.
+    have hproj' : projectR (.comm s r branches) s = .ok (.send r [(label, contType)]) := by
+      simpa using hproj
+    -- Extract projectBranches result from sender projection.
+    have hnonempty : branches.isEmpty = false := by
+      by_contra hempty
+      have := hproj'
+      simp [projectR_comm_sender, hempty] at this
+    -- Use projectR_comm_sender to rewrite.
+    have hbranches :
+        projectBranches branches s = .ok [(label, contType)] := by
+      -- projectR_comm_sender gives map (.send r ·)
+      have htmp := hproj'
+      simp [projectR_comm_sender, hnonempty] at htmp
+      exact htmp
+    -- Now the branch with matching label projects to contType.
+    have hcont : projectR cont s = .ok contType :=
+      projectBranches_find_proj branches s label contType cont hbranches hfind
+    -- g' = cont in this constructor.
+    simpa using hcont
+  | mu t body s r lbl g'' hcons ih =>
+    -- Use equi-recursive projection commutation to reduce to unfolded body.
+    have hproj' :
+        projectR (body.substitute t (.mu t body)) s = .ok (.send r [(label, contType)]) := by
+      simpa [projectR_subst_comm_non_participant] using hproj
+    exact ih hproj'
 
 /-- Projection and substitution commute for equi-recursive types.
 
@@ -99,7 +127,21 @@ theorem projection_preserved_other_thm (g g' : GlobalType) (sender receiver role
     (hne2 : role ≠ receiver)
     (hproj : projectR g role = .ok result)
     : projectR g' role = .ok result := by
-  sorry
+  have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
+  induction hcr generalizing result with
+  | comm s r branches lbl cont hfind =>
+    -- g = .comm s r branches, g' = cont
+    -- Role is not a participant, so projection is preserved for each branch.
+    -- sender = s and receiver = r in this constructor.
+    have hne1' : role ≠ s := by simpa using hne1
+    have hne2' : role ≠ r := by simpa using hne2
+    exact projectR_comm_non_participant s r role branches result hne1' hne2' hproj lbl cont hfind
+  | mu t body s r lbl g'' hcons ih =>
+    -- Use equi-recursive projection commutation to reduce to the unfolded body.
+    have hproj' :
+        projectR (body.substitute t (.mu t body)) role = .ok result := by
+      simpa [projectR_subst_comm_non_participant] using hproj
+    exact ih hproj'
 
 /-- Subject reduction for send axiom.
 
@@ -200,7 +242,34 @@ private theorem mapM_singleton_input {α β ε : Type} {f : α → Except ε β}
     {xs : List α} {y : β}
     (hmap : xs.mapM f = .ok [y])
     : ∃ x, xs = [x] ∧ f x = .ok y := by
-  sorry
+  induction xs with
+  | nil =>
+    simp only [List.mapM_nil] at hmap
+    cases hmap
+  | cons x xs' ih =>
+    simp only [List.mapM_cons, bind, Except.bind] at hmap
+    cases hfx : f x with
+    | error e =>
+      simp only [hfx] at hmap
+      cases hmap
+    | ok b =>
+      simp only [hfx] at hmap
+      cases hrest : xs'.mapM f with
+      | error e =>
+        simp only [hrest] at hmap
+        cases hmap
+      | ok bs =>
+        simp only [hrest] at hmap
+        cases hmap
+        -- Now b :: bs = [y]
+        cases bs with
+        | nil =>
+          simp only at *
+          exact ⟨x, rfl, hfx⟩
+        | cons b' bs' =>
+          -- b :: b' :: bs' cannot equal [y]
+          cases hmap
+          simp
 
 /-- If mapM on branches gives [(l, t)], and we find a branch with matching label,
     that branch's projection is t. -/
@@ -310,12 +379,13 @@ theorem projection_after_send (g g' : GlobalType) (sender receiver : String)
     If G consumes p →ℓ q to get G', and r ∉ {p, q},
     then G' ↾ r = G ↾ r (or a subtype). -/
 theorem projection_preserved_other (g g' : GlobalType) (sender receiver role : String)
-    (label : Label)
+    (label : Label) (result : LocalTypeR)
     (hcons : g.consume sender receiver label = some g')
     (hne1 : role ≠ sender)
     (hne2 : role ≠ receiver)
-    : projectR g' role = projectR g role := by
-  sorry
+    (hproj : projectR g role = .ok result)
+    : projectR g' role = .ok result :=
+  projection_preserved_other_thm g g' sender receiver role label result hcons hne1 hne2 hproj
 
 /-- Helper: find? returning some implies element is in list and satisfies predicate. -/
 private theorem find?_some_implies {α : Type _} (l : List α) (p : α → Bool) (x : α)
@@ -356,7 +426,17 @@ theorem wellTyped_role_has_projection (g : GlobalType) (c : Configuration)
     (hwt : ConfigWellTyped g c)
     (hget : c.getProcess role = some proc)
     : ∃ lt, projectR g role = .ok lt ∧ WellTyped [] proc lt := by
-  sorry
+  obtain ⟨rp, hrp, hrole, hproc⟩ := getProcess_implies_mem c role proc hget
+  obtain ⟨_hunique, hall⟩ := hwt
+  have hrpwt := hall rp hrp
+  subst hrole
+  subst hproc
+  unfold RoleProcessWellTyped at hrpwt
+  cases hproj : projectR g role with
+  | error e =>
+    cases hrpwt
+  | ok lt =>
+    exact ⟨lt, hproj, hrpwt⟩
 
 /-- Subject reduction for send case.
 
@@ -425,7 +505,16 @@ theorem subject_reduction_rec (g : GlobalType) (c : Configuration)
     4. For cond/rec: both proven above -/
 theorem subject_reduction : SubjectReduction := by
   intro g c c' hwt hred
-  sorry
+  cases hred with
+  | send c role receiver label value cont hget =>
+    exact subject_reduction_send g c role receiver label value cont hwt hget
+  | recv c c' role sender branches msg cont hget hdeq hfind =>
+    exact subject_reduction_recv_ax g c c' role sender branches msg cont hwt hget hdeq hfind
+  | cond c role b p q hget =>
+    refine ⟨g, GlobalTypeReducesStar.refl g, ?_⟩
+    exact subject_reduction_cond g c role b p q hwt hget
+  | recurse c role x body hget =>
+    exact subject_reduction_rec g c role x body hwt hget
 
 /-! ## Partial Claims Bundle -/
 

@@ -6,8 +6,6 @@
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use std::any::TypeId;
-use std::collections::HashMap;
 
 use crate::effects::algebra::{Effect, InterpretResult, InterpreterState, Program, ProgramMessage};
 use crate::effects::registry::ExtensibleHandler;
@@ -24,7 +22,7 @@ where
     R: RoleId,
     M: ProgramMessage + Serialize + DeserializeOwned + 'static,
 {
-    let mut interpreter = Interpreter::new();
+    let mut interpreter: Interpreter<M, R> = Interpreter::new();
     interpreter.run(handler, endpoint, program).await
 }
 
@@ -34,40 +32,35 @@ where
 /// dispatch extension effects to registered handlers.
 pub async fn interpret_extensible<H, R, M>(
     handler: &mut H,
-    endpoint: &mut <H as ExtensibleHandler>::Endpoint,
+    endpoint: &mut H::Endpoint,
     program: Program<R, M>,
 ) -> Result<InterpretResult<M>>
 where
-    H: ChoreoHandler<Role = R, Endpoint = <H as ExtensibleHandler>::Endpoint>
-        + ExtensibleHandler
-        + Send,
+    H: ExtensibleHandler<Role = R> + Send,
     R: RoleId,
     M: ProgramMessage + Serialize + DeserializeOwned + 'static,
 {
-    let mut interpreter = ExtensibleInterpreter::new();
+    let mut interpreter: ExtensibleInterpreter<M, R> = ExtensibleInterpreter::new();
     interpreter.run(handler, endpoint, program).await
 }
 
 /// Internal interpreter state
-struct Interpreter<M> {
+struct Interpreter<M, R: RoleId> {
     received_values: Vec<M>,
-    #[allow(dead_code)]
-    type_registry: HashMap<TypeId, String>,
     /// Track the last received label from an Offer effect
-    last_label: Option<crate::effects::Label>,
+    last_label: Option<<R as RoleId>::Label>,
 }
 
-impl<M> Interpreter<M> {
+impl<M, R: RoleId> Interpreter<M, R> {
     fn new() -> Self {
         Self {
             received_values: Vec::new(),
-            type_registry: HashMap::new(),
             last_label: None,
         }
     }
 
     #[async_recursion]
-    async fn run<H, R>(
+    async fn run<H>(
         &mut self,
         handler: &mut H,
         endpoint: &mut H::Endpoint,
@@ -75,10 +68,9 @@ impl<M> Interpreter<M> {
     ) -> Result<InterpretResult<M>>
     where
         H: ChoreoHandler<Role = R> + Send,
-        R: RoleId,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
-        for effect in program.effects {
+        for effect in program.into_effects() {
             match self.execute_effect(handler, endpoint, effect).await {
                 Ok(()) => continue,
                 Err(ChoreographyError::Timeout(_)) => {
@@ -103,7 +95,7 @@ impl<M> Interpreter<M> {
     }
 
     #[async_recursion]
-    async fn execute_effect<H, R>(
+    async fn execute_effect<H>(
         &mut self,
         handler: &mut H,
         endpoint: &mut H::Endpoint,
@@ -111,7 +103,6 @@ impl<M> Interpreter<M> {
     ) -> Result<()>
     where
         H: ChoreoHandler<Role = R> + Send,
-        R: RoleId,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
         match effect {
@@ -119,14 +110,18 @@ impl<M> Interpreter<M> {
                 handler.send(endpoint, to, &msg).await?;
             }
 
-            Effect::Recv { from, msg_type } => {
+            Effect::Recv { from, msg_tag } => {
                 // Type-erased receive: attempt to receive as expected type M
                 // Type-specific interpreters or sophisticated type registry needed for full polymorphism
-                tracing::debug!(?from, ?msg_type, "recv effect - type casting required");
+                tracing::debug!(
+                    ?from,
+                    msg_type = msg_tag.type_name(),
+                    "recv effect - type casting required"
+                );
 
                 // Attempt to receive as the expected type M
                 match self
-                    .try_recv_as_type::<H, R, M>(handler, endpoint, from)
+                    .try_recv_as_type::<H, M>(handler, endpoint, from)
                     .await
                 {
                     Ok(value) => {
@@ -231,9 +226,14 @@ impl<M> Interpreter<M> {
                 }
             }
 
-            Effect::Timeout { at, dur, body } => {
+            Effect::Timeout {
+                at,
+                dur,
+                body,
+                on_timeout,
+            } => {
                 // Execute the body with a timeout
-                tracing::debug!(?at, ?dur, "Executing timeout effect");
+                tracing::debug!(?at, ?dur, has_fallback = on_timeout.is_some(), "Executing timeout effect");
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let timeout_result = {
@@ -278,7 +278,26 @@ impl<M> Interpreter<M> {
                     Ok(Err(e)) => return Err(e),
                     Err(_) => {
                         // Timeout occurred
-                        return Err(ChoreographyError::Timeout(dur));
+                        if let Some(timeout_body) = on_timeout {
+                            // Execute the fallback program (timed choice)
+                            tracing::debug!("Timeout fired, executing fallback program");
+                            let result = self.run(handler, endpoint, *timeout_body).await?;
+                            self.received_values.extend(result.received_values);
+                            if !matches!(result.final_state, InterpreterState::Completed) {
+                                match result.final_state {
+                                    InterpreterState::Failed(msg) => {
+                                        return Err(ChoreographyError::Transport(msg));
+                                    }
+                                    InterpreterState::Timeout => {
+                                        return Err(ChoreographyError::Timeout(dur));
+                                    }
+                                    InterpreterState::Completed => {}
+                                }
+                            }
+                        } else {
+                            // No fallback - return timeout error
+                            return Err(ChoreographyError::Timeout(dur));
+                        }
                     }
                 }
             }
@@ -335,7 +354,7 @@ impl<M> Interpreter<M> {
         Ok(())
     }
 
-    async fn try_recv_as_type<H, R, T>(
+    async fn try_recv_as_type<H, T>(
         &mut self,
         handler: &mut H,
         endpoint: &mut H::Endpoint,
@@ -343,7 +362,6 @@ impl<M> Interpreter<M> {
     ) -> Result<T>
     where
         H: ChoreoHandler<Role = R>,
-        R: RoleId,
         T: DeserializeOwned + Send,
     {
         handler.recv(endpoint, from).await
@@ -351,11 +369,11 @@ impl<M> Interpreter<M> {
 }
 
 /// Extensible interpreter that supports extension effects
-struct ExtensibleInterpreter<M> {
-    base: Interpreter<M>,
+struct ExtensibleInterpreter<M, R: RoleId> {
+    base: Interpreter<M, R>,
 }
 
-impl<M> ExtensibleInterpreter<M> {
+impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
     fn new() -> Self {
         Self {
             base: Interpreter::new(),
@@ -363,20 +381,17 @@ impl<M> ExtensibleInterpreter<M> {
     }
 
     #[async_recursion]
-    async fn run<H, R>(
+    async fn run<H>(
         &mut self,
         handler: &mut H,
-        endpoint: &mut <H as ExtensibleHandler>::Endpoint,
+        endpoint: &mut H::Endpoint,
         program: Program<R, M>,
     ) -> Result<InterpretResult<M>>
     where
-        H: ChoreoHandler<Role = R, Endpoint = <H as ExtensibleHandler>::Endpoint>
-            + ExtensibleHandler
-            + Send,
-        R: RoleId,
+        H: ExtensibleHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
-        for effect in program.effects {
+        for effect in program.into_effects() {
             match self.execute_effect(handler, endpoint, effect).await {
                 Ok(()) => continue,
                 Err(ChoreographyError::Timeout(_)) => {
@@ -401,17 +416,14 @@ impl<M> ExtensibleInterpreter<M> {
     }
 
     #[async_recursion]
-    async fn execute_effect<H, R>(
+    async fn execute_effect<H>(
         &mut self,
         handler: &mut H,
-        endpoint: &mut <H as ExtensibleHandler>::Endpoint,
+        endpoint: &mut H::Endpoint,
         effect: Effect<R, M>,
     ) -> Result<()>
     where
-        H: ChoreoHandler<Role = R, Endpoint = <H as ExtensibleHandler>::Endpoint>
-            + ExtensibleHandler
-            + Send,
-        R: RoleId,
+        H: ExtensibleHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
     {
         // Handle extension effects
@@ -465,37 +477,40 @@ pub mod testing {
 
     /// A mock handler that records operations and provides scripted responses
     pub struct MockHandler<R: RoleId> {
-        #[allow(dead_code)]
-        role: R,
+        /// The role this handler represents (kept for debugging/future use)
+        _role: R,
         recorded_operations: Vec<MockOperation<R>>,
-        scripted_responses: VecDeque<MockResponse>,
+        scripted_responses: VecDeque<MockResponse<<R as RoleId>::Label>>,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     pub enum MockOperation<R: RoleId> {
         Send { to: R, msg_type: String },
         Recv { from: R },
-        Choose { at: R, label: String },
+        Choose {
+            at: R,
+            label: <R as RoleId>::Label,
+        },
         Offer { from: R },
     }
 
     #[derive(Debug, Clone)]
-    pub enum MockResponse {
+    pub enum MockResponse<L> {
         Message(Vec<u8>),
-        Label(String),
+        Label(L),
         Error(String),
     }
 
     impl<R: RoleId> MockHandler<R> {
         pub fn new(role: R) -> Self {
             Self {
-                role,
+                _role: role,
                 recorded_operations: Vec::new(),
                 scripted_responses: VecDeque::new(),
             }
         }
 
-        pub fn add_response(&mut self, response: MockResponse) {
+        pub fn add_response(&mut self, response: MockResponse<<R as RoleId>::Label>) {
             self.scripted_responses.push_back(response);
         }
 
@@ -547,12 +562,10 @@ pub mod testing {
             &mut self,
             _ep: &mut Self::Endpoint,
             at: Self::Role,
-            label: crate::effects::Label,
+            label: <Self::Role as RoleId>::Label,
         ) -> Result<()> {
-            self.recorded_operations.push(MockOperation::Choose {
-                at,
-                label: label.0.to_string(),
-            });
+            self.recorded_operations
+                .push(MockOperation::Choose { at, label });
             Ok(())
         }
 
@@ -560,11 +573,11 @@ pub mod testing {
             &mut self,
             _ep: &mut Self::Endpoint,
             from: Self::Role,
-        ) -> Result<crate::effects::Label> {
+        ) -> Result<<Self::Role as RoleId>::Label> {
             self.recorded_operations.push(MockOperation::Offer { from });
 
             if let Some(MockResponse::Label(label)) = self.scripted_responses.pop_front() {
-                Ok(crate::effects::Label(Box::leak(label.into_boxed_str())))
+                Ok(label)
             } else {
                 Err(ChoreographyError::Transport(
                     "No scripted label available".into(),
@@ -590,12 +603,44 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::effects::Label;
+    use crate::effects::{LabelId, RoleId};
+    use crate::identifiers::RoleName;
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
     enum TestRole {
         Alice,
         Bob,
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+    enum TestLabel {
+        Continue,
+    }
+
+    impl LabelId for TestLabel {
+        fn as_str(&self) -> &'static str {
+            match self {
+                TestLabel::Continue => "continue",
+            }
+        }
+
+        fn from_str(label: &str) -> Option<Self> {
+            match label {
+                "continue" => Some(TestLabel::Continue),
+                _ => None,
+            }
+        }
+    }
+
+    impl RoleId for TestRole {
+        type Label = TestLabel;
+
+        fn role_name(&self) -> RoleName {
+            match self {
+                TestRole::Alice => RoleName::from_static("Alice"),
+                TestRole::Bob => RoleName::from_static("Bob"),
+            }
+        }
     }
 
     #[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
@@ -627,7 +672,7 @@ mod tests {
         let program = Program::new()
             .send(TestRole::Bob, TestMessage("hello".into()))
             .recv::<TestMessage>(TestRole::Bob)
-            .choose(TestRole::Alice, Label("continue"))
+            .choose(TestRole::Alice, TestLabel::Continue)
             .end();
 
         assert_eq!(program.send_count(), 1);

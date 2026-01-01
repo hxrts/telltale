@@ -85,7 +85,7 @@ impl TimeoutStatementParser {
 
         Ok(TimeoutProtocol {
             duration: Duration::from_millis(duration_ms),
-            role_names: roles.iter().map(|r| r.name.to_string()).collect(),
+            role_names: roles.iter().map(|r| r.name().to_string()).collect(),
             body_repr: "End".to_string(),
         })
     }
@@ -136,13 +136,16 @@ impl ProtocolExtension for TimeoutProtocol {
     fn mentions_role(&self, role: &Role) -> bool {
         self.role_names
             .iter()
-            .any(|name| name == &role.name.to_string())
+            .any(|name| name == &role.name().to_string())
     }
 
     fn validate(&self, all_roles: &[Role]) -> Result<(), ExtensionValidationError> {
         // Validate that all mentioned roles are declared
         for role_name in &self.role_names {
-            if !all_roles.iter().any(|r| &r.name.to_string() == role_name) {
+            if !all_roles
+                .iter()
+                .any(|r| &r.name().to_string() == role_name)
+            {
                 return Err(ExtensionValidationError::UndeclaredRole {
                     role: role_name.clone(),
                 });
@@ -173,7 +176,7 @@ impl ProtocolExtension for TimeoutProtocol {
         if self
             .role_names
             .iter()
-            .any(|name| name == &role.name.to_string())
+            .any(|name| name == &role.name().to_string())
         {
             // This role participates in the timeout
             // For now, just return a placeholder. In a real implementation,
@@ -260,8 +263,8 @@ mod tests {
         assert_eq!(timeout_protocol.type_name(), "TimeoutProtocol");
 
         use proc_macro2::Span;
-        let alice = Role::new(proc_macro2::Ident::new("Alice", Span::call_site()));
-        let bob = Role::new(proc_macro2::Ident::new("Bob", Span::call_site()));
+        let alice = Role::new(proc_macro2::Ident::new("Alice", Span::call_site())).unwrap();
+        let bob = Role::new(proc_macro2::Ident::new("Bob", Span::call_site())).unwrap();
 
         assert!(timeout_protocol.mentions_role(&alice));
         assert!(!timeout_protocol.mentions_role(&bob));
@@ -273,11 +276,11 @@ mod tests {
         let roles = vec![Role::new(proc_macro2::Ident::new(
             "Alice",
             Span::call_site(),
-        ))];
+        )).unwrap()];
 
         let valid_timeout = TimeoutProtocol {
             duration: Duration::from_millis(5000),
-            role_names: roles.iter().map(|r| r.name.to_string()).collect(),
+            role_names: roles.iter().map(|r| r.name().to_string()).collect(),
             body_repr: "End".to_string(),
         };
 
@@ -286,7 +289,7 @@ mod tests {
         // Test invalid duration
         let invalid_timeout = TimeoutProtocol {
             duration: Duration::ZERO,
-            role_names: roles.iter().map(|r| r.name.to_string()).collect(),
+            role_names: roles.iter().map(|r| r.name().to_string()).collect(),
             body_repr: "End".to_string(),
         };
 

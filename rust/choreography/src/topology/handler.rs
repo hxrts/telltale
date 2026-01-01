@@ -3,10 +3,14 @@
 //! This module provides a handler that automatically selects and manages
 //! transports based on the topology configuration.
 
-use super::{Location, Topology, Transport, TransportError, TransportFactory, TransportResult};
+use super::{
+    Location, Topology, TopologyError, Transport, TransportError, TransportFactory, TransportResult,
+};
+use crate::identifiers::RoleName;
+use crate::runtime::sync::RwLock;
+use crate::{read_lock, write_lock};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// A topology-aware protocol handler.
 ///
@@ -18,44 +22,49 @@ use tokio::sync::RwLock;
 ///
 /// ```ignore
 /// let topology = Topology::builder()
-///     .local_role("Alice")
-///     .remote_role("Bob", "localhost:8080")
+///     .local_role(RoleName::from_static("Alice"))
+///     .remote_role(
+///         RoleName::from_static("Bob"),
+///         TopologyEndpoint::new("localhost:8080").unwrap(),
+///     )
 ///     .build();
 ///
-/// let handler = TopologyHandler::new(topology, "Alice");
+/// let handler = TopologyHandler::new(topology, RoleName::from_static("Alice"));
 ///
 /// // Send to Bob - automatically uses TCP
-/// handler.send("Bob", b"Hello".to_vec()).await?;
+/// handler
+///     .send(&RoleName::from_static("Bob"), b"Hello".to_vec())
+///     .await?;
 /// ```
 pub struct TopologyHandler {
     /// The topology configuration.
     topology: Topology,
     /// The role this handler represents.
-    role: String,
+    role: RoleName,
     /// Transports for each peer role.
-    transports: Arc<RwLock<HashMap<String, Box<dyn Transport>>>>,
+    transports: Arc<RwLock<HashMap<RoleName, Box<dyn Transport>>>>,
     /// Whether the handler is initialized.
     initialized: Arc<RwLock<bool>>,
 }
 
 impl TopologyHandler {
     /// Create a new topology handler.
-    pub fn new(topology: Topology, role: impl Into<String>) -> Self {
+    pub fn new(topology: Topology, role: RoleName) -> Self {
         Self {
             topology,
-            role: role.into(),
+            role,
             transports: Arc::new(RwLock::new(HashMap::new())),
             initialized: Arc::new(RwLock::new(false)),
         }
     }
 
     /// Create a handler from a parsed topology.
-    pub fn from_parsed(parsed: super::ParsedTopology, role: impl Into<String>) -> Self {
+    pub fn from_parsed(parsed: super::ParsedTopology, role: RoleName) -> Self {
         Self::new(parsed.topology, role)
     }
 
     /// Get the role this handler represents.
-    pub fn role(&self) -> &str {
+    pub fn role(&self) -> &RoleName {
         &self.role
     }
 
@@ -66,8 +75,8 @@ impl TopologyHandler {
 
     /// Initialize transports for all roles.
     pub async fn initialize(&self) -> TransportResult<()> {
-        let mut transports = self.transports.write().await;
-        let mut initialized = self.initialized.write().await;
+        let mut transports = write_lock!(self.transports);
+        let mut initialized = write_lock!(self.initialized);
 
         if *initialized {
             return Ok(());
@@ -86,8 +95,8 @@ impl TopologyHandler {
     }
 
     /// Send a message to a role.
-    pub async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()> {
-        let transports = self.transports.read().await;
+    pub async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
+        let transports = read_lock!(self.transports);
 
         // If we don't have a transport, create one on-demand
         if let Some(transport) = transports.get(to_role) {
@@ -96,53 +105,55 @@ impl TopologyHandler {
             drop(transports);
 
             // Create transport on-demand
-            let mut transports = self.transports.write().await;
+            let mut transports = write_lock!(self.transports);
             let transport = TransportFactory::create(&self.topology, to_role);
-            transports.insert(to_role.to_string(), transport);
+            transports.insert(to_role.clone(), transport);
 
             transports
                 .get(to_role)
-                .ok_or_else(|| TransportError::UnknownRole(to_role.to_string()))?
+                .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?
                 .send(to_role, message)
                 .await
         }
     }
 
     /// Receive a message from a role.
-    pub async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>> {
-        let transports = self.transports.read().await;
+    pub async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
+        let transports = read_lock!(self.transports);
 
         if let Some(transport) = transports.get(from_role) {
             transport.recv(from_role).await
         } else {
-            Err(TransportError::UnknownRole(from_role.to_string()))
+            Err(TransportError::UnknownRole(from_role.clone()))
         }
     }
 
     /// Check if connected to a role.
-    pub fn is_connected(&self, role: &str) -> bool {
+    pub fn is_connected(&self, role: &RoleName) -> Result<bool, TopologyError> {
         // For now, always return true for local mode
-        self.topology.is_local(role) || {
-            // Could check transport connection status
-            true
+        if self.topology.is_local(role)? {
+            return Ok(true);
         }
+
+        // Could check transport connection status
+        Ok(true)
     }
 
     /// Get the location of a role.
-    pub fn get_location(&self, role: &str) -> Location {
+    pub fn get_location(&self, role: &RoleName) -> Result<Location, TopologyError> {
         self.topology.get_location(role)
     }
 
     /// Close all transports.
     pub async fn close(&self) -> TransportResult<()> {
-        let mut transports = self.transports.write().await;
+        let mut transports = write_lock!(self.transports);
 
         for (_, transport) in transports.iter() {
             transport.close().await?;
         }
 
         transports.clear();
-        *self.initialized.write().await = false;
+        *write_lock!(self.initialized) = false;
 
         Ok(())
     }
@@ -151,7 +162,7 @@ impl TopologyHandler {
 /// Builder for TopologyHandler with fluent API.
 pub struct TopologyHandlerBuilder {
     topology: Topology,
-    role: Option<String>,
+    role: Option<RoleName>,
 }
 
 impl TopologyHandlerBuilder {
@@ -164,8 +175,8 @@ impl TopologyHandlerBuilder {
     }
 
     /// Set the role for this handler.
-    pub fn with_role(mut self, role: impl Into<String>) -> Self {
-        self.role = Some(role.into());
+    pub fn with_role(mut self, role: RoleName) -> Self {
+        self.role = Some(role);
         self
     }
 
@@ -181,7 +192,7 @@ impl TopologyHandler {
     /// Create a handler for local-only mode.
     ///
     /// All roles run in-process using channels.
-    pub fn local(role: impl Into<String>) -> Self {
+    pub fn local(role: RoleName) -> Self {
         Self::new(Topology::local_mode(), role)
     }
 
@@ -198,49 +209,65 @@ mod tests {
     #[test]
     fn test_topology_handler_creation() {
         let topology = Topology::builder()
-            .local_role("Alice")
-            .local_role("Bob")
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
             .build();
 
-        let handler = TopologyHandler::new(topology, "Alice");
-        assert_eq!(handler.role(), "Alice");
+        let handler = TopologyHandler::new(topology, RoleName::from_static("Alice"));
+        assert_eq!(handler.role(), &RoleName::from_static("Alice"));
     }
 
     #[test]
     fn test_local_handler() {
-        let handler = TopologyHandler::local("Alice");
-        assert_eq!(handler.role(), "Alice");
+        let handler = TopologyHandler::local(RoleName::from_static("Alice"));
+        assert_eq!(handler.role(), &RoleName::from_static("Alice"));
         assert!(handler.topology().mode.is_some());
     }
 
     #[test]
     fn test_handler_builder() {
         let topology = Topology::builder()
-            .remote_role("Alice", "localhost:8080")
-            .remote_role("Bob", "localhost:8081")
+            .remote_role(
+                RoleName::from_static("Alice"),
+                crate::identifiers::Endpoint::new("localhost:8080").unwrap(),
+            )
+            .remote_role(
+                RoleName::from_static("Bob"),
+                crate::identifiers::Endpoint::new("localhost:8081").unwrap(),
+            )
             .build();
 
         let handler = TopologyHandler::builder(topology)
-            .with_role("Alice")
+            .with_role(RoleName::from_static("Alice"))
             .build()
             .unwrap();
 
-        assert_eq!(handler.role(), "Alice");
+        assert_eq!(handler.role(), &RoleName::from_static("Alice"));
     }
 
     #[test]
     fn test_get_location() {
         let topology = Topology::builder()
-            .local_role("Alice")
-            .remote_role("Bob", "localhost:8080")
+            .local_role(RoleName::from_static("Alice"))
+            .remote_role(
+                RoleName::from_static("Bob"),
+                crate::identifiers::Endpoint::new("localhost:8080").unwrap(),
+            )
             .build();
 
-        let handler = TopologyHandler::new(topology, "Alice");
+        let handler = TopologyHandler::new(topology, RoleName::from_static("Alice"));
 
-        assert_eq!(handler.get_location("Alice"), Location::Local);
         assert_eq!(
-            handler.get_location("Bob"),
-            Location::Remote("localhost:8080".to_string())
+            handler
+                .get_location(&RoleName::from_static("Alice"))
+                .unwrap(),
+            Location::Local
+        );
+        assert_eq!(
+            handler
+                .get_location(&RoleName::from_static("Bob"))
+                .unwrap(),
+            Location::Remote(crate::identifiers::Endpoint::new("localhost:8080").unwrap())
         );
     }
 }

@@ -9,7 +9,7 @@
 use proc_macro2::{Ident, Span};
 use quote::quote;
 use rumpsteak_aura_choreography::ast::{
-    Branch, Choreography, Condition, MessageType, Protocol, Role,
+    Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol, Role,
 };
 use rumpsteak_aura_choreography::compiler::{analyze, project};
 use std::collections::HashMap;
@@ -17,6 +17,11 @@ use std::collections::HashMap;
 // Helper to create identifiers
 fn ident(s: &str) -> Ident {
     Ident::new(s, Span::call_site())
+}
+
+// Helper to create roles
+fn role(name: &str) -> Role {
+    Role::new(ident(name)).unwrap()
 }
 
 // Helper to create a message type
@@ -40,8 +45,8 @@ fn msg_with_payload(name: &str, payload_type: &str) -> MessageType {
 #[test]
 fn test_simple_two_party_protocol() {
     // Construct a simple ping-pong protocol
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let protocol = Protocol::Send {
         from: alice.clone(),
@@ -91,9 +96,9 @@ fn test_simple_two_party_protocol() {
 
 #[test]
 fn test_three_party_protocol() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
-    let carol = Role::new(ident("Carol"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let carol = role("Carol");
 
     // Alice -> Bob -> Carol -> Alice
     let protocol = Protocol::Send {
@@ -138,13 +143,13 @@ fn test_three_party_protocol() {
 
 #[test]
 fn test_broadcast_protocol() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
-    let carol = Role::new(ident("Carol"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let carol = role("Carol");
 
     let protocol = Protocol::Broadcast {
         from: alice.clone(),
-        to_all: vec![bob.clone(), carol.clone()],
+        to_all: NonEmptyVec::from_head_tail(bob.clone(), vec![carol.clone()]),
         message: msg("Announcement"),
         continuation: Box::new(Protocol::End),
         annotations: HashMap::new(),
@@ -167,8 +172,8 @@ fn test_broadcast_protocol() {
 
 #[test]
 fn test_choice_protocol() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let accept_branch = Protocol::Send {
         from: alice.clone(),
@@ -192,18 +197,18 @@ fn test_choice_protocol() {
 
     let protocol = Protocol::Choice {
         role: alice.clone(),
-        branches: vec![
+        branches: NonEmptyVec::from_head_tail(
             Branch {
                 label: ident("accept"),
                 guard: None,
                 protocol: accept_branch,
             },
-            Branch {
+            vec![Branch {
                 label: ident("reject"),
                 guard: None,
                 protocol: reject_branch,
-            },
-        ],
+            }],
+        ),
         annotations: HashMap::new(),
     };
 
@@ -222,8 +227,8 @@ fn test_choice_protocol() {
 
 #[test]
 fn test_loop_protocol() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let body = Protocol::Send {
         from: alice.clone(),
@@ -255,9 +260,9 @@ fn test_loop_protocol() {
 
 #[test]
 fn test_parallel_protocol() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
-    let carol = Role::new(ident("Carol"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let carol = role("Carol");
 
     let branch1 = Protocol::Send {
         from: alice.clone(),
@@ -280,7 +285,7 @@ fn test_parallel_protocol() {
     };
 
     let protocol = Protocol::Parallel {
-        protocols: vec![branch1, branch2],
+        protocols: NonEmptyVec::from_head_tail(branch1, vec![branch2]),
     };
 
     let choreography = Choreography {
@@ -299,8 +304,8 @@ fn test_parallel_protocol() {
 
 #[test]
 fn test_recursive_protocol() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let var_label = ident("X");
 
@@ -334,8 +339,8 @@ fn test_recursive_protocol() {
 
 #[test]
 fn test_complex_negotiation() {
-    let buyer = Role::new(ident("Buyer"));
-    let seller = Role::new(ident("Seller"));
+    let buyer = role("Buyer");
+    let seller = role("Seller");
 
     let accept = Protocol::Send {
         from: seller.clone(),
@@ -359,18 +364,18 @@ fn test_complex_negotiation() {
 
     let choice = Protocol::Choice {
         role: seller.clone(),
-        branches: vec![
+        branches: NonEmptyVec::from_head_tail(
             Branch {
                 label: ident("accept"),
                 guard: None,
                 protocol: accept,
             },
-            Branch {
+            vec![Branch {
                 label: ident("counter"),
                 guard: None,
                 protocol: counter,
-            },
-        ],
+            }],
+        ),
         annotations: HashMap::new(),
     };
 
@@ -401,9 +406,9 @@ fn test_complex_negotiation() {
 
 #[test]
 fn test_invalid_choreography_missing_role() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
-    let carol = Role::new(ident("Carol"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let carol = role("Carol");
 
     let protocol = Protocol::Send {
         from: alice.clone(),
@@ -432,8 +437,8 @@ fn test_invalid_choreography_missing_role() {
 
 #[test]
 fn test_projection_consistency() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let protocol = Protocol::Send {
         from: alice.clone(),
@@ -472,9 +477,9 @@ fn test_projection_consistency() {
 
 #[test]
 fn test_analysis_detects_roles() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
-    let carol = Role::new(ident("Carol"));
+    let alice = role("Alice");
+    let bob = role("Bob");
+    let carol = role("Carol");
 
     let protocol = Protocol::Send {
         from: alice.clone(),
@@ -510,8 +515,8 @@ fn test_analysis_detects_roles() {
 
 #[test]
 fn test_message_with_payload() {
-    let alice = Role::new(ident("Alice"));
-    let bob = Role::new(ident("Bob"));
+    let alice = role("Alice");
+    let bob = role("Bob");
 
     let protocol = Protocol::Send {
         from: alice.clone(),

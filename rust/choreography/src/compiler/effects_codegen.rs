@@ -10,6 +10,8 @@ use std::collections::HashSet;
 
 /// Generate annotation-aware effect metadata for a protocol node
 fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) -> TokenStream {
+    use crate::ast::ProtocolAnnotation;
+
     let annotations = protocol.get_annotations();
 
     if annotations.is_empty() {
@@ -18,21 +20,28 @@ fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) 
 
     let metadata_items: Vec<TokenStream> = annotations
         .iter()
-        .map(|(key, value)| {
-            match key.as_str() {
-                "priority" => {
-                    quote! { .with_priority(#value.parse().unwrap_or(0)) }
+        .filter_map(|annotation| {
+            match annotation {
+                ProtocolAnnotation::Priority(value) => {
+                    Some(quote! { .with_priority(#value) })
                 }
-                "timeout" => {
-                    quote! { .with_timeout(std::time::Duration::from_secs(#value.parse().unwrap_or(30))) }
+                ProtocolAnnotation::RuntimeTimeout(dur) => {
+                    let secs = dur.as_secs();
+                    Some(quote! { .with_timeout(std::time::Duration::from_secs(#secs)) })
                 }
-                "retry" => {
-                    quote! { .with_retry(#value.parse().unwrap_or(1)) }
+                ProtocolAnnotation::Retry { max_attempts, .. } => {
+                    Some(quote! { .with_retry(#max_attempts) })
                 }
-                _ => {
+                ProtocolAnnotation::Custom { key, value } => {
                     // Generic annotation - add as metadata
-                    quote! { .with_annotation(#key, #value) }
+                    Some(quote! { .with_annotation(#key, #value) })
                 }
+                // Skip annotations that don't generate effect metadata
+                // (these are handled elsewhere or are purely structural)
+                ProtocolAnnotation::TimedChoice { .. }
+                | ProtocolAnnotation::Idempotent
+                | ProtocolAnnotation::Trace { .. }
+                | ProtocolAnnotation::Heartbeat { .. } => None,
             }
         })
         .collect();
@@ -45,13 +54,14 @@ fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) 
 pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
     let protocol_name = &choreography.name;
     let roles = generate_role_enum(&choreography.roles);
+    let labels = generate_label_type(&choreography.protocol);
     let messages = generate_message_types(&choreography.protocol);
     let role_functions = generate_role_functions(choreography);
     let endpoint_type = generate_endpoint_type(protocol_name);
 
     quote! {
         use rumpsteak_aura_choreography::{
-            ChoreoHandler, Result, Label, Program, Effect,
+            ChoreoHandler, Result, Program, Effect, LabelId, RoleId, RoleName,
             interpret, InterpretResult, ProgramMessage
         };
         use serde::{Serialize, Deserialize};
@@ -69,6 +79,8 @@ pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
 
         #endpoint_type
 
+        #labels
+
         #messages
 
         #role_functions
@@ -76,7 +88,12 @@ pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
 }
 
 fn generate_role_enum(roles: &[Role]) -> TokenStream {
-    let role_names: Vec<_> = roles.iter().map(|r| &r.name).collect();
+    let role_names: Vec<_> = roles.iter().map(|r| r.name()).collect();
+    let role_match_arms = roles.iter().map(|role| {
+        let role_name = role.name();
+        let role_str = role.name().to_string();
+        quote! { Role::#role_name => RoleName::from_static(#role_str) }
+    });
 
     quote! {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -84,7 +101,15 @@ fn generate_role_enum(roles: &[Role]) -> TokenStream {
             #(#role_names),*
         }
 
-        impl rumpsteak::effects::RoleId for Role {}
+        impl RoleId for Role {
+            type Label = Label;
+
+            fn role_name(&self) -> RoleName {
+                match self {
+                    #(#role_match_arms),*
+                }
+            }
+        }
     }
 }
 
@@ -125,6 +150,68 @@ fn generate_message_types(protocol: &Protocol) -> TokenStream {
 
     quote! {
         #(#message_structs)*
+    }
+}
+
+fn generate_label_type(protocol: &Protocol) -> TokenStream {
+    let mut labels = HashSet::new();
+    collect_choice_labels(protocol, &mut labels);
+
+    let mut label_list: Vec<String> = labels.into_iter().collect();
+    label_list.sort();
+
+    if label_list.is_empty() {
+        return quote! {
+            #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+            pub enum Label {}
+
+            impl LabelId for Label {
+                fn as_str(&self) -> &'static str {
+                    match *self {}
+                }
+
+                fn from_str(_label: &str) -> Option<Self> {
+                    None
+                }
+            }
+        };
+    }
+
+    let variants = label_list.iter().map(|label| {
+        let ident = format_ident!("{}", label);
+        quote! { #ident }
+    });
+
+    let as_str_arms = label_list.iter().map(|label| {
+        let ident = format_ident!("{}", label);
+        quote! { Label::#ident => #label }
+    });
+
+    let from_str_arms = label_list.iter().map(|label| {
+        let ident = format_ident!("{}", label);
+        quote! { #label => Some(Label::#ident) }
+    });
+
+    quote! {
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+        pub enum Label {
+            #(#variants),*
+        }
+
+        impl LabelId for Label {
+            fn as_str(&self) -> &'static str {
+                match self {
+                    #(#as_str_arms),*
+                }
+            }
+
+            fn from_str(label: &str) -> Option<Self> {
+                match label {
+                    #(#from_str_arms),*,
+                    _ => None,
+                }
+            }
+        }
     }
 }
 
@@ -170,12 +257,37 @@ fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<Messag
     }
 }
 
+fn collect_choice_labels(protocol: &Protocol, labels: &mut HashSet<String>) {
+    match protocol {
+        Protocol::Choice { branches, .. } => {
+            for branch in branches {
+                labels.insert(branch.label.to_string());
+                collect_choice_labels(&branch.protocol, labels);
+            }
+        }
+        Protocol::Send { continuation, .. }
+        | Protocol::Broadcast { continuation, .. }
+        | Protocol::Extension { continuation, .. } => {
+            collect_choice_labels(continuation, labels);
+        }
+        Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+            collect_choice_labels(body, labels);
+        }
+        Protocol::Parallel { protocols } => {
+            for proto in protocols {
+                collect_choice_labels(proto, labels);
+            }
+        }
+        Protocol::Var(_) | Protocol::End => {}
+    }
+}
+
 fn generate_role_functions(choreography: &Choreography) -> TokenStream {
     choreography
         .roles
         .iter()
         .map(|role| {
-            let role_name_str = role.name.to_string().to_lowercase();
+            let role_name_str = role.name().to_string().to_lowercase();
             let program_fn_name = format_ident!("{}_program", role_name_str);
             let run_fn_name = format_ident!("run_{}", role_name_str);
             let protocol_name = &choreography.name;
@@ -211,7 +323,7 @@ fn generate_program_builder(protocol: &Protocol, role: &Role) -> TokenStream {
     let program_effects = generate_program_effects(protocol, role);
 
     quote! {
-        use rumpsteak_aura_choreography::{Program, Effect, Label};
+        use rumpsteak_aura_choreography::{Program, Effect};
 
         Program::new()
             #program_effects
@@ -237,7 +349,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             if from == role {
                 // This role is sending
                 let message_type = &message.name;
-                let to_ident = &to.name;
+                let to_ident = to.name();
                 let send_metadata = generate_effect_metadata_from_annotations(protocol, role);
 
                 quote! {
@@ -248,7 +360,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             } else if to == role {
                 // This role is receiving
                 let message_type = &message.name;
-                let from_ident = &from.name;
+                let from_ident = from.name();
                 let recv_metadata = generate_effect_metadata_from_annotations(protocol, role);
 
                 quote! {
@@ -264,80 +376,154 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         Protocol::Choice {
             role: choice_role,
             branches,
-            ..
+            annotations,
         } => {
+            // Check for timed_choice annotation using typed accessor
+            let timed_choice_duration = annotations.timed_choice();
+            let is_timed_choice = timed_choice_duration.is_some();
+            let timeout_ms = timed_choice_duration
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(5000); // Default 5 seconds
+
             // Generate Branch effect with all possible continuations
-            let choice_role_name = &choice_role.name;
+            let choice_role_name = choice_role.name();
 
             // Generate all branch continuations
             let branch_programs: Vec<_> = branches
                 .iter()
                 .map(|branch| {
-                    let label_str = branch.label.to_string();
+                    let label_ident = &branch.label;
                     let branch_effects = generate_program_effects(&branch.protocol, role);
 
                     quote! {
-                        (Label(#label_str), Program::new()#branch_effects)
+                        (Label::#label_ident, Program::new()#branch_effects.end())
                     }
                 })
                 .collect();
 
             if choice_role == role {
                 // This role is making the choice
-                // Check if branches have guards - if so, generate guard evaluation
-                // Otherwise, generate code that takes the first valid branch
-                let has_guards = branches.iter().any(|b| b.guard.is_some());
+                if is_timed_choice {
+                    // For timed choice: the actor races operations against a timeout
+                    // The first branch is executed if action completes in time (OnTime)
+                    // The second branch is executed if timeout fires first (TimedOut)
+                    //
+                    // Generated code wraps the choice in a timeout effect:
+                    // .with_timeout(duration, normal_program)
+                    // The handler will use tokio::select! internally
 
-                if has_guards {
-                    // Generate guard evaluation logic
-                    let guard_checks: Vec<TokenStream> = branches
-                        .iter()
-                        .map(|branch| {
-                            let label_str = branch.label.to_string();
-                            if let Some(ref guard) = branch.guard {
-                                quote! {
-                                    if #guard {
-                                        Label(#label_str)
-                                    }
-                                }
-                            } else {
-                                quote! {
-                                    // No guard - default fallback
-                                    { Label(#label_str) }
-                                }
+                    // Find OnTime and TimedOut branches
+                    let on_time_branch = branches.iter().find(|b| b.label.to_string() == "OnTime");
+                    let timed_out_branch =
+                        branches.iter().find(|b| b.label.to_string() == "TimedOut");
+
+                    match (on_time_branch, timed_out_branch) {
+                        (Some(on_time), Some(timed_out)) => {
+                            let on_time_effects = generate_program_effects(&on_time.protocol, role);
+                            let timed_out_effects =
+                                generate_program_effects(&timed_out.protocol, role);
+
+                            quote! {
+                                .with_timed_choice(
+                                    Role::#choice_role_name,
+                                    std::time::Duration::from_millis(#timeout_ms),
+                                    // OnTime branch - executed if no timeout
+                                    Program::new()
+                                        .choose(Role::#choice_role_name, Label::OnTime)
+                                        #on_time_effects
+                                        .end(),
+                                    // TimedOut branch - executed on timeout
+                                    Program::new()
+                                        .choose(Role::#choice_role_name, Label::TimedOut)
+                                        #timed_out_effects
+                                        .end()
+                                )
                             }
-                        })
-                        .collect();
-
-                    // Generate a choice selection expression using guards
-                    let first_label = branches
-                        .first()
-                        .map(|b| b.label.to_string())
-                        .unwrap_or_default();
-                    quote! {
-                        .choose(Role::#choice_role_name, {
-                            // Evaluate guards to determine which branch to choose
-                            #(#guard_checks else)* Label(#first_label)
-                        })
-                        .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
-                    }
-                } else if let Some(first_branch) = branches.first() {
-                    // No guards - default to first branch or allow runtime decision
-                    let label_str = first_branch.label.to_string();
-
-                    quote! {
-                        .choose(Role::#choice_role_name, Label(#label_str))
-                        .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                        }
+                        _ => {
+                            // Fall back to regular choice if OnTime/TimedOut not found
+                            let first_branch = branches.first();
+                            let label_ident = &first_branch.label;
+                            quote! {
+                                .with_timed_choice(
+                                    Role::#choice_role_name,
+                                    std::time::Duration::from_millis(#timeout_ms),
+                                    Program::new()
+                                        .choose(Role::#choice_role_name, Label::#label_ident)
+                                        .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                                        .end(),
+                                    // Timeout takes first branch as fallback
+                                    Program::new()
+                                        .choose(Role::#choice_role_name, Label::#label_ident)
+                                        .end()
+                                )
+                            }
+                        }
                     }
                 } else {
-                    quote! {}
+                    // Standard choice without timeout
+                    // Check if branches have guards - if so, generate guard evaluation
+                    // Otherwise, generate code that takes the first valid branch
+                    let has_guards = branches.iter().any(|b| b.guard.is_some());
+
+                    if has_guards {
+                        // Generate guard evaluation logic
+                        let guard_checks: Vec<TokenStream> = branches
+                            .iter()
+                            .map(|branch| {
+                                let label_ident = &branch.label;
+                                if let Some(ref guard) = branch.guard {
+                                    quote! {
+                                        if #guard {
+                                            Label::#label_ident
+                                        }
+                                    }
+                                } else {
+                                    quote! {
+                                        // No guard - default fallback
+                                        { Label::#label_ident }
+                                    }
+                                }
+                            })
+                            .collect();
+
+                        // Generate a choice selection expression using guards
+                        let first_label = branches.first();
+                        let first_label_ident = &first_label.label;
+                        quote! {
+                            .choose(Role::#choice_role_name, {
+                                // Evaluate guards to determine which branch to choose
+                                #(#guard_checks else)* Label::#first_label_ident
+                            })
+                            .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                        }
+                    } else {
+                        // No guards - default to first branch or allow runtime decision
+                        let first_branch = branches.first();
+                        let label_ident = &first_branch.label;
+
+                        quote! {
+                            .choose(Role::#choice_role_name, Label::#label_ident)
+                            .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                        }
+                    }
                 }
             } else {
                 // This role is offering/waiting for choice
                 // It will receive the label and execute the matching branch
-                quote! {
-                    .offer(Role::#choice_role_name)
-                    .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                if is_timed_choice {
+                    // For timed choice receivers: they still wait for the choice
+                    // The timeout is managed by the choice maker, so receivers
+                    // just offer as normal. They'll receive either OnTime or TimedOut.
+                    quote! {
+                        .offer(Role::#choice_role_name)
+                        .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                    }
+                } else {
+                    quote! {
+                        .offer(Role::#choice_role_name)
+                        .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
+                    }
                 }
             }
         }
@@ -349,7 +535,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 Some(Condition::Count(n)) => {
                     // Fixed iteration count - use loop_n
                     quote! {
-                        .loop_n(#n, Program::new()#body_effects)
+                        .loop_n(#n, Program::new()#body_effects.end())
                     }
                 }
                 Some(Condition::RoleDecides(deciding_role)) => {
@@ -364,14 +550,14 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                             // Loop controlled by this role via choices
                             // Check condition and choose "continue" or "break"
                             // Execute once (implicit "break" choice in this generation)
-                            .loop_n(1, Program::new()#body_effects)
+                            .loop_n(1, Program::new()#body_effects.end())
                         }
                     } else {
                         // This role follows the deciding role's decision
                         quote! {
                             // Loop follows Role::#deciding_role_name's decision
                             // Receives "continue" or "break" choice from deciding role
-                            .loop_n(1, Program::new()#body_effects)
+                            .loop_n(1, Program::new()#body_effects.end())
                         }
                     }
                 }
@@ -386,33 +572,33 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                             // Default to 1 if condition doesn't produce a count
                             let count: usize = 1; // Custom expr evaluation would go here
                             count
-                        }, Program::new()#body_effects)
+                        }, Program::new()#body_effects.end())
                     }
                 }
                 Some(Condition::Fuel(n)) => {
                     // Fuel-based bounding - max iterations
                     quote! {
-                        .loop_n(#n, Program::new()#body_effects)
+                        .loop_n(#n, Program::new()#body_effects.end())
                     }
                 }
                 Some(Condition::YieldAfter(n)) => {
                     // Yield after N communication steps
                     // Execute up to N iterations then yield
                     quote! {
-                        .loop_n(#n, Program::new()#body_effects)
+                        .loop_n(#n, Program::new()#body_effects.end())
                     }
                 }
                 Some(Condition::YieldWhen(_condition)) => {
                     // Yield when condition is met
                     // For now, execute once and check condition
                     quote! {
-                        .loop_n(1, Program::new()#body_effects)
+                        .loop_n(1, Program::new()#body_effects.end())
                     }
                 }
                 None => {
                     // No explicit condition - execute once
                     quote! {
-                        .loop_n(1, Program::new()#body_effects)
+                        .loop_n(1, Program::new()#body_effects.end())
                     }
                 }
             }
@@ -447,7 +633,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 let sends: Vec<TokenStream> = to_all
                     .iter()
                     .map(|to| {
-                        let to_ident = &to.name;
+                        let to_ident = to.name();
                         quote! {
                             .send(Role::#to_ident, #message_type::default())
                         }
@@ -460,7 +646,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 }
             } else if to_all.contains(role) {
                 // This role is receiving the broadcast
-                let from_ident = &from.name;
+                let from_ident = from.name();
 
                 quote! {
                     .recv::<#message_type>(Role::#from_ident)
@@ -529,8 +715,8 @@ mod tests {
             name: format_ident!("SimpleProtocol"),
             namespace: None,
             roles: vec![
-                Role::new(format_ident!("Client")),
-                Role::new(format_ident!("Server")),
+                Role::new(format_ident!("Client")).unwrap(),
+                Role::new(format_ident!("Server")).unwrap(),
             ],
             protocol: Protocol::End,
             attrs: std::collections::HashMap::new(),

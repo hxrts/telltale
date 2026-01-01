@@ -8,10 +8,10 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use super::envelope::ProtocolEnvelope;
-use crate::runtime::RoleId;
+use crate::identifiers::RoleName;
 
 /// Type alias for the message queue storage shared between transports.
-type MessageQueues = Arc<Mutex<HashMap<(String, String), VecDeque<ProtocolEnvelope>>>>;
+type MessageQueues = Arc<Mutex<HashMap<(RoleName, RoleName), VecDeque<ProtocolEnvelope>>>>;
 
 /// Errors that can occur during transport operations.
 #[derive(Debug, thiserror::Error)]
@@ -36,6 +36,10 @@ pub enum TransportError {
     #[error("Timeout waiting for message")]
     Timeout,
 
+    /// Role was not set on the transport before use.
+    #[error("Role not set on transport")]
+    RoleNotSet,
+
     /// Generic transport error.
     #[error("Transport error: {0}")]
     Other(String),
@@ -50,15 +54,15 @@ pub type TransportResult<T> = Result<T, TransportError>;
 /// controls message delivery timing.
 pub trait SimulatedTransport: Send {
     /// Send a message to a destination.
-    fn send(&mut self, to: RoleId, envelope: ProtocolEnvelope) -> TransportResult<()>;
+    fn send(&mut self, to: &RoleName, envelope: ProtocolEnvelope) -> TransportResult<()>;
 
     /// Receive a message from a source.
     ///
     /// Returns `Err(TransportError::NoMessage)` if no message is available.
-    fn recv(&mut self, from: RoleId) -> TransportResult<ProtocolEnvelope>;
+    fn recv(&mut self, from: &RoleName) -> TransportResult<ProtocolEnvelope>;
 
     /// Check if a message is available from a source without consuming it.
-    fn peek(&self, from: RoleId) -> bool;
+    fn peek(&self, from: &RoleName) -> bool;
 
     /// Get all pending messages (for debugging/inspection).
     fn pending_messages(&self) -> Vec<&ProtocolEnvelope>;
@@ -70,16 +74,16 @@ pub trait SimulatedTransport: Send {
 #[async_trait]
 pub trait AsyncSimulatedTransport: Send + Sync {
     /// Send a message to a destination.
-    async fn send(&mut self, to: RoleId, envelope: ProtocolEnvelope) -> TransportResult<()>;
+    async fn send(&mut self, to: &RoleName, envelope: ProtocolEnvelope) -> TransportResult<()>;
 
     /// Receive a message from a source, waiting if necessary.
-    async fn recv(&mut self, from: RoleId) -> TransportResult<ProtocolEnvelope>;
+    async fn recv(&mut self, from: &RoleName) -> TransportResult<ProtocolEnvelope>;
 
     /// Try to receive a message without blocking.
-    fn try_recv(&mut self, from: RoleId) -> TransportResult<Option<ProtocolEnvelope>>;
+    fn try_recv(&mut self, from: &RoleName) -> TransportResult<Option<ProtocolEnvelope>>;
 
     /// Check if a message is available from a source.
-    fn has_message(&self, from: RoleId) -> bool;
+    fn has_message(&self, from: &RoleName) -> bool;
 }
 
 /// In-memory transport for testing.
@@ -88,7 +92,7 @@ pub trait AsyncSimulatedTransport: Send + Sync {
 #[derive(Debug, Default)]
 pub struct InMemoryTransport {
     /// Current role using this transport.
-    role: Option<RoleId>,
+    role: Option<RoleName>,
     /// Message queues: (from_role, to_role) -> queue.
     queues: MessageQueues,
 }
@@ -112,19 +116,19 @@ impl InMemoryTransport {
     }
 
     /// Set the role for this transport.
-    pub fn set_role(&mut self, role: RoleId) {
+    pub fn set_role(&mut self, role: RoleName) {
         self.role = Some(role);
     }
 
     /// Get the current role.
     #[must_use]
-    pub fn role(&self) -> Option<&RoleId> {
+    pub fn role(&self) -> Option<&RoleName> {
         self.role.as_ref()
     }
 
     /// Get the queue key for a sender-receiver pair.
-    fn queue_key(from: &RoleId, to: &RoleId) -> (String, String) {
-        (from.to_string(), to.to_string())
+    fn queue_key(from: &RoleName, to: &RoleName) -> (RoleName, RoleName) {
+        (from.clone(), to.clone())
     }
 
     /// Get all messages in transit (for debugging).
@@ -158,24 +162,18 @@ impl Clone for InMemoryTransport {
 }
 
 impl SimulatedTransport for InMemoryTransport {
-    fn send(&mut self, to: RoleId, envelope: ProtocolEnvelope) -> TransportResult<()> {
-        let from = self
-            .role
-            .as_ref()
-            .ok_or_else(|| TransportError::Other("Role not set".to_string()))?;
-        let key = Self::queue_key(from, &to);
+    fn send(&mut self, to: &RoleName, envelope: ProtocolEnvelope) -> TransportResult<()> {
+        let from = self.role.as_ref().ok_or(TransportError::RoleNotSet)?;
+        let key = Self::queue_key(from, to);
 
         let mut queues = self.queues.lock().unwrap();
         queues.entry(key).or_default().push_back(envelope);
         Ok(())
     }
 
-    fn recv(&mut self, from: RoleId) -> TransportResult<ProtocolEnvelope> {
-        let to = self
-            .role
-            .as_ref()
-            .ok_or_else(|| TransportError::Other("Role not set".to_string()))?;
-        let key = Self::queue_key(&from, to);
+    fn recv(&mut self, from: &RoleName) -> TransportResult<ProtocolEnvelope> {
+        let to = self.role.as_ref().ok_or(TransportError::RoleNotSet)?;
+        let key = Self::queue_key(from, to);
 
         let mut queues = self.queues.lock().unwrap();
         queues
@@ -184,11 +182,11 @@ impl SimulatedTransport for InMemoryTransport {
             .ok_or_else(|| TransportError::NoMessage(from.to_string()))
     }
 
-    fn peek(&self, from: RoleId) -> bool {
+    fn peek(&self, from: &RoleName) -> bool {
         let Some(to) = self.role.as_ref() else {
             return false;
         };
-        let key = Self::queue_key(&from, to);
+        let key = Self::queue_key(from, to);
 
         let queues = self.queues.lock().unwrap();
         queues.get(&key).is_some_and(|q| !q.is_empty())
@@ -203,17 +201,17 @@ impl SimulatedTransport for InMemoryTransport {
 
 #[async_trait]
 impl AsyncSimulatedTransport for InMemoryTransport {
-    async fn send(&mut self, to: RoleId, envelope: ProtocolEnvelope) -> TransportResult<()> {
+    async fn send(&mut self, to: &RoleName, envelope: ProtocolEnvelope) -> TransportResult<()> {
         SimulatedTransport::send(self, to, envelope)
     }
 
-    async fn recv(&mut self, from: RoleId) -> TransportResult<ProtocolEnvelope> {
+    async fn recv(&mut self, from: &RoleName) -> TransportResult<ProtocolEnvelope> {
         // In a real implementation, this would wait for a message.
         // For now, just try immediately.
         SimulatedTransport::recv(self, from)
     }
 
-    fn try_recv(&mut self, from: RoleId) -> TransportResult<Option<ProtocolEnvelope>> {
+    fn try_recv(&mut self, from: &RoleName) -> TransportResult<Option<ProtocolEnvelope>> {
         match SimulatedTransport::recv(self, from) {
             Ok(env) => Ok(Some(env)),
             Err(TransportError::NoMessage(_)) => Ok(None),
@@ -221,7 +219,7 @@ impl AsyncSimulatedTransport for InMemoryTransport {
         }
     }
 
-    fn has_message(&self, from: RoleId) -> bool {
+    fn has_message(&self, from: &RoleName) -> bool {
         self.peek(from)
     }
 }
@@ -286,7 +284,7 @@ impl<T> FaultyTransport<T> {
 }
 
 impl<T: SimulatedTransport> SimulatedTransport for FaultyTransport<T> {
-    fn send(&mut self, to: RoleId, envelope: ProtocolEnvelope) -> TransportResult<()> {
+    fn send(&mut self, to: &RoleName, envelope: ProtocolEnvelope) -> TransportResult<()> {
         if self.should_drop() {
             // Silently drop the message
             return Ok(());
@@ -294,11 +292,11 @@ impl<T: SimulatedTransport> SimulatedTransport for FaultyTransport<T> {
         self.inner.send(to, envelope)
     }
 
-    fn recv(&mut self, from: RoleId) -> TransportResult<ProtocolEnvelope> {
+    fn recv(&mut self, from: &RoleName) -> TransportResult<ProtocolEnvelope> {
         self.inner.recv(from)
     }
 
-    fn peek(&self, from: RoleId) -> bool {
+    fn peek(&self, from: &RoleName) -> bool {
         self.inner.peek(from)
     }
 
@@ -314,8 +312,8 @@ mod tests {
     fn make_envelope(from: &str, to: &str) -> ProtocolEnvelope {
         ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender(from)
-            .recipient(to)
+            .sender(RoleName::new(from).unwrap())
+            .recipient(RoleName::new(to).unwrap())
             .message_type("Msg")
             .payload(vec![1, 2, 3])
             .build()
@@ -327,28 +325,31 @@ mod tests {
         let queues = Arc::new(Mutex::new(HashMap::new()));
 
         let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-        client.set_role(RoleId::new("Client"));
+        client.set_role(RoleName::from_static("Client"));
 
         let mut server = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
-        server.set_role(RoleId::new("Server"));
+        server.set_role(RoleName::from_static("Server"));
 
         // Client sends to server (use explicit trait method)
         let env = make_envelope("Client", "Server");
-        SimulatedTransport::send(&mut client, RoleId::new("Server"), env).unwrap();
+        let server_role = RoleName::from_static("Server");
+        SimulatedTransport::send(&mut client, &server_role, env).unwrap();
 
         // Server receives
-        assert!(server.peek(RoleId::new("Client")));
-        let received = SimulatedTransport::recv(&mut server, RoleId::new("Client")).unwrap();
-        assert_eq!(received.from_role, "Client");
-        assert_eq!(received.to_role, "Server");
+        let client_role = RoleName::from_static("Client");
+        assert!(server.peek(&client_role));
+        let received = SimulatedTransport::recv(&mut server, &client_role).unwrap();
+        assert_eq!(received.from_role.as_str(), "Client");
+        assert_eq!(received.to_role.as_str(), "Server");
     }
 
     #[test]
     fn test_no_message_error() {
         let mut transport = InMemoryTransport::new();
-        transport.set_role(RoleId::new("Client"));
+        transport.set_role(RoleName::from_static("Client"));
 
-        let result = SimulatedTransport::recv(&mut transport, RoleId::new("Server"));
+        let server_role = RoleName::from_static("Server");
+        let result = SimulatedTransport::recv(&mut transport, &server_role);
         assert!(matches!(result, Err(TransportError::NoMessage(_))));
     }
 
@@ -359,10 +360,11 @@ mod tests {
             .with_drop_rate(1.0) // Always drop
             .with_seed(42);
 
-        faulty.inner.set_role(RoleId::new("Client"));
+        faulty.inner.set_role(RoleName::from_static("Client"));
 
         let env = make_envelope("Client", "Server");
-        faulty.send(RoleId::new("Server"), env).unwrap();
+        let server_role = RoleName::from_static("Server");
+        faulty.send(&server_role, env).unwrap();
 
         // Message should be dropped, so pending count should be 0
         assert_eq!(faulty.inner.pending_count(), 0);

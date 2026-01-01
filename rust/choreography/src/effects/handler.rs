@@ -14,7 +14,7 @@
 //! # Example
 //!
 //! ```text
-//! use rumpsteak_aura_choreography::{ChoreoHandler, Label};
+//! use rumpsteak_aura_choreography::{ChoreoHandler, LabelId};
 //!
 //! #[async_trait]
 //! impl ChoreoHandler for MyHandler {
@@ -30,25 +30,72 @@
 
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
+use std::any::TypeId;
 use std::fmt::Debug;
 use std::time::Duration;
 use thiserror::Error;
 
 use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
+use crate::identifiers::RoleName;
 
 /// Trait for role identifiers in choreographies
 ///
 /// Roles are typically generated as enums per choreography, but any type
 /// implementing the required traits can serve as a role identifier.
-pub trait RoleId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {}
-impl<T: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static> RoleId for T {}
+pub trait RoleId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {
+    /// Protocol-specific label type associated with this role type.
+    type Label: LabelId;
 
-/// Labels identify branches in internal/external choice
+    /// Get the canonical role name for this role identifier.
+    fn role_name(&self) -> RoleName;
+
+    /// Optional index for parameterized roles.
+    fn role_index(&self) -> Option<u32> {
+        None
+    }
+}
+
+/// Labels identify branches in internal/external choice.
 ///
-/// Used to distinguish between different paths in choice protocols.
-/// The label is typically a static string matching a protocol branch name.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-pub struct Label(pub &'static str);
+/// Labels must be stable identifiers that can be sent across the wire
+/// and re-hydrated on the receiving side.
+pub trait LabelId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {
+    /// Stable textual identifier for serialization/logging.
+    fn as_str(&self) -> &'static str;
+
+    /// Parse a label from its textual identifier.
+    fn from_str(label: &str) -> Option<Self>;
+}
+
+/// Typed message tag for receive effects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct MessageTag {
+    type_id: TypeId,
+    type_name: &'static str,
+}
+
+impl MessageTag {
+    /// Create a tag for a concrete message type.
+    #[must_use]
+    pub fn of<T: 'static>() -> Self {
+        Self {
+            type_id: TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+
+    /// Access the underlying `TypeId`.
+    #[must_use]
+    pub fn type_id(&self) -> TypeId {
+        self.type_id
+    }
+
+    /// Access the human-readable type name.
+    #[must_use]
+    pub fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+}
 
 /// Session endpoint trait
 ///
@@ -67,6 +114,51 @@ pub enum ChoreographyError {
     /// Message serialization/deserialization error
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    /// Channel send operation failed
+    #[error("{channel_type} send failed: {reason}")]
+    ChannelSendFailed {
+        /// Type of channel (e.g., "SimpleChannel", "SinkStream")
+        channel_type: &'static str,
+        /// Human-readable failure reason
+        reason: String,
+    },
+
+    /// Channel was closed unexpectedly during operation
+    #[error("{channel_type} closed during {operation}")]
+    ChannelClosed {
+        /// Type of channel (e.g., "SimpleChannel", "SinkStream")
+        channel_type: &'static str,
+        /// Operation being performed when channel closed
+        operation: &'static str,
+    },
+
+    /// No channel registered for the specified peer
+    #[error("No channel registered for peer: {peer}")]
+    NoPeerChannel {
+        /// String representation of the peer role
+        peer: String,
+    },
+
+    /// Label serialization failed during choice/offer
+    #[error("Label {operation} failed: {reason}")]
+    LabelSerializationFailed {
+        /// Operation: "serialization" or "deserialization"
+        operation: &'static str,
+        /// Human-readable failure reason
+        reason: String,
+    },
+
+    /// Message serialization failed with type context
+    #[error("{operation} of {type_name} failed: {reason}")]
+    MessageSerializationFailed {
+        /// Operation: "Serialization" or "Deserialization"
+        operation: &'static str,
+        /// Name of the type being serialized
+        type_name: &'static str,
+        /// Human-readable failure reason
+        reason: String,
+    },
 
     /// Operation exceeded the specified timeout
     #[error("Timeout after {0:?}")]
@@ -233,13 +325,30 @@ impl ChoreographyError {
     /// Check if this error is a transport error.
     #[must_use]
     pub fn is_transport(&self) -> bool {
-        matches!(self.root_cause(), ChoreographyError::Transport(_))
+        matches!(
+            self.root_cause(),
+            ChoreographyError::Transport(_)
+                | ChoreographyError::ChannelSendFailed { .. }
+                | ChoreographyError::ChannelClosed { .. }
+                | ChoreographyError::NoPeerChannel { .. }
+        )
     }
 
     /// Check if this error is a protocol violation.
     #[must_use]
     pub fn is_protocol_violation(&self) -> bool {
         matches!(self.root_cause(), ChoreographyError::ProtocolViolation(_))
+    }
+
+    /// Check if this error is a serialization error.
+    #[must_use]
+    pub fn is_serialization(&self) -> bool {
+        matches!(
+            self.root_cause(),
+            ChoreographyError::Serialization(_)
+                | ChoreographyError::LabelSerializationFailed { .. }
+                | ChoreographyError::MessageSerializationFailed { .. }
+        )
     }
 }
 
@@ -372,7 +481,7 @@ pub trait ChoreoHandler: Send {
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()>;
 
     /// External choice: receive a label selection
@@ -387,7 +496,11 @@ pub trait ChoreoHandler: Send {
     /// # Returns
     ///
     /// The label selected by the choosing role
-    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label>;
+    async fn offer(
+        &mut self,
+        ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label>;
 
     /// Execute a future with a timeout
     ///
@@ -464,7 +577,7 @@ pub trait ChoreoHandlerExt: ChoreoHandler {
 /// testing protocol logic without network overhead.
 pub struct NoOpHandler<R: RoleId> {
     _phantom: std::marker::PhantomData<R>,
-    registry: ExtensionRegistry<()>,
+    registry: ExtensionRegistry<(), R>,
 }
 
 impl<R: RoleId> NoOpHandler<R> {
@@ -486,9 +599,7 @@ impl<R: RoleId> Default for NoOpHandler<R> {
 
 #[async_trait]
 impl<R: RoleId + 'static> ExtensibleHandler for NoOpHandler<R> {
-    type Endpoint = ();
-
-    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint> {
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role> {
         &self.registry
     }
 }
@@ -521,12 +632,16 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         _who: Self::Role,
-        _label: Label,
+        _label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
         Ok(())
     }
 
-    async fn offer(&mut self, _ep: &mut Self::Endpoint, _from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        _from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         Err(ChoreographyError::Transport(
             "NoOpHandler cannot offer".into(),
         ))

@@ -23,12 +23,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Successfully parsed choreography: {}", choreography.name);
     println!("  Roles:");
     for role in &choreography.roles {
-        if let Some(size) = &role.array_size {
-            println!("    - {} (array size: {})", role.name, quote::quote!(#size));
-        } else if role.index.is_some() {
-            println!("    - {}[{}]", role.name, role.index.as_ref().unwrap());
+        if let Some(size) = role.array_size() {
+            println!("    - {} (array size: {})", role.name(), quote::quote!(#size));
+        } else if role.index().is_some() {
+            println!("    - {}[{}]", role.name(), role.index().unwrap());
         } else {
-            println!("    - {}", role.name);
+            println!("    - {}", role.name());
         }
     }
 
@@ -41,10 +41,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for role in &choreography.roles {
         match project(&choreography, role) {
             Ok(local_type) => {
-                println!("    - {}: {:?}", role.name, local_type);
+                println!("    - {}: {:?}", role.name(), local_type);
             }
             Err(e) => {
-                println!("    - {}: Error - {}", role.name, e);
+                println!("    - {}: Error - {}", role.name(), e);
             }
         }
     }

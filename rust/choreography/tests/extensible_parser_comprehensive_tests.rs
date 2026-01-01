@@ -450,7 +450,7 @@ mod feature_inheritance_tests {
         // Verify choice construct is parsed correctly
         match &choreography.protocol {
             Protocol::Choice { role, branches, .. } => {
-                assert_eq!(role.name, "Alice");
+                assert_eq!(role.name().to_string(), "Alice");
                 assert_eq!(branches.len(), 2);
                 assert_eq!(branches[0].label.to_string(), "path1");
                 assert_eq!(branches[1].label.to_string(), "path2");
@@ -477,23 +477,23 @@ mod feature_inheritance_tests {
         let worker_role = choreography
             .roles
             .iter()
-            .find(|r| r.name == "Worker")
+            .find(|r| r.name().to_string() == "Worker")
             .unwrap();
-        assert!(worker_role.param.is_some());
+        assert!(worker_role.param().is_some());
 
         let client_role = choreography
             .roles
             .iter()
-            .find(|r| r.name == "Client")
+            .find(|r| r.name().to_string() == "Client")
             .unwrap();
-        assert!(client_role.param.is_some());
+        assert!(client_role.param().is_some());
 
         let manager_role = choreography
             .roles
             .iter()
-            .find(|r| r.name == "Manager")
+            .find(|r| r.name().to_string() == "Manager")
             .unwrap();
-        assert!(manager_role.param.is_none());
+        assert!(manager_role.param().is_none());
     }
 
     #[test]
@@ -543,8 +543,8 @@ mod feature_inheritance_tests {
             Protocol::Broadcast { from, to_all, .. } => {
                 assert_eq!(from.name, "Server");
                 assert_eq!(to_all.len(), 2);
-                assert!(to_all.iter().any(|r| r.name == "Client1"));
-                assert!(to_all.iter().any(|r| r.name == "Client2"));
+                assert!(to_all.iter().any(|r| r.name().to_string() == "Client1"));
+                assert!(to_all.iter().any(|r| r.name().to_string() == "Client2"));
             }
             _ => panic!("Expected broadcast protocol"),
         }
@@ -581,9 +581,9 @@ mod feature_inheritance_tests {
         let worker_role = choreography
             .roles
             .iter()
-            .find(|r| r.name == "Worker")
+            .find(|r| r.name().to_string() == "Worker")
             .unwrap();
-        assert!(worker_role.param.is_some());
+        assert!(worker_role.param().is_some());
 
         // Verify complex structure is parsed
         match &choreography.protocol {
@@ -1009,7 +1009,7 @@ mod integration_tests {
         let role_names: Vec<String> = choreography
             .roles
             .iter()
-            .map(|r| r.name.to_string())
+            .map(|r| r.name().to_string())
             .collect();
         assert!(role_names.contains(&"Guardian".to_string()));
         assert!(role_names.contains(&"User".to_string()));
@@ -1089,9 +1089,9 @@ mod regression_tests {
         let worker_role = choreography
             .roles
             .iter()
-            .find(|r| r.name == "Worker")
+            .find(|r| r.name().to_string() == "Worker")
             .unwrap();
-        assert!(worker_role.param.is_some());
+        assert!(worker_role.param().is_some());
     }
 
     #[test]

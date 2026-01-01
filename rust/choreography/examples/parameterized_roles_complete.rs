@@ -66,7 +66,7 @@ fn test_multiple_workers() -> Result<(), Box<dyn std::error::Error>> {
 
     for role in &choreography.roles {
         let local = project(&choreography, role)?;
-        println!("  - {}: {:?}", role.name, local);
+        println!("  - {}: {:?}", role.name(), local);
     }
 
     println!("  Multiple worker indices working\n");

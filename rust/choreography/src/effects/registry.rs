@@ -1,8 +1,7 @@
 //! Extension handler registry for type-safe extension dispatch
 
 use crate::effects::extension::{ExtensionEffect, ExtensionError};
-use crate::effects::Endpoint;
-use async_trait::async_trait;
+use crate::effects::{Endpoint, RoleId};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::future::Future;
@@ -19,8 +18,9 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 ///
 /// Handlers return `Result<(), ExtensionError>` and must handle
 /// their extension type or return an error.
-pub type ExtensionHandler<E> = Box<
-    dyn for<'a> Fn(&'a mut E, &'a dyn ExtensionEffect) -> BoxFuture<'a, Result<(), ExtensionError>>
+pub type ExtensionHandler<E, R> = Box<
+    dyn for<'a> Fn(&'a mut E, &'a dyn ExtensionEffect<R>)
+            -> BoxFuture<'a, Result<(), ExtensionError>>
         + Send
         + Sync,
 >;
@@ -49,11 +49,11 @@ pub type ExtensionHandler<E> = Box<
 ///     })
 /// });
 /// ```
-pub struct ExtensionRegistry<E: Endpoint> {
-    handlers: HashMap<TypeId, (ExtensionHandler<E>, &'static str)>,
+pub struct ExtensionRegistry<E: Endpoint, R: RoleId> {
+    handlers: HashMap<TypeId, (ExtensionHandler<E, R>, &'static str)>,
 }
 
-impl<E: Endpoint> ExtensionRegistry<E> {
+impl<E: Endpoint, R: RoleId> ExtensionRegistry<E, R> {
     /// Create a new empty extension registry
     #[must_use]
     pub fn new() -> Self {
@@ -74,10 +74,10 @@ impl<E: Endpoint> ExtensionRegistry<E> {
     /// Returns `ExtensionError::DuplicateHandler` if a handler is already registered for type `Ext`.
     pub fn register<Ext, F>(&mut self, handler: F) -> Result<(), ExtensionError>
     where
-        Ext: ExtensionEffect + 'static,
+        Ext: ExtensionEffect<R> + 'static,
         F: for<'a> Fn(
                 &'a mut E,
-                &'a dyn ExtensionEffect,
+                &'a dyn ExtensionEffect<R>,
             ) -> BoxFuture<'a, Result<(), ExtensionError>>
             + Send
             + Sync
@@ -103,7 +103,7 @@ impl<E: Endpoint> ExtensionRegistry<E> {
     pub async fn handle(
         &self,
         endpoint: &mut E,
-        extension: &dyn ExtensionEffect,
+        extension: &dyn ExtensionEffect<R>,
     ) -> Result<(), ExtensionError> {
         let type_id = extension.type_id();
 
@@ -117,7 +117,7 @@ impl<E: Endpoint> ExtensionRegistry<E> {
 
     /// Check if a handler is registered for an extension type
     #[must_use]
-    pub fn is_registered<Ext: ExtensionEffect + 'static>(&self) -> bool {
+    pub fn is_registered<Ext: ExtensionEffect<R> + 'static>(&self) -> bool {
         self.handlers.contains_key(&TypeId::of::<Ext>())
     }
 
@@ -126,7 +126,7 @@ impl<E: Endpoint> ExtensionRegistry<E> {
     /// # Errors
     ///
     /// Returns `ExtensionError::MergeConflict` if there are overlapping extension types.
-    pub fn merge(&mut self, other: ExtensionRegistry<E>) -> Result<(), ExtensionError> {
+    pub fn merge(&mut self, other: ExtensionRegistry<E, R>) -> Result<(), ExtensionError> {
         for (type_id, (handler, type_name)) in other.handlers {
             if self.handlers.contains_key(&type_id) {
                 return Err(ExtensionError::MergeConflict { type_name });
@@ -137,7 +137,7 @@ impl<E: Endpoint> ExtensionRegistry<E> {
     }
 }
 
-impl<E: Endpoint> Default for ExtensionRegistry<E> {
+impl<E: Endpoint, R: RoleId> Default for ExtensionRegistry<E, R> {
     fn default() -> Self {
         Self::new()
     }
@@ -147,13 +147,9 @@ impl<E: Endpoint> Default for ExtensionRegistry<E> {
 ///
 /// This trait provides access to the extension registry. Handlers
 /// should populate the registry during construction.
-#[async_trait]
-pub trait ExtensibleHandler {
-    /// The endpoint type for this handler
-    type Endpoint: Endpoint;
-
+pub trait ExtensibleHandler: crate::effects::ChoreoHandler {
     /// Get the extension registry for this handler
     ///
     /// The interpreter uses this to dispatch extension effects.
-    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint>;
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role>;
 }

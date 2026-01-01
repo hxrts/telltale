@@ -13,8 +13,8 @@ use std::collections::HashMap;
 
 fn simple_role_strategy() -> impl Strategy<Value = Role> {
     prop_oneof![
-        Just(Role::new(format_ident!("Alice"))),
-        Just(Role::new(format_ident!("Bob"))),
+        Just(Role::new(format_ident!("Alice")).unwrap()),
+        Just(Role::new(format_ident!("Bob")).unwrap()),
     ]
 }
 
@@ -37,7 +37,7 @@ proptest! {
 
 #[test]
 fn test_end_projection() {
-    let alice = Role::new(format_ident!("Alice"));
+    let alice = Role::new(format_ident!("Alice")).unwrap();
     let choreo = Choreography {
         name: format_ident!("EndOnly"),
         namespace: None,

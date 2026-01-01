@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
-use crate::effects::{ChoreoHandler, ChoreographyError, Label, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreographyError, Result, RoleId};
 
 /// Recording handler for testing - captures all effects for verification
 #[derive(Clone)]
@@ -20,7 +20,10 @@ pub struct RecordingHandler<R: RoleId> {
 pub enum RecordedEvent<R: RoleId> {
     Send { from: R, to: R, msg_type: String },
     Recv { from: R, to: R, msg_type: String },
-    Choose { at: R, label: Label },
+    Choose {
+        at: R,
+        label: <R as RoleId>::Label,
+    },
     Offer { from: R, to: R },
 }
 
@@ -91,7 +94,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         at: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
         self.events
             .lock()
@@ -100,7 +103,11 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         Ok(())
     }
 
-    async fn offer(&mut self, _ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         self.events
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

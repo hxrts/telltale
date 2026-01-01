@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
-use crate::effects::{ChoreoHandler, Label, Result};
+use crate::effects::{ChoreoHandler, Result, RoleId};
 
 /// Metrics collection middleware
 #[derive(Clone)]
@@ -82,12 +82,16 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()> {
         self.inner.choose(ep, who, label).await
     }
 
-    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label> {
         self.inner.offer(ep, from).await
     }
 

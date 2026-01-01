@@ -73,14 +73,17 @@ fn generate_annotation_metadata(name: &str, annotations: &HashMap<String, String
 /// Reserved for future annotation-to-attribute mapping when code generation
 /// supports priority, timeout, and async annotations on generated types.
 #[allow(dead_code)] // Reserved for future annotation support
-fn generate_annotation_attributes(annotations: &HashMap<String, String>) -> TokenStream {
+fn generate_annotation_attributes(annotations: &crate::ast::Annotations) -> TokenStream {
     let mut attrs = Vec::new();
 
-    // Handle common annotation patterns
-    if let Some(priority) = annotations.get("priority") {
-        attrs.push(quote! { #[priority = #priority] });
+    // Handle common annotation patterns using typed accessors
+    if let Some(priority) = annotations.priority() {
+        let p = priority.to_string();
+        attrs.push(quote! { #[priority = #p] });
     }
 
+    // For timeout/async/retry, fall back to string-based lookup for now
+    // as these aren't yet typed variants
     if let Some(timeout) = annotations.get("timeout") {
         attrs.push(quote! { #[timeout = #timeout] });
     }
@@ -105,7 +108,9 @@ fn generate_runtime_annotation_access(name: &str, protocol: &Protocol) -> TokenS
         return quote! {};
     }
 
-    let annotation_map: Vec<TokenStream> = all_annotations
+    // Convert to legacy map for code generation
+    let legacy_map = all_annotations.to_legacy_map();
+    let annotation_map: Vec<TokenStream> = legacy_map
         .iter()
         .map(|(key, value)| {
             quote! { map.insert(#key.to_string(), #value.to_string()); }
@@ -129,7 +134,7 @@ pub fn generate_session_type(
     local_type: &LocalType,
     protocol_name: &str,
 ) -> TokenStream {
-    let type_name = format_ident!("{}_{}", role.name, protocol_name);
+    let type_name = format_ident!("{}_{}", role.name(), protocol_name);
     let inner_type = generate_type_expr(local_type);
 
     quote! {
@@ -146,7 +151,7 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
             message,
             continuation,
         } => {
-            let to_name = &to.name;
+            let to_name = to.name();
             let msg_name = &message.name;
             let cont = generate_type_expr(continuation);
 
@@ -160,7 +165,7 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
             message,
             continuation,
         } => {
-            let from_name = &from.name;
+            let from_name = from.name();
             let msg_name = &message.name;
             let cont = generate_type_expr(continuation);
 
@@ -170,7 +175,7 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
         }
 
         LocalType::Select { to, branches } => {
-            let to_name = &to.name;
+            let to_name = to.name();
             let choice_type = generate_choice_enum(branches, true);
 
             quote! {
@@ -179,7 +184,7 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
         }
 
         LocalType::Branch { from, branches } => {
-            let from_name = &from.name;
+            let from_name = from.name();
             let choice_type = generate_choice_enum(branches, false);
 
             quote! {
@@ -401,7 +406,7 @@ fn generate_extension_code(
 /// Generate role struct definitions
 fn generate_role_structs(roles: &[Role]) -> TokenStream {
     let _n = roles.len();
-    let role_names: Vec<&Ident> = roles.iter().map(|r| &r.name).collect();
+    let role_names: Vec<&Ident> = roles.iter().map(|r| r.name()).collect();
 
     // Generate Roles tuple struct
     let roles_struct = quote! {
@@ -411,12 +416,12 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
 
     // Generate individual role structs with routes
     let role_structs = roles.iter().enumerate().map(|(i, role)| {
-        let role_name = &role.name;
+        let role_name = role.name();
         let other_roles: Vec<_> = roles
             .iter()
             .enumerate()
             .filter(|(j, _)| i != *j)
-            .map(|(_, r)| &r.name)
+            .map(|(_, r)| r.name())
             .collect();
 
         if other_roles.is_empty() {
@@ -454,7 +459,7 @@ pub fn generate_role_implementations(
     local_type: &LocalType,
     protocol_name: &str,
 ) -> TokenStream {
-    let role_name = &role.name;
+    let role_name = role.name();
     let fn_name = format_ident!("{}_protocol", role_name.to_string().to_lowercase());
     let session_type = format_ident!("{}_{}", role_name, protocol_name);
 
@@ -639,16 +644,16 @@ pub fn generate_choreography_code_with_annotations(
     // Generate metadata for roles with annotations
     let role_metadata: Vec<TokenStream> = roles
         .iter()
-        .filter(|role| role.index.is_some() || role.param.is_some())
+        .filter(|role| role.index().is_some() || role.param().is_some())
         .map(|role| {
             let mut role_annotations = HashMap::new();
-            if role.index.is_some() {
+            if role.index().is_some() {
                 role_annotations.insert("indexed".to_string(), "true".to_string());
             }
-            if role.param.is_some() {
+            if role.param().is_some() {
                 role_annotations.insert("parameterized".to_string(), "true".to_string());
             }
-            generate_annotation_metadata(&role.name.to_string(), &role_annotations)
+            generate_annotation_metadata(&role.name().to_string(), &role_annotations)
         })
         .collect();
 
@@ -695,7 +700,7 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 
     // Generate role binding validation functions
     let validation_functions = dynamic_roles.iter().map(|role| {
-        let role_name = &role.name;
+        let role_name = role.name();
         let validation_fn_name =
             format_ident!("validate_{}_count", role_name.to_string().to_lowercase());
 
@@ -719,7 +724,7 @@ pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 
     // Generate role mapping functions
     let mapping_functions = dynamic_roles.iter().map(|role| {
-        let role_name = &role.name;
+        let role_name = role.name();
         let map_fn_name = format_ident!("map_{}_instances", role_name.to_string().to_lowercase());
         let get_fn_name = format_ident!("get_{}_device", role_name.to_string().to_lowercase());
 
@@ -923,22 +928,17 @@ pub fn generate_topology_integration(
     let _protocol_name = &choreography.name;
 
     // Collect role names for validation
-    let role_names: Vec<&Ident> = choreography.roles.iter().map(|r| &r.name).collect();
+    let role_names: Vec<&Ident> = choreography.roles.iter().map(|r| r.name()).collect();
     let role_name_strs: Vec<String> = role_names.iter().map(|r| r.to_string()).collect();
 
     // Generate handler method
     let handler_method = generate_handler_method();
 
     // Generate with_topology method
-    let with_topology_method = generate_with_topology_method();
+    let with_topology_method = generate_with_topology_method(&role_name_strs);
 
     // Generate topology constants
     let topology_constants = generate_topology_constants(inline_topologies, &role_name_strs);
-
-    // Generate role name validation
-    let valid_roles_array = quote! {
-        const VALID_ROLES: &[&str] = &[#(#role_name_strs),*];
-    };
 
     quote! {
         /// Topology integration for the #protocol_name_str protocol
@@ -947,20 +947,9 @@ pub fn generate_topology_integration(
             use ::rumpsteak_aura_choreography::topology::{
                 Location, Topology, TopologyBuilder, TopologyHandler, TopologyMode,
             };
-
-            #valid_roles_array
-
-            /// Validate that a role name is part of this protocol
-            pub fn validate_role(role: &str) -> Result<(), String> {
-                if VALID_ROLES.contains(&role) {
-                    Ok(())
-                } else {
-                    Err(format!(
-                        "Unknown role '{}' - valid roles are: {:?}",
-                        role, VALID_ROLES
-                    ))
-                }
-            }
+            use ::rumpsteak_aura_choreography::{
+                Datacenter, Namespace, Region, RoleName, TopologyEndpoint,
+            };
 
             #handler_method
             #with_topology_method
@@ -979,23 +968,26 @@ fn generate_handler_method() -> TokenStream {
         ///
         /// # Arguments
         ///
-        /// * `role` - The role name this handler will act as
+        /// * `role` - The role this handler will act as
         ///
         /// # Example
         ///
         /// ```ignore
-        /// let handler = MyProtocol::handler("Alice");
+        /// let handler = MyProtocol::handler(Role::Alice);
         /// ```
-        pub fn handler(role: impl Into<String>) -> Result<TopologyHandler, String> {
-            let role_str = role.into();
-            validate_role(&role_str)?;
-            Ok(TopologyHandler::local(role_str))
+        pub fn handler(role: Role) -> TopologyHandler {
+            TopologyHandler::local(role.role_name())
         }
     }
 }
 
 /// Generate the `with_topology(topo, role)` method
-fn generate_with_topology_method() -> TokenStream {
+fn generate_with_topology_method(role_names: &[String]) -> TokenStream {
+    let role_name_literals: Vec<TokenStream> = role_names
+        .iter()
+        .map(|role| quote! { RoleName::from_static(#role) })
+        .collect();
+
     quote! {
         /// Create a handler for this protocol with a custom topology.
         ///
@@ -1005,32 +997,34 @@ fn generate_with_topology_method() -> TokenStream {
         /// # Arguments
         ///
         /// * `topology` - The topology configuration
-        /// * `role` - The role name this handler will act as
+        /// * `role` - The role this handler will act as
         ///
         /// # Example
         ///
         /// ```ignore
         /// let topology = Topology::builder()
-        ///     .local_role("Alice")
-        ///     .remote_role("Bob", "192.168.1.10:8080")
+        ///     .local_role(RoleName::from_static("Alice"))
+        ///     .remote_role(
+        ///         RoleName::from_static("Bob"),
+        ///         TopologyEndpoint::new("192.168.1.10:8080").unwrap(),
+        ///     )
         ///     .build();
         ///
-        /// let handler = MyProtocol::with_topology(topology, "Alice")?;
+        /// let handler = MyProtocol::with_topology(topology, Role::Alice)?;
         /// ```
         pub fn with_topology(
             topology: Topology,
-            role: impl Into<String>,
+            role: Role,
         ) -> Result<TopologyHandler, String> {
-            let role_str = role.into();
-            validate_role(&role_str)?;
+            let roles = [#(#role_name_literals),*];
 
             // Validate topology against protocol roles
-            let validation = topology.validate(VALID_ROLES);
+            let validation = topology.validate(&roles);
             if !validation.is_valid() {
                 return Err(format!("Topology validation failed: {:?}", validation));
             }
 
-            Ok(TopologyHandler::new(topology, role_str))
+            Ok(TopologyHandler::new(topology, role.role_name()))
         }
     }
 }
@@ -1061,7 +1055,7 @@ fn generate_topology_constants(
                 }
 
                 /// Get handler for the #const_name topology
-                pub fn #handler_fn_name(role: impl Into<String>) -> Result<TopologyHandler, String> {
+                pub fn #handler_fn_name(role: Role) -> Result<TopologyHandler, String> {
                     with_topology(#fn_name(), role)
                 }
             }
@@ -1088,10 +1082,12 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
             TopologyMode::Local => quote! { .mode(TopologyMode::Local) },
             TopologyMode::PerRole => quote! { .mode(TopologyMode::PerRole) },
             TopologyMode::Kubernetes(ns) => {
-                quote! { .mode(TopologyMode::Kubernetes(#ns.to_string())) }
+                let ns_literal = ns.as_str();
+                quote! { .mode(TopologyMode::Kubernetes(Namespace::new(#ns_literal).unwrap())) }
             }
             TopologyMode::Consul(dc) => {
-                quote! { .mode(TopologyMode::Consul(#dc.to_string())) }
+                let dc_literal = dc.as_str();
+                quote! { .mode(TopologyMode::Consul(Datacenter::new(#dc_literal).unwrap())) }
             }
         };
         builder_calls.push(mode_call);
@@ -1099,10 +1095,27 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
 
     // Add role locations
     for (role, location) in &topology.locations {
+        let role_literal = role.as_str();
         let location_call = match location {
-            Location::Local => quote! { .local_role(#role) },
-            Location::Remote(endpoint) => quote! { .remote_role(#role, #endpoint) },
-            Location::Colocated(peer) => quote! { .colocated_role(#role, #peer) },
+            Location::Local => quote! { .local_role(RoleName::from_static(#role_literal)) },
+            Location::Remote(endpoint) => {
+                let endpoint_literal = endpoint.as_str();
+                quote! {
+                    .remote_role(
+                        RoleName::from_static(#role_literal),
+                        TopologyEndpoint::new(#endpoint_literal).unwrap()
+                    )
+                }
+            }
+            Location::Colocated(peer) => {
+                let peer_literal = peer.as_str();
+                quote! {
+                    .colocated_role(
+                        RoleName::from_static(#role_literal),
+                        RoleName::from_static(#peer_literal)
+                    )
+                }
+            }
         };
         builder_calls.push(location_call);
     }
@@ -1111,21 +1124,49 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
     for constraint in &topology.constraints {
         let constraint_call = match constraint {
             crate::topology::TopologyConstraint::Colocated(r1, r2) => {
-                quote! { .colocated(#r1, #r2) }
+                let r1_literal = r1.as_str();
+                let r2_literal = r2.as_str();
+                quote! {
+                    .colocated(
+                        RoleName::from_static(#r1_literal),
+                        RoleName::from_static(#r2_literal)
+                    )
+                }
             }
             crate::topology::TopologyConstraint::Separated(r1, r2) => {
-                quote! { .separated(#r1, #r2) }
+                let r1_literal = r1.as_str();
+                let r2_literal = r2.as_str();
+                quote! {
+                    .separated(
+                        RoleName::from_static(#r1_literal),
+                        RoleName::from_static(#r2_literal)
+                    )
+                }
             }
             crate::topology::TopologyConstraint::Pinned(role, loc) => {
+                let role_literal = role.as_str();
                 let loc_expr = match loc {
                     Location::Local => quote! { Location::Local },
-                    Location::Remote(ep) => quote! { Location::Remote(#ep.to_string()) },
-                    Location::Colocated(p) => quote! { Location::Colocated(#p.to_string()) },
+                    Location::Remote(ep) => {
+                        let ep_literal = ep.as_str();
+                        quote! { Location::Remote(TopologyEndpoint::new(#ep_literal).unwrap()) }
+                    }
+                    Location::Colocated(p) => {
+                        let p_literal = p.as_str();
+                        quote! { Location::Colocated(RoleName::from_static(#p_literal)) }
+                    }
                 };
-                quote! { .pinned(#role, #loc_expr) }
+                quote! { .pinned(RoleName::from_static(#role_literal), #loc_expr) }
             }
             crate::topology::TopologyConstraint::Region(role, region) => {
-                quote! { .region(#role, #region) }
+                let role_literal = role.as_str();
+                let region_literal = region.as_str();
+                quote! {
+                    .region(
+                        RoleName::from_static(#role_literal),
+                        Region::new(#region_literal).unwrap()
+                    )
+                }
             }
         };
         builder_calls.push(constraint_call);
@@ -1173,6 +1214,7 @@ pub fn generate_choreography_code_with_topology(
 mod tests {
     use super::*;
     use crate::ast::{Choreography, Protocol};
+    use crate::identifiers::RoleName;
 
     fn create_test_choreography() -> Choreography {
         use quote::format_ident;
@@ -1181,8 +1223,8 @@ mod tests {
             name: format_ident!("TestProtocol"),
             namespace: None,
             roles: vec![
-                Role::new(format_ident!("Alice")),
-                Role::new(format_ident!("Bob")),
+                Role::new(format_ident!("Alice")).unwrap(),
+                Role::new(format_ident!("Bob")).unwrap(),
             ],
             protocol: Protocol::End,
             attrs: std::collections::HashMap::new(),
@@ -1199,8 +1241,8 @@ mod tests {
 
         // Should generate the topology module
         assert!(code.contains("pub mod topology"));
-        // Should contain role validation
-        assert!(code.contains("VALID_ROLES"));
+        // Should construct role names for validation
+        assert!(code.contains("RoleName :: from_static"));
         // Should contain handler function
         assert!(code.contains("pub fn handler"));
         // Should contain with_topology function
@@ -1213,13 +1255,19 @@ mod tests {
 
         let dev_topology = Topology::builder()
             .mode(TopologyMode::Local)
-            .local_role("Alice")
-            .local_role("Bob")
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
             .build();
 
         let prod_topology = Topology::builder()
-            .remote_role("Alice", "alice.prod:8080")
-            .remote_role("Bob", "bob.prod:8081")
+            .remote_role(
+                RoleName::from_static("Alice"),
+                crate::identifiers::Endpoint::new("alice.prod:8080").unwrap(),
+            )
+            .remote_role(
+                RoleName::from_static("Bob"),
+                crate::identifiers::Endpoint::new("bob.prod:8081").unwrap(),
+            )
             .build();
 
         let inline_topologies = vec![
@@ -1254,12 +1302,12 @@ mod tests {
 
         assert!(code.contains("pub fn handler"));
         assert!(code.contains("TopologyHandler :: local"));
-        assert!(code.contains("validate_role"));
+        assert!(code.contains("role_name"));
     }
 
     #[test]
     fn test_generate_with_topology_method() {
-        let tokens = generate_with_topology_method();
+        let tokens = generate_with_topology_method(&["Alice".to_string(), "Bob".to_string()]);
         let code = tokens.to_string();
 
         assert!(code.contains("pub fn with_topology"));
@@ -1281,8 +1329,11 @@ mod tests {
     #[test]
     fn test_generate_topology_builder_with_roles() {
         let topology = Topology::builder()
-            .local_role("Alice")
-            .remote_role("Bob", "localhost:8080")
+            .local_role(RoleName::from_static("Alice"))
+            .remote_role(
+                RoleName::from_static("Bob"),
+                crate::identifiers::Endpoint::new("localhost:8080").unwrap(),
+            )
             .build();
 
         let tokens =
@@ -1297,10 +1348,16 @@ mod tests {
     #[test]
     fn test_generate_topology_builder_with_constraints() {
         let topology = Topology::builder()
-            .local_role("Alice")
-            .local_role("Bob")
-            .colocated("Alice", "Bob")
-            .separated("Alice", "Carol")
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .colocated(
+                RoleName::from_static("Alice"),
+                RoleName::from_static("Bob"),
+            )
+            .separated(
+                RoleName::from_static("Alice"),
+                RoleName::from_static("Carol"),
+            )
             .build();
 
         let tokens = generate_topology_builder(
@@ -1318,10 +1375,10 @@ mod tests {
         let choreography = create_test_choreography();
         let local_types = vec![
             (
-                Role::new(format_ident!("Alice")),
+                Role::new(format_ident!("Alice")).unwrap(),
                 crate::ast::LocalType::End,
             ),
-            (Role::new(format_ident!("Bob")), crate::ast::LocalType::End),
+            (Role::new(format_ident!("Bob")).unwrap(), crate::ast::LocalType::End),
         ];
         let inline_topologies = vec![];
 
