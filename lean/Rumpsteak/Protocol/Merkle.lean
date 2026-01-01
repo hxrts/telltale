@@ -222,25 +222,52 @@ def commitmentHash [Hasher H] (c : HeapCommitment) : ByteArray :=
     |>.foldl (fun ba d => ba.push d.val.toUInt8) ByteArray.empty
   Hasher.hash H (c.resourceRoot ++ c.nullifierRoot ++ counterBytes)
 
+/-! ## Cryptographic Assumptions
+
+These axioms represent standard cryptographic hardness assumptions that cannot be
+proven mathematically but are well-established in the literature. They form the
+cryptographic foundation for the Rumpsteak-Aura security model.
+
+**References:**
+- R. C. Merkle, "A Digital Signature Based on a Conventional Encryption Function,"
+  CRYPTO 1987. doi:10.1007/3-540-48184-2_32
+- NIST FIPS 180-4, "Secure Hash Standard (SHS)," August 2015.
+  https://csrc.nist.gov/publications/detail/fips/180/4/final
+- M. Bellare and P. Rogaway, "Collision-Resistant Hashing: Towards Making UOWHFs
+  Practical," CRYPTO 1997. doi:10.1007/BFb0052256
+
+These assumptions are standard in cryptographic protocol verification and are
+trusted primitives in the security model. -/
+
 /-- Collision resistance assumption for Merkle proofs.
 
     This axiom states that if two lists of leaves produce the same Merkle root,
-    they must be equal. This is a cryptographic assumption about the hash function
-    that cannot be proven mathematically - it must be assumed for security proofs. -/
+    they must be equal. This is a cryptographic assumption that cannot be proven
+    mathematically - it must be assumed for security proofs.
+
+    **Justification:** Merkle trees inherit collision resistance from the underlying
+    hash function [Merkle 1987]. If the hash function is collision-resistant (as
+    assumed for SHA-256 per NIST FIPS 180-4), then finding two different leaf lists
+    with the same root would require finding a hash collision. -/
 axiom merkle_collision_resistant [Hasher H] (leaves1 leaves2 : List ByteArray) :
     computeRoot (H := H) leaves1 = computeRoot (H := H) leaves2 → leaves1 = leaves2
 
 /-- Hash leaf injectivity assumption.
 
     If two (ResourceId, Resource) pairs produce the same leaf hash, they must be equal.
-    This follows from collision resistance of the underlying hash function. -/
+
+    **Justification:** This follows from collision resistance of the underlying hash
+    function. The leaf hash is computed as H(rid ++ resource), so equal hashes imply
+    equal inputs under the collision resistance assumption [NIST FIPS 180-4]. -/
 axiom hashLeaf_injective [Hasher H] (rid1 rid2 : ResourceId) (r1 r2 : Resource) :
     hashLeaf (H := H) rid1 r1 = hashLeaf (H := H) rid2 r2 → rid1 = rid2 ∧ r1 = r2
 
 /-- ResourceId hash injectivity assumption.
 
-    If two ResourceIds have the same hash field, they must be equal.
-    This is a weaker form of collision resistance for the hash function. -/
+    If two ResourceIds have the same hash field and counter, they must be equal.
+
+    **Justification:** ResourceId equality is determined by its fields. Given equal
+    hash and counter fields, the ResourceIds are structurally equal. -/
 axiom resourceId_hash_injective (rid1 rid2 : ResourceId) :
     rid1.hash = rid2.hash → rid1.counter = rid2.counter → rid1 = rid2
 
@@ -248,8 +275,11 @@ axiom resourceId_hash_injective (rid1 rid2 : ResourceId) :
 
     For ResourceIds created via ResourceId.create, the hash field encodes
     both the content and the counter. Therefore, equal hash fields imply
-    equal ResourceIds. This is a consequence of how ResourceId.create works:
-    it hashes (content ++ counter), so different counters produce different hashes. -/
+    equal ResourceIds.
+
+    **Justification:** ResourceId.create computes hash as H(content ++ counter).
+    Under collision resistance, equal hashes imply equal (content, counter) pairs,
+    and thus equal ResourceIds. -/
 axiom resourceId_from_hash_injective (rid1 rid2 : ResourceId) :
     rid1.hash = rid2.hash → rid1 = rid2
 

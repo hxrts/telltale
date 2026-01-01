@@ -529,13 +529,39 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
         exact hlookup
       exact .var hlookup'
 
+/-! ## Equi-Recursive Type Theory Axioms
+
+Under equi-recursive semantics, recursive types are treated as infinite regular trees
+where μX.T is definitionally equal to its unfolding T[μX.T/X]. These axioms capture
+this fundamental property from type theory.
+
+**References:**
+- B. C. Pierce, "Types and Programming Languages," MIT Press 2002, Section 20.1
+  (Recursive Types via Iso-Recursive and Equi-Recursive approaches)
+- M. Abadi and L. Cardelli, "A Theory of Objects," Springer 1996, Chapter 21
+  (Coinductive interpretation of recursive types)
+- S. Gay and M. Hole, "Subtyping for Session Types in the Pi Calculus,"
+  Acta Informatica 42(2-3), 2005. doi:10.1007/s00236-005-0177-z
+  (Session types with recursion)
+- K. Honda, V. T. Vasconcelos, and M. Kubo, "Language Primitives and Type Discipline
+  for Structured Communication-Based Programming," ESOP 1998.
+  (Original session type recursion)
+
+In equi-recursive systems, type equality is defined coinductively, making μX.T
+and T[μX.T/X] indistinguishable. Proving these axioms directly would require
+defining type equality as a coinductive relation, which is beyond the scope of
+this formalization. -/
+
 /-- Equi-recursive type equivalence axiom.
 
     Under equi-recursive semantics, μX.T is considered equivalent to T[μX.T/X].
     This axiom states that if a process is well-typed with the recursive variable
     bound to T, it remains well-typed when the variable is bound to μX.T.
 
-    This is a fundamental axiom of equi-recursive type theory. -/
+    **Justification:** In equi-recursive type theory [Pierce 2002, §20.1], μX.T ≈ T[μX.T/X].
+    A process well-typed under Γ, X:T remains well-typed under Γ, X:μX.T because
+    the types are coinductively equal. The typing derivation is preserved because
+    type equality respects the typing rules. -/
 axiom equi_recursive_context (Γ : TypingContext) (x : String) (body : Process) (bodyType : LocalTypeR)
     (hbody : WellTyped (Γ.extend x bodyType) body bodyType)
     : WellTyped (Γ.extend x (.mu x bodyType)) body bodyType
@@ -543,7 +569,12 @@ axiom equi_recursive_context (Γ : TypingContext) (x : String) (body : Process) 
 /-- Equi-recursive substitution axiom.
 
     If a process body is well-typed with X : μX.T, then substituting the
-    recursive process for X preserves typing at the recursive type. -/
+    recursive process for X preserves typing at the recursive type.
+
+    **Justification:** This captures the equi-recursive unfolding principle. Given
+    Γ, X:μX.T ⊢ P : T and μX.T ≈ T, we have Γ ⊢ P[μX.P/X] : μX.T by substitution
+    [Abadi & Cardelli 1996]. The recursive process μX.P has type μX.T, and
+    substituting it for X in the body preserves typing. -/
 axiom equi_recursive_substitute (Γ : TypingContext) (x : String) (body : Process) (bodyType : LocalTypeR)
     (hbody : WellTyped (Γ.extend x (.mu x bodyType)) body bodyType)
     : WellTyped Γ (body.substitute x (.recurse x body)) (.mu x bodyType)
