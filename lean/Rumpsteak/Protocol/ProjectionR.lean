@@ -587,12 +587,450 @@ theorem merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t := by
 
 /-- Key lemma: if foldlM merge over a list produces result m, then each element
     is merge-compatible with the accumulator at that point. For non-participants,
-    this means all elements are equal to m (under certain merge semantics). -/
--- This is complex to prove in full generality. We use an axiom for now.
-axiom merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
+    this means all elements are equal to m (under certain merge semantics).
+
+    PROOF STRATEGY:
+    This uses the key property that merge is "absorptive": if merge a b = some c,
+    and we continue merging c with more types to get result, then merge result b = some result.
+
+    The proof proceeds by:
+    1. Use induction on the list
+    2. For each element t, either it was merged early (and stays absorbed), or later
+    3. Apply merge_refl and transitivity of absorption -/
+theorem merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
     (hfold : types.foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result)
     (t : LocalTypeR) (hmem : t ∈ types)
-    : LocalTypeR.merge result t = some result
+    : LocalTypeR.merge result t = some result := by
+  induction types generalizing first result with
+  | nil => cases hmem
+  | cons head tail ih =>
+    simp only [List.foldlM, bind, Option.bind] at hfold
+    cases hmerge : LocalTypeR.merge first head with
+    | none => simp only [hmerge, Option.none_bind] at hfold
+    | some acc' =>
+      simp only [hmerge, Option.some_bind] at hfold
+      cases hmem with
+      | head =>
+        -- t = head, need to show merge result head = some result
+        -- We know: merge first head = some acc', and foldlM tail acc' = some result
+        -- By induction on tail, we know that acc' "flows through" to result
+        -- Key insight: merge acc' acc' = some acc' (reflexivity)
+        -- And if we fold more on top, the result still absorbs acc'
+        -- This requires: if merge a b = some c, then merge c b = some c
+        -- And transitively: merge (fold rest c) b = some (fold rest c)
+        -- We need an auxiliary lemma for this...
+        -- For now, we use the observation that in MPST, after folding,
+        -- result = acc' when tail is empty, or result contains acc' when non-empty
+        cases tail with
+        | nil =>
+          simp only [List.foldlM] at hfold
+          cases hfold
+          -- result = acc', so merge result head = merge acc' head
+          -- But merge first head = some acc', and we need merge acc' head = some acc'
+          -- This is the absorption property!
+          -- We need: if merge a b = some c, then merge c b = some c
+          -- This is non-trivial but follows from merge semantics
+          exact merge_absorb first head acc' hmerge
+        | cons h2 t2 =>
+          -- result = fold (h2 :: t2) acc'
+          -- We need merge result head = some result
+          -- Key: head was absorbed into acc', and acc' flows into result
+          -- So result also absorbs head
+          have hab := merge_absorb first head acc' hmerge
+          exact merge_fold_absorb (h2 :: t2) acc' result hfold head hab
+      | tail hmem' =>
+        -- t ∈ tail, use induction hypothesis
+        exact ih acc' result hfold t hmem'
+where
+  /-- Absorption property: if merge a b = some c, then merge c b = some c.
+
+      This captures that once b is "absorbed" into the accumulator, merging again is idempotent. -/
+  merge_absorb (a b c : LocalTypeR) (hmerge : LocalTypeR.merge a b = some c)
+      : LocalTypeR.merge c b = some c := by
+    -- Proof by case analysis on the structure of a and b
+    cases a with
+    | end =>
+      cases b with
+      | end => simp only [LocalTypeR.merge] at hmerge ⊢; cases hmerge; rfl
+      | _ => simp only [LocalTypeR.merge] at hmerge
+    | var v1 =>
+      cases b with
+      | var v2 =>
+        simp only [LocalTypeR.merge] at hmerge ⊢
+        split at hmerge
+        · cases hmerge; simp only [↓reduceIte]
+        · cases hmerge
+      | _ => simp only [LocalTypeR.merge] at hmerge
+    | send p1 bs1 =>
+      cases b with
+      | send p2 bs2 =>
+        simp only [LocalTypeR.merge, Option.bind_eq_bind] at hmerge ⊢
+        split at hmerge
+        · cases hmerge
+        · simp only [Option.some_bind] at hmerge
+          cases hms : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) with
+          | none => simp only [hms, Option.none_bind] at hmerge
+          | some merged =>
+            simp only [hms, Option.some_bind, Option.some.injEq, LocalTypeR.send.injEq] at hmerge
+            obtain ⟨hp, hbs⟩ := hmerge
+            subst hp hbs
+            -- Need: merge (.send p1 merged) (.send p2 bs2) = some (.send p1 merged)
+            simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.some_bind]
+            -- sortBranches merged should equal merged when merged is already sorted
+            -- And mergeSendSorted merged (sortBranches bs2) should be some merged
+            -- This requires proving that mergeSendSorted has absorption
+            exact mergeSendSorted_absorb (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) merged hms
+      | _ => simp only [LocalTypeR.merge] at hmerge
+    | recv p1 bs1 =>
+      cases b with
+      | recv p2 bs2 =>
+        simp only [LocalTypeR.merge, Option.bind_eq_bind] at hmerge ⊢
+        split at hmerge
+        · cases hmerge
+        · simp only [Option.some_bind] at hmerge
+          cases hmr : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) with
+          | none => simp only [hmr, Option.none_bind] at hmerge
+          | some merged =>
+            simp only [hmr, Option.some_bind, Option.some.injEq, LocalTypeR.recv.injEq] at hmerge
+            obtain ⟨hp, hbs⟩ := hmerge
+            subst hp hbs
+            simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.some_bind]
+            exact mergeRecvSorted_absorb (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) merged hmr
+      | _ => simp only [LocalTypeR.merge] at hmerge
+    | mu v1 body1 =>
+      cases b with
+      | mu v2 body2 =>
+        simp only [LocalTypeR.merge, Option.bind_eq_bind] at hmerge ⊢
+        split at hmerge
+        · cases hmerge
+        · simp only [Option.some_bind] at hmerge
+          cases hmb : LocalTypeR.merge body1 body2 with
+          | none => simp only [hmb, Option.none_bind] at hmerge
+          | some mergedBody =>
+            simp only [hmb, Option.some_bind, Option.some.injEq, LocalTypeR.mu.injEq] at hmerge
+            obtain ⟨hv, hbody⟩ := hmerge
+            subst hv hbody
+            simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.some_bind]
+            rw [merge_absorb body1 body2 mergedBody hmb]
+      | _ => simp only [LocalTypeR.merge] at hmerge
+
+  /-- Helper: mergeSendSorted has absorption property. -/
+  mergeSendSorted_absorb (bs1 bs2 merged : List (Label × LocalTypeR))
+      (hmerge : LocalTypeR.mergeSendSorted bs1 bs2 = some merged)
+      : LocalTypeR.mergeSendSorted merged bs2 = some merged := by
+    induction bs1, bs2 using LocalTypeR.mergeSendSorted.induct with
+    | case1 => -- [], []
+      simp only [LocalTypeR.mergeSendSorted] at hmerge ⊢
+      cases hmerge; rfl
+    | case2 l1 c1 r1 l2 c2 r2 heq ih_merge ih_rest => -- matching labels
+      simp only [LocalTypeR.mergeSendSorted, heq, ↓reduceIte, Option.bind_eq_bind] at hmerge ⊢
+      cases hmc : LocalTypeR.merge c1 c2 with
+      | none => simp only [hmc, Option.none_bind] at hmerge
+      | some mergedCont =>
+        simp only [hmc, Option.some_bind] at hmerge
+        cases hmr : LocalTypeR.mergeSendSorted r1 r2 with
+        | none => simp only [hmr, Option.none_bind] at hmerge
+        | some mergedRest =>
+          simp only [hmr, Option.some_bind, Option.some.injEq] at hmerge
+          cases hmerge
+          -- merged = (l1, mergedCont) :: mergedRest
+          -- Need: mergeSendSorted ((l1, mergedCont) :: mergedRest) ((l2, c2) :: r2) = some ((l1, mergedCont) :: mergedRest)
+          -- Since l1 = l2, we need merge mergedCont c2 = some mergedCont
+          simp only [LocalTypeR.mergeSendSorted, heq, ↓reduceIte, Option.bind_eq_bind]
+          have hab := merge_absorb c1 c2 mergedCont hmc
+          rw [hab]
+          simp only [Option.some_bind]
+          have hrest := ih_rest hmr
+          rw [hrest]
+          simp only [Option.some_bind]
+    | case3 l1 c1 r1 l2 c2 r2 hne => -- labels don't match
+      simp only [LocalTypeR.mergeSendSorted, hne, Bool.false_eq_true, ↓reduceIte] at hmerge
+    | case4 l c r => -- left non-empty, right empty
+      simp only [LocalTypeR.mergeSendSorted] at hmerge
+    | case5 l c r => -- left empty, right non-empty
+      simp only [LocalTypeR.mergeSendSorted] at hmerge
+
+  /-- Helper: mergeRecvSorted has absorption property. -/
+  mergeRecvSorted_absorb (bs1 bs2 merged : List (Label × LocalTypeR))
+      (hmerge : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
+      : LocalTypeR.mergeRecvSorted merged bs2 = some merged := by
+    induction bs1, bs2 using LocalTypeR.mergeRecvSorted.induct with
+    | case1 => -- [], []
+      simp only [LocalTypeR.mergeRecvSorted] at hmerge ⊢
+      cases hmerge; rfl
+    | case2 ys => -- [], ys
+      simp only [LocalTypeR.mergeRecvSorted] at hmerge ⊢
+      cases hmerge
+      -- merged = ys, need mergeRecvSorted ys ys = some ys
+      exact mergeRecvSorted_refl ys (fun c hc => merge_refl c)
+    | case3 xs => -- xs, []
+      simp only [LocalTypeR.mergeRecvSorted] at hmerge ⊢
+      cases hmerge
+      rfl
+    | case4 l1 c1 r1 l2 c2 r2 hlt ih => -- l1.name < l2.name
+      simp only [LocalTypeR.mergeRecvSorted, hlt, ↓reduceIte, Option.bind_eq_bind] at hmerge ⊢
+      cases hmr : LocalTypeR.mergeRecvSorted r1 ((l2, c2) :: r2) with
+      | none => simp only [hmr, Option.none_bind] at hmerge
+      | some restMerged =>
+        simp only [hmr, Option.some_bind, Option.some.injEq] at hmerge
+        cases hmerge
+        -- merged = (l1, c1) :: restMerged
+        -- Need: mergeRecvSorted ((l1, c1) :: restMerged) ((l2, c2) :: r2) = some ((l1, c1) :: restMerged)
+        simp only [LocalTypeR.mergeRecvSorted, hlt, ↓reduceIte, Option.bind_eq_bind]
+        have hab := ih hmr
+        rw [hab]
+        simp only [Option.some_bind]
+    | case5 l1 c1 r1 l2 c2 r2 hlt ih => -- l2.name < l1.name
+      simp only [LocalTypeR.mergeRecvSorted] at hmerge ⊢
+      have hnotlt1 : ¬ (l1.name < l2.name) := Nat.lt_asymm hlt
+      simp only [hnotlt1, ↓reduceIte, hlt, Option.bind_eq_bind] at hmerge
+      cases hmr : LocalTypeR.mergeRecvSorted ((l1, c1) :: r1) r2 with
+      | none => simp only [hmr, Option.none_bind] at hmerge
+      | some restMerged =>
+        simp only [hmr, Option.some_bind, Option.some.injEq] at hmerge
+        cases hmerge
+        -- merged = (l2, c2) :: restMerged
+        -- Need: mergeRecvSorted ((l2, c2) :: restMerged) ((l2, c2) :: r2)
+        have hnotlt1' : ¬ (l2.name < l2.name) := lt_irrefl l2.name
+        simp only [LocalTypeR.mergeRecvSorted, hnotlt1', ↓reduceIte, Option.bind_eq_bind]
+        -- l2.name = l2.name, so we hit the equal case
+        rw [merge_refl c2]
+        simp only [Option.some_bind]
+        -- Need: mergeRecvSorted restMerged r2 = some restMerged
+        have hab := ih hmr
+        -- hab : mergeRecvSorted restMerged r2 = some restMerged
+        rw [hab]
+        simp only [Option.some_bind]
+    | case6 l1 c1 r1 l2 c2 r2 heq ih => -- l1.name = l2.name, l1 = l2
+      simp only [LocalTypeR.mergeRecvSorted] at hmerge ⊢
+      have hnotlt1 : ¬ (l1.name < l2.name) := by rw [heq]; exact lt_irrefl l2.name
+      have hnotlt2 : ¬ (l2.name < l1.name) := by rw [heq]; exact lt_irrefl l2.name
+      simp only [hnotlt1, ↓reduceIte, hnotlt2, Option.bind_eq_bind] at hmerge
+      split at hmerge
+      · simp only [Option.bind_eq_bind] at hmerge
+        cases hmc : LocalTypeR.merge c1 c2 with
+        | none => simp only [hmc, Option.none_bind] at hmerge
+        | some mergedCont =>
+          simp only [hmc, Option.some_bind] at hmerge
+          cases hmr : LocalTypeR.mergeRecvSorted r1 r2 with
+          | none => simp only [hmr, Option.none_bind] at hmerge
+          | some restMerged =>
+            simp only [hmr, Option.some_bind, Option.some.injEq] at hmerge
+            cases hmerge
+            -- merged = (l1, mergedCont) :: restMerged
+            simp only [hnotlt1, ↓reduceIte, hnotlt2, Option.bind_eq_bind]
+            split
+            · simp only [Option.bind_eq_bind]
+              have hab := merge_absorb c1 c2 mergedCont hmc
+              rw [hab]
+              simp only [Option.some_bind]
+              have hrest := ih hmr
+              rw [hrest]
+              simp only [Option.some_bind]
+            · -- labels not equal, but we know l1 = l2 from heq
+              rename_i hne
+              exact absurd (Eq.symm heq) hne
+      · -- labels not equal
+        rename_i hne
+        exact absurd (Eq.symm heq) hne
+    | case7 l1 c1 r1 l2 c2 r2 hneq hne => -- l1.name = l2.name but l1 ≠ l2
+      simp only [LocalTypeR.mergeRecvSorted] at hmerge
+      have hnotlt1 : ¬ (l1.name < l2.name) := by rw [hneq]; exact lt_irrefl l2.name
+      have hnotlt2 : ¬ (l2.name < l1.name) := by rw [hneq]; exact lt_irrefl l2.name
+      simp only [hnotlt1, ↓reduceIte, hnotlt2, hne, Bool.false_eq_true] at hmerge
+
+  /-- Helper: if we fold more types after merging b, the result still absorbs b. -/
+  merge_fold_absorb (tail : List LocalTypeR) (acc result : LocalTypeR)
+      (hfold : tail.foldlM (fun acc proj => LocalTypeR.merge acc proj) acc = some result)
+      (b : LocalTypeR) (hab : LocalTypeR.merge acc b = some acc)
+      : LocalTypeR.merge result b = some result := by
+    induction tail generalizing acc result with
+    | nil =>
+      simp only [List.foldlM] at hfold
+      cases hfold
+      exact hab
+    | cons head tail' ih =>
+      simp only [List.foldlM, bind, Option.bind] at hfold
+      cases hm : LocalTypeR.merge acc head with
+      | none => simp only [hm, Option.none_bind] at hfold
+      | some acc' =>
+        simp only [hm, Option.some_bind] at hfold
+        -- acc' = merge acc head
+        -- We need: merge acc' b = some acc'
+        -- From hab: merge acc b = some acc
+        -- Key insight: if merge acc b = some acc (absorption), and merge acc head = some acc',
+        -- then merge acc' b = some acc'
+        -- This requires: absorption is preserved under further merging
+        have hab' : LocalTypeR.merge acc' b = some acc' := merge_absorb_preserved acc b head acc' hab hm
+        exact ih acc' result hfold hab'
+
+  /-- Helper: absorption is preserved under further merging.
+      If merge a b = some a (a absorbs b), and merge a c = some d,
+      then merge d b = some d (d also absorbs b). -/
+  merge_absorb_preserved (a b c d : LocalTypeR)
+      (hab : LocalTypeR.merge a b = some a)
+      (hac : LocalTypeR.merge a c = some d)
+      : LocalTypeR.merge d b = some d := by
+    -- This is the key transitivity property
+    -- If a absorbs b (merge a b = a), and d = merge a c,
+    -- then d also absorbs b because d contains all of a's "information"
+    -- This follows from merge being monotonic in some sense
+    cases a with
+    | end =>
+      cases b with
+      | end =>
+        simp only [LocalTypeR.merge] at hab hac
+        cases c with
+        | end => simp only at hac; cases hac; simp only [LocalTypeR.merge]
+        | _ => simp only at hac
+      | _ => simp only [LocalTypeR.merge] at hab
+    | var v =>
+      cases b with
+      | var vb =>
+        simp only [LocalTypeR.merge] at hab
+        split at hab
+        · cases hab
+          cases c with
+          | var vc =>
+            simp only [LocalTypeR.merge] at hac ⊢
+            split at hac
+            · cases hac; simp only [↓reduceIte]
+            · cases hac
+          | _ => simp only [LocalTypeR.merge] at hac
+        · cases hab
+      | _ => simp only [LocalTypeR.merge] at hab
+    | send p bs =>
+      cases b with
+      | send pb bsb =>
+        simp only [LocalTypeR.merge, Option.bind_eq_bind] at hab
+        split at hab
+        · cases hab
+        · simp only [Option.some_bind] at hab
+          cases hms : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches bs) (LocalTypeR.sortBranches bsb) with
+          | none => simp only [hms, Option.none_bind] at hab
+          | some merged =>
+            simp only [hms, Option.some_bind, Option.some.injEq, LocalTypeR.send.injEq] at hab
+            obtain ⟨hp, hbs'⟩ := hab
+            -- merged = sortBranches bs (from hab, a absorbs b means merged = bs after sorting)
+            cases c with
+            | send pc bsc =>
+              simp only [LocalTypeR.merge, Option.bind_eq_bind] at hac ⊢
+              split at hac
+              · cases hac
+              · simp only [Option.some_bind] at hac
+                cases hmsc : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches bs) (LocalTypeR.sortBranches bsc) with
+                | none => simp only [hmsc, Option.none_bind] at hac
+                | some mergedC =>
+                  simp only [hmsc, Option.some_bind, Option.some.injEq, LocalTypeR.send.injEq] at hac
+                  obtain ⟨_, hbsc⟩ := hac
+                  subst hbsc hp
+                  -- d = .send p mergedC
+                  -- Need: merge (.send p mergedC) (.send pb bsb)
+                  simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.some_bind]
+                  -- mergeSendSorted preserves absorption through composition
+                  exact mergeSendSorted_absorb_composed
+                    (LocalTypeR.sortBranches bs)
+                    (LocalTypeR.sortBranches bsb)
+                    (LocalTypeR.sortBranches bsc)
+                    merged mergedC hms hmsc hbs'
+            | _ => simp only [LocalTypeR.merge] at hac
+      | _ => simp only [LocalTypeR.merge] at hab
+    | recv p bs =>
+      cases b with
+      | recv pb bsb =>
+        simp only [LocalTypeR.merge, Option.bind_eq_bind] at hab
+        split at hab
+        · cases hab
+        · simp only [Option.some_bind] at hab
+          cases hmr : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches bs) (LocalTypeR.sortBranches bsb) with
+          | none => simp only [hmr, Option.none_bind] at hab
+          | some merged =>
+            simp only [hmr, Option.some_bind, Option.some.injEq, LocalTypeR.recv.injEq] at hab
+            obtain ⟨hp, hbs'⟩ := hab
+            cases c with
+            | recv pc bsc =>
+              simp only [LocalTypeR.merge, Option.bind_eq_bind] at hac ⊢
+              split at hac
+              · cases hac
+              · simp only [Option.some_bind] at hac
+                cases hmrc : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches bs) (LocalTypeR.sortBranches bsc) with
+                | none => simp only [hmrc, Option.none_bind] at hac
+                | some mergedC =>
+                  simp only [hmrc, Option.some_bind, Option.some.injEq, LocalTypeR.recv.injEq] at hac
+                  obtain ⟨_, hbsc⟩ := hac
+                  subst hbsc hp
+                  simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.some_bind]
+                  exact mergeRecvSorted_absorb_composed
+                    (LocalTypeR.sortBranches bs)
+                    (LocalTypeR.sortBranches bsb)
+                    (LocalTypeR.sortBranches bsc)
+                    merged mergedC hmr hmrc hbs'
+            | _ => simp only [LocalTypeR.merge] at hac
+      | _ => simp only [LocalTypeR.merge] at hab
+    | mu v body =>
+      cases b with
+      | mu vb bodyb =>
+        simp only [LocalTypeR.merge, Option.bind_eq_bind] at hab
+        split at hab
+        · cases hab
+        · simp only [Option.some_bind] at hab
+          cases hmb : LocalTypeR.merge body bodyb with
+          | none => simp only [hmb, Option.none_bind] at hab
+          | some mergedBody =>
+            simp only [hmb, Option.some_bind, Option.some.injEq, LocalTypeR.mu.injEq] at hab
+            obtain ⟨hv, hbody'⟩ := hab
+            cases c with
+            | mu vc bodyc =>
+              simp only [LocalTypeR.merge, Option.bind_eq_bind] at hac ⊢
+              split at hac
+              · cases hac
+              · simp only [Option.some_bind] at hac
+                cases hmbc : LocalTypeR.merge body bodyc with
+                | none => simp only [hmbc, Option.none_bind] at hac
+                | some mergedBodyC =>
+                  simp only [hmbc, Option.some_bind, Option.some.injEq, LocalTypeR.mu.injEq] at hac
+                  obtain ⟨_, hbodyc⟩ := hac
+                  subst hbodyc hv
+                  simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.some_bind]
+                  have hab' := merge_absorb_preserved body bodyb bodyc mergedBody
+                    (by rw [← hbody']; exact hmb) hmbc
+                  rw [hab']
+            | _ => simp only [LocalTypeR.merge] at hac
+      | _ => simp only [LocalTypeR.merge] at hab
+
+  /-- Axiom: Send branch absorption is preserved under composition.
+
+      If bs1 absorbs bs2 (mergeSendSorted bs1 bs2 = some bs1), and
+      mergeSendSorted bs1 bs3 = some merged2, then merged2 absorbs bs2.
+
+      PROOF SKETCH: By induction on the branch structure.
+      - Since bs1 absorbs bs2, they have the same labels and for each label,
+        the continuation in bs1 absorbs the continuation in bs2.
+      - When we merge bs1 with bs3, the result merged2 inherits this property:
+        each continuation in merged2 is a merge of bs1's and bs3's continuations,
+        and since bs1's continuations absorbed bs2's, merged2's will too.
+
+      This requires mutual induction with merge_absorb_preserved. -/
+  axiom mergeSendSorted_absorb_composed (bs1 bs2 bs3 merged1 merged2 : List (Label × LocalTypeR))
+      (hm1 : LocalTypeR.mergeSendSorted bs1 bs2 = some merged1)
+      (hm2 : LocalTypeR.mergeSendSorted bs1 bs3 = some merged2)
+      (heq : merged1 = bs1)
+      : LocalTypeR.mergeSendSorted merged2 bs2 = some merged2
+
+  /-- Axiom: Recv branch absorption is preserved under composition.
+
+      Similar to send case but for recv branches with label union semantics.
+
+      PROOF SKETCH: By induction on the branch structure.
+      - Since merged1 = sortBranches bs1, we know bs1 has already absorbed bs2's structure.
+      - When we merge bs1 with bs3, the result merged2 maintains this absorption property
+        because any labels from bs2 that appear in merged2 have continuations
+        that absorbed bs2's continuations through the chain of merges. -/
+  axiom mergeRecvSorted_absorb_composed (bs1 bs2 bs3 merged1 merged2 : List (Label × LocalTypeR))
+      (hm1 : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged1)
+      (hm2 : LocalTypeR.mergeRecvSorted bs1 bs3 = some merged2)
+      (heq : merged1 = sortBranches bs1)
+      : LocalTypeR.mergeRecvSorted (sortBranches merged2) bs2 = some (sortBranches merged2)
 
 /-- For non-participants: if projection succeeds and the result is the merge of branches,
     then each branch projects to the merge result.
