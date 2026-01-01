@@ -998,34 +998,98 @@ where
             | _ => simp only [LocalTypeR.merge] at hac
       | _ => simp only [LocalTypeR.merge] at hab
 
-  /-- Axiom: Send branch absorption is preserved under composition.
+  /-- Send branch absorption is preserved under composition.
 
       If bs1 absorbs bs2 (mergeSendSorted bs1 bs2 = some bs1), and
-      mergeSendSorted bs1 bs3 = some merged2, then merged2 absorbs bs2.
-
-      PROOF SKETCH: By induction on the branch structure.
-      - Since bs1 absorbs bs2, they have the same labels and for each label,
-        the continuation in bs1 absorbs the continuation in bs2.
-      - When we merge bs1 with bs3, the result merged2 inherits this property:
-        each continuation in merged2 is a merge of bs1's and bs3's continuations,
-        and since bs1's continuations absorbed bs2's, merged2's will too.
-
-      This requires mutual induction with merge_absorb_preserved. -/
-  axiom mergeSendSorted_absorb_composed (bs1 bs2 bs3 merged1 merged2 : List (Label × LocalTypeR))
+      mergeSendSorted bs1 bs3 = some merged2, then merged2 absorbs bs2. -/
+  theorem mergeSendSorted_absorb_composed (bs1 bs2 bs3 merged1 merged2 : List (Label × LocalTypeR))
       (hm1 : LocalTypeR.mergeSendSorted bs1 bs2 = some merged1)
       (hm2 : LocalTypeR.mergeSendSorted bs1 bs3 = some merged2)
       (heq : merged1 = bs1)
-      : LocalTypeR.mergeSendSorted merged2 bs2 = some merged2
+      : LocalTypeR.mergeSendSorted merged2 bs2 = some merged2 := by
+    -- Substitute heq to get hm1 : mergeSendSorted bs1 bs2 = some bs1
+    subst heq
+    -- Now prove by induction on the merge structure
+    induction bs1, bs2 using LocalTypeR.mergeSendSorted.induct generalizing bs3 merged2 with
+    | case1 => -- [], []
+      simp only [LocalTypeR.mergeSendSorted] at hm1 hm2 ⊢
+      cases hm2; rfl
+    | case2 l1 c1 r1 l2 c2 r2 heq_label ih_merge ih_rest => -- l1 = l2
+      simp only [LocalTypeR.mergeSendSorted, heq_label, ↓reduceIte, Option.bind_eq_bind] at hm1 hm2 ⊢
+      -- Extract from hm1: merge c1 c2 = some c1 and mergeSendSorted r1 r2 = some r1
+      cases hmc : LocalTypeR.merge c1 c2 with
+      | none => simp only [hmc, Option.none_bind] at hm1
+      | some mc =>
+        simp only [hmc, Option.some_bind] at hm1
+        cases hmr : LocalTypeR.mergeSendSorted r1 r2 with
+        | none => simp only [hmr, Option.none_bind] at hm1
+        | some mr =>
+          simp only [hmr, Option.some_bind, Option.some.injEq] at hm1
+          -- hm1 : (l1, mc) :: mr = (l1, c1) :: r1
+          -- So mc = c1 and mr = r1
+          have hmc_eq : mc = c1 := by
+            have h := congrArg (fun l => l.head?.map Prod.snd) hm1
+            simp only [List.head?_cons, Option.map_some'] at h
+            exact Option.some.inj h
+          have hmr_eq : mr = r1 := by
+            have h := congrArg List.tail hm1
+            simp only [List.tail_cons] at h
+            exact h
+          subst hmc_eq hmr_eq
+          -- Now hmc : merge c1 c2 = some c1 (c1 absorbs c2)
+          -- And hmr : mergeSendSorted r1 r2 = some r1 (r1 absorbs r2)
+          -- Process hm2 for bs3
+          cases bs3 with
+          | nil => simp only [LocalTypeR.mergeSendSorted] at hm2
+          | cons b3 r3 =>
+            simp only [LocalTypeR.mergeSendSorted, Option.bind_eq_bind] at hm2
+            split at hm2
+            · -- l1 = b3.1
+              simp only [Option.some_bind] at hm2
+              cases hmc3 : LocalTypeR.merge c1 b3.2 with
+              | none => simp only [hmc3, Option.none_bind] at hm2
+              | some mc3 =>
+                simp only [hmc3, Option.some_bind] at hm2
+                cases hmr3 : LocalTypeR.mergeSendSorted r1 r3 with
+                | none => simp only [hmr3, Option.none_bind] at hm2
+                | some mr3 =>
+                  simp only [hmr3, Option.some_bind, Option.some.injEq] at hm2
+                  cases hm2
+                  -- merged2 = (l1, mc3) :: mr3
+                  -- Need: mergeSendSorted ((l1, mc3) :: mr3) ((l2, c2) :: r2) = some ((l1, mc3) :: mr3)
+                  simp only [LocalTypeR.mergeSendSorted, heq_label, ↓reduceIte, Option.bind_eq_bind]
+                  -- Need: merge mc3 c2 = some mc3
+                  -- We have: merge c1 c2 = some c1 and merge c1 b3.2 = some mc3
+                  have hab := merge_absorb_preserved c1 c2 b3.2 mc3 hmc hmc3
+                  rw [hab]
+                  simp only [Option.some_bind]
+                  -- Need: mergeSendSorted mr3 r2 = some mr3
+                  -- Apply IH: ih_rest needs mergeSendSorted r1 r2 = some r1
+                  have hrest := ih_rest r3 mr3 hmr hmr3
+                  rw [hrest]
+                  simp only [Option.some_bind]
+            · -- l1 ≠ b3.1, but mergeSendSorted requires matching labels, so hm2 fails
+              cases hm2
+    | case3 l1 c1 r1 l2 c2 r2 hne => -- l1 ≠ l2
+      simp only [LocalTypeR.mergeSendSorted, hne, Bool.false_eq_true, ↓reduceIte] at hm1
+    | case4 l c r => -- left cons, right nil
+      simp only [LocalTypeR.mergeSendSorted] at hm1
+    | case5 l c r => -- left nil, right cons
+      simp only [LocalTypeR.mergeSendSorted] at hm1
 
-  /-- Axiom: Recv branch absorption is preserved under composition.
+  /-- Recv branch absorption is preserved under composition.
 
       Similar to send case but for recv branches with label union semantics.
+      The key insight is that if mergeRecvSorted bs1 bs2 = some merged1 and merged1 = sortBranches bs1,
+      then bs2's labels must be a subset of bs1's (since mergeRecvSorted unions labels).
 
-      PROOF SKETCH: By induction on the branch structure.
-      - Since merged1 = sortBranches bs1, we know bs1 has already absorbed bs2's structure.
-      - When we merge bs1 with bs3, the result merged2 maintains this absorption property
-        because any labels from bs2 that appear in merged2 have continuations
-        that absorbed bs2's continuations through the chain of merges. -/
+      NOTE: This proof requires careful handling of sortBranches interactions.
+      The key observations are:
+      1. If l2 < l1 (case5), then l2 would be first in merged1, but merged1 = sortBranches bs1
+         only contains labels from bs1, creating a length/membership contradiction.
+      2. For l1 < l2 (case4) and l1 = l2 (case6), the structure follows the send case pattern.
+
+      We use axiom for the complex sortBranches interaction cases. -/
   axiom mergeRecvSorted_absorb_composed (bs1 bs2 bs3 merged1 merged2 : List (Label × LocalTypeR))
       (hm1 : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged1)
       (hm2 : LocalTypeR.mergeRecvSorted bs1 bs3 = some merged2)
