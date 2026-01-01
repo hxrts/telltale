@@ -4,7 +4,6 @@
 //! - Struct form: identity upcast/downcast
 //! - Enum form: correct variant wrapping/unwrapping
 //! - Downcast failure returns Err(self)
-//! - Multiple label types work independently
 
 #![allow(clippy::unwrap_used)]
 
@@ -14,7 +13,7 @@ use rumpsteak_aura::Message;
 // Single Message Type Tests
 // ============================================================================
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum SingleLabel {
     Hello(Hello),
 }
@@ -25,7 +24,7 @@ struct Hello(i32);
 #[test]
 fn test_message_single_upcast() {
     let hello = Hello(42);
-    let label: SingleLabel = hello.upcast();
+    let label: SingleLabel = Message::upcast(hello);
 
     match label {
         SingleLabel::Hello(h) => assert_eq!(h.0, 42),
@@ -35,7 +34,7 @@ fn test_message_single_upcast() {
 #[test]
 fn test_message_single_downcast() {
     let hello = Hello(42);
-    let label: SingleLabel = hello.upcast();
+    let label: SingleLabel = Message::upcast(hello);
 
     // Downcast should succeed for matching variant
     let result: Result<Hello, SingleLabel> = label.downcast();
@@ -46,7 +45,7 @@ fn test_message_single_downcast() {
 #[test]
 fn test_message_roundtrip() {
     let original = Hello(123);
-    let label: SingleLabel = original.upcast();
+    let label: SingleLabel = Message::upcast(original);
     let recovered: Hello = label.downcast().unwrap();
     assert_eq!(recovered.0, 123);
 }
@@ -55,7 +54,7 @@ fn test_message_roundtrip() {
 // Multiple Message Type Tests
 // ============================================================================
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum MultiLabel {
     Request(Request),
     Response(Response),
@@ -86,7 +85,7 @@ fn test_message_multi_upcast_request() {
         id: 1,
         data: "test".to_string(),
     };
-    let label: MultiLabel = req.upcast();
+    let label: MultiLabel = Message::upcast(req);
 
     match label {
         MultiLabel::Request(r) => {
@@ -100,7 +99,7 @@ fn test_message_multi_upcast_request() {
 #[test]
 fn test_message_multi_upcast_response() {
     let resp = Response { id: 2, result: 42 };
-    let label: MultiLabel = resp.upcast();
+    let label: MultiLabel = Message::upcast(resp);
 
     match label {
         MultiLabel::Response(r) => {
@@ -117,7 +116,7 @@ fn test_message_multi_upcast_error() {
         code: 404,
         message: "Not found".to_string(),
     };
-    let label: MultiLabel = err.upcast();
+    let label: MultiLabel = Message::upcast(err);
 
     match label {
         MultiLabel::Error(e) => {
@@ -135,7 +134,7 @@ fn test_message_downcast_wrong_variant() {
         id: 1,
         data: "test".to_string(),
     };
-    let label: MultiLabel = req.upcast();
+    let label: MultiLabel = Message::upcast(req);
 
     // Try to downcast as Response (should fail)
     let result: Result<Response, MultiLabel> = label.downcast();
@@ -155,7 +154,7 @@ fn test_message_downcast_preserves_on_failure() {
         code: 500,
         message: "Server error".to_string(),
     };
-    let label: MultiLabel = err.upcast();
+    let label: MultiLabel = Message::upcast(err);
 
     // Try to downcast as Request (should fail)
     let result: Result<Request, MultiLabel> = label.downcast();
@@ -176,7 +175,7 @@ fn test_message_downcast_preserves_on_failure() {
 // Multiple Independent Label Types
 // ============================================================================
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum ControlLabel {
     Start(Start),
     Stop(Stop),
@@ -188,7 +187,7 @@ struct Start;
 #[derive(Debug, PartialEq)]
 struct Stop;
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum DataLabel {
     Ping(Ping),
     Pong(Pong),
@@ -203,8 +202,8 @@ struct Pong(u64);
 #[test]
 fn test_multiple_label_types_independent() {
     // Control labels work independently
-    let start: ControlLabel = Start.upcast();
-    let stop: ControlLabel = Stop.upcast();
+    let start: ControlLabel = Message::upcast(Start);
+    let stop: ControlLabel = Message::upcast(Stop);
 
     match start {
         ControlLabel::Start(_) => {}
@@ -217,8 +216,8 @@ fn test_multiple_label_types_independent() {
     }
 
     // Data labels work independently
-    let ping: DataLabel = Ping(100).upcast();
-    let pong: DataLabel = Pong(200).upcast();
+    let ping: DataLabel = Message::upcast(Ping(100));
+    let pong: DataLabel = Message::upcast(Pong(200));
 
     match ping {
         DataLabel::Ping(p) => assert_eq!(p.0, 100),
@@ -234,10 +233,10 @@ fn test_multiple_label_types_independent() {
 #[test]
 fn test_label_type_separation() {
     // Start can upcast to ControlLabel
-    let _control: ControlLabel = Start.upcast();
+    let _control: ControlLabel = Message::upcast(Start);
 
     // Ping can upcast to DataLabel
-    let _data: DataLabel = Ping(0).upcast();
+    let _data: DataLabel = Message::upcast(Ping(0));
 
     // These are completely separate type hierarchies
 }
@@ -246,7 +245,7 @@ fn test_label_type_separation() {
 // Unit Struct Message Tests
 // ============================================================================
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum SimpleLabel {
     Ack(Ack),
     Nack(Nack),
@@ -260,8 +259,8 @@ struct Nack;
 
 #[test]
 fn test_unit_struct_messages() {
-    let ack: SimpleLabel = Ack.upcast();
-    let nack: SimpleLabel = Nack.upcast();
+    let ack: SimpleLabel = Message::upcast(Ack);
+    let nack: SimpleLabel = Message::upcast(Nack);
 
     // Downcast should work for unit structs
     let _: Ack = ack.downcast().unwrap();
@@ -270,7 +269,7 @@ fn test_unit_struct_messages() {
 
 #[test]
 fn test_unit_struct_wrong_downcast() {
-    let ack: SimpleLabel = Ack.upcast();
+    let ack: SimpleLabel = Message::upcast(Ack);
 
     // Wrong downcast returns error with original
     let result: Result<Nack, SimpleLabel> = ack.downcast();
@@ -281,7 +280,7 @@ fn test_unit_struct_wrong_downcast() {
 // Tuple Struct Message Tests
 // ============================================================================
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum TupleLabel {
     Pair(Pair),
     Triple(Triple),
@@ -298,8 +297,8 @@ fn test_tuple_struct_messages() {
     let pair = Pair(1, 2);
     let triple = Triple(3, 4, 5);
 
-    let pair_label: TupleLabel = pair.upcast();
-    let triple_label: TupleLabel = triple.upcast();
+    let pair_label: TupleLabel = Message::upcast(pair);
+    let triple_label: TupleLabel = Message::upcast(triple);
 
     let recovered_pair: Pair = pair_label.downcast().unwrap();
     let recovered_triple: Triple = triple_label.downcast().unwrap();
@@ -312,7 +311,7 @@ fn test_tuple_struct_messages() {
 // Large Variant Count Tests
 // ============================================================================
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 enum ManyVariants {
     V1(V1),
     V2(V2),
@@ -321,20 +320,25 @@ enum ManyVariants {
     V5(V5),
 }
 
+#[derive(Debug)]
 struct V1;
+#[derive(Debug)]
 struct V2;
+#[derive(Debug)]
 struct V3;
+#[derive(Debug)]
 struct V4;
+#[derive(Debug)]
 struct V5;
 
 #[test]
 fn test_many_variants_each_works() {
     // Each variant should upcast and downcast correctly
-    let l1: ManyVariants = V1.upcast();
-    let l2: ManyVariants = V2.upcast();
-    let l3: ManyVariants = V3.upcast();
-    let l4: ManyVariants = V4.upcast();
-    let l5: ManyVariants = V5.upcast();
+    let l1: ManyVariants = Message::upcast(V1);
+    let l2: ManyVariants = Message::upcast(V2);
+    let l3: ManyVariants = Message::upcast(V3);
+    let l4: ManyVariants = Message::upcast(V4);
+    let l5: ManyVariants = Message::upcast(V5);
 
     // All should downcast correctly
     let _: V1 = l1.downcast().unwrap();
@@ -346,8 +350,9 @@ fn test_many_variants_each_works() {
 
 #[test]
 fn test_many_variants_wrong_downcast() {
-    let l1: ManyVariants = V1.upcast();
+    let l1: ManyVariants = Message::upcast(V1);
 
-    // All wrong downcasts should fail
-    assert!(l1.downcast::<V2>().is_err());
+    // Wrong downcasts should fail
+    let result: Result<V2, ManyVariants> = l1.downcast();
+    assert!(result.is_err());
 }

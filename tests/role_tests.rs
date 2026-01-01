@@ -50,15 +50,15 @@ fn test_role_route_accessor_two_party() {
 }
 
 #[test]
-fn test_role_route_mut_accessor() {
+fn test_role_route_mutable_access() {
     let TwoRoles(mut alice, mut bob) = TwoRoles::default();
 
-    // Mutable route access should work
-    let channel_to_bob: &mut Channel = alice.route_mut();
+    // Route takes &mut self and returns &mut Route
+    let channel_to_bob: &mut Channel = alice.route();
     channel_to_bob.seal();
     assert!(channel_to_bob.is_sealed());
 
-    let channel_to_alice: &mut Channel = bob.route_mut();
+    let channel_to_alice: &mut Channel = bob.route();
     channel_to_alice.seal();
     assert!(channel_to_alice.is_sealed());
 }
@@ -143,8 +143,8 @@ fn test_role_seal_all_fields() {
 fn test_role_is_sealed_any_field() {
     let ThreeRoles(mut p, _q, _r) = ThreeRoles::default();
 
-    // Manually seal just one channel
-    let channel_to_q: &mut Channel3 = <P as Route<Q>>::route_mut(&mut p);
+    // Manually seal just one channel using route()
+    let channel_to_q: &mut Channel3 = <P as Route<Q>>::route(&mut p);
     channel_to_q.seal();
 
     // is_sealed returns true if ANY field is sealed

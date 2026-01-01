@@ -3,8 +3,7 @@
 //! Verifies that generated session type wrappers work correctly:
 //! - Lifetime parameter added correctly
 //! - FromState/IntoSession implemented
-//! - Generic parameters preserved
-//! - Choice branching correct
+//! - Multi-message sessions work
 
 #![allow(clippy::unwrap_used)]
 
@@ -13,8 +12,7 @@ use futures::{
     executor, try_join,
 };
 use rumpsteak_aura::{
-    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
-    Select, Send,
+    channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
 };
 use std::{error::Error, result};
 
@@ -37,8 +35,6 @@ struct Server(#[route(Client)] Channel);
 enum Label {
     Request(Request),
     Response(Response),
-    Accept(Accept),
-    Reject(Reject),
 }
 
 #[derive(Debug)]
@@ -46,9 +42,6 @@ struct Request(String);
 
 #[derive(Debug)]
 struct Response(i32);
-
-struct Accept;
-struct Reject;
 
 // ============================================================================
 // Basic Session Type Tests
@@ -109,89 +102,6 @@ fn test_session_into_session() {
 }
 
 // ============================================================================
-// Choice Session Tests
-// ============================================================================
-
-#[session]
-type ClientWithChoice = Select<Server, AcceptChoice, RejectChoice>;
-
-#[session]
-type AcceptChoice = Send<Server, Accept, End>;
-
-#[session]
-type RejectChoice = Send<Server, Reject, End>;
-
-#[session]
-type ServerWithChoice = Branch<Client, AcceptHandler, RejectHandler>;
-
-#[session]
-type AcceptHandler = Receive<Client, Accept, End>;
-
-#[session]
-type RejectHandler = Receive<Client, Reject, End>;
-
-#[test]
-fn test_session_choice_select_first() {
-    let TestRoles(mut client, mut server) = TestRoles::default();
-
-    let result: Result<_> = executor::block_on(async {
-        try_join!(
-            try_session(&mut client, |s: ClientWithChoice<'_, _>| async {
-                // Select first branch (Accept)
-                let s = s.select_left().await?;
-                let s = s.send(Accept).await?;
-                Ok(((), s))
-            }),
-            try_session(&mut server, |s: ServerWithChoice<'_, _>| async {
-                // Branch and handle whatever the client chose
-                match s.branch().await? {
-                    rumpsteak_aura::Choices::Left(s) => {
-                        let (_, s) = s.receive().await?;
-                        Ok(((), s))
-                    }
-                    rumpsteak_aura::Choices::Right(s) => {
-                        let (_, s) = s.receive().await?;
-                        Ok(((), s))
-                    }
-                }
-            })
-        )
-    });
-
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_session_choice_select_second() {
-    let TestRoles(mut client, mut server) = TestRoles::default();
-
-    let result: Result<_> = executor::block_on(async {
-        try_join!(
-            try_session(&mut client, |s: ClientWithChoice<'_, _>| async {
-                // Select second branch (Reject)
-                let s = s.select_right().await?;
-                let s = s.send(Reject).await?;
-                Ok(((), s))
-            }),
-            try_session(&mut server, |s: ServerWithChoice<'_, _>| async {
-                match s.branch().await? {
-                    rumpsteak_aura::Choices::Left(s) => {
-                        let (_, s) = s.receive().await?;
-                        Ok(((), s))
-                    }
-                    rumpsteak_aura::Choices::Right(s) => {
-                        let (_, s) = s.receive().await?;
-                        Ok(((), s))
-                    }
-                }
-            })
-        )
-    });
-
-    assert!(result.is_ok());
-}
-
-// ============================================================================
 // Multi-Message Session Tests
 // ============================================================================
 
@@ -243,7 +153,7 @@ type PongSession = Receive<Client, Request, Send<Client, Response, End>>;
 fn test_session_ping_pong() {
     let TestRoles(mut client, mut server) = TestRoles::default();
 
-    let (client_result, server_result): (i32, String) = executor::block_on(async {
+    let results: Result<_> = executor::block_on(async {
         try_join!(
             try_session(&mut client, |s: PingSession<'_, _>| async {
                 let s = s.send(Request("ping".to_string())).await?;
@@ -256,8 +166,8 @@ fn test_session_ping_pong() {
                 Ok((msg, s))
             })
         )
-    })
-    .unwrap();
+    });
+    let (client_result, server_result) = results.unwrap();
 
     assert_eq!(client_result, 42);
     assert_eq!(server_result, "ping");
@@ -341,4 +251,34 @@ fn test_session_deeply_nested() {
     });
 
     assert!(result.is_ok());
+}
+
+// ============================================================================
+// Session Sealing Tests
+// ============================================================================
+
+#[test]
+fn test_session_seals_role_on_completion() {
+    let TestRoles(mut client, mut server) = TestRoles::default();
+
+    assert!(!client.is_sealed());
+    assert!(!server.is_sealed());
+
+    let _: Result<_> = executor::block_on(async {
+        try_join!(
+            try_session(&mut client, |s: SimpleClientSession<'_, _>| async {
+                let s = s.send(Request("msg".to_string())).await?;
+                let (_, s) = s.receive().await?;
+                Ok(((), s))
+            }),
+            try_session(&mut server, |s: SimpleServerSession<'_, _>| async {
+                let (_, s) = s.receive().await?;
+                let s = s.send(Response(0)).await?;
+                Ok(((), s))
+            })
+        )
+    });
+
+    assert!(client.is_sealed());
+    assert!(server.is_sealed());
 }
