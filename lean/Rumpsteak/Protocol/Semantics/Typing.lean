@@ -705,4 +705,62 @@ theorem empty_queues_queueTypeCorrespondence (g : GlobalType) (c : Configuration
     rw [hpair_empty] at hmem
     exact False.elim (List.not_mem_nil msg hmem)
 
+/-! ## Synchronous Semantics
+
+In synchronous semantics, all roles execute in lockstep and queues are always empty.
+The following definition captures a well-typed configuration with explicit queue invariant. -/
+
+/-- Full well-typing with queue invariant for async semantics.
+
+    This extends ConfigWellTyped with the queue-type correspondence invariant,
+    making it suitable for proving progress and subject reduction. -/
+def ConfigWellTypedFull (g : GlobalType) (c : Configuration) : Prop :=
+  ConfigWellTyped g c ∧ QueueTypeCorrespondence g c
+
+/-- Synchronous well-typing: ConfigWellTyped with empty queues.
+
+    In synchronous semantics, queues are always empty, so the queue invariant
+    is trivially satisfied. -/
+def ConfigWellTypedSync (g : GlobalType) (c : Configuration) : Prop :=
+  ConfigWellTyped g c ∧ c.queuesEmpty
+
+/-- Synchronous configs satisfy the full invariant. -/
+theorem syncWellTyped_implies_full (g : GlobalType) (c : Configuration)
+    (h : ConfigWellTypedSync g c)
+    : ConfigWellTypedFull g c := by
+  obtain ⟨hwt, hempty⟩ := h
+  exact ⟨hwt, empty_queues_queueTypeCorrespondence g c hempty⟩
+
+/-- getQueue returns the actual queue content for a channel in the list. -/
+theorem getQueue_of_mem (c : Configuration) (ch : Channel) (q : Queue)
+    (hmem : (ch, q) ∈ c.queues)
+    (hunique : ∀ ch' q1 q2, (ch', q1) ∈ c.queues → (ch', q2) ∈ c.queues → q1 = q2)
+    : c.getQueue ch = q := by
+  unfold Configuration.getQueue
+  -- find? returns the first matching element
+  have hfind : c.queues.find? (fun (ch', _) => ch' == ch) = some (ch, q) := by
+    induction c.queues with
+    | nil => cases hmem
+    | cons pair rest ih =>
+      simp only [List.find?_cons]
+      cases hmem with
+      | head =>
+        simp only [beq_self_eq_true, ↓reduceIte]
+      | tail _ htail =>
+        by_cases heq : pair.1 == ch
+        · -- pair.1 == ch but (ch, q) is in tail
+          -- By uniqueness, pair.2 = q
+          simp only [heq, ↓reduceIte]
+          simp only [beq_iff_eq] at heq
+          have heq' : pair = (ch, pair.2) := by simp only [heq, Prod.mk.eta]
+          have hmem1 : (ch, pair.2) ∈ pair :: rest := by rw [← heq']; exact List.mem_cons_self
+          have hmem2 : (ch, q) ∈ pair :: rest := List.mem_cons_of_mem pair htail
+          have hqeq := hunique ch pair.2 q hmem1 hmem2
+          simp only [hqeq, Prod.mk.eta, heq']
+        · simp only [heq, Bool.false_eq_true, ↓reduceIte]
+          apply ih htail
+          intro ch' q1 q2 h1 h2
+          exact hunique ch' q1 q2 (List.mem_cons_of_mem pair h1) (List.mem_cons_of_mem pair h2)
+  simp only [hfind, Option.map_some', Option.getD_some]
+
 end Rumpsteak.Protocol.Semantics.Typing

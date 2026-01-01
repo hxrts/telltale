@@ -519,3 +519,6 @@ where
 mod private {
     pub trait Session {}
 }
+
+#[cfg(test)]
+mod channel_test;
