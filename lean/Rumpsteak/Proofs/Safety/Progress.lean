@@ -70,22 +70,101 @@ structure Claims where
 
 /-! ## Proofs -/
 
-/-! ## Session Type Theory Axioms
+/-! ## Session Type Theory Lemmas and Axioms
 
-These axioms capture fundamental properties of multiparty session types
-that require substantial infrastructure to prove formally. They are
-standard results from the session type literature (Yoshida & Gheri). -/
+These results capture fundamental properties of multiparty session types.
+Some are proved directly from the typing infrastructure; others require
+queue-type correspondence which is stated as an axiom.
+
+### References
+
+- K. Yoshida and L. Gheri, "A Very Gentle Introduction to Multiparty Session Types"
+  (2021): Theorem 1 (Subject Reduction) and Theorem 2 (Progress)
+- M. Ghilezan et al., "Precise Subtyping for Asynchronous Multiparty Sessions"
+  Proc. ACM POPL 2019: Queue semantics and liveness properties
+- K. Honda, V. Vasconcelos, M. Kubo, "Language Primitives and Type Discipline
+  for Structured Communication-Based Programming," ESOP 1998: Original session types -/
+
+/-- Inaction is well-typed only at type `end`. -/
+theorem wellTyped_inaction_implies_end (lt : LocalTypeR)
+    (h : WellTyped [] Process.inaction lt)
+    : lt = .end := by
+  cases h with
+  | inaction => rfl
+
+/-- Parallel composition is not well-typed (no typing rule for par). -/
+theorem wellTyped_par_false (p q : Process) (lt : LocalTypeR)
+    (h : WellTyped [] (.par p q) lt) : False := by
+  cases h  -- No constructor matches
+
+/-- Terminated processes have type `end`.
+
+    A process is terminated when it is `.inaction` or a parallel composition
+    of terminated processes. Since there's no typing rule for `par`, well-typed
+    terminated processes must be `.inaction`, which has type `.end`. -/
+theorem terminated_process_has_type_end (p : Process) (lt : LocalTypeR)
+    (hterm : p.isTerminated = true)
+    (hwt : WellTyped [] p lt)
+    : lt = .end := by
+  cases p with
+  | inaction => exact wellTyped_inaction_implies_end lt hwt
+  | par q r =>
+    -- par is not well-typed
+    exact False.elim (wellTyped_par_false q r lt hwt)
+  | send _ _ _ _ => simp only [Process.isTerminated] at hterm
+  | recv _ _ => simp only [Process.isTerminated] at hterm
+  | cond _ _ _ => simp only [Process.isTerminated] at hterm
+  | recurse _ _ => simp only [Process.isTerminated] at hterm
+  | var _ => simp only [Process.isTerminated] at hterm
+
+/-- All well-typed terminated role processes project to `end`.
+
+    Consequence: If configuration is well-typed and all processes terminated,
+    then every role's projection is `.end`. -/
+theorem terminated_roles_project_to_end (g : GlobalType) (c : Configuration)
+    (hwt : ConfigWellTyped g c)
+    (hterm : c.processes.all (fun rp => rp.process.isTerminated))
+    : ∀ rp ∈ c.processes, projectR g rp.role = .ok .end := by
+  intro rp hrp
+  obtain ⟨_, hrpwt⟩ := hwt
+  have hwtrp := hrpwt rp hrp
+  -- Get the terminated status for this specific process
+  simp only [List.all_eq_true] at hterm
+  have hterm_rp := hterm rp hrp
+  -- Extract projection and typing from well-typedness
+  unfold RoleProcessWellTyped at hwtrp
+  cases hproj : projectR g rp.role with
+  | error _ => simp only [hproj] at hwtrp
+  | ok lt =>
+    -- hwtrp : WellTyped [] rp.process lt
+    have hend := terminated_process_has_type_end rp.process lt hterm_rp hwtrp
+    rw [hend]
 
 /-- Queue-type correspondence axiom: well-typed terminated configurations have empty queues.
 
+    **THEORETICAL JUSTIFICATION**
+
+    This axiom follows from the queue-type correspondence invariant:
+    "Queues contain exactly the messages that have been sent but not yet received."
+
     PROOF SKETCH (Session type theory):
     1. All processes terminated ⟹ all processes have type `end`
-    2. By projection, global type must be `end` (no pending communications)
-    3. Queue messages correspond to in-flight communications in global type
-    4. `end` global type has no in-flight messages ⟹ queues empty
+       (PROVED above as `terminated_roles_project_to_end`)
+    2. All projections being `end` ⟹ global type is "completed"
+       (No pending communications remain in the protocol)
+    3. Queue messages correspond to "in-flight" communications
+       (This is the invariant not captured in `ConfigWellTyped`)
+    4. Completed global type has no in-flight messages ⟹ queues empty
 
-    This follows from the invariant that queues contain exactly the messages
-    that have been sent but not yet received according to the global type. -/
+    The missing piece is step 3: `QueueTypeCorrespondence g c` (defined in Typing.lean)
+    is not part of `ConfigWellTyped`. Adding it would complete this proof.
+
+    In the MPST literature, this property is immediate from the typing rules which
+    ensure queues are consistent with the global type state at all times.
+
+    **References:**
+    - Ghilezan et al. POPL 2019: Async queue semantics with liveness
+    - Honda, Yoshida, Carbone POPL 2016: MPST with async queues -/
 axiom terminated_config_queues_empty (g : GlobalType) (c : Configuration)
     (hwt : ConfigWellTyped g c)
     (hterm : c.processes.all (fun rp => rp.process.isTerminated))
@@ -93,16 +172,38 @@ axiom terminated_config_queues_empty (g : GlobalType) (c : Configuration)
 
 /-- Recv progress axiom: if a receiver is waiting, some role can reduce.
 
-    PROOF SKETCH (Session type theory, key duality insight):
-    If role r has type ?s{...} (receive from s), then by global type structure:
-      Case 1: Queue from s→r is non-empty ⟹ r can dequeue (Reduces.recv)
-      Case 2: Queue is empty ⟹ s has type !r{...} (complementary send)
-        - If s is terminated ⟹ contradiction (terminated has type `end`)
-        - If s is not terminated with send type ⟹ s can send (Reduces.send)
-    Either way, SOME role can reduce, satisfying ∃ c', Reduces c c'
+    **THEORETICAL JUSTIFICATION**
 
-    This is the key insight from session type theory: global types ensure
-    that send/recv pairs are properly matched, preventing deadlocks. -/
+    This is the key duality property of session types: every receive has a matching send.
+    The global type ensures that communication patterns are balanced.
+
+    PROOF SKETCH (Session type theory, Yoshida & Gheri):
+
+    Given: Role r has process `.recv s branches`, i.e., type `?s{ℓᵢ.Tᵢ}`
+
+    **Case 1:** Queue from s→r is non-empty
+    - There's a message `msg` at the head of the queue
+    - By queue-type correspondence, msg.label matches some branch
+    - Role r can dequeue via `Reduces.recv`
+
+    **Case 2:** Queue from s→r is empty
+    - By projection duality (`ProjectionDuality g` in Typing.lean):
+      If `projectR g r = .ok (.recv s _)`, then sender s has a matching send type
+    - Sender s has type `!r{...}` (send to r)
+    - By well-typedness, s's process is either:
+      a) `.send r label value cont` → s can reduce via `Reduces.send`
+      b) `.inaction` → contradiction (type `end` ≠ type `!r{...}`)
+      c) Other forms → by induction or other rules
+
+    Either way, SOME role can reduce, satisfying `∃ c', Reduces c c'`
+
+    The missing infrastructure is `ProjectionDuality g` (defined in Typing.lean),
+    which captures the invariant that send/recv pairs are properly matched.
+
+    **References:**
+    - Yoshida & Gheri 2021: Theorem 2 (Progress)
+    - Honda, Vasconcelos, Kubo ESOP 1998: Duality in session types
+    - Gay & Hole, Acta Informatica 2005: Subtyping preserves duality -/
 axiom recv_can_progress (g : GlobalType) (c : Configuration) (role sender : String)
     (branches : List (Label × Process))
     (hwt : ConfigWellTyped g c)
