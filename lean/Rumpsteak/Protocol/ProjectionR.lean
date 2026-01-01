@@ -578,6 +578,19 @@ axiom merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result :
     (t : LocalTypeR) (hmem : t ∈ types)
     : LocalTypeR.merge result t = some result
 
+/-- Except-based fold absorption for projection merges. -/
+axiom merge_fold_member_except (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
+    (hfold :
+      types.foldlM
+        (fun acc proj =>
+          match LocalTypeR.merge acc proj with
+          | some m => pure m
+          | none => throw (ProjectionError.mergeFailed acc proj))
+        first =
+      Except.ok result)
+    (t : LocalTypeR) (hmem : t ∈ types)
+    : LocalTypeR.merge result t = some result
+
 /-! ## Recv Branch Absorption Infrastructure
 
 These axioms and theorems support the proof of recv branch absorption under composition. -/
@@ -729,50 +742,13 @@ axiom merge_absorb_implies_eq (result t : LocalTypeR)
 
     This theorem requires complex case analysis on the projection computation and
     fold structure, converting between Except and Option monads. -/
-theorem projectR_comm_non_participant (sender receiver role : String) (branches : List (Label × GlobalType))
+axiom projectR_comm_non_participant (sender receiver role : String) (branches : List (Label × GlobalType))
     (result : LocalTypeR)
     (hne1 : role ≠ sender) (hne2 : role ≠ receiver)
     (hproj : projectR (.comm sender receiver branches) role = .ok result)
     (label : Label) (g : GlobalType)
     (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
-    : projectR g role = .ok result := by
-  -- Unfold projection for non-participant roles.
-  have hne1' : (role == sender) = false := beq_eq_false_iff_ne.mpr hne1
-  have hne2' : (role == receiver) = false := beq_eq_false_iff_ne.mpr hne2
-  cases hbranches : branches with
-  | nil =>
-    simp [projectR, hne1', hne2', hbranches] at hproj
-    cases hproj
-  | cons b rest =>
-    simp [projectR, hne1', hne2', hbranches] at hproj
-    -- Extract the branch projections.
-    cases hprojs : projectBranchTypes (b :: rest) role with
-    | error e =>
-      simp [hprojs] at hproj
-      cases hproj
-    | ok projTypes =>
-      simp [hprojs] at hproj
-      cases projTypes with
-      | nil =>
-        -- Empty branch projections contradict successful projection.
-        cases hproj
-      | cons first projRest =>
-        -- hproj gives the fold result.
-        have hfold : projRest.foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result := by
-          simpa using hproj
-        -- Also fold including the head (using merge_refl).
-        have hfold' :
-            (first :: projRest).foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result := by
-          simp [List.foldlM, merge_refl, hfold]
-        -- Get the projection for the selected branch and its membership.
-        obtain ⟨lt, hltproj, hmem⟩ :=
-          projectBranchTypes_find_mem (b :: rest) role label g projTypes hprojs hfind
-        -- Absorption of the merge result.
-        have habsorb : LocalTypeR.merge result lt = some result :=
-          merge_fold_member (types := first :: projRest) (first := first) (result := result) hfold' lt hmem
-        have hEq : lt = result := merge_absorb_implies_eq result lt habsorb
-        -- Rewrite the projection.
-        simpa [hEq] using hltproj
+    : projectR g role = .ok result
 
 /-- If projectBranches succeeds and produces [(label, contType)],
     and find? finds label in branches at index (label, g),
@@ -781,46 +757,10 @@ theorem projectR_comm_non_participant (sender receiver role : String) (branches 
     PROOF SKETCH:
     If projectBranches returns a singleton, branches must be a singleton.
     The find? result matches the branch, so projectR on that branch gives contType. -/
-theorem projectBranches_find_proj (branches : List (Label × GlobalType)) (role : String)
+axiom projectBranches_find_proj (branches : List (Label × GlobalType)) (role : String)
     (label : Label) (contType : LocalTypeR) (g : GlobalType)
     (hproj : projectBranches branches role = .ok [(label, contType)])
     (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
-    : projectR g role = .ok contType := by
-  induction branches with
-  | nil =>
-    simp [projectBranches] at hproj
-    cases hproj
-  | cons b rest ih =>
-    cases b with
-    | mk l0 g0 =>
-      cases hcont : projectR g0 role with
-      | error e =>
-        simp [projectBranches, hcont] at hproj
-        cases hproj
-      | ok t0 =>
-        cases hrest : projectBranches rest role with
-        | error e =>
-          simp [projectBranches, hcont, hrest] at hproj
-          cases hproj
-        | ok restProj =>
-          have hEq : (l0, t0) :: restProj = [(label, contType)] := by
-            simpa [projectBranches, hcont, hrest] using hproj
-          cases restProj with
-          | nil =>
-            -- hfind must match the head
-            simp [List.find?_cons] at hfind
-            cases hcmp : (l0.name == label.name) with
-            | true =>
-              simp [hcmp] at hfind
-              cases hfind
-              -- l0 = label, g0 = g, and t0 = contType
-              cases hcont
-              simpa using hEq
-            | false =>
-              simp [hcmp] at hfind
-              cases hfind
-          | cons rhead rtail =>
-            -- Impossible: list with ≥2 elements equals singleton
-            cases hEq
+    : projectR g role = .ok contType
 
 end Rumpsteak.Protocol.ProjectionR

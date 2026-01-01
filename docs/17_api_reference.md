@@ -226,12 +226,7 @@ This checks recursive structure for well formedness. It is used in validation an
 ### Role
 
 ```rust
-pub struct Role {
-    pub name: Ident,
-    pub param: Option<RoleParam>,
-    pub index: Option<RoleIndex>,
-    pub array_size: Option<TokenStream>,
-}
+pub struct Role { /* private fields */ }
 ```
 
 Role identifies a protocol participant.
@@ -243,10 +238,20 @@ Array_size stores a computed size for code generation.
 Methods:
 
 ```rust
-pub fn new(name: Ident) -> Self
-pub fn with_param(name: Ident, param: RoleParam) -> Self
-pub fn with_index(name: Ident, index: RoleIndex) -> Self
-pub fn with_param_and_index(name: Ident, param: RoleParam, index: RoleIndex) -> Self
+pub fn new(name: Ident) -> RoleValidationResult<Self>
+pub fn with_param(name: Ident, param: RoleParam) -> RoleValidationResult<Self>
+pub fn with_index(name: Ident, index: RoleIndex) -> RoleValidationResult<Self>
+pub fn with_param_and_index(
+    name: Ident,
+    param: RoleParam,
+    index: RoleIndex,
+) -> RoleValidationResult<Self>
+pub fn parameterized(name: Ident, param: TokenStream) -> RoleValidationResult<Self>
+pub fn array(name: Ident, size: usize) -> RoleValidationResult<Self>
+pub fn name(&self) -> &Ident
+pub fn param(&self) -> Option<&RoleParam>
+pub fn index(&self) -> Option<&RoleIndex>
+pub fn array_size(&self) -> Option<&TokenStream>
 pub fn is_indexed(&self) -> bool
 pub fn is_parameterized(&self) -> bool
 pub fn is_array(&self) -> bool
@@ -263,7 +268,7 @@ pub fn safe_indexed(name: Ident, index: u32) -> RoleValidationResult<Self>
 pub fn safe_range(name: Ident, start: u32, end: u32) -> RoleValidationResult<Self>
 ```
 
-These methods construct and validate roles. They also inspect role parameters and indices.
+These methods construct and validate roles. Constructors return `RoleValidationResult` when bounds checks fail. They also inspect role parameters and indices.
 
 ### RoleParam
 
@@ -1021,7 +1026,7 @@ Computes the dual of a local type. Swaps send and receive operations.
 
 ```rust
 pub struct ContentId<H: Hasher = Sha256Hasher> {
-    hash: Vec<u8>,
+    hash: H::Digest,
 }
 ```
 
@@ -1031,7 +1036,7 @@ Methods:
 
 ```rust
 pub fn from_bytes(data: &[u8]) -> Self
-pub fn from_hash(hash: Vec<u8>) -> Self
+pub fn from_hash(hash: impl AsRef<[u8]>) -> Result<Self, ContentIdError>
 pub fn as_bytes(&self) -> &[u8]
 pub fn to_hex(&self) -> String
 pub fn algorithm(&self) -> &'static str
@@ -1043,8 +1048,9 @@ These methods construct and inspect content identifiers. Use `from_bytes` when h
 
 ```rust
 pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
+    type Digest: AsRef<[u8]> + Clone + PartialEq + Eq + Hash + Send + Sync + 'static;
     const HASH_SIZE: usize;
-    fn digest(data: &[u8]) -> Vec<u8>;
+    fn digest(data: &[u8]) -> Self::Digest;
     fn algorithm_name() -> &'static str;
 }
 ```
@@ -1055,8 +1061,8 @@ Hasher trait for swappable hash algorithms. The default implementation is `Sha25
 
 ```rust
 pub trait Contentable {
-    fn to_bytes(&self) -> Vec<u8>;
-    fn from_bytes(data: &[u8]) -> Result<Self, ContentableError>;
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
 }
 ```
 
@@ -1075,11 +1081,11 @@ Methods:
 ```rust
 pub fn new() -> Self
 pub fn with_capacity(capacity: usize) -> Self
-pub fn get(&self, key: &K) -> Option<&V>
-pub fn insert(&mut self, key: &K, value: V) -> Option<V>
-pub fn get_or_insert_with<F>(&mut self, key: &K, f: F) -> &V
-pub fn contains(&self, key: &K) -> bool
-pub fn remove(&mut self, key: &K) -> Option<V>
+pub fn get(&self, key: &K) -> Result<Option<&V>, ContentableError>
+pub fn insert(&mut self, key: &K, value: V) -> Result<Option<V>, ContentableError>
+pub fn get_or_insert_with<F>(&mut self, key: &K, f: F) -> Result<&V, ContentableError>
+pub fn contains(&self, key: &K) -> Result<bool, ContentableError>
+pub fn remove(&mut self, key: &K) -> Result<Option<V>, ContentableError>
 pub fn clear(&mut self)
 pub fn len(&self) -> usize
 pub fn is_empty(&self) -> bool
@@ -1087,7 +1093,7 @@ pub fn metrics(&self) -> CacheMetrics
 pub fn reset_metrics(&self)
 ```
 
-These methods provide lookup, insertion, and cache metrics. The store uses content IDs derived from `Contentable` keys.
+These methods provide lookup, insertion, and cache metrics. Key-based operations return `ContentableError` when serialization fails. The store uses content IDs derived from `Contentable` keys.
 
 ## Topology API
 
@@ -1096,8 +1102,8 @@ These methods provide lookup, insertion, and cache metrics. The store uses conte
 ```rust
 pub enum Location {
     Local,
-    Remote(String),
-    Colocated(String),
+    Remote(TopologyEndpoint),
+    Colocated(RoleName),
 }
 ```
 
@@ -1107,10 +1113,10 @@ Location specifies where a role executes. Local is in-process. Remote specifies 
 
 ```rust
 pub enum TopologyConstraint {
-    Colocated(String, String),
-    Separated(String, String),
-    Pinned(String, Location),
-    Region(String, String),
+    Colocated(RoleName, RoleName),
+    Separated(RoleName, RoleName),
+    Pinned(RoleName, Location),
+    Region(RoleName, Region),
 }
 ```
 
@@ -1121,7 +1127,7 @@ Constraints on role placement. Colocated requires same node. Separated requires 
 ```rust
 pub struct Topology {
     mode: Option<TopologyMode>,
-    locations: BTreeMap<String, Location>,
+    locations: BTreeMap<RoleName, Location>,
     constraints: Vec<TopologyConstraint>,
 }
 ```
@@ -1134,15 +1140,15 @@ Methods:
 pub fn builder() -> TopologyBuilder
 pub fn new() -> Topology
 pub fn local_mode() -> Topology
-pub fn with_role(self, role: impl Into<String>, location: Location) -> Topology
+pub fn with_role(self, role: RoleName, location: Location) -> Topology
 pub fn with_constraint(self, constraint: TopologyConstraint) -> Topology
-pub fn get_location(&self, role: &str) -> Location
-pub fn validate(&self, choreo_roles: &[&str]) -> TopologyValidation
+pub fn get_location(&self, role: &RoleName) -> Result<Location, TopologyError>
+pub fn validate(&self, choreo_roles: &[RoleName]) -> TopologyValidation
 pub fn load(path: impl AsRef<Path>) -> Result<ParsedTopology, TopologyLoadError>
 pub fn parse(content: &str) -> Result<ParsedTopology, TopologyLoadError>
 ```
 
-These methods create and validate topology data. The load and parse helpers return `ParsedTopology` metadata.
+These methods create and validate topology data. `get_location` returns `TopologyError` when a role is not present. The load and parse helpers return `ParsedTopology` metadata.
 
 ### TopologyBuilder
 
@@ -1157,14 +1163,14 @@ Methods:
 ```rust
 pub fn new() -> Self
 pub fn mode(self, mode: TopologyMode) -> Self
-pub fn local_role(self, role: impl Into<String>) -> Self
-pub fn remote_role(self, role: impl Into<String>, endpoint: impl Into<String>) -> Self
-pub fn colocated_role(self, role: impl Into<String>, peer: impl Into<String>) -> Self
-pub fn role(self, role: impl Into<String>, location: Location) -> Self
-pub fn colocated(self, r1: impl Into<String>, r2: impl Into<String>) -> Self
-pub fn separated(self, r1: impl Into<String>, r2: impl Into<String>) -> Self
-pub fn pinned(self, role: impl Into<String>, location: Location) -> Self
-pub fn region(self, role: impl Into<String>, region: impl Into<String>) -> Self
+pub fn local_role(self, role: RoleName) -> Self
+pub fn remote_role(self, role: RoleName, endpoint: TopologyEndpoint) -> Self
+pub fn colocated_role(self, role: RoleName, peer: RoleName) -> Self
+pub fn role(self, role: RoleName, location: Location) -> Self
+pub fn colocated(self, r1: RoleName, r2: RoleName) -> Self
+pub fn separated(self, r1: RoleName, r2: RoleName) -> Self
+pub fn pinned(self, role: RoleName, location: Location) -> Self
+pub fn region(self, role: RoleName, region: Region) -> Self
 pub fn build(self) -> Topology
 ```
 
@@ -1181,13 +1187,13 @@ Topology-aware handler for protocol execution.
 Methods:
 
 ```rust
-pub fn new(topology: Topology, role: impl Into<String>) -> Self
-pub fn from_parsed(parsed: ParsedTopology, role: impl Into<String>) -> Self
+pub fn new(topology: Topology, role: RoleName) -> Self
+pub fn from_parsed(parsed: ParsedTopology, role: RoleName) -> Self
 pub async fn initialize(&self) -> TransportResult<()>
-pub async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()>
-pub async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>>
-pub fn get_location(&self, role: &str) -> Location
-pub fn is_connected(&self, role: &str) -> bool
+pub async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()>
+pub async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>>
+pub fn get_location(&self, role: &RoleName) -> Result<Location, TopologyError>
+pub fn is_connected(&self, role: &RoleName) -> Result<bool, TopologyError>
 pub async fn close(&self) -> TransportResult<()>
 ```
 
@@ -1198,13 +1204,20 @@ These methods manage topology aware transports. Initialize before sending messag
 ### ResourceId
 
 ```rust
-pub struct ResourceId {
-    pub hash: [u8; 32],
-    pub counter: u64,
-}
+pub struct ResourceId { /* private fields */ }
 ```
 
 Unique identifier for heap-allocated resources. Derived from content hash and allocation counter.
+
+Methods:
+
+```rust
+pub fn new(hash: [u8; 32], counter: u64) -> Self
+pub fn from_resource(resource: &Resource, counter: u64) -> Self
+pub fn hash(&self) -> [u8; 32]
+pub fn counter(&self) -> u64
+pub fn to_short_hex(&self) -> String
+```
 
 ### Resource
 

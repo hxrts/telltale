@@ -29,9 +29,9 @@ use std::fmt;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ResourceId {
     /// The content hash (SHA-256)
-    pub hash: [u8; 32],
+    hash: [u8; 32],
     /// Allocation counter (for uniqueness of identical content)
-    pub counter: u64,
+    counter: u64,
 }
 
 impl ResourceId {
@@ -60,6 +60,18 @@ impl ResourceId {
             .map(|b| format!("{:02x}", b))
             .collect();
         format!("{}:{}", hex, self.counter)
+    }
+
+    /// Get the raw hash bytes.
+    #[must_use]
+    pub fn hash(&self) -> [u8; 32] {
+        self.hash
+    }
+
+    /// Get the allocation counter.
+    #[must_use]
+    pub fn counter(&self) -> u64 {
+        self.counter
     }
 }
 

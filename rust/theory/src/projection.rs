@@ -65,6 +65,10 @@ pub enum ProjectionError {
     /// Empty branches in communication
     #[error("empty branches in communication from {sender} to {receiver}")]
     EmptyBranches { sender: String, receiver: String },
+
+    /// Content addressing failed while caching.
+    #[error("content addressing failed: {0}")]
+    ContentAddressing(String),
 }
 
 /// Result type for projection operations
@@ -271,13 +275,19 @@ impl MemoizedProjector {
         let role_key = role.to_string();
 
         // Check if already cached
-        if let Some(result) = self.cache.get(global, &role_key) {
+        if let Some(result) = self
+            .cache
+            .get(global, &role_key)
+            .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?
+        {
             return result.clone();
         }
 
         // Compute and cache
         let result = project(global, role);
-        self.cache.insert(global, role_key, result.clone());
+        self.cache
+            .insert(global, role_key, result.clone())
+            .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?;
         result
     }
 

@@ -177,8 +177,8 @@ fn test_linear_state_machine_step_sequence() {
     // Create envelopes for testing
     let send_env = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![1, 2, 3])
         .build()
@@ -186,8 +186,8 @@ fn test_linear_state_machine_step_sequence() {
 
     let recv_env = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Bob")
-        .recipient("Alice")
+        .sender(RoleName::from_static("Bob"))
+        .recipient(RoleName::from_static("Alice"))
         .message_type("Response")
         .payload(vec![4, 5, 6])
         .build()
@@ -227,8 +227,8 @@ fn test_linear_state_machine_wrong_input_type() {
     // Create a recv envelope when expecting send
     let recv_env = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Bob")
-        .recipient("Alice")
+        .sender(RoleName::from_static("Bob"))
+        .recipient(RoleName::from_static("Alice"))
         .message_type("Response")
         .payload(vec![])
         .build()
@@ -382,8 +382,8 @@ fn test_checkpoint_roundtrip() {
     // Advance state machine
     let send_env = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![])
         .build()
@@ -672,11 +672,11 @@ fn test_seeded_rng_state_save_restore() {
 // InMemoryTransport Tests
 // ============================================================================
 
-fn make_envelope(from: &str, to: &str, msg_type: &str) -> ProtocolEnvelope {
+fn make_envelope(from: &'static str, to: &'static str, msg_type: &str) -> ProtocolEnvelope {
     ProtocolEnvelope::builder()
         .protocol("Test")
-        .sender(from)
-        .recipient(to)
+        .sender(RoleName::from_static(from))
+        .recipient(RoleName::from_static(to))
         .message_type(msg_type)
         .payload(vec![1, 2, 3])
         .build()
@@ -697,8 +697,8 @@ fn test_in_memory_transport_send_recv() {
     SimulatedTransport::send(&mut client, &RoleName::from_static("Server"), envelope).unwrap();
 
     let received = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
-    assert_eq!(received.from_role, "Client");
-    assert_eq!(received.to_role, "Server");
+    assert_eq!(received.from_role, RoleName::from_static("Client"));
+    assert_eq!(received.to_role, RoleName::from_static("Server"));
     assert_eq!(received.payload, vec![1, 2, 3]);
 }
 
@@ -716,8 +716,8 @@ fn test_in_memory_transport_fifo_ordering() {
     for i in 0..5 {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
             .sequence(i)
             .payload(vec![i as u8])
@@ -787,8 +787,8 @@ fn test_in_memory_transport_multiple_recipients() {
     // Alice sends to Bob and Charlie
     let env_bob = ProtocolEnvelope::builder()
         .protocol("Test")
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Msg")
         .payload(vec![1])
         .build()
@@ -796,8 +796,8 @@ fn test_in_memory_transport_multiple_recipients() {
 
     let env_charlie = ProtocolEnvelope::builder()
         .protocol("Test")
-        .sender("Alice")
-        .recipient("Charlie")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Charlie"))
         .message_type("Msg")
         .payload(vec![2])
         .build()
@@ -853,8 +853,8 @@ fn test_in_memory_transport_thread_safe() {
 
             let envelope = ProtocolEnvelope::builder()
                 .protocol("Test")
-                .sender("Client")
-                .recipient("Server")
+                .sender(RoleName::from_static("Client"))
+                .recipient(RoleName::from_static("Server"))
                 .message_type("Msg")
                 .payload(vec![i])
                 .build()
@@ -895,8 +895,8 @@ fn test_faulty_transport_zero_drop_rate() {
     for i in 0u8..10 {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
             .payload(vec![i])
             .build()
@@ -926,8 +926,8 @@ fn test_faulty_transport_full_drop_rate() {
     for i in 0u8..10 {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
             .payload(vec![i])
             .build()
@@ -958,8 +958,8 @@ fn test_faulty_transport_deterministic_dropping() {
     for i in 0u8..100 {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
             .payload(vec![i])
             .build()
@@ -1003,8 +1003,8 @@ fn test_faulty_transport_different_seeds_different_drops() {
     for i in 0u8..100 {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
             .payload(vec![i])
             .build()
@@ -1044,8 +1044,8 @@ fn test_faulty_transport_partial_drop_rate() {
     for i in 0..send_count {
         let envelope = ProtocolEnvelope::builder()
             .protocol("Test")
-            .sender("Client")
-            .recipient("Server")
+            .sender(RoleName::from_static("Client"))
+            .recipient(RoleName::from_static("Server"))
             .message_type("Msg")
             .payload(vec![(i % 256) as u8])
             .build()
@@ -1082,8 +1082,8 @@ fn test_faulty_transport_partial_drop_rate() {
 fn test_envelope_builder_complete() {
     let envelope = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![1, 2, 3])
         .sequence(42)
@@ -1092,8 +1092,8 @@ fn test_envelope_builder_complete() {
         .unwrap();
 
     assert_eq!(envelope.protocol, "TestProtocol");
-    assert_eq!(envelope.from_role, "Alice");
-    assert_eq!(envelope.to_role, "Bob");
+    assert_eq!(envelope.from_role, RoleName::from_static("Alice"));
+    assert_eq!(envelope.to_role, RoleName::from_static("Bob"));
     assert_eq!(envelope.message_type, "Request");
     assert_eq!(envelope.payload, vec![1, 2, 3]);
     assert_eq!(envelope.sequence, 42);
@@ -1104,9 +1104,9 @@ fn test_envelope_builder_complete() {
 fn test_envelope_builder_with_indices() {
     let envelope = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Worker")
+        .sender(RoleName::from_static("Worker"))
         .sender_index(3)
-        .recipient("Manager")
+        .recipient(RoleName::from_static("Manager"))
         .recipient_index(0)
         .message_type("Status")
         .payload(vec![])
@@ -1120,8 +1120,8 @@ fn test_envelope_builder_with_indices() {
 #[test]
 fn test_envelope_builder_missing_protocol() {
     let result = ProtocolEnvelope::builder()
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![])
         .build();
@@ -1133,7 +1133,7 @@ fn test_envelope_builder_missing_protocol() {
 fn test_envelope_builder_missing_sender() {
     let result = ProtocolEnvelope::builder()
         .protocol("Test")
-        .recipient("Bob")
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![])
         .build();
@@ -1145,7 +1145,7 @@ fn test_envelope_builder_missing_sender() {
 fn test_envelope_builder_missing_recipient() {
     let result = ProtocolEnvelope::builder()
         .protocol("Test")
-        .sender("Alice")
+        .sender(RoleName::from_static("Alice"))
         .message_type("Request")
         .payload(vec![])
         .build();
@@ -1157,8 +1157,8 @@ fn test_envelope_builder_missing_recipient() {
 fn test_envelope_routing_key() {
     let simple = ProtocolEnvelope::builder()
         .protocol("Proto")
-        .sender("A")
-        .recipient("B")
+        .sender(RoleName::from_static("A"))
+        .recipient(RoleName::from_static("B"))
         .message_type("Msg")
         .payload(vec![])
         .build()
@@ -1168,9 +1168,9 @@ fn test_envelope_routing_key() {
 
     let indexed_sender = ProtocolEnvelope::builder()
         .protocol("Proto")
-        .sender("Worker")
+        .sender(RoleName::from_static("Worker"))
         .sender_index(0)
-        .recipient("Manager")
+        .recipient(RoleName::from_static("Manager"))
         .message_type("Msg")
         .payload(vec![])
         .build()
@@ -1183,8 +1183,8 @@ fn test_envelope_routing_key() {
 fn test_envelope_serialization_roundtrip() {
     let envelope = ProtocolEnvelope::builder()
         .protocol("Test")
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![1, 2, 3, 4, 5])
         .sequence(99)
@@ -1208,8 +1208,8 @@ fn test_envelope_serialization_roundtrip() {
 fn test_envelope_predicates() {
     let envelope = ProtocolEnvelope::builder()
         .protocol("TestProtocol")
-        .sender("Alice")
-        .recipient("Bob")
+        .sender(RoleName::from_static("Alice"))
+        .recipient(RoleName::from_static("Bob"))
         .message_type("Request")
         .payload(vec![])
         .build()
@@ -1229,8 +1229,8 @@ fn test_envelope_predicates() {
 fn test_envelope_payload_size() {
     let envelope = ProtocolEnvelope::builder()
         .protocol("Test")
-        .sender("A")
-        .recipient("B")
+        .sender(RoleName::from_static("A"))
+        .recipient(RoleName::from_static("B"))
         .message_type("Msg")
         .payload(vec![0u8; 100])
         .build()

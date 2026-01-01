@@ -48,11 +48,11 @@ use serde::{de::DeserializeOwned, Serialize};
 /// let g1 = GlobalType::mu("x", GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")));
 /// let g2 = GlobalType::mu("y", GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("y")));
 ///
-/// assert_eq!(g1.to_bytes(), g2.to_bytes());
+/// assert_eq!(g1.to_bytes().unwrap(), g2.to_bytes().unwrap());
 /// ```
 pub trait Contentable: Sized {
     /// Serialize to canonical byte representation.
-    fn to_bytes(&self) -> Vec<u8>;
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
 
     /// Deserialize from bytes.
     ///
@@ -62,12 +62,13 @@ pub trait Contentable: Sized {
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
 
     /// Compute content ID using the specified hasher.
-    fn content_id<H: Hasher>(&self) -> ContentId<H> {
-        ContentId::from_bytes(&self.to_bytes())
+    fn content_id<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
+        let bytes = self.to_bytes()?;
+        Ok(ContentId::from_bytes(&bytes))
     }
 
     /// Compute content ID using default SHA-256 hasher.
-    fn content_id_sha256(&self) -> ContentId<Sha256Hasher> {
+    fn content_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id()
     }
 }
@@ -77,6 +78,8 @@ pub trait Contentable: Sized {
 pub enum ContentableError {
     /// Failed to deserialize bytes
     DeserializationFailed(String),
+    /// Failed to serialize value
+    SerializationFailed(String),
     /// Invalid format or structure
     InvalidFormat(String),
 }
@@ -86,6 +89,9 @@ impl std::fmt::Display for ContentableError {
         match self {
             ContentableError::DeserializationFailed(msg) => {
                 write!(f, "deserialization failed: {msg}")
+            }
+            ContentableError::SerializationFailed(msg) => {
+                write!(f, "serialization failed: {msg}")
             }
             ContentableError::InvalidFormat(msg) => {
                 write!(f, "invalid format: {msg}")
@@ -97,9 +103,10 @@ impl std::fmt::Display for ContentableError {
 impl std::error::Error for ContentableError {}
 
 // Helper for JSON serialization
-fn to_json_bytes<T: Serialize>(value: &T) -> Vec<u8> {
+fn to_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableError> {
     // Use compact JSON without pretty printing for determinism
-    serde_json::to_vec(value).expect("serialization should not fail for valid types")
+    serde_json::to_vec(value)
+        .map_err(|e| ContentableError::SerializationFailed(e.to_string()))
 }
 
 fn from_json_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
@@ -112,7 +119,7 @@ fn from_json_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableEr
 // ============================================================================
 
 impl Contentable for PayloadSort {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError> {
         to_json_bytes(self)
     }
 
@@ -122,7 +129,7 @@ impl Contentable for PayloadSort {
 }
 
 impl Contentable for Label {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError> {
         to_json_bytes(self)
     }
 
@@ -132,7 +139,7 @@ impl Contentable for Label {
 }
 
 impl Contentable for GlobalType {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError> {
         // Convert to de Bruijn, normalize, then serialize
         let db = GlobalTypeDB::from(self).normalize();
         to_json_bytes(&db)
@@ -147,7 +154,7 @@ impl Contentable for GlobalType {
 }
 
 impl Contentable for LocalTypeR {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError> {
         // Convert to de Bruijn, normalize, then serialize
         let db = LocalTypeRDB::from(self).normalize();
         to_json_bytes(&db)
@@ -248,7 +255,7 @@ mod tests {
     #[test]
     fn test_payload_sort_roundtrip() {
         let sort = PayloadSort::prod(PayloadSort::Nat, PayloadSort::Bool);
-        let bytes = sort.to_bytes();
+        let bytes = sort.to_bytes().unwrap();
         let recovered = PayloadSort::from_bytes(&bytes).unwrap();
         assert_eq!(sort, recovered);
     }
@@ -256,7 +263,7 @@ mod tests {
     #[test]
     fn test_label_roundtrip() {
         let label = Label::with_sort("data", PayloadSort::Nat);
-        let bytes = label.to_bytes();
+        let bytes = label.to_bytes().unwrap();
         let recovered = Label::from_bytes(&bytes).unwrap();
         assert_eq!(label, recovered);
     }
@@ -275,10 +282,13 @@ mod tests {
         );
 
         // α-equivalent types should produce the same bytes
-        assert_eq!(g1.to_bytes(), g2.to_bytes());
+        assert_eq!(g1.to_bytes().unwrap(), g2.to_bytes().unwrap());
 
         // And the same content ID
-        assert_eq!(g1.content_id_sha256(), g2.content_id_sha256());
+        assert_eq!(
+            g1.content_id_sha256().unwrap(),
+            g2.content_id_sha256().unwrap()
+        );
     }
 
     #[test]
@@ -294,8 +304,11 @@ mod tests {
             LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("y")),
         );
 
-        assert_eq!(t1.to_bytes(), t2.to_bytes());
-        assert_eq!(t1.content_id_sha256(), t2.content_id_sha256());
+        assert_eq!(t1.to_bytes().unwrap(), t2.to_bytes().unwrap());
+        assert_eq!(
+            t1.content_id_sha256().unwrap(),
+            t2.content_id_sha256().unwrap()
+        );
     }
 
     #[test]
@@ -305,11 +318,11 @@ mod tests {
             GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")),
         );
 
-        let bytes = g.to_bytes();
+        let bytes = g.to_bytes().unwrap();
         let recovered = GlobalType::from_bytes(&bytes).unwrap();
 
         // Roundtrip should be α-equivalent (same structure, possibly different names)
-        assert_eq!(g.to_bytes(), recovered.to_bytes());
+        assert_eq!(g.to_bytes().unwrap(), recovered.to_bytes().unwrap());
     }
 
     #[test]
@@ -319,10 +332,10 @@ mod tests {
             LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("x")),
         );
 
-        let bytes = t.to_bytes();
+        let bytes = t.to_bytes().unwrap();
         let recovered = LocalTypeR::from_bytes(&bytes).unwrap();
 
-        assert_eq!(t.to_bytes(), recovered.to_bytes());
+        assert_eq!(t.to_bytes().unwrap(), recovered.to_bytes().unwrap());
     }
 
     #[test]
@@ -345,7 +358,7 @@ mod tests {
             ],
         );
 
-        assert_eq!(g1.to_bytes(), g2.to_bytes());
+        assert_eq!(g1.to_bytes().unwrap(), g2.to_bytes().unwrap());
     }
 
     #[test]
@@ -353,8 +366,11 @@ mod tests {
         let g1 = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let g2 = GlobalType::send("A", "B", Label::new("other"), GlobalType::End);
 
-        assert_ne!(g1.to_bytes(), g2.to_bytes());
-        assert_ne!(g1.content_id_sha256(), g2.content_id_sha256());
+        assert_ne!(g1.to_bytes().unwrap(), g2.to_bytes().unwrap());
+        assert_ne!(
+            g1.content_id_sha256().unwrap(),
+            g2.content_id_sha256().unwrap()
+        );
     }
 
     #[test]
@@ -376,7 +392,10 @@ mod tests {
             ),
         );
 
-        assert_eq!(g1.content_id_sha256(), g2.content_id_sha256());
+        assert_eq!(
+            g1.content_id_sha256().unwrap(),
+            g2.content_id_sha256().unwrap()
+        );
     }
 
     #[test]
@@ -399,7 +418,10 @@ mod tests {
         );
 
         // These are NOT α-equivalent
-        assert_ne!(g1.content_id_sha256(), g2.content_id_sha256());
+        assert_ne!(
+            g1.content_id_sha256().unwrap(),
+            g2.content_id_sha256().unwrap()
+        );
     }
 }
 
@@ -601,16 +623,16 @@ mod proptests {
         /// Property: Same type produces same content ID
         #[test]
         fn prop_content_id_deterministic(g in arb_global_type(3)) {
-            let cid1 = g.content_id_sha256();
-            let cid2 = g.content_id_sha256();
+            let cid1 = g.content_id_sha256().unwrap();
+            let cid2 = g.content_id_sha256().unwrap();
             prop_assert_eq!(cid1, cid2);
         }
 
         /// Property: Same type produces same bytes
         #[test]
         fn prop_to_bytes_deterministic(g in arb_global_type(3)) {
-            let bytes1 = g.to_bytes();
-            let bytes2 = g.to_bytes();
+            let bytes1 = g.to_bytes().unwrap();
+            let bytes2 = g.to_bytes().unwrap();
             prop_assert_eq!(bytes1, bytes2);
         }
 
@@ -623,8 +645,8 @@ mod proptests {
 
             // α-equivalent closed types should have same content ID
             prop_assert_eq!(
-                g.content_id_sha256(),
-                renamed.content_id_sha256(),
+                g.content_id_sha256().unwrap(),
+                renamed.content_id_sha256().unwrap(),
                 "α-equivalent closed types should have same content ID"
             );
         }
@@ -632,12 +654,12 @@ mod proptests {
         /// Property: roundtrip preserves content ID for well-formed types
         #[test]
         fn prop_roundtrip_closed(g in arb_closed_global_type(3)) {
-            let bytes = g.to_bytes();
+            let bytes = g.to_bytes().unwrap();
             if let Ok(recovered) = GlobalType::from_bytes(&bytes) {
                 // Roundtrip should preserve content ID (α-equivalence)
                 prop_assert_eq!(
-                    g.content_id_sha256(),
-                    recovered.content_id_sha256(),
+                    g.content_id_sha256().unwrap(),
+                    recovered.content_id_sha256().unwrap(),
                     "roundtrip should preserve content ID for closed types"
                 );
             }
@@ -669,8 +691,8 @@ mod proptests {
 
             // Same content ID regardless of branch order
             prop_assert_eq!(
-                g1.content_id_sha256(),
-                g2.content_id_sha256(),
+                g1.content_id_sha256().unwrap(),
+                g2.content_id_sha256().unwrap(),
                 "branch order should not affect content ID"
             );
         }
@@ -685,8 +707,8 @@ mod proptests {
             let t2 = LocalTypeR::mu("y", LocalTypeR::send(&partner, label, LocalTypeR::var("y")));
 
             prop_assert_eq!(
-                t1.content_id_sha256(),
-                t2.content_id_sha256(),
+                t1.content_id_sha256().unwrap(),
+                t2.content_id_sha256().unwrap(),
                 "α-equivalent local types should have same content ID"
             );
         }

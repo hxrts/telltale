@@ -14,8 +14,6 @@ Core session types and choreography system work fully. The InMemoryHandler provi
 
 ## What Does Not Work in WASM
 
-The caching example uses Redis and Hyper which are not WASM compatible.
-
 Multi-threading is unavailable since WASM runs single-threaded.
 
 Native file system access requires browser File APIs.

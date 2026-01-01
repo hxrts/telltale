@@ -76,7 +76,7 @@ fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
 /// Compute hash of a (ResourceId, Resource) leaf.
 fn hash_leaf(rid: &ResourceId, resource: &Resource) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(rid.hash);
+    hasher.update(rid.hash());
     hasher.update(resource.to_bytes());
     hasher.finalize().into()
 }
@@ -217,7 +217,8 @@ impl HeapCommitment {
             .collect();
         let resource_tree = MerkleTree::from_leaves(resource_leaves);
 
-        let nullifier_leaves: Vec<[u8; 32]> = heap.consumed_ids().map(|rid| rid.hash).collect();
+        let nullifier_leaves: Vec<[u8; 32]> =
+            heap.consumed_ids().map(|rid| rid.hash()).collect();
         let nullifier_tree = MerkleTree::from_leaves(nullifier_leaves);
 
         Self {

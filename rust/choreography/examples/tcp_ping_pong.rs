@@ -36,7 +36,10 @@
 //! - N bytes: message payload
 
 use async_trait::async_trait;
-use rumpsteak_aura_choreography::topology::{Transport, TransportError, TransportResult};
+use rumpsteak_aura_choreography::{
+    topology::{Transport, TransportError, TransportResult},
+    RoleName,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -56,17 +59,17 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 /// - Maintains persistent connections with automatic reconnection
 pub struct TcpTransport {
     /// This role's name
-    role: String,
+    role: RoleName,
     /// Address this role listens on
     listen_addr: String,
     /// Map of role names to their addresses
-    peer_addrs: HashMap<String, String>,
+    peer_addrs: HashMap<RoleName, String>,
     /// Outgoing connections (role -> stream)
-    outgoing: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
+    outgoing: Arc<RwLock<HashMap<RoleName, Arc<Mutex<TcpStream>>>>>,
     /// Incoming message queues (role -> receiver)
-    incoming: Arc<Mutex<HashMap<String, mpsc::Receiver<Vec<u8>>>>>,
+    incoming: Arc<Mutex<HashMap<RoleName, mpsc::Receiver<Vec<u8>>>>>,
     /// Senders for incoming messages (used by accept loop)
-    incoming_senders: Arc<Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>>,
+    incoming_senders: Arc<Mutex<HashMap<RoleName, mpsc::Sender<Vec<u8>>>>>,
     /// Shutdown signal
     shutdown: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
@@ -80,12 +83,12 @@ impl TcpTransport {
     /// * `listen_addr` - Address to listen for incoming connections
     /// * `peer_addrs` - Map of peer role names to their addresses
     pub fn new(
-        role: impl Into<String>,
+        role: RoleName,
         listen_addr: impl Into<String>,
-        peer_addrs: HashMap<String, String>,
+        peer_addrs: HashMap<RoleName, String>,
     ) -> Self {
         Self {
-            role: role.into(),
+            role,
             listen_addr: listen_addr.into(),
             peer_addrs,
             outgoing: Arc::new(RwLock::new(HashMap::new())),
@@ -149,7 +152,7 @@ impl TcpTransport {
     }
 
     /// Connect to a peer role.
-    pub async fn connect_to(&self, peer_role: &str) -> TransportResult<()> {
+    pub async fn connect_to(&self, peer_role: &RoleName) -> TransportResult<()> {
         let addr = self
             .peer_addrs
             .get(peer_role)
@@ -164,7 +167,7 @@ impl TcpTransport {
             match TcpStream::connect(addr).await {
                 Ok(mut stream) => {
                     // Send our role name so the peer knows who connected
-                    let role_bytes = self.role.as_bytes();
+                    let role_bytes = self.role.as_str().as_bytes();
                     let len = role_bytes.len() as u32;
                     stream.write_all(&len.to_be_bytes()).await?;
                     stream.write_all(role_bytes).await?;
@@ -174,7 +177,7 @@ impl TcpTransport {
                     self.outgoing
                         .write()
                         .await
-                        .insert(peer_role.to_string(), Arc::new(Mutex::new(stream)));
+                        .insert(peer_role.clone(), Arc::new(Mutex::new(stream)));
                     return Ok(());
                 }
                 Err(e) => {
@@ -197,7 +200,7 @@ impl TcpTransport {
     }
 
     /// Get the role name.
-    pub fn role(&self) -> &str {
+    pub fn role(&self) -> &RoleName {
         &self.role
     }
 }
@@ -205,8 +208,8 @@ impl TcpTransport {
 /// Handle an incoming TCP connection.
 async fn handle_incoming_connection(
     mut stream: TcpStream,
-    senders: Arc<Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>>,
-    local_role: &str,
+    senders: Arc<Mutex<HashMap<RoleName, mpsc::Sender<Vec<u8>>>>>,
+    local_role: &RoleName,
 ) -> TransportResult<()> {
     // First, read the peer's role name
     let mut len_buf = [0u8; 4];
@@ -216,6 +219,8 @@ async fn handle_incoming_connection(
     let mut role_buf = vec![0u8; len];
     stream.read_exact(&mut role_buf).await?;
     let peer_role = String::from_utf8(role_buf)
+        .map_err(|e| TransportError::ReceiveFailed(format!("Invalid role name: {}", e)))?;
+    let peer_role = RoleName::new(peer_role)
         .map_err(|e| TransportError::ReceiveFailed(format!("Invalid role name: {}", e)))?;
 
     println!("[{}] Identified peer as: {}", local_role, peer_role);
@@ -255,7 +260,7 @@ async fn handle_incoming_connection(
 
 #[async_trait]
 impl Transport for TcpTransport {
-    async fn send(&self, to_role: &str, message: Vec<u8>) -> TransportResult<()> {
+    async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
         let outgoing = self.outgoing.read().await;
         let stream = outgoing
             .get(to_role)
@@ -274,7 +279,7 @@ impl Transport for TcpTransport {
         Ok(())
     }
 
-    async fn recv(&self, from_role: &str) -> TransportResult<Vec<u8>> {
+    async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
         let mut incoming = self.incoming.lock().await;
         let receiver = incoming
             .get_mut(from_role)
@@ -283,7 +288,7 @@ impl Transport for TcpTransport {
         receiver.recv().await.ok_or(TransportError::ChannelClosed)
     }
 
-    fn is_connected(&self, role: &str) -> bool {
+    fn is_connected(&self, role: &RoleName) -> bool {
         // Check if we have an outgoing connection
         // Note: This is a sync method, so we can't await here
         // In a real impl, you'd track connection state separately
@@ -348,15 +353,16 @@ impl Message {
 /// Run Alice's role (sends pings, receives pongs).
 async fn run_alice(transport: Arc<TcpTransport>) -> TransportResult<()> {
     println!("\n[Alice] Starting ping-pong...\n");
+    let bob = RoleName::from_static("Bob");
 
     for i in 1..=5 {
         // Send Ping
         let ping = Message::Ping(i);
         println!("[Alice] Sending: {:?}", ping);
-        transport.send("Bob", ping.to_bytes()).await?;
+        transport.send(&bob, ping.to_bytes()).await?;
 
         // Receive Pong
-        let bytes = transport.recv("Bob").await?;
+        let bytes = transport.recv(&bob).await?;
         let pong = Message::from_bytes(&bytes).expect("Invalid message");
         println!("[Alice] Received: {:?}", pong);
 
@@ -370,10 +376,11 @@ async fn run_alice(transport: Arc<TcpTransport>) -> TransportResult<()> {
 /// Run Bob's role (receives pings, sends pongs).
 async fn run_bob(transport: Arc<TcpTransport>) -> TransportResult<()> {
     println!("\n[Bob] Waiting for pings...\n");
+    let alice = RoleName::from_static("Alice");
 
     for _ in 1..=5 {
         // Receive Ping
-        let bytes = transport.recv("Alice").await?;
+        let bytes = transport.recv(&alice).await?;
         let ping = Message::from_bytes(&bytes).expect("Invalid message");
         println!("[Bob] Received: {:?}", ping);
 
@@ -381,7 +388,7 @@ async fn run_bob(transport: Arc<TcpTransport>) -> TransportResult<()> {
         if let Message::Ping(n) = ping {
             let pong = Message::Pong(n);
             println!("[Bob] Sending: {:?}", pong);
-            transport.send("Alice", pong.to_bytes()).await?;
+            transport.send(&alice, pong.to_bytes()).await?;
         }
     }
 
@@ -401,18 +408,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configuration
     let alice_addr = "127.0.0.1:18080";
     let bob_addr = "127.0.0.1:18081";
+    let alice_role = RoleName::from_static("Alice");
+    let bob_role = RoleName::from_static("Bob");
 
     // Create transports for both roles
     let alice_transport = Arc::new(TcpTransport::new(
-        "Alice",
+        alice_role.clone(),
         alice_addr,
-        HashMap::from([("Bob".to_string(), bob_addr.to_string())]),
+        HashMap::from([(bob_role.clone(), bob_addr.to_string())]),
     ));
 
     let bob_transport = Arc::new(TcpTransport::new(
-        "Bob",
+        bob_role.clone(),
         bob_addr,
-        HashMap::from([("Alice".to_string(), alice_addr.to_string())]),
+        HashMap::from([(alice_role.clone(), alice_addr.to_string())]),
     ));
 
     // Start both transports (begin listening)
@@ -424,9 +433,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Establish connections
     // Alice connects to Bob
-    alice_transport.connect_to("Bob").await?;
+    alice_transport.connect_to(&bob_role).await?;
     // Bob connects to Alice
-    bob_transport.connect_to("Alice").await?;
+    bob_transport.connect_to(&alice_role).await?;
 
     // Small delay for connections to stabilize
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;

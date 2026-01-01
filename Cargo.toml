@@ -117,7 +117,7 @@ debug = true
 debug = true
 
 [workspace]
-members = ["rust/caching", "rust/fsm", "rust/macros", "rust/choreography", "rust/lean-exporter", "rust/types", "rust/theory", "rust/lean-bridge", "rust/transport-tcp"]
+members = ["rust/fsm", "rust/macros", "rust/choreography", "rust/lean-exporter", "rust/types", "rust/theory", "rust/lean-bridge", "rust/transport-tcp"]
 exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members

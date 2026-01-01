@@ -15,7 +15,8 @@ use rumpsteak_types::{ContentId, Sha256Hasher, GlobalType, Label};
 use rumpsteak_types::contentable::Contentable;
 
 let g = GlobalType::comm("A", "B", vec![(Label::new("msg"), GlobalType::End)]);
-let cid: ContentId<Sha256Hasher> = ContentId::from_bytes(&g.to_bytes());
+let bytes = g.to_bytes()?;
+let cid: ContentId<Sha256Hasher> = ContentId::from_bytes(&bytes);
 ```
 
 The content ID is computed from the canonical JSON bytes of the value. Two structurally equivalent types produce the same content ID. DAG-CBOR is a possible future encoding.
@@ -26,8 +27,9 @@ The hash algorithm is configurable through the `Hasher` trait.
 
 ```rust
 pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
+    type Digest: AsRef<[u8]> + Clone + PartialEq + Eq + Hash + Send + Sync + 'static;
     const HASH_SIZE: usize;
-    fn digest(data: &[u8]) -> Vec<u8>;
+    fn digest(data: &[u8]) -> Self::Digest;
     fn algorithm_name() -> &'static str;
 }
 ```
@@ -42,8 +44,8 @@ Types that support content addressing implement the `Contentable` trait.
 
 ```rust
 pub trait Contentable {
-    fn to_bytes(&self) -> Vec<u8>;
-    fn from_bytes(data: &[u8]) -> Result<Self, ContentableError>;
+    fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
 }
 ```
 
@@ -117,10 +119,12 @@ The `ContentStore` provides deduplication for protocol artifacts.
 
 ```rust
 use rumpsteak_types::ContentStore;
+use rumpsteak_types::{GlobalType, Label};
 
 let mut store = ContentStore::new();
-let cid = store.insert(global_type);
-let retrieved = store.get(&cid);
+let global = GlobalType::comm("A", "B", vec![(Label::new("ping"), GlobalType::End)]);
+store.insert(&global, global.clone())?;
+let retrieved = store.get(&global)?;
 ```
 
 Identical types are stored once regardless of how many times they are inserted. The store uses content IDs as keys for O(1) lookup.
@@ -157,7 +161,7 @@ Alpha equivalence holds when de Bruijn conversion produces identical results for
 ## Usage Example
 
 ```rust
-use rumpsteak_types::{GlobalType, ContentId, Sha256Hasher, ContentStore};
+use rumpsteak_types::{contentable::Contentable, ContentStore, GlobalType, Label};
 use rumpsteak_theory::ProjectionCache;
 
 // Create a protocol
@@ -172,12 +176,12 @@ let ping_pong = GlobalType::comm(
 );
 
 // Compute content ID
-let cid = ContentId::<Sha256Hasher>::new(&ping_pong);
+let cid = ping_pong.content_id_sha256()?;
 println!("Protocol CID: {:?}", cid);
 
 // Store in content-addressed storage
 let mut store = ContentStore::new();
-store.insert(ping_pong.clone());
+store.insert(&ping_pong, ping_pong.clone())?;
 
 // Project with memoization
 let cache = ProjectionCache::new();

@@ -15,7 +15,7 @@
 //! This corresponds to the memoization infrastructure described in work/009.md Phase 1.5.
 
 use crate::content_id::{ContentId, Hasher, Sha256Hasher};
-use crate::contentable::Contentable;
+use crate::contentable::{Contentable, ContentableError};
 use std::collections::HashMap;
 use std::hash::Hash as StdHash;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -67,10 +67,10 @@ impl CacheMetrics {
 /// let local = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
 ///
 /// // Store a projection result
-/// store.insert(&global, local.clone());
+/// store.insert(&global, local.clone()).unwrap();
 ///
 /// // Retrieve it later (cache hit)
-/// assert_eq!(store.get(&global), Some(&local));
+/// assert_eq!(store.get(&global).unwrap(), Some(&local));
 /// ```
 #[derive(Debug)]
 pub struct ContentStore<K: Contentable, V, H: Hasher + Eq + StdHash = Sha256Hasher> {
@@ -112,16 +112,16 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Get a cached value by its content key.
     ///
     /// Updates cache metrics (hit/miss counters).
-    pub fn get(&self, key: &K) -> Option<&V> {
-        let cid = key.content_id::<H>();
+    pub fn get(&self, key: &K) -> Result<Option<&V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
         match self.store.get(&cid) {
             Some(v) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
-                Some(v)
+                Ok(Some(v))
             }
             None => {
                 self.misses.fetch_add(1, Ordering::Relaxed);
-                None
+                Ok(None)
             }
         }
     }
@@ -129,9 +129,9 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// Insert a value into the store.
     ///
     /// Returns the previous value if the key already existed.
-    pub fn insert(&mut self, key: &K, value: V) -> Option<V> {
-        let cid = key.content_id::<H>();
-        self.store.insert(cid, value)
+    pub fn insert(&mut self, key: &K, value: V) -> Result<Option<V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.store.insert(cid, value))
     }
 
     /// Get or compute a value.
@@ -139,31 +139,34 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     /// If the key exists, returns the cached value (cache hit).
     /// Otherwise, computes the value using the provided function,
     /// stores it, and returns a reference (cache miss).
-    pub fn get_or_insert_with<F>(&mut self, key: &K, f: F) -> &V
+    pub fn get_or_insert_with<F>(&mut self, key: &K, f: F) -> Result<&V, ContentableError>
     where
         F: FnOnce() -> V,
     {
-        let cid = key.content_id::<H>();
-        if self.store.contains_key(&cid) {
-            self.hits.fetch_add(1, Ordering::Relaxed);
-        } else {
-            self.misses.fetch_add(1, Ordering::Relaxed);
-            self.store.insert(cid.clone(), f());
+        let cid = key.content_id::<H>()?;
+        match self.store.entry(cid) {
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                self.hits.fetch_add(1, Ordering::Relaxed);
+                Ok(entry.into_mut())
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                self.misses.fetch_add(1, Ordering::Relaxed);
+                Ok(entry.insert(f()))
+            }
         }
-        self.store.get(&cid).unwrap()
     }
 
     /// Check if a key exists in the store.
     #[must_use]
-    pub fn contains(&self, key: &K) -> bool {
-        let cid = key.content_id::<H>();
-        self.store.contains_key(&cid)
+    pub fn contains(&self, key: &K) -> Result<bool, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.store.contains_key(&cid))
     }
 
     /// Remove a value from the store.
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-        let cid = key.content_id::<H>();
-        self.store.remove(&cid)
+    pub fn remove(&mut self, key: &K) -> Result<Option<V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.store.remove(&cid))
     }
 
     /// Clear all entries from the store.
@@ -235,13 +238,13 @@ impl<K: Contentable, V: Clone, H: Hasher + Eq + StdHash> Clone for ContentStore<
 ///
 /// // Store projection result for role "A"
 /// let local_a = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
-/// store.insert(&global, "A".to_string(), local_a.clone());
+/// store.insert(&global, "A".to_string(), local_a.clone()).unwrap();
 ///
 /// // Retrieve it later
-/// assert_eq!(store.get(&global, &"A".to_string()), Some(&local_a));
+/// assert_eq!(store.get(&global, &"A".to_string()).unwrap(), Some(&local_a));
 ///
 /// // Different role has different projection
-/// assert_eq!(store.get(&global, &"B".to_string()), None);
+/// assert_eq!(store.get(&global, &"B".to_string()).unwrap(), None);
 /// ```
 #[derive(Debug)]
 pub struct KeyedContentStore<
@@ -290,53 +293,61 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Get a cached value by content key and extra key.
-    pub fn get(&self, key: &K, extra: &E) -> Option<&V> {
-        let cid = key.content_id::<H>();
+    pub fn get(&self, key: &K, extra: &E) -> Result<Option<&V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
         match self.store.get(&(cid, extra.clone())) {
             Some(v) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
-                Some(v)
+                Ok(Some(v))
             }
             None => {
                 self.misses.fetch_add(1, Ordering::Relaxed);
-                None
+                Ok(None)
             }
         }
     }
 
     /// Insert a value into the store.
-    pub fn insert(&mut self, key: &K, extra: E, value: V) -> Option<V> {
-        let cid = key.content_id::<H>();
-        self.store.insert((cid, extra), value)
+    pub fn insert(&mut self, key: &K, extra: E, value: V) -> Result<Option<V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.store.insert((cid, extra), value))
     }
 
     /// Get or compute a value.
-    pub fn get_or_insert_with<F>(&mut self, key: &K, extra: E, f: F) -> &V
+    pub fn get_or_insert_with<F>(
+        &mut self,
+        key: &K,
+        extra: E,
+        f: F,
+    ) -> Result<&V, ContentableError>
     where
         F: FnOnce() -> V,
     {
-        let cid = key.content_id::<H>();
+        let cid = key.content_id::<H>()?;
         let composite = (cid, extra);
-        if self.store.contains_key(&composite) {
-            self.hits.fetch_add(1, Ordering::Relaxed);
-        } else {
-            self.misses.fetch_add(1, Ordering::Relaxed);
-            self.store.insert(composite.clone(), f());
+        match self.store.entry(composite) {
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                self.hits.fetch_add(1, Ordering::Relaxed);
+                Ok(entry.into_mut())
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                self.misses.fetch_add(1, Ordering::Relaxed);
+                Ok(entry.insert(f()))
+            }
         }
-        self.store.get(&composite).unwrap()
     }
 
     /// Check if a key pair exists in the store.
     #[must_use]
-    pub fn contains(&self, key: &K, extra: &E) -> bool {
-        let cid = key.content_id::<H>();
-        self.store.contains_key(&(cid, extra.clone()))
+    pub fn contains(&self, key: &K, extra: &E) -> Result<bool, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.store.contains_key(&(cid, extra.clone())))
     }
 
     /// Remove a value from the store.
-    pub fn remove(&mut self, key: &K, extra: &E) -> Option<V> {
-        let cid = key.content_id::<H>();
-        self.store.remove(&(cid, extra.clone()))
+    pub fn remove(&mut self, key: &K, extra: &E) -> Result<Option<V>, ContentableError> {
+        let cid = key.content_id::<H>()?;
+        Ok(self.store.remove(&(cid, extra.clone())))
     }
 
     /// Clear all entries from the store.
@@ -400,14 +411,14 @@ mod tests {
 
         // Initially empty
         assert!(store.is_empty());
-        assert_eq!(store.get(&global), None);
+        assert_eq!(store.get(&global).unwrap(), None);
 
         // Insert
-        store.insert(&global, local.clone());
+        store.insert(&global, local.clone()).unwrap();
         assert_eq!(store.len(), 1);
 
         // Get (cache hit)
-        assert_eq!(store.get(&global), Some(&local));
+        assert_eq!(store.get(&global).unwrap(), Some(&local));
 
         // Metrics
         let metrics = store.metrics();
@@ -429,10 +440,10 @@ mod tests {
             GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("y")),
         );
 
-        store.insert(&g1, "result".to_string());
+        store.insert(&g1, "result".to_string()).unwrap();
 
         // g2 should hit the same cache entry
-        assert_eq!(store.get(&g2), Some(&"result".to_string()));
+        assert_eq!(store.get(&g2).unwrap(), Some(&"result".to_string()));
     }
 
     #[test]
@@ -444,7 +455,7 @@ mod tests {
         let value = store.get_or_insert_with(&global, || {
             computed = true;
             42
-        });
+        }).unwrap();
         assert_eq!(*value, 42);
         assert!(computed);
 
@@ -453,7 +464,7 @@ mod tests {
         let value = store.get_or_insert_with(&global, || {
             computed = true;
             99
-        });
+        }).unwrap();
         assert_eq!(*value, 42); // Same value
         assert!(!computed); // Not recomputed
 
@@ -471,13 +482,21 @@ mod tests {
         let local_b = LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End);
 
         // Store projections for different roles
-        store.insert(&global, "A".to_string(), local_a.clone());
-        store.insert(&global, "B".to_string(), local_b.clone());
+        store.insert(&global, "A".to_string(), local_a.clone())
+            .unwrap();
+        store.insert(&global, "B".to_string(), local_b.clone())
+            .unwrap();
 
         assert_eq!(store.len(), 2);
-        assert_eq!(store.get(&global, &"A".to_string()), Some(&local_a));
-        assert_eq!(store.get(&global, &"B".to_string()), Some(&local_b));
-        assert_eq!(store.get(&global, &"C".to_string()), None);
+        assert_eq!(
+            store.get(&global, &"A".to_string()).unwrap(),
+            Some(&local_a)
+        );
+        assert_eq!(
+            store.get(&global, &"B".to_string()).unwrap(),
+            Some(&local_b)
+        );
+        assert_eq!(store.get(&global, &"C".to_string()).unwrap(), None);
     }
 
     #[test]
@@ -487,18 +506,18 @@ mod tests {
         let g2 = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
         // Miss
-        store.get(&g1);
-        store.get(&g2);
+        store.get(&g1).unwrap();
+        store.get(&g2).unwrap();
 
         // Insert
-        store.insert(&g1, 1);
+        store.insert(&g1, 1).unwrap();
 
         // Hit
-        store.get(&g1);
-        store.get(&g1);
+        store.get(&g1).unwrap();
+        store.get(&g1).unwrap();
 
         // Miss again
-        store.get(&g2);
+        store.get(&g2).unwrap();
 
         let metrics = store.metrics();
         assert_eq!(metrics.misses, 3); // g1 miss, g2 miss, g2 miss
@@ -510,11 +529,12 @@ mod tests {
     fn test_content_store_clear() {
         let mut store: ContentStore<GlobalType, i32> = ContentStore::new();
 
-        store.insert(&GlobalType::End, 1);
+        store.insert(&GlobalType::End, 1).unwrap();
         store.insert(
             &GlobalType::send("A", "B", Label::new("msg"), GlobalType::End),
             2,
-        );
+        )
+        .unwrap();
 
         assert_eq!(store.len(), 2);
 
@@ -527,11 +547,11 @@ mod tests {
         let mut store: ContentStore<GlobalType, i32> = ContentStore::new();
         let global = GlobalType::End;
 
-        store.insert(&global, 42);
-        assert!(store.contains(&global));
+        store.insert(&global, 42).unwrap();
+        assert!(store.contains(&global).unwrap());
 
-        let removed = store.remove(&global);
+        let removed = store.remove(&global).unwrap();
         assert_eq!(removed, Some(42));
-        assert!(!store.contains(&global));
+        assert!(!store.contains(&global).unwrap());
     }
 }

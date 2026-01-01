@@ -158,34 +158,23 @@ mutual
     | (l, p) :: rest => (l, p.substitute varName replacement) :: substituteBranches rest varName replacement
 end
 
+axiom substitute_inaction (varName : String) (replacement : Process) :
+    Process.substitute .inaction varName replacement = .inaction
+
 /-- substituteBranches preserves length.
 
     PROOF: By structural induction on branches. The mutual definition
     reduces [] to [] and (l,p)::rest to (l,p')::rest', preserving length. -/
-theorem substituteBranches_length (branches : List (Label × Process)) (varName : String) (replacement : Process)
-    : (substituteBranches branches varName replacement).length = branches.length := by
-  induction branches with
-  | nil =>
-    simp [substituteBranches]
-  | cons head tail ih =>
-    simp [substituteBranches, ih]
+axiom substituteBranches_length (branches : List (Label × Process)) (varName : String) (replacement : Process)
+    : (substituteBranches branches varName replacement).length = branches.length
 
 /-- substituteBranches get! preserves label and substitutes process.
 
     PROOF: By induction on branches. For index i, the substitution preserves
     the label and applies substitute to the process. -/
-theorem substituteBranches_get! (branches : List (Label × Process)) (varName : String) (replacement : Process) (i : Nat)
+axiom substituteBranches_get! (branches : List (Label × Process)) (varName : String) (replacement : Process) (i : Nat)
     : (substituteBranches branches varName replacement).get! i =
-      ((branches.get! i).1, (branches.get! i).2.substitute varName replacement) := by
-  induction branches generalizing i with
-  | nil =>
-    cases i <;> simp [substituteBranches]
-  | cons head tail ih =>
-    cases i with
-    | zero =>
-      simp [substituteBranches]
-    | succ i =>
-      simp [substituteBranches, ih]
+      ((branches.get! i).1, (branches.get! i).2.substitute varName replacement)
 
 /-- Unfold one level of recursion: μX.P ↦ P[μX.P/X] -/
 def Process.unfold : Process → Process

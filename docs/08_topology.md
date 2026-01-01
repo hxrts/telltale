@@ -34,9 +34,9 @@ Locations specify where a role executes.
 
 ```rust
 pub enum Location {
-    Local,            // In-process
-    Remote(String),   // Network endpoint
-    Colocated(String), // Same node as another role
+    Local,                       // In-process
+    Remote(TopologyEndpoint),    // Network endpoint
+    Colocated(RoleName),         // Same node as another role
 }
 ```
 
@@ -49,7 +49,7 @@ A topology maps roles to locations with optional constraints.
 ```rust
 pub struct Topology {
     mode: Option<TopologyMode>,
-    locations: BTreeMap<String, Location>,
+    locations: BTreeMap<RoleName, Location>,
     constraints: Vec<TopologyConstraint>,
 }
 ```
@@ -62,10 +62,10 @@ Constraints express requirements on role placement.
 
 ```rust
 pub enum TopologyConstraint {
-    Colocated(String, String),      // Must be same node
-    Separated(String, String),      // Must be different nodes
-    Pinned(String, Location),       // Must be at specific location
-    Region(String, String),         // Must be in specific region
+    Colocated(RoleName, RoleName), // Must be same node
+    Separated(RoleName, RoleName), // Must be different nodes
+    Pinned(RoleName, Location),    // Must be at specific location
+    Region(RoleName, Region),      // Must be in specific region
 }
 ```
 
@@ -151,12 +151,17 @@ This creates an in-memory handler with implicit local topology.
 Simple deployments specify peer addresses directly.
 
 ```rust
+use rumpsteak_aura_choreography::{RoleName, TopologyEndpoint};
+
 let topology = Topology::builder()
-    .local_role("Alice")
-    .remote_role("Bob", "localhost:8081")
+    .local_role(RoleName::from_static("Alice"))
+    .remote_role(
+        RoleName::from_static("Bob"),
+        TopologyEndpoint::new("localhost:8081").unwrap(),
+    )
     .build();
 
-let handler = PingPong::with_topology(topology, "Alice")?;
+let handler = PingPong::with_topology(topology, Role::Alice)?;
 ```
 
 This builds a topology in code and binds it to a generated protocol handler.
@@ -166,16 +171,36 @@ This builds a topology in code and binds it to a generated protocol handler.
 Production deployments use explicit topology objects.
 
 ```rust
+use rumpsteak_aura_choreography::{Region, RoleName, TopologyEndpoint};
+
 let topology = Topology::builder()
-    .remote_role("Coordinator", "coordinator.internal:9000")
-    .remote_role("ParticipantA", "participant-a.internal:9000")
-    .remote_role("ParticipantB", "participant-b.internal:9000")
-    .separated("Coordinator", "ParticipantA")
-    .separated("Coordinator", "ParticipantB")
-    .region("Coordinator", "us_east_1")
+    .remote_role(
+        RoleName::from_static("Coordinator"),
+        TopologyEndpoint::new("coordinator.internal:9000").unwrap(),
+    )
+    .remote_role(
+        RoleName::from_static("ParticipantA"),
+        TopologyEndpoint::new("participant-a.internal:9000").unwrap(),
+    )
+    .remote_role(
+        RoleName::from_static("ParticipantB"),
+        TopologyEndpoint::new("participant-b.internal:9000").unwrap(),
+    )
+    .separated(
+        RoleName::from_static("Coordinator"),
+        RoleName::from_static("ParticipantA"),
+    )
+    .separated(
+        RoleName::from_static("Coordinator"),
+        RoleName::from_static("ParticipantB"),
+    )
+    .region(
+        RoleName::from_static("Coordinator"),
+        Region::new("us_east_1").unwrap(),
+    )
     .build();
 
-let handler = TwoPhaseCommit::with_topology(topology, "Coordinator")?;
+let handler = TwoPhaseCommit::with_topology(topology, Role::Coordinator)?;
 ```
 
 This example configures explicit endpoints and constraints. It then creates a topology aware handler for a role.
@@ -186,7 +211,7 @@ Topologies can be loaded from external files.
 
 ```rust
 let parsed = Topology::load("deploy/prod.topology")?;
-let handler = PingPong::with_topology(parsed.topology, "Alice")?;
+let handler = PingPong::with_topology(parsed.topology, Role::Alice)?;
 ```
 
 This supports separation of code and configuration.
@@ -197,7 +222,7 @@ Topology definitions are separate from the choreography DSL. Define topologies i
 
 ```rust
 let parsed = Topology::load("deploy/dev.topology")?;
-let handler = PingPong::with_topology(parsed.topology, "Alice")?;
+let handler = PingPong::with_topology(parsed.topology, Role::Alice)?;
 ```
 
 This loads a topology file and binds it to a generated handler.
@@ -214,7 +239,7 @@ topology Dev for PingPong {
 }
 "#)?;
 
-let handler = PingPong::with_topology(parsed.topology, "Alice")?;
+let handler = PingPong::with_topology(parsed.topology, Role::Alice)?;
 ```
 
 This parses the DSL into a `ParsedTopology`. The `topology` field contains the `Topology` value used at runtime.
@@ -224,12 +249,20 @@ This parses the DSL into a `ParsedTopology`. The `topology` field contains the `
 The topology determines which transport to use for each role pair.
 
 ```rust
-fn select_transport(topo: &Topology, from: &str, to: &str) -> Transport {
-    match (topo.get_location(from), topo.get_location(to)) {
+use rumpsteak_aura_choreography::{RoleName, TopologyError};
+
+fn select_transport(
+    topo: &Topology,
+    from: &RoleName,
+    to: &RoleName,
+) -> Result<Transport, TopologyError> {
+    let from_loc = topo.get_location(from)?;
+    let to_loc = topo.get_location(to)?;
+    Ok(match (from_loc, to_loc) {
         (Location::Local, Location::Local) => InMemoryTransport::new(),
         (_, Location::Remote(endpoint)) => TcpTransport::new(endpoint),
         (_, Location::Colocated(peer)) => SharedMemoryTransport::new(peer),
-    }
+    })
 }
 ```
 
@@ -240,10 +273,15 @@ The handler automatically routes messages through appropriate transports.
 Topologies are validated against choreography roles.
 
 ```rust
+use rumpsteak_aura_choreography::RoleName;
+
 let choreo = parse_choreography_str(dsl)?;
 let topo = parse_topology(topo_dsl)?;
 
-let roles = ["Alice", "Bob"];
+let roles = [
+    RoleName::from_static("Alice"),
+    RoleName::from_static("Bob"),
+];
 let validation = topo.topology.validate(&roles);
 if !validation.is_valid() {
     return Err(format!("Topology validation failed: {:?}", validation).into());
@@ -279,7 +317,7 @@ The `InMemoryHandler::new()` API remains valid. Choreographies without explicit 
 ## Usage Example
 
 ```rust
-use rumpsteak_aura_choreography::{choreography, Topology};
+use rumpsteak_aura_choreography::{choreography, RoleName, Topology, TopologyEndpoint};
 
 choreography!(r#"
 protocol Auction =
@@ -294,23 +332,47 @@ protocol Auction =
 
 // Development topology
 let dev_topo = Topology::builder()
-    .remote_role("Auctioneer", "localhost:9000")
-    .remote_role("Bidder1", "localhost:9001")
-    .remote_role("Bidder2", "localhost:9002")
+    .remote_role(
+        RoleName::from_static("Auctioneer"),
+        TopologyEndpoint::new("localhost:9000").unwrap(),
+    )
+    .remote_role(
+        RoleName::from_static("Bidder1"),
+        TopologyEndpoint::new("localhost:9001").unwrap(),
+    )
+    .remote_role(
+        RoleName::from_static("Bidder2"),
+        TopologyEndpoint::new("localhost:9002").unwrap(),
+    )
     .build();
 
 // Production topology
 let prod_topo = Topology::builder()
-    .remote_role("Auctioneer", "auction.prod:9000")
-    .remote_role("Bidder1", "bidder1.prod:9000")
-    .remote_role("Bidder2", "bidder2.prod:9000")
-    .separated("Auctioneer", "Bidder1")
-    .separated("Auctioneer", "Bidder2")
+    .remote_role(
+        RoleName::from_static("Auctioneer"),
+        TopologyEndpoint::new("auction.prod:9000").unwrap(),
+    )
+    .remote_role(
+        RoleName::from_static("Bidder1"),
+        TopologyEndpoint::new("bidder1.prod:9000").unwrap(),
+    )
+    .remote_role(
+        RoleName::from_static("Bidder2"),
+        TopologyEndpoint::new("bidder2.prod:9000").unwrap(),
+    )
+    .separated(
+        RoleName::from_static("Auctioneer"),
+        RoleName::from_static("Bidder1"),
+    )
+    .separated(
+        RoleName::from_static("Auctioneer"),
+        RoleName::from_static("Bidder2"),
+    )
     .build();
 
 // Same protocol, different deployments
-let dev_handler = Auction::with_topology(dev_topo, "Auctioneer")?;
-let prod_handler = Auction::with_topology(prod_topo, "Auctioneer")?;
+let dev_handler = Auction::with_topology(dev_topo, Role::Auctioneer)?;
+let prod_handler = Auction::with_topology(prod_topo, Role::Auctioneer)?;
 ```
 
 This example shows the same auction protocol deployed in development and production environments.

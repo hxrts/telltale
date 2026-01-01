@@ -32,6 +32,9 @@ use std::marker::PhantomData;
 /// assert_eq!(hash.len(), Sha256Hasher::HASH_SIZE);
 /// ```
 pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
+    /// Fixed-size digest type produced by this hasher.
+    type Digest: AsRef<[u8]> + Clone + PartialEq + Eq + Hash + Send + Sync + 'static;
+
     /// Size of the hash output in bytes.
     const HASH_SIZE: usize;
 
@@ -39,7 +42,7 @@ pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
     ///
     /// This function must be deterministic: the same input always produces
     /// the same output.
-    fn digest(data: &[u8]) -> Vec<u8>;
+    fn digest(data: &[u8]) -> Self::Digest;
 
     /// Name of the hash algorithm (for display/debugging).
     fn algorithm_name() -> &'static str;
@@ -58,10 +61,12 @@ pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
 pub struct Sha256Hasher;
 
 impl Hasher for Sha256Hasher {
+    type Digest = [u8; 32];
+
     const HASH_SIZE: usize = 32;
 
-    fn digest(data: &[u8]) -> Vec<u8> {
-        sha2::Sha256::digest(data).to_vec()
+    fn digest(data: &[u8]) -> Self::Digest {
+        sha2::Sha256::digest(data).into()
     }
 
     fn algorithm_name() -> &'static str {
@@ -89,9 +94,35 @@ impl Hasher for Sha256Hasher {
 /// ```
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ContentId<H: Hasher = Sha256Hasher> {
-    hash: Vec<u8>,
+    hash: H::Digest,
     _hasher: PhantomData<H>,
 }
+
+/// Errors that can occur when constructing a ContentId.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentIdError {
+    expected: usize,
+    actual: usize,
+}
+
+impl ContentIdError {
+    #[must_use]
+    pub fn invalid_length(expected: usize, actual: usize) -> Self {
+        Self { expected, actual }
+    }
+}
+
+impl fmt::Display for ContentIdError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "hash length {} doesn't match expected size {}",
+            self.actual, self.expected
+        )
+    }
+}
+
+impl std::error::Error for ContentIdError {}
 
 impl<H: Hasher> ContentId<H> {
     /// Create a ContentId by hashing raw bytes.
@@ -105,34 +136,37 @@ impl<H: Hasher> ContentId<H> {
 
     /// Create a ContentId from a pre-computed hash.
     ///
-    /// # Panics
-    ///
-    /// Panics if the hash length doesn't match the hasher's output size.
-    #[must_use]
-    pub fn from_hash(hash: Vec<u8>) -> Self {
-        assert_eq!(
-            hash.len(),
-            H::HASH_SIZE,
-            "Hash length {} doesn't match expected size {}",
-            hash.len(),
-            H::HASH_SIZE
-        );
-        Self {
-            hash,
-            _hasher: PhantomData,
+    /// Returns an error if the hash length doesn't match the hasher's output size.
+    pub fn from_hash(hash: impl AsRef<[u8]>) -> Result<Self, ContentIdError>
+    where
+        for<'a> H::Digest: TryFrom<&'a [u8]>,
+    {
+        let bytes = hash.as_ref();
+        if bytes.len() != H::HASH_SIZE {
+            return Err(ContentIdError::invalid_length(H::HASH_SIZE, bytes.len()));
         }
+        let digest = H::Digest::try_from(bytes)
+            .map_err(|_| ContentIdError::invalid_length(H::HASH_SIZE, bytes.len()))?;
+        Ok(Self {
+            hash: digest,
+            _hasher: PhantomData,
+        })
     }
 
     /// Get the raw hash bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.hash
+        self.hash.as_ref()
     }
 
     /// Convert to a hexadecimal string.
     #[must_use]
     pub fn to_hex(&self) -> String {
-        self.hash.iter().map(|b| format!("{b:02x}")).collect()
+        self.hash
+            .as_ref()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
     }
 
     /// Get the hash algorithm name.
@@ -147,6 +181,7 @@ impl<H: Hasher> fmt::Debug for ContentId<H> {
         // Show first 8 bytes in hex for readability
         let short_hex: String = self
             .hash
+            .as_ref()
             .iter()
             .take(8)
             .map(|b| format!("{b:02x}"))

@@ -223,11 +223,11 @@ impl Heap {
         let resource_hash: u64 = self
             .resources
             .keys()
-            .fold(0u64, |acc, rid| acc ^ rid.counter);
+            .fold(0u64, |acc, rid| acc ^ rid.counter());
         let nullifier_hash: u64 = self
             .nullifiers
             .iter()
-            .fold(0u64, |acc, rid| acc ^ rid.counter);
+            .fold(0u64, |acc, rid| acc ^ rid.counter());
         resource_hash ^ nullifier_hash ^ self.counter
     }
 }

@@ -102,13 +102,13 @@ pub enum RangeExpr {
 #[derive(Debug, Clone)]
 pub struct Role {
     /// The name identifier of the role
-    pub name: Ident,
+    name: Ident,
     /// Optional parameter for role count/size
-    pub param: Option<RoleParam>,
+    param: Option<RoleParam>,
     /// Optional index for role references
-    pub index: Option<RoleIndex>,
+    index: Option<RoleIndex>,
     /// Array size for code generation (e.g., for `Worker[N]`)
-    pub array_size: Option<TokenStream>,
+    array_size: Option<TokenStream>,
 }
 
 // Manual implementations for PartialEq, Eq, and Hash

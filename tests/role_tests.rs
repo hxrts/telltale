@@ -36,6 +36,7 @@ enum Label {
     Msg(Msg),
 }
 
+#[allow(dead_code)]
 struct Msg(i32);
 
 #[test]
@@ -106,6 +107,7 @@ enum Label3 {
     Data(Data),
 }
 
+#[allow(dead_code)]
 struct Data(String);
 
 #[test]
