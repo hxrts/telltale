@@ -75,3 +75,7 @@ harness = false
 [[bench]]
 name = "rumpsteak_handler_bench"
 harness = false
+
+[[bin]]
+name = "choreo-fmt"
+path = "src/bin/choreo_fmt.rs"

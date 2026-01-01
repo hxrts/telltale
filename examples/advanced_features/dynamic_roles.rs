@@ -1,136 +1,85 @@
-//! Example demonstrating dynamic role count support
+//! Example demonstrating dynamic role count support.
 //!
-//! This example shows different types of dynamic role parameterization
-//! for protocols with runtime-determined participant counts.
+//! This example parses protocols using the DSL string parser so dynamic roles
+//! and range expressions are fully supported.
 
-use rumpsteak_aura_choreography_macros::choreography;
+use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
 
-// Threshold signature protocol with runtime participant count
-choreography! {
-    #[namespace = "threshold_crypto"]
-    ThresholdSignature {
-        roles: Coordinator, Signers[*];
-        
-        // Coordinator broadcasts signing request to all signers
-        [@phase = "request"]
-        Coordinator -> Signers[*]: SigningRequest;
-        
-        // Only enough signers for threshold respond
-        [@phase = "response"]
-        Signers[0..threshold] -> Coordinator: PartialSignature;
-        
-        // Coordinator broadcasts final signature
-        [@phase = "completion"]
-        Coordinator -> Signers[*]: FinalSignature;
-    }
+const THRESHOLD_SIGNATURE: &str = r#"
+module threshold_crypto exposing (ThresholdSignature)
+protocol ThresholdSignature = {
+    roles Coordinator, Signers[*]
+
+    Coordinator -> Signers[*] : SigningRequest
+    Signers[0..threshold] -> Coordinator : PartialSignature
+    Coordinator -> Signers[*] : FinalSignature
 }
+"#;
 
-// Consensus protocol with symbolic parameters
-choreography! {
-    #[namespace = "consensus"]
-    PracticalByzantineFaultTolerance {
-        roles: Primary, Backups[N];
-        
-        // Pre-prepare phase: Primary sends to all backups
-        Primary -> Backups[*]: PrePrepare;
-        
-        // Prepare phase: Backups communicate among themselves
-        Backups[i] -> Backups[*]: Prepare;
-        
-        // Commit phase: Backups respond to primary when consensus reached
-        Backups[0..byzantine_threshold] -> Primary: Commit;
-        
-        // Primary confirms consensus
-        Primary -> Backups[*]: CommitConfirmation;
-    }
+const PBFT: &str = r#"
+module consensus exposing (PracticalByzantineFaultTolerance)
+protocol PracticalByzantineFaultTolerance = {
+    roles Primary, Backups[N]
+
+    Primary -> Backups[*] : PrePrepare
+    Backups[i] -> Backups[*] : Prepare
+    Backups[0..byzantine_threshold] -> Primary : Commit
+    Primary -> Backups[*] : CommitConfirmation
 }
+"#;
 
-// Multi-party computation with range operations
-choreography! {
-    #[namespace = "secure_computation"]
-    SecretSharing {
-        roles: Dealer, Participants[*];
-        
-        // Dealer distributes secret shares
-        [@security = "information_theoretic"]
-        Dealer -> Participants[*]: SecretShare;
-        
-        // Participants verify shares among subset
-        Participants[i] -> Participants[i+1..i+verification_window]: VerificationChallenge;
-        
-        // Subset responds with verification
-        Participants[0..verification_count] -> Dealer: VerificationResponse;
-        
-        choice Dealer {
-            accept: {
-                Dealer -> Participants[*]: SharesAccepted;
-            }
-            reject: {
-                Dealer -> Participants[*]: SharesRejected;
-            }
+const SECRET_SHARING: &str = r#"
+module secure_computation exposing (SecretSharing)
+protocol SecretSharing = {
+    roles Dealer, Participants[*]
+
+    Dealer -> Participants[*] : SecretShare
+    Participants[i] -> Participants[i+1..i+verification_window] : VerificationChallenge
+    Participants[0..verification_count] -> Dealer : VerificationResponse
+
+    choice at Dealer {
+        accept -> {
+            Dealer -> Participants[*] : SharesAccepted
+        }
+        reject -> {
+            Dealer -> Participants[*] : SharesRejected
         }
     }
 }
+"#;
 
-// Load balancer with dynamic worker pool
-choreography! {
-    #[namespace = "load_balancing"]
-    DynamicLoadBalancer {
-        roles: LoadBalancer, Workers[*], HealthChecker;
-        
-        // Health checker monitors worker availability
-        HealthChecker -> Workers[*]: HealthCheck;
-        Workers[0..available_count] -> HealthChecker: HealthStatus;
-        HealthChecker -> LoadBalancer: WorkerAvailability;
-        
-        // Load balancer distributes work
-        LoadBalancer -> Workers[0..active_workers]: WorkUnit;
-        
-        // Workers process and respond
-        Workers[i] -> LoadBalancer: WorkResult;
-        
-        loop (decides: LoadBalancer) {
-            // Continuous load monitoring
-            LoadBalancer -> HealthChecker: RequestHealthCheck;
-            HealthChecker -> Workers[*]: PingCheck;
-            Workers[0..responsive_count] -> HealthChecker: PongResponse;
-            HealthChecker -> LoadBalancer: HealthReport;
-        }
+const LOAD_BALANCER: &str = r#"
+module load_balancing exposing (DynamicLoadBalancer)
+protocol DynamicLoadBalancer = {
+    roles LoadBalancer, Workers[*], HealthChecker
+
+    HealthChecker -> Workers[*] : HealthCheck
+    Workers[0..available_count] -> HealthChecker : HealthStatus
+    HealthChecker -> LoadBalancer : WorkerAvailability
+
+    LoadBalancer -> Workers[0..active_workers] : WorkUnit
+    Workers[i] -> LoadBalancer : WorkResult
+
+    loop decide by LoadBalancer {
+        LoadBalancer -> HealthChecker : RequestHealthCheck
+        HealthChecker -> Workers[*] : PingCheck
+        Workers[0..responsive_count] -> HealthChecker : PongResponse
+        HealthChecker -> LoadBalancer : HealthReport
     }
 }
+"#;
 
 fn main() {
     println!("Dynamic Role Count Support Example");
     println!("==================================");
-    println!();
-    
-    println!("1. ThresholdSignature Protocol:");
-    println!("   - Signers[*]: Runtime-determined number of signers");
-    println!("   - Signers[0..threshold]: Only threshold number respond");
-    println!("   - Enables flexible threshold cryptography");
-    println!();
-    
-    println!("2. PracticalByzantineFaultTolerance:");
-    println!("   - Backups[N]: Symbolic parameter for compile-time flexibility");
-    println!("   - Backups[i] -> Backups[*]: Participant-to-all communication");
-    println!("   - Supports variable Byzantine fault tolerance requirements");
-    println!();
-    
-    println!("3. SecretSharing Protocol:");
-    println!("   - Participants[i+1..i+verification_window]: Range expressions");
-    println!("   - Participants[0..verification_count]: Subset selection");
-    println!("   - Enables secure multi-party computation protocols");
-    println!();
-    
-    println!("4. DynamicLoadBalancer:");
-    println!("   - Workers[0..available_count]: Dynamic availability");
-    println!("   - Workers[0..active_workers]: Runtime work distribution");
-    println!("   - Demonstrates elastic scaling scenarios");
-    println!();
-    
-    println!("Security Features:");
-    println!("- Maximum role count: 10,000 (prevents overflow attacks)");
-    println!("- Runtime bounds checking for all dynamic operations");
-    println!("- Type-safe role parameter resolution");
-    println!("- Comprehensive validation at compile and runtime");
+
+    for (name, src) in [
+        ("ThresholdSignature", THRESHOLD_SIGNATURE),
+        ("PracticalByzantineFaultTolerance", PBFT),
+        ("SecretSharing", SECRET_SHARING),
+        ("DynamicLoadBalancer", LOAD_BALANCER),
+    ] {
+        let choreo = parse_choreography_str(src).expect("Protocol should parse");
+        println!("Parsed {} with {} roles", name, choreo.roles.len());
+    }
 }

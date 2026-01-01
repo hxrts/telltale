@@ -15,7 +15,7 @@ publish = false
 argh = "0.1"
 bincode = { workspace = true }
 bytes = { version = "1.0", features = ["serde"] }
-fred = "3.0"
+fred = "10.1"
 futures = { workspace = true }
 http-serde = "1.0"
 rand = { workspace = true }

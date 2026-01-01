@@ -23,6 +23,13 @@ lint:
 lint-quick:
     ./scripts/lint-check.sh --quick
 
+# Format choreography DSL files (prints to stdout unless --write is used)
+choreo-fmt *FILES:
+    cargo run -p rumpsteak-aura-choreography --bin choreo-fmt -- {{FILES}}
+
+choreo-fmt-write *FILES:
+    cargo run -p rumpsteak-aura-choreography --bin choreo-fmt -- --write {{FILES}}
+
 # Install git hooks for pre-commit checks
 install-hooks:
     git config core.hooksPath .githooks

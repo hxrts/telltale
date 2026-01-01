@@ -184,40 +184,27 @@ let handler = ProtocolHandler::from_topology(topology, "Alice");
 
 This supports separation of code and configuration.
 
-## Macro Integration
+## Topology Integration
 
-The `choreography!` macro accepts inline topology definitions.
+Topology definitions are **separate** from the choreography DSL. Define topologies in standalone `.topology` files or strings and load them at runtime.
 
 ```rust
-choreography! {
-    PingPong {
-        roles: Alice, Bob
-        Alice -> Bob: Ping
-        Bob -> Alice: Pong
-    }
+let topo = Topology::load("deploy/dev.topology")?;
+let handler = PingPong::with_topology(topo, Role::Alice);
+```
 
-    topology Local {
-        mode: local
-    }
+You can also parse a topology from a string.
 
-    topology Dev {
-        Alice: localhost:8080
-        Bob: localhost:8081
-    }
+```rust
+use rumpsteak_aura_choreography::topology::parse_topology_str;
+
+let topo = parse_topology_str(r#"
+topology Dev {
+  Alice: localhost:8080
+  Bob: localhost:8081
 }
-```
+"#)?;
 
-Named topologies are accessible as constants.
-
-```rust
-let handler = PingPong::handler(Role::Alice);
-let handler = PingPong::with_topology(PingPong::Dev, Role::Alice);
-```
-
-External topologies can also be used.
-
-```rust
-let topo = Topology::load("deploy/prod.topology")?;
 let handler = PingPong::with_topology(topo, Role::Alice);
 ```
 
@@ -270,9 +257,9 @@ def Topology.valid (topo : Topology) (g : GlobalType) : Bool :=
 
 Projection correctness is proven independent of topology. The `project` function does not reference location information.
 
-## Backward Compatibility
+## Default Behavior
 
-Existing code works without modification. The `InMemoryHandler::new()` API remains valid. Choreographies without explicit topologies use implicit local mode.
+The `InMemoryHandler::new()` API remains valid. Choreographies without explicit topologies use implicit local mode.
 
 ## Usage Example
 
@@ -280,16 +267,14 @@ Existing code works without modification. The `InMemoryHandler::new()` API remai
 use rumpsteak_aura_choreography::{choreography, Topology, ProtocolHandler};
 
 choreography! {
-    Auction {
-        roles: Auctioneer, Bidder1, Bidder2
-
-        Auctioneer -> Bidder1: Item
-        Auctioneer -> Bidder2: Item
-        Bidder1 -> Auctioneer: Bid
-        Bidder2 -> Auctioneer: Bid
-        Auctioneer -> Bidder1: Result
-        Auctioneer -> Bidder2: Result
-    }
+    protocol Auction =
+      roles Auctioneer, Bidder1, Bidder2
+      Auctioneer -> Bidder1 : Item
+      Auctioneer -> Bidder2 : Item
+      Bidder1 -> Auctioneer : Bid
+      Bidder2 -> Auctioneer : Bid
+      Auctioneer -> Bidder1 : Result
+      Auctioneer -> Bidder2 : Result
 }
 
 // Development topology

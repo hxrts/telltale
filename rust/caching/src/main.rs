@@ -19,10 +19,7 @@ mod proxy;
 
 use crate::{cache::Cache, client::Client, origin::Origin, proxy::Proxy};
 use argh::FromArgs;
-use fred::{
-    client::RedisClient,
-    types::{ReconnectPolicy, RedisConfig, ServerConfig},
-};
+use fred::prelude::{Client as RedisClient, ClientLike, Config, ReconnectPolicy, ServerConfig};
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     Future,
@@ -217,14 +214,19 @@ async fn try_main() -> Result<()> {
     options.header.sort_unstable();
     options.header.dedup();
 
-    let redis = RedisClient::new(RedisConfig {
-        server: ServerConfig::new_centralized(
-            options.redis.host(),
-            options.redis.port_u16().unwrap_or(6379),
-        ),
-        ..Default::default()
-    });
-    let handle = redis.connect(Some(ReconnectPolicy::new_constant(0, 0)));
+    let redis = RedisClient::new(
+        Config {
+            server: ServerConfig::new_centralized(
+                options.redis.host(),
+                options.redis.port_u16().unwrap_or(6379),
+            ),
+            ..Default::default()
+        },
+        None,
+        None,
+        Some(ReconnectPolicy::new_constant(0, 0)),
+    );
+    let handle = redis.connect();
     wrap(redis.wait_for_connect().await)?;
 
     let context = Arc::new(Context {

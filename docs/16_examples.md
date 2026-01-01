@@ -8,19 +8,19 @@ The `adder.rs` example shows a simple addition service. It uses client and serve
 
 The `alternating_bit.rs` example implements the alternating bit protocol. This provides reliable message delivery.
 
-The `client_server_log.rs` example demonstrates client-server interaction. It includes logging functionality.
+The `client_server_log.rs` example demonstrates client‑server interaction. It includes logging functionality.
 
 The `ring.rs` example shows ring topology. Messages pass sequentially through the ring.
 
 ### Advanced Protocols
 
-The `three_adder.rs` example shows a three-party protocol. It includes coordination logic.
+The `three_adder.rs` example shows a three‑party protocol. It includes coordination logic.
 
 The `oauth.rs` example implements OAuth authentication flow. It uses client, authorization server, and resource server roles.
 
-The `double_buffering.rs` example shows producer-consumer pattern. It uses double buffering for efficiency.
+The `double_buffering.rs` example shows producer‑consumer pattern. It uses double buffering for efficiency.
 
-The `elevator.rs` example implements multi-floor elevator control. The protocol coordinates elevator movements.
+The `elevator.rs` example implements multi‑floor elevator control. The protocol coordinates elevator movements.
 
 The `fft.rs` example shows distributed Fast Fourier Transform. Computation is distributed across roles.
 
@@ -28,28 +28,26 @@ The `fft.rs` example shows distributed Fast Fourier Transform. Computation is di
 
 The `ring_choice.rs` example shows ring topology with choice points. Roles make decisions at each node.
 
-The `choreography.rs` example demonstrates choice constructs. It shows branching patterns.
+The `choreography.rs` example demonstrates choice constructs and branching patterns.
 
 ### WASM
 
-The `wasm-ping-pong` example runs in browsers. It shows browser-based ping-pong protocol. See examples/wasm-ping-pong/README.md for details.
+The `wasm-ping-pong` example runs in browsers. It shows browser‑based ping‑pong protocol. See examples/wasm-ping-pong/README.md for details.
 
 `RumpsteakEndpoint` supports two patterns. Use `register_channel` for `SimpleChannel`. Use `register_session` for custom transports. Call `RumpsteakSession::from_sink_stream` for WebSockets or other transports.
 
 ## Common Patterns
 
-### Request-Response
+### Request‑Response
 
 Client sends request to server. Server processes and sends response back.
 
 ```rust
 choreography! {
-    RequestResponse {
-        roles: Client, Server
-        
-        Client -> Server: Request
-        Server -> Client: Response
-    }
+    protocol RequestResponse =
+      roles Client, Server
+      Client -> Server : Request
+      Server -> Client : Response
 }
 ```
 
@@ -61,18 +59,13 @@ One role decides between branches. Other roles react to the decision.
 
 ```rust
 choreography! {
-    ChoicePattern {
-        roles: Client, Server
-        
-        choice Server {
-            accept: {
-                Server -> Client: Confirmation
-            }
-            reject: {
-                Server -> Client: Rejection
-            }
-        }
-    }
+    protocol ChoicePattern =
+      roles Client, Server
+      case choose Server of
+        Accept ->
+          Server -> Client : Confirmation
+        Reject ->
+          Server -> Client : Rejection
 }
 ```
 
@@ -84,33 +77,29 @@ Send multiple messages in sequence. Each message may depend on previous response
 
 ```rust
 choreography! {
-    SequentialMessages {
-        roles: Client, Server
-        
-        Client -> Server: Message1
-        Server -> Client: Ack
-        Client -> Server: Message2
-        Server -> Client: Ack
-    }
+    protocol SequentialMessages =
+      roles Client, Server
+      Client -> Server : Message1
+      Server -> Client : Ack
+      Client -> Server : Message2
+      Server -> Client : Ack
 }
 ```
 
 This pattern provides acknowledgment after each step.
 
-### Multi-Party Coordination
+### Multi‑Party Coordination
 
 Three or more roles coordinate. Messages flow between different pairs.
 
 ```rust
 choreography! {
-    MultiPartyCoordination {
-        roles: Buyer, Coordinator, Seller
-        
-        Buyer -> Coordinator: Offer
-        Coordinator -> Seller: Offer
-        Seller -> Coordinator: Response
-        Coordinator -> Buyer: Response
-    }
+    protocol MultiPartyCoordination =
+      roles Buyer, Coordinator, Seller
+      Buyer -> Coordinator : Offer
+      Coordinator -> Seller : Offer
+      Seller -> Coordinator : Response
+      Coordinator -> Buyer : Response
 }
 ```
 
@@ -122,14 +111,11 @@ Repeat protocol steps. Loop condition determines when to stop.
 
 ```rust
 choreography! {
-    LoopPattern {
-        roles: Client, Server
-        
-        loop (count: 5) {
-            Client -> Server: Request
-            Server -> Client: Response
-        }
-    }
+    protocol LoopPattern =
+      roles Client, Server
+      loop repeat 5
+        Client -> Server : Request
+        Server -> Client : Response
 }
 ```
 
@@ -137,43 +123,35 @@ Use loops for batch processing or iterative protocols. This example repeats 5 ti
 
 ### Parallel Composition
 
-Execute independent protocol branches concurrently.
+Execute independent protocol branches concurrently via adjacent `branch` blocks.
 
 ```rust
 choreography! {
-    ParallelPattern {
-        roles: Coordinator, Worker1, Worker2
-        
-        parallel {
-            Coordinator -> Worker1: Task
-        |
-            Coordinator -> Worker2: Task
-        }
-    }
+    protocol ParallelPattern =
+      roles Coordinator, Worker1, Worker2
+      branch
+        Coordinator -> Worker1 : Task
+      branch
+        Coordinator -> Worker2 : Task
 }
 ```
 
 Branches must not conflict. Different recipients allow parallel execution.
 
-### Timeout Protection
+### Dynamic Role Binding
 
-Use annotations to specify timeouts for handling unresponsive peers.
+Bind role counts at runtime for threshold protocols.
 
 ```rust
 choreography! {
-    TimeoutPattern {
-        roles: Client, Server
-        
-        [@timeout = 5000]
-        Client -> Server: Request
-        
-        [@timeout = 5000]
-        Server -> Client: Response
-    }
+    protocol Threshold =
+      roles Coordinator, Signers[*]
+      Coordinator -> Signers[*] : Request
+      Signers[0..threshold] -> Coordinator : Signature
 }
 ```
 
-The operation fails with timeout error if duration elapses. Timeout annotations are in milliseconds.
+The wildcard syntax `Signers[*]` defers count to runtime. Range syntax `Signers[0..threshold]` selects a subset. Generated code supports runtime validation and binding.
 
 ## Testing Patterns
 
@@ -188,7 +166,7 @@ async fn test_protocol() {
     let program = Program::new()
         .send(Role::Bob, TestMessage)
         .end();
-    
+
     let mut endpoint = ();
     let result = interpret(&mut handler, &mut endpoint, program).await;
     assert!(result.is_ok());
@@ -199,19 +177,19 @@ InMemoryHandler provides fast deterministic testing.
 
 ### Integration Test with RumpsteakHandler
 
-Test actual session-typed communication.
+Test actual session‑typed communication.
 
 ```rust
 #[tokio::test]
 async fn test_session_types() {
     let (alice_ch, bob_ch) = SimpleChannel::pair();
-    
+
     let mut alice_ep = RumpsteakEndpoint::new(Role::Alice);
     alice_ep.register_channel(Role::Bob, alice_ch);
-    
+
     let mut bob_ep = RumpsteakEndpoint::new(Role::Bob);
     bob_ep.register_channel(Role::Alice, bob_ch);
-    
+
     // Run protocol with both endpoints
 }
 ```
@@ -246,84 +224,6 @@ let mut handler = FaultInjection::new(base)
 ```
 
 Use this to verify retry logic and error recovery.
-
-### Advanced Feature Combinations
-
-Combine namespaces, annotations, and dynamic roles in complex protocols.
-
-```rust
-choreography! {
-    #[namespace = "distributed_system"]
-    ThresholdConsensus {
-        roles: Leader, Followers[*], Monitor
-
-        [@phase = "prepare", @timeout = 5000]
-        Leader -> Followers[*]: Prepare
-
-        [@min_responses = "quorum"]
-        Followers[0..quorum] -> Leader: PrepareOk
-
-        choice Leader {
-            commit: {
-                [@audit_log = "true"]
-                Leader -> Followers[*]: Commit
-
-                [@parallel = "true"]
-                Followers[i] -> Monitor: CommitAck
-            }
-            abort: {
-                [@alert_level = "high"]
-                Leader -> Monitor: AbortNotice
-            }
-        }
-    }
-}
-```
-
-This example shows namespace isolation for the protocol. Dynamic role count allows runtime-determined follower count. Range selection targets quorum subset. Annotations provide timeout and audit metadata. Choice combines with dynamic roles for flexible protocols.
-
-### Dynamic Role Binding
-
-Bind role counts at runtime for threshold protocols.
-
-```rust
-choreography! {
-    Threshold {
-        roles: Coordinator, Signers[*]
-
-        Coordinator -> Signers[*]: Request
-        Signers[0..threshold] -> Coordinator: Signature
-    }
-}
-```
-
-The wildcard syntax `Signers[*]` defers count to runtime. Range syntax `Signers[0..threshold]` selects subset. Code generation includes runtime validation. Generated code supports dynamic binding.
-
-### Annotation-Driven Optimization
-
-Use annotations to guide runtime behavior and optimization.
-
-```rust
-choreography! {
-    OptimizedProtocol {
-        roles: Client, Server, Cache
-
-        [@cost = 100, @priority = "high"]
-        Client -> Server: Request
-
-        [@timeout = 1000]
-        Server[@connection_pool = "true"] -> Cache: CacheQuery
-
-        [@compress = "gzip", @cache_ttl = 300]
-        Cache -> Server: CachedData
-
-        [@retry = 3, @backoff = "exponential"]
-        Server -> Client: Response
-    }
-}
-```
-
-Statement annotations specify cost and priority. Role annotations configure connection behavior. Multiple annotations combine for complex policies. Runtime handlers can access annotation metadata.
 
 ## Running Examples
 

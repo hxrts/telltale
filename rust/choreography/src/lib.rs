@@ -32,8 +32,9 @@ pub use runtime::{
 pub use ast::{Choreography, MessageType, Protocol, Role};
 pub use compiler::generate_effects_protocol;
 pub use compiler::{
-    create_standard_extension_parser, ExtensionParseError, ExtensionParser, ExtensionParserBuilder,
-    GrammarComposer, GrammarComposerBuilder, GrammarCompositionError,
+    create_standard_extension_parser, format_choreography, format_choreography_str,
+    format_choreography_with_config, ExtensionParseError, ExtensionParser, ExtensionParserBuilder,
+    GrammarComposer, GrammarComposerBuilder, GrammarCompositionError, PrettyConfig,
 };
 pub use effects::middleware::{Metrics, Retry, Trace};
 pub use effects::NoOpHandler;

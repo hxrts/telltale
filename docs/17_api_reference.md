@@ -858,10 +858,9 @@ Useful for WASM where Send is not required.
 
 ```rust
 choreography! {
-    ProtocolName {
-        roles: Role1, Role2
-        Role1 -> Role2: Message
-    }
+    protocol ProtocolName =
+      roles Role1, Role2
+      Role1 -> Role2 : Message
 }
 ```
 
@@ -873,16 +872,10 @@ Example:
 
 ```rust
 choreography! {
-    TwoPhaseCommit {
-        roles: Coordinator, Participant
-        
-        Coordinator -> Participant: Prepare
-        Participant -> Coordinator: Vote
-        choice Coordinator {
-            Commit => Coordinator -> Participant: Commit,
-            Abort => Coordinator -> Participant: Abort
-        }
-    }
+    protocol TwoPhaseCommit =
+      roles Coordinator, Participant
+      Coordinator -> Participant : Prepare
+      Participant -> Coordinator : Vote
 }
 ```
 

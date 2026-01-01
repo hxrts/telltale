@@ -7,11 +7,11 @@ use rumpsteak_aura_choreography::compiler::{parse_dsl, project};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dsl = r"
-    choreography TestParamRoles {
-        roles: Coordinator, Worker[3]
+    protocol TestParamRoles = {
+        roles Coordinator, Worker[3]
 
-        Coordinator -> Worker[0]: Task
-        Worker[0] -> Coordinator: Result
+        Coordinator -> Worker[0] : Task
+        Worker[0] -> Coordinator : Result
     }
     ";
 

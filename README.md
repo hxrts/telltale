@@ -51,8 +51,8 @@ Define a protocol using the choreographic DSL:
 use rumpsteak_aura_choreography::choreography;
 
 choreography! {
-    PingPong {
-        roles: Alice, Bob
+    protocol PingPong = {
+        roles Alice, Bob
         Alice -> Bob: Ping
         Bob -> Alice: Pong
     }
@@ -99,7 +99,7 @@ The foundation library providing core session type primitives, async channels, r
 
 #### `choreography/` - Choreographic Programming (`rumpsteak-aura-choreography`)
 
-Choreographic programming layer for global protocol specification with automatic projection to local session types. Includes a Pest-based DSL parser for `.choreography` files with support for protocol composition, guards, annotations, and parameterized roles.
+Choreographic programming layer for global protocol specification with automatic projection to local session types. Includes a Pest-based DSL parser with support for protocol composition, guards, and parameterized roles.
 
 A transport-agnostic effect handler system, with `InMemoryHandler` for testing and `RumpsteakHandler` for production distributed execution. The effect handler system also provides middleware support for tracing, retry, metrics, and fault injection. Session state tracking provides metadata for debugging and monitoring. The system works in browser environments with WebAssembly support. Guides available in the `docs/` directory.
 

@@ -47,12 +47,11 @@ pub enum ResponseStatus {
 
 // Define the secure choreography with basic rumpsteak-aura syntax and namespace
 choreography! {
-    #[namespace = "secure_request_response"]
-    choreography SecureProtocol {
-        roles: Client, Server;
-        
-        Client -> Server: SecureRequest;
-        Server -> Client: SecureResponse;
+    protocol SecureProtocol = {
+        roles Client, Server
+
+        Client -> Server : SecureRequest
+        Server -> Client : SecureResponse
     }
 }
 

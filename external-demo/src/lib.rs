@@ -20,12 +20,11 @@
 //!
 //! // Define choreography using the macro
 //! choreography! {
-//!     #[namespace = "my_protocol"]
-//!     choreography Example {
-//!         roles: Alice, Bob;
+//!     protocol Example = {
+//!         roles Alice, Bob
 //!
-//!         Alice -> Bob: Request;
-//!         Bob -> Alice: Response;
+//!         Alice -> Bob : Request
+//!         Bob -> Alice : Response
 //!     }
 //! }
 //! ```

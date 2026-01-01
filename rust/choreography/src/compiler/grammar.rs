@@ -121,101 +121,45 @@ impl GrammarComposer {
     #[allow(dead_code)] // Part of extensible grammar system (WIP)
     fn inject_extension_rules(
         &self,
-        mut base_grammar: String,
+        base_grammar: String,
         extension_rules: &str,
     ) -> Result<String, GrammarCompositionError> {
-        // Find the statement rule and inject extension rules
-        let _statement_rule_start = base_grammar.find("annotated_stmt = {").ok_or(
-            GrammarCompositionError::InvalidBaseGrammar(
-                "Could not find annotated_stmt rule".to_string(),
-            ),
-        )?;
-
-        // Find the end of the statement alternatives
-        let alternatives_start = base_grammar
-            .find("annotation* ~ (send_stmt | broadcast_stmt")
-            .ok_or(GrammarCompositionError::InvalidBaseGrammar(
-                "Could not find statement alternatives".to_string(),
-            ))?;
-
-        let alternatives_end = base_grammar[alternatives_start..].find(")").ok_or(
-            GrammarCompositionError::InvalidBaseGrammar(
-                "Could not find end of statement alternatives".to_string(),
-            ),
-        )? + alternatives_start;
-
-        // Extract extension statement rules
-        let extension_statements = self.extract_extension_statements(extension_rules)?;
-
-        if !extension_statements.is_empty() {
-            // Insert extension statements into the alternatives
-            let before_end = &base_grammar[..alternatives_end];
-            let after_end = &base_grammar[alternatives_end..];
-
-            let extension_alternatives = extension_statements.join(" | ");
-            base_grammar = format!("{} | {}{}", before_end, extension_alternatives, after_end);
-        }
-
-        // Append extension rule definitions at the end
-        base_grammar.push('\n');
-        base_grammar.push_str("// Extension Rules\n");
-        base_grammar.push_str(extension_rules);
-
-        Ok(base_grammar)
+        self.inject_extension_rules_via_lines(base_grammar, extension_rules)
     }
 
     /// Optimized version of inject_extension_rules with pre-compiled patterns
     fn inject_extension_rules_optimized(
         &self,
-        mut base_grammar: String,
+        base_grammar: String,
         extension_rules: &str,
     ) -> Result<String, GrammarCompositionError> {
-        // Cache frequently used search patterns
-        static STATEMENT_RULE_PATTERN: &str = "annotated_stmt = {";
-        static ALTERNATIVES_PATTERN: &str = "annotation* ~ (send_stmt | broadcast_stmt";
+        self.inject_extension_rules_via_lines(base_grammar, extension_rules)
+    }
 
-        let _statement_rule_start = base_grammar.find(STATEMENT_RULE_PATTERN).ok_or(
-            GrammarCompositionError::InvalidBaseGrammar(
-                "Could not find annotated_stmt rule".to_string(),
-            ),
-        )?;
-
-        // Find the end of the statement alternatives (optimized search)
-        let alternatives_start = base_grammar.find(ALTERNATIVES_PATTERN).ok_or(
-            GrammarCompositionError::InvalidBaseGrammar(
-                "Could not find statement alternatives".to_string(),
-            ),
-        )?;
-
-        let alternatives_end = base_grammar[alternatives_start..].find(")").ok_or(
-            GrammarCompositionError::InvalidBaseGrammar(
-                "Could not find end of statement alternatives".to_string(),
-            ),
-        )? + alternatives_start;
-
-        // Extract extension statements with optimized parsing
+    fn inject_extension_rules_via_lines(
+        &self,
+        base_grammar: String,
+        extension_rules: &str,
+    ) -> Result<String, GrammarCompositionError> {
         let extension_statements = self.extract_extension_statements_optimized(extension_rules)?;
+        let mut lines: Vec<String> = base_grammar.lines().map(|line| line.to_string()).collect();
 
         if !extension_statements.is_empty() {
-            // Use String capacity planning to reduce allocations
-            let extension_alternatives = extension_statements.join(" | ");
-            let estimated_size = base_grammar.len() + extension_alternatives.len() + 3;
+            let (stmt_start, stmt_end) = find_statement_rule_bounds(&lines)?;
+            let indent = find_statement_indent(&lines, stmt_start, stmt_end);
+            let insert_lines: Vec<String> = extension_statements
+                .iter()
+                .map(|rule| format!("{indent}| {rule}"))
+                .collect();
 
-            let mut new_grammar = String::with_capacity(estimated_size);
-            new_grammar.push_str(&base_grammar[..alternatives_end]);
-            new_grammar.push_str(" | ");
-            new_grammar.push_str(&extension_alternatives);
-            new_grammar.push_str(&base_grammar[alternatives_end..]);
-            base_grammar = new_grammar;
+            lines.splice(stmt_end..stmt_end, insert_lines);
         }
 
-        // Append extension rule definitions efficiently
-        base_grammar.reserve(extension_rules.len() + 30);
-        base_grammar.push('\n');
-        base_grammar.push_str("// Extension Rules\n");
-        base_grammar.push_str(extension_rules);
-
-        Ok(base_grammar)
+        let mut composed = lines.join("\n");
+        composed.push('\n');
+        composed.push_str("// Extension Rules\n");
+        composed.push_str(extension_rules);
+        Ok(composed)
     }
 
     /// Extract statement rule names from extension grammar
@@ -271,12 +215,7 @@ impl GrammarComposer {
     /// grammar validation is enabled for parser extensions.
     #[allow(dead_code)] // Part of extensible grammar system (WIP)
     fn validate_base_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
-        let required_rules = [
-            "annotated_stmt = {",
-            "annotation* ~",
-            "send_stmt",
-            "broadcast_stmt",
-        ];
+        let required_rules = ["statement = _{", "send_stmt", "broadcast_stmt"];
 
         for rule in &required_rules {
             if !grammar.contains(rule) {
@@ -293,12 +232,7 @@ impl GrammarComposer {
     /// Optimized validation with static patterns and early exit
     fn validate_base_grammar_cached(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
         // Use static patterns for better performance
-        const REQUIRED_PATTERNS: &[&str] = &[
-            "annotated_stmt = {",
-            "annotation* ~",
-            "send_stmt",
-            "broadcast_stmt",
-        ];
+        const REQUIRED_PATTERNS: &[&str] = &["statement = _{", "send_stmt", "broadcast_stmt"];
 
         for &pattern in REQUIRED_PATTERNS {
             if !grammar.contains(pattern) {
@@ -336,9 +270,8 @@ impl GrammarComposer {
             }
         }
 
-        // Basic syntax validation (check balanced braces)
-        let open_braces = grammar.chars().filter(|&c| c == '{').count();
-        let close_braces = grammar.chars().filter(|&c| c == '}').count();
+        // Basic syntax validation (check balanced braces outside of string literals)
+        let (open_braces, close_braces) = count_braces_outside_quotes(grammar);
 
         if open_braces != close_braces {
             return Err(GrammarCompositionError::SyntaxError(
@@ -372,9 +305,8 @@ impl GrammarComposer {
             }
         }
 
-        // Optimized brace counting using iterator methods
-        let open_braces = grammar.chars().filter(|&c| c == '{').count();
-        let close_braces = grammar.chars().filter(|&c| c == '}').count();
+        // Optimized brace counting (ignore braces inside string literals)
+        let (open_braces, close_braces) = count_braces_outside_quotes(grammar);
 
         if open_braces != close_braces {
             return Err(GrammarCompositionError::SyntaxError(
@@ -406,6 +338,76 @@ impl GrammarComposer {
         })?;
         Ok(())
     }
+}
+
+fn count_braces_outside_quotes(grammar: &str) -> (usize, usize) {
+    let mut open_braces = 0usize;
+    let mut close_braces = 0usize;
+    let mut in_string = false;
+    let mut escape = false;
+
+    for ch in grammar.chars() {
+        if in_string {
+            if escape {
+                escape = false;
+            } else if ch == '\\' {
+                escape = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        if ch == '"' {
+            in_string = true;
+            continue;
+        }
+
+        match ch {
+            '{' => open_braces += 1,
+            '}' => close_braces += 1,
+            _ => {}
+        }
+    }
+
+    (open_braces, close_braces)
+}
+
+fn find_statement_rule_bounds(lines: &[String]) -> Result<(usize, usize), GrammarCompositionError> {
+    let mut start = None;
+    for (idx, line) in lines.iter().enumerate() {
+        if line.trim_start().starts_with("statement = _{") {
+            start = Some(idx);
+            break;
+        }
+    }
+
+    let start = start.ok_or_else(|| {
+        GrammarCompositionError::InvalidBaseGrammar(
+            "Could not find statement rule in base grammar".to_string(),
+        )
+    })?;
+
+    for (idx, line) in lines.iter().enumerate().skip(start + 1) {
+        if line.trim_start().starts_with('}') {
+            return Ok((start, idx));
+        }
+    }
+
+    Err(GrammarCompositionError::InvalidBaseGrammar(
+        "Could not find end of statement rule in base grammar".to_string(),
+    ))
+}
+
+fn find_statement_indent(lines: &[String], start: usize, end: usize) -> String {
+    for line in lines.iter().take(end).skip(start + 1) {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('|') {
+            let indent_len = line.len().saturating_sub(trimmed.len());
+            return line[..indent_len].to_string();
+        }
+    }
+    "    ".to_string()
 }
 
 impl Default for GrammarComposer {
@@ -471,7 +473,7 @@ mod tests {
 
     impl GrammarExtension for TestExtension {
         fn grammar_rules(&self) -> &'static str {
-            "timeout_stmt = { \"timeout\" ~ integer ~ \"{\" ~ protocol_body ~ \"}\" }"
+            "timeout_stmt = { \"timeout\" ~ integer ~ block }"
         }
 
         fn statement_rules(&self) -> Vec<&'static str> {
@@ -488,7 +490,7 @@ mod tests {
         let composer = GrammarComposer::new();
         assert_eq!(composer.extension_count(), 0);
         assert!(composer.base_grammar.contains("choreography"));
-        assert!(composer.base_grammar.contains("annotated_stmt"));
+        assert!(composer.base_grammar.contains("statement = _{"));
     }
 
     #[test]

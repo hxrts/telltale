@@ -1,76 +1,56 @@
-// Choreographic DSL Grammar
-// Defines syntax for choreographic protocol specifications
+// Choreographic DSL Grammar (new direct-style syntax)
 
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
-COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | COMMENT }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
 // Top-level choreography definition
 choreography = {
-    SOI ~ annotation* ~ namespace_decl? ~ "choreography" ~ ident ~ "{" ~ roles_decl ~ protocol_defs? ~ protocol_body ~ "}" ~ inline_topologies? ~ EOI
+    SOI ~ module_decl? ~ import_decl* ~ protocol_decl ~ EOI
 }
 
-// Inline topology definitions (optional, for convenience)
-inline_topologies = { inline_topology+ }
-inline_topology = {
-    "topology" ~ ident ~ "{" ~ topology_body ~ "}"
-}
+// Module and imports (optional)
+module_decl = { "module" ~ ident ~ "exposing" ~ "(" ~ expose_list? ~ ")" }
+import_decl = { "import" ~ ident ~ ("as" ~ ident)? ~ ("exposing" ~ "(" ~ expose_list? ~ ")")? }
+expose_list = { (!")" ~ ANY)* }
 
-// Namespace declaration (optional)
-namespace_decl = { "#[" ~ "namespace" ~ "=" ~ string ~ "]" }
+// Protocol definitions
+protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body ~ where_block? }
+where_block = { "where" ~ locals_block }
+locals_block = { "{" ~ local_protocol_decl+ ~ "}" | "(" ~ local_protocol_decl+ ~ ")" | local_protocol_decl+ }
+local_protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body }
 
-// Annotations (for optimization hints, verification, etc.)
-annotation = { "@" ~ ident ~ annotation_args? | "[" ~ annotation_list ~ "]" }
-annotation_args = { "(" ~ annotation_arg_list? ~ ")" }
-annotation_arg_list = { annotation_arg ~ ("," ~ annotation_arg)* }
-annotation_arg = { ident ~ ("=" ~ annotation_value)? }
-annotation_value = { string | integer | boolean | ident }
+header_roles = { "(" ~ role_list ~ ")" }
 
-// Enhanced annotation support for statements and roles
-annotation_list = { annotation_item ~ ("," ~ annotation_item)* }
-annotation_item = { "@" ~ ident ~ ("=" ~ annotation_value)? }
-
-// Role annotation items (without @ prefix since role_annotations already has it)
-role_annotation_list = { role_annotation_item ~ ("," ~ role_annotation_item)* }
-role_annotation_item = { ident ~ ("=" ~ annotation_value)? }
-boolean = { "true" | "false" }
-
-// Protocol definitions (sub-protocols)
-protocol_defs = { protocol_def+ }
-protocol_def = {
-    "protocol" ~ ident ~ "{" ~ protocol_body ~ "}"
-}
-
-// Role declarations
-roles_decl = { "roles" ~ ":" ~ role_list ~ ";"? }
+// Roles declaration
+roles_decl = { "roles" ~ role_list }
 role_list = { role_decl ~ ("," ~ role_decl)* }
 role_decl = { ident ~ role_param? }
 role_param = { "[" ~ role_param_expr ~ "]" }
-role_param_expr = { integer | ident | "*" } // "*" for runtime-determined count
+role_param_expr = { integer | ident | "*" }
 
 // Protocol body (sequence of statements)
-protocol_body = { statement* }
+protocol_body = { block_protocol }
+block_protocol = { "{" ~ roles_decl? ~ statement* ~ "}" | "(" ~ roles_decl? ~ statement+ ~ ")" }
 
-// Statement types (can be annotated)
+// Statement types
 statement = _{
-    annotated_stmt
-}
-
-annotated_stmt = {
-    annotation* ~ (send_stmt | broadcast_stmt | choice_stmt | loop_stmt | parallel_stmt | rec_stmt | call_stmt)
+    send_stmt
+    | broadcast_stmt
+    | choice_stmt
+    | loop_stmt
+    | branch_stmt
+    | rec_stmt
+    | call_stmt
 }
 
 // Protocol call statement
 call_stmt = { "call" ~ ident }
 
-// Send statement: A[@annotations] -> B: Message(payload) or A -> B[@annotations]: Message(payload)
-send_stmt = { annotated_role ~ "->" ~ annotated_role ~ ":" ~ message ~ ";"? }
+// Send statement
+send_stmt = { role_ref ~ "->" ~ role_ref ~ ":" ~ message }
 
-// Broadcast statement: A[@annotations] ->* : Message(payload)
-broadcast_stmt = { annotated_role ~ "->*" ~ ":" ~ message ~ ";"? }
-
-// Role with optional annotations
-annotated_role = { role_ref ~ role_annotations? }
-role_annotations = { "[" ~ "@" ~ role_annotation_list ~ "]" }
+// Broadcast statement
+broadcast_stmt = { role_ref ~ "->*" ~ ":" ~ message }
 
 // Role reference (can be simple or indexed)
 role_ref = { ident ~ role_index? }
@@ -79,132 +59,46 @@ role_index_expr = { range_expr | integer | ident | "*" }
 range_expr = { (integer | ident) ~ ".." ~ (integer | ident) }
 
 // Choice statement
-choice_stmt = {
-    "choice" ~ ident ~ "{" ~ choice_branch+ ~ "}"
-}
-
-choice_branch = {
-    ident ~ guard? ~ ":" ~ "{" ~ protocol_body ~ "}"
-}
+choice_stmt = { choice_head ~ choice_block }
+choice_head = { ("case" ~ "choose" ~ role_ref ~ "of") | ("choice" ~ "at" ~ role_ref) }
+choice_block = { block_choice }
+block_choice = { "{" ~ choice_branch+ ~ "}" | "(" ~ choice_branch+ ~ ")" }
+choice_branch = { ident ~ guard? ~ "->" ~ block }
 
 // Guard condition for choice branches
 guard = { "when" ~ "(" ~ guard_expr ~ ")" }
 guard_expr = { (!")" ~ ANY)+ }
 
 // Loop statement
-loop_stmt = {
-    "loop" ~ loop_condition? ~ "{" ~ protocol_body ~ "}"
-}
+loop_stmt = { "loop" ~ loop_spec ~ block }
+loop_spec = { loop_decide | loop_repeat | loop_while | loop_forever }
+loop_decide = { "decide" ~ "by" ~ role_ref }
+loop_repeat = { "repeat" ~ int_expr }
+loop_while = { "while" ~ string }
+loop_forever = { "forever" }
+int_expr = { integer | ident }
 
-loop_condition = _{
-    count_condition
-    | role_decides_condition
-    | fuel_condition
-    | yield_after_condition
-    | yield_when_condition
-    | custom_condition
-}
-
-count_condition = { "(" ~ "count" ~ ":" ~ (integer | ident) ~ ")" }
-role_decides_condition = { "(" ~ "decides" ~ ":" ~ ident ~ ")" }
-fuel_condition = { "(" ~ "fuel" ~ ":" ~ (integer | ident) ~ ")" }
-yield_after_condition = { "(" ~ "yield_after" ~ ":" ~ (integer | ident) ~ ")" }
-yield_when_condition = { "(" ~ "yield_when" ~ ":" ~ string ~ ")" }
-custom_condition = { "(" ~ "custom" ~ ":" ~ string ~ ")" }
-
-// Parallel composition
-parallel_stmt = {
-    "parallel" ~ "{" ~ parallel_branch ~ ("|" ~ parallel_branch)* ~ "}"
-}
-
-parallel_branch = { protocol_body }
+// Parallel branch statement
+branch_stmt = { "branch" ~ block }
 
 // Recursive protocol
-rec_stmt = {
-    "rec" ~ ident ~ "{" ~ protocol_body ~ "}"
-}
+rec_stmt = { "rec" ~ ident ~ block }
+
+// Block
+block = { "{" ~ statement* ~ "}" | "(" ~ statement+ ~ ")" }
 
 // Message specification
 message = { ident ~ message_type? ~ payload? }
-
 message_type = { "<" ~ type_spec ~ ("," ~ type_spec)* ~ ">" }
 type_spec = { type_path ~ type_generics? }
 type_path = { ident ~ ("::" ~ ident)* }
 type_generics = { "<" ~ type_spec ~ ("," ~ type_spec)* ~ ">" }
 
-payload = { "(" ~ payload_content ~ ")" }
-payload_content = { (!(")" | ",") ~ ANY)* ~ ("," ~ (!(")" | ",") ~ ANY)*)* }
+payload = { payload_paren | payload_brace }
+payload_paren = { "(" ~ (!")" ~ ANY)* ~ ")" }
+payload_brace = { "{" ~ (!"}" ~ ANY)* ~ "}" }
 
-// ==========================================
-// Topology DSL (separate from choreography)
-// ==========================================
-
-// Top-level topology definition
-topology = {
-    SOI ~ "topology" ~ ident ~ "for" ~ ident ~ "{" ~ topology_body ~ "}" ~ EOI
-}
-
-topology_body = {
-    topology_mode? ~ topology_mappings ~ topology_constraints?
-}
-
-// Topology mode declaration
-topology_mode = { "mode" ~ ":" ~ topology_mode_value ~ ";"? }
-topology_mode_value = {
-    "local"
-    | "per_role"
-    | kubernetes_mode
-    | consul_mode
-}
-
-kubernetes_mode = { "kubernetes" ~ "(" ~ ident ~ ")" }
-consul_mode = { "consul" ~ "(" ~ ident ~ ")" }
-
-// Role to location mappings
-topology_mappings = { topology_mapping* }
-topology_mapping = { ident ~ ":" ~ location ~ ";"? }
-
-// Location specification
-// IMPORTANT: Order matters - endpoint must come before local_location
-// to prevent "localhost" from matching "local"
-location = {
-    colocated_location
-    | endpoint
-    | local_location
-}
-
-// "local" keyword - only matches when NOT followed by alphanumeric
-local_location = @{ "local" ~ !ASCII_ALPHANUMERIC }
-
-colocated_location = { "colocated" ~ "(" ~ ident ~ ")" }
-
-// Endpoint: host:port format
-// Examples: localhost:8080, 192.168.1.1:9000, host.domain.com:443
-endpoint = @{
-    (ASCII_ALPHANUMERIC | "_" | "-" | ".")+ ~ ":" ~ (ASCII_ALPHANUMERIC | "_" | "-" | "." | ":")+
-}
-
-// Topology constraints block
-topology_constraints = { "constraints" ~ "{" ~ constraint_decl* ~ "}" }
-
-constraint_decl = {
-    colocated_constraint
-    | separated_constraint
-    | pinned_constraint
-    | region_constraint
-}
-
-colocated_constraint = { "colocated" ~ ":" ~ ident ~ "," ~ ident ~ ";"? }
-separated_constraint = { "separated" ~ ":" ~ role_list_inline ~ ";"? }
-pinned_constraint = { "pinned" ~ ":" ~ ident ~ "->" ~ location ~ ";"? }
-region_constraint = { "region" ~ ":" ~ ident ~ "->" ~ ident ~ ";"? }
-
-role_list_inline = { ident ~ ("," ~ ident)+ }
-
-// ==========================================
 // Basic tokens
-// ==========================================
-
 ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 integer = @{ ASCII_DIGIT+ }
 string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }

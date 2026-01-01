@@ -116,25 +116,56 @@ struct ChoiceBranch {
 
 impl Parse for ProtocolDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Parse: protocol Name { ... }
+        // Parse: protocol Name (Roles)? (=)? { ... }
         let protocol_ident: Ident = input.parse()?;
         if protocol_ident != "protocol" {
             return Err(Error::new(protocol_ident.span(), "expected 'protocol'"));
         }
         let name: Ident = input.parse()?;
 
+        // Optional header roles: protocol Name(A, B)
+        let mut roles_from_header: Option<Vec<RoleDef>> = None;
+        if input.peek(syn::token::Paren) {
+            let content;
+            parenthesized!(content in input);
+            let mut roles = Vec::new();
+            while !content.is_empty() {
+                let role_name: Ident = content.parse()?;
+                roles.push(RoleDef {
+                    name: role_name,
+                    params: None,
+                });
+                if content.peek(Token![,]) {
+                    let _: Token![,] = content.parse()?;
+                } else {
+                    break;
+                }
+            }
+            roles_from_header = Some(roles);
+        }
+
+        // Optional '=' before the block
+        if input.peek(Token![=]) {
+            let _: Token![=] = input.parse()?;
+        }
+
         let content;
         braced!(content in input);
 
         // Parse roles
         let mut roles = Vec::new();
-        if content.peek(syn::Ident) {
+        if let Some(header_roles) = roles_from_header {
+            roles = header_roles;
+        } else if content.peek(syn::Ident) {
             let roles_ident: Ident = content.parse()?;
             if roles_ident != "roles" {
                 return Err(Error::new(roles_ident.span(), "expected 'roles'"));
             }
-            let _: Token![:] = content.parse()?;
+            if content.peek(Token![:]) {
+                let _: Token![:] = content.parse()?;
+            }
 
+            // Parse comma-separated role names.
             loop {
                 let role_name: Ident = content.parse()?;
                 roles.push(RoleDef {
@@ -142,11 +173,14 @@ impl Parse for ProtocolDef {
                     params: None,
                 });
 
-                if content.peek(Token![;]) {
+                if content.peek(Token![,]) {
+                    let _: Token![,] = content.parse()?;
+                } else if content.peek(Token![;]) {
                     let _: Token![;] = content.parse()?;
                     break;
+                } else {
+                    break;
                 }
-                let _: Token![,] = content.parse()?;
             }
         }
 
@@ -181,7 +215,9 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
             Box::new(None)
         };
 
-        let _: Token![;] = input.parse()?;
+        if input.peek(Token![;]) {
+            let _: Token![;] = input.parse()?;
+        }
 
         return Ok(Interaction::Send {
             from,

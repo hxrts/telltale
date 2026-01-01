@@ -1,36 +1,16 @@
-choreography MealPrep {
-    roles: Chef, SousChef, Baker
-
-    Chef -> SousChef: IngredientRequest(items: Vec<String>)
-    SousChef -> Chef: DeliveryConfirm
-    Chef -> Baker: OvenStatus(status: String)
-
-    choice Chef {
-        pasta: {
-            Chef -> SousChef: BoilPasta
-            SousChef -> Chef: PastaReady
-            Chef -> Baker: PrepareGarlicBread
-            Baker -> Chef: BreadReady
-        }
-        tacos: {
-            Chef -> SousChef: PrepTortillas
-            SousChef -> Chef: TortillasReady
-            Chef -> Baker: HeatFillings
-            Baker -> Chef: FillingsReady
-        }
-    }
-
-    choice Baker {
-        cake: {
-            Baker -> Chef: BakeCake
-            Chef -> Baker: FrostingReady
-        }
-        fruit: {
-            Baker -> Chef: PrepFruitPlate
-        }
-        none: {
-            Baker -> Chef: NoDessert
-        }
-    }
-
-}
+protocol MealPrep =
+  roles Chef, SousChef, Baker
+  Chef -> SousChef : IngredientRequest (items : Vec < String >)
+  SousChef -> Chef : DeliveryConfirm
+  Chef -> Baker : OvenStatus (status : String)
+  case choose Chef of
+    pasta ->
+      Chef -> SousChef : BoilPasta
+      SousChef -> Chef : PastaReady
+      Chef -> Baker : PrepareGarlicBread
+      Baker -> Chef : BreadReady
+    tacos ->
+      Chef -> SousChef : PrepTortillas
+      SousChef -> Chef : TortillasReady
+      Chef -> Baker : HeatFillings
+      Baker -> Chef : FillingsReady

@@ -11,15 +11,15 @@ fn test_choice_construct_parsing_only() {
     
     // Test the corrected syntax based on the grammar
     let choreography_with_choice = r#"
-        choreography TestChoice {
-            roles: Alice, Bob;
+        protocol TestChoice = {
+            roles Alice, Bob
             
-            choice Alice {
-                option1: {
-                    Alice -> Bob: Message1;
+            choice at Alice {
+                option1 -> {
+                    Alice -> Bob: Message1
                 }
-                option2: {
-                    Alice -> Bob: Message2;
+                option2 -> {
+                    Alice -> Bob: Message2
                 }
             }
         }
@@ -59,12 +59,12 @@ fn test_original_user_syntax() {
     
     // Test the user's original syntax
     let original_syntax = r#"
-        choreography TestChoice {
-            roles: Alice, Bob;
+        protocol TestChoice = {
+            roles Alice, Bob
             
-            choice at Alice {
-                option1: Alice -> Bob: Message1;
-                option2: Alice -> Bob: Message2;
+            choice Alice {
+                option1: Alice -> Bob : Message1
+                option2: Alice -> Bob : Message2
             }
         }
     "#;
@@ -81,7 +81,7 @@ fn test_original_user_syntax() {
         Err(err) => {
             println!("✗ Original user syntax failed (as expected)");
             println!("Error: {}", err);
-            println!("This confirms the syntax needs to be: 'choice Alice' not 'choice at Alice'");
+            println!("This confirms the syntax needs to be: 'choice at Alice' with 'label -> { ... }'");
         }
     }
 }
@@ -91,23 +91,23 @@ fn test_complex_choice_parsing() {
     println!("\n=== Testing Complex Choice Construct ===");
     
     let complex_choice = r#"
-        choreography ComplexChoice {
-            roles: Alice, Bob, Charlie;
+        protocol ComplexChoice = {
+            roles Alice, Bob, Charlie
             
-            choice Alice {
-                path1: {
-                    Alice -> Bob: Message1;
-                    Bob -> Charlie: Message2;
+            choice at Alice {
+                path1 -> {
+                    Alice -> Bob : Message1
+                    Bob -> Charlie : Message2
                 }
-                path2: {
-                    Alice -> Charlie: Message2;
-                    Charlie -> Bob: Message1;
+                path2 -> {
+                    Alice -> Charlie : Message2
+                    Charlie -> Bob : Message1
                 }
-                path3: {
-                    Alice -> Bob: Message1;
-                    Alice -> Charlie: Message2;
-                    Bob -> Alice: Message1;
-                    Charlie -> Alice: Message2;
+                path3 -> {
+                    Alice -> Bob : Message1
+                    Alice -> Charlie : Message2
+                    Bob -> Alice : Message1
+                    Charlie -> Alice : Message2
                 }
             }
         }
@@ -136,15 +136,15 @@ fn test_choice_with_guards() {
     println!("\n=== Testing Choice With Guards ===");
     
     let choice_with_guards = r#"
-        choreography GuardedChoice {
-            roles: Alice, Bob;
+        protocol GuardedChoice = {
+            roles Alice, Bob
             
-            choice Alice {
-                fast when (condition == "fast"): {
-                    Alice -> Bob: QuickMessage;
+            choice at Alice {
+                fast when (condition == "fast") -> {
+                    Alice -> Bob : QuickMessage
                 }
-                slow when (condition == "slow"): {
-                    Alice -> Bob: SlowMessage;
+                slow when (condition == "slow") -> {
+                    Alice -> Bob : SlowMessage
                 }
             }
         }

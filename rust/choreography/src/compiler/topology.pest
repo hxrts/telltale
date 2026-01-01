@@ -1,0 +1,71 @@
+// Topology DSL Grammar
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | COMMENT }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+// Top-level topology definition
+topology = {
+    SOI ~ "topology" ~ ident ~ "for" ~ ident ~ "{" ~ topology_body ~ "}" ~ EOI
+}
+
+topology_body = {
+    topology_mode? ~ topology_mappings ~ topology_constraints?
+}
+
+// Topology mode declaration
+topology_mode = { "mode" ~ ":" ~ topology_mode_value ~ ";"? }
+topology_mode_value = {
+    "local"
+    | "per_role"
+    | kubernetes_mode
+    | consul_mode
+}
+
+kubernetes_mode = { "kubernetes" ~ "(" ~ ident ~ ")" }
+consul_mode = { "consul" ~ "(" ~ ident ~ ")" }
+
+// Role to location mappings
+topology_mappings = { topology_mapping* }
+topology_mapping = { ident ~ ":" ~ location ~ ";"? }
+
+// Location specification
+// IMPORTANT: Order matters - endpoint must come before local_location
+// to prevent "localhost" from matching "local"
+location = {
+    colocated_location
+    | endpoint
+    | local_location
+}
+
+// "local" keyword - only matches when NOT followed by alphanumeric
+local_location = @{ "local" ~ !ASCII_ALPHANUMERIC }
+
+colocated_location = { "colocated" ~ "(" ~ ident ~ ")" }
+
+// Endpoint: host:port format
+// Examples: localhost:8080, 192.168.1.1:9000, host.domain.com:443
+endpoint = @{
+    (ASCII_ALPHANUMERIC | "_" | "-" | ".")+ ~ ":" ~ (ASCII_ALPHANUMERIC | "_" | "-" | "." | ":")+
+}
+
+// Topology constraints block
+topology_constraints = { "constraints" ~ "{" ~ constraint_decl* ~ "}" }
+
+constraint_decl = {
+    colocated_constraint
+    | separated_constraint
+    | pinned_constraint
+    | region_constraint
+}
+
+colocated_constraint = { "colocated" ~ ":" ~ ident ~ "," ~ ident ~ ";"? }
+separated_constraint = { "separated" ~ ":" ~ role_list_inline ~ ";"? }
+pinned_constraint = { "pinned" ~ ":" ~ ident ~ "->" ~ location ~ ";"? }
+region_constraint = { "region" ~ ":" ~ ident ~ "->" ~ ident ~ ";"? }
+
+role_list_inline = { ident ~ ("," ~ ident)+ }
+
+// Basic tokens
+ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+integer = @{ ASCII_DIGIT+ }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }

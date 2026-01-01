@@ -8,7 +8,7 @@ use pest_derive::Parser;
 use thiserror::Error;
 
 #[derive(Parser)]
-#[grammar = "compiler/choreography.pest"]
+#[grammar = "compiler/topology.pest"]
 struct TopologyParser;
 
 /// Errors that can occur during topology parsing.

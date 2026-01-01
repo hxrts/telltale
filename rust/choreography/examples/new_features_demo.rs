@@ -4,12 +4,11 @@
 //! Comprehensive demonstration of new rumpsteak-aura choreography features
 //!
 //! This example demonstrates all the new functionality:
-//! 1. Enhanced namespace support
-//! 2. Multiple annotations system
+//! 1. Module namespace support
+//! 2. Choice syntax
 //! 3. Dynamic role count support with overflow protection
 //! 4. Range syntax for dynamic roles
-//! 5. Role-level annotations
-//! 6. Cross-feature integration
+//! 5. Cross-feature integration
 
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
 
@@ -20,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     demo_namespace_support()?;
-    demo_multiple_annotations()?;
+    demo_choice_syntax()?;
     demo_dynamic_roles()?;
     demo_range_syntax()?;
     demo_integration()?;
@@ -33,26 +32,26 @@ fn demo_namespace_support() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 1. Namespace Support ===");
 
     let protocol_a = r#"
-        #[namespace = "authentication"]
-        choreography LoginProtocol {
-            roles: Client, Server, Database
+        module authentication exposing (LoginProtocol)
+        protocol LoginProtocol = {
+            roles Client, Server, Database
 
-            Client -> Server: LoginRequest
-            Server -> Database: ValidateCredentials
-            Database -> Server: ValidationResult
-            Server -> Client: LoginResponse
+            Client -> Server : LoginRequest
+            Server -> Database : ValidateCredentials
+            Database -> Server : ValidationResult
+            Server -> Client : LoginResponse
         }
     "#;
 
     let protocol_b = r#"
-        #[namespace = "payment"]
-        choreography PaymentProtocol {
-            roles: Client, Server, Database
+        module payment exposing (PaymentProtocol)
+        protocol PaymentProtocol = {
+            roles Client, Server, Database
 
-            Client -> Server: PaymentRequest
-            Server -> Database: ProcessPayment
-            Database -> Server: PaymentResult
-            Server -> Client: PaymentResponse
+            Client -> Server : PaymentRequest
+            Server -> Database : ProcessPayment
+            Database -> Server : PaymentResult
+            Server -> Client : PaymentResponse
         }
     "#;
 
@@ -68,32 +67,28 @@ fn demo_namespace_support() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn demo_multiple_annotations() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== 2. Multiple Annotations Support ===");
+fn demo_choice_syntax() -> Result<(), Box<dyn std::error::Error>> {
+    println!("=== 2. Choice Syntax ===");
 
     let protocol = r#"
-        choreography AnnotatedProtocol {
-            roles: Client, Server, Cache
+        protocol ShoppingFlow = {
+            roles Client, Server
 
-            [@priority = "high", @timeout = 5000, @retry = 3]
-            Client -> Server: ImportantRequest
-
-            Server[@load_balance = "round_robin"] -> Cache[@ttl = 3600]: CacheQuery
-
-            [@compress = "gzip", @encrypt = "aes256"]
-            Cache -> Server: CachedData
-
-            [@audit_log = "true", @alert_on_failure = "slack"]
-            Server -> Client: Response
+            choice at Client {
+                buy -> {
+                    Client -> Server : Purchase
+                }
+                cancel -> {
+                    Client -> Server : Cancel
+                }
+            }
         }
     "#;
 
     let _choreo = parse_choreography_str(protocol)?;
-    println!("Parsed protocol with multiple annotations:");
-    println!("   • Statement-level annotations supported");
-    println!("   • Role-level annotations supported");
-    println!("   • Multiple annotations per statement supported");
-    println!("   • Annotations parsed and stored successfully!");
+    println!("Parsed protocol with choice branches:");
+    println!("   • Explicit decider role with 'choice at'");
+    println!("   • Labelled branches with 'label -> {{ ... }}'");
     println!();
 
     Ok(())
@@ -103,13 +98,13 @@ fn demo_dynamic_roles() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 3. Dynamic Roles Support ===");
 
     let protocol = r#"
-        choreography DynamicWorkflow {
-            roles: Coordinator, Workers[*], Database
+        protocol DynamicWorkflow = {
+            roles Coordinator, Workers[*], Database
 
-            Coordinator -> Workers[*]: StartWork
-            Workers[i] -> Database: QueryData
-            Database -> Workers[i]: ResultData
-            Workers[0..quorum] -> Coordinator: WorkComplete
+            Coordinator -> Workers[*] : StartWork
+            Workers[i] -> Database : QueryData
+            Database -> Workers[i] : ResultData
+            Workers[0..quorum] -> Coordinator : WorkComplete
         }
     "#;
 
@@ -137,13 +132,13 @@ fn demo_range_syntax() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 4. Range Syntax Support ===");
 
     let protocol = r#"
-        choreography ConsensusProtocol {
-            roles: Leader, Followers[N]
+        protocol ConsensusProtocol = {
+            roles Leader, Followers[N]
 
-            Leader -> Followers[*]: PrepareRequest
-            Followers[0..quorum] -> Leader: PrepareResponse
-            Leader -> Followers[*]: CommitRequest
-            Followers[majority..N] -> Leader: CommitResponse
+            Leader -> Followers[*] : PrepareRequest
+            Followers[0..quorum] -> Leader : PrepareResponse
+            Leader -> Followers[*] : CommitRequest
+            Followers[majority..N] -> Leader : CommitResponse
         }
     "#;
 
@@ -161,35 +156,28 @@ fn demo_integration() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== 5. Cross-Feature Integration ===");
 
     let complex_protocol = r#"
-        #[namespace = "distributed_consensus"]
-        choreography ByzantineConsensus {
-            roles: Leader, Followers[*], Auditor
+        module distributed_consensus exposing (ByzantineConsensus)
+        protocol ByzantineConsensus = {
+            roles Leader, Followers[*], Auditor
 
-            [@phase = "prepare", @byzantine_tolerance = "true"]
-            Leader -> Followers[*]: PrepareRequest
+            Leader -> Followers[*] : PrepareRequest
 
-            [@timeout = 10000, @min_responses = "2f+1"]
-            Followers[0..byzantine_threshold] -> Leader: PrepareResponse
+            Followers[0..byzantine_threshold] -> Leader : PrepareResponse
 
-            [@phase = "commit", @audit_required = "true"]
-            Leader -> Followers[*]: CommitRequest
+            Leader -> Followers[*] : CommitRequest
 
-            [@critical = "true", @consensus_threshold = "majority"]
-            Followers[honest_majority] -> Leader: CommitResponse
+            Followers[honest_majority] -> Leader : CommitResponse
 
-            [@audit_log = "blockchain", @finality = "true"]
-            Leader -> Auditor: ConsensusResult
+            Leader -> Auditor : ConsensusResult
         }
     "#;
 
     let choreo = parse_choreography_str(complex_protocol)?;
 
-    println!("Parsed complex protocol with ALL features:");
+    println!("Parsed complex protocol with multiple features:");
     println!("   • Namespace: {}", choreo.qualified_name());
     println!("   • Roles: {} (including dynamic)", choreo.roles.len());
-    println!(
-        "   • Features: Annotations (yes), Dynamic Roles (yes), Ranges (yes), Namespaces (yes)"
-    );
+    println!("   • Features: Dynamic Roles (yes), Ranges (yes), Namespaces (yes)");
     println!("   • Successfully demonstrated all advanced features together");
     println!();
 

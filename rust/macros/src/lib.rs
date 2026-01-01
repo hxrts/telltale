@@ -105,11 +105,10 @@ pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```text
 /// choreography! {
-///     protocol Simple {
-///         roles: Client, Server;
-///         Client -> Server: Hello;
-///         Server -> Client: Goodbye;
-///     }
+///     protocol Simple =
+///       roles Client, Server
+///       Client -> Server : Hello
+///       Server -> Client : Goodbye
 /// }
 /// ```
 #[proc_macro]

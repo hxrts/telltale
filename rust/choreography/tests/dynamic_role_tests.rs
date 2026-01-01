@@ -107,11 +107,11 @@ fn test_role_index_matching() {
 #[test]
 fn test_choreography_parsing_with_dynamic_roles() {
     let _choreo_str = r#"
-        choreography ThresholdProtocol {
-            roles: Coordinator, Signers[*];
+        protocol ThresholdProtocol = {
+            roles Coordinator, Signers[*]
             
-            Coordinator -> Signers[*]: Request;
-            Signers[0..threshold] -> Coordinator: Response;
+            Coordinator -> Signers[*]: Request
+            Signers[0..threshold] -> Coordinator: Response
         }
     "#;
 

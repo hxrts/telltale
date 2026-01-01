@@ -47,9 +47,9 @@ enum Label {
 fn test_basic_choreography_inheritance() {
     // Test that basic choreography syntax works exactly like rumpsteak-aura
     choreography! {
-        choreography BasicExample {
-            roles: Alice, Bob;
-            Alice -> Bob: Message;
+        protocol BasicExample = {
+            roles Alice, Bob
+            Alice -> Bob : Message
         }
     }
 
@@ -60,10 +60,10 @@ fn test_basic_choreography_inheritance() {
 fn test_simple_client_server() {
     // Test simple client-server protocol
     choreography! {
-        choreography ClientServer {
-            roles: Client, Server;
-            Client -> Server: Request;
-            Server -> Client: Response;
+        protocol ClientServer = {
+            roles Client, Server
+            Client -> Server : Request
+            Server -> Client : Response
         }
     }
 }
@@ -72,10 +72,10 @@ fn test_simple_client_server() {
 fn test_another_two_party_protocol() {
     // Test another two-party communication
     choreography! {
-        choreography AnotherExample {
-            roles: Sender, Receiver;
+        protocol AnotherExample = {
+            roles Sender, Receiver
 
-            Sender -> Receiver: Data;
+            Sender -> Receiver : Data
         }
     }
 }
@@ -101,12 +101,12 @@ fn test_core_requirement_fulfilled() {
 
     // Verify choreography macro works with basic syntax
     choreography! {
-        choreography RequirementValidation {
-            roles: ThirdParty, RumpsteakAura;
+        protocol RequirementValidation = {
+            roles ThirdParty, RumpsteakAura
 
             // This validates that 3rd parties get basic functionality
-            ThirdParty -> RumpsteakAura: ImportRequest;
-            RumpsteakAura -> ThirdParty: BasicFeatures;
+            ThirdParty -> RumpsteakAura : ImportRequest
+            RumpsteakAura -> ThirdParty : BasicFeatures
         }
     }
 

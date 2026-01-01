@@ -52,11 +52,11 @@ fn demo_annotation_extension() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test parsing a choreography with priority annotations
     let _choreography_with_priority = r#"
-        choreography PriorityExample {
-            roles: Client, Server;
+        protocol PriorityExample = {
+            roles Client, Server
 
-            Client -> Server: Request;
-            priority high Server -> Client: UrgentResponse;
+            Client -> Server : Request
+            priority high Server -> Client : UrgentResponse
         }
     "#;
 

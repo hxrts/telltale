@@ -2,7 +2,7 @@ async fn C(role: &mut C) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: AuthC<'_, _>| async {
         let mut s = s.send(SetPw(10000000)).await?;
         let mut cur_attempt = 0;
-        loop {
+        loop forever {
             let s_send = s.send(Password(cur_attempt)).await?;
             cur_attempt += 1;
             match s_send.branch().await? {
@@ -24,7 +24,7 @@ async fn S(role: &mut S) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: AuthS<'_, _>| async {
         let (SetPw(p), mut s) = s.receive().await?;
         let password = p;
-        loop {
+        loop forever {
             let (Password(n), s_rec) = s.receive().await?;
             if n == password {
                 let s_end = s_rec.select(Success(0)).await?;

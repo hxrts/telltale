@@ -4,10 +4,7 @@
 //! optimistic locking to coordinate concurrent access.
 
 use crate::{client::Client, origin::Origin, proxy::Proxy, wrap, Channel, Entry, Result};
-use fred::{
-    client::RedisClient,
-    types::{RedisValue, SetOptions::NX},
-};
+use fred::prelude::{Client as RedisClient, KeysInterface, SetOptions::NX, Value};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rumpsteak_aura::{channel::Nil, session, try_session, Branch, End, Receive, Role, Send};
 use std::{any::Any, marker, time::Duration};
@@ -77,7 +74,13 @@ async fn try_run(role: &mut Cache, redis: &RedisClient) -> Result<()> {
         lock.push_str(":lock");
         let key = &lock[..size];
 
-        while !wrap(redis.set(&lock, 0, None, Some(NX), false).await)?.is_ok() {
+        while !wrap(
+            redis
+                .set::<Value, _, _>(&lock, 0, None, Some(NX), false)
+                .await,
+        )?
+        .is_ok()
+        {
             let delay = rng.gen_range(0..MAX_RETRY_DELAY);
             time::sleep(Duration::from_millis(delay)).await;
         }
@@ -90,7 +93,7 @@ async fn try_run(role: &mut Cache, redis: &RedisClient) -> Result<()> {
                 Choice::Load(Load, s) => loop {
                     match &replica {
                         Replica::None => {
-                            let entry = wrap(redis.get(key).await)?;
+                            let entry: Value = wrap(redis.get(key).await)?;
                             replica = Replica::Clean(match entry.as_bytes() {
                                 Some(bytes) => Some(bincode::deserialize(bytes)?),
                                 None => None,
@@ -116,17 +119,23 @@ async fn try_run(role: &mut Cache, redis: &RedisClient) -> Result<()> {
                         debug!("flushing changes to cache");
                         match entry {
                             Some(entry) => {
-                                let value = RedisValue::Bytes(bincode::serialize(&entry)?);
-                                let value = wrap(redis.set(key, value, None, None, false).await)?;
+                                let value = Value::Bytes(bincode::serialize(&entry)?.into());
+                                let value: Value = wrap(
+                                    redis
+                                        .set::<Value, _, _>(key, value, None, None, false)
+                                        .await,
+                                )?;
                                 assert!(value.is_ok());
                             }
                             None => {
-                                assert_eq!(wrap(redis.del(key).await)?, RedisValue::Integer(1));
+                                let deleted: Value = wrap(redis.del::<Value, _>(key).await)?;
+                                assert_eq!(deleted, Value::Integer(1));
                             }
                         }
                     }
 
-                    assert_eq!(wrap(redis.del(&lock).await)?, RedisValue::Integer(1));
+                    let deleted: Value = wrap(redis.del::<Value, _>(&lock).await)?;
+                    assert_eq!(deleted, Value::Integer(1));
                     return Ok(((), s));
                 }
             }

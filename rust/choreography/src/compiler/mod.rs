@@ -11,8 +11,10 @@ pub mod diagnostics;
 pub mod effects_codegen;
 pub mod extension_parser;
 pub mod grammar;
+pub mod layout;
 pub mod merge;
 pub mod parser;
+pub mod pretty;
 pub mod projection;
 pub mod runner;
 pub mod typed_runner;
@@ -50,7 +52,10 @@ pub use grammar::{GrammarComposer, GrammarComposerBuilder, GrammarCompositionErr
 pub use merge::{can_merge, merge, merge_all, MergeError};
 pub use parser::{
     choreography_macro, parse_choreography, parse_choreography_file, parse_choreography_str,
-    parse_choreography_str_with_topologies, parse_dsl, ParsedChoreographyWithTopologies,
+    parse_dsl,
+};
+pub use pretty::{
+    format_choreography, format_choreography_str, format_choreography_with_config, PrettyConfig,
 };
 pub use projection::{project, ProjectionError};
 pub use runner::{generate_all_runners, generate_execute_as, generate_runner_fn};

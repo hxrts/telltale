@@ -41,10 +41,10 @@ Choreographic programming takes the global types concept further. Instead of jus
 
 ```rust
 choreography! {
-    Calculator {
-        roles: Alice, Bob
-        Alice -> Bob: Value
-        Bob -> Alice: Result
+    protocol Calculator = {
+        roles Alice, Bob
+        Alice -> Bob : Value
+        Bob -> Alice : Result
     }
 }
 ```

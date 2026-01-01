@@ -39,12 +39,11 @@ pub struct Pong {
 
 // Define the choreography using the macro with namespace
 choreography! {
-    #[namespace = "simple_ping_pong"]
-    choreography PingPong {
-        roles: Alice, Bob;
-        
-        Alice -> Bob: Ping;
-        Bob -> Alice: Pong;
+    protocol PingPong = {
+        roles Alice, Bob
+
+        Alice -> Bob : Ping
+        Bob -> Alice : Pong
     }
 }
 
@@ -71,11 +70,11 @@ fn demo_feature_inheritance() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test basic choreography
     let basic_choreography = r#"
-        choreography BasicPingPong {
-            roles: Client, Server;
-            
-            Client -> Server: Ping;
-            Server -> Client: Pong;
+        protocol BasicPingPong = {
+            roles Client, Server
+
+            Client -> Server : Ping
+            Server -> Client : Pong
         }
 "#;
 
@@ -117,12 +116,12 @@ fn demo_aura_extensions() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test basic protocol with extension system and namespace
     let aura_choreography = r#"
-        #[namespace = "aura_ping_pong"]
-        choreography AuraEnhancedPingPong {
-            roles: Alice, Bob;
-            
-            Alice -> Bob: SecurePing;
-            Bob -> Alice: SecurePong;
+        module aura_ping_pong exposing (AuraEnhancedPingPong)
+        protocol AuraEnhancedPingPong = {
+            roles Alice, Bob
+
+            Alice -> Bob : SecurePing
+            Bob -> Alice : SecurePong
         }
 "#;
 

@@ -12,9 +12,9 @@ use rumpsteak_aura_choreography::compiler::{
 #[test]
 fn test_parse_simple_namespaced_choreography() {
     let input = r#"
-#[namespace = "protocol_a"]
-choreography SimpleProtocol {
-    roles: Alice, Bob
+module protocol_a exposing (SimpleProtocol)
+protocol SimpleProtocol = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
@@ -35,8 +35,8 @@ choreography SimpleProtocol {
 #[test]
 fn test_parse_choreography_without_namespace() {
     let input = r#"
-choreography SimpleProtocol {
-    roles: Alice, Bob
+protocol SimpleProtocol = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
@@ -57,9 +57,9 @@ choreography SimpleProtocol {
 #[test]
 fn test_qualified_name_with_namespace() {
     let input = r#"
-#[namespace = "threshold_ceremony"]
-choreography ThresholdProtocol {
-    roles: Coordinator, Signer1, Signer2
+module threshold_ceremony exposing (ThresholdProtocol)
+protocol ThresholdProtocol = {
+    roles Coordinator, Signer1, Signer2
     Coordinator -> Signer1: Request
     Signer1 -> Coordinator: Response
 }
@@ -75,8 +75,8 @@ choreography ThresholdProtocol {
 #[test]
 fn test_qualified_name_without_namespace() {
     let input = r#"
-choreography SimpleProtocol {
-    roles: Alice, Bob
+protocol SimpleProtocol = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
@@ -89,9 +89,9 @@ choreography SimpleProtocol {
 fn test_invalid_namespace_names() {
     // Test namespace with invalid characters
     let input = r#"
-#[namespace = "invalid-name-with-dashes"]
-choreography TestProtocol {
-    roles: A, B
+module invalid-name-with-dashes exposing (TestProtocol)
+protocol TestProtocol = {
+    roles A, B
     A -> B: Msg
 }
 "#;
@@ -101,9 +101,9 @@ choreography TestProtocol {
 
     // Test empty namespace
     let input = r#"
-#[namespace = ""]
-choreography TestProtocol {
-    roles: A, B
+module  exposing (TestProtocol)
+protocol TestProtocol = {
+    roles A, B
     A -> B: Msg
 }
 "#;
@@ -116,9 +116,9 @@ choreography TestProtocol {
 fn test_valid_namespace_names() {
     // Test namespace with underscores
     let input = r#"
-#[namespace = "valid_namespace_name"]
-choreography TestProtocol {
-    roles: A, B
+module valid_namespace_name exposing (TestProtocol)
+protocol TestProtocol = {
+    roles A, B
     A -> B: Msg
 }
 "#;
@@ -132,9 +132,9 @@ choreography TestProtocol {
 
     // Test namespace with numbers
     let input = r#"
-#[namespace = "namespace123"]
-choreography TestProtocol {
-    roles: A, B
+module namespace123 exposing (TestProtocol)
+protocol TestProtocol = {
+    roles A, B
     A -> B: Msg
 }
 "#;
@@ -150,9 +150,9 @@ choreography TestProtocol {
 #[test]
 fn test_namespace_code_generation() {
     let input = r#"
-#[namespace = "test_namespace"]
-choreography TestProtocol {
-    roles: Alice, Bob
+module test_namespace exposing (TestProtocol)
+protocol TestProtocol = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
@@ -186,8 +186,8 @@ choreography TestProtocol {
 #[test]
 fn test_non_namespace_code_generation() {
     let input = r#"
-choreography TestProtocol {
-    roles: Alice, Bob
+protocol TestProtocol = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
@@ -223,17 +223,17 @@ fn test_multiple_namespaced_protocols_compilation() {
     // can be defined without conflicts (compilation test)
 
     let protocol_a = r#"
-#[namespace = "protocol_a"]
-choreography ProtocolA {
-    roles: Alice, Bob
+module protocol_a exposing (ProtocolA)
+protocol ProtocolA = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
 
     let protocol_b = r#"
-#[namespace = "protocol_b"]
-choreography ProtocolB {
-    roles: Alice, Bob
+module protocol_b exposing (ProtocolB)
+protocol ProtocolB = {
+    roles Alice, Bob
     Alice -> Bob: Message
 }
 "#;
@@ -254,27 +254,27 @@ choreography ProtocolB {
 #[test]
 fn test_namespace_with_complex_protocol() {
     let input = r#"
-#[namespace = "complex_protocol"]
-choreography ComplexProtocol {
-    roles: Coordinator, Worker1, Worker2, Observer
+module complex_protocol exposing (ComplexProtocol)
+protocol ComplexProtocol = {
+    roles Coordinator, Worker1, Worker2, Observer
     
     Coordinator -> Worker1: Task
     Coordinator -> Worker2: Task
     
-    choice Worker1 {
-        success: {
+    choice at Worker1 {
+        success -> {
             Worker1 -> Coordinator: Success
         }
-        failure: {
+        failure -> {
             Worker1 -> Coordinator: Failure
         }
     }
     
-    choice Worker2 {
-        success: {
+    choice at Worker2 {
+        success -> {
             Worker2 -> Coordinator: Success
         }
-        failure: {
+        failure -> {
             Worker2 -> Coordinator: Failure
         }
     }
@@ -299,9 +299,9 @@ choreography ComplexProtocol {
 fn test_namespace_validation() {
     let choreo = parse_choreography_str(
         r#"
-#[namespace = "test_validation"]
-choreography TestProtocol {
-    roles: A, B, C
+module test_validation exposing (TestProtocol)
+protocol TestProtocol = {
+    roles A, B, C
     A -> B: Message1
     B -> C: Message2
     C -> A: Message3

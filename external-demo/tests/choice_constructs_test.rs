@@ -10,15 +10,15 @@ use rumpsteak_aura_choreography::{extensions::ExtensionRegistry, parse_and_gener
 fn test_choice_construct_basic() {
     // This test verifies that the parser can handle choice constructs
     let choreography_src = r#"
-        choreography TestChoice {
-            roles: Alice, Bob;
+        protocol TestChoice = {
+            roles Alice, Bob
 
-            choice Alice {
-                option1: {
-                    Alice -> Bob: Message1;
+            choice at Alice {
+                option1 -> {
+                    Alice -> Bob : Message1
                 }
-                option2: {
-                    Alice -> Bob: Message2;
+                option2 -> {
+                    Alice -> Bob : Message2
                 }
             }
         }
@@ -43,17 +43,17 @@ fn test_choice_construct_basic() {
 #[test]
 fn test_choice_construct_complex() {
     let choreography_src = r#"
-        choreography ComplexChoice {
-            roles: Alice, Bob, Charlie;
+        protocol ComplexChoice = {
+            roles Alice, Bob, Charlie
 
-            choice Alice {
-                path1: {
-                    Alice -> Bob: Message1;
-                    Bob -> Charlie: Message2;
+            choice at Alice {
+                path1 -> {
+                    Alice -> Bob : Message1
+                    Bob -> Charlie : Message2
                 }
-                path2: {
-                    Alice -> Charlie: Message2;
-                    Charlie -> Bob: Message1;
+                path2 -> {
+                    Alice -> Charlie : Message2
+                    Charlie -> Bob : Message1
                 }
             }
         }
@@ -83,11 +83,11 @@ fn test_choice_construct_error_handling() {
 
     // Test invalid syntax that should fail
     let invalid_choreography = r#"
-        choreography InvalidChoice {
-            roles: Alice, Bob;
+        protocol InvalidChoice = {
+            roles Alice, Bob
 
             choice at Alice {
-                option1: Alice -> Bob: Message1;
+                option1: Alice -> Bob : Message1
             }
         }
     "#;
@@ -95,13 +95,13 @@ fn test_choice_construct_error_handling() {
     let registry = ExtensionRegistry::new();
     let result = parse_and_generate_with_extensions(invalid_choreography, &registry);
 
-    match result {
-        Ok(_) => {
-            println!("Note: 'choice at Alice' syntax was accepted");
-        }
-        Err(e) => {
-            println!("✓ Invalid syntax correctly rejected: {}", e);
-        }
+        match result {
+            Ok(_) => {
+            println!("Note: Invalid branch syntax was accepted");
+            }
+            Err(e) => {
+                println!("✓ Invalid syntax correctly rejected: {}", e);
+            }
     }
 
     println!("✓ Choice construct syntax appears to be recognized by the parser");
@@ -120,12 +120,12 @@ mod choice_construct_analysis {
         println!("1. Testing basic choice construct parsing...");
 
         let basic_choice = r#"
-            choreography BasicChoice {
-                roles: Alice, Bob;
+            protocol BasicChoice = {
+                roles Alice, Bob
 
-                choice Alice {
-                    option1: {
-                        Alice -> Bob: Message1;
+                choice at Alice {
+                    option1 -> {
+                        Alice -> Bob : Message1
                     }
                 }
             }

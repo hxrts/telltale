@@ -3,7 +3,7 @@ type Array = [u32; 5];
 async fn c1(role: &mut C1) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: MapReduceC1<'_, _>| async {
         let mut s = s;
-        loop {
+        loop forever {
             let s_branch = match s.branch().await? {
                 MapReduceC10::Terminates(Terminates, s_end) => return Ok(((), s_end)),
                 MapReduceC10::Workload(Workload(payload), s_return) => {
@@ -21,7 +21,7 @@ async fn c1(role: &mut C1) -> Result<(), Box<dyn Error>> {
 async fn c2(role: &mut C2) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: MapReduceC2<'_, _>| async {
         let mut s = s;
-        loop {
+        loop forever {
             let s_branch = match s.branch().await? {
                 MapReduceC20::Terminates(Terminates, s_end) => return Ok(((), s_end)),
                 MapReduceC20::Workload(Workload(payload), s_return) => {
@@ -39,7 +39,7 @@ async fn c2(role: &mut C2) -> Result<(), Box<dyn Error>> {
 async fn c3(role: &mut C3) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: MapReduceC3<'_, _>| async {
         let mut s = s;
-        loop {
+        loop forever {
             let s_branch = match s.branch().await? {
                 MapReduceC30::Terminates(Terminates, s_end) => return Ok(((), s_end)),
                 MapReduceC30::Workload(Workload(payload), s_return) => {
@@ -57,7 +57,7 @@ async fn c3(role: &mut C3) -> Result<(), Box<dyn Error>> {
 async fn c4(role: &mut C4) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: MapReduceC4<'_, _>| async {
         let mut s = s;
-        loop {
+        loop forever {
             let s_branch = match s.branch().await? {
                 MapReduceC40::Terminates(Terminates, s_end) => return Ok(((), s_end)),
                 MapReduceC40::Workload(Workload(payload), s_return) => {

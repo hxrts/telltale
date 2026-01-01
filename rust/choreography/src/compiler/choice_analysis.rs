@@ -14,7 +14,7 @@
 //! # Example
 //!
 //! ```text
-//! choice Seller {
+//! case choose Seller of
 //!     Accept => {
 //!         Seller -> Buyer: Accepted;  // Buyer learns: Accept
 //!     }
@@ -808,7 +808,7 @@ mod tests {
 
     #[test]
     fn test_simple_informed_choice() {
-        // choice Seller {
+        // case choose Seller of
         //     Accept => { Seller -> Buyer: Accepted; }
         //     Reject => { Seller -> Buyer: Rejected; }
         // }
@@ -862,7 +862,7 @@ mod tests {
 
     #[test]
     fn test_uninformed_observer() {
-        // choice Seller {
+        // case choose Seller of
         //     Accept => { Seller -> Buyer: Accepted; }
         //     Reject => { Seller -> Buyer: Rejected; }
         // }

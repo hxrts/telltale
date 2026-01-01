@@ -14,11 +14,11 @@ fn main() {
     // Example 1: Undefined role in send statement
     println!("Example 1: Undefined role\n");
     let input1 = r"
-choreography Example {
-    roles: Alice, Bob
+protocol Example = {
+    roles Alice, Bob
     
-    Alice -> Charlie: Hello
-    Bob -> Alice: World
+    Alice -> Charlie : Hello
+    Bob -> Alice : World
 }
 ";
 
@@ -32,10 +32,10 @@ choreography Example {
     // Example 2: Duplicate role declaration
     println!("Example 2: Duplicate role declaration\n");
     let input2 = r"
-choreography DuplicateExample {
-    roles: Alice, Bob, Charlie, Alice
+protocol DuplicateExample = {
+    roles Alice, Bob, Charlie, Alice
     
-    Alice -> Bob: Hello
+    Alice -> Bob : Hello
 }
 ";
 
@@ -49,11 +49,11 @@ choreography DuplicateExample {
     // Example 3: Undefined role in loop condition
     println!("Example 3: Undefined role in loop\n");
     let input3 = r"
-choreography LoopExample {
-    roles: Client, Server
+protocol LoopExample = {
+    roles Client, Server
     
-    loop (decides: UnknownRole) {
-        Client -> Server: Request
+    loop decide by UnknownRole {
+        Client -> Server : Request
     }
 }
 ";
@@ -68,11 +68,11 @@ choreography LoopExample {
     // Example 4: Invalid loop count
     println!("Example 4: Invalid loop condition\n");
     let input4 = r"
-choreography CountExample {
-    roles: A, B
+protocol CountExample = {
+    roles A, B
     
-    loop (count: not_a_number) {
-        A -> B: Ping
+    loop repeat not_a_number {
+        A -> B : Ping
     }
 }
 ";
@@ -87,11 +87,11 @@ choreography CountExample {
     // Example 5: Success case for comparison
     println!("Example 5: Valid choreography (for comparison)\n");
     let input5 = r"
-choreography ValidExample {
-    roles: Alice, Bob
+protocol ValidExample = {
+    roles Alice, Bob
     
-    Alice -> Bob: Ping
-    Bob -> Alice: Pong
+    Alice -> Bob : Ping
+    Bob -> Alice : Pong
 }
 ";
 

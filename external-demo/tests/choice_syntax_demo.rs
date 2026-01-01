@@ -11,27 +11,27 @@ fn demo_correct_choice_syntax() {
     
     // The user's original request (DOESN'T WORK):
     let original_request = r#"
-choreography TestChoice {
-    roles: Alice, Bob;
-    
-    choice at Alice {
-        option1: Alice -> Bob: Message1;
-        option2: Alice -> Bob: Message2;
+protocol TestChoice = {
+    roles Alice, Bob
+
+    choice Alice {
+        option1: Alice -> Bob : Message1
+        option2: Alice -> Bob : Message2
     }
 }
 "#;
-    
+
     // The CORRECTED syntax that WORKS:
     let corrected_syntax = r#"
-choreography TestChoice {
-    roles: Alice, Bob;
-    
-    choice Alice {
-        option1: {
-            Alice -> Bob: Message1;
+protocol TestChoice = {
+    roles Alice, Bob
+
+    choice at Alice {
+        option1 -> {
+            Alice -> Bob : Message1
         }
-        option2: {
-            Alice -> Bob: Message2;
+        option2 -> {
+            Alice -> Bob : Message2
         }
     }
 }
@@ -61,8 +61,8 @@ choreography TestChoice {
     }
     
     println!("\n=== Key Differences ===");
-    println!("1. Remove 'at' keyword: 'choice Alice' not 'choice at Alice'");
-    println!("2. Each branch needs braces: option1: {{ ... }}");
+    println!("1. Use 'choice at Role' (or 'case choose Role of')");
+    println!("2. Each branch uses 'label ->' with a block");
     println!("3. The parser generates session types automatically");
     println!("\n=== Result ===");
     println!("Choice constructs ARE supported by parse_and_generate_with_extensions!");

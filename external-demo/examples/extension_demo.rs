@@ -82,11 +82,11 @@ fn demo_basic_extensions() -> Result<(), Box<dyn std::error::Error>> {
 
     // Use choreography! macro for basic protocol
     choreography! {
-        choreography BasicDemo {
-            roles: Alice, Bob;
+        protocol BasicDemo = {
+            roles Alice, Bob
 
             // Standard rumpsteak syntax
-            Alice -> Bob: HelloMsg;
+            Alice -> Bob : HelloMsg
         }
     }
 
@@ -116,7 +116,9 @@ fn demo_extension_discovery() -> Result<(), Box<dyn std::error::Error>> {
             required_rumpsteak_version: Some("0.5.0".to_string()),
             priority: Some(100),
             overview: Some("Adds logging capabilities to choreographies".to_string()),
-            syntax_guide: Some("Use @log annotations on statements".to_string()),
+            syntax_guide: Some(
+                "Attach logging metadata externally (no inline annotation syntax)".to_string(),
+            ),
             use_cases: Some(vec!["Debugging".to_string(), "Audit trails".to_string()]),
             keywords: Some(vec!["logging".to_string(), "debug".to_string()]),
         },
@@ -133,7 +135,9 @@ fn demo_extension_discovery() -> Result<(), Box<dyn std::error::Error>> {
             required_rumpsteak_version: Some("0.5.0".to_string()),
             priority: Some(120),
             overview: Some("Provides runtime monitoring of choreography execution".to_string()),
-            syntax_guide: Some("Use @monitor annotations on statements".to_string()),
+            syntax_guide: Some(
+                "Attach monitoring metadata externally (no inline annotation syntax)".to_string(),
+            ),
             use_cases: Some(vec![
                 "Performance tracking".to_string(),
                 "Runtime analysis".to_string(),
@@ -202,9 +206,9 @@ fn demo_performance_optimization() -> Result<(), Box<dyn std::error::Error>> {
     // Use choreography! macro to demonstrate performance
     let start = std::time::Instant::now();
     choreography! {
-        choreography PerfDemo {
-            roles: Alice, Bob;
-            Alice -> Bob: SimpleMessage;
+        protocol PerfDemo = {
+            roles Alice, Bob
+            Alice -> Bob : SimpleMessage
         }
     }
     let parse_time = start.elapsed();
@@ -233,13 +237,13 @@ fn demo_third_party_integration() -> Result<(), Box<dyn std::error::Error>> {
 
     // Show that external-demo has full access using choreography! macro
     choreography! {
-        choreography ThirdPartyDemo {
-            roles: Worker, Coordinator;
+        protocol ThirdPartyDemo = {
+            roles Worker, Coordinator
 
             // All rumpsteak features work automatically
-            Coordinator -> Worker: TaskMessage;
-            Worker -> Coordinator: ResultMessage;
-            Coordinator -> Worker: CancelMessage;
+            Coordinator -> Worker : TaskMessage
+            Worker -> Coordinator : ResultMessage
+            Coordinator -> Worker : CancelMessage
         }
     }
 

@@ -10,7 +10,7 @@ async fn b(role: &mut B) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: PlusMinusB<'_, _>| async {
         let (Secret(n), mut s) = s.receive().await?;
 
-	loop {
+	loop forever {
 		let (Guess(x), s1) = s.receive().await?;
 		if n > x {
 			s = s1.select(More(x)).await?;
@@ -30,7 +30,7 @@ async fn c(role: &mut C) -> Result<(), Box<dyn Error>> {
 	let mut min = i32::MIN;
 	let mut max = i32::MAX; // both included
 	let mut s = s;
-	loop {
+	loop forever {
 		let attempt = min/2 + max/2;
 		let s1 = s.send(Guess(attempt)).await?;
 		match s1.branch().await? {

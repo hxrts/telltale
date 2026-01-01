@@ -4,9 +4,9 @@ This guide covers the complete syntax extension system in rumpsteak-aura, which 
 
 ## Overview
 
-The rumpsteak-aura extension system provides a clean, elegant way for 3rd party projects to extend choreographic DSL syntax while automatically inheriting ALL rumpsteak-aura features including:
+The rumpsteak-aura extension system provides a clean, elegant way for 3rd party projects to extend choreographic DSL syntax while automatically inheriting all core features, including:
 
-- **Full Feature Inheritance**: Choice constructs, loops, parameterized roles, protocol composition, error handling
+- **Full Feature Inheritance**: Choice constructs, loops, branch‑parallel, parameterized roles, protocol composition, error handling
 - **Extension Discovery**: Automatic discovery and registration of extensions
 - **Performance Optimization**: Cached grammar composition with 387x performance improvements
 - **Conflict Resolution**: Priority-based conflict resolution between extensions  
@@ -34,7 +34,7 @@ Key benefits:
 - **Simplicity**: Clean separation between extension and base parsing
 - **Performance**: Cached transformations with minimal overhead (387x faster when cached)
 - **Elegance**: No complex runtime grammar composition
-- **Compatibility**: Full backwards compatibility with existing features
+- **Compatibility**: Extensions compose with the current DSL (no legacy syntax required)
 
 ## Complete Integration Example
 
@@ -100,14 +100,12 @@ pub struct AuraGrammarExtension;
 impl GrammarExtension for AuraGrammarExtension {
     fn grammar_rules(&self) -> &'static str {
         r#"
-        aura_annotation = { "[" ~ annotation_pair ~ ("," ~ annotation_pair)* ~ "]" }
-        annotation_pair = { ident ~ "=" ~ (string | integer | ident) }
-        aura_send_stmt = { annotation* ~ role ~ arrow ~ role ~ ":" ~ ident ~ ";" }
+        timeout_stmt = { "timeout" ~ integer ~ block }
         "#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["aura_send_stmt"]
+        vec!["timeout_stmt"]
     }
 
     fn extension_id(&self) -> &'static str {
@@ -165,7 +163,7 @@ pub fn choreography(input: TokenStream) -> TokenStream {
 ```rust
 /// Generate code for an Aura choreography with integrated effect system
 fn generate_aura_choreography_code(choreography: &Choreography) -> TokenStream {
-    // Extract namespace from choreography attributes
+    // Extract namespace from the module header (if present)
     let namespace = choreography.namespace.as_deref().unwrap_or("aura_choreography");
     let choreo_name = syn::Ident::new(namespace, proc_macro2::Span::call_site());
 
@@ -293,7 +291,7 @@ impl ExtensionParser {
     ) -> Result<Choreography, ExtensionParseError> {
         // Reuse pre-allocated buffers to reduce allocations
         self.parse_buffer.clear();
-        self.annotation_cache.clear();
+        self.extension_cache.clear();
         
         // Reserve capacity based on input size for efficient parsing
         self.parse_buffer.reserve(input.len());
@@ -302,7 +300,7 @@ impl ExtensionParser {
         let mut choreography = parse_choreography_str(input)
             .map_err(ExtensionParseError::StandardParseError)?;
 
-        // Post-process to handle extension annotations
+        // Post-process to handle extension statements
         choreography.protocol = 
             self.process_extensions_optimized(choreography.protocol, input, &choreography.roles)?;
 
@@ -319,14 +317,13 @@ The system ensures 3rd party projects automatically inherit ALL rumpsteak-aura f
 
 ```rust
 choreography! {
-    choreography Example {
-        roles: Alice, Bob, Charlie;
-        
-        choice at Alice {
-            path1: Alice -> Bob: Request;
-            path2: Alice -> Charlie: Alternative;
-        }
-    }
+    protocol Example =
+      roles Alice, Bob, Charlie
+      case choose Alice of
+        Path1 ->
+          Alice -> Bob : Request
+        Path2 ->
+          Alice -> Charlie : Alternative
 }
 ```
 
@@ -334,12 +331,10 @@ choreography! {
 
 ```rust
 choreography! {
-    choreography Distributed {
-        roles: Worker[N], Manager, Client[3];
-        
-        Worker[*] -> Manager: Status;
-        Manager -> Client[0]: Response;
-    }
+    protocol Distributed =
+      roles Worker[N], Manager, Client[3]
+      Worker[*] -> Manager : Status
+      Manager -> Client[0] : Response
 }
 ```
 
@@ -347,13 +342,10 @@ choreography! {
 
 ```rust
 choreography! {
-    choreography Streaming {
-        roles: Producer, Consumer;
-        
-        loop {
-            Producer -> Consumer: Data;
-        }
-    }
+    protocol Streaming =
+      roles Producer, Consumer
+      loop forever
+        Producer -> Consumer : Data
 }
 ```
 
@@ -399,8 +391,8 @@ let choreography = my_custom_parser(&input)?;
 ### 2. Extract Extension Data from AST
 
 ```rust
-// ✅ GOOD: Extract from parsed AST annotations
-choreography.protocol.collect_nodes_with_annotation("guard_capability", &mut nodes);
+// ✅ GOOD: Extract extension data from the parsed AST
+let nodes = extract_extension_nodes(&choreography.protocol, "timeout");
 
 // ❌ BAD: Custom parsing of extension syntax
 let extensions = parse_custom_extension_syntax(&input)?;
@@ -468,10 +460,9 @@ fn test_extension_parsing() {
     parser.register_extension(TestGrammarExtension, TestStatementParser);
 
     let choreography = parser.parse_with_extensions(r#"
-        choreography TestProtocol {
-            roles: Alice, Bob;
-            Alice -> Bob: Message;
-        }
+        protocol TestProtocol =
+          roles Alice, Bob
+          Alice -> Bob : Message
     "#).expect("Should parse with extensions");
 
     assert_eq!(choreography.roles.len(), 2);
@@ -486,10 +477,9 @@ fn test_extension_parsing() {
 fn test_feature_inheritance() {
     // Test that 3rd party projects inherit parameterized roles
     let choreography = parse_choreography_str(r#"
-        choreography Test {
-            roles: Worker[N], Manager;
-            Worker[*] -> Manager: Status;
-        }
+        protocol Test =
+          roles Worker[N], Manager
+          Worker[*] -> Manager : Status
     "#).expect("Should parse parameterized roles");
 
     // Verify parameterized role parsing worked
@@ -505,26 +495,23 @@ Before (custom DSL):
 ```rust
 // Custom macro with limited features
 my_choreography! {
-    protocol MyProtocol {
-        A -> B: Message with_timeout 5000;
-    }
+    protocol MyProtocol =
+      A -> B : Message with_timeout 5000
 }
 ```
 
 After (extension system with full feature inheritance):
 ```rust
 // Standard rumpsteak-aura with extensions
-choreography!("
-    choreography MyProtocol {
-        roles: A, B;
-        
-        // Inherits ALL rumpsteak features automatically
-        choice at A {
-            fast: A -> B: QuickMessage;
-            slow: timeout 5000 { A -> B: SlowMessage; }
-        }
-    }
-")
+choreography!(r#"
+protocol MyProtocol =
+  roles A, B
+  case choose A of
+    Fast ->
+      A -> B : QuickMessage
+    Slow ->
+      timeout 5000 { A -> B : SlowMessage }
+"#)
 ```
 
 ### Performance Considerations

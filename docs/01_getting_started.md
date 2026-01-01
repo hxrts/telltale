@@ -118,10 +118,10 @@ Define the choreography using the `choreography!` macro.
 use rumpsteak_aura_choreography::choreography;
 
 choreography! {
-    PingPong {
-        roles: Alice, Bob
-        Alice -> Bob: Ping
-        Bob -> Alice: Pong
+    protocol PingPong = {
+        roles Alice, Bob
+        Alice -> Bob : Ping
+        Bob -> Alice : Pong
     }
 }
 ```

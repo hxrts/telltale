@@ -1,55 +1,18 @@
-choreography MealService {
-    roles: Chef, SousChef, Baker
-
-    Chef -> SousChef: IngredientRequest(items: Vec<String>)
-    SousChef -> Chef: DeliveryConfirm
-    Chef -> Baker: OvenStatus(status: String)
-
-    Chef -> SousChef: CourseRequest(course: String)
-    SousChef -> Chef: CourseReady
-
-    choice Chef {
-        pasta: {
-            Chef -> SousChef: BoilPasta
-            SousChef -> Chef: PastaReady
-            Chef -> Baker: PrepareGarlicBread
-            Baker -> Chef: BreadReady
-        }
-        tacos: {
-            Chef -> SousChef: PrepTortillas
-            SousChef -> Chef: TortillasReady
-            Chef -> Baker: HeatFillings
-            Baker -> Chef: FillingsReady
-        }
-    }
-
-    choice Baker {
-        cake: {
-            Baker -> Chef: BakeCake
-            Chef -> Baker: FrostingReady
-        }
-        fruit: {
-            Baker -> Chef: PrepFruitPlate
-        }
-        none: {
-            Baker -> Chef: NoDessert
-        }
-    }
-
-    Chef -> SousChef: CourseRequest(course: String)
-    SousChef -> Chef: CourseReady
-
-    choice Chef {
-        soup: {
-            Chef -> SousChef: PrepSoup
-            SousChef -> Chef: SoupReady
-        }
-        salad: {
-            Chef -> SousChef: PrepSalad
-            SousChef -> Chef: SaladReady
-        }
-    }
-
-    Chef -> Baker: FinalCheck
-    Baker -> Chef: FinalStatus
-}
+protocol MealService =
+  roles Chef, SousChef, Baker
+  Chef -> SousChef : IngredientRequest (items : Vec < String >)
+  SousChef -> Chef : DeliveryConfirm
+  Chef -> Baker : OvenStatus (status : String)
+  Chef -> SousChef : CourseRequest (course : String)
+  SousChef -> Chef : CourseReady
+  case choose Chef of
+    pasta ->
+      Chef -> SousChef : BoilPasta
+      SousChef -> Chef : PastaReady
+      Chef -> Baker : PrepareGarlicBread
+      Baker -> Chef : BreadReady
+    tacos ->
+      Chef -> SousChef : PrepTortillas
+      SousChef -> Chef : TortillasReady
+      Chef -> Baker : HeatFillings
+      Baker -> Chef : FillingsReady

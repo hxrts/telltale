@@ -8,8 +8,8 @@ use rumpsteak_aura_choreography::compiler::parser::{parse_choreography_str, Pars
 #[test]
 fn test_parse_simple_protocol() {
     let input = r"
-choreography PingPong {
-    roles: Alice, Bob
+protocol PingPong = {
+    roles Alice, Bob
     
     Alice -> Bob: Ping
     Bob -> Alice: Pong
@@ -27,8 +27,8 @@ choreography PingPong {
 #[test]
 fn test_parse_three_party_protocol() {
     let input = r"
-choreography ThreeParty {
-    roles: Alice, Bob, Carol
+protocol ThreeParty = {
+    roles Alice, Bob, Carol
     
     Alice -> Bob: Hello
     Bob -> Carol: Forward
@@ -46,8 +46,8 @@ choreography ThreeParty {
 #[test]
 fn test_parse_broadcast() {
     let input = r"
-choreography Broadcast {
-    roles: Leader, Worker1, Worker2
+protocol Broadcast = {
+    roles Leader, Worker1, Worker2
     
     Leader ->* : Start
 }
@@ -96,16 +96,16 @@ choreography Broadcast {
 #[test]
 fn test_parse_choice_two_branches() {
     let input = r"
-choreography Choice {
-    roles: A, B
+protocol Choice = {
+    roles A, B
     
     A -> B: Propose
     
-    choice B {
-        accept: {
+    choice at B {
+        accept -> {
             B -> A: Accept
         }
-        reject: {
+        reject -> {
             B -> A: Reject
         }
     }
@@ -119,17 +119,17 @@ choreography Choice {
 #[test]
 fn test_parse_choice_three_branches() {
     let input = r"
-choreography ThreeWayChoice {
-    roles: Client, Server
+protocol ThreeWayChoice = {
+    roles Client, Server
     
-    choice Client {
-        get: {
+    choice at Client {
+        get -> {
             Client -> Server: Get
         }
-        post: {
+        post -> {
             Client -> Server: Post
         }
-        delete: {
+        delete -> {
             Client -> Server: Delete
         }
     }
@@ -143,22 +143,22 @@ choreography ThreeWayChoice {
 #[test]
 fn test_parse_nested_choice() {
     let input = r"
-choreography NestedChoice {
-    roles: A, B, C
+protocol NestedChoice = {
+    roles A, B, C
     
-    choice A {
-        path1: {
+    choice at A {
+        path1 -> {
             A -> B: First
-            choice B {
-                inner1: {
+            choice at B {
+                inner1 -> {
                     B -> C: InnerA
                 }
-                inner2: {
+                inner2 -> {
                     B -> C: InnerB
                 }
             }
         }
-        path2: {
+        path2 -> {
             A -> C: Second
         }
     }
@@ -172,10 +172,10 @@ choreography NestedChoice {
 #[test]
 fn test_parse_loop_with_count() {
     let input = r"
-choreography LoopCount {
-    roles: Client, Server
+protocol LoopCount = {
+    roles Client, Server
     
-    loop (count: 5) {
+    loop repeat 5 {
         Client -> Server: Request
         Server -> Client: Response
     }
@@ -189,10 +189,10 @@ choreography LoopCount {
 #[test]
 fn test_parse_loop_with_role_decides() {
     let input = r"
-choreography LoopRoleDecides {
-    roles: Client, Server
+protocol LoopRoleDecides = {
+    roles Client, Server
     
-    loop (decides: Client) {
+    loop decide by Client {
         Client -> Server: Request
         Server -> Client: Response
     }
@@ -206,10 +206,10 @@ choreography LoopRoleDecides {
 #[test]
 fn test_parse_loop_with_custom_condition() {
     let input = r#"
-choreography LoopCustom {
-    roles: A, B
+protocol LoopCustom = {
+    roles A, B
     
-    loop (custom: "has_more_data") {
+    loop while "has_more_data" {
         A -> B: Data
     }
 }
@@ -222,10 +222,10 @@ choreography LoopCustom {
 #[test]
 fn test_parse_loop_without_condition() {
     let input = r"
-choreography InfiniteLoop {
-    roles: A, B
+protocol InfiniteLoop = {
+    roles A, B
     
-    loop {
+    loop forever {
         A -> B: Tick
     }
 }
@@ -238,12 +238,13 @@ choreography InfiniteLoop {
 #[test]
 fn test_parse_parallel() {
     let input = r"
-choreography Parallel {
-    roles: A, B, C, D
-    
-    parallel {
+protocol Parallel = {
+    roles A, B, C, D
+
+    branch {
         A -> B: Msg1
-    |
+    }
+    branch {
         C -> D: Msg2
     }
 }
@@ -256,8 +257,8 @@ choreography Parallel {
 #[test]
 fn test_parse_recursive() {
     let input = r"
-choreography Recursive {
-    roles: A, B
+protocol Recursive = {
+    roles A, B
     
     rec Loop {
         A -> B: Data
@@ -272,19 +273,19 @@ choreography Recursive {
 #[test]
 fn test_parse_complex_protocol() {
     let input = r"
-choreography ComplexProtocol {
-    roles: Buyer, Seller, Shipper
+protocol ComplexProtocol = {
+    roles Buyer, Seller, Shipper
     
     Buyer -> Seller: Inquiry
     Seller -> Buyer: Quote
     
-    choice Buyer {
-        order: {
+    choice at Buyer {
+        order -> {
             Buyer -> Seller: Order
             Seller -> Shipper: ShipRequest
             Shipper -> Buyer: Tracking
             
-            loop (decides: Buyer) {
+            loop decide by Buyer {
                 Buyer -> Shipper: StatusCheck
                 Shipper -> Buyer: StatusUpdate
             }
@@ -292,7 +293,7 @@ choreography ComplexProtocol {
             Shipper -> Buyer: Delivered
             Buyer -> Seller: Confirmation
         }
-        cancel: {
+        cancel -> {
             Buyer -> Seller: Cancel
         }
     }
@@ -310,8 +311,8 @@ choreography ComplexProtocol {
 #[test]
 fn test_parse_with_payload() {
     let input = r"
-choreography WithPayload {
-    roles: A, B
+protocol WithPayload = {
+    roles A, B
     
     A -> B: Message(data: String)
 }
@@ -326,8 +327,8 @@ choreography WithPayload {
 #[test]
 fn test_error_undefined_role_in_send() {
     let input = r"
-choreography Invalid {
-    roles: Alice
+protocol Invalid = {
+    roles Alice
     
     Alice -> Bob: Hello
 }
@@ -348,11 +349,11 @@ choreography Invalid {
 #[test]
 fn test_error_undefined_role_in_choice() {
     let input = r"
-choreography Invalid {
-    roles: Alice
+protocol Invalid = {
+    roles Alice
     
-    choice Bob {
-        opt: {
+    choice at Bob {
+        opt -> {
             Alice -> Alice: Self
         }
     }
@@ -373,10 +374,10 @@ choreography Invalid {
 #[test]
 fn test_error_undefined_role_in_loop_decides() {
     let input = r"
-choreography Invalid {
-    roles: Alice
+protocol Invalid = {
+    roles Alice
     
-    loop (decides: Bob) {
+    loop decide by Bob {
         Alice -> Alice: Msg
     }
 }
@@ -396,8 +397,8 @@ choreography Invalid {
 #[test]
 fn test_error_duplicate_role() {
     let input = r"
-choreography Invalid {
-    roles: Alice, Bob, Alice
+protocol Invalid = {
+    roles Alice, Bob, Alice
     
     Alice -> Bob: Hello
 }
@@ -417,7 +418,7 @@ choreography Invalid {
 #[test]
 fn test_error_no_roles() {
     let input = r"
-choreography Invalid {
+protocol Invalid = {
     Alice -> Bob: Hello
 }
 ";
@@ -429,8 +430,8 @@ choreography Invalid {
 #[test]
 fn test_error_invalid_syntax() {
     let input = r"
-choreography Invalid {
-    roles: A, B
+protocol Invalid = {
+    roles A, B
     
     A -> -> B: Hello
 }
@@ -444,8 +445,8 @@ choreography Invalid {
 fn test_parse_with_comments() {
     let input = r"
 // This is a comment
-choreography CommentTest {
-    roles: Alice, Bob  // Inline comment
+protocol CommentTest = {
+    roles Alice, Bob  // Inline comment
     
     /* Multi-line
        comment */
@@ -464,8 +465,8 @@ choreography CommentTest {
 #[test]
 fn test_parse_whitespace_variations() {
     let input = r"
-choreography   WhitespaceTest   {
-    roles:Alice,Bob
+protocol WhitespaceTest = {
+    roles Alice,Bob
     Alice->Bob:Hello
 }
 ";
@@ -477,8 +478,8 @@ choreography   WhitespaceTest   {
 #[test]
 fn test_empty_protocol_body() {
     let input = r"
-choreography Empty {
-    roles: A, B
+protocol Empty = {
+    roles A, B
 }
 ";
 
@@ -489,8 +490,8 @@ choreography Empty {
 #[test]
 fn test_parse_role_names_with_underscores() {
     let input = r"
-choreography UnderscoreRoles {
-    roles: Alice_Client, Bob_Server
+protocol UnderscoreRoles = {
+    roles Alice_Client, Bob_Server
     
     Alice_Client -> Bob_Server: Request
 }
@@ -503,8 +504,8 @@ choreography UnderscoreRoles {
 #[test]
 fn test_parse_role_names_with_numbers() {
     let input = r"
-choreography NumericRoles {
-    roles: Worker1, Worker2, Worker3
+protocol NumericRoles = {
+    roles Worker1, Worker2, Worker3
     
     Worker1 -> Worker2: Data
     Worker2 -> Worker3: Forward
@@ -518,8 +519,8 @@ choreography NumericRoles {
 #[test]
 fn test_parse_sequence_of_sends() {
     let input = r"
-choreography Sequence {
-    roles: A, B, C, D
+protocol Sequence = {
+    roles A, B, C, D
     
     A -> B: Msg1
     B -> C: Msg2
@@ -537,8 +538,8 @@ fn test_integration_with_projection() {
     use rumpsteak_aura_choreography::compiler::projection;
 
     let input = r"
-choreography TwoParty {
-    roles: Client, Server
+protocol TwoParty = {
+    roles Client, Server
     
     Client -> Server: Request
     Server -> Client: Response
@@ -562,8 +563,8 @@ choreography TwoParty {
 #[test]
 fn test_integration_validation() {
     let input = r"
-choreography ValidProtocol {
-    roles: A, B
+protocol ValidProtocol = {
+    roles A, B
     
     A -> B: Hello
     B -> A: World
@@ -585,8 +586,8 @@ choreography ValidProtocol {
 fn test_error_message_quality() {
     // This test verifies that error messages include helpful span information
     let input = r"
-choreography Example {
-    roles: Alice, Bob
+protocol Example = {
+    roles Alice, Bob
     
     Alice -> Charlie: Hello
 }
@@ -621,8 +622,8 @@ choreography Example {
 fn test_error_span_precision() {
     // Test that the span precisely identifies the error location
     let input = r"
-choreography Test {
-    roles: Alice, Bob
+protocol Test = {
+    roles Alice, Bob
     
     Alice -> UnknownRole: Message
     Bob -> Alice: Response
@@ -647,16 +648,17 @@ choreography Test {
 #[test]
 fn test_parse_protocol_composition_simple() {
     let input = r"
-choreography CompositionExample {
-    roles: Alice, Bob
-    
-    protocol Handshake {
+protocol CompositionExample = {
+    roles Alice, Bob
+
+    call Handshake
+    Alice -> Bob: Data
+}
+where {
+    protocol Handshake = {
         Alice -> Bob: Hello
         Bob -> Alice: Hi
     }
-    
-    call Handshake
-    Alice -> Bob: Data
 }
 ";
 
@@ -674,24 +676,23 @@ choreography CompositionExample {
 #[test]
 fn test_parse_protocol_composition_multiple_defs() {
     let input = r"
-choreography MultipleProtocols {
-    roles: A, B, C
-    
-    protocol Step1 {
-        A -> B: Start
-    }
-    
-    protocol Step2 {
-        B -> C: Continue
-    }
-    
-    protocol Step3 {
-        C -> A: Finish
-    }
-    
+protocol MultipleProtocols = {
+    roles A, B, C
+
     call Step1
     call Step2
     call Step3
+}
+where {
+    protocol Step1 = {
+        A -> B: Start
+    }
+    protocol Step2 = {
+        B -> C: Continue
+    }
+    protocol Step3 = {
+        C -> A: Finish
+    }
 }
 ";
 
@@ -706,20 +707,20 @@ choreography MultipleProtocols {
 #[test]
 fn test_parse_protocol_composition_nested_calls() {
     let input = r"
-choreography NestedCalls {
-    roles: Alice, Bob
-    
-    protocol Inner {
+protocol NestedCalls = {
+    roles Alice, Bob
+
+    call Outer
+}
+where {
+    protocol Inner = {
         Alice -> Bob: Data1
         Bob -> Alice: Ack1
     }
-    
-    protocol Outer {
+    protocol Outer = {
         call Inner
         Alice -> Bob: Data2
     }
-    
-    call Outer
 }
 ";
 
@@ -734,26 +735,26 @@ choreography NestedCalls {
 #[test]
 fn test_parse_protocol_composition_in_choice() {
     let input = r"
-choreography CallInChoice {
-    roles: Client, Server
-    
-    protocol Success {
-        Server -> Client: Success
-    }
-    
-    protocol Failure {
-        Server -> Client: Failure
-    }
-    
+protocol CallInChoice = {
+    roles Client, Server
+
     Client -> Server: Request
     
-    choice Server {
-        ok: {
+    choice at Server {
+        ok -> {
             call Success
         }
-        error: {
+        error -> {
             call Failure
         }
+    }
+}
+where {
+    protocol Success = {
+        Server -> Client: Success
+    }
+    protocol Failure = {
+        Server -> Client: Failure
     }
 }
 ";
@@ -769,16 +770,17 @@ choreography CallInChoice {
 #[test]
 fn test_parse_protocol_composition_in_loop() {
     let input = r"
-choreography CallInLoop {
-    roles: A, B
-    
-    protocol Exchange {
+protocol CallInLoop = {
+    roles A, B
+
+    loop repeat 3 {
+        call Exchange
+    }
+}
+where {
+    protocol Exchange = {
         A -> B: Request
         B -> A: Response
-    }
-    
-    loop (count: 3) {
-        call Exchange
     }
 }
 ";
@@ -794,8 +796,8 @@ choreography CallInLoop {
 #[test]
 fn test_error_undefined_protocol_call() {
     let input = r"
-choreography UndefinedCall {
-    roles: A, B
+protocol UndefinedCall = {
+    roles A, B
     
     call NonExistent
 }
@@ -817,14 +819,14 @@ choreography UndefinedCall {
 #[test]
 fn test_error_duplicate_protocol_def() {
     let input = r"
-choreography DuplicateDef {
-    roles: A, B
-    
-    protocol MyProtocol {
+protocol DuplicateDef = {
+    roles A, B
+}
+where {
+    protocol MyProtocol = {
         A -> B: First
     }
-    
-    protocol MyProtocol {
+    protocol MyProtocol = {
         A -> B: Second
     }
 }
@@ -848,14 +850,14 @@ choreography DuplicateDef {
 #[test]
 fn test_parse_choice_with_guard() {
     let input = r"
-choreography GuardExample {
-    roles: Client, Server
+protocol GuardExample = {
+    roles Client, Server
     
-    choice Client {
-        buy when (balance > price): {
+    choice at Client {
+        buy when (balance > price) -> {
             Client -> Server: Purchase
         }
-        cancel: {
+        cancel -> {
             Client -> Server: Cancel
         }
     }
@@ -873,17 +875,17 @@ choreography GuardExample {
 #[test]
 fn test_parse_choice_with_multiple_guards() {
     let input = r"
-choreography MultiGuards {
-    roles: A, B
+protocol MultiGuards = {
+    roles A, B
     
-    choice A {
-        option1 when (x > 0): {
+    choice at A {
+        option1 when (x > 0) -> {
             A -> B: Msg1
         }
-        option2 when (x < 0): {
+        option2 when (x < 0) -> {
             A -> B: Msg2
         }
-        option3: {
+        option3 -> {
             A -> B: Msg3
         }
     }
@@ -901,14 +903,14 @@ choreography MultiGuards {
 #[test]
 fn test_parse_guard_with_complex_expression() {
     let input = r"
-choreography ComplexGuard {
-    roles: Client, Server
+protocol ComplexGuard = {
+    roles Client, Server
     
-    choice Client {
-        proceed when (balance >= price && is_authenticated): {
+    choice at Client {
+        proceed when (balance >= price && is_authenticated) -> {
             Client -> Server: Action
         }
-        reject: {
+        reject -> {
             Client -> Server: Reject
         }
     }
@@ -926,22 +928,22 @@ choreography ComplexGuard {
 #[test]
 fn test_parse_guard_in_nested_choice() {
     let input = r"
-choreography NestedGuard {
-    roles: A, B, C
+protocol NestedGuard = {
+    roles A, B, C
     
-    choice A {
-        outer when (condition1): {
+    choice at A {
+        outer when (condition1) -> {
             A -> B: Start
-            choice B {
-                inner when (condition2): {
+            choice at B {
+                inner when (condition2) -> {
                     B -> C: Inner
                 }
-                fallback: {
+                fallback -> {
                     B -> C: Fallback
                 }
             }
         }
-        skip: {
+        skip -> {
             A -> C: Skip
         }
     }
@@ -957,130 +959,21 @@ choreography NestedGuard {
 }
 
 // ============================================================================
-// Annotation Tests (Performance Hints & Verification)
+// Annotation Syntax (Rejected)
 // ============================================================================
 
 #[test]
-fn test_parse_simple_annotation() {
+fn test_annotation_syntax_is_rejected() {
     let input = r"
 @optimize
-choreography Simple {
-    roles: A, B
-    
+protocol Simple = {
+    roles A, B
     A -> B: Msg
 }
 ";
 
     let result = parse_choreography_str(input);
-    assert!(
-        result.is_ok(),
-        "Failed to parse simple annotation: {:?}",
-        result.err()
-    );
-
-    let choreo = result.unwrap();
-    assert!(choreo.attrs.contains_key("optimize"));
-    assert_eq!(choreo.attrs.get("optimize").unwrap(), "true");
-}
-
-#[test]
-fn test_parse_annotation_with_args() {
-    let input = r"
-@optimize(inline, buffer_size=1024)
-choreography WithArgs {
-    roles: A, B
-    
-    A -> B: Msg
-}
-";
-
-    let result = parse_choreography_str(input);
-    assert!(
-        result.is_ok(),
-        "Failed to parse annotation with args: {:?}",
-        result.err()
-    );
-
-    let choreo = result.unwrap();
-    assert!(choreo.attrs.contains_key("optimize"));
-    let value = choreo.attrs.get("optimize").unwrap();
-    assert!(value.contains("inline"));
-    assert!(value.contains("buffer_size=1024"));
-}
-
-#[test]
-fn test_parse_multiple_annotations() {
-    let input = r"
-@optimize(inline)
-@verify(deadlock_free)
-@parallel
-choreography MultiAnnotated {
-    roles: A, B, C
-    
-    A -> B: Msg1
-    B -> C: Msg2
-}
-";
-
-    let result = parse_choreography_str(input);
-    assert!(
-        result.is_ok(),
-        "Failed to parse multiple annotations: {:?}",
-        result.err()
-    );
-
-    let choreo = result.unwrap();
-    assert!(choreo.attrs.contains_key("optimize"));
-    assert!(choreo.attrs.contains_key("verify"));
-    assert!(choreo.attrs.contains_key("parallel"));
-}
-
-#[test]
-fn test_parse_statement_annotations() {
-    let input = r"
-choreography StatementAnnotations {
-    roles: A, B
-    
-    @critical
-    A -> B: ImportantMsg
-    
-    @buffered(size=10)
-    B -> A: Response
-}
-";
-
-    let result = parse_choreography_str(input);
-    assert!(
-        result.is_ok(),
-        "Failed to parse statement annotations: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn test_parse_verification_annotation() {
-    let input = r"
-@verify(deadlock_free, liveness)
-choreography Verified {
-    roles: A, B
-    
-    A -> B: Start
-    B -> A: Ack
-}
-";
-
-    let result = parse_choreography_str(input);
-    assert!(
-        result.is_ok(),
-        "Failed to parse verification annotation: {:?}",
-        result.err()
-    );
-
-    let choreo = result.unwrap();
-    assert!(choreo.attrs.contains_key("verify"));
-    let value = choreo.attrs.get("verify").unwrap();
-    assert!(value.contains("deadlock_free"));
-    assert!(value.contains("liveness"));
+    assert!(result.is_err(), "Annotation syntax should be rejected");
 }
 
 // ============================================================================
@@ -1090,8 +983,8 @@ choreography Verified {
 #[test]
 fn test_parse_message_with_type() {
     let input = r"
-choreography TypedMessages {
-    roles: A, B
+protocol TypedMessages = {
+    roles A, B
     
     A -> B: Request<String>
     B -> A: Response<i32>
@@ -1109,8 +1002,8 @@ choreography TypedMessages {
 #[test]
 fn test_parse_message_with_multiple_types() {
     let input = r"
-choreography MultiTyped {
-    roles: A, B
+protocol MultiTyped = {
+    roles A, B
     
     A -> B: Data<String, i32, bool>
 }
@@ -1127,8 +1020,8 @@ choreography MultiTyped {
 #[test]
 fn test_parse_message_with_generic_types() {
     let input = r"
-choreography Generics {
-    roles: A, B
+protocol Generics = {
+    roles A, B
     
     A -> B: Container<Vec<String>>
     B -> A: Result<i32, Error>
@@ -1146,8 +1039,8 @@ choreography Generics {
 #[test]
 fn test_parse_message_with_type_and_payload() {
     let input = r"
-choreography TypedWithPayload {
-    roles: A, B
+protocol TypedWithPayload = {
+    roles A, B
     
     A -> B: Request<String>(data)
     B -> A: Response<i32>(result)
@@ -1165,8 +1058,8 @@ choreography TypedWithPayload {
 #[test]
 fn test_parse_message_with_path_types() {
     let input = r"
-choreography PathTypes {
-    roles: A, B
+protocol PathTypes = {
+    roles A, B
     
     A -> B: Data<std::string::String>
     B -> A: Result<std::vec::Vec<i32>>
@@ -1188,8 +1081,8 @@ choreography PathTypes {
 #[test]
 fn test_parse_parameterized_role() {
     let input = r"
-choreography WorkerPool {
-    roles: Master, Worker[N]
+protocol WorkerPool = {
+    roles Master, Worker[N]
     
     Master -> Worker[0]: Task
 }
@@ -1210,8 +1103,8 @@ choreography WorkerPool {
 #[test]
 fn test_parse_concrete_indexed_role() {
     let input = r"
-choreography IndexedWorkers {
-    roles: Master, Worker[3]
+protocol IndexedWorkers = {
+    roles Master, Worker[3]
     
     Master -> Worker[0]: Task1
     Master -> Worker[1]: Task2
@@ -1230,8 +1123,8 @@ choreography IndexedWorkers {
 #[test]
 fn test_parse_multiple_parameterized_roles() {
     let input = r"
-choreography MultiParam {
-    roles: Coordinator, Worker[N], Monitor[M]
+protocol MultiParam = {
+    roles Coordinator, Worker[N], Monitor[M]
     
     Coordinator -> Worker[i]: Start
     Worker[i] -> Monitor[j]: Report
@@ -1252,14 +1145,14 @@ choreography MultiParam {
 #[test]
 fn test_parse_parameterized_role_in_choice() {
     let input = r"
-choreography ParameterizedChoice {
-    roles: Master, Worker[N]
+protocol ParameterizedChoice = {
+    roles Master, Worker[N]
     
-    choice Master {
-        assign: {
+    choice at Master {
+        assign -> {
             Master -> Worker[i]: Task
         }
-        skip: {
+        skip -> {
             Master -> Worker[0]: Skip
         }
     }
@@ -1277,10 +1170,10 @@ choreography ParameterizedChoice {
 #[test]
 fn test_parse_parameterized_role_loop() {
     let input = r"
-choreography ParameterizedLoop {
-    roles: Master, Worker[N]
+protocol ParameterizedLoop = {
+    roles Master, Worker[N]
     
-    loop (count: N) {
+    loop repeat N {
         Master -> Worker[i]: Work
         Worker[i] -> Master: Result
     }

@@ -20,9 +20,9 @@ fn test_fixed_implementation(input: &str) -> Result<proc_macro2::TokenStream, St
 
 fn main() {
     let input = r#"
-choreography Test {
-    roles: Alice, Bob;
-    Alice -> Bob: Message;
+protocol Test = {
+    roles Alice, Bob
+    Alice -> Bob : Message
 }
 "#;
 

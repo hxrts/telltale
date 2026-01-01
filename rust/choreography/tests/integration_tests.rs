@@ -3,8 +3,8 @@
 
 //! Integration tests for enhanced choreography features
 //!
-//! This module tests the integration of all enhanced features:
-//! - Namespaces with annotations and dynamic roles
+//! This module tests the integration of enhanced features:
+//! - Namespaces with dynamic roles and choices
 //! - Complex multi-feature protocols
 //! - End-to-end compilation and generation
 
@@ -18,31 +18,25 @@ use rumpsteak_aura_choreography::{
 };
 
 #[test]
-fn test_namespaced_choreographies_with_annotations() {
-    // Test combining namespaces with enhanced annotations
+fn test_namespaced_choreographies() {
+    // Test combining namespaces with basic message flows
     let protocol1 = r#"
-        #[namespace = "secure_messaging"]
-        choreography EncryptedChat {
-            roles: Client, Server;
-            
-            [@priority = "high", @encrypt = "aes256"]
-            Client -> Server: SecureMessage;
-            
-            [@audit_log = "true"]
-            Server -> Client: Acknowledgment;
+        module secure_messaging exposing (EncryptedChat)
+        protocol EncryptedChat = {
+            roles Client, Server
+
+            Client -> Server: SecureMessage
+            Server -> Client: Acknowledgment
         }
     "#;
 
     let protocol2 = r#"
-        #[namespace = "file_transfer"]
-        choreography SecureFileTransfer {
-            roles: Sender, Receiver;
-            
-            [@compress = "gzip", @checksum = "sha256"]
-            Sender -> Receiver: FileChunk;
-            
-            [@retry = 3]
-            Receiver -> Sender: ChunkAck;
+        module file_transfer exposing (SecureFileTransfer)
+        protocol SecureFileTransfer = {
+            roles Sender, Receiver
+
+            Sender -> Receiver: FileChunk
+            Receiver -> Sender: ChunkAck
         }
     "#;
 
@@ -71,23 +65,17 @@ fn test_namespaced_choreographies_with_annotations() {
 }
 
 #[test]
-fn test_dynamic_roles_with_annotations() {
-    // Test dynamic roles combined with enhanced annotations
+fn test_dynamic_roles() {
+    // Test dynamic roles combined with branching and ranges
     let protocol = r#"
-        #[namespace = "threshold_consensus"]
-        choreography AnnotatedThreshold {
-            roles: Leader, Followers[*];
-            
-            [@phase = "prepare", @timeout = 5000]
-            Leader -> Followers[*]: PrepareRequest;
-            
-            [@critical, @min_responses = "quorum"]
-            Followers[0..quorum] -> Leader: PrepareResponse;
-            
-            [@phase = "commit", @audit_log = "true"]
-            Leader -> Followers[*]: CommitRequest;
-            
-            Followers[0..quorum][@priority = "high"] -> Leader: CommitResponse;
+        module threshold_consensus exposing (AnnotatedThreshold)
+        protocol AnnotatedThreshold = {
+            roles Leader, Followers[*]
+
+            Leader -> Followers[*]: PrepareRequest
+            Followers[0..quorum] -> Leader: PrepareResponse
+            Leader -> Followers[*]: CommitRequest
+            Followers[0..quorum] -> Leader: CommitResponse
         }
     "#;
 
@@ -123,38 +111,26 @@ fn test_dynamic_roles_with_annotations() {
 fn test_complex_multi_feature_protocol() {
     // Test protocol using all enhanced features together
     let protocol = r#"
-        #[namespace = "advanced_example"]
-        choreography ComplexProtocol {
-            roles: Coordinator, Workers[N], Database;
-            
-            [@phase = "initialization", @cost = 100]
-            Coordinator -> Workers[*]: InitRequest;
-            
-            Workers[i][@timeout = 2000] -> Database[@priority = "medium"]: DataQuery;
-            
-            [@compress = "lz4", @cache_ttl = 300]
-            Database -> Workers[i]: QueryResult;
-            
-            [@critical, @min_responses = "majority"]
-            Workers[0..majority] -> Coordinator: WorkResult;
-            
-            choice Coordinator {
-                success: {
-                    [@audit_log = "true"]
-                    Coordinator -> Workers[*]: SuccessNotification;
-                    
-                    [@cleanup = "true"]
-                    Coordinator -> Database: FinalizeTransaction;
+        module advanced_example exposing (ComplexProtocol)
+        protocol ComplexProtocol = {
+            roles Coordinator, Workers[N], Database
+
+            Coordinator -> Workers[*]: InitRequest
+            Workers[i] -> Database: DataQuery
+            Database -> Workers[i]: QueryResult
+            Workers[0..majority] -> Coordinator: WorkResult
+
+            choice at Coordinator {
+                success -> {
+                    Coordinator -> Workers[*]: SuccessNotification
+                    Coordinator -> Database: FinalizeTransaction
                 }
-                retry: {
-                    [@retry_count = "3", @backoff = "exponential"]
-                    Coordinator -> Workers[*]: RetryRequest;
+                retry -> {
+                    Coordinator -> Workers[*]: RetryRequest
                 }
-                abort: {
-                    [@rollback = "true"]
-                    Coordinator -> Database: AbortTransaction;
-                    
-                    Coordinator -> Workers[*]: AbortNotification;
+                abort -> {
+                    Coordinator -> Database: AbortTransaction
+                    Coordinator -> Workers[*]: AbortNotification
                 }
             }
         }
@@ -219,17 +195,17 @@ fn test_complex_multi_feature_protocol() {
 fn test_multiple_dynamic_role_types() {
     // Test protocol with multiple types of dynamic roles
     let protocol = r#"
-        #[namespace = "multi_dynamic"]
-        choreography MultiDynamicRoles {
-            roles: Controller, StaticWorkers[3], DynamicWorkers[*], SymbolicWorkers[M];
-            
-            Controller -> StaticWorkers[0]: StaticTask;
-            Controller -> DynamicWorkers[*]: DynamicTask;
-            Controller -> SymbolicWorkers[*]: SymbolicTask;
-            
-            StaticWorkers[0] -> Controller: StaticResult;
-            DynamicWorkers[0..response_count] -> Controller: DynamicResult;
-            SymbolicWorkers[i] -> Controller: SymbolicResult;
+        module multi_dynamic exposing (MultiDynamicRoles)
+        protocol MultiDynamicRoles = {
+            roles Controller, StaticWorkers[3], DynamicWorkers[*], SymbolicWorkers[M]
+
+            Controller -> StaticWorkers[0]: StaticTask
+            Controller -> DynamicWorkers[*]: DynamicTask
+            Controller -> SymbolicWorkers[*]: SymbolicTask
+
+            StaticWorkers[0] -> Controller: StaticResult
+            DynamicWorkers[0..response_count] -> Controller: DynamicResult
+            SymbolicWorkers[i] -> Controller: SymbolicResult
         }
     "#;
 
@@ -270,40 +246,32 @@ fn test_multiple_dynamic_role_types() {
 }
 
 #[test]
-fn test_nested_choices_with_annotations() {
-    // Test complex nested structures with annotations
+fn test_nested_choices() {
+    // Test complex nested structures without annotations
     let protocol = r#"
-        #[namespace = "nested_complex"]
-        choreography NestedProtocol {
-            roles: Client, Server, Database;
-            
-            [@session_start = "true"]
-            Client -> Server: StartSession;
-            
-            choice Server {
-                authenticate: {
-                    [@security = "oauth2"]
-                    Server -> Database: AuthQuery;
-                    
-                    choice Database {
-                        success: {
-                            [@cache = "true"]
-                            Database -> Server: AuthSuccess;
-                            
-                            [@session_token = "jwt"]
-                            Server -> Client: AuthToken;
+        module nested_complex exposing (NestedProtocol)
+        protocol NestedProtocol = {
+            roles Client, Server, Database
+
+            Client -> Server: StartSession
+
+            choice at Server {
+                authenticate -> {
+                    Server -> Database: AuthQuery
+
+                    choice at Database {
+                        success -> {
+                            Database -> Server: AuthSuccess
+                            Server -> Client: AuthToken
                         }
-                        failure: {
-                            [@log_level = "warning"]
-                            Database -> Server: AuthFailure;
-                            
-                            Server -> Client: AuthDenied;
+                        failure -> {
+                            Database -> Server: AuthFailure
+                            Server -> Client: AuthDenied
                         }
                     }
                 }
-                reject: {
-                    [@immediate = "true"]
-                    Server -> Client: Rejected;
+                reject -> {
+                    Server -> Client: Rejected
                 }
             }
         }
@@ -341,39 +309,26 @@ fn test_error_handling_integration() {
 
     // Test undefined role in dynamic context
     let invalid_protocol1 = r#"
-        #[namespace = "error_test"]
-        choreography InvalidProtocol {
-            roles: A, B[*];
-            A -> UndefinedRole: Message;
+        module error_test exposing (InvalidProtocol)
+        protocol InvalidProtocol = {
+            roles A, B[*]
+            A -> UndefinedRole: Message
         }
     "#;
 
     let result1 = parse_choreography_str(invalid_protocol1);
     assert!(result1.is_err());
 
-    // Test invalid annotation syntax
-    let invalid_protocol2 = r#"
-        #[namespace = "error_test2"]
-        choreography InvalidAnnotation {
-            roles: A, B;
-            [@invalid_syntax
-            A -> B: Message;
-        }
-    "#;
-
-    let result2 = parse_choreography_str(invalid_protocol2);
-    assert!(result2.is_err());
-
     // Test invalid dynamic role syntax
     let invalid_protocol3 = r#"
-        choreography InvalidDynamic {
-            roles: A, B[invalid];
-            A -> B[999999999]: Message;
+        protocol InvalidDynamic = {
+            roles A, B[invalid]
+            A -> B[999999999]: Message
         }
     "#;
 
-    let result3 = parse_choreography_str(invalid_protocol3);
-    assert!(result3.is_err());
+    let result2 = parse_choreography_str(invalid_protocol3);
+    assert!(result2.is_err());
 }
 
 #[test]
@@ -382,23 +337,19 @@ fn test_performance_characteristics() {
     use std::time::Instant;
 
     let complex_protocol = r#"
-        #[namespace = "performance_test"]
-        choreography PerformanceTest {
-            roles: Controller, Workers[*];
-            
-            [@benchmark = "true"]
-            Controller -> Workers[*]: StartWork;
-            
-            Workers[0..batch_size] -> Controller: WorkComplete;
-            
-            choice Controller {
-                continue: {
-                    [@loop_iteration = "true"]
-                    Controller -> Workers[*]: ContinueWork;
+        module performance_test exposing (PerformanceTest)
+        protocol PerformanceTest = {
+            roles Controller, Workers[*]
+
+            Controller -> Workers[*]: StartWork
+            Workers[0..batch_size] -> Controller: WorkComplete
+
+            choice at Controller {
+                continue -> {
+                    Controller -> Workers[*]: ContinueWork
                 }
-                stop: {
-                    [@cleanup = "true"]
-                    Controller -> Workers[*]: StopWork;
+                stop -> {
+                    Controller -> Workers[*]: StopWork
                 }
             }
         }
@@ -438,20 +389,14 @@ fn test_performance_characteristics() {
 fn test_full_compilation_pipeline() {
     // Test end-to-end compilation of enhanced features
     let protocol = r#"
-        #[namespace = "compilation_test"]
-        choreography CompilationTest {
-            roles: Client, Servers[*], Database;
-            
-            [@start_transaction = "true"]
-            Client -> Servers[*]: Request;
-            
-            Servers[i][@load_balance = "round_robin"] -> Database[@connection_pool = "true"]: Query;
-            
-            [@result_cache = "redis"]
-            Database -> Servers[i]: Response;
-            
-            [@aggregate = "true"]
-            Servers[0..quorum] -> Client: AggregatedResponse;
+        module compilation_test exposing (CompilationTest)
+        protocol CompilationTest = {
+            roles Client, Servers[*], Database
+
+            Client -> Servers[*]: Request
+            Servers[i] -> Database: Query
+            Database -> Servers[i]: Response
+            Servers[0..quorum] -> Client: AggregatedResponse
         }
     "#;
 

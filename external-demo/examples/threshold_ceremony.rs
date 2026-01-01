@@ -1,12 +1,13 @@
 //! Threshold Signing Ceremony Choreography
 //!
 //! This example demonstrates a complete threshold signing ceremony using the
-//! choreography! macro with basic rumpsteak-aura features and extension points
+//! DSL parsing with basic rumpsteak-aura features and extension points
 //! for future Aura-specific enhancements.
 
-use external_demo::choreography;
 use rumpsteak_aura::*;
 use futures::channel::mpsc::{UnboundedSender, UnboundedReceiver};
+use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str_with_extensions;
+use rumpsteak_aura_choreography::extensions::ExtensionRegistry;
 use serde::{Deserialize, Serialize};
 
 // Type definitions for the generated code
@@ -66,31 +67,25 @@ pub struct FinalSignature {
     pub completion_timestamp: u64,
 }
 
-// Define the threshold ceremony choreography with dynamic roles and namespace
-choreography! {
-    #[namespace = "threshold_ceremony"]
-    choreography ThresholdCeremony {
-        roles: Coordinator, Signer[N];
-        
-        // Phase 1: Ceremony Initiation (broadcast to all signers)
-        Coordinator -> Signer[*]: InitiateCeremony;
-        
-        // Phase 2: Commitment Collection (from all signers)
-        Signer[*] -> Coordinator: SigningCommitment;
-        
-        // Phase 3: Commitment Aggregation Broadcast (to all signers)
-        Coordinator -> Signer[*]: CommitmentAggregation;
-        
-        // Phase 4: Signature Share Collection (from all signers)
-        Signer[*] -> Coordinator: SignatureShare;
-        
-        // Phase 5: Final Signature Distribution (to all signers)
-        Coordinator -> Signer[*]: FinalSignature;
-    }
+const THRESHOLD_CEREMONY: &str = r#"
+module threshold_ceremony exposing (ThresholdCeremony)
+protocol ThresholdCeremony = {
+    roles Coordinator, Signer[N]
+
+    Coordinator -> Signer[*] : InitiateCeremony
+    Signer[*] -> Coordinator : SigningCommitment
+    Coordinator -> Signer[*] : CommitmentAggregation
+    Signer[*] -> Coordinator : SignatureShare
+    Coordinator -> Signer[*] : FinalSignature
 }
+"#;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Threshold Signing Ceremony Choreography ===\n");
+
+    let registry = ExtensionRegistry::new();
+    let (choreo, _) = parse_choreography_str_with_extensions(THRESHOLD_CEREMONY, &registry)?;
+    println!("Parsed protocol: {}", choreo.name);
 
     println!("This example demonstrates:");
     println!("- Complex multi-party protocol with external-demo");

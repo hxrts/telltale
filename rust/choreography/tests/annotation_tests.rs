@@ -401,37 +401,16 @@ fn test_broadcast_annotation_support() {
 }
 
 #[test]
-fn test_annotation_parsing_integration() {
-    // Test that annotations can be parsed from DSL syntax
+fn test_annotation_syntax_is_rejected() {
     let choreography_dsl = r#"
         #[version="1.0"]
-        #[author="test"]
-        choreography TestChoreography {
-            Alice, Bob
-            
-            #[priority="high"]
-            Alice -> Bob: Message
-        }
+        protocol TestChoreography =
+          roles Alice, Bob
+          Alice -> Bob : Message
     "#;
 
-    // This would test the full parsing pipeline if we had the complete implementation
-    // For now, we just test that the parse function exists
     let result = parse_choreography_str(choreography_dsl);
-
-    // The test may fail due to parsing issues, but we're testing the infrastructure
-    // In a complete implementation, we would verify:
-    // - Choreography has version="1.0" and author="test" attributes
-    // - The Send protocol has priority="high" annotation
-    match result {
-        Ok(_choreo) => {
-            // Success case - would check annotations here
-            println!("Parsing succeeded");
-        }
-        Err(_) => {
-            // Expected for now - parsing may not be fully implemented
-            println!("Parsing failed as expected - infrastructure is in place");
-        }
-    }
+    assert!(result.is_err(), "Annotation syntax should be rejected");
 }
 
 #[test]

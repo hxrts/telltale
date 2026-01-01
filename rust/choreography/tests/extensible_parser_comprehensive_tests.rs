@@ -139,6 +139,39 @@ impl ProtocolExtension for TestProtocolExtension {
 mod grammar_composition_tests {
     use super::*;
 
+    fn count_braces_outside_quotes(input: &str) -> (usize, usize) {
+        let mut open = 0;
+        let mut close = 0;
+        let mut in_string = false;
+        let mut escape = false;
+
+        for ch in input.chars() {
+            if in_string {
+                if escape {
+                    escape = false;
+                } else if ch == '\\' {
+                    escape = true;
+                } else if ch == '"' {
+                    in_string = false;
+                }
+                continue;
+            }
+
+            if ch == '"' {
+                in_string = true;
+                continue;
+            }
+
+            match ch {
+                '{' => open += 1,
+                '}' => close += 1,
+                _ => {}
+            }
+        }
+
+        (open, close)
+    }
+
     #[test]
     fn test_basic_grammar_composition() {
         let mut composer = GrammarComposer::new();
@@ -262,8 +295,7 @@ mod grammar_composition_tests {
         assert!(composed.contains("test_stmt"));
 
         // Should have proper structure
-        let open_braces = composed.chars().filter(|&c| c == '{').count();
-        let close_braces = composed.chars().filter(|&c| c == '}').count();
+        let (open_braces, close_braces) = count_braces_outside_quotes(&composed);
         assert_eq!(
             open_braces, close_braces,
             "Grammar should have balanced braces"
@@ -316,8 +348,8 @@ mod extension_parser_tests {
         let mut parser = ExtensionParser::new();
 
         let input = r#"
-            choreography TestProtocol {
-                roles: Alice, Bob
+            protocol TestProtocol = {
+                roles Alice, Bob
                 Alice -> Bob: Message
             }
         "#;
@@ -367,8 +399,8 @@ mod extension_parser_tests {
         parser.register_extension(TestGrammarExtension, TestStatementParser);
 
         let input = r#"
-            choreography LargeProtocol {
-                roles: A, B, C, D, E
+            protocol LargeProtocol = {
+                roles A, B, C, D, E
                 A -> B: Message1
                 B -> C: Message2
                 C -> D: Message3
@@ -397,14 +429,14 @@ mod feature_inheritance_tests {
     fn test_choice_construct_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            choreography ChoiceExample {
-                roles: Alice, Bob, Charlie
+            protocol ChoiceExample = {
+                roles Alice, Bob, Charlie
 
-                choice Alice {
-                    path1: {
+                choice at Alice {
+                    path1 -> {
                         Alice -> Bob: Request
                     }
-                    path2: {
+                    path2 -> {
                         Alice -> Charlie: Alternative
                     }
                 }
@@ -431,11 +463,11 @@ mod feature_inheritance_tests {
     fn test_parameterized_roles_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            choreography ParameterizedExample {
-                roles: Worker[N], Manager, Client[3]
+            protocol ParameterizedExample = {
+                roles Worker[N], Manager, Client[3]
 
                 Worker[*] -> Manager: Status
-                Manager -> Client[0]: Response;
+                Manager -> Client[0]: Response
             }
         "#,
         )
@@ -468,10 +500,10 @@ mod feature_inheritance_tests {
     fn test_loop_construct_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            choreography LoopExample {
-                roles: Producer, Consumer
+            protocol LoopExample = {
+                roles Producer, Consumer
 
-                loop {
+                loop forever {
                     Producer -> Consumer: Data
                 }
             }
@@ -498,8 +530,8 @@ mod feature_inheritance_tests {
     fn test_broadcast_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            choreography BroadcastExample {
-                roles: Server, Client1, Client2
+            protocol BroadcastExample = {
+                roles Server, Client1, Client2
 
                 Server ->*: Notification
             }
@@ -522,18 +554,18 @@ mod feature_inheritance_tests {
     fn test_complex_protocol_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            choreography ComplexExample {
-                roles: Coordinator, Worker[N], Client
+            protocol ComplexExample = {
+                roles Coordinator, Worker[N], Client
 
-                choice Coordinator {
-                    distribute: {
-                        loop {
+                choice at Coordinator {
+                    distribute -> {
+                        loop forever {
                             Coordinator -> Worker[*]: Task
                             Worker[*] -> Coordinator: Result
                         }
                         Coordinator -> Client: Summary
                     }
-                    direct: {
+                    direct -> {
                         Coordinator -> Client: DirectResponse
                     }
                 }
@@ -566,32 +598,33 @@ mod feature_inheritance_tests {
 }
 
 // ============================================================================
-// Backwards Compatibility Tests
+// Standard Syntax Tests
 // ============================================================================
 
 #[cfg(test)]
-mod backwards_compatibility_tests {
+mod standard_syntax_tests {
     use super::*;
 
     #[test]
     fn test_basic_choreography_compatibility() {
         let choreographies = [
             r#"
-                choreography Simple {
-                    roles: A, B
+                protocol Simple = {
+                    roles A, B
                     A -> B: Message
                 }
             "#,
             r#"
-                #[namespace = "custom"]
-                choreography WithNamespace {
-                    roles: X, Y
-                    X -> Y: Data
+                module custom exposing (WithNamespace)
+
+                protocol WithNamespace = {
+                    roles X, Y
+                    X -> Y : Data
                 }
             "#,
             r#"
-                choreography MultipleMessages {
-                    roles: Sender, Receiver
+                protocol MultipleMessages = {
+                    roles Sender, Receiver
                     Sender -> Receiver: Message1
                     Sender -> Receiver: Message2
                     Receiver -> Sender: Ack
@@ -617,19 +650,19 @@ mod backwards_compatibility_tests {
 
         let standard_choreographies = [
             r#"
-                choreography Test1 {
-                    roles: Alice, Bob
+                protocol Test1 = {
+                    roles Alice, Bob
                     Alice -> Bob: Hello
                 }
             "#,
             r#"
-                choreography Test2 {
-                    roles: X, Y, Z
-                    choice X {
-                        opt1: {
+                protocol Test2 = {
+                    roles X, Y, Z
+                    choice at X {
+                        opt1 -> {
                             X -> Y: Option1
                         }
-                        opt2: {
+                        opt2 -> {
                             X -> Z: Option2
                         }
                     }
@@ -701,11 +734,11 @@ mod error_handling_tests {
     #[test]
     fn test_invalid_choreography_syntax() {
         let invalid_choreographies = vec![
-            "not a choreography",
-            "choreography { }",
-            "choreography Test { roles:  }",
-            "choreography Test { roles: A, B A -> : Message; }",
-            "choreography Test { roles: A A -> B: Message }", // B not declared
+            "not a protocol",
+            "protocol { }",
+            "protocol Test = { roles }",
+            "protocol Test = { roles A, B A -> : Message }",
+            "protocol Test = { roles A A -> B: Message }", // B not declared
         ];
 
         for invalid in invalid_choreographies {
@@ -723,7 +756,7 @@ mod error_handling_tests {
         let mut parser = ExtensionParser::new();
         parser.register_extension(TestGrammarExtension, TestStatementParser);
 
-        let invalid_input = "choreography Test { invalid syntax }";
+        let invalid_input = "protocol Test = { invalid syntax }";
         let result = parser.parse_with_extensions(invalid_input);
 
         assert!(result.is_err());
@@ -759,17 +792,16 @@ mod error_handling_tests {
             // Empty roles
             (
                 r#"
-                choreography Empty {
-                    roles:
-                }
+                protocol Empty = {
+                    roles }
             "#,
                 false,
             ),
             // Single role
             (
                 r#"
-                choreography Single {
-                    roles: Alice
+                protocol Single = {
+                    roles Alice
                 }
             "#,
                 true,
@@ -777,8 +809,8 @@ mod error_handling_tests {
             // Role with special characters (should fail)
             (
                 r#"
-                choreography Special {
-                    roles: Role-With-Dashes
+                protocol Special = {
+                    roles Role-With-Dashes
                 }
             "#,
                 false,
@@ -800,8 +832,8 @@ mod error_handling_tests {
         // Test parsing performance with large choreography
         let mut large_choreo = String::from(
             r#"
-            choreography LargeExample {
-                roles: "#,
+            protocol LargeExample = {
+                roles "#,
         );
 
         // Add many roles
@@ -811,12 +843,12 @@ mod error_handling_tests {
                 large_choreo.push_str(", ");
             }
         }
-        large_choreo.push_str(";\n");
+        large_choreo.push('\n');
 
         // Add many message exchanges
         for i in 0..100 {
             large_choreo.push_str(&format!(
-                "                Role{} -> Role{}: Message{};\n",
+                "                Role{} -> Role{}: Message{}\n",
                 i % 100,
                 (i + 1) % 100,
                 i
@@ -844,8 +876,8 @@ mod error_handling_tests {
         parser.register_extension(TestGrammarExtension, TestStatementParser);
 
         let test_input = r#"
-            choreography BufferTest {
-                roles: A, B
+            protocol BufferTest = {
+                roles A, B
                 A -> B: Message
             }
         "#;
@@ -899,8 +931,8 @@ mod performance_tests {
         parser.register_extension(TestGrammarExtension, TestStatementParser);
 
         let medium_choreo = r#"
-            choreography MemoryTest {
-                roles: A, B, C, D, E, F, G, H, I, J
+            protocol MemoryTest = {
+                roles A, B, C, D, E, F, G, H, I, J
                 A -> B: M1 B -> C: M2 C -> D: M3 D -> E: M4 E -> F: M5
                 F -> G: M6 G -> H: M7 H -> I: M8 I -> J: M9 J -> A: M10
             }
@@ -955,8 +987,8 @@ mod integration_tests {
         // Test that the extension system works with external-macro-demo patterns
 
         let external_style_input = r#"
-            choreography AuraExample {
-                roles: Guardian, User, Validator
+            protocol AuraExample = {
+                roles Guardian, User, Validator
 
                 Guardian -> User: Challenge
                 User -> Validator: Proof
@@ -989,8 +1021,8 @@ mod integration_tests {
         // Test AST annotation system that external-macro-demo relies on
         let mut choreography = parse_choreography_str(
             r#"
-            choreography AnnotationTest {
-                roles: Alice, Bob
+            protocol AnnotationTest = {
+                roles Alice, Bob
                 Alice -> Bob: Message
             }
         "#,
@@ -1036,14 +1068,14 @@ mod regression_tests {
         // Regression test for complex feature combinations
         let choreography = parse_choreography_str(
             r#"
-            choreography Regression1 {
-                roles: Worker[N], Coordinator
+            protocol Regression1 = {
+                roles Worker[N], Coordinator
 
-                choice Coordinator {
-                    parallel: {
+                choice at Coordinator {
+                    parallel -> {
                         Worker[*] -> Coordinator: Status
                     }
-                    sequential: {
+                    sequential -> {
                         Worker[0] -> Coordinator: FirstStatus
                         Worker[1] -> Coordinator: SecondStatus
                     }
@@ -1067,23 +1099,23 @@ mod regression_tests {
         // Regression test for deeply nested structures
         let choreography = parse_choreography_str(
             r#"
-            choreography NestedExample {
-                roles: A, B, C
+            protocol NestedExample = {
+                roles A, B, C
 
-                choice A {
-                    path1: {
-                        loop {
-                            choice B {
-                                continue: {
+                choice at A {
+                    path1 -> {
+                        loop forever {
+                            choice at B {
+                                continue -> {
                                     B -> A: Continue
                                 }
-                                stop: {
+                                stop -> {
                                     B -> A: Stop
                                 }
                             }
                         }
                     }
-                    path2: {
+                    path2 -> {
                         A -> C: Direct
                     }
                 }

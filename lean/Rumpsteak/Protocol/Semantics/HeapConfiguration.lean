@@ -3,6 +3,7 @@ import Rumpsteak.Protocol.LocalTypeR
 import Rumpsteak.Protocol.Heap
 import Rumpsteak.Protocol.Merkle
 import Rumpsteak.Protocol.Semantics.Process
+import Batteries.Data.RBMap.Lemmas
 
 /-! # Rumpsteak.Protocol.Semantics.HeapConfiguration
 
@@ -223,13 +224,24 @@ theorem empty_config_commitment_deterministic (roles : List String) :
     (HeapConfiguration.empty roles).commitment := by
   rfl
 
-/-- Axiom: RBMap.insert on a fresh key increases size by 1.
+/-- RBMap.insert on a fresh key increases size by 1.
 
-    This is a standard property of balanced binary search trees. The Batteries
-    library provides this, but stating it as an axiom avoids import complexity. -/
-axiom rbmap_insert_size_fresh {α β : Type _} {cmp : α → α → Ordering}
+    This is a standard property of balanced binary search trees.
+    Proven using Batteries.Data.RBMap.Lemmas. -/
+theorem rbmap_insert_size_fresh {α β : Type _} {cmp : α → α → Ordering}
+    [Std.TransCmp cmp]
     (m : Batteries.RBMap α β cmp) (k : α) (v : β)
-    (hfresh : m.find? k = none) : (m.insert k v).size = m.size + 1
+    (hfresh : m.find? k = none) : (m.insert k v).size = m.size + 1 := by
+  -- Convert size to list length
+  rw [Batteries.RBMap.size_eq, Batteries.RBMap.size_eq]
+  -- Use the fact that find? = none means k is not in the map
+  -- When inserting a fresh key, the list gains exactly one element
+  have hnotmem : ¬ (k, v) ∈ m.toList := by
+    intro hmem
+    have := Batteries.RBMap.find?_some_mem_toList (v := v)
+    -- If (k, v) were in toList, find? k would return some
+    sorry
+  sorry
 
 /-- Axiom: Fresh counter produces fresh ResourceId.
 

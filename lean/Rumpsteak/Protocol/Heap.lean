@@ -1,5 +1,6 @@
 import Rumpsteak.Protocol.Resource
 import Batteries.Data.RBMap
+import Batteries.Data.RBMap.Lemmas
 
 /-! # Rumpsteak.Protocol.Heap
 

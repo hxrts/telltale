@@ -257,12 +257,7 @@ mod tests {
     fn test_standard_parsing() {
         let mut parser = ExtensionParser::new();
 
-        let input = r#"
-            choreography TestProtocol {
-                roles: Alice, Bob;
-                Alice -> Bob: Message;
-            }
-        "#;
+        let input = "protocol TestProtocol =\n  roles Alice, Bob\n  Alice -> Bob : Message\n";
 
         let result = parser.parse_with_extensions(input);
         assert!(result.is_ok(), "Should parse standard choreography");

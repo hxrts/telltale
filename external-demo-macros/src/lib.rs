@@ -12,12 +12,11 @@ mod choreography;
 /// Full-featured choreography! macro with ALL rumpsteak-aura features
 ///
 /// This macro provides access to ALL rumpsteak-aura features including:
-/// - Namespace attributes: `#[namespace = "my_protocol"]` 
+/// - Module declarations: `module my_protocol exposing (MyProtocol)`
 /// - Parameterized roles: `Worker[N]`, `Signer[*]`
 /// - Choice constructs: `choice at Role { ... }`
-/// - Loop constructs: `loop { ... }`
+/// - Loop constructs: `loop repeat N { ... }`, `loop decide by Role { ... }`
 /// - Extension system integration
-/// - Custom annotations
 ///
 /// # Example
 ///
@@ -25,19 +24,19 @@ mod choreography;
 /// use external_demo::choreography;
 ///
 /// choreography! {
-///     #[namespace = "threshold_ceremony"]
-///     protocol ThresholdExample {
-///         roles: Coordinator, Signer[N];
-///         
+///     module threshold_ceremony exposing (ThresholdExample)
+///     protocol ThresholdExample = {
+///         roles Coordinator, Signer[N]
+///
 ///         choice at Coordinator {
-///             start_ceremony: {
-///                 Coordinator -> Signer[*]: StartRequest;
-///                 Signer[*] -> Coordinator: Commitment;
-///                 Coordinator -> Signer[*]: Challenge;
-///                 Signer[*] -> Coordinator: Response;
+///             start_ceremony -> {
+///                 Coordinator -> Signer[*] : StartRequest
+///                 Signer[*] -> Coordinator : Commitment
+///                 Coordinator -> Signer[*] : Challenge
+///                 Signer[*] -> Coordinator : Response
 ///             }
-///             abort: {
-///                 Coordinator -> Signer[*]: Abort;  
+///             abort -> {
+///                 Coordinator -> Signer[*] : Abort
 ///             }
 ///         }
 ///     }
