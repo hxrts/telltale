@@ -5,6 +5,7 @@ import Rumpsteak.Protocol.Semantics.Process
 import Rumpsteak.Protocol.Semantics.Configuration
 import Rumpsteak.Protocol.Semantics.Reduction
 import Rumpsteak.Protocol.Semantics.Typing
+import Mathlib.Data.List.Nodup
 
 /-! # Rumpsteak.Proofs.Safety.Progress
 
@@ -94,20 +95,15 @@ as axioms to enable the main theorems. -/
 /-- Channel uniqueness in configurations.
 
     Well-formed configurations have at most one queue entry per channel.
-    This is an invariant of the enqueue/dequeue operations. -/
-axiom config_channel_unique (c : Configuration) (ch : Channel) (q1 q2 : Queue)
+    This holds when the list of channels is unique. -/
+theorem config_channel_unique (c : Configuration) (ch : Channel) (q1 q2 : Queue)
+    (hunique : (c.queues.map Prod.fst).Nodup)
     (h1 : (ch, q1) ∈ c.queues) (h2 : (ch, q2) ∈ c.queues)
-    : q1 = q2
-
-/-- If consume succeeds, the receiver's projection is not end.
-
-    When g.consume sender receiver label = some g', it means there's a
-    communication in g from sender to receiver with label. By projection,
-    receiver must have a recv type (not end) in g. -/
-axiom consume_implies_receiver_not_end (g g' : GlobalType) (sender receiver : String)
-    (label : Label)
-    (hcons : g.consume sender receiver label = some g')
-    : projectR g receiver ≠ .ok .end
+    : q1 = q2 := by
+  have hinj := List.inj_on_of_nodup_map (f := Prod.fst) (l := c.queues) hunique
+  have hpair : (ch, q1) = (ch, q2) := hinj h1 h2 rfl
+  cases hpair
+  rfl
 
 /-- GlobalTypeReducesStar preserves receiver typing.
 
@@ -119,6 +115,20 @@ axiom reduces_star_preserves_receiver_alive (g g' : GlobalType) (sender receiver
     (hred : GlobalTypeReducesStar g g')
     (hcons : g'.consume sender receiver label ≠ none)
     : projectR g receiver ≠ .ok .end
+
+/-- If consume succeeds, the receiver's projection is not end.
+
+    When g.consume sender receiver label = some g', it means there's a
+    communication in g from sender to receiver with label. By projection,
+    receiver must have a recv type (not end) in g. -/
+theorem consume_implies_receiver_not_end (g g' : GlobalType) (sender receiver : String)
+    (label : Label)
+    (hcons : g.consume sender receiver label = some g')
+    : projectR g receiver ≠ .ok .end := by
+  have hcons' : g.consume sender receiver label ≠ none := by
+    simpa [hcons]
+  exact reduces_star_preserves_receiver_alive g g sender receiver label
+    (GlobalTypeReducesStar.refl g) hcons'
 
 /-- Configuration completeness: if a queue exists for a channel, both roles are in the configuration.
 
@@ -150,18 +160,7 @@ axiom sender_role_exists (g : GlobalType) (c : Configuration)
     (hproj : projectR g role = .ok (.recv sender branches))
     : ∃ rp ∈ c.processes, rp.role = sender
 
-/-- Process with send type has send process shape.
 
-    If a process is well-typed with send type, it must be either:
-    - A send process (can reduce)
-    - A cond/rec that evaluates to send (can reduce)
-    This axiom captures the shape correspondence. -/
-axiom wellTyped_send_type_can_reduce (g : GlobalType) (c : Configuration)
-    (sender receiver : String) (branches : List (Label × LocalTypeR))
-    (hwt : ConfigWellTyped g c)
-    (hproj : projectR g sender = .ok (.send receiver branches))
-    (hsender_exists : ∃ rp ∈ c.processes, rp.role = sender)
-    : ∃ c', Reduces c c'
 
 /-- Inaction is well-typed only at type `end`. -/
 theorem wellTyped_inaction_implies_end (lt : LocalTypeR)
@@ -401,6 +400,68 @@ theorem rec_can_reduce (c : Configuration) (role x : String) (body : Process)
     (hrp : c.getProcess role = some (.recurse x body))
     : ∃ c', Reduces c c' := by
   exact ⟨_, Reduces.recurse c role x body hrp⟩
+
+/-- Process with send type can reduce.
+
+    If a process is well-typed with send type, it must be either:
+    - A send process (can reduce)
+    - A cond/rec that evaluates to send (can reduce) -/
+theorem wellTyped_send_type_can_reduce (g : GlobalType) (c : Configuration)
+    (sender receiver : String) (branches : List (Label × LocalTypeR))
+    (hwt : ConfigWellTyped g c)
+    (hproj : projectR g sender = .ok (.send receiver branches))
+    (hsender_exists : ∃ rp ∈ c.processes, rp.role = sender)
+    : ∃ c', Reduces c c' := by
+  obtain ⟨huniqueRoles, hallwt⟩ := hwt
+  obtain ⟨rp, hrp_mem, hrp_role⟩ := hsender_exists
+  have hunique : ∀ rp' ∈ c.processes, rp'.role = rp.role → rp' = rp := by
+    intro rp' hrp'_mem hrole_eq
+    exact Configuration.role_uniqueness_from_hasUniqueRoles c huniqueRoles rp' rp hrp'_mem hrp_mem hrole_eq
+  have hget' : c.getProcess rp.role = some rp.process :=
+    mem_getProcess c rp hrp_mem hunique
+  have hget : c.getProcess sender = some rp.process := by
+    simpa [hrp_role] using hget'
+  -- Extract the local typing for this role process
+  have hrpwt := hallwt rp hrp_mem
+  unfold RoleProcessWellTyped at hrpwt
+  have hproj' : projectR g rp.role = .ok (.send receiver branches) := by
+    simpa [hrp_role] using hproj
+  have hrpwt' : WellTyped [] rp.process (.send receiver branches) := by
+    simpa [hproj'] using hrpwt
+  -- Case analysis on the process shape
+  cases hp : rp.process with
+  | inaction =>
+    have hwt : WellTyped [] .inaction (.send receiver branches) := by
+      simpa [hp] using hrpwt'
+    cases hwt
+  | send receiver' label value cont =>
+    have hget'' : c.getProcess sender = some (.send receiver' label value cont) := by
+      simpa [hp] using hget
+    exact send_can_reduce c sender receiver' label value cont hget''
+  | recv sender' branches' =>
+    have hwt : WellTyped [] (.recv sender' branches') (.send receiver branches) := by
+      simpa [hp] using hrpwt'
+    cases hwt
+  | cond b p q =>
+    have hget'' : c.getProcess sender = some (.cond b p q) := by
+      simpa [hp] using hget
+    exact cond_can_reduce c sender b p q hget''
+  | recurse x body =>
+    have hget'' : c.getProcess sender = some (.recurse x body) := by
+      simpa [hp] using hget
+    exact rec_can_reduce c sender x body hget''
+  | var x =>
+    have hwt : WellTyped [] (.var x) (.send receiver branches) := by
+      simpa [hp] using hrpwt'
+    cases hwt with
+    | var hlookup =>
+      unfold TypingContext.lookup at hlookup
+      simp only [List.find?_nil, Option.map] at hlookup
+      cases hlookup
+  | par p q =>
+    have hwt : WellTyped [] (.par p q) (.send receiver branches) := by
+      simpa [hp] using hrpwt'
+    cases hwt
 
 /-- Progress theorem.
 
