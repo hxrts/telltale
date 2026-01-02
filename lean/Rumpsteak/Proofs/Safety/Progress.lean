@@ -41,6 +41,14 @@ open Rumpsteak.Protocol.Semantics.Typing
 
 /-! ## Claims -/
 
+/-- Synchronous projection duality.
+
+    In sync semantics, if role has recv type from sender, sender has send type to role. -/
+def ProjectionDualitySync (g : GlobalType) : Prop :=
+  ∀ role sender branches,
+    projectR g role = .ok (.recv sender branches) →
+    ∃ senderBranches, projectR g sender = .ok (.send role senderBranches)
+
 /-- Progress: well-typed, non-terminated configurations can reduce.
 
     Theorem 2 (Yoshida & Gheri):
@@ -50,7 +58,9 @@ open Rumpsteak.Protocol.Semantics.Typing
     Formal: ∀ G M, ⊢ M : G → ¬ M.isDone → ∃ M'. M → M' -/
 def Progress : Prop :=
   ∀ (g : GlobalType) (c : Configuration),
-    ConfigWellTyped g c → ¬ c.isDone → ∃ c', Reduces c c'
+    ConfigWellTyped g c →
+    ProjectionDualitySync g →
+    ¬ c.isDone → ∃ c', Reduces c c'
 
 /-- Deadlock Freedom: well-typed configurations never get stuck.
 
@@ -60,7 +70,9 @@ def Progress : Prop :=
     Formal: ∀ G M, ⊢ M : G → ¬ isStuck M -/
 def DeadlockFreedom : Prop :=
   ∀ (g : GlobalType) (c : Configuration),
-    ConfigWellTyped g c → ¬ isStuck c
+    ConfigWellTyped g c →
+    ProjectionDualitySync g →
+    ¬ isStuck c
 
 /-- Claims bundle for progress properties. -/
 structure Claims where
@@ -145,10 +157,12 @@ axiom config_queue_implies_role (c : Configuration) (ch : Channel) (q : Queue)
 
     In async semantics, the sender may have already sent and advanced,
     but in sync (empty queues), both roles are at matching points. -/
-axiom projection_duality_sync (g : GlobalType) (role sender : String)
+theorem projection_duality_sync (g : GlobalType) (role sender : String)
     (branches : List (Label × LocalTypeR))
+    (hdual : ProjectionDualitySync g)
     (hproj : projectR g role = .ok (.recv sender branches))
-    : ∃ senderBranches, projectR g sender = .ok (.send role senderBranches)
+    : ∃ senderBranches, projectR g sender = .ok (.send role senderBranches) := by
+  exact hdual role sender branches hproj
 
 /-- Sender role exists in configuration if receiver has recv type.
 
@@ -268,56 +282,27 @@ axiom terminated_config_queues_empty (g : GlobalType) (c : Configuration)
     (hterm : c.processes.all (fun rp => rp.process.isTerminated))
     : c.queues.all (fun (_, q) => q.isEmpty)
 
-/-- Recv progress for sync semantics: if a receiver is waiting, sender can send.
-
-    In synchronous semantics (empty queues), if receiver has recv type,
-    sender must have send type and can reduce via send.
-
-    This is the duality theorem for synchronous session types. -/
-axiom recv_can_progress_sync (g : GlobalType) (c : Configuration) (role sender : String)
-    (branches : List (Label × Process))
-    (hwt : ConfigWellTypedSync g c)
-    (hget : c.getProcess role = some (.recv sender branches))
-    : ∃ c', Reduces c c'
-
-/-- Recv progress axiom: if a receiver is waiting, some role can reduce.
-
-    **THEORETICAL JUSTIFICATION**
-
-    This is the key duality property of session types: every receive has a matching send.
-    The global type ensures that communication patterns are balanced.
-
-    PROOF SKETCH (Session type theory, Yoshida & Gheri):
-
-    Given: Role r has process `.recv s branches`, i.e., type `?s{ℓᵢ.Tᵢ}`
-
-    **Case 1:** Queue from s→r is non-empty
-    - There's a message `msg` at the head of the queue
-    - By queue-type correspondence, msg.label matches some branch
-    - Role r can dequeue via `Reduces.recv`
-
-    **Case 2:** Queue from s→r is empty (sync semantics)
-    - By projection duality: sender s has type `!r{...}` (send to r)
-    - By well-typedness, s's process can reduce via `Reduces.send`
-
-    Either way, SOME role can reduce, satisfying `∃ c', Reduces c c'`
-
-    **References:**
-    - Yoshida & Gheri 2021: Theorem 2 (Progress)
-    - Honda, Vasconcelos, Kubo ESOP 1998: Duality in session types
-    - Gay & Hole, Acta Informatica 2005: Subtyping preserves duality -/
-axiom recv_can_progress (g : GlobalType) (c : Configuration) (role sender : String)
-    (branches : List (Label × Process))
-    (hwt : ConfigWellTyped g c)
-    (hget : c.getProcess role = some (.recv sender branches))
-    : ∃ c', Reduces c c'
+/-- Helper: If getProcess succeeds, the role process exists in the list. -/
+theorem getProcess_implies_mem (c : Configuration) (role : String) (p : Process)
+    (hget : c.getProcess role = some p)
+    : ∃ rp ∈ c.processes, rp.role = role ∧ rp.process = p := by
+  unfold Configuration.getProcess at hget
+  cases hfind : c.processes.find? (fun rp => rp.role == role) with
+  | none =>
+    simp [hfind] at hget
+  | some rp =>
+    simp [hfind] at hget
+    refine ⟨rp, ?_, ?_, hget⟩
+    · exact List.mem_of_find?_eq_some hfind
+    · have hpred := find?_pred_holds (p := fun rp : RoleProcess => rp.role == role) hfind
+      exact beq_iff_eq.mp hpred
 
 /-- Deadlock freedom follows from progress. -/
 theorem deadlock_freedom_from_progress (h : Progress) : DeadlockFreedom := by
-  intro g c hwt hstuck
+  intro g c hwt hdual hstuck
   unfold isStuck at hstuck
   obtain ⟨hnotdone, hnoreduce⟩ := hstuck
-  have ⟨c', hred⟩ := h g c hwt hnotdone
+  have ⟨c', hred⟩ := h g c hwt hdual hnotdone
   exact hnoreduce c' hred
 
 /-- Helper lemma for exists_active_process. -/
@@ -369,10 +354,10 @@ private theorem mem_implies_find? {α : Type _} (l : List α) (p : α → Bool) 
     For a proper proof, we'd need this as an invariant on Configuration. -/
 theorem mem_getProcess (c : Configuration) (rp : RoleProcess)
     (hmem : rp ∈ c.processes)
-    (hunique : ∀ rp' ∈ c.processes, rp'.role = rp.role → rp' = rp)
-    : c.getProcess rp.role = some rp.process := by
+    (hunique : ∀ rp' ∈ c.processes, rp'.role = RoleProcess.role rp → rp' = rp)
+    : c.getProcess (RoleProcess.role rp) = some (RoleProcess.process rp) := by
   unfold Configuration.getProcess
-  have hfind : c.processes.find? (fun r => r.role == rp.role) = some rp := by
+  have hfind : c.processes.find? (fun r => r.role == RoleProcess.role rp) = some rp := by
     apply mem_implies_find?
     · exact hmem
     · simp only [beq_self_eq_true]
@@ -463,6 +448,92 @@ theorem wellTyped_send_type_can_reduce (g : GlobalType) (c : Configuration)
       simpa [hp] using hrpwt'
     cases hwt
 
+/-- Recv progress for sync semantics: if a receiver is waiting, sender can send.
+
+    In synchronous semantics (empty queues), if receiver has recv type,
+    sender must have send type and can reduce via send.
+
+    This is the duality theorem for synchronous session types. -/
+private theorem recv_can_progress_core (g : GlobalType) (c : Configuration) (role sender : String)
+    (branches : List (Label × Process))
+    (hwt : ConfigWellTyped g c)
+    (hdual : ProjectionDualitySync g)
+    (hget : c.getProcess role = some (.recv sender branches))
+    : ∃ c', Reduces c c' := by
+  obtain ⟨huniqueRoles, hallwt⟩ := hwt
+  obtain ⟨rp, hrp_mem, hrp_role, hrp_proc⟩ :=
+    getProcess_implies_mem c role (.recv sender branches) hget
+  -- Get the typing derivation for this role process
+  have hrpwt := hallwt rp hrp_mem
+  unfold RoleProcessWellTyped at hrpwt
+  have hrpwt' :
+      match projectR g role with
+      | .ok lt => WellTyped [] rp.process lt
+      | .error _ => False := by
+    simpa [hrp_role] using hrpwt
+  cases hprojRole : projectR g role with
+  | error e =>
+    have : False := by
+      simpa [hprojRole] using hrpwt'
+    exact False.elim this
+  | ok lt =>
+    have hwt_proc : WellTyped [] rp.process lt := by
+      simpa [hprojRole] using hrpwt'
+    have hwt_recv : WellTyped [] (.recv sender branches) lt := by
+      simpa [hrp_proc] using hwt_proc
+    obtain ⟨types, hlt, _hlen, _hall, _hlabel⟩ :=
+      wellTyped_recv_inversion [] sender branches lt hwt_recv
+    have hproj : projectR g role = .ok (.recv sender types) := by
+      simpa [hprojRole, hlt]
+    obtain ⟨senderBranches, hprojSender⟩ :=
+      projection_duality_sync g role sender types hdual hproj
+    have hsender_exists : ∃ rp ∈ c.processes, rp.role = sender :=
+      sender_role_exists g c role sender types ⟨huniqueRoles, hallwt⟩ hproj
+    exact wellTyped_send_type_can_reduce g c sender role senderBranches
+      ⟨huniqueRoles, hallwt⟩ hprojSender hsender_exists
+
+theorem recv_can_progress_sync (g : GlobalType) (c : Configuration) (role sender : String)
+    (branches : List (Label × Process))
+    (hwt : ConfigWellTypedSync g c)
+    (hdual : ProjectionDualitySync g)
+    (hget : c.getProcess role = some (.recv sender branches))
+    : ∃ c', Reduces c c' := by
+  exact recv_can_progress_core g c role sender branches hwt.1 hdual hget
+
+/-- Recv progress axiom: if a receiver is waiting, some role can reduce.
+
+    **THEORETICAL JUSTIFICATION**
+
+    This is the key duality property of session types: every receive has a matching send.
+    The global type ensures that communication patterns are balanced.
+
+    PROOF SKETCH (Session type theory, Yoshida & Gheri):
+
+    Given: Role r has process `.recv s branches`, i.e., type `?s{ℓᵢ.Tᵢ}`
+
+    **Case 1:** Queue from s→r is non-empty
+    - There's a message `msg` at the head of the queue
+    - By queue-type correspondence, msg.label matches some branch
+    - Role r can dequeue via `Reduces.recv`
+
+    **Case 2:** Queue from s→r is empty (sync semantics)
+    - By projection duality: sender s has type `!r{...}` (send to r)
+    - By well-typedness, s's process can reduce via `Reduces.send`
+
+    Either way, SOME role can reduce, satisfying `∃ c', Reduces c c'`
+
+    **References:**
+    - Yoshida & Gheri 2021: Theorem 2 (Progress)
+    - Honda, Vasconcelos, Kubo ESOP 1998: Duality in session types
+    - Gay & Hole, Acta Informatica 2005: Subtyping preserves duality -/
+theorem recv_can_progress (g : GlobalType) (c : Configuration) (role sender : String)
+    (branches : List (Label × Process))
+    (hwt : ConfigWellTyped g c)
+    (hdual : ProjectionDualitySync g)
+    (hget : c.getProcess role = some (.recv sender branches))
+    : ∃ c', Reduces c c' := by
+  exact recv_can_progress_core g c role sender branches hwt hdual hget
+
 /-- Progress theorem.
 
     Proof outline (Theorem 2, Yoshida & Gheri):
@@ -475,7 +546,7 @@ theorem wellTyped_send_type_can_reduce (g : GlobalType) (c : Configuration)
     3. The key insight for recv is that the global type ensures
        matching send/recv pairs -/
 theorem progress : Progress := by
-  intro g c hwt hnotdone
+  intro g c hwt hdual hnotdone
   -- Extract the unique roles property and role process typing from well-typedness
   obtain ⟨huniqueRoles, hallwt⟩ := hwt
   -- If not done, either some process is not terminated or some queue is not empty
@@ -511,7 +582,7 @@ theorem progress : Progress := by
       -- Use recv_can_progress axiom (session type duality)
       have hget := mem_getProcess c rp hrp_mem hunique
       rw [hp] at hget
-      exact recv_can_progress g c rp.role sender branches ⟨huniqueRoles, hallwt⟩ hget
+      exact recv_can_progress g c rp.role sender branches ⟨huniqueRoles, hallwt⟩ hdual hget
     | cond b p q =>
       -- Conditional can always reduce
       have hget := mem_getProcess c rp hrp_mem hunique

@@ -194,10 +194,55 @@ theorem mapM_result_member {α β : Type} {f : α → Except ε β}
           exact ⟨x', List.mem_cons_of_mem x hx'mem, hfx'⟩
 
 /-- Helper: mapM producing singleton means input is singleton. -/
-axiom mapM_singleton_input {α β ε : Type} {f : α → Except ε β}
+theorem mapM_singleton_input {α β ε : Type} {f : α → Except ε β}
     {xs : List α} {y : β}
     (hmap : xs.mapM f = .ok [y])
-    : ∃ x, xs = [x] ∧ f x = .ok y
+    : ∃ x, xs = [x] ∧ f x = .ok y := by
+  induction xs with
+  | nil =>
+    simp [List.mapM_nil] at hmap
+    cases hmap
+  | cons x xs ih =>
+    simp [List.mapM_cons, bind, Except.bind] at hmap
+    cases hfx : f x with
+    | error e =>
+      simp [hfx] at hmap
+    | ok b =>
+      simp [hfx] at hmap
+      cases hrest : xs.mapM f with
+      | error e =>
+        simp [hrest] at hmap
+      | ok bs =>
+        simp [hrest] at hmap
+        cases bs with
+        | nil =>
+          have hb : b = y := by
+            -- Extract list equality from the Except equality
+            have hlist : ([b] : List β) = [y] := by
+              cases hmap
+              rfl
+            simpa using hlist
+          subst hb
+          cases xs with
+          | nil =>
+            refine ⟨x, rfl, ?_⟩
+            simpa [hfx]
+          | cons x' xs' =>
+            -- mapM on a non-empty list cannot produce []
+            cases hfx' : f x' with
+            | error e =>
+              simp [List.mapM_cons, hfx'] at hrest
+              cases hrest
+            | ok b' =>
+              cases hrest' : xs'.mapM f with
+              | error e =>
+                simp [List.mapM_cons, hfx', hrest'] at hrest
+                cases hrest
+              | ok bs' =>
+                simp [List.mapM_cons, hfx', hrest'] at hrest
+                cases hrest
+        | cons b' bs' =>
+          cases hmap
 
 /-- If mapM on branches gives [(l, t)], and we find a branch with matching label,
     that branch's projection is t. -/
