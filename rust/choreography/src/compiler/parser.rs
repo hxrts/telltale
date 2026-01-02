@@ -1838,6 +1838,115 @@ fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> P
                     body: Box::new(heartbeat_send),
                 }
             }
+            // RoleDecides desugars to choice+rec pattern (Option B: fused with first message)
+            //   loop decide by Client { Client -> Server: Request; ... }
+            // becomes:
+            //   rec RoleDecidesLoop {
+            //       choice at Client {
+            //           Request { Client -> Server: Request; ...; continue RoleDecidesLoop }
+            //           Done { Client -> Server: Done }
+            //       }
+            //   }
+            Statement::Loop {
+                condition: Some(Condition::RoleDecides(deciding_role)),
+                body,
+            } => {
+                // Check if first statement is a Send from the deciding role
+                if let Some(Statement::Send {
+                    from,
+                    to,
+                    message,
+                    annotations: send_annotations,
+                    from_annotations,
+                    to_annotations,
+                }) = body.first()
+                {
+                    if from == deciding_role {
+                        let rec_label = format_ident!("RoleDecidesLoop");
+                        let remaining_body: Vec<_> =
+                            body.iter().skip(1).cloned().collect();
+
+                        // Build continue branch: remaining body + continue
+                        let mut continue_body = remaining_body;
+                        continue_body.push(Statement::Continue {
+                            label: rec_label.clone(),
+                        });
+                        let continue_protocol =
+                            convert_statements_to_protocol(&continue_body, roles);
+
+                        // The continue branch includes the first send
+                        let continue_branch_protocol = Protocol::Send {
+                            from: from.clone(),
+                            to: to.clone(),
+                            message: MessageType {
+                                name: message.name.clone(),
+                                type_annotation: message.type_annotation.clone(),
+                                payload: message.payload.clone(),
+                            },
+                            continuation: Box::new(continue_protocol),
+                            annotations: Annotations::from_legacy_map(send_annotations),
+                            from_annotations: Annotations::from_legacy_map(from_annotations),
+                            to_annotations: Annotations::from_legacy_map(to_annotations),
+                        };
+
+                        let continue_branch = Branch {
+                            label: message.name.clone(),
+                            guard: None,
+                            protocol: continue_branch_protocol,
+                        };
+
+                        // Build done branch: deciding role sends Done, then continue with
+                        // whatever comes after the loop (stored in `current`)
+                        let done_branch_protocol = Protocol::Send {
+                            from: from.clone(),
+                            to: to.clone(),
+                            message: MessageType {
+                                name: format_ident!("Done"),
+                                type_annotation: None,
+                                payload: None,
+                            },
+                            continuation: Box::new(current),
+                            annotations: Annotations::new(),
+                            from_annotations: Annotations::new(),
+                            to_annotations: Annotations::new(),
+                        };
+
+                        let done_branch = Branch {
+                            label: format_ident!("Done"),
+                            guard: None,
+                            protocol: done_branch_protocol,
+                        };
+
+                        // Build the choice at the deciding role
+                        let choice = Protocol::Choice {
+                            role: deciding_role.clone(),
+                            branches: NonEmptyVec::from_head_tail(
+                                continue_branch,
+                                vec![done_branch],
+                            ),
+                            annotations: Annotations::new(),
+                        };
+
+                        // Wrap in recursion
+                        Protocol::Rec {
+                            label: rec_label,
+                            body: Box::new(choice),
+                        }
+                    } else {
+                        // First statement is a Send but not from deciding role - keep as Loop
+                        Protocol::Loop {
+                            condition: Some(Condition::RoleDecides(deciding_role.clone())),
+                            body: Box::new(convert_statements_to_protocol(body, roles)),
+                        }
+                    }
+                } else {
+                    // First statement is not a Send - keep as Loop (runner will produce error)
+                    Protocol::Loop {
+                        condition: Some(Condition::RoleDecides(deciding_role.clone())),
+                        body: Box::new(convert_statements_to_protocol(body, roles)),
+                    }
+                }
+            }
             Statement::Loop { condition, body } => Protocol::Loop {
                 condition: condition.clone(),
                 body: Box::new(convert_statements_to_protocol(body, roles)),
@@ -2236,6 +2345,578 @@ protocol DecideLoop =
             "Failed to parse decide loop: {:?}",
             result.err()
         );
+    }
+
+    #[test]
+    fn test_role_decides_desugaring() {
+        // RoleDecides loops should be desugared to choice+rec pattern (Option B: fused)
+        // loop decide by Client { Client -> Server: Ping; ... }
+        // becomes:
+        //   rec RoleDecidesLoop {
+        //       choice at Client {
+        //           Ping { Client -> Server: Ping; ...; continue }
+        //           Done { Client -> Server: Done }
+        //       }
+        //   }
+        let input = r#"
+protocol DecideLoop =
+  roles Client, Server
+  loop decide by Client
+    Client -> Server : Ping
+    Server -> Client : Pong
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse decide loop: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { label, body } => {
+                assert_eq!(label.to_string(), "RoleDecidesLoop");
+                match body.as_ref() {
+                    Protocol::Choice { role, branches, .. } => {
+                        assert_eq!(role.name().to_string(), "Client");
+                        assert_eq!(branches.len(), 2);
+
+                        // First branch should be the continue branch (using first message label)
+                        let continue_branch = branches.first();
+                        assert_eq!(continue_branch.label.to_string(), "Ping");
+
+                        // Inside the continue branch, we should have the Send
+                        match &continue_branch.protocol {
+                            Protocol::Send {
+                                from,
+                                to,
+                                message,
+                                continuation,
+                                ..
+                            } => {
+                                assert_eq!(from.name().to_string(), "Client");
+                                assert_eq!(to.name().to_string(), "Server");
+                                assert_eq!(message.name.to_string(), "Ping");
+
+                                // Continuation should be the response followed by Var (continue)
+                                match continuation.as_ref() {
+                                    Protocol::Send {
+                                        from,
+                                        to,
+                                        message,
+                                        continuation,
+                                        ..
+                                    } => {
+                                        assert_eq!(from.name().to_string(), "Server");
+                                        assert_eq!(to.name().to_string(), "Client");
+                                        assert_eq!(message.name.to_string(), "Pong");
+
+                                        // Should end with Var (continue RoleDecidesLoop)
+                                        match continuation.as_ref() {
+                                            Protocol::Var(label) => {
+                                                assert_eq!(label.to_string(), "RoleDecidesLoop");
+                                            }
+                                            _ => panic!("Expected Var for continue, got {:?}", continuation),
+                                        }
+                                    }
+                                    _ => panic!("Expected Send for Pong, got {:?}", continuation),
+                                }
+                            }
+                            _ => panic!("Expected Send for Ping, got {:?}", continue_branch.protocol),
+                        }
+
+                        // Second branch should be Done
+                        let done_branch = &branches.as_slice()[1];
+                        assert_eq!(done_branch.label.to_string(), "Done");
+                        match &done_branch.protocol {
+                            Protocol::Send {
+                                from,
+                                to,
+                                message,
+                                continuation,
+                                ..
+                            } => {
+                                assert_eq!(from.name().to_string(), "Client");
+                                assert_eq!(to.name().to_string(), "Server");
+                                assert_eq!(message.name.to_string(), "Done");
+                                assert!(matches!(continuation.as_ref(), Protocol::End));
+                            }
+                            _ => panic!("Expected Send for Done, got {:?}", done_branch.protocol),
+                        }
+                    }
+                    _ => panic!("Expected Choice inside Rec, got {:?}", body),
+                }
+            }
+            _ => panic!("Expected Rec at top level, got {:?}", choreo.protocol),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_wrong_first_sender_no_desugar() {
+        // When the first statement is a Send but NOT from the deciding role,
+        // the loop should NOT be desugared and should remain as Protocol::Loop
+        let input = r#"
+protocol WrongSender =
+  roles Client, Server
+  loop decide by Client
+    Server -> Client : Response
+    Client -> Server : Ack
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        // Should remain as Loop, not desugared to Rec
+        match &choreo.protocol {
+            Protocol::Loop { condition, .. } => {
+                match condition {
+                    Some(Condition::RoleDecides(role)) => {
+                        assert_eq!(role.name().to_string(), "Client");
+                    }
+                    _ => panic!("Expected RoleDecides condition"),
+                }
+            }
+            _ => panic!("Expected Loop (not desugared) when first sender doesn't match deciding role"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_single_message() {
+        // Minimal case: loop with just one message
+        let input = r#"
+protocol SingleMessage =
+  roles A, B
+  loop decide by A
+    A -> B : Msg
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { label, body } => {
+                assert_eq!(label.to_string(), "RoleDecidesLoop");
+                match body.as_ref() {
+                    Protocol::Choice { role, branches, .. } => {
+                        assert_eq!(role.name().to_string(), "A");
+                        assert_eq!(branches.len(), 2);
+
+                        // Continue branch
+                        let continue_branch = branches.first();
+                        assert_eq!(continue_branch.label.to_string(), "Msg");
+                        match &continue_branch.protocol {
+                            Protocol::Send { message, continuation, .. } => {
+                                assert_eq!(message.name.to_string(), "Msg");
+                                // Should directly continue (no more statements)
+                                assert!(matches!(continuation.as_ref(), Protocol::Var(_)));
+                            }
+                            _ => panic!("Expected Send"),
+                        }
+
+                        // Done branch
+                        let done_branch = &branches.as_slice()[1];
+                        assert_eq!(done_branch.label.to_string(), "Done");
+                    }
+                    _ => panic!("Expected Choice"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_three_roles() {
+        // Test with three roles where deciding role sends to one, then another responds
+        let input = r#"
+protocol ThreeRoles =
+  roles Client, Server, Logger
+  loop decide by Client
+    Client -> Server : Request
+    Server -> Logger : Log
+    Logger -> Client : Ack
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { body, .. } => {
+                match body.as_ref() {
+                    Protocol::Choice { role, branches, .. } => {
+                        assert_eq!(role.name().to_string(), "Client");
+
+                        let continue_branch = branches.first();
+                        assert_eq!(continue_branch.label.to_string(), "Request");
+
+                        // Verify the chain: Request -> Log -> Ack -> continue
+                        match &continue_branch.protocol {
+                            Protocol::Send { from, to, message, continuation, .. } => {
+                                assert_eq!(from.name().to_string(), "Client");
+                                assert_eq!(to.name().to_string(), "Server");
+                                assert_eq!(message.name.to_string(), "Request");
+
+                                match continuation.as_ref() {
+                                    Protocol::Send { from, to, message, continuation, .. } => {
+                                        assert_eq!(from.name().to_string(), "Server");
+                                        assert_eq!(to.name().to_string(), "Logger");
+                                        assert_eq!(message.name.to_string(), "Log");
+
+                                        match continuation.as_ref() {
+                                            Protocol::Send { from, to, message, continuation, .. } => {
+                                                assert_eq!(from.name().to_string(), "Logger");
+                                                assert_eq!(to.name().to_string(), "Client");
+                                                assert_eq!(message.name.to_string(), "Ack");
+                                                assert!(matches!(continuation.as_ref(), Protocol::Var(_)));
+                                            }
+                                            _ => panic!("Expected Send for Ack"),
+                                        }
+                                    }
+                                    _ => panic!("Expected Send for Log"),
+                                }
+                            }
+                            _ => panic!("Expected Send for Request"),
+                        }
+
+                        // Done branch sends to Server (same as first message target)
+                        let done_branch = &branches.as_slice()[1];
+                        match &done_branch.protocol {
+                            Protocol::Send { from, to, .. } => {
+                                assert_eq!(from.name().to_string(), "Client");
+                                assert_eq!(to.name().to_string(), "Server");
+                            }
+                            _ => panic!("Expected Send in Done branch"),
+                        }
+                    }
+                    _ => panic!("Expected Choice"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_with_type_annotation() {
+        // Test that type annotations are preserved through desugaring
+        let input = r#"
+protocol TypedLoop =
+  roles Client, Server
+  loop decide by Client
+    Client -> Server : Request<String>
+    Server -> Client : Response<u32>
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { body, .. } => {
+                match body.as_ref() {
+                    Protocol::Choice { branches, .. } => {
+                        let continue_branch = branches.first();
+                        match &continue_branch.protocol {
+                            Protocol::Send { message, continuation, .. } => {
+                                assert_eq!(message.name.to_string(), "Request");
+                                // Type annotation should be preserved
+                                assert!(message.type_annotation.is_some());
+                                let type_str = message.type_annotation.as_ref().unwrap().to_string();
+                                assert!(type_str.contains("String"), "Expected String type, got: {}", type_str);
+
+                                match continuation.as_ref() {
+                                    Protocol::Send { message, .. } => {
+                                        assert_eq!(message.name.to_string(), "Response");
+                                        assert!(message.type_annotation.is_some());
+                                        let type_str = message.type_annotation.as_ref().unwrap().to_string();
+                                        assert!(type_str.contains("u32"), "Expected u32 type, got: {}", type_str);
+                                    }
+                                    _ => panic!("Expected Send for Response"),
+                                }
+                            }
+                            _ => panic!("Expected Send for Request"),
+                        }
+                    }
+                    _ => panic!("Expected Choice"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_first_stmt_is_choice_no_desugar() {
+        // When the first statement is NOT a Send (e.g., it's a choice),
+        // the loop should NOT be desugared
+        let input = r#"
+protocol FirstIsChoice =
+  roles A, B
+  loop decide by A
+    choice at A
+      opt1 ->
+        A -> B : Msg1
+      opt2 ->
+        A -> B : Msg2
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        // Should remain as Loop, not desugared
+        match &choreo.protocol {
+            Protocol::Loop { condition, body } => {
+                match condition {
+                    Some(Condition::RoleDecides(role)) => {
+                        assert_eq!(role.name().to_string(), "A");
+                    }
+                    _ => panic!("Expected RoleDecides condition"),
+                }
+                // Body should be a Choice
+                match body.as_ref() {
+                    Protocol::Choice { .. } => {}
+                    _ => panic!("Expected Choice in body"),
+                }
+            }
+            _ => panic!("Expected Loop (not desugared) when first statement is not a Send"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_followed_by_statements() {
+        // Test that statements after the loop are preserved
+        let input = r#"
+protocol LoopThenMore =
+  roles A, B
+  loop decide by A
+    A -> B : Request
+    B -> A : Response
+  A -> B : Goodbye
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        // The loop should be desugared, followed by the Goodbye send
+        match &choreo.protocol {
+            Protocol::Rec { body, .. } => {
+                match body.as_ref() {
+                    Protocol::Choice { branches, .. } => {
+                        // Done branch should continue to the Goodbye message
+                        let done_branch = &branches.as_slice()[1];
+                        match &done_branch.protocol {
+                            Protocol::Send { message, continuation, .. } => {
+                                assert_eq!(message.name.to_string(), "Done");
+                                // After Done, should be the Goodbye send
+                                match continuation.as_ref() {
+                                    Protocol::Send { message, .. } => {
+                                        assert_eq!(message.name.to_string(), "Goodbye");
+                                    }
+                                    _ => panic!("Expected Goodbye after Done"),
+                                }
+                            }
+                            _ => panic!("Expected Send in Done branch"),
+                        }
+                    }
+                    _ => panic!("Expected Choice"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_multiple_loops() {
+        // Test two consecutive RoleDecides loops
+        let input = r#"
+protocol TwoLoops =
+  roles A, B
+  loop decide by A
+    A -> B : First
+  loop decide by B
+    B -> A : Second
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        // First loop should be Rec
+        match &choreo.protocol {
+            Protocol::Rec { label, body } => {
+                assert_eq!(label.to_string(), "RoleDecidesLoop");
+                match body.as_ref() {
+                    Protocol::Choice { role, branches, .. } => {
+                        assert_eq!(role.name().to_string(), "A");
+
+                        // Done branch should lead to second loop
+                        let done_branch = &branches.as_slice()[1];
+                        match &done_branch.protocol {
+                            Protocol::Send { continuation, .. } => {
+                                // After first loop's Done, should be second Rec
+                                match continuation.as_ref() {
+                                    Protocol::Rec { body, .. } => {
+                                        match body.as_ref() {
+                                            Protocol::Choice { role, .. } => {
+                                                assert_eq!(role.name().to_string(), "B");
+                                            }
+                                            _ => panic!("Expected Choice in second loop"),
+                                        }
+                                    }
+                                    _ => panic!("Expected second Rec after first loop"),
+                                }
+                            }
+                            _ => panic!("Expected Send in Done branch"),
+                        }
+                    }
+                    _ => panic!("Expected Choice in first loop"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_empty_body_edge_case() {
+        // Edge case: empty loop body (should parse but not desugar - no first statement)
+        // Note: This tests the parser's robustness, not valid protocol design
+        let input = r#"
+protocol EmptyBody =
+  roles A, B
+  loop decide by A
+  A -> B : AfterLoop
+"#;
+
+        // This might fail to parse or produce a Loop with empty body
+        // Either way, we should handle it gracefully
+        let result = parse_choreography_str(input);
+        // Just verify it doesn't panic - the exact behavior depends on grammar
+        if result.is_ok() {
+            let choreo = result.unwrap();
+            // If parsed, should not be desugared (no first Send)
+            match &choreo.protocol {
+                Protocol::Loop { .. } => {
+                    // Expected: Loop not desugared due to empty/invalid body
+                }
+                Protocol::Send { .. } => {
+                    // Also acceptable: empty loop might be elided
+                }
+                _ => {
+                    // Any other result is acceptable for this edge case
+                }
+            }
+        }
+        // Parsing failure is also acceptable for this malformed input
+    }
+
+    #[test]
+    fn test_role_decides_preserves_branch_label_from_message() {
+        // Verify that the branch label matches the first message name exactly
+        let input = r#"
+protocol CustomMessageName =
+  roles Producer, Consumer
+  loop decide by Producer
+    Producer -> Consumer : DataChunk
+    Consumer -> Producer : Ack
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(result.is_ok());
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { body, .. } => {
+                match body.as_ref() {
+                    Protocol::Choice { branches, .. } => {
+                        // First branch label should be "DataChunk" (the message name)
+                        let continue_branch = branches.first();
+                        assert_eq!(continue_branch.label.to_string(), "DataChunk");
+
+                        // Second branch label should be "Done"
+                        let done_branch = &branches.as_slice()[1];
+                        assert_eq!(done_branch.label.to_string(), "Done");
+                    }
+                    _ => panic!("Expected Choice"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
+    }
+
+    #[test]
+    fn test_role_decides_done_message_targets_same_receiver() {
+        // The Done message should go to the same receiver as the first message
+        let input = r#"
+protocol TargetConsistency =
+  roles Sender, Receiver, Observer
+  loop decide by Sender
+    Sender -> Receiver : Data
+    Receiver -> Observer : Forward
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(result.is_ok());
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Rec { body, .. } => {
+                match body.as_ref() {
+                    Protocol::Choice { branches, .. } => {
+                        // Continue branch sends to Receiver
+                        let continue_branch = branches.first();
+                        match &continue_branch.protocol {
+                            Protocol::Send { to, .. } => {
+                                assert_eq!(to.name().to_string(), "Receiver");
+                            }
+                            _ => panic!("Expected Send"),
+                        }
+
+                        // Done branch should also send to Receiver (same target)
+                        let done_branch = &branches.as_slice()[1];
+                        match &done_branch.protocol {
+                            Protocol::Send { from, to, .. } => {
+                                assert_eq!(from.name().to_string(), "Sender");
+                                assert_eq!(to.name().to_string(), "Receiver");
+                            }
+                            _ => panic!("Expected Send in Done branch"),
+                        }
+                    }
+                    _ => panic!("Expected Choice"),
+                }
+            }
+            _ => panic!("Expected Rec"),
+        }
     }
 
     #[test]

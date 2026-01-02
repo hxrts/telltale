@@ -71,6 +71,8 @@ pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalTy
                     adapter: &mut A,
                     index: u32,
                 ) -> Result<#output_type, A::Error>
+                where
+                    A::Error: From<::rumpsteak_aura_choreography::ChoreographyError>
             },
             quote! {
                 let _ctx = ProtocolContext::for_role(#protocol_str, #role_variant);
@@ -83,6 +85,8 @@ pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalTy
                 pub async fn #fn_name<A: ChoreographicAdapter<Role = Role>>(
                     adapter: &mut A,
                 ) -> Result<#output_type, A::Error>
+                where
+                    A::Error: From<::rumpsteak_aura_choreography::ChoreographyError>
             },
             quote! {
                 let _ctx = ProtocolContext::for_role(#protocol_str, #role_variant);
@@ -146,10 +150,7 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
             quote! {
                 // Send to #to
-                // TODO(message-provisioning): Currently uses Default::default() for message values.
-                // Users should provide actual message content through a callback or builder pattern.
-                // See: protocol state machine should call user-provided message factory.
-                let msg: #msg_type = Default::default();
+                let msg: #msg_type = adapter.provide_message(#to_role).await?;
                 adapter.send(#to_role, msg).await?;
                 #cont
             }
@@ -180,7 +181,7 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 .map(|(label, cont_type)| {
                     let cont = generate_runner_body(cont_type, ctx);
                     quote! {
-                        Choice::#label => {
+                        BranchLabel::#label => {
                             adapter.choose(#to_role, BranchLabel::#label).await?;
                             #cont
                         }
@@ -188,27 +189,16 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 })
                 .collect();
 
-            // Generate the Choice enum for this select
             let choice_variants: Vec<TokenStream> = branches
                 .iter()
                 .map(|(label, _)| {
-                    quote! { #label }
+                    quote! { BranchLabel::#label }
                 })
                 .collect();
 
-            // Get the first variant for default choice
-            let first_variant = branches.first().map(|(label, _)| label.clone());
-
             quote! {
                 // Internal choice - select branch to send to #to
-                #[derive(Debug, Clone, Copy)]
-                enum Choice {
-                    #(#choice_variants),*
-                }
-
-                // Default to first variant. Override this logic in production code.
-                // Consider using a ChoiceProvider callback for runtime decisions.
-                let choice: Choice = Choice::#first_variant;
+                let choice = adapter.select_branch(&[#(#choice_variants),*]).await?;
                 match choice {
                     #(#match_arms)*
                 }
@@ -233,16 +223,9 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
             quote! {
                 // External choice - receive branch selection from #from
-                // TODO(protocol-errors): Replace panic with proper error type
-                // See: https://github.com/aura-project/rumpsteak-aura/issues/new
                 let label = adapter.offer(#from_role).await?;
                 match label {
                     #(#match_arms)*
-                    _ => panic!(
-                        "Protocol violation: unexpected branch label '{}' from {}",
-                        label.as_str(),
-                        stringify!(#from_role)
-                    ),
                 }
             }
         }
@@ -254,33 +237,23 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 .map(|(label, cont_type)| {
                     let cont = generate_runner_body(cont_type, ctx);
                     quote! {
-                        LocalChoice::#label => {
+                        BranchLabel::#label => {
                             #cont
                         }
                     }
                 })
                 .collect();
 
-            // Generate the LocalChoice enum
             let choice_variants: Vec<TokenStream> = branches
                 .iter()
                 .map(|(label, _)| {
-                    quote! { #label }
+                    quote! { BranchLabel::#label }
                 })
                 .collect();
 
-            // Get the first variant for default choice
-            let first_variant = branches.first().map(|(label, _)| label.clone());
-
             quote! {
                 // Local choice - no communication
-                #[derive(Debug, Clone, Copy)]
-                enum LocalChoice {
-                    #(#choice_variants),*
-                }
-
-                // Default to first variant. Override this logic in production code.
-                let choice: LocalChoice = LocalChoice::#first_variant;
+                let choice = adapter.select_branch(&[#(#choice_variants),*]).await?;
                 match choice {
                     #(#match_arms)*
                 }
@@ -300,18 +273,20 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                     }
                 }
                 Some(crate::ast::Condition::RoleDecides(role)) => {
+                    // Note: RoleDecides loops are normally desugared to choice+rec at parse time.
+                    // This case is only reached if someone constructs a LocalType::Loop with
+                    // RoleDecides directly, bypassing the normal parse/desugar path.
                     let role_str = role.name().to_string();
                     quote! {
-                        // Loop controlled by role
-                        loop {
-                            #loop_body
-                            // Check if role signals continuation
-                            let _ = #role_str; // Role that decides: role_str
-                            // TODO(loop-choice): Role-controlled loops need integration with the
-                            // choice mechanism. The controlling role should send a "continue/break"
-                            // choice that other participants observe to decide loop termination.
-                            break;
-                        }
+                        return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                            format!(
+                                "role-decided loops are not supported directly in generated runners. \
+                                 The parser should desugar 'loop decide by {}' to a choice+rec pattern. \
+                                 If you see this error, the LocalType was constructed without going \
+                                 through the normal parse path.",
+                                #role_str
+                            )
+                        ).into());
                     }
                 }
                 Some(crate::ast::Condition::Custom(expr)) => {
@@ -352,16 +327,14 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 }
                 None => {
                     quote! {
-                        // Unbounded loop - runs until explicitly broken
-                        // TODO(loop-termination): Unbounded loops currently break immediately.
-                        // For correct semantics, loops need a termination condition from:
-                        // - A controlling role's choice (see TODO(loop-choice))
-                        // - A user-provided predicate function
-                        // - Protocol-level termination signals
-                        loop {
-                            #loop_body
-                            break; // Placeholder: should check termination condition
-                        }
+                        return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                            "unbounded loops are not supported in generated runners. \
+                             Use a bounded loop condition like: \
+                             'loop decide by Role' (desugars to choice), \
+                             'loop repeat N' (fixed iterations), \
+                             'loop fuel N' (max iterations), or \
+                             'loop yield_after N' (bounded steps)".to_string()
+                        ).into());
                     }
                 }
             }
@@ -405,8 +378,12 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
                 quote! {
                     // Recursive variable (unbound) - this indicates a code generator bug
                     // The variable should have been bound by a Mu construct
-                    panic!("Internal error: unbound recursive variable '{}'. \
-                           This is a bug in the protocol code generator.", #label_str);
+                    return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                        format!(
+                            "unbound recursive variable '{}'; this indicates a code generator bug",
+                            #label_str
+                        )
+                    ).into());
                 }
             }
         }
@@ -417,9 +394,6 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
             quote! {
                 // Timeout after #duration ms
-                // TODO(protocol-errors): Replace panic with proper timeout error
-                // The adapter error type should implement From<TimeoutError> for production use
-                // See: https://github.com/aura-project/rumpsteak-aura/issues/new
                 let timeout_result = tokio::time::timeout(
                     std::time::Duration::from_millis(#timeout_ms),
                     async {
@@ -430,12 +404,12 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 
                 match timeout_result {
                     Ok(inner_result) => inner_result?,
-                    Err(_elapsed) => panic!(
-                        "Protocol timeout: operation exceeded {} ms. \
-                         To handle timeouts gracefully, implement From<tokio::time::error::Elapsed> \
-                         for your adapter's error type.",
-                        #timeout_ms
-                    ),
+                    Err(_elapsed) => {
+                        return Err(::rumpsteak_aura_choreography::ChoreographyError::Timeout(
+                            std::time::Duration::from_millis(#timeout_ms),
+                        )
+                        .into());
+                    }
                 }
             }
         }
@@ -469,20 +443,18 @@ fn generate_role_id(role: &Role) -> TokenStream {
                 }
             }
             RoleIndex::Wildcard => {
-                // TODO(wildcard-roles): Wildcard roles (e.g., "Worker[*]") should be expanded
-                // at code generation time to handle all matching participants. Currently
-                // falls back to a placeholder index which won't correctly broadcast/multicast.
-                quote! {
-                    Role::#name(0) // Placeholder: wildcards need expansion to role set
-                }
+                quote! {{
+                    return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                        "wildcard roles are not supported in generated runners".to_string()
+                    ).into());
+                }}
             }
             RoleIndex::Range(_) => {
-                // TODO(range-roles): Range roles (e.g., "Worker[0..n]") should be expanded
-                // to iterate over the specified range. Currently falls back to a simple
-                // Role value which won't correctly handle the range semantics.
-                quote! {
-                    Role::#name(0) // Placeholder: ranges need iteration loop
-                }
+                quote! {{
+                    return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                        "range roles are not supported in generated runners".to_string()
+                    ).into());
+                }}
             }
         }
     } else if role.param().is_some() {
@@ -538,7 +510,10 @@ pub fn generate_execute_as(
         pub async fn execute_as<A: ChoreographicAdapter<Role = Role>>(
             role: Role,
             adapter: &mut A,
-        ) -> Result<(), A::Error> {
+        ) -> Result<(), A::Error>
+        where
+            A::Error: From<::rumpsteak_aura_choreography::ChoreographyError>
+        {
             match role {
                 #(#match_arms)*
             }

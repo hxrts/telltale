@@ -90,7 +90,31 @@ loop decide by Client
   Server -> Client : Response
 ```
 
-This loop continues while the deciding role chooses to continue. The condition is implicit in the `decide` form.
+This loop continues while the deciding role chooses to continue. The `decide by` form is
+desugared to a choice+recursion pattern at parse time. The first message in the loop body
+serves as the "continue" signal - when the deciding role sends it, the loop continues.
+A synthetic `Done` message is added as the termination signal.
+
+The example above desugars to:
+
+```rust
+rec RoleDecidesLoop
+  choice at Client
+    Request ->
+      Client -> Server : Request
+      Server -> Client : Response
+      continue RoleDecidesLoop
+    Done ->
+      Client -> Server : Done
+```
+
+**Requirement**: The first statement in a `loop decide by Role` body must be a send from
+the deciding role. This ensures the decision to continue is fused with the first message,
+saving a round trip compared to sending a separate "continue" signal.
+
+This desugaring converts the `RoleDecides` loop into standard multiparty session type
+constructs (choice + recursion), enabling formal verification in Lean and compatibility
+with standard MPST projection algorithms.
 
 ```rust
 loop repeat 5

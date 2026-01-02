@@ -11,6 +11,7 @@ use crate::runtime::sync::RwLock;
 use crate::{read_lock, write_lock};
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 
 /// A topology-aware protocol handler.
 ///
@@ -129,14 +130,17 @@ impl TopologyHandler {
     }
 
     /// Check if connected to a role.
-    pub fn is_connected(&self, role: &RoleName) -> Result<bool, TopologyError> {
-        // For now, always return true for local mode
+    pub async fn is_connected(&self, role: &RoleName) -> Result<bool, TopologyError> {
         if self.topology.is_local(role)? {
             return Ok(true);
         }
 
-        // Could check transport connection status
-        Ok(true)
+        let transports = read_lock!(self.transports);
+        if let Some(transport) = transports.get(role) {
+            Ok(transport.is_connected(role))
+        } else {
+            Ok(false)
+        }
     }
 
     /// Get the location of a role.
@@ -165,6 +169,13 @@ pub struct TopologyHandlerBuilder {
     role: Option<RoleName>,
 }
 
+/// Errors that can occur while building a TopologyHandler.
+#[derive(Debug, Error)]
+pub enum TopologyHandlerBuildError {
+    #[error("role not specified for topology handler")]
+    MissingRole,
+}
+
 impl TopologyHandlerBuilder {
     /// Create a new builder with a topology.
     pub fn new(topology: Topology) -> Self {
@@ -181,8 +192,8 @@ impl TopologyHandlerBuilder {
     }
 
     /// Build the handler.
-    pub fn build(self) -> Result<TopologyHandler, String> {
-        let role = self.role.ok_or_else(|| "Role not specified".to_string())?;
+    pub fn build(self) -> Result<TopologyHandler, TopologyHandlerBuildError> {
+        let role = self.role.ok_or(TopologyHandlerBuildError::MissingRole)?;
         Ok(TopologyHandler::new(self.topology, role))
     }
 }

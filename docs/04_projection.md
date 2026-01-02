@@ -166,7 +166,9 @@ LocalType::Loop {
 
 The count condition is maintained.
 
-Supported conditions include `Condition::Count(n)` for fixed iteration count and `Condition::RoleDecides(role)` for loops controlled by a role. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally.
+Supported conditions include `Condition::Count(n)` for fixed iteration count. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally.
+
+Note: `Condition::RoleDecides(role)` loops are desugared at parse time to a choice+recursion pattern, so they don't appear in the AST after parsing and are handled as standard `Protocol::Rec` with `Protocol::Choice` during projection.
 
 ### 5. Parallel Composition
 

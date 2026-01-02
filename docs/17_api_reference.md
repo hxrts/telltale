@@ -157,7 +157,9 @@ pub enum Condition {
 ```
 
 Loop condition specification.
-RoleDecides means a role controls iteration.
+RoleDecides means a role controls iteration. Note: `loop decide by Role` is desugared
+to a choice+recursion pattern at parse time, so `RoleDecides` is rarely seen in the AST
+after parsing. See the DSL documentation for details.
 Count specifies fixed iterations.
 Custom contains arbitrary Rust expressions.
 Fuel limits the number of iterations.
@@ -647,14 +649,14 @@ pub trait ChoreoHandler: Send {
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
-        label: Label,
+        label: <Self::Role as RoleId>::Label,
     ) -> Result<()>;
 
     async fn offer(
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<Label>;
+    ) -> Result<<Self::Role as RoleId>::Label>;
 
     async fn with_timeout<F, T>(
         &mut self,
@@ -678,6 +680,45 @@ pub trait ChoreoHandler: Send {
 ChoreoHandler trait defines the handler interface.
 Implement this trait to create custom transport handlers.
 Uses async_trait for object safety.
+
+### ChoreographicAdapter
+
+```rust
+#[async_trait]
+pub trait ChoreographicAdapter: Send {
+    type Error: std::error::Error + Send + Sync + From<ChoreographyError> + 'static;
+    type Role: RoleId;
+
+    async fn send<M: Message>(&mut self, to: Self::Role, msg: M) -> Result<(), Self::Error>;
+    async fn recv<M: Message>(&mut self, from: Self::Role) -> Result<M, Self::Error>;
+
+    async fn provide_message<M: Message>(&mut self, to: Self::Role) -> Result<M, Self::Error>;
+    async fn select_branch<L: LabelId>(&mut self, labels: &[L]) -> Result<L, Self::Error>;
+
+    async fn broadcast<M: Message + Clone>(
+        &mut self,
+        to: &[Self::Role],
+        msg: M,
+    ) -> Result<(), Self::Error>;
+
+    async fn collect<M: Message>(&mut self, from: &[Self::Role]) -> Result<Vec<M>, Self::Error>;
+
+    async fn choose(
+        &mut self,
+        to: Self::Role,
+        label: <Self::Role as RoleId>::Label,
+    ) -> Result<(), Self::Error>;
+
+    async fn offer(
+        &mut self,
+        from: Self::Role,
+    ) -> Result<<Self::Role as RoleId>::Label, Self::Error>;
+}
+```
+
+ChoreographicAdapter drives generated runners directly.
+Implement `provide_message` and `select_branch` to supply runtime data and decisions.
+Default implementations return errors to avoid placeholder behavior.
 
 ### ExtensionEffect
 
@@ -705,9 +746,36 @@ Clone_box enables cloning trait objects.
 pub enum ChoreographyError {
     Transport(String),
     Serialization(String),
+    ChannelSendFailed { channel_type: &'static str, reason: String },
+    ChannelClosed { channel_type: &'static str, operation: &'static str },
+    NoPeerChannel { peer: String },
+    LabelSerializationFailed { operation: &'static str, reason: String },
+    MessageSerializationFailed {
+        operation: &'static str,
+        type_name: &'static str,
+        reason: String
+    },
     Timeout(Duration),
     ProtocolViolation(String),
     UnknownRole(String),
+    ProtocolContext {
+        protocol: &'static str,
+        role: &'static str,
+        phase: &'static str,
+        inner: Box<ChoreographyError>
+    },
+    RoleContext { role: &'static str, index: Option<u32>, inner: Box<ChoreographyError> },
+    MessageContext {
+        operation: &'static str,
+        message_type: &'static str,
+        direction: &'static str,
+        other_role: &'static str,
+        inner: Box<ChoreographyError>
+    },
+    ChoiceError { role: &'static str, details: String },
+    WithContext { context: String, inner: Box<ChoreographyError> },
+    InvalidChoice { expected: Vec<String>, actual: String },
+    ExecutionError(String),
 }
 ```
 
@@ -718,19 +786,26 @@ Timeout indicates operation exceeded duration.
 ProtocolViolation means session type mismatch.
 UnknownRole indicates referenced role not found.
 
-### Label
+### LabelId
 
 ```rust
-pub struct Label(pub &'static str);
+pub trait LabelId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {
+    fn as_str(&self) -> &'static str;
+    fn from_str(label: &str) -> Option<Self>;
+}
 ```
 
-Label identifies branches in choice protocols.
-Contains a static string matching protocol branch names.
+LabelId identifies branches in choice protocols.
+Implementations map stable identifiers to protocol branch names.
 
 ### RoleId
 
 ```rust
-pub trait RoleId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {}
+pub trait RoleId: Copy + Eq + std::hash::Hash + Debug + Send + Sync + 'static {
+    type Label: LabelId;
+    fn role_name(&self) -> RoleName;
+    fn role_index(&self) -> Option<u32>;
+}
 ```
 
 RoleId trait for role identifiers.
@@ -1198,6 +1273,51 @@ pub async fn close(&self) -> TransportResult<()>
 ```
 
 These methods manage topology aware transports. Initialize before sending messages when eager setup is required.
+
+### TopologyHandlerBuilder
+
+```rust
+pub struct TopologyHandlerBuilder { ... }
+```
+
+Builder for `TopologyHandler`.
+
+Methods:
+
+```rust
+pub fn new(topology: Topology) -> Self
+pub fn with_role(self, role: RoleName) -> Self
+pub fn build(self) -> Result<TopologyHandler, TopologyHandlerBuildError>
+```
+
+### TopologyHandlerBuildError
+
+```rust
+pub enum TopologyHandlerBuildError {
+    MissingRole,
+}
+```
+
+Returned when required builder configuration is absent.
+
+### TransportMessage
+
+```rust
+pub trait TransportMessage: Send + Sync + 'static {
+    fn to_bytes(&self) -> Vec<u8>;
+    fn from_bytes(bytes: &[u8]) -> Result<Self, TransportMessageError>
+    where
+        Self: Sized;
+}
+```
+
+### TransportMessageError
+
+```rust
+pub enum TransportMessageError {
+    Deserialization(String),
+}
+```
 
 ## Resource Heap API
 
