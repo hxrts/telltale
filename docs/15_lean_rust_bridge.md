@@ -4,12 +4,12 @@ The `rumpsteak-lean-bridge` crate connects Rust implementations to Lean verifica
 
 ## Two Projection Implementations
 
-The project maintains two independent projection implementations:
+The project maintains two independent projection implementations.
 
 | Implementation | Location | Purpose |
 |---------------|----------|---------|
-| **Theory Projection** | `rust/theory/src/projection.rs` | Minimal, matches Lean formalization |
-| **DSL Projection** | `rust/choreography/src/compiler/projection.rs` | Extended features for code generation |
+| Theory Projection | `rust/theory/src/projection.rs` | Minimal, matches Lean formalization |
+| DSL Projection | `rust/choreography/src/compiler/projection.rs` | Extended features for code generation |
 
 The Theory Projection implements core MPST projection with direct correspondence to Lean. The DSL Projection extends this for practical use. Cross-validation tests verify both produce equivalent results on the common subset of protocols.
 
@@ -23,7 +23,7 @@ The JSON format mirrors Lean type definitions exactly. Each type uses a discrimi
 { "kind": "end" }
 ```
 
-Protocol termination.
+This represents protocol termination.
 
 ```json
 {
@@ -39,7 +39,7 @@ Protocol termination.
 }
 ```
 
-Communication with labeled branches.
+This represents communication with labeled branches.
 
 ```json
 {
@@ -49,7 +49,7 @@ Communication with labeled branches.
 }
 ```
 
-Recursive type with explicit binding.
+This represents a recursive type with explicit binding.
 
 ### LocalTypeR
 
@@ -66,7 +66,7 @@ Recursive type with explicit binding.
 }
 ```
 
-Internal choice (sender selects).
+This represents internal choice where the sender selects a branch.
 
 ```json
 {
@@ -81,7 +81,7 @@ Internal choice (sender selects).
 }
 ```
 
-External choice (sender selects, receiver handles).
+This represents external choice where the sender selects and the receiver handles.
 
 ### PayloadSort
 
@@ -93,22 +93,15 @@ External choice (sender selects, receiver handles).
 { "sort": { "prod": [{ "sort": "nat" }, { "sort": "bool" }] } }
 ```
 
+These examples show the supported payload sorts including products.
+
 ## Test Infrastructure
 
 ### Cross-Validation Tests
 
 Location: `rust/lean-bridge/tests/projection_equivalence_tests.rs`
 
-These tests verify DSL and Theory projections produce equivalent results:
-
-- Simple sends and multi-message sequences
-- Binary and multi-way choices (3+ branches)
-- Nested choices
-- Three-party protocols
-- Non-participant merging scenarios
-- **Recursive protocols** with explicit `continue` statements
-
-The tests parse DSL choreographies, project using both implementations, and compare results structurally. Recursive protocols use explicit `continue` syntax that maps directly to the theory's `Var` constructor:
+These tests verify DSL and Theory projections produce equivalent results. Coverage includes simple sends, multi-message sequences, binary and multi-way choices, nested choices, three-party protocols, non-participant merging scenarios, and recursive protocols with explicit `continue` statements.
 
 ```
 rec Loop {
@@ -118,36 +111,43 @@ rec Loop {
 }
 ```
 
-### Property-Based Tests
+The tests parse DSL choreographies, project using both implementations, and compare results structurally. Recursive protocols use explicit `continue` syntax that maps directly to the theory's `Var` constructor.
+
+### Projection Property Tests
 
 Location: `rust/lean-bridge/tests/proptest_projection.rs`
 
-Randomized testing with deterministic seeds covers:
+Randomized testing with deterministic seeds covers simple protocols, choice protocols with binary and multi-way branches, deep nesting at 4-6 levels, three-party non-participant merge scenarios, and continuation preservation regressions. Each generated protocol is validated against the Lean binary when available.
 
-- **Simple protocols**: End, single send, sequences
-- **Choice protocols**: Binary and multi-way (3-5 branches)
-- **Deep nesting**: 4-6 level depth
-- **Three-party**: Non-participant merge scenarios
-- **Continuation preservation**: Regression tests for fixed bugs
+### Async Subtyping Property Tests
 
-Each generated protocol is validated against the Lean binary when available.
+Location: `rust/lean-bridge/tests/proptest_async_subtyping.rs`
+
+These tests validate the SISO decomposition and asynchronous subtyping algorithms from `rumpsteak-theory`. The test suite uses fixed seeds for full reproducibility.
+
+```rust
+// Example: Input tree contravariance property
+let tree = InputTree::Node {
+    partner: "Alice".to_string(),
+    label: Label::new("msg"),
+    children: vec![InputTree::Leaf],
+};
+assert!(tree.subtype(&InputTree::Leaf));
+```
+
+Input tree subtyping is contravariant where a process accepting more inputs is substitutable for one accepting fewer. Output tree subtyping is covariant where a process sending fewer outputs is substitutable for one sending more.
+
+The property tests cover input tree reflexivity and contravariance, output tree reflexivity and covariance, SISO decomposition for simple types and sequences, `async_subtype` and `async_equivalent` reflexivity and symmetry, orphan freedom checks, choice type decomposition, recursive type handling, and segment subtyping.
 
 ### Lean Integration Tests
 
 Location: `rust/lean-bridge/tests/lean_integration_tests.rs`
 
-Direct validation against the Lean runner:
-
-- Ping-pong protocols
-- Three-party ring topologies
-- Choice branching correctness
-- Recursive protocols (unrolled one iteration)
-- Error detection (invalid projections, wrong labels)
-- Complex multi-branch protocols
+Direct validation against the Lean runner covers ping-pong protocols, three-party ring topologies, choice branching correctness, recursive protocols unrolled one iteration, error detection for invalid projections and wrong labels, and complex multi-branch protocols.
 
 ## CI Enforcement
 
-The GitHub Actions workflow ensures Lean verification runs on every push:
+The GitHub Actions workflow ensures Lean verification runs on every push.
 
 1. Build Lean binary: `cd lean && lake build`
 2. Run Lean verification scripts: `just rumpsteak-lean-check*`
@@ -167,6 +167,8 @@ nix develop --command bash -c "cd lean && lake build"
 cd lean && lake build
 ```
 
+These commands build the Lean binary required for cross-validation tests.
+
 ### Run All Lean-Validated Tests
 
 ```bash
@@ -176,12 +178,17 @@ cargo test -p rumpsteak-lean-bridge
 # Cross-validation only
 cargo test -p rumpsteak-lean-bridge --test projection_equivalence_tests
 
-# Property tests only
+# Projection property tests only
 cargo test -p rumpsteak-lean-bridge --test proptest_projection
+
+# Async subtyping property tests only
+cargo test -p rumpsteak-lean-bridge --test proptest_async_subtyping
 
 # Integration tests only
 cargo test -p rumpsteak-lean-bridge --test lean_integration_tests
 ```
+
+These commands run specific test suites for focused debugging.
 
 ## Rust API
 
@@ -201,6 +208,8 @@ let json = global_to_json(&g);
 let parsed = json_to_global(&json)?;
 ```
 
+This example shows the round-trip export and import of a global type through JSON.
+
 ### LeanRunner
 
 ```rust
@@ -217,6 +226,8 @@ if LeanRunner::is_available() {
 LeanRunner::require_available();
 ```
 
+The `LeanRunner` invokes the Lean binary for validation. Use `is_available()` to check for the binary before use. Use `require_available()` in CI environments where the binary must be present.
+
 ### Validator
 
 ```rust
@@ -227,15 +238,15 @@ let result = validator.validate_projection_with_lean(&choreo, &program)?;
 assert!(result.is_valid());
 ```
 
-## CLI Tool
+The `Validator` provides a higher-level API for comparing Rust and Lean projections.
 
-Build the CLI with the `cli` feature:
+## CLI Tool
 
 ```bash
 cargo build -p rumpsteak-lean-bridge --features cli --release
 ```
 
-Commands:
+This command builds the CLI with the `cli` feature enabled.
 
 ```bash
 # Generate sample protocol JSON
@@ -252,12 +263,13 @@ lean-bridge import --input protocol.json --type local
 lean-bridge export --type global --output protocol.json --pretty
 ```
 
+These commands demonstrate the CLI operations for generating, validating, and converting protocol JSON.
+
 ## Merge Semantics
 
-The Rust merge implementation matches the Lean formalization in `ProjectionR.lean`:
+The Rust merge implementation matches the Lean formalization in `ProjectionR.lean`.
 
-- **Send merge** (`mergeSendSorted`): Branches must have identical label sets. A non-participant cannot choose based on an unseen choice.
-- **Receive merge** (`mergeRecvSorted`): Branches union their label sets. A non-participant can handle any incoming message.
+Send merge follows `mergeSendSorted` where branches must have identical label sets. A non-participant cannot choose based on an unseen choice. Receive merge follows `mergeRecvSorted` where branches union their label sets. A non-participant can handle any incoming message.
 
 The `rumpsteak-theory` crate implements these in `merge.rs`. Tests validate correspondence between Rust and Lean results.
 
@@ -276,6 +288,8 @@ match json_to_global(&json) {
 }
 ```
 
+Import errors distinguish between unknown type kinds, missing required fields, and format violations.
+
 ### Validation Results
 
 ```rust
@@ -290,11 +304,11 @@ match validator.compare_local(&rust, &lean) {
 }
 ```
 
+Validation results indicate whether types match or describe the specific mismatch.
+
 ## Extending the Bridge
 
 ### Adding Type Kinds
-
-Update both export and import:
 
 ```rust
 fn global_to_json(g: &GlobalType) -> Value {
@@ -319,7 +333,7 @@ fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
 }
 ```
 
-Update Lean definitions to match.
+Update both export and import functions when adding new type kinds. Update Lean definitions to match.
 
 ### Custom Validators
 
@@ -336,8 +350,12 @@ impl Validator {
 }
 ```
 
+Extend the `Validator` with custom comparison options as needed.
+
 ## References
 
-- [Multiparty Session Types](https://doi.org/10.1145/1328438.1328472) - Honda et al.
-- [Session Types and Choreographies](https://arxiv.org/abs/2301.00715) - Survey
+See the following resources for background on the theoretical foundations.
+
+- [Multiparty Session Types](https://doi.org/10.1145/1328438.1328472) by Honda et al.
+- [Session Types and Choreographies](https://arxiv.org/abs/2301.00715) survey
 - [Lean 4 Theorem Prover](https://lean-lang.org/)
