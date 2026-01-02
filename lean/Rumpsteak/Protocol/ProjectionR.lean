@@ -1,6 +1,7 @@
 import Rumpsteak.Protocol.GlobalType
 import Rumpsteak.Protocol.LocalTypeR
-import Init.Data.List.Sort.Basic
+import Init.Data.List.Sort.Lemmas
+import Init.Data.Order.Lemmas
 
 /-! # Rumpsteak.Protocol.ProjectionR
 
@@ -595,6 +596,49 @@ axiom merge_fold_member_except (types : List LocalTypeR) (first : LocalTypeR) (r
 
 These axioms and theorems support the proof of recv branch absorption under composition. -/
 
+private theorem branchLe_trans (a b c : Label × LocalTypeR) :
+    LocalTypeR.branchLe a b = true →
+    LocalTypeR.branchLe b c = true →
+    LocalTypeR.branchLe a c = true := by
+  intro hab hbc
+  have hab' : a.1.name ≤ b.1.name := by
+    simpa [LocalTypeR.branchLe] using hab
+  have hbc' : b.1.name ≤ c.1.name := by
+    simpa [LocalTypeR.branchLe] using hbc
+  have hac : a.1.name ≤ c.1.name := Std.le_trans hab' hbc'
+  simpa [LocalTypeR.branchLe] using hac
+
+private theorem branchLe_total (a b : Label × LocalTypeR) :
+    LocalTypeR.branchLe a b || LocalTypeR.branchLe b a := by
+  by_cases hab : a.1.name ≤ b.1.name
+  · simp [LocalTypeR.branchLe, hab]
+  · have hba : b.1.name ≤ a.1.name := by
+      have ht : a.1.name ≤ b.1.name ∨ b.1.name ≤ a.1.name :=
+        Std.le_total (a := a.1.name) (b := b.1.name)
+      cases ht with
+      | inl h => exact (False.elim (hab h))
+      | inr h => exact h
+    simp [LocalTypeR.branchLe, hab, hba]
+
+private theorem mergeSort_cons_min_nil
+    (l1 : Label) (c1 : LocalTypeR) (r1 l₁ l₂ : List (Label × LocalTypeR))
+    (hmin : ∀ b ∈ r1, LocalTypeR.branchLe (l1, c1) b = true)
+    (h₂ : List.mergeSort (le := LocalTypeR.branchLe) r1 = l₁ ++ l₂)
+    (h₃ : ∀ b, b ∈ l₁ → !LocalTypeR.branchLe (l1, c1) b) :
+    l₁ = [] := by
+  cases l₁ with
+  | nil => rfl
+  | cons b rest =>
+    have hb_in_merge : b ∈ List.mergeSort (le := LocalTypeR.branchLe) r1 := by
+      simp [h₂]
+    have hb_in_r1 : b ∈ r1 :=
+      (List.mem_mergeSort (le := LocalTypeR.branchLe) (a := b) (l := r1)).1 hb_in_merge
+    have hminb : LocalTypeR.branchLe (l1, c1) b = true := hmin b hb_in_r1
+    have hnot : !LocalTypeR.branchLe (l1, c1) b := h₃ b (by simp)
+    have : False := by
+      simpa [hminb] using hnot
+    cases this
+
 /-- Head of mergeSort when input has its minimum element first.
 
     If (l1, c1) is the minimum element of (l1, c1) :: r1 according to branchLe,
@@ -603,20 +647,30 @@ These axioms and theorems support the proof of recv branch absorption under comp
     PROOF SKETCH: mergeSort is stable and preserves the minimum element's position
     when it's already first. This follows from the merge step always taking the
     smaller element first. -/
-axiom mergeSort_head_min (l1 : Label) (c1 : LocalTypeR) (r1 : List (Label × LocalTypeR))
+theorem mergeSort_head_min (l1 : Label) (c1 : LocalTypeR) (r1 : List (Label × LocalTypeR))
     (hmin : ∀ b ∈ r1, LocalTypeR.branchLe (l1, c1) b = true)
     : (List.mergeSort (le := LocalTypeR.branchLe) ((l1, c1) :: r1)).head? =
-      some (l1, c1)
+      some (l1, c1) := by
+  obtain ⟨l₁, l₂, h₁, h₂, h₃⟩ :=
+    List.mergeSort_cons (le := LocalTypeR.branchLe) branchLe_trans branchLe_total (l1, c1) r1
+  have hnil : l₁ = [] := mergeSort_cons_min_nil l1 c1 r1 l₁ l₂ hmin h₂ h₃
+  subst hnil
+  simp [h₁]
 
 /-- Tail of mergeSort when input has its minimum element first.
 
     When the head is preserved by mergeSort, the tail is the mergeSort of the original tail.
 
     PROOF SKETCH: This follows from the structure of mergeSort and the stability property. -/
-axiom mergeSort_tail_min (l1 : Label) (c1 : LocalTypeR) (r1 : List (Label × LocalTypeR))
+theorem mergeSort_tail_min (l1 : Label) (c1 : LocalTypeR) (r1 : List (Label × LocalTypeR))
     (hmin : ∀ b ∈ r1, LocalTypeR.branchLe (l1, c1) b = true)
     : (List.mergeSort (le := LocalTypeR.branchLe) ((l1, c1) :: r1)).tail =
-      List.mergeSort (le := LocalTypeR.branchLe) r1
+      List.mergeSort (le := LocalTypeR.branchLe) r1 := by
+  obtain ⟨l₁, l₂, h₁, h₂, h₃⟩ :=
+    List.mergeSort_cons (le := LocalTypeR.branchLe) branchLe_trans branchLe_total (l1, c1) r1
+  have hnil : l₁ = [] := mergeSort_cons_min_nil l1 c1 r1 l₁ l₂ hmin h₂ h₃
+  subst hnil
+  simp [h₁, h₂]
 
 /-- Head of mergeSort is a member of the original list.
 
