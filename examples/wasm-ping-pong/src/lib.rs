@@ -5,7 +5,7 @@
 
 use wasm_bindgen::prelude::*;
 use rumpsteak_aura_choreography::{
-    InMemoryHandler, Program, interpret,
+    InMemoryHandler, Program, interpret, RoleId, LabelId, RoleName,
 };
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
@@ -19,11 +19,45 @@ pub fn init() {
 }
 
 /// Role definitions
-/// RoleId is automatically implemented for Copy + Eq + Hash + Debug + Send + Sync types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Role {
     Alice,
     Bob,
+}
+
+/// Label definitions for choice branches
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Label {
+    Ping,
+    Pong,
+}
+
+impl LabelId for Label {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Label::Ping => "Ping",
+            Label::Pong => "Pong",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "Ping" => Some(Label::Ping),
+            "Pong" => Some(Label::Pong),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = Label;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Alice => RoleName::from_static("Alice"),
+            Role::Bob => RoleName::from_static("Bob"),
+        }
+    }
 }
 
 /// Message types

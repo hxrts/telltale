@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 rumpsteak-aura = { path = "../..", features = ["wasm"] }
-rumpsteak-aura-choreography = { path = "../../choreography", features = ["wasm"] }
+rumpsteak-aura-choreography = { path = "../../rust/choreography", features = ["wasm"] }
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
