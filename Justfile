@@ -9,6 +9,8 @@ ci-dry-run:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
     just book
+    # WASM compilation checks
+    just wasm-check
     # Lean verification (sample + extended)
     just rumpsteak-lean-check
     just rumpsteak-lean-check-extended
@@ -22,6 +24,19 @@ lint:
 # Rust style guide lint check (quick - format + clippy only)
 lint-quick:
     ./scripts/lint-check.sh --quick
+
+# Check WASM compilation for choreography and core crates
+wasm-check:
+    cargo check --package rumpsteak-aura-choreography --target wasm32-unknown-unknown --features wasm
+    cargo check --package rumpsteak-aura --target wasm32-unknown-unknown --features wasm
+
+# Build WASM example with wasm-pack
+wasm-build:
+    cd examples/wasm-ping-pong && wasm-pack build --target web
+
+# Run WASM tests (requires Chrome/Firefox)
+wasm-test:
+    cd examples/wasm-ping-pong && wasm-pack test --headless --chrome
 
 # Format choreography DSL files (prints to stdout unless --write is used)
 choreo-fmt *FILES:
