@@ -91,13 +91,29 @@ axiom projectR_subst_comm_non_participant (body : GlobalType) (t : String) (role
     and projection of G to role succeeds, then G' ↾ role = G ↾ role.
 
     Proof by induction on ConsumeResult. -/
-axiom projection_preserved_other_thm (g g' : GlobalType) (sender receiver role : String)
+theorem projection_preserved_other_thm (g g' : GlobalType) (sender receiver role : String)
     (label : Label) (result : LocalTypeR)
     (hcons : g.consume sender receiver label = some g')
     (hne1 : role ≠ sender)
     (hne2 : role ≠ receiver)
     (hproj : projectR g role = .ok result)
-    : projectR g' role = .ok result
+    : projectR g' role = .ok result := by
+  have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
+  -- Induction on the consume derivation, generalizing the role/result payload.
+  induction hcr generalizing role result with
+  | comm sender receiver branches label cont hfind =>
+    intro role result hne1 hne2 hproj
+    -- For non-participants, each branch projection equals the merged result.
+    exact projectR_comm_non_participant sender receiver role branches result
+      hne1 hne2 hproj label cont hfind
+  | mu t body sender receiver label g' hcr' ih =>
+    intro role result hne1 hne2 hproj
+    have hproj' : projectR (body.substitute t (.mu t body)) role = .ok result := by
+      calc
+        projectR (body.substitute t (.mu t body)) role
+            = projectR (.mu t body) role := projectR_subst_comm_non_participant body t role
+        _ = .ok result := hproj
+    exact ih role result hne1 hne2 hproj'
 
 /-- Subject reduction for send axiom.
 
@@ -351,13 +367,14 @@ theorem projection_after_send (g g' : GlobalType) (sender receiver : String)
 
     If G consumes p →ℓ q to get G', and r ∉ {p, q},
     then G' ↾ r = G ↾ r (or a subtype). -/
-axiom projection_preserved_other (g g' : GlobalType) (sender receiver role : String)
+theorem projection_preserved_other (g g' : GlobalType) (sender receiver role : String)
     (label : Label) (result : LocalTypeR)
     (hcons : g.consume sender receiver label = some g')
     (hne1 : role ≠ sender)
     (hne2 : role ≠ receiver)
     (hproj : projectR g role = .ok result)
-    : projectR g' role = .ok result
+    : projectR g' role = .ok result :=
+  projection_preserved_other_thm g g' sender receiver role label result hcons hne1 hne2 hproj
 
 /-- Helper: find? returning some implies element is in list and satisfies predicate. -/
 private theorem find?_some_implies {α : Type _} (l : List α) (p : α → Bool) (x : α)
@@ -393,11 +410,32 @@ theorem getProcess_implies_mem (c : Configuration) (role : String) (proc : Proce
     exact ⟨rp, hmem, hprop, hget⟩
 
 /-- Helper: Get the projected type for a role from a well-typed config. -/
-axiom wellTyped_role_has_projection (g : GlobalType) (c : Configuration)
+theorem wellTyped_role_has_projection (g : GlobalType) (c : Configuration)
     (role : String) (proc : Process)
     (hwt : ConfigWellTyped g c)
     (hget : c.getProcess role = some proc)
-    : ∃ lt, projectR g role = .ok lt ∧ WellTyped [] proc lt
+    : ∃ lt, projectR g role = .ok lt ∧ WellTyped [] proc lt := by
+  obtain ⟨rp, hrp_mem, hrp_role, hrp_proc⟩ :=
+    getProcess_implies_mem c role proc hget
+  obtain ⟨_, hallwt⟩ := hwt
+  have hrpwt := hallwt rp hrp_mem
+  unfold RoleProcessWellTyped at hrpwt
+  have hrpwt' :
+      match projectR g role with
+      | .ok lt => WellTyped [] rp.process lt
+      | .error _ => False := by
+    simpa [hrp_role] using hrpwt
+  cases hproj : projectR g role with
+  | error e =>
+    have : False := by
+      simpa [hproj] using hrpwt'
+    exact False.elim this
+  | ok lt =>
+    have hwt_proc : WellTyped [] rp.process lt := by
+      simpa [hproj] using hrpwt'
+    have hwt_proc' : WellTyped [] proc lt := by
+      simpa [hrp_proc] using hwt_proc
+    exact ⟨lt, hproj, hwt_proc'⟩
 
 /-- Subject reduction for send case.
 
