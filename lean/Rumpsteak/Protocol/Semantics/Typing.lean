@@ -469,6 +469,14 @@ axiom equi_recursive_substitute (Γ : TypingContext) (x : String) (body : Proces
     (hbody : WellTyped (Γ.extend x (.mu x bodyType)) body bodyType)
     : WellTyped Γ (body.substitute x (.recurse x body)) (.mu x bodyType)
 
+/-- Typing is preserved under local-type equivalence (EQ2).
+
+    This is the Coq `OFT_EQ2` transport lemma, instantiated to `LocalTypeR.equiv`. -/
+axiom wellTyped_equiv (Γ : TypingContext) (p : Process) (t t' : LocalTypeR)
+    (hwt : WellTyped Γ p t)
+    (heq : LocalTypeR.equiv t t')
+    : WellTyped Γ p t'
+
 /-- Recursion unfolding preserves typing (equi-recursive view).
 
     If μX.P : μX.T, then P[μX.P/X] : μX.T (via equi-recursion μX.T ≅ T[μX.T/X]). -/

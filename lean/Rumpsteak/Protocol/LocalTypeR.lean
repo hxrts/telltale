@@ -1,4 +1,5 @@
 import Rumpsteak.Protocol.GlobalType
+import Rumpsteak.Protocol.Core
 
 /-! # Rumpsteak.Protocol.LocalTypeR
 
@@ -32,6 +33,7 @@ The following definitions form the semantic interface for proofs:
 namespace Rumpsteak.Protocol.LocalTypeR
 
 open Rumpsteak.Protocol.GlobalType (PayloadSort Label)
+open Rumpsteak.Protocol.Core (LocalKind)
 
 /-- Local types describe protocols from a single participant's view.
 
@@ -86,6 +88,54 @@ partial def LocalTypeR.substitute (lt : LocalTypeR) (varName : String) (replacem
 partial def LocalTypeR.unfold : LocalTypeR → LocalTypeR
   | lt@(.mu t body) => body.substitute t lt
   | lt => lt
+
+/-- Local actions over recursive local types (kind, partner, label). -/
+structure LocalActionR where
+  kind : LocalKind
+  partner : String
+  label : Label
+deriving Repr, DecidableEq, Inhabited
+
+/-- Smart constructors for local actions. -/
+def LocalActionR.send (partner : String) (label : Label) : LocalActionR :=
+  { kind := LocalKind.send, partner := partner, label := label }
+
+def LocalActionR.recv (partner : String) (label : Label) : LocalActionR :=
+  { kind := LocalKind.recv, partner := partner, label := label }
+
+/-- Convert a local action to a global action for a given role. -/
+def LocalActionR.toGlobal (role : String) (act : LocalActionR) : Rumpsteak.Protocol.GlobalType.GlobalActionR :=
+  match act.kind with
+  | LocalKind.send =>
+      { sender := role, receiver := act.partner, label := act.label }
+  | LocalKind.recv =>
+      { sender := act.partner, receiver := role, label := act.label }
+
+/-- Local enabledness (async): a local type can take a local action. -/
+inductive canStep : LocalTypeR → LocalActionR → Prop
+  | send_head (partner : String) (branches : List (Label × LocalTypeR))
+      (label : Label) (cont : LocalTypeR) :
+      (label, cont) ∈ branches →
+      canStep (.send partner branches) (LocalActionR.send partner label)
+  | recv_head (partner : String) (branches : List (Label × LocalTypeR))
+      (label : Label) (cont : LocalTypeR) :
+      (label, cont) ∈ branches →
+      canStep (.recv partner branches) (LocalActionR.recv partner label)
+  | send_async (partner : String) (branches : List (Label × LocalTypeR))
+      (act : LocalActionR) (label : Label) (cont : LocalTypeR) :
+      act.partner ≠ partner →
+      (label, cont) ∈ branches →
+      canStep cont act →
+      canStep (.send partner branches) act
+  | recv_async (partner : String) (branches : List (Label × LocalTypeR))
+      (act : LocalActionR) (label : Label) (cont : LocalTypeR) :
+      act.partner ≠ partner →
+      (label, cont) ∈ branches →
+      canStep cont act →
+      canStep (.recv partner branches) act
+  | mu (t : String) (body : LocalTypeR) (act : LocalActionR) :
+      canStep (body.substitute t (.mu t body)) act →
+      canStep (.mu t body) act
 
 /-- Compute the dual of a local type (swap send/recv).
     The dual of role A's view is role B's view when A and B are the only participants. -/

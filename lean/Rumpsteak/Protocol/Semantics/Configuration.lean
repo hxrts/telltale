@@ -43,7 +43,7 @@ structure Message where
   label : Label
   /-- The message payload -/
   value : Value
-deriving Repr, DecidableEq, BEq, Inhabited
+deriving Repr, DecidableEq, Inhabited
 
 /-- A queue of messages between two roles.
     Messages are ordered FIFO (first in, first out). -/
@@ -55,7 +55,35 @@ structure Channel where
   sender : String
   /-- The receiver role -/
   receiver : String
-deriving Repr, DecidableEq, BEq, Inhabited
+deriving Repr, DecidableEq, Inhabited
+
+/-- Boolean equality for channels. -/
+instance : BEq Channel where
+  beq a b := a.sender == b.sender && a.receiver == b.receiver
+
+instance : ReflBEq Channel where
+  rfl := by
+    intro a
+    cases a
+    simp [BEq.beq]
+
+instance : LawfulBEq Channel where
+  eq_of_beq := by
+    intro a b h
+    cases a with
+    | mk as ar =>
+      cases b with
+      | mk bs br =>
+        simp [BEq.beq] at h
+        have h' : (as == bs) = true ∧ (ar == br) = true := by
+          simpa [Bool.and_eq_true] using h
+        have hs : as = bs := by
+          exact (beq_iff_eq.mp h'.1)
+        have hr : ar = br := by
+          exact (beq_iff_eq.mp h'.2)
+        cases hs
+        cases hr
+        rfl
 
 /-- Configuration: parallel processes plus message queues.
 

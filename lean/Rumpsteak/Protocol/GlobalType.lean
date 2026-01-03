@@ -1,3 +1,4 @@
+import Mathlib.Data.List.Forall2
 /-! # Rumpsteak.Protocol.GlobalType
 
 Recursive global types for multiparty session type protocols.
@@ -243,6 +244,101 @@ inductive GlobalTypeReducesStar : GlobalType → GlobalType → Prop where
 /-- Notation for global type reduction -/
 scoped infix:50 " ⟹ " => GlobalTypeReduces
 scoped infix:50 " ⟹* " => GlobalTypeReducesStar
+
+/-- Global action with payload label (sender, receiver, label). -/
+structure GlobalActionR where
+  sender : String
+  receiver : String
+  label : Label
+deriving Repr, DecidableEq, Inhabited
+
+/-- Global enabledness: an action is available in the global type. -/
+inductive canStep : GlobalType → GlobalActionR → Prop where
+  | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
+      (label : Label) (cont : GlobalType) :
+      (label, cont) ∈ branches →
+      canStep (.comm sender receiver branches) { sender := sender, receiver := receiver, label := label }
+  | comm_async (sender receiver : String) (branches : List (Label × GlobalType))
+      (act : GlobalActionR) (label : Label) (cont : GlobalType) :
+      act.sender ≠ receiver →
+      act.receiver ≠ receiver →
+      (label, cont) ∈ branches →
+      canStep cont act →
+      canStep (.comm sender receiver branches) act
+  | mu (t : String) (body : GlobalType) (act : GlobalActionR) :
+      canStep (body.substitute t (.mu t body)) act →
+      canStep (.mu t body) act
+
+/-- Branch-wise step for async commutation. -/
+inductive BranchesStep (stepFn : GlobalType → GlobalActionR → GlobalType → Prop) :
+    List (Label × GlobalType) → GlobalActionR → List (Label × GlobalType) → Prop where
+  | nil (act : GlobalActionR) : BranchesStep stepFn [] act []
+  | cons (label : Label) (g g' : GlobalType) (rest rest' : List (Label × GlobalType))
+      (act : GlobalActionR) :
+      stepFn g act g' →
+      BranchesStep stepFn rest act rest' →
+      BranchesStep stepFn ((label, g) :: rest) act ((label, g') :: rest')
+
+/-- Global async step relation (allows skipping unrelated prefixes). -/
+inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
+  | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
+      (label : Label) (cont : GlobalType) :
+      (label, cont) ∈ branches →
+      step (.comm sender receiver branches) { sender := sender, receiver := receiver, label := label } cont
+  | comm_async (sender receiver : String) (branches branches' : List (Label × GlobalType))
+      (act : GlobalActionR) (label : Label) (cont : GlobalType) :
+      act.sender ≠ receiver →
+      act.receiver ≠ receiver →
+      (label, cont) ∈ branches →
+      canStep cont act →
+      BranchesStep step branches act branches' →
+      step (.comm sender receiver branches) act (.comm sender receiver branches')
+  | mu (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType) :
+      step (body.substitute t (.mu t body)) act g' →
+      step (.mu t body) act g'
+
+/-- Placeholder linearity predicate for globals (refine later). -/
+def linearPred (_ : GlobalType) : Prop := True
+
+/-- Placeholder size predicate for globals (refine later). -/
+def sizePred (_ : GlobalType) : Prop := True
+
+/-- Placeholder action predicate for globals (refine later). -/
+def actionPred (_ : GlobalType) : Prop := True
+
+/-- Branch-wise label uniqueness with recursive predicate. -/
+inductive BranchesUniq (p : GlobalType → Prop) : List (Label × GlobalType) → Prop where
+  | nil : BranchesUniq p []
+  | cons (label : Label) (g : GlobalType) (rest : List (Label × GlobalType)) :
+      p g →
+      BranchesUniq p rest →
+      label.name ∉ (rest.map (fun b => b.1.name)) →
+      BranchesUniq p ((label, g) :: rest)
+
+/-- Label-name uniqueness for each branch list (inductive). -/
+inductive uniqLabels : GlobalType → Prop
+  | end : uniqLabels .end
+  | var (t : String) : uniqLabels (.var t)
+  | mu (t : String) (body : GlobalType) :
+      uniqLabels body →
+      uniqLabels (.mu t body)
+  | comm (sender receiver : String) (branches : List (Label × GlobalType)) :
+      BranchesUniq uniqLabels branches →
+      uniqLabels (.comm sender receiver branches)
+
+/-- Enabledness implies a step. This is the good-global condition. -/
+def goodG (g : GlobalType) : Prop :=
+  ∀ act, canStep g act → ∃ g', step g act g'
+
+/-- A step implies enabledness (to be proved). -/
+axiom step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType} :
+    step g act g' → canStep g act
+
+/-- Reflexive-transitive closure of async step. -/
+inductive GlobalTypeStepStar : GlobalType → GlobalType → Prop where
+  | refl : ∀ g, GlobalTypeStepStar g g
+  | step : ∀ g1 g2 g3 act, step g1 act g2 → GlobalTypeStepStar g2 g3 →
+      GlobalTypeStepStar g1 g3
 
 /-! ## Consume as an inductive relation
 

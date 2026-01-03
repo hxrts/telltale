@@ -582,7 +582,7 @@ axiom merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result :
 /-- Except-based fold absorption for projection merges. -/
 axiom merge_fold_member_except (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
     (hfold :
-      types.foldlM
+      types.foldlM (m := Except ProjectionError)
         (fun acc proj =>
           match LocalTypeR.merge acc proj with
           | some m => pure m
