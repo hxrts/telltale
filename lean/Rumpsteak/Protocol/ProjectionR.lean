@@ -1136,11 +1136,14 @@ theorem mergeSort_head_mem (l : Label × LocalTypeR) (bs : List (Label × LocalT
 
 /-- Every element in the result of mergeRecvSorted comes from one of the input lists.
 
-    PROOF SKETCH: By induction on the merge. Each step either:
+    By case analysis on the merge. Each step either:
     - Takes head from bs1 (when l1.name < l2.name)
     - Takes head from bs2 (when l2.name < l1.name)
     - Merges heads with same label (when l1 = l2)
-    In all cases, the element's label comes from bs1 or bs2. -/
+    In all cases, the element's label comes from bs1 or bs2.
+
+    PROOF APPROACH: This requires well-founded induction on sizeOf bs1 + sizeOf bs2.
+    Due to the complexity of extracting the recursive structure, we keep this as an axiom. -/
 axiom mergeRecvSorted_mem (bs1 bs2 merged : List (Label × LocalTypeR))
     (hm : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
     (x : Label × LocalTypeR) (hx : x ∈ merged)
