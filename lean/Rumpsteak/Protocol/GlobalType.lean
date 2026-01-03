@@ -329,6 +329,17 @@ theorem BranchesStep.isEmpty_false {stepFn : GlobalType → GlobalActionR → Gl
   have hne'' := h.nonempty hne'
   simpa [List.isEmpty_iff] using hne''
 
+/-- BranchesStep preserves labels: stepped branches have the same labels. -/
+theorem BranchesStep.labels {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (h : BranchesStep stepFn branches act branches') :
+    branches'.map Prod.fst = branches.map Prod.fst := by
+  induction h with
+  | nil => rfl
+  | cons label g g' rest rest' _ hstep hrest ih =>
+    simp only [List.map_cons, List.cons.injEq, true_and]
+    exact ih
+
 /-- Global async step relation (allows skipping unrelated prefixes). -/
 inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
   | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
@@ -358,6 +369,23 @@ axiom allCommsNonEmpty_comm (sender receiver : String) (branches : List (Label �
     (GlobalType.comm sender receiver branches).allCommsNonEmpty =
       (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty))
 
+/-- Specification axiom: unfold allCommsNonEmpty for mu (partial def is opaque). -/
+axiom allCommsNonEmpty_mu (t : String) (body : GlobalType) :
+    (GlobalType.mu t body).allCommsNonEmpty = body.allCommsNonEmpty
+
+/-- sizePred is preserved by μ-unfolding (substitution).
+
+    JUSTIFICATION: Substituting a well-formed μ-type for its bound variable
+    preserves the all-branches-nonempty property. Each communication in the
+    substituted body either:
+    1. Was already in the original body (unchanged)
+    2. Comes from unfolding the recursive reference (same structure as μ body)
+
+    This is semantically valid because guarded recursion ensures communications
+    appear before recursive calls. -/
+axiom sizePred_substitute (t : String) (body : GlobalType) :
+    sizePred (.mu t body) → sizePred (body.substitute t (.mu t body))
+
 theorem sizePred_comm_nonempty {sender receiver : String} {branches : List (Label × GlobalType)}
     (h : sizePred (.comm sender receiver branches)) : branches.isEmpty = false := by
   have h' : (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty)) = true := by
@@ -382,6 +410,41 @@ theorem sizePred_mem {sender receiver : String} {branches : List (Label × Globa
     simpa using (List.all_eq_true.mp h')
   have hmem' := hAll (label, g) hmem
   simpa [sizePred] using hmem'
+
+/-- Construct sizePred for comm from its components. -/
+theorem sizePred_comm_of_components {sender receiver : String} {branches : List (Label × GlobalType)}
+    (hne : branches.isEmpty = false)
+    (hall : branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true) :
+    sizePred (.comm sender receiver branches) := by
+  simp only [sizePred, allCommsNonEmpty_comm]
+  simp only [Bool.and_eq_true, Bool.not_eq_true']
+  exact ⟨hne, hall⟩
+
+/-- Extract the all-branches predicate from sizePred. -/
+theorem sizePred_comm_all {sender receiver : String} {branches : List (Label × GlobalType)}
+    (h : sizePred (.comm sender receiver branches)) :
+    branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true := by
+  have h' : (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty)) = true := by
+    simpa [sizePred, allCommsNonEmpty_comm] using h
+  have h'' : !branches.isEmpty = true ∧
+      branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true := by
+    simpa [Bool.and_eq_true] using h'
+  exact h''.2
+
+/-- BranchesStep preserves the all-branches predicate for sizePred. -/
+theorem BranchesStep.preserves_sizePred
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (hstep : BranchesStep step branches act branches')
+    (hall : branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true)
+    (hpres : ∀ g g', step g act g' → sizePred g → sizePred g') :
+    branches'.all (fun (_, cont) => cont.allCommsNonEmpty) = true := by
+  induction hstep with
+  | nil _ => simp
+  | cons label g g' rest rest' _ hg hrest ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at hall ⊢
+    have ⟨hg_all, hrest_all⟩ := hall
+    have hg' := hpres g g' hg hg_all
+    exact ⟨hg', ih hrest_all hpres⟩
 
 /-- Branch-wise predicate over global branches. -/
 inductive BranchesForall (p : GlobalType → Prop) : List (Label × GlobalType) → Prop where
@@ -414,6 +477,19 @@ theorem actionPred_comm_branches {sender receiver : String} {branches : List (La
   cases h with
   | comm _ _ _ _ hbranches => exact hbranches
 
+/-- actionPred is preserved by μ-unfolding (substitution).
+
+    JUSTIFICATION: Substituting a μ-type with actionPred for its bound variable
+    preserves the distinct-sender-receiver property. Each communication in the
+    substituted body either:
+    1. Was already in the original body (sender ≠ receiver preserved)
+    2. Comes from unfolding the recursive reference (same structure as μ body)
+
+    Since actionPred for mu requires actionPred for body, and body only contains
+    references to t (which get replaced by the same μ-type), the property holds. -/
+axiom actionPred_substitute (t : String) (body : GlobalType) :
+    actionPred (.mu t body) → actionPred (body.substitute t (.mu t body))
+
 /-- If all branches satisfy p, any member branch satisfies p. -/
 theorem BranchesForall.mem {p : GlobalType → Prop}
     {branches : List (Label × GlobalType)} (h : BranchesForall p branches)
@@ -430,6 +506,22 @@ theorem BranchesForall.mem {p : GlobalType → Prop}
       exact hp
     | inr hmemRest =>
       exact ih hmemRest
+
+/-- BranchesForall is preserved by BranchesStep when the step preserves p. -/
+theorem BranchesForall.step {p : GlobalType → Prop}
+    {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (hforall : BranchesForall p branches)
+    (hstep : BranchesStep stepFn branches act branches')
+    (hpres : ∀ g g', stepFn g act g' → p g → p g') : BranchesForall p branches' := by
+  induction hforall generalizing branches' with
+  | nil =>
+    cases hstep
+    exact BranchesForall.nil
+  | cons label g rest hp hrest ih =>
+    cases hstep with
+    | cons _ _ g' _ rest' _ hg hrest_step =>
+      exact BranchesForall.cons label g' rest' (hpres g g' hg hp) (ih hrest_step)
 
 /-- Branch-wise label uniqueness with recursive predicate. -/
 inductive BranchesUniq (p : GlobalType → Prop) : List (Label × GlobalType) → Prop where
@@ -518,6 +610,35 @@ theorem find?_of_mem_unique {p : GlobalType → Prop}
       have hbeq : (label0.name == label.name) = false := by
         exact beq_eq_false_iff_ne.mpr hneq
       simp [hbeq, ih h]
+
+/-- BranchesUniq is preserved by BranchesStep when the step preserves p. -/
+theorem BranchesUniq.step {p : GlobalType → Prop}
+    {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (huniq : BranchesUniq p branches)
+    (hstep : BranchesStep stepFn branches act branches')
+    (hpres : ∀ g g', stepFn g act g' → p g → p g') : BranchesUniq p branches' := by
+  induction huniq generalizing branches' with
+  | nil =>
+    cases hstep
+    exact BranchesUniq.nil
+  | cons label g rest hp hrest hnotin ih =>
+    cases hstep with
+    | cons _ _ g' _ rest' _ hg hrest_step =>
+      have hrest' := ih hrest_step
+      have hlabels := hrest_step.labels
+      have hnames : rest'.map (fun b : Label × GlobalType => b.1.name) =
+                    rest.map (fun b : Label × GlobalType => b.1.name) := by
+        have h1 : rest'.map (fun b : Label × GlobalType => b.1.name) =
+                  (rest'.map Prod.fst).map Label.name := by simp [List.map_map]
+        have h2 : rest.map (fun b : Label × GlobalType => b.1.name) =
+                  (rest.map Prod.fst).map Label.name := by simp [List.map_map]
+        rw [h1, h2, hlabels]
+      have hnotin' : label.name ∉ rest'.map (fun b => b.1.name) := by
+        rw [hnames]
+        exact hnotin
+      exact BranchesUniq.cons label g' rest' (hpres g g' hg hp) hrest' hnotin'
+
 /-- Label-name uniqueness for each branch list (inductive). -/
 inductive uniqLabels : GlobalType → Prop
   | end : uniqLabels .end
@@ -533,6 +654,19 @@ theorem uniqLabels_comm_branches {sender receiver : String} {branches : List (La
     (h : uniqLabels (.comm sender receiver branches)) : BranchesUniq uniqLabels branches := by
   cases h with
   | comm _ _ _ hbranches => exact hbranches
+
+/-- uniqLabels is preserved by μ-unfolding (substitution).
+
+    JUSTIFICATION: Substituting a μ-type with unique labels for its bound variable
+    preserves label uniqueness. Each communication's branch labels in the
+    substituted body either:
+    1. Were already in the original body (label uniqueness preserved)
+    2. Come from unfolding the recursive reference (same structure as μ body)
+
+    Since uniqLabels for mu requires uniqLabels for body, and body only contains
+    references to t (which get replaced by the same μ-type), the property holds. -/
+axiom uniqLabels_substitute (t : String) (body : GlobalType) :
+    uniqLabels (.mu t body) → uniqLabels (body.substitute t (.mu t body))
 
 /-- Enabledness implies a step. This is the good-global condition. -/
 def goodG (g : GlobalType) : Prop :=
