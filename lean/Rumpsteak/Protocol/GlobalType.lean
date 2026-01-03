@@ -300,6 +300,35 @@ theorem BranchesStep.mem_step {stepFn : GlobalType → GlobalActionR → GlobalT
     | inr h =>
       exact ih label' g0 h
 
+/-- BranchesStep preserves list length. -/
+theorem BranchesStep.length {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (h : BranchesStep stepFn branches act branches') : branches'.length = branches.length := by
+  induction h with
+  | nil _ => rfl
+  | cons label g g' rest rest' act _ _ ih =>
+    simp only [List.length_cons, ih]
+
+/-- BranchesStep preserves non-emptiness. -/
+theorem BranchesStep.nonempty {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (h : BranchesStep stepFn branches act branches')
+    (hne : branches ≠ []) : branches' ≠ [] := by
+  induction h with
+  | nil _ => exact absurd rfl hne
+  | cons label g g' rest rest' act _ _ _ =>
+    intro h
+    cases h
+
+/-- BranchesStep preserves isEmpty = false. -/
+theorem BranchesStep.isEmpty_false {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (h : BranchesStep stepFn branches act branches')
+    (hne : branches.isEmpty = false) : branches'.isEmpty = false := by
+  have hne' : branches ≠ [] := by simpa [List.isEmpty_iff] using hne
+  have hne'' := h.nonempty hne'
+  simpa [List.isEmpty_iff] using hne''
+
 /-- Global async step relation (allows skipping unrelated prefixes). -/
 inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
   | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
