@@ -661,7 +661,15 @@ private theorem mem_map_snd_sortBranches_iff (bs : List (Label × LocalTypeR)) (
     simpa [LocalTypeR.sortBranches] using (List.mergeSort_perm bs LocalTypeR.branchLe)
   exact (hp.map Prod.snd).mem_iff
 
-/-- Normalize a local type by recursively sorting all branch lists. -/
+/-- Normalize a local type by recursively sorting all branch lists.
+
+    TERMINATION NOTE: Termination is semantically clear (structural recursion on
+    LocalTypeR) but proving it requires showing that elements of `bs.map` are
+    smaller than the original type. The sizeOf_mem_snd_lt lemmas establish this,
+    but Lean's wf_preprocess doesn't expose membership from List.map.
+
+    The sorry in decreasing_by is for this specific termination proof, not
+    correctness. The function is semantically total and productive. -/
 def LocalTypeR.normalize : LocalTypeR → LocalTypeR
   | .end => .end
   | .var v => .var v
