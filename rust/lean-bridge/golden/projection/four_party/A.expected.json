@@ -1,0 +1,27 @@
+{
+  "kind": "send",
+  "partner": "B",
+  "branches": [
+    {
+      "label": {
+        "name": "m1",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "recv",
+        "partner": "D",
+        "branches": [
+          {
+            "label": {
+              "name": "m4",
+              "sort": "unit"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "kind": "recv",
+  "partner": "A",
+  "branches": [
+    {
+      "label": {
+        "name": "x",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    },
+    {
+      "label": {
+        "name": "y",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    }
+  ]
+}

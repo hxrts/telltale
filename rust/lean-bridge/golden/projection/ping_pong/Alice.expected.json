@@ -1,0 +1,27 @@
+{
+  "kind": "send",
+  "partner": "Bob",
+  "branches": [
+    {
+      "label": {
+        "name": "ping",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "recv",
+        "partner": "Bob",
+        "branches": [
+          {
+            "label": {
+              "name": "pong",
+              "sort": "unit"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "kind": "send",
+  "partner": "Server",
+  "branches": [
+    {
+      "label": {
+        "name": "accept",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "recv",
+        "partner": "Server",
+        "branches": [
+          {
+            "label": {
+              "name": "data",
+              "sort": "string"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": {
+        "name": "reject",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "recv",
+        "partner": "Server",
+        "branches": [
+          {
+            "label": {
+              "name": "error",
+              "sort": "string"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

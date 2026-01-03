@@ -1,0 +1,34 @@
+{
+  "kind": "comm",
+  "sender": "Client",
+  "receiver": "Server",
+  "branches": [
+    {
+      "label": {
+        "name": "get",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    },
+    {
+      "label": {
+        "name": "put",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    },
+    {
+      "label": {
+        "name": "delete",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    }
+  ]
+}

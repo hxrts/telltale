@@ -1,0 +1,51 @@
+{
+  "kind": "comm",
+  "sender": "Client",
+  "receiver": "Server",
+  "branches": [
+    {
+      "label": {
+        "name": "accept",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "comm",
+        "sender": "Server",
+        "receiver": "Client",
+        "branches": [
+          {
+            "label": {
+              "name": "data",
+              "sort": "string"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": {
+        "name": "reject",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "comm",
+        "sender": "Server",
+        "receiver": "Client",
+        "branches": [
+          {
+            "label": {
+              "name": "error",
+              "sort": "string"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "kind": "send",
+  "partner": "D",
+  "branches": [
+    {
+      "label": {
+        "name": "m2",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    }
+  ]
+}

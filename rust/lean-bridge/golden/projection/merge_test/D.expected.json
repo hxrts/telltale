@@ -1,0 +1,15 @@
+{
+  "kind": "recv",
+  "partner": "C",
+  "branches": [
+    {
+      "label": {
+        "name": "data",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "end"
+      }
+    }
+  ]
+}

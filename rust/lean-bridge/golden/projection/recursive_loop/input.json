@@ -1,0 +1,30 @@
+{
+  "kind": "rec",
+  "var": "t",
+  "body": {
+    "kind": "comm",
+    "sender": "A",
+    "receiver": "B",
+    "branches": [
+      {
+        "label": {
+          "name": "continue",
+          "sort": "unit"
+        },
+        "continuation": {
+          "kind": "var",
+          "name": "t"
+        }
+      },
+      {
+        "label": {
+          "name": "stop",
+          "sort": "unit"
+        },
+        "continuation": {
+          "kind": "end"
+        }
+      }
+    ]
+  }
+}

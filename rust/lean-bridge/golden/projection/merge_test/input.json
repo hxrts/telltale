@@ -1,0 +1,51 @@
+{
+  "kind": "comm",
+  "sender": "A",
+  "receiver": "B",
+  "branches": [
+    {
+      "label": {
+        "name": "x",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "comm",
+        "sender": "C",
+        "receiver": "D",
+        "branches": [
+          {
+            "label": {
+              "name": "data",
+              "sort": "unit"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": {
+        "name": "y",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "comm",
+        "sender": "C",
+        "receiver": "D",
+        "branches": [
+          {
+            "label": {
+              "name": "data",
+              "sort": "unit"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

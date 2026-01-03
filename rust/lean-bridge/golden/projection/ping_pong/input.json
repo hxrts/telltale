@@ -1,0 +1,29 @@
+{
+  "kind": "comm",
+  "sender": "Alice",
+  "receiver": "Bob",
+  "branches": [
+    {
+      "label": {
+        "name": "ping",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "comm",
+        "sender": "Bob",
+        "receiver": "Alice",
+        "branches": [
+          {
+            "label": {
+              "name": "pong",
+              "sort": "unit"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

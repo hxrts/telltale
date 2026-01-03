@@ -1,0 +1,42 @@
+{
+  "kind": "comm",
+  "sender": "A",
+  "receiver": "B",
+  "branches": [
+    {
+      "label": {
+        "name": "m1",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "comm",
+        "sender": "B",
+        "receiver": "C",
+        "branches": [
+          {
+            "label": {
+              "name": "m2",
+              "sort": "unit"
+            },
+            "continuation": {
+              "kind": "comm",
+              "sender": "C",
+              "receiver": "A",
+              "branches": [
+                {
+                  "label": {
+                    "name": "m3",
+                    "sort": "unit"
+                  },
+                  "continuation": {
+                    "kind": "end"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

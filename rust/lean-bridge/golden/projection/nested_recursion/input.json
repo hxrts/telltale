@@ -1,0 +1,57 @@
+{
+  "kind": "rec",
+  "var": "t",
+  "body": {
+    "kind": "comm",
+    "sender": "A",
+    "receiver": "B",
+    "branches": [
+      {
+        "label": {
+          "name": "outer",
+          "sort": "unit"
+        },
+        "continuation": {
+          "kind": "rec",
+          "var": "s",
+          "body": {
+            "kind": "comm",
+            "sender": "B",
+            "receiver": "A",
+            "branches": [
+              {
+                "label": {
+                  "name": "inner",
+                  "sort": "unit"
+                },
+                "continuation": {
+                  "kind": "var",
+                  "name": "s"
+                }
+              },
+              {
+                "label": {
+                  "name": "exit",
+                  "sort": "unit"
+                },
+                "continuation": {
+                  "kind": "var",
+                  "name": "t"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "label": {
+          "name": "done",
+          "sort": "unit"
+        },
+        "continuation": {
+          "kind": "end"
+        }
+      }
+    ]
+  }
+}

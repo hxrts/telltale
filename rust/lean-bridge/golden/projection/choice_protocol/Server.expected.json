@@ -1,0 +1,48 @@
+{
+  "kind": "recv",
+  "partner": "Client",
+  "branches": [
+    {
+      "label": {
+        "name": "accept",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "send",
+        "partner": "Client",
+        "branches": [
+          {
+            "label": {
+              "name": "data",
+              "sort": "string"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": {
+        "name": "reject",
+        "sort": "unit"
+      },
+      "continuation": {
+        "kind": "send",
+        "partner": "Client",
+        "branches": [
+          {
+            "label": {
+              "name": "error",
+              "sort": "string"
+            },
+            "continuation": {
+              "kind": "end"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
