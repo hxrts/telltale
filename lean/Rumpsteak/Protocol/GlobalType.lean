@@ -279,6 +279,27 @@ inductive BranchesStep (stepFn : GlobalType → GlobalActionR → GlobalType →
       BranchesStep stepFn rest act rest' →
       BranchesStep stepFn ((label, g) :: rest) act ((label, g') :: rest')
 
+/-- If branches step, any branch in the source list has a corresponding step. -/
+theorem BranchesStep.mem_step {stepFn : GlobalType → GlobalActionR → GlobalType → Prop}
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR} :
+    BranchesStep stepFn branches act branches' →
+    ∀ label g, (label, g) ∈ branches → ∃ g', stepFn g act g' := by
+  intro h
+  induction h with
+  | nil act =>
+    intro label g hmem
+    cases hmem
+  | cons label g g' rest rest' act hstep hrest ih =>
+    intro label' g0 hmem
+    have hmem' : (label', g0) = (label, g) ∨ (label', g0) ∈ rest := by
+      simpa [List.mem_cons] using hmem
+    cases hmem' with
+    | inl h =>
+      cases h
+      exact ⟨g', hstep⟩
+    | inr h =>
+      exact ih label' g0 h
+
 /-- Global async step relation (allows skipping unrelated prefixes). -/
 inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
   | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
@@ -315,6 +336,34 @@ inductive BranchesUniq (p : GlobalType → Prop) : List (Label × GlobalType) �
       label.name ∉ (rest.map (fun b => b.1.name)) →
       BranchesUniq p ((label, g) :: rest)
 
+/-- If labels are unique, membership determines find?. -/
+theorem find?_of_mem_unique {p : GlobalType → Prop}
+    {branches : List (Label × GlobalType)} (huniq : BranchesUniq p branches)
+    {label : Label} {g : GlobalType} (hmem : (label, g) ∈ branches) :
+    branches.find? (fun (l, _) => l.name == label.name) = some (label, g) := by
+  induction huniq generalizing label g with
+  | nil =>
+    cases hmem
+  | cons label0 g0 rest hpg0 huniq_rest hnotin ih =>
+    simp only [List.find?_cons]
+    have hmem' : (label, g) = (label0, g0) ∨ (label, g) ∈ rest := by
+      simpa [List.mem_cons] using hmem
+    cases hmem' with
+    | inl h =>
+      cases h
+      simp [beq_self_eq_true]
+    | inr h =>
+      have hname_mem : label.name ∈ rest.map (fun b => b.1.name) := by
+        -- membership in rest implies membership of label.name in mapped names
+        simpa [List.mem_map] using h
+      have hneq : label0.name ≠ label.name := by
+        intro hEq
+        have : label0.name ∈ rest.map (fun b => b.1.name) := by
+          simpa [hEq] using hname_mem
+        exact hnotin this
+      have hbeq : (label0.name == label.name) = false := by
+        exact beq_eq_false_iff_ne.mpr hneq
+      simp [hbeq, ih h]
 /-- Label-name uniqueness for each branch list (inductive). -/
 inductive uniqLabels : GlobalType → Prop
   | end : uniqLabels .end
@@ -330,9 +379,17 @@ inductive uniqLabels : GlobalType → Prop
 def goodG (g : GlobalType) : Prop :=
   ∀ act, canStep g act → ∃ g', step g act g'
 
-/-- A step implies enabledness (to be proved). -/
-axiom step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType} :
-    step g act g' → canStep g act
+/-- A step implies enabledness. -/
+theorem step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType} :
+    step g act g' → canStep g act := by
+  intro h
+  induction h with
+  | comm_head sender receiver branches label cont hmem =>
+    exact canStep.comm_head sender receiver branches label cont hmem
+  | comm_async sender receiver branches branches' act label cont hne1 hne2 hmem hcan _hstep =>
+    exact canStep.comm_async sender receiver branches act label cont hne1 hne2 hmem hcan
+  | mu t body act g' hstep ih =>
+    exact canStep.mu t body act ih
 
 /-- Reflexive-transitive closure of async step. -/
 inductive GlobalTypeStepStar : GlobalType → GlobalType → Prop where

@@ -74,13 +74,9 @@ instance : LawfulBEq Channel where
     | mk as ar =>
       cases b with
       | mk bs br =>
-        simp [BEq.beq] at h
-        have h' : (as == bs) = true ∧ (ar == br) = true := by
-          simpa [Bool.and_eq_true] using h
-        have hs : as = bs := by
-          exact (beq_iff_eq.mp h'.1)
-        have hr : ar = br := by
-          exact (beq_iff_eq.mp h'.2)
+        have h' : as = bs ∧ ar = br := by
+          simpa [BEq.beq, Bool.and_eq_true, beq_iff_eq] using h
+        rcases h' with ⟨hs, hr⟩
         cases hs
         cases hr
         rfl

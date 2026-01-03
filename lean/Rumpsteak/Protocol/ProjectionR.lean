@@ -421,6 +421,40 @@ theorem projectR_comm_receiver (sender receiver : String) (branches : List (Labe
   | error e => rfl
   | ok bs => rfl
 
+/-- Inversion: sender projection of a comm yields the projected branch list. -/
+theorem projectR_comm_sender_inv (sender receiver : String) (branches : List (Label × GlobalType))
+    (bs : List (Label × LocalTypeR))
+    (hproj : projectR (.comm sender receiver branches) sender = .ok (.send receiver bs)) :
+    projectBranches branches sender = .ok bs := by
+  have h := projectR_comm_sender sender receiver branches
+  by_cases hnonempty : branches.isEmpty
+  · simp [h, hnonempty] at hproj
+  · cases hbranches : projectBranches branches sender with
+    | error err =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+    | ok bs' =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+      rfl
+
+/-- Inversion: receiver projection of a comm yields the projected branch list. -/
+theorem projectR_comm_receiver_inv (sender receiver : String) (branches : List (Label × GlobalType))
+    (bs : List (Label × LocalTypeR)) (hne : sender ≠ receiver)
+    (hproj : projectR (.comm sender receiver branches) receiver = .ok (.recv sender bs)) :
+    projectBranches branches receiver = .ok bs := by
+  have h := projectR_comm_receiver sender receiver branches hne
+  by_cases hnonempty : branches.isEmpty
+  · simp [h, hnonempty] at hproj
+  · cases hbranches : projectBranches branches receiver with
+    | error err =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+    | ok bs' =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+      rfl
+
 /-- Key inversion: .mu never directly produces .send (only .mu t ... or .end). -/
 theorem projectR_mu_not_send (t : String) (body : GlobalType) (role partner : String)
     (branches : List (Label × LocalTypeR))
@@ -498,6 +532,46 @@ theorem projectBranchTypes_find_mem (branches : List (Label × GlobalType)) (rol
           simp only [hb, Bool.false_eq_true, ↓reduceIte] at hfind
           have ⟨lt', hlt', hmem⟩ := ih lts hrest hfind
           exact ⟨lt', hlt', List.Mem.tail lt hmem⟩
+
+/-! ## Projection membership lemmas -/
+
+/-- If projectBranches succeeds and a projected branch appears in the result,
+    then the corresponding global branch exists and projects to that local branch. -/
+theorem projectBranches_mem_proj (branches : List (Label × GlobalType)) (role : String)
+    (label : Label) (cont : LocalTypeR) (projBranches : List (Label × LocalTypeR))
+    (hproj : projectBranches branches role = .ok projBranches)
+    (hmem : (label, cont) ∈ projBranches)
+    : ∃ g, (label, g) ∈ branches ∧ projectR g role = .ok cont := by
+  induction branches generalizing projBranches with
+  | nil =>
+    simp [projectBranches] at hproj
+    cases hproj
+    cases hmem
+  | cons b rest ih =>
+    unfold projectBranches at hproj
+    cases hcont : projectR b.2 role with
+    | error e =>
+      simp only [hcont] at hproj
+      cases hproj
+    | ok lt =>
+      simp only [hcont] at hproj
+      cases hrest : projectBranches rest role with
+      | error e =>
+        simp only [hrest] at hproj
+        cases hproj
+      | ok projRest =>
+        simp only [hrest] at hproj
+        cases hproj
+        -- projBranches = (b.1, lt) :: projRest
+        have hmem' : (label, cont) = (b.1, lt) ∨ (label, cont) ∈ projRest := by
+          simpa [List.mem_cons] using hmem
+        cases hmem' with
+        | inl h =>
+          cases h
+          exact ⟨b.2, by simp, hcont⟩
+        | inr h =>
+          obtain ⟨g, hmemg, hprojg⟩ := ih projRest hrest h
+          exact ⟨g, by simp [hmemg], hprojg⟩
 
 /-! ## Merge Reflexivity Lemmas
 
