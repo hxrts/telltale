@@ -19,7 +19,7 @@ let bytes = g.to_bytes()?;
 let cid: ContentId<Sha256Hasher> = ContentId::from_bytes(&bytes);
 ```
 
-The content ID is computed from the canonical JSON bytes of the value. Two structurally equivalent types produce the same content ID. DAG-CBOR is a possible future encoding.
+The content ID is computed from canonical bytes of the value. Two structurally equivalent types produce the same content ID. JSON is the default encoding; DAG-CBOR is available as an optional feature.
 
 ## Hasher Trait
 
@@ -52,6 +52,63 @@ pub trait Contentable {
 The `to_bytes` method produces a canonical byte representation. The `from_bytes` method reconstructs the value from bytes.
 
 Implementations exist for `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. Custom types can implement the trait for integration.
+
+## Serialization Formats
+
+Two serialization formats are available for content addressing.
+
+### JSON (Default)
+
+JSON serialization is enabled by default. It produces human-readable output suitable for debugging and interoperability.
+
+```rust
+use rumpsteak_types::{GlobalType, Label};
+use rumpsteak_types::contentable::Contentable;
+
+let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+// Serialize to JSON bytes
+let json_bytes = g.to_bytes()?;
+
+// Deserialize from JSON bytes
+let recovered = GlobalType::from_bytes(&json_bytes)?;
+
+// Compute content ID from JSON
+let cid = g.content_id_sha256()?;
+```
+
+### DAG-CBOR (Optional)
+
+DAG-CBOR serialization is available with the `dag-cbor` feature flag. It produces compact binary output compatible with IPLD and IPFS.
+
+Enable the feature in `Cargo.toml`:
+
+```toml
+[dependencies]
+rumpsteak-types = { version = "0.7", features = ["dag-cbor"] }
+```
+
+DAG-CBOR methods become available on the `Contentable` trait:
+
+```rust
+use rumpsteak_types::{GlobalType, Label};
+use rumpsteak_types::contentable::Contentable;
+
+let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+// Serialize to DAG-CBOR bytes
+let cbor_bytes = g.to_cbor_bytes()?;
+
+// Deserialize from DAG-CBOR bytes
+let recovered = GlobalType::from_cbor_bytes(&cbor_bytes)?;
+
+// Compute content ID from CBOR (different from JSON-based CID)
+let cbor_cid = g.content_id_cbor_sha256()?;
+```
+
+DAG-CBOR provides several advantages over JSON. It produces smaller output, typically 30-50% more compact. It handles binary data natively without base64 encoding. It generates CIDs compatible with IPFS and other IPLD-based systems.
+
+Note that JSON and DAG-CBOR produce different content IDs for the same value. Choose one format consistently within a system to ensure content ID compatibility.
 
 ## Deterministic Serialization
 
@@ -147,6 +204,8 @@ def contentId [Hasher H] [Contentable α] (x : α) : ContentId H :=
 ```
 
 The `fromCbor ∘ toCbor = id` property is proven for all contentable types. This ensures round-trip correctness.
+
+The Rust implementation with the `dag-cbor` feature provides `to_cbor_bytes`/`from_cbor_bytes` methods that correspond to the Lean `toCbor`/`fromCbor` methods. This alignment enables verification of content-addressed artifacts across both implementations.
 
 ## Verification Properties
 

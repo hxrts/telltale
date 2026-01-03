@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
 #[cfg(feature = "test-utils")]
-use crate::effects::{ChoreoHandler, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
 /// Fault injection middleware for testing
 #[cfg(feature = "test-utils")]
@@ -50,7 +50,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         use rand::Rng;
 
         // Inject random delay
@@ -83,7 +83,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         self.inner.recv(ep, from).await
     }
 
@@ -92,7 +92,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         ep: &mut Self::Endpoint,
         who: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         self.inner.choose(ep, who, label).await
     }
 
@@ -100,7 +100,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         self.inner.offer(ep, from).await
     }
 
@@ -110,9 +110,9 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for FaultInjection<H> {
         at: Self::Role,
         dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         self.inner.with_timeout(ep, at, dur, body).await
     }

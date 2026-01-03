@@ -19,25 +19,25 @@ use thiserror::Error;
 /// Errors that can occur during transport operations.
 #[derive(Debug, Error)]
 pub enum TransportError {
-    #[error("Connection failed: {0}")]
+    #[error("connection failed: {0}")]
     ConnectionFailed(String),
 
-    #[error("Send failed: {0}")]
+    #[error("send failed: {0}")]
     SendFailed(String),
 
-    #[error("Receive failed: {0}")]
+    #[error("receive failed: {0}")]
     ReceiveFailed(String),
 
-    #[error("Timeout")]
+    #[error("timeout")]
     Timeout,
 
-    #[error("Channel closed")]
+    #[error("channel closed")]
     ChannelClosed,
 
-    #[error("Unknown role: {0}")]
+    #[error("unknown role: {0}")]
     UnknownRole(RoleName),
 
-    #[error("Transport not ready")]
+    #[error("transport not ready")]
     NotReady,
 
     #[error("IO error: {0}")]

@@ -358,4 +358,3 @@ See the following resources for background on the theoretical foundations.
 
 - [Multiparty Session Types](https://doi.org/10.1145/1328438.1328472) by Honda et al.
 - [Session Types and Choreographies](https://arxiv.org/abs/2301.00715) survey
-- [Lean 4 Theorem Prover](https://lean-lang.org/)

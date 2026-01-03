@@ -10,10 +10,15 @@ use std::{
     task::{Context, Poll},
 };
 
+/// Trait for types that can be paired with a dual type.
+///
+/// Used to create matched channel endpoints (e.g., sender/receiver pairs).
 pub trait Pair<P: Pair<Self>>: Sized {
+    /// Create a new pair of dual endpoints.
     fn pair() -> (Self, P);
 }
 
+/// An empty channel placeholder representing no communication.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nil;
 
@@ -73,6 +78,9 @@ impl<T> Sealable for mpsc::UnboundedReceiver<T> {
     }
 }
 
+/// A bidirectional channel combining a sender and receiver.
+///
+/// Implements both `Sink` and `Stream` for full-duplex communication.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Bidirectional<S, R> {
     sender: S,
@@ -81,6 +89,7 @@ pub struct Bidirectional<S, R> {
 }
 
 impl<S, R> Bidirectional<S, R> {
+    /// Create a new bidirectional channel from a sender and receiver.
     pub fn new(sender: S, receiver: R) -> Self {
         Self {
             sender,

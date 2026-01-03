@@ -9,14 +9,14 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::effects::algebra::{Effect, InterpretResult, InterpreterState, Program, ProgramMessage};
 use crate::effects::registry::ExtensibleHandler;
-use crate::effects::{ChoreoHandler, ChoreographyError, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, RoleId};
 
 /// Interpret a choreographic program using a concrete handler
 pub async fn interpret<H, R, M>(
     handler: &mut H,
     endpoint: &mut H::Endpoint,
     program: Program<R, M>,
-) -> Result<InterpretResult<M>>
+) -> ChoreoResult<InterpretResult<M>>
 where
     H: ChoreoHandler<Role = R> + Send,
     R: RoleId,
@@ -34,7 +34,7 @@ pub async fn interpret_extensible<H, R, M>(
     handler: &mut H,
     endpoint: &mut H::Endpoint,
     program: Program<R, M>,
-) -> Result<InterpretResult<M>>
+) -> ChoreoResult<InterpretResult<M>>
 where
     H: ExtensibleHandler<Role = R> + Send,
     R: RoleId,
@@ -65,7 +65,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
         handler: &mut H,
         endpoint: &mut H::Endpoint,
         program: Program<R, M>,
-    ) -> Result<InterpretResult<M>>
+    ) -> ChoreoResult<InterpretResult<M>>
     where
         H: ChoreoHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
@@ -100,7 +100,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
         handler: &mut H,
         endpoint: &mut H::Endpoint,
         effect: Effect<R, M>,
-    ) -> Result<()>
+    ) -> ChoreoResult<()>
     where
         H: ChoreoHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
@@ -359,7 +359,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
         handler: &mut H,
         endpoint: &mut H::Endpoint,
         from: R,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
         H: ChoreoHandler<Role = R>,
         T: DeserializeOwned + Send,
@@ -386,7 +386,7 @@ impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
         handler: &mut H,
         endpoint: &mut H::Endpoint,
         program: Program<R, M>,
-    ) -> Result<InterpretResult<M>>
+    ) -> ChoreoResult<InterpretResult<M>>
     where
         H: ExtensibleHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
@@ -421,7 +421,7 @@ impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
         handler: &mut H,
         endpoint: &mut H::Endpoint,
         effect: Effect<R, M>,
-    ) -> Result<()>
+    ) -> ChoreoResult<()>
     where
         H: ExtensibleHandler<Role = R> + Send,
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
@@ -456,7 +456,7 @@ pub trait ChoreoHandlerExt: ChoreoHandler + Sized {
         &mut self,
         endpoint: &mut Self::Endpoint,
         program: Program<Self::Role, M>,
-    ) -> Result<InterpretResult<M>>
+    ) -> ChoreoResult<InterpretResult<M>>
     where
         M: ProgramMessage + Serialize + DeserializeOwned + 'static,
         Self: Send,
@@ -471,7 +471,7 @@ impl<T: ChoreoHandler> ChoreoHandlerExt for T {}
 /// Utilities for testing and simulation
 pub mod testing {
     use super::{
-        async_trait, ChoreoHandler, ChoreographyError, DeserializeOwned, Result, RoleId, Serialize,
+        async_trait, ChoreoHandler, ChoreoResult, ChoreographyError, DeserializeOwned, RoleId, Serialize,
     };
     use std::collections::VecDeque;
 
@@ -533,7 +533,7 @@ pub mod testing {
             _ep: &mut Self::Endpoint,
             to: Self::Role,
             _msg: &M,
-        ) -> Result<()> {
+        ) -> ChoreoResult<()> {
             self.recorded_operations.push(MockOperation::Send {
                 to,
                 msg_type: std::any::type_name::<M>().to_string(),
@@ -545,7 +545,7 @@ pub mod testing {
             &mut self,
             _ep: &mut Self::Endpoint,
             from: Self::Role,
-        ) -> Result<M> {
+        ) -> ChoreoResult<M> {
             self.recorded_operations.push(MockOperation::Recv { from });
 
             if let Some(MockResponse::Message(bytes)) = self.scripted_responses.pop_front() {
@@ -563,7 +563,7 @@ pub mod testing {
             _ep: &mut Self::Endpoint,
             at: Self::Role,
             label: <Self::Role as RoleId>::Label,
-        ) -> Result<()> {
+        ) -> ChoreoResult<()> {
             self.recorded_operations
                 .push(MockOperation::Choose { at, label });
             Ok(())
@@ -573,7 +573,7 @@ pub mod testing {
             &mut self,
             _ep: &mut Self::Endpoint,
             from: Self::Role,
-        ) -> Result<<Self::Role as RoleId>::Label> {
+        ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
             self.recorded_operations.push(MockOperation::Offer { from });
 
             if let Some(MockResponse::Label(label)) = self.scripted_responses.pop_front() {
@@ -591,9 +591,9 @@ pub mod testing {
             _at: Self::Role,
             _dur: std::time::Duration,
             body: F,
-        ) -> Result<T>
+        ) -> ChoreoResult<T>
         where
-            F: std::future::Future<Output = Result<T>> + Send,
+            F: std::future::Future<Output = ChoreoResult<T>> + Send,
         {
             body.await
         }

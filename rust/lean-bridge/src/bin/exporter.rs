@@ -1,3 +1,14 @@
+//! Choreography Exporter CLI Tool
+//!
+//! Exports choreography DSL files to JSON for Lean verification.
+//!
+//! # Usage
+//!
+//! ```bash
+//! lean-bridge-exporter --input protocol.choreo --role Alice \
+//!     --choreography-out choreo.json --program-out program.json
+//! ```
+
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -138,7 +149,7 @@ fn parse_args(args: &[String]) -> Result<Config> {
         || config.program_out.as_os_str().is_empty()
     {
         return Err(anyhow!(
-            "Usage: lean-exporter --input <dsl> --role <role> --choreography-out <path> --program-out <path>"
+            "Usage: lean-bridge-exporter --input <dsl> --role <role> --choreography-out <path> --program-out <path>"
         ));
     }
 
@@ -216,7 +227,7 @@ fn collect_branches(local: &LocalType) -> Vec<ProgramBranch> {
                 let mut next = current.clone();
                 next.push(SimpleEffect {
                     kind: "send".to_string(),
-                    partner: to.name.to_string(),
+                    partner: to.name().to_string(),
                     label: message.name.to_string(),
                 });
                 go(continuation, next, branch.clone(), acc);
@@ -230,7 +241,7 @@ fn collect_branches(local: &LocalType) -> Vec<ProgramBranch> {
                 let mut next = current.clone();
                 next.push(SimpleEffect {
                     kind: "recv".to_string(),
-                    partner: from.name.to_string(),
+                    partner: from.name().to_string(),
                     label: message.name.to_string(),
                 });
                 go(continuation, next, branch.clone(), acc);

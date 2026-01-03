@@ -26,13 +26,6 @@
 //! | `theory-async-subtyping` | POPL 2021 asynchronous subtyping algorithm |
 //! | `theory-bounded` | Bounded recursion strategies |
 //!
-//! ## Lean Verification
-//!
-//! | Feature | Description |
-//! |---------|-------------|
-//! | `lean-bridge` | Lean verification bridge (JSON export/import) |
-//! | `lean-runner` | LeanRunner for invoking Lean binary |
-//!
 //! ## Meta Features
 //!
 //! | Feature | Description |
@@ -49,9 +42,6 @@ pub use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 // Re-export optional crates
 #[cfg(feature = "theory")]
 pub use rumpsteak_theory as theory;
-
-#[cfg(feature = "lean-bridge")]
-pub use rumpsteak_lean_bridge as lean_bridge;
 
 pub use rumpsteak_aura_macros::{session, Message, Role, Roles};
 

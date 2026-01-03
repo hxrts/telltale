@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::effects::{ChoreoHandler, ChoreographyError, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, RoleId};
 
 type MessageChannelPair = (UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>);
 type ChoiceChannelPair<L> = (UnboundedSender<L>, UnboundedReceiver<L>);
@@ -72,7 +72,6 @@ impl<R: RoleId> InMemoryHandler<R> {
     }
 
     /// Get or create a choice channel pair for broadcasting choices
-    #[allow(dead_code)]
     fn get_or_create_choice_channel(&self, from: R, to: R) -> UnboundedSender<R::Label> {
         let mut channels = self
             .choice_channels
@@ -105,7 +104,7 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
         _ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         // Serialize message
         let bytes =
             bincode::serialize(msg).map_err(|e| ChoreographyError::Serialization(e.to_string()))?;
@@ -127,7 +126,7 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         tracing::trace!(?from, "InMemoryHandler: recv start");
 
         // Get the receiver for messages from 'from' to 'self.role'
@@ -164,7 +163,7 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
         _ep: &mut Self::Endpoint,
         who: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         // Send choice label from self.role to who via the choice channel
         let sender = self.get_or_create_choice_channel(self.role, who);
         sender.unbounded_send(label).map_err(|_| {
@@ -182,7 +181,7 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         tracing::trace!(?from, "InMemoryHandler: waiting for choice");
 
         // Get the choice receiver for choices from 'from' to 'self.role'
@@ -219,9 +218,9 @@ impl<R: RoleId + 'static> ChoreoHandler for InMemoryHandler<R> {
         at: Self::Role,
         dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         if at == self.role {
             // Platform-specific timeout implementation

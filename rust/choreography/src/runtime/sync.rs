@@ -31,7 +31,13 @@ pub use futures::channel::mpsc;
 /// Helper macro for acquiring a read lock.
 ///
 /// On native targets, this awaits the async lock.
-/// On WASM, this uses the blocking (but single-threaded safe) unwrap.
+/// On WASM, this uses the blocking (but single-threaded safe) lock.
+///
+/// # Panics (WASM only)
+///
+/// On WASM targets, panics if the lock is poisoned (another thread panicked
+/// while holding the lock). This should not occur in practice since WASM
+/// is single-threaded.
 ///
 /// # Example
 ///
@@ -48,7 +54,7 @@ macro_rules! read_lock {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            $lock.read().unwrap()
+            $lock.read().expect("RwLock poisoned")
         }
     }};
 }
@@ -56,7 +62,13 @@ macro_rules! read_lock {
 /// Helper macro for acquiring a write lock.
 ///
 /// On native targets, this awaits the async lock.
-/// On WASM, this uses the blocking (but single-threaded safe) unwrap.
+/// On WASM, this uses the blocking (but single-threaded safe) lock.
+///
+/// # Panics (WASM only)
+///
+/// On WASM targets, panics if the lock is poisoned (another thread panicked
+/// while holding the lock). This should not occur in practice since WASM
+/// is single-threaded.
 ///
 /// # Example
 ///
@@ -73,7 +85,7 @@ macro_rules! write_lock {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            $lock.write().unwrap()
+            $lock.write().expect("RwLock poisoned")
         }
     }};
 }
@@ -81,7 +93,13 @@ macro_rules! write_lock {
 /// Helper macro for acquiring a mutex lock.
 ///
 /// On native targets, this awaits the async lock.
-/// On WASM, this uses the blocking (but single-threaded safe) unwrap.
+/// On WASM, this uses the blocking (but single-threaded safe) lock.
+///
+/// # Panics (WASM only)
+///
+/// On WASM targets, panics if the mutex is poisoned (another thread panicked
+/// while holding the lock). This should not occur in practice since WASM
+/// is single-threaded.
 ///
 /// # Example
 ///
@@ -98,7 +116,7 @@ macro_rules! mutex_lock {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            $lock.lock().unwrap()
+            $lock.lock().expect("Mutex poisoned")
         }
     }};
 }

@@ -18,7 +18,7 @@ use futures::{channel::mpsc, future::BoxFuture, SinkExt, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, time::Duration};
 
-use crate::effects::{ChoreoHandler, ChoreographyError, LabelId, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, LabelId, RoleId};
 use rumpsteak_aura::{
     channel::{Bidirectional, Pair},
     Message, Role,
@@ -112,22 +112,22 @@ pub trait SessionTypeDynamic: Send {
     fn type_name(&self) -> &'static str;
 
     /// Send a serialized message.
-    fn send(&mut self, _data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+    fn send(&mut self, _data: Vec<u8>) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
         unsupported("send", self.type_name())
     }
 
     /// Receive a serialized message.
-    fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
+    fn recv(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<Vec<u8>>>> {
         unsupported("recv", self.type_name())
     }
 
     /// Make a choice/selection.
-    fn choose(&mut self, _label: &str) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+    fn choose(&mut self, _label: &str) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
         unsupported("choose", self.type_name())
     }
 
     /// Offer a branch selection.
-    fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
+    fn offer(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<String>>> {
         unsupported("offer", self.type_name())
     }
 }
@@ -135,7 +135,7 @@ pub trait SessionTypeDynamic: Send {
 fn unsupported<T>(
     operation: &'static str,
     name: &'static str,
-) -> BoxFuture<'static, Result<SessionUpdate<T>>> {
+) -> BoxFuture<'static, ChoreoResult<SessionUpdate<T>>> {
     Box::pin(async move {
         Err(ChoreographyError::ProtocolViolation(format!(
             "{name} does not support {operation} operations"
@@ -170,7 +170,7 @@ where
         self.label
     }
 
-    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
         let sender = &mut self.sender;
         Box::pin(async move {
             sender.send(data).await.map_err(|e| {
@@ -183,7 +183,7 @@ where
         })
     }
 
-    fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
+    fn recv(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<Vec<u8>>>> {
         let receiver = &mut self.receiver;
         Box::pin(async move {
             let bytes = receiver.next().await.ok_or_else(|| {
@@ -196,7 +196,7 @@ where
         })
     }
 
-    fn choose(&mut self, label: &str) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+    fn choose(&mut self, label: &str) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
         let sender = &mut self.sender;
         let data = label.to_string();
         Box::pin(async move {
@@ -216,7 +216,7 @@ where
         })
     }
 
-    fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
+    fn offer(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<String>>> {
         let receiver = &mut self.receiver;
         Box::pin(async move {
             let bytes = receiver.next().await.ok_or_else(|| {
@@ -254,7 +254,7 @@ impl SessionTypeDynamic for SimpleSession {
         "SimpleSession"
     }
 
-    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+    fn send(&mut self, data: Vec<u8>) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
             channel.send(data).await.map_err(|e| {
@@ -267,7 +267,7 @@ impl SessionTypeDynamic for SimpleSession {
         })
     }
 
-    fn recv(&mut self) -> BoxFuture<'_, Result<SessionUpdate<Vec<u8>>>> {
+    fn recv(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<Vec<u8>>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
             let bytes = channel.recv().await.map_err(|_| {
@@ -280,7 +280,7 @@ impl SessionTypeDynamic for SimpleSession {
         })
     }
 
-    fn choose(&mut self, label: &str) -> BoxFuture<'_, Result<SessionUpdate<()>>> {
+    fn choose(&mut self, label: &str) -> BoxFuture<'_, ChoreoResult<SessionUpdate<()>>> {
         let channel = &mut self.channel;
         let label = label.to_string();
         Box::pin(async move {
@@ -300,7 +300,7 @@ impl SessionTypeDynamic for SimpleSession {
         })
     }
 
-    fn offer(&mut self) -> BoxFuture<'_, Result<SessionUpdate<String>>> {
+    fn offer(&mut self) -> BoxFuture<'_, ChoreoResult<SessionUpdate<String>>> {
         let channel = &mut self.channel;
         Box::pin(async move {
             let bytes = channel.recv().await.map_err(|_| {
@@ -360,19 +360,19 @@ impl RumpsteakSession {
         self.inner.type_name()
     }
 
-    pub async fn send(&mut self, data: Vec<u8>) -> Result<SessionUpdate<()>> {
+    pub async fn send(&mut self, data: Vec<u8>) -> ChoreoResult<SessionUpdate<()>> {
         self.inner.send(data).await
     }
 
-    pub async fn recv(&mut self) -> Result<SessionUpdate<Vec<u8>>> {
+    pub async fn recv(&mut self) -> ChoreoResult<SessionUpdate<Vec<u8>>> {
         self.inner.recv().await
     }
 
-    pub async fn choose(&mut self, label: &str) -> Result<SessionUpdate<()>> {
+    pub async fn choose(&mut self, label: &str) -> ChoreoResult<SessionUpdate<()>> {
         self.inner.choose(label).await
     }
 
-    pub async fn offer(&mut self) -> Result<SessionUpdate<String>> {
+    pub async fn offer(&mut self) -> ChoreoResult<SessionUpdate<String>> {
         self.inner.offer().await
     }
 }
@@ -511,10 +511,10 @@ where
         peer: &R,
         default_description: &str,
         f: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
         F: FnOnce(ChannelState) -> Fut,
-        Fut: std::future::Future<Output = Result<(T, ChannelState, Option<String>, bool)>>,
+        Fut: std::future::Future<Output = ChoreoResult<(T, ChannelState, Option<String>, bool)>>,
     {
         let mut record = ep.take_record(peer).ok_or_else(|| {
             ChoreographyError::NoPeerChannel {
@@ -559,7 +559,7 @@ where
         ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &Msg,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         let serialized = bincode::serialize(msg).map_err(|e| {
             ChoreographyError::MessageSerializationFailed {
                 operation: "Serialization",
@@ -597,7 +597,7 @@ where
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<Msg> {
+    ) -> ChoreoResult<Msg> {
         Self::with_channel_operation(ep, &from, "Recv", |state| async move {
             match state {
                 ChannelState::Simple(mut channel) => {
@@ -642,7 +642,7 @@ where
         ep: &mut Self::Endpoint,
         who: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         let label_str = label.as_str().to_string();
         Self::with_channel_operation(ep, &who, "Choose", |state| async move {
             match state {
@@ -679,7 +679,7 @@ where
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         Self::with_channel_operation(ep, &from, "Offer", |state| async move {
             match state {
                 ChannelState::Simple(mut channel) => {
@@ -730,9 +730,9 @@ where
         _at: Self::Role,
         dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         #[cfg(not(target_arch = "wasm32"))]
         {

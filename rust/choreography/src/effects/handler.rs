@@ -108,11 +108,11 @@ impl<T: Send> Endpoint for T {}
 #[derive(Debug, Error)]
 pub enum ChoreographyError {
     /// Transport-layer error (network, channel failure, etc.)
-    #[error("Transport error: {0}")]
+    #[error("transport error: {0}")]
     Transport(String),
 
     /// Message serialization/deserialization error
-    #[error("Serialization error: {0}")]
+    #[error("serialization error: {0}")]
     Serialization(String),
 
     /// Channel send operation failed
@@ -134,14 +134,14 @@ pub enum ChoreographyError {
     },
 
     /// No channel registered for the specified peer
-    #[error("No channel registered for peer: {peer}")]
+    #[error("no channel registered for peer: {peer}")]
     NoPeerChannel {
         /// String representation of the peer role
         peer: String,
     },
 
     /// Label serialization failed during choice/offer
-    #[error("Label {operation} failed: {reason}")]
+    #[error("label {operation} failed: {reason}")]
     LabelSerializationFailed {
         /// Operation: "serialization" or "deserialization"
         operation: &'static str,
@@ -161,15 +161,15 @@ pub enum ChoreographyError {
     },
 
     /// Operation exceeded the specified timeout
-    #[error("Timeout after {0:?}")]
+    #[error("timeout after {0:?}")]
     Timeout(Duration),
 
     /// Protocol specification was violated at runtime
-    #[error("Protocol violation: {0}")]
+    #[error("protocol violation: {0}")]
     ProtocolViolation(String),
 
     /// Referenced role not found in the choreography
-    #[error("Role {0:?} not found in this choreography")]
+    #[error("role {0:?} not found in this choreography")]
     UnknownRole(String),
 
     /// Error with protocol execution context
@@ -218,7 +218,7 @@ pub enum ChoreographyError {
     },
 
     /// Error during choice/branch operation
-    #[error("Choice error at {role}: {details}")]
+    #[error("choice error at {role}: {details}")]
     ChoiceError {
         /// The role making or receiving the choice
         role: &'static str,
@@ -237,7 +237,7 @@ pub enum ChoreographyError {
     },
 
     /// Invalid choice: the chosen branch was not among expected options
-    #[error("Invalid choice: expected one of {expected:?}, got {actual}")]
+    #[error("invalid choice: expected one of {expected:?}, got {actual}")]
     InvalidChoice {
         /// Expected branch labels
         expected: Vec<String>,
@@ -246,7 +246,7 @@ pub enum ChoreographyError {
     },
 
     /// General execution error
-    #[error("Execution error: {0}")]
+    #[error("execution error: {0}")]
     ExecutionError(String),
 }
 
@@ -352,8 +352,8 @@ impl ChoreographyError {
     }
 }
 
-/// Result type for choreography operations
-pub type Result<T> = std::result::Result<T, ChoreographyError>;
+/// Result type for choreography operations.
+pub type ChoreoResult<T> = std::result::Result<T, ChoreographyError>;
 
 /// Extension trait for adding context to Results.
 ///
@@ -366,10 +366,10 @@ pub trait ContextExt<T> {
         protocol: &'static str,
         role: &'static str,
         phase: &'static str,
-    ) -> Result<T>;
+    ) -> ChoreoResult<T>;
 
     /// Add role context to an error.
-    fn with_role_context(self, role: &'static str, index: Option<u32>) -> Result<T>;
+    fn with_role_context(self, role: &'static str, index: Option<u32>) -> ChoreoResult<T>;
 
     /// Add message context to an error.
     fn with_message_context(
@@ -378,23 +378,23 @@ pub trait ContextExt<T> {
         message_type: &'static str,
         direction: &'static str,
         other_role: &'static str,
-    ) -> Result<T>;
+    ) -> ChoreoResult<T>;
 
     /// Add generic context to an error.
-    fn with_context(self, context: impl Into<String>) -> Result<T>;
+    fn with_context(self, context: impl Into<String>) -> ChoreoResult<T>;
 }
 
-impl<T> ContextExt<T> for Result<T> {
+impl<T> ContextExt<T> for ChoreoResult<T> {
     fn with_protocol_context(
         self,
         protocol: &'static str,
         role: &'static str,
         phase: &'static str,
-    ) -> Result<T> {
+    ) -> ChoreoResult<T> {
         self.map_err(|e| e.with_protocol_context(protocol, role, phase))
     }
 
-    fn with_role_context(self, role: &'static str, index: Option<u32>) -> Result<T> {
+    fn with_role_context(self, role: &'static str, index: Option<u32>) -> ChoreoResult<T> {
         self.map_err(|e| e.with_role_context(role, index))
     }
 
@@ -404,11 +404,11 @@ impl<T> ContextExt<T> for Result<T> {
         message_type: &'static str,
         direction: &'static str,
         other_role: &'static str,
-    ) -> Result<T> {
+    ) -> ChoreoResult<T> {
         self.map_err(|e| e.with_message_context(operation, message_type, direction, other_role))
     }
 
-    fn with_context(self, context: impl Into<String>) -> Result<T> {
+    fn with_context(self, context: impl Into<String>) -> ChoreoResult<T> {
         self.map_err(|e| e.with_context(context))
     }
 }
@@ -450,7 +450,7 @@ pub trait ChoreoHandler: Send {
         ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &M,
-    ) -> Result<()>;
+    ) -> ChoreoResult<()>;
 
     /// Receive a strongly-typed message from a specific role
     ///
@@ -466,7 +466,7 @@ pub trait ChoreoHandler: Send {
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M>;
+    ) -> ChoreoResult<M>;
 
     /// Internal choice: broadcast a label selection
     ///
@@ -482,7 +482,7 @@ pub trait ChoreoHandler: Send {
         ep: &mut Self::Endpoint,
         who: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()>;
+    ) -> ChoreoResult<()>;
 
     /// External choice: receive a label selection
     ///
@@ -500,7 +500,7 @@ pub trait ChoreoHandler: Send {
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label>;
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label>;
 
     /// Execute a future with a timeout
     ///
@@ -520,9 +520,9 @@ pub trait ChoreoHandler: Send {
         at: Self::Role,
         dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send;
+        F: std::future::Future<Output = ChoreoResult<T>> + Send;
 
     /// Broadcast a message to multiple recipients
     ///
@@ -532,7 +532,7 @@ pub trait ChoreoHandler: Send {
         ep: &mut Self::Endpoint,
         recipients: &[Self::Role],
         msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         for &recipient in recipients {
             self.send(ep, recipient, msg).await?;
         }
@@ -546,7 +546,7 @@ pub trait ChoreoHandler: Send {
         &mut self,
         ep: &mut Self::Endpoint,
         sends: &[(Self::Role, M)],
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         // Default implementation: sequential sends
         for (recipient, msg) in sends {
             self.send(ep, *recipient, msg).await?;
@@ -563,12 +563,12 @@ pub trait ChoreoHandlerExt: ChoreoHandler {
     /// Setup phase - establish connections, initialize state
     ///
     /// Called before protocol execution begins.
-    async fn setup(&mut self, role: Self::Role) -> Result<Self::Endpoint>;
+    async fn setup(&mut self, role: Self::Role) -> ChoreoResult<Self::Endpoint>;
 
     /// Teardown phase - close connections, cleanup
     ///
     /// Called after protocol execution completes.
-    async fn teardown(&mut self, ep: Self::Endpoint) -> Result<()>;
+    async fn teardown(&mut self, ep: Self::Endpoint) -> ChoreoResult<()>;
 }
 
 /// A no-op handler for testing pure choreographic logic
@@ -614,7 +614,7 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         _ep: &mut Self::Endpoint,
         _to: Self::Role,
         _msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         Ok(())
     }
 
@@ -622,7 +622,7 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         _from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         Err(ChoreographyError::Transport(
             "NoOpHandler cannot receive".into(),
         ))
@@ -633,7 +633,7 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         _ep: &mut Self::Endpoint,
         _who: Self::Role,
         _label: <Self::Role as RoleId>::Label,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         Ok(())
     }
 
@@ -641,7 +641,7 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         _from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         Err(ChoreographyError::Transport(
             "NoOpHandler cannot offer".into(),
         ))
@@ -653,9 +653,9 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         _at: Self::Role,
         _dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         body.await
     }

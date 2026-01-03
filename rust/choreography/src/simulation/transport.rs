@@ -4,8 +4,9 @@
 //! allowing custom delivery semantics (delays, reordering, failures).
 
 use async_trait::async_trait;
+use parking_lot::Mutex;
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use super::envelope::ProtocolEnvelope;
 use crate::identifiers::RoleName;
@@ -17,31 +18,31 @@ type MessageQueues = Arc<Mutex<HashMap<(RoleName, RoleName), VecDeque<ProtocolEn
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError {
     /// The destination is not reachable.
-    #[error("Destination unreachable: {0}")]
+    #[error("destination unreachable: {0}")]
     Unreachable(String),
 
     /// No message available for receive.
-    #[error("No message available from {0}")]
+    #[error("no message available from {0}")]
     NoMessage(String),
 
     /// The channel is closed.
-    #[error("Channel closed")]
+    #[error("channel closed")]
     ChannelClosed,
 
     /// Serialization/deserialization error.
-    #[error("Serialization error: {0}")]
+    #[error("serialization error: {0}")]
     Serialization(String),
 
     /// Timeout waiting for message.
-    #[error("Timeout waiting for message")]
+    #[error("timeout waiting for message")]
     Timeout,
 
     /// Role was not set on the transport before use.
-    #[error("Role not set on transport")]
+    #[error("role not set on transport")]
     RoleNotSet,
 
     /// Generic transport error.
-    #[error("Transport error: {0}")]
+    #[error("transport error: {0}")]
     Other(String),
 }
 
@@ -134,20 +135,20 @@ impl InMemoryTransport {
     /// Get all messages in transit (for debugging).
     #[must_use]
     pub fn all_messages(&self) -> Vec<ProtocolEnvelope> {
-        let queues = self.queues.lock().unwrap();
+        let queues = self.queues.lock();
         queues.values().flatten().cloned().collect()
     }
 
     /// Clear all message queues.
     pub fn clear(&mut self) {
-        let mut queues = self.queues.lock().unwrap();
+        let mut queues = self.queues.lock();
         queues.clear();
     }
 
     /// Get the number of pending messages.
     #[must_use]
     pub fn pending_count(&self) -> usize {
-        let queues = self.queues.lock().unwrap();
+        let queues = self.queues.lock();
         queues.values().map(|q| q.len()).sum()
     }
 }
@@ -166,7 +167,7 @@ impl SimulatedTransport for InMemoryTransport {
         let from = self.role.as_ref().ok_or(TransportError::RoleNotSet)?;
         let key = Self::queue_key(from, to);
 
-        let mut queues = self.queues.lock().unwrap();
+        let mut queues = self.queues.lock();
         queues.entry(key).or_default().push_back(envelope);
         Ok(())
     }
@@ -175,7 +176,7 @@ impl SimulatedTransport for InMemoryTransport {
         let to = self.role.as_ref().ok_or(TransportError::RoleNotSet)?;
         let key = Self::queue_key(from, to);
 
-        let mut queues = self.queues.lock().unwrap();
+        let mut queues = self.queues.lock();
         queues
             .get_mut(&key)
             .and_then(|q| q.pop_front())
@@ -188,7 +189,7 @@ impl SimulatedTransport for InMemoryTransport {
         };
         let key = Self::queue_key(from, to);
 
-        let queues = self.queues.lock().unwrap();
+        let queues = self.queues.lock();
         queues.get(&key).is_some_and(|q| !q.is_empty())
     }
 

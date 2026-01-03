@@ -12,31 +12,31 @@ pub fn project(choreography: &Choreography, role: &Role) -> Result<LocalType, Pr
 /// Errors that can occur during projection
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectionError {
-    #[error("Cannot project choice for non-participant role")]
+    #[error("cannot project choice for non-participant role")]
     NonParticipantChoice,
 
-    #[error("Parallel composition not supported for role {0}")]
+    #[error("parallel composition not supported for role {0}")]
     UnsupportedParallel(String),
 
-    #[error("Inconsistent projections in parallel branches")]
+    #[error("inconsistent projections in parallel branches")]
     InconsistentParallel,
 
-    #[error("Recursive variable {0} not in scope")]
+    #[error("recursive variable {0} not in scope")]
     UnboundVariable(String),
 
-    #[error("Dynamic role {role} requires runtime context for projection")]
+    #[error("dynamic role {role} requires runtime context for projection")]
     DynamicRoleProjection { role: String },
 
-    #[error("Symbolic role parameter '{param}' not bound in context")]
+    #[error("symbolic role parameter '{param}' not bound in context")]
     UnboundSymbolic { param: String },
 
-    #[error("Range role index cannot be projected to concrete local type")]
+    #[error("range role index cannot be projected to concrete local type")]
     RangeProjection,
 
-    #[error("Wildcard role index requires specialized projection context")]
+    #[error("wildcard role index requires specialized projection context")]
     WildcardProjection,
 
-    #[error("Cannot merge branches: {0}")]
+    #[error("cannot merge branches: {0}")]
     MergeFailure(String),
 }
 
@@ -637,8 +637,9 @@ impl<'a> ProjectionContext<'a> {
         }
 
         // Fold the merge operation over all projections
+        // Safety: non_end is non-empty (checked above)
         let mut iter = non_end.into_iter();
-        let mut result = iter.next().unwrap();
+        let mut result = iter.next().expect("non-empty after is_empty check");
 
         for next in iter {
             result = merge_local_types(&result, &next)?;

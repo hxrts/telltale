@@ -21,8 +21,8 @@ pub use algebra::{
 };
 pub use extension::{ExtensionEffect, ExtensionError};
 pub use handler::{
-    ChoreoHandler, ChoreoHandlerExt, ChoreographyError, ContextExt, Endpoint, LabelId, MessageTag,
-    NoOpHandler, Result, RoleId,
+    ChoreoHandler, ChoreoHandlerExt, ChoreoResult, ChoreographyError, ContextExt, Endpoint,
+    LabelId, MessageTag, NoOpHandler, RoleId,
 };
 pub use interpreter::{interpret, interpret_extensible};
 pub use registry::{ExtensibleHandler, ExtensionRegistry};

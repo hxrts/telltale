@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
-use crate::effects::{ChoreoHandler, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
 /// Metrics collection middleware
 #[derive(Clone)]
@@ -50,7 +50,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         let result = self.inner.send(ep, to, msg).await;
         if result.is_ok() {
             self.send_count
@@ -66,7 +66,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         let result = self.inner.recv(ep, from).await;
         if result.is_ok() {
             self.recv_count
@@ -83,7 +83,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         ep: &mut Self::Endpoint,
         who: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         self.inner.choose(ep, who, label).await
     }
 
@@ -91,7 +91,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         self.inner.offer(ep, from).await
     }
 
@@ -101,9 +101,9 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         at: Self::Role,
         dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         self.inner.with_timeout(ep, at, dur, body).await
     }

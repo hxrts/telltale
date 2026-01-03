@@ -8,19 +8,18 @@
 //! The serialization process:
 //! 1. Convert to de Bruijn representation (for α-equivalence)
 //! 2. Normalize branch ordering (deterministic)
-//! 3. Serialize to JSON bytes (simple, deterministic)
+//! 3. Serialize to bytes (JSON by default, DAG-CBOR with feature flag)
+//!
+//! # Serialization Formats
+//!
+//! - **JSON** (default): Simple and human-readable. Uses `to_bytes`/`from_bytes`.
+//! - **DAG-CBOR** (with `dag-cbor` feature): Compact binary format compatible
+//!   with IPLD/IPFS. Uses `to_cbor_bytes`/`from_cbor_bytes`.
 //!
 //! # Lean Correspondence
 //!
 //! This module corresponds to `lean/Rumpsteak/Protocol/Serialize.lean`.
-//! The `toCbor`/`fromCbor` methods in Lean map to `to_bytes`/`from_bytes` here.
-//!
-//! # Future Work
-//!
-//! Currently uses JSON for simplicity. Consider migrating to DAG-CBOR for:
-//! - More compact representation
-//! - Better handling of binary data
-//! - CID compatibility (IPFS/IPLD)
+//! The `toCbor`/`fromCbor` methods in Lean map to `to_cbor_bytes`/`from_cbor_bytes` here.
 
 use crate::content_id::{ContentId, Hasher, Sha256Hasher};
 use crate::de_bruijn::{GlobalTypeDB, LocalTypeRDB};
@@ -51,25 +50,56 @@ use serde::{de::DeserializeOwned, Serialize};
 /// assert_eq!(g1.to_bytes().unwrap(), g2.to_bytes().unwrap());
 /// ```
 pub trait Contentable: Sized {
-    /// Serialize to canonical byte representation.
+    /// Serialize to canonical byte representation (JSON format).
     fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
 
-    /// Deserialize from bytes.
+    /// Deserialize from JSON bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if deserialization fails.
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
 
-    /// Compute content ID using the specified hasher.
+    /// Serialize to DAG-CBOR bytes (requires `dag-cbor` feature).
+    ///
+    /// DAG-CBOR is a deterministic subset of CBOR designed for content addressing.
+    /// It produces more compact output than JSON and is compatible with IPLD/IPFS.
+    #[cfg(feature = "dag-cbor")]
+    fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError>;
+
+    /// Deserialize from DAG-CBOR bytes (requires `dag-cbor` feature).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if deserialization fails.
+    #[cfg(feature = "dag-cbor")]
+    fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
+
+    /// Compute content ID using the specified hasher (from JSON bytes).
     fn content_id<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
         let bytes = self.to_bytes()?;
         Ok(ContentId::from_bytes(&bytes))
     }
 
-    /// Compute content ID using default SHA-256 hasher.
+    /// Compute content ID using default SHA-256 hasher (from JSON bytes).
     fn content_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id()
+    }
+
+    /// Compute content ID from DAG-CBOR bytes (requires `dag-cbor` feature).
+    ///
+    /// This produces a different content ID than the JSON-based methods.
+    /// Use this for IPLD/IPFS compatibility.
+    #[cfg(feature = "dag-cbor")]
+    fn content_id_cbor<H: Hasher>(&self) -> Result<ContentId<H>, ContentableError> {
+        let bytes = self.to_cbor_bytes()?;
+        Ok(ContentId::from_bytes(&bytes))
+    }
+
+    /// Compute content ID from DAG-CBOR using SHA-256 (requires `dag-cbor` feature).
+    #[cfg(feature = "dag-cbor")]
+    fn content_id_cbor_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
+        self.content_id_cbor()
     }
 }
 
@@ -114,6 +144,19 @@ fn from_json_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableEr
         .map_err(|e| ContentableError::DeserializationFailed(e.to_string()))
 }
 
+// Helper for DAG-CBOR serialization (requires dag-cbor feature)
+#[cfg(feature = "dag-cbor")]
+fn to_cbor_bytes_impl<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableError> {
+    serde_ipld_dagcbor::to_vec(value)
+        .map_err(|e| ContentableError::SerializationFailed(format!("dag-cbor: {e}")))
+}
+
+#[cfg(feature = "dag-cbor")]
+fn from_cbor_bytes_impl<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
+    serde_ipld_dagcbor::from_slice(bytes)
+        .map_err(|e| ContentableError::DeserializationFailed(format!("dag-cbor: {e}")))
+}
+
 // ============================================================================
 // Contentable implementations
 // ============================================================================
@@ -126,6 +169,16 @@ impl Contentable for PayloadSort {
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
         from_json_bytes(bytes)
     }
+
+    #[cfg(feature = "dag-cbor")]
+    fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        to_cbor_bytes_impl(self)
+    }
+
+    #[cfg(feature = "dag-cbor")]
+    fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
+        from_cbor_bytes_impl(bytes)
+    }
 }
 
 impl Contentable for Label {
@@ -135,6 +188,16 @@ impl Contentable for Label {
 
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
         from_json_bytes(bytes)
+    }
+
+    #[cfg(feature = "dag-cbor")]
+    fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        to_cbor_bytes_impl(self)
+    }
+
+    #[cfg(feature = "dag-cbor")]
+    fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
+        from_cbor_bytes_impl(bytes)
     }
 }
 
@@ -151,6 +214,18 @@ impl Contentable for GlobalType {
         let db: GlobalTypeDB = from_json_bytes(bytes)?;
         Ok(global_from_de_bruijn(&db, &mut vec![]))
     }
+
+    #[cfg(feature = "dag-cbor")]
+    fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        let db = GlobalTypeDB::from(self).normalize();
+        to_cbor_bytes_impl(&db)
+    }
+
+    #[cfg(feature = "dag-cbor")]
+    fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
+        let db: GlobalTypeDB = from_cbor_bytes_impl(bytes)?;
+        Ok(global_from_de_bruijn(&db, &mut vec![]))
+    }
 }
 
 impl Contentable for LocalTypeR {
@@ -164,6 +239,18 @@ impl Contentable for LocalTypeR {
         // Note: This returns a type with generated variable names,
         // since de Bruijn indices don't preserve names.
         let db: LocalTypeRDB = from_json_bytes(bytes)?;
+        Ok(local_from_de_bruijn(&db, &mut vec![]))
+    }
+
+    #[cfg(feature = "dag-cbor")]
+    fn to_cbor_bytes(&self) -> Result<Vec<u8>, ContentableError> {
+        let db = LocalTypeRDB::from(self).normalize();
+        to_cbor_bytes_impl(&db)
+    }
+
+    #[cfg(feature = "dag-cbor")]
+    fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
+        let db: LocalTypeRDB = from_cbor_bytes_impl(bytes)?;
         Ok(local_from_de_bruijn(&db, &mut vec![]))
     }
 }
@@ -422,6 +509,113 @@ mod tests {
             g1.content_id_sha256().unwrap(),
             g2.content_id_sha256().unwrap()
         );
+    }
+
+    // ========================================================================
+    // DAG-CBOR tests (require dag-cbor feature)
+    // ========================================================================
+
+    #[cfg(feature = "dag-cbor")]
+    mod cbor_tests {
+        use super::*;
+
+        #[test]
+        fn test_payload_sort_cbor_roundtrip() {
+            let sort = PayloadSort::prod(PayloadSort::Nat, PayloadSort::Bool);
+            let bytes = sort.to_cbor_bytes().unwrap();
+            let recovered = PayloadSort::from_cbor_bytes(&bytes).unwrap();
+            assert_eq!(sort, recovered);
+        }
+
+        #[test]
+        fn test_label_cbor_roundtrip() {
+            let label = Label::with_sort("data", PayloadSort::Nat);
+            let bytes = label.to_cbor_bytes().unwrap();
+            let recovered = Label::from_cbor_bytes(&bytes).unwrap();
+            assert_eq!(label, recovered);
+        }
+
+        #[test]
+        fn test_global_type_cbor_roundtrip() {
+            let g = GlobalType::mu(
+                "x",
+                GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")),
+            );
+
+            let bytes = g.to_cbor_bytes().unwrap();
+            let recovered = GlobalType::from_cbor_bytes(&bytes).unwrap();
+
+            // Roundtrip should be α-equivalent
+            assert_eq!(g.to_cbor_bytes().unwrap(), recovered.to_cbor_bytes().unwrap());
+        }
+
+        #[test]
+        fn test_local_type_cbor_roundtrip() {
+            let t = LocalTypeR::mu(
+                "x",
+                LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("x")),
+            );
+
+            let bytes = t.to_cbor_bytes().unwrap();
+            let recovered = LocalTypeR::from_cbor_bytes(&bytes).unwrap();
+
+            assert_eq!(t.to_cbor_bytes().unwrap(), recovered.to_cbor_bytes().unwrap());
+        }
+
+        #[test]
+        fn test_cbor_alpha_equivalence() {
+            // Two α-equivalent types should produce the same CBOR bytes
+            let g1 = GlobalType::mu(
+                "x",
+                GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")),
+            );
+            let g2 = GlobalType::mu(
+                "y",
+                GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("y")),
+            );
+
+            assert_eq!(g1.to_cbor_bytes().unwrap(), g2.to_cbor_bytes().unwrap());
+            assert_eq!(
+                g1.content_id_cbor_sha256().unwrap(),
+                g2.content_id_cbor_sha256().unwrap()
+            );
+        }
+
+        #[test]
+        fn test_cbor_more_compact_than_json() {
+            // CBOR should typically be more compact than JSON
+            let g = GlobalType::comm(
+                "A",
+                "B",
+                vec![
+                    (Label::new("msg1"), GlobalType::End),
+                    (Label::new("msg2"), GlobalType::End),
+                    (Label::new("msg3"), GlobalType::End),
+                ],
+            );
+
+            let json_bytes = g.to_bytes().unwrap();
+            let cbor_bytes = g.to_cbor_bytes().unwrap();
+
+            // CBOR is typically 30-50% smaller than JSON for structured data
+            assert!(
+                cbor_bytes.len() < json_bytes.len(),
+                "CBOR ({} bytes) should be smaller than JSON ({} bytes)",
+                cbor_bytes.len(),
+                json_bytes.len()
+            );
+        }
+
+        #[test]
+        fn test_json_and_cbor_produce_different_bytes() {
+            // JSON and CBOR are different formats, so bytes should differ
+            let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+            let json_bytes = g.to_bytes().unwrap();
+            let cbor_bytes = g.to_cbor_bytes().unwrap();
+
+            assert_ne!(json_bytes, cbor_bytes);
+        }
     }
 }
 

@@ -36,10 +36,9 @@ hex = { workspace = true }
 uuid = { workspace = true }
 pest = { workspace = true }
 pest_derive = { workspace = true }
-regex = { workspace = true }
-lazy_static = { workspace = true }
 toml = { workspace = true }
 sha2 = { workspace = true }
+parking_lot = { workspace = true }
 
 # Optional dependencies
 rand = { workspace = true, optional = true }

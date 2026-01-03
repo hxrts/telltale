@@ -171,6 +171,11 @@ impl<R: RoleId, M> Program<R, M> {
     }
 
     /// Extend this program with another program.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the composed program violates structural invariants (e.g., End
+    /// not at the final position). Use `try_then` for fallible composition.
     #[must_use]
     pub fn then(self, other: Program<R, M>) -> Program<R, M> {
         let mut effects = self.effects;
@@ -202,6 +207,12 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
         }
     }
 
+    /// Push an effect onto the builder.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after `end()` has been called, as no effects can
+    /// follow the End effect.
     fn push(&mut self, effect: Effect<R, M>) {
         if self.ended {
             panic!("cannot add effects after end");
@@ -329,6 +340,11 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
     }
 
     /// Mark the end of the program and finalize it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the program violates structural invariants. This should not
+    /// happen with normal builder usage. Use `build()` for fallible construction.
     pub fn end(mut self) -> Program<R, M> {
         self.push(Effect::End);
         self.build()
@@ -342,9 +358,14 @@ impl<R: RoleId, M> ProgramBuilder<R, M> {
 }
 
 impl<R: RoleId, M> Default for Program<R, M> {
+    /// Returns an empty program with no effects.
+    ///
+    /// An empty program is always valid, so this cannot fail.
     fn default() -> Self {
-        Program::from_effects(Vec::new())
-            .unwrap_or_else(|err| panic!("invalid default program: {err}"))
+        // Empty program is always valid - no panic possible
+        Self {
+            effects: Vec::new(),
+        }
     }
 }
 

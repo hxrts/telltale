@@ -45,7 +45,7 @@ pub use effects::NoOpHandler;
 pub use effects::{
     interpret, ChoreoHandler, ChoreoHandlerExt, ChoreographyError, Effect, Endpoint,
     InterpretResult, InterpreterState, LabelId, MessageTag, Program, ProgramBuilder, ProgramMessage,
-    Result, RoleId,
+    ChoreoResult, RoleId,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
 pub use effects::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
@@ -135,16 +135,16 @@ pub fn parse_choreography_with_extensions(
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::enum_variant_names)]
 pub enum CompilationError {
-    #[error("Parse error: {0}")]
+    #[error("parse error: {0}")]
     ParseError(#[from] compiler::parser::ParseError),
 
-    #[error("Validation error: {0}")]
+    #[error("validation error: {0}")]
     ValidationError(String),
 
-    #[error("Projection error: {0}")]
+    #[error("projection error: {0}")]
     ProjectionError(String),
 
-    #[error("Code generation error: {0}")]
+    #[error("code generation error: {0}")]
     CodegenError(String),
 }
 
@@ -202,7 +202,7 @@ mod tests {
 
         // Test effect system is available
         let _program: Option<Program<TestRole, String>> = None;
-        let _result: Option<Result<()>> = None;
+        let _result: Option<ChoreoResult<()>> = None;
         let _label: Option<TestLabel> = None;
     }
 

@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
-use crate::effects::{ChoreoHandler, ChoreographyError, Result, RoleId};
+use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, RoleId};
 
 /// Recording handler for testing - captures all effects for verification
 #[derive(Clone)]
@@ -60,7 +60,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         _ep: &mut Self::Endpoint,
         to: Self::Role,
         _msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         self.events
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -76,7 +76,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         self.events
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -95,7 +95,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         _ep: &mut Self::Endpoint,
         at: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         self.events
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -107,7 +107,7 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         self.events
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -126,9 +126,9 @@ impl<R: RoleId + 'static> ChoreoHandler for RecordingHandler<R> {
         _at: Self::Role,
         _dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         body.await
     }

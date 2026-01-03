@@ -115,7 +115,8 @@ impl MerkleTree {
         while current_level.len() > 1 {
             // Pad to even if needed
             if current_level.len() % 2 == 1 {
-                current_level.push(*current_level.last().unwrap());
+                // Safety: current_level is non-empty (len > 1 checked above)
+                current_level.push(*current_level.last().expect("non-empty after len check"));
             }
 
             // Compute next level

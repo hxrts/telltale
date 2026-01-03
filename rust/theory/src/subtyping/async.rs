@@ -35,6 +35,15 @@ pub enum AsyncSubtypeError {
     OrphanMessage { partner: String, label: String },
 }
 
+/// Direction for SISO tree building
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// Input direction (receives)
+    Input,
+    /// Output direction (sends)
+    Output,
+}
+
 /// An input tree (receives only)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputTree {
@@ -159,54 +168,79 @@ fn siso_decompose_impl(
     }
 }
 
-fn build_output_tree(lt: &LocalTypeR) -> Result<OutputTree, AsyncSubtypeError> {
-    match lt {
-        LocalTypeR::Send { partner, branches } => {
-            let tree_branches: Vec<_> = branches
-                .iter()
-                .map(|(label, cont)| {
-                    let sub_tree = if matches!(cont, LocalTypeR::Send { .. }) {
-                        build_output_tree(cont)?
-                    } else {
-                        OutputTree::Empty
-                    };
-                    Ok((label.clone(), sub_tree))
-                })
-                .collect::<Result<Vec<_>, AsyncSubtypeError>>()?;
-
-            Ok(OutputTree::Send {
-                partner: partner.clone(),
-                branches: tree_branches,
-            })
-        }
-        LocalTypeR::End | LocalTypeR::Var(_) => Ok(OutputTree::Empty),
-        _ => Err(AsyncSubtypeError::NotSisoDecomposable),
+/// Check if a LocalTypeR matches the given direction (Send for Output, Recv for Input)
+fn matches_direction(lt: &LocalTypeR, direction: Direction) -> bool {
+    match (direction, lt) {
+        (Direction::Output, LocalTypeR::Send { .. }) => true,
+        (Direction::Input, LocalTypeR::Recv { .. }) => true,
+        _ => false,
     }
 }
 
-fn build_input_tree(lt: &LocalTypeR) -> Result<InputTree, AsyncSubtypeError> {
-    match lt {
-        LocalTypeR::Recv { partner, branches } => {
-            let tree_branches: Vec<_> = branches
-                .iter()
-                .map(|(label, cont)| {
-                    let sub_tree = if matches!(cont, LocalTypeR::Recv { .. }) {
-                        build_input_tree(cont)?
-                    } else {
-                        InputTree::Empty
-                    };
-                    Ok((label.clone(), sub_tree))
-                })
-                .collect::<Result<Vec<_>, AsyncSubtypeError>>()?;
-
-            Ok(InputTree::Recv {
-                partner: partner.clone(),
-                branches: tree_branches,
-            })
-        }
-        LocalTypeR::End | LocalTypeR::Var(_) => Ok(InputTree::Empty),
-        _ => Err(AsyncSubtypeError::NotSisoDecomposable),
+/// Extract partner and branches from a LocalTypeR if it matches the direction
+fn extract_components(lt: &LocalTypeR, direction: Direction) -> Option<(&String, &Vec<(Label, LocalTypeR)>)> {
+    match (direction, lt) {
+        (Direction::Output, LocalTypeR::Send { partner, branches }) => Some((partner, branches)),
+        (Direction::Input, LocalTypeR::Recv { partner, branches }) => Some((partner, branches)),
+        _ => None,
     }
+}
+
+/// Build a SISO tree in the given direction.
+///
+/// This is the unified implementation for both input and output tree building.
+/// The direction determines whether we extract Send operations (Output) or
+/// Recv operations (Input).
+fn build_siso_tree<T>(
+    lt: &LocalTypeR,
+    direction: Direction,
+    empty: fn() -> T,
+    construct: fn(String, Vec<(Label, T)>) -> T,
+) -> Result<T, AsyncSubtypeError>
+where
+    T: Clone,
+{
+    // Handle terminal cases
+    if matches!(lt, LocalTypeR::End | LocalTypeR::Var(_)) {
+        return Ok(empty());
+    }
+
+    // Extract components if direction matches
+    let Some((partner, branches)) = extract_components(lt, direction) else {
+        return Err(AsyncSubtypeError::NotSisoDecomposable);
+    };
+
+    let tree_branches: Vec<_> = branches
+        .iter()
+        .map(|(label, cont)| {
+            let sub_tree = if matches_direction(cont, direction) {
+                build_siso_tree(cont, direction, empty, construct)?
+            } else {
+                empty()
+            };
+            Ok((label.clone(), sub_tree))
+        })
+        .collect::<Result<Vec<_>, AsyncSubtypeError>>()?;
+
+    Ok(construct(partner.clone(), tree_branches))
+}
+
+fn build_output_tree(lt: &LocalTypeR) -> Result<OutputTree, AsyncSubtypeError> {
+    build_siso_tree(
+        lt,
+        Direction::Output,
+        || OutputTree::Empty,
+        |partner, branches| OutputTree::Send { partner, branches },
+    )
+}
+
+fn build_input_tree(lt: &LocalTypeR) -> Result<InputTree, AsyncSubtypeError> {
+    build_siso_tree(
+        lt,
+        Direction::Input,
+        || InputTree::Empty,
+        |partner, branches| InputTree::Recv { partner, branches },
+    )
 }
 
 fn find_output_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {

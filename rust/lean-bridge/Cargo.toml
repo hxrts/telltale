@@ -15,18 +15,26 @@ name = "lean-bridge"
 path = "src/bin/main.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "lean-bridge-exporter"
+path = "src/bin/exporter.rs"
+required-features = ["exporter"]
+
 [features]
 default = ["runner"]
 cli = ["clap"]
 runner = []  # Enable LeanRunner for invoking Lean binary
+exporter = ["rumpsteak-aura-choreography", "anyhow"]  # Enable choreography exporter
 
 [dependencies]
 rumpsteak-types = { path = "../types", version = "0.7.0" }
 serde = { workspace = true, features = ["derive"] }
-serde_json = "1.0"
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4.4", features = ["derive"], optional = true }
 tempfile = { workspace = true }
+anyhow = { workspace = true, optional = true }
+rumpsteak-aura-choreography = { path = "../choreography", version = "0.7.0", optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

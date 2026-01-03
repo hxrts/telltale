@@ -106,7 +106,10 @@ pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalTy
 }
 
 /// Context for tracking recursion during code generation.
-struct RecursionContext {
+///
+/// Used internally to track which recursive labels are currently in scope
+/// when generating loop/continue statements.
+pub(crate) struct RecursionContext {
     /// Current recursion depth
     depth: usize,
     /// Labels of active recursion points
@@ -114,7 +117,8 @@ struct RecursionContext {
 }
 
 impl RecursionContext {
-    fn new() -> Self {
+    /// Create a new empty recursion context.
+    pub(crate) fn new() -> Self {
         Self {
             depth: 0,
             labels: Vec::new(),
@@ -137,7 +141,13 @@ impl RecursionContext {
 }
 
 /// Generate the body of a runner function from a local type.
-fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> TokenStream {
+///
+/// This produces a `TokenStream` containing the async code that executes
+/// the protocol by walking the local type and calling adapter methods
+/// (send, recv, choose, offer) as appropriate.
+///
+/// Used by both `generate_runner_fn` and `typed_runner::generate_typed_runner`.
+pub(crate) fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> TokenStream {
     match local_type {
         LocalType::Send {
             to,
@@ -423,7 +433,10 @@ fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> T
 }
 
 /// Generate a runtime Role expression for a role.
-fn generate_role_id(role: &Role) -> TokenStream {
+///
+/// Converts an AST `Role` to a `TokenStream` that constructs the
+/// corresponding runtime role value (e.g., `Role::Alice` or `Role::Worker(0)`).
+pub(crate) fn generate_role_id(role: &Role) -> TokenStream {
     use crate::ast::role::RoleIndex;
 
     let name = role.name();

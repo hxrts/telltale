@@ -3,7 +3,10 @@
 //! This demonstrates how to create a complete extension that adds timeout
 //! functionality to choreographic protocols.
 
-use super::*;
+use super::{
+    CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
+    ParseError, ProjectionContext, ProtocolExtension, StatementParser,
+};
 use crate::ast::{LocalType, Role};
 use crate::compiler::projection::ProjectionError;
 use std::any::{Any, TypeId};

@@ -52,7 +52,7 @@ pub use grammar::{GrammarComposer, GrammarComposerBuilder, GrammarCompositionErr
 pub use merge::{can_merge, merge, merge_all, MergeError};
 pub use parser::{
     choreography_macro, parse_choreography, parse_choreography_file, parse_choreography_str,
-    parse_dsl,
+    parse_dsl, ErrorSpan, ParseError,
 };
 pub use pretty::{
     format_choreography, format_choreography_str, format_choreography_with_config, PrettyConfig,

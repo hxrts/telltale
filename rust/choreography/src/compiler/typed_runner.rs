@@ -30,6 +30,7 @@
 //! ```
 
 use crate::ast::{LocalType, MessageType, Role};
+use crate::compiler::runner::{generate_runner_body, RecursionContext};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashSet;
@@ -286,6 +287,10 @@ pub fn generate_typed_runner(
     let serialize_fn = generate_serialize_helper(config);
     let deserialize_fn = generate_deserialize_helper(config);
 
+    // Generate the protocol execution body from the local type
+    let mut ctx = RecursionContext::new();
+    let runner_body = generate_runner_body(local_type, &mut ctx);
+
     // Generate the runner struct and impl
     let protocol_str = protocol_name;
     let role_str = role_name.to_string();
@@ -348,17 +353,13 @@ pub fn generate_typed_runner(
             /// Internal implementation that runs the protocol logic.
             async fn run_impl<A: ChoreographicAdapter>(
                 adapter: &mut A,
-                ctx: &ProtocolContext,
+                _ctx: &ProtocolContext,
                 _params: #params_type,
             ) -> std::result::Result<#result_type, ChoreographyError> {
-                use crate::runtime::{ChoreographicAdapter, ProtocolContext};
+                use crate::runtime::ChoreographicAdapter;
                 use crate::effects::ChoreographyError;
 
-                let _ = ctx; // Context available for future use
-
-                // TODO: Generated protocol execution logic goes here
-                // This is a placeholder - actual implementation would be generated
-                // from the local type
+                #runner_body
 
                 Ok(#result_type::default())
             }

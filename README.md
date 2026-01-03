@@ -1,20 +1,22 @@
-# Rumpsteak (Aura) ♨️
+# Rumpsteak Aura ♨️
 
 Rust-based choreographic programming DSL for projecting session typed protocols.
 
-Where did the grotesque name come from? The session type system is forked from Zak Cutner's [Rumpsteak](https://github.com/zakcutner/rumpsteak) library. This is an experiment in projecting session types from a global viewpoint. So I've added a choreographic programming DSL which generates session typed code into an effect API.**
+Where did the grotesque name come from? The session type system is forked from Zak Cutner's [Rumpsteak](https://github.com/zakcutner/rumpsteak) library. This is an experiment in projecting session types from a global viewpoint. I've added a choreographic programming DSL which generates session typed code into an effect API.
 
 [![Crate](https://img.shields.io/crates/v/rumpsteak-aura)](https://crates.io/crates/rumpsteak-aura)
 [![Docs](https://docs.rs/rumpsteak-aura/badge.svg)](https://docs.rs/rumpsteak-aura)
 [![License](https://img.shields.io/crates/l/rumpsteak-aura)](LICENSE)
 
-Rumpsteak is a Rust framework for _safely_ and _efficiently_ implementing
+`rumpsteak-aura` is a Rust framework for safely and efficiently implementing
 message-passing asynchronous programs. It uses multiparty session types to statically guarantee the absence of communication errors such as deadlocks and asynchronous subtyping to allow optimizing communications.
 
 Multiparty session types (MPST) verify the safety of message-passing protocols, as described in [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
 Asynchronous subtyping, introduced for MPST in [Precise Subtyping for
 Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf),
 verifies the reordering of messages to create more optimized implementations than are usually possible with MPST.
+
+[Mechanised Subject Reduction for Multiparty Asynchronous Session Types](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.31) (ECOOP 2025) presents a mechanized Coq proof addressing flaws in the original MPST formulation by Honda et al. The authors identify that the original subject reduction theorem does not hold under asynchronous semantics due to out-of-order message delivery, and introduce a restricted theory with an additional *unstuckness* property that restores subject reduction. Their mechanization ([github.com/Tirore96/subject_reduction](https://github.com/Tirore96/subject_reduction)) includes a decidable coinductive equality for session types and a corrected projection theorem.
 
 ## Features
 
@@ -30,7 +32,7 @@ verifies the reordering of messages to create more optimized implementations tha
 
 ## Usage
 
-This is the Aura fork of Rumpsteak with enhanced choreographic programming support.
+For core session types:
 
 ```toml
 [dependencies]
@@ -91,35 +93,35 @@ The choreography macro generates role types, message types, and session types au
 
 ## Workspace Structure
 
-This project is organized as a Cargo workspace with multiple crates:
+This project is organized as a Cargo workspace. All Rust crates are in the `rust/` directory:
 
-#### `src/` - Core Session Types (`rumpsteak-aura`)
+#### `rust/src/` - Core Session Types (`rumpsteak-aura`)
 
-The foundation library providing core session type primitives, async channels, role definitions, and serialization support. This is the base dependency for all other crates and implements the fundamental session types theory.
+The facade library providing core session type primitives (`Send`, `Receive`, `Select`, `Branch`, `End`), async channels, and role definitions. Re-exports types from other crates.
 
-#### `choreography/` - Choreographic Programming (`rumpsteak-aura-choreography`)
+#### `rust/types/` - Type Definitions (`rumpsteak-types`)
 
-Choreographic programming layer for global protocol specification with automatic projection to local session types. Includes a Pest-based DSL parser with support for protocol composition, guards, and parameterized roles.
+Core type definitions matching Lean exactly: `GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`. Includes content addressing infrastructure.
 
-A transport-agnostic effect handler system, with `InMemoryHandler` for testing and `RumpsteakHandler` for production distributed execution. The effect handler system also provides middleware support for tracing, retry, metrics, and fault injection. Session state tracking provides metadata for debugging and monitoring. The system works in browser environments with WebAssembly support. Guides available in the `docs/` directory.
+#### `rust/theory/` - Session Type Algorithms (`rumpsteak-theory`)
 
-*This is the primary extension of the original version with significant enhancements.*
+Pure algorithms for session type operations: projection, merge, duality, synchronous/asynchronous subtyping, and bounded recursion strategies.
 
-#### `macros/` - Procedural Macros (`rumpsteak-aura-macros`)
+#### `rust/choreography/` - Choreographic Programming (`rumpsteak-aura-choreography`)
 
-Procedural macros used by both the core library and choreography crate, including the `choreography!` macro for inline protocol definitions.
+Choreographic programming layer with DSL parser, automatic projection, and code generation. Includes a transport-agnostic effect handler system (`InMemoryHandler` for testing, `RumpsteakHandler` for production), middleware support (tracing, retry, metrics, fault injection), and WebAssembly support.
 
-#### `lean-exporter/` - Lean Verification Exporter
+#### `rust/macros/` - Procedural Macros (`rumpsteak-aura-macros`)
 
-Exports choreography ASTs and projected programs to JSON for formal verification in Lean 4. Used by the verification pipeline to validate projection correctness, duality, and subtyping invariants.
+Procedural macros including `choreography!` for inline protocol definitions.
 
-#### `caching/` - Example Application
+#### `rust/lean-bridge/` - Lean Verification Bridge (`rumpsteak-lean-bridge`)
 
-HTTP cache case study backed by Redis, demonstrating real-world usage of Rumpsteak with distributed caching protocols.
+Bidirectional conversion between Rust session types and Lean-compatible JSON. The `exporter` feature adds a CLI tool that exports choreography ASTs to JSON for Lean 4 verification.
 
 #### `examples/` - Protocol Examples
 
-Examples of using Rumpsteak from popular protocols (updated to use new APIs). Includes `wasm-ping-pong/` demonstrating browser-based protocols running in WebAssembly.
+Examples demonstrating Rumpsteak usage. Includes `wasm-ping-pong/` for browser-based protocols.
 
 ## WebAssembly Support
 
@@ -136,7 +138,7 @@ Choreographic projection correctness is verified using Lean. The verification pi
 - **Subtyping invariants**: Asynchronous message reordering preserves causal dependencies
 - **Effect conformance**: Generated effect programs match their projected session types
 
-The `lean/` directory contains Lean proof modules, and `lean-exporter` serializes Rust choreography ASTs to JSON for verification. Run the full pipeline with `just rumpsteak-lean-check` (requires Nix). See `docs/14_lean_verification.md` for details.
+The `lean/` directory contains Lean proof modules, and `lean-bridge` (with the `exporter` feature) serializes Rust choreography ASTs to JSON for verification. Run the full pipeline with `just rumpsteak-lean-check` (requires Nix). See `docs/14_lean_verification.md` for details.
 
 ## License
 
