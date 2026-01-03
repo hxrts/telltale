@@ -7,7 +7,6 @@
 //!
 //! - [`types`] - Core session type definitions (GlobalType, LocalTypeR, Label)
 //! - [`channel`] - Channel abstractions for communication
-//! - [`serialize`] - Serialization support
 //!
 //! # Feature Flags
 //!
@@ -34,23 +33,14 @@
 //! | `lean-bridge` | Lean verification bridge (JSON export/import) |
 //! | `lean-runner` | LeanRunner for invoking Lean binary |
 //!
-//! ## FSM Features
-//!
-//! | Feature | Description |
-//! |---------|-------------|
-//! | `fsm` | FSM support for session types |
-//! | `fsm-parsing` | DOT format parsing |
-//! | `fsm-subtyping` | Asynchronous subtyping verification |
-//! | `fsm-convert` | Conversion to/from rumpsteak-types |
-//!
 //! ## Meta Features
 //!
 //! | Feature | Description |
 //! |---------|-------------|
 //! | `full` | Enable all optional features |
 
+/// Channel abstractions for asynchronous communication.
 pub mod channel;
-pub mod serialize;
 
 // Re-export core types (always available)
 pub use rumpsteak_types as types;
@@ -62,9 +52,6 @@ pub use rumpsteak_theory as theory;
 
 #[cfg(feature = "lean-bridge")]
 pub use rumpsteak_lean_bridge as lean_bridge;
-
-#[cfg(feature = "rumpsteak-aura-fsm")]
-pub use rumpsteak_aura_fsm as fsm;
 
 pub use rumpsteak_aura_macros::{session, Message, Role, Roles};
 
@@ -96,23 +83,31 @@ pub trait Sealable {
     fn is_sealed(&self) -> bool;
 }
 
+/// Error that can occur during a session send operation.
 #[derive(Debug, Error)]
 pub enum SessionError<E> {
+    /// The session was used after being sealed.
     #[error("session was used after being sealed")]
     Sealed,
+    /// An error from the underlying channel.
     #[error(transparent)]
     Channel(E),
 }
 
+/// Error type for send operations, specialized to the channel's error type.
 pub type SendError<Q, R> =
     SessionError<<<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error>;
 
+/// Error that can occur during a session receive operation.
 #[derive(Debug, Error)]
 pub enum ReceiveError {
+    /// The receiver stream is empty (no messages available).
     #[error("receiver stream is empty")]
     EmptyStream,
+    /// Received a message with an unexpected type.
     #[error("received message with an unexpected type")]
     UnexpectedType,
+    /// The session was used after being sealed.
     #[error("session was used after being sealed")]
     Sealed,
 }
@@ -164,19 +159,28 @@ impl<L: marker::Send + Sync + 'static> Message<L> for Box<dyn Any + marker::Send
     }
 }
 
+/// A participant in a session-typed protocol.
+///
+/// Roles define the message type and provide routing to other participants.
 pub trait Role {
+    /// The message type exchanged by this role.
     type Message;
 
-    /// Seal all routes for this role, preventing further communication
+    /// Seal all routes for this role, preventing further communication.
     fn seal(&mut self);
 
-    /// Check if this role has been sealed
+    /// Check if this role has been sealed.
     fn is_sealed(&self) -> bool;
 }
 
+/// Provides a route to another role for communication.
+///
+/// A role implements `Route<R>` for each peer role R it can communicate with.
 pub trait Route<R>: Role + Sized {
+    /// The channel type used to communicate with role R.
     type Route;
 
+    /// Get a mutable reference to the route for sending/receiving messages.
     fn route(&mut self) -> &mut Self::Route;
 }
 
@@ -196,17 +200,26 @@ impl<'r, R: Role> State<'r, R> {
     }
 }
 
+/// Trait for session types that can be constructed from a state.
+///
+/// All session types (Send, Receive, Select, Branch, End) implement this.
 pub trait FromState<'r> {
+    /// The role type this session state is for.
     type Role: Role;
 
+    /// Construct this session state from the given state.
     fn from_state(state: State<'r, Self::Role>) -> Self;
 }
 
+/// Marker trait for session types in a protocol.
 pub trait Session<'r>: FromState<'r> + private::Session {}
 
+/// Trait for types that can be converted into a session.
 pub trait IntoSession<'r>: FromState<'r> {
+    /// The session type to convert into.
     type Session: Session<'r, Role = Self::Role>;
 
+    /// Convert this value into a session.
     fn into_session(self) -> Self::Session;
 }
 
@@ -336,10 +349,15 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> private::Session for Receive
 
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> Session<'q> for Receive<'q, Q, R, L, S> {}
 
+/// Maps a choice label to its continuation session type.
 pub trait Choice<'r, L> {
+    /// The session type to continue with after selecting this label.
     type Session: FromState<'r>;
 }
 
+/// A protocol state where this role selects one of several branches.
+///
+/// The choice is sent to role R, and C determines the continuation for each label.
 pub struct Select<'q, Q: Role, R, C> {
     state: State<'q, Q>,
     phantom: PhantomData<(R, C)>,
@@ -391,7 +409,11 @@ impl<Q: Role, R, C> private::Session for Select<'_, Q, R, C> {}
 
 impl<'q, Q: Role, R, C> Session<'q> for Select<'q, Q, R, C> {}
 
+/// Trait for an enum of possible branch choices.
+///
+/// Implemented by generated choice enums to dispatch incoming messages.
 pub trait Choices<'r>: Sized {
+    /// The role type this choice set is for.
     type Role: Role;
 
     /// Attempts to downcast a message into one of the available choices.
@@ -405,6 +427,9 @@ pub trait Choices<'r>: Sized {
     ) -> Result<Self, <Self::Role as Role>::Message>;
 }
 
+/// A protocol state where this role receives one of several branch choices.
+///
+/// The choice is received from role R, and C is the enum of possible continuations.
 pub struct Branch<'q, Q: Role, R, C> {
     state: State<'q, Q>,
     phantom: PhantomData<(R, C)>,
@@ -479,6 +504,9 @@ impl Drop for SessionGuard {
     }
 }
 
+/// Run a session-typed protocol that cannot fail.
+///
+/// This is a convenience wrapper around [`try_session`] for infallible protocols.
 #[inline]
 pub async fn session<'r, R: Role, S: FromState<'r, Role = R>, T, F>(
     role: &'r mut R,

@@ -105,10 +105,6 @@ A transport-agnostic effect handler system, with `InMemoryHandler` for testing a
 
 *This is the primary extension of the original version with significant enhancements.*
 
-#### `fsm/` - Finite State Machines (`rumpsteak-aura-fsm`)
-
-Finite state machine support for session types, including DOT parsing and subtyping verification. Optional dependency for advanced session type analysis.
-
 #### `macros/` - Procedural Macros (`rumpsteak-aura-macros`)
 
 Procedural macros used by both the core library and choreography crate, including the `choreography!` macro for inline protocol definitions.

@@ -16,7 +16,6 @@ graph TB
 
     subgraph Verification
         lean["rumpsteak-lean-bridge<br/>Lean interop & validation"]
-        fsm["rumpsteak-aura-fsm<br/>FSM visualization (optional)"]
     end
 
     subgraph Application
@@ -30,7 +29,6 @@ graph TB
 
     types --> theory
     types --> lean
-    types --> fsm
     types --> choreo
 
     theory --> choreo
@@ -40,7 +38,6 @@ graph TB
     theory --> main
     choreo --> main
     lean --> main
-    fsm --> main
 ```
 
 This diagram shows the dependency relationships between crates. Arrows indicate dependency direction. The `rumpsteak-types` crate serves as the foundation for all other crates.
@@ -54,6 +51,10 @@ This crate is located in `rust/types/`. It contains all core type definitions th
 The crate defines `GlobalType` for global protocol views. It defines `LocalTypeR` for local participant views. It also defines `Label` for message labels with payload sorts, `PayloadSort` for type classification, and `Action` for send and receive actions.
 
 The crate also provides content addressing infrastructure. The `ContentId` type wraps a cryptographic hash. The `Contentable` trait defines canonical serialization. The `Hasher` trait abstracts hash algorithms.
+
+**Feature flags:**
+
+- `dag-cbor` — Enables DAG-CBOR serialization for IPLD/IPFS compatibility. Adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
 
 ```rust
 use rumpsteak_types::{GlobalType, LocalTypeR, Label, PayloadSort};
@@ -92,23 +93,6 @@ assert!(sync_subtype(&local_a, &local_a_expected));
 
 The `project` function computes the local type for a given role. The `sync_subtype` function checks synchronous subtyping between local types.
 
-### rumpsteak-aura-fsm
-
-This crate is located in `rust/fsm/`. It provides finite state machine representation for visualization. This crate is optional.
-
-The `dot` module handles DOT format export and parsing for Graphviz. The `mermaid` module handles Mermaid diagram format export. The `petrify` module handles Petri net export. The `subtype` module provides FSM-based subtyping as an alternative to tree-based methods. The `convert` module handles `LocalTypeR` to FSM conversion and is feature-gated.
-
-```rust
-use rumpsteak_aura_fsm::{Fsm, Dot, Mermaid};
-
-let mut fsm: Fsm<&str, &str, ()> = Fsm::new("Client");
-
-println!("{}", Dot::new(&fsm));
-println!("{}", Mermaid::new(&fsm));
-```
-
-The `Dot` and `Mermaid` types implement `Display` for format conversion. They produce text suitable for visualization tools.
-
 ### rumpsteak-lean-bridge
 
 This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](15_lean_rust_bridge.md) for detailed documentation.
@@ -137,7 +121,7 @@ The `topology/` directory provides deployment configuration. See [Topology](08_t
 
 This crate is located in `rust/src/`. It is the main facade crate that re-exports from all other crates.
 
-The crate supports several feature flags. The `theory` feature includes `rumpsteak-theory` algorithms. The `lean-bridge` feature includes `rumpsteak-lean-bridge`. The `fsm` feature includes `rumpsteak-aura-fsm`. The `full` feature enables all features.
+The crate supports several feature flags. The `theory` feature includes `rumpsteak-theory` algorithms. The `lean-bridge` feature includes `rumpsteak-lean-bridge`. The `full` feature enables all features.
 
 ```rust
 use rumpsteak_aura::prelude::*;
@@ -224,20 +208,6 @@ pub fn project_with_strategy(
 ```
 
 The strategy parameter controls projection behavior. This enables alternative projection algorithms.
-
-### New Visualization Formats
-
-Add formats alongside `mermaid.rs` in `rust/fsm/src/`.
-
-```rust
-pub struct MyFormat<'a, R, N, E>(&'a Fsm<R, N, E>);
-
-impl Display for MyFormat<'_, R, N, E> {
-    // implementation
-}
-```
-
-The new format type wraps an FSM reference. The `Display` implementation produces the formatted output.
 
 ### Lean Integration Extensions
 

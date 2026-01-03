@@ -334,7 +334,6 @@ rumpsteak-aura/
 │   │       ├── export.rs   Rust to JSON export
 │   │       ├── import.rs   JSON to Rust import
 │   │       └── runner.rs   Lean binary invocation
-│   ├── fsm/                FSM visualization (rumpsteak-aura-fsm)
 │   └── macros/             Procedural macros (rumpsteak-aura-macros)
 ├── lean/                   Lean 4 verification code
 ├── examples/               Example protocols
@@ -354,7 +353,5 @@ The `rumpsteak-theory` crate contains pure algorithms. It provides projection, m
 The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It includes the DSL parser, effect handlers, code generation, and runtime support.
 
 The `rumpsteak-lean-bridge` crate provides Lean integration. It exports Rust types to JSON and imports JSON from Lean. It includes a runner for invoking the Lean verification binary.
-
-The `rumpsteak-aura-fsm` crate provides finite state machine support. Use it for visualization with DOT and Mermaid formats. FSM-based subtyping is also available.
 
 The `rumpsteak-aura` crate is the main facade. It re-exports types from other crates with feature flags. Most users import from this crate.

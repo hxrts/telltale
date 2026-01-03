@@ -22,8 +22,6 @@ The `rumpsteak-theory` crate contains pure algorithms. It provides projection, m
 
 The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It provides the DSL parser, effect handlers, and code generation.
 
-The `rumpsteak-aura-fsm` crate provides optional finite state machine support. Use it for visualization and alternative subtyping algorithms.
-
 The `rumpsteak-lean-bridge` crate enables cross-validation with Lean. It provides JSON import and export functions.
 
 The `rumpsteak-aura` crate is the main facade. It re-exports types from the other crates with feature flags.
@@ -46,10 +44,6 @@ The workspace provides granular feature flags to control dependencies and functi
 | `theory-bounded` | no | Bounded recursion strategies |
 | `lean-bridge` | no | Lean verification bridge (JSON export/import) |
 | `lean-runner` | no | LeanRunner for invoking Lean binary |
-| `fsm` | no | FSM support via `rumpsteak-aura-fsm` |
-| `fsm-parsing` | no | DOT format parsing for FSMs |
-| `fsm-subtyping` | no | Asynchronous subtyping verification |
-| `fsm-convert` | no | Conversion between FSM and core types |
 | `full` | no | Enable all optional features |
 
 #### Theory Crate (`rumpsteak-theory`)
@@ -63,14 +57,6 @@ The workspace provides granular feature flags to control dependencies and functi
 | `bounded` | **yes** | Bounded recursion strategies |
 | `async-subtyping` | **yes** | POPL 2021 asynchronous subtyping |
 | `sync-subtyping` | **yes** | Synchronous subtyping |
-
-#### FSM Crate (`rumpsteak-aura-fsm`)
-
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `parsing` | no | DOT format parsing (brings in `logos`, `bitvec`) |
-| `subtyping` | no | Asynchronous subtyping verification |
-| `convert` | no | Conversion to/from `rumpsteak-types` |
 
 #### Choreography Crate (`rumpsteak-aura-choreography`)
 
