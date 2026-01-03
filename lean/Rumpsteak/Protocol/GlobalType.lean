@@ -510,8 +510,15 @@ def goodG (g : GlobalType) : Prop :=
   ∀ act, canStep g act → ∃ g', step g act g'
 
 /-- A step implies enabledness. -/
-axiom step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType} :
-    step g act g' → canStep g act
+theorem step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType}
+    (h : step g act g') : canStep g act := by
+  match h with
+  | .comm_head sender receiver branches label cont hmem =>
+    exact canStep.comm_head sender receiver branches label cont hmem
+  | .comm_async sender receiver branches branches' act label cont hne1 hne2 hmem hcan _ =>
+    exact canStep.comm_async sender receiver branches act label cont hne1 hne2 hmem hcan
+  | .mu t body act g' hstep =>
+    exact canStep.mu t body act (step_implies_canStep hstep)
 
 /-- Reflexive-transitive closure of async step. -/
 inductive GlobalTypeStepStar : GlobalType → GlobalType → Prop where

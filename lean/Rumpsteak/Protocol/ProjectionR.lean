@@ -597,7 +597,9 @@ theorem projectBranchTypes_forall2 (branches : List (Label × GlobalType)) (role
 
 /-! ## Merge Reflexivity Lemma -/
 
-/-- Reflexivity of merge: merging a type with itself succeeds. -/
+/-- Reflexivity of merge: merging a type with itself succeeds.
+
+    This requires mutual induction with mergeSendSorted_refl and mergeRecvSorted_refl. -/
 axiom merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t
 
 /-- If all elements equal t, merge-fold returns t (using merge_refl). -/

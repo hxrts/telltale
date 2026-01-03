@@ -1,5 +1,6 @@
 import Rumpsteak.Protocol.GlobalType
 import Rumpsteak.Protocol.LocalTypeR
+import Rumpsteak.Protocol.LocalTypeREquiv
 import Rumpsteak.Protocol.ProjectionR
 import Rumpsteak.Protocol.Semantics.Process
 import Rumpsteak.Protocol.Semantics.Configuration
@@ -99,6 +100,20 @@ inductive WellTyped : TypingContext → Process → LocalTypeR → Prop where
     ∀ {Γ : TypingContext} {x : String} {t : LocalTypeR},
     Γ.lookup x = some t →
     WellTyped Γ (.var x) t
+
+  /-- Equivalence/Subsumption: typing is preserved under type equivalence (EQ2).
+
+      This is the key rule that enables equi-recursive typing: if P has type T
+      and T is equivalent to T' (via μ-unfolding or branch permutation), then
+      P also has type T'. This corresponds to Coq's OFT_EQ2 lemma.
+
+      Without this rule, WellTyped is syntax-directed and cannot express that
+      `.recurse x body` has type `T[μX.T/X]` (only `μX.T`). -/
+  | equiv :
+    ∀ {Γ : TypingContext} {p : Process} {t t' : LocalTypeR},
+    WellTyped Γ p t →
+    LocalTypeR.equiv t t' →
+    WellTyped Γ p t'
 
 /-- A role process is well-typed if its process has the projected type. -/
 def RoleProcessWellTyped (g : GlobalType) (rp : RoleProcess) : Prop :=
@@ -471,11 +486,13 @@ axiom equi_recursive_substitute (Γ : TypingContext) (x : String) (body : Proces
 
 /-- Typing is preserved under local-type equivalence (EQ2).
 
-    This is the Coq `OFT_EQ2` transport lemma, instantiated to `LocalTypeR.equiv`. -/
-axiom wellTyped_equiv (Γ : TypingContext) (p : Process) (t t' : LocalTypeR)
+    This is now a direct application of the `WellTyped.equiv` constructor,
+    which was added to support equi-recursive typing following the Coq approach. -/
+theorem wellTyped_equiv (Γ : TypingContext) (p : Process) (t t' : LocalTypeR)
     (hwt : WellTyped Γ p t)
     (heq : LocalTypeR.equiv t t')
-    : WellTyped Γ p t'
+    : WellTyped Γ p t' :=
+  WellTyped.equiv hwt heq
 
 /-- Recursion unfolding preserves typing (equi-recursive view).
 
