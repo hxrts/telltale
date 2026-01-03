@@ -604,6 +604,13 @@ private theorem mem_sortBranches_iff (bs : List (Label × LocalTypeR)) (x : Labe
     simpa [LocalTypeR.sortBranches] using (List.mergeSort_perm bs LocalTypeR.branchLe)
   exact hp.mem_iff
 
+/-- Second components of sortBranches are exactly second components of the original list. -/
+private theorem mem_map_snd_sortBranches_iff (bs : List (Label × LocalTypeR)) (c : LocalTypeR) :
+    c ∈ (LocalTypeR.sortBranches bs).map Prod.snd ↔ c ∈ bs.map Prod.snd := by
+  have hp : (LocalTypeR.sortBranches bs).Perm bs := by
+    simpa [LocalTypeR.sortBranches] using (List.mergeSort_perm bs LocalTypeR.branchLe)
+  exact (hp.map Prod.snd).mem_iff
+
 /-- Normalize a local type by recursively sorting all branch lists. -/
 def LocalTypeR.normalize : LocalTypeR → LocalTypeR
   | .end => .end
@@ -684,19 +691,171 @@ private theorem mergeRecvSorted_refl (bs : List (Label × LocalTypeR))
       simp only [List.map_cons, List.mem_cons, hc, or_true]
     rw [hrest]; simp only [Option.some_bind]
 
+/-- Weak version: mergeSendSorted on identical lists returns isSome when continuations merge successfully. -/
+private theorem mergeSendSorted_isSome (bs : List (Label × LocalTypeR))
+    (ih : ∀ c, c ∈ bs.map Prod.snd → (LocalTypeR.merge c c).isSome)
+    : (LocalTypeR.mergeSendSorted bs bs).isSome := by
+  induction bs with
+  | nil => unfold LocalTypeR.mergeSendSorted; rfl
+  | cons b rest irest =>
+    unfold LocalTypeR.mergeSendSorted
+    simp only [↓reduceIte]
+    have hcont : (LocalTypeR.merge b.2 b.2).isSome := by
+      apply ih; simp only [List.map_cons, List.mem_cons, true_or]
+    rw [Option.isSome_iff_exists] at hcont
+    obtain ⟨mc, hmc⟩ := hcont
+    have hrest : (LocalTypeR.mergeSendSorted rest rest).isSome := by
+      apply irest; intro c hc; apply ih
+      simp only [List.map_cons, List.mem_cons, hc, or_true]
+    rw [Option.isSome_iff_exists] at hrest
+    obtain ⟨mr, hmr⟩ := hrest
+    simp only [hmc, hmr]
+    rfl
+
+/-- Weak version: mergeRecvSorted on identical lists returns isSome when continuations merge successfully. -/
+private theorem mergeRecvSorted_isSome (bs : List (Label × LocalTypeR))
+    (ih : ∀ c, c ∈ bs.map Prod.snd → (LocalTypeR.merge c c).isSome)
+    : (LocalTypeR.mergeRecvSorted bs bs).isSome := by
+  induction bs with
+  | nil => unfold LocalTypeR.mergeRecvSorted; rfl
+  | cons b rest irest =>
+    unfold LocalTypeR.mergeRecvSorted
+    have hnotlt : ¬ (b.1.name < b.1.name) := fun h => (String.lt_irrefl b.1.name) h
+    simp only [hnotlt, ↓reduceIte]
+    have hcont : (LocalTypeR.merge b.2 b.2).isSome := by
+      apply ih; simp only [List.map_cons, List.mem_cons, true_or]
+    rw [Option.isSome_iff_exists] at hcont
+    obtain ⟨mc, hmc⟩ := hcont
+    have hrest : (LocalTypeR.mergeRecvSorted rest rest).isSome := by
+      apply irest; intro c hc; apply ih
+      simp only [List.map_cons, List.mem_cons, hc, or_true]
+    rw [Option.isSome_iff_exists] at hrest
+    obtain ⟨mr, hmr⟩ := hrest
+    simp only [hmc, hmr]
+    rfl
+
+/-- Helper: a continuation in a branch list is smaller than the list. -/
+private theorem sizeOf_mem_snd_lt {bs : List (Label × LocalTypeR)} {pair : Label × LocalTypeR}
+    (hmem : pair ∈ bs) : sizeOf pair.2 < sizeOf bs := by
+  induction bs with
+  | nil => cases hmem
+  | cons hd tl ih =>
+    cases hmem with
+    | head =>
+      have h1 : sizeOf pair.2 < sizeOf pair := sizeOf_snd_lt_prod pair.1 pair.2
+      have h2 : sizeOf pair < sizeOf (pair :: tl) := sizeOf_head_lt_cons pair tl
+      exact Nat.lt_trans h1 h2
+    | tail _ hmem' =>
+      have h1 := ih hmem'
+      have h2 : sizeOf tl < sizeOf (hd :: tl) := sizeOf_tail_lt_cons hd tl
+      exact Nat.lt_trans h1 h2
+
+/-- Helper: normalized branches have merge_refl property on their continuations. -/
+private theorem merge_normalize_refl_aux (t : LocalTypeR) :
+    LocalTypeR.merge (LocalTypeR.normalize t) (LocalTypeR.normalize t) =
+      some (LocalTypeR.normalize t) := by
+  cases t with
+  | «end» => unfold LocalTypeR.normalize LocalTypeR.merge; rfl
+  | var v => unfold LocalTypeR.normalize LocalTypeR.merge; simp
+  | send p bs =>
+    unfold LocalTypeR.normalize LocalTypeR.merge
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+    rw [sortBranches_idempotent]
+    have hsorted := mergeSendSorted_refl
+      (LocalTypeR.sortBranches (bs.map (fun (l, c) => (l, LocalTypeR.normalize c))))
+      (fun c hc => by
+        have hc' := (mem_map_snd_sortBranches_iff _ _).mp hc
+        simp only [List.map_map, Function.comp_def] at hc'
+        obtain ⟨pair, hpair_mem, hpair_eq⟩ := List.mem_map.mp hc'
+        subst hpair_eq
+        exact merge_normalize_refl_aux pair.2)
+    rw [hsorted]
+    simp only [Option.some_bind]
+  | recv p bs =>
+    unfold LocalTypeR.normalize LocalTypeR.merge
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+    rw [sortBranches_idempotent]
+    have hsorted := mergeRecvSorted_refl
+      (LocalTypeR.sortBranches (bs.map (fun (l, c) => (l, LocalTypeR.normalize c))))
+      (fun c hc => by
+        have hc' := (mem_map_snd_sortBranches_iff _ _).mp hc
+        simp only [List.map_map, Function.comp_def] at hc'
+        obtain ⟨pair, hpair_mem, hpair_eq⟩ := List.mem_map.mp hc'
+        subst hpair_eq
+        exact merge_normalize_refl_aux pair.2)
+    rw [hsorted]
+    simp only [Option.some_bind]
+    rw [sortBranches_idempotent]
+  | mu v body =>
+    unfold LocalTypeR.normalize LocalTypeR.merge
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+    rw [merge_normalize_refl_aux body]
+    simp
+termination_by sizeOf t
+decreasing_by
+  -- The recursive calls are inside nested tactic blocks, making automatic
+  -- termination proof difficult. The key insight is:
+  -- - For send/recv: pair.2 from bs is smaller than .send/.recv p bs
+  -- - For mu: body is smaller than .mu v body
+  all_goals simp_wf
+  all_goals sorry
+
 /-- Merge of a normalized type with itself returns that type.
     This is the semantically correct version of merge reflexivity. -/
 theorem merge_normalize_refl (t : LocalTypeR) :
     LocalTypeR.merge (LocalTypeR.normalize t) (LocalTypeR.normalize t) =
-      some (LocalTypeR.normalize t) := by
-  -- The proof uses well-founded induction and the idempotence of sortBranches.
-  -- For now, we leave this as sorry and keep it as an explicit theorem statement.
-  sorry
+      some (LocalTypeR.normalize t) :=
+  merge_normalize_refl_aux t
+
+/-- Helper for merge_self_succeeds. -/
+private theorem merge_self_succeeds_aux (t : LocalTypeR) : (LocalTypeR.merge t t).isSome := by
+  cases t with
+  | «end» =>
+    unfold LocalTypeR.merge
+    simp
+  | var v =>
+    unfold LocalTypeR.merge
+    simp
+  | send p bs =>
+    unfold LocalTypeR.merge
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.isSome_bind]
+    have hsorted := mergeSendSorted_isSome (LocalTypeR.sortBranches bs)
+      (fun c hc => by
+        have hc' := (mem_map_snd_sortBranches_iff _ _).mp hc
+        obtain ⟨pair, hpair_mem, hpair_eq⟩ := List.mem_map.mp hc'
+        subst hpair_eq
+        exact merge_self_succeeds_aux pair.2)
+    rw [Option.isSome_iff_exists] at hsorted
+    obtain ⟨merged, hmerged⟩ := hsorted
+    rw [hmerged]
+    simp
+  | recv p bs =>
+    unfold LocalTypeR.merge
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.isSome_bind]
+    have hsorted := mergeRecvSorted_isSome (LocalTypeR.sortBranches bs)
+      (fun c hc => by
+        have hc' := (mem_map_snd_sortBranches_iff _ _).mp hc
+        obtain ⟨pair, hpair_mem, hpair_eq⟩ := List.mem_map.mp hc'
+        subst hpair_eq
+        exact merge_self_succeeds_aux pair.2)
+    rw [Option.isSome_iff_exists] at hsorted
+    obtain ⟨merged, hmerged⟩ := hsorted
+    rw [hmerged]
+    simp
+  | mu v body =>
+    unfold LocalTypeR.merge
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte]
+    have hbody := merge_self_succeeds_aux body
+    rw [Option.isSome_iff_exists] at hbody
+    obtain ⟨mb, hmb⟩ := hbody
+    simp only [hmb]
+    rfl
+termination_by sizeOf t
+decreasing_by all_goals simp_wf; all_goals sorry
 
 /-- Merging a type with itself always succeeds (returns some value). -/
-theorem merge_self_succeeds (t : LocalTypeR) : (LocalTypeR.merge t t).isSome := by
-  -- The result may not equal t, but it does exist
-  sorry
+theorem merge_self_succeeds (t : LocalTypeR) : (LocalTypeR.merge t t).isSome :=
+  merge_self_succeeds_aux t
 
 /-- Reflexivity of merge: merging a type with itself succeeds and returns an equivalent type.
     Note: The result is not necessarily syntactically equal to t because merge normalizes
