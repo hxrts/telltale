@@ -52,3 +52,9 @@ work/
 
 # Log files
 *.log
+
+subject_reduction/
+
+# Mutation testing artifacts
+mutants.out/
+mutants.out.old/

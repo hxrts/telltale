@@ -11,6 +11,8 @@ ci-dry-run:
     just book
     # WASM compilation checks
     just wasm-check
+    # Golden file equivalence tests (fast, no Lean required)
+    just test-golden
     # Lean verification (sample + extended)
     just rumpsteak-lean-check
     just rumpsteak-lean-check-extended
@@ -158,6 +160,29 @@ rumpsteak-lean-check-extended: lean-init
     ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
     ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
     ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-baker.json --log lean/artifacts/runner-extended-baker.log --json-log lean/artifacts/runner-extended-baker.json
+
+# Regenerate golden files from Lean (requires Lean build)
+regenerate-golden: lean-init
+    lake --dir lean build rumpsteak_runner
+    cargo run -p rumpsteak-lean-bridge --bin golden --features golden -- regenerate
+
+# Check for golden file drift (fails if golden files are outdated)
+check-golden-drift: lean-init
+    lake --dir lean build rumpsteak_runner
+    cargo run -p rumpsteak-lean-bridge --bin golden --features golden -- check
+
+# List all golden test cases
+list-golden:
+    cargo run -p rumpsteak-lean-bridge --bin golden --features golden -- list
+
+# Run golden file equivalence tests (fast, no Lean required)
+test-golden:
+    cargo test -p rumpsteak-lean-bridge --test golden_equivalence_tests
+
+# Run live Lean equivalence tests (requires Lean build)
+test-live-equivalence: lean-init
+    lake --dir lean build rumpsteak_runner
+    cargo test -p rumpsteak-lean-bridge --test live_equivalence_tests
 
 # Intentional failure fixture: labels mismatch.
 rumpsteak-lean-check-failing: lean-init

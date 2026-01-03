@@ -55,6 +55,9 @@ pub mod export;
 pub mod import;
 
 #[cfg(feature = "runner")]
+pub mod equivalence;
+
+#[cfg(feature = "runner")]
 pub mod runner;
 
 #[cfg(feature = "runner")]
@@ -65,6 +68,12 @@ pub mod test_utils;
 
 pub use export::{global_to_json, local_to_json};
 pub use import::{json_to_global, json_to_local, ImportError};
+
+#[cfg(feature = "runner")]
+pub use equivalence::{
+    CoherenceBundle, EquivalenceChecker, EquivalenceConfig, EquivalenceError, EquivalenceResult,
+    GoldenBundle,
+};
 
 #[cfg(feature = "runner")]
 pub use runner::{BranchResult, LeanRunner, LeanRunnerError, LeanValidationResult};

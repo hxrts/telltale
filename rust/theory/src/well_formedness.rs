@@ -11,13 +11,20 @@
 //! - Each communication has at least one branch
 //! - Sender and receiver are different in each communication
 //! - Types are guarded (no immediate recursion)
+//! - Label names are unique within each branch set
 //!
 //! ## Local Types
 //! - All recursion variables are bound
 //! - Each choice has at least one branch
 //! - Types are guarded
+//! - Label names are unique within each branch set
+//!
+//! # Lean Correspondence
+//!
+//! - `unique_labels` ↔ Lean's `uniqLabels` inductive
+//! - `branches_unique` ↔ Lean's `BranchesUniq`
 
-use rumpsteak_types::{GlobalType, LocalTypeR};
+use rumpsteak_types::{GlobalType, Label, LocalTypeR};
 use thiserror::Error;
 
 /// Errors during well-formedness validation
@@ -38,6 +45,10 @@ pub enum ValidationError {
     /// Unguarded recursion
     #[error("unguarded recursion: μ-binder must be followed by communication")]
     UnguardedRecursion,
+
+    /// Duplicate label names in branches
+    #[error("duplicate label name '{0}' in branches")]
+    DuplicateLabel(String),
 
     /// Multiple errors
     #[error("multiple validation errors: {}", .0.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", "))]
@@ -90,6 +101,12 @@ pub fn validate_global(g: &GlobalType) -> ValidationResult {
         errors.push(ValidationError::UnguardedRecursion);
     }
 
+    if !unique_labels(g) {
+        if let Some(label) = find_duplicate_label(g) {
+            errors.push(ValidationError::DuplicateLabel(label));
+        }
+    }
+
     match errors.len() {
         0 => Ok(()),
         1 => Err(errors.pop().unwrap()),
@@ -112,6 +129,128 @@ fn find_self_comm(g: &GlobalType) -> Option<String> {
         }
         GlobalType::Mu { body, .. } => find_self_comm(body),
         _ => None,
+    }
+}
+
+/// Check if all branch labels are unique within each choice.
+///
+/// This corresponds to Lean's `uniqLabels` inductive predicate.
+/// For each communication/choice, all branch labels must have distinct names.
+///
+/// # Examples
+///
+/// ```
+/// use rumpsteak_theory::unique_labels;
+/// use rumpsteak_types::{GlobalType, Label};
+///
+/// // Unique labels
+/// let g = GlobalType::comm("A", "B", vec![
+///     (Label::new("accept"), GlobalType::End),
+///     (Label::new("reject"), GlobalType::End),
+/// ]);
+/// assert!(unique_labels(&g));
+///
+/// // Duplicate labels
+/// let bad = GlobalType::comm("A", "B", vec![
+///     (Label::new("msg"), GlobalType::End),
+///     (Label::new("msg"), GlobalType::End),
+/// ]);
+/// assert!(!unique_labels(&bad));
+/// ```
+#[must_use]
+pub fn unique_labels(g: &GlobalType) -> bool {
+    match g {
+        GlobalType::End => true,
+        GlobalType::Var(_) => true,
+        GlobalType::Comm { branches, .. } => {
+            // Check that this branch set has unique label names
+            if !branches_unique(branches) {
+                return false;
+            }
+            // Recursively check all continuations
+            branches.iter().all(|(_, cont)| unique_labels(cont))
+        }
+        GlobalType::Mu { body, .. } => unique_labels(body),
+    }
+}
+
+/// Helper: check if all labels in a branch list have unique names.
+///
+/// Corresponds to Lean's `BranchesUniq`.
+fn branches_unique(branches: &[(Label, GlobalType)]) -> bool {
+    let mut seen = std::collections::HashSet::new();
+    for (label, _) in branches {
+        if !seen.insert(&label.name) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Find duplicate label names in a global type.
+fn find_duplicate_label(g: &GlobalType) -> Option<String> {
+    match g {
+        GlobalType::End | GlobalType::Var(_) => None,
+        GlobalType::Comm { branches, .. } => {
+            let mut seen = std::collections::HashSet::new();
+            for (label, _) in branches {
+                if !seen.insert(&label.name) {
+                    return Some(label.name.clone());
+                }
+            }
+            branches
+                .iter()
+                .find_map(|(_, cont)| find_duplicate_label(cont))
+        }
+        GlobalType::Mu { body, .. } => find_duplicate_label(body),
+    }
+}
+
+/// Check if all branch labels are unique in a local type.
+///
+/// Corresponds to Lean's `uniqLabels` for local types.
+#[must_use]
+pub fn unique_labels_local(lt: &LocalTypeR) -> bool {
+    match lt {
+        LocalTypeR::End => true,
+        LocalTypeR::Var(_) => true,
+        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+            if !branches_unique_local(branches) {
+                return false;
+            }
+            branches.iter().all(|(_, cont)| unique_labels_local(cont))
+        }
+        LocalTypeR::Mu { body, .. } => unique_labels_local(body),
+    }
+}
+
+/// Helper: check if all labels in a local branch list have unique names.
+fn branches_unique_local(branches: &[(Label, LocalTypeR)]) -> bool {
+    let mut seen = std::collections::HashSet::new();
+    for (label, _) in branches {
+        if !seen.insert(&label.name) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Find duplicate label names in a local type.
+fn find_duplicate_label_local(lt: &LocalTypeR) -> Option<String> {
+    match lt {
+        LocalTypeR::End | LocalTypeR::Var(_) => None,
+        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+            let mut seen = std::collections::HashSet::new();
+            for (label, _) in branches {
+                if !seen.insert(&label.name) {
+                    return Some(label.name.clone());
+                }
+            }
+            branches
+                .iter()
+                .find_map(|(_, cont)| find_duplicate_label_local(cont))
+        }
+        LocalTypeR::Mu { body, .. } => find_duplicate_label_local(body),
     }
 }
 
@@ -146,6 +285,12 @@ pub fn validate_local(lt: &LocalTypeR) -> ValidationResult {
 
     if !lt.is_guarded() {
         errors.push(ValidationError::UnguardedRecursion);
+    }
+
+    if !unique_labels_local(lt) {
+        if let Some(label) = find_duplicate_label_local(lt) {
+            errors.push(ValidationError::DuplicateLabel(label));
+        }
     }
 
     match errors.len() {
@@ -244,5 +389,159 @@ mod tests {
 
         assert!(is_well_formed_global(&good));
         assert!(!is_well_formed_global(&bad));
+    }
+
+    #[test]
+    fn test_unique_labels_simple() {
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("accept"), GlobalType::End),
+                (Label::new("reject"), GlobalType::End),
+            ],
+        );
+        assert!(unique_labels(&g));
+    }
+
+    #[test]
+    fn test_unique_labels_duplicate() {
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("msg"), GlobalType::End),
+                (Label::new("msg"), GlobalType::End),
+            ],
+        );
+        assert!(!unique_labels(&g));
+    }
+
+    #[test]
+    fn test_unique_labels_nested() {
+        // Outer labels unique, inner labels duplicate
+        let inner = GlobalType::comm(
+            "B",
+            "C",
+            vec![
+                (Label::new("dup"), GlobalType::End),
+                (Label::new("dup"), GlobalType::End),
+            ],
+        );
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("first"), inner),
+                (Label::new("second"), GlobalType::End),
+            ],
+        );
+        assert!(!unique_labels(&g));
+    }
+
+    #[test]
+    fn test_unique_labels_recursive() {
+        let g = GlobalType::mu(
+            "t",
+            GlobalType::comm(
+                "A",
+                "B",
+                vec![
+                    (Label::new("cont"), GlobalType::var("t")),
+                    (Label::new("stop"), GlobalType::End),
+                ],
+            ),
+        );
+        assert!(unique_labels(&g));
+    }
+
+    #[test]
+    fn test_unique_labels_local() {
+        let lt = LocalTypeR::send_choice(
+            "B",
+            vec![
+                (Label::new("a"), LocalTypeR::End),
+                (Label::new("b"), LocalTypeR::End),
+            ],
+        );
+        assert!(unique_labels_local(&lt));
+
+        let bad = LocalTypeR::send_choice(
+            "B",
+            vec![
+                (Label::new("x"), LocalTypeR::End),
+                (Label::new("x"), LocalTypeR::End),
+            ],
+        );
+        assert!(!unique_labels_local(&bad));
+    }
+
+    #[test]
+    fn test_validate_global_duplicate_labels() {
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("msg"), GlobalType::End),
+                (Label::new("msg"), GlobalType::End),
+            ],
+        );
+        let result = validate_global(&g);
+        assert!(matches!(result, Err(ValidationError::DuplicateLabel(ref s)) if s == "msg"));
+    }
+
+    #[test]
+    fn test_validate_global_nested_duplicate_labels() {
+        let inner = GlobalType::comm(
+            "B",
+            "C",
+            vec![
+                (Label::new("dup"), GlobalType::End),
+                (Label::new("dup"), GlobalType::End),
+            ],
+        );
+        let g = GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("first"), inner),
+                (Label::new("second"), GlobalType::End),
+            ],
+        );
+        let result = validate_global(&g);
+        assert!(matches!(result, Err(ValidationError::DuplicateLabel(ref s)) if s == "dup"));
+    }
+
+    #[test]
+    fn test_validate_local_duplicate_labels() {
+        let lt = LocalTypeR::send_choice(
+            "B",
+            vec![
+                (Label::new("x"), LocalTypeR::End),
+                (Label::new("x"), LocalTypeR::End),
+            ],
+        );
+        let result = validate_local(&lt);
+        assert!(matches!(result, Err(ValidationError::DuplicateLabel(ref s)) if s == "x"));
+    }
+
+    #[test]
+    fn test_validate_local_nested_duplicate_labels() {
+        let inner = LocalTypeR::recv_choice(
+            "C",
+            vec![
+                (Label::new("dup"), LocalTypeR::End),
+                (Label::new("dup"), LocalTypeR::End),
+            ],
+        );
+        let lt = LocalTypeR::send_choice(
+            "B",
+            vec![
+                (Label::new("first"), inner),
+                (Label::new("second"), LocalTypeR::End),
+            ],
+        );
+        let result = validate_local(&lt);
+        assert!(matches!(result, Err(ValidationError::DuplicateLabel(ref s)) if s == "dup"));
     }
 }

@@ -329,6 +329,135 @@ impl LeanRunner {
             })
             .unwrap_or_default()
     }
+
+    // ========================================================================
+    // Export Methods (for equivalence testing)
+    // ========================================================================
+
+    /// Export Lean's projection for a single role.
+    ///
+    /// Invokes the Lean runner with `--export-projection` mode and returns
+    /// the JSON result containing either the computed LocalTypeR or an error.
+    ///
+    /// # JSON Output Format
+    ///
+    /// On success:
+    /// ```json
+    /// {
+    ///   "success": true,
+    ///   "result": { "kind": "send", ... }
+    /// }
+    /// ```
+    ///
+    /// On error:
+    /// ```json
+    /// {
+    ///   "success": false,
+    ///   "error": { "error": "merge_failed", ... }
+    /// }
+    /// ```
+    pub fn export_projection(
+        &self,
+        global_json: &Value,
+        role: &str,
+    ) -> Result<Value, LeanRunnerError> {
+        // Create temp files
+        let input_file = NamedTempFile::new()?;
+        let output_file = NamedTempFile::new()?;
+
+        // Write GlobalType JSON to input file
+        std::fs::write(
+            input_file.path(),
+            serde_json::to_string_pretty(global_json)
+                .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
+        )?;
+
+        // Invoke Lean runner in export-projection mode
+        let output = Command::new(&self.binary_path)
+            .arg("--export-projection")
+            .arg(input_file.path())
+            .arg("--role")
+            .arg(role)
+            .arg("--output")
+            .arg(output_file.path())
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        // Read and parse the output file
+        let result_content = std::fs::read_to_string(output_file.path())?;
+        let result: Value = serde_json::from_str(&result_content)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        Ok(result)
+    }
+
+    /// Export Lean's projection for all roles in a GlobalType.
+    ///
+    /// Invokes the Lean runner with `--export-all-projections` mode and returns
+    /// the JSON result containing projections for all roles.
+    ///
+    /// # JSON Output Format
+    ///
+    /// On success:
+    /// ```json
+    /// {
+    ///   "success": true,
+    ///   "projections": [
+    ///     { "role": "Alice", "localType": { "kind": "send", ... } },
+    ///     { "role": "Bob", "localType": { "kind": "recv", ... } }
+    ///   ]
+    /// }
+    /// ```
+    ///
+    /// On error:
+    /// ```json
+    /// {
+    ///   "success": false,
+    ///   "error": { "error": "merge_failed", ... }
+    /// }
+    /// ```
+    pub fn export_all_projections(&self, global_json: &Value) -> Result<Value, LeanRunnerError> {
+        // Create temp files
+        let input_file = NamedTempFile::new()?;
+        let output_file = NamedTempFile::new()?;
+
+        // Write GlobalType JSON to input file
+        std::fs::write(
+            input_file.path(),
+            serde_json::to_string_pretty(global_json)
+                .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
+        )?;
+
+        // Invoke Lean runner in export-all-projections mode
+        let output = Command::new(&self.binary_path)
+            .arg("--export-all-projections")
+            .arg(input_file.path())
+            .arg("--output")
+            .arg(output_file.path())
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        // Read and parse the output file
+        let result_content = std::fs::read_to_string(output_file.path())?;
+        let result: Value = serde_json::from_str(&result_content)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]

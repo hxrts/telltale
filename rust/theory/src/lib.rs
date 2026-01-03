@@ -8,6 +8,8 @@
 //! - **Well-formedness**: Validate session type properties
 //! - **Duality**: Compute dual types for binary sessions
 //! - **Bounded Recursion**: Limit recursive types for runtime execution
+//! - **Semantics**: Async step semantics for global and local types
+//! - **Coherence**: Coherence predicates for global types
 //!
 //! All algorithms are designed to match their Lean implementations exactly.
 //!
@@ -17,6 +19,8 @@
 //! - `duality` (default) - Dual type computation
 //! - `merge` (default) - Local type merging
 //! - `well-formedness` (default) - Type validation
+//! - `semantics` (default) - Async step semantics
+//! - `coherence` (default) - Coherence predicates
 //! - `async-subtyping` - POPL 2021 asynchronous subtyping algorithm
 //! - `sync-subtyping` - Synchronous subtyping
 //! - `bounded` - Bounded recursion strategies
@@ -25,6 +29,7 @@
 //!
 //! - "A Very Gentle Introduction to Multiparty Session Types" (Yoshida & Gheri)
 //! - "Precise Subtyping for Asynchronous Multiparty Sessions" (Ghilezan et al., POPL 2021)
+//! - "Mechanised Subject Reduction for Multiparty Asynchronous Session Types" (ECOOP 2025)
 
 // Core modules (feature-gated but on by default)
 #[cfg(feature = "duality")]
@@ -35,6 +40,10 @@ pub mod merge;
 pub mod projection;
 #[cfg(feature = "well-formedness")]
 pub mod well_formedness;
+#[cfg(feature = "semantics")]
+pub mod semantics;
+#[cfg(feature = "coherence")]
+pub mod coherence;
 
 // Optional modules
 #[cfg(feature = "bounded")]
@@ -51,7 +60,15 @@ pub use merge::{can_merge, merge, merge_all, MergeError};
 #[cfg(feature = "projection")]
 pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
 #[cfg(feature = "well-formedness")]
-pub use well_formedness::{validate_global, validate_local, ValidationError};
+pub use well_formedness::{validate_global, validate_local, unique_labels, ValidationError};
+#[cfg(feature = "semantics")]
+pub use semantics::{
+    can_step, step, local_can_step, local_step,
+    consume_with_proof, reduces, reduces_star, good_g,
+    GlobalAction, LocalAction, LocalKind, ConsumeResult,
+};
+#[cfg(feature = "coherence")]
+pub use coherence::{check_coherent, projectable, CoherentG};
 
 // Re-exports for optional modules
 #[cfg(feature = "bounded")]

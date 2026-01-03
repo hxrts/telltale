@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 7317bed6d0821b80cfcb2c7ff942aa86eee9bd8aa6aba4cc257d006ed4462793 # shrinks to g = Comm { sender: "Role0", receiver: "Role1", branches: [(Label { name: "yes", sort: Unit }, Comm { sender: "Role0", receiver: "Role1", branches: [(Label { name: "msg", sort: Unit }, End)] }), (Label { name: "no", sort: Unit }, Comm { sender: "Role2", receiver: "Role3", branches: [(Label { name: "msg", sort: Unit }, End)] })] }
+cc e91d1999eb261deeb6912fa670529462e97dc75a11a1e137b761dd23feb343ae # shrinks to g = Comm { sender: "Role2", receiver: "Role3", branches: [(Label { name: "yes", sort: Unit }, Comm { sender: "Role3", receiver: "Role0", branches: [(Label { name: "msg", sort: Unit }, End)] }), (Label { name: "no", sort: Unit }, Comm { sender: "Role1", receiver: "Role2", branches: [(Label { name: "msg", sort: Unit }, End)] })] }

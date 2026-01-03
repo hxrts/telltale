@@ -26,7 +26,6 @@ hex = { workspace = true }
 rumpsteak-aura-macros = { path = "rust/macros", version = "0.7.0" }
 rumpsteak-types = { path = "rust/types", version = "0.7.0" }
 rumpsteak-theory = { path = "rust/theory", version = "0.7.0", optional = true }
-rumpsteak-lean-bridge = { path = "rust/lean-bridge", version = "0.7.0", optional = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -85,17 +84,11 @@ theory = ["rumpsteak-theory"]
 theory-async-subtyping = ["theory", "rumpsteak-theory/async-subtyping"]
 theory-bounded = ["theory", "rumpsteak-theory/bounded"]
 
-# Lean verification bridge
-lean-bridge = ["rumpsteak-lean-bridge"]
-lean-runner = ["lean-bridge", "rumpsteak-lean-bridge/runner"]
-
 # All optional features
 full = [
     "theory",
     "theory-async-subtyping",
     "theory-bounded",
-    "lean-bridge",
-    "lean-runner",
     "serialize",
 ]
 
@@ -106,7 +99,7 @@ debug = true
 debug = true
 
 [workspace]
-members = ["rust/macros", "rust/choreography", "rust/lean-exporter", "rust/types", "rust/theory", "rust/lean-bridge"]
+members = ["rust/macros", "rust/choreography", "rust/types", "rust/theory", "rust/lean-bridge"]
 exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members
