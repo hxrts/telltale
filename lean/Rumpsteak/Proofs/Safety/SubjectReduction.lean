@@ -151,7 +151,12 @@ theorem projection_after_send_thm (g g' : GlobalType) (sender receiver : String)
           rfl
         cases hsend
         -- singleton projection pins down the branch
-        exact projectBranches_find_proj branches sender label contType cont hpb hfind
+        obtain ⟨g0, hbranches, hproj0⟩ :=
+          projectBranches_singleton_inv branches sender label contType hpb
+        have hfind' : (label, cont) = (label, g0) := by
+          simpa [hbranches] using hfind
+        cases hfind'
+        simpa using hproj0
   | mu t body sender receiver label g' hcr' ih =>
     have hproj' :
         projectR (body.substitute t (.mu t body)) sender =
@@ -181,7 +186,7 @@ theorem projection_send_implies_step (g : GlobalType) (sender receiver : String)
     simp
   have hcan : canStep g (LocalActionR.toGlobal sender (LocalActionR.send receiver label)) :=
     project_can_step g sender (.send receiver [(label, contType)])
-      (LocalActionR.send receiver label) hproj hlocal hcoh
+      (LocalActionR.send receiver label) hproj hlocal hcoh.action hcoh.size hcoh.uniqLabels
   exact hcoh.good _ hcan
 
 /-- If a receiver projection offers a label, the corresponding async step exists. -/
@@ -197,30 +202,147 @@ theorem projection_recv_implies_step (g : GlobalType) (sender receiver : String)
     exact hmem
   have hcan : canStep g (LocalActionR.toGlobal receiver (LocalActionR.recv sender label)) :=
     project_can_step g receiver (.recv sender types)
-      (LocalActionR.recv sender label) hproj hlocal hcoh
+      (LocalActionR.recv sender label) hproj hlocal hcoh.action hcoh.size hcoh.uniqLabels
   exact hcoh.good _ hcan
 
-axiom projection_after_recv_thm (g g' : GlobalType) (sender receiver : String)
+theorem projection_after_recv_thm (g g' : GlobalType) (sender receiver : String)
     (label : Label) (types : List (Label × LocalTypeR)) (contType : LocalTypeR)
     (hproj : projectR g receiver = .ok (.recv sender types))
     (hmem : (label, contType) ∈ types)
     (hcons : g.consume sender receiver label = some g')
-    : projectR g' receiver = .ok contType
+    (huniq : GlobalType.uniqLabels g)
+    : projectR g' receiver = .ok contType := by
+  have hcr := consume_implies_ConsumeResult g sender receiver label g' hcons
+  induction hcr generalizing types contType with
+  | comm sender receiver branches label cont hfind =>
+    -- invert receiver projection on the comm head
+    have hne : sender ≠ receiver := by
+      intro hEq
+      subst hEq
+      simp [projectR_comm_sender] at hproj
+    have hprojBranches :
+        projectBranches branches receiver = .ok types :=
+      projectR_comm_receiver_inv sender receiver branches types hne hproj
+    obtain ⟨g0, hmem0, hproj0⟩ :=
+      projectBranches_mem_proj branches receiver label contType types hprojBranches hmem
+    have hmemCont : (label, cont) ∈ branches := by
+      obtain ⟨hmem, _⟩ :=
+        find?_some_implies branches (fun (l, _) => l.name == label.name) (label, cont) hfind
+      exact hmem
+    have huniqBranches : GlobalType.BranchesUniq GlobalType.uniqLabels branches := by
+      simpa using (GlobalType.uniqLabels_comm_branches (sender := sender) (receiver := receiver) huniq)
+    have hcontEq : cont = g0 :=
+      GlobalType.BranchesUniq.eq_of_label_mem huniqBranches hmemCont hmem0
+    cases hcontEq
+    simpa using hproj0
+  | mu t body sender receiver label g' hcr' ih =>
+    have hproj' :
+        projectR (body.substitute t (.mu t body)) receiver =
+          .ok (.recv sender types) := by
+      calc
+        projectR (body.substitute t (.mu t body)) receiver
+            = projectR (.mu t body) receiver := projectR_subst_comm_non_participant body t receiver
+        _ = .ok (.recv sender types) := hproj
+    have hcons' : (body.substitute t (.mu t body)).consume sender receiver label = some g' :=
+      ConsumeResult_implies_consume (body.substitute t (.mu t body)) sender receiver label g' hcr'
+    have huniq' : GlobalType.uniqLabels (body.substitute t (.mu t body)) := by
+      cases huniq with
+      | mu _ _ huniqBody => simpa using huniqBody
+    exact ih contType hproj' hmem hcons' huniq'
 
 /-- Projection after an async send step (to be proved). -/
-axiom projection_after_send_step (g g' : GlobalType) (sender receiver : String)
+theorem projection_after_send_step (g g' : GlobalType) (sender receiver : String)
     (label : Label) (contType : LocalTypeR)
     (hproj : projectR g sender = .ok (.send receiver [(label, contType)]))
     (hstep : step g (LocalActionR.toGlobal sender (LocalActionR.send receiver label)) g')
-    : projectR g' sender = .ok contType
+    : projectR g' sender = .ok contType := by
+  induction hstep generalizing contType with
+  | comm_head sender0 receiver0 branches label0 cont hmem =>
+    -- projection fixes the head branch
+    obtain ⟨hpartner, hbranches⟩ :=
+      projectR_comm_sender_inv' sender0 receiver0 branches receiver [(label, contType)] hproj
+    -- singleton projection pins down the branch
+    obtain ⟨g0, hbranches', hproj0⟩ :=
+      projectBranches_singleton_inv branches sender label contType hbranches
+    have hmem' : (label, cont) ∈ [(label, g0)] := by
+      simpa [hbranches'] using hmem
+    have hcontEq : cont = g0 := by
+      simpa using hmem'
+    cases hcontEq
+    simpa using hproj0
+  | comm_async sender0 receiver0 branches branches' act label0 cont hne1 hne2 hmem _hcan _hstep =>
+    obtain ⟨hpartner, _hbranches⟩ :=
+      projectR_comm_sender_inv' sender0 receiver0 branches receiver [(label, contType)] hproj
+    have hreceiver_ne : receiver ≠ receiver0 := by
+      simpa [LocalActionR.toGlobal] using hne2
+    exact (False.elim (hreceiver_ne hpartner.symm))
+  | mu t body act g'' hstep ih =>
+    have hproj' :
+        projectR (body.substitute t (.mu t body)) sender =
+          .ok (.send receiver [(label, contType)]) := by
+      calc
+        projectR (body.substitute t (.mu t body)) sender
+            = projectR (.mu t body) sender := projectR_subst_comm_non_participant body t sender
+        _ = .ok (.send receiver [(label, contType)]) := hproj
+    exact ih contType hproj'
 
 /-- Projection after an async recv step (to be proved). -/
-axiom projection_after_recv_step (g g' : GlobalType) (sender receiver : String)
+theorem projection_after_recv_step (g g' : GlobalType) (sender receiver : String)
     (label : Label) (types : List (Label × LocalTypeR)) (contType : LocalTypeR)
     (hproj : projectR g receiver = .ok (.recv sender types))
     (hmem : (label, contType) ∈ types)
     (hstep : step g (LocalActionR.toGlobal receiver (LocalActionR.recv sender label)) g')
-    : projectR g' receiver = .ok contType
+    (huniq : GlobalType.uniqLabels g)
+    : projectR g' receiver = .ok contType := by
+  induction hstep generalizing types contType with
+  | comm_head sender0 receiver0 branches label0 cont hmemBranch =>
+    -- identify the receiver and projected branches
+    have hne : sender0 ≠ receiver0 := by
+      intro hEq
+      subst hEq
+      simp [projectR_comm_sender] at hproj
+    have hprojBranches :
+        projectBranches branches receiver = .ok types := by
+      have hroleReceiver : receiver = receiver0 := by
+        by_cases hroleSender : receiver = sender0
+        · subst hroleSender
+          simp [projectR_comm_sender] at hproj
+        · by_cases hroleReceiver : receiver = receiver0
+          · exact hroleReceiver
+          · simp [projectR, hroleSender, hroleReceiver] at hproj
+      subst hroleReceiver
+      exact projectR_comm_receiver_inv sender0 receiver0 branches types hne hproj
+    obtain ⟨g0, hmem0, hproj0⟩ :=
+      projectBranches_mem_proj branches receiver label contType types hprojBranches hmem
+    have huniqBranches : GlobalType.BranchesUniq GlobalType.uniqLabels branches := by
+      simpa using (GlobalType.uniqLabels_comm_branches (sender := sender0) (receiver := receiver0) huniq)
+    have hcontEq : cont = g0 :=
+      GlobalType.BranchesUniq.eq_of_label_mem huniqBranches hmemBranch hmem0
+    cases hcontEq
+    simpa using hproj0
+  | comm_async sender0 receiver0 branches branches' act label0 cont hne1 hne2 hmemBranch _hcan _hstep =>
+    have hreceiver_ne : receiver ≠ receiver0 := by
+      simpa [LocalActionR.toGlobal] using hne2
+    have hroleReceiver : receiver = receiver0 := by
+      by_cases hroleSender : receiver = sender0
+      · subst hroleSender
+        simp [projectR_comm_sender] at hproj
+      · by_cases hroleReceiver : receiver = receiver0
+        · exact hroleReceiver
+        · simp [projectR, hroleSender, hroleReceiver] at hproj
+    exact (False.elim (hreceiver_ne hroleReceiver))
+  | mu t body act g'' hstep ih =>
+    have hproj' :
+        projectR (body.substitute t (.mu t body)) receiver =
+          .ok (.recv sender types) := by
+      calc
+        projectR (body.substitute t (.mu t body)) receiver
+            = projectR (.mu t body) receiver := projectR_subst_comm_non_participant body t receiver
+        _ = .ok (.recv sender types) := hproj
+    have huniq' : GlobalType.uniqLabels (body.substitute t (.mu t body)) := by
+      cases huniq with
+      | mu _ _ huniqBody => simpa using huniqBody
+    exact ih contType hproj' hmem huniq'
 
 /-- Projection preserved for non-participants (success case).
 
@@ -816,6 +938,7 @@ theorem subject_reduction_recv_queue (g : GlobalType) (c c' : Configuration)
       GlobalTypeStepStar.trans hstar0 hstar1
     have hproj_cont : projectR g1 role = .ok contType :=
       projection_after_recv_step g0 g1 sender role msg.label types contType hproj_recv hmem_types hstep
+        hcoh0.uniqLabels
     have hproj_cont' : projectR g1 rp.role = .ok contType := by
       simpa [hrole] using hproj_cont
     have hwt_cont' : WellTyped [] rp.process contType := by

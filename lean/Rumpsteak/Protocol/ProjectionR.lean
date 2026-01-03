@@ -438,6 +438,23 @@ theorem projectR_comm_sender_inv (sender receiver : String) (branches : List (La
       cases hproj
       rfl
 
+/-- Inversion: sender projection determines the receiver and projected branches. -/
+theorem projectR_comm_sender_inv' (sender receiver : String) (branches : List (Label × GlobalType))
+    (partner : String) (bs : List (Label × LocalTypeR))
+    (hproj : projectR (.comm sender receiver branches) sender = .ok (.send partner bs)) :
+    partner = receiver ∧ projectBranches branches sender = .ok bs := by
+  have h := projectR_comm_sender sender receiver branches
+  by_cases hnonempty : branches.isEmpty
+  · simp [h, hnonempty] at hproj
+  · cases hbranches : projectBranches branches sender with
+    | error err =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+    | ok bs' =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+      exact ⟨rfl, by simpa using hbranches⟩
+
 /-- Inversion: receiver projection of a comm yields the projected branch list. -/
 theorem projectR_comm_receiver_inv (sender receiver : String) (branches : List (Label × GlobalType))
     (bs : List (Label × LocalTypeR)) (hne : sender ≠ receiver)
@@ -454,6 +471,23 @@ theorem projectR_comm_receiver_inv (sender receiver : String) (branches : List (
       simp [h, hnonempty, hbranches] at hproj
       cases hproj
       rfl
+
+/-- Inversion: receiver projection determines the sender and projected branches. -/
+theorem projectR_comm_receiver_inv' (sender receiver : String) (branches : List (Label × GlobalType))
+    (partner : String) (bs : List (Label × LocalTypeR)) (hne : sender ≠ receiver)
+    (hproj : projectR (.comm sender receiver branches) receiver = .ok (.recv partner bs)) :
+    partner = sender ∧ projectBranches branches receiver = .ok bs := by
+  have h := projectR_comm_receiver sender receiver branches hne
+  by_cases hnonempty : branches.isEmpty
+  · simp [h, hnonempty] at hproj
+  · cases hbranches : projectBranches branches receiver with
+    | error err =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+    | ok bs' =>
+      simp [h, hnonempty, hbranches] at hproj
+      cases hproj
+      exact ⟨rfl, by simpa using hbranches⟩
 
 /-- Key inversion: .mu never directly produces .send (only .mu t ... or .end). -/
 theorem projectR_mu_not_send (t : String) (body : GlobalType) (role partner : String)
@@ -533,6 +567,59 @@ theorem projectBranchTypes_find_mem (branches : List (Label × GlobalType)) (rol
           have ⟨lt', hlt', hmem⟩ := ih lts hrest hfind
           exact ⟨lt', hlt', List.Mem.tail lt hmem⟩
 
+/-! ## Projection list structure -/
+
+/-- Successful projectBranchTypes aligns branches with projected types. -/
+theorem projectBranchTypes_forall2 (branches : List (Label × GlobalType)) (role : String)
+    (tys : List LocalTypeR)
+    (hproj : projectBranchTypes branches role = .ok tys) :
+    List.Forall₂ (fun b t => projectR b.2 role = .ok t) branches tys := by
+  induction branches generalizing tys with
+  | nil =>
+    simp [projectBranchTypes] at hproj
+    cases hproj
+    exact List.Forall₂.nil
+  | cons b rest ih =>
+    unfold projectBranchTypes at hproj
+    cases hcont : projectR b.2 role with
+    | error e =>
+      simp [hcont] at hproj
+      cases hproj
+    | ok lt =>
+      cases hrest : projectBranchTypes rest role with
+      | error e =>
+        simp [hrest, hcont] at hproj
+        cases hproj
+      | ok restTys =>
+        simp [hrest, hcont] at hproj
+        cases hproj
+        exact List.Forall₂.cons hcont (ih restTys hrest)
+
+/-! ## Merge Reflexivity Lemma -/
+
+/-- Reflexivity of merge: merging a type with itself succeeds. -/
+axiom merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t
+
+/-- If all elements equal t, merge-fold returns t (using merge_refl). -/
+theorem foldlM_merge_eq_of_forall (ts : List LocalTypeR) (t : LocalTypeR)
+    (hall : List.Forall (fun u => u = t) ts) :
+    ts.foldlM (m := Except ProjectionError)
+        (fun acc proj =>
+          match LocalTypeR.merge acc proj with
+          | some m => pure m
+          | none => throw (ProjectionError.mergeFailed acc proj))
+        t =
+      Except.ok t := by
+  induction ts with
+  | nil =>
+    simp at hall
+    rfl
+  | cons u rest ih =>
+    simp at hall
+    rcases hall with ⟨hEq, hrest⟩
+    subst hEq
+    simp [LocalTypeR.merge, merge_refl, ih hrest]
+
 /-! ## Projection membership lemmas -/
 
 /-- If projectBranches succeeds and a projected branch appears in the result,
@@ -572,6 +659,56 @@ theorem projectBranches_mem_proj (branches : List (Label × GlobalType)) (role :
         | inr h =>
           obtain ⟨g, hmemg, hprojg⟩ := ih projRest hrest h
           exact ⟨g, by simp [hmemg], hprojg⟩
+
+/-- projectBranches returns [] iff the branch list is empty. -/
+theorem projectBranches_eq_nil_iff (branches : List (Label × GlobalType)) (role : String)
+    (hproj : projectBranches branches role = .ok []) : branches = [] := by
+  induction branches with
+  | nil => rfl
+  | cons b rest ih =>
+    unfold projectBranches at hproj
+    cases hcont : projectR b.2 role with
+    | error e =>
+      simp [hcont] at hproj
+      cases hproj
+    | ok lt =>
+      cases hrest : projectBranches rest role with
+      | error e =>
+        simp [hcont, hrest] at hproj
+        cases hproj
+      | ok projRest =>
+        simp [hcont, hrest] at hproj
+        cases hproj
+
+/-- If projectBranches succeeds with a singleton, the branch list is a singleton
+    and the head branch projects to the singleton continuation. -/
+theorem projectBranches_singleton_inv (branches : List (Label × GlobalType)) (role : String)
+    (label : Label) (contType : LocalTypeR)
+    (hproj : projectBranches branches role = .ok [(label, contType)]) :
+    ∃ g, branches = [(label, g)] ∧ projectR g role = .ok contType := by
+  cases branches with
+  | nil =>
+    simp [projectBranches] at hproj
+    cases hproj
+  | cons b rest =>
+    unfold projectBranches at hproj
+    cases hcont : projectR b.2 role with
+    | error e =>
+      simp [hcont] at hproj
+      cases hproj
+    | ok lt =>
+      cases hrest : projectBranches rest role with
+      | error e =>
+        simp [hcont, hrest] at hproj
+        cases hproj
+      | ok projRest =>
+        simp [hcont, hrest] at hproj
+        cases hproj
+        have hrest' : rest = [] := projectBranches_eq_nil_iff rest role hrest
+        subst hrest'
+        refine ⟨b.2, ?_, ?_⟩
+        · simp
+        · simpa [hcont]
 
 /-! ## Merge Reflexivity Lemmas
 
@@ -623,18 +760,6 @@ theorem mergeRecvSorted_refl (bs : List (Label × LocalTypeR))
       simp only [List.map_cons, List.mem_cons, hc, or_true]
     rw [hrest]
     simp only [Option.some_bind]
-
-/-- If merge of a and b succeeds, then merge is reflexive (a merges with a).
-
-    PROOF NOTE: This requires induction on nested inductive types (LocalTypeR contains
-    List (Label × LocalTypeR)), which Lean 4's standard induction doesn't support.
-    A proper proof requires either:
-    1. A custom well-founded induction principle on sizeOf
-    2. Using the Equations package for nested induction
-    3. Manual structural recursion via a terminating function
-
-    The property follows from merge semantics: merging identical types is idempotent. -/
-axiom merge_refl (t : LocalTypeR) : LocalTypeR.merge t t = some t
 
 /-- Key lemma: if foldlM merge over a list produces result m, then each element
     is merge-compatible with the accumulator at that point. For non-participants,
@@ -878,17 +1003,36 @@ axiom projectR_comm_non_participant (sender receiver role : String) (branches : 
     (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
     : projectR g role = .ok result
 
-/-- If projectBranches succeeds and produces [(label, contType)],
-    and find? finds label in branches at index (label, g),
-    then projectR g role = contType.
+ /-- Non-participant projection is uniform across branches (membership form). -/
+theorem projectR_comm_non_participant_mem (sender receiver role : String)
+    (branches : List (Label × GlobalType)) (result : LocalTypeR)
+    (hne1 : role ≠ sender) (hne2 : role ≠ receiver)
+    (hproj : projectR (.comm sender receiver branches) role = .ok result)
+    (huniq : GlobalType.uniqLabels (.comm sender receiver branches))
+    (label : Label) (g : GlobalType)
+    (hmem : (label, g) ∈ branches)
+    : projectR g role = .ok result := by
+  have huniqBranches := GlobalType.uniqLabels_comm_branches huniq
+  have hfind := GlobalType.find?_of_mem_unique (p := GlobalType.uniqLabels) huniqBranches hmem
+  exact projectR_comm_non_participant sender receiver role branches result hne1 hne2 hproj label g hfind
 
-    PROOF SKETCH:
-    If projectBranches returns a singleton, branches must be a singleton.
-    The find? result matches the branch, so projectR on that branch gives contType. -/
-axiom projectBranches_find_proj (branches : List (Label × GlobalType)) (role : String)
-    (label : Label) (contType : LocalTypeR) (g : GlobalType)
-    (hproj : projectBranches branches role = .ok [(label, contType)])
-    (hfind : branches.find? (fun (l, _) => l.name == label.name) = some (label, g))
-    : projectR g role = .ok contType
 
+ /-- Non-participant substitution commutes with projection (merge case). -/
+axiom projectR_substitute_nonparticipant (sender receiver role : String)
+    (branches : List (Label × GlobalType)) (t : String) (replacement : GlobalType)
+    (lt rlt : LocalTypeR)
+    (hne1 : role ≠ sender) (hne2 : role ≠ receiver)
+    (hproj : projectR (GlobalType.comm sender receiver branches) role = .ok lt)
+    (hrep : projectR replacement role = .ok rlt)
+    (huniq : GlobalType.uniqLabels (GlobalType.comm sender receiver branches))
+    : projectR ((GlobalType.comm sender receiver branches).substitute t replacement) role =
+        .ok (lt.substitute t rlt)
+
+/-- Projection commutes with substitution, given the replacement projection. -/
+axiom projectR_substitute (body : GlobalType) (t : String) (replacement : GlobalType)
+    (role : String) (lt rlt : LocalTypeR)
+    (hproj : projectR body role = .ok lt)
+    (hrep : projectR replacement role = .ok rlt)
+    (huniq : GlobalType.uniqLabels body)
+    : projectR (body.substitute t replacement) role = .ok (lt.substitute t rlt)
 end Rumpsteak.Protocol.ProjectionR

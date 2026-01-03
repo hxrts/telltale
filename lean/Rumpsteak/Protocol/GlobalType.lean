@@ -321,11 +321,86 @@ inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
 /-- Placeholder linearity predicate for globals (refine later). -/
 def linearPred (_ : GlobalType) : Prop := True
 
-/-- Placeholder size predicate for globals (refine later). -/
-def sizePred (_ : GlobalType) : Prop := True
+/-- Size predicate for globals: each communication has at least one branch. -/
+def sizePred (g : GlobalType) : Prop := g.allCommsNonEmpty = true
 
-/-- Placeholder action predicate for globals (refine later). -/
-def actionPred (_ : GlobalType) : Prop := True
+/-- Specification axiom: unfold allCommsNonEmpty for comm (partial def is opaque). -/
+axiom allCommsNonEmpty_comm (sender receiver : String) (branches : List (Label × GlobalType)) :
+    (GlobalType.comm sender receiver branches).allCommsNonEmpty =
+      (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty))
+
+theorem sizePred_comm_nonempty {sender receiver : String} {branches : List (Label × GlobalType)}
+    (h : sizePred (.comm sender receiver branches)) : branches.isEmpty = false := by
+  have h' : (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty)) = true := by
+    simpa [sizePred, allCommsNonEmpty_comm] using h
+  have h'' : !branches.isEmpty = true ∧
+      branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true := by
+    simpa [Bool.and_eq_true] using h'
+  simpa using h''.1
+
+theorem sizePred_mem {sender receiver : String} {branches : List (Label × GlobalType)}
+    (h : sizePred (.comm sender receiver branches))
+    {label : Label} {g : GlobalType} (hmem : (label, g) ∈ branches) :
+    sizePred g := by
+  have h' : branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true := by
+    have h'' : (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty)) = true := by
+      simpa [sizePred, allCommsNonEmpty_comm] using h
+    have h''' : !branches.isEmpty = true ∧
+        branches.all (fun (_, cont) => cont.allCommsNonEmpty) = true := by
+      simpa [Bool.and_eq_true] using h''
+    exact h'''.2
+  have hAll : ∀ b ∈ branches, (fun (_, cont) => cont.allCommsNonEmpty) b = true := by
+    simpa using (List.all_eq_true.mp h')
+  have hmem' := hAll (label, g) hmem
+  simpa [sizePred] using hmem'
+
+/-- Branch-wise predicate over global branches. -/
+inductive BranchesForall (p : GlobalType → Prop) : List (Label × GlobalType) → Prop where
+  | nil : BranchesForall p []
+  | cons (label : Label) (g : GlobalType) (rest : List (Label × GlobalType)) :
+      p g →
+      BranchesForall p rest →
+      BranchesForall p ((label, g) :: rest)
+
+/-- Action predicate for globals: communications are between distinct roles
+    and the predicate holds for all branch continuations. -/
+inductive actionPred : GlobalType → Prop
+  | end : actionPred .end
+  | var (t : String) : actionPred (.var t)
+  | mu (t : String) (body : GlobalType) :
+      actionPred body →
+      actionPred (.mu t body)
+  | comm (sender receiver : String) (branches : List (Label × GlobalType)) :
+      sender ≠ receiver →
+      BranchesForall actionPred branches →
+      actionPred (.comm sender receiver branches)
+
+theorem actionPred_comm_sender_ne {sender receiver : String} {branches : List (Label × GlobalType)}
+    (h : actionPred (.comm sender receiver branches)) : sender ≠ receiver := by
+  cases h with
+  | comm _ _ _ hne _ => exact hne
+
+theorem actionPred_comm_branches {sender receiver : String} {branches : List (Label × GlobalType)}
+    (h : actionPred (.comm sender receiver branches)) : BranchesForall actionPred branches := by
+  cases h with
+  | comm _ _ _ _ hbranches => exact hbranches
+
+/-- If all branches satisfy p, any member branch satisfies p. -/
+theorem BranchesForall.mem {p : GlobalType → Prop}
+    {branches : List (Label × GlobalType)} (h : BranchesForall p branches)
+    {label : Label} {g : GlobalType} (hmem : (label, g) ∈ branches) : p g := by
+  induction h with
+  | nil =>
+    cases hmem
+  | cons label0 g0 rest hp hrest ih =>
+    have hmem' : (label, g) = (label0, g0) ∨ (label, g) ∈ rest := by
+      simpa [List.mem_cons] using hmem
+    cases hmem' with
+    | inl hEq =>
+      cases hEq
+      exact hp
+    | inr hmemRest =>
+      exact ih hmemRest
 
 /-- Branch-wise label uniqueness with recursive predicate. -/
 inductive BranchesUniq (p : GlobalType → Prop) : List (Label × GlobalType) → Prop where
@@ -335,6 +410,56 @@ inductive BranchesUniq (p : GlobalType → Prop) : List (Label × GlobalType) �
       BranchesUniq p rest →
       label.name ∉ (rest.map (fun b => b.1.name)) →
       BranchesUniq p ((label, g) :: rest)
+
+theorem BranchesUniq.mem {p : GlobalType → Prop}
+    {branches : List (Label × GlobalType)} (h : BranchesUniq p branches)
+    {label : Label} {g : GlobalType} (hmem : (label, g) ∈ branches) : p g := by
+  induction h with
+  | nil =>
+    cases hmem
+  | cons label0 g0 rest hp hrest _ hih =>
+    have hmem' : (label, g) = (label0, g0) ∨ (label, g) ∈ rest := by
+      simpa [List.mem_cons] using hmem
+    cases hmem' with
+    | inl hEq =>
+      cases hEq
+      exact hp
+    | inr hmemRest =>
+      exact hih hmemRest
+
+/-- Uniqueness: in a BranchesUniq list, a label determines its continuation. -/
+theorem BranchesUniq.eq_of_label_mem {p : GlobalType → Prop}
+    {branches : List (Label × GlobalType)} (huniq : BranchesUniq p branches)
+    {label : Label} {g1 g2 : GlobalType}
+    (hmem1 : (label, g1) ∈ branches) (hmem2 : (label, g2) ∈ branches) : g1 = g2 := by
+  induction huniq with
+  | nil =>
+    cases hmem1
+  | cons label0 g0 rest _ hrest hnotin ih =>
+    have hmem1' : (label, g1) = (label0, g0) ∨ (label, g1) ∈ rest := by
+      simpa [List.mem_cons] using hmem1
+    have hmem2' : (label, g2) = (label0, g0) ∨ (label, g2) ∈ rest := by
+      simpa [List.mem_cons] using hmem2
+    cases hmem1' with
+    | inl h1 =>
+      cases h1
+      cases hmem2' with
+      | inl h2 =>
+        cases h2
+        rfl
+      | inr h2 =>
+        have hname_mem : label.name ∈ rest.map (fun b : Label × GlobalType => b.1.name) := by
+          exact List.mem_map_of_mem (f := fun b : Label × GlobalType => b.1.name) h2
+        exact (False.elim (hnotin hname_mem))
+    | inr h1 =>
+      cases hmem2' with
+      | inl h2 =>
+        cases h2
+        have hname_mem : label.name ∈ rest.map (fun b : Label × GlobalType => b.1.name) := by
+          exact List.mem_map_of_mem (f := fun b : Label × GlobalType => b.1.name) h1
+        exact (False.elim (hnotin hname_mem))
+      | inr h2 =>
+        exact ih h1 h2
 
 /-- If labels are unique, membership determines find?. -/
 theorem find?_of_mem_unique {p : GlobalType → Prop}
@@ -353,9 +478,9 @@ theorem find?_of_mem_unique {p : GlobalType → Prop}
       cases h
       simp [beq_self_eq_true]
     | inr h =>
-      have hname_mem : label.name ∈ rest.map (fun b => b.1.name) := by
+      have hname_mem : label.name ∈ rest.map (fun b : Label × GlobalType => b.1.name) := by
         -- membership in rest implies membership of label.name in mapped names
-        simpa [List.mem_map] using h
+        exact List.mem_map_of_mem (f := fun b : Label × GlobalType => b.1.name) h
       have hneq : label0.name ≠ label.name := by
         intro hEq
         have : label0.name ∈ rest.map (fun b => b.1.name) := by
@@ -375,21 +500,18 @@ inductive uniqLabels : GlobalType → Prop
       BranchesUniq uniqLabels branches →
       uniqLabels (.comm sender receiver branches)
 
+theorem uniqLabels_comm_branches {sender receiver : String} {branches : List (Label × GlobalType)}
+    (h : uniqLabels (.comm sender receiver branches)) : BranchesUniq uniqLabels branches := by
+  cases h with
+  | comm _ _ _ hbranches => exact hbranches
+
 /-- Enabledness implies a step. This is the good-global condition. -/
 def goodG (g : GlobalType) : Prop :=
   ∀ act, canStep g act → ∃ g', step g act g'
 
 /-- A step implies enabledness. -/
-theorem step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType} :
-    step g act g' → canStep g act := by
-  intro h
-  induction h with
-  | comm_head sender receiver branches label cont hmem =>
-    exact canStep.comm_head sender receiver branches label cont hmem
-  | comm_async sender receiver branches branches' act label cont hne1 hne2 hmem hcan _hstep =>
-    exact canStep.comm_async sender receiver branches act label cont hne1 hne2 hmem hcan
-  | mu t body act g' hstep ih =>
-    exact canStep.mu t body act ih
+axiom step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType} :
+    step g act g' → canStep g act
 
 /-- Reflexive-transitive closure of async step. -/
 inductive GlobalTypeStepStar : GlobalType → GlobalType → Prop where

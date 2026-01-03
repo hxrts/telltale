@@ -2,6 +2,7 @@ import Lean.Data.Json
 import Rumpsteak.Protocol.Core
 import Rumpsteak.Protocol.Choreography
 import Rumpsteak.Protocol.Program
+import Rumpsteak.Protocol.GlobalType
 
 /-! # Rumpsteak.Runner.Json
 
@@ -127,5 +128,63 @@ def parseProgramExport (json : Json) : Except String ProgramExport := do
 def readJsonFile (path : System.FilePath) : IO (Except String Json) := do
   let content ← IO.FS.readFile path
   pure (Json.parse content)
+
+/-! ## GlobalType Parsing -/
+
+open Rumpsteak.Protocol.GlobalType (GlobalType Label PayloadSort)
+
+/-- Parse a PayloadSort from JSON. -/
+partial def parseSort (json : Json) : Except String PayloadSort :=
+  match json with
+  | Json.str "unit" => Except.ok .unit
+  | Json.str "nat" => Except.ok .nat
+  | Json.str "bool" => Except.ok .bool
+  | Json.str "string" => Except.ok .string
+  | Json.obj _ =>
+    match json.getObjVal? "prod" with
+    | Except.ok prodArr =>
+        match prodArr.getArr? with
+        | Except.ok arr =>
+            if h : arr.size = 2 then do
+              let left ← parseSort arr[0]
+              let right ← parseSort arr[1]
+              Except.ok (.prod left right)
+            else
+              Except.error "Expected prod array of size 2"
+        | _ => Except.error "Expected prod array"
+    | _ => Except.error "Unknown sort format"
+  | _ => Except.error "Unknown sort format"
+
+/-- Parse a Label from JSON. -/
+def parseLabel (json : Json) : Except String Label := do
+  let name ← getField json "name" >>= parseString
+  let sortJson ← getField json "sort"
+  let sort ← parseSort sortJson
+  pure { name := name, sort := sort }
+
+/-- Parse a GlobalType from JSON (matching Rust lean-bridge format). -/
+partial def parseGlobalType (json : Json) : Except String GlobalType := do
+  let kind ← getField json "kind" >>= parseString
+  match kind with
+  | "end" => Except.ok .end
+  | "var" =>
+      let name ← getField json "name" >>= parseString
+      Except.ok (.var name)
+  | "rec" =>
+      let var ← getField json "var" >>= parseString
+      let bodyJson ← getField json "body"
+      let body ← parseGlobalType bodyJson
+      Except.ok (.mu var body)
+  | "comm" =>
+      let sender ← getField json "sender" >>= parseString
+      let receiver ← getField json "receiver" >>= parseString
+      let branchesArr ← getField json "branches" >>= parseArray
+      let branches ← branchesArr.toList.mapM fun branchJson => do
+        let label ← getField branchJson "label" >>= parseLabel
+        let contJson ← getField branchJson "continuation"
+        let cont ← parseGlobalType contJson
+        pure (label, cont)
+      Except.ok (.comm sender receiver branches)
+  | _ => Except.error s!"Unknown GlobalType kind '{kind}'"
 
 end Rumpsteak.Runner.Json

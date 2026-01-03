@@ -111,7 +111,8 @@ def LocalActionR.toGlobal (role : String) (act : LocalActionR) : Rumpsteak.Proto
   | LocalKind.recv =>
       { sender := act.partner, receiver := role, label := act.label }
 
-/-- Local enabledness (async): a local type can take a local action. -/
+/-- Local enabledness (async): a local type can take a local action.
+    Async skip is allowed only through send heads (receiver blocks). -/
 inductive canStep : LocalTypeR → LocalActionR → Prop
   | send_head (partner : String) (branches : List (Label × LocalTypeR))
       (label : Label) (cont : LocalTypeR) :
@@ -127,12 +128,6 @@ inductive canStep : LocalTypeR → LocalActionR → Prop
       (label, cont) ∈ branches →
       canStep cont act →
       canStep (.send partner branches) act
-  | recv_async (partner : String) (branches : List (Label × LocalTypeR))
-      (act : LocalActionR) (label : Label) (cont : LocalTypeR) :
-      act.partner ≠ partner →
-      (label, cont) ∈ branches →
-      canStep cont act →
-      canStep (.recv partner branches) act
   | mu (t : String) (body : LocalTypeR) (act : LocalActionR) :
       canStep (body.substitute t (.mu t body)) act →
       canStep (.mu t body) act

@@ -1,6 +1,7 @@
 import Rumpsteak.Runner.Json
 import Rumpsteak.Runner.Validation
 import Rumpsteak.Runner.Logging
+import Rumpsteak.Runner.Export
 
 /-! # Rumpsteak.Runner.Main
 
@@ -30,6 +31,8 @@ namespace Rumpsteak.Runner.Main
 open Rumpsteak.Runner.Json
 open Rumpsteak.Runner.Validation
 open Rumpsteak.Runner.Logging
+open Rumpsteak.Runner.Export
+open Rumpsteak.Protocol.ProjectionR (projectR)
 
 /-- Run validation given file paths for choreography and program JSON.
     Optionally writes results to text and/or JSON log files.
@@ -77,14 +80,60 @@ def runPaths (chPath progPath : System.FilePath)
             IO.println s!"Lean runner: choreography and program validated for {programExport.role}"
             pure (0 : UInt32)
 
+/-- Export projection for a role, given a GlobalType JSON file.
+    Returns 0 on success, 1 on error. -/
+def runExportProjection (inputPath outputPath : System.FilePath) (role : String) : IO UInt32 := do
+  let inputJson ← readJsonFile inputPath
+  match inputJson with
+  | Except.error err =>
+    IO.eprintln s!"Failed to parse input JSON: {err}"
+    pure (1 : UInt32)
+  | Except.ok inputDoc =>
+    match parseGlobalType inputDoc with
+    | Except.error err =>
+      IO.eprintln s!"Failed to decode GlobalType: {err}"
+      pure (1 : UInt32)
+    | Except.ok globalType =>
+      let result := projectionResultToJson (projectR globalType role)
+      writeJsonFile outputPath result
+      IO.println s!"Exported projection for role '{role}' to {outputPath}"
+      pure (0 : UInt32)
+
+/-- Export all projections for a GlobalType JSON file.
+    Returns 0 on success, 1 on error. -/
+def runExportAllProjections (inputPath outputPath : System.FilePath) : IO UInt32 := do
+  let inputJson ← readJsonFile inputPath
+  match inputJson with
+  | Except.error err =>
+    IO.eprintln s!"Failed to parse input JSON: {err}"
+    pure (1 : UInt32)
+  | Except.ok inputDoc =>
+    match parseGlobalType inputDoc with
+    | Except.error err =>
+      IO.eprintln s!"Failed to decode GlobalType: {err}"
+      pure (1 : UInt32)
+    | Except.ok globalType =>
+      let result := projectAllToJson globalType
+      writeJsonFile outputPath result
+      IO.println s!"Exported all projections to {outputPath}"
+      pure (0 : UInt32)
+
 /-- Usage message for the CLI. -/
 def usage : String :=
-  "usage: rumpsteak_runner --choreography <path> --program <path> [--log <path>] [--json-log <path>]"
+  "usage: rumpsteak_runner <mode> [options]\n\n" ++
+  "Modes:\n" ++
+  "  --choreography <path> --program <path> [--log <path>] [--json-log <path>]\n" ++
+  "      Validate a program against a choreography\n\n" ++
+  "  --export-projection <global.json> --role <name> --output <local.json>\n" ++
+  "      Export Lean's projection of a GlobalType for a specific role\n\n" ++
+  "  --export-all-projections <global.json> --output <projections.json>\n" ++
+  "      Export Lean's projection of a GlobalType for all roles"
 
-/-- Parse command-line arguments and dispatch to runPaths.
-    Supports various orderings of optional --log and --json-log flags. -/
+/-- Parse command-line arguments and dispatch to appropriate handler.
+    Supports validation mode and export modes. -/
 def runnerMain (args : List String) : IO UInt32 :=
   match args with
+  -- Validation mode (original)
   | ["--choreography", chPath, "--program", progPath] =>
       runPaths ⟨chPath⟩ ⟨progPath⟩ none none
   | ["--choreography", chPath, "--program", progPath, "--log", logPath] =>
@@ -95,6 +144,14 @@ def runnerMain (args : List String) : IO UInt32 :=
       runPaths ⟨chPath⟩ ⟨progPath⟩ (some ⟨logPath⟩) (some ⟨jsonLog⟩)
   | ["--choreography", chPath, "--program", progPath, "--json-log", jsonLog, "--log", logPath] =>
       runPaths ⟨chPath⟩ ⟨progPath⟩ (some ⟨logPath⟩) (some ⟨jsonLog⟩)
+  -- Export projection for a single role
+  | ["--export-projection", inputPath, "--role", role, "--output", outputPath] =>
+      runExportProjection ⟨inputPath⟩ ⟨outputPath⟩ role
+  | ["--export-projection", inputPath, "--output", outputPath, "--role", role] =>
+      runExportProjection ⟨inputPath⟩ ⟨outputPath⟩ role
+  -- Export all projections
+  | ["--export-all-projections", inputPath, "--output", outputPath] =>
+      runExportAllProjections ⟨inputPath⟩ ⟨outputPath⟩
   | _ =>
     IO.println usage *> pure (1 : UInt32)
 
