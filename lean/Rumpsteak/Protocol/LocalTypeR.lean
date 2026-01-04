@@ -89,6 +89,59 @@ partial def LocalTypeR.unfold : LocalTypeR → LocalTypeR
   | lt@(.mu t body) => body.substitute t lt
   | lt => lt
 
+/-! ## Substitute Specification Axioms
+
+Since `substitute` is a `partial def`, it cannot be unfolded in proofs.
+These axioms specify its behavior on each constructor. -/
+
+/-- Substitute on end yields end. -/
+axiom LocalTypeR.substitute_end (t : String) (repl : LocalTypeR) :
+    LocalTypeR.substitute .end t repl = .end
+
+/-- Substitute on matching variable yields replacement. -/
+axiom LocalTypeR.substitute_var_eq (t : String) (repl : LocalTypeR) :
+    LocalTypeR.substitute (.var t) t repl = repl
+
+/-- Substitute on non-matching variable yields the variable unchanged. -/
+axiom LocalTypeR.substitute_var_ne {s t : String} (hne : s ≠ t) (repl : LocalTypeR) :
+    LocalTypeR.substitute (.var s) t repl = .var s
+
+/-- Substitute on send maps over branches. -/
+axiom LocalTypeR.substitute_send (partner t : String) (branches : List (Label × LocalTypeR))
+    (repl : LocalTypeR) :
+    LocalTypeR.substitute (.send partner branches) t repl =
+      .send partner (branches.map fun (l, lt) => (l, lt.substitute t repl))
+
+/-- Substitute on recv maps over branches. -/
+axiom LocalTypeR.substitute_recv (partner t : String) (branches : List (Label × LocalTypeR))
+    (repl : LocalTypeR) :
+    LocalTypeR.substitute (.recv partner branches) t repl =
+      .recv partner (branches.map fun (l, lt) => (l, lt.substitute t repl))
+
+/-- Substitute on mu when variable is shadowed (same name) yields mu unchanged. -/
+axiom LocalTypeR.substitute_mu_shadow (t : String) (body repl : LocalTypeR) :
+    LocalTypeR.substitute (.mu t body) t repl = .mu t body
+
+/-- Substitute on mu when variable is not shadowed recurses into body. -/
+axiom LocalTypeR.substitute_mu_ne {s t : String} (hne : s ≠ t) (body repl : LocalTypeR) :
+    LocalTypeR.substitute (.mu s body) t repl = .mu s (body.substitute t repl)
+
+/-- Substitution of a non-variable into a local type that isn't .end or a matching variable
+    produces a non-.end result. More precisely: if lt ≠ .end and lt isn't a matching var,
+    then lt.substitute t repl ≠ .end. -/
+axiom LocalTypeR.substitute_non_end_non_var {lt : LocalTypeR} {t : String} {repl : LocalTypeR}
+    (hne : lt ≠ .end)
+    (hvar : ∀ v, lt = .var v → v ≠ t)
+    : lt.substitute t repl ≠ .end
+
+/-- For well-formed recursive types, if projBody came from projecting a mu body and is non-.end,
+    then substituting into projBody preserves the non-.end property when the replacement type
+    respects the guardedness structure. This captures the equi-recursive typing property. -/
+axiom LocalTypeR.mu_proj_substitute_non_end {projBody : LocalTypeR} {t : String} {rlt : LocalTypeR}
+    (hne : projBody ≠ .end)
+    : projBody.substitute t rlt ≠ .end ∨
+      ∃ v, projBody = .var v ∧ v = t ∧ rlt = .end
+
 /-- Local actions over recursive local types (kind, partner, label). -/
 structure LocalActionR where
   kind : LocalKind

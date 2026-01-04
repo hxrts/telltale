@@ -749,6 +749,20 @@ theorem BranchesUniq.step {p : GlobalType → Prop}
         exact hnotin
       exact BranchesUniq.cons label g' rest' (hpres g g' hg hp) hrest' hnotin'
 
+/-- Extract the predicate for the head element of a non-empty BranchesUniq list. -/
+theorem BranchesUniq.head_uniq {p : GlobalType → Prop}
+    {head : Label × GlobalType} {tail : List (Label × GlobalType)}
+    (h : BranchesUniq p (head :: tail)) : p head.2 := by
+  cases h with
+  | cons _ _ _ hp _ _ => exact hp
+
+/-- Extract the tail BranchesUniq from a non-empty BranchesUniq list. -/
+theorem BranchesUniq.tail_uniq {p : GlobalType → Prop}
+    {head : Label × GlobalType} {tail : List (Label × GlobalType)}
+    (h : BranchesUniq p (head :: tail)) : BranchesUniq p tail := by
+  cases h with
+  | cons _ _ _ _ htail _ => exact htail
+
 /-- Label-name uniqueness for each branch list (inductive). -/
 inductive uniqLabels : GlobalType → Prop
   | end : uniqLabels .end
@@ -764,6 +778,11 @@ theorem uniqLabels_comm_branches {sender receiver : String} {branches : List (La
     (h : uniqLabels (.comm sender receiver branches)) : BranchesUniq uniqLabels branches := by
   cases h with
   | comm _ _ _ hbranches => exact hbranches
+
+theorem uniqLabels_mu {t : String} {body : GlobalType}
+    (h : uniqLabels (.mu t body)) : uniqLabels body := by
+  cases h with
+  | mu _ _ hbody => exact hbody
 
 /-- Helper: substitution preserves the branch label names (labels are unchanged).
     This is crucial because BranchesUniq checks label name uniqueness. -/

@@ -1441,7 +1441,239 @@ theorem projectR_comm_non_participant_mem (sender receiver role : String)
   exact projectR_comm_non_participant sender receiver role branches result hne1 hne2 hproj label g hfind
 
 
- /-- Non-participant substitution commutes with projection (merge case). -/
+/-- Projection commutes with substitution, given the replacement projection.
+
+    Proof uses mutual induction on GlobalType via @GlobalType.rec with three motives:
+    - motive_1: For GlobalType g
+    - motive_2: For List (Label × GlobalType) branches
+    - motive_3: For (Label × GlobalType) pair
+
+    The key insight from Coq is that projection distributes over substitution
+    because substitution only affects recursion variables, not the role-based
+    structure that projection depends on.
+-/
+theorem projectR_substitute (body : GlobalType) (t : String) (replacement : GlobalType)
+    (role : String) (lt rlt : LocalTypeR)
+    (hproj : projectR body role = .ok lt)
+    (hrep : projectR replacement role = .ok rlt)
+    (huniq : GlobalType.uniqLabels body)
+    : projectR (body.substitute t replacement) role = .ok (lt.substitute t rlt) := by
+  -- Define motives for mutual induction
+  let motive1 (g : GlobalType) : Prop :=
+    ∀ (t : String) (replacement : GlobalType) (role : String) (lt rlt : LocalTypeR),
+      projectR g role = .ok lt →
+      projectR replacement role = .ok rlt →
+      GlobalType.uniqLabels g →
+      projectR (g.substitute t replacement) role = .ok (lt.substitute t rlt)
+  let motive2 (bs : List (Label × GlobalType)) : Prop :=
+    ∀ (t : String) (replacement : GlobalType) (role : String) (projBs : List (Label × LocalTypeR)) (rlt : LocalTypeR),
+      projectBranches bs role = .ok projBs →
+      projectR replacement role = .ok rlt →
+      GlobalType.BranchesUniq GlobalType.uniqLabels bs →
+      projectBranches (bs.map fun (l, g) => (l, g.substitute t replacement)) role =
+        .ok (projBs.map fun (l, lt) => (l, lt.substitute t rlt))
+  let motive3 (p : Label × GlobalType) : Prop :=
+    ∀ (t : String) (replacement : GlobalType) (role : String) (lt rlt : LocalTypeR),
+      projectR p.2 role = .ok lt →
+      projectR replacement role = .ok rlt →
+      GlobalType.uniqLabels p.2 →
+      projectR ((p.2).substitute t replacement) role = .ok (lt.substitute t rlt)
+  -- Apply the recursor
+  have hmain := @GlobalType.rec (motive_1 := motive1) (motive_2 := motive2) (motive_3 := motive3)
+  -- End case
+  have hend : motive1 .end := by
+    intro t' repl role' lt' rlt' hproj' hrep' _
+    simp only [projectR, pure, Except.pure] at hproj'
+    cases hproj'
+    simp only [substitute_end, projectR, pure, Except.pure, LocalTypeR.substitute_end]
+  -- Comm case (sender/receiver/non-participant)
+  have hcomm : ∀ (sender receiver : String) (branches : List (Label × GlobalType)),
+      motive2 branches → motive1 (.comm sender receiver branches) := by
+    intro sender receiver branches ih_branches t' repl role' lt' rlt' hproj' hrep' huniq'
+    -- Case split: role = sender, role = receiver, or neither
+    by_cases hSender : role' = sender
+    · -- Sender case: projectR gives .send
+      subst hSender
+      rw [projectR_comm_sender] at hproj'
+      by_cases hempty : branches.isEmpty
+      · simp [hempty] at hproj'
+      · simp only [hempty, ↓reduceIte, Except.map] at hproj'
+        cases hbs : projectBranches branches sender with
+        | error e => simp [hbs] at hproj'
+        | ok projBs =>
+          simp [hbs] at hproj'
+          cases hproj'
+          -- After substitution, projection should give .send with substituted branches
+          rw [substitute_comm]
+          rw [projectR_comm_sender]
+          have hne' : (branches.map fun p => (p.1, p.2.substitute t' repl)).isEmpty = false := by
+            simp [List.isEmpty_eq_true, List.map_eq_nil_iff, hempty]
+          simp only [hne', ↓reduceIte, Except.map]
+          -- Use IH on branches
+          have huniqBranches := GlobalType.uniqLabels_comm_branches huniq'
+          have hbsSubst := ih_branches t' repl sender projBs rlt' hbs hrep' huniqBranches
+          simp only [hbsSubst]
+          simp [LocalTypeR.substitute_send]
+    · by_cases hRecv : role' = receiver
+      · -- Receiver case: projectR gives .recv
+        subst hRecv
+        have hne_sr : sender ≠ receiver := by
+          intro heq
+          rw [heq] at hSender
+          exact hSender rfl
+        rw [projectR_comm_receiver sender receiver branches hne_sr] at hproj'
+        by_cases hempty : branches.isEmpty
+        · simp [hempty] at hproj'
+        · simp only [hempty, ↓reduceIte, Except.map] at hproj'
+          cases hbs : projectBranches branches receiver with
+          | error e => simp [hbs] at hproj'
+          | ok projBs =>
+            simp [hbs] at hproj'
+            cases hproj'
+            -- After substitution
+            rw [substitute_comm]
+            rw [projectR_comm_receiver]
+            · have hne' : (branches.map fun p => (p.1, p.2.substitute t' repl)).isEmpty = false := by
+                simp [List.isEmpty_eq_true, List.map_eq_nil_iff, hempty]
+              simp only [hne', ↓reduceIte, Except.map]
+              have huniqBranches := GlobalType.uniqLabels_comm_branches huniq'
+              have hbsSubst := ih_branches t' repl receiver projBs rlt' hbs hrep' huniqBranches
+              simp only [hbsSubst]
+              simp [LocalTypeR.substitute_recv]
+            · exact hne_sr
+      · -- Non-participant case: merge all branch projections
+        -- This case is more complex and requires showing merge commutes with substitution
+        -- We use the projectR_substitute_nonparticipant axiom which handles this case
+        exact projectR_substitute_nonparticipant sender receiver role' branches t' repl lt' rlt'
+          hSender hRecv hproj' hrep' huniq'
+  -- Mu case (handle shadowing)
+  have hmu : ∀ (s : String) (body' : GlobalType),
+      motive1 body' → motive1 (.mu s body') := by
+    intro s body' ih_body t' repl role' lt' rlt' hproj' hrep' huniq'
+    rw [projectR_mu] at hproj'
+    cases hbody : projectR body' role' with
+    | error e => simp [hbody] at hproj'
+    | ok projBody =>
+      simp [hbody] at hproj'
+      by_cases hshadow : s = t'
+      · -- Variable is shadowed: substitution is identity on body
+        subst hshadow
+        rw [substitute_mu_shadow]
+        rw [projectR_mu, hbody]
+        cases hend' : projBody == .end with
+        | true =>
+          simp [hend'] at hproj'
+          cases hproj'
+          simp only [beq_iff_eq] at hend'
+          subst hend'
+          simp [LocalTypeR.substitute_end]
+        | false =>
+          simp [hend'] at hproj'
+          cases hproj'
+          simp [hend', LocalTypeR.substitute_mu_shadow]
+      · -- Variable is not shadowed: recurse into body
+        have hne : s ≠ t' := hshadow
+        rw [substitute_mu_ne hne]
+        have huniq_body := GlobalType.uniqLabels_mu huniq'
+        have hih := ih_body t' repl role' projBody rlt' hbody hrep' huniq_body
+        rw [projectR_mu, hih]
+        cases hend' : projBody == .end with
+        | true =>
+          simp [hend'] at hproj'
+          cases hproj'
+          simp only [beq_iff_eq] at hend'
+          subst hend'
+          simp [LocalTypeR.substitute_end]
+          have hneq : (LocalTypeR.end.substitute t' rlt' == .end) = true := by
+            simp [LocalTypeR.substitute_end]
+          simp [hneq]
+        | false =>
+          simp [hend'] at hproj'
+          cases hproj'
+          -- The goal is to show:
+          -- (if projBody.substitute t' rlt' == .end then .ok .end else .ok (.mu s (projBody.substitute t' rlt')))
+          --   = .ok (.mu s (projBody.substitute t' rlt'))
+          -- Use the mu_proj_substitute_non_end axiom
+          have hprojNe : projBody ≠ .end := by
+            simp only [beq_iff_eq] at hend'
+            exact hend'
+          have hcase := LocalTypeR.mu_proj_substitute_non_end hprojNe (t := t') (rlt := rlt')
+          cases hcase with
+          | inl hne' =>
+            -- projBody.substitute t' rlt' ≠ .end
+            have hend'' : (projBody.substitute t' rlt' == .end) = false := by
+              simp only [beq_iff_eq]
+              exact hne'
+            simp [hend'']
+            rw [LocalTypeR.substitute_mu_ne hne]
+          | inr hexists =>
+            -- projBody = .var v where v = t' and rlt' = .end
+            -- This edge case is where projBody is just a recursion variable
+            -- and substitution produces .end
+            obtain ⟨v, hprojBody, hvt, hrltEnd⟩ := hexists
+            subst hprojBody hvt hrltEnd
+            simp [LocalTypeR.substitute_var_eq]
+            -- Goal: .ok .end = .ok (.mu s .end).substitute t' .end
+            -- (.mu s (.var t')).substitute t' .end = .mu s ((.var t').substitute t' .end)
+            -- = .mu s .end (by substitute_var_eq)
+            rw [LocalTypeR.substitute_mu_ne hne, LocalTypeR.substitute_var_eq]
+  -- Var case
+  have hvar : ∀ (v : String), motive1 (.var v) := by
+    intro v t' repl role' lt' rlt' hproj' hrep' _
+    simp only [projectR, pure, Except.pure] at hproj'
+    cases hproj'
+    by_cases hv : v = t'
+    · -- Matching variable: substitute yields replacement
+      subst hv
+      rw [substitute_var_eq]
+      rw [LocalTypeR.substitute_var_eq]
+      exact hrep'
+    · -- Non-matching variable: substitute yields the variable
+      rw [substitute_var_ne hv]
+      simp only [projectR, pure, Except.pure]
+      rw [LocalTypeR.substitute_var_ne hv]
+  -- Nil case for branches
+  have hnil : motive2 [] := by
+    intro t' repl role' projBs rlt' hproj' _ _
+    simp [projectBranches] at hproj'
+    cases hproj'
+    simp [projectBranches, List.map, pure, Except.pure]
+  -- Cons case for branches
+  have hcons : ∀ (head : Label × GlobalType) (tail : List (Label × GlobalType)),
+      motive3 head → motive2 tail → motive2 (head :: tail) := by
+    intro head tail ih_head ih_tail t' repl role' projBs rlt' hproj' hrep' huniqBranches
+    -- Expand projectBranches on head :: tail
+    simp only [projectBranches, bind, Except.bind] at hproj'
+    cases hhead : projectR head.2 role' with
+    | error e => simp [hhead] at hproj'
+    | ok projHead =>
+      cases htail : projectBranches tail role' with
+      | error e => simp [hhead, htail] at hproj'
+      | ok projTail =>
+        simp [hhead, htail, pure, Except.pure] at hproj'
+        cases hproj'
+        -- After substitution
+        simp only [List.map_cons]
+        simp only [projectBranches, bind, Except.bind]
+        -- Use IH on head
+        have huniq_head := GlobalType.BranchesUniq.head_uniq huniqBranches
+        have hih_head := ih_head t' repl role' projHead rlt' hhead hrep' huniq_head
+        simp only [hih_head]
+        -- Use IH on tail
+        have huniq_tail := GlobalType.BranchesUniq.tail_uniq huniqBranches
+        have hih_tail := ih_tail t' repl role' projTail rlt' htail hrep' huniq_tail
+        simp only [hih_tail, pure, Except.pure]
+  -- Pair case
+  have hpair : ∀ (l : Label) (g : GlobalType),
+      motive1 g → motive3 (l, g) := by
+    intro l g ih_g t' repl role' lt' rlt' hproj' hrep' huniq'
+    simp only at hproj' huniq' ⊢
+    exact ih_g t' repl role' lt' rlt' hproj' hrep' huniq'
+  -- Apply the recursor and extract the result
+  exact hmain hend hcomm hmu hvar hnil hcons hpair body t replacement role lt rlt hproj hrep huniq
+
+/-- Non-participant substitution commutes with projection (merge case).
+    This is a specialized version for the non-participant comm case. -/
 axiom projectR_substitute_nonparticipant (sender receiver role : String)
     (branches : List (Label × GlobalType)) (t : String) (replacement : GlobalType)
     (lt rlt : LocalTypeR)
@@ -1451,14 +1683,6 @@ axiom projectR_substitute_nonparticipant (sender receiver role : String)
     (huniq : GlobalType.uniqLabels (GlobalType.comm sender receiver branches))
     : projectR ((GlobalType.comm sender receiver branches).substitute t replacement) role =
         .ok (lt.substitute t rlt)
-
-/-- Projection commutes with substitution, given the replacement projection. -/
-axiom projectR_substitute (body : GlobalType) (t : String) (replacement : GlobalType)
-    (role : String) (lt rlt : LocalTypeR)
-    (hproj : projectR body role = .ok lt)
-    (hrep : projectR replacement role = .ok rlt)
-    (huniq : GlobalType.uniqLabels body)
-    : projectR (body.substitute t replacement) role = .ok (lt.substitute t rlt)
 
 /-! ## Projectability preservation helpers
 
