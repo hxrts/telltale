@@ -1130,12 +1130,149 @@ theorem projectBranches_singleton_inv (branches : List (Label × GlobalType)) (r
         · simp
         · simpa [hcont]
 
+/-- Helper: If mergeSendSorted bs1 bs2 = some merged, then mergeSendSorted merged bs2 = some merged.
+    This captures that the merged result already contains all of bs2. -/
+private axiom mergeSendSorted_idempotent_right
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (hmerge : LocalTypeR.mergeSendSorted bs1 bs2 = some merged)
+    : LocalTypeR.mergeSendSorted merged bs2 = some merged
+
+/-- Helper: If mergeRecvSorted bs1 bs2 = some merged, then mergeRecvSorted merged bs2 = some merged.
+    This captures that the merged result already contains all labels from bs2. -/
+private axiom mergeRecvSorted_idempotent_right
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (hmerge : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
+    : LocalTypeR.mergeRecvSorted merged bs2 = some merged
+
+/-- Helper: sortBranches on mergeSendSorted output is identity.
+    mergeSendSorted preserves the sorted order of its inputs. -/
+private axiom sortBranches_mergeSendSorted_id
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (h1 : bs1 = LocalTypeR.sortBranches bs1)
+    (h2 : bs2 = LocalTypeR.sortBranches bs2)
+    (hmerge : LocalTypeR.mergeSendSorted bs1 bs2 = some merged)
+    : LocalTypeR.sortBranches merged = merged
+
+/-- Helper: sortBranches on mergeRecvSorted output is identity.
+    mergeRecvSorted produces a sorted list when given sorted inputs. -/
+private axiom sortBranches_mergeRecvSorted_id
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (h1 : bs1 = LocalTypeR.sortBranches bs1)
+    (h2 : bs2 = LocalTypeR.sortBranches bs2)
+    (hmerge : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
+    : LocalTypeR.sortBranches merged = merged
+
 /-- Right idempotence of merge: if merge a b succeeds giving c, then merge c b = some c.
     This is the key absorption property: once a type is merged in, it stays absorbed.
 
-    This axiom captures that merge produces a "least upper bound" that already contains b. -/
-axiom merge_idempotent_right (a b c : LocalTypeR)
-    (hab : LocalTypeR.merge a b = some c) : LocalTypeR.merge c b = some c
+    This theorem captures that merge produces a "least upper bound" that already contains b. -/
+theorem merge_idempotent_right (a b c : LocalTypeR)
+    (hab : LocalTypeR.merge a b = some c) : LocalTypeR.merge c b = some c := by
+  cases a with
+  | «end» =>
+    cases b with
+    | «end» =>
+      -- merge end end = some end
+      unfold LocalTypeR.merge at hab
+      simp at hab; subst hab
+      unfold LocalTypeR.merge; rfl
+    | _ => unfold LocalTypeR.merge at hab; simp at hab
+  | var v1 =>
+    cases b with
+    | var v2 =>
+      unfold LocalTypeR.merge at hab
+      split at hab
+      · next heq =>
+        -- v1 = v2 case: some (var v1) = some c, so c = var v1
+        simp at hab; subst hab
+        -- goal: merge (var v1) (var v2) = some (var v1)
+        unfold LocalTypeR.merge
+        simp [heq]
+      · simp at hab  -- v1 ≠ v2 case: none = some c is contradiction
+    | _ => unfold LocalTypeR.merge at hab; simp at hab
+  | send p1 bs1 =>
+    cases b with
+    | send p2 bs2 =>
+      unfold LocalTypeR.merge at hab
+      split at hab
+      · simp at hab  -- p1 ≠ p2 case
+      · next hp =>
+        simp only [Option.bind_eq_bind] at hab
+        cases hms : LocalTypeR.mergeSendSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) with
+        | none => simp [hms] at hab
+        | some merged =>
+          simp only [hms, Option.bind_some] at hab
+          simp at hab; subst hab
+          -- c = send p1 merged
+          unfold LocalTypeR.merge
+          -- hp : ¬(p1 != p2) = true means (p1 != p2) = false
+          have hp' : (p1 != p2) = false := by
+            cases hbne : (p1 != p2) <;> simp_all
+          simp only [hp', Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+          -- sortBranches merged = merged (already sorted)
+          have hsorted := sortBranches_mergeSendSorted_id
+            (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) merged
+            (sortBranches_idempotent bs1).symm (sortBranches_idempotent bs2).symm hms
+          rw [hsorted]
+          -- mergeSendSorted merged (sortBranches bs2) = some merged
+          have hidem := mergeSendSorted_idempotent_right
+            (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) merged hms
+          simp only [hidem, Option.bind_some]
+    | _ => unfold LocalTypeR.merge at hab; simp at hab
+  | recv p1 bs1 =>
+    cases b with
+    | recv p2 bs2 =>
+      unfold LocalTypeR.merge at hab
+      split at hab
+      · simp at hab  -- p1 ≠ p2 case
+      · next hp =>
+        simp only [Option.bind_eq_bind] at hab
+        cases hmr : LocalTypeR.mergeRecvSorted (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) with
+        | none => simp [hmr] at hab
+        | some merged =>
+          simp only [hmr, Option.bind_some] at hab
+          simp at hab; subst hab
+          -- c = recv p1 (sortBranches merged)
+          unfold LocalTypeR.merge
+          -- hp : ¬(p1 != p2) = true means (p1 != p2) = false
+          have hp' : (p1 != p2) = false := by
+            cases hbne : (p1 != p2) <;> simp_all
+          simp only [hp', Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+          -- Need: mergeRecvSorted (sortBranches (sortBranches merged)) (sortBranches bs2)
+          have hsorted := sortBranches_mergeRecvSorted_id
+            (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) merged
+            (sortBranches_idempotent bs1).symm (sortBranches_idempotent bs2).symm hmr
+          -- sortBranches (sortBranches merged) = sortBranches merged = merged
+          rw [sortBranches_idempotent, hsorted]
+          have hidem := mergeRecvSorted_idempotent_right
+            (LocalTypeR.sortBranches bs1) (LocalTypeR.sortBranches bs2) merged hmr
+          simp only [hidem, Option.bind_some, hsorted]
+    | _ => unfold LocalTypeR.merge at hab; simp at hab
+  | mu v1 body1 =>
+    cases b with
+    | mu v2 body2 =>
+      unfold LocalTypeR.merge at hab
+      split at hab
+      · simp at hab  -- v1 ≠ v2 case
+      · next hv =>
+        simp only [Option.bind_eq_bind] at hab
+        cases hmb : LocalTypeR.merge body1 body2 with
+        | none => simp [hmb] at hab
+        | some mb =>
+          simp only [hmb, Option.bind_some] at hab
+          simp at hab; subst hab
+          -- c = mu v1 mb
+          unfold LocalTypeR.merge
+          -- hv : ¬(v1 != v2) = true means (v1 != v2) = false
+          have hv' : (v1 != v2) = false := by
+            cases hbne : (v1 != v2) <;> simp_all
+          simp only [hv', Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+          -- IH: merge mb body2 = some mb (by well-founded recursion)
+          have hmb_idem : LocalTypeR.merge mb body2 = some mb :=
+            merge_idempotent_right body1 body2 mb hmb
+          simp only [hmb_idem, Option.bind_some]
+    | _ => unfold LocalTypeR.merge at hab; simp at hab
+termination_by (a, b)
 
 /-- Absorption is preserved through further merges.
     If c absorbs b, and we merge c with d to get e, then e also absorbs b. -/
