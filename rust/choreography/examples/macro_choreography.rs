@@ -16,7 +16,8 @@
 
 use futures::executor;
 use rumpsteak_aura_choreography::{
-    interpret, InterpretResult, Label, Metrics, NoOpHandler, Program, RecordingHandler, Result,
+    interpret, ChoreoResult, InterpretResult, LabelId, Metrics, NoOpHandler, Program,
+    RecordingHandler, RoleId, RoleName,
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +31,41 @@ enum Role {
     Coordinator,
     Participant1,
     Participant2,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum ProtocolLabel {
+    Commit,
+    Abort,
+}
+
+impl LabelId for ProtocolLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ProtocolLabel::Commit => "commit",
+            ProtocolLabel::Abort => "abort",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "commit" => Some(ProtocolLabel::Commit),
+            "abort" => Some(ProtocolLabel::Abort),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = ProtocolLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Coordinator => RoleName::from_static("Coordinator"),
+            Role::Participant1 => RoleName::from_static("Participant1"),
+            Role::Participant2 => RoleName::from_static("Participant2"),
+        }
+    }
 }
 
 // Messages for the effect algebra representation
@@ -74,19 +110,19 @@ fn coordinator_with_choice_program() -> Program<Role, ProtocolMessage> {
         .recv::<ProtocolMessage>(Role::Participant1)
         .recv::<ProtocolMessage>(Role::Participant2)
         // Coordinator makes a choice based on votes
-        .choose(Role::Coordinator, Label("commit"))
+        .choose(Role::Coordinator, ProtocolLabel::Commit)
         .branch(
             Role::Coordinator,
             vec![
                 (
-                    Label("commit"),
+                    ProtocolLabel::Commit,
                     Program::new()
                         .send(Role::Participant1, ProtocolMessage::Commit)
                         .send(Role::Participant2, ProtocolMessage::Commit)
                         .end(),
                 ),
                 (
-                    Label("abort"),
+                    ProtocolLabel::Abort,
                     Program::new()
                         .send(Role::Participant1, ProtocolMessage::Abort)
                         .send(Role::Participant2, ProtocolMessage::Abort)
@@ -102,7 +138,7 @@ async fn run_program<H>(
     endpoint: &mut H::Endpoint,
     program: Program<Role, ProtocolMessage>,
     name: &str,
-) -> Result<InterpretResult<ProtocolMessage>>
+) -> ChoreoResult<InterpretResult<ProtocolMessage>>
 where
     H: rumpsteak_aura_choreography::ChoreoHandler<Role = Role>,
 {
@@ -149,7 +185,7 @@ fn analyze_protocols() {
         "  • Roles involved: {:?}",
         coordinator_prog.roles_involved()
     );
-    println!("  • Total effects: {}", coordinator_prog.effects.len());
+    println!("  • Total effects: {}", coordinator_prog.effects().len());
 
     println!("\nParticipant protocol:");
     println!("  • Send operations: {}", participant_prog.send_count());
@@ -158,13 +194,13 @@ fn analyze_protocols() {
         "  • Roles involved: {:?}",
         participant_prog.roles_involved()
     );
-    println!("  • Total effects: {}", participant_prog.effects.len());
+    println!("  • Total effects: {}", participant_prog.effects().len());
 
     println!("\nCoordinator with choice:");
     println!("  • Send operations: {}", choice_prog.send_count());
     println!("  • Receive operations: {}", choice_prog.recv_count());
-    println!("  • Has branches: {}", !choice_prog.effects.is_empty());
-    println!("  • Total effects: {}", choice_prog.effects.len());
+    println!("  • Has branches: {}", !choice_prog.effects().is_empty());
+    println!("  • Total effects: {}", choice_prog.effects().len());
 
     // Validate protocols
     for (name, prog) in [

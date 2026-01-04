@@ -11,8 +11,8 @@
 
 use rumpsteak_aura_choreography::{
     ast::{
-        Choreography, LocalType, MessageType, Protocol, RangeExpr, Role, RoleIndex, RoleParam,
-        RoleRange, RoleValidationError, MAX_RANGE_SIZE, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
+        Annotations, Choreography, LocalType, MessageType, Protocol, RangeExpr, Role, RoleIndex,
+        RoleParam, RoleRange, RoleValidationError, MAX_RANGE_SIZE, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
     },
     compiler::{
         codegen::{generate_choreography_code_with_dynamic_roles, generate_dynamic_role_support},
@@ -143,9 +143,9 @@ fn test_dynamic_role_projection() {
         to: signers.clone(),
         message: request_msg,
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
     // Test projection for coordinator (should be Send)
@@ -162,9 +162,9 @@ fn test_dynamic_role_projection() {
                 payload: None,
             },
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::new(),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
         },
         attrs: HashMap::new(),
     };

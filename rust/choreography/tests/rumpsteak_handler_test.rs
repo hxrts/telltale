@@ -5,14 +5,64 @@
 
 use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel},
-    ChoreoHandler,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum TestRole {
     Alice,
     Bob,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TestLabel {
+    OptionA,
+    Buy,
+    Sell,
+    Hold,
+    Cancel,
+    Proceed,
+    DynamicPath,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::OptionA => "option_a",
+            TestLabel::Buy => "buy",
+            TestLabel::Sell => "sell",
+            TestLabel::Hold => "hold",
+            TestLabel::Cancel => "cancel",
+            TestLabel::Proceed => "proceed",
+            TestLabel::DynamicPath => "dynamic_path",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "option_a" => Some(TestLabel::OptionA),
+            "buy" => Some(TestLabel::Buy),
+            "sell" => Some(TestLabel::Sell),
+            "hold" => Some(TestLabel::Hold),
+            "cancel" => Some(TestLabel::Cancel),
+            "proceed" => Some(TestLabel::Proceed),
+            "dynamic_path" => Some(TestLabel::DynamicPath),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+        }
+    }
 }
 
 impl rumpsteak_aura::Role for TestRole {
@@ -191,7 +241,7 @@ async fn test_no_channel_error() {
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("No channel registered"));
+        .contains("no channel registered"));
 }
 
 #[tokio::test]
@@ -233,7 +283,6 @@ async fn test_large_message() {
 
 #[tokio::test]
 async fn test_choice_selection() {
-    use rumpsteak_aura_choreography::effects::Label;
 
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
@@ -249,7 +298,7 @@ async fn test_choice_selection() {
     let mut bob_handler = RumpsteakHandler::<TestRole, TestMessage>::new();
 
     // Alice chooses "option_a"
-    let choice_label = Label("option_a");
+    let choice_label = TestLabel::OptionA;
     alice_handler
         .choose(&mut alice_endpoint, TestRole::Bob, choice_label)
         .await
@@ -262,14 +311,14 @@ async fn test_choice_selection() {
         .expect("Bob should receive choice");
 
     assert_eq!(
-        received_label.0, "option_a",
+        received_label,
+        TestLabel::OptionA,
         "Bob should receive the same choice Alice made"
     );
 }
 
 #[tokio::test]
 async fn test_multiple_choices() {
-    use rumpsteak_aura_choreography::effects::Label;
 
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
@@ -285,10 +334,9 @@ async fn test_multiple_choices() {
     let mut bob_handler = RumpsteakHandler::<TestRole, TestMessage>::new();
 
     // Test multiple choice sequences
-    let choices = vec!["buy", "sell", "hold", "cancel"];
+    let choices = vec![TestLabel::Buy, TestLabel::Sell, TestLabel::Hold, TestLabel::Cancel];
 
-    for choice_str in choices {
-        let choice_label = Label(choice_str);
+    for choice_label in choices {
 
         alice_handler
             .choose(&mut alice_endpoint, TestRole::Bob, choice_label)
@@ -301,15 +349,16 @@ async fn test_multiple_choices() {
             .expect("Bob should receive choice");
 
         assert_eq!(
-            received_label.0, choice_str,
-            "Bob should receive choice: {choice_str}"
+            received_label,
+            choice_label,
+            "Bob should receive choice: {}",
+            choice_label.as_str()
         );
     }
 }
 
 #[tokio::test]
 async fn test_choice_with_messages() {
-    use rumpsteak_aura_choreography::effects::Label;
 
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
@@ -341,7 +390,7 @@ async fn test_choice_with_messages() {
     assert_eq!(received1.content, "Hello");
 
     // Make a choice
-    let choice_label = Label("proceed");
+    let choice_label = TestLabel::Proceed;
     bob_handler
         .choose(&mut bob_endpoint, TestRole::Alice, choice_label)
         .await
@@ -352,7 +401,7 @@ async fn test_choice_with_messages() {
         .await
         .expect("Offer should succeed");
 
-    assert_eq!(received_choice.0, "proceed");
+    assert_eq!(received_choice, TestLabel::Proceed);
 
     // Send another message
     let msg2 = TestMessage {
@@ -418,8 +467,7 @@ async fn test_session_state_tracking() {
     assert_eq!(bob_meta.state_description, "Recv");
 
     // Perform choice operation
-    use rumpsteak_aura_choreography::effects::Label;
-    let choice_label = Label("option_a");
+    let choice_label = TestLabel::OptionA;
     alice_handler
         .choose(&mut alice_endpoint, TestRole::Bob, choice_label)
         .await
@@ -530,12 +578,11 @@ async fn test_error_recovery() {
 
     // Verify error message is informative
     let err = result.unwrap_err();
-    assert!(err.to_string().contains("No channel registered"));
+    assert!(err.to_string().contains("no channel registered"));
 }
 
 #[tokio::test]
 async fn test_dynamic_session_flow() {
-    use rumpsteak_aura_choreography::effects::Label;
 
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
     let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);
@@ -569,7 +616,7 @@ async fn test_dynamic_session_flow() {
 
     assert_eq!(received.content, "dynamic session");
 
-    let label = Label("dynamic_path");
+    let label = TestLabel::DynamicPath;
     bob_handler
         .choose(&mut bob_endpoint, TestRole::Alice, label)
         .await
@@ -580,7 +627,7 @@ async fn test_dynamic_session_flow() {
         .await
         .expect("dynamic offer should succeed");
 
-    assert_eq!(offered.0, "dynamic_path");
+    assert_eq!(offered, TestLabel::DynamicPath);
 
     let alice_meta = alice_endpoint.get_metadata(&TestRole::Bob).unwrap();
     assert!(alice_meta.operation_count >= 2);

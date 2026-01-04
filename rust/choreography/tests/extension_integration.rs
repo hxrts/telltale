@@ -4,6 +4,7 @@
 //! Integration tests for the extension system
 
 use rumpsteak_aura_choreography::effects::*;
+use rumpsteak_aura_choreography::RoleName;
 use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
 
@@ -44,9 +45,39 @@ enum TestRole {
     Alice,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum TestLabel {
+    Default,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "default" => Some(TestLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+        }
+    }
+}
+
 // Test handler with extension support
 struct TestHandler {
-    registry: ExtensionRegistry<()>,
+    registry: ExtensionRegistry<(), TestRole>,
     executed_extensions: Arc<Mutex<Vec<u32>>>,
 }
 
@@ -86,9 +117,7 @@ impl TestHandler {
 
 #[async_trait::async_trait]
 impl ExtensibleHandler for TestHandler {
-    type Endpoint = ();
-
-    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint> {
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role> {
         &self.registry
     }
 }
@@ -103,7 +132,7 @@ impl ChoreoHandler for TestHandler {
         _ep: &mut Self::Endpoint,
         _to: Self::Role,
         _msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         Ok(())
     }
 
@@ -111,7 +140,7 @@ impl ChoreoHandler for TestHandler {
         &mut self,
         _ep: &mut Self::Endpoint,
         _from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         Err(ChoreographyError::Transport("recv not implemented".into()))
     }
 
@@ -119,13 +148,13 @@ impl ChoreoHandler for TestHandler {
         &mut self,
         _ep: &mut Self::Endpoint,
         _who: Self::Role,
-        _label: Label,
-    ) -> Result<()> {
+        _label: TestLabel,
+    ) -> ChoreoResult<()> {
         Ok(())
     }
 
-    async fn offer(&mut self, _ep: &mut Self::Endpoint, _from: Self::Role) -> Result<Label> {
-        Ok(Label("default"))
+    async fn offer(&mut self, _ep: &mut Self::Endpoint, _from: Self::Role) -> ChoreoResult<TestLabel> {
+        Ok(TestLabel::Default)
     }
 
     async fn with_timeout<F, T>(
@@ -134,9 +163,9 @@ impl ChoreoHandler for TestHandler {
         _at: Self::Role,
         _dur: std::time::Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         body.await
     }
@@ -178,7 +207,7 @@ fn test_extension_in_program() {
     assert_eq!(program.len(), 2); // extension + end
 
     // Verify we can extract the extension
-    if let Some(ext) = program.effects[0].as_extension::<TestExtension>() {
+    if let Some(ext) = program.effects()[0].as_extension::<TestExtension>() {
         assert_eq!(ext.value, 42);
     } else {
         panic!("Expected TestExtension");
@@ -195,14 +224,14 @@ fn test_extension_type_checking() {
     // Wrong type check
     #[derive(Clone, Debug)]
     struct OtherExtension;
-    impl ExtensionEffect for OtherExtension {
+    impl ExtensionEffect<TestRole> for OtherExtension {
         fn type_id(&self) -> TypeId {
             TypeId::of::<Self>()
         }
         fn type_name(&self) -> &'static str {
             "OtherExtension"
         }
-        fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+        fn participating_roles(&self) -> Vec<TestRole> {
             vec![]
         }
         fn as_any(&self) -> &dyn Any {
@@ -211,7 +240,7 @@ fn test_extension_type_checking() {
         fn as_any_mut(&mut self) -> &mut dyn Any {
             self
         }
-        fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+        fn clone_box(&self) -> Box<dyn ExtensionEffect<TestRole>> {
             Box::new(self.clone())
         }
     }

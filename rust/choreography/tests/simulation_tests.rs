@@ -10,6 +10,7 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use rumpsteak_aura_choreography::effects::LabelId;
 use rumpsteak_aura_choreography::RoleName;
 use rumpsteak_aura_choreography::simulation::{
     clock::{Clock, MockClock, Rng, SeededRng},
@@ -20,9 +21,41 @@ use rumpsteak_aura_choreography::simulation::{
     },
     transport::{FaultyTransport, InMemoryTransport, SimulatedTransport, TransportError},
 };
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum TestLabel {
+    Accept,
+    Reject,
+    Other,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::Accept => "Accept",
+            TestLabel::Reject => "Reject",
+            TestLabel::Other => "Other",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "Accept" => Some(TestLabel::Accept),
+            "Reject" => Some(TestLabel::Reject),
+            "Other" => Some(TestLabel::Other),
+            _ => None,
+        }
+    }
+}
+
+type TestBlockedOn = BlockedOn<TestLabel>;
+type TestStepInput = StepInput<TestLabel>;
+type TestStepOutput = StepOutput<TestLabel>;
+type TestStateMachine = LinearStateMachine<TestLabel>;
 
 // ============================================================================
 // State Machine Transition Tests
@@ -31,23 +64,23 @@ use std::time::Duration;
 #[test]
 fn test_blocked_on_all_variants() {
     // Verify all BlockedOn variants exist and are distinguishable
-    let send = BlockedOn::Send {
+    let send: BlockedOn<TestLabel> = TestBlockedOn::Send {
         to: RoleName::from_static("Bob"),
         message_type: "Request".to_string(),
     };
-    let recv = BlockedOn::Recv {
+    let recv: BlockedOn<TestLabel> = TestBlockedOn::Recv {
         from: RoleName::from_static("Alice"),
         expected_types: vec!["Response".to_string()],
     };
-    let choice = BlockedOn::Choice {
-        branches: vec!["Accept".to_string(), "Reject".to_string()],
+    let choice: BlockedOn<TestLabel> = TestBlockedOn::Choice {
+        branches: vec![TestLabel::Accept, TestLabel::Reject],
     };
-    let offer = BlockedOn::Offer {
+    let offer: BlockedOn<TestLabel> = TestBlockedOn::Offer {
         from: RoleName::from_static("Alice"),
-        branches: vec!["Accept".to_string(), "Reject".to_string()],
+        branches: vec![TestLabel::Accept, TestLabel::Reject],
     };
-    let complete = BlockedOn::Complete;
-    let failed = BlockedOn::Failed("test failure".to_string());
+    let complete = TestBlockedOn::Complete;
+    let failed = TestBlockedOn::Failed("test failure".to_string());
 
     // Verify they're all distinct via Debug output
     assert!(format!("{:?}", send).contains("Send"));
@@ -61,25 +94,25 @@ fn test_blocked_on_all_variants() {
 #[test]
 fn test_blocked_on_is_terminal() {
     // Complete and Failed are terminal states
-    assert!(BlockedOn::Complete.is_terminal());
-    assert!(BlockedOn::Failed("error".to_string()).is_terminal());
+    assert!(TestBlockedOn::Complete.is_terminal());
+    assert!(TestBlockedOn::Failed("error".to_string()).is_terminal());
 
     // Others are not terminal
-    assert!(!BlockedOn::Send {
+    assert!(!TestBlockedOn::Send {
         to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_terminal());
-    assert!(!BlockedOn::Recv {
+    assert!(!TestBlockedOn::Recv {
         from: RoleName::from_static("Alice"),
         expected_types: vec!["Msg".to_string()]
     }
     .is_terminal());
-    assert!(!BlockedOn::Choice {
+    assert!(!TestBlockedOn::Choice {
         branches: vec![]
     }
     .is_terminal());
-    assert!(!BlockedOn::Offer {
+    assert!(!TestBlockedOn::Offer {
         from: RoleName::from_static("Alice"),
         branches: vec![]
     }
@@ -88,88 +121,88 @@ fn test_blocked_on_is_terminal() {
 
 #[test]
 fn test_blocked_on_is_send() {
-    assert!(BlockedOn::Send {
+    assert!(TestBlockedOn::Send {
         to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_send());
-    assert!(!BlockedOn::Recv {
+    assert!(!TestBlockedOn::Recv {
         from: RoleName::from_static("Alice"),
         expected_types: vec![]
     }
     .is_send());
-    assert!(!BlockedOn::Complete.is_send());
+    assert!(!TestBlockedOn::Complete.is_send());
 }
 
 #[test]
 fn test_blocked_on_is_recv() {
-    assert!(BlockedOn::Recv {
+    assert!(TestBlockedOn::Recv {
         from: RoleName::from_static("Alice"),
         expected_types: vec!["Msg".to_string()]
     }
     .is_recv());
-    assert!(!BlockedOn::Send {
+    assert!(!TestBlockedOn::Send {
         to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_recv());
-    assert!(!BlockedOn::Complete.is_recv());
+    assert!(!TestBlockedOn::Complete.is_recv());
 }
 
 #[test]
 fn test_blocked_on_is_choice() {
     // Both Choice and Offer count as choice states
-    assert!(BlockedOn::Choice {
+    assert!(TestBlockedOn::Choice {
         branches: vec![]
     }
     .is_choice());
-    assert!(BlockedOn::Offer {
+    assert!(TestBlockedOn::Offer {
         from: RoleName::from_static("Alice"),
         branches: vec![]
     }
     .is_choice());
-    assert!(!BlockedOn::Send {
+    assert!(!TestBlockedOn::Send {
         to: RoleName::from_static("Bob"),
         message_type: "Msg".to_string()
     }
     .is_choice());
-    assert!(!BlockedOn::Complete.is_choice());
+    assert!(!TestBlockedOn::Complete.is_choice());
 }
 
 #[test]
 fn test_linear_state_machine_creation() {
     let states = vec![
-        BlockedOn::Send {
+        TestBlockedOn::Send {
             to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
-        BlockedOn::Recv {
+        TestBlockedOn::Recv {
             from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states.clone());
 
     assert_eq!(sm.protocol_name(), "TestProtocol");
     assert_eq!(sm.role().as_str(), "Alice");
-    assert!(matches!(sm.blocked_on(), BlockedOn::Send { .. }));
+    assert!(matches!(sm.blocked_on(), TestBlockedOn::Send { .. }));
     assert_eq!(sm.sequence(), 0);
 }
 
 #[test]
 fn test_linear_state_machine_step_sequence() {
     let states = vec![
-        BlockedOn::Send {
+        TestBlockedOn::Send {
             to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
-        BlockedOn::Recv {
+        TestBlockedOn::Recv {
             from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
@@ -195,14 +228,14 @@ fn test_linear_state_machine_step_sequence() {
 
     // Step 1: Send
     assert!(sm.blocked_on().is_send());
-    let output = sm.step(StepInput::send(send_env));
+    let output = sm.step(TestStepInput::send(send_env));
     assert!(output.is_ok());
     assert!(matches!(output.unwrap(), StepOutput::Sent(_)));
     assert_eq!(sm.sequence(), 1);
 
     // Step 2: Recv
     assert!(sm.blocked_on().is_recv());
-    let output = sm.step(StepInput::recv(recv_env));
+    let output = sm.step(TestStepInput::recv(recv_env));
     assert!(output.is_ok());
     assert!(matches!(output.unwrap(), StepOutput::Received { .. }));
     assert_eq!(sm.sequence(), 2);
@@ -215,11 +248,11 @@ fn test_linear_state_machine_step_sequence() {
 #[test]
 fn test_linear_state_machine_wrong_input_type() {
     let states = vec![
-        BlockedOn::Send {
+        TestBlockedOn::Send {
             to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
@@ -235,7 +268,7 @@ fn test_linear_state_machine_wrong_input_type() {
         .unwrap();
 
     // Try to receive when expecting send - should return NoProgress
-    let result = sm.step(StepInput::recv(recv_env));
+    let result = sm.step(TestStepInput::recv(recv_env));
     assert!(result.is_ok());
     assert!(matches!(result.unwrap(), StepOutput::NoProgress));
 }
@@ -243,16 +276,16 @@ fn test_linear_state_machine_wrong_input_type() {
 #[test]
 fn test_linear_state_machine_choice_step() {
     let states = vec![
-        BlockedOn::Choice {
-            branches: vec!["Accept".to_string(), "Reject".to_string()],
+        TestBlockedOn::Choice {
+            branches: vec![TestLabel::Accept, TestLabel::Reject],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("ChoiceProtocol", RoleName::from_static("Alice"), states);
 
     // Make a choice
-    let result = sm.step(StepInput::choice("Accept"));
+    let result = sm.step(TestStepInput::choice(TestLabel::Accept));
     assert!(result.is_ok());
     assert!(matches!(result.unwrap(), StepOutput::ChoiceMade(_)));
     assert_eq!(sm.sequence(), 1);
@@ -261,33 +294,33 @@ fn test_linear_state_machine_choice_step() {
 #[test]
 fn test_linear_state_machine_invalid_choice_label() {
     let states = vec![
-        BlockedOn::Choice {
-            branches: vec!["Accept".to_string(), "Reject".to_string()],
+        TestBlockedOn::Choice {
+            branches: vec![TestLabel::Accept, TestLabel::Reject],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("ChoiceProtocol", RoleName::from_static("Alice"), states);
 
     // Invalid label should fail
-    let result = sm.step(StepInput::choice("Invalid"));
+    let result = sm.step(TestStepInput::choice(TestLabel::Other));
     assert!(result.is_err());
 }
 
 #[test]
 fn test_linear_state_machine_offer_step() {
     let states = vec![
-        BlockedOn::Offer {
+        TestBlockedOn::Offer {
             from: RoleName::from_static("Alice"),
-            branches: vec!["Accept".to_string(), "Reject".to_string()],
+            branches: vec![TestLabel::Accept, TestLabel::Reject],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("OfferProtocol", RoleName::from_static("Bob"), states);
 
     // Receive an offer
-    let result = sm.step(StepInput::offer("Accept"));
+    let result = sm.step(TestStepInput::offer(TestLabel::Accept));
     assert!(result.is_ok());
     assert!(matches!(result.unwrap(), StepOutput::OfferReceived(_)));
     assert_eq!(sm.sequence(), 1);
@@ -296,44 +329,44 @@ fn test_linear_state_machine_offer_step() {
 #[test]
 fn test_linear_state_machine_invalid_offer_label() {
     let states = vec![
-        BlockedOn::Offer {
+        TestBlockedOn::Offer {
             from: RoleName::from_static("Alice"),
-            branches: vec!["Accept".to_string(), "Reject".to_string()],
+            branches: vec![TestLabel::Accept, TestLabel::Reject],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("OfferProtocol", RoleName::from_static("Bob"), states);
 
     // Invalid label should fail
-    let result = sm.step(StepInput::offer("Invalid"));
+    let result = sm.step(TestStepInput::offer(TestLabel::Other));
     assert!(result.is_err());
 }
 
 #[test]
 fn test_linear_state_machine_complete_returns_completed() {
-    let states = vec![BlockedOn::Complete];
+    let states = vec![TestBlockedOn::Complete];
 
     let mut sm = LinearStateMachine::new("CompleteProto", RoleName::from_static("Alice"), states);
 
     assert!(sm.is_complete());
 
     // Any input should return Completed
-    let result = sm.step(StepInput::choice("anything"));
+    let result = sm.step(TestStepInput::choice(TestLabel::Other));
     assert!(result.is_ok());
     assert!(matches!(result.unwrap(), StepOutput::Completed));
 }
 
 #[test]
 fn test_linear_state_machine_failed_returns_error() {
-    let states = vec![BlockedOn::Failed("Protocol error".to_string())];
+    let states = vec![TestBlockedOn::Failed("Protocol error".to_string())];
 
     let mut sm = LinearStateMachine::new("FailedProto", RoleName::from_static("Alice"), states);
 
     assert!(sm.is_complete()); // Failed is terminal
 
     // Any input should return error
-    let result = sm.step(StepInput::choice("anything"));
+    let result = sm.step(TestStepInput::choice(TestLabel::Other));
     assert!(result.is_err());
 }
 
@@ -344,37 +377,37 @@ fn test_linear_state_machine_failed_returns_error() {
 #[test]
 fn test_checkpoint_creation() {
     let states = vec![
-        BlockedOn::Send {
+        TestBlockedOn::Send {
             to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
-        BlockedOn::Recv {
+        TestBlockedOn::Recv {
             from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states);
     let checkpoint = sm.checkpoint().unwrap();
 
     assert_eq!(checkpoint.protocol, "TestProtocol");
-    assert_eq!(checkpoint.role, "Alice");
+    assert_eq!(checkpoint.role, RoleName::from_static("Alice"));
     assert_eq!(checkpoint.sequence, 0);
 }
 
 #[test]
 fn test_checkpoint_roundtrip() {
     let states = vec![
-        BlockedOn::Send {
+        TestBlockedOn::Send {
             to: RoleName::from_static("Bob"),
             message_type: "Request".to_string(),
         },
-        BlockedOn::Recv {
+        TestBlockedOn::Recv {
             from: RoleName::from_static("Bob"),
             expected_types: vec!["Response".to_string()],
         },
-        BlockedOn::Complete,
+        TestBlockedOn::Complete,
     ];
 
     let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states.clone());
@@ -389,7 +422,7 @@ fn test_checkpoint_roundtrip() {
         .build()
         .unwrap();
 
-    sm.step(StepInput::send(send_env)).unwrap();
+    sm.step(TestStepInput::send(send_env)).unwrap();
     assert_eq!(sm.sequence(), 1);
 
     // Take checkpoint
@@ -407,7 +440,7 @@ fn test_checkpoint_roundtrip() {
 
 #[test]
 fn test_checkpoint_serialization() {
-    let checkpoint = Checkpoint::new("TestProtocol", "Alice", "state_0")
+    let checkpoint = Checkpoint::new("TestProtocol", RoleName::from_static("Alice"), "state_0")
         .with_data(vec![1, 2, 3, 4, 5])
         .with_sequence(5)
         .with_metadata("key", "value");
@@ -427,11 +460,11 @@ fn test_checkpoint_serialization() {
 
 #[test]
 fn test_checkpoint_protocol_mismatch() {
-    let states = vec![BlockedOn::Complete];
+    let states = vec![TestBlockedOn::Complete];
 
     let mut sm = LinearStateMachine::new("ProtocolA", RoleName::from_static("Alice"), states);
 
-    let wrong_checkpoint = Checkpoint::new("ProtocolB", "Alice", "state_0");
+    let wrong_checkpoint = Checkpoint::new("ProtocolB", RoleName::from_static("Alice"), "state_0");
 
     // Restore should fail for mismatched protocol
     let result = sm.restore(&wrong_checkpoint);
@@ -1218,11 +1251,11 @@ fn test_envelope_predicates() {
     assert!(envelope.is_protocol("TestProtocol"));
     assert!(!envelope.is_protocol("OtherProtocol"));
 
-    assert!(envelope.is_from("Alice"));
-    assert!(!envelope.is_from("Bob"));
+    assert!(envelope.is_from(&RoleName::from_static("Alice")));
+    assert!(!envelope.is_from(&RoleName::from_static("Bob")));
 
-    assert!(envelope.is_to("Bob"));
-    assert!(!envelope.is_to("Alice"));
+    assert!(envelope.is_to(&RoleName::from_static("Bob")));
+    assert!(!envelope.is_to(&RoleName::from_static("Alice")));
 }
 
 #[test]

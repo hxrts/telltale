@@ -122,19 +122,29 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
           have hsize0 : GlobalType.sizePred g0 := by
             exact sizePred_mem (sender := sender) (receiver := receiver)
               (branches := gbranches) hsize hmem0
-          have hsafe : act.partner ≠ receiver :=
-            nonparticipant_action_safe sender receiver role gbranches lt act hroleSender hroleReceiver
-              hproj hstep hact
           have huniq0 : GlobalType.uniqLabels g0 := by
             have hbranches := GlobalType.uniqLabels_comm_branches huniqComm
             exact GlobalType.BranchesUniq.mem hbranches hmem0
           have hcan0 := ih g0 hproj0 hact0 hsize0 huniq0
+          -- Condition 1: act.sender ≠ receiver
+          -- For send actions: act.sender = role ≠ receiver (by hroleReceiver)
+          -- For recv actions: act.sender = act.partner, needs nonparticipant_action_safe
+          have hsafe : act.partner ≠ receiver :=
+            nonparticipant_action_safe sender receiver role gbranches lt act hroleSender hroleReceiver
+              hproj hstep hact
           have hsender_ne : (LocalActionR.toGlobal role act).sender ≠ receiver := by
-            cases act.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe] <;> exact hroleReceiver
-          have hreceiver_ne : (LocalActionR.toGlobal role act).receiver ≠ receiver := by
-            cases act.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe] <;> exact hroleReceiver
+            cases act.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe]
+          -- Condition 2: act.sender = sender → act.receiver ≠ receiver (vacuously true for non-participants)
+          -- For send: role = sender is false (by hroleSender), so vacuously true
+          -- For recv: act.partner = sender → role ≠ receiver (true since role ≠ receiver)
+          have hchannel_cond : (LocalActionR.toGlobal role act).sender = sender →
+              (LocalActionR.toGlobal role act).receiver ≠ receiver := by
+            intro heq
+            cases act.kind <;> simp [LocalActionR.toGlobal] at heq ⊢
+            · exact absurd heq.symm hroleSender
+            · exact hroleReceiver
           exact canStep.comm_async sender receiver gbranches
-            (LocalActionR.toGlobal role act) label0 g0 hsender_ne hreceiver_ne hmem0 hcan0
+            (LocalActionR.toGlobal role act) label0 g0 hsender_ne hchannel_cond hmem0 hcan0
   | recv_head partner branches label cont hmem =>
     cases g with
     | end =>
@@ -185,12 +195,17 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
             have hbranches := GlobalType.uniqLabels_comm_branches huniqComm
             exact GlobalType.BranchesUniq.mem hbranches hmem0
           have hcan0 := ih g0 hproj0 hact0 hsize0 huniq0
+          -- Same conditions as in send_head case above
           have hsender_ne : (LocalActionR.toGlobal role act).sender ≠ receiver := by
-            cases act.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe] <;> exact hroleReceiver
-          have hreceiver_ne : (LocalActionR.toGlobal role act).receiver ≠ receiver := by
-            cases act.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe] <;> exact hroleReceiver
+            cases act.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe]
+          have hchannel_cond : (LocalActionR.toGlobal role act).sender = sender →
+              (LocalActionR.toGlobal role act).receiver ≠ receiver := by
+            intro heq
+            cases act.kind <;> simp [LocalActionR.toGlobal] at heq ⊢
+            · exact absurd heq.symm hroleSender
+            · exact hroleReceiver
           exact canStep.comm_async sender receiver gbranches
-            (LocalActionR.toGlobal role act) label0 g0 hsender_ne hreceiver_ne hmem0 hcan0
+            (LocalActionR.toGlobal role act) label0 g0 hsender_ne hchannel_cond hmem0 hcan0
   | send_async partner branches act' label cont hnePartner hmem hstep_cont ih =>
     cases g with
     | end =>
@@ -220,14 +235,22 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
           have hbranches := GlobalType.uniqLabels_comm_branches huniqComm
           exact GlobalType.BranchesUniq.mem hbranches hmemg
         have hcan0 := ih gcont hprojg hact0 hsize0 huniq0
+        have hne : sender ≠ receiver := actionPred_comm_sender_ne hact
+        -- Condition 1: act.sender ≠ receiver
         have hsender_ne : (LocalActionR.toGlobal role act').sender ≠ receiver := by
-          have hne : sender ≠ receiver := actionPred_comm_sender_ne hact
           cases act'.kind <;> simp [LocalActionR.toGlobal, hne, hnePartner]
-        have hreceiver_ne : (LocalActionR.toGlobal role act').receiver ≠ receiver := by
-          have hne : sender ≠ receiver := actionPred_comm_sender_ne hact
-          cases act'.kind <;> simp [LocalActionR.toGlobal, hne, hnePartner]
+        -- Condition 2: act.sender = sender → act.receiver ≠ receiver
+        -- We're the sender, so need to show the receiver differs from outer receiver
+        -- For send: sender = sender → act'.partner ≠ receiver (hnePartner gives receiver ≠ act'.partner)
+        -- For recv: act'.partner = sender → sender ≠ receiver (true by hne)
+        have hchannel_cond : (LocalActionR.toGlobal role act').sender = sender →
+            (LocalActionR.toGlobal role act').receiver ≠ receiver := by
+          intro heq
+          cases act'.kind <;> simp [LocalActionR.toGlobal] at heq ⊢
+          · exact hnePartner.symm
+          · exact hne
         exact canStep.comm_async sender receiver gbranches
-          (LocalActionR.toGlobal role act') label gcont hsender_ne hreceiver_ne hmemg hcan0
+          (LocalActionR.toGlobal role act') label gcont hsender_ne hchannel_cond hmemg hcan0
       · by_cases hroleReceiver : role = receiver
         · subst hroleReceiver
           have hpr := projectR_comm_receiver sender receiver gbranches (actionPred_comm_sender_ne hact)
@@ -257,15 +280,21 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
             have hbranches := GlobalType.uniqLabels_comm_branches huniqComm
             exact GlobalType.BranchesUniq.mem hbranches hmem0
           have hcan0 := ih g0 hproj0 hact0 hsize0 huniq0
+          -- Condition 1: act.sender ≠ receiver (needs nonparticipant_action_safe for recv case)
           have hsafe : act'.partner ≠ receiver :=
             nonparticipant_action_safe sender receiver role gbranches lt act' hroleSender hroleReceiver
               hproj hstep hact
           have hsender_ne : (LocalActionR.toGlobal role act').sender ≠ receiver := by
-            cases act'.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe] <;> exact hroleReceiver
-          have hreceiver_ne : (LocalActionR.toGlobal role act').receiver ≠ receiver := by
-            cases act'.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe] <;> exact hroleReceiver
+            cases act'.kind <;> simp [LocalActionR.toGlobal, hroleReceiver, hsafe]
+          -- Condition 2: vacuously true for non-participants
+          have hchannel_cond : (LocalActionR.toGlobal role act').sender = sender →
+              (LocalActionR.toGlobal role act').receiver ≠ receiver := by
+            intro heq
+            cases act'.kind <;> simp [LocalActionR.toGlobal] at heq ⊢
+            · exact absurd heq.symm hroleSender
+            · exact hroleReceiver
           exact canStep.comm_async sender receiver gbranches
-            (LocalActionR.toGlobal role act') label0 g0 hsender_ne hreceiver_ne hmem0 hcan0
+            (LocalActionR.toGlobal role act') label0 g0 hsender_ne hchannel_cond hmem0 hcan0
   | mu t body act' hstep' ih =>
     cases g with
     | end =>

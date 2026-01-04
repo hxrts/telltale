@@ -359,8 +359,8 @@ mod extension_parser_tests {
 
         let choreography = result.unwrap();
         assert_eq!(choreography.roles.len(), 2);
-        assert_eq!(choreography.roles[0].name, "Alice");
-        assert_eq!(choreography.roles[1].name, "Bob");
+        assert_eq!(choreography.roles[0].name(), "Alice");
+        assert_eq!(choreography.roles[1].name(), "Bob");
     }
 
     #[test]
@@ -517,8 +517,8 @@ mod feature_inheritance_tests {
         match &choreography.protocol {
             Protocol::Loop { body, .. } => match body.as_ref() {
                 Protocol::Send { from, to, .. } => {
-                    assert_eq!(from.name, "Producer");
-                    assert_eq!(to.name, "Consumer");
+                    assert_eq!(from.name(), "Producer");
+                    assert_eq!(to.name(), "Consumer");
                 }
                 _ => panic!("Expected send in loop body"),
             },
@@ -541,7 +541,7 @@ mod feature_inheritance_tests {
 
         match &choreography.protocol {
             Protocol::Broadcast { from, to_all, .. } => {
-                assert_eq!(from.name, "Server");
+                assert_eq!(from.name(), "Server");
                 assert_eq!(to_all.len(), 2);
                 assert!(to_all.iter().any(|r| r.name().to_string() == "Client1"));
                 assert!(to_all.iter().any(|r| r.name().to_string() == "Client2"));
@@ -1031,8 +1031,8 @@ mod integration_tests {
 
         // Add annotations like external-macro-demo would
         if let Some(annotations) = choreography.protocol.get_annotations_mut() {
-            annotations.insert("guard_capability".to_string(), "send".to_string());
-            annotations.insert("flow_cost".to_string(), "100".to_string());
+            annotations.push(ProtocolAnnotation::custom("guard_capability", "send"));
+            annotations.push(ProtocolAnnotation::custom("flow_cost", "100"));
         }
 
         // Test annotation retrieval

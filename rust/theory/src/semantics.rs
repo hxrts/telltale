@@ -138,8 +138,8 @@ impl LocalAction {
 /// assert!(!can_step(&g, &wrong));
 /// ```
 #[must_use]
-pub fn can_step(g: &GlobalType, act: &GlobalAction) -> bool {
-    can_step_fuel(g, act, 100)
+pub fn can_step(global: &GlobalType, action: &GlobalAction) -> bool {
+    can_step_fuel(global, action, 100)
 }
 
 /// Fuel-bounded version of can_step for termination.
@@ -210,8 +210,8 @@ fn can_step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> bool {
 /// assert_eq!(step(&g, &act), Some(GlobalType::End));
 /// ```
 #[must_use]
-pub fn step(g: &GlobalType, act: &GlobalAction) -> Option<GlobalType> {
-    step_fuel(g, act, 100)
+pub fn step(global: &GlobalType, action: &GlobalAction) -> Option<GlobalType> {
+    step_fuel(global, action, 100)
 }
 
 /// Fuel-bounded version of step for termination.
@@ -297,8 +297,8 @@ fn step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> Option<GlobalTy
 /// assert!(local_can_step(&lt, &act));
 /// ```
 #[must_use]
-pub fn local_can_step(lt: &LocalTypeR, act: &LocalAction) -> bool {
-    local_can_step_fuel(lt, act, 100)
+pub fn local_can_step(local: &LocalTypeR, action: &LocalAction) -> bool {
+    local_can_step_fuel(local, action, 100)
 }
 
 /// Fuel-bounded version of local_can_step for termination.
@@ -358,8 +358,8 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
 ///
 /// Returns the resulting local type after the action is performed.
 #[must_use]
-pub fn local_step(lt: &LocalTypeR, act: &LocalAction) -> Option<LocalTypeR> {
-    local_step_fuel(lt, act, 100)
+pub fn local_step(local: &LocalTypeR, action: &LocalAction) -> Option<LocalTypeR> {
+    local_step_fuel(local, action, 100)
 }
 
 /// Fuel-bounded version of local_step for termination.
@@ -465,12 +465,12 @@ impl ConsumeResult {
 /// Corresponds to Lean's `ConsumeResult` relation.
 #[must_use]
 pub fn consume_with_proof(
-    g: &GlobalType,
+    global: &GlobalType,
     sender: &str,
     receiver: &str,
     label: &Label,
 ) -> Option<ConsumeResult> {
-    consume_with_proof_fuel(g, sender, receiver, label, 100)
+    consume_with_proof_fuel(global, sender, receiver, label, 100)
 }
 
 fn consume_with_proof_fuel(
@@ -522,8 +522,8 @@ fn consume_with_proof_fuel(
 /// Corresponds to Lean's `GlobalTypeReduces` relation.
 /// G ⟹ G' means G can reduce to G' by performing one communication.
 #[must_use]
-pub fn reduces(g: &GlobalType, g_prime: &GlobalType) -> bool {
-    reduces_fuel(g, g_prime, 100)
+pub fn reduces(global: &GlobalType, target: &GlobalType) -> bool {
+    reduces_fuel(global, target, 100)
 }
 
 fn reduces_fuel(g: &GlobalType, g_prime: &GlobalType, fuel: usize) -> bool {
@@ -554,8 +554,8 @@ fn reduces_fuel(g: &GlobalType, g_prime: &GlobalType, fuel: usize) -> bool {
 ///
 /// Corresponds to Lean's `GlobalTypeReducesStar`.
 #[must_use]
-pub fn reduces_star(g: &GlobalType, g_prime: &GlobalType) -> bool {
-    reduces_star_fuel(g, g_prime, 100, &mut HashSet::new())
+pub fn reduces_star(global: &GlobalType, target: &GlobalType) -> bool {
+    reduces_star_fuel(global, target, 100, &mut HashSet::new())
 }
 
 fn reduces_star_fuel(
@@ -602,8 +602,8 @@ fn reduces_star_fuel(
 /// This is the "good global" condition from the ECOOP 2025 paper.
 /// For well-formed types, if `can_step(g, act)` then `step(g, act).is_some()`.
 #[must_use]
-pub fn good_g(g: &GlobalType) -> bool {
-    good_g_fuel(g, 100, &mut HashSet::new())
+pub fn good_g(global: &GlobalType) -> bool {
+    good_g_fuel(global, 100, &mut HashSet::new())
 }
 
 fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -> bool {

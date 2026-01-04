@@ -365,7 +365,10 @@ theorem wellTyped_shadow (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x 
 /-- Helper: If x is not in freeVars, extending with x doesn't affect variable lookups. -/
 private theorem lookup_extend_fresh (Γ : TypingContext) (x y : String) (s : LocalTypeR)
     (hne : x ≠ y) : (Γ.extend x s).lookup y = Γ.lookup y := by
-  sorry
+  unfold TypingContext.extend TypingContext.lookup
+  simp only [List.find?_cons]
+  have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hne
+  simp only [hbeq, ↓reduceIte]
 
 /-- Weakening: Adding an unused variable binding preserves typing.
 
@@ -381,7 +384,47 @@ private theorem lookup_extend_fresh (Γ : TypingContext) (x y : String) (s : Loc
 theorem wellTyped_weaken (Γ : TypingContext) (p : Process) (t : LocalTypeR) (x : String) (s : LocalTypeR)
     (h : WellTyped Γ p t) (hfree : x ∉ p.freeVars)
     : WellTyped (Γ.extend x s) p t := by
-  sorry
+  induction h with
+  | inaction =>
+    exact WellTyped.inaction
+  | send hcont ih =>
+    simp only [Process.freeVars] at hfree
+    exact WellTyped.send (ih hfree)
+  | recv hlen hbranches hlabels ih =>
+    apply WellTyped.recv hlen
+    · intro i
+      apply ih i
+      -- Need: x ∉ (branches.get! i).2.freeVars
+      simp only [Process.freeVars] at hfree
+      intro hmem
+      apply hfree
+      exact freeVarsOfBranches_mem_of_index _ _ _ hmem
+    · exact hlabels
+  | cond hp hq ihp ihq =>
+    simp only [Process.freeVars, List.mem_append] at hfree
+    push_neg at hfree
+    exact WellTyped.cond (ihp hfree.1) (ihq hfree.2)
+  | recurse hbody ih =>
+    simp only [Process.freeVars, List.mem_filter, bne_iff_ne, ne_eq,
+               decide_eq_true_eq] at hfree
+    push_neg at hfree
+    by_cases hxy : x = x_1
+    · -- x = bound variable: shadowing
+      subst hxy
+      exact WellTyped.recurse (wellTyped_shadow hbody)
+    · -- x ≠ bound variable: exchange contexts
+      have hfree' : x ∉ body.freeVars := fun hmem => hfree hmem hxy
+      have ih' := ih hfree'
+      apply WellTyped.recurse
+      exact wellTyped_exchange (Γ.extend x s) x_1 x t s hxy ih'
+  | var hlookup =>
+    simp only [Process.freeVars, List.mem_singleton] at hfree
+    apply WellTyped.var
+    rw [lookup_extend_fresh Γ x x_1 s hfree]
+    exact hlookup
+  | equiv hwt heq ih =>
+    simp only at hfree
+    exact WellTyped.equiv (ih hfree) heq
 
 /-- Helper: Lookup in swapped contexts gives same result when x ≠ y. -/
 private theorem lookup_extend_exchange (Γ : TypingContext) (x y : String) (s u : LocalTypeR)
@@ -432,7 +475,105 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     (hp : WellTyped (Γ.extend x s) p t)
     (hq : WellTyped Γ q s)
     : WellTyped Γ (p.substitute x q) t := by
-  sorry
+  induction hp generalizing Γ q with
+  | inaction =>
+    -- substitute .inaction x q = .inaction
+    simp only [Process.substitute]
+    exact WellTyped.inaction
+  | send hcont ih =>
+    -- substitute (.send r l v cont) x q = .send r l v (substitute cont x q)
+    simp only [Process.substitute]
+    exact WellTyped.send (ih hq)
+  | @recv Γ' sender branches types hlen hbranches hlabels ih =>
+    -- substitute (.recv sender branches) x q = .recv sender (substBranches)
+    simp only [Process.substitute]
+    -- Need to show WellTyped on the substituted branches
+    apply WellTyped.recv
+    · -- Length preservation: substitution preserves list length
+      simp only [List.length_map, hlen]
+    · -- Each branch is well-typed
+      intro i
+      simp only [List.get!_map, Prod.snd_mk, Prod.fst_mk]
+      -- ih i gives us the IH for branch i
+      have hih := ih i hq
+      -- But we need to relate branches.get! i to the unfolded substitute
+      sorry  -- This requires showing the internal substBranches matches List.map
+    · -- Labels match
+      intro i
+      simp only [List.get!_map, Prod.fst_mk]
+      exact hlabels i
+  | cond hp' hq' ihp ihq =>
+    simp only [Process.substitute]
+    exact WellTyped.cond (ihp hq) (ihq hq)
+  | @recurse Γ' y body bodyType hbody ih =>
+    simp only [Process.substitute]
+    split_ifs with hxy
+    · -- y == x: variable is shadowed, body unchanged
+      -- hbody : WellTyped ((Γ'.extend x s).extend y bodyType) body bodyType
+      -- But (Γ'.extend x s).extend y = (Γ'.extend y) since y == x shadows x
+      -- Actually, if y == x, then the body doesn't reference x (it's shadowed)
+      -- So we need to show WellTyped (Γ.extend y bodyType) body bodyType
+      -- But hbody is in context (Γ'.extend x s).extend y bodyType
+      -- where Γ' = Γ.extend x s, so context is ((Γ.extend x s).extend x s).extend y...
+      -- Wait, Γ' here is the context from the judgment, let me reconsider
+      -- hp : WellTyped (Γ.extend x s) (.recurse y body) (.mu y bodyType)
+      -- means hbody : WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
+      -- If y == x, we need WellTyped (Γ.extend y bodyType) body bodyType
+      -- Use context equivalence: ((Γ.extend x s).extend y t).lookup = (Γ.extend y t).lookup
+      -- when y = x due to shadowing
+      have heq : y = x := beq_eq_true_iff_eq.mp hxy
+      subst heq
+      apply WellTyped.recurse
+      -- hbody : WellTyped ((Γ.extend x s).extend x bodyType) body bodyType
+      -- Need: WellTyped (Γ.extend x bodyType) body bodyType
+      apply wellTyped_context_equiv body bodyType _ hbody
+      intro z
+      exact lookup_extend_shadow Γ x s bodyType z
+    · -- y ≠ x: substitute in body
+      apply WellTyped.recurse
+      -- ih : ∀ Γ q, WellTyped Γ q s → WellTyped Γ (body.substitute x q) bodyType
+      -- But we need to apply ih with context (Γ.extend y bodyType)
+      -- hbody : WellTyped ((Γ.extend x s).extend y bodyType) body bodyType
+      -- Need: WellTyped ((Γ.extend y bodyType).extend x s) body bodyType (to apply ih)
+      -- Then: WellTyped (Γ.extend y bodyType) (body.substitute x q) bodyType
+      have hne : x ≠ y := fun h => hxy (beq_iff_eq.mpr h.symm)
+      have hbody' := wellTyped_exchange (Γ.extend x s) body bodyType y x bodyType s (Ne.symm hne) hbody
+      -- hbody' : WellTyped (((Γ.extend x s).extend x s).extend y bodyType) body bodyType
+      -- That's not quite right. Let me reconsider the context structure.
+      -- The original hbody is in context ((Γ.extend x s).extend y bodyType)
+      -- We need it in context ((Γ.extend y bodyType).extend x s) to apply ih
+      -- wellTyped_exchange swaps the top two bindings
+      have hbody'' : WellTyped ((Γ.extend y bodyType).extend x s) body bodyType := by
+        apply wellTyped_context_equiv body bodyType _ hbody
+        intro z
+        exact lookup_extend_exchange Γ x y s bodyType hne z
+      -- Now apply ih with Γ.extend y bodyType
+      have hq' : WellTyped (Γ.extend y bodyType) q s := by
+        apply wellTyped_weaken Γ q s y bodyType hq
+        sorry -- Need: y ∉ q.freeVars
+      exact ih hq'
+  | @var Γ' varName varType hlookup =>
+    simp only [Process.substitute]
+    split_ifs with hxvar
+    · -- varName == x: substitute to q
+      -- hlookup : (Γ'.extend x s).lookup varName = some varType
+      -- where Γ' = Γ, so (Γ.extend x s).lookup varName = some varType
+      -- If varName == x, then lookup gives s, so varType = s
+      have heq : varName = x := beq_eq_true_iff_eq.mp hxvar
+      subst heq
+      -- hlookup : (Γ.extend x s).lookup x = some varType
+      unfold TypingContext.extend TypingContext.lookup at hlookup
+      simp only [List.find?_cons, beq_self_eq_true, ↓reduceIte, Option.map_some'] at hlookup
+      have ht : varType = s := Option.some.injEq.mp hlookup
+      subst ht
+      exact hq
+    · -- varName ≠ x: keep as variable
+      apply WellTyped.var
+      have hne : x ≠ varName := fun h => hxvar (beq_iff_eq.mpr h)
+      rw [← lookup_extend_neq Γ varName x s varType hne]
+      exact hlookup
+  | equiv hwt heq ih =>
+    exact WellTyped.equiv (ih hq) heq
 
 /-! ## Equi-Recursive Type Theory Axioms
 

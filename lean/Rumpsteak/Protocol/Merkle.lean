@@ -115,6 +115,13 @@ where
     | [x] => [x]  -- Shouldn't happen after padding
     | x :: y :: rest => hashPair (H := H) x y :: pairUp rest
 
+/-- Specification axiom: computeRoot of empty list returns emptyRoot.
+
+    JUSTIFICATION: By inspection of the partial def, the first case is:
+    `| [] => emptyRoot (H := H)`
+    This axiom captures this semantic behavior since partial defs are opaque. -/
+axiom computeRoot_nil [Hasher H] : computeRoot (H := H) [] = emptyRoot (H := H)
+
 /-- Compute the Merkle root of a heap.
 
     The resources are already sorted by ResourceId due to RBMap ordering. -/
@@ -377,10 +384,8 @@ theorem empty_heap_commitment [Hasher H] :
   -- This is true by definition of RBMap.empty
   congr 1
   · -- resourceRoot: computeRoot [] = emptyRoot
-    -- computeRoot is partial def with type class parameter, can't reduce via native_decide
-    -- The property is trivial: computeRoot [] matches the first case which returns emptyRoot
-    sorry
+    exact computeRoot_nil
   · -- nullifierRoot: computeRoot [] = emptyRoot
-    sorry
+    exact computeRoot_nil
 
 end Rumpsteak.Protocol.Merkle

@@ -8,8 +8,9 @@
 
 use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
-    ChoreoHandler, Label,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -17,6 +18,41 @@ enum Role {
     Buyer,
     Seller,
     Broker,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum NegotiationLabel {
+    Accept,
+    Reject,
+}
+
+impl LabelId for NegotiationLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            NegotiationLabel::Accept => "accept",
+            NegotiationLabel::Reject => "reject",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "accept" => Some(NegotiationLabel::Accept),
+            "reject" => Some(NegotiationLabel::Reject),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = NegotiationLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Buyer => RoleName::from_static("Buyer"),
+            Role::Seller => RoleName::from_static("Seller"),
+            Role::Broker => RoleName::from_static("Broker"),
+        }
+    }
 }
 
 impl rumpsteak_aura::Role for Role {
@@ -133,21 +169,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // For demo purposes, buyer accepts if price <= 1200
         let decision = if price <= 1200 {
             println!("  Buyer decides to ACCEPT");
-            "accept"
+            NegotiationLabel::Accept
         } else {
             println!("  Buyer decides to REJECT");
-            "reject"
+            NegotiationLabel::Reject
         };
 
         buyer_handler
-            .choose(&mut buyer_ep, Role::Broker, Label(decision))
+            .choose(&mut buyer_ep, Role::Broker, decision)
             .await?;
     }
 
     let buyer_decision = broker_handler.offer(&mut broker_ep, Role::Buyer).await?;
     println!("\nPhase 6: Broker processes decision");
 
-    if buyer_decision.0 == "accept" {
+    if buyer_decision == NegotiationLabel::Accept {
         println!("  Broker: Finalizing sale...");
         let accept_msg = Message::Accept;
         broker_handler

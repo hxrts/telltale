@@ -7,7 +7,8 @@
 fn test_effect_traits_compile() {
     // Just verify the module structure compiles
     // The crate name in tests is the library name with underscores
-    use rumpsteak_aura_choreography::effects::RoleId;
+    use rumpsteak_aura_choreography::effects::{LabelId, RoleId};
+    use rumpsteak_aura_choreography::RoleName;
 
     // Basic role enum
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -15,6 +16,35 @@ fn test_effect_traits_compile() {
     enum TestRole {
         A,
         B,
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+    enum TestLabel {
+        Default,
+    }
+
+    impl LabelId for TestLabel {
+        fn as_str(&self) -> &'static str {
+            "default"
+        }
+
+        fn from_str(label: &str) -> Option<Self> {
+            match label {
+                "default" => Some(TestLabel::Default),
+                _ => None,
+            }
+        }
+    }
+
+    impl RoleId for TestRole {
+        type Label = TestLabel;
+
+        fn role_name(&self) -> RoleName {
+            match self {
+                TestRole::A => RoleName::from_static("A"),
+                TestRole::B => RoleName::from_static("B"),
+            }
+        }
     }
 
     // Verify it implements RoleId

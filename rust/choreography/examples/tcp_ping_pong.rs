@@ -156,7 +156,7 @@ impl TcpTransport {
         let addr = self
             .peer_addrs
             .get(peer_role)
-            .ok_or_else(|| TransportError::UnknownRole(peer_role.to_string()))?;
+            .ok_or_else(|| TransportError::UnknownRole(peer_role.clone()))?;
 
         // Retry connection with backoff
         let mut attempts = 0;
@@ -264,7 +264,7 @@ impl Transport for TcpTransport {
         let outgoing = self.outgoing.read().await;
         let stream = outgoing
             .get(to_role)
-            .ok_or_else(|| TransportError::UnknownRole(to_role.to_string()))?;
+            .ok_or_else(|| TransportError::UnknownRole(to_role.clone()))?;
 
         let mut stream = stream.lock().await;
 
@@ -283,7 +283,7 @@ impl Transport for TcpTransport {
         let mut incoming = self.incoming.lock().await;
         let receiver = incoming
             .get_mut(from_role)
-            .ok_or_else(|| TransportError::UnknownRole(from_role.to_string()))?;
+            .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
 
         receiver.recv().await.ok_or(TransportError::ChannelClosed)
     }

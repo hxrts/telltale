@@ -12,7 +12,7 @@
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use quote::{format_ident, quote};
-use rumpsteak_aura_choreography::ast::{Choreography, MessageType, Protocol, Role};
+use rumpsteak_aura_choreography::ast::{Annotations, Choreography, MessageType, Protocol, Role};
 use rumpsteak_aura_choreography::compiler::analysis::analyze;
 use std::collections::HashMap;
 
@@ -76,9 +76,9 @@ fn simple_protocol_strategy() -> BoxedStrategy<Protocol> {
                             to,
                             message: msg,
                             continuation: Box::new(cont),
-                            annotations: HashMap::new(),
-                            from_annotations: HashMap::new(),
-                            to_annotations: HashMap::new(),
+                            annotations: Annotations::new(),
+                            from_annotations: Annotations::new(),
+                            to_annotations: Annotations::new(),
                         }
                     }
                 }),
@@ -107,13 +107,13 @@ fn simple_protocol_strategy() -> BoxedStrategy<Protocol> {
                                         to: other.clone(),
                                         message: msg,
                                         continuation: Box::new(Protocol::End),
-                                        annotations: HashMap::new(),
-                                        from_annotations: HashMap::new(),
-                                        to_annotations: HashMap::new(),
+                                        annotations: Annotations::new(),
+                                        from_annotations: Annotations::new(),
+                                        to_annotations: Annotations::new(),
                                     },
                                 })
                                 .collect(),
-                            annotations: HashMap::new(),
+                            annotations: Annotations::new(),
                         })
                     }
                 ),
@@ -306,13 +306,13 @@ proptest! {
                         payload: Some(quote! { () }),
                     },
                     continuation: Box::new(Protocol::End),
-                    annotations: HashMap::new(),
-                    from_annotations: HashMap::new(),
-                    to_annotations: HashMap::new(),
+                    annotations: Annotations::new(),
+                    from_annotations: Annotations::new(),
+                    to_annotations: Annotations::new(),
                 }),
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
             },
             attrs: HashMap::new(),
         };
@@ -364,9 +364,9 @@ proptest! {
                 to,
                 message: msg,
                 continuation: Box::new(Protocol::End),
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
             },
             attrs: HashMap::new(),
         };
@@ -420,9 +420,9 @@ mod unit_tests {
                     payload: Some(quote! { String }),
                 },
                 continuation: Box::new(Protocol::End),
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
             },
             attrs: HashMap::new(),
         };
@@ -460,9 +460,9 @@ mod unit_tests {
                     payload: Some(quote! { String }),
                 },
                 continuation: Box::new(Protocol::End),
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
             },
             attrs: HashMap::new(),
         };

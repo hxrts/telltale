@@ -426,7 +426,14 @@ This pattern matches common parse errors. It formats diagnostics with the report
 
 ### Comments
 
-Single-line comments use `//`. Multi-line comments use `/* ... */`.
+Single-line comments use `--`. Multi-line comments use `{- ... -}`.
+
+```
+-- This is a single-line comment
+
+{- This is a
+   multi-line comment -}
+```
 
 ### Whitespace and Layout
 

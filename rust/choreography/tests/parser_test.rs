@@ -489,12 +489,12 @@ protocol Invalid = {
 #[test]
 fn test_parse_with_comments() {
     let input = r"
-// This is a comment
+-- This is a comment
 protocol CommentTest = {
-    roles Alice, Bob  // Inline comment
-    
-    /* Multi-line
-       comment */
+    roles Alice, Bob  -- Inline comment
+
+    {- Multi-line
+       comment -}
     Alice -> Bob: Hello
 }
 ";

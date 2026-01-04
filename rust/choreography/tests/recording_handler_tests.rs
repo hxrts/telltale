@@ -11,8 +11,9 @@
 
 use rumpsteak_aura_choreography::effects::{
     handlers::recording::{RecordedEvent, RecordingHandler},
-    ChoreoHandler, Label,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -24,6 +25,41 @@ enum TestRole {
     Alice,
     Bob,
     Charlie,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TestLabel {
+    Accept,
+    Option1,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::Accept => "Accept",
+            TestLabel::Option1 => "Option1",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "Accept" => Some(TestLabel::Accept),
+            "Option1" => Some(TestLabel::Option1),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+            TestRole::Charlie => RoleName::from_static("Charlie"),
+        }
+    }
 }
 
 // ============================================================================
@@ -93,7 +129,7 @@ async fn test_recording_captures_recv_then_fails() {
 async fn test_recording_captures_choose() {
     let mut handler = RecordingHandler::new(TestRole::Alice);
 
-    let label = Label("Accept");
+    let label = TestLabel::Accept;
     handler
         .choose(&mut (), TestRole::Bob, label)
         .await
@@ -105,7 +141,7 @@ async fn test_recording_captures_choose() {
     match &events[0] {
         RecordedEvent::Choose { at, label } => {
             assert_eq!(*at, TestRole::Bob);
-            assert_eq!(label.0, "Accept");
+            assert_eq!(*label, TestLabel::Accept);
         }
         _ => panic!("Expected Choose event"),
     }
@@ -150,7 +186,7 @@ async fn test_recording_preserves_event_order() {
         .await
         .unwrap();
     handler
-        .choose(&mut (), TestRole::Bob, Label("Option1"))
+        .choose(&mut (), TestRole::Bob, TestLabel::Option1)
         .await
         .unwrap();
     handler
@@ -173,7 +209,7 @@ async fn test_recording_preserves_event_order() {
         _ => panic!("Expected Send to Charlie second"),
     }
     match &events[2] {
-        RecordedEvent::Choose { label, .. } => assert_eq!(label.0, "Option1"),
+        RecordedEvent::Choose { label, .. } => assert_eq!(*label, TestLabel::Option1),
         _ => panic!("Expected Choose third"),
     }
     match &events[3] {

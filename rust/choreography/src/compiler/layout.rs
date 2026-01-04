@@ -54,7 +54,7 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
         let next = chars.get(i + 1).copied();
 
         if st.in_block_comment {
-            if ch == '*' && next == Some('/') {
+            if ch == '-' && next == Some('}') {
                 st.in_block_comment = false;
                 i += 2;
                 continue;
@@ -82,11 +82,11 @@ fn scan_line(line: &str, state: &ScanState) -> LineScan {
         }
 
         // Not in string or block comment.
-        if ch == '/' && next == Some('/') {
+        if ch == '-' && next == Some('-') {
             // Line comment; ignore remainder.
             break;
         }
-        if ch == '/' && next == Some('*') {
+        if ch == '{' && next == Some('-') {
             st.in_block_comment = true;
             i += 2;
             continue;

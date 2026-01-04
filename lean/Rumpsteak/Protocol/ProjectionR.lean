@@ -645,6 +645,88 @@ theorem projectBranchTypes_forall2 (branches : List (Label × GlobalType)) (role
         cases hproj
         exact List.Forall₂.cons hcont (ih restTys hrest)
 
+/-- Successful projectBranches aligns branches with projected (label, local type) pairs. -/
+theorem projectBranches_forall2 (branches : List (Label × GlobalType)) (role : String)
+    (bs : List (Label × LocalTypeR))
+    (hproj : projectBranches branches role = .ok bs) :
+    List.Forall₂ (fun g l => g.1 = l.1 ∧ projectR g.2 role = .ok l.2) branches bs := by
+  induction branches generalizing bs with
+  | nil =>
+    simp [projectBranches] at hproj
+    cases hproj
+    exact List.Forall₂.nil
+  | cons b rest ih =>
+    unfold projectBranches at hproj
+    cases hcont : projectR b.2 role with
+    | error e =>
+      simp [hcont] at hproj
+      cases hproj
+    | ok lt =>
+      cases hrest : projectBranches rest role with
+      | error e =>
+        simp [hrest, hcont] at hproj
+        cases hproj
+      | ok restBs =>
+        simp [hrest, hcont] at hproj
+        cases hproj
+        exact List.Forall₂.cons ⟨rfl, hcont⟩ (ih restBs hrest)
+
+/-- Helper: Except.bind produces ok iff both sides produce ok. -/
+private theorem except_bind_eq_ok {α β : Type} {x : Except ProjectionError α} {f : α → Except ProjectionError β} {b : β} :
+    (x >>= f) = .ok b ↔ ∃ a, x = .ok a ∧ f a = .ok b := by
+  constructor
+  · intro h
+    cases x with
+    | error e => simp [bind, Except.bind] at h
+    | ok a => exact ⟨a, rfl, h⟩
+  · intro ⟨a, hx, hf⟩
+    simp [hx, bind, Except.bind, hf]
+
+/-- If projectBranches succeeds, each branch's projection succeeds. -/
+theorem projectBranches_mem_succeeds (branches : List (Label × GlobalType)) (role : String)
+    (bs : List (Label × LocalTypeR))
+    (hproj : projectBranches branches role = .ok bs)
+    {label : Label} {g : GlobalType} (hmem : (label, g) ∈ branches) :
+    ∃ lt, projectR g role = .ok lt := by
+  induction branches generalizing bs with
+  | nil => cases hmem
+  | cons b rest ih =>
+    -- projectBranches (b :: rest) = do { projCont ← projectR b.2; projRest ← projectBranches rest; pure ((b.1, projCont) :: projRest) }
+    unfold projectBranches at hproj
+    -- Expand the do-notation: first bind
+    rw [except_bind_eq_ok] at hproj
+    obtain ⟨projCont, hCont, hproj'⟩ := hproj
+    -- Second bind
+    rw [except_bind_eq_ok] at hproj'
+    obtain ⟨projRest, hRest, hproj''⟩ := hproj'
+    cases hmem with
+    | head _ =>
+      -- (label, g) = b, so g = b.2
+      exact ⟨projCont, hCont⟩
+    | tail _ hmem' =>
+      -- (label, g) ∈ rest, use IH
+      exact ih projRest hRest hmem'
+
+/-- If projectBranchTypes succeeds, each branch's projection succeeds. -/
+theorem projectBranchTypes_mem_succeeds (branches : List (Label × GlobalType)) (role : String)
+    (tys : List LocalTypeR)
+    (hproj : projectBranchTypes branches role = .ok tys)
+    {label : Label} {g : GlobalType} (hmem : (label, g) ∈ branches) :
+    ∃ lt, projectR g role = .ok lt := by
+  induction branches generalizing tys with
+  | nil => cases hmem
+  | cons b rest ih =>
+    unfold projectBranchTypes at hproj
+    rw [except_bind_eq_ok] at hproj
+    obtain ⟨projCont, hCont, hproj'⟩ := hproj
+    rw [except_bind_eq_ok] at hproj'
+    obtain ⟨projRest, hRest, hproj''⟩ := hproj'
+    cases hmem with
+    | head _ =>
+      exact ⟨projCont, hCont⟩
+    | tail _ hmem' =>
+      exact ih projRest hRest hmem'
+
 /-! ## Merge Reflexivity Lemma -/
 
 /-- Elements of sortBranches are exactly elements of the original list. -/
@@ -1283,4 +1365,201 @@ axiom projectR_substitute (body : GlobalType) (t : String) (replacement : Global
     (hrep : projectR replacement role = .ok rlt)
     (huniq : GlobalType.uniqLabels body)
     : projectR (body.substitute t replacement) role = .ok (lt.substitute t rlt)
+
+/-! ## Projectability preservation helpers
+
+These lemmas support proving that projectability is preserved through steps. -/
+
+/-- If a comm is projectable for a role, each branch continuation is projectable for that role. -/
+theorem projectable_comm_mem_role (s r p : String)
+    (branches : List (Label × GlobalType))
+    (hproj : ∃ lt, projectR (.comm s r branches) p = .ok lt)
+    {label : Label} {cont : GlobalType} (hmem : (label, cont) ∈ branches) :
+    ∃ lt, projectR cont p = .ok lt := by
+  obtain ⟨lt, hlt⟩ := hproj
+  by_cases hr1 : p = s
+  · -- sender case: use projectBranches
+    rw [hr1] at hlt ⊢
+    simp only [projectR] at hlt
+    by_cases hne : branches.isEmpty
+    · -- branches.isEmpty = true contradicts hmem
+      simp only [List.isEmpty_iff] at hne
+      rw [hne] at hmem
+      cases hmem
+    · simp only [hne, beq_self_eq_true, ↓reduceIte] at hlt
+      cases hbs : projectBranches branches s with
+      | error e =>
+        simp [hbs] at hlt
+      | ok bs =>
+        exact projectBranches_mem_succeeds branches s bs hbs hmem
+  · by_cases hr2 : p = r
+    · -- receiver case: use projectBranches
+      rw [hr2] at hlt ⊢
+      have hne_sr : s ≠ r := by
+        intro heq
+        rw [heq] at hr1
+        exact hr1 hr2
+      simp only [projectR] at hlt
+      by_cases hne : branches.isEmpty
+      · -- branches.isEmpty = true contradicts hmem
+        simp only [List.isEmpty_iff] at hne
+        rw [hne] at hmem
+        cases hmem
+      · have hs : (r == s) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne_sr)
+        simp only [hne, hs, Bool.false_eq_true, ↓reduceIte, beq_self_eq_true] at hlt
+        cases hbs : projectBranches branches r with
+        | error e =>
+          simp [hbs] at hlt
+        | ok bs =>
+          exact projectBranches_mem_succeeds branches r bs hbs hmem
+    · -- non-participant case: use projectBranchTypes
+      by_cases hne : branches.isEmpty
+      · simp only [List.isEmpty_iff] at hne
+        rw [hne] at hmem
+        cases hmem
+      · simp only [projectR] at hlt
+        have hs : (p == s) = false := beq_eq_false_iff_ne.mpr hr1
+        have hr : (p == r) = false := beq_eq_false_iff_ne.mpr hr2
+        simp only [hne, hs, Bool.false_eq_true, ↓reduceIte, hr, bind, Except.bind] at hlt
+        cases hbts : projectBranchTypes branches p with
+        | error e =>
+          simp only [hbts] at hlt
+          cases hlt
+        | ok tys =>
+          exact projectBranchTypes_mem_succeeds branches p tys hbts hmem
+
+/-! ## BranchesStep preservation for projection
+
+These lemmas show that if projection succeeds on branches, and we step via BranchesStep,
+then projection succeeds on the stepped branches. -/
+
+/-- If all branches in the source are projectable, and stepping preserves projectability,
+    then all branches in the target are projectable. -/
+theorem projectable_all_BranchesStep
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR}
+    (hbstep : GlobalType.BranchesStep GlobalType.step branches act branches')
+    (hih : ∀ g g', GlobalType.step g act g' →
+           (∀ role, ∃ lt, projectR g role = .ok lt) →
+           ∀ role, ∃ lt, projectR g' role = .ok lt)
+    (hproj : ∀ (label : Label) (g : GlobalType), (label, g) ∈ branches →
+             ∀ role, ∃ lt, projectR g role = .ok lt) :
+    ∀ (label : Label) (g' : GlobalType), (label, g') ∈ branches' →
+    ∀ role, ∃ lt, projectR g' role = .ok lt := by
+  induction hbstep with
+  | nil _ =>
+    intro label g' hmem
+    cases hmem
+  | cons label g g' rest rest' act hstep hrest ih =>
+    intro label' g'' hmem' role
+    have hmem'' : (label', g'') = (label, g') ∨ (label', g'') ∈ rest' := by
+      simpa [List.mem_cons] using hmem'
+    cases hmem'' with
+    | inl heq =>
+      cases heq
+      have hprojG : ∀ role, ∃ lt, projectR g role = .ok lt := fun r =>
+        hproj label g List.mem_cons_self r
+      exact hih g g' hstep hprojG role
+    | inr hmem'' =>
+      have hprojRest : ∀ (l : Label) (g0 : GlobalType), (l, g0) ∈ rest →
+                       ∀ r, ∃ lt, projectR g0 r = .ok lt := fun l g0 hm r =>
+        hproj l g0 (List.mem_cons_of_mem _ hm) r
+      exact ih hih hprojRest label' g'' hmem'' role
+
+/-- If all branches are projectable for a role, then projectBranches succeeds. -/
+theorem projectBranches_from_all_projectable
+    {branches : List (Label × GlobalType)} {role : String}
+    (hproj : ∀ (l : Label) (g : GlobalType), (l, g) ∈ branches → ∃ lt, projectR g role = .ok lt) :
+    ∃ bs, projectBranches branches role = .ok bs := by
+  induction branches with
+  | nil =>
+    use []
+    simp only [projectBranches, pure, Except.pure]
+  | cons b rest ih =>
+    have ⟨lt, hlt⟩ := hproj b.1 b.2 List.mem_cons_self
+    have hrest : ∀ (l : Label) (g : GlobalType), (l, g) ∈ rest → ∃ lt, projectR g role = .ok lt :=
+      fun l g hm => hproj l g (List.mem_cons_of_mem _ hm)
+    have ⟨restBs, hrestBs⟩ := ih hrest
+    use (b.1, lt) :: restBs
+    unfold projectBranches
+    simp only [bind, Except.bind, hlt, hrestBs, pure, Except.pure]
+
+/-- If all branches are projectable for a role, then projectBranchTypes succeeds. -/
+theorem projectBranchTypes_from_all_projectable
+    {branches : List (Label × GlobalType)} {role : String}
+    (hproj : ∀ (l : Label) (g : GlobalType), (l, g) ∈ branches → ∃ lt, projectR g role = .ok lt) :
+    ∃ tys, projectBranchTypes branches role = .ok tys := by
+  induction branches with
+  | nil =>
+    use []
+    simp only [projectBranchTypes, pure, Except.pure]
+  | cons b rest ih =>
+    have ⟨lt, hlt⟩ := hproj b.1 b.2 List.mem_cons_self
+    have hrest : ∀ (l : Label) (g : GlobalType), (l, g) ∈ rest → ∃ lt, projectR g role = .ok lt :=
+      fun l g hm => hproj l g (List.mem_cons_of_mem _ hm)
+    have ⟨restTys, hrestTys⟩ := ih hrest
+    use lt :: restTys
+    unfold projectBranchTypes
+    simp only [bind, Except.bind, hlt, hrestTys, pure, Except.pure]
+
+/-- If projectBranches succeeds on branches and stepping preserves projectability,
+    then projectBranches succeeds on the stepped branches.
+
+    This takes the stronger hypothesis that all branches are projectable for ALL roles,
+    which is what we have when the enclosing comm type is projectable. -/
+theorem projectBranches_BranchesStep
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR} {role : String}
+    (hbstep : GlobalType.BranchesStep GlobalType.step branches act branches')
+    (hih : ∀ g g', GlobalType.step g act g' →
+           (∀ role, ∃ lt, projectR g role = .ok lt) →
+           ∀ role, ∃ lt, projectR g' role = .ok lt)
+    (hprojAll : ∀ (label : Label) (g : GlobalType), (label, g) ∈ branches →
+                ∀ role, ∃ lt, projectR g role = .ok lt) :
+    ∃ bs', projectBranches branches' role = .ok bs' := by
+  induction hbstep with
+  | nil _ =>
+    use []
+    simp only [projectBranches, pure, Except.pure]
+  | cons label g g' rest rest' act hstep hrest ih =>
+    have hprojG : ∀ r, ∃ lt, projectR g r = .ok lt := fun r =>
+      hprojAll label g List.mem_cons_self r
+    have hprojG' : ∀ r, ∃ lt, projectR g' r = .ok lt := fun r =>
+      hih g g' hstep hprojG r
+    have ⟨projCont', hCont'⟩ := hprojG' role
+    have hprojRest : ∀ (l : Label) (g0 : GlobalType), (l, g0) ∈ rest →
+                     ∀ r, ∃ lt, projectR g0 r = .ok lt := fun l g0 hm r =>
+      hprojAll l g0 (List.mem_cons_of_mem _ hm) r
+    have ⟨projRest', hRest'⟩ := ih hih hprojRest
+    use (label, projCont') :: projRest'
+    unfold projectBranches
+    simp only [bind, Except.bind, hCont', hRest', pure, Except.pure]
+
+/-- If projectBranchTypes succeeds on branches and stepping preserves projectability,
+    then projectBranchTypes succeeds on the stepped branches. -/
+theorem projectBranchTypes_BranchesStep
+    {branches branches' : List (Label × GlobalType)} {act : GlobalActionR} {role : String}
+    (hbstep : GlobalType.BranchesStep GlobalType.step branches act branches')
+    (hih : ∀ g g', GlobalType.step g act g' →
+           (∀ role, ∃ lt, projectR g role = .ok lt) →
+           ∀ role, ∃ lt, projectR g' role = .ok lt)
+    (hprojAll : ∀ (label : Label) (g : GlobalType), (label, g) ∈ branches →
+                ∀ role, ∃ lt, projectR g role = .ok lt) :
+    ∃ tys', projectBranchTypes branches' role = .ok tys' := by
+  induction hbstep with
+  | nil _ =>
+    use []
+    simp only [projectBranchTypes, pure, Except.pure]
+  | cons label g g' rest rest' act hstep hrest ih =>
+    have hprojG : ∀ r, ∃ lt, projectR g r = .ok lt := fun r =>
+      hprojAll label g List.mem_cons_self r
+    have hprojG' : ∀ r, ∃ lt, projectR g' r = .ok lt := fun r =>
+      hih g g' hstep hprojG r
+    have ⟨projCont', hCont'⟩ := hprojG' role
+    have hprojRest : ∀ (l : Label) (g0 : GlobalType), (l, g0) ∈ rest →
+                     ∀ r, ∃ lt, projectR g0 r = .ok lt := fun l g0 hm r =>
+      hprojAll l g0 (List.mem_cons_of_mem _ hm) r
+    have ⟨projRest', hRest'⟩ := ih hih hprojRest
+    use projCont' :: projRest'
+    unfold projectBranchTypes
+    simp only [bind, Except.bind, hCont', hRest', pure, Except.pure]
+
 end Rumpsteak.Protocol.ProjectionR

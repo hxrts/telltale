@@ -48,7 +48,7 @@ work/
 
 # Lean build artifacts
 /lean/.lake/
-/lean/artifacts/*.json
+/lean/artifacts/
 
 # Log files
 *.log

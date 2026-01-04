@@ -8,7 +8,9 @@
 //!
 //! Run with: cargo run --example bounded_recursion
 
-use rumpsteak_theory::{bound_recursion, unfold_bounded, BoundingStrategy};
+use rumpsteak_theory::{
+    bound_recursion, unfold_bounded, BoundingStrategy, FuelSteps, YieldAfterSteps,
+};
 use rumpsteak_types::{Label, LocalTypeR};
 
 fn main() {
@@ -30,14 +32,17 @@ fn main() {
     // Strategy 1: Fuel-based bounding
     println!("1. Fuel Strategy (max 3 iterations)");
     println!("-----------------------------------");
-    let fuel_bounded = bound_recursion(&recursive_protocol, BoundingStrategy::Fuel(3));
+    let fuel_bounded = bound_recursion(&recursive_protocol, BoundingStrategy::Fuel(FuelSteps(3)));
     println!("Bounded protocol with Fuel(3):");
     println!("{:#?}\n", fuel_bounded);
 
     // Strategy 2: YieldAfter bounding
     println!("2. YieldAfter Strategy (yield after 5 steps)");
     println!("--------------------------------------------");
-    let yield_bounded = bound_recursion(&recursive_protocol, BoundingStrategy::YieldAfter(5));
+    let yield_bounded = bound_recursion(
+        &recursive_protocol,
+        BoundingStrategy::YieldAfter(YieldAfterSteps(5)),
+    );
     println!("Bounded protocol with YieldAfter(5):");
     println!("{:#?}\n", yield_bounded);
 
@@ -79,7 +84,7 @@ fn main() {
     println!("Complex recursive protocol with choice:");
     println!("{:#?}\n", complex_protocol);
 
-    let bounded_complex = bound_recursion(&complex_protocol, BoundingStrategy::Fuel(2));
+    let bounded_complex = bound_recursion(&complex_protocol, BoundingStrategy::Fuel(FuelSteps(2)));
     println!("Bounded with Fuel(2):");
     println!("{:#?}\n", bounded_complex);
 
@@ -100,7 +105,7 @@ fn main() {
     println!("Role A's view of ring protocol:");
     println!("{:#?}\n", ring_a);
 
-    let bounded_ring = bound_recursion(&ring_a, BoundingStrategy::Fuel(5));
+    let bounded_ring = bound_recursion(&ring_a, BoundingStrategy::Fuel(FuelSteps(5)));
     println!("Bounded ring (Fuel 5):");
     println!("{:#?}\n", bounded_ring);
 

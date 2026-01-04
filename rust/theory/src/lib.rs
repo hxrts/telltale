@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+#![deny(unused_must_use, unreachable_pub)]
 //! Session Type Theory Algorithms
 //!
 //! This crate provides pure algorithms for session type operations:
@@ -51,6 +53,8 @@ pub mod bounded;
 
 // Subtyping module - contains both sync and async subtyping
 pub mod subtyping;
+pub mod limits;
+pub mod policy;
 
 // Re-exports for core modules
 #[cfg(feature = "duality")]
@@ -67,6 +71,11 @@ pub use semantics::{
     consume_with_proof, reduces, reduces_star, good_g,
     GlobalAction, LocalAction, LocalKind, ConsumeResult,
 };
+pub use limits::{
+    FuelSteps, YieldAfterSteps, UnfoldSteps, CacheEntries,
+    DEFAULT_SISO_UNFOLD_STEPS, DEFAULT_PROJECTOR_CACHE_ENTRIES,
+};
+pub use policy::{BreadthFirst, DepthFirst, RoundRobin, SchedulerPolicy};
 #[cfg(feature = "coherence")]
 pub use coherence::{check_coherent, projectable, CoherentG};
 
@@ -77,8 +86,8 @@ pub use bounded::{bound_recursion, unfold_bounded, BoundingStrategy};
 // Subtyping re-exports (conditionally based on features)
 #[cfg(feature = "async-subtyping")]
 pub use subtyping::{
-    async_subtype, orphan_free, siso_decompose, AsyncSubtypeError, InputTree, OutputTree,
-    SisoSegment,
+    async_subtype, orphan_free, siso_decompose, siso_decompose_with_fuel, AsyncSubtypeError,
+    InputTree, OutputTree, SisoSegment,
 };
 #[cfg(feature = "sync-subtyping")]
 pub use subtyping::{sync_subtype, SyncSubtypeError};

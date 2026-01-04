@@ -1,7 +1,11 @@
-// Choreographic DSL Grammar (new direct-style syntax)
+// Choreographic DSL Grammar (PureScript-inspired syntax)
+//
+// DSL comments use Haskell/PureScript style:
+//   -- single line comment
+//   {- multi-line comment -}
 
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" | COMMENT }
-COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+COMMENT = _{ "--" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI) | "{-" ~ (!"-}" ~ ANY)* ~ "-}" }
 
 // Top-level choreography definition
 choreography = {

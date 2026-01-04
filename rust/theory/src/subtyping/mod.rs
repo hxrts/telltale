@@ -36,8 +36,8 @@ mod sync;
 
 #[cfg(feature = "async-subtyping")]
 pub use r#async::{
-    async_subtype, orphan_free, siso_decompose, AsyncSubtypeError, InputTree, OutputTree,
-    SisoSegment,
+    async_subtype, orphan_free, siso_decompose, siso_decompose_with_fuel, AsyncSubtypeError,
+    InputTree, OutputTree, SisoSegment,
 };
 #[cfg(feature = "sync-subtyping")]
 pub use sync::{sync_subtype, SyncSubtypeError};

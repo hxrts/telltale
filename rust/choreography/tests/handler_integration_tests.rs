@@ -14,8 +14,9 @@ use rumpsteak_aura_choreography::effects::{
     handlers::in_memory::InMemoryHandler,
     interpreter::{interpret, testing::MockHandler},
     middleware::Trace,
-    ChoreoHandler, Label,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -29,6 +30,44 @@ enum TestRole {
     Alice,
     Bob,
     Charlie,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TestLabel {
+    Accept,
+    Option1,
+    Ok,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::Accept => "Accept",
+            TestLabel::Option1 => "Option1",
+            TestLabel::Ok => "ok",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "Accept" => Some(TestLabel::Accept),
+            "Option1" => Some(TestLabel::Option1),
+            "ok" => Some(TestLabel::Ok),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+            TestRole::Charlie => RoleName::from_static("Charlie"),
+        }
+    }
 }
 
 // ============================================================================
@@ -118,7 +157,7 @@ async fn test_interpreter_choose_offer_sequence() {
     let mut handler = MockHandler::new(TestRole::Bob);
 
     // Script the label for the offer operation
-    handler.add_response(MockResponse::Label("Accept".into()));
+    handler.add_response(MockResponse::Label(TestLabel::Accept));
 
     let mut endpoint = ();
 
@@ -233,7 +272,7 @@ async fn test_trace_middleware_choose_offer() {
     let mut endpoint = ();
 
     // Choose should work through trace
-    traced.choose(&mut endpoint, TestRole::Bob, Label("Option1"))
+    traced.choose(&mut endpoint, TestRole::Bob, TestLabel::Option1)
         .await
         .expect("Choose should succeed");
 }
@@ -302,7 +341,7 @@ async fn test_in_memory_handler_choice_protocol() {
     );
 
     // Alice makes a choice
-    alice.choose(&mut (), TestRole::Bob, Label("Accept"))
+    alice.choose(&mut (), TestRole::Bob, TestLabel::Accept)
         .await
         .expect("Alice choose should succeed");
 
@@ -311,7 +350,7 @@ async fn test_in_memory_handler_choice_protocol() {
         .await
         .expect("Bob offer should succeed");
 
-    assert_eq!(label.0, "Accept");
+    assert_eq!(label, TestLabel::Accept);
 }
 
 #[tokio::test]
@@ -429,7 +468,7 @@ fn test_program_roles_involved() {
     let program: Program<TestRole, Request> = Program::new()
         .send(TestRole::Bob, Request { id: 1, payload: "x".into() })
         .recv::<Request>(TestRole::Charlie)
-        .choose(TestRole::Alice, Label("ok"))
+        .choose(TestRole::Alice, TestLabel::Ok)
         .end();
 
     let roles = program.roles_involved();

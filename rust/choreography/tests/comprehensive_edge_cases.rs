@@ -324,7 +324,7 @@ fn test_module_dynamic_roles_integration() {
 
     // Verify dynamic roles
     let workers = &choreo.roles[1];
-    assert_eq!(workers.name.to_string(), "Workers");
+    assert_eq!(workers.name().to_string(), "Workers");
     assert!(workers.is_dynamic());
 }
 

@@ -42,9 +42,10 @@
 //! assert_eq!(metrics.misses, 1);
 //! ```
 
+use crate::limits::{CacheEntries, DEFAULT_PROJECTOR_CACHE_ENTRIES};
 use crate::merge::{merge_all, MergeError};
 use rumpsteak_types::content_store::{CacheMetrics, KeyedContentStore};
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use rumpsteak_types::{GlobalType, LocalTypeR};
 use thiserror::Error;
 
 /// Errors that can occur during projection
@@ -114,13 +115,11 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
 
             if role == sender {
                 // Sender sees internal choice (send)
-                let local_branches: Vec<(Label, LocalTypeR)> = branches
-                    .iter()
-                    .map(|(label, cont)| {
-                        let local_cont = project(cont, role)?;
-                        Ok((label.clone(), local_cont))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut local_branches = Vec::with_capacity(branches.len());
+                for (label, cont) in branches {
+                    let local_cont = project(cont, role)?;
+                    local_branches.push((label.clone(), local_cont));
+                }
 
                 Ok(LocalTypeR::Send {
                     partner: receiver.clone(),
@@ -128,13 +127,11 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
                 })
             } else if role == receiver {
                 // Receiver sees external choice (recv)
-                let local_branches: Vec<(Label, LocalTypeR)> = branches
-                    .iter()
-                    .map(|(label, cont)| {
-                        let local_cont = project(cont, role)?;
-                        Ok((label.clone(), local_cont))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut local_branches = Vec::with_capacity(branches.len());
+                for (label, cont) in branches {
+                    let local_cont = project(cont, role)?;
+                    local_branches.push((label.clone(), local_cont));
+                }
 
                 Ok(LocalTypeR::Recv {
                     partner: sender.clone(),
@@ -142,10 +139,10 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
                 })
             } else {
                 // Non-participant: merge all branch projections
-                let projections: Vec<LocalTypeR> = branches
-                    .iter()
-                    .map(|(_, cont)| project(cont, role))
-                    .collect::<Result<Vec<_>, _>>()?;
+                let mut projections = Vec::with_capacity(branches.len());
+                for (_, cont) in branches {
+                    projections.push(project(cont, role)?);
+                }
 
                 merge_all(&projections).map_err(|e| ProjectionError::MergeFailure {
                     role: role.to_string(),
@@ -198,13 +195,12 @@ fn body_mentions_role(global: &GlobalType, role: &str) -> bool {
 /// Returns a map from role names to their local types.
 pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, ProjectionError> {
     let roles = global.roles();
-    roles
-        .into_iter()
-        .map(|role| {
-            let local = project(global, &role)?;
-            Ok((role, local))
-        })
-        .collect()
+    let mut projections = Vec::with_capacity(roles.len());
+    for role in roles {
+        let local = project(global, &role)?;
+        projections.push((role, local));
+    }
+    Ok(projections)
 }
 
 // ============================================================================
@@ -242,6 +238,7 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
 #[derive(Debug, Clone)]
 pub struct MemoizedProjector {
     cache: KeyedContentStore<GlobalType, String, Result<LocalTypeR, ProjectionError>>,
+    max_entries: CacheEntries,
 }
 
 impl Default for MemoizedProjector {
@@ -256,6 +253,7 @@ impl MemoizedProjector {
     pub fn new() -> Self {
         Self {
             cache: KeyedContentStore::new(),
+            max_entries: DEFAULT_PROJECTOR_CACHE_ENTRIES,
         }
     }
 
@@ -264,6 +262,16 @@ impl MemoizedProjector {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             cache: KeyedContentStore::with_capacity(capacity),
+            max_entries: DEFAULT_PROJECTOR_CACHE_ENTRIES,
+        }
+    }
+
+    /// Create a memoized projector with an explicit cache limit.
+    #[must_use]
+    pub fn with_limit(max_entries: CacheEntries) -> Self {
+        Self {
+            cache: KeyedContentStore::new(),
+            max_entries,
         }
     }
 
@@ -285,9 +293,11 @@ impl MemoizedProjector {
 
         // Compute and cache
         let result = project(global, role);
-        self.cache
-            .insert(global, role_key, result.clone())
-            .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?;
+        if self.cache.len() < self.max_entries.as_usize() {
+            self.cache
+                .insert(global, role_key, result.clone())
+                .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?;
+        }
         result
     }
 
@@ -297,13 +307,12 @@ impl MemoizedProjector {
         global: &GlobalType,
     ) -> Result<Vec<(String, LocalTypeR)>, ProjectionError> {
         let roles = global.roles();
-        roles
-            .into_iter()
-            .map(|role| {
-                let local = self.project(global, &role)?;
-                Ok((role, local))
-            })
-            .collect()
+        let mut projections = Vec::with_capacity(roles.len());
+        for role in roles {
+            let local = self.project(global, &role)?;
+            projections.push((role, local));
+        }
+        Ok(projections)
     }
 
     /// Get cache performance metrics.
@@ -333,6 +342,7 @@ impl MemoizedProjector {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use rumpsteak_types::Label;
 
     #[test]
     fn test_project_end() {

@@ -252,7 +252,15 @@ structure GlobalActionR where
   label : Label
 deriving Repr, DecidableEq, Inhabited
 
-/-- Global enabledness: an action is available in the global type. -/
+/-- Global enabledness: an action is available in the global type.
+
+    The async condition matches the Coq formalization (`can_gstep1` in SubjectRed.v):
+    - `act.sender ≠ receiver`: the acting role cannot be the outer receiver (must wait)
+    - `act.sender = sender → act.receiver ≠ receiver`: if the acting role is the outer
+      sender, the action must be on a different channel (to a different receiver)
+
+    This allows non-participants to have any action, including ones targeting the outer
+    receiver, because they're on a different channel. -/
 inductive canStep : GlobalType → GlobalActionR → Prop where
   | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
       (label : Label) (cont : GlobalType) :
@@ -261,7 +269,7 @@ inductive canStep : GlobalType → GlobalActionR → Prop where
   | comm_async (sender receiver : String) (branches : List (Label × GlobalType))
       (act : GlobalActionR) (label : Label) (cont : GlobalType) :
       act.sender ≠ receiver →
-      act.receiver ≠ receiver →
+      (act.sender = sender → act.receiver ≠ receiver) →
       (label, cont) ∈ branches →
       canStep cont act →
       canStep (.comm sender receiver branches) act
@@ -340,7 +348,15 @@ theorem BranchesStep.labels {stepFn : GlobalType → GlobalActionR → GlobalTyp
     simp only [List.map_cons, List.cons.injEq, true_and]
     exact ih
 
-/-- Global async step relation (allows skipping unrelated prefixes). -/
+/-- Global async step relation (allows skipping unrelated prefixes).
+
+    The async condition matches the Coq formalization:
+    - `act.sender ≠ receiver`: the acting role cannot be the outer receiver (must wait)
+    - `act.sender = sender → act.receiver ≠ receiver`: if the acting role is the outer
+      sender, the action must be on a different channel (to a different receiver)
+
+    This allows non-participants to have any action, including ones targeting the outer
+    receiver, because they're on a different channel. -/
 inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
   | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
       (label : Label) (cont : GlobalType) :
@@ -349,7 +365,7 @@ inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
   | comm_async (sender receiver : String) (branches branches' : List (Label × GlobalType))
       (act : GlobalActionR) (label : Label) (cont : GlobalType) :
       act.sender ≠ receiver →
-      act.receiver ≠ receiver →
+      (act.sender = sender → act.receiver ≠ receiver) →
       (label, cont) ∈ branches →
       canStep cont act →
       BranchesStep step branches act branches' →
@@ -668,9 +684,16 @@ theorem uniqLabels_comm_branches {sender receiver : String} {branches : List (La
 axiom uniqLabels_substitute (t : String) (body : GlobalType) :
     uniqLabels (.mu t body) → uniqLabels (body.substitute t (.mu t body))
 
-/-- Enabledness implies a step. This is the good-global condition. -/
-def goodG (g : GlobalType) : Prop :=
-  ∀ act, canStep g act → ∃ g', step g act g'
+/-- Good-global condition (coinductive).
+
+    A global type is "good" if every enabled action can step, AND the result
+    is also good. This coinductive definition matches Coq's `paco1 good_gen`.
+
+    The coinductive structure directly gives us:
+    - goodG g → ∀ act, canStep g act → ∃ g', step g act g' ∧ goodG g'
+    - This means `goodG_step` is essentially built into the definition. -/
+coinductive goodG : GlobalType → Prop where
+  | intro : (∀ act, canStep g act → ∃ g', step g act g' ∧ goodG g') → goodG g
 
 /-- A step implies enabledness. -/
 theorem step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType}

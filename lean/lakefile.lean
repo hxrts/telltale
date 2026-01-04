@@ -15,7 +15,7 @@ package rumpsteakLean
 
 -- Mathlib provides standard lemmas and automation for proofs.
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4" @ "v4.24.0"
+  "https://github.com/leanprover-community/mathlib4" @ "v4.26.0"
 
 /-- The main library containing all Protocol, Proofs, Runner, and Diagnostics modules. -/
 lean_lib Rumpsteak

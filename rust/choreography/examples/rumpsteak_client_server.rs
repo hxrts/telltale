@@ -8,14 +8,46 @@
 
 use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel},
-    ChoreoHandler,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Role {
     Client,
     Server,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum ClientServerLabel {
+    Default,
+}
+
+impl LabelId for ClientServerLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ClientServerLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "default" => Some(ClientServerLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = ClientServerLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Client => RoleName::from_static("Client"),
+            Role::Server => RoleName::from_static("Server"),
+        }
+    }
 }
 
 impl rumpsteak_aura::Role for Role {

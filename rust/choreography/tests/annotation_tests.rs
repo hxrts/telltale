@@ -7,7 +7,9 @@
 // the choreography compilation pipeline.
 
 use proc_macro2::{Ident, Span};
-use rumpsteak_aura_choreography::ast::{Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role};
+use rumpsteak_aura_choreography::ast::{
+    Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, ProtocolAnnotation, Role,
+};
 use rumpsteak_aura_choreography::compiler::{
     generate_choreography_code_with_namespacing, parse_choreography_str,
 };
@@ -32,6 +34,14 @@ fn msg(name: &str) -> MessageType {
     }
 }
 
+fn annotations(pairs: &[(&str, &str)]) -> Annotations {
+    let items = pairs
+        .iter()
+        .map(|(key, value)| ProtocolAnnotation::custom(*key, *value))
+        .collect();
+    Annotations::from_vec(items)
+}
+
 #[test]
 fn test_protocol_annotation_storage() {
     let alice = role("Alice");
@@ -42,36 +52,39 @@ fn test_protocol_annotation_storage() {
         to: bob.clone(),
         message: msg("Ping"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
     // Test setting annotations
-    assert!(protocol.set_annotation("priority".to_string(), "high".to_string()));
-    assert!(protocol.set_from_annotation("timeout".to_string(), "30s".to_string()));
-    assert!(protocol.set_to_annotation("retry".to_string(), "3".to_string()));
+    assert!(protocol.add_annotation(ProtocolAnnotation::custom("priority", "high")));
+    protocol
+        .get_from_annotations_mut()
+        .unwrap()
+        .push(ProtocolAnnotation::custom("timeout", "30s"));
+    protocol
+        .get_to_annotations_mut()
+        .unwrap()
+        .push(ProtocolAnnotation::custom("retry", "3"));
 
     // Test getting annotations
-    assert_eq!(
-        protocol.get_annotation("priority"),
-        Some(&"high".to_string())
-    );
+    assert_eq!(protocol.get_annotation("priority"), Some("high".to_string()));
     assert_eq!(
         protocol.get_from_annotations().unwrap().get("timeout"),
-        Some(&"30s".to_string())
+        Some("30s".to_string())
     );
     assert_eq!(
         protocol.get_to_annotations().unwrap().get("retry"),
-        Some(&"3".to_string())
+        Some("3".to_string())
     );
 
     // Test boolean annotations
-    protocol.set_annotation("async".to_string(), "true".to_string());
+    protocol.add_annotation(ProtocolAnnotation::custom("async", "true"));
     assert_eq!(protocol.get_annotation_as_bool("async"), Some(true));
 
     // Test typed annotations
-    protocol.set_annotation("count".to_string(), "42".to_string());
+    protocol.add_annotation(ProtocolAnnotation::custom("count", "42"));
     assert_eq!(protocol.get_annotation_as::<i32>("count"), Some(42));
 }
 
@@ -85,14 +98,14 @@ fn test_protocol_annotation_api() {
         to: bob.clone(),
         message: msg("Test"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
     // Test has_annotation
     assert!(!protocol.has_annotation("priority"));
-    protocol.set_annotation("priority".to_string(), "high".to_string());
+    protocol.add_annotation(ProtocolAnnotation::custom("priority", "high"));
     assert!(protocol.has_annotation("priority"));
 
     // Test annotation_matches
@@ -101,10 +114,14 @@ fn test_protocol_annotation_api() {
     assert!(!protocol.annotation_matches("priority", "low"));
 
     // Test annotation_keys
-    protocol.set_annotation("timeout".to_string(), "30s".to_string());
-    let keys = protocol.annotation_keys();
-    assert!(keys.contains(&&"priority".to_string()));
-    assert!(keys.contains(&&"timeout".to_string()));
+    protocol.add_annotation(ProtocolAnnotation::custom("timeout", "30s"));
+    let keys: Vec<String> = protocol
+        .get_annotations()
+        .iter()
+        .map(|annotation| annotation.key().to_string())
+        .collect();
+    assert!(keys.contains(&"priority".to_string()));
+    assert!(keys.contains(&"timeout".to_string()));
 
     // Test annotation_count
     assert_eq!(protocol.annotation_count(), 2);
@@ -128,13 +145,13 @@ fn test_protocol_annotation_validation() {
         to: bob.clone(),
         message: msg("Test"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
-    protocol.set_annotation("priority".to_string(), "high".to_string());
-    protocol.set_annotation("timeout".to_string(), "30s".to_string());
+    protocol.add_annotation(ProtocolAnnotation::custom("priority", "high"));
+    protocol.add_annotation(ProtocolAnnotation::custom("timeout", "30s"));
 
     // Test successful validation
     let required = vec!["priority", "timeout"];
@@ -158,9 +175,9 @@ fn test_protocol_annotation_merging() {
         to: bob.clone(),
         message: msg("Test1"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::from([("priority".to_string(), "high".to_string())]),
-        from_annotations: HashMap::from([("timeout".to_string(), "30s".to_string())]),
-        to_annotations: HashMap::from([("retry".to_string(), "3".to_string())]),
+        annotations: annotations(&[("priority", "high")]),
+        from_annotations: annotations(&[("timeout", "30s")]),
+        to_annotations: annotations(&[("retry", "3")]),
     };
 
     let protocol2 = Protocol::Send {
@@ -168,43 +185,31 @@ fn test_protocol_annotation_merging() {
         to: bob.clone(),
         message: msg("Test2"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::from([
-            ("priority".to_string(), "low".to_string()),
-            ("async".to_string(), "true".to_string()),
-        ]),
-        from_annotations: HashMap::from([
-            ("timeout".to_string(), "60s".to_string()),
-            ("buffer".to_string(), "1024".to_string()),
-        ]),
-        to_annotations: HashMap::from([
-            ("retry".to_string(), "5".to_string()),
-            ("backoff".to_string(), "exponential".to_string()),
-        ]),
+        annotations: annotations(&[("priority", "low"), ("async", "true")]),
+        from_annotations: annotations(&[("timeout", "60s"), ("buffer", "1024")]),
+        to_annotations: annotations(&[("retry", "5"), ("backoff", "exponential")]),
     };
 
     protocol1.merge_annotations_from(&protocol2);
 
-    // Verify merged annotations (protocol2 should override protocol1)
-    assert_eq!(
-        protocol1.get_annotation("priority"),
-        Some(&"low".to_string())
-    );
-    assert_eq!(protocol1.get_annotation("async"), Some(&"true".to_string()));
+    // Verify merged annotations (merge is additive; first entry wins on lookup)
+    assert_eq!(protocol1.get_annotation("priority"), Some("high".to_string()));
+    assert_eq!(protocol1.get_annotation("async"), Some("true".to_string()));
     assert_eq!(
         protocol1.get_from_annotations().unwrap().get("timeout"),
-        Some(&"60s".to_string())
+        Some("30s".to_string())
     );
     assert_eq!(
         protocol1.get_from_annotations().unwrap().get("buffer"),
-        Some(&"1024".to_string())
+        Some("1024".to_string())
     );
     assert_eq!(
         protocol1.get_to_annotations().unwrap().get("retry"),
-        Some(&"5".to_string())
+        Some("3".to_string())
     );
     assert_eq!(
         protocol1.get_to_annotations().unwrap().get("backoff"),
-        Some(&"exponential".to_string())
+        Some("exponential".to_string())
     );
 }
 
@@ -218,16 +223,29 @@ fn test_protocol_annotation_filtering() {
         to: bob.clone(),
         message: msg("Test"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
-    protocol.set_annotation("timeout_seconds".to_string(), "30".to_string());
-    protocol.set_annotation("timeout_retries".to_string(), "3".to_string());
-    protocol.set_annotation("priority".to_string(), "high".to_string());
+    protocol.add_annotation(ProtocolAnnotation::custom("timeout_seconds", "30"));
+    protocol.add_annotation(ProtocolAnnotation::custom("timeout_retries", "3"));
+    protocol.add_annotation(ProtocolAnnotation::custom("priority", "high"));
 
-    let timeout_annotations = protocol.get_annotations_with_prefix("timeout_");
+    let timeout_annotations: HashMap<String, String> = protocol
+        .get_annotations()
+        .iter()
+        .filter_map(|annotation| {
+            let key = annotation.key();
+            if key.starts_with("timeout_") {
+                annotation
+                    .custom_value(key)
+                    .map(|value| (key.to_string(), value.to_string()))
+            } else {
+                None
+            }
+        })
+        .collect();
     assert_eq!(timeout_annotations.len(), 2);
     assert!(timeout_annotations.contains_key("timeout_seconds"));
     assert!(timeout_annotations.contains_key("timeout_retries"));
@@ -276,9 +294,9 @@ fn test_protocol_traversal_with_annotations() {
         to: bob.clone(),
         message: msg("InnerMsg"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::from([("inner".to_string(), "true".to_string())]),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: annotations(&[("inner", "true")]),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
     let outer_protocol = Protocol::Send {
@@ -290,13 +308,13 @@ fn test_protocol_traversal_with_annotations() {
             to: bob.clone(),
             message: msg("InnerMsg"),
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::from([("inner".to_string(), "true".to_string())]),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: annotations(&[("inner", "true")]),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
         }),
-        annotations: HashMap::from([("outer".to_string(), "true".to_string())]),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: annotations(&[("outer", "true")]),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
     // Test deep annotation count
@@ -337,9 +355,9 @@ fn test_choice_annotation_support() {
             to: bob.clone(),
             message: msg("Accept"),
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::new(),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
         },
     };
 
@@ -351,24 +369,21 @@ fn test_choice_annotation_support() {
             to: bob.clone(),
             message: msg("Reject"),
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::new(),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
         },
     };
 
     let mut choice = Protocol::Choice {
         role: alice.clone(),
         branches: NonEmptyVec::from_head_tail(branch1, vec![branch2]),
-        annotations: HashMap::new(),
+        annotations: Annotations::new(),
     };
 
     // Test Choice annotation support
-    assert!(choice.set_annotation("decision_timeout".to_string(), "10s".to_string()));
-    assert_eq!(
-        choice.get_annotation("decision_timeout"),
-        Some(&"10s".to_string())
-    );
+    assert!(choice.add_annotation(ProtocolAnnotation::custom("decision_timeout", "10s")));
+    assert_eq!(choice.get_annotation("decision_timeout"), Some("10s".to_string()));
     assert!(choice.has_any_annotations());
 }
 
@@ -383,25 +398,27 @@ fn test_broadcast_annotation_support() {
         to_all: NonEmptyVec::from_head_tail(bob.clone(), vec![carol.clone()]),
         message: msg("Announcement"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
     };
 
     // Test Broadcast annotation support
-    assert!(broadcast.set_annotation("reliability".to_string(), "at_least_once".to_string()));
-    assert!(broadcast.set_from_annotation("batch_size".to_string(), "100".to_string()));
+    assert!(broadcast.add_annotation(ProtocolAnnotation::custom("reliability", "at_least_once")));
+    broadcast
+        .get_from_annotations_mut()
+        .unwrap()
+        .push(ProtocolAnnotation::custom("batch_size", "100"));
 
     assert_eq!(
         broadcast.get_annotation("reliability"),
-        Some(&"at_least_once".to_string())
+        Some("at_least_once".to_string())
     );
     assert_eq!(
         broadcast.get_from_annotations().unwrap().get("batch_size"),
-        Some(&"100".to_string())
+        Some("100".to_string())
     );
 
     // Broadcast doesn't have to_annotations
-    assert!(!broadcast.set_to_annotation("invalid".to_string(), "value".to_string()));
     assert!(broadcast.get_to_annotations().is_none());
 }
 
@@ -432,9 +449,9 @@ fn test_code_generation_with_annotations() {
             to: bob.clone(),
             message: msg("TestMessage"),
             continuation: Box::new(Protocol::End),
-            annotations: HashMap::from([("priority".to_string(), "high".to_string())]),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: annotations(&[("priority", "high")]),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
         },
         attrs: HashMap::from([("version".to_string(), "1.0".to_string())]),
     };
@@ -461,24 +478,21 @@ fn test_annotation_different_types() {
         to: bob.clone(),
         message: msg("Test"),
         continuation: Box::new(Protocol::End),
-        annotations: HashMap::new(),
-        from_annotations: HashMap::new(),
-        to_annotations: HashMap::new(),
+        annotations: Annotations::new(),
+        from_annotations: Annotations::new(),
+        to_annotations: Annotations::new(),
     };
 
     // Test different annotation value types
-    protocol.set_annotation("string_value".to_string(), "hello".to_string());
-    protocol.set_annotation("number_value".to_string(), "42".to_string());
-    protocol.set_annotation("boolean_true".to_string(), "true".to_string());
-    protocol.set_annotation("boolean_false".to_string(), "false".to_string());
-    protocol.set_annotation("boolean_yes".to_string(), "yes".to_string());
-    protocol.set_annotation("boolean_no".to_string(), "no".to_string());
+    protocol.add_annotation(ProtocolAnnotation::custom("string_value", "hello"));
+    protocol.add_annotation(ProtocolAnnotation::custom("number_value", "42"));
+    protocol.add_annotation(ProtocolAnnotation::custom("boolean_true", "true"));
+    protocol.add_annotation(ProtocolAnnotation::custom("boolean_false", "false"));
+    protocol.add_annotation(ProtocolAnnotation::custom("boolean_yes", "yes"));
+    protocol.add_annotation(ProtocolAnnotation::custom("boolean_no", "no"));
 
     // Test string values
-    assert_eq!(
-        protocol.get_annotation("string_value"),
-        Some(&"hello".to_string())
-    );
+    assert_eq!(protocol.get_annotation("string_value"), Some("hello".to_string()));
 
     // Test numeric parsing
     assert_eq!(protocol.get_annotation_as::<i32>("number_value"), Some(42));

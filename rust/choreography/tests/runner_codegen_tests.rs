@@ -151,20 +151,15 @@ fn test_generate_execute_as() {
     let tokens = generate_execute_as("TestProtocol", &roles, &local_types);
     let output = tokens.to_string();
 
-    // Should generate role enum
+    // Should reference role enum variants
     assert!(
-        output.contains("TestProtocolRole"),
-        "Should contain role enum: {}",
+        output.contains("Role :: Client") || output.contains("Role::Client"),
+        "Should reference Client role: {}",
         output
     );
     assert!(
-        output.contains("Client"),
-        "Should contain Client variant: {}",
-        output
-    );
-    assert!(
-        output.contains("Server"),
-        "Should contain Server variant: {}",
+        output.contains("Role :: Server") || output.contains("Role::Server"),
+        "Should reference Server role: {}",
         output
     );
 
@@ -291,8 +286,8 @@ fn test_generate_runner_fn_select() {
         output
     );
     assert!(
-        output.contains("enum Choice"),
-        "Should contain Choice enum: {}",
+        output.contains("BranchLabel"),
+        "Should reference BranchLabel enum: {}",
         output
     );
     assert!(

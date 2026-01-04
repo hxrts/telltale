@@ -14,7 +14,7 @@
 //! - `check_coherent` bundles all predicates
 
 use crate::merge::can_merge;
-use crate::projection::project;
+use crate::projection::MemoizedProjector;
 use crate::semantics::{can_step, step, GlobalAction};
 use crate::well_formedness::unique_labels;
 use rumpsteak_types::GlobalType;
@@ -87,6 +87,9 @@ pub fn check_coherent(g: &GlobalType) -> CoherentG {
 /// Currently always returns true (refinement needed for full linearity checks).
 #[must_use]
 pub fn linear_pred(_g: &GlobalType) -> bool {
+    // Linearity would ensure channels are used without races and choices are well-scoped.
+    // We stub this out to mirror the current Lean placeholder and keep checks explicit
+    // until a full linearity predicate is implemented.
     true
 }
 
@@ -142,11 +145,12 @@ fn action_pred_rec(g: &GlobalType) -> bool {
 pub fn projectable(g: &GlobalType) -> bool {
     // Get all roles mentioned in the global type
     let roles = g.roles();
+    let mut projector = MemoizedProjector::new();
 
     // Check that projection would succeed for each role
     // For now, we check structural properties that ensure projection succeeds
     for role in &roles {
-        if !can_project_role(g, role, &mut HashSet::new()) {
+        if !can_project_role(g, role, &mut HashSet::new(), &mut projector) {
             return false;
         }
     }
@@ -157,7 +161,12 @@ pub fn projectable(g: &GlobalType) -> bool {
 ///
 /// For non-participant roles in a choice, this verifies that the projected
 /// continuations from all branches can be merged together.
-fn can_project_role(g: &GlobalType, role: &str, visited: &mut HashSet<GlobalType>) -> bool {
+fn can_project_role(
+    g: &GlobalType,
+    role: &str,
+    visited: &mut HashSet<GlobalType>,
+    projector: &mut MemoizedProjector,
+) -> bool {
     if visited.contains(g) {
         return true; // Assume projectable for cycles
     }
@@ -175,7 +184,7 @@ fn can_project_role(g: &GlobalType, role: &str, visited: &mut HashSet<GlobalType
             if sender == role || receiver == role {
                 branches
                     .iter()
-                    .all(|(_, cont)| can_project_role(cont, role, visited))
+                    .all(|(_, cont)| can_project_role(cont, role, visited, projector))
             } else {
                 // Role not involved: branches must be mergeable
                 if branches.is_empty() {
@@ -185,17 +194,20 @@ fn can_project_role(g: &GlobalType, role: &str, visited: &mut HashSet<GlobalType
                 // First check all continuations are recursively projectable
                 if !branches
                     .iter()
-                    .all(|(_, cont)| can_project_role(cont, role, visited))
+                    .all(|(_, cont)| can_project_role(cont, role, visited, projector))
                 {
                     return false;
                 }
 
                 // Then verify the projected continuations can be merged
                 // Project each continuation for this role
-                let projected: Vec<_> = branches
-                    .iter()
-                    .filter_map(|(_, cont)| project(cont, role).ok())
-                    .collect();
+                let mut projected = Vec::with_capacity(branches.len());
+                for (_, cont) in branches {
+                    match projector.project(cont, role) {
+                        Ok(local) => projected.push(local),
+                        Err(_) => return false,
+                    }
+                }
 
                 // If any projection failed, not projectable
                 if projected.len() != branches.len() {
@@ -220,7 +232,7 @@ fn can_project_role(g: &GlobalType, role: &str, visited: &mut HashSet<GlobalType
         }
         GlobalType::Mu { body, .. } => {
             // Check body is projectable
-            can_project_role(body, role, visited)
+            can_project_role(body, role, visited, projector)
         }
     }
 }

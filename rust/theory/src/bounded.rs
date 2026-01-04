@@ -14,7 +14,7 @@
 //!
 //! ```
 //! use rumpsteak_types::{LocalTypeR, Label};
-//! use rumpsteak_theory::bounded::{BoundingStrategy, bound_recursion};
+//! use rumpsteak_theory::{bound_recursion, BoundingStrategy, FuelSteps};
 //!
 //! // Create a recursive ping-pong protocol
 //! let lt = LocalTypeR::mu(
@@ -27,9 +27,10 @@
 //! );
 //!
 //! // Bound to 3 iterations
-//! let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(3));
+//! let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(FuelSteps(3)));
 //! ```
 
+use crate::limits::{FuelSteps, YieldAfterSteps};
 use rumpsteak_types::LocalTypeR;
 use std::collections::HashSet;
 
@@ -39,12 +40,12 @@ pub enum BoundingStrategy {
     /// Maximum number of recursive iterations.
     ///
     /// When fuel is exhausted, recursion variables are replaced with `End`.
-    Fuel(usize),
+    Fuel(FuelSteps),
 
     /// Yield control after N communication steps.
     ///
     /// Inserts yield points after the specified number of send/recv operations.
-    YieldAfter(usize),
+    YieldAfter(YieldAfterSteps),
 
     /// Yield when a named condition is encountered.
     ///
@@ -74,19 +75,20 @@ pub fn bound_recursion(lt: &LocalTypeR, strategy: BoundingStrategy) -> LocalType
 }
 
 /// Bound recursion by limiting iterations (fuel strategy).
-fn bound_with_fuel(lt: &LocalTypeR, fuel: usize) -> LocalTypeR {
-    if fuel == 0 {
+fn bound_with_fuel(lt: &LocalTypeR, fuel: FuelSteps) -> LocalTypeR {
+    if fuel.0 == 0 {
         return LocalTypeR::End;
     }
 
+    let next_fuel = FuelSteps(fuel.0 - 1);
     match lt {
         LocalTypeR::End => LocalTypeR::End,
 
         LocalTypeR::Send { partner, branches } => {
-            let bounded_branches = branches
-                .iter()
-                .map(|(label, cont)| (label.clone(), bound_with_fuel(cont, fuel)))
-                .collect();
+            let mut bounded_branches = Vec::with_capacity(branches.len());
+            for (label, cont) in branches {
+                bounded_branches.push((label.clone(), bound_with_fuel(cont, fuel)));
+            }
             LocalTypeR::Send {
                 partner: partner.clone(),
                 branches: bounded_branches,
@@ -94,10 +96,10 @@ fn bound_with_fuel(lt: &LocalTypeR, fuel: usize) -> LocalTypeR {
         }
 
         LocalTypeR::Recv { partner, branches } => {
-            let bounded_branches = branches
-                .iter()
-                .map(|(label, cont)| (label.clone(), bound_with_fuel(cont, fuel)))
-                .collect();
+            let mut bounded_branches = Vec::with_capacity(branches.len());
+            for (label, cont) in branches {
+                bounded_branches.push((label.clone(), bound_with_fuel(cont, fuel)));
+            }
             LocalTypeR::Recv {
                 partner: partner.clone(),
                 branches: bounded_branches,
@@ -106,7 +108,7 @@ fn bound_with_fuel(lt: &LocalTypeR, fuel: usize) -> LocalTypeR {
 
         LocalTypeR::Mu { var, body } => {
             // Decrement fuel for each recursion unfolding
-            let bounded_body = bound_with_fuel(body, fuel - 1);
+            let bounded_body = bound_with_fuel(body, next_fuel);
             LocalTypeR::Mu {
                 var: var.clone(),
                 body: Box::new(bounded_body),
@@ -121,16 +123,16 @@ fn bound_with_fuel(lt: &LocalTypeR, fuel: usize) -> LocalTypeR {
 }
 
 /// Bound recursion by inserting yield points after N steps.
-fn bound_with_yield_after(lt: &LocalTypeR, steps: usize) -> LocalTypeR {
+fn bound_with_yield_after(lt: &LocalTypeR, steps: YieldAfterSteps) -> LocalTypeR {
     bound_with_yield_after_impl(lt, steps, 0).0
 }
 
 fn bound_with_yield_after_impl(
     lt: &LocalTypeR,
-    max_steps: usize,
-    current: usize,
-) -> (LocalTypeR, usize) {
-    if current >= max_steps {
+    max_steps: YieldAfterSteps,
+    current: u32,
+) -> (LocalTypeR, u32) {
+    if current >= max_steps.0 {
         // Insert a yield point by ending
         return (LocalTypeR::End, current);
     }
@@ -140,17 +142,15 @@ fn bound_with_yield_after_impl(
 
         LocalTypeR::Send { partner, branches } => {
             let new_current = current + 1;
-            if new_current >= max_steps {
+            if new_current >= max_steps.0 {
                 (LocalTypeR::End, new_current)
             } else {
-                let bounded_branches: Vec<_> = branches
-                    .iter()
-                    .map(|(label, cont)| {
-                        let (bounded, _) =
-                            bound_with_yield_after_impl(cont, max_steps, new_current);
-                        (label.clone(), bounded)
-                    })
-                    .collect();
+                let mut bounded_branches = Vec::with_capacity(branches.len());
+                for (label, cont) in branches {
+                    let (bounded, _) =
+                        bound_with_yield_after_impl(cont, max_steps, new_current);
+                    bounded_branches.push((label.clone(), bounded));
+                }
                 (
                     LocalTypeR::Send {
                         partner: partner.clone(),
@@ -163,17 +163,15 @@ fn bound_with_yield_after_impl(
 
         LocalTypeR::Recv { partner, branches } => {
             let new_current = current + 1;
-            if new_current >= max_steps {
+            if new_current >= max_steps.0 {
                 (LocalTypeR::End, new_current)
             } else {
-                let bounded_branches: Vec<_> = branches
-                    .iter()
-                    .map(|(label, cont)| {
-                        let (bounded, _) =
-                            bound_with_yield_after_impl(cont, max_steps, new_current);
-                        (label.clone(), bounded)
-                    })
-                    .collect();
+                let mut bounded_branches = Vec::with_capacity(branches.len());
+                for (label, cont) in branches {
+                    let (bounded, _) =
+                        bound_with_yield_after_impl(cont, max_steps, new_current);
+                    bounded_branches.push((label.clone(), bounded));
+                }
                 (
                     LocalTypeR::Recv {
                         partner: partner.clone(),
@@ -213,25 +211,21 @@ fn bound_with_yield_when_impl(
         LocalTypeR::End => LocalTypeR::End,
 
         LocalTypeR::Send { partner, branches } => {
-            let bounded_branches: Vec<_> = branches
-                .iter()
-                .map(|(label, cont)| {
-                    if label.name == condition {
-                        // Yield when this condition is seen
-                        if seen_conditions.contains(condition) {
-                            (label.clone(), LocalTypeR::End)
-                        } else {
-                            seen_conditions.insert(condition.to_string());
-                            let bounded =
-                                bound_with_yield_when_impl(cont, condition, seen_conditions);
-                            (label.clone(), bounded)
-                        }
+            let mut bounded_branches = Vec::with_capacity(branches.len());
+            for (label, cont) in branches {
+                let next = if label.name == condition {
+                    // Yield when this condition is seen
+                    if seen_conditions.contains(condition) {
+                        LocalTypeR::End
                     } else {
-                        let bounded = bound_with_yield_when_impl(cont, condition, seen_conditions);
-                        (label.clone(), bounded)
+                        seen_conditions.insert(condition.to_string());
+                        bound_with_yield_when_impl(cont, condition, seen_conditions)
                     }
-                })
-                .collect();
+                } else {
+                    bound_with_yield_when_impl(cont, condition, seen_conditions)
+                };
+                bounded_branches.push((label.clone(), next));
+            }
             LocalTypeR::Send {
                 partner: partner.clone(),
                 branches: bounded_branches,
@@ -239,24 +233,20 @@ fn bound_with_yield_when_impl(
         }
 
         LocalTypeR::Recv { partner, branches } => {
-            let bounded_branches: Vec<_> = branches
-                .iter()
-                .map(|(label, cont)| {
-                    if label.name == condition {
-                        if seen_conditions.contains(condition) {
-                            (label.clone(), LocalTypeR::End)
-                        } else {
-                            seen_conditions.insert(condition.to_string());
-                            let bounded =
-                                bound_with_yield_when_impl(cont, condition, seen_conditions);
-                            (label.clone(), bounded)
-                        }
+            let mut bounded_branches = Vec::with_capacity(branches.len());
+            for (label, cont) in branches {
+                let next = if label.name == condition {
+                    if seen_conditions.contains(condition) {
+                        LocalTypeR::End
                     } else {
-                        let bounded = bound_with_yield_when_impl(cont, condition, seen_conditions);
-                        (label.clone(), bounded)
+                        seen_conditions.insert(condition.to_string());
+                        bound_with_yield_when_impl(cont, condition, seen_conditions)
                     }
-                })
-                .collect();
+                } else {
+                    bound_with_yield_when_impl(cont, condition, seen_conditions)
+                };
+                bounded_branches.push((label.clone(), next));
+            }
             LocalTypeR::Recv {
                 partner: partner.clone(),
                 branches: bounded_branches,
@@ -296,15 +286,13 @@ fn unfold_bounded_impl(
         LocalTypeR::End => LocalTypeR::End,
 
         LocalTypeR::Send { partner, branches } => {
-            let unfolded_branches = branches
-                .iter()
-                .map(|(label, cont)| {
-                    (
-                        label.clone(),
-                        unfold_bounded_impl(original, cont, max_depth, depth),
-                    )
-                })
-                .collect();
+            let mut unfolded_branches = Vec::with_capacity(branches.len());
+            for (label, cont) in branches {
+                unfolded_branches.push((
+                    label.clone(),
+                    unfold_bounded_impl(original, cont, max_depth, depth),
+                ));
+            }
             LocalTypeR::Send {
                 partner: partner.clone(),
                 branches: unfolded_branches,
@@ -312,15 +300,13 @@ fn unfold_bounded_impl(
         }
 
         LocalTypeR::Recv { partner, branches } => {
-            let unfolded_branches = branches
-                .iter()
-                .map(|(label, cont)| {
-                    (
-                        label.clone(),
-                        unfold_bounded_impl(original, cont, max_depth, depth),
-                    )
-                })
-                .collect();
+            let mut unfolded_branches = Vec::with_capacity(branches.len());
+            for (label, cont) in branches {
+                unfolded_branches.push((
+                    label.clone(),
+                    unfold_bounded_impl(original, cont, max_depth, depth),
+                ));
+            }
             LocalTypeR::Recv {
                 partner: partner.clone(),
                 branches: unfolded_branches,
@@ -362,14 +348,14 @@ mod tests {
     #[test]
     fn test_fuel_zero() {
         let lt = ping_pong_recursive();
-        let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(0));
+        let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(FuelSteps(0)));
         assert!(matches!(bounded, LocalTypeR::End));
     }
 
     #[test]
     fn test_fuel_one() {
         let lt = ping_pong_recursive();
-        let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(1));
+        let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(FuelSteps(1)));
 
         // Should have Mu with End body
         match bounded {
@@ -383,7 +369,7 @@ mod tests {
     #[test]
     fn test_fuel_preserves_structure() {
         let lt = ping_pong_recursive();
-        let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(3));
+        let bounded = bound_recursion(&lt, BoundingStrategy::Fuel(FuelSteps(3)));
 
         // Should preserve Mu structure
         match bounded {
@@ -398,14 +384,14 @@ mod tests {
     #[test]
     fn test_yield_after_zero() {
         let lt = ping_pong_recursive();
-        let bounded = bound_recursion(&lt, BoundingStrategy::YieldAfter(0));
+        let bounded = bound_recursion(&lt, BoundingStrategy::YieldAfter(YieldAfterSteps(0)));
         assert!(matches!(bounded, LocalTypeR::End));
     }
 
     #[test]
     fn test_yield_after_one() {
         let lt = ping_pong_recursive();
-        let bounded = bound_recursion(&lt, BoundingStrategy::YieldAfter(1));
+        let bounded = bound_recursion(&lt, BoundingStrategy::YieldAfter(YieldAfterSteps(1)));
 
         // With YieldAfter(1), after 1 step we end
         // The Mu wraps Send, which counts as 1 step, so continuation ends
@@ -488,10 +474,10 @@ mod tests {
     fn test_end_unchanged() {
         let lt = LocalTypeR::End;
 
-        let fuel = bound_recursion(&lt, BoundingStrategy::Fuel(5));
+        let fuel = bound_recursion(&lt, BoundingStrategy::Fuel(FuelSteps(5)));
         assert!(matches!(fuel, LocalTypeR::End));
 
-        let yield_after = bound_recursion(&lt, BoundingStrategy::YieldAfter(5));
+        let yield_after = bound_recursion(&lt, BoundingStrategy::YieldAfter(YieldAfterSteps(5)));
         assert!(matches!(yield_after, LocalTypeR::End));
 
         let yield_when = bound_recursion(&lt, BoundingStrategy::YieldWhen("x".to_string()));

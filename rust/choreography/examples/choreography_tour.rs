@@ -210,7 +210,7 @@ fn demo_projection() -> Result<(), Box<dyn std::error::Error>> {
         choreography
             .roles
             .iter()
-            .map(|r| &r.name)
+            .map(|r| r.name())
             .collect::<Vec<_>>()
     );
 

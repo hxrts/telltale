@@ -11,7 +11,8 @@
 
 use futures::executor;
 use rumpsteak_aura_choreography::{
-    interpret, Label, Metrics, NoOpHandler, Program, RecordingHandler, Retry, Trace,
+    interpret, LabelId, Metrics, NoOpHandler, Program, RecordingHandler, Retry, Trace, RoleId,
+    RoleName,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -21,6 +22,50 @@ enum TestRole {
     Alice,
     Bob,
     Charlie,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum TestLabel {
+    OptionA,
+    BranchA,
+    BranchB,
+    Inner,
+    Outer,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::OptionA => "option_a",
+            TestLabel::BranchA => "branch_a",
+            TestLabel::BranchB => "branch_b",
+            TestLabel::Inner => "inner",
+            TestLabel::Outer => "outer",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "option_a" => Some(TestLabel::OptionA),
+            "branch_a" => Some(TestLabel::BranchA),
+            "branch_b" => Some(TestLabel::BranchB),
+            "inner" => Some(TestLabel::Inner),
+            "outer" => Some(TestLabel::Outer),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+            TestRole::Charlie => RoleName::from_static("Charlie"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -93,7 +138,7 @@ fn test_send_recv_sequence() {
 fn test_choose_operation() {
     executor::block_on(async {
         let program = Program::<TestRole, TestMessage>::new()
-            .choose(TestRole::Alice, Label("option_a"))
+            .choose(TestRole::Alice, TestLabel::OptionA)
             .end();
 
         let mut handler = RecordingHandler::new(TestRole::Alice);
@@ -109,18 +154,18 @@ fn test_choose_operation() {
 fn test_branch_operation() {
     executor::block_on(async {
         let program = Program::<TestRole, TestMessage>::new()
-            .choose(TestRole::Alice, Label("branch_a"))
+            .choose(TestRole::Alice, TestLabel::BranchA)
             .branch(
                 TestRole::Alice,
                 vec![
                     (
-                        Label("branch_a"),
+                        TestLabel::BranchA,
                         Program::<TestRole, TestMessage>::new()
                             .send(TestRole::Bob, TestMessage::Data(1))
                             .end(),
                     ),
                     (
-                        Label("branch_b"),
+                        TestLabel::BranchB,
                         Program::<TestRole, TestMessage>::new()
                             .send(TestRole::Bob, TestMessage::Data(2))
                             .end(),
@@ -142,19 +187,16 @@ fn test_branch_operation() {
 fn test_nested_branches() {
     executor::block_on(async {
         let inner_branch = Program::<TestRole, TestMessage>::new()
-            .choose(TestRole::Bob, Label("inner"))
+            .choose(TestRole::Bob, TestLabel::Inner)
             .branch(
                 TestRole::Bob,
-                vec![(
-                    Label("inner"),
-                    Program::<TestRole, TestMessage>::new().end(),
-                )],
+                vec![(TestLabel::Inner, Program::<TestRole, TestMessage>::new().end())],
             )
             .end();
 
         let program = Program::<TestRole, TestMessage>::new()
-            .choose(TestRole::Alice, Label("outer"))
-            .branch(TestRole::Alice, vec![(Label("outer"), inner_branch)])
+            .choose(TestRole::Alice, TestLabel::Outer)
+            .branch(TestRole::Alice, vec![(TestLabel::Outer, inner_branch)])
             .end();
 
         let mut handler = NoOpHandler::new();
@@ -390,6 +432,7 @@ fn test_multiple_receives() {
 
 // Test 19: Empty parallel
 #[test]
+#[should_panic(expected = "Parallel must contain at least one program")]
 fn test_empty_parallel() {
     executor::block_on(async {
         let program = Program::<TestRole, TestMessage>::new()
@@ -408,13 +451,13 @@ fn test_empty_parallel() {
 #[test]
 fn test_large_composition() {
     executor::block_on(async {
-        let mut program = Program::<TestRole, TestMessage>::new();
+        let mut builder = Program::<TestRole, TestMessage>::new();
 
         // Build a large program with many effects
         for i in 0..10 {
-            program = program.send(TestRole::Bob, TestMessage::Data(i));
+            builder = builder.send(TestRole::Bob, TestMessage::Data(i));
         }
-        program = program.end();
+        let program = builder.end();
 
         let mut handler = Metrics::new(NoOpHandler::new());
         let mut endpoint = ();

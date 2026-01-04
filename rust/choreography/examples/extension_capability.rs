@@ -6,7 +6,8 @@
 //! This example demonstrates a role-specific extension that validates
 //! capabilities before allowing operations.
 
-use rumpsteak_aura_choreography::effects::{ExtensionEffect, Program};
+use rumpsteak_aura_choreography::effects::{ExtensionEffect, LabelId, Program, RoleId};
+use rumpsteak_aura_choreography::RoleName;
 use std::any::{Any, TypeId};
 
 // Define roles
@@ -16,6 +17,37 @@ pub enum Role {
     Bob,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum CapabilityLabel {
+    Default,
+}
+
+impl LabelId for CapabilityLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            CapabilityLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "default" => Some(CapabilityLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = CapabilityLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Alice => RoleName::from_static("Alice"),
+            Role::Bob => RoleName::from_static("Bob"),
+        }
+    }
+}
+
 // Define a capability validation extension
 #[derive(Clone, Debug)]
 pub struct ValidateCapability {
@@ -23,7 +55,7 @@ pub struct ValidateCapability {
     pub role: Role,
 }
 
-impl ExtensionEffect for ValidateCapability {
+impl ExtensionEffect<Role> for ValidateCapability {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -32,9 +64,8 @@ impl ExtensionEffect for ValidateCapability {
         "ValidateCapability"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        // Only the role being validated participates in this extension
-        vec![Box::new(self.role)]
+    fn participating_roles(&self) -> Vec<Role> {
+        vec![self.role]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -45,7 +76,7 @@ impl ExtensionEffect for ValidateCapability {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
@@ -57,7 +88,7 @@ pub struct ChargeFlowCost {
     pub role: Role,
 }
 
-impl ExtensionEffect for ChargeFlowCost {
+impl ExtensionEffect<Role> for ChargeFlowCost {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -66,8 +97,8 @@ impl ExtensionEffect for ChargeFlowCost {
         "ChargeFlowCost"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![Box::new(self.role)]
+    fn participating_roles(&self) -> Vec<Role> {
+        vec![self.role]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -78,7 +109,7 @@ impl ExtensionEffect for ChargeFlowCost {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
@@ -111,7 +142,7 @@ fn main() {
 
     println!("Created program with {} effects", program.len());
     println!("\nProgram structure:");
-    for (i, effect) in program.effects.iter().enumerate() {
+    for (i, effect) in program.effects().iter().enumerate() {
         if let Some(validate) = effect.as_extension::<ValidateCapability>() {
             println!(
                 "  [{}] ValidateCapability: {:?} needs '{}'",

@@ -12,6 +12,7 @@
 //! only send operations. A local type is a valid asynchronous type if it can
 //! be decomposed into alternating input and output phases.
 
+use crate::limits::{UnfoldSteps, DEFAULT_SISO_UNFOLD_STEPS};
 use rumpsteak_types::{Label, LocalTypeR};
 use thiserror::Error;
 
@@ -33,11 +34,15 @@ pub enum AsyncSubtypeError {
     /// Orphan message detected
     #[error("orphan message detected: message '{label}' from {partner} has no receiver")]
     OrphanMessage { partner: String, label: String },
+
+    /// SISO decomposition exceeded the unfold limit.
+    #[error("siso decomposition exceeded the unfold limit")]
+    UnfoldLimitExceeded,
 }
 
 /// Direction for SISO tree building
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Direction {
+enum Direction {
     /// Input direction (receives)
     Input,
     /// Output direction (sends)
@@ -100,14 +105,24 @@ pub struct SisoSegment {
 /// assert!(!segments.is_empty());
 /// ```
 pub fn siso_decompose(lt: &LocalTypeR) -> Result<Vec<SisoSegment>, AsyncSubtypeError> {
+    siso_decompose_with_fuel(lt, DEFAULT_SISO_UNFOLD_STEPS)
+}
+
+/// Decompose a local type into SISO segments with an explicit unfold limit.
+pub fn siso_decompose_with_fuel(
+    lt: &LocalTypeR,
+    fuel: UnfoldSteps,
+) -> Result<Vec<SisoSegment>, AsyncSubtypeError> {
     let mut segments = Vec::new();
-    siso_decompose_impl(lt, &mut segments)?;
+    let mut remaining_unfolds = fuel.0;
+    siso_decompose_impl(lt, &mut segments, &mut remaining_unfolds)?;
     Ok(segments)
 }
 
 fn siso_decompose_impl(
     lt: &LocalTypeR,
     segments: &mut Vec<SisoSegment>,
+    remaining_unfolds: &mut u32,
 ) -> Result<(), AsyncSubtypeError> {
     match lt {
         LocalTypeR::End => {
@@ -129,7 +144,7 @@ fn siso_decompose_impl(
             });
 
             if let Some(cont) = continuation {
-                siso_decompose_impl(&cont, segments)?;
+                siso_decompose_impl(&cont, segments, remaining_unfolds)?;
             }
 
             Ok(())
@@ -149,16 +164,20 @@ fn siso_decompose_impl(
             });
 
             if let Some(cont) = continuation {
-                siso_decompose_impl(&cont, segments)?;
+                siso_decompose_impl(&cont, segments, remaining_unfolds)?;
             }
 
             Ok(())
         }
 
         LocalTypeR::Mu { var, body } => {
+            if *remaining_unfolds == 0 {
+                return Err(AsyncSubtypeError::UnfoldLimitExceeded);
+            }
+            *remaining_unfolds -= 1;
             // Handle recursion by unfolding once
             let unfolded = body.substitute(var, lt);
-            siso_decompose_impl(&unfolded, segments)
+            siso_decompose_impl(&unfolded, segments, remaining_unfolds)
         }
 
         LocalTypeR::Var(_) => {

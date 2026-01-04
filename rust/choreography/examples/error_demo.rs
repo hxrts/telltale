@@ -103,7 +103,7 @@ protocol ValidExample = {
                 choreo
                     .roles
                     .iter()
-                    .map(|r| r.name.to_string())
+                    .map(|r| r.name().to_string())
                     .collect::<Vec<_>>()
                     .join(", ")
             );

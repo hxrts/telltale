@@ -9,7 +9,10 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::effects::{handlers::in_memory::InMemoryHandler, ChoreoHandler};
+use rumpsteak_aura_choreography::effects::{
+    handlers::in_memory::InMemoryHandler, ChoreoHandler, LabelId, RoleId,
+};
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -23,6 +26,38 @@ enum TestRole {
     Alice,
     Bob,
     Charlie,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TestLabel {
+    Default,
+}
+
+impl LabelId for TestLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            TestLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "default" => Some(TestLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = TestLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+            TestRole::Charlie => RoleName::from_static("Charlie"),
+        }
+    }
 }
 
 // ============================================================================

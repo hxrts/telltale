@@ -13,8 +13,9 @@
 use rumpsteak_aura::Message;
 use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
-    ChoreoHandler, Label,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -28,6 +29,44 @@ enum TestRole {
     Alice,
     Bob,
     Charlie,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum ChoiceLabel {
+    Accept,
+    Option1,
+    Default,
+}
+
+impl LabelId for ChoiceLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ChoiceLabel::Accept => "Accept",
+            ChoiceLabel::Option1 => "Option1",
+            ChoiceLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "Accept" => Some(ChoiceLabel::Accept),
+            "Option1" => Some(ChoiceLabel::Option1),
+            "default" => Some(ChoiceLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for TestRole {
+    type Label = ChoiceLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            TestRole::Alice => RoleName::from_static("Alice"),
+            TestRole::Bob => RoleName::from_static("Bob"),
+            TestRole::Charlie => RoleName::from_static("Charlie"),
+        }
+    }
 }
 
 // Implement Role trait for TestRole
@@ -357,7 +396,7 @@ async fn test_handler_choose_offer() {
 
     // Alice chooses
     handler
-        .choose(&mut alice_ep, TestRole::Bob, Label("Accept"))
+        .choose(&mut alice_ep, TestRole::Bob, ChoiceLabel::Accept)
         .await
         .expect("Choose should succeed");
 
@@ -367,7 +406,7 @@ async fn test_handler_choose_offer() {
         .await
         .expect("Offer should succeed");
 
-    assert_eq!(label.0, "Accept");
+    assert_eq!(label, ChoiceLabel::Accept);
 }
 
 #[tokio::test]
@@ -379,7 +418,7 @@ async fn test_handler_choose_updates_metadata() {
     endpoint.register_channel(TestRole::Bob, channel);
 
     handler
-        .choose(&mut endpoint, TestRole::Bob, Label("Option1"))
+        .choose(&mut endpoint, TestRole::Bob, ChoiceLabel::Option1)
         .await
         .unwrap();
 
@@ -407,9 +446,9 @@ async fn test_handler_missing_channel_error() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    let msg = format!("{:?}", err);
+    let msg = err.to_string();
     assert!(
-        msg.contains("No channel registered"),
+        msg.contains("no channel registered"),
         "Error should mention missing channel: {}",
         msg
     );

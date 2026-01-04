@@ -10,6 +10,7 @@
 //! - Metrics collection
 
 use rumpsteak_aura_choreography::effects::*;
+use rumpsteak_aura_choreography::RoleName;
 use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
 
@@ -24,6 +25,38 @@ enum Role {
     Database,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum WorkflowLabel {
+    Default,
+}
+
+impl LabelId for WorkflowLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            WorkflowLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "default" => Some(WorkflowLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = WorkflowLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Client => RoleName::from_static("Client"),
+            Role::Server => RoleName::from_static("Server"),
+            Role::Database => RoleName::from_static("Database"),
+        }
+    }
+}
+
 // ============================================================================
 // Extension Definitions
 // ============================================================================
@@ -34,7 +67,7 @@ struct ValidateCapability {
     role: Role,
 }
 
-impl ExtensionEffect for ValidateCapability {
+impl ExtensionEffect<Role> for ValidateCapability {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -43,8 +76,8 @@ impl ExtensionEffect for ValidateCapability {
         "ValidateCapability"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![Box::new(self.role)]
+    fn participating_roles(&self) -> Vec<Role> {
+        vec![self.role]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -55,7 +88,7 @@ impl ExtensionEffect for ValidateCapability {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
@@ -66,7 +99,7 @@ struct ChargeFlowCost {
     role: Role,
 }
 
-impl ExtensionEffect for ChargeFlowCost {
+impl ExtensionEffect<Role> for ChargeFlowCost {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -75,8 +108,8 @@ impl ExtensionEffect for ChargeFlowCost {
         "ChargeFlowCost"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![Box::new(self.role)]
+    fn participating_roles(&self) -> Vec<Role> {
+        vec![self.role]
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -87,7 +120,7 @@ impl ExtensionEffect for ChargeFlowCost {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
@@ -105,7 +138,7 @@ enum LogLevel {
     Error,
 }
 
-impl ExtensionEffect for LogEvent {
+impl ExtensionEffect<Role> for LogEvent {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -114,7 +147,7 @@ impl ExtensionEffect for LogEvent {
         "LogEvent"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    fn participating_roles(&self) -> Vec<Role> {
         vec![] // Global
     }
 
@@ -126,7 +159,7 @@ impl ExtensionEffect for LogEvent {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
@@ -137,7 +170,7 @@ struct RecordMetric {
     value: u64,
 }
 
-impl ExtensionEffect for RecordMetric {
+impl ExtensionEffect<Role> for RecordMetric {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -146,7 +179,7 @@ impl ExtensionEffect for RecordMetric {
         "RecordMetric"
     }
 
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
+    fn participating_roles(&self) -> Vec<Role> {
         vec![]
     }
 
@@ -158,7 +191,7 @@ impl ExtensionEffect for RecordMetric {
         self
     }
 
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
@@ -169,7 +202,7 @@ impl ExtensionEffect for RecordMetric {
 
 struct WorkflowHandler {
     role: Role,
-    registry: ExtensionRegistry<()>,
+    registry: ExtensionRegistry<(), Role>,
     budget: Arc<Mutex<u32>>,
     metrics: Arc<Mutex<Vec<(String, u64)>>>,
 }
@@ -295,9 +328,7 @@ impl WorkflowHandler {
 
 #[async_trait::async_trait]
 impl ExtensibleHandler for WorkflowHandler {
-    type Endpoint = ();
-
-    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint> {
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role> {
         &self.registry
     }
 }
@@ -312,7 +343,7 @@ impl ChoreoHandler for WorkflowHandler {
         _ep: &mut Self::Endpoint,
         to: Self::Role,
         _msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         println!("[{:?}] -> [{:?}] Message sent", self.role, to);
         Ok(())
     }
@@ -321,7 +352,7 @@ impl ChoreoHandler for WorkflowHandler {
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         println!("[{:?}] <- [{:?}] Message received", self.role, from);
         Err(ChoreographyError::Transport(
             "recv not implemented in example".into(),
@@ -332,15 +363,19 @@ impl ChoreoHandler for WorkflowHandler {
         &mut self,
         _ep: &mut Self::Endpoint,
         _who: Self::Role,
-        label: Label,
-    ) -> Result<()> {
-        println!("[{:?}] Choice: {}", self.role, label.0);
+        label: WorkflowLabel,
+    ) -> ChoreoResult<()> {
+        println!("[{:?}] Choice: {}", self.role, label.as_str());
         Ok(())
     }
 
-    async fn offer(&mut self, _ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label> {
+    async fn offer(
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        from: Self::Role,
+    ) -> ChoreoResult<WorkflowLabel> {
         println!("[{:?}] Offering choice from {:?}", self.role, from);
-        Ok(Label("default"))
+        Ok(WorkflowLabel::Default)
     }
 
     async fn with_timeout<F, T>(
@@ -349,9 +384,9 @@ impl ChoreoHandler for WorkflowHandler {
         _at: Self::Role,
         _dur: std::time::Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         body.await
     }
