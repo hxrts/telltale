@@ -67,14 +67,69 @@ partial def LocalTypeR.freeVars : LocalTypeR → List String
   | .mu t body => body.freeVars.filter (· != t)
   | .var t => [t]
 
+/-! ## Termination Helpers for LocalTypeR -/
+
+private theorem sizeOf_snd_lt_prod_local {α : Type} [SizeOf α] (a : α) (b : LocalTypeR) :
+    sizeOf b < sizeOf (a, b) := by
+  simp only [sizeOf, Prod._sizeOf_1]
+  omega
+
+private theorem sizeOf_head_lt_cons_local {α : Type} [SizeOf α] (x : α) (l : List α) :
+    sizeOf x < sizeOf (x :: l) := by
+  simp only [sizeOf, List._sizeOf_1]
+  omega
+
+private theorem sizeOf_tail_lt_cons_local {α : Type} [SizeOf α] (x : α) (l : List α) :
+    sizeOf l < sizeOf (x :: l) := by
+  simp only [sizeOf, List._sizeOf_1]
+  omega
+
+private theorem sizeOf_mem_snd_lt_local {bs : List (Label × LocalTypeR)} {pair : Label × LocalTypeR}
+    (hmem : pair ∈ bs) : sizeOf pair.2 < sizeOf bs := by
+  induction bs with
+  | nil => cases hmem
+  | cons hd tl ih =>
+    cases hmem with
+    | head =>
+      have h1 : sizeOf pair.2 < sizeOf pair := sizeOf_snd_lt_prod_local pair.1 pair.2
+      have h2 : sizeOf pair < sizeOf (pair :: tl) := sizeOf_head_lt_cons_local pair tl
+      exact Nat.lt_trans h1 h2
+    | tail _ hmem' =>
+      have h1 := ih hmem'
+      have h2 : sizeOf tl < sizeOf (hd :: tl) := sizeOf_tail_lt_cons_local hd tl
+      exact Nat.lt_trans h1 h2
+
+private theorem sizeOf_bs_lt_send_local (p : String) (bs : List (Label × LocalTypeR)) :
+    sizeOf bs < sizeOf (LocalTypeR.send p bs) := by
+  simp only [LocalTypeR.send.sizeOf_spec]
+  omega
+
+private theorem sizeOf_bs_lt_recv_local (p : String) (bs : List (Label × LocalTypeR)) :
+    sizeOf bs < sizeOf (LocalTypeR.recv p bs) := by
+  simp only [LocalTypeR.recv.sizeOf_spec]
+  omega
+
+private theorem sizeOf_body_lt_mu_local (v : String) (body : LocalTypeR) :
+    sizeOf body < sizeOf (LocalTypeR.mu v body) := by
+  simp only [LocalTypeR.mu.sizeOf_spec]
+  omega
+
 /-- Substitute a local type for a variable. -/
-partial def LocalTypeR.substitute (lt : LocalTypeR) (varName : String) (replacement : LocalTypeR) : LocalTypeR :=
+def LocalTypeR.substitute (lt : LocalTypeR) (varName : String) (replacement : LocalTypeR) : LocalTypeR :=
   match lt with
   | .end => .end
   | .send partner branches =>
-    .send partner (branches.map fun (l, cont) => (l, cont.substitute varName replacement))
+    .send partner (branches.attach.map fun ⟨(l, cont), hmem⟩ =>
+      have _h : sizeOf cont < 1 + sizeOf partner + sizeOf branches := by
+        have h1 : sizeOf cont < sizeOf branches := sizeOf_mem_snd_lt_local hmem
+        omega
+      (l, cont.substitute varName replacement))
   | .recv partner branches =>
-    .recv partner (branches.map fun (l, cont) => (l, cont.substitute varName replacement))
+    .recv partner (branches.attach.map fun ⟨(l, cont), hmem⟩ =>
+      have _h : sizeOf cont < 1 + sizeOf partner + sizeOf branches := by
+        have h1 : sizeOf cont < sizeOf branches := sizeOf_mem_snd_lt_local hmem
+        omega
+      (l, cont.substitute varName replacement))
   | .mu t body =>
     if t == varName then
       -- Variable is shadowed by this binder
@@ -83,64 +138,141 @@ partial def LocalTypeR.substitute (lt : LocalTypeR) (varName : String) (replacem
       .mu t (body.substitute varName replacement)
   | .var t =>
     if t == varName then replacement else .var t
+termination_by sizeOf lt
 
 /-- Unfold one level of recursion: μt.T ↦ T[μt.T/t] -/
 partial def LocalTypeR.unfold : LocalTypeR → LocalTypeR
   | lt@(.mu t body) => body.substitute t lt
   | lt => lt
 
-/-! ## Substitute Specification Axioms
+/-! ## Substitute Specification Theorems
 
-Since `substitute` is a `partial def`, it cannot be unfolded in proofs.
-These axioms specify its behavior on each constructor. -/
+Now that `substitute` is a total function, we can prove its behavior on each constructor. -/
+
+/-- Helper: attach.map with function extracting element equals map with that function. -/
+private theorem attach_map_eq_map_local {α β : Type} (l : List α) (f : α → β) :
+    l.attach.map (fun ⟨x, _⟩ => f x) = l.map f := by
+  induction l with
+  | nil => rfl
+  | cons hd tl ih => simp [List.attach, List.map, ih]
 
 /-- Substitute on end yields end. -/
-axiom LocalTypeR.substitute_end (t : String) (repl : LocalTypeR) :
-    LocalTypeR.substitute .end t repl = .end
+@[simp] theorem LocalTypeR.substitute_end (t : String) (repl : LocalTypeR) :
+    LocalTypeR.substitute .end t repl = .end := by
+  unfold substitute
+  rfl
 
 /-- Substitute on matching variable yields replacement. -/
-axiom LocalTypeR.substitute_var_eq (t : String) (repl : LocalTypeR) :
-    LocalTypeR.substitute (.var t) t repl = repl
+@[simp] theorem LocalTypeR.substitute_var_eq (t : String) (repl : LocalTypeR) :
+    LocalTypeR.substitute (.var t) t repl = repl := by
+  simp only [substitute, beq_self_eq_true, ↓reduceIte]
 
 /-- Substitute on non-matching variable yields the variable unchanged. -/
-axiom LocalTypeR.substitute_var_ne {s t : String} (hne : s ≠ t) (repl : LocalTypeR) :
-    LocalTypeR.substitute (.var s) t repl = .var s
+@[simp] theorem LocalTypeR.substitute_var_ne {s t : String} (hne : s ≠ t) (repl : LocalTypeR) :
+    LocalTypeR.substitute (.var s) t repl = .var s := by
+  simp only [substitute, beq_eq_false_iff_ne.mpr hne, Bool.false_eq_true, ↓reduceIte]
 
 /-- Substitute on send maps over branches. -/
-axiom LocalTypeR.substitute_send (partner t : String) (branches : List (Label × LocalTypeR))
+theorem LocalTypeR.substitute_send (partner t : String) (branches : List (Label × LocalTypeR))
     (repl : LocalTypeR) :
     LocalTypeR.substitute (.send partner branches) t repl =
-      .send partner (branches.map fun (l, lt) => (l, lt.substitute t repl))
+      .send partner (branches.map fun (l, lt) => (l, lt.substitute t repl)) := by
+  simp only [substitute]
+  congr 1
+  exact attach_map_eq_map_local branches fun (l, cont) => (l, cont.substitute t repl)
 
 /-- Substitute on recv maps over branches. -/
-axiom LocalTypeR.substitute_recv (partner t : String) (branches : List (Label × LocalTypeR))
+theorem LocalTypeR.substitute_recv (partner t : String) (branches : List (Label × LocalTypeR))
     (repl : LocalTypeR) :
     LocalTypeR.substitute (.recv partner branches) t repl =
-      .recv partner (branches.map fun (l, lt) => (l, lt.substitute t repl))
+      .recv partner (branches.map fun (l, lt) => (l, lt.substitute t repl)) := by
+  simp only [substitute]
+  congr 1
+  exact attach_map_eq_map_local branches fun (l, cont) => (l, cont.substitute t repl)
 
 /-- Substitute on mu when variable is shadowed (same name) yields mu unchanged. -/
-axiom LocalTypeR.substitute_mu_shadow (t : String) (body repl : LocalTypeR) :
-    LocalTypeR.substitute (.mu t body) t repl = .mu t body
+@[simp] theorem LocalTypeR.substitute_mu_shadow (t : String) (body repl : LocalTypeR) :
+    LocalTypeR.substitute (.mu t body) t repl = .mu t body := by
+  simp only [substitute, beq_self_eq_true, ↓reduceIte]
 
 /-- Substitute on mu when variable is not shadowed recurses into body. -/
-axiom LocalTypeR.substitute_mu_ne {s t : String} (hne : s ≠ t) (body repl : LocalTypeR) :
-    LocalTypeR.substitute (.mu s body) t repl = .mu s (body.substitute t repl)
+theorem LocalTypeR.substitute_mu_ne {s t : String} (hne : s ≠ t) (body repl : LocalTypeR) :
+    LocalTypeR.substitute (.mu s body) t repl = .mu s (body.substitute t repl) := by
+  simp only [substitute, beq_eq_false_iff_ne.mpr hne, Bool.false_eq_true, ↓reduceIte]
 
 /-- Substitution of a non-variable into a local type that isn't .end or a matching variable
     produces a non-.end result. More precisely: if lt ≠ .end and lt isn't a matching var,
     then lt.substitute t repl ≠ .end. -/
-axiom LocalTypeR.substitute_non_end_non_var {lt : LocalTypeR} {t : String} {repl : LocalTypeR}
+theorem LocalTypeR.substitute_non_end_non_var {lt : LocalTypeR} {t : String} {repl : LocalTypeR}
     (hne : lt ≠ .end)
     (hvar : ∀ v, lt = .var v → v ≠ t)
-    : lt.substitute t repl ≠ .end
+    : lt.substitute t repl ≠ .end := by
+  cases lt with
+  | «end» => exact absurd rfl hne
+  | var v =>
+    by_cases hv : v = t
+    · -- v = t: substitute gives repl, and we need repl ≠ .end
+      -- But hvar says v ≠ t, contradiction
+      exact absurd hv (hvar v rfl)
+    · -- v ≠ t: substitute gives .var v ≠ .end
+      simp only [substitute_var_ne hv repl]
+      intro h; cases h
+  | send partner branches =>
+    simp only [substitute_send]
+    intro h; cases h
+  | recv partner branches =>
+    simp only [substitute_recv]
+    intro h; cases h
+  | mu s body =>
+    by_cases hs : s = t
+    · -- Shadowed: substitute gives .mu s body ≠ .end
+      subst hs
+      simp only [substitute_mu_shadow]
+      intro h; cases h
+    · -- Not shadowed: substitute gives .mu s (body.substitute t repl) ≠ .end
+      simp only [substitute_mu_ne hs]
+      intro h; cases h
 
 /-- For well-formed recursive types, if projBody came from projecting a mu body and is non-.end,
     then substituting into projBody preserves the non-.end property when the replacement type
     respects the guardedness structure. This captures the equi-recursive typing property. -/
-axiom LocalTypeR.mu_proj_substitute_non_end {projBody : LocalTypeR} {t : String} {rlt : LocalTypeR}
+theorem LocalTypeR.mu_proj_substitute_non_end {projBody : LocalTypeR} {t : String} {rlt : LocalTypeR}
     (hne : projBody ≠ .end)
     : projBody.substitute t rlt ≠ .end ∨
-      ∃ v, projBody = .var v ∧ v = t ∧ rlt = .end
+      ∃ v, projBody = .var v ∧ v = t ∧ rlt = .end := by
+  cases projBody with
+  | «end» => exact absurd rfl hne
+  | var v =>
+    by_cases hv : v = t
+    · -- v = t: substitution gives rlt
+      subst hv
+      by_cases hr : rlt = .end
+      · -- rlt = .end: right disjunct
+        right
+        exact ⟨v, rfl, rfl, hr⟩
+      · -- rlt ≠ .end: left disjunct
+        left
+        simp only [substitute_var_eq]
+        exact hr
+    · -- v ≠ t: substitution gives .var v ≠ .end
+      left
+      simp only [substitute_var_ne hv]
+      intro h; cases h
+  | send partner branches =>
+    left
+    simp only [substitute_send]
+    intro h; cases h
+  | recv partner branches =>
+    left
+    simp only [substitute_recv]
+    intro h; cases h
+  | mu s body =>
+    left
+    by_cases hs : s = t
+    · subst hs
+      simp only [substitute_mu_shadow]
+      intro h; cases h
+    · simp only [substitute_mu_ne hs]; intro h; cases h
 
 /-- Local actions over recursive local types (kind, partner, label). -/
 structure LocalActionR where
