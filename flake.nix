@@ -43,7 +43,7 @@
           findutils
           gawk
           gnused
-          lean4
+          elan
         ];
 
         buildInputs =
@@ -63,7 +63,7 @@
           shellHook = ''
             echo "Rumpsteak Aura development environment"
             echo "Rust: $(rustc --version)"
-            echo "Lean: $(lean --version 2>/dev/null || echo 'available')"
+            echo "Lean: $(elan show 2>/dev/null | head -1 || echo 'run: elan default leanprover/lean4:v4.25.0')"
             echo "WASM: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
           '';
         };
