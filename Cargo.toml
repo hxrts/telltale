@@ -4,7 +4,7 @@ version = "0.7.0"
 authors = ["Zak Cutner <me@zakcutner.uk>", "Sam Hart <sam@hxrts.com>"]
 edition = "2021"
 rust-version = "1.75"
-description = "Session types for asynchronous communication between multiple parties (Aura flavored)."
+description = "Session types for multi-party asynchronous communication."
 readme = "README.md"
 repository = "https://github.com/aura-project/rumpsteak-aura"
 license = "MIT"
@@ -157,8 +157,7 @@ tempfile = "3.2"
 assert_matches = "1.5"
 
 # ============================================================================
-# Workspace Lints (Rust Style Guide)
-# See work/style_guide_rust.md for rationale
+# Workspace Lints
 # ============================================================================
 
 [workspace.lints.rust]
