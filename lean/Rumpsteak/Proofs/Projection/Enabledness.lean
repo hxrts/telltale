@@ -81,7 +81,7 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
   induction hstep generalizing g with
   | send_head partner branches label cont hmem =>
     cases g with
-    | end =>
+    | «end» =>
       simp [projectR] at hproj
     | var t =>
       simp [projectR] at hproj
@@ -147,7 +147,7 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
             (LocalActionR.toGlobal role act) label0 g0 hsender_ne hchannel_cond hmem0 hcan0
   | recv_head partner branches label cont hmem =>
     cases g with
-    | end =>
+    | «end» =>
       simp [projectR] at hproj
     | var t =>
       simp [projectR] at hproj
@@ -208,7 +208,7 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
             (LocalActionR.toGlobal role act) label0 g0 hsender_ne hchannel_cond hmem0 hcan0
   | send_async partner branches act' label cont hnePartner hmem hstep_cont ih =>
     cases g with
-    | end =>
+    | «end» =>
       simp [projectR] at hproj
     | var t =>
       simp [projectR] at hproj
@@ -297,7 +297,7 @@ theorem project_can_step (g : GlobalType) (role : String) (lt : LocalTypeR)
             (LocalActionR.toGlobal role act') label0 g0 hsender_ne hchannel_cond hmem0 hcan0
   | mu t body act' hstep' ih =>
     cases g with
-    | end =>
+    | «end» =>
       simp [projectR] at hproj
     | var t0 =>
       simp [projectR] at hproj

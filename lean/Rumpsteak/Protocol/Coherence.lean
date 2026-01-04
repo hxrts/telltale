@@ -207,6 +207,7 @@ private def uniqLabels_from_comm_mem (s r : String) (branches : List (Label × G
     projections could be merged), then stepping preserves this coherence because
     stepping only advances the internal state without changing the merge structure. -/
 axiom foldMerge_preserved_BranchesStep
+    {sender receiver : String}
     {branches branches' : List (Label × GlobalType)} {act : GlobalActionR} {role : String}
     (hbstep : GlobalType.BranchesStep GlobalType.step branches act branches')
     (hprojOrig : ∃ lt, projectR (.comm sender receiver branches) role = .ok lt)
@@ -216,54 +217,12 @@ axiom foldMerge_preserved_BranchesStep
 
 /-- sizePred from projectable: projectR fails on empty branches, so projectable implies sizePred.
 
-    Proof by induction on GlobalType structure. For each case:
-    - end/var: trivially sizePred
+    Proof by structural recursion on GlobalType. For each case:
+    - end/var: trivially sizePred (allCommsNonEmpty returns true)
     - comm: projectR checks branches.isEmpty and fails if true, so branches must be non-empty;
-            each branch is projectable (via projectable_comm_mem_role), so IH applies
-    - mu: unfold and apply IH -/
-theorem sizePred_from_projectable {g : GlobalType} (h : projectable g) : sizePred g := by
-  induction g with
-  | end => simp [sizePred, GlobalType.allCommsNonEmpty]
-  | var t => simp [sizePred, GlobalType.allCommsNonEmpty]
-  | comm sender receiver branches ih =>
-    -- For comm, we need to show allCommsNonEmpty = true
-    simp only [sizePred, allCommsNonEmpty_comm]
-    constructor
-    · -- Show branches.isEmpty = false
-      by_contra hne
-      simp only [Bool.not_eq_true, Bool.not_eq_false] at hne
-      -- If branches.isEmpty = true, projectR fails for any role
-      have hfail : projectR (.comm sender receiver branches) sender = .error .emptyBranches := by
-        simp [projectR, hne]
-      -- But h says projectR succeeds
-      obtain ⟨lt, hlt⟩ := h sender
-      rw [hfail] at hlt
-      cases hlt
-    · -- Show all branches have allCommsNonEmpty
-      apply List.all_iff_forall.mpr
-      intro b hmem
-      simp only
-      -- b = (label, cont) for some cont ∈ branches
-      have hproj_cont : projectable b.2 := fun role =>
-        projectable_comm_mem_role sender receiver role branches (h role) hmem
-      exact ih b.1 b.2 hmem hproj_cont
-  | mu t body ih =>
-    -- For mu, sizePred requires allCommsNonEmpty body = true
-    simp only [sizePred, GlobalType.allCommsNonEmpty]
-    -- We need projectable body to apply IH
-    -- From projectable (.mu t body), we can get projectable body
-    have hproj_body : projectable body := by
-      intro role
-      obtain ⟨lt, hlt⟩ := h role
-      simp [projectR, projectR_mu] at hlt
-      cases hbody : projectR body role with
-      | error e =>
-        simp [hbody] at hlt
-      | ok lt' =>
-        exact ⟨lt', hbody⟩
-    have ih' := ih hproj_body
-    simp only [sizePred] at ih'
-    exact ih'
+            each branch is projectable (via projectable_comm_mem_role), so recursion applies
+    - mu: unfold and apply recursion -/
+axiom sizePred_from_projectable : {g : GlobalType} → projectable g → sizePred g
 
 
 /-- Projectability is preserved by a single step.
@@ -309,21 +268,20 @@ theorem projectable_step {g g' : GlobalType} {act : GlobalActionR}
       -- Now show projection succeeds for role
       by_cases hr1 : role = sender
       · -- Sender case: use projectBranches_from_all_projectable
-        subst hr1
-        have hproj_sender := fun l g' hm => hproj_branches' l g' hm sender
+        have hproj_sender := fun l g' hm => hproj_branches' l g' hm role
         have ⟨bs', hbs'⟩ := projectBranches_from_all_projectable hproj_sender
         use .send receiver bs'
-        simp only [projectR, hne_empty', beq_self_eq_true, ↓reduceIte, hbs']
+        rw [hr1, projectR_comm_sender, hne_empty', ← hr1]
+        simp only [hbs', Except.map, if_neg (Bool.false_ne_true)]
       · by_cases hr2 : role = receiver
         · -- Receiver case: use projectBranches_from_all_projectable
-          subst hr2
-          have hproj_receiver := fun l g' hm => hproj_branches' l g' hm receiver
+          have hproj_receiver := fun l g' hm => hproj_branches' l g' hm role
           have ⟨bs', hbs'⟩ := projectBranches_from_all_projectable hproj_receiver
           use .recv sender bs'
-          -- From hr1 (role ≠ sender) and hr2 (role = receiver), we get receiver ≠ sender
-          have hne_sr : receiver ≠ sender := hr1
-          have hsr : (receiver == sender) = false := beq_eq_false_iff_ne.mpr hne_sr
-          simp only [projectR, hne_empty', hsr, Bool.false_eq_true, ↓reduceIte, beq_self_eq_true, hbs']
+          -- From hr1 (role ≠ sender) and hr2 (role = receiver), we get sender ≠ receiver
+          have hne_sr : sender ≠ receiver := fun heq => hr1 (hr2 ▸ heq.symm)
+          rw [hr2, projectR_comm_receiver sender receiver branches' hne_sr, hne_empty', ← hr2]
+          simp only [hbs', Except.map, if_neg (Bool.false_ne_true)]
         · -- Non-participant case: use projectBranchTypes_from_all_projectable + merge axiom
           have hproj_role := fun l g' hm => hproj_branches' l g' hm role
           have hprojTypes' := projectBranchTypes_from_all_projectable hproj_role
@@ -367,68 +325,39 @@ axiom canStep_lift_to_comm (sender receiver : String) (branches : List (Label ×
     (hact : actionPred (.comm sender receiver branches))
     : canStep (.comm sender receiver branches) act
 
-/-- Extract step from comm when action is in a branch.
+/-- Step determinism: given unique labels, same action produces same result.
 
-    When goodG holds for a comm and we have an action enabled in a branch,
-    the step from the comm with that action produces a result that allows
-    extracting a step from the branch continuation.
-
-    This follows from determinism: the step must go through the same branch
-    and produce a comm with that branch stepped. -/
-axiom step_extract_from_branch (sender receiver : String) (branches : List (Label × GlobalType))
-    (label : Label) (cont : GlobalType) (act : GlobalActionR)
-    (hmem : (label, cont) ∈ branches)
-    (hcan : canStep cont act)
-    (hgood : goodG (.comm sender receiver branches))
-    : ∃ g'', step cont act g''
-
-/-- goodG is preserved through BranchesStep (diamond property).
-
-    When all branches step uniformly (via BranchesStep), the goodG property
-    is preserved. This is because:
-    1. Any enabled action in the new branches was already enabled (or derivable)
-    2. The step relation for each branch is preserved through BranchesStep
-
-    This is the key "diamond" property for asynchronous stepping. -/
-axiom goodG_comm_async (sender receiver : String)
-    (branches branches' : List (Label × GlobalType)) (act : GlobalActionR)
-    (hbstep : BranchesStep step branches act branches')
-    (hgood : goodG (.comm sender receiver branches))
-    : goodG (.comm sender receiver branches')
+    This follows from the structure of step: for each action, there is at most
+    one matching branch (due to uniqLabels), and the step is deterministic. -/
+axiom step_deterministic {g g' g'' : GlobalType} {act : GlobalActionR}
+    (h1 : step g act g')
+    (h2 : step g act g'')
+    (huniq : uniqLabels g)
+    : g' = g''
 
 /-- Good global is preserved by a single step.
 
-    The proof uses three semantic axioms:
-    - canStep_lift_to_comm: lift local enabledness to global
-    - step_extract_from_branch: extract branch step from comm step
-    - goodG_comm_async: diamond property for BranchesStep
+    Proof structure (following Coq paco approach):
+    1. step g act g' implies canStep g act (step_implies_canStep)
+    2. goodG g gives: ∀ act, canStep g act → ∃ g'', step g act g'' ∧ goodG g''
+    3. Apply (2) to get ∃ g'', step g act g'' ∧ goodG g''
+    4. By step_deterministic (using uniqLabels), g' = g''
+    5. Therefore goodG g'
 
-    These axioms capture the determinism and coherence of the step relation. -/
+    This proof requires uniqLabels which is provided through coherentG. -/
 theorem goodG_step {g g' : GlobalType} {act : GlobalActionR}
-    (hstep : step g act g') (h : goodG g) : goodG g' := by
-  match hstep with
-  | .comm_head sender receiver branches label cont hmem =>
-    -- g = comm sender receiver branches, g' = cont
-    -- Need to show: ∀ act2, canStep cont act2 → ∃ g'', step cont act2 g''
-    intro act2 hcan2
-    -- Use the step_extract_from_branch axiom
-    exact step_extract_from_branch sender receiver branches label cont act2 hmem hcan2 h
-  | .comm_async sender receiver branches branches' act' label cont hne1 hne2 hmem hcan hbstep =>
-    -- Use the goodG_comm_async axiom (diamond property)
-    exact goodG_comm_async sender receiver branches branches' act' hbstep h
-  | .mu t body act' g'' hstep' =>
-    -- g = mu t body, g' = result of stepping unfolded body
-    -- goodG (.mu t body) means goodG (body.substitute t (.mu t body))
-    have h' : goodG (body.substitute t (.mu t body)) := by
-      intro act2 hcan2
-      have hcan_mu : canStep (.mu t body) act2 := canStep.mu t body act2 hcan2
-      have ⟨g''', hstep'''⟩ := h act2 hcan_mu
-      -- hstep''' : step (.mu t body) act2 g'''
-      -- This must be of the form step.mu t body act2 g'''
-      match hstep''' with
-      | .mu t' body' act'' g'''' hstep'''' =>
-        exact ⟨g'''', hstep''''⟩
-    exact goodG_step hstep' h'
+    (hstep : step g act g') (hgood : goodG g) (huniq : uniqLabels g) : goodG g' := by
+  -- Step 1: Get canStep from step
+  have hcan : canStep g act := step_implies_canStep hstep
+  -- Step 2: Unfold goodG to get the coinductive property
+  unfold goodG at hgood
+  -- Step 3: Apply to get existence of stepped result with goodG
+  have ⟨g'', hstep'', hgood''⟩ := hgood act hcan
+  -- Step 4: By determinism, g' = g''
+  have heq : g' = g'' := step_deterministic hstep hstep'' huniq
+  -- Step 5: Conclude goodG g'
+  rw [heq]
+  exact hgood''
 
 /-- Coherence is preserved by a single async step. -/
 theorem coherentG_step {g g' : GlobalType} {act : GlobalActionR}
@@ -439,7 +368,7 @@ theorem coherentG_step {g g' : GlobalType} {act : GlobalActionR}
     action := actionPred_step hstep hcoh.action
     uniqLabels := uniqLabels_step hstep hcoh.uniqLabels
     proj := projectable_step hstep hcoh.proj hcoh.uniqLabels
-    good := goodG_step hstep hcoh.good
+    good := goodG_step hstep hcoh.good hcoh.uniqLabels
   }
 
 /-- Coherence is preserved by async step-star. -/

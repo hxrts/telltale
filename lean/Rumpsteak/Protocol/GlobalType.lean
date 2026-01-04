@@ -692,8 +692,9 @@ axiom uniqLabels_substitute (t : String) (body : GlobalType) :
     The coinductive structure directly gives us:
     - goodG g → ∀ act, canStep g act → ∃ g', step g act g' ∧ goodG g'
     - This means `goodG_step` is essentially built into the definition. -/
-coinductive goodG : GlobalType → Prop where
-  | intro : (∀ act, canStep g act → ∃ g', step g act g' ∧ goodG g') → goodG g
+def goodG (g : GlobalType) : Prop :=
+  ∀ act, canStep g act → ∃ g', step g act g' ∧ goodG g'
+  coinductive_fixpoint
 
 /-- A step implies enabledness. -/
 theorem step_implies_canStep {g : GlobalType} {act : GlobalActionR} {g' : GlobalType}
