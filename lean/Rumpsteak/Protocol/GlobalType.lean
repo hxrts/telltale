@@ -551,18 +551,54 @@ theorem actionPred_comm_branches {sender receiver : String} {branches : List (La
   cases h with
   | comm _ _ _ _ hbranches => exact hbranches
 
+/-- General substitution lemma: actionPred is preserved when both body and replacement
+    satisfy actionPred. Proof by mutual recursion using actionPred.rec. -/
+theorem actionPred_substitute_lemma (body : GlobalType) (t : String) (repl : GlobalType) :
+    actionPred body → actionPred repl → actionPred (body.substitute t repl) := fun hbody hrepl =>
+  let motive1 (g : GlobalType) (_ : actionPred g) : Prop :=
+    actionPred (g.substitute t repl)
+  let motive2 (bs : List (Label × GlobalType)) (_ : BranchesForall actionPred bs) : Prop :=
+    BranchesForall actionPred (bs.map fun (l, g) => (l, g.substitute t repl))
+  @actionPred.rec (motive_1 := motive1) (motive_2 := motive2)
+    -- end case
+    (by simp only [motive1, substitute_end]; exact actionPred.end)
+    -- var case
+    (fun s => by
+      simp only [motive1]
+      by_cases hs : s = t
+      · rw [hs, substitute_var_eq]; exact hrepl
+      · rw [substitute_var_ne hs]; exact actionPred.var s)
+    -- mu case
+    (fun s body' hbody' ih => by
+      simp only [motive1] at ih ⊢
+      by_cases hs : s = t
+      · rw [hs, substitute_mu_shadow]; exact actionPred.mu t body' hbody'
+      · rw [substitute_mu_ne hs]; exact actionPred.mu s (body'.substitute t repl) ih)
+    -- comm case
+    (fun sender receiver branches hne hbranches ih => by
+      simp only [motive1, motive2] at ih ⊢
+      rw [substitute_comm]
+      exact actionPred.comm sender receiver _ hne ih)
+    -- BranchesForall.nil case
+    (by simp only [motive2, List.map_nil]; exact BranchesForall.nil)
+    -- BranchesForall.cons case
+    (fun label g rest hp hrest ih_g ih_rest => by
+      simp only [motive1, motive2] at ih_g ih_rest ⊢
+      simp only [List.map_cons]
+      exact BranchesForall.cons label (g.substitute t repl)
+        (rest.map fun (l, g) => (l, g.substitute t repl)) ih_g ih_rest)
+    body hbody
+
 /-- actionPred is preserved by μ-unfolding (substitution).
 
-    JUSTIFICATION: Substituting a μ-type with actionPred for its bound variable
-    preserves the distinct-sender-receiver property. Each communication in the
-    substituted body either:
-    1. Was already in the original body (sender ≠ receiver preserved)
-    2. Comes from unfolding the recursive reference (same structure as μ body)
-
-    Since actionPred for mu requires actionPred for body, and body only contains
-    references to t (which get replaced by the same μ-type), the property holds. -/
-axiom actionPred_substitute (t : String) (body : GlobalType) :
-    actionPred (.mu t body) → actionPred (body.substitute t (.mu t body))
+    Proof: Extract actionPred body from actionPred (.mu t body), then apply
+    actionPred_substitute_lemma with (.mu t body) as the replacement. -/
+theorem actionPred_substitute (t : String) (body : GlobalType) :
+    actionPred (.mu t body) → actionPred (body.substitute t (.mu t body)) := by
+  intro h
+  cases h with
+  | mu _ _ hbody =>
+    exact actionPred_substitute_lemma body t (.mu t body) hbody (actionPred.mu t body hbody)
 
 /-- If all branches satisfy p, any member branch satisfies p. -/
 theorem BranchesForall.mem {p : GlobalType → Prop}
