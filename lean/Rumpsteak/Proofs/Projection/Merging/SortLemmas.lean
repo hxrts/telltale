@@ -246,4 +246,402 @@ theorem mergeSendSorted_self
       have hRest := ihTail ih'
       simpa [LocalTypeR.mergeSendSorted, ht, hRest]
 
+/-! ## sortBranches preservation for merge operations -/
+
+/-- mergeSendSorted preserves the label sequence from the first list.
+    If mergeSendSorted bs1 bs2 = some merged, then merged.map (·.1) = bs1.map (·.1). -/
+theorem mergeSendSorted_labels_eq
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (hmerge : LocalTypeR.mergeSendSorted bs1 bs2 = some merged)
+    : merged.map (·.1) = bs1.map (·.1) := by
+  induction bs1 generalizing bs2 merged with
+  | nil =>
+    cases bs2 with
+    | nil =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      simp at hmerge; subst hmerge; rfl
+    | cons _ _ =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      simp at hmerge
+  | cons h1 t1 ih =>
+    cases bs2 with
+    | nil =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      simp at hmerge
+    | cons h2 t2 =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      split at hmerge
+      · next heq =>
+        simp only [Option.bind_eq_bind] at hmerge
+        cases hmc : LocalTypeR.merge h1.2 h2.2 with
+        | none => simp [hmc] at hmerge
+        | some mc =>
+          simp only [hmc, Option.bind_some] at hmerge
+          cases hmr : LocalTypeR.mergeSendSorted t1 t2 with
+          | none => simp [hmr] at hmerge
+          | some mr =>
+            simp only [hmr, Option.bind_some] at hmerge
+            simp at hmerge; subst hmerge
+            simp only [List.map_cons, Prod.fst]
+            congr
+            exact ih t2 mr hmr
+      · simp at hmerge
+
+/-- If bs1 is sorted (Pairwise branchLe), and mergeSendSorted bs1 bs2 = some merged,
+    then merged is also sorted. -/
+theorem mergeSendSorted_pairwise
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (hsorted : bs1.Pairwise LocalTypeR.branchLe)
+    (hmerge : LocalTypeR.mergeSendSorted bs1 bs2 = some merged)
+    : merged.Pairwise LocalTypeR.branchLe := by
+  -- merged has the same labels as bs1, so if bs1 is sorted, merged is sorted
+  have hlabels := mergeSendSorted_labels_eq bs1 bs2 merged hmerge
+  induction bs1 generalizing bs2 merged with
+  | nil =>
+    cases bs2 with
+    | nil =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      simp at hmerge; subst hmerge
+      exact List.Pairwise.nil
+    | cons _ _ =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      simp at hmerge
+  | cons h1 t1 ih =>
+    cases bs2 with
+    | nil =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      simp at hmerge
+    | cons h2 t2 =>
+      unfold LocalTypeR.mergeSendSorted at hmerge
+      split at hmerge
+      · next heq =>
+        simp only [Option.bind_eq_bind] at hmerge
+        cases hmc : LocalTypeR.merge h1.2 h2.2 with
+        | none => simp [hmc] at hmerge
+        | some mc =>
+          simp only [hmc, Option.bind_some] at hmerge
+          cases hmr : LocalTypeR.mergeSendSorted t1 t2 with
+          | none => simp [hmr] at hmerge
+          | some mr =>
+            simp only [hmr, Option.bind_some] at hmerge
+            simp at hmerge; subst hmerge
+            -- Goal: ((h1.1, mc) :: mr).Pairwise branchLe
+            rw [List.pairwise_cons]
+            constructor
+            · -- h1.1 is ≤ all elements in mr
+              intro b hb
+              -- b ∈ mr, and mr has labels from t1
+              have hmr_labels := mergeSendSorted_labels_eq t1 t2 mr hmr
+              -- b.1 ∈ mr.map fst = t1.map fst
+              have hb_label : b.1 ∈ mr.map (·.1) := List.mem_map_of_mem (·.1) hb
+              rw [hmr_labels] at hb_label
+              -- So b.1 is in t1.map fst, meaning there's some (b.1, _) in t1
+              obtain ⟨c, hc_mem, hc_fst⟩ := List.mem_map.mp hb_label
+              -- Since h1 :: t1 is sorted, h1 ≤ c (which has first component b.1)
+              rw [List.pairwise_cons] at hsorted
+              have h1_le_c := hsorted.1 c hc_mem
+              -- branchLe compares first components
+              simp only [LocalTypeR.branchLe] at h1_le_c ⊢
+              rw [← hc_fst]
+              exact h1_le_c
+            · -- mr is Pairwise branchLe
+              have htail_sorted : t1.Pairwise LocalTypeR.branchLe := by
+                rw [List.pairwise_cons] at hsorted
+                exact hsorted.2
+              exact ih t2 mr htail_sorted hmr
+      · simp at hmerge
+
+/-- Main theorem: If bs1 = sortBranches bs1 and bs2 = sortBranches bs2,
+    and mergeSendSorted bs1 bs2 = some merged, then sortBranches merged = merged. -/
+theorem sortBranches_mergeSendSorted_id'
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (h1 : bs1 = LocalTypeR.sortBranches bs1)
+    (h2 : bs2 = LocalTypeR.sortBranches bs2)
+    (hmerge : LocalTypeR.mergeSendSorted bs1 bs2 = some merged)
+    : LocalTypeR.sortBranches merged = merged := by
+  -- bs1 is sorted because sortBranches returns a sorted list
+  have hs1 : bs1.Pairwise LocalTypeR.branchLe := by
+    rw [h1]
+    exact pairwise_sortBranches bs1
+  -- merged is sorted by mergeSendSorted_pairwise
+  have hm : merged.Pairwise LocalTypeR.branchLe :=
+    mergeSendSorted_pairwise bs1 bs2 merged hs1 hmerge
+  -- Sorted lists are fixed by sortBranches
+  exact sortBranches_eq_of_pairwise merged hm
+
+/-! ## mergeRecvSorted sorting preservation -/
+
+/-- Helper: every label in the output of mergeRecvSorted comes from either bs1 or bs2.
+    More precisely: for any (l, c) in merged, there exists (l, c') in bs1 or (l, c') in bs2
+    (possibly with different continuation). -/
+theorem mergeRecvSorted_label_mem
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (hmerge : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
+    (b : Label × LocalTypeR) (hb : b ∈ merged)
+    : (∃ c, (b.1, c) ∈ bs1) ∨ (∃ c, (b.1, c) ∈ bs2) := by
+  induction bs1 generalizing bs2 merged with
+  | nil =>
+    unfold LocalTypeR.mergeRecvSorted at hmerge
+    simp at hmerge; subst hmerge
+    right; exact ⟨b.2, hb⟩
+  | cons h1 t1 ih1 =>
+    cases bs2 with
+    | nil =>
+      unfold LocalTypeR.mergeRecvSorted at hmerge
+      simp at hmerge; subst hmerge
+      left; exact ⟨b.2, hb⟩
+    | cons h2 t2 =>
+      unfold LocalTypeR.mergeRecvSorted at hmerge
+      simp only at hmerge
+      split at hmerge
+      · next hlt1 =>
+        simp only [Option.bind_eq_bind] at hmerge
+        cases hmr : LocalTypeR.mergeRecvSorted t1 ((h2.1, h2.2) :: t2) with
+        | none => simp [hmr] at hmerge
+        | some mr =>
+          simp only [hmr, Option.bind_some] at hmerge
+          simp at hmerge; subst hmerge
+          cases hb with
+          | head => left; exact ⟨h1.2, List.Mem.head _⟩
+          | tail _ hb' =>
+            have := ih1 ((h2.1, h2.2) :: t2) mr hmr b hb'
+            cases this with
+            | inl h => left; obtain ⟨c, hc⟩ := h; exact ⟨c, List.Mem.tail _ hc⟩
+            | inr h => right; exact h
+      · split at hmerge
+        · next hlt2 =>
+          simp only [Option.bind_eq_bind] at hmerge
+          cases hmr : LocalTypeR.mergeRecvSorted ((h1.1, h1.2) :: t1) t2 with
+          | none => simp [hmr] at hmerge
+          | some mr =>
+            simp only [hmr, Option.bind_some] at hmerge
+            simp at hmerge; subst hmerge
+            cases hb with
+            | head => right; exact ⟨h2.2, List.Mem.head _⟩
+            | tail _ hb' =>
+              have := ih1 t2 mr hmr b hb'
+              cases this with
+              | inl h => left; exact h
+              | inr h => right; obtain ⟨c, hc⟩ := h; exact ⟨c, List.Mem.tail _ hc⟩
+        · split at hmerge
+          · next heq =>
+            simp only [Option.bind_eq_bind] at hmerge
+            cases hmc : LocalTypeR.merge h1.2 h2.2 with
+            | none => simp [hmc] at hmerge
+            | some mc =>
+              simp only [hmc, Option.bind_some] at hmerge
+              cases hmr : LocalTypeR.mergeRecvSorted t1 t2 with
+              | none => simp [hmr] at hmerge
+              | some mr =>
+                simp only [hmr, Option.bind_some] at hmerge
+                simp at hmerge; subst hmerge
+                cases hb with
+                | head =>
+                  -- b = (h1.1, mc), and h1.1 = h2.1
+                  left; exact ⟨h1.2, List.Mem.head _⟩
+                | tail _ hb' =>
+                  have := ih1 t2 mr hmr b hb'
+                  cases this with
+                  | inl h => left; obtain ⟨c, hc⟩ := h; exact ⟨c, List.Mem.tail _ hc⟩
+                  | inr h => right; obtain ⟨c, hc⟩ := h; exact ⟨c, List.Mem.tail _ hc⟩
+          · simp at hmerge
+  termination_by sizeOf bs1 + sizeOf bs2
+  decreasing_by
+    all_goals
+      simp_wf
+      first
+        | apply Nat.add_lt_add_right; exact sizeOf_tail_lt_cons h1 t1
+        | apply Nat.add_lt_add_left; exact sizeOf_tail_lt_cons h2 t2
+        | apply Nat.add_lt_add; exact sizeOf_tail_lt_cons h1 t1; exact sizeOf_tail_lt_cons h2 t2
+
+/-- mergeRecvSorted preserves sortedness.
+    If both inputs are sorted, the output is sorted.
+    This is essentially the merge step of merge sort. -/
+theorem mergeRecvSorted_pairwise
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (hs1 : bs1.Pairwise LocalTypeR.branchLe)
+    (hs2 : bs2.Pairwise LocalTypeR.branchLe)
+    (hmerge : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
+    : merged.Pairwise LocalTypeR.branchLe := by
+  induction bs1 generalizing bs2 merged with
+  | nil =>
+    -- bs1 = [], so merged = bs2
+    unfold LocalTypeR.mergeRecvSorted at hmerge
+    simp at hmerge; subst hmerge
+    exact hs2
+  | cons h1 t1 ih1 =>
+    induction bs2 generalizing merged with
+    | nil =>
+      -- bs2 = [], so merged = h1 :: t1
+      unfold LocalTypeR.mergeRecvSorted at hmerge
+      simp at hmerge; subst hmerge
+      exact hs1
+    | cons h2 t2 ih2 =>
+      unfold LocalTypeR.mergeRecvSorted at hmerge
+      simp only at hmerge
+      split at hmerge
+      · next hlt1 =>
+        -- l1.name < l2.name: merged = h1 :: (mergeRecvSorted t1 (h2::t2))
+        simp only [Option.bind_eq_bind] at hmerge
+        cases hmr : LocalTypeR.mergeRecvSorted t1 ((h2.1, h2.2) :: t2) with
+        | none => simp [hmr] at hmerge
+        | some mr =>
+          simp only [hmr, Option.bind_some] at hmerge
+          simp at hmerge; subst hmerge
+          -- Goal: (h1 :: mr).Pairwise branchLe
+          rw [List.pairwise_cons]
+          have ht1_sorted : t1.Pairwise LocalTypeR.branchLe := by
+            rw [List.pairwise_cons] at hs1
+            exact hs1.2
+          have hmr_sorted := ih1 ((h2.1, h2.2) :: t2) mr ht1_sorted hs2 hmr
+          constructor
+          · -- h1 ≤ all elements in mr
+            intro b hb
+            simp only [LocalTypeR.branchLe]
+            -- b's label comes from either t1 or h2::t2
+            have hmem := mergeRecvSorted_label_mem t1 ((h2.1, h2.2) :: t2) mr hmr b hb
+            cases hmem with
+            | inl h =>
+              -- b.1 comes from t1, so h1.1.name ≤ b.1.name by hs1
+              obtain ⟨c, hc⟩ := h
+              rw [List.pairwise_cons] at hs1
+              have := hs1.1 (b.1, c) hc
+              simp only [LocalTypeR.branchLe] at this
+              exact this
+            | inr h =>
+              -- b.1 comes from h2::t2, so h1.1.name < h2.1.name ≤ b.1.name
+              obtain ⟨c, hc⟩ := h
+              cases hc with
+              | head =>
+                -- b.1 = h2.1, so h1.1.name < h2.1.name means h1.1.name ≤ h2.1.name
+                exact String.le_of_lt hlt1
+              | tail _ hc' =>
+                -- b.1 is in t2, and h2 ≤ all of t2 by hs2
+                rw [List.pairwise_cons] at hs2
+                have h2_le_c := hs2.1 (b.1, c) hc'
+                simp only [LocalTypeR.branchLe] at h2_le_c
+                exact Std.le_trans (String.le_of_lt hlt1) h2_le_c
+          · exact hmr_sorted
+      · split at hmerge
+        · next hlt2 =>
+          -- l2.name < l1.name: merged = h2 :: (mergeRecvSorted (h1::t1) t2)
+          simp only [Option.bind_eq_bind] at hmerge
+          cases hmr : LocalTypeR.mergeRecvSorted ((h1.1, h1.2) :: t1) t2 with
+          | none => simp [hmr] at hmerge
+          | some mr =>
+            simp only [hmr, Option.bind_some] at hmerge
+            simp at hmerge; subst hmerge
+            rw [List.pairwise_cons]
+            have ht2_sorted : t2.Pairwise LocalTypeR.branchLe := by
+              rw [List.pairwise_cons] at hs2
+              exact hs2.2
+            have hmr_sorted := ih2 ht2_sorted mr hmr
+            constructor
+            · -- h2 ≤ all elements in mr
+              intro b hb
+              simp only [LocalTypeR.branchLe]
+              -- b's label comes from either h1::t1 or t2
+              have hmem := mergeRecvSorted_label_mem ((h1.1, h1.2) :: t1) t2 mr hmr b hb
+              cases hmem with
+              | inl h =>
+                -- b.1 comes from h1::t1, so h2.1.name < h1.1.name ≤ b.1.name
+                obtain ⟨c, hc⟩ := h
+                cases hc with
+                | head =>
+                  -- b.1 = h1.1, so h2.1.name < h1.1.name means h2.1.name ≤ h1.1.name
+                  exact String.le_of_lt hlt2
+                | tail _ hc' =>
+                  -- b.1 is in t1, and h1 ≤ all of t1 by hs1
+                  rw [List.pairwise_cons] at hs1
+                  have h1_le_c := hs1.1 (b.1, c) hc'
+                  simp only [LocalTypeR.branchLe] at h1_le_c
+                  exact Std.le_trans (String.le_of_lt hlt2) h1_le_c
+              | inr h =>
+                -- b.1 comes from t2, so h2.1.name ≤ b.1.name by hs2
+                obtain ⟨c, hc⟩ := h
+                rw [List.pairwise_cons] at hs2
+                have := hs2.1 (b.1, c) hc
+                simp only [LocalTypeR.branchLe] at this
+                exact this
+            · exact hmr_sorted
+        · split at hmerge
+          · next heq =>
+            -- l1 = l2: merge continuations
+            simp only [Option.bind_eq_bind] at hmerge
+            cases hmc : LocalTypeR.merge h1.2 h2.2 with
+            | none => simp [hmc] at hmerge
+            | some mc =>
+              simp only [hmc, Option.bind_some] at hmerge
+              cases hmr : LocalTypeR.mergeRecvSorted t1 t2 with
+              | none => simp [hmr] at hmerge
+              | some mr =>
+                simp only [hmr, Option.bind_some] at hmerge
+                simp at hmerge; subst hmerge
+                rw [List.pairwise_cons]
+                have ht1_sorted : t1.Pairwise LocalTypeR.branchLe := by
+                  rw [List.pairwise_cons] at hs1
+                  exact hs1.2
+                have ht2_sorted : t2.Pairwise LocalTypeR.branchLe := by
+                  rw [List.pairwise_cons] at hs2
+                  exact hs2.2
+                have hmr_sorted := ih1 t2 mr ht1_sorted ht2_sorted hmr
+                constructor
+                · -- (h1.1, mc) ≤ all elements in mr
+                  intro b hb
+                  simp only [LocalTypeR.branchLe]
+                  -- b's label comes from either t1 or t2
+                  have hmem := mergeRecvSorted_label_mem t1 t2 mr hmr b hb
+                  cases hmem with
+                  | inl h =>
+                    -- b.1 comes from t1, so h1.1.name ≤ b.1.name by hs1
+                    obtain ⟨c, hc⟩ := h
+                    rw [List.pairwise_cons] at hs1
+                    have := hs1.1 (b.1, c) hc
+                    simp only [LocalTypeR.branchLe] at this
+                    exact this
+                  | inr h =>
+                    -- b.1 comes from t2, so h2.1.name ≤ b.1.name by hs2
+                    -- And h1.1 = h2.1 (by heq), so h1.1.name ≤ b.1.name
+                    obtain ⟨c, hc⟩ := h
+                    rw [List.pairwise_cons] at hs2
+                    have := hs2.1 (b.1, c) hc
+                    simp only [LocalTypeR.branchLe] at this
+                    rw [heq]
+                    exact this
+                · exact hmr_sorted
+          · simp at hmerge
+  termination_by sizeOf bs1 + sizeOf bs2
+  decreasing_by
+    all_goals
+      simp_wf
+      first
+        | -- Left shrinks
+          apply Nat.add_lt_add_right
+          exact sizeOf_tail_lt_cons h1 t1
+        | -- Right shrinks
+          apply Nat.add_lt_add_left
+          exact sizeOf_tail_lt_cons h2 t2
+        | -- Both shrink
+          apply Nat.add_lt_add
+          · exact sizeOf_tail_lt_cons h1 t1
+          · exact sizeOf_tail_lt_cons h2 t2
+
+/-- Main theorem: If bs1 = sortBranches bs1 and bs2 = sortBranches bs2,
+    and mergeRecvSorted bs1 bs2 = some merged, then sortBranches merged = merged. -/
+theorem sortBranches_mergeRecvSorted_id'
+    (bs1 bs2 merged : List (Label × LocalTypeR))
+    (h1 : bs1 = LocalTypeR.sortBranches bs1)
+    (h2 : bs2 = LocalTypeR.sortBranches bs2)
+    (hmerge : LocalTypeR.mergeRecvSorted bs1 bs2 = some merged)
+    : LocalTypeR.sortBranches merged = merged := by
+  have hs1 : bs1.Pairwise LocalTypeR.branchLe := by
+    rw [h1]
+    exact pairwise_sortBranches bs1
+  have hs2 : bs2.Pairwise LocalTypeR.branchLe := by
+    rw [h2]
+    exact pairwise_sortBranches bs2
+  have hm : merged.Pairwise LocalTypeR.branchLe :=
+    mergeRecvSorted_pairwise bs1 bs2 merged hs1 hs2 hmerge
+  exact sortBranches_eq_of_pairwise merged hm
+
 end Rumpsteak.Proofs.Projection.Merging
