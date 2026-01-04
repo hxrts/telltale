@@ -1112,6 +1112,42 @@ theorem projectBranches_singleton_inv (branches : List (Label × GlobalType)) (r
         · simp
         · simpa [hcont]
 
+/-- Right idempotence of merge: if merge a b succeeds giving c, then merge c b = some c.
+    This is the key absorption property: once a type is merged in, it stays absorbed.
+
+    This axiom captures that merge produces a "least upper bound" that already contains b. -/
+axiom merge_idempotent_right (a b c : LocalTypeR)
+    (hab : LocalTypeR.merge a b = some c) : LocalTypeR.merge c b = some c
+
+/-- Absorption is preserved through further merges.
+    If c absorbs b, and we merge c with d to get e, then e also absorbs b. -/
+axiom merge_absorption_preserved (b c d e : LocalTypeR)
+    (hcb : LocalTypeR.merge c b = some c)
+    (hcd : LocalTypeR.merge c d = some e)
+    : LocalTypeR.merge e b = some e
+
+/-- Helper: if t is absorbed by m, and we continue folding merge from m to get result,
+    then t is still absorbed by result. -/
+private theorem merge_absorption_through_fold (ts : List LocalTypeR) (t m result : LocalTypeR)
+    (habsorbed : LocalTypeR.merge m t = some m)
+    (hfold : ts.foldlM (fun acc proj => LocalTypeR.merge acc proj) m = some result)
+    : LocalTypeR.merge result t = some result := by
+  induction ts generalizing m with
+  | nil =>
+    simp [List.foldlM] at hfold
+    cases hfold
+    exact habsorbed
+  | cons x xs ih =>
+    simp only [List.foldlM_cons, Option.bind_eq_bind] at hfold
+    cases hmx : LocalTypeR.merge m x with
+    | none => simp [hmx] at hfold
+    | some next =>
+      simp [hmx] at hfold
+      -- By merge_absorption_preserved: merge next t = some next
+      have hnext : LocalTypeR.merge next t = some next :=
+        merge_absorption_preserved t m x next habsorbed hmx
+      exact ih next hnext hfold
+
 /-- Key lemma: if foldlM merge over a list produces result m, then each element
     is merge-compatible with the accumulator at that point. For non-participants,
     this means all elements are equal to m (under certain merge semantics).
@@ -1123,14 +1159,70 @@ theorem projectBranches_singleton_inv (branches : List (Label × GlobalType)) (r
     The proof proceeds by:
     1. Use induction on the list
     2. For each element t, either it was merged early (and stays absorbed), or later
-    3. Apply merge_refl and transitivity of absorption -/
-axiom merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
+    3. Apply merge_idempotent_right and merge_absorption_preserved -/
+theorem merge_fold_member (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
     (hfold : types.foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result)
     (t : LocalTypeR) (hmem : t ∈ types)
-    : LocalTypeR.merge result t = some result
+    : LocalTypeR.merge result t = some result := by
+  induction types generalizing first result t with
+  | nil => cases hmem
+  | cons hd tl ih =>
+    -- Unfold the fold: first we merge first with hd
+    simp only [List.foldlM_cons, Option.bind_eq_bind] at hfold
+    -- Extract the intermediate result after merging with hd
+    cases hmerge : LocalTypeR.merge first hd with
+    | none => simp [hmerge] at hfold
+    | some intermediate =>
+      simp [hmerge] at hfold
+      -- Now hfold says: tl.foldlM ... intermediate = some result
+      -- t is either hd or in tl
+      rcases List.mem_cons.mp hmem with rfl | htl
+      · -- t = hd, we need merge result t = some result
+        -- We have: merge first t = some intermediate
+        -- Use merge_idempotent_right to get: merge intermediate t = some intermediate
+        have hidem : LocalTypeR.merge intermediate t = some intermediate :=
+          merge_idempotent_right first t intermediate hmerge
+        -- Use helper lemma to show absorption is preserved through the fold
+        exact merge_absorption_through_fold tl t intermediate result hidem hfold
+      · -- t ∈ tl, use IH
+        exact ih intermediate result hfold t htl
 
-/-- Except-based fold absorption for projection merges. -/
-axiom merge_fold_member_except (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
+/-- Helper: convert an Except-based merge fold to an Option-based fold. -/
+private theorem except_fold_to_option_fold (types : List LocalTypeR) (first result : LocalTypeR)
+    (hfold :
+      types.foldlM (m := Except ProjectionError)
+        (fun acc proj =>
+          match LocalTypeR.merge acc proj with
+          | some m => pure m
+          | none => throw (ProjectionError.mergeFailed acc proj))
+        first =
+      Except.ok result)
+    : types.foldlM (fun acc proj => LocalTypeR.merge acc proj) first = some result := by
+  induction types generalizing first with
+  | nil =>
+    simp only [List.foldlM_nil] at hfold ⊢
+    cases hfold
+    rfl
+  | cons hd tl ih =>
+    simp only [List.foldlM_cons, Option.bind_eq_bind]
+    -- The Except fold also unfolds
+    simp only [List.foldlM_cons] at hfold
+    -- Case on the merge result
+    cases hmerge : LocalTypeR.merge first hd with
+    | none =>
+      -- merge failed, so the Except fold must have thrown - contradiction
+      simp only [hmerge, Except.bind] at hfold
+      -- hfold is now Except.error _ = Except.ok result, different constructors
+      cases hfold
+    | some intermediate =>
+      simp only [hmerge, Option.some_bind]
+      -- The Except fold now has intermediate as the accumulator
+      simp only [hmerge, Except.bind, pure, Except.pure] at hfold
+      exact ih intermediate hfold
+
+/-- Except-based fold absorption for projection merges.
+    This follows directly from merge_fold_member by extracting the Option-level fold. -/
+theorem merge_fold_member_except (types : List LocalTypeR) (first : LocalTypeR) (result : LocalTypeR)
     (hfold :
       types.foldlM (m := Except ProjectionError)
         (fun acc proj =>
@@ -1140,7 +1232,9 @@ axiom merge_fold_member_except (types : List LocalTypeR) (first : LocalTypeR) (r
         first =
       Except.ok result)
     (t : LocalTypeR) (hmem : t ∈ types)
-    : LocalTypeR.merge result t = some result
+    : LocalTypeR.merge result t = some result := by
+  have hopt := except_fold_to_option_fold types first result hfold
+  exact merge_fold_member types first result hopt t hmem
 
 /-! ## Recv Branch Absorption Infrastructure
 
