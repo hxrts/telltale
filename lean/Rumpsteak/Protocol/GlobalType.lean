@@ -765,18 +765,67 @@ theorem uniqLabels_comm_branches {sender receiver : String} {branches : List (La
   cases h with
   | comm _ _ _ hbranches => exact hbranches
 
+/-- Helper: substitution preserves the branch label names (labels are unchanged).
+    This is crucial because BranchesUniq checks label name uniqueness. -/
+theorem substitute_preserves_branch_labels (branches : List (Label × GlobalType))
+    (t : String) (repl : GlobalType) :
+    (branches.map fun (l, g) => (l, g.substitute t repl)).map (fun b : Label × GlobalType => b.1.name) =
+    branches.map (fun b : Label × GlobalType => b.1.name) := by
+  simp only [List.map_map]
+  rfl
+
+/-- General substitution lemma: uniqLabels is preserved when both body and replacement
+    satisfy uniqLabels. Proof by mutual recursion using uniqLabels.rec. -/
+theorem uniqLabels_substitute_lemma (body : GlobalType) (t : String) (repl : GlobalType) :
+    uniqLabels body → uniqLabels repl → uniqLabels (body.substitute t repl) := fun hbody hrepl =>
+  let motive1 (g : GlobalType) (_ : uniqLabels g) : Prop :=
+    uniqLabels (g.substitute t repl)
+  let motive2 (bs : List (Label × GlobalType)) (_ : BranchesUniq uniqLabels bs) : Prop :=
+    BranchesUniq uniqLabels (bs.map fun (l, g) => (l, g.substitute t repl))
+  @uniqLabels.rec (motive_1 := motive1) (motive_2 := motive2)
+    -- end case
+    (by simp only [motive1, substitute_end]; exact uniqLabels.end)
+    -- var case
+    (fun s => by
+      simp only [motive1]
+      by_cases hs : s = t
+      · rw [hs, substitute_var_eq]; exact hrepl
+      · rw [substitute_var_ne hs]; exact uniqLabels.var s)
+    -- mu case
+    (fun s body' hbody' ih => by
+      simp only [motive1] at ih ⊢
+      by_cases hs : s = t
+      · rw [hs, substitute_mu_shadow]; exact uniqLabels.mu t body' hbody'
+      · rw [substitute_mu_ne hs]; exact uniqLabels.mu s (body'.substitute t repl) ih)
+    -- comm case
+    (fun sender receiver branches hbranches ih => by
+      simp only [motive1, motive2] at ih ⊢
+      rw [substitute_comm]
+      exact uniqLabels.comm sender receiver _ ih)
+    -- BranchesUniq.nil case
+    (by simp only [motive2, List.map_nil]; exact BranchesUniq.nil)
+    -- BranchesUniq.cons case
+    (fun label g rest hp hrest hnotin ih_g ih_rest => by
+      simp only [motive1, motive2] at ih_g ih_rest ⊢
+      simp only [List.map_cons]
+      have hnotin' : label.name ∉ (rest.map fun (l, g) => (l, g.substitute t repl)).map
+                       (fun b : Label × GlobalType => b.1.name) := by
+        rw [substitute_preserves_branch_labels]
+        exact hnotin
+      exact BranchesUniq.cons label (g.substitute t repl)
+        (rest.map fun (l, g) => (l, g.substitute t repl)) ih_g ih_rest hnotin')
+    body hbody
+
 /-- uniqLabels is preserved by μ-unfolding (substitution).
 
-    JUSTIFICATION: Substituting a μ-type with unique labels for its bound variable
-    preserves label uniqueness. Each communication's branch labels in the
-    substituted body either:
-    1. Were already in the original body (label uniqueness preserved)
-    2. Come from unfolding the recursive reference (same structure as μ body)
-
-    Since uniqLabels for mu requires uniqLabels for body, and body only contains
-    references to t (which get replaced by the same μ-type), the property holds. -/
-axiom uniqLabels_substitute (t : String) (body : GlobalType) :
-    uniqLabels (.mu t body) → uniqLabels (body.substitute t (.mu t body))
+    Proof: Extract uniqLabels body from uniqLabels (.mu t body), then apply
+    uniqLabels_substitute_lemma with (.mu t body) as the replacement. -/
+theorem uniqLabels_substitute (t : String) (body : GlobalType) :
+    uniqLabels (.mu t body) → uniqLabels (body.substitute t (.mu t body)) := by
+  intro h
+  cases h with
+  | mu _ _ hbody =>
+    exact uniqLabels_substitute_lemma body t (.mu t body) hbody (uniqLabels.mu t body hbody)
 
 /-- Good-global condition (coinductive).
 
