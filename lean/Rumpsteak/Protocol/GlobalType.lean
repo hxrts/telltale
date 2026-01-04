@@ -109,6 +109,37 @@ partial def GlobalType.substitute (g : GlobalType) (varName : String) (replaceme
   | .var t =>
     if t == varName then replacement else .var t
 
+/-! ## Substitute Specification Axioms
+
+Since `substitute` is a `partial def`, it cannot be unfolded in proofs.
+These axioms specify its behavior on each constructor. -/
+
+/-- Substitute on end yields end. -/
+axiom substitute_end (t : String) (repl : GlobalType) :
+    GlobalType.substitute .end t repl = .end
+
+/-- Substitute on matching variable yields replacement. -/
+axiom substitute_var_eq (t : String) (repl : GlobalType) :
+    GlobalType.substitute (.var t) t repl = repl
+
+/-- Substitute on non-matching variable yields the variable unchanged. -/
+axiom substitute_var_ne {s t : String} (hne : s ≠ t) (repl : GlobalType) :
+    GlobalType.substitute (.var s) t repl = .var s
+
+/-- Substitute on comm maps over branches. -/
+axiom substitute_comm (sender receiver t : String) (branches : List (Label × GlobalType))
+    (repl : GlobalType) :
+    GlobalType.substitute (.comm sender receiver branches) t repl =
+      .comm sender receiver (branches.map fun (l, g) => (l, g.substitute t repl))
+
+/-- Substitute on mu when variable is shadowed (same name) yields mu unchanged. -/
+axiom substitute_mu_shadow (t : String) (body repl : GlobalType) :
+    GlobalType.substitute (.mu t body) t repl = .mu t body
+
+/-- Substitute on mu when variable is not shadowed recurses into body. -/
+axiom substitute_mu_ne {s t : String} (hne : s ≠ t) (body repl : GlobalType) :
+    GlobalType.substitute (.mu s body) t repl = .mu s (body.substitute t repl)
+
 /-- Check if all recursion variables are bound. -/
 partial def GlobalType.allVarsBound (g : GlobalType) (bound : List String := []) : Bool :=
   match g with
@@ -380,6 +411,12 @@ def linearPred (_ : GlobalType) : Prop := True
 /-- Size predicate for globals: each communication has at least one branch. -/
 def sizePred (g : GlobalType) : Prop := g.allCommsNonEmpty = true
 
+/-- Specification axiom: allCommsNonEmpty for end is true. -/
+axiom allCommsNonEmpty_end : GlobalType.end.allCommsNonEmpty = true
+
+/-- Specification axiom: allCommsNonEmpty for var is true (no communications). -/
+axiom allCommsNonEmpty_var (t : String) : (GlobalType.var t).allCommsNonEmpty = true
+
 /-- Specification axiom: unfold allCommsNonEmpty for comm (partial def is opaque). -/
 axiom allCommsNonEmpty_comm (sender receiver : String) (branches : List (Label × GlobalType)) :
     (GlobalType.comm sender receiver branches).allCommsNonEmpty =
@@ -389,18 +426,39 @@ axiom allCommsNonEmpty_comm (sender receiver : String) (branches : List (Label �
 axiom allCommsNonEmpty_mu (t : String) (body : GlobalType) :
     (GlobalType.mu t body).allCommsNonEmpty = body.allCommsNonEmpty
 
+/-- Key lemma: allCommsNonEmpty is preserved through substitution when both the body
+    and replacement satisfy the predicate.
+
+    This is the core insight: substituting a type with allCommsNonEmpty for a variable
+    preserves allCommsNonEmpty because:
+    - Variables have allCommsNonEmpty = true (no communications)
+    - Substituting preserves the structure of communications
+    - The replacement's allCommsNonEmpty is "inherited" at each substitution point -/
+axiom allCommsNonEmpty_substitute (body : GlobalType) (t : String) (repl : GlobalType) :
+    body.allCommsNonEmpty = true →
+    repl.allCommsNonEmpty = true →
+    (body.substitute t repl).allCommsNonEmpty = true
+
 /-- sizePred is preserved by μ-unfolding (substitution).
 
-    JUSTIFICATION: Substituting a well-formed μ-type for its bound variable
-    preserves the all-branches-nonempty property. Each communication in the
-    substituted body either:
-    1. Was already in the original body (unchanged)
-    2. Comes from unfolding the recursive reference (same structure as μ body)
-
-    This is semantically valid because guarded recursion ensures communications
-    appear before recursive calls. -/
-axiom sizePred_substitute (t : String) (body : GlobalType) :
-    sizePred (.mu t body) → sizePred (body.substitute t (.mu t body))
+    Proof: Since sizePred g = (g.allCommsNonEmpty = true), we use allCommsNonEmpty_substitute
+    with body and (.mu t body) as replacement. Both have allCommsNonEmpty = body.allCommsNonEmpty
+    (via allCommsNonEmpty_mu), so the result follows. -/
+theorem sizePred_substitute (t : String) (body : GlobalType) :
+    sizePred (.mu t body) → sizePred (body.substitute t (.mu t body)) := by
+  intro h
+  -- h : sizePred (.mu t body)
+  -- Goal: sizePred (body.substitute t (.mu t body))
+  simp only [sizePred] at h ⊢
+  -- h : (.mu t body).allCommsNonEmpty = true
+  -- Goal: (body.substitute t (.mu t body)).allCommsNonEmpty = true
+  have hbody : body.allCommsNonEmpty = true := by
+    rw [allCommsNonEmpty_mu] at h
+    exact h
+  have hmu : (GlobalType.mu t body).allCommsNonEmpty = true := by
+    rw [allCommsNonEmpty_mu]
+    exact hbody
+  exact allCommsNonEmpty_substitute body t (.mu t body) hbody hmu
 
 theorem sizePred_comm_nonempty {sender receiver : String} {branches : List (Label × GlobalType)}
     (h : sizePred (.comm sender receiver branches)) : branches.isEmpty = false := by
