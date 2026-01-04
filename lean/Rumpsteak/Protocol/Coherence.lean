@@ -215,14 +215,75 @@ axiom foldMerge_preserved_BranchesStep
     (hprojTypes' : ∃ tys', projectBranchTypes branches' role = .ok tys')
     : ∃ lt', projectR (.comm sender receiver branches') role = .ok lt'
 
+/-- Helper: if projectR of a comm succeeds for the sender, branches must be non-empty. -/
+private theorem projectable_comm_nonempty (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (hproj : ∃ lt, projectR (.comm sender receiver branches) sender = .ok lt)
+    : branches.isEmpty = false := by
+  obtain ⟨lt, hlt⟩ := hproj
+  rw [projectR_comm_sender] at hlt
+  by_cases he : branches.isEmpty
+  · simp [he] at hlt
+  · simp [he]
+
+/-- Helper: extract body projectability from mu projectability. -/
+private theorem projectable_mu_body (t : String) (body : GlobalType)
+    (h : projectable (.mu t body)) : projectable body := fun role => by
+  obtain ⟨lt, hlt⟩ := h role
+  rw [projectR_mu] at hlt
+  simp only [Except.bind] at hlt
+  cases hproj : projectR body role with
+  | error e =>
+    simp [hproj] at hlt
+  | ok projBody =>
+    use projBody
+
 /-- sizePred from projectable: projectR fails on empty branches, so projectable implies sizePred.
 
     Proof by structural recursion on GlobalType. For each case:
     - end/var: trivially sizePred (allCommsNonEmpty returns true)
     - comm: projectR checks branches.isEmpty and fails if true, so branches must be non-empty;
             each branch is projectable (via projectable_comm_mem_role), so recursion applies
-    - mu: unfold and apply recursion -/
-axiom sizePred_from_projectable : {g : GlobalType} → projectable g → sizePred g
+    - mu: unfold and apply recursion
+
+    Uses @GlobalType.rec since GlobalType is a nested inductive. -/
+theorem sizePred_from_projectable {g : GlobalType} (h : projectable g) : sizePred g :=
+  let motive1 (g : GlobalType) : Prop := projectable g → sizePred g
+  let motive2 (bs : List (Label × GlobalType)) : Prop :=
+    ∀ (l : Label) (g : GlobalType), (l, g) ∈ bs → projectable g → sizePred g
+  let motive3 (p : Label × GlobalType) : Prop := projectable p.2 → sizePred p.2
+  @GlobalType.rec (motive_1 := motive1) (motive_2 := motive2) (motive_3 := motive3)
+    -- end case (motive_1 end)
+    (fun _ => by simp [sizePred, allCommsNonEmpty_end])
+    -- comm case (motive_1 (comm ...))
+    (fun sender receiver branches ih_branches hproj => by
+      simp only [sizePred, allCommsNonEmpty_comm]
+      have hne : branches.isEmpty = false :=
+        projectable_comm_nonempty sender receiver branches (hproj sender)
+      simp only [hne, Bool.not_false, Bool.true_and]
+      apply List.all_eq_true.mpr
+      intro ⟨label, cont⟩ hmem
+      simp only
+      have hcont_proj : projectable cont := fun role =>
+        projectable_comm_mem_role sender receiver role branches (hproj role) hmem
+      exact ih_branches label cont hmem hcont_proj)
+    -- mu case (motive_1 (mu ...))
+    (fun t body ih_body hproj => by
+      simp only [sizePred, allCommsNonEmpty_mu]
+      have hbody_proj := projectable_mu_body t body hproj
+      exact ih_body hbody_proj)
+    -- var case (motive_1 (var ...))
+    (fun _ _ => by simp [sizePred, allCommsNonEmpty_var])
+    -- List.nil case (motive_2 [])
+    (fun _ _ hmem _ => by cases hmem)
+    -- List.cons case (motive_2 (head :: tail))
+    (fun head tail ih_head ih_tail l g' hmem hproj => by
+      cases hmem with
+      | head => exact ih_head hproj
+      | tail _ htail => exact ih_tail l g' htail hproj)
+    -- pair case (motive_3 (fst, snd))
+    (fun _label g ih_g hproj => ih_g hproj)
+    g h
 
 
 /-- Projectability is preserved by a single step.
