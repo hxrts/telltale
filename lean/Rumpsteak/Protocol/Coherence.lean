@@ -328,12 +328,72 @@ axiom canStep_lift_to_comm (sender receiver : String) (branches : List (Label ×
 /-- Step determinism: given unique labels, same action produces same result.
 
     This follows from the structure of step: for each action, there is at most
-    one matching branch (due to uniqLabels), and the step is deterministic. -/
-axiom step_deterministic {g g' g'' : GlobalType} {act : GlobalActionR}
+    one matching branch (due to uniqLabels), and the step is deterministic.
+
+    Proof by mutual induction on step and BranchesStep using step.rec:
+    - comm_head: By BranchesUniq, the same label determines the same continuation
+    - comm_async: By IH on BranchesStep, stepped branches are equal
+    - mu: By IH with uniqLabels_substitute -/
+theorem step_deterministic {g g' g'' : GlobalType} {act : GlobalActionR}
     (h1 : step g act g')
     (h2 : step g act g'')
     (huniq : uniqLabels g)
-    : g' = g''
+    : g' = g'' :=
+  -- Use mutual induction on step and BranchesStep via step.rec
+  let motive1 (g : GlobalType) (act : GlobalActionR) (g' : GlobalType)
+      (_hstep : step g act g') : Prop :=
+    ∀ g'', step g act g'' → uniqLabels g → g' = g''
+  let motive2 (bs : List (Label × GlobalType)) (act : GlobalActionR)
+      (bs' : List (Label × GlobalType)) (_hbstep : BranchesStep step bs act bs') : Prop :=
+    ∀ bs'', BranchesStep step bs act bs'' → BranchesUniq uniqLabels bs → bs' = bs''
+  @step.rec (motive_1 := motive1) (motive_2 := motive2)
+    -- comm_head case: By label uniqueness, same label gives same continuation
+    (fun sender receiver branches label cont hmem g0 h2' huniq' => by
+      cases h2' with
+      | comm_head _ _ _ label' cont' hmem' =>
+        -- Same label (from action equality)
+        have hbranches := uniqLabels_comm_branches huniq'
+        exact BranchesUniq.eq_of_label_mem hbranches hmem hmem'
+      | comm_async _ _ _ _ _ _ _ hne1 hne2 _ _ _ =>
+        -- Contradiction: actions match, but hne2 says sender = sender → receiver ≠ receiver
+        -- This is a contradiction since receiver = receiver
+        have hcontra := hne2 rfl
+        exact absurd rfl hcontra)
+    -- comm_async case: By IH on BranchesStep, stepped branches are equal
+    (fun sender receiver branches branches' act' label cont hne1 hne2 hmem hcan hbstep ih_bstep g0 h2' huniq' => by
+      cases h2' with
+      | comm_head _ _ _ label' cont' hmem' =>
+        -- Contradiction: symmetric - act' matches head, but hne2 says sender = sender → act'.receiver ≠ receiver
+        -- Since we're matching with comm_head, act' = { sender, receiver, label' }
+        -- So act'.sender = sender (true) and act'.receiver = receiver
+        -- This contradicts hne2
+        have hcontra := hne2 rfl
+        exact absurd rfl hcontra
+      | comm_async _ _ _ branches'' _ _ _ hne1' hne2' hmem' hcan' hbstep' =>
+        -- Same structure, need branches' = branches''
+        have hbranches := uniqLabels_comm_branches huniq'
+        have heq := ih_bstep branches'' hbstep' hbranches
+        rw [heq])
+    -- mu case: Use IH with uniqLabels_substitute
+    (fun t body act' g''' _hstep' ih g0 h2' huniq' => by
+      match h2' with
+      | step.mu _ _ _ g2 hstep'' =>
+        have huniq'' := uniqLabels_substitute t body huniq'
+        exact ih g2 hstep'' huniq'')
+    -- BranchesStep.nil case
+    (fun _act bs'' h2' _huniq' => by
+      cases h2'
+      rfl)
+    -- BranchesStep.cons case
+    (fun label g g' rest rest' _act _hstep _hrest ih_step ih_rest bs'' h2' huniq' => by
+      cases h2' with
+      | cons _ _ g'' _ rest'' _ hstep'' hrest'' =>
+        cases huniq' with
+        | cons _ _ _ hpg hrest_uniq _ =>
+          have heq_g := ih_step g'' hstep'' hpg
+          have heq_rest := ih_rest rest'' hrest'' hrest_uniq
+          rw [heq_g, heq_rest])
+    g act g' h1 g'' h2 huniq
 
 /-- Good global is preserved by a single step.
 
