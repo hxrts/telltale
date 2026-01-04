@@ -745,25 +745,33 @@ private theorem mem_map_snd_sortBranches_iff (bs : List (Label × LocalTypeR)) (
 
 /-- Normalize a local type by recursively sorting all branch lists.
 
-    TERMINATION NOTE: Termination is semantically clear (structural recursion on
-    LocalTypeR) but proving it requires showing that elements of `bs.map` are
-    smaller than the original type. The sizeOf_mem_snd_lt lemmas establish this,
-    but Lean's wf_preprocess doesn't expose membership from List.map.
-
-    The sorry in decreasing_by is for this specific termination proof, not
-    correctness. The function is semantically total and productive. -/
+    This function recursively normalizes all branch continuations and sorts
+    branch lists into canonical order. -/
 def LocalTypeR.normalize : LocalTypeR → LocalTypeR
   | .end => .end
   | .var v => .var v
   | .send p bs =>
-    let normBranches := bs.map (fun (l, c) => (l, normalize c))
+    let normBranches := bs.attach.map (fun ⟨(l, c), hmem⟩ =>
+      have _h : sizeOf c < 1 + sizeOf p + sizeOf bs := by
+        have h1 : sizeOf c < sizeOf bs := sizeOf_mem_snd_lt hmem
+        omega
+      (l, normalize c))
     .send p (LocalTypeR.sortBranches normBranches)
   | .recv p bs =>
-    let normBranches := bs.map (fun (l, c) => (l, normalize c))
+    let normBranches := bs.attach.map (fun ⟨(l, c), hmem⟩ =>
+      have _h : sizeOf c < 1 + sizeOf p + sizeOf bs := by
+        have h1 : sizeOf c < sizeOf bs := sizeOf_mem_snd_lt hmem
+        omega
+      (l, normalize c))
     .recv p (LocalTypeR.sortBranches normBranches)
   | .mu v body => .mu v (normalize body)
 termination_by t => sizeOf t
-decreasing_by all_goals simp_wf; all_goals sorry
+
+/-- attach.map with a function that ignores membership equals map. -/
+private theorem attach_map_eq_map {α β : Type*} (l : List α) (f : α → β) :
+    l.attach.map (fun ⟨x, _⟩ => f x) = l.map f := by
+  have h : l.attach.map (fun ⟨x, _⟩ => f x) = l.attach.map (f ∘ Subtype.val) := rfl
+  rw [h, ← List.map_map, List.attach_map_subtype_val]
 
 /-- branchLe is transitive. -/
 private theorem branchLe_trans : ∀ a b c : Label × LocalTypeR,
@@ -889,6 +897,11 @@ private theorem merge_normalize_refl_aux (t : LocalTypeR) :
   | send p bs =>
     unfold LocalTypeR.normalize LocalTypeR.merge
     simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+    -- Convert attach.map form to map form
+    have hmap : bs.attach.map (fun ⟨(l, c), _⟩ => (l, LocalTypeR.normalize c)) =
+                bs.map (fun (l, c) => (l, LocalTypeR.normalize c)) :=
+      attach_map_eq_map bs (fun (l, c) => (l, LocalTypeR.normalize c))
+    simp only [hmap]
     rw [sortBranches_idempotent]
     have ih : ∀ pair, pair ∈ bs → LocalTypeR.merge (LocalTypeR.normalize pair.2) (LocalTypeR.normalize pair.2) =
                                   some (LocalTypeR.normalize pair.2) :=
@@ -901,6 +914,11 @@ private theorem merge_normalize_refl_aux (t : LocalTypeR) :
   | recv p bs =>
     unfold LocalTypeR.normalize LocalTypeR.merge
     simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, Option.bind_eq_bind]
+    -- Convert attach.map form to map form
+    have hmap : bs.attach.map (fun ⟨(l, c), _⟩ => (l, LocalTypeR.normalize c)) =
+                bs.map (fun (l, c) => (l, LocalTypeR.normalize c)) :=
+      attach_map_eq_map bs (fun (l, c) => (l, LocalTypeR.normalize c))
+    simp only [hmap]
     rw [sortBranches_idempotent]
     have ih : ∀ pair, pair ∈ bs → LocalTypeR.merge (LocalTypeR.normalize pair.2) (LocalTypeR.normalize pair.2) =
                                   some (LocalTypeR.normalize pair.2) :=
