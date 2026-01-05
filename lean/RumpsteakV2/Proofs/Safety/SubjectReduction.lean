@@ -4,7 +4,7 @@ import RumpsteakV2.Proofs.Core.Assumptions
 /-! # RumpsteakV2.Proofs.Safety.SubjectReduction
 
 Subject reduction for V2.
--/-
+-/
 
 namespace RumpsteakV2.Proofs.Safety.SubjectReduction
 

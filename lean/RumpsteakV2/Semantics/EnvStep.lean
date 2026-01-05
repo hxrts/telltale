@@ -53,7 +53,7 @@ def projEnv (g : GlobalType) : ProjectedEnv :=
 /-- Environment step induced by a global step through projection. -/
 inductive EnvStep : ProjectedEnv → GlobalActionR → ProjectedEnv → Prop where
   | of_global (g g' : GlobalType) (act : GlobalActionR) :
-      GlobalType.step g act g' →
+      step g act g' →
       EnvStep (projEnv g) act (projEnv g')
 
 end RumpsteakV2.Semantics.EnvStep

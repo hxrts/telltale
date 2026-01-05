@@ -4,7 +4,7 @@ import RumpsteakV2.Proofs.Core.Assumptions
 /-! # RumpsteakV2.Proofs.Safety.Progress
 
 Progress for V2.
--/-
+-/
 
 namespace RumpsteakV2.Proofs.Safety.Progress
 

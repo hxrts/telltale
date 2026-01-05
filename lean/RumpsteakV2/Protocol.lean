@@ -16,7 +16,7 @@ The following definitions form the semantic interface for proofs:
 - Core: `Role`, `Action`, `LocalKind`, `LocalAction`, `LocalType`
 - Global: `PayloadSort`, `Label`, `GlobalType`, `GlobalType.wellFormed`
 - Local: `LocalTypeR`, `LocalTypeR.unfold`, `LocalTypeR.substitute`
-- Projection: `trans`, `projectb`, `CProject`, `projectR?`
+- Projection: `trans`, `projectb`, `CProject`
 - CoTypes: `EQ2`, `QLocalTypeR`, `QLocalTypeR.unfold`
 - Semantics: `ProjectedEnv`, `projEnv`, `EnvStep`, `WellFormedEnv`
 -/
@@ -36,7 +36,8 @@ export RumpsteakV2.Protocol.LocalTypeR
     LocalTypeR.substitute)
 
 export RumpsteakV2.Protocol.Projection
-  (trans lcontractive projectb CProject projectR?)
+  (trans lcontractive projectb CProject)
+-- TODO (Phase C): add projectR? once implemented
 
 export RumpsteakV2.Protocol.CoTypes
   (EQ2 QLocalTypeR QLocalTypeR.unfold)

@@ -202,108 +202,102 @@ mutual
   theorem trans_freeVars_subset (g : GlobalType) (role : String) :
       (trans g role).freeVars ⊆ g.freeVars := by
     intro x hx
-    cases g with
-    | «end» =>
+    match g with
+    | .end =>
         simp only [trans, LocalTypeR.freeVars, List.mem_nil_iff] at hx
-    | var t =>
+    | .var t =>
         simp only [trans, LocalTypeR.freeVars, GlobalType.freeVars] at hx ⊢
         exact hx
-    | mu t body =>
+    | .mu t body =>
         cases hcontract : lcontractive body with
         | true =>
             simp only [trans, hcontract, ↓reduceIte, LocalTypeR.freeVars, List.mem_filter,
               bne_iff_ne, ne_eq] at hx
-            have hmem : x ∈ body.freeVars := (trans_freeVars_subset body role) hx.1
+            have hmem : x ∈ body.freeVars := trans_freeVars_subset body role hx.1
             simp only [GlobalType.freeVars, List.mem_filter, bne_iff_ne, ne_eq]
             exact ⟨hmem, hx.2⟩
         | false =>
             simp only [trans, hcontract] at hx
             contradiction
-    | comm sender receiver branches =>
-        have hsubset := transBranches_freeVars_subset branches role
+    | .comm sender receiver branches =>
         cases hsender : role == sender with
         | true =>
-            cases branches with
-            | nil =>
+            match branches with
+            | [] =>
                 unfold trans at hx
                 simp only [hsender, ↓reduceIte, transBranches, LocalTypeR.freeVars,
                   LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap_nil, List.mem_nil_iff] at hx
-            | cons head tail =>
-                cases head with
-                | mk label cont =>
-                    simp only [trans, hsender, ↓reduceIte, LocalTypeR.freeVars,
-                      LocalTypeR.freeVarsOfBranches_eq_flatMap, List.mem_flatMap] at hx
-                    rcases hx with ⟨pair, hmem, hxmem⟩
-                    have hxMem : x ∈ (transBranches ((label, cont) :: tail) role).flatMap
-                        (fun (_, t) => t.freeVars) := List.mem_flatMap.2 ⟨pair, hmem, hxmem⟩
-                    have : x ∈ ((label, cont) :: tail).flatMap (fun (_, g) => g.freeVars) :=
-                      hsubset hxMem
-                    simp only [GlobalType.freeVars, GlobalType.freeVarsOfBranches_eq_flatMap]
-                    exact this
+            | (label, cont) :: tail =>
+                simp only [trans, hsender, ↓reduceIte, LocalTypeR.freeVars,
+                  LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
+                have hsub := transBranches_freeVars_subset ((label, cont) :: tail) role
+                have hmem := hsub hx
+                simp only [GlobalType.freeVars, GlobalType.freeVarsOfBranches_eq_flatMap]
+                exact hmem
         | false =>
             cases hreceiver : role == receiver with
             | true =>
-                cases branches with
-                | nil =>
+                match branches with
+                | [] =>
                     unfold trans at hx
                     simp only [hsender, Bool.false_eq_true, ↓reduceIte, hreceiver, transBranches,
                       LocalTypeR.freeVars, LocalTypeR.freeVarsOfBranches_eq_flatMap,
                       List.flatMap_nil, List.mem_nil_iff] at hx
-                | cons head tail =>
-                    cases head with
-                    | mk label cont =>
-                        simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver,
-                          LocalTypeR.freeVars, LocalTypeR.freeVarsOfBranches_eq_flatMap,
-                          List.mem_flatMap] at hx
-                        rcases hx with ⟨pair, hmem, hxmem⟩
-                        have hxMem : x ∈ (transBranches ((label, cont) :: tail) role).flatMap
-                            (fun (_, t) => t.freeVars) := List.mem_flatMap.2 ⟨pair, hmem, hxmem⟩
-                        have : x ∈ ((label, cont) :: tail).flatMap (fun (_, g) => g.freeVars) :=
-                          hsubset hxMem
-                        simp only [GlobalType.freeVars, GlobalType.freeVarsOfBranches_eq_flatMap]
-                        exact this
+                | (label, cont) :: tail =>
+                    simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver,
+                      LocalTypeR.freeVars, LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
+                    have hsub := transBranches_freeVars_subset ((label, cont) :: tail) role
+                    have hmem := hsub hx
+                    simp only [GlobalType.freeVars, GlobalType.freeVarsOfBranches_eq_flatMap]
+                    exact hmem
             | false =>
-                cases branches with
-                | nil =>
+                match branches with
+                | [] =>
                     simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver,
                       LocalTypeR.freeVars, List.mem_nil_iff] at hx
-                | cons head tail =>
-                    cases head with
-                    | mk label cont =>
-                        simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver] at hx
-                        have hmem' : x ∈ cont.freeVars := (trans_freeVars_subset cont role) hx
-                        simp only [GlobalType.freeVars, GlobalType.freeVarsOfBranches_eq_flatMap,
-                          List.flatMap_cons, List.mem_append]
-                        left
-                        exact hmem'
-  termination_by g _ => sizeOf g
-  decreasing_by all_goals sorry -- TODO: fix mutual termination
+                | (label, cont) :: tail =>
+                    simp only [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver] at hx
+                    have hmem' : x ∈ cont.freeVars := trans_freeVars_subset cont role hx
+                    simp only [GlobalType.freeVars, GlobalType.freeVarsOfBranches_eq_flatMap,
+                      List.flatMap_cons, List.mem_append]
+                    left
+                    exact hmem'
+  termination_by sizeOf g
+  decreasing_by
+    all_goals
+      first
+      | exact sizeOf_body_lt_mu _ _
+      | exact sizeOf_bs_lt_comm _ _ _
+      | exact sizeOf_cont_lt_comm _ _ _ _ _
 
   /-- Branch-wise free variable inclusion for `transBranches`. -/
   theorem transBranches_freeVars_subset (branches : List (Label × GlobalType)) (role : String) :
       (transBranches branches role).flatMap (fun (_, t) => t.freeVars) ⊆
         branches.flatMap (fun (_, g) => g.freeVars) := by
     intro y hy
-    induction branches with
-    | nil =>
+    match branches with
+    | [] =>
         simp only [transBranches, List.flatMap_nil, List.mem_nil_iff] at hy
-    | cons head tail ih =>
-        cases head with
-        | mk label cont =>
-            simp only [transBranches, List.flatMap_cons, List.mem_append] at hy
-            cases hy with
-            | inl hhead =>
-                have hmem : y ∈ cont.freeVars := (trans_freeVars_subset cont role) hhead
-                simp only [List.flatMap_cons, List.mem_append]
-                left
-                exact hmem
-            | inr htail =>
-                have hmem : y ∈ tail.flatMap (fun (_, g) => g.freeVars) := ih htail
-                simp only [List.flatMap_cons, List.mem_append]
-                right
-                exact hmem
-  termination_by branches _ => sizeOf branches
-  decreasing_by all_goals sorry -- TODO: fix mutual termination
+    | (label, cont) :: tail =>
+        simp only [transBranches, List.flatMap_cons, List.mem_append] at hy
+        cases hy with
+        | inl hhead =>
+            have hmem : y ∈ cont.freeVars := trans_freeVars_subset cont role hhead
+            simp only [List.flatMap_cons, List.mem_append]
+            left
+            exact hmem
+        | inr htail =>
+            have hmem : y ∈ tail.flatMap (fun (_, g) => g.freeVars) :=
+              transBranches_freeVars_subset tail role htail
+            simp only [List.flatMap_cons, List.mem_append]
+            right
+            exact hmem
+  termination_by sizeOf branches
+  decreasing_by
+    all_goals
+      first
+      | exact sizeOf_cont_lt_cons _ _ _
+      | exact sizeOf_tail_lt_cons _ _
 end
 
 end RumpsteakV2.Protocol.Projection.Trans

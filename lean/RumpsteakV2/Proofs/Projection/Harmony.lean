@@ -4,7 +4,7 @@ import RumpsteakV2.Proofs.Core.Assumptions
 /-! # RumpsteakV2.Proofs.Projection.Harmony
 
 Harmony between global steps and environment steps for V2.
--/-
+-/
 
 namespace RumpsteakV2.Proofs.Projection.Harmony
 

@@ -17,13 +17,12 @@ The following definitions form the semantic interface for proofs:
 - `lcontractive`
 - `projectb`
 - `CProject`
-- `projectR?`
 -/
 
 namespace RumpsteakV2.Protocol.Projection
 
 export RumpsteakV2.Protocol.Projection.Trans (trans lcontractive)
 export RumpsteakV2.Protocol.Projection.Projectb (projectb CProject)
-export RumpsteakV2.Protocol.Projection.Project (projectR?)
+-- TODO (Phase C): export RumpsteakV2.Protocol.Projection.Project (projectR?)
 
 end RumpsteakV2.Protocol.Projection
