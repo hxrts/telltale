@@ -1,3 +1,4 @@
+import Mathlib.Order.FixedPoints
 import RumpsteakV2.Protocol.Projection.Trans
 
 /-! # RumpsteakV2.Protocol.Projection.Projectb
@@ -11,7 +12,11 @@ The following definitions form the semantic interface for proofs:
 - `projectb`: boolean projection checker
 - `projectbBranches`: branch-wise projection for participants
 - `projectbAllBranches`: single candidate check for non-participants
-- `CProject`: placeholder projection relation (to be coinductive gfp)
+- `CProjectF`: one-step generator for coinductive projection
+- `CProject`: coinductive projection relation (greatest fixed point of CProjectF)
+- `CProject_coind`: coinduction principle for CProject
+- `BranchesProjRel`: branch-wise projection for send/recv
+- `AllBranchesProj`: all branches project to same candidate
 - `projectb_end_end`: reflection lemma for end-end
 - `projectb_var_var`: reflection lemma for var-var
 - `projectb_mu_mu`: reflection lemma for mu-mu
@@ -161,10 +166,172 @@ mutual
       | exact sizeOf_rest_lt_branch_cons _ _ _
 end
 
-/-- Placeholder definition: EQ via `projectb`.
-    This will be replaced by the coinductive gfp-based relation in Phase A. -/
-def CProject (g : GlobalType) (role : String) (cand : LocalTypeR) : Prop :=
-  projectb g role cand = true
+/-! ## CProject Coinductive Relation
+
+CProject is defined as the greatest fixed point of CProjectF, which captures
+one step of the projection relation. This is analogous to how EQ2 is defined
+for local type equality. -/
+
+/-- Ternary relation for projection. -/
+abbrev ProjRel := GlobalType → String → LocalTypeR → Prop
+
+/-- Branch-wise projection relation for send/recv. -/
+def BranchesProjRel (R : ProjRel)
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR)) : Prop :=
+  List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ R gb.2 role lb.2) gbs lbs
+
+/-- All branches project to the same candidate (for non-participants). -/
+def AllBranchesProj (R : ProjRel)
+    (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR) : Prop :=
+  ∀ gb ∈ gbs, R gb.2 role cand
+
+/-- One-step generator for CProject.
+    For comm nodes, we check role participation first to properly handle all cases. -/
+def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
+  match g, cand with
+  | .end, .end => True
+  | .var t, .var t' => t = t'
+  | .mu t body, .mu t' candBody =>
+      t = t' ∧ lcontractive body ∧ R body role candBody
+  | .comm sender receiver gbs, cand =>
+      if role = sender then
+        match cand with
+        | .send partner lbs => partner = receiver ∧ BranchesProjRel R gbs role lbs
+        | _ => False
+      else if role = receiver then
+        match cand with
+        | .recv partner lbs => partner = sender ∧ BranchesProjRel R gbs role lbs
+        | _ => False
+      else
+        AllBranchesProj R gbs role cand
+  | _, _ => False
+
+private theorem BranchesProjRel_mono {R S : ProjRel}
+    (h : ∀ g r c, R g r c → S g r c) :
+    ∀ {gbs lbs role}, BranchesProjRel R gbs role lbs → BranchesProjRel S gbs role lbs := by
+  intro gbs lbs role hrel
+  induction hrel with
+  | nil => exact List.Forall₂.nil
+  | cons hpair _ ih =>
+      exact List.Forall₂.cons ⟨hpair.1, h _ _ _ hpair.2⟩ ih
+
+private theorem AllBranchesProj_mono {R S : ProjRel}
+    (h : ∀ g r c, R g r c → S g r c) :
+    ∀ {gbs role cand}, AllBranchesProj R gbs role cand → AllBranchesProj S gbs role cand := by
+  intro gbs role cand hall gb hgb
+  exact h _ _ _ (hall gb hgb)
+
+private theorem CProjectF_mono : Monotone CProjectF := by
+  intro R S h g role cand hrel
+  cases g <;> cases cand <;> simp only [CProjectF] at hrel ⊢
+  all_goals
+    first
+    | exact hrel                                                -- trivial cases
+    | (obtain ⟨h1, h2, h3⟩ := hrel;                             -- mu case
+       exact ⟨h1, h2, h _ _ _ h3⟩)
+    | (-- comm cases with if-then-else structure
+       split_ifs at hrel ⊢
+       all_goals
+         first
+         | exact hrel
+         | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
+         | exact AllBranchesProj_mono h hrel)
+
+/-- CProject as the greatest fixed point of CProjectF.
+    Uses the pointwise complete lattice structure on ProjRel. -/
+def CProject : ProjRel :=
+  OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩
+
+private theorem CProject_fixed : CProjectF CProject = CProject := by
+  simpa [CProject] using (OrderHom.isFixedPt_gfp ⟨CProjectF, CProjectF_mono⟩)
+
+/-- Coinduction principle for CProject: if R ⊆ CProjectF R, then R ⊆ CProject. -/
+theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CProjectF R g role cand) :
+    ∀ g role cand, R g role cand → CProject g role cand := by
+  intro g role cand hr
+  have hle : R ≤ CProjectF R := fun x y z hxyz => h x y z hxyz
+  have hgfp : R ≤ CProject := OrderHom.le_gfp ⟨CProjectF, CProjectF_mono⟩ hle
+  exact hgfp g role cand hr
+
+/-- Destruct CProject: if CProject holds, then CProjectF CProject holds. -/
+theorem CProject_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
+    (h : CProject g role cand) : CProjectF CProject g role cand := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  exact Eq.mp (congrFun (congrFun (congrFun hfix.symm g) role) cand) h
+
+/-! ## Constructor-style lemmas for CProject
+
+These lemmas allow building CProject proofs by cases on the global type. -/
+
+/-- CProject for end-end. -/
+theorem CProject_end (role : String) : CProject .end role .end := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hf : CProjectF CProject .end role .end := by simp only [CProjectF]
+  exact Eq.mp (congrFun (congrFun (congrFun hfix .end) role) .end) hf
+
+/-- CProject for var-var. -/
+theorem CProject_var (t : String) (role : String) : CProject (.var t) role (.var t) := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hf : CProjectF CProject (.var t) role (.var t) := by simp only [CProjectF]
+  exact Eq.mp (congrFun (congrFun (congrFun hfix (.var t)) role) (.var t)) hf
+
+/-- CProject for mu-mu. -/
+theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (role : String)
+    (hcontr : lcontractive body) (hbody : CProject body role candBody) :
+    CProject (.mu t body) role (.mu t candBody) := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hf : CProjectF CProject (.mu t body) role (.mu t candBody) := by
+    dsimp only [CProjectF]
+    exact ⟨rfl, hcontr, hbody⟩
+  exact Eq.mp (congrFun (congrFun (congrFun hfix (.mu t body)) role) (.mu t candBody)) hf
+
+/-- CProject for comm-send (role is sender). -/
+theorem CProject_comm_send (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (lbs : List (Label × LocalTypeR))
+    (hbranches : BranchesProjRel CProject gbs sender lbs) :
+    CProject (.comm sender receiver gbs) sender (.send receiver lbs) := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hf : CProjectF CProject (.comm sender receiver gbs) sender (.send receiver lbs) := by
+    dsimp only [CProjectF]
+    split_ifs with h h'
+    · exact ⟨rfl, hbranches⟩           -- sender = sender, take first branch
+    · exact absurd rfl h                -- ¬sender = sender ∧ sender = receiver, contradiction
+    · exact absurd rfl h                -- ¬sender = sender ∧ ¬sender = receiver, contradiction
+  exact Eq.mp (congrFun (congrFun (congrFun hfix (.comm sender receiver gbs)) sender)
+    (.send receiver lbs)) hf
+
+/-- CProject for comm-recv (role is receiver). -/
+theorem CProject_comm_recv (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (lbs : List (Label × LocalTypeR))
+    (hns : sender ≠ receiver)
+    (hbranches : BranchesProjRel CProject gbs receiver lbs) :
+    CProject (.comm sender receiver gbs) receiver (.recv sender lbs) := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hf : CProjectF CProject (.comm sender receiver gbs) receiver (.recv sender lbs) := by
+    dsimp only [CProjectF]
+    -- The if structure is: if receiver = sender then ... else if receiver = receiver then ... else ...
+    split_ifs with h1 h2
+    · -- h1 : receiver = sender - contradiction since sender ≠ receiver
+      exact absurd h1.symm hns
+    · -- ¬h1 ∧ h2 : receiver ≠ sender ∧ receiver = receiver - this is the case we want
+      exact ⟨rfl, hbranches⟩
+    · -- ¬h1 ∧ ¬h2 : receiver ≠ sender ∧ receiver ≠ receiver - contradiction
+      exact absurd rfl h2
+  exact Eq.mp (congrFun (congrFun (congrFun hfix (.comm sender receiver gbs)) receiver)
+    (.recv sender lbs)) hf
+
+/-- CProject for comm-other (role is non-participant). -/
+theorem CProject_comm_other (sender receiver role : String)
+    (gbs : List (Label × GlobalType)) (cand : LocalTypeR)
+    (hns : role ≠ sender) (hnr : role ≠ receiver)
+    (hall : AllBranchesProj CProject gbs role cand) :
+    CProject (.comm sender receiver gbs) role cand := by
+  have hfix : CProjectF CProject = CProject := CProject_fixed
+  have hf : CProjectF CProject (.comm sender receiver gbs) role cand := by
+    unfold CProjectF
+    simp only [hns, hnr, ite_false]
+    exact hall
+  exact Eq.mp (congrFun (congrFun (congrFun hfix (.comm sender receiver gbs)) role) cand) hf
 
 /-! ## Reflection Lemmas
 
