@@ -1,6 +1,7 @@
 import RumpsteakV2.Protocol.Projection.Projectb
 import RumpsteakV2.Protocol.Projection.Trans
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.Participation
 
 /-! # RumpsteakV2.Protocol.Projection.Project
 
@@ -14,6 +15,7 @@ The following definitions form the semantic interface for proofs:
 - `projectR?_some_iff_CProject`: specification lemma
 - `projectR?_sound`: soundness (some implies CProject)
 - `projectR?_complete`: completeness (CProject implies some)
+- `EQ_end`: non-participants project to EEnd (EQ2-equivalent)
 -/
 
 namespace RumpsteakV2.Protocol.Projection.Project
@@ -23,6 +25,7 @@ open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.Projection.Projectb
 open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.Participation
 
 /-- Proof-carrying projection: returns the local type with a proof that CProject holds.
     Uses `trans` to compute the candidate and `projectb` to validate.
@@ -57,6 +60,58 @@ theorem projectR?_sound {g : GlobalType} {role : String}
     (_h : projectR? g role = some result) :
     CProject g role result.val :=
   result.property
+
+/-! ## EQ_end: Non-participants project to EEnd
+
+This section establishes that if a role doesn't participate in a global protocol,
+then the projection function `trans` produces a local type EQ2-equivalent to EEnd.
+
+This corresponds to Coq's `EQ_end` theorem from indProj.v (lines 147-152). -/
+
+/-- Non-participants project to EEnd (EQ2-equivalent).
+
+If a role doesn't participate in the global type and the global type is well-formed
+(closed, all comms have branches), then trans g role is EQ2-equivalent to .end.
+
+### Proof Strategy (from Coq)
+
+1. Show that `trans` on a non-participant produces a "muve" type (mu-var-end chain):
+   - `inp_muve`: if ¬participates role g, then muve (trans role g)
+
+2. Show that unfolding a muve type produces a "leaf" (end or var):
+   - `muve_leaf`: if lcontractive e ∧ muve e, then leaf (full_eunf e)
+
+3. For closed types, the leaf must be EEnd (no free variables):
+   - If full_eunf (trans role g) = EEnd, then EQ2 EEnd (trans role g)
+
+4. Apply EQ2 unfolding to conclude.
+
+### Coq Reference
+
+See `subject_reduction/theories/Projection/indProj.v:147-152`:
+```coq
+Theorem EQ_end : forall p g, ~ part_of2 p g -> gInvPred g ->
+  EEnd << (ApplyF full_eunf full_eunf \o EQ2_gen) >> (trans p g).
+```
+
+The Coq proof uses `EQ2_eunf` which is the coinductive EQ2 with unfolding on both sides. -/
+axiom EQ_end (role : String) (g : GlobalType)
+    (hnotpart : ¬ part_of2 role g)
+    (hwf : g.wellFormed = true) :
+    EQ2 .end (trans g role)
+
+/-- Classification: a role either participates or projects to EEnd.
+
+This is the key structural lemma for projection proofs. It corresponds to
+Coq's `part_of2_or_end` from intermediateProj.v (lines 193-200).
+
+For a role in a global type with a CProject proof:
+- Either the role participates (part_of_all2), OR
+- The projection is EQ2-equivalent to EEnd -/
+axiom part_of2_or_end (role : String) (g : GlobalType) (lt : LocalTypeR)
+    (hproj : CProject g role lt)
+    (hwf : g.wellFormed = true) :
+    part_of_all2 role g ∨ EQ2 lt .end
 
 /-! ## Projection-EQ2 Congruence Lemmas
 
