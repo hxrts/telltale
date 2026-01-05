@@ -68,43 +68,99 @@ These correspond to key lemmas from the Coq development:
 /-- If CProject g role lt holds, then lt is EQ2-equivalent to trans g role.
 
 This axiom corresponds to the Coq lemma `proj_proj` from indProj.v (lines 221-260).
-The proof uses coinduction with case analysis on role participation:
 
-1. **Participant case** (role is sender or receiver):
-   - By induction on the participation path (`part_of_all2`)
-   - For comm head: trans computes send/recv, CProject gives the same structure
-   - For comm async: IH on the enabled branch continuation
-   - For mu: unfold and use IH with substitution
+### Proof Strategy
 
-2. **Non-participant case** (role is neither sender nor receiver):
-   - trans computes by taking first branch's projection
-   - CProject requires all branches to project identically (for non-participants)
-   - Therefore trans g role = the unique projection
-   - Result: EQ2 lt (trans g role) by EQ2_refl
+The proof uses coinduction on EQ2 with the relation:
+```
+CProjectTransRel lt cand := ∃ g role, CProject g role lt ∧ cand = trans g role
+```
 
-The proof requires coinductive reasoning on EQ2 combined with structural
-induction on participation, which interacts with the unfolding of mu types. -/
+For most cases (end, var, comm-sender, comm-receiver), the structure of CProject
+and trans match directly:
+- `CProject .end role .end` and `trans .end role = .end` → EQ2F trivially True
+- `CProject (.var t) role (.var t)` and `trans (.var t) role = .var t` → names equal
+- Participant comm cases: CProject gives send/recv with BranchesProjRel,
+  trans gives send/recv with transBranches, structures match
+
+### Blocked Cases
+
+**mu case:** When `CProject (.mu t body) role (.mu t candBody)` and
+`trans (.mu t body) role = .mu t (trans body role)`:
+- EQ2F for two mu types requires showing unfolding pairs are related:
+  1. `(candBody.substitute t (.mu t candBody), .mu t (trans body role))`
+  2. `(.mu t candBody, (trans body role).substitute t (...))`
+- These substituted types don't directly correspond to any CProject/trans pair
+- Need a helper lemma: CProject_substitute or trans_substitute_EQ2
+- The Coq proof uses pcofix (parametrized coinduction) to handle this
+
+**empty branches case:** For non-participant with empty branches:
+- CProject's AllBranchesProj is vacuously true for any lt
+- trans returns .end
+- Need EQ2F lt .end, but lt is unconstrained
+- This may indicate a gap in the CProject definition for edge cases
+
+**nested non-participant case:** For non-participant where first branch is also
+a non-participant comm:
+- Requires well-founded recursion on global type size
+- Standard coinduction postfix proof doesn't capture this pattern
+
+### Required Sub-Lemmas
+
+1. `CProject_substitute`: If `CProject body role candBody`, then
+   `CProject (body.substitute t (mu t body)) role (candBody.substitute t (mu t candBody))`
+
+2. `trans_substitute_EQ2`: Trans commutes with substitution up to EQ2:
+   `EQ2 (trans (g.substitute t repl) role) ((trans g role).substitute t (trans repl role))`
+
+### Coq Reference
+
+See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq proof
+which uses `pcofix CIH` (parametrized coinduction from paco library). -/
 axiom CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) : EQ2 lt (trans g role)
 
 /-- CProject is preserved under EQ2 equivalence.
 
 This axiom corresponds to the Coq lemma `Project_EQ2` from indProj.v (lines 263-300).
-The proof uses coinduction with case analysis on role participation:
 
-1. **Participant case** (role is sender or receiver):
-   - By induction on the participation path (`part_of_all2`)
-   - For comm head: e0 and e1 have same structure (by EQ2), so CProject transfers
-   - For comm async: IH on continuations, EQ2 gives matching continuations
-   - For mu: unfold both sides using EQ2_unfold, apply IH
+### Proof Strategy
 
-2. **Non-participant case**:
-   - CProject requires projection to a unique type (all branches identical)
-   - EQ2 equivalence means the projections are observationally equal
-   - Therefore CProject holds for the EQ2-equivalent type
+The proof uses coinduction on CProject with the relation:
+```
+EQ2_CProject_Rel g role e1 := ∃ e0, CProject g role e0 ∧ EQ2 e0 e1
+```
 
-The proof requires coinductive reasoning on both CProject and EQ2, tracking
-how their unfoldings interact for mu types. -/
+### Case Analysis
+
+**Participant case** (role is sender or receiver):
+- By induction on the participation path
+- For comm head: e0 = send/recv with some branches, e1 must have same top-level
+  structure (by EQ2), so CProject transfers with BranchesRel from EQ2
+- For mu: EQ2_unfold gives EQ2 on unfolded types, apply IH
+
+**Non-participant case**:
+- CProject requires AllBranchesProj: all branch continuations project to e0
+- EQ2 e0 e1 means e1 is observationally equal to e0
+- For each branch, we need CProject cont role e1
+- This follows by IH on continuations + EQ2 transitivity
+
+### Blocked Cases
+
+**mu case with different binders:** When g = mu t body and e0 = mu t' body0:
+- EQ2 (mu t' body0) e1 could have e1 = mu s' body1 with s' ≠ t'
+- Need to show CProject (mu t body) role (mu s' body1)
+- This requires tracking how EQ2's mu unfolding interacts with CProject
+
+**Branch-wise EQ2 lifting:** For participant comm cases:
+- EQ2 gives BranchesRel EQ2 on branch continuations
+- Need to transfer CProject branch-by-branch
+- Requires BranchesRel to lift through CProject correctly
+
+### Coq Reference
+
+See `subject_reduction/theories/Projection/indProj.v:263-300` for the Coq proof
+which uses `pcofix CIH` with participation predicates. -/
 axiom CProject_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1
 
