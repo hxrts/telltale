@@ -574,4 +574,78 @@ theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)
   have hinR : SoundRel g role cand := h
   exact CProject_coind SoundRel_postfix g role cand hinR
 
+/-- Completeness: if CProject holds, then projectb returns true.
+    This is the converse of projectb_sound. -/
+theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
+    (h : CProject g role cand) : projectb g role cand = true := by
+  -- Use CProject_destruct to access the CProjectF structure
+  have hF := CProject_destruct h
+  -- Case split on g and cand using CProjectF structure
+  cases g with
+  | «end» =>
+      -- CProjectF says cand = .end
+      dsimp only [CProjectF] at hF
+      -- hF : cand = .end
+      cases cand with
+      | «end» => simp only [projectb]
+      | _ => exact False.elim (by simp_all)
+  | var t =>
+      -- CProjectF says cand = .var t
+      dsimp only [CProjectF] at hF
+      cases cand with
+      | var t' =>
+          simp only [projectb]
+          -- hF : t = t'
+          subst hF
+          simp only [beq_self_eq_true]
+      | _ => exact False.elim (by simp_all)
+  | mu t body =>
+      cases cand with
+      | mu t' candBody =>
+          dsimp only [CProjectF] at hF
+          obtain ⟨heq, hcontr, hbody⟩ := hF
+          subst heq
+          simp only [projectb, beq_self_eq_true, hcontr, ↓reduceIte]
+          -- Need: projectb body role candBody = true
+          -- hbody : CProject body role candBody
+          -- This requires recursion - use sorry for now
+          sorry
+      | «end» => exact False.elim hF
+      | var _ => exact False.elim hF
+      | send _ _ => exact False.elim hF
+      | recv _ _ => exact False.elim hF
+  | comm sender receiver gbs =>
+      dsimp only [CProjectF] at hF
+      split_ifs at hF with hs hr
+      · -- hs : role = sender
+        cases cand with
+        | send partner lbs =>
+            obtain ⟨hpartner, hbranches⟩ := hF
+            simp only [projectb]
+            subst hs hpartner
+            simp only [beq_self_eq_true, ↓reduceIte]
+            -- Need projectbBranches to be true from hbranches
+            sorry
+        | «end» => exact False.elim hF
+        | var _ => exact False.elim hF
+        | recv _ _ => exact False.elim hF
+        | mu _ _ => exact False.elim hF
+      · -- hr : role = receiver
+        cases cand with
+        | recv partner lbs =>
+            -- hF : partner = sender ∧ BranchesProjRel CProject gbs role lbs
+            -- Need to show projectb returns true
+            sorry
+        | «end» => exact False.elim hF
+        | var _ => exact False.elim hF
+        | send _ _ => exact False.elim hF
+        | mu _ _ => exact False.elim hF
+      · -- non-participant: hF : AllBranchesProj CProject gbs role cand
+        sorry
+
+/-- projectb = true iff CProject holds. -/
+theorem projectb_iff_CProject (g : GlobalType) (role : String) (cand : LocalTypeR) :
+    projectb g role cand = true ↔ CProject g role cand :=
+  ⟨projectb_sound g role cand, projectb_complete g role cand⟩
+
 end RumpsteakV2.Protocol.Projection.Projectb
