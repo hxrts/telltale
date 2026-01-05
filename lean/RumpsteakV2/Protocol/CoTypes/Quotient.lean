@@ -15,8 +15,14 @@ The following definitions form the semantic interface for proofs:
 - `QLocalTypeR.unfold`: lifted unfold operation
 - `QLocalTypeR.substitute`: lifted substitution
 - `QLocalTypeR.dual`: lifted duality
-- `EQ2_substitute`: substitution respects EQ2
 - `EQ2_dual`: duality respects EQ2
+
+## Imports from Substitute Module
+
+The following are imported from `RumpsteakV2.Protocol.CoTypes.Substitute`:
+
+- `EQ2_substitute`: substitution respects EQ2
+- `unfold_substitute_EQ2`: unfold/substitute confluence
 -/
 
 namespace RumpsteakV2.Protocol.CoTypes.Quotient
@@ -209,32 +215,9 @@ def QLocalTypeR.liftProp (P : LocalTypeR → Prop)
     intro a b h
     exact propext (hresp a b h))
 
-/-- Unfold commutes with substitute on representatives.
-
-For non-mu types, unfold is the identity, so both sides are definitionally equal.
-For mu types, the proof requires coinductive reasoning on the resulting infinite trees.
-
-This axiom states that applying substitute then unfold is EQ2-equivalent to
-applying unfold then substitute. Both result in observationally equivalent
-infinite trees.
-
-### Proof sketch (by case analysis on t)
-
-- end/var/send/recv: unfold is identity, trivial
-- mu t body: requires coinductive reasoning on EQ2
-
-This corresponds to the semantic property that substitution and unfolding
-are confluent operations on infinite trees.
-
-### Connection to Coq's `full_eunf_subst`
-
-This is a single-step version of the Coq lemma `full_eunf_subst` (coLocal.v:56) which states:
-  `full_eunf (μt.body) = full_eunf (body[t := μt.body])`
-
-Where `full_eunf` completely unfolds all mu binders. Our axiom is weaker (single step vs full
-unfolding) but sufficient when combined with coinduction on EQ2. -/
-axiom unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
-    EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)
+-- unfold_substitute_EQ2 is imported from RumpsteakV2.Protocol.CoTypes.Substitute
+-- See that module for detailed documentation of the proof strategy and
+-- its circular dependency with EQ2_substitute.
 
 /-- Unfold commutes with substitute (on quotient). -/
 theorem QLocalTypeR.unfold_substitute (q : QLocalTypeR) (var : String) (repl : LocalTypeR) :

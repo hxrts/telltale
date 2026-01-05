@@ -7,6 +7,15 @@ This module establishes that EQ2 (the coinductive equi-recursive equality) is
 preserved under substitution. This is a key lemma for the typing and subject
 reduction proofs.
 
+## Expose
+
+The following definitions form the semantic interface for proofs:
+
+- `EQ2_substitute`: substitution preserves EQ2
+- `unfold_substitute_EQ2`: unfold/substitute confluence (substitute then unfold ≈ unfold then substitute)
+- `Fresh`: freshness predicate (variable not free in type)
+- `isFreeIn`: check if variable appears free in type
+
 ## Theorem Statement
 
 `EQ2_substitute`: If `EQ2 a b`, then `EQ2 (a.substitute var repl) (b.substitute var repl)`.
@@ -113,5 +122,95 @@ theorem EQ2_substitute' {a b : LocalTypeR} (var : String) (repl : LocalTypeR)
 theorem EQ2_substitute_left (a : LocalTypeR) (var : String) (repl : LocalTypeR) :
     EQ2 (a.substitute var repl) (a.substitute var repl) :=
   EQ2_substitute a a var repl (EQ2_refl a)
+
+/-! ## Unfold-Substitute Confluence
+
+The second key axiom for substitution: unfolding and substitution are confluent
+operations on equi-recursive types.
+
+## Theorem Statement
+
+`unfold_substitute_EQ2`: For any type `t`, variable `var`, and replacement `repl`:
+  `EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)`
+
+This says that substitute-then-unfold produces an EQ2-equivalent result to
+unfold-then-substitute.
+
+## Proof Strategy
+
+The proof proceeds by case analysis on `t`:
+
+### Non-mu cases (end, var, send, recv)
+
+For these constructors, `unfold` is the identity function:
+- `t.unfold = t`
+- `(t.substitute var repl).unfold = t.substitute var repl`
+- `(t.unfold).substitute var repl = t.substitute var repl`
+
+Both sides are definitionally equal, so `EQ2_refl` suffices.
+
+### Mu case (mu s body)
+
+This is where the interesting confluence happens. Let `M = mu s body`:
+
+- **LHS**: `(M.substitute var repl).unfold`
+  - If `s == var`: `M.unfold = body.substitute s M`
+  - If `s ≠ var`: `(mu s (body.substitute var repl)).unfold`
+              `= (body.substitute var repl).substitute s (mu s (body.substitute var repl))`
+
+- **RHS**: `(M.unfold).substitute var repl`
+  - `M.unfold = body.substitute s M`
+  - `(body.substitute s M).substitute var repl`
+
+The two sides differ in the ORDER of substitutions:
+- LHS: substitute `var`, then unfold (which substitutes `s` with the modified mu)
+- RHS: unfold (substitute `s` with original mu), then substitute `var`
+
+The key insight is that these produce the same INFINITE TREE. The difference is
+only in how the finite recursive syntax is represented. When fully unfolded to
+infinite depth, both give identical communication structures.
+
+## Circular Dependency with EQ2_substitute
+
+This axiom and `EQ2_substitute` are mutually dependent:
+- `EQ2_substitute` proof needs `unfold_substitute_EQ2` for the mu case
+- `unfold_substitute_EQ2` proof needs `EQ2_substitute` for recursive reasoning
+
+Both can be proven simultaneously using a combined coinductive relation, but
+the proof is complex. We accept both as axioms since:
+1. They are semantically sound (infinite tree semantics)
+2. They correspond to proven lemmas in Coq (`subst_EQ2`, `full_eunf_subst`)
+3. The Barendregt convention ensures well-formedness
+
+## Connection to Coq's `full_eunf_subst`
+
+This corresponds to the single-step version of `full_eunf_subst` (coLocal.v:56):
+  `full_eunf (μt.body) = full_eunf (body[t := μt.body])`
+
+Where `full_eunf` completely unfolds all mu binders. Our axiom is weaker
+(single step vs full unfolding) but sufficient when combined with coinduction.
+
+-/
+
+/-- Unfold and substitute are confluent operations on local types.
+
+This axiom states that applying substitute then unfold is EQ2-equivalent to
+applying unfold then substitute. Both produce observationally equivalent
+infinite communication trees.
+
+**Proof sketch:**
+1. Non-mu cases: unfold is identity, trivial by `EQ2_refl`
+2. Mu case: requires showing confluence of substitution order
+3. Use coinduction on the infinite tree to show semantic equivalence
+
+**Coq reference:** `full_eunf_subst` in `subject_reduction/coLocal.v`
+-/
+axiom unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
+    EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)
+
+/-- Unfold-substitute confluence for the reflexive case. -/
+theorem unfold_substitute_EQ2_refl (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
+    EQ2 ((t.substitute var repl).unfold) ((t.substitute var repl).unfold) :=
+  EQ2_refl _
 
 end RumpsteakV2.Protocol.CoTypes.Substitute
