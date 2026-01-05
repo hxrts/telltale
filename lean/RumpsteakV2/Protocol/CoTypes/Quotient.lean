@@ -1,4 +1,5 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.Substitute
 import RumpsteakV2.Protocol.LocalTypeR
 
 /-! # RumpsteakV2.Protocol.CoTypes.Quotient
@@ -21,6 +22,7 @@ The following definitions form the semantic interface for proofs:
 namespace RumpsteakV2.Protocol.CoTypes.Quotient
 
 open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.Substitute
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 
@@ -45,48 +47,8 @@ theorem QLocalTypeR.unfold_ofLocal (t : LocalTypeR) :
 
 /-! ## Substitution Congruence -/
 
-/-- Substitution respects EQ2: if two types are EQ2-equivalent, their substitutions
-    (with the same variable and replacement) are also EQ2-equivalent.
-
-This axiom captures the semantic property that observationally equal types
-remain observationally equal after substitution.
-
-### Why this is an axiom (not a theorem)
-
-Proving this constructively requires "coinduction up-to" techniques (like Coq's paco library).
-The naive coinduction relation:
-  `SubstRel var repl a' b' := ∃ a b, EQ2 a b ∧ a' = a.subst var repl ∧ b' = b.subst var repl`
-
-is NOT a post-fixpoint of EQ2F because of the mu-mu case with distinct bound variables.
-
-**Problematic case:** When `EQ2 (mu t body) (mu s body')` where `t ≠ var` and `s ≠ var`:
-- After substitution: `a' = mu t (body.subst var repl)`, `b' = mu s (body'.subst var repl)`
-- EQ2F requires: `SubstRel (body.subst var repl).subst t (mu t (body.subst var repl)) (mu s (body'.subst var repl))`
-- This LHS has nested substitutions that don't factor as `a.subst var repl` for any simple `a`
-
-The fix in Coq uses parametrized coinduction (paco) which allows "accumulating" EQ2 reasoning
-during the coinductive proof. Lean 4 lacks built-in support for this.
-
-**Alternative Coq technique (full_eunf):** Coq also uses `full_eunf` which completely unfolds
-all mu binders before comparing. The key lemma `full_eunf_subst` states that full unfolding
-is invariant under mu unfolding: `full_eunf (μt.body) = full_eunf (body[t := μt.body])`.
-This eliminates nested substitutions by reasoning about the "leaf" structure after all mus
-are removed. Implementing this in Lean would require termination proofs on contractive depth.
-
-### Semantic soundness
-
-The axiom is semantically sound because:
-- EQ2 represents observational equality of infinite trees
-- Substitution is a structural transformation on trees
-- If two trees are observationally equal, applying the same transformation
-  to corresponding positions yields observationally equal results
-
-### Coq reference
-
-- `subject_reduction/theories/CoTypes/bisim.v` — EQ2 bisimulation using paco
-- `subject_reduction/theories/CoTypes/coLocal.v:56` — `full_eunf_subst` lemma -/
-axiom EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR)
-    (h : EQ2 a b) : EQ2 (a.substitute var repl) (b.substitute var repl)
+-- EQ2_substitute is imported from RumpsteakV2.Protocol.CoTypes.Substitute
+-- See that module for detailed documentation of the proof strategy.
 
 /-- Substitute on the quotient (well-defined by EQ2_substitute). -/
 def QLocalTypeR.substitute (q : QLocalTypeR) (var : String) (repl : LocalTypeR) : QLocalTypeR :=
