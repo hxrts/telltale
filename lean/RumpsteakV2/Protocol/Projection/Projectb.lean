@@ -390,4 +390,188 @@ theorem projectb_comm_other
       cases head with
       | mk label cont => unfold projectb projectbAllBranches; simp [hsender, hreceiver]
 
+/-! ## Soundness and Completeness
+
+These theorems establish the correspondence between the boolean checker `projectb`
+and the coinductive relation `CProject`. -/
+
+/-- Helper: convert BEq equality to Prop equality for String. -/
+private theorem string_beq_eq_true_to_eq {a b : String} (h : (a == b) = true) : a = b := by
+  exact eq_of_beq h
+
+/-- Helper: PayloadSort BEq true implies equality.
+    Proven by induction since PayloadSort has recursive prod constructor. -/
+private theorem payloadSort_beq_eq_true_to_eq {a b : PayloadSort} (h : (a == b) = true) : a = b := by
+  induction a generalizing b with
+  | unit => cases b <;> simp_all [reduceBEq]
+  | nat => cases b <;> simp_all [reduceBEq]
+  | bool => cases b <;> simp_all [reduceBEq]
+  | string => cases b <;> simp_all [reduceBEq]
+  | prod s1 s2 ih1 ih2 =>
+      cases b with
+      | prod t1 t2 =>
+          simp only [reduceBEq, Bool.and_eq_true] at h
+          obtain ⟨h1, h2⟩ := h
+          simp only [ih1 h1, ih2 h2]
+      | _ => simp_all [reduceBEq]
+
+/-- Helper: convert BEq equality to Prop equality for Label.
+    Uses reduceBEq simproc to unfold derived BEq to component-wise form. -/
+private theorem label_beq_eq_true_to_eq {a b : Label} (h : (a == b) = true) : a = b := by
+  -- Destruct Label to access components
+  cases a with | mk n1 s1 =>
+  cases b with | mk n2 s2 =>
+  -- Use reduceBEq to unfold the derived BEq to (n1 == n2) && (s1 == s2)
+  simp only [reduceBEq, Bool.and_eq_true] at h
+  obtain ⟨hn, hs⟩ := h
+  -- String has LawfulBEq, so eq_of_beq works
+  have heq_n : n1 = n2 := eq_of_beq hn
+  -- PayloadSort: use our helper
+  have heq_s : s1 = s2 := payloadSort_beq_eq_true_to_eq hs
+  simp only [heq_n, heq_s]
+
+/-- Relation for coinduction in projectb_sound: pairs where projectb returns true. -/
+private def SoundRel : ProjRel := fun g role cand => projectb g role cand = true
+
+/-- Helper: split Bool.and = true into two parts. -/
+private theorem bool_and_true {a b : Bool} (h : (a && b) = true) : a = true ∧ b = true := by
+  cases a <;> cases b <;> simp_all
+
+/-- Helper: projectbBranches true implies BranchesProjRel SoundRel. -/
+private theorem projectbBranches_to_SoundRel
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (h : projectbBranches gbs role lbs = true) :
+    BranchesProjRel SoundRel gbs role lbs := by
+  induction gbs generalizing lbs with
+  | nil =>
+      cases lbs with
+      | nil => exact List.Forall₂.nil
+      | cons _ _ =>
+          unfold projectbBranches at h
+          exact False.elim (Bool.false_ne_true h)
+  | cons ghd gtl ih =>
+      cases lbs with
+      | nil =>
+          unfold projectbBranches at h
+          exact False.elim (Bool.false_ne_true h)
+      | cons lhd ltl =>
+          unfold projectbBranches at h
+          split_ifs at h with hlabel
+          -- Only one goal: hlabel = true (the false branch is eliminated since false = true is absurd)
+          have ⟨hproj, hrest⟩ := bool_and_true h
+          have hlabel' : ghd.1 = lhd.1 := label_beq_eq_true_to_eq hlabel
+          exact List.Forall₂.cons ⟨hlabel', hproj⟩ (ih ltl hrest)
+
+/-- Helper: projectbAllBranches true implies AllBranchesProj SoundRel. -/
+private theorem projectbAllBranches_to_SoundRel
+    (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
+    (h : projectbAllBranches gbs role cand = true) :
+    AllBranchesProj SoundRel gbs role cand := by
+  induction gbs with
+  | nil =>
+      intro gb hgb
+      cases hgb
+  | cons ghd gtl ih =>
+      intro gb hgb
+      unfold projectbAllBranches at h
+      simp only [Bool.and_eq_true] at h
+      obtain ⟨hhead, hrest⟩ := h
+      cases hgb with
+      | head _ => exact hhead
+      | tail _ hmem => exact ih hrest gb hmem
+
+/-- SoundRel is a post-fixpoint of CProjectF. -/
+private theorem SoundRel_postfix : ∀ g role cand, SoundRel g role cand → CProjectF SoundRel g role cand := by
+  intro g role cand h
+  unfold SoundRel at h
+  cases g with
+  | «end» =>
+      cases cand with
+      | «end» => simp only [CProjectF]
+      | var _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | send _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | recv _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | mu _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+  | var t =>
+      cases cand with
+      | «end» => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | var t' =>
+          simp only [CProjectF]
+          simp only [projectb] at h
+          exact string_beq_eq_true_to_eq h
+      | send _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | recv _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | mu _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+  | mu t body =>
+      cases cand with
+      | «end» => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | var _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | send _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | recv _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | mu t' candBody =>
+          simp only [projectb] at h
+          split_ifs at h with ht hcontr
+          -- Only one goal remains: ht = true ∧ hcontr = true (other branches give false = true)
+          simp only [CProjectF]
+          refine ⟨string_beq_eq_true_to_eq ht, hcontr, h⟩
+  | comm sender receiver gbs =>
+      unfold projectb at h
+      split_ifs at h with hs hr
+      · -- sender case: role == sender
+        cases cand with
+        | «end» => exact False.elim (Bool.false_ne_true h)
+        | var _ => exact False.elim (Bool.false_ne_true h)
+        | send partner lbs =>
+            dsimp only at h
+            split_ifs at h with hpartner
+            -- Only true case remains (false = true is absurd)
+            dsimp only [CProjectF]
+            split_ifs with hs' hr'
+            · -- hs' : role = sender - this is the correct case
+              exact ⟨string_beq_eq_true_to_eq hpartner, projectbBranches_to_SoundRel gbs role lbs h⟩
+            · -- hs' : ¬role = sender - contradicts hs
+              exact absurd (string_beq_eq_true_to_eq hs) hs'
+            · -- hs' : ¬role = sender AND hr' : ¬role = receiver - contradicts hs
+              exact absurd (string_beq_eq_true_to_eq hs) hs'
+        | recv _ _ => exact False.elim (Bool.false_ne_true h)
+        | mu _ _ => exact False.elim (Bool.false_ne_true h)
+      · -- receiver case: role == receiver
+        cases cand with
+        | «end» => exact False.elim (Bool.false_ne_true h)
+        | var _ => exact False.elim (Bool.false_ne_true h)
+        | send _ _ => exact False.elim (Bool.false_ne_true h)
+        | recv partner lbs =>
+            dsimp only at h
+            split_ifs at h with hpartner
+            -- Only true case remains
+            dsimp only [CProjectF]
+            split_ifs with hs' hr'
+            · -- hs' : role = sender - contradiction since role ≠ sender
+              have hne : role ≠ sender := fun heq => by
+                subst heq
+                simp only [beq_self_eq_true] at hs
+                exact absurd trivial hs
+              exact absurd hs' hne
+            · exact ⟨string_beq_eq_true_to_eq hpartner, projectbBranches_to_SoundRel gbs role lbs h⟩
+            · exact absurd (string_beq_eq_true_to_eq hr) hr'
+        | mu _ _ => exact False.elim (Bool.false_ne_true h)
+      · -- non-participant case
+        dsimp only [CProjectF]
+        split_ifs with hs' hr'
+        · -- hs' : role = sender contradicts hs (role ≠ sender as Bool)
+          subst hs'
+          simp only [beq_self_eq_true] at hs
+          exact absurd trivial hs
+        · -- hr' : role = receiver contradicts hr (role ≠ receiver as Bool)
+          subst hr'
+          simp only [beq_self_eq_true] at hr
+          exact absurd trivial hr
+        · exact projectbAllBranches_to_SoundRel gbs role cand h
+
+/-- Soundness: if projectb returns true, then CProject holds. -/
+theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)
+    (h : projectb g role cand = true) : CProject g role cand := by
+  have hinR : SoundRel g role cand := h
+  exact CProject_coind SoundRel_postfix g role cand hinR
+
 end RumpsteakV2.Protocol.Projection.Projectb
