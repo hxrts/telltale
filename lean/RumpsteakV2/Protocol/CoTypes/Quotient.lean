@@ -67,6 +67,12 @@ is NOT a post-fixpoint of EQ2F because of the mu-mu case with distinct bound var
 The fix in Coq uses parametrized coinduction (paco) which allows "accumulating" EQ2 reasoning
 during the coinductive proof. Lean 4 lacks built-in support for this.
 
+**Alternative Coq technique (full_eunf):** Coq also uses `full_eunf` which completely unfolds
+all mu binders before comparing. The key lemma `full_eunf_subst` states that full unfolding
+is invariant under mu unfolding: `full_eunf (μt.body) = full_eunf (body[t := μt.body])`.
+This eliminates nested substitutions by reasoning about the "leaf" structure after all mus
+are removed. Implementing this in Lean would require termination proofs on contractive depth.
+
 ### Semantic soundness
 
 The axiom is semantically sound because:
@@ -77,7 +83,8 @@ The axiom is semantically sound because:
 
 ### Coq reference
 
-See `subject_reduction/theories/CoTypes/bisim.v` for the Coq proof using paco. -/
+- `subject_reduction/theories/CoTypes/bisim.v` — EQ2 bisimulation using paco
+- `subject_reduction/theories/CoTypes/coLocal.v:56` — `full_eunf_subst` lemma -/
 axiom EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR)
     (h : EQ2 a b) : EQ2 (a.substitute var repl) (b.substitute var repl)
 
@@ -249,12 +256,21 @@ This axiom states that applying substitute then unfold is EQ2-equivalent to
 applying unfold then substitute. Both result in observationally equivalent
 infinite trees.
 
-Proof sketch (by case analysis on t):
+### Proof sketch (by case analysis on t)
+
 - end/var/send/recv: unfold is identity, trivial
 - mu t body: requires coinductive reasoning on EQ2
 
 This corresponds to the semantic property that substitution and unfolding
-are confluent operations on infinite trees. -/
+are confluent operations on infinite trees.
+
+### Connection to Coq's `full_eunf_subst`
+
+This is a single-step version of the Coq lemma `full_eunf_subst` (coLocal.v:56) which states:
+  `full_eunf (μt.body) = full_eunf (body[t := μt.body])`
+
+Where `full_eunf` completely unfolds all mu binders. Our axiom is weaker (single step vs full
+unfolding) but sufficient when combined with coinduction on EQ2. -/
 axiom unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
     EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)
 
