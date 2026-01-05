@@ -147,15 +147,32 @@ EQ2_CProject_Rel g role e1 := ∃ e0, CProject g role e0 ∧ EQ2 e0 e1
 
 ### Blocked Cases
 
-**mu case with different binders:** When g = mu t body and e0 = mu t' body0:
-- EQ2 (mu t' body0) e1 could have e1 = mu s' body1 with s' ≠ t'
-- Need to show CProject (mu t body) role (mu s' body1)
-- This requires tracking how EQ2's mu unfolding interacts with CProject
+The fundamental issue is that CProjectF requires the candidate local type to have
+the same top-level constructor as dictated by the global type:
+- g = end → candidate = end
+- g = var t → candidate = var t
+- g = mu t body → candidate = mu t' candBody (with t = t')
+- g = comm (sender case) → candidate = send
+- g = comm (receiver case) → candidate = recv
 
-**Branch-wise EQ2 lifting:** For participant comm cases:
-- EQ2 gives BranchesRel EQ2 on branch continuations
-- Need to transfer CProject branch-by-branch
-- Requires BranchesRel to lift through CProject correctly
+But EQ2 allows relating types with different constructors via mu unfolding.
+When EQ2 e0 e1 holds with e0 having the "right" constructor but e1 being a mu
+(or vice versa), the standard coinduction approach fails.
+
+**Specific blocked cases:**
+
+1. **end-mu / var-mu / send-mu / recv-mu**: When CProject gives e0 with a specific
+   constructor but EQ2 e0 e1 where e1 is a mu that unfolds to that constructor.
+   CProjectF requires exact constructor matching, but e1 has the wrong constructor.
+
+2. **mu-mu with different binders:** EQ2 allows (.mu t body) ~ (.mu s body') with t ≠ s,
+   but CProjectF requires the binder name to match the global type's binder.
+
+3. **mu to non-mu:** When e0 is a mu but e1 unfolds to end/var/send/recv.
+   CProjectF requires e1 to be a mu to match g = mu.
+
+The Coq proof uses parametrized coinduction (pcofix) which can "remember" that
+e0 and e1 are EQ2-equivalent across unfolding steps, resolving these cases.
 
 ### Coq Reference
 
