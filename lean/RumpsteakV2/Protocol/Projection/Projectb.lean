@@ -87,6 +87,23 @@ private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label �
   have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
   omega
 
+private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
+    (xs : List (α × β)) (x : α × β) (h : x ∈ xs) :
+    sizeOf x.2 < sizeOf xs := by
+  induction xs with
+  | nil => simp at h
+  | cons hd tl ih =>
+      cases h with
+      | head => simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]; omega
+      | tail _ hmem => have := ih hmem; simp only [sizeOf, List._sizeOf_1] at *; omega
+
+private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (gb : Label × GlobalType) (h : gb ∈ gbs) :
+    sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver gbs) := by
+  have h1 := sizeOf_elem_snd_lt_list gbs gb h
+  have h2 := sizeOf_bs_lt_comm sender receiver gbs
+  omega
+
 mutual
   /-- Boolean projection checker (`projectb`). -/
   def projectb : GlobalType → String → LocalTypeR → Bool
@@ -430,6 +447,23 @@ private theorem label_beq_eq_true_to_eq {a b : Label} (h : (a == b) = true) : a 
   have heq_s : s1 = s2 := payloadSort_beq_eq_true_to_eq hs
   simp only [heq_n, heq_s]
 
+/-- Helper: PayloadSort beq is reflexive. -/
+private theorem payloadSort_beq_refl (s : PayloadSort) : (s == s) = true := by
+  induction s with
+  | unit => rfl
+  | nat => rfl
+  | bool => rfl
+  | string => rfl
+  | prod s1 s2 ih1 ih2 =>
+      simp only [reduceBEq, Bool.and_eq_true]
+      exact ⟨ih1, ih2⟩
+
+/-- Helper: convert Prop equality to BEq equality for Label. -/
+private theorem eq_to_label_beq_eq_true {a b : Label} (h : a = b) : (a == b) = true := by
+  subst h
+  cases a with | mk n s =>
+  simp only [reduceBEq, beq_self_eq_true, Bool.true_and, payloadSort_beq_refl]
+
 /-- Relation for coinduction in projectb_sound: pairs where projectb returns true. -/
 private def SoundRel : ProjRel := fun g role cand => projectb g role cand = true
 
@@ -574,74 +608,132 @@ theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)
   have hinR : SoundRel g role cand := h
   exact CProject_coind SoundRel_postfix g role cand hinR
 
+/-- Helper: BranchesProjRel CProject implies projectbBranches.
+    The ih provides recursive evidence that for each branch global type,
+    if CProject holds then projectb returns true. -/
+private theorem BranchesProjRel_to_projectbBranches
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (hrel : BranchesProjRel CProject gbs role lbs)
+    (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → projectb gb.2 role lb = true) :
+    projectbBranches gbs role lbs = true := by
+  induction hrel with
+  | nil => simp only [projectbBranches]
+  | @cons ghd lhd gtl ltl hpair hrest ihrest =>
+      obtain ⟨hlabel, hproj⟩ := hpair
+      unfold projectbBranches
+      -- hlabel : ghd.1 = lhd.1, so we need (ghd.1 == lhd.1) = true
+      have hbeq : (ghd.1 == lhd.1) = true := eq_to_label_beq_eq_true hlabel
+      simp only [hbeq, ↓reduceIte, Bool.and_eq_true]
+      constructor
+      · exact ih ghd (List.Mem.head gtl) lhd.2 hproj
+      · exact ihrest (fun gb hmem lb hcp => ih gb (List.Mem.tail ghd hmem) lb hcp)
+
+/-- Helper: AllBranchesProj CProject implies projectbAllBranches.
+    The ih provides recursive evidence that for each branch global type,
+    if CProject holds then projectb returns true. -/
+private theorem AllBranchesProj_to_projectbAllBranches
+    (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
+    (hall : AllBranchesProj CProject gbs role cand)
+    (ih : ∀ gb ∈ gbs, CProject gb.2 role cand → projectb gb.2 role cand = true) :
+    projectbAllBranches gbs role cand = true := by
+  induction gbs with
+  | nil => simp only [projectbAllBranches]
+  | cons ghd gtl ihtl =>
+      unfold projectbAllBranches
+      simp only [Bool.and_eq_true]
+      constructor
+      · exact ih ghd (List.Mem.head gtl) (hall ghd (List.Mem.head gtl))
+      · exact ihtl (fun gb hgb => hall gb (List.Mem.tail ghd hgb))
+            (fun gb hmem hcp => ih gb (List.Mem.tail ghd hmem) hcp)
+
 /-- Completeness: if CProject holds, then projectb returns true.
-    This is the converse of projectb_sound. -/
+    Proven by well-founded recursion on g. -/
 theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
     (h : CProject g role cand) : projectb g role cand = true := by
   -- Use CProject_destruct to access the CProjectF structure
   have hF := CProject_destruct h
   -- Case split on g and cand using CProjectF structure
-  cases g with
+  cases hg : g with
   | «end» =>
-      -- CProjectF says cand = .end
+      subst hg  -- Substitute g = GlobalType.end first
       dsimp only [CProjectF] at hF
-      -- hF : cand = .end
       cases cand with
       | «end» => simp only [projectb]
       | _ => exact False.elim (by simp_all)
   | var t =>
-      -- CProjectF says cand = .var t
+      subst hg  -- Substitute g = GlobalType.var t first
       dsimp only [CProjectF] at hF
       cases cand with
       | var t' =>
           simp only [projectb]
-          -- hF : t = t'
-          subst hF
+          subst hF  -- Now hF : t = t'
           simp only [beq_self_eq_true]
       | _ => exact False.elim (by simp_all)
   | mu t body =>
+      simp only [hg, CProjectF] at hF
       cases cand with
       | mu t' candBody =>
-          dsimp only [CProjectF] at hF
           obtain ⟨heq, hcontr, hbody⟩ := hF
           subst heq
-          simp only [projectb, beq_self_eq_true, hcontr, ↓reduceIte]
-          -- Need: projectb body role candBody = true
-          -- hbody : CProject body role candBody
-          -- This requires recursion - use sorry for now
-          sorry
-      | «end» => exact False.elim hF
-      | var _ => exact False.elim hF
-      | send _ _ => exact False.elim hF
-      | recv _ _ => exact False.elim hF
+          simp only [hg, projectb, beq_self_eq_true, hcontr, ↓reduceIte]
+          exact projectb_complete body role candBody hbody
+      | «end» => exact hF.elim
+      | var _ => exact hF.elim
+      | send _ _ => exact hF.elim
+      | recv _ _ => exact hF.elim
   | comm sender receiver gbs =>
-      dsimp only [CProjectF] at hF
+      simp only [hg, CProjectF] at hF
       split_ifs at hF with hs hr
       · -- hs : role = sender
         cases cand with
         | send partner lbs =>
             obtain ⟨hpartner, hbranches⟩ := hF
-            simp only [projectb]
+            simp only [hg, projectb]
             subst hs hpartner
             simp only [beq_self_eq_true, ↓reduceIte]
-            -- Need projectbBranches to be true from hbranches
-            sorry
+            exact BranchesProjRel_to_projectbBranches gbs role lbs hbranches
+              (fun gb hmem lb hcp => projectb_complete gb.2 role lb hcp)
         | «end» => exact False.elim hF
         | var _ => exact False.elim hF
         | recv _ _ => exact False.elim hF
         | mu _ _ => exact False.elim hF
-      · -- hr : role = receiver
+      · -- hr : role = receiver, hs : ¬(role = sender)
         cases cand with
         | recv partner lbs =>
-            -- hF : partner = sender ∧ BranchesProjRel CProject gbs role lbs
-            -- Need to show projectb returns true
-            sorry
+            obtain ⟨hpartner, hbranches⟩ := hF
+            simp only [hg, projectb]
+            have hne : (role == sender) = false := by
+              simp only [beq_eq_false_iff_ne, ne_eq]; exact hs
+            simp only [hne, ↓reduceIte]
+            subst hr hpartner
+            simp only [beq_self_eq_true, ↓reduceIte]
+            exact BranchesProjRel_to_projectbBranches gbs role lbs hbranches
+              (fun gb hmem lb hcp => projectb_complete gb.2 role lb hcp)
         | «end» => exact False.elim hF
         | var _ => exact False.elim hF
         | send _ _ => exact False.elim hF
         | mu _ _ => exact False.elim hF
-      · -- non-participant: hF : AllBranchesProj CProject gbs role cand
-        sorry
+      · -- non-participant: hs : ¬(role = sender), hr : ¬(role = receiver)
+        subst hg
+        unfold projectb
+        have hne_s : (role == sender) = false := by
+          simp only [beq_eq_false_iff_ne, ne_eq]; exact hs
+        have hne_r : (role == receiver) = false := by
+          simp only [beq_eq_false_iff_ne, ne_eq]; exact hr
+        simp only [hne_s, hne_r, ↓reduceIte]
+        exact AllBranchesProj_to_projectbAllBranches gbs role cand hF
+          (fun gb hmem hcp => projectb_complete gb.2 role cand hcp)
+termination_by g
+decreasing_by
+  all_goals
+    simp_wf
+    -- Now we have context like: hg : g = GlobalType... and hmem : gb ∈ gbs
+    -- Use cases to match which termination goal we're in
+    first
+    -- mu case: sizeOf body < sizeOf g where g = GlobalType.mu t body
+    | (subst_vars; exact sizeOf_body_lt_mu _ _)
+    -- comm case: sizeOf gb.2 < sizeOf g where g = GlobalType.comm s r gbs and gb ∈ gbs
+    | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
 
 /-- projectb = true iff CProject holds. -/
 theorem projectb_iff_CProject (g : GlobalType) (role : String) (cand : LocalTypeR) :

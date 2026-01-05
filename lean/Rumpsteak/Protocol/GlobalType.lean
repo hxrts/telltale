@@ -78,6 +78,30 @@ inductive GlobalType where
   | var : String → GlobalType
 deriving Repr, Inhabited
 
+/-- Helper: a continuation in a branch list is smaller than the list. -/
+private theorem sizeOf_mem_snd_lt_global {bs : List (Label × GlobalType)} {pair : Label × GlobalType}
+    (hmem : pair ∈ bs) : sizeOf pair.2 < sizeOf bs := by
+  induction bs with
+  | nil => cases hmem
+  | cons hd tl ih =>
+    cases hmem with
+    | head => simp_all [sizeOf, List._sizeOf_1]; omega
+    | tail h => have := ih h; simp_all [sizeOf, List._sizeOf_1]; omega
+
+/-- Helper: attach.map with function extracting element equals map with that function. -/
+private theorem attach_map_eq_map_global {α β : Type} (l : List α) (f : α → β) :
+    l.attach.map (fun ⟨x, _⟩ => f x) = l.map f := by
+  induction l with
+  | nil => rfl
+  | cons hd tl ih => simp [List.attach, List.map, ih]
+
+/-- Helper: attach.all with predicate extracting element equals all with that predicate. -/
+private theorem attach_all_eq_all_global {α : Type} (l : List α) (p : α → Bool) :
+    l.attach.all (fun ⟨x, _⟩ => p x) = l.all p := by
+  induction l with
+  | nil => rfl
+  | cons hd tl ih => simp [List.attach, List.all, ih]
+
 /-- Extract all role names from a global type. -/
 partial def GlobalType.roles : GlobalType → List String
   | .end => []
@@ -95,11 +119,15 @@ partial def GlobalType.freeVars : GlobalType → List String
   | .var t => [t]
 
 /-- Substitute a global type for a variable. -/
-partial def GlobalType.substitute (g : GlobalType) (varName : String) (replacement : GlobalType) : GlobalType :=
+def GlobalType.substitute (g : GlobalType) (varName : String) (replacement : GlobalType) : GlobalType :=
   match g with
   | .end => .end
   | .comm sender receiver branches =>
-    .comm sender receiver (branches.map fun (l, cont) => (l, cont.substitute varName replacement))
+    .comm sender receiver (branches.attach.map fun ⟨(l, cont), hmem⟩ =>
+      have _h : sizeOf cont < 1 + sizeOf sender + (1 + sizeOf receiver + sizeOf branches) := by
+        have h1 : sizeOf cont < sizeOf branches := sizeOf_mem_snd_lt_global hmem
+        omega
+      (l, cont.substitute varName replacement))
   | .mu t body =>
     if t == varName then
       -- Variable is shadowed by this binder
@@ -108,37 +136,43 @@ partial def GlobalType.substitute (g : GlobalType) (varName : String) (replaceme
       .mu t (body.substitute varName replacement)
   | .var t =>
     if t == varName then replacement else .var t
+termination_by sizeOf g
 
-/-! ## Substitute Specification Axioms
+/-! ## Substitute Specification Theorems
 
-Since `substitute` is a `partial def`, it cannot be unfolded in proofs.
-These axioms specify its behavior on each constructor. -/
+Now that `substitute` is a total function, we can prove its behavior on each constructor. -/
 
 /-- Substitute on end yields end. -/
-axiom substitute_end (t : String) (repl : GlobalType) :
-    GlobalType.substitute .end t repl = .end
+theorem substitute_end (t : String) (repl : GlobalType) :
+    GlobalType.substitute .end t repl = .end := rfl
 
 /-- Substitute on matching variable yields replacement. -/
-axiom substitute_var_eq (t : String) (repl : GlobalType) :
-    GlobalType.substitute (.var t) t repl = repl
+theorem substitute_var_eq (t : String) (repl : GlobalType) :
+    GlobalType.substitute (.var t) t repl = repl := by simp [substitute]
 
 /-- Substitute on non-matching variable yields the variable unchanged. -/
-axiom substitute_var_ne {s t : String} (hne : s ≠ t) (repl : GlobalType) :
-    GlobalType.substitute (.var s) t repl = .var s
+theorem substitute_var_ne {s t : String} (hne : s ≠ t) (repl : GlobalType) :
+    GlobalType.substitute (.var s) t repl = .var s := by simp [substitute, hne]
 
 /-- Substitute on comm maps over branches. -/
-axiom substitute_comm (sender receiver t : String) (branches : List (Label × GlobalType))
+theorem substitute_comm (sender receiver t : String) (branches : List (Label × GlobalType))
     (repl : GlobalType) :
     GlobalType.substitute (.comm sender receiver branches) t repl =
-      .comm sender receiver (branches.map fun (l, g) => (l, g.substitute t repl))
+      .comm sender receiver (branches.map fun (l, g) => (l, g.substitute t repl)) := by
+  simp only [substitute]
+  congr 1
+  exact attach_map_eq_map_global branches (fun (l, g) => (l, g.substitute t repl))
 
 /-- Substitute on mu when variable is shadowed (same name) yields mu unchanged. -/
-axiom substitute_mu_shadow (t : String) (body repl : GlobalType) :
-    GlobalType.substitute (.mu t body) t repl = .mu t body
+theorem substitute_mu_shadow (t : String) (body repl : GlobalType) :
+    GlobalType.substitute (.mu t body) t repl = .mu t body := by simp [substitute]
 
 /-- Substitute on mu when variable is not shadowed recurses into body. -/
-axiom substitute_mu_ne {s t : String} (hne : s ≠ t) (body repl : GlobalType) :
-    GlobalType.substitute (.mu s body) t repl = .mu s (body.substitute t repl)
+theorem substitute_mu_ne {s t : String} (hne : s ≠ t) (body repl : GlobalType) :
+    GlobalType.substitute (.mu s body) t repl = .mu s (body.substitute t repl) := by
+  simp only [substitute]
+  have hneq : (s == t) = false := by simp [bne_iff_ne, hne]
+  simp [hneq]
 
 /-- Check if all recursion variables are bound. -/
 partial def GlobalType.allVarsBound (g : GlobalType) (bound : List String := []) : Bool :=
@@ -149,11 +183,16 @@ partial def GlobalType.allVarsBound (g : GlobalType) (bound : List String := [])
   | .var t => bound.contains t
 
 /-- Check if each communication has at least one branch. -/
-partial def GlobalType.allCommsNonEmpty : GlobalType → Bool
+def GlobalType.allCommsNonEmpty : GlobalType → Bool
   | .end => true
-  | .comm _ _ branches => !branches.isEmpty && branches.all fun (_, cont) => cont.allCommsNonEmpty
+  | .comm _ _ branches =>
+    !branches.isEmpty &&
+      branches.attach.all fun ⟨(_, cont), hmem⟩ =>
+        have _h : sizeOf cont < sizeOf branches := sizeOf_mem_snd_lt_global hmem
+        cont.allCommsNonEmpty
   | .mu _ body => body.allCommsNonEmpty
   | .var _ => true
+termination_by g => sizeOf g
 
 /-- Check if sender and receiver are different in each communication. -/
 partial def GlobalType.noSelfComm : GlobalType → Bool
@@ -411,20 +450,23 @@ def linearPred (_ : GlobalType) : Prop := True
 /-- Size predicate for globals: each communication has at least one branch. -/
 def sizePred (g : GlobalType) : Prop := g.allCommsNonEmpty = true
 
-/-- Specification axiom: allCommsNonEmpty for end is true. -/
-axiom allCommsNonEmpty_end : GlobalType.end.allCommsNonEmpty = true
+/-- Specification theorem: allCommsNonEmpty for end is true. -/
+theorem allCommsNonEmpty_end : GlobalType.end.allCommsNonEmpty = true := rfl
 
-/-- Specification axiom: allCommsNonEmpty for var is true (no communications). -/
-axiom allCommsNonEmpty_var (t : String) : (GlobalType.var t).allCommsNonEmpty = true
+/-- Specification theorem: allCommsNonEmpty for var is true (no communications). -/
+theorem allCommsNonEmpty_var (t : String) : (GlobalType.var t).allCommsNonEmpty = true := rfl
 
-/-- Specification axiom: unfold allCommsNonEmpty for comm (partial def is opaque). -/
-axiom allCommsNonEmpty_comm (sender receiver : String) (branches : List (Label × GlobalType)) :
+/-- Specification theorem: unfold allCommsNonEmpty for comm. -/
+theorem allCommsNonEmpty_comm (sender receiver : String) (branches : List (Label × GlobalType)) :
     (GlobalType.comm sender receiver branches).allCommsNonEmpty =
-      (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty))
+      (!branches.isEmpty && branches.all (fun (_, cont) => cont.allCommsNonEmpty)) := by
+  simp only [allCommsNonEmpty]
+  congr 1
+  exact attach_all_eq_all_global branches (fun (_, cont) => cont.allCommsNonEmpty)
 
-/-- Specification axiom: unfold allCommsNonEmpty for mu (partial def is opaque). -/
-axiom allCommsNonEmpty_mu (t : String) (body : GlobalType) :
-    (GlobalType.mu t body).allCommsNonEmpty = body.allCommsNonEmpty
+/-- Specification theorem: unfold allCommsNonEmpty for mu. -/
+theorem allCommsNonEmpty_mu (t : String) (body : GlobalType) :
+    (GlobalType.mu t body).allCommsNonEmpty = body.allCommsNonEmpty := rfl
 
 /-- Key lemma: allCommsNonEmpty is preserved through substitution when both the body
     and replacement satisfy the predicate.
@@ -434,10 +476,40 @@ axiom allCommsNonEmpty_mu (t : String) (body : GlobalType) :
     - Variables have allCommsNonEmpty = true (no communications)
     - Substituting preserves the structure of communications
     - The replacement's allCommsNonEmpty is "inherited" at each substitution point -/
-axiom allCommsNonEmpty_substitute (body : GlobalType) (t : String) (repl : GlobalType) :
+theorem allCommsNonEmpty_substitute (body : GlobalType) (t : String) (repl : GlobalType) :
     body.allCommsNonEmpty = true →
     repl.allCommsNonEmpty = true →
-    (body.substitute t repl).allCommsNonEmpty = true
+    (body.substitute t repl).allCommsNonEmpty = true := by
+  intro hbody hrepl
+  induction body generalizing with
+  | «end» => simp [substitute]
+  | var v =>
+    simp only [substitute]
+    split_ifs with heq
+    · exact hrepl
+    · rfl
+  | comm sender receiver branches ih =>
+    simp only [substitute, allCommsNonEmpty, Bool.and_eq_true, decide_eq_true_eq,
+               Bool.not_eq_eq_eq_not, Bool.not_false]
+    constructor
+    · -- branches not empty after substitution
+      simp only [List.map_eq_nil_iff, List.attach_eq_nil_iff]
+      intro hempty
+      simp only [allCommsNonEmpty, Bool.and_eq_true] at hbody
+      simp_all
+    · -- all branches satisfy allCommsNonEmpty
+      simp only [attach_all_eq_all_global, List.all_map, Function.comp_def]
+      intro pair hmem
+      simp only [allCommsNonEmpty, Bool.and_eq_true, List.all_eq_true] at hbody
+      have hpair := hbody.2 pair hmem
+      exact ih pair.2 (by simp_all [sizeOf_mem_snd_lt_global]) hpair
+  | mu s mbody ih =>
+    simp only [substitute]
+    split_ifs with heq
+    · exact hbody
+    · simp only [allCommsNonEmpty] at hbody ⊢
+      exact ih hbody
+termination_by sizeOf body
 
 /-- sizePred is preserved by μ-unfolding (substitution).
 
