@@ -8,15 +8,17 @@ Global types for the V2 development.
 
 The following definitions form the semantic interface for proofs:
 
-- `PayloadSort`
-- `Label`
-- `GlobalType`
-- `GlobalType.wellFormed`
-- `GlobalType.roles`
-- `GlobalType.freeVars`
-- `GlobalType.substitute`
-- `GlobalActionR`
-- `GlobalType.step`
+- `PayloadSort`: payload type annotations
+- `Label`: message labels with payload sorts
+- `GlobalType`: global protocol types
+- `GlobalType.wellFormed`: well-formedness predicate
+- `GlobalType.roles`: extract role names
+- `GlobalType.freeVars`: extract free type variables
+- `GlobalType.substitute`: type variable substitution
+- `GlobalActionR`: global action with sender, receiver, label
+- `canStep`: global enabledness predicate
+- `BranchesStep`: branch-wise step relation
+- `step`: global async step relation
 -/
 
 namespace RumpsteakV2.Protocol.GlobalType

@@ -8,8 +8,14 @@ Boolean checker for V2 projection (`projectb`).
 
 The following definitions form the semantic interface for proofs:
 
-- `projectb`
-- `CProject`
+- `projectb`: boolean projection checker
+- `projectbBranches`: branch-wise projection for participants
+- `projectbAllBranches`: single candidate check for non-participants
+- `CProject`: placeholder projection relation (to be coinductive gfp)
+- `projectb_end_end`: reflection lemma for end-end
+- `projectb_var_var`: reflection lemma for var-var
+- `projectb_mu_mu`: reflection lemma for mu-mu
+- `projectb_comm_other`: reflection lemma for non-participant
 -/
 
 namespace RumpsteakV2.Protocol.Projection.Projectb

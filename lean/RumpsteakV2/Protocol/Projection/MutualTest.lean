@@ -3,6 +3,9 @@ import Mathlib.Tactic
 /-! # RumpsteakV2.Protocol.Projection.MutualTest
 
 Minimal mutual recursion test for Lean 4 syntax/termination.
+
+This is an internal test file for debugging mutual recursion patterns.
+It is not part of the semantic interface and does not export definitions for proofs.
 -/
 
 namespace RumpsteakV2.Protocol.Projection.MutualTest

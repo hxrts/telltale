@@ -3,6 +3,9 @@ import Mathlib.Tactic
 /-! # RumpsteakV2.Protocol.Projection.MutualTestSizeOf
 
 Minimal mutual recursion test using `sizeOf` + `decreasing_by`.
+
+This is an internal test file for debugging mutual recursion patterns.
+It is not part of the semantic interface and does not export definitions for proofs.
 -/
 
 namespace RumpsteakV2.Protocol.Projection.MutualTestSizeOf

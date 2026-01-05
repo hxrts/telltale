@@ -4,6 +4,9 @@ import RumpsteakV2.Protocol.Projection.MutualTestSizeOf
 /-! # RumpsteakV2.Protocol.Projection.MutualTestIncr
 
 Incremental mutual recursion examples to debug syntax/termination.
+
+This is an internal test file for debugging mutual recursion patterns.
+It is not part of the semantic interface and does not export definitions for proofs.
 -/
 
 namespace RumpsteakV2.Protocol.Projection.MutualTestIncr
