@@ -113,4 +113,45 @@ mutual
           (dualBranches_dualBranches rest)
 end
 
+/-! ## Dual-Substitute Commutation
+
+These lemmas show that dual and substitute commute, which is essential for
+proving that EQ2 is a congruence for duality. -/
+
+mutual
+  /-- Dual commutes with substitute: (t.substitute v r).dual = t.dual.substitute v r.dual. -/
+  theorem LocalTypeR.dual_substitute : (t : LocalTypeR) → (var : String) → (repl : LocalTypeR) →
+      (t.substitute var repl).dual = t.dual.substitute var repl.dual
+    | .end, _, _ => rfl
+    | .var v, var, repl => by
+        simp only [LocalTypeR.substitute, LocalTypeR.dual]
+        split <;> rfl
+    | .mu v body, var, repl =>
+        if hv : v == var then by
+          -- Shadowed case: both sides reduce to mu v body.dual
+          simp only [LocalTypeR.substitute, LocalTypeR.dual, hv, ↓reduceIte]
+        else by
+          -- Non-shadowed case
+          simp only [LocalTypeR.substitute, LocalTypeR.dual, hv, ↓reduceIte, Bool.false_eq_true]
+          exact congrArg (LocalTypeR.mu v) (LocalTypeR.dual_substitute body var repl)
+    | .send p bs, var, repl => by
+        simp only [LocalTypeR.substitute, LocalTypeR.dual]
+        exact congrArg (LocalTypeR.recv p) (dualBranches_substituteBranches bs var repl)
+    | .recv p bs, var, repl => by
+        simp only [LocalTypeR.substitute, LocalTypeR.dual]
+        exact congrArg (LocalTypeR.send p) (dualBranches_substituteBranches bs var repl)
+
+  /-- Dual and substitute commute for branch lists. -/
+  theorem dualBranches_substituteBranches : (bs : List (Label × LocalTypeR)) →
+      (var : String) → (repl : LocalTypeR) →
+      dualBranches (substituteBranches bs var repl) =
+        substituteBranches (dualBranches bs) var repl.dual
+    | [], _, _ => rfl
+    | (label, cont) :: rest, var, repl => by
+        simp only [substituteBranches, dualBranches]
+        exact congrArg₂ List.cons
+          (congrArg₂ Prod.mk rfl (LocalTypeR.dual_substitute cont var repl))
+          (dualBranches_substituteBranches rest var repl)
+end
+
 end RumpsteakV2.Protocol.LocalTypeR

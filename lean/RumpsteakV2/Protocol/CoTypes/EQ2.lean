@@ -144,6 +144,58 @@ theorem EQ2_coind {R : Rel} (h : ∀ a b, R a b → EQ2F R a b) :
   have hgfp : R ≤ EQ2 := OrderHom.le_gfp ⟨EQ2F, EQ2F_mono⟩ hle
   exact hgfp a b hr
 
+/-! ## Coinduction Up-To
+
+This section provides "coinduction up-to" infrastructure, allowing coinductive proofs
+to "borrow" from the EQ2 relation during intermediate steps. This is essential for
+proving congruence lemmas like EQ2_substitute and EQ2_dual.
+
+The key insight is that if a relation R is a post-fixpoint of EQ2F when extended
+by EQ2, then R is still contained in EQ2. -/
+
+/-- Destruct EQ2 to get EQ2F EQ2 (public version for coinduction up-to proofs). -/
+theorem EQ2.destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b :=
+  EQ2_destruct h
+
+/-- EQ2F is monotone (public version for coinduction up-to proofs). -/
+theorem EQ2F.mono : Monotone EQ2F := EQ2F_mono
+
+/-- EQ2 closure of a relation: pairs in R or pairs in EQ2. -/
+def EQ2_closure (R : Rel) : Rel := fun a b => R a b ∨ EQ2 a b
+
+/-- EQ2 closure is monotone. -/
+theorem EQ2_closure_mono : Monotone EQ2_closure := by
+  intro R S hrs a b h
+  cases h with
+  | inl hr => exact Or.inl (hrs a b hr)
+  | inr heq => exact Or.inr heq
+
+/-- Enhanced coinduction principle: if R is a post-fixpoint of EQ2F up to EQ2 closure,
+    then R ⊆ EQ2.
+
+    This allows the step case to appeal to either R or the already-established EQ2.
+    Formally: if ∀ a b, R a b → EQ2F (R ∨ EQ2) a b, then R ⊆ EQ2. -/
+theorem EQ2_coind_upto {R : Rel} (h : ∀ a b, R a b → EQ2F (EQ2_closure R) a b) :
+    ∀ a b, R a b → EQ2 a b := by
+  intro a b hr
+  -- Define the accumulated relation: R ∪ EQ2
+  let S := EQ2_closure R
+  -- Show S is a post-fixpoint of EQ2F
+  have hS_postfix : ∀ x y, S x y → EQ2F S x y := by
+    intro x y hxy
+    cases hxy with
+    | inl hxr =>
+        -- x y in R, so EQ2F (EQ2_closure R) x y by h
+        exact h x y hxr
+    | inr hxeq =>
+        -- x y in EQ2, so EQ2F EQ2 x y by fixed point
+        have hf : EQ2F EQ2 x y := EQ2_destruct hxeq
+        -- Lift EQ2F EQ2 to EQ2F S using monotonicity
+        exact EQ2F_mono (fun a b h => Or.inr h) x y hf
+  -- Apply standard coinduction with S
+  have hinS : S a b := Or.inl hr
+  exact EQ2_coind hS_postfix a b hinS
+
 /-! ## Equivalence Properties -/
 
 /-- BranchesRel is reflexive when the underlying relation is. -/
