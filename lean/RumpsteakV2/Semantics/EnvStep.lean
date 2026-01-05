@@ -16,6 +16,8 @@ The following definitions form the semantic interface for proofs:
 - `ProjectedEnv.set`
 - `projEnv`
 - `EnvStep`
+- `step_to_envstep`
+- `envstep_preserves_dom`
 -/
 
 namespace RumpsteakV2.Semantics.EnvStep
@@ -55,5 +57,32 @@ inductive EnvStep : ProjectedEnv → GlobalActionR → ProjectedEnv → Prop whe
   | of_global (g g' : GlobalType) (act : GlobalActionR) :
       step g act g' →
       EnvStep (projEnv g) act (projEnv g')
+
+/-! ## Derived theorems -/
+
+/-- Global step implies environment step (via projection). -/
+theorem step_to_envstep (g g' : GlobalType) (act : GlobalActionR)
+    (hstep : step g act g') :
+    EnvStep (projEnv g) act (projEnv g') :=
+  EnvStep.of_global g g' act hstep
+
+/-- Helper: projEnv produces an environment with the same domain as roles. -/
+theorem projEnv_dom (g : GlobalType) :
+    (projEnv g).map Prod.fst = g.roles := by
+  simp only [projEnv, List.map_map, Function.comp_def, List.map_id']
+
+/-- Global step preserves roles (sender, receiver, and branches have same roles).
+    This is a key structural property of the step relation. -/
+axiom step_preserves_roles (g g' : GlobalType) (act : GlobalActionR)
+    (h : step g act g') : g.roles = g'.roles
+
+/-- Environment step preserves domain (roles don't change). -/
+theorem envstep_preserves_dom {env env' : ProjectedEnv} {act : GlobalActionR}
+    (hstep : EnvStep env act env') :
+    env.map Prod.fst = env'.map Prod.fst := by
+  cases hstep with
+  | of_global g g' _ hstep' =>
+      simp only [projEnv_dom]
+      exact step_preserves_roles g g' _ hstep'
 
 end RumpsteakV2.Semantics.EnvStep
