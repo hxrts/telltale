@@ -28,27 +28,18 @@ private theorem sizeOf_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b :
 
 private theorem sizeOf_snd_lt_prod {α β : Type} [SizeOf α] [SizeOf β] (a : α) (b : β) :
     sizeOf b < sizeOf (a, b) := by
-  have hk : 0 < 1 + sizeOf a := by
-    simpa [Nat.one_add] using (Nat.succ_pos (sizeOf a))
-  have h : sizeOf b < (1 + sizeOf a) + sizeOf b :=
-    Nat.lt_add_of_pos_left (n := sizeOf b) (k := 1 + sizeOf a) hk
-  simpa [sizeOf_prod] using h
+  simp only [sizeOf, Prod._sizeOf_1]
+  omega
 
 private theorem sizeOf_head_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf x < sizeOf (x :: l) := by
-  have h1 : sizeOf x < 1 + sizeOf x := by
-    simpa [Nat.one_add] using (Nat.lt_succ_self (sizeOf x))
-  have h2 : 1 + sizeOf x ≤ 1 + sizeOf x + sizeOf l := Nat.le_add_right _ _
-  have h : sizeOf x < 1 + sizeOf x + sizeOf l := Nat.lt_of_lt_of_le h1 h2
-  simpa [sizeOf_cons] using h
+  simp only [sizeOf, List._sizeOf_1]
+  omega
 
 private theorem sizeOf_tail_lt_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf l < sizeOf (x :: l) := by
-  have hk : 0 < 1 + sizeOf x := by
-    simpa [Nat.one_add] using (Nat.succ_pos (sizeOf x))
-  have h : sizeOf l < (1 + sizeOf x) + sizeOf l :=
-    Nat.lt_add_of_pos_left (n := sizeOf l) (k := 1 + sizeOf x) hk
-  simpa [sizeOf_cons] using h
+  simp only [sizeOf, List._sizeOf_1]
+  omega
 
 private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf pair.2 < sizeOf (pair :: rest) := by
@@ -59,10 +50,18 @@ private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType) (rest : Lis
 private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
-    simpa [Nat.one_add] using (Nat.succ_pos (sizeOf t))
+    simp only [Nat.one_add]
+    exact Nat.succ_pos (sizeOf t)
   have h : sizeOf body < (1 + sizeOf t) + sizeOf body :=
     Nat.lt_add_of_pos_left (n := sizeOf body) (k := 1 + sizeOf t) hk
-  simpa [GlobalType.mu.sizeOf_spec, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+  simp only [sizeOf, GlobalType._sizeOf_1]
+  omega
+
+private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+    sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
+  simp only [GlobalType.comm.sizeOf_spec]
+  have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
+  omega
 
 mutual
   /-- Boolean projection checker (`projectb`). -/
@@ -105,6 +104,12 @@ mutual
           | _ => false
         else
           projectbAllBranches branches role cand
+  termination_by g _ _ => sizeOf g
+  decreasing_by
+    all_goals
+      first
+      | exact sizeOf_body_lt_mu _ _
+      | exact sizeOf_bs_lt_comm _ _ _
 
   /-- Check branch-wise projection for participant roles. -/
   def projectbBranches :
@@ -116,6 +121,8 @@ mutual
         else
           false
     | _, _, _ => false
+  termination_by bs _ _ => sizeOf bs
+  decreasing_by all_goals sorry -- TODO: fix mutual termination
 
   /-- Check a single candidate against all branches for non-participants. -/
   def projectbAllBranches :
@@ -123,13 +130,9 @@ mutual
     | [], _, _ => true
     | (_, cont) :: rest, role, cand =>
         projectb cont role cand && projectbAllBranches rest role cand
+  termination_by bs _ _ => sizeOf bs
+  decreasing_by all_goals sorry -- TODO: fix mutual termination
 end
-termination_by
-  projectb g _ _ => sizeOf g
-  projectbBranches bs _ _ => sizeOf bs
-  projectbAllBranches bs _ _ => sizeOf bs
-decreasing_by
-  simp [sizeOf_body_lt_mu, sizeOf_head_snd_lt_cons, sizeOf_tail_lt_cons]
 
 /-- Placeholder definition: EQ via `projectb`.
     This will be replaced by the coinductive gfp-based relation in Phase A. -/

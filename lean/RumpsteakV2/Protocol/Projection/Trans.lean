@@ -18,10 +18,22 @@ namespace RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 
-/-- Placeholder guardedness check for recursive globals.
-    This is intentionally permissive and will be refined in Phase A proofs. -/
-def lcontractive (_g : GlobalType) : Bool :=
-  true
+/-- Check if a global type is locally contractive (guarded recursion).
+    A type is contractive if:
+    - `end`, `var`, and `comm` are always contractive
+    - `mu t body` is contractive iff body starts with a `comm` (not `var` or another `mu`)
+
+    This ensures that unfolding recursion makes progress (necessary for coinductive projection). -/
+def lcontractive : GlobalType → Bool
+  | .end => true
+  | .var _ => true
+  | .comm _ _ _ => true
+  | .mu _ body =>
+      match body with
+      | .var _ => false    -- Immediately recursive without guard
+      | .mu _ _ => false   -- Nested mu without guard
+      | .comm _ _ _ => true
+      | .end => true       -- Degenerate but contractive
 
 private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf (x :: l) = 1 + sizeOf x + sizeOf l := by
