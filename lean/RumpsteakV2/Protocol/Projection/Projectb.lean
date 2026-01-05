@@ -353,9 +353,8 @@ theorem CProject_comm_other (sender receiver role : String)
 /-! ## Reflection Lemmas
 
 These lemmas characterize the behavior of `projectb` for each constructor case.
-We use `sorry` placeholders for now - these will be filled in Phase A when
-we establish the CProject coinductive relation. The important part is that
-the types are correct. -/
+They provide the computational behavior that the soundness and completeness
+proofs rely on. -/
 
 /-- Reflection: projectb for end with end candidate. -/
 theorem projectb_end_end (role : String) :
