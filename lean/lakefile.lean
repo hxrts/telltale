@@ -1,14 +1,10 @@
 import Lake
 open Lake DSL
 
-/-! # Rumpsteak Lean Package
+/-! # RumpsteakV2 Lean Package
 
-Lake build definition for the Rumpsteak verification library and runner.
-
-## Targets
-
-- `Rumpsteak` - Library containing protocol definitions and proofs
-- `rumpsteak_runner` - CLI executable for validating choreographies
+Lake build definition for the RumpsteakV2 verification library.
+V1 (Rumpsteak) is intentionally excluded from build targets.
 -/
 
 package rumpsteakLean
@@ -17,11 +13,7 @@ package rumpsteakLean
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4" @ "v4.25.0"
 
-/-- The main library containing all Protocol, Proofs, Runner, and Diagnostics modules. -/
-lean_lib Rumpsteak
-
-/-- CLI executable for validating choreography/program pairs. -/
+/-- V2 library containing the new protocol semantics and proofs. -/
 @[default_target]
-lean_exe rumpsteak_runner where
-  root := `Rumpsteak.Runner.Main
-  supportInterpreter := true
+lean_lib RumpsteakV2 where
+  globs := #[`RumpsteakV2.*]

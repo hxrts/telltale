@@ -239,9 +239,50 @@ theorem empty_config_commitment_deterministic (roles : List String) :
     We axiomatize this because the full proof requires navigating
     complex Batteries internals (zoom, Path, Balanced) that are
     orthogonal to session type theory. -/
-axiom rbmap_insert_size_fresh {α β : Type _} {cmp : α → α → Ordering}
+theorem rbmap_insert_size_fresh {α β : Type _} {cmp : α → α → Ordering}
     (m : Batteries.RBMap α β cmp) (k : α) (v : β)
-    (hfresh : m.find? k = none) : (m.insert k v).size = m.size + 1
+    (hfresh : m.find? k = none) : (m.insert k v).size = m.size + 1 := by
+  classical
+  -- Reduce to list lengths
+  simp [Batteries.RBMap.size_eq]
+  -- Work with the underlying RBNode and comparator
+  set cmp' : (α × β) → (α × β) → Ordering := Ordering.byKey Prod.fst cmp
+  set cut : (α × β) → Ordering := cmp' (k, v)
+  -- find? = none implies findEntry? = none
+  have hentry : m.findEntry? k = none := by
+    cases hentry' : m.findEntry? k <;> simp [Batteries.RBMap.find?, hentry'] at hfresh <;> exact hentry'
+  -- Lift to the underlying RBNode find?
+  have hfindNode : m.1.find? cut = none := by
+    simpa [Batteries.RBMap.findEntry?, Batteries.RBSet.findP?, cut] using hentry
+  -- Extract balance invariant for the underlying tree
+  let ⟨_, _, ht⟩ := m.2.out.2
+  -- Show zoom reaches an empty node when the key is fresh
+  cases hz : m.1.zoom cut with
+  | mk t' p =>
+    have hroot : t'.root? = none := by
+      have hzoom := (Batteries.RBNode.find?_eq_zoom (t := m.1) (cut := cut))
+      have hzoom' : none = t'.root? := by
+        simpa [hfindNode, hz] using hzoom
+      exact hzoom'.symm
+    cases t' with
+    | nil =>
+      have hz' : m.1.zoom (cmp' (k, v)) = (Batteries.RBNode.nil, p) := by
+        simpa [cut] using hz
+      have ⟨L, R, hlist, hlist'⟩ :=
+        Batteries.RBNode.exists_insert_toList_zoom_nil
+          (t := m.1) (cmp := cmp') (v := (k, v)) ht hz'
+      -- Compute lengths from the list decomposition
+      calc
+        (m.insert k v).toList.length
+            = (L ++ (k, v) :: R).length := by
+                simpa [cmp', Batteries.RBMap.insert, Batteries.RBMap.toList, Batteries.RBSet.toList, hlist']
+        _ = (L ++ R).length + 1 := by
+                simp [List.length_append, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm]
+        _ = m.toList.length + 1 := by
+                simpa [Batteries.RBMap.toList, Batteries.RBSet.toList, hlist]
+    | node c l x r =>
+      -- Contradiction: root? = none for a node
+      simp [Batteries.RBNode.root?] at hroot
 
 /-- Axiom: Fresh counter produces fresh ResourceId.
 

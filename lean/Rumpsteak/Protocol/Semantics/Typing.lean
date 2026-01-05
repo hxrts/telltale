@@ -474,6 +474,7 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
     (x : String) (s t : LocalTypeR)
     (hp : WellTyped (Γ.extend x s) p t)
     (hq : WellTyped Γ q s)
+    (hclosed : q.freeVars = [])
     : WellTyped Γ (p.substitute x q) t := by
   induction hp generalizing Γ q with
   | inaction =>
@@ -483,28 +484,29 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
   | send hcont ih =>
     -- substitute (.send r l v cont) x q = .send r l v (substitute cont x q)
     simp only [Process.substitute]
-    exact WellTyped.send (ih hq)
+    exact WellTyped.send (ih hq hclosed)
   | @recv Γ' sender branches types hlen hbranches hlabels ih =>
     -- substitute (.recv sender branches) x q = .recv sender (substBranches)
     simp only [Process.substitute]
     -- Need to show WellTyped on the substituted branches
     apply WellTyped.recv
     · -- Length preservation: substitution preserves list length
-      simp only [List.length_map, hlen]
+      simpa [substituteBranches_length, hlen]
     · -- Each branch is well-typed
       intro i
-      simp only [List.get!_map, Prod.snd_mk, Prod.fst_mk]
       -- ih i gives us the IH for branch i
-      have hih := ih i hq
+      have hih := ih i hq hclosed
       -- But we need to relate branches.get! i to the unfolded substitute
-      sorry  -- This requires showing the internal substBranches matches List.map
+      simpa [substituteBranches_get!] using hih
     · -- Labels match
       intro i
-      simp only [List.get!_map, Prod.fst_mk]
-      exact hlabels i
+      have hget := substituteBranches_get! branches x q i
+      have hlabel' : ((substituteBranches branches x q).get! i).1 = (branches.get! i).1 := by
+        simpa using congrArg Prod.fst hget
+      exact hlabel'.trans (hlabels i)
   | cond hp' hq' ihp ihq =>
     simp only [Process.substitute]
-    exact WellTyped.cond (ihp hq) (ihq hq)
+    exact WellTyped.cond (ihp hq hclosed) (ihq hq hclosed)
   | @recurse Γ' y body bodyType hbody ih =>
     simp only [Process.substitute]
     split_ifs with hxy
@@ -550,8 +552,8 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
       -- Now apply ih with Γ.extend y bodyType
       have hq' : WellTyped (Γ.extend y bodyType) q s := by
         apply wellTyped_weaken Γ q s y bodyType hq
-        sorry -- Need: y ∉ q.freeVars
-      exact ih hq'
+        simp [hclosed]
+      exact ih hq' hclosed
   | @var Γ' varName varType hlookup =>
     simp only [Process.substitute]
     split_ifs with hxvar
@@ -573,7 +575,7 @@ theorem wellTyped_process_substitute (Γ : TypingContext) (p q : Process)
       rw [← lookup_extend_neq Γ varName x s varType hne]
       exact hlookup
   | equiv hwt heq ih =>
-    exact WellTyped.equiv (ih hq) heq
+    exact WellTyped.equiv (ih hq hclosed) heq
 
 /-! ## Equi-Recursive Type Theory Axioms
 

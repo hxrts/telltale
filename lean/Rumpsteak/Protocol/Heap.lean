@@ -249,7 +249,17 @@ theorem alloc_preserves_invariant (h : Heap) (r : Resource)
       -- This requires RBMap lemmas about insert with TransCmp instance
       -- The property follows from: insert only adds the new key,
       -- so if rid ≠ newKey and rid ∈ insert, then rid ∈ original
-      sorry
+      have hcmp : ResourceId.compare rid (ResourceId.create r h.counter) ≠ .eq := by
+        intro hcmp
+        apply heq
+        exact (ResourceId.compare_eq_iff).1 hcmp
+      rcases (Batteries.RBMap.contains_iff_find? (t := h.resources.insert (ResourceId.create r h.counter) r)
+        (x := rid)).1 hcontains' with ⟨v, hv⟩
+      have hv' : h.resources.find? rid = some v := by
+        have hfind := Batteries.RBMap.find?_insert_of_ne
+          (t := h.resources) (k := ResourceId.create r h.counter) (v := r) (k' := rid) hcmp
+        simpa [hfind] using hv
+      exact (Batteries.RBMap.contains_iff_find? (t := h.resources) (x := rid)).2 ⟨v, hv'⟩
     omega
 
 /-- A ResourceId with the current counter is not in the heap (assuming invariant).
@@ -268,10 +278,9 @@ theorem fresh_counter_not_found (h : Heap) (r : Resource)
   | some _ =>
     -- If found, then it's in the heap
     have hcontains : h.resources.contains (ResourceId.create r h.counter) := by
-      simp only [Batteries.RBMap.contains]
-      -- Need to show findEntry?.isSome = true given find? = some
-      -- find? and findEntry? are related
-      sorry
+      apply (Batteries.RBMap.contains_iff_find? (t := h.resources)
+        (x := ResourceId.create r h.counter)).2
+      exact ⟨_, hfind⟩
     -- By invariant, its counter must be < h.counter
     have hlt := hinv (ResourceId.create r h.counter) hcontains
     -- But ResourceId.create r h.counter has counter = h.counter

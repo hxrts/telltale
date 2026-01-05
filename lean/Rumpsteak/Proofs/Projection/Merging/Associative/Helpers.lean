@@ -191,7 +191,7 @@ theorem mergeRecvSorted_mem_fst
   termination_by bs1.length + bs2.length
   decreasing_by
     all_goals
-      simp_wf
+      simp
       simp (config := { failIfUnchanged := false }) [hbs1, hbs2]
       try omega
 
@@ -377,7 +377,7 @@ theorem mergeRecvSorted_pairwise
   termination_by bs1.length + bs2.length
   decreasing_by
     all_goals
-      simp_wf
+      simp
       simp (config := { failIfUnchanged := false }) [hbs1, hbs2]
       try omega
 

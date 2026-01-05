@@ -97,12 +97,19 @@ instance : DecidableEq ResourceId := fun a b =>
 
 /-- Comparison for ResourceId (lexicographic on hash, then counter). -/
 def ResourceId.compare (a b : ResourceId) : Ordering :=
-  match Ord.compare a.hash.toList b.hash.toList with
-  | .eq => Ord.compare a.counter b.counter
-  | ord => ord
+  compareLex (compareOn (fun r => r.hash.data)) (compareOn (fun r => r.counter)) a b
 
 instance : Ord ResourceId where
   compare := ResourceId.compare
+
+instance : Std.TransCmp ResourceId.compare := by
+  unfold ResourceId.compare
+  infer_instance
+
+theorem ResourceId.compare_eq_iff {a b : ResourceId} :
+    ResourceId.compare a b = .eq ↔ a = b := by
+  cases a <;> cases b
+  simp [ResourceId.compare, compareOn, ByteArray.ext_iff]
 
 instance : Hashable ResourceId where
   hash rid := rid.hash.foldl (fun acc b => acc ^^^ b.toUInt64) rid.counter.toUInt64

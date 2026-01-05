@@ -113,7 +113,7 @@ mutual
   termination_by sizeOf t
   decreasing_by
     all_goals
-      simp_wf
+      simp
       apply Nat.lt_add_of_pos_left
       simp [Nat.one_add]
 

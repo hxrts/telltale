@@ -155,7 +155,7 @@ theorem mergeRecvSorted_comm
   termination_by sizeOf bs1 + sizeOf bs2
   decreasing_by
     all_goals
-      simp_wf
+      simp
       simp (config := { failIfUnchanged := false })
       first
         | -- Left list shrinks (drop head of `bs1`).
@@ -448,7 +448,7 @@ theorem mergeRecvSorted_label_mem
   termination_by sizeOf bs1 + sizeOf bs2
   decreasing_by
     all_goals
-      simp_wf
+      simp
       first
         | apply Nat.add_lt_add_right; exact sizeOf_tail_lt_cons h1 t1
         | apply Nat.add_lt_add_left; exact sizeOf_tail_lt_cons h2 t2
@@ -613,7 +613,7 @@ theorem mergeRecvSorted_pairwise
   termination_by sizeOf bs1 + sizeOf bs2
   decreasing_by
     all_goals
-      simp_wf
+      simp
       first
         | -- Left shrinks
           apply Nat.add_lt_add_right

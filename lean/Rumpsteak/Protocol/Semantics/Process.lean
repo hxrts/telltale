@@ -1,5 +1,5 @@
 import Rumpsteak.Protocol.GlobalType
-import Mathlib.Data.List.Basic
+import Rumpsteak.Protocol.ListCompat
 
 /-! # Rumpsteak.Protocol.Semantics.Process
 
@@ -127,40 +127,48 @@ theorem freeVarsOfBranches_mem_of (branches : List (Label × Process)) (x : Stri
       simp only [List.get!_cons_succ] at h
       exact Or.inr (ih n h)
 
--- Substitute a process for a variable.
-/-- Substitute a process for a variable. -/
-def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=
-  match proc with
-  | .inaction => .inaction
-  | .send role label value p =>
-    .send role label value (p.substitute varName replacement)
-  | .recv role branches =>
-    let rec substBranches : List (Label × Process) → List (Label × Process)
-      | [] => []
-      | (l, p) :: rest => (l, p.substitute varName replacement) :: substBranches rest
-    .recv role (substBranches branches)
-  | .cond b p q =>
-    .cond b (p.substitute varName replacement) (q.substitute varName replacement)
-  | .recurse x p =>
-    if x == varName then
-      .recurse x p  -- Variable is shadowed
-    else
-      .recurse x (p.substitute varName replacement)
-  | .var x =>
-    if x == varName then replacement else .var x
-  | .par p q =>
-    .par (p.substitute varName replacement) (q.substitute varName replacement)
+mutual
+  -- Substitute a process for a variable.
+  /-- Substitute a process for a variable. -/
+  def Process.substitute (proc : Process) (varName : String) (replacement : Process) : Process :=
+    match proc with
+    | .inaction => .inaction
+    | .send role label value p =>
+      .send role label value (p.substitute varName replacement)
+    | .recv role branches =>
+      .recv role (substituteBranches branches varName replacement)
+    | .cond b p q =>
+      .cond b (p.substitute varName replacement) (q.substitute varName replacement)
+    | .recurse x p =>
+      if x == varName then
+        .recurse x p  -- Variable is shadowed
+      else
+        .recurse x (p.substitute varName replacement)
+    | .var x =>
+      if x == varName then replacement else .var x
+    | .par p q =>
+      .par (p.substitute varName replacement) (q.substitute varName replacement)
 
-/-- Substitute in a list of branches. -/
-def substituteBranches (branches : List (Label × Process)) (varName : String) (replacement : Process)
-    : List (Label × Process) :=
-  match branches with
-  | [] => []
-  | (l, p) :: rest => (l, p.substitute varName replacement) :: substituteBranches rest varName replacement
+  /-- Substitute in a list of branches. -/
+  def substituteBranches (branches : List (Label × Process)) (varName : String) (replacement : Process)
+      : List (Label × Process) :=
+    match branches with
+    | [] => []
+    | (l, p) :: rest => (l, p.substitute varName replacement) :: substituteBranches rest varName replacement
+end
 
 @[simp] theorem substitute_inaction (varName : String) (replacement : Process) :
     Process.substitute .inaction varName replacement = .inaction := by
-  rfl
+  simp [Process.substitute]
+
+@[simp] theorem instInhabitedProcess_default : instInhabitedProcess.default = Process.inaction := rfl
+
+@[simp] theorem default_snd_eq_default : (default : Label × Process).snd = (default : Process) := rfl
+
+@[simp] theorem substitute_default (varName : String) (replacement : Process) :
+    (default : Process).substitute varName replacement = default := by
+  change instInhabitedProcess.default.substitute varName replacement = instInhabitedProcess.default
+  simp [Process.substitute]
 
 /-- substituteBranches preserves length.
 
@@ -171,7 +179,9 @@ theorem substituteBranches_length (branches : List (Label × Process)) (varName 
   | nil =>
     simp [substituteBranches]
   | cons b rest ih =>
-    simp [substituteBranches, ih]
+    cases b with
+    | mk l p =>
+      simp [substituteBranches, ih]
 
 /-- substituteBranches get! preserves label and substitutes process.
 
@@ -181,13 +191,16 @@ theorem substituteBranches_get! (branches : List (Label × Process)) (varName : 
       ((branches.get! i).1, (branches.get! i).2.substitute varName replacement) := by
   induction branches generalizing i with
   | nil =>
-    rfl
+    cases i <;>
+      ext <;> simp [substituteBranches, substitute_default]
   | cons b rest ih =>
-    cases i with
-    | zero =>
-      simp [substituteBranches]
-    | succ n =>
-      simpa [substituteBranches] using ih n
+    cases b with
+    | mk l p =>
+      cases i with
+      | zero =>
+        simp [substituteBranches]
+      | succ n =>
+        simpa [substituteBranches] using ih n
 
 /-- Unfold one level of recursion: μX.P ↦ P[μX.P/X] -/
 def Process.unfold : Process → Process
