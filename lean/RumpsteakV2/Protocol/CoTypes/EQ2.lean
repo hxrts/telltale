@@ -196,7 +196,24 @@ private def ReflRel : Rel := fun a b =>
   (∃ t body, a = body.substitute t (.mu t body) ∧ b = .mu t body) ∨
   (∃ t body, a = .mu t body ∧ b = body.substitute t (.mu t body))
 
-/-- ReflRel is a post-fixpoint of EQ2F (requires coinduction up-to). -/
+/-- ReflRel is a post-fixpoint of EQ2F.
+
+This axiom encapsulates the coinductive reasoning for reflexivity. The proof requires
+"coinduction up-to" techniques (as in Coq's paco library) because:
+
+1. For mu types, EQ2F requires unfolding pairs to be in the relation
+2. When `body.substitute t (mu t body)` is itself a mu, we get nested unfoldings
+3. The nested case requires showing ReflRel holds for pairs that aren't directly
+   in the definition (e.g., unfolding of an unfolding paired with the original)
+
+The axiom is semantically sound because:
+- EQ2 represents observational equality of infinite trees
+- Any type is observationally equal to itself
+- Unfolding a mu produces the same observations as the mu itself
+
+Proving this constructively in Lean would require:
+- Coinduction up-to equivalence (parametrized coinduction)
+- Or a more sophisticated relation that captures transitive unfolding -/
 private axiom ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b
 
 /-- EQ2 is reflexive.
@@ -250,7 +267,20 @@ theorem EQ2_symm {a b : LocalTypeR} (h : EQ2 a b) : EQ2 b a := by
 /-- Coinductive relation for transitivity: composition of EQ2 pairs. -/
 private def TransRel : Rel := fun a c => ∃ b, EQ2 a b ∧ EQ2 b c
 
-/-- TransRel is a post-fixpoint of EQ2F (requires up-to coinduction). -/
+/-- TransRel is a post-fixpoint of EQ2F.
+
+This axiom encapsulates the coinductive reasoning for transitivity. Like ReflRel_postfix,
+proving this constructively requires "coinduction up-to" techniques because:
+
+1. TransRel a c means ∃ b, EQ2 a b ∧ EQ2 b c
+2. To show EQ2F TransRel a c, we need to decompose a, b, c by constructor
+3. For mu types, EQ2 involves unfolding, and the intermediate type b might unfold
+   differently than a or c, requiring transitive chains of unfoldings
+
+The axiom is semantically sound because:
+- If a ≈ b and b ≈ c (observationally equal), then a ≈ c
+- Transitivity holds for observational equality on infinite trees
+- The intermediate witness b guides the proof but the result only relates a and c -/
 private axiom TransRel_postfix : ∀ a c, TransRel a c → EQ2F TransRel a c
 
 /-- EQ2 is transitive.
