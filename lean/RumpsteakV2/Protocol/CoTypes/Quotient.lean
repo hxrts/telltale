@@ -48,15 +48,35 @@ theorem QLocalTypeR.unfold_ofLocal (t : LocalTypeR) :
     (with the same variable and replacement) are also EQ2-equivalent.
 
 This axiom captures the semantic property that observationally equal types
-remain observationally equal after substitution. The proof would require
-coinduction showing that substitution commutes with the unfolding structure
-that defines EQ2.
+remain observationally equal after substitution.
 
-Semantically sound because:
+### Why this is an axiom (not a theorem)
+
+Proving this constructively requires "coinduction up-to" techniques (like Coq's paco library).
+The naive coinduction relation:
+  `SubstRel var repl a' b' := ∃ a b, EQ2 a b ∧ a' = a.subst var repl ∧ b' = b.subst var repl`
+
+is NOT a post-fixpoint of EQ2F because of the mu-mu case with distinct bound variables.
+
+**Problematic case:** When `EQ2 (mu t body) (mu s body')` where `t ≠ var` and `s ≠ var`:
+- After substitution: `a' = mu t (body.subst var repl)`, `b' = mu s (body'.subst var repl)`
+- EQ2F requires: `SubstRel (body.subst var repl).subst t (mu t (body.subst var repl)) (mu s (body'.subst var repl))`
+- This LHS has nested substitutions that don't factor as `a.subst var repl` for any simple `a`
+
+The fix in Coq uses parametrized coinduction (paco) which allows "accumulating" EQ2 reasoning
+during the coinductive proof. Lean 4 lacks built-in support for this.
+
+### Semantic soundness
+
+The axiom is semantically sound because:
 - EQ2 represents observational equality of infinite trees
 - Substitution is a structural transformation on trees
 - If two trees are observationally equal, applying the same transformation
-  to corresponding positions yields observationally equal results -/
+  to corresponding positions yields observationally equal results
+
+### Coq reference
+
+See `subject_reduction/theories/CoTypes/bisim.v` for the Coq proof using paco. -/
 axiom EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR)
     (h : EQ2 a b) : EQ2 (a.substitute var repl) (b.substitute var repl)
 
@@ -123,16 +143,19 @@ def QLocalTypeR.liftProp (P : LocalTypeR → Prop)
 
 /-- Unfold commutes with substitute on representatives.
 
-This axiom states that unfolding and substitution commute modulo EQ2.
-Semantically, this is because both operations are structural transformations
-that interact predictably with each other.
+For non-mu types, unfold is the identity, so both sides are definitionally equal.
+For mu types, the proof requires coinductive reasoning on the resulting infinite trees.
 
-The full proof would require showing that for all local types t:
-  unfold(t.substitute var repl) EQ2 (unfold t).substitute var repl
+This axiom states that applying substitute then unfold is EQ2-equivalent to
+applying unfold then substitute. Both result in observationally equivalent
+infinite trees.
 
-This holds because:
-- If t is not a mu, unfold is identity on both sides
-- If t is a mu, the substitution distributes through the body -/
+Proof sketch (by case analysis on t):
+- end/var/send/recv: unfold is identity, trivial
+- mu t body: requires coinductive reasoning on EQ2
+
+This corresponds to the semantic property that substitution and unfolding
+are confluent operations on infinite trees. -/
 axiom unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
     EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)
 
