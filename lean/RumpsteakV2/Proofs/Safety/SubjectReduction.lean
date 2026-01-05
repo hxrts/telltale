@@ -50,21 +50,28 @@ structure Configuration where
   processes : List Process
   deriving Inhabited
 
-/-! ## Typing Judgment -/
+/-! ## Typing Judgment
+
+Following the ECOOP 2025 Coq mechanization, we use a fixed role set S that contains
+all roles of the global type. This handles the case where roles can shrink during
+stepping (Remark 10 in the paper). -/
 
 /-- A process is well-typed if its local type matches the projection of the global type. -/
 def Process.wellTyped (p : Process) (g : GlobalType) : Prop :=
   p.localType = QLocalTypeR.ofLocal (trans g p.role)
 
-/-- A configuration is well-typed if:
+/-- A configuration is well-typed relative to a fixed role set S if:
     1. All processes are well-typed under the global type
-    2. Each role in the global type has exactly one corresponding process
-    3. The processes form a well-formed environment -/
+    2. The roles of the global type are contained in the process roles (S)
+    3. The processes form a well-formed environment with unique roles
+
+This follows the Coq definition of coherent:
+  coherent l := ∃ g S, coherentG g ∧ l = map (proj g) S ∧ uniq S ∧ subset (roles g) S -/
 structure WellTypedConfig (c : Configuration) : Prop where
   /-- Each process is typed by the projection of the global type. -/
   processes_typed : ∀ p ∈ c.processes, p.wellTyped c.globalType
-  /-- Roles match between processes and global type (as permutations). -/
-  roles_complete : (c.processes.map Process.role).Perm c.globalType.roles
+  /-- Global type roles are contained in process roles. -/
+  roles_contained : ∀ r ∈ c.globalType.roles, r ∈ c.processes.map Process.role
   /-- No duplicate roles in processes. -/
   roles_unique : (c.processes.map Process.role).Nodup
 
@@ -94,7 +101,7 @@ and can take a step, then the resulting configuration is also well-typed.
 The proof relies on:
 1. Harmony (step_harmony): global steps induce environment steps
 2. Projection coherence: projections commute with stepping
-3. EQ2 alignment: local types are equal modulo unfolding -/
+3. Role containment: step_roles_subset shows roles(g') ⊆ roles(g) -/
 theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
     (htyped : WellTypedConfig c)
     (hstep : ConfigStep c c' act) :
@@ -102,28 +109,28 @@ theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
   processes_typed := by
     intro p' hp'
     exact hstep.processes_stepped p' hp'
-  roles_complete := by
-    have hroles := step_preserves_roles c.globalType c'.globalType act hstep.global_step
-    have hperm := htyped.roles_complete
+  roles_contained := by
+    -- Key insight: roles(g') ⊆ roles(g) ⊆ S
+    intro r hr
+    have hroles := step_roles_subset c.globalType c'.globalType act hstep.global_step r hr
+    have hcontained := htyped.roles_contained r hroles
     rw [← hstep.roles_preserved]
-    rw [← hroles]
-    exact hperm
+    exact hcontained
   roles_unique := by
     rw [← hstep.roles_preserved]
     exact htyped.roles_unique
 
-/-- Subject reduction preserves well-formedness of the environment. -/
+/-- Subject reduction preserves well-formedness of the environment.
+
+Note: projEnv g has domain g.roles, which uses eraseDups and is always Nodup. -/
 theorem step_preserves_wellformed {c c' : Configuration} {act : GlobalActionR}
-    (htyped : WellTypedConfig c)
-    (hstep : ConfigStep c c' act) :
+    (_htyped : WellTypedConfig c)
+    (_hstep : ConfigStep c c' act) :
     WellFormedEnv (projEnv c'.globalType) := by
   constructor
   rw [projEnv_dom]
-  have hroles := step_preserves_roles c.globalType c'.globalType act hstep.global_step
-  rw [← hroles]
-  have hperm := htyped.roles_complete
-  have hunique := htyped.roles_unique
-  exact hperm.nodup_iff.mp hunique
+  -- GlobalType.roles always produces Nodup lists
+  exact GlobalType.roles_nodup _
 
 /-! ## Type Preservation via EQ2 -/
 

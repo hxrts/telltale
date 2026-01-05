@@ -145,27 +145,12 @@ theorem QLocalTypeR.unfold_substitute (q : QLocalTypeR) (var : String) (repl : L
       apply QLocalTypeR.eq_of_EQ2
       exact unfold_substitute_EQ2 t var repl
 
-/-- Dual is an involution on local types.
-
-This can be proven by mutual structural induction on LocalTypeR and branch lists.
-The key insight is that dual only swaps send/recv, so applying it twice returns
-to the original structure.
-
-For a complete proof, one would:
-1. Define mutual induction on LocalTypeR and List (Label × LocalTypeR)
-2. Show dual_dual for each constructor (trivial for end, var)
-3. Show dualBranches_dualBranches for branch lists
-4. Combine for send/recv cases
-
-We axiomatize this since mutual recursion termination is complex in Lean 4. -/
-axiom dual_dual_eq (t : LocalTypeR) : t.dual.dual = t
-
 /-- Dual is an involution (on quotient). -/
 theorem QLocalTypeR.dual_dual (q : QLocalTypeR) :
     q.dual.dual = q := by
   induction q using Quot.ind with
   | mk t =>
       show QLocalTypeR.ofLocal _ = QLocalTypeR.ofLocal _
-      rw [dual_dual_eq]
+      rw [t.dual_dual]
 
 end RumpsteakV2.Protocol.CoTypes.Quotient

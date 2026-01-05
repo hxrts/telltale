@@ -94,4 +94,23 @@ mutual
     | (label, cont) :: rest => (label, cont.dual) :: dualBranches rest
 end
 
+mutual
+  /-- Dual is an involution on local types. -/
+  def LocalTypeR.dual_dual : (t : LocalTypeR) → t.dual.dual = t
+    | .end => rfl
+    | .var _ => rfl
+    | .mu _ body => congrArg (LocalTypeR.mu _) body.dual_dual
+    | .send _ bs => congrArg (LocalTypeR.send _) (dualBranches_dualBranches bs)
+    | .recv _ bs => congrArg (LocalTypeR.recv _) (dualBranches_dualBranches bs)
+
+  /-- Dual branches is an involution. -/
+  def dualBranches_dualBranches : (bs : List (Label × LocalTypeR)) →
+      dualBranches (dualBranches bs) = bs
+    | [] => rfl
+    | (_, cont) :: rest =>
+        congrArg₂ List.cons
+          (congrArg₂ Prod.mk rfl cont.dual_dual)
+          (dualBranches_dualBranches rest)
+end
+
 end RumpsteakV2.Protocol.LocalTypeR
