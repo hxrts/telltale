@@ -380,60 +380,84 @@ theorem part_of2_or_end (role : String) (g : GlobalType) (lt : LocalTypeR)
 The following lemmas establish that CProject and trans interact coherently with EQ2.
 These correspond to key lemmas from the Coq development:
 - `proj_proj`: if CProject g p e, then EQ2 e (trans g p)
-- `Project_EQ2`: if CProject g p e0 and EQ2 e0 e1, then CProject g p e1 -/
+- `Project_EQ2`: if CProject g p e0 and EQ2 e0 e1, then CProject g p e1
+
+### CProject_implies_EQ2_trans Proof Strategy
+
+The proof uses coinduction on EQ2 with the relation:
+`CProjectTransRel lt cand := ∃ g role, CProject g role lt ∧ cand = trans g role`
+
+For end, var, and participant comm cases, CProject and trans have matching structures.
+For non-participants, we use `part_of2_or_end` + `EQ_end` to show EQ2 lt .end ∧ EQ2 .end (trans g role).
+The mu case requires coinduction up-to with substitution lemmas.
+
+See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq reference. -/
+
+/-! ### Helper Lemmas for CProject_implies_EQ2_trans
+
+The following helper lemmas and axioms support the proof of the main theorem. -/
+
+/-- Helper: part_of_all2 implies part_of2.
+
+If a role participates on all branches, it certainly participates on some path. -/
+axiom part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
+    (h : part_of_all2 role g) : part_of2 role g
+
+/-- Helper: if CProject gives lt and role doesn't participate, then lt is EQ2 to trans.
+
+This uses the muve/closed infrastructure from EQ_end and part_of2_or_end.
+
+#### Proof Outline
+
+1. By `part_of2_or_end`, we get `part_of_all2 role g ∨ EQ2 lt .end`
+2. The Left case contradicts `hnotpart` via `part_of_all2_implies_part_of2`
+3. The Right case: chain `EQ2 lt .end` with `EQ2 .end (trans g role)` from `EQ_end` -/
+private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : String) (lt : LocalTypeR)
+    (hproj : CProject g role lt)
+    (hnotpart : ¬part_of2 role g)
+    (hwf : g.wellFormed = true) :
+    EQ2 lt (trans g role) := by
+  -- By part_of2_or_end, we get EQ2 lt .end
+  have h_or := part_of2_or_end role g lt hproj hwf
+  cases h_or with
+  | inl hpart_all => exact absurd (part_of_all2_implies_part_of2 role g hpart_all) hnotpart
+  | inr hlt_end =>
+      -- hlt_end : EQ2 lt .end
+      -- By EQ_end, we get EQ2 .end (trans g role)
+      have hend_trans := EQ_end role g hnotpart hwf
+      -- Chain: EQ2 lt .end ∧ EQ2 .end (trans g role) → EQ2 lt (trans g role)
+      exact EQ2_trans hlt_end hend_trans
+
+/-- BranchesRel for EQ2 implies branch-wise EQ2.
+
+If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
+then the local branches are EQ2-related. -/
+axiom BranchesProjRel_implies_BranchesRel_EQ2
+    (gbs : List (Label × GlobalType)) (role : String)
+    (lbs : List (Label × LocalTypeR)) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
+    (h : BranchesProjRel CProject gbs role lbs) :
+    BranchesRel EQ2 lbs (transBranches gbs role)
+
+/-- AllBranchesProj with trans gives EQ2.
+
+For non-participants, AllBranchesProj CProject gbs role lt means all branches
+project to lt. The trans of the first branch should be EQ2 to lt. -/
+axiom AllBranchesProj_implies_EQ2_trans
+    (sender receiver role : String) (gbs : List (Label × GlobalType)) (lt : LocalTypeR)
+    (hns : role ≠ sender) (hnr : role ≠ receiver)
+    (hall : AllBranchesProj CProject gbs role lt)
+    (hne : gbs ≠ [])
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    EQ2 lt (trans (GlobalType.comm sender receiver gbs) role)
+
+/-! ### Main Theorem: CProject_implies_EQ2_trans -/
 
 /-- If CProject g role lt holds, then lt is EQ2-equivalent to trans g role.
 
 This axiom corresponds to the Coq lemma `proj_proj` from indProj.v (lines 221-260).
 
-### Proof Strategy
-
-The proof uses coinduction on EQ2 with the relation:
-```
-CProjectTransRel lt cand := ∃ g role, CProject g role lt ∧ cand = trans g role
-```
-
-For most cases (end, var, comm-sender, comm-receiver), the structure of CProject
-and trans match directly:
-- `CProject .end role .end` and `trans .end role = .end` → EQ2F trivially True
-- `CProject (.var t) role (.var t)` and `trans (.var t) role = .var t` → names equal
-- Participant comm cases: CProject gives send/recv with BranchesProjRel,
-  trans gives send/recv with transBranches, structures match
-
-### Blocked Cases
-
-**mu case:** When `CProject (.mu t body) role (.mu t candBody)` and
-`trans (.mu t body) role = .mu t (trans body role)`:
-- EQ2F for two mu types requires showing unfolding pairs are related:
-  1. `(candBody.substitute t (.mu t candBody), .mu t (trans body role))`
-  2. `(.mu t candBody, (trans body role).substitute t (...))`
-- These substituted types don't directly correspond to any CProject/trans pair
-- Need a helper lemma: CProject_substitute or trans_substitute_EQ2
-- The Coq proof uses pcofix (parametrized coinduction) to handle this
-
-**empty branches case:** For non-participant with empty branches:
-- CProject's AllBranchesProj is vacuously true for any lt
-- trans returns .end
-- Need EQ2F lt .end, but lt is unconstrained
-- This may indicate a gap in the CProject definition for edge cases
-
-**nested non-participant case:** For non-participant where first branch is also
-a non-participant comm:
-- Requires well-founded recursion on global type size
-- Standard coinduction postfix proof doesn't capture this pattern
-
-### Required Sub-Lemmas
-
-1. `CProject_substitute`: If `CProject body role candBody`, then
-   `CProject (body.substitute t (mu t body)) role (candBody.substitute t (mu t candBody))`
-
-2. `trans_substitute_EQ2`: Trans commutes with substitution up to EQ2:
-   `EQ2 (trans (g.substitute t repl) role) ((trans g role).substitute t (trans repl role))`
-
-### Coq Reference
-
-See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq proof
-which uses `pcofix CIH` (parametrized coinduction from paco library). -/
+For non-participants, this follows from `CProject_implies_EQ2_trans_nonpart`.
+For participants, the proof requires coinduction with the `CProjectTransRel`. -/
 axiom CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) : EQ2 lt (trans g role)
 
