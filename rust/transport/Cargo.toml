@@ -1,6 +1,6 @@
 [package]
 name = "rumpsteak-transport"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 authors = ["Rumpsteak Contributors"]
 license = "MIT OR Apache-2.0"
@@ -11,7 +11,7 @@ categories = ["asynchronous", "network-programming"]
 readme = "README.md"
 
 [dependencies]
-rumpsteak-aura-choreography = { version = "0.8.0", path = "../choreography" }
+rumpsteak-aura-choreography = { version = "0.8.1", path = "../choreography" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt-multi-thread"] }
 thiserror = "1"

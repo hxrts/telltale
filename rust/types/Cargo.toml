@@ -1,6 +1,6 @@
 [package]
 name = "rumpsteak-types"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
