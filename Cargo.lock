@@ -1216,7 +1216,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "rumpsteak-aura"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1232,7 +1232,6 @@ dependencies = [
  "quote",
  "rand 0.8.5",
  "rumpsteak-aura-macros",
- "rumpsteak-lean-bridge",
  "rumpsteak-theory",
  "rumpsteak-types",
  "serde",
@@ -1252,7 +1251,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-choreography"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -1293,7 +1292,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-macros"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1302,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-lean-bridge"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap 4.5.53",
@@ -1318,7 +1317,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-theory"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "assert_matches",
  "proptest",
@@ -1328,7 +1327,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-types"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "assert_matches",
  "proptest",

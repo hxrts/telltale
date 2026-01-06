@@ -62,7 +62,6 @@ anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
 # For examples
 rumpsteak-theory = { path = "rust/theory", version = "0.8.0" }
-rumpsteak-lean-bridge = { path = "rust/lean-bridge", version = "0.8.0" }
 serde_json = { workspace = true }
 
 [features]

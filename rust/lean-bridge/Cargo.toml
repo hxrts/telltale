@@ -48,3 +48,4 @@ proptest = { workspace = true }
 rumpsteak-theory = { path = "../theory", version = "0.8.0" }
 rumpsteak-aura-choreography = { path = "../choreography", version = "0.8.0" }
 tempfile = { workspace = true }
+serde_json = { workspace = true }

@@ -3,7 +3,7 @@
 //! This example demonstrates how to use the Lean bridge to validate
 //! protocol definitions by converting between Rust and Lean JSON format.
 //!
-//! Run with: cargo run --example lean_validation
+//! Run with: cargo run -p rumpsteak-lean-bridge --example lean_validation
 
 use rumpsteak_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
 use rumpsteak_types::{GlobalType, Label, LocalTypeR};
