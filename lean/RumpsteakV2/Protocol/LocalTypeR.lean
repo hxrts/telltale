@@ -178,29 +178,21 @@ def LocalTypeR.muHeight : LocalTypeR → Nat
 def LocalTypeR.fullUnfold (lt : LocalTypeR) : LocalTypeR :=
   (LocalTypeR.unfold)^[lt.muHeight] lt
 
-/-- fullUnfold produces a non-mu type.
+/-- If a type has no leading `mu`, then `fullUnfold` cannot be a `mu`.
 
-    Note: This holds when the type is contractive (guarded recursion).
-    For non-contractive types like `mu x. x`, fullUnfold may not terminate
-    conceptually, but our fuel-based definition handles it gracefully. -/
+    This is the only unconditional statement we can make without assuming
+    guardedness/contractiveness. -/
 theorem LocalTypeR.fullUnfold_not_mu (lt : LocalTypeR) :
-    ∀ t body, lt.fullUnfold ≠ .mu t body := by
-  intro t body
-  match lt with
-  | .end => simp [fullUnfold, muHeight, Nat.iterate]
-  | .var _ => simp [fullUnfold, muHeight, Nat.iterate]
-  | .send _ _ => simp [fullUnfold, muHeight, Nat.iterate]
-  | .recv _ _ => simp [fullUnfold, muHeight, Nat.iterate]
-  | .mu _ _ =>
-      simp only [fullUnfold, muHeight]
-      -- The unfolding makes progress; proof via termination
-      sorry  -- Would need stronger induction on muHeight
+    lt.muHeight = 0 → ∀ t body, lt.fullUnfold ≠ .mu t body := by
+  intro h t body
+  cases lt <;> simp [fullUnfold, muHeight] at h ⊢
 
-/-- fullUnfold is idempotent. -/
+/-- fullUnfold is idempotent when its result has no leading `mu`. -/
 theorem LocalTypeR.fullUnfold_idemp (lt : LocalTypeR) :
-    lt.fullUnfold.fullUnfold = lt.fullUnfold := by
-  -- After full unfolding, muHeight is 0, so iterate 0 times = identity
-  simp only [fullUnfold]
-  sorry  -- Need to prove muHeight (fullUnfold lt) = 0
+    lt.fullUnfold.muHeight = 0 → lt.fullUnfold.fullUnfold = lt.fullUnfold := by
+  intro h
+  have h' : ((LocalTypeR.unfold)^[lt.muHeight] lt).muHeight = 0 := by
+    simpa [fullUnfold] using h
+  simp [fullUnfold, h']
 
 end RumpsteakV2.Protocol.LocalTypeR

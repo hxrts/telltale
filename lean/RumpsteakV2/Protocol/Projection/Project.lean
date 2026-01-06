@@ -1288,35 +1288,6 @@ private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : Stri
       -- Chain: EQ2 lt .end ∧ EQ2 .end (trans g role) → EQ2 lt (trans g role)
       exact EQ2_trans hlt_end hend_trans
 
-/-- BranchesRel for EQ2 implies branch-wise EQ2.
-
-If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
-then the local branches are EQ2-related. -/
-theorem BranchesProjRel_implies_BranchesRel_EQ2
-    (gbs : List (Label × GlobalType)) (role : String)
-    (lbs : List (Label × LocalTypeR)) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
-    (h : BranchesProjRel CProject gbs role lbs) :
-    BranchesRel EQ2 lbs (transBranches gbs role) := by
-  -- By induction on BranchesProjRel, show each pair is EQ2-related
-  -- Uses CProject_implies_EQ2_trans on each branch (mutual dependency)
-  sorry
-
-/-- AllBranchesProj with trans gives EQ2.
-
-For non-participants, AllBranchesProj CProject gbs role lt means all branches
-project to lt. The trans of the first branch should be EQ2 to lt. -/
-theorem AllBranchesProj_implies_EQ2_trans
-    (sender receiver role : String) (gbs : List (Label × GlobalType)) (lt : LocalTypeR)
-    (hns : role ≠ sender) (hnr : role ≠ receiver)
-    (hall : AllBranchesProj CProject gbs role lt)
-    (hne : gbs ≠ [])
-    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
-    EQ2 lt (trans (GlobalType.comm sender receiver gbs) role) := by
-  -- trans for non-participant comm picks first branch
-  -- AllBranchesProj means first branch projects to lt
-  -- By CProject_implies_EQ2_trans on first branch, lt is EQ2 to trans of first branch
-  sorry
-
 /-! ### Main Theorem: CProject_implies_EQ2_trans -/
 
 /-- If CProject g role lt holds, then lt is EQ2-equivalent to trans g role.
@@ -1361,6 +1332,69 @@ theorem CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalT
   -- 1. CProject_destruct to analyze h
   -- 2. EQ2_coind with the relation CProjectTransRel
   sorry
+
+/-- BranchesRel for EQ2 implies branch-wise EQ2.
+
+If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
+then the local branches are EQ2-related. -/
+theorem BranchesProjRel_implies_BranchesRel_EQ2
+    (gbs : List (Label × GlobalType)) (role : String)
+    (lbs : List (Label × LocalTypeR)) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
+    (h : BranchesProjRel CProject gbs role lbs) :
+    BranchesRel EQ2 lbs (transBranches gbs role) := by
+  -- By induction on BranchesProjRel, show each pair is EQ2-related
+  induction h with
+  | nil =>
+      simp [BranchesRel, transBranches]
+  | cons hpair hrest ih =>
+      rename_i gb lb gbs_tail lbs_tail
+      cases gb with
+      | mk gLabel gCont =>
+          cases lb with
+          | mk lLabel lCont =>
+              rcases hpair with ⟨hlab, hproj⟩
+              have heq : EQ2 lCont (trans gCont role) :=
+                CProject_implies_EQ2_trans _ _ _ hproj
+              have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
+                intro gb' hmem
+                exact hwf gb' (List.mem_cons_of_mem _ hmem)
+              have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
+              have htail' :
+                  List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2 b.2)
+                    lbs_tail (transBranches gbs_tail role) := by
+                simpa [BranchesRel] using htail
+              have htb :
+                  transBranches ((gLabel, gCont) :: gbs_tail) role =
+                    (gLabel, trans gCont role) :: transBranches gbs_tail role := by
+                simp [transBranches]
+              have hcons :
+                  List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2 b.2)
+                    ((lLabel, lCont) :: lbs_tail)
+                    ((gLabel, trans gCont role) :: transBranches gbs_tail role) :=
+                List.Forall₂.cons ⟨hlab.symm, by simpa using heq⟩ htail'
+              simpa [BranchesRel, htb] using hcons
+
+/-- AllBranchesProj with trans gives EQ2.
+
+For non-participants, AllBranchesProj CProject gbs role lt means all branches
+project to lt. The trans of the first branch should be EQ2 to lt. -/
+theorem AllBranchesProj_implies_EQ2_trans
+    (sender receiver role : String) (gbs : List (Label × GlobalType)) (lt : LocalTypeR)
+    (hns : role ≠ sender) (hnr : role ≠ receiver)
+    (hall : AllBranchesProj CProject gbs role lt)
+    (hne : gbs ≠ [])
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    EQ2 lt (trans (GlobalType.comm sender receiver gbs) role) := by
+  cases gbs with
+  | nil =>
+      exact (hne rfl).elim
+  | cons first rest =>
+      have hproj : CProject first.2 role lt := hall first (by simp)
+      have heq : EQ2 lt (trans first.2 role) := CProject_implies_EQ2_trans _ _ _ hproj
+      have htrans : trans (GlobalType.comm sender receiver (first :: rest)) role =
+          trans first.2 role := by
+        simpa using trans_comm_other sender receiver role (first :: rest) hns hnr
+      simpa [htrans] using heq
 
 /-- CProject is preserved under EQ2 equivalence.
 
