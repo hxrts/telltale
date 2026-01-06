@@ -467,4 +467,178 @@ theorem trans {a b c : LocalTypeR} (hab : Bisim a b) (hbc : Bisim b c) : Bisim a
 
 end Bisim
 
+/-! ## Equivalence with EQ2
+
+The membership predicates in BisimF correspond to unfolding behavior in EQ2F.
+We prove Bisim ↔ EQ2, which enables deriving EQ2_trans from Bisim.trans. -/
+
+/-- Helper: unfolds-to-end implies EQ2 to .end through unfolding.
+    If a unfolds to end, then EQ2 a .end (since unfolding preserves EQ2). -/
+theorem UnfoldsToEnd.toEQ2 {a : LocalTypeR} (h : UnfoldsToEnd a) :
+    EQ2 a .end := by
+  induction h with
+  | base => exact EQ2_refl _
+  | @mu t body _ ih =>
+    -- EQ2 (mu t body) end requires EQ2F EQ2 (mu t body) end
+    -- EQ2F at (mu, end) = EQ2 (body.substitute t (mu t body)) end = ih
+    exact EQ2.construct ih
+
+/-- Helper: unfolds-to-var implies EQ2 to that var. -/
+theorem UnfoldsToVar.toEQ2 {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) :
+    EQ2 a (.var v) := by
+  induction h with
+  | base => exact EQ2_refl _
+  | @mu t body v' _ ih =>
+    exact EQ2.construct ih
+
+/-- Helper: can-send implies EQ2 to the corresponding send type. -/
+theorem CanSend.toEQ2 {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanSend a p bs) : EQ2 a (.send p bs) := by
+  induction h with
+  | base => exact EQ2_refl _
+  | @mu t body p' bs' _ ih =>
+    exact EQ2.construct ih
+
+/-- Helper: can-recv implies EQ2 to the corresponding recv type. -/
+theorem CanRecv.toEQ2 {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecv a p bs) : EQ2 a (.recv p bs) := by
+  induction h with
+  | base => exact EQ2_refl _
+  | @mu t body p' bs' _ ih =>
+    exact EQ2.construct ih
+
+/-- Convert BranchesRelBisim to BranchesRel EQ2 when the underlying relation implies EQ2. -/
+theorem BranchesRelBisim.toEQ2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
+    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    BranchesRel EQ2 bs cs := by
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | cons hbc _ ih =>
+    exact List.Forall₂.cons ⟨hbc.1, hR _ _ hbc.2⟩ ih
+
+/-- Bisim implies EQ2.
+
+    This is the key theorem: membership-based bisimulation implies coinductive equality.
+    The proof uses the EQ2 coinduction principle with Bisim as the witness relation.
+
+    Proof idea:
+    - Show that Bisim is a post-fixpoint of EQ2F
+    - Case on BisimF to determine observable behavior
+    - Use the toEQ2 helpers to convert membership predicates to EQ2 proofs
+    - Apply EQ2_coind -/
+theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
+  -- Use Bisim as the witness relation for coinduction
+  have hpost : ∀ x y, Bisim x y → EQ2F Bisim x y := by
+    intro x y ⟨R, hRpost, hxy⟩
+    have hf : BisimF R x y := hRpost x y hxy
+    -- Case on BisimF to determine observable behavior
+    cases hf with
+    | eq_end hx hy =>
+      -- Both unfold to end
+      -- Need EQ2F Bisim x y, which for end cases is just True (for end,end)
+      -- But x might not be .end, just UnfoldsToEnd x
+      -- We need to show that EQ2F Bisim works through unfolding
+      sorry
+    | eq_var hx hy =>
+      sorry
+    | eq_send hx hy hbr =>
+      sorry
+    | eq_recv hx hy hbr =>
+      sorry
+  exact EQ2_coind hpost a b h
+
+/-- Convert BranchesRel R to BranchesRelBisim R (same structure, just namespace difference). -/
+private theorem BranchesRel_to_BranchesRelBisim {R : Rel}
+    {bs cs : List (Label × LocalTypeR)} (h : BranchesRel R bs cs) :
+    BranchesRelBisim R bs cs := by
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
+
+/-- EQ2 implies Bisim.
+
+    This direction shows that coinductive equality implies membership-based bisimulation.
+    The proof constructs the Bisim witness using EQ2 itself.
+
+    Proof idea:
+    - Use EQ2 as the witness relation for Bisim
+    - Show EQ2 is a post-fixpoint of BisimF by destruct-ing EQ2 to EQ2F
+    - Convert EQ2F structure to membership predicates -/
+theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
+  -- Use EQ2 as the witness relation
+  use EQ2
+  constructor
+  · -- Show EQ2 is a post-fixpoint of BisimF
+    intro x y hxy
+    have hf : EQ2F EQ2 x y := EQ2.destruct hxy
+    -- Convert EQ2F to BisimF by extracting membership predicates
+    cases x with
+    | «end» =>
+      cases y with
+      | «end» => exact BisimF.eq_end UnfoldsToEnd.base UnfoldsToEnd.base
+      | mu s body' =>
+        -- EQ2F EQ2 end (mu s body') = EQ2 end (body'.substitute s (mu s body'))
+        -- Need to show BisimF EQ2 end (mu s body')
+        -- end unfolds to end, (mu s body') must also unfold to end for EQ2 to hold
+        sorry
+      | var _ => simp only [EQ2F] at hf
+      | send _ _ => simp only [EQ2F] at hf
+      | recv _ _ => simp only [EQ2F] at hf
+    | var v =>
+      cases y with
+      | var w =>
+        simp only [EQ2F] at hf
+        subst hf
+        exact BisimF.eq_var UnfoldsToVar.base UnfoldsToVar.base
+      | mu s body' =>
+        sorry
+      | «end» => simp only [EQ2F] at hf
+      | send _ _ => simp only [EQ2F] at hf
+      | recv _ _ => simp only [EQ2F] at hf
+    | send p bs =>
+      cases y with
+      | send q cs =>
+        simp only [EQ2F] at hf
+        have ⟨heq, hbr⟩ := hf
+        subst heq
+        apply BisimF.eq_send CanSend.base CanSend.base
+        -- Convert BranchesRel EQ2 to BranchesRelBisim EQ2
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | mu s body' =>
+        sorry
+      | «end» => simp only [EQ2F] at hf
+      | var _ => simp only [EQ2F] at hf
+      | recv _ _ => simp only [EQ2F] at hf
+    | recv p bs =>
+      cases y with
+      | recv q cs =>
+        simp only [EQ2F] at hf
+        have ⟨heq, hbr⟩ := hf
+        subst heq
+        apply BisimF.eq_recv CanRecv.base CanRecv.base
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | mu s body' =>
+        sorry
+      | «end» => simp only [EQ2F] at hf
+      | var _ => simp only [EQ2F] at hf
+      | send _ _ => simp only [EQ2F] at hf
+    | mu t body =>
+      cases y with
+      | mu s body' =>
+        -- EQ2F requires both unfolding pairs to be in EQ2
+        -- Need to determine observable behavior of both mus
+        sorry
+      | «end» =>
+        -- EQ2F EQ2 (mu t body) end = EQ2 (body.substitute t (mu t body)) end
+        -- The mu must unfold to end
+        sorry
+      | var v =>
+        sorry
+      | send q cs =>
+        sorry
+      | recv q cs =>
+        sorry
+  · -- Show EQ2 a b
+    exact h
+
 end RumpsteakV2.Protocol.CoTypes.Bisim
