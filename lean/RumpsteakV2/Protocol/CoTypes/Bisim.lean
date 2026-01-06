@@ -1299,32 +1299,125 @@ theorem unfold_non_mu {t : LocalTypeR} (h : ∀ x body, t ≠ .mu x body) :
 theorem unfold_mu (x : String) (body : LocalTypeR) :
     (LocalTypeR.mu x body).unfold = body.substitute x (.mu x body) := rfl
 
-/-- SubstUnfoldRel is a post-fixpoint of BisimF.
+/-- Closure of SubstUnfoldRel including Bisim for reflexive cases.
+    This is needed because SubstUnfoldRel is not reflexive, but for send/recv cases
+    both sides are identical (unfold is identity on send/recv). -/
+def SubstUnfoldClosure (var : String) (repl : LocalTypeR) : Rel :=
+  fun u v => SubstUnfoldRel var repl u v ∨ Bisim u v
 
-    This is the key lemma for proving unfold_substitute_EQ2.
+/-- SubstUnfoldClosure is a post-fixpoint of BisimF.
+    This is the key lemma for proving unfold_substitute_EQ2. -/
+theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
+    ∀ u v, SubstUnfoldClosure var repl u v →
+      BisimF (SubstUnfoldClosure var repl) u v := by
+  intro u v huv
+  cases huv with
+  | inl hSubst =>
+    -- Case: SubstUnfoldRel var repl u v
+    obtain ⟨t, hu, hv⟩ := hSubst
+    cases t with
+    | «end» =>
+      simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
+      subst hu hv
+      exact BisimF.eq_end UnfoldsToEnd.base UnfoldsToEnd.base
+    | var x =>
+      simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
+      by_cases heq : x = var
+      · -- x = var: LHS = repl.unfold, RHS = repl
+        subst heq
+        simp only [beq_self_eq_true, ↓reduceIte] at hu hv
+        subst hu hv
+        -- Use Bisim.refl: repl.unfold and repl are Bisim via EQ2
+        -- This needs the observable_of_closed axiom for closed repl
+        sorry  -- Requires showing repl.unfold ~ repl
+      · -- x ≠ var: both sides are .var x
+        have hne : (x == var) = false := by simp [heq]
+        simp only [hne] at hu hv
+        subst hu hv
+        exact BisimF.eq_var UnfoldsToVar.base UnfoldsToVar.base
+    | send p bs =>
+      -- t = .send p bs: both sides are .send p (substituteBranches bs var repl)
+      simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
+      subst hu hv
+      apply BisimF.eq_send CanSend.base CanSend.base
+      -- Both sides have identical branches, use Bisim.refl via closure
+      unfold BranchesRelBisim
+      induction bs with
+      | nil => exact List.Forall₂.nil
+      | cons b rest ih =>
+          simp only [LocalTypeR.substituteBranches]
+          apply List.Forall₂.cons
+          · constructor
+            · rfl
+            -- Use Bisim.refl_of_observable for the continuation (both sides are c.substitute var repl)
+            · exact Or.inr (Bisim.refl_of_observable sorry)
+          · exact ih
+    | recv p bs =>
+      -- t = .recv p bs: both sides are .recv p (substituteBranches bs var repl)
+      simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
+      subst hu hv
+      apply BisimF.eq_recv CanRecv.base CanRecv.base
+      unfold BranchesRelBisim
+      induction bs with
+      | nil => exact List.Forall₂.nil
+      | cons b rest ih =>
+          simp only [LocalTypeR.substituteBranches]
+          apply List.Forall₂.cons
+          · constructor
+            · rfl
+            · exact Or.inr (Bisim.refl_of_observable sorry)
+          · exact ih
+    | mu x body =>
+      -- t = .mu x body: the complex case
+      -- LHS: ((.mu x body).substitute var repl).unfold
+      -- RHS: ((.mu x body).unfold).substitute var repl
+      simp only [LocalTypeR.unfold] at hu hv
+      by_cases hshadow : x = var
+      · -- x = var: substitution is shadowed
+        have hsame : (x == var) = true := by simp [hshadow]
+        simp only [LocalTypeR.substitute, hsame, ↓reduceIte] at hu
+        -- LHS = (.mu x body).unfold = body.substitute x (.mu x body)
+        -- RHS = (body.substitute x (.mu x body)).substitute var repl
+        -- Since x = var, RHS substitutes var into the already-substituted body
+        subst hu hv
+        -- The key insight: (A.sub x B).sub x C = A.sub x C when x is the same variable
+        -- This is because substitution replaces all occurrences of x
+        sorry  -- Requires double-substitution lemma
+      · -- x ≠ var: substitution goes through
+        have hdiff : (x == var) = false := by simp [hshadow]
+        simp only [LocalTypeR.substitute, hdiff] at hu
+        -- LHS = (.mu x (body.substitute var repl)).unfold
+        --     = (body.substitute var repl).substitute x (.mu x (body.substitute var repl))
+        -- RHS = (body.substitute x (.mu x body)).substitute var repl
+        subst hu hv
+        -- These require substitution commutativity when x ≠ var
+        sorry  -- Requires substitution commutativity
+  | inr hBisim =>
+    -- Case: Bisim u v - use the existing Bisim post-fixpoint property
+    obtain ⟨R, hRpost, huv⟩ := hBisim
+    have hf : BisimF R u v := hRpost u v huv
+    -- Lift R to SubstUnfoldClosure via Bisim inclusion
+    have hlift : ∀ a b, R a b → SubstUnfoldClosure var repl a b :=
+      fun a b hab => Or.inr ⟨R, hRpost, hab⟩
+    exact BisimF.mono hlift u v hf
 
-    Note: This proof is complex due to mu-mu interactions. -/
-axiom SubstUnfoldRel_postfix (var : String) (repl : LocalTypeR) :
-    ∀ u v, SubstUnfoldRel var repl u v →
-      BisimF (SubstUnfoldRel var repl) u v
+/-- SubstUnfoldRel implies Bisim via the closure.
 
-/-- SubstUnfoldRel implies Bisim.
-
-    Once SubstUnfoldRel_postfix is proven, this follows directly. -/
+    Once SubstUnfoldClosure_postfix is proven, this follows directly. -/
 theorem SubstUnfoldRel_implies_Bisim (var : String) (repl : LocalTypeR)
     (t : LocalTypeR) :
     Bisim ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) := by
-  use SubstUnfoldRel var repl
+  use SubstUnfoldClosure var repl
   constructor
-  · exact SubstUnfoldRel_postfix var repl
-  · exact ⟨t, rfl, rfl⟩
+  · exact SubstUnfoldClosure_postfix var repl
+  · exact Or.inl ⟨t, rfl, rfl⟩
 
 /-- EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl).
 
     This eliminates the unfold_substitute_EQ2 axiom.
 
-    Proof: SubstUnfoldRel is a bisimulation, so the pair is in Bisim,
-    and Bisim.toEQ2 gives us EQ2. -/
+    Proof: SubstUnfoldRel is in SubstUnfoldClosure which is a bisimulation,
+    so the pair is in Bisim, and Bisim.toEQ2 gives us EQ2. -/
 theorem unfold_substitute_EQ2_via_Bisim (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
     EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) := by
   have hBisim := SubstUnfoldRel_implies_Bisim var repl t

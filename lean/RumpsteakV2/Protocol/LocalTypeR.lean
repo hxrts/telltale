@@ -76,6 +76,14 @@ mutual
           substituteBranches rest varName replacement
 end
 
+/-- substituteBranches is equivalent to mapping substitute over the continuations. -/
+theorem substituteBranches_eq_map (bs : List (Label × LocalTypeR)) (var : String) (repl : LocalTypeR) :
+    substituteBranches bs var repl = bs.map (fun (l, c) => (l, c.substitute var repl)) := by
+  induction bs with
+  | nil => rfl
+  | cons head tail ih =>
+      simp only [substituteBranches, List.map_cons, ih]
+
 /-- Unfold one level of recursion: μt.T ↦ T[μt.T/t]. -/
 def LocalTypeR.unfold : LocalTypeR → LocalTypeR
   | lt@(.mu t body) => body.substitute t lt
