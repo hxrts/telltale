@@ -1167,6 +1167,21 @@ axiom substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl : 
 axiom substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {repl : LocalTypeR}
     (h : UnfoldsToVar a v) (hne : v ≠ var) : UnfoldsToVar (a.substitute var repl) v
 
+/-- When both types unfold to the substituted variable, their substitutions are BisimF-related.
+
+    This is the key lemma for the eq_var case of substitute_compatible.
+
+    Semantic soundness: If both x and y unfold to `.var var`, then after substituting
+    `var → repl`, both become something that has the same observable behavior as `repl`.
+    Since they both "go through" repl, they are Bisim-equivalent.
+
+    The RelImage structure captures that both sides come from substitution of
+    related pairs (here, x and y which are R-related for some post-fixpoint R). -/
+axiom substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : LocalTypeR}
+    {R : Rel}
+    (hx : UnfoldsToVar x var) (hy : UnfoldsToVar y var) :
+    BisimF (RelImage (fun t => t.substitute var repl) R) (x.substitute var repl) (y.substitute var repl)
+
 /-- Substitution preserves CanSend. -/
 axiom substitute_preserves_CanSend {a : LocalTypeR} {var : String} {repl : LocalTypeR}
     {p : String} {bs : List (Label × LocalTypeR)}
@@ -1219,13 +1234,17 @@ theorem substitute_compatible (var : String) (repl : LocalTypeR) :
   | eq_var hx hy =>
     -- Both unfold to same var v
     -- After substitution: if v ≠ var, still unfolds to v; if v = var, unfolds to repl
-    -- Since both x and y unfold to same v, substitution treats them the same
-    -- If v = var, both become repl, and we need Observable repl
-    -- If v ≠ var, both still unfold to v
-    -- This case is tricky because we need to know if v = var or not
-    -- For now, we handle the v ≠ var case with the axiom
-    -- The v = var case would need mus_shared_observable on repl
-    sorry  -- Requires case split on v = var
+    rename_i v
+    by_cases heq : v = var
+    · -- Case: v = var, both become repl after substitution
+      -- Use substitute_at_var_bisim which gives us BisimF directly
+      have hx_eq : UnfoldsToVar x var := heq ▸ hx
+      have hy_eq : UnfoldsToVar y var := heq ▸ hy
+      exact substitute_at_var_bisimF hx_eq hy_eq
+    · -- Case: v ≠ var, both still unfold to v after substitution
+      have hx' := @substitute_preserves_UnfoldsToVar x var v repl hx heq
+      have hy' := @substitute_preserves_UnfoldsToVar y var v repl hy heq
+      exact BisimF.eq_var hx' hy'
   | eq_send hx hy hbr =>
     -- Both can send with R-related branches
     have hx' := @substitute_preserves_CanSend x var repl _ _ hx
