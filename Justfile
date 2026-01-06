@@ -13,11 +13,11 @@ ci-dry-run:
     just wasm-check
     # Golden file equivalence tests (fast, no Lean required)
     just test-golden
-    # Lean verification (sample + extended)
-    just rumpsteak-lean-check
-    just rumpsteak-lean-check-extended
-    # Negative check: intentional mismatch must fail
-    just rumpsteak-lean-check-failing
+    # Lean runner disabled - rumpsteak_runner target removed in V2 refactor
+    # TODO: Re-enable once V2 runner is implemented
+    # just rumpsteak-lean-check
+    # just rumpsteak-lean-check-extended
+    # just rumpsteak-lean-check-failing
 
 # Rust style guide lint check (comprehensive)
 lint:
