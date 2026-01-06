@@ -58,3 +58,7 @@ subject_reduction/
 # Mutation testing artifacts
 mutants.out/
 mutants.out.old/
+
+# QPF experiments
+QpfTypes/
+qpf4-example/
