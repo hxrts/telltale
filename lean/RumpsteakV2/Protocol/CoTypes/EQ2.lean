@@ -157,6 +157,11 @@ by EQ2, then R is still contained in EQ2. -/
 theorem EQ2.destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b :=
   EQ2_destruct h
 
+/-- Construct EQ2 from EQ2F EQ2 (inverse of destruct). -/
+theorem EQ2.construct {a b : LocalTypeR} (h : EQ2F EQ2 a b) : EQ2 a b := by
+  have hfix : EQ2F EQ2 = EQ2 := EQ2_fixed
+  exact Eq.mp (congrArg (fun R => R a b) hfix) h
+
 /-- EQ2F is monotone (public version for coinduction up-to proofs). -/
 theorem EQ2F.mono : Monotone EQ2F := EQ2F_mono
 

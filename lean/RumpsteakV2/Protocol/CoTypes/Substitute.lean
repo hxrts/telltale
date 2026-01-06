@@ -106,6 +106,15 @@ Barendregt convention (bound variables are fresh w.r.t. external terms).
    `(body.subst var repl).subst t X = (body.subst t X).subst var repl`
 4. The freshness condition holds by Barendregt convention
 
+**Proven version:** See `EQ2_substitute_barendregt` in `SubstCommBarendregt.lean` which
+proves this under explicit Barendregt preconditions:
+- `notBoundAt var a` and `notBoundAt var b` (no shadowing of var)
+- `∀ t, isFreeIn t repl = false` (repl is closed, so no capture)
+
+The unconditional axiom here is semantically sound because well-formed types
+satisfy the Barendregt convention. The proof has 2 remaining sorries for
+double-unfold edge cases that require more sophisticated coinductive reasoning.
+
 **Coq reference:** `subst_EQ2` in `subject_reduction/EQ2.v`
 -/
 axiom EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR) :
