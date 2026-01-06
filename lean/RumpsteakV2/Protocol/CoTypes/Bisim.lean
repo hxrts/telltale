@@ -527,25 +527,41 @@ theorem BranchesRelBisim.toEQ2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
     - Use the toEQ2 helpers to convert membership predicates to EQ2 proofs
     - Apply EQ2_coind -/
 theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
-  -- Use Bisim as the witness relation for coinduction
-  have hpost : ∀ x y, Bisim x y → EQ2F Bisim x y := by
-    intro x y ⟨R, hRpost, hxy⟩
+  -- Use EQ2_coind_upto which allows using EQ2 directly in the post-fixpoint proof
+  apply EQ2_coind_upto (R := Bisim)
+  · -- Show: ∀ x y, Bisim x y → EQ2F (EQ2_closure Bisim) x y
+    intro x y hBisim
+    obtain ⟨R, hRpost, hxy⟩ := hBisim
     have hf : BisimF R x y := hRpost x y hxy
     -- Case on BisimF to determine observable behavior
     cases hf with
     | eq_end hx hy =>
-      -- Both unfold to end
-      -- Need EQ2F Bisim x y, which for end cases is just True (for end,end)
-      -- But x might not be .end, just UnfoldsToEnd x
-      -- We need to show that EQ2F Bisim works through unfolding
-      sorry
+      -- Both unfold to end, so both are EQ2 to .end
+      have hxeq : EQ2 x .end := UnfoldsToEnd.toEQ2 hx
+      have hyeq : EQ2 y .end := UnfoldsToEnd.toEQ2 hy
+      -- EQ2 x y follows by transitivity through .end
+      have hxy_eq2 : EQ2 x y := EQ2_trans hxeq (EQ2_symm hyeq)
+      -- Lift EQ2F EQ2 to EQ2F (EQ2_closure Bisim) using monotonicity
+      have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
+      exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
     | eq_var hx hy =>
-      sorry
+      -- Both unfold to the same var
+      have hxeq : EQ2 x (.var _) := UnfoldsToVar.toEQ2 hx
+      have hyeq : EQ2 y (.var _) := UnfoldsToVar.toEQ2 hy
+      have hxy_eq2 : EQ2 x y := EQ2_trans hxeq (EQ2_symm hyeq)
+      have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
+      exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
     | eq_send hx hy hbr =>
+      -- Both can send to same partner with related branches
+      have hxeq : EQ2 x (.send _ _) := CanSend.toEQ2 hx
+      have hyeq : EQ2 y (.send _ _) := CanSend.toEQ2 hy
+      -- For the branches, we need to construct EQ2 for each pair
+      -- The branches in hbr are related by R, which implies Bisim
+      -- But we need to lift through the EQ2 chain...
       sorry
     | eq_recv hx hy hbr =>
       sorry
-  exact EQ2_coind hpost a b h
+  · exact h
 
 /-- Convert BranchesRel R to BranchesRelBisim R (same structure, just namespace difference). -/
 private theorem BranchesRel_to_BranchesRelBisim {R : Rel}
