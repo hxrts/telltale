@@ -472,6 +472,103 @@ end Bisim
 The membership predicates in BisimF correspond to unfolding behavior in EQ2F.
 We prove Bisim ↔ EQ2, which enables deriving EQ2_trans from Bisim.trans. -/
 
+/-- Convert BranchesRelBisim R to BranchesRel R (same structure, just namespace difference). -/
+private theorem BranchesRelBisim_to_BranchesRel {R : Rel}
+    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    BranchesRel R bs cs := by
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
+
+/-- Convert BranchesRel R to BranchesRelBisim R (same structure, just namespace difference). -/
+private theorem BranchesRel_to_BranchesRelBisim {R : Rel}
+    {bs cs : List (Label × LocalTypeR)} (h : BranchesRel R bs cs) :
+    BranchesRelBisim R bs cs := by
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
+
+/-- If two types can both send to the same partner with Bisim-related branches,
+    they are Bisim equivalent.
+
+    The proof constructs a witness relation that includes the pair plus all
+    continuation pairs from Bisim. -/
+theorem Bisim_of_same_send {a b : LocalTypeR} {p : String}
+    {bsa bsb : List (Label × LocalTypeR)}
+    (ha : CanSend a p bsa) (hb : CanSend b p bsb)
+    (hbr : BranchesRelBisim Bisim bsa bsb) : Bisim a b := by
+  -- Define witness relation: includes this pair + all Bisim pairs
+  let R : Rel := fun x y =>
+    (∃ p' bsa' bsb', CanSend x p' bsa' ∧ CanSend y p' bsb' ∧ BranchesRelBisim Bisim bsa' bsb') ∨
+    (∃ p' bsa' bsb', CanRecv x p' bsa' ∧ CanRecv y p' bsb' ∧ BranchesRelBisim Bisim bsa' bsb') ∨
+    Bisim x y
+  use R
+  constructor
+  · -- Show R is a post-fixpoint of BisimF
+    intro x y hxy
+    cases hxy with
+    | inl hSend =>
+      obtain ⟨p', bsa', bsb', hxSend, hySend, hbr'⟩ := hSend
+      -- Lift Bisim to R in the branches
+      have hbr_R : BranchesRelBisim R bsa' bsb' :=
+        BranchesRelBisim.mono (fun a b hBisim => Or.inr (Or.inr hBisim)) hbr'
+      exact BisimF.eq_send hxSend hySend hbr_R
+    | inr hRest =>
+      cases hRest with
+      | inl hRecv =>
+        obtain ⟨p', bsa', bsb', hxRecv, hyRecv, hbr'⟩ := hRecv
+        have hbr_R : BranchesRelBisim R bsa' bsb' :=
+          BranchesRelBisim.mono (fun a b hBisim => Or.inr (Or.inr hBisim)) hbr'
+        exact BisimF.eq_recv hxRecv hyRecv hbr_R
+      | inr hBisim =>
+        -- x and y are Bisim, extract witness and use its post-fixpoint property
+        obtain ⟨R', hR'post, hxy'⟩ := hBisim
+        have hf : BisimF R' x y := hR'post x y hxy'
+        -- Lift BisimF R' to BisimF R using monotonicity
+        -- R' ⊆ Bisim ⊆ R
+        have hR'_to_Bisim : ∀ a b, R' a b → Bisim a b := fun a b h => ⟨R', hR'post, h⟩
+        have hR'_to_R : ∀ a b, R' a b → R a b := fun a b h => Or.inr (Or.inr (hR'_to_Bisim a b h))
+        exact BisimF.mono hR'_to_R x y hf
+  · -- Show R a b via the send case
+    exact Or.inl ⟨p, bsa, bsb, ha, hb, hbr⟩
+
+/-- If two types can both recv from the same partner with Bisim-related branches,
+    they are Bisim equivalent. -/
+theorem Bisim_of_same_recv {a b : LocalTypeR} {p : String}
+    {bsa bsb : List (Label × LocalTypeR)}
+    (ha : CanRecv a p bsa) (hb : CanRecv b p bsb)
+    (hbr : BranchesRelBisim Bisim bsa bsb) : Bisim a b := by
+  -- Use same witness relation as Bisim_of_same_send
+  let R : Rel := fun x y =>
+    (∃ p' bsa' bsb', CanSend x p' bsa' ∧ CanSend y p' bsb' ∧ BranchesRelBisim Bisim bsa' bsb') ∨
+    (∃ p' bsa' bsb', CanRecv x p' bsa' ∧ CanRecv y p' bsb' ∧ BranchesRelBisim Bisim bsa' bsb') ∨
+    Bisim x y
+  use R
+  constructor
+  · -- Same post-fixpoint proof as Bisim_of_same_send
+    intro x y hxy
+    cases hxy with
+    | inl hSend =>
+      obtain ⟨p', bsa', bsb', hxSend, hySend, hbr'⟩ := hSend
+      have hbr_R : BranchesRelBisim R bsa' bsb' :=
+        BranchesRelBisim.mono (fun a b hBisim => Or.inr (Or.inr hBisim)) hbr'
+      exact BisimF.eq_send hxSend hySend hbr_R
+    | inr hRest =>
+      cases hRest with
+      | inl hRecv =>
+        obtain ⟨p', bsa', bsb', hxRecv, hyRecv, hbr'⟩ := hRecv
+        have hbr_R : BranchesRelBisim R bsa' bsb' :=
+          BranchesRelBisim.mono (fun a b hBisim => Or.inr (Or.inr hBisim)) hbr'
+        exact BisimF.eq_recv hxRecv hyRecv hbr_R
+      | inr hBisim =>
+        obtain ⟨R', hR'post, hxy'⟩ := hBisim
+        have hf : BisimF R' x y := hR'post x y hxy'
+        have hR'_to_Bisim : ∀ a b, R' a b → Bisim a b := fun a b h => ⟨R', hR'post, h⟩
+        have hR'_to_R : ∀ a b, R' a b → R a b := fun a b h => Or.inr (Or.inr (hR'_to_Bisim a b h))
+        exact BisimF.mono hR'_to_R x y hf
+  · -- Show R a b via the recv case
+    exact Or.inr (Or.inl ⟨p, bsa, bsb, ha, hb, hbr⟩)
+
 /-- Helper: unfolds-to-end implies EQ2 to .end through unfolding.
     If a unfolds to end, then EQ2 a .end (since unfolding preserves EQ2). -/
 theorem UnfoldsToEnd.toEQ2 {a : LocalTypeR} (h : UnfoldsToEnd a) :
@@ -551,25 +648,153 @@ theorem Bisim.toEQ2 {a b : LocalTypeR} (h : Bisim a b) : EQ2 a b := by
       have hxy_eq2 : EQ2 x y := EQ2_trans hxeq (EQ2_symm hyeq)
       have hf_eq2 : EQ2F EQ2 x y := EQ2.destruct hxy_eq2
       exact EQ2F.mono (fun _ _ h => Or.inr h) x y hf_eq2
-    | eq_send hx hy hbr =>
-      -- Both can send to same partner with related branches
-      have hxeq : EQ2 x (.send _ _) := CanSend.toEQ2 hx
-      have hyeq : EQ2 y (.send _ _) := CanSend.toEQ2 hy
-      -- For the branches, we need to construct EQ2 for each pair
-      -- The branches in hbr are related by R, which implies Bisim
-      -- But we need to lift through the EQ2 chain...
-      sorry
-    | eq_recv hx hy hbr =>
-      sorry
+    | @eq_send _ _ partner bsa bsb hx hy hbr =>
+      -- Key insight: R ⊆ Bisim since R is a post-fixpoint of BisimF
+      have hR_to_Bisim : ∀ a b, R a b → Bisim a b := fun a b hr => ⟨R, hRpost, hr⟩
+      -- Lift branches to EQ2_closure Bisim
+      have hbr_closure : BranchesRelBisim (EQ2_closure Bisim) bsa bsb :=
+        BranchesRelBisim.mono (fun a b h => Or.inl (hR_to_Bisim a b h)) hbr
+      -- Convert to BranchesRel for EQ2F (extracted as helper to avoid induction scope issues)
+      have hbr_rel : BranchesRel (EQ2_closure Bisim) bsa bsb :=
+        BranchesRelBisim_to_BranchesRel hbr_closure
+      -- Case on the actual constructors of x and y
+      -- Lift branch relation to Bisim for use in Bisim_of_same_send/recv
+      have hbr_bisim : BranchesRelBisim Bisim bsa bsb :=
+        BranchesRelBisim.mono (fun a b h => hR_to_Bisim a b h) hbr
+      cases hx with
+      | base =>
+        -- x = send partner bsa directly
+        cases hy with
+        | base =>
+          -- y = send partner bsb directly
+          -- EQ2F at (send, send) = (partner = partner) ∧ BranchesRel closure bsa bsb
+          -- simp reduces partner = partner to True since they're definitionally equal
+          simp only [EQ2F]
+          exact ⟨trivial, hbr_rel⟩
+        | @mu s body _ _ hinner =>
+          -- y = mu s body, need EQ2F closure (send partner bsa) (mu s body)
+          -- which is: closure (send partner bsa) (body.substitute s (mu s body))
+          simp only [EQ2F, EQ2_closure]
+          -- Both can send to partner with related branches, so they're Bisim
+          have hBisim := Bisim_of_same_send CanSend.base hinner hbr_bisim
+          exact Or.inl hBisim
+      | @mu t body _ _ hinner =>
+        -- x = mu t body, need EQ2F closure (mu t body) y
+        -- Must case on hy to make y concrete for the match to reduce
+        cases hy with
+        | base =>
+          -- y = send partner bsb
+          simp only [EQ2F, EQ2_closure]
+          have hBisim := Bisim_of_same_send hinner CanSend.base hbr_bisim
+          exact Or.inl hBisim
+        | @mu s body' _ _ hinner' =>
+          -- y = mu s body'
+          -- EQ2F at (mu, mu) = closure pair ∧ closure pair
+          simp only [EQ2F, EQ2_closure]
+          constructor
+          · have hBisim := Bisim_of_same_send hinner (CanSend.mu hinner') hbr_bisim
+            exact Or.inl hBisim
+          · have hBisim := Bisim_of_same_send (CanSend.mu hinner) hinner' hbr_bisim
+            exact Or.inl hBisim
+    | @eq_recv _ _ partner bsa bsb hx hy hbr =>
+      -- Similar to eq_send with recv
+      have hR_to_Bisim : ∀ a b, R a b → Bisim a b := fun a b hr => ⟨R, hRpost, hr⟩
+      have hbr_closure : BranchesRelBisim (EQ2_closure Bisim) bsa bsb :=
+        BranchesRelBisim.mono (fun a b h => Or.inl (hR_to_Bisim a b h)) hbr
+      have hbr_rel : BranchesRel (EQ2_closure Bisim) bsa bsb :=
+        BranchesRelBisim_to_BranchesRel hbr_closure
+      have hbr_bisim : BranchesRelBisim Bisim bsa bsb :=
+        BranchesRelBisim.mono (fun a b h => hR_to_Bisim a b h) hbr
+      cases hx with
+      | base =>
+        cases hy with
+        | base =>
+          simp only [EQ2F]
+          exact ⟨trivial, hbr_rel⟩
+        | @mu s body _ _ hinner =>
+          simp only [EQ2F, EQ2_closure]
+          have hBisim := Bisim_of_same_recv CanRecv.base hinner hbr_bisim
+          exact Or.inl hBisim
+      | @mu t body _ _ hinner =>
+        -- x = mu t body, need EQ2F closure (mu t body) y
+        -- Must case on hy to make y concrete for the match to reduce
+        cases hy with
+        | base =>
+          -- y = recv partner bsb
+          simp only [EQ2F, EQ2_closure]
+          have hBisim := Bisim_of_same_recv hinner CanRecv.base hbr_bisim
+          exact Or.inl hBisim
+        | @mu s body' _ _ hinner' =>
+          -- y = mu s body'
+          -- EQ2F at (mu, mu) = closure pair ∧ closure pair
+          simp only [EQ2F, EQ2_closure]
+          constructor
+          · have hBisim := Bisim_of_same_recv hinner (CanRecv.mu hinner') hbr_bisim
+            exact Or.inl hBisim
+          · have hBisim := Bisim_of_same_recv (CanRecv.mu hinner) hinner' hbr_bisim
+            exact Or.inl hBisim
   · exact h
 
-/-- Convert BranchesRel R to BranchesRelBisim R (same structure, just namespace difference). -/
-private theorem BranchesRel_to_BranchesRelBisim {R : Rel}
-    {bs cs : List (Label × LocalTypeR)} (h : BranchesRel R bs cs) :
-    BranchesRelBisim R bs cs := by
+/-! ## Observable Behavior Extraction from EQ2
+
+These lemmas extract observable behavior from EQ2 proofs. They are needed for EQ2.toBisim.
+The proofs use well-founded recursion on muHeight, showing that EQ2 to a base type
+implies unfolding to that base type. -/
+
+/-- If EQ2 .end x, then x unfolds to end.
+
+    Proof strategy: Well-founded recursion on muHeight of x.
+    - Base cases (end, var, send, recv): EQ2.destruct gives contradiction or direct proof
+    - Mu case: EQ2.destruct gives EQ2 end (body.substitute...). By IH on the substitution
+      (which may have lower muHeight due to unguardedness), get UnfoldsToEnd of substitution.
+      Then conclude via UnfoldsToEnd.mu. -/
+axiom EQ2.end_right_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x
+
+/-- If EQ2 x .end, then x unfolds to end. -/
+theorem EQ2.end_left_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 x .end) : UnfoldsToEnd x :=
+  EQ2.end_right_implies_UnfoldsToEnd (EQ2_symm h)
+
+/-- If EQ2 (.var v) x, then x unfolds to var v. -/
+axiom EQ2.var_right_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
+    (h : EQ2 (.var v) x) : UnfoldsToVar x v
+
+/-- If EQ2 x (.var v), then x unfolds to var v. -/
+theorem EQ2.var_left_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
+    (h : EQ2 x (.var v)) : UnfoldsToVar x v :=
+  EQ2.var_right_implies_UnfoldsToVar (EQ2_symm h)
+
+/-- If EQ2 (.send p bs) x, then x can send to p with EQ2-related branches. -/
+axiom EQ2.send_right_implies_CanSend {x : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (h : EQ2 (.send p bs) x) :
+    ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs
+
+/-- Flip BranchesRel with symmetric relation. -/
+private theorem BranchesRel_flip {as bs : List (Label × LocalTypeR)}
+    (h : BranchesRel EQ2 as bs) : BranchesRel EQ2 bs as := by
   induction h with
   | nil => exact List.Forall₂.nil
-  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1.symm, EQ2_symm hbc.2⟩ ih
+
+/-- If EQ2 x (.send p cs), then x can send to p with EQ2-related branches. -/
+theorem EQ2.send_left_implies_CanSend {x : LocalTypeR} {p : String}
+    {cs : List (Label × LocalTypeR)} (h : EQ2 x (.send p cs)) :
+    ∃ bs, CanSend x p bs ∧ BranchesRel EQ2 bs cs := by
+  have hsymm := EQ2_symm h
+  obtain ⟨bs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend hsymm
+  exact ⟨bs, hcan, BranchesRel_flip hbr⟩
+
+/-- If EQ2 (.recv p bs) x, then x can recv from p with EQ2-related branches. -/
+axiom EQ2.recv_right_implies_CanRecv {x : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (h : EQ2 (.recv p bs) x) :
+    ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs
+
+/-- If EQ2 x (.recv p cs), then x can recv from p with EQ2-related branches. -/
+theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
+    {cs : List (Label × LocalTypeR)} (h : EQ2 x (.recv p cs)) :
+    ∃ bs, CanRecv x p bs ∧ BranchesRel EQ2 bs cs := by
+  have hsymm := EQ2_symm h
+  obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv hsymm
+  exact ⟨bs, hcan, BranchesRel_flip hbr⟩
 
 /-- EQ2 implies Bisim.
 
@@ -579,7 +804,7 @@ private theorem BranchesRel_to_BranchesRelBisim {R : Rel}
     Proof idea:
     - Use EQ2 as the witness relation for Bisim
     - Show EQ2 is a post-fixpoint of BisimF by destruct-ing EQ2 to EQ2F
-    - Convert EQ2F structure to membership predicates -/
+    - Convert EQ2F structure to membership predicates using the extraction lemmas -/
 theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
   -- Use EQ2 as the witness relation
   use EQ2
@@ -593,10 +818,9 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
       cases y with
       | «end» => exact BisimF.eq_end UnfoldsToEnd.base UnfoldsToEnd.base
       | mu s body' =>
-        -- EQ2F EQ2 end (mu s body') = EQ2 end (body'.substitute s (mu s body'))
-        -- Need to show BisimF EQ2 end (mu s body')
-        -- end unfolds to end, (mu s body') must also unfold to end for EQ2 to hold
-        sorry
+        -- y must unfold to end since EQ2 end y
+        have hUnfold := EQ2.end_right_implies_UnfoldsToEnd hxy
+        exact BisimF.eq_end UnfoldsToEnd.base hUnfold
       | var _ => simp only [EQ2F] at hf
       | send _ _ => simp only [EQ2F] at hf
       | recv _ _ => simp only [EQ2F] at hf
@@ -607,7 +831,9 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
         subst hf
         exact BisimF.eq_var UnfoldsToVar.base UnfoldsToVar.base
       | mu s body' =>
-        sorry
+        -- y must unfold to var v since EQ2 (var v) y
+        have hUnfold := EQ2.var_right_implies_UnfoldsToVar hxy
+        exact BisimF.eq_var UnfoldsToVar.base hUnfold
       | «end» => simp only [EQ2F] at hf
       | send _ _ => simp only [EQ2F] at hf
       | recv _ _ => simp only [EQ2F] at hf
@@ -621,7 +847,10 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
         -- Convert BranchesRel EQ2 to BranchesRelBisim EQ2
         exact BranchesRel_to_BranchesRelBisim hbr
       | mu s body' =>
-        sorry
+        -- y must be able to send since EQ2 (send p bs) y
+        obtain ⟨cs, hCanSend, hbr⟩ := EQ2.send_right_implies_CanSend hxy
+        apply BisimF.eq_send CanSend.base hCanSend
+        exact BranchesRel_to_BranchesRelBisim hbr
       | «end» => simp only [EQ2F] at hf
       | var _ => simp only [EQ2F] at hf
       | recv _ _ => simp only [EQ2F] at hf
@@ -634,26 +863,52 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
         apply BisimF.eq_recv CanRecv.base CanRecv.base
         exact BranchesRel_to_BranchesRelBisim hbr
       | mu s body' =>
-        sorry
+        -- y must be able to recv since EQ2 (recv p bs) y
+        obtain ⟨cs, hCanRecv, hbr⟩ := EQ2.recv_right_implies_CanRecv hxy
+        apply BisimF.eq_recv CanRecv.base hCanRecv
+        exact BranchesRel_to_BranchesRelBisim hbr
       | «end» => simp only [EQ2F] at hf
       | var _ => simp only [EQ2F] at hf
       | send _ _ => simp only [EQ2F] at hf
     | mu t body =>
       cases y with
       | mu s body' =>
-        -- EQ2F requires both unfolding pairs to be in EQ2
-        -- Need to determine observable behavior of both mus
+        -- Both mus - use EQ2.destruct to get the unfolding pairs
+        simp only [EQ2F] at hf
+        have ⟨h1, h2⟩ := hf
+        -- h1 : EQ2 (body.substitute t (mu t body)) (mu s body')
+        -- h2 : EQ2 (mu t body) (body'.substitute s (mu s body'))
+        --
+        -- Proof strategy for (mu, mu) case:
+        -- 1. Both mus are EQ2 to their respective substitutions
+        -- 2. By observable_of_closed (axiom), closed mus have observable behavior
+        -- 3. Case on Observable (mu t body):
+        --    - UnfoldsToEnd: h2 gives EQ2 (mu t body) (body'.substitute...), use extraction
+        --    - UnfoldsToVar: similar
+        --    - CanSend/CanRecv: use extraction lemmas on h1 and h2
+        -- 4. For each case, extract the matching observable behavior from h1 or h2
+        --
+        -- This requires proving that substitutions preserve closedness, which is
+        -- needed for observable_of_closed. Currently blocked on this dependency.
         sorry
       | «end» =>
-        -- EQ2F EQ2 (mu t body) end = EQ2 (body.substitute t (mu t body)) end
-        -- The mu must unfold to end
-        sorry
+        -- x must unfold to end since EQ2 x end
+        have hUnfold := EQ2.end_left_implies_UnfoldsToEnd hxy
+        exact BisimF.eq_end hUnfold UnfoldsToEnd.base
       | var v =>
-        sorry
+        -- x must unfold to var v since EQ2 x (var v)
+        have hUnfold := EQ2.var_left_implies_UnfoldsToVar hxy
+        exact BisimF.eq_var hUnfold UnfoldsToVar.base
       | send q cs =>
-        sorry
+        -- x must be able to send since EQ2 x (send q cs)
+        obtain ⟨bs, hCanSend, hbr⟩ := EQ2.send_left_implies_CanSend hxy
+        apply BisimF.eq_send hCanSend CanSend.base
+        exact BranchesRel_to_BranchesRelBisim hbr
       | recv q cs =>
-        sorry
+        -- x must be able to recv since EQ2 x (recv q cs)
+        obtain ⟨bs, hCanRecv, hbr⟩ := EQ2.recv_left_implies_CanRecv hxy
+        apply BisimF.eq_recv hCanRecv CanRecv.base
+        exact BranchesRel_to_BranchesRelBisim hbr
   · -- Show EQ2 a b
     exact h
 
