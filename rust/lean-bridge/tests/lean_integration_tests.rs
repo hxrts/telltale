@@ -492,12 +492,15 @@ fn test_lean_binary_available_for_ci() {
     LeanRunner::require_available();
 
     // Verify we can actually create a runner
-    let runner = LeanRunner::new().expect("Lean runner should be constructable after require_available()");
+    let runner =
+        LeanRunner::new().expect("Lean runner should be constructable after require_available()");
 
     // Run a minimal validation to confirm the binary works
     let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "msg")]);
     let program = build_program_json("A", &[("send", "B", "msg")]);
 
-    let result = runner.validate(&choreo, &program).expect("Lean validation should work");
+    let result = runner
+        .validate(&choreo, &program)
+        .expect("Lean validation should work");
     assert!(result.success, "Basic validation should pass");
 }

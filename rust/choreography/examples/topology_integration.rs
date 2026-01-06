@@ -92,9 +92,7 @@ fn demonstrate_custom_topology() {
     );
     println!(
         "    Location of Bob:   {:?}",
-        handler
-            .get_location(&RoleName::from_static("Bob"))
-            .unwrap()
+        handler.get_location(&RoleName::from_static("Bob")).unwrap()
     );
     println!(
         "    Location of Carol: {:?}",
@@ -183,10 +181,7 @@ fn demonstrate_role_validation() {
     let constrained_topology = TopologyBuilder::new()
         .local_role(RoleName::from_static("Alice"))
         .local_role(RoleName::from_static("Bob"))
-        .colocated(
-            RoleName::from_static("Alice"),
-            RoleName::from_static("Bob"),
-        )
+        .colocated(RoleName::from_static("Alice"), RoleName::from_static("Bob"))
         .build();
 
     println!("\n  Topology with constraints:");

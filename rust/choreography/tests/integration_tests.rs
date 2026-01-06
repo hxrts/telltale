@@ -169,7 +169,8 @@ fn test_complex_multi_feature_protocol() {
                 // Expected for dynamic roles without runtime bindings
                 println!(
                     "Expected projection error for {}: {:?}",
-                    role.name(), projection_error
+                    role.name(),
+                    projection_error
                 );
             }
         }

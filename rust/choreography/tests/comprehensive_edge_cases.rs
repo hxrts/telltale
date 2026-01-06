@@ -357,7 +357,8 @@ fn test_complex_projection_with_dynamic_roles() {
                 // Projection may fail for dynamic roles without bindings - ensure error is reasonable
                 println!(
                     "Expected projection error for dynamic role {}: {:?}",
-                    role.name(), err
+                    role.name(),
+                    err
                 );
             }
         }

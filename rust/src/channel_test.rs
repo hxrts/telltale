@@ -44,7 +44,7 @@ fn test_nil_is_sealed_always_false() {
 
 #[test]
 fn test_nil_default_and_clone() {
-    let nil1 = Nil::default();
+    let nil1 = Nil;
     let nil2 = nil1;
     assert_eq!(nil1, nil2);
 }

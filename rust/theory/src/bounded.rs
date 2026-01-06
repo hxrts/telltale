@@ -147,8 +147,7 @@ fn bound_with_yield_after_impl(
             } else {
                 let mut bounded_branches = Vec::with_capacity(branches.len());
                 for (label, cont) in branches {
-                    let (bounded, _) =
-                        bound_with_yield_after_impl(cont, max_steps, new_current);
+                    let (bounded, _) = bound_with_yield_after_impl(cont, max_steps, new_current);
                     bounded_branches.push((label.clone(), bounded));
                 }
                 (
@@ -168,8 +167,7 @@ fn bound_with_yield_after_impl(
             } else {
                 let mut bounded_branches = Vec::with_capacity(branches.len());
                 for (label, cont) in branches {
-                    let (bounded, _) =
-                        bound_with_yield_after_impl(cont, max_steps, new_current);
+                    let (bounded, _) = bound_with_yield_after_impl(cont, max_steps, new_current);
                     bounded_branches.push((label.clone(), bounded));
                 }
                 (

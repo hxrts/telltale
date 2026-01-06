@@ -96,7 +96,13 @@ async fn test_interpreter_simple_send_program() {
     let mut endpoint = ();
 
     let program = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "hello".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "hello".into(),
+            },
+        )
         .end();
 
     let result = interpret(&mut handler, &mut endpoint, program)
@@ -111,21 +117,30 @@ async fn test_interpreter_simple_send_program() {
 
 #[tokio::test]
 async fn test_interpreter_send_recv_sequence() {
-    use rumpsteak_aura_choreography::effects::interpreter::testing::{MockResponse, MockOperation};
+    use rumpsteak_aura_choreography::effects::interpreter::testing::{MockOperation, MockResponse};
 
     let mut handler = MockHandler::new(TestRole::Alice);
 
     // Script the response for the recv operation (same type as send for Program consistency)
-    let response = Request { id: 100, payload: "reply".into() };
+    let response = Request {
+        id: 100,
+        payload: "reply".into(),
+    };
     handler.add_response(MockResponse::Message(
-        bincode::serialize(&response).unwrap()
+        bincode::serialize(&response).unwrap(),
     ));
 
     let mut endpoint = ();
 
     // Note: Program<R, M> requires consistent message type M
     let program = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "query".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "query".into(),
+            },
+        )
         .recv::<Request>(TestRole::Bob)
         .end();
 
@@ -152,7 +167,7 @@ async fn test_interpreter_send_recv_sequence() {
 
 #[tokio::test]
 async fn test_interpreter_choose_offer_sequence() {
-    use rumpsteak_aura_choreography::effects::interpreter::testing::{MockResponse, MockOperation};
+    use rumpsteak_aura_choreography::effects::interpreter::testing::{MockOperation, MockResponse};
 
     let mut handler = MockHandler::new(TestRole::Bob);
 
@@ -162,9 +177,7 @@ async fn test_interpreter_choose_offer_sequence() {
     let mut endpoint = ();
 
     // Bob offers and receives Alice's choice
-    let program: Program<TestRole, Request> = Program::new()
-        .offer(TestRole::Alice)
-        .end();
+    let program: Program<TestRole, Request> = Program::new().offer(TestRole::Alice).end();
 
     let result = interpret(&mut handler, &mut endpoint, program)
         .await
@@ -193,9 +206,7 @@ async fn test_interpreter_recv_error_becomes_failed_state() {
     // Don't add a response - recv will fail
     let mut endpoint = ();
 
-    let program: Program<TestRole, Request> = Program::new()
-        .recv::<Request>(TestRole::Bob)
-        .end();
+    let program: Program<TestRole, Request> = Program::new().recv::<Request>(TestRole::Bob).end();
 
     let result: InterpretResult<Request> = interpret(&mut handler, &mut endpoint, program)
         .await
@@ -218,9 +229,7 @@ async fn test_interpreter_offer_error_becomes_failed_state() {
     // Don't add a response - offer will fail
     let mut endpoint = ();
 
-    let program: Program<TestRole, Request> = Program::new()
-        .offer(TestRole::Alice)
-        .end();
+    let program: Program<TestRole, Request> = Program::new().offer(TestRole::Alice).end();
 
     let result: InterpretResult<Request> = interpret(&mut handler, &mut endpoint, program)
         .await
@@ -245,8 +254,12 @@ async fn test_trace_middleware_wraps_handler() {
     let mut endpoint = ();
 
     // Send through traced handler
-    let msg = Request { id: 1, payload: "test".into() };
-    traced.send(&mut endpoint, TestRole::Bob, &msg)
+    let msg = Request {
+        id: 1,
+        payload: "test".into(),
+    };
+    traced
+        .send(&mut endpoint, TestRole::Bob, &msg)
         .await
         .expect("Send should succeed");
 
@@ -260,7 +273,15 @@ async fn test_trace_middleware_with_custom_prefix() {
     let mut traced = Trace::with_prefix(inner, "custom-prefix");
     let mut endpoint = ();
 
-    traced.send(&mut endpoint, TestRole::Bob, &Request { id: 1, payload: "x".into() })
+    traced
+        .send(
+            &mut endpoint,
+            TestRole::Bob,
+            &Request {
+                id: 1,
+                payload: "x".into(),
+            },
+        )
         .await
         .unwrap();
 }
@@ -272,7 +293,8 @@ async fn test_trace_middleware_choose_offer() {
     let mut endpoint = ();
 
     // Choose should work through trace
-    traced.choose(&mut endpoint, TestRole::Bob, TestLabel::Option1)
+    traced
+        .choose(&mut endpoint, TestRole::Bob, TestLabel::Option1)
         .await
         .expect("Choose should succeed");
 }
@@ -286,37 +308,40 @@ async fn test_in_memory_handler_bidirectional_protocol() {
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));
 
-    let mut alice = InMemoryHandler::with_channels(
-        TestRole::Alice,
-        channels.clone(),
-        choice_channels.clone(),
-    );
-    let mut bob = InMemoryHandler::with_channels(
-        TestRole::Bob,
-        channels.clone(),
-        choice_channels.clone(),
-    );
+    let mut alice =
+        InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
+    let mut bob =
+        InMemoryHandler::with_channels(TestRole::Bob, channels.clone(), choice_channels.clone());
 
     // Alice sends request
-    let request = Request { id: 42, payload: "hello".into() };
-    alice.send(&mut (), TestRole::Bob, &request)
+    let request = Request {
+        id: 42,
+        payload: "hello".into(),
+    };
+    alice
+        .send(&mut (), TestRole::Bob, &request)
         .await
         .expect("Alice send should succeed");
 
     // Bob receives request
-    let received_request: Request = bob.recv(&mut (), TestRole::Alice)
+    let received_request: Request = bob
+        .recv(&mut (), TestRole::Alice)
         .await
         .expect("Bob recv should succeed");
     assert_eq!(received_request, request);
 
     // Bob sends response
-    let response = Response { id: 42, result: 100 };
+    let response = Response {
+        id: 42,
+        result: 100,
+    };
     bob.send(&mut (), TestRole::Alice, &response)
         .await
         .expect("Bob send should succeed");
 
     // Alice receives response
-    let received_response: Response = alice.recv(&mut (), TestRole::Bob)
+    let received_response: Response = alice
+        .recv(&mut (), TestRole::Bob)
         .await
         .expect("Alice recv should succeed");
     assert_eq!(received_response, response);
@@ -329,24 +354,20 @@ async fn test_in_memory_handler_choice_protocol() {
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));
 
-    let mut alice = InMemoryHandler::with_channels(
-        TestRole::Alice,
-        channels.clone(),
-        choice_channels.clone(),
-    );
-    let mut bob = InMemoryHandler::with_channels(
-        TestRole::Bob,
-        channels.clone(),
-        choice_channels.clone(),
-    );
+    let mut alice =
+        InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
+    let mut bob =
+        InMemoryHandler::with_channels(TestRole::Bob, channels.clone(), choice_channels.clone());
 
     // Alice makes a choice
-    alice.choose(&mut (), TestRole::Bob, TestLabel::Accept)
+    alice
+        .choose(&mut (), TestRole::Bob, TestLabel::Accept)
         .await
         .expect("Alice choose should succeed");
 
     // Bob receives the choice
-    let label = bob.offer(&mut (), TestRole::Alice)
+    let label = bob
+        .offer(&mut (), TestRole::Alice)
         .await
         .expect("Bob offer should succeed");
 
@@ -358,16 +379,10 @@ async fn test_in_memory_handler_three_party_protocol() {
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));
 
-    let mut alice = InMemoryHandler::with_channels(
-        TestRole::Alice,
-        channels.clone(),
-        choice_channels.clone(),
-    );
-    let mut bob = InMemoryHandler::with_channels(
-        TestRole::Bob,
-        channels.clone(),
-        choice_channels.clone(),
-    );
+    let mut alice =
+        InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
+    let mut bob =
+        InMemoryHandler::with_channels(TestRole::Bob, channels.clone(), choice_channels.clone());
     let mut charlie = InMemoryHandler::with_channels(
         TestRole::Charlie,
         channels.clone(),
@@ -375,12 +390,28 @@ async fn test_in_memory_handler_three_party_protocol() {
     );
 
     // Alice -> Bob
-    alice.send(&mut (), TestRole::Bob, &Request { id: 1, payload: "to bob".into() })
+    alice
+        .send(
+            &mut (),
+            TestRole::Bob,
+            &Request {
+                id: 1,
+                payload: "to bob".into(),
+            },
+        )
         .await
         .unwrap();
 
     // Alice -> Charlie
-    alice.send(&mut (), TestRole::Charlie, &Request { id: 2, payload: "to charlie".into() })
+    alice
+        .send(
+            &mut (),
+            TestRole::Charlie,
+            &Request {
+                id: 2,
+                payload: "to charlie".into(),
+            },
+        )
         .await
         .unwrap();
 
@@ -411,29 +442,29 @@ async fn test_traced_in_memory_handler() {
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));
 
-    let alice_inner = InMemoryHandler::with_channels(
-        TestRole::Alice,
-        channels.clone(),
-        choice_channels.clone(),
-    );
-    let bob_inner = InMemoryHandler::with_channels(
-        TestRole::Bob,
-        channels.clone(),
-        choice_channels.clone(),
-    );
+    let alice_inner =
+        InMemoryHandler::with_channels(TestRole::Alice, channels.clone(), choice_channels.clone());
+    let bob_inner =
+        InMemoryHandler::with_channels(TestRole::Bob, channels.clone(), choice_channels.clone());
 
     // Wrap handlers with tracing
     let mut alice = Trace::with_prefix(alice_inner, "alice");
     let mut bob = Trace::with_prefix(bob_inner, "bob");
 
     // Run a simple protocol through traced handlers
-    alice.send(&mut (), TestRole::Bob, &Request { id: 1, payload: "test".into() })
+    alice
+        .send(
+            &mut (),
+            TestRole::Bob,
+            &Request {
+                id: 1,
+                payload: "test".into(),
+            },
+        )
         .await
         .unwrap();
 
-    let msg: Request = bob.recv(&mut (), TestRole::Alice)
-        .await
-        .unwrap();
+    let msg: Request = bob.recv(&mut (), TestRole::Alice).await.unwrap();
 
     assert_eq!(msg.id, 1);
 }
@@ -445,8 +476,20 @@ async fn test_traced_in_memory_handler() {
 #[test]
 fn test_program_send_count() {
     let program: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "a".into() })
-        .send(TestRole::Charlie, Request { id: 2, payload: "b".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "a".into(),
+            },
+        )
+        .send(
+            TestRole::Charlie,
+            Request {
+                id: 2,
+                payload: "b".into(),
+            },
+        )
         .end();
 
     assert_eq!(program.send_count(), 2);
@@ -466,7 +509,13 @@ fn test_program_recv_count() {
 #[test]
 fn test_program_roles_involved() {
     let program: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "x".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "x".into(),
+            },
+        )
         .recv::<Request>(TestRole::Charlie)
         .choose(TestRole::Alice, TestLabel::Ok)
         .end();
@@ -482,13 +531,25 @@ fn test_program_has_timeouts() {
     use std::time::Duration;
 
     let program_no_timeout: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "x".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "x".into(),
+            },
+        )
         .end();
 
     assert!(!program_no_timeout.has_timeouts());
 
     let inner: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "x".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "x".into(),
+            },
+        )
         .end();
 
     let program_with_timeout: Program<TestRole, Request> = Program::new()
@@ -501,21 +562,38 @@ fn test_program_has_timeouts() {
 #[test]
 fn test_program_has_parallel() {
     let program_no_parallel: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "x".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "x".into(),
+            },
+        )
         .end();
 
     assert!(!program_no_parallel.has_parallel());
 
     let p1: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "a".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "a".into(),
+            },
+        )
         .end();
     let p2: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Charlie, Request { id: 2, payload: "b".into() })
+        .send(
+            TestRole::Charlie,
+            Request {
+                id: 2,
+                payload: "b".into(),
+            },
+        )
         .end();
 
-    let program_with_parallel: Program<TestRole, Request> = Program::new()
-        .parallel(vec![p1, p2])
-        .end();
+    let program_with_parallel: Program<TestRole, Request> =
+        Program::new().parallel(vec![p1, p2]).end();
 
     assert!(program_with_parallel.has_parallel());
 }
@@ -532,19 +610,39 @@ async fn test_interpreter_multi_step_protocol() {
 
     // Script responses for each recv (using Request type to match Program<_, Request>)
     handler.add_response(MockResponse::Message(
-        bincode::serialize(&Request { id: 10, payload: "response1".into() }).unwrap()
+        bincode::serialize(&Request {
+            id: 10,
+            payload: "response1".into(),
+        })
+        .unwrap(),
     ));
     handler.add_response(MockResponse::Message(
-        bincode::serialize(&Request { id: 20, payload: "response2".into() }).unwrap()
+        bincode::serialize(&Request {
+            id: 20,
+            payload: "response2".into(),
+        })
+        .unwrap(),
     ));
 
     let mut endpoint = ();
 
     // Note: Program<R, M> has single message type M, so we use Request for all
     let program: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "first".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "first".into(),
+            },
+        )
         .recv::<Request>(TestRole::Bob)
-        .send(TestRole::Bob, Request { id: 2, payload: "second".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 2,
+                payload: "second".into(),
+            },
+        )
         .recv::<Request>(TestRole::Bob)
         .end();
 
@@ -567,12 +665,16 @@ async fn test_interpreter_loop_effect() {
 
     // Create a loop that sends 3 times
     let body: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 0, payload: "loop".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 0,
+                payload: "loop".into(),
+            },
+        )
         .end();
 
-    let program: Program<TestRole, Request> = Program::new()
-        .loop_n(3, body)
-        .end();
+    let program: Program<TestRole, Request> = Program::new().loop_n(3, body).end();
 
     let result = interpret(&mut handler, &mut endpoint, program)
         .await
@@ -595,15 +697,25 @@ async fn test_interpreter_parallel_effect() {
     let mut endpoint = ();
 
     let p1: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Bob, Request { id: 1, payload: "to bob".into() })
+        .send(
+            TestRole::Bob,
+            Request {
+                id: 1,
+                payload: "to bob".into(),
+            },
+        )
         .end();
     let p2: Program<TestRole, Request> = Program::new()
-        .send(TestRole::Charlie, Request { id: 2, payload: "to charlie".into() })
+        .send(
+            TestRole::Charlie,
+            Request {
+                id: 2,
+                payload: "to charlie".into(),
+            },
+        )
         .end();
 
-    let program = Program::new()
-        .parallel(vec![p1, p2])
-        .end();
+    let program = Program::new().parallel(vec![p1, p2]).end();
 
     let result = interpret(&mut handler, &mut endpoint, program)
         .await

@@ -136,20 +136,6 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
         }
     });
 
-    #[cfg(feature = "serialize")]
-    {
-        let mut where_clause = where_clause.cloned().unwrap_or_else(|| parse_quote!(where));
-        where_clause.predicates.push(parse_quote!(Self: 'static));
-
-        output.extend(quote! {
-            impl #impl_generics ::rumpsteak_aura::serialize::Serialize for #ident #ty_generics #where_clause {
-                fn serialize(s: &mut ::rumpsteak_aura::serialize::Serializer) {
-                    <#field_ty as ::rumpsteak_aura::serialize::Serialize>::serialize(s);
-                }
-            }
-        });
-    }
-
     Ok(quote!(#input #output))
 }
 
@@ -217,20 +203,6 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
         parse_quote!('__r, __R: ::rumpsteak_aura::Role),
     );
     let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
-
-    #[cfg(feature = "serialize")]
-    {
-        let mut where_clause = where_clause.cloned().unwrap_or_else(|| parse_quote!(where));
-        where_clause.predicates.push(parse_quote!(Self: 'static));
-
-        output.extend(quote! {
-            impl #impl_generics ::rumpsteak_aura::serialize::SerializeChoices for #ident #ty_generics #where_clause {
-                fn serialize_choices(mut s: ::rumpsteak_aura::serialize::ChoicesSerializer<'_>) {
-                    #(s.serialize_choice::<#labels, #tys>();)*
-                }
-            }
-        });
-    }
 
     let mut generics = input.generics.clone();
     generics.make_where_clause().predicates.push(parse_quote! {

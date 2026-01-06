@@ -564,6 +564,7 @@ impl EquivalenceChecker {
     }
 
     /// Check if two JSON values are structurally equal (ignoring formatting).
+    #[allow(clippy::only_used_in_recursion)]
     fn json_structurally_equal(&self, a: &Value, b: &Value) -> bool {
         match (a, b) {
             (Value::Null, Value::Null) => true,

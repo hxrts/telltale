@@ -218,8 +218,7 @@ impl HeapCommitment {
             .collect();
         let resource_tree = MerkleTree::from_leaves(resource_leaves);
 
-        let nullifier_leaves: Vec<[u8; 32]> =
-            heap.consumed_ids().map(|rid| rid.hash()).collect();
+        let nullifier_leaves: Vec<[u8; 32]> = heap.consumed_ids().map(|rid| rid.hash()).collect();
         let nullifier_tree = MerkleTree::from_leaves(nullifier_leaves);
 
         Self {

@@ -1,5 +1,7 @@
+//! Double buffering example demonstrating concurrent data transfer.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
+#![allow(missing_docs)]
 
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},

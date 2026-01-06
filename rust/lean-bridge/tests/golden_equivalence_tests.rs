@@ -37,7 +37,8 @@ fn load_input(test_name: &str) -> rumpsteak_types::GlobalType {
         .join("projection")
         .join(test_name)
         .join("input.json");
-    let content = std::fs::read_to_string(&path).expect(&format!("Failed to read {:?}", path));
+    let content =
+        std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read {:?}", path));
     let json: serde_json::Value = serde_json::from_str(&content).expect("Failed to parse JSON");
     json_to_global(&json).expect("Failed to convert to GlobalType")
 }

@@ -153,7 +153,11 @@ impl ChoreoHandler for TestHandler {
         Ok(())
     }
 
-    async fn offer(&mut self, _ep: &mut Self::Endpoint, _from: Self::Role) -> ChoreoResult<TestLabel> {
+    async fn offer(
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        _from: Self::Role,
+    ) -> ChoreoResult<TestLabel> {
         Ok(TestLabel::Default)
     }
 

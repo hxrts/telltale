@@ -19,10 +19,7 @@ pub enum Effect<R: RoleId, M> {
     Recv { from: R, msg_tag: MessageTag },
 
     /// Make an internal choice and broadcast the label
-    Choose {
-        at: R,
-        label: <R as RoleId>::Label,
-    },
+    Choose { at: R, label: <R as RoleId>::Label },
 
     /// Wait for an external choice from another role
     Offer { from: R },
@@ -141,6 +138,7 @@ pub struct ProgramBuilder<R: RoleId, M> {
 impl<R: RoleId, M> Program<R, M> {
     /// Create a new program builder.
     #[must_use]
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> ProgramBuilder<R, M> {
         ProgramBuilder::new()
     }
@@ -194,6 +192,12 @@ impl<R: RoleId, M> Program<R, M> {
     #[must_use]
     pub fn len(&self) -> usize {
         self.effects.len()
+    }
+}
+
+impl<R: RoleId, M> Default for ProgramBuilder<R, M> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

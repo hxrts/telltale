@@ -24,6 +24,7 @@ pub enum LogLevel {
     Error,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum DummyRole {
     Global,

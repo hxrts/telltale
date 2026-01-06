@@ -477,21 +477,21 @@ mod feature_inheritance_tests {
         let worker_role = choreography
             .roles
             .iter()
-            .find(|r| r.name().to_string() == "Worker")
+            .find(|r| *r.name() == "Worker")
             .unwrap();
         assert!(worker_role.param().is_some());
 
         let client_role = choreography
             .roles
             .iter()
-            .find(|r| r.name().to_string() == "Client")
+            .find(|r| *r.name() == "Client")
             .unwrap();
         assert!(client_role.param().is_some());
 
         let manager_role = choreography
             .roles
             .iter()
-            .find(|r| r.name().to_string() == "Manager")
+            .find(|r| *r.name() == "Manager")
             .unwrap();
         assert!(manager_role.param().is_none());
     }
@@ -543,8 +543,8 @@ mod feature_inheritance_tests {
             Protocol::Broadcast { from, to_all, .. } => {
                 assert_eq!(from.name(), "Server");
                 assert_eq!(to_all.len(), 2);
-                assert!(to_all.iter().any(|r| r.name().to_string() == "Client1"));
-                assert!(to_all.iter().any(|r| r.name().to_string() == "Client2"));
+                assert!(to_all.iter().any(|r| *r.name() == "Client1"));
+                assert!(to_all.iter().any(|r| *r.name() == "Client2"));
             }
             _ => panic!("Expected broadcast protocol"),
         }
@@ -581,7 +581,7 @@ mod feature_inheritance_tests {
         let worker_role = choreography
             .roles
             .iter()
-            .find(|r| r.name().to_string() == "Worker")
+            .find(|r| *r.name() == "Worker")
             .unwrap();
         assert!(worker_role.param().is_some());
 
@@ -1089,7 +1089,7 @@ mod regression_tests {
         let worker_role = choreography
             .roles
             .iter()
-            .find(|r| r.name().to_string() == "Worker")
+            .find(|r| *r.name() == "Worker")
             .unwrap();
         assert!(worker_role.param().is_some());
     }

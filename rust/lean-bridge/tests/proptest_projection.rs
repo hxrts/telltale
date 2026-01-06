@@ -88,7 +88,8 @@ fn simple_global_strategy() -> impl Strategy<Value = GlobalType> {
             role_strategy(),
             label_strategy()
         )
-            .prop_filter("no self-comm", |(s1, r1, _, s2, r2, _)| s1 != r1 && s2 != r2)
+            .prop_filter("no self-comm", |(s1, r1, _, s2, r2, _)| s1 != r1
+                && s2 != r2)
             .prop_map(|(s1, r1, l1, s2, r2, l2)| {
                 GlobalType::comm(
                     &s1,
@@ -139,19 +140,11 @@ fn choice_with_continuation_strategy() -> impl Strategy<Value = GlobalType> {
                 vec![
                     (
                         l1,
-                        GlobalType::comm(
-                            &sender,
-                            &receiver,
-                            vec![(cont1, GlobalType::End)],
-                        ),
+                        GlobalType::comm(&sender, &receiver, vec![(cont1, GlobalType::End)]),
                     ),
                     (
                         l2,
-                        GlobalType::comm(
-                            &sender,
-                            &receiver,
-                            vec![(cont2, GlobalType::End)],
-                        ),
+                        GlobalType::comm(&sender, &receiver, vec![(cont2, GlobalType::End)]),
                     ),
                 ],
             )
@@ -289,7 +282,13 @@ fn test_sender_gets_send_receiver_gets_recv() {
     // Generate single-communication global types
     let strategy = (role_strategy(), role_strategy(), label_strategy())
         .prop_filter("sender != receiver", |(s, r, _)| s != r)
-        .prop_map(|(s, r, l)| (s.clone(), r.clone(), GlobalType::comm(&s, &r, vec![(l, GlobalType::End)])));
+        .prop_map(|(s, r, l)| {
+            (
+                s.clone(),
+                r.clone(),
+                GlobalType::comm(&s, &r, vec![(l, GlobalType::End)]),
+            )
+        });
 
     for _ in 0..30 {
         let (sender, receiver, global) = strategy
@@ -308,7 +307,8 @@ fn test_sender_gets_send_receiver_gets_recv() {
         );
 
         // Receiver should see Recv
-        let receiver_local = project(&global, &receiver).expect("Receiver projection should succeed");
+        let receiver_local =
+            project(&global, &receiver).expect("Receiver projection should succeed");
         assert!(
             matches!(&receiver_local, LocalTypeR::Recv { partner, .. } if partner == &sender),
             "Receiver {} should see Recv from {}, got {:?}",
@@ -333,7 +333,9 @@ fn test_choice_projections_have_all_branches() {
         label_strategy(),
         label_strategy(),
     )
-        .prop_filter("valid choice", |(s, r, l1, l2)| s != r && l1.name != l2.name)
+        .prop_filter("valid choice", |(s, r, l1, l2)| {
+            s != r && l1.name != l2.name
+        })
         .prop_map(|(s, r, l1, l2)| {
             (
                 s.clone(),
@@ -366,7 +368,8 @@ fn test_choice_projections_have_all_branches() {
         }
 
         // Receiver should see both branches in Recv
-        let receiver_local = project(&global, &receiver).expect("Receiver projection should succeed");
+        let receiver_local =
+            project(&global, &receiver).expect("Receiver projection should succeed");
         if let LocalTypeR::Recv { branches, .. } = receiver_local {
             let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
             assert!(
@@ -410,7 +413,9 @@ fn test_choice_continuations_preserved() {
                 match lt {
                     LocalTypeR::End | LocalTypeR::Var(_) => depth > 0,
                     LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                        branches.iter().all(|(_, cont)| has_nested_action(cont, depth + 1))
+                        branches
+                            .iter()
+                            .all(|(_, cont)| has_nested_action(cont, depth + 1))
                     }
                     LocalTypeR::Mu { body, .. } => has_nested_action(body, depth),
                 }
@@ -493,7 +498,9 @@ fn test_rust_projection_matches_lean_choice() {
         label_strategy(),
         label_strategy(),
     )
-        .prop_filter("valid choice", |(s, r, l1, l2)| s != r && l1.name != l2.name)
+        .prop_filter("valid choice", |(s, r, l1, l2)| {
+            s != r && l1.name != l2.name
+        })
         .prop_map(|(s, r, l1, l2)| {
             GlobalType::comm(&s, &r, vec![(l1, GlobalType::End), (l2, GlobalType::End)])
         });
@@ -572,10 +579,17 @@ fn test_choice_continuation_bug_fix_against_lean() {
             for (label, cont) in branches {
                 // Each branch should have a Recv continuation, not End
                 match cont {
-                    LocalTypeR::Recv { partner: recv_partner, branches: recv_branches } => {
+                    LocalTypeR::Recv {
+                        partner: recv_partner,
+                        branches: recv_branches,
+                    } => {
                         assert_eq!(recv_partner, "Server");
                         assert_eq!(recv_branches.len(), 1);
-                        let expected_label = if label.name == "success" { "AuthToken" } else { "AuthError" };
+                        let expected_label = if label.name == "success" {
+                            "AuthToken"
+                        } else {
+                            "AuthError"
+                        };
                         assert_eq!(recv_branches[0].0.name, expected_label);
                     }
                     LocalTypeR::End => {
@@ -584,7 +598,10 @@ fn test_choice_continuation_bug_fix_against_lean() {
                             label.name
                         );
                     }
-                    other => panic!("Unexpected continuation for branch {}: {:?}", label.name, other),
+                    other => panic!(
+                        "Unexpected continuation for branch {}: {:?}",
+                        label.name, other
+                    ),
                 }
             }
         }
@@ -603,10 +620,17 @@ fn test_choice_continuation_bug_fix_against_lean() {
             for (label, cont) in branches {
                 // Each branch should have a Send continuation, not End
                 match cont {
-                    LocalTypeR::Send { partner: send_partner, branches: send_branches } => {
+                    LocalTypeR::Send {
+                        partner: send_partner,
+                        branches: send_branches,
+                    } => {
                         assert_eq!(send_partner, "Client");
                         assert_eq!(send_branches.len(), 1);
-                        let expected_label = if label.name == "success" { "AuthToken" } else { "AuthError" };
+                        let expected_label = if label.name == "success" {
+                            "AuthToken"
+                        } else {
+                            "AuthError"
+                        };
                         assert_eq!(send_branches[0].0.name, expected_label);
                     }
                     LocalTypeR::End => {
@@ -615,7 +639,10 @@ fn test_choice_continuation_bug_fix_against_lean() {
                             label.name
                         );
                     }
-                    other => panic!("Unexpected continuation for branch {}: {:?}", label.name, other),
+                    other => panic!(
+                        "Unexpected continuation for branch {}: {:?}",
+                        label.name, other
+                    ),
                 }
             }
         }
@@ -652,7 +679,8 @@ fn multiway_choice_strategy() -> impl Strategy<Value = GlobalType> {
     )
         .prop_filter("valid multiway choice", |(s, r, labels)| {
             s != r && {
-                let names: std::collections::HashSet<_> = labels.iter().map(|l| l.name.as_str()).collect();
+                let names: std::collections::HashSet<_> =
+                    labels.iter().map(|l| l.name.as_str()).collect();
                 names.len() == labels.len() // all distinct
             }
         })
@@ -793,7 +821,11 @@ fn test_deep_nesting_projections() {
                 match lt {
                     LocalTypeR::End | LocalTypeR::Var(_) => 0,
                     LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                        1 + branches.iter().map(|(_, c)| count_depth(c)).max().unwrap_or(0)
+                        1 + branches
+                            .iter()
+                            .map(|(_, c)| count_depth(c))
+                            .max()
+                            .unwrap_or(0)
                     }
                     LocalTypeR::Mu { body, .. } => count_depth(body),
                 }
@@ -985,13 +1017,19 @@ fn test_projection_json_export_consistency() {
 
         // Export to JSON and verify structure
         let global_json = global_to_json(&global);
-        assert!(global_json.get("kind").is_some(), "Global JSON should have 'kind' field");
+        assert!(
+            global_json.get("kind").is_some(),
+            "Global JSON should have 'kind' field"
+        );
 
         for role in global.roles() {
             let local = project(&global, &role).expect("Projection should succeed");
             let local_json = local_to_json(&local);
 
-            assert!(local_json.get("kind").is_some(), "Local JSON should have 'kind' field");
+            assert!(
+                local_json.get("kind").is_some(),
+                "Local JSON should have 'kind' field"
+            );
         }
     }
 }

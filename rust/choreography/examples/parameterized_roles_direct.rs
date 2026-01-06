@@ -24,7 +24,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Roles:");
     for role in &choreography.roles {
         if let Some(size) = role.array_size() {
-            println!("    - {} (array size: {})", role.name(), quote::quote!(#size));
+            println!(
+                "    - {} (array size: {})",
+                role.name(),
+                quote::quote!(#size)
+            );
         } else if role.index().is_some() {
             println!("    - {}[{}]", role.name(), role.index().unwrap());
         } else {

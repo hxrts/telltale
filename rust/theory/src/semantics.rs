@@ -157,13 +157,11 @@ fn can_step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> bool {
             branches,
         } => {
             // comm_head: direct match at head position
-            if sender == &act.sender && receiver == &act.receiver {
-                if branches
-                    .iter()
-                    .any(|(l, _)| l.name == act.label.name)
-                {
-                    return true;
-                }
+            if sender == &act.sender
+                && receiver == &act.receiver
+                && branches.iter().any(|(l, _)| l.name == act.label.name)
+            {
+                return true;
             }
 
             // comm_async: skip this communication if unrelated to receiver
@@ -313,13 +311,9 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
         LocalTypeR::Send { partner, branches } => {
             if act.kind == LocalKind::Send {
                 // send_head: direct match
-                if partner == &act.partner {
-                    if branches
-                        .iter()
-                        .any(|(l, _)| l.name == act.label.name)
-                    {
-                        return true;
-                    }
+                if partner == &act.partner && branches.iter().any(|(l, _)| l.name == act.label.name)
+                {
+                    return true;
                 }
 
                 // send_async: skip if different partner
@@ -335,13 +329,11 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
         }
         LocalTypeR::Recv { partner, branches } => {
             // recv_head: direct match
-            if act.kind == LocalKind::Recv && partner == &act.partner {
-                if branches
-                    .iter()
-                    .any(|(l, _)| l.name == act.label.name)
-                {
-                    return true;
-                }
+            if act.kind == LocalKind::Recv
+                && partner == &act.partner
+                && branches.iter().any(|(l, _)| l.name == act.label.name)
+            {
+                return true;
             }
             // Note: recv blocks - no async skip through recv
             false

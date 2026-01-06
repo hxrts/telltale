@@ -37,6 +37,11 @@ impl<T> NonEmptyVec<T> {
         self.0.len()
     }
 
+    /// NonEmptyVec is never empty by construction
+    pub fn is_empty(&self) -> bool {
+        false
+    }
+
     pub fn first(&self) -> &T {
         &self.0[0]
     }

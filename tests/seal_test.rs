@@ -1,4 +1,6 @@
-// Test file to verify session sealing works correctly
+//! Tests for session sealing functionality.
+#![allow(missing_docs)]
+#![allow(clippy::let_underscore_must_use)]
 
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -125,14 +127,8 @@ fn test_is_sealed_consistency_before_and_after() {
     let Roles(mut a, mut b) = Roles::default();
 
     // Before session, roles should not be sealed
-    assert!(
-        !a.is_sealed(),
-        "Role A should not be sealed before session"
-    );
-    assert!(
-        !b.is_sealed(),
-        "Role B should not be sealed before session"
-    );
+    assert!(!a.is_sealed(), "Role A should not be sealed before session");
+    assert!(!b.is_sealed(), "Role B should not be sealed before session");
 
     executor::block_on(async {
         let _: Result<_> = try_join!(
@@ -190,8 +186,14 @@ fn test_multiple_messages_before_seal() {
         .map(|_| ());
     });
 
-    assert!(a.is_sealed(), "Role A should be sealed after multi-message session");
-    assert!(b.is_sealed(), "Role B should be sealed after multi-message session");
+    assert!(
+        a.is_sealed(),
+        "Role A should be sealed after multi-message session"
+    );
+    assert!(
+        b.is_sealed(),
+        "Role B should be sealed after multi-message session"
+    );
 }
 
 #[test]

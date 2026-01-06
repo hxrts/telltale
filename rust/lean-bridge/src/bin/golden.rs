@@ -159,12 +159,20 @@ fn cmd_add(golden_dir: &PathBuf, name: &str, json: &str) -> anyhow::Result<()> {
     checker.write_golden_bundle(name, &bundle)?;
 
     println!("Added test case: {}", name);
-    println!("  Roles: {}", bundle.projections.keys().cloned().collect::<Vec<_>>().join(", "));
+    println!(
+        "  Roles: {}",
+        bundle
+            .projections
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     Ok(())
 }
 
 /// List all golden test cases.
-fn cmd_list(golden_dir: &PathBuf) -> anyhow::Result<()> {
+fn cmd_list(golden_dir: &std::path::Path) -> anyhow::Result<()> {
     let projection_dir = golden_dir.join("projection");
 
     if !projection_dir.exists() {

@@ -167,8 +167,11 @@ async fn test_multiple_independent_exchanges() {
             channels.clone(),
             choice_channels.clone(),
         );
-        let mut bob =
-            InMemoryHandler::with_channels(TestRole::Bob, channels.clone(), choice_channels.clone());
+        let mut bob = InMemoryHandler::with_channels(
+            TestRole::Bob,
+            channels.clone(),
+            choice_channels.clone(),
+        );
 
         let msg = SimpleMessage { value: i };
         alice
@@ -256,8 +259,11 @@ async fn test_label_with_special_characters() {
             channels.clone(),
             choice_channels.clone(),
         );
-        let mut bob =
-            InMemoryHandler::with_channels(TestRole::Bob, channels.clone(), choice_channels.clone());
+        let mut bob = InMemoryHandler::with_channels(
+            TestRole::Bob,
+            channels.clone(),
+            choice_channels.clone(),
+        );
 
         alice
             .send(&mut (), TestRole::Bob, expected)

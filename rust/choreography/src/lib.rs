@@ -43,9 +43,9 @@ pub use compiler::{
 pub use effects::middleware::{Metrics, Retry, Trace};
 pub use effects::NoOpHandler;
 pub use effects::{
-    interpret, ChoreoHandler, ChoreoHandlerExt, ChoreographyError, Effect, Endpoint,
-    InterpretResult, InterpreterState, LabelId, MessageTag, Program, ProgramBuilder, ProgramMessage,
-    ChoreoResult, RoleId,
+    interpret, ChoreoHandler, ChoreoHandlerExt, ChoreoResult, ChoreographyError, Effect, Endpoint,
+    InterpretResult, InterpreterState, LabelId, MessageTag, Program, ProgramBuilder,
+    ProgramMessage, RoleId,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
 pub use effects::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
@@ -155,6 +155,7 @@ mod tests {
     use crate::identifiers::RoleName;
 
     // Simple test role type for unit tests
+    #[allow(dead_code)]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     enum TestRole {
         Alice,

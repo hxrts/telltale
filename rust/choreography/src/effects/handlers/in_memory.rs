@@ -15,14 +15,17 @@ use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, RoleId};
 
 type MessageChannelPair = (UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>);
 type ChoiceChannelPair<L> = (UnboundedSender<L>, UnboundedReceiver<L>);
+type MessageChannelMap<R> = std::sync::Arc<std::sync::Mutex<HashMap<(R, R), MessageChannelPair>>>;
+type ChoiceChannelMap<R, L> =
+    std::sync::Arc<std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair<L>>>>;
 
 /// In-memory handler for testing - uses tokio channels
 pub struct InMemoryHandler<R: RoleId> {
     role: R,
     // Channel map for sending/receiving messages between roles
-    channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), MessageChannelPair>>>,
+    channels: MessageChannelMap<R>,
     // Choice channel for broadcasting/receiving choice labels
-    choice_channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair<R::Label>>>>,
+    choice_channels: ChoiceChannelMap<R, R::Label>,
 }
 
 impl<R: RoleId> InMemoryHandler<R> {
@@ -37,10 +40,8 @@ impl<R: RoleId> InMemoryHandler<R> {
     /// Create a new handler with shared channels for coordinated testing
     pub fn with_channels(
         role: R,
-        channels: std::sync::Arc<std::sync::Mutex<HashMap<(R, R), MessageChannelPair>>>,
-        choice_channels: std::sync::Arc<
-            std::sync::Mutex<HashMap<(R, R), ChoiceChannelPair<R::Label>>>,
-        >,
+        channels: MessageChannelMap<R>,
+        choice_channels: ChoiceChannelMap<R, R::Label>,
     ) -> Self {
         Self {
             role,

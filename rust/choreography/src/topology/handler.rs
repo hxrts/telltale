@@ -275,9 +275,7 @@ mod tests {
             Location::Local
         );
         assert_eq!(
-            handler
-                .get_location(&RoleName::from_static("Bob"))
-                .unwrap(),
+            handler.get_location(&RoleName::from_static("Bob")).unwrap(),
             Location::Remote(crate::identifiers::Endpoint::new("localhost:8080").unwrap())
         );
     }

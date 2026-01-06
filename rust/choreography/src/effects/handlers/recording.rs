@@ -20,10 +20,7 @@ pub struct RecordingHandler<R: RoleId> {
 pub enum RecordedEvent<R: RoleId> {
     Send { from: R, to: R, msg_type: String },
     Recv { from: R, to: R, msg_type: String },
-    Choose {
-        at: R,
-        label: <R as RoleId>::Label,
-    },
+    Choose { at: R, label: <R as RoleId>::Label },
     Offer { from: R, to: R },
 }
 

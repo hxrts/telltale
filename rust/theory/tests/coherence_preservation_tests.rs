@@ -21,8 +21,9 @@ fn well_formed_global(depth: usize) -> BoxedStrategy<GlobalType> {
     } else {
         prop_oneof![
             // Simple send
-            (any::<u8>(), any::<u8>(), well_formed_global(depth - 1))
-                .prop_filter_map("distinct roles", |(a, b, cont)| {
+            (any::<u8>(), any::<u8>(), well_formed_global(depth - 1)).prop_filter_map(
+                "distinct roles",
+                |(a, b, cont)| {
                     let sender = format!("Role{}", a % 4);
                     let receiver = format!("Role{}", b % 4);
                     if sender != receiver {
@@ -30,7 +31,8 @@ fn well_formed_global(depth: usize) -> BoxedStrategy<GlobalType> {
                     } else {
                         None
                     }
-                }),
+                }
+            ),
             // Binary choice with distinct labels
             (
                 any::<u8>(),
@@ -45,10 +47,7 @@ fn well_formed_global(depth: usize) -> BoxedStrategy<GlobalType> {
                         Some(GlobalType::comm(
                             sender,
                             receiver,
-                            vec![
-                                (Label::new("yes"), c1),
-                                (Label::new("no"), c2),
-                            ],
+                            vec![(Label::new("yes"), c1), (Label::new("no"), c2)],
                         ))
                     } else {
                         None
@@ -99,10 +98,7 @@ fn well_formed_local(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     let partner = format!("Role{}", p % 4);
                     LocalTypeR::send_choice(
                         partner,
-                        vec![
-                            (Label::new("left"), c1),
-                            (Label::new("right"), c2),
-                        ],
+                        vec![(Label::new("left"), c1), (Label::new("right"), c2)],
                     )
                 }),
             // Recv choice
@@ -115,10 +111,7 @@ fn well_formed_local(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     let partner = format!("Role{}", p % 4);
                     LocalTypeR::recv_choice(
                         partner,
-                        vec![
-                            (Label::new("left"), c1),
-                            (Label::new("right"), c2),
-                        ],
+                        vec![(Label::new("left"), c1), (Label::new("right"), c2)],
                     )
                 }),
         ]
@@ -591,11 +584,7 @@ fn test_merge_branch_choices() {
 fn test_recursive_merge() {
     let lt = LocalTypeR::mu(
         "t",
-        LocalTypeR::send(
-            "B",
-            Label::new("msg"),
-            LocalTypeR::var("t"),
-        ),
+        LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("t")),
     );
 
     // Merging identical recursive types should work

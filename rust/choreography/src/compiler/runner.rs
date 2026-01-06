@@ -147,7 +147,10 @@ impl RecursionContext {
 /// (send, recv, choose, offer) as appropriate.
 ///
 /// Used by both `generate_runner_fn` and `typed_runner::generate_typed_runner`.
-pub(crate) fn generate_runner_body(local_type: &LocalType, ctx: &mut RecursionContext) -> TokenStream {
+pub(crate) fn generate_runner_body(
+    local_type: &LocalType,
+    ctx: &mut RecursionContext,
+) -> TokenStream {
     match local_type {
         LocalType::Send {
             to,
@@ -625,9 +628,15 @@ fn collect_branch_labels(local_type: &LocalType, labels: &mut BTreeSet<String>) 
         }
         LocalType::Send { continuation, .. }
         | LocalType::Receive { continuation, .. }
-        | LocalType::Loop { body: continuation, .. }
-        | LocalType::Rec { body: continuation, .. }
-        | LocalType::Timeout { body: continuation, .. } => {
+        | LocalType::Loop {
+            body: continuation, ..
+        }
+        | LocalType::Rec {
+            body: continuation, ..
+        }
+        | LocalType::Timeout {
+            body: continuation, ..
+        } => {
             collect_branch_labels(continuation, labels);
         }
         LocalType::Var(_) | LocalType::End => {}

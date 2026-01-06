@@ -62,10 +62,7 @@ pub(crate) fn parse_protocol_body(
                     });
                 }
                 let parsed_roles = parse_roles_from_pair(item, input)?;
-                declared_roles = parsed_roles
-                    .iter()
-                    .map(|r| r.name().to_string())
-                    .collect();
+                declared_roles = parsed_roles.iter().map(|r| r.name().to_string()).collect();
                 roles = Some(parsed_roles);
             }
             _ => {
@@ -164,11 +161,11 @@ fn parse_annotated_stmt(
     input: &str,
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
-    let mut inner = pair.into_inner();
+    let inner = pair.into_inner();
     let mut annotations: HashMap<String, String> = HashMap::new();
 
     // Parse all annotations
-    while let Some(item) = inner.next() {
+    for item in inner {
         match item.as_rule() {
             Rule::annotation => {
                 let annotation_kind = item

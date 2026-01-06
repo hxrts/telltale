@@ -269,8 +269,7 @@ fn test_runtime_role_binding() {
     role_bindings.insert("N".to_string(), 5u32);
 
     // Test validation with bindings
-    let bound_workers =
-        Role::with_param(format_ident!("Workers"), RoleParam::Static(5)).unwrap();
+    let bound_workers = Role::with_param(format_ident!("Workers"), RoleParam::Static(5)).unwrap();
     assert_eq!(bound_workers.get_static_count(), Some(5));
 
     // Test that runtime roles require bounds checking
@@ -321,8 +320,7 @@ fn test_role_family_matching() {
         RoleIndex::Symbolic("i".to_string()),
     )
     .unwrap();
-    let worker_wildcard =
-        Role::with_index(format_ident!("Worker"), RoleIndex::Wildcard).unwrap();
+    let worker_wildcard = Role::with_index(format_ident!("Worker"), RoleIndex::Wildcard).unwrap();
 
     // Test family matching
     assert!(worker_instance.matches_family(&worker_array));

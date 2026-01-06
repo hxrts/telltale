@@ -73,7 +73,8 @@ fn simple_global_strategy() -> impl Strategy<Value = GlobalType> {
             role_strategy(),
             label_strategy()
         )
-            .prop_filter("no self-comm", |(s1, r1, _, s2, r2, _)| s1 != r1 && s2 != r2)
+            .prop_filter("no self-comm", |(s1, r1, _, s2, r2, _)| s1 != r1
+                && s2 != r2)
             .prop_map(|(s1, r1, l1, s2, r2, l2)| {
                 GlobalType::comm(
                     &s1,
@@ -85,13 +86,20 @@ fn simple_global_strategy() -> impl Strategy<Value = GlobalType> {
 }
 
 /// Strategy for generating simple LocalTypes (non-recursive).
+#[allow(dead_code)]
 fn simple_local_strategy() -> impl Strategy<Value = LocalTypeR> {
     prop_oneof![
         Just(LocalTypeR::End),
-        (role_strategy(), label_strategy())
-            .prop_map(|(p, l)| LocalTypeR::send(&p, l, LocalTypeR::End)),
-        (role_strategy(), label_strategy())
-            .prop_map(|(p, l)| LocalTypeR::recv(&p, l, LocalTypeR::End)),
+        (role_strategy(), label_strategy()).prop_map(|(p, l)| LocalTypeR::send(
+            &p,
+            l,
+            LocalTypeR::End
+        )),
+        (role_strategy(), label_strategy()).prop_map(|(p, l)| LocalTypeR::recv(
+            &p,
+            l,
+            LocalTypeR::End
+        )),
     ]
 }
 
@@ -148,7 +156,10 @@ fn test_can_step_async_reorder() {
     let g = GlobalType::send("A", "B", Label::new("m1"), inner);
 
     let act = GlobalAction::new("C", "D", Label::new("m2"));
-    assert!(can_step(&g, &act), "Async action should skip unrelated comm");
+    assert!(
+        can_step(&g, &act),
+        "Async action should skip unrelated comm"
+    );
 }
 
 #[test]
@@ -159,7 +170,10 @@ fn test_can_step_async_blocked_same_receiver() {
     let g = GlobalType::send("A", "B", Label::new("m1"), inner);
 
     let act = GlobalAction::new("C", "B", Label::new("m2"));
-    assert!(!can_step(&g, &act), "Action with same receiver should block");
+    assert!(
+        !can_step(&g, &act),
+        "Action with same receiver should block"
+    );
 }
 
 #[test]
@@ -209,7 +223,11 @@ fn test_step_async() {
     let result = step(&g, &act);
 
     let expected = GlobalType::send("A", "B", Label::new("m1"), GlobalType::End);
-    assert_eq!(result, Some(expected), "Should step inner and preserve outer");
+    assert_eq!(
+        result,
+        Some(expected),
+        "Should step inner and preserve outer"
+    );
 }
 
 #[test]
@@ -345,7 +363,10 @@ fn test_consume_proof_wrong_sender() {
 fn test_reduces_simple() {
     let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
-    assert!(reduces(&g, &GlobalType::End), "Should reduce to continuation");
+    assert!(
+        reduces(&g, &GlobalType::End),
+        "Should reduce to continuation"
+    );
 }
 
 #[test]
@@ -354,14 +375,20 @@ fn test_reduces_choice() {
         "A",
         "B",
         vec![
-            (Label::new("yes"), GlobalType::send("B", "C", Label::new("m2"), GlobalType::End)),
+            (
+                Label::new("yes"),
+                GlobalType::send("B", "C", Label::new("m2"), GlobalType::End),
+            ),
             (Label::new("no"), GlobalType::End),
         ],
     );
 
     // Can reduce to either branch
     assert!(reduces(&g, &GlobalType::End));
-    assert!(reduces(&g, &GlobalType::send("B", "C", Label::new("m2"), GlobalType::End)));
+    assert!(reduces(
+        &g,
+        &GlobalType::send("B", "C", Label::new("m2"), GlobalType::End)
+    ));
 }
 
 #[test]
@@ -380,7 +407,10 @@ fn test_reduces_star_transitive() {
         GlobalType::send("B", "C", Label::new("m2"), GlobalType::End),
     );
 
-    assert!(reduces_star(&g, &GlobalType::End), "Should reduce to End transitively");
+    assert!(
+        reduces_star(&g, &GlobalType::End),
+        "Should reduce to End transitively"
+    );
 }
 
 // ============================================================================
@@ -446,7 +476,7 @@ fn test_local_action_to_global_recv() {
     let act = LocalAction::recv("B", Label::new("msg"));
     let global = act.to_global("A");
 
-    assert_eq!(global.sender, "B");  // Partner is sender for recv
+    assert_eq!(global.sender, "B"); // Partner is sender for recv
     assert_eq!(global.receiver, "A"); // Role is receiver for recv
     assert_eq!(global.label.name, "msg");
 }

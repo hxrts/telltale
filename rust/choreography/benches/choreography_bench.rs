@@ -12,9 +12,10 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use quote::format_ident;
 use rumpsteak_aura_choreography::{
-    ast::{Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol, Role},
+    ast::{Annotations, Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol, Role},
     compiler::{codegen::generate_session_type, projection::project},
-    effects::{interpret, NoOpHandler, Program},
+    effects::{interpret, LabelId, NoOpHandler, Program, RoleId},
+    identifiers::RoleName,
 };
 use std::collections::HashMap;
 
@@ -40,9 +41,9 @@ fn create_simple_choreography() -> Choreography {
                 type_annotation: None,
                 payload: None,
             },
-            annotations: HashMap::new(),
-            from_annotations: HashMap::new(),
-            to_annotations: HashMap::new(),
+            annotations: Annotations::new(),
+            from_annotations: Annotations::new(),
+            to_annotations: Annotations::new(),
             continuation: Box::new(Protocol::Send {
                 from: bob,
                 to: alice,
@@ -51,9 +52,9 @@ fn create_simple_choreography() -> Choreography {
                     type_annotation: None,
                     payload: None,
                 },
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
                 continuation: Box::new(Protocol::End),
             }),
         },
@@ -81,12 +82,12 @@ fn create_complex_choreography() -> Choreography {
                     type_annotation: None,
                     payload: None,
                 },
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
                 continuation: Box::new(Protocol::Choice {
                     role: bob.clone(),
-                    annotations: HashMap::new(),
+                    annotations: Annotations::new(),
                     branches: NonEmptyVec::from_head_tail(
                         Branch {
                             label: format_ident!("Accept"),
@@ -99,9 +100,9 @@ fn create_complex_choreography() -> Choreography {
                                     type_annotation: None,
                                     payload: None,
                                 },
-                                annotations: HashMap::new(),
-                                from_annotations: HashMap::new(),
-                                to_annotations: HashMap::new(),
+                                annotations: Annotations::new(),
+                                from_annotations: Annotations::new(),
+                                to_annotations: Annotations::new(),
                                 continuation: Box::new(Protocol::End),
                             },
                         },
@@ -116,9 +117,9 @@ fn create_complex_choreography() -> Choreography {
                                     type_annotation: None,
                                     payload: None,
                                 },
-                                annotations: HashMap::new(),
-                                from_annotations: HashMap::new(),
-                                to_annotations: HashMap::new(),
+                                annotations: Annotations::new(),
+                                from_annotations: Annotations::new(),
+                                to_annotations: Annotations::new(),
                                 continuation: Box::new(Protocol::End),
                             },
                         }],
@@ -136,6 +137,39 @@ fn create_complex_choreography() -> Choreography {
 enum SimpleRole {
     Alice,
     Bob,
+}
+
+// Define a simple label type for effect programs
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
+enum SimpleLabel {
+    Default,
+}
+
+impl LabelId for SimpleLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            SimpleLabel::Default => "default",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "default" => Some(SimpleLabel::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for SimpleRole {
+    type Label = SimpleLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            SimpleRole::Alice => RoleName::from_static("Alice"),
+            SimpleRole::Bob => RoleName::from_static("Bob"),
+        }
+    }
 }
 
 // Create an effect program for benchmarking
@@ -288,9 +322,9 @@ fn bench_scaling(c: &mut Criterion) {
                     type_annotation: None,
                     payload: None,
                 },
-                annotations: HashMap::new(),
-                from_annotations: HashMap::new(),
-                to_annotations: HashMap::new(),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
                 continuation: Box::new(protocol),
             };
         }

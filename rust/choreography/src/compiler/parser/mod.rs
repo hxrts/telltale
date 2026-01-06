@@ -146,12 +146,10 @@ pub fn parse_choreography_str_with_extensions(
 
                         if let Some(r) = header_roles {
                             roles = r;
-                            declared_roles =
-                                roles.iter().map(|r| r.name().to_string()).collect();
+                            declared_roles = roles.iter().map(|r| r.name().to_string()).collect();
                         } else if let Some(r) = body_roles {
                             roles = r;
-                            declared_roles =
-                                roles.iter().map(|r| r.name().to_string()).collect();
+                            declared_roles = roles.iter().map(|r| r.name().to_string()).collect();
                         }
 
                         if let Some(where_block) = where_pair {
@@ -758,7 +756,8 @@ protocol TypedLoop =
                                 assert_eq!(message.name.to_string(), "Request");
                                 // Type annotation should be preserved
                                 assert!(message.type_annotation.is_some());
-                                let type_str = message.type_annotation.as_ref().unwrap().to_string();
+                                let type_str =
+                                    message.type_annotation.as_ref().unwrap().to_string();
                                 assert!(
                                     type_str.contains("String"),
                                     "Expected String type, got: {}",
@@ -906,14 +905,12 @@ protocol TwoLoops =
                             Protocol::Send { continuation, .. } => {
                                 // After first loop's Done, should be second Rec
                                 match continuation.as_ref() {
-                                    Protocol::Rec { body, .. } => {
-                                        match body.as_ref() {
-                                            Protocol::Choice { role, .. } => {
-                                                assert_eq!(role.name().to_string(), "B");
-                                            }
-                                            _ => panic!("Expected Choice in second loop"),
+                                    Protocol::Rec { body, .. } => match body.as_ref() {
+                                        Protocol::Choice { role, .. } => {
+                                            assert_eq!(role.name().to_string(), "B");
                                         }
-                                    }
+                                        _ => panic!("Expected Choice in second loop"),
+                                    },
                                     _ => panic!("Expected second Rec after first loop"),
                                 }
                             }
@@ -942,8 +939,7 @@ protocol EmptyBody =
         // Either way, we should handle it gracefully
         let result = parse_choreography_str(input);
         // Just verify it doesn't panic - the exact behavior depends on grammar
-        if result.is_ok() {
-            let choreo = result.unwrap();
+        if let Ok(choreo) = result {
             // If parsed, should not be desugared (no first Send)
             match &choreo.protocol {
                 Protocol::Loop { .. } => {
@@ -1289,22 +1285,18 @@ protocol FastHeartbeat =
 
         let choreo = result.unwrap();
         match &choreo.protocol {
-            Protocol::Rec { body, .. } => {
-                match body.as_ref() {
-                    Protocol::Send { continuation, .. } => {
-                        match continuation.as_ref() {
-                            Protocol::Choice { annotations, .. } => {
-                                assert!(annotations.has_heartbeat());
-                                let (interval, on_missing) = annotations.heartbeat().unwrap();
-                                assert_eq!(interval, std::time::Duration::from_millis(500));
-                                assert_eq!(on_missing, 5);
-                            }
-                            _ => panic!("Expected Choice"),
-                        }
+            Protocol::Rec { body, .. } => match body.as_ref() {
+                Protocol::Send { continuation, .. } => match continuation.as_ref() {
+                    Protocol::Choice { annotations, .. } => {
+                        assert!(annotations.has_heartbeat());
+                        let (interval, on_missing) = annotations.heartbeat().unwrap();
+                        assert_eq!(interval, std::time::Duration::from_millis(500));
+                        assert_eq!(on_missing, 5);
                     }
-                    _ => panic!("Expected Send"),
-                }
-            }
+                    _ => panic!("Expected Choice"),
+                },
+                _ => panic!("Expected Send"),
+            },
             _ => panic!("Expected Rec"),
         }
     }

@@ -186,7 +186,7 @@ fn convert_choice_branch(
                     label: branch.label.to_string(),
                 });
             }
-            if to.name().to_string() != expected_receiver {
+            if *to.name() != expected_receiver {
                 return Err(ConversionError::InconsistentReceivers {
                     expected: expected_receiver.to_string(),
                     actual: to.name().to_string(),
@@ -270,9 +270,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                         to: send_to,
                         message,
                         continuation,
-                    } if send_to.name() == to.name()
-                        && message.name.to_string() == ident.to_string() =>
-                    {
+                    } if send_to.name() == to.name() && message.name == *ident => {
                         local_to_local_r(continuation)?
                     }
                     _ => local_to_local_r(cont)?,
@@ -298,9 +296,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                         from: recv_from,
                         message,
                         continuation,
-                    } if recv_from.name() == from.name()
-                        && message.name.to_string() == ident.to_string() =>
-                    {
+                    } if recv_from.name() == from.name() && message.name == *ident => {
                         local_to_local_r(continuation)?
                     }
                     _ => local_to_local_r(cont)?,
@@ -433,8 +429,10 @@ mod tests {
         };
 
         let global = protocol_to_global(&protocol).unwrap();
-        assert!(matches!(global, GlobalTypeCore::Comm { sender, receiver, .. }
-            if sender == "A" && receiver == "B"));
+        assert!(
+            matches!(global, GlobalTypeCore::Comm { sender, receiver, .. }
+            if sender == "A" && receiver == "B")
+        );
     }
 
     #[test]
@@ -469,7 +467,9 @@ mod tests {
         };
 
         let result = protocol_to_global(&protocol);
-        assert!(matches!(result, Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "Broadcast"));
+        assert!(
+            matches!(result, Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "Broadcast")
+        );
     }
 
     #[test]

@@ -132,7 +132,11 @@ fn test_dynamic_role_projection_with_runtime_param() {
     let choreo = Choreography {
         name: format_ident!("RuntimeRoleTest"),
         namespace: None,
-        roles: vec![worker_static.clone(), worker_runtime.clone(), manager.clone()],
+        roles: vec![
+            worker_static.clone(),
+            worker_runtime.clone(),
+            manager.clone(),
+        ],
         protocol: send(
             worker_runtime.clone(),
             manager.clone(),
@@ -165,7 +169,11 @@ fn test_dynamic_role_projection_runtime_receiver() {
     let choreo = Choreography {
         name: format_ident!("RuntimeReceiverTest"),
         namespace: None,
-        roles: vec![manager.clone(), worker_static.clone(), worker_runtime.clone()],
+        roles: vec![
+            manager.clone(),
+            worker_static.clone(),
+            worker_runtime.clone(),
+        ],
         protocol: send(
             manager.clone(),
             worker_runtime.clone(),
@@ -203,7 +211,11 @@ fn test_unbound_symbolic_in_sender() {
     let choreo = Choreography {
         name: format_ident!("UnboundSymbolicTest"),
         namespace: None,
-        roles: vec![worker_static.clone(), worker_symbolic.clone(), manager.clone()],
+        roles: vec![
+            worker_static.clone(),
+            worker_symbolic.clone(),
+            manager.clone(),
+        ],
         protocol: send(
             worker_symbolic.clone(),
             manager.clone(),
@@ -233,7 +245,11 @@ fn test_unbound_symbolic_in_receiver() {
     let choreo = Choreography {
         name: format_ident!("UnboundSymbolicReceiverTest"),
         namespace: None,
-        roles: vec![manager.clone(), worker_static.clone(), worker_symbolic.clone()],
+        roles: vec![
+            manager.clone(),
+            worker_static.clone(),
+            worker_symbolic.clone(),
+        ],
         protocol: send(
             manager.clone(),
             worker_symbolic.clone(),
@@ -280,7 +296,12 @@ fn test_merge_failure_different_send_messages() {
                         alice.clone(),
                         bob.clone(),
                         message("Left"),
-                        send(bob.clone(), charlie.clone(), message("DataA"), Protocol::End),
+                        send(
+                            bob.clone(),
+                            charlie.clone(),
+                            message("DataA"),
+                            Protocol::End,
+                        ),
                     ),
                 },
                 vec![Branch {
@@ -290,7 +311,12 @@ fn test_merge_failure_different_send_messages() {
                         alice.clone(),
                         bob.clone(),
                         message("Right"),
-                        send(bob.clone(), charlie.clone(), message("DataB"), Protocol::End),
+                        send(
+                            bob.clone(),
+                            charlie.clone(),
+                            message("DataB"),
+                            Protocol::End,
+                        ),
                     ),
                 }],
             ),
@@ -341,7 +367,12 @@ fn test_merge_failure_incompatible_types() {
                         alice.clone(),
                         bob.clone(),
                         message("Left"),
-                        send(bob.clone(), charlie.clone(), message("ToCharlie"), Protocol::End),
+                        send(
+                            bob.clone(),
+                            charlie.clone(),
+                            message("ToCharlie"),
+                            Protocol::End,
+                        ),
                     ),
                 },
                 vec![Branch {
@@ -677,7 +708,12 @@ fn test_parallel_no_conflict_succeeds() {
         roles: vec![alice.clone(), bob.clone(), charlie.clone()],
         protocol: Protocol::Parallel {
             protocols: NonEmptyVec::from_head_tail(
-                send(alice.clone(), bob.clone(), message("FromAlice"), Protocol::End),
+                send(
+                    alice.clone(),
+                    bob.clone(),
+                    message("FromAlice"),
+                    Protocol::End,
+                ),
                 vec![send(
                     charlie.clone(),
                     bob.clone(),
@@ -713,7 +749,12 @@ fn test_static_parameterized_roles_succeed() {
             worker0.clone(),
             manager.clone(),
             message("Report"),
-            send(manager.clone(), worker1.clone(), message("Task"), Protocol::End),
+            send(
+                manager.clone(),
+                worker1.clone(),
+                message("Task"),
+                Protocol::End,
+            ),
         ),
         attrs: HashMap::new(),
     };

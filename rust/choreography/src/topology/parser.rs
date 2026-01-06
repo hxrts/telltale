@@ -135,27 +135,19 @@ fn parse_mode_value(pair: pest::iterators::Pair<Rule>) -> Result<TopologyMode, T
     match inner {
         Some(p) => match p.as_rule() {
             Rule::kubernetes_mode => {
-                let namespace = p
-                    .into_inner()
-                    .next()
-                    .map(|i| i.as_str())
-                    .ok_or_else(|| {
-                        TopologyParseError::InvalidConstraint(
-                            "kubernetes mode requires a namespace".to_string(),
-                        )
-                    })?;
+                let namespace = p.into_inner().next().map(|i| i.as_str()).ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "kubernetes mode requires a namespace".to_string(),
+                    )
+                })?;
                 Ok(TopologyMode::Kubernetes(Namespace::new(namespace)?))
             }
             Rule::consul_mode => {
-                let datacenter = p
-                    .into_inner()
-                    .next()
-                    .map(|i| i.as_str())
-                    .ok_or_else(|| {
-                        TopologyParseError::InvalidConstraint(
-                            "consul mode requires a datacenter".to_string(),
-                        )
-                    })?;
+                let datacenter = p.into_inner().next().map(|i| i.as_str()).ok_or_else(|| {
+                    TopologyParseError::InvalidConstraint(
+                        "consul mode requires a datacenter".to_string(),
+                    )
+                })?;
                 Ok(TopologyMode::Consul(Datacenter::new(datacenter)?))
             }
             _ => {
@@ -201,9 +193,7 @@ fn parse_location(pair: pest::iterators::Pair<Rule>) -> Result<Location, Topolog
                     .map(|i| RoleName::new(i.as_str()))
                     .transpose()?
                     .ok_or_else(|| {
-                        TopologyParseError::InvalidLocation(
-                            "colocated requires a role".to_string(),
-                        )
+                        TopologyParseError::InvalidLocation("colocated requires a role".to_string())
                     })?;
                 Ok(Location::Colocated(peer))
             }
@@ -277,9 +267,7 @@ fn parse_constraint(
                 .map(|p| RoleName::new(p.as_str()))
                 .transpose()?
                 .ok_or_else(|| {
-                    TopologyParseError::InvalidConstraint(
-                        "pinned requires a role".to_string(),
-                    )
+                    TopologyParseError::InvalidConstraint("pinned requires a role".to_string())
                 })?;
             let location = inner_iter
                 .next()
@@ -295,18 +283,14 @@ fn parse_constraint(
                 .map(|p| RoleName::new(p.as_str()))
                 .transpose()?
                 .ok_or_else(|| {
-                    TopologyParseError::InvalidConstraint(
-                        "region requires a role".to_string(),
-                    )
+                    TopologyParseError::InvalidConstraint("region requires a role".to_string())
                 })?;
             let region = idents
                 .next()
                 .map(|p| Region::new(p.as_str()))
                 .transpose()?
                 .ok_or_else(|| {
-                    TopologyParseError::InvalidConstraint(
-                        "region requires a value".to_string(),
-                    )
+                    TopologyParseError::InvalidConstraint("region requires a value".to_string())
                 })?;
             Ok(TopologyConstraint::Region(role, region))
         }

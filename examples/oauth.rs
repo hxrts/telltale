@@ -1,5 +1,7 @@
+//! OAuth example demonstrating authentication session types.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
+#![allow(missing_docs)]
 
 // Adapted from: Stay safe under panic: Rust programming with affine MPST
 //

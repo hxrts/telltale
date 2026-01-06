@@ -167,11 +167,7 @@ pub struct Checkpoint {
 
 impl Checkpoint {
     /// Create a new checkpoint.
-    pub fn new(
-        protocol: impl Into<String>,
-        role: RoleName,
-        state_id: impl Into<String>,
-    ) -> Self {
+    pub fn new(protocol: impl Into<String>, role: RoleName, state_id: impl Into<String>) -> Self {
         Self {
             protocol: protocol.into(),
             role,
@@ -341,7 +337,7 @@ impl<L: LabelId> ProtocolStateMachine for LinearStateMachine<L> {
             (BlockedOn::Choice { branches }, StepInput::MakeChoice(branch)) => {
                 if branches.contains(branch) {
                     self.advance();
-                    Ok(StepOutput::ChoiceMade(branch.clone()))
+                    Ok(StepOutput::ChoiceMade(*branch))
                 } else {
                     Err(ChoreographyError::InvalidChoice {
                         expected: branches
@@ -355,7 +351,7 @@ impl<L: LabelId> ProtocolStateMachine for LinearStateMachine<L> {
             (BlockedOn::Offer { branches, .. }, StepInput::ReceiveOffer(branch)) => {
                 if branches.contains(branch) {
                     self.advance();
-                    Ok(StepOutput::OfferReceived(branch.clone()))
+                    Ok(StepOutput::OfferReceived(*branch))
                 } else {
                     Err(ChoreographyError::InvalidChoice {
                         expected: branches

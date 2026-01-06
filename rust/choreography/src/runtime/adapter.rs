@@ -343,10 +343,7 @@ mod tests {
         }
 
         let static_role = TestRole::Client;
-        assert_eq!(
-            static_role.role_name().as_str(),
-            "Client"
-        );
+        assert_eq!(static_role.role_name().as_str(), "Client");
 
         let indexed_role = TestRole::Witness(2);
         assert_eq!(indexed_role.role_name().as_str(), "Witness");

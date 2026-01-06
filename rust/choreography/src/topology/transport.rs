@@ -7,8 +7,8 @@
 
 use super::{Location, Topology, TopologyMode};
 use crate::identifiers::RoleName;
-use crate::runtime::sync::{mpsc, Mutex};
 use crate::mutex_lock;
+use crate::runtime::sync::{mpsc, Mutex};
 use async_trait::async_trait;
 #[cfg(target_arch = "wasm32")]
 use futures::{SinkExt, StreamExt};
@@ -220,7 +220,9 @@ impl TransportFactory {
     /// Create a transport for a role based on the topology.
     pub fn create(topology: &Topology, role: &RoleName) -> Box<dyn Transport> {
         match &topology.mode {
-            Some(TopologyMode::Local) | None => Box::new(InMemoryChannelTransport::new(role.clone())),
+            Some(TopologyMode::Local) | None => {
+                Box::new(InMemoryChannelTransport::new(role.clone()))
+            }
             Some(TopologyMode::PerRole) => {
                 // For per-role mode, we'd use TCP but for now fall back to in-memory
                 Box::new(InMemoryChannelTransport::new(role.clone()))

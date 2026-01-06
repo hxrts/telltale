@@ -327,10 +327,7 @@ async fn test_handler_metadata_updates_on_recv() {
     other.send(bytes).await.unwrap();
 
     // Receive
-    let _: TestMessage = handler
-        .recv(&mut endpoint, TestRole::Alice)
-        .await
-        .unwrap();
+    let _: TestMessage = handler.recv(&mut endpoint, TestRole::Alice).await.unwrap();
 
     // Metadata should be updated
     let meta = endpoint.get_metadata(&TestRole::Alice).unwrap();
@@ -476,9 +473,12 @@ async fn test_handler_with_timeout_success() {
     let mut endpoint = RumpsteakEndpoint::new(TestRole::Alice);
 
     let result = handler
-        .with_timeout(&mut endpoint, TestRole::Alice, Duration::from_secs(1), async {
-            Ok(42)
-        })
+        .with_timeout(
+            &mut endpoint,
+            TestRole::Alice,
+            Duration::from_secs(1),
+            async { Ok(42) },
+        )
         .await;
 
     assert_eq!(result.unwrap(), 42);
@@ -506,7 +506,11 @@ async fn test_handler_with_timeout_expires() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     let msg = format!("{:?}", err);
-    assert!(msg.contains("Timeout"), "Should be a timeout error: {}", msg);
+    assert!(
+        msg.contains("Timeout"),
+        "Should be a timeout error: {}",
+        msg
+    );
 }
 
 // ============================================================================

@@ -81,7 +81,10 @@ impl TreeTestExt for InputTree {
         match self {
             InputTree::Empty => 0,
             InputTree::Recv { branches, .. } => {
-                1 + branches.iter().map(|(_, child)| child.size()).sum::<usize>()
+                1 + branches
+                    .iter()
+                    .map(|(_, child)| child.size())
+                    .sum::<usize>()
             }
         }
     }
@@ -123,7 +126,10 @@ impl TreeTestExt for OutputTree {
         match self {
             OutputTree::Empty => 0,
             OutputTree::Send { branches, .. } => {
-                1 + branches.iter().map(|(_, child)| child.size()).sum::<usize>()
+                1 + branches
+                    .iter()
+                    .map(|(_, child)| child.size())
+                    .sum::<usize>()
             }
         }
     }
@@ -178,9 +184,17 @@ fn simple_local_strategy() -> impl Strategy<Value = LocalTypeR> {
         // End type
         Just(LocalTypeR::End),
         // Single send
-        (role_strategy(), label_strategy()).prop_map(|(r, l)| LocalTypeR::send(&r, l, LocalTypeR::End)),
+        (role_strategy(), label_strategy()).prop_map(|(r, l)| LocalTypeR::send(
+            &r,
+            l,
+            LocalTypeR::End
+        )),
         // Single recv
-        (role_strategy(), label_strategy()).prop_map(|(r, l)| LocalTypeR::recv(&r, l, LocalTypeR::End)),
+        (role_strategy(), label_strategy()).prop_map(|(r, l)| LocalTypeR::recv(
+            &r,
+            l,
+            LocalTypeR::End
+        )),
     ]
 }
 
@@ -188,18 +202,34 @@ fn simple_local_strategy() -> impl Strategy<Value = LocalTypeR> {
 fn send_recv_sequence_strategy() -> impl Strategy<Value = LocalTypeR> {
     prop_oneof![
         // Send then End
-        (role_strategy(), label_strategy())
-            .prop_map(|(r, l)| LocalTypeR::send(&r, l, LocalTypeR::End)),
+        (role_strategy(), label_strategy()).prop_map(|(r, l)| LocalTypeR::send(
+            &r,
+            l,
+            LocalTypeR::End
+        )),
         // Recv then End
-        (role_strategy(), label_strategy())
-            .prop_map(|(r, l)| LocalTypeR::recv(&r, l, LocalTypeR::End)),
+        (role_strategy(), label_strategy()).prop_map(|(r, l)| LocalTypeR::recv(
+            &r,
+            l,
+            LocalTypeR::End
+        )),
         // Send then Recv
-        (role_strategy(), label_strategy(), role_strategy(), label_strategy())
+        (
+            role_strategy(),
+            label_strategy(),
+            role_strategy(),
+            label_strategy()
+        )
             .prop_map(|(r1, l1, r2, l2)| {
                 LocalTypeR::send(&r1, l1, LocalTypeR::recv(&r2, l2, LocalTypeR::End))
             }),
         // Recv then Send
-        (role_strategy(), label_strategy(), role_strategy(), label_strategy())
+        (
+            role_strategy(),
+            label_strategy(),
+            role_strategy(),
+            label_strategy()
+        )
             .prop_map(|(r1, l1, r2, l2)| {
                 LocalTypeR::recv(&r1, l1, LocalTypeR::send(&r2, l2, LocalTypeR::End))
             }),
@@ -234,15 +264,9 @@ fn choice_strategy() -> impl Strategy<Value = LocalTypeR> {
         .prop_map(|(partner, l1, l2, is_send)| {
             let branches = vec![(l1, LocalTypeR::End), (l2, LocalTypeR::End)];
             if is_send {
-                LocalTypeR::Send {
-                    partner,
-                    branches,
-                }
+                LocalTypeR::Send { partner, branches }
             } else {
-                LocalTypeR::Recv {
-                    partner,
-                    branches,
-                }
+                LocalTypeR::Recv { partner, branches }
             }
         })
 }

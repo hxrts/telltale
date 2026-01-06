@@ -10,8 +10,8 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use parking_lot::Mutex;
 use rumpsteak_aura_choreography::effects::LabelId;
-use rumpsteak_aura_choreography::RoleName;
 use rumpsteak_aura_choreography::simulation::{
     clock::{Clock, MockClock, Rng, SeededRng},
     envelope::ProtocolEnvelope,
@@ -21,7 +21,7 @@ use rumpsteak_aura_choreography::simulation::{
     },
     transport::{FaultyTransport, InMemoryTransport, SimulatedTransport, TransportError},
 };
-use parking_lot::Mutex;
+use rumpsteak_aura_choreography::RoleName;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -54,7 +54,9 @@ impl LabelId for TestLabel {
 
 type TestBlockedOn = BlockedOn<TestLabel>;
 type TestStepInput = StepInput<TestLabel>;
+#[allow(dead_code)]
 type TestStepOutput = StepOutput<TestLabel>;
+#[allow(dead_code)]
 type TestStateMachine = LinearStateMachine<TestLabel>;
 
 // ============================================================================
@@ -108,10 +110,7 @@ fn test_blocked_on_is_terminal() {
         expected_types: vec!["Msg".to_string()]
     }
     .is_terminal());
-    assert!(!TestBlockedOn::Choice {
-        branches: vec![]
-    }
-    .is_terminal());
+    assert!(!TestBlockedOn::Choice { branches: vec![] }.is_terminal());
     assert!(!TestBlockedOn::Offer {
         from: RoleName::from_static("Alice"),
         branches: vec![]
@@ -152,10 +151,7 @@ fn test_blocked_on_is_recv() {
 #[test]
 fn test_blocked_on_is_choice() {
     // Both Choice and Offer count as choice states
-    assert!(TestBlockedOn::Choice {
-        branches: vec![]
-    }
-    .is_choice());
+    assert!(TestBlockedOn::Choice { branches: vec![] }.is_choice());
     assert!(TestBlockedOn::Offer {
         from: RoleName::from_static("Alice"),
         branches: vec![]
@@ -183,7 +179,11 @@ fn test_linear_state_machine_creation() {
         TestBlockedOn::Complete,
     ];
 
-    let sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states.clone());
+    let sm = LinearStateMachine::new(
+        "TestProtocol",
+        RoleName::from_static("Alice"),
+        states.clone(),
+    );
 
     assert_eq!(sm.protocol_name(), "TestProtocol");
     assert_eq!(sm.role().as_str(), "Alice");
@@ -410,7 +410,11 @@ fn test_checkpoint_roundtrip() {
         TestBlockedOn::Complete,
     ];
 
-    let mut sm = LinearStateMachine::new("TestProtocol", RoleName::from_static("Alice"), states.clone());
+    let mut sm = LinearStateMachine::new(
+        "TestProtocol",
+        RoleName::from_static("Alice"),
+        states.clone(),
+    );
 
     // Advance state machine
     let send_env = ProtocolEnvelope::builder()
@@ -646,7 +650,11 @@ fn test_seeded_rng_next_f64_range() {
 
     for _ in 0..1000 {
         let f = rng.next_f64();
-        assert!(f >= 0.0 && f < 1.0, "f64 should be in [0, 1), got {}", f);
+        assert!(
+            (0.0..1.0).contains(&f),
+            "f64 should be in [0, 1), got {}",
+            f
+        );
     }
 }
 
@@ -761,7 +769,8 @@ fn test_in_memory_transport_fifo_ordering() {
 
     // Receive in FIFO order
     for i in 0..5 {
-        let received = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
+        let received =
+            SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
         assert_eq!(received.sequence, i);
         assert_eq!(received.payload, vec![i as u8]);
     }
@@ -844,7 +853,8 @@ fn test_in_memory_transport_multiple_recipients() {
     assert_eq!(bob_msg.payload, vec![1]);
 
     // Charlie gets his message
-    let charlie_msg = SimulatedTransport::recv(&mut charlie, &RoleName::from_static("Alice")).unwrap();
+    let charlie_msg =
+        SimulatedTransport::recv(&mut charlie, &RoleName::from_static("Alice")).unwrap();
     assert_eq!(charlie_msg.payload, vec![2]);
 }
 
@@ -892,7 +902,8 @@ fn test_in_memory_transport_thread_safe() {
                 .payload(vec![i])
                 .build()
                 .unwrap();
-            SimulatedTransport::send(&mut transport, &RoleName::from_static("Server"), envelope).unwrap();
+            SimulatedTransport::send(&mut transport, &RoleName::from_static("Server"), envelope)
+                .unwrap();
         }));
     }
 
@@ -922,7 +933,9 @@ fn test_faulty_transport_zero_drop_rate() {
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     inner.set_role(RoleName::from_static("Client"));
 
-    let mut faulty = FaultyTransport::new(inner).with_drop_rate(0.0).with_seed(12345);
+    let mut faulty = FaultyTransport::new(inner)
+        .with_drop_rate(0.0)
+        .with_seed(12345);
 
     // 0% drop rate should deliver all messages
     for i in 0u8..10 {
@@ -934,7 +947,9 @@ fn test_faulty_transport_zero_drop_rate() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty.send(&RoleName::from_static("Server"), envelope).unwrap();
+        faulty
+            .send(&RoleName::from_static("Server"), envelope)
+            .unwrap();
     }
 
     // All should be received
@@ -942,7 +957,8 @@ fn test_faulty_transport_zero_drop_rate() {
     server.set_role(RoleName::from_static("Server"));
 
     for i in 0u8..10 {
-        let received = SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
+        let received =
+            SimulatedTransport::recv(&mut server, &RoleName::from_static("Client")).unwrap();
         assert_eq!(received.payload, vec![i]);
     }
 }
@@ -953,7 +969,9 @@ fn test_faulty_transport_full_drop_rate() {
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     inner.set_role(RoleName::from_static("Client"));
 
-    let mut faulty = FaultyTransport::new(inner).with_drop_rate(1.0).with_seed(12345);
+    let mut faulty = FaultyTransport::new(inner)
+        .with_drop_rate(1.0)
+        .with_seed(12345);
 
     // 100% drop rate should drop all messages
     for i in 0u8..10 {
@@ -965,7 +983,9 @@ fn test_faulty_transport_full_drop_rate() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty.send(&RoleName::from_static("Server"), envelope).unwrap(); // Still "succeeds" but message is dropped
+        faulty
+            .send(&RoleName::from_static("Server"), envelope)
+            .unwrap(); // Still "succeeds" but message is dropped
     }
 
     // None should be received - check via server transport
@@ -985,8 +1005,12 @@ fn test_faulty_transport_deterministic_dropping() {
     let mut inner2 = InMemoryTransport::with_shared_queues(Arc::clone(&queues2));
     inner2.set_role(RoleName::from_static("Client"));
 
-    let mut faulty1 = FaultyTransport::new(inner1).with_drop_rate(0.5).with_seed(42);
-    let mut faulty2 = FaultyTransport::new(inner2).with_drop_rate(0.5).with_seed(42);
+    let mut faulty1 = FaultyTransport::new(inner1)
+        .with_drop_rate(0.5)
+        .with_seed(42);
+    let mut faulty2 = FaultyTransport::new(inner2)
+        .with_drop_rate(0.5)
+        .with_seed(42);
 
     for i in 0u8..100 {
         let envelope = ProtocolEnvelope::builder()
@@ -997,8 +1021,12 @@ fn test_faulty_transport_deterministic_dropping() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty1.send(&RoleName::from_static("Server"), envelope.clone()).unwrap();
-        faulty2.send(&RoleName::from_static("Server"), envelope).unwrap();
+        faulty1
+            .send(&RoleName::from_static("Server"), envelope.clone())
+            .unwrap();
+        faulty2
+            .send(&RoleName::from_static("Server"), envelope)
+            .unwrap();
     }
 
     // Both should have same messages (same drop pattern)
@@ -1030,8 +1058,12 @@ fn test_faulty_transport_different_seeds_different_drops() {
     let mut inner2 = InMemoryTransport::with_shared_queues(Arc::clone(&queues2));
     inner2.set_role(RoleName::from_static("Client"));
 
-    let mut faulty1 = FaultyTransport::new(inner1).with_drop_rate(0.5).with_seed(111);
-    let mut faulty2 = FaultyTransport::new(inner2).with_drop_rate(0.5).with_seed(222);
+    let mut faulty1 = FaultyTransport::new(inner1)
+        .with_drop_rate(0.5)
+        .with_seed(111);
+    let mut faulty2 = FaultyTransport::new(inner2)
+        .with_drop_rate(0.5)
+        .with_seed(222);
 
     for i in 0u8..100 {
         let envelope = ProtocolEnvelope::builder()
@@ -1042,8 +1074,12 @@ fn test_faulty_transport_different_seeds_different_drops() {
             .payload(vec![i])
             .build()
             .unwrap();
-        faulty1.send(&RoleName::from_static("Server"), envelope.clone()).unwrap();
-        faulty2.send(&RoleName::from_static("Server"), envelope).unwrap();
+        faulty1
+            .send(&RoleName::from_static("Server"), envelope.clone())
+            .unwrap();
+        faulty2
+            .send(&RoleName::from_static("Server"), envelope)
+            .unwrap();
     }
 
     let mut server1 = InMemoryTransport::with_shared_queues(queues1);
@@ -1071,7 +1107,9 @@ fn test_faulty_transport_partial_drop_rate() {
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     inner.set_role(RoleName::from_static("Client"));
 
-    let mut faulty = FaultyTransport::new(inner).with_drop_rate(0.3).with_seed(12345);
+    let mut faulty = FaultyTransport::new(inner)
+        .with_drop_rate(0.3)
+        .with_seed(12345);
 
     let send_count = 1000;
     for i in 0..send_count {
@@ -1083,7 +1121,9 @@ fn test_faulty_transport_partial_drop_rate() {
             .payload(vec![(i % 256) as u8])
             .build()
             .unwrap();
-        faulty.send(&RoleName::from_static("Server"), envelope).unwrap();
+        faulty
+            .send(&RoleName::from_static("Server"), envelope)
+            .unwrap();
     }
 
     let mut server = InMemoryTransport::with_shared_queues(queues);

@@ -11,8 +11,8 @@
 
 use futures::executor;
 use rumpsteak_aura_choreography::{
-    interpret, LabelId, Metrics, NoOpHandler, Program, RecordingHandler, Retry, Trace, RoleId,
-    RoleName,
+    interpret, LabelId, Metrics, NoOpHandler, Program, RecordingHandler, Retry, RoleId, RoleName,
+    Trace,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -190,7 +190,10 @@ fn test_nested_branches() {
             .choose(TestRole::Bob, TestLabel::Inner)
             .branch(
                 TestRole::Bob,
-                vec![(TestLabel::Inner, Program::<TestRole, TestMessage>::new().end())],
+                vec![(
+                    TestLabel::Inner,
+                    Program::<TestRole, TestMessage>::new().end(),
+                )],
             )
             .end();
 

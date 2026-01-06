@@ -455,9 +455,9 @@ pub(super) fn parse_loop_stmt(
                             .into_inner()
                             .find(|p| p.as_rule() == Rule::role_ref)
                             .ok_or_else(|| ParseError::Syntax {
-                                span: ErrorSpan::from_pest_span(span, input),
-                                message: "loop decide by is missing a role".to_string(),
-                            })?;
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "loop decide by is missing a role".to_string(),
+                        })?;
                         let role = parse_role_ref(role_pair, declared_roles, input)?;
                         condition = Some(Condition::RoleDecides(role));
                     }

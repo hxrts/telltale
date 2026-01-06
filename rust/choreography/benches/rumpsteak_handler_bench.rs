@@ -6,8 +6,9 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rumpsteak_aura_choreography::effects::{
     handlers::rumpsteak::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel},
-    ChoreoHandler, Label,
+    ChoreoHandler, LabelId, RoleId,
 };
+use rumpsteak_aura_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 
@@ -15,6 +16,37 @@ use tokio::runtime::Runtime;
 enum BenchRole {
     Alice,
     Bob,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum BenchLabel {
+    OptionA,
+}
+
+impl LabelId for BenchLabel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            BenchLabel::OptionA => "option_a",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "option_a" => Some(BenchLabel::OptionA),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for BenchRole {
+    type Label = BenchLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            BenchRole::Alice => RoleName::from_static("Alice"),
+            BenchRole::Bob => RoleName::from_static("Bob"),
+        }
+    }
 }
 
 impl rumpsteak_aura::Role for BenchRole {
@@ -97,7 +129,7 @@ fn bench_choice_overhead(c: &mut Criterion) {
                 let mut alice_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
                 let mut bob_handler = RumpsteakHandler::<BenchRole, BenchMessage>::new();
 
-                let label = Label("option_a");
+                let label = BenchLabel::OptionA;
 
                 alice_handler
                     .choose(&mut alice_ep, BenchRole::Bob, black_box(label))

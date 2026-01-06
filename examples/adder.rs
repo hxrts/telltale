@@ -1,6 +1,8 @@
+//! Adder example demonstrating session types with arithmetic operations.
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
+#![allow(missing_docs)]
 
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},

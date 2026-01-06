@@ -19,8 +19,10 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Handlers return `Result<(), ExtensionError>` and must handle
 /// their extension type or return an error.
 pub type ExtensionHandler<E, R> = Box<
-    dyn for<'a> Fn(&'a mut E, &'a dyn ExtensionEffect<R>)
-            -> BoxFuture<'a, Result<(), ExtensionError>>
+    dyn for<'a> Fn(
+            &'a mut E,
+            &'a dyn ExtensionEffect<R>,
+        ) -> BoxFuture<'a, Result<(), ExtensionError>>
         + Send
         + Sync,
 >;

@@ -157,7 +157,6 @@ impl<K: Contentable, V, H: Hasher + Eq + StdHash> ContentStore<K, V, H> {
     }
 
     /// Check if a key exists in the store.
-    #[must_use]
     pub fn contains(&self, key: &K) -> Result<bool, ContentableError> {
         let cid = key.content_id::<H>()?;
         Ok(self.store.contains_key(&cid))
@@ -314,12 +313,7 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Get or compute a value.
-    pub fn get_or_insert_with<F>(
-        &mut self,
-        key: &K,
-        extra: E,
-        f: F,
-    ) -> Result<&V, ContentableError>
+    pub fn get_or_insert_with<F>(&mut self, key: &K, extra: E, f: F) -> Result<&V, ContentableError>
     where
         F: FnOnce() -> V,
     {
@@ -338,7 +332,6 @@ impl<K: Contentable, E: StdHash + Eq + Clone, V, H: Hasher + Eq + StdHash>
     }
 
     /// Check if a key pair exists in the store.
-    #[must_use]
     pub fn contains(&self, key: &K, extra: &E) -> Result<bool, ContentableError> {
         let cid = key.content_id::<H>()?;
         Ok(self.store.contains_key(&(cid, extra.clone())))
@@ -452,19 +445,23 @@ mod tests {
         let global = GlobalType::End;
 
         let mut computed = false;
-        let value = store.get_or_insert_with(&global, || {
-            computed = true;
-            42
-        }).unwrap();
+        let value = store
+            .get_or_insert_with(&global, || {
+                computed = true;
+                42
+            })
+            .unwrap();
         assert_eq!(*value, 42);
         assert!(computed);
 
         // Second call should not compute
         computed = false;
-        let value = store.get_or_insert_with(&global, || {
-            computed = true;
-            99
-        }).unwrap();
+        let value = store
+            .get_or_insert_with(&global, || {
+                computed = true;
+                99
+            })
+            .unwrap();
         assert_eq!(*value, 42); // Same value
         assert!(!computed); // Not recomputed
 
@@ -482,9 +479,11 @@ mod tests {
         let local_b = LocalTypeR::recv("A", Label::new("msg"), LocalTypeR::End);
 
         // Store projections for different roles
-        store.insert(&global, "A".to_string(), local_a.clone())
+        store
+            .insert(&global, "A".to_string(), local_a.clone())
             .unwrap();
-        store.insert(&global, "B".to_string(), local_b.clone())
+        store
+            .insert(&global, "B".to_string(), local_b.clone())
             .unwrap();
 
         assert_eq!(store.len(), 2);
@@ -530,11 +529,12 @@ mod tests {
         let mut store: ContentStore<GlobalType, i32> = ContentStore::new();
 
         store.insert(&GlobalType::End, 1).unwrap();
-        store.insert(
-            &GlobalType::send("A", "B", Label::new("msg"), GlobalType::End),
-            2,
-        )
-        .unwrap();
+        store
+            .insert(
+                &GlobalType::send("A", "B", Label::new("msg"), GlobalType::End),
+                2,
+            )
+            .unwrap();
 
         assert_eq!(store.len(), 2);
 

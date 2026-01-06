@@ -145,10 +145,7 @@ impl ProtocolExtension for TimeoutProtocol {
     fn validate(&self, all_roles: &[Role]) -> Result<(), ExtensionValidationError> {
         // Validate that all mentioned roles are declared
         for role_name in &self.role_names {
-            if !all_roles
-                .iter()
-                .any(|r| &r.name().to_string() == role_name)
-            {
+            if !all_roles.iter().any(|r| &r.name().to_string() == role_name) {
                 return Err(ExtensionValidationError::UndeclaredRole {
                     role: role_name.clone(),
                 });
@@ -276,10 +273,7 @@ mod tests {
     #[test]
     fn test_timeout_validation() {
         use proc_macro2::Span;
-        let roles = vec![Role::new(proc_macro2::Ident::new(
-            "Alice",
-            Span::call_site(),
-        )).unwrap()];
+        let roles = vec![Role::new(proc_macro2::Ident::new("Alice", Span::call_site())).unwrap()];
 
         let valid_timeout = TimeoutProtocol {
             duration: Duration::from_millis(5000),

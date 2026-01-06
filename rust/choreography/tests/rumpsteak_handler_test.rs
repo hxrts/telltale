@@ -283,7 +283,6 @@ async fn test_large_message() {
 
 #[tokio::test]
 async fn test_choice_selection() {
-
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
     let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);
@@ -319,7 +318,6 @@ async fn test_choice_selection() {
 
 #[tokio::test]
 async fn test_multiple_choices() {
-
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
     let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);
@@ -334,10 +332,14 @@ async fn test_multiple_choices() {
     let mut bob_handler = RumpsteakHandler::<TestRole, TestMessage>::new();
 
     // Test multiple choice sequences
-    let choices = vec![TestLabel::Buy, TestLabel::Sell, TestLabel::Hold, TestLabel::Cancel];
+    let choices = vec![
+        TestLabel::Buy,
+        TestLabel::Sell,
+        TestLabel::Hold,
+        TestLabel::Cancel,
+    ];
 
     for choice_label in choices {
-
         alice_handler
             .choose(&mut alice_endpoint, TestRole::Bob, choice_label)
             .await
@@ -359,7 +361,6 @@ async fn test_multiple_choices() {
 
 #[tokio::test]
 async fn test_choice_with_messages() {
-
     // Create endpoints
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
     let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);
@@ -583,7 +584,6 @@ async fn test_error_recovery() {
 
 #[tokio::test]
 async fn test_dynamic_session_flow() {
-
     let mut alice_endpoint = RumpsteakEndpoint::new(TestRole::Alice);
     let mut bob_endpoint = RumpsteakEndpoint::new(TestRole::Bob);
 

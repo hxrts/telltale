@@ -286,7 +286,6 @@ fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

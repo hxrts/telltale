@@ -29,8 +29,7 @@
 #![allow(clippy::expect_used)]
 
 use rumpsteak_aura_choreography::ast::{
-    choreography_to_global, local_to_local_r, local_types_equivalent, Choreography,
-    ConversionError,
+    choreography_to_global, local_to_local_r, local_types_equivalent, Choreography, ConversionError,
 };
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
 use rumpsteak_aura_choreography::compiler::projection::project;
@@ -46,10 +45,7 @@ fn find_role<'a>(
     choreography: &'a Choreography,
     name: &str,
 ) -> Option<&'a rumpsteak_aura_choreography::ast::Role> {
-    choreography
-        .roles
-        .iter()
-        .find(|r| r.name().to_string() == name)
+    choreography.roles.iter().find(|r| *r.name() == name)
 }
 
 /// Helper to run the cross-validation for a given DSL input and role.
@@ -62,8 +58,8 @@ fn validate_projection_equivalence(dsl_input: &str, role_name: &str) -> Result<(
         .ok_or_else(|| format!("Role {} not found in choreography", role_name))?;
 
     // Step 2: Project using DSL projection
-    let dsl_local = project(&choreography, role)
-        .map_err(|e| format!("DSL projection failed: {:?}", e))?;
+    let dsl_local =
+        project(&choreography, role).map_err(|e| format!("DSL projection failed: {:?}", e))?;
 
     // Step 3: Convert Choreography to GlobalType
     let global = match choreography_to_global(&choreography) {
@@ -438,7 +434,7 @@ fn validate_all_roles(dsl: &str) -> Vec<(String, Result<(), String>)> {
 
 #[test]
 fn test_comprehensive_validation() {
-    let test_cases = vec![
+    let test_cases = [
         // Simple protocols
         r#"protocol T1 = { roles A, B  A -> B: M }"#,
         // Request-response

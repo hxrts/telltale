@@ -22,9 +22,7 @@ fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) 
         .iter()
         .filter_map(|annotation| {
             match annotation {
-                ProtocolAnnotation::Priority(value) => {
-                    Some(quote! { .with_priority(#value) })
-                }
+                ProtocolAnnotation::Priority(value) => Some(quote! { .with_priority(#value) }),
                 ProtocolAnnotation::RuntimeTimeout(dur) => {
                     let secs = dur.as_secs();
                     Some(quote! { .with_timeout(std::time::Duration::from_secs(#secs)) })
@@ -413,9 +411,8 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                     // The handler will use tokio::select! internally
 
                     // Find OnTime and TimedOut branches
-                    let on_time_branch = branches.iter().find(|b| b.label.to_string() == "OnTime");
-                    let timed_out_branch =
-                        branches.iter().find(|b| b.label.to_string() == "TimedOut");
+                    let on_time_branch = branches.iter().find(|b| b.label == "OnTime");
+                    let timed_out_branch = branches.iter().find(|b| b.label == "TimedOut");
 
                     match (on_time_branch, timed_out_branch) {
                         (Some(on_time), Some(timed_out)) => {

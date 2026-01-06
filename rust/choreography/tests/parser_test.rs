@@ -298,14 +298,12 @@ protocol Recursive = {
             // The body should be a Send -> Send -> Var chain
             match body.as_ref() {
                 Protocol::Send { continuation, .. } => match continuation.as_ref() {
-                    Protocol::Send { continuation, .. } => {
-                        match continuation.as_ref() {
-                            Protocol::Var(var_label) => {
-                                assert_eq!(var_label.to_string(), "Loop");
-                            }
-                            other => panic!("Expected Var, got {:?}", other),
+                    Protocol::Send { continuation, .. } => match continuation.as_ref() {
+                        Protocol::Var(var_label) => {
+                            assert_eq!(var_label.to_string(), "Loop");
                         }
-                    }
+                        other => panic!("Expected Var, got {:?}", other),
+                    },
                     other => panic!("Expected Send, got {:?}", other),
                 },
                 other => panic!("Expected Send, got {:?}", other),

@@ -83,7 +83,7 @@ fn main() -> Result<()> {
     let role = choreography
         .roles
         .iter()
-        .find(|role| role.name().to_string() == config.role)
+        .find(|role| *role.name() == config.role)
         .ok_or_else(|| anyhow!("Unknown role {}", config.role))?;
 
     let local_type = project(&choreography, role)?;

@@ -189,15 +189,17 @@ fn siso_decompose_impl(
 
 /// Check if a LocalTypeR matches the given direction (Send for Output, Recv for Input)
 fn matches_direction(lt: &LocalTypeR, direction: Direction) -> bool {
-    match (direction, lt) {
-        (Direction::Output, LocalTypeR::Send { .. }) => true,
-        (Direction::Input, LocalTypeR::Recv { .. }) => true,
-        _ => false,
-    }
+    matches!(
+        (direction, lt),
+        (Direction::Output, LocalTypeR::Send { .. }) | (Direction::Input, LocalTypeR::Recv { .. })
+    )
 }
 
 /// Extract partner and branches from a LocalTypeR if it matches the direction
-fn extract_components(lt: &LocalTypeR, direction: Direction) -> Option<(&String, &Vec<(Label, LocalTypeR)>)> {
+fn extract_components(
+    lt: &LocalTypeR,
+    direction: Direction,
+) -> Option<(&String, &Vec<(Label, LocalTypeR)>)> {
     match (direction, lt) {
         (Direction::Output, LocalTypeR::Send { partner, branches }) => Some((partner, branches)),
         (Direction::Input, LocalTypeR::Recv { partner, branches }) => Some((partner, branches)),

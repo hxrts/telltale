@@ -120,10 +120,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
                 );
 
                 // Attempt to receive as the expected type M
-                match self
-                    .try_recv_as_type::<H, M>(handler, endpoint, from)
-                    .await
-                {
+                match self.try_recv_as_type::<H, M>(handler, endpoint, from).await {
                     Ok(value) => {
                         self.received_values.push(value);
                     }
@@ -233,7 +230,12 @@ impl<M, R: RoleId> Interpreter<M, R> {
                 on_timeout,
             } => {
                 // Execute the body with a timeout
-                tracing::debug!(?at, ?dur, has_fallback = on_timeout.is_some(), "Executing timeout effect");
+                tracing::debug!(
+                    ?at,
+                    ?dur,
+                    has_fallback = on_timeout.is_some(),
+                    "Executing timeout effect"
+                );
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let timeout_result = {
@@ -471,7 +473,8 @@ impl<T: ChoreoHandler> ChoreoHandlerExt for T {}
 /// Utilities for testing and simulation
 pub mod testing {
     use super::{
-        async_trait, ChoreoHandler, ChoreoResult, ChoreographyError, DeserializeOwned, RoleId, Serialize,
+        async_trait, ChoreoHandler, ChoreoResult, ChoreographyError, DeserializeOwned, RoleId,
+        Serialize,
     };
     use std::collections::VecDeque;
 
@@ -487,10 +490,7 @@ pub mod testing {
     pub enum MockOperation<R: RoleId> {
         Send { to: R, msg_type: String },
         Recv { from: R },
-        Choose {
-            at: R,
-            label: <R as RoleId>::Label,
-        },
+        Choose { at: R, label: <R as RoleId>::Label },
         Offer { from: R },
     }
 

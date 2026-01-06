@@ -193,11 +193,7 @@ fn test_generate_session_type_end() {
     let code = generate_session_type(&alice, &LocalType::End, "EmptyProtocol");
     let code_str = code.to_string();
 
-    assert!(
-        code_str.contains("End"),
-        "Should contain End: {}",
-        code_str
-    );
+    assert!(code_str.contains("End"), "Should contain End: {}", code_str);
 }
 
 // ============================================================================
@@ -411,7 +407,12 @@ fn test_generate_dynamic_role_support_static() {
         name: format_ident!("StaticWorkerProtocol"),
         namespace: None,
         roles: vec![worker.clone(), manager.clone()],
-        protocol: send(worker.clone(), manager.clone(), message("Report"), Protocol::End),
+        protocol: send(
+            worker.clone(),
+            manager.clone(),
+            message("Report"),
+            Protocol::End,
+        ),
         attrs: HashMap::new(),
     };
 
@@ -436,7 +437,12 @@ fn test_generate_dynamic_role_support_runtime() {
         name: format_ident!("DynamicWorkerProtocol"),
         namespace: None,
         roles: vec![worker.clone(), manager.clone()],
-        protocol: send(manager.clone(), worker.clone(), message("Task"), Protocol::End),
+        protocol: send(
+            manager.clone(),
+            worker.clone(),
+            message("Task"),
+            Protocol::End,
+        ),
         attrs: HashMap::new(),
     };
 
@@ -462,7 +468,12 @@ fn test_generate_dynamic_role_support_symbolic() {
         name: format_ident!("SymbolicWorkerProtocol"),
         namespace: None,
         roles: vec![worker.clone(), manager.clone()],
-        protocol: send(manager.clone(), worker.clone(), message("Task"), Protocol::End),
+        protocol: send(
+            manager.clone(),
+            worker.clone(),
+            message("Task"),
+            Protocol::End,
+        ),
         attrs: HashMap::new(),
     };
 
@@ -572,11 +583,7 @@ fn test_generate_session_type_nested_structure() {
     let code_str = code.to_string();
 
     // Should contain all operations
-    assert!(
-        code_str.contains("Send"),
-        "Should have Send: {}",
-        code_str
-    );
+    assert!(code_str.contains("Send"), "Should have Send: {}", code_str);
     assert!(
         code_str.contains("Receive"),
         "Should have Receive: {}",
@@ -592,11 +599,7 @@ fn test_generate_session_type_nested_structure() {
         "Should have Response: {}",
         code_str
     );
-    assert!(
-        code_str.contains("Ack"),
-        "Should have Ack: {}",
-        code_str
-    );
+    assert!(code_str.contains("Ack"), "Should have Ack: {}", code_str);
 }
 
 #[test]

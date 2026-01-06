@@ -34,50 +34,49 @@
 //! - "Mechanised Subject Reduction for Multiparty Asynchronous Session Types" (ECOOP 2025)
 
 // Core modules (feature-gated but on by default)
+#[cfg(feature = "coherence")]
+pub mod coherence;
 #[cfg(feature = "duality")]
 pub mod duality;
 #[cfg(feature = "merge")]
 pub mod merge;
 #[cfg(feature = "projection")]
 pub mod projection;
-#[cfg(feature = "well-formedness")]
-pub mod well_formedness;
 #[cfg(feature = "semantics")]
 pub mod semantics;
-#[cfg(feature = "coherence")]
-pub mod coherence;
+#[cfg(feature = "well-formedness")]
+pub mod well_formedness;
 
 // Optional modules
 #[cfg(feature = "bounded")]
 pub mod bounded;
 
 // Subtyping module - contains both sync and async subtyping
-pub mod subtyping;
 pub mod limits;
 pub mod policy;
+pub mod subtyping;
 
 // Re-exports for core modules
-#[cfg(feature = "duality")]
-pub use duality::{dual, is_dual};
-#[cfg(feature = "merge")]
-pub use merge::{can_merge, merge, merge_all, MergeError};
-#[cfg(feature = "projection")]
-pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
-#[cfg(feature = "well-formedness")]
-pub use well_formedness::{validate_global, validate_local, unique_labels, ValidationError};
-#[cfg(feature = "semantics")]
-pub use semantics::{
-    can_step, step, local_can_step, local_step,
-    consume_with_proof, reduces, reduces_star, good_g,
-    GlobalAction, LocalAction, LocalKind, ConsumeResult,
-};
-pub use limits::{
-    FuelSteps, YieldAfterSteps, UnfoldSteps, CacheEntries,
-    DEFAULT_SISO_UNFOLD_STEPS, DEFAULT_PROJECTOR_CACHE_ENTRIES,
-};
-pub use policy::{BreadthFirst, DepthFirst, RoundRobin, SchedulerPolicy};
 #[cfg(feature = "coherence")]
 pub use coherence::{check_coherent, projectable, CoherentG};
+#[cfg(feature = "duality")]
+pub use duality::{dual, is_dual};
+pub use limits::{
+    CacheEntries, FuelSteps, UnfoldSteps, YieldAfterSteps, DEFAULT_PROJECTOR_CACHE_ENTRIES,
+    DEFAULT_SISO_UNFOLD_STEPS,
+};
+#[cfg(feature = "merge")]
+pub use merge::{can_merge, merge, merge_all, MergeError};
+pub use policy::{BreadthFirst, DepthFirst, RoundRobin, SchedulerPolicy};
+#[cfg(feature = "projection")]
+pub use projection::{project, project_all, MemoizedProjector, ProjectionError};
+#[cfg(feature = "semantics")]
+pub use semantics::{
+    can_step, consume_with_proof, good_g, local_can_step, local_step, reduces, reduces_star, step,
+    ConsumeResult, GlobalAction, LocalAction, LocalKind,
+};
+#[cfg(feature = "well-formedness")]
+pub use well_formedness::{unique_labels, validate_global, validate_local, ValidationError};
 
 // Re-exports for optional modules
 #[cfg(feature = "bounded")]

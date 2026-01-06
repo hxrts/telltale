@@ -16,7 +16,7 @@ use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use rumpsteak_theory::coherence::{
-    action_pred, check_coherent, good_g, linear_pred, projectable, size_pred, CoherentG,
+    action_pred, check_coherent, good_g, linear_pred, projectable, size_pred,
 };
 use rumpsteak_theory::well_formedness::unique_labels;
 use rumpsteak_types::{GlobalType, Label};
@@ -150,7 +150,10 @@ fn test_coherent_three_party() {
     );
     let bundle = check_coherent(&g);
 
-    assert!(bundle.is_coherent(), "Three-party protocol should be coherent");
+    assert!(
+        bundle.is_coherent(),
+        "Three-party protocol should be coherent"
+    );
 }
 
 #[test]
@@ -260,7 +263,12 @@ fn test_incoherent_nested_duplicate_labels() {
 fn test_linear_pred_always_true() {
     // Currently a placeholder
     assert!(linear_pred(&GlobalType::End));
-    assert!(linear_pred(&GlobalType::send("A", "B", Label::new("msg"), GlobalType::End)));
+    assert!(linear_pred(&GlobalType::send(
+        "A",
+        "B",
+        Label::new("msg"),
+        GlobalType::End
+    )));
 }
 
 #[test]
@@ -455,7 +463,11 @@ fn proptest_coherence_bundle_consistency() {
         assert_eq!(bundle.linear, linear_pred(&g), "linear mismatch");
         assert_eq!(bundle.size, size_pred(&g), "size mismatch");
         assert_eq!(bundle.action, action_pred(&g), "action mismatch");
-        assert_eq!(bundle.uniq_labels, unique_labels(&g), "uniq_labels mismatch");
+        assert_eq!(
+            bundle.uniq_labels,
+            unique_labels(&g),
+            "uniq_labels mismatch"
+        );
         assert_eq!(bundle.projectable, projectable(&g), "projectable mismatch");
         assert_eq!(bundle.good, good_g(&g), "good mismatch");
 

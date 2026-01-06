@@ -68,9 +68,6 @@ serde_json = { workspace = true }
 [features]
 default = []
 
-# Serialization support for session types
-serialize = ["rumpsteak-aura-macros/serialize"]
-
 # Testing utilities (random generation, etc.)
 test-utils = ["rand"]
 
@@ -89,7 +86,6 @@ full = [
     "theory",
     "theory-async-subtyping",
     "theory-bounded",
-    "serialize",
 ]
 
 [profile.release]

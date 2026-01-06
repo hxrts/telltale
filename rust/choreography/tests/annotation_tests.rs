@@ -69,7 +69,10 @@ fn test_protocol_annotation_storage() {
         .push(ProtocolAnnotation::custom("retry", "3"));
 
     // Test getting annotations
-    assert_eq!(protocol.get_annotation("priority"), Some("high".to_string()));
+    assert_eq!(
+        protocol.get_annotation("priority"),
+        Some("high".to_string())
+    );
     assert_eq!(
         protocol.get_from_annotations().unwrap().get("timeout"),
         Some("30s".to_string())
@@ -193,7 +196,10 @@ fn test_protocol_annotation_merging() {
     protocol1.merge_annotations_from(&protocol2);
 
     // Verify merged annotations (merge is additive; first entry wins on lookup)
-    assert_eq!(protocol1.get_annotation("priority"), Some("high".to_string()));
+    assert_eq!(
+        protocol1.get_annotation("priority"),
+        Some("high".to_string())
+    );
     assert_eq!(protocol1.get_annotation("async"), Some("true".to_string()));
     assert_eq!(
         protocol1.get_from_annotations().unwrap().get("timeout"),
@@ -383,7 +389,10 @@ fn test_choice_annotation_support() {
 
     // Test Choice annotation support
     assert!(choice.add_annotation(ProtocolAnnotation::custom("decision_timeout", "10s")));
-    assert_eq!(choice.get_annotation("decision_timeout"), Some("10s".to_string()));
+    assert_eq!(
+        choice.get_annotation("decision_timeout"),
+        Some("10s".to_string())
+    );
     assert!(choice.has_any_annotations());
 }
 
@@ -492,7 +501,10 @@ fn test_annotation_different_types() {
     protocol.add_annotation(ProtocolAnnotation::custom("boolean_no", "no"));
 
     // Test string values
-    assert_eq!(protocol.get_annotation("string_value"), Some("hello".to_string()));
+    assert_eq!(
+        protocol.get_annotation("string_value"),
+        Some("hello".to_string())
+    );
 
     // Test numeric parsing
     assert_eq!(protocol.get_annotation_as::<i32>("number_value"), Some(42));

@@ -157,7 +157,6 @@ impl Role {
     }
 
     /// Create a new simple role with the given name
-    #[must_use]
     pub fn new(name: Ident) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(name, None, None, None);
         role.validate()?;
@@ -165,7 +164,6 @@ impl Role {
     }
 
     /// Create a role with a parameter (e.g., Worker[3], Worker[N], Worker[*])
-    #[must_use]
     pub fn with_param(name: Ident, param: RoleParam) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(name, Some(param), None, None);
         role.validate()?;
@@ -173,7 +171,6 @@ impl Role {
     }
 
     /// Create a role reference with an index (e.g., Worker[0], Worker[i], Worker[*])
-    #[must_use]
     pub fn with_index(name: Ident, index: RoleIndex) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(name, None, Some(index), None);
         role.validate()?;
@@ -181,7 +178,6 @@ impl Role {
     }
 
     /// Create a role reference with both param and index
-    #[must_use]
     pub fn with_param_and_index(
         name: Ident,
         param: RoleParam,
@@ -193,7 +189,6 @@ impl Role {
     }
 
     /// Create a new indexed role (e.g., Worker with index 0)
-    #[must_use]
     pub fn indexed(name: Ident, index: usize) -> RoleValidationResult<Self> {
         let role_index = RoleIndex::safe_concrete(index as u32)?;
         let role = Self::new_unchecked(name, None, Some(role_index), None);
@@ -202,7 +197,6 @@ impl Role {
     }
 
     /// Create a parameterized role with symbolic parameter (e.g., Worker[N])
-    #[must_use]
     pub fn parameterized(name: Ident, param: TokenStream) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(
             name,
@@ -215,7 +209,6 @@ impl Role {
     }
 
     /// Create a role array with a concrete size (e.g., Worker[3])
-    #[must_use]
     pub fn array(name: Ident, size: usize) -> RoleValidationResult<Self> {
         let size_token: TokenStream = size.to_string().parse().unwrap();
         let role = Self::new_unchecked(

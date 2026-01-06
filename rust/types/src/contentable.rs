@@ -135,8 +135,7 @@ impl std::error::Error for ContentableError {}
 // Helper for JSON serialization
 fn to_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableError> {
     // Use compact JSON without pretty printing for determinism
-    serde_json::to_vec(value)
-        .map_err(|e| ContentableError::SerializationFailed(e.to_string()))
+    serde_json::to_vec(value).map_err(|e| ContentableError::SerializationFailed(e.to_string()))
 }
 
 fn from_json_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
@@ -546,7 +545,10 @@ mod tests {
             let recovered = GlobalType::from_cbor_bytes(&bytes).unwrap();
 
             // Roundtrip should be α-equivalent
-            assert_eq!(g.to_cbor_bytes().unwrap(), recovered.to_cbor_bytes().unwrap());
+            assert_eq!(
+                g.to_cbor_bytes().unwrap(),
+                recovered.to_cbor_bytes().unwrap()
+            );
         }
 
         #[test]
@@ -559,7 +561,10 @@ mod tests {
             let bytes = t.to_cbor_bytes().unwrap();
             let recovered = LocalTypeR::from_cbor_bytes(&bytes).unwrap();
 
-            assert_eq!(t.to_cbor_bytes().unwrap(), recovered.to_cbor_bytes().unwrap());
+            assert_eq!(
+                t.to_cbor_bytes().unwrap(),
+                recovered.to_cbor_bytes().unwrap()
+            );
         }
 
         #[test]

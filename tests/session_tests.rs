@@ -6,6 +6,7 @@
 //! - Multi-message sessions work
 
 #![allow(clippy::unwrap_used)]
+#![allow(clippy::let_underscore_must_use)]
 
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},

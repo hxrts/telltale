@@ -96,7 +96,11 @@ pub fn protocol_span(protocol: &str, role: &RoleName, role_index: Option<u32>) -
             role = role.as_str(),
             role_index = idx
         ),
-        None => info_span!("protocol.execute", protocol = protocol, role = role.as_str()),
+        None => info_span!(
+            "protocol.execute",
+            protocol = protocol,
+            role = role.as_str()
+        ),
     }
 }
 
@@ -368,11 +372,7 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
         &mut self,
         from: Self::Role,
     ) -> Result<<Self::Role as RoleId>::Label, Self::Error> {
-        let result = self
-            .inner
-            .offer(from)
-            .instrument(self.span.clone())
-            .await;
+        let result = self.inner.offer(from).instrument(self.span.clone()).await;
         if let Ok(ref label) = result {
             trace_offer(&format_role(from), label.as_str());
         }

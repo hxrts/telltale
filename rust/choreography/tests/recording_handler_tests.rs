@@ -190,9 +190,13 @@ async fn test_recording_preserves_event_order() {
         .await
         .unwrap();
     handler
-        .send(&mut (), TestRole::Bob, &AnotherMessage {
-            data: "test".to_string(),
-        })
+        .send(
+            &mut (),
+            TestRole::Bob,
+            &AnotherMessage {
+                data: "test".to_string(),
+            },
+        )
         .await
         .unwrap();
 
@@ -372,9 +376,13 @@ async fn test_recording_tracks_message_types() {
         .await
         .unwrap();
     handler
-        .send(&mut (), TestRole::Bob, &AnotherMessage {
-            data: "test".to_string(),
-        })
+        .send(
+            &mut (),
+            TestRole::Bob,
+            &AnotherMessage {
+                data: "test".to_string(),
+            },
+        )
         .await
         .unwrap();
 
