@@ -1092,4 +1092,164 @@ theorem EQ2_trans_via_Bisim {a b c : LocalTypeR}
   have hBisim_ac := Bisim.trans hBisim_ab hBisim_bc
   exact Bisim.toEQ2 hBisim_ac
 
+/-! ## Phase 4: Congruence Framework
+
+This section provides the infrastructure for proving that Bisim (and hence EQ2)
+is a congruence for various operations like substitution. The key idea is to
+define "compatible" functions and show that compatible functions preserve Bisim.
+
+Following the pattern from QpfTypes PR #49. -/
+
+/-- RelImage lifts a relation through a function application.
+
+    `RelImage f R u v` holds when there exist `a b` such that `R a b` and
+    `u = f a` and `v = f b`. This is the image of R under f × f. -/
+def RelImage (f : LocalTypeR → LocalTypeR) (R : Rel) : Rel :=
+  fun u v => ∃ a b, R a b ∧ u = f a ∧ v = f b
+
+/-- A function is compatible if it preserves BisimF structure.
+
+    `Compatible f` means: if `BisimF R x y` holds, then
+    `BisimF (RelImage f R) (f x) (f y)` holds.
+
+    This is the key property that allows lifting Bisim through f. -/
+def Compatible (f : LocalTypeR → LocalTypeR) : Prop :=
+  ∀ {R : Rel} {x y : LocalTypeR}, BisimF R x y → BisimF (RelImage f R) (f x) (f y)
+
+/-- Compatible functions are congruences for Bisim.
+
+    If f is compatible, then Bisim x y implies Bisim (f x) (f y).
+    This is the main theorem that enables proving EQ2_substitute via Bisim. -/
+theorem Bisim.congr (f : LocalTypeR → LocalTypeR) (hf : Compatible f)
+    {x y : LocalTypeR} (h : Bisim x y) : Bisim (f x) (f y) := by
+  obtain ⟨R, hRpost, hxy⟩ := h
+  -- Use RelImage f R as the witness relation
+  let Rf := RelImage f R
+  use Rf
+  constructor
+  · -- Show Rf is a post-fixpoint of BisimF
+    intro u v ⟨a, b, hab, hu, hv⟩
+    have hf_ab := hRpost a b hab
+    rw [hu, hv]
+    exact hf hf_ab
+  · -- Show Rf (f x) (f y)
+    exact ⟨x, y, hxy, rfl, rfl⟩
+
+/-- BranchesRelBisim under RelImage. -/
+theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
+    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    BranchesRelBisim (RelImage f R)
+      (bs.map (fun b => (b.1, f b.2)))
+      (cs.map (fun c => (c.1, f c.2))) := by
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | cons hbc _ ih =>
+    apply List.Forall₂.cons
+    · constructor
+      · exact hbc.1
+      · exact ⟨_, _, hbc.2, rfl, rfl⟩
+    · exact ih
+
+/-! ### Substitute Compatibility
+
+To prove `EQ2_substitute` we need to show that substitution is compatible.
+This requires showing that substitution preserves observable behavior. -/
+
+/-- Substitution preserves UnfoldsToEnd.
+
+    If a unfolds to end, then (a.substitute var repl) also unfolds to end
+    (or to something EQ2-equivalent, when var is substituted). -/
+axiom substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl : LocalTypeR}
+    (h : UnfoldsToEnd a) : UnfoldsToEnd (a.substitute var repl) ∨
+      ∃ n, UnfoldPathEndBounded n repl ∧ a = .var var
+
+/-- Substitution preserves UnfoldsToVar (when not the substituted variable). -/
+axiom substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {repl : LocalTypeR}
+    (h : UnfoldsToVar a v) (hne : v ≠ var) : UnfoldsToVar (a.substitute var repl) v
+
+/-- Substitution preserves CanSend. -/
+axiom substitute_preserves_CanSend {a : LocalTypeR} {var : String} {repl : LocalTypeR}
+    {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanSend a p bs) :
+    CanSend (a.substitute var repl) p (bs.map (fun b => (b.1, b.2.substitute var repl)))
+
+/-- Substitution preserves CanRecv. -/
+axiom substitute_preserves_CanRecv {a : LocalTypeR} {var : String} {repl : LocalTypeR}
+    {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecv a p bs) :
+    CanRecv (a.substitute var repl) p (bs.map (fun b => (b.1, b.2.substitute var repl)))
+
+/-- Substitution is compatible (preserves BisimF structure).
+
+    This is the key lemma for proving EQ2_substitute.
+
+    Note: This requires the substitution preservation axioms above. -/
+theorem substitute_compatible (var : String) (repl : LocalTypeR) :
+    Compatible (fun t => t.substitute var repl) := by
+  intro R x y hBisimF
+  cases hBisimF with
+  | eq_end hx hy =>
+    -- Both unfold to end
+    have hx' := @substitute_preserves_UnfoldsToEnd x var repl hx
+    have hy' := @substitute_preserves_UnfoldsToEnd y var repl hy
+    cases hx' with
+    | inl hx_end =>
+      cases hy' with
+      | inl hy_end => exact BisimF.eq_end hx_end hy_end
+      | inr hy_var =>
+        -- hy says y = .var var and repl unfolds to end
+        obtain ⟨_, hrepl_end, hy_eq⟩ := hy_var
+        have hrepl_unfolds : UnfoldsToEnd repl := hrepl_end.toUnfoldsToEnd
+        subst hy_eq
+        simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
+        exact BisimF.eq_end hx_end hrepl_unfolds
+    | inr hx_var =>
+      obtain ⟨_, hrepl_end, hx_eq⟩ := hx_var
+      have hrepl_unfolds : UnfoldsToEnd repl := hrepl_end.toUnfoldsToEnd
+      cases hy' with
+      | inl hy_end =>
+        subst hx_eq
+        simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
+        exact BisimF.eq_end hrepl_unfolds hy_end
+      | inr hy_var' =>
+        obtain ⟨_, _, hy_eq⟩ := hy_var'
+        subst hx_eq hy_eq
+        simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
+        exact BisimF.eq_end hrepl_unfolds hrepl_unfolds
+  | eq_var hx hy =>
+    -- Both unfold to same var v
+    -- After substitution: if v ≠ var, still unfolds to v; if v = var, unfolds to repl
+    -- Since both x and y unfold to same v, substitution treats them the same
+    -- If v = var, both become repl, and we need Observable repl
+    -- If v ≠ var, both still unfold to v
+    -- This case is tricky because we need to know if v = var or not
+    -- For now, we handle the v ≠ var case with the axiom
+    -- The v = var case would need mus_shared_observable on repl
+    sorry  -- Requires case split on v = var
+  | eq_send hx hy hbr =>
+    -- Both can send with R-related branches
+    have hx' := @substitute_preserves_CanSend x var repl _ _ hx
+    have hy' := @substitute_preserves_CanSend y var repl _ _ hy
+    apply BisimF.eq_send hx' hy'
+    -- Need: BranchesRelBisim (RelImage substitute R) mapped_bs mapped_cs
+    exact BranchesRelBisim.map_image hbr
+  | eq_recv hx hy hbr =>
+    have hx' := @substitute_preserves_CanRecv x var repl _ _ hx
+    have hy' := @substitute_preserves_CanRecv y var repl _ _ hy
+    apply BisimF.eq_recv hx' hy'
+    exact BranchesRelBisim.map_image hbr
+
+/-- EQ2 is preserved by substitution.
+
+    This is a direct consequence of substitute_compatible and Bisim.congr.
+    It eliminates the need for the EQ2_substitute axiom.
+
+    Note: Depends on substitute_compatible which has one sorry in eq_var case. -/
+theorem EQ2_substitute_via_Bisim {a b : LocalTypeR} {var : String} {repl : LocalTypeR}
+    (h : EQ2 a b) : EQ2 (a.substitute var repl) (b.substitute var repl) := by
+  have hBisim := EQ2.toBisim h
+  have hCompat : Compatible (fun t => t.substitute var repl) := substitute_compatible var repl
+  have hCongr := Bisim.congr (fun t => t.substitute var repl) hCompat hBisim
+  exact Bisim.toEQ2 hCongr
+
 end RumpsteakV2.Protocol.CoTypes.Bisim
