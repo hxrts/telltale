@@ -2,6 +2,7 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
+#![allow(unreachable_code)]
 
 // Ring Protocol with Choices - Demonstrates Infinite Recursive Session Types
 //
