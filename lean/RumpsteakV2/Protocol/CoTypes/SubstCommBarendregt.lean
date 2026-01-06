@@ -60,22 +60,77 @@ axiom unfold_subst_eq_subst_unfold (a : LocalTypeR) (var : String) (repl : Local
     (hbar : notBoundAt var a = true) (hfresh : ∀ t, isFreeIn t repl = false) :
     (a.substitute var repl).unfold = (a.unfold).substitute var repl
 
-/-- notBoundAt is preserved through substitution with a closed term. -/
-axiom notBoundAt_subst_closed (v var : String) (a repl : LocalTypeR)
-    (hbar : notBoundAt v a = true)
-    (hfresh : ∀ t, isFreeIn t repl = false) :
-    notBoundAt v (a.substitute var repl) = true
+mutual
+  /-- notBoundAt is preserved through substitution when repl also satisfies it. -/
+  theorem notBoundAt_subst (v var : String) (a repl : LocalTypeR)
+      (hbar : notBoundAt v a = true)
+      (hvarRepl : notBoundAt v repl = true) :
+      notBoundAt v (a.substitute var repl) = true := by
+    cases a with
+    | «end» => simp [LocalTypeR.substitute, notBoundAt]
+    | var w =>
+        simp only [LocalTypeR.substitute]
+        by_cases hwvar : w == var
+        · simp only [hwvar, ↓reduceIte]; exact hvarRepl
+        · simp only [hwvar, Bool.false_eq_true, ↓reduceIte, notBoundAt]
+    | send p bs =>
+        simp only [LocalTypeR.substitute, notBoundAt]
+        exact notBoundAt_subst_branches v var bs repl (by unfold notBoundAt at hbar; exact hbar) hvarRepl
+    | recv p bs =>
+        simp only [LocalTypeR.substitute, notBoundAt]
+        exact notBoundAt_subst_branches v var bs repl (by unfold notBoundAt at hbar; exact hbar) hvarRepl
+    | mu t body =>
+        simp only [LocalTypeR.substitute]
+        by_cases htvar : t == var
+        · -- Shadowed: substitution is identity
+          simp only [htvar, ↓reduceIte]; exact hbar
+        · -- Not shadowed: recurse
+          simp only [htvar, Bool.false_eq_true, ↓reduceIte, notBoundAt]
+          unfold notBoundAt at hbar
+          have ⟨hvt, hbarBody⟩ := Bool.and_eq_true_iff.mp hbar
+          exact Bool.and_eq_true_iff.mpr ⟨hvt, notBoundAt_subst v var body repl hbarBody hvarRepl⟩
+  termination_by sizeOf a
 
-/-- notBoundAt is preserved through substitution when repl also satisfies it. -/
-axiom notBoundAt_subst (v var : String) (a repl : LocalTypeR)
-    (hbar : notBoundAt v a = true)
-    (hvarRepl : notBoundAt v repl = true) :
-    notBoundAt v (a.substitute var repl) = true
+  /-- notBoundAt for branches is preserved through substitution. -/
+  theorem notBoundAt_subst_branches (v var : String) (bs : List (Label × LocalTypeR)) (repl : LocalTypeR)
+      (hbar : notBoundAtBranches v bs = true)
+      (hvarRepl : notBoundAt v repl = true) :
+      notBoundAtBranches v (LocalTypeR.substituteBranches bs var repl) = true :=
+    match bs, hbar with
+    | [], _ => by simp [LocalTypeR.substituteBranches, notBoundAtBranches]
+    | hd :: tl, hbar => by
+        simp only [LocalTypeR.substituteBranches, notBoundAtBranches]
+        unfold notBoundAtBranches at hbar
+        have ⟨hbarHd, hbarTl⟩ := Bool.and_eq_true_iff.mp hbar
+        exact Bool.and_eq_true_iff.mpr ⟨notBoundAt_subst v var hd.2 repl hbarHd hvarRepl,
+          notBoundAt_subst_branches v var tl repl hbarTl hvarRepl⟩
+  termination_by sizeOf bs
+  decreasing_by
+    all_goals simp_wf
+    all_goals simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
+    all_goals omega
+end
 
 /-- notBoundAt is preserved through unfolding. -/
-axiom notBoundAt_unfold (v : String) (a : LocalTypeR)
+theorem notBoundAt_unfold (v : String) (a : LocalTypeR)
     (hbar : notBoundAt v a = true) :
-    notBoundAt v a.unfold = true
+    notBoundAt v a.unfold = true := by
+  cases a with
+  | «end» | var _ | send _ _ | recv _ _ =>
+      -- Non-mu cases: unfold is identity
+      simp only [LocalTypeR.unfold]; exact hbar
+  | mu t body =>
+      -- unfold (.mu t body) = body.substitute t (.mu t body)
+      simp only [LocalTypeR.unfold]
+      -- hbar : notBoundAt v (.mu t body) = true
+      -- means: (v != t) && notBoundAt v body = true
+      unfold notBoundAt at hbar
+      have ⟨hvt, hbarBody⟩ := Bool.and_eq_true_iff.mp hbar
+      -- Apply notBoundAt_subst: need notBoundAt v body and notBoundAt v (.mu t body)
+      apply notBoundAt_subst v t body (.mu t body) hbarBody
+      -- Need: notBoundAt v (.mu t body) = true
+      unfold notBoundAt
+      exact Bool.and_eq_true_iff.mpr ⟨hvt, hbarBody⟩
 
 /-- Key substitution commutation lemma.
 
