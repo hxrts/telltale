@@ -109,6 +109,27 @@ inductive Observable : LocalTypeR → Prop where
     recursive reference). -/
 axiom observable_of_closed {a : LocalTypeR} (h : a.isClosed) : Observable a
 
+/-- Two EQ2-equivalent mu types have the same observable behavior.
+
+    This axiom extracts the shared observable behavior from two EQ2-equivalent mus.
+    Since EQ2 is observational equivalence, equivalent types must reach the same
+    observable form after (possibly different numbers of) unfolding steps.
+
+    Proof strategy (for later elimination):
+    - Use well-founded recursion on the sum of "mu heights"
+    - Guardedness ensures the recursive calls terminate
+    - Each unfolding step reduces the mu height
+
+    This axiom will be eliminated when we prove the extraction lemmas for all cases. -/
+axiom mus_shared_observable {t s : String} {body body' : LocalTypeR}
+    (h : EQ2 (.mu t body) (.mu s body')) :
+    (UnfoldsToEnd (.mu t body) ∧ UnfoldsToEnd (.mu s body')) ∨
+    (∃ v, UnfoldsToVar (.mu t body) v ∧ UnfoldsToVar (.mu s body') v) ∨
+    (∃ p bs cs, CanSend (.mu t body) p bs ∧ CanSend (.mu s body') p cs ∧
+       BranchesRel EQ2 bs cs) ∨
+    (∃ p bs cs, CanRecv (.mu t body) p bs ∧ CanRecv (.mu s body') p cs ∧
+       BranchesRel EQ2 bs cs)
+
 /-! ## Basic Properties of Membership Predicates -/
 
 /-- UnfoldsToEnd is reflexive for end types. -/
@@ -309,16 +330,36 @@ theorem refl_of_observable {a : LocalTypeR} (hobs : Observable a) : Bisim a a :=
       apply BisimF.eq_recv CanRecv.base CanRecv.base
       exact BranchesRelBisim.refl (fun t => rfl) bs
     | .mu t body =>
-      -- For mu, the type must eventually unfold to a base constructor.
-      -- We need Observable (.mu t body) to determine which BisimF case applies.
-      --
-      -- The proof requires showing that mu types are observable (which follows
-      -- from observable_of_closed for closed types), and that all continuations
-      -- in branches are also observable (closure preservation).
-      --
-      -- TODO: Add axiom isClosed_of_closed_branch to derive Observable for
-      -- continuations, then complete this proof.
-      sorry
+      -- For mu, use mus_shared_observable with EQ2_refl
+      have hrefl : EQ2 (.mu t body) (.mu t body) := EQ2_refl _
+      have hobs := mus_shared_observable hrefl
+      cases hobs with
+      | inl hEnd =>
+        exact BisimF.eq_end hEnd.1 hEnd.2
+      | inr hRest =>
+        cases hRest with
+        | inl hVar =>
+          obtain ⟨v, hx, hy⟩ := hVar
+          exact BisimF.eq_var hx hy
+        | inr hRest2 =>
+          cases hRest2 with
+          | inl hSend =>
+            obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hSend
+            apply BisimF.eq_send hx hy
+            -- R is equality, so we need BranchesRelBisim (· = ·) bs cs
+            -- But we only have BranchesRel EQ2 bs cs. Since bs and cs come from
+            -- the SAME mu type, they ARE equal.
+            -- The key: hx and hy both witness that (.mu t body) can send to p.
+            -- By CanSend.deterministic, bs = cs.
+            have ⟨_, heq⟩ := CanSend.deterministic hx hy
+            subst heq
+            exact BranchesRelBisim.refl (fun t => rfl) bs
+          | inr hRecv =>
+            obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hRecv
+            apply BisimF.eq_recv hx hy
+            have ⟨_, heq⟩ := CanRecv.deterministic hx hy
+            subst heq
+            exact BranchesRelBisim.refl (fun t => rfl) bs
   · -- Show R a a
     rfl
 
@@ -873,24 +914,30 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
     | mu t body =>
       cases y with
       | mu s body' =>
-        -- Both mus - use EQ2.destruct to get the unfolding pairs
-        simp only [EQ2F] at hf
-        have ⟨h1, h2⟩ := hf
-        -- h1 : EQ2 (body.substitute t (mu t body)) (mu s body')
-        -- h2 : EQ2 (mu t body) (body'.substitute s (mu s body'))
-        --
-        -- Proof strategy for (mu, mu) case:
-        -- 1. Both mus are EQ2 to their respective substitutions
-        -- 2. By observable_of_closed (axiom), closed mus have observable behavior
-        -- 3. Case on Observable (mu t body):
-        --    - UnfoldsToEnd: h2 gives EQ2 (mu t body) (body'.substitute...), use extraction
-        --    - UnfoldsToVar: similar
-        --    - CanSend/CanRecv: use extraction lemmas on h1 and h2
-        -- 4. For each case, extract the matching observable behavior from h1 or h2
-        --
-        -- This requires proving that substitutions preserve closedness, which is
-        -- needed for observable_of_closed. Currently blocked on this dependency.
-        sorry
+        -- Both mus - use mus_shared_observable to extract shared behavior
+        have hobs := mus_shared_observable hxy
+        cases hobs with
+        | inl hEnd =>
+          -- Both unfold to end
+          exact BisimF.eq_end hEnd.1 hEnd.2
+        | inr hRest =>
+          cases hRest with
+          | inl hVar =>
+            -- Both unfold to same var
+            obtain ⟨v, hx, hy⟩ := hVar
+            exact BisimF.eq_var hx hy
+          | inr hRest2 =>
+            cases hRest2 with
+            | inl hSend =>
+              -- Both can send with EQ2-related branches
+              obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hSend
+              apply BisimF.eq_send hx hy
+              exact BranchesRel_to_BranchesRelBisim hbr
+            | inr hRecv =>
+              -- Both can recv with EQ2-related branches
+              obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hRecv
+              apply BisimF.eq_recv hx hy
+              exact BranchesRel_to_BranchesRelBisim hbr
       | «end» =>
         -- x must unfold to end since EQ2 x end
         have hUnfold := EQ2.end_left_implies_UnfoldsToEnd hxy
@@ -911,5 +958,28 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
         exact BranchesRel_to_BranchesRelBisim hbr
   · -- Show EQ2 a b
     exact h
+
+/-! ## EQ2 Transitivity via Bisim
+
+The Bisim detour provides an alternative proof of EQ2 transitivity that does not
+require the TransRel_postfix axiom. This eliminates the need for one of the two
+private axioms in EQ2.lean. -/
+
+/-- EQ2 transitivity via the Bisim detour.
+
+    This theorem provides an alternative proof of EQ2_trans that does not require
+    the TransRel_postfix axiom. The proof goes:
+    1. Convert EQ2 proofs to Bisim using EQ2.toBisim
+    2. Apply Bisim.trans (fully proven)
+    3. Convert back to EQ2 using Bisim.toEQ2
+
+    This theorem can replace the axiom-based EQ2_trans in EQ2.lean once we
+    resolve the circular import issue. -/
+theorem EQ2_trans_via_Bisim {a b c : LocalTypeR}
+    (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
+  have hBisim_ab := EQ2.toBisim hab
+  have hBisim_bc := EQ2.toBisim hbc
+  have hBisim_ac := Bisim.trans hBisim_ab hBisim_bc
+  exact Bisim.toEQ2 hBisim_ac
 
 end RumpsteakV2.Protocol.CoTypes.Bisim

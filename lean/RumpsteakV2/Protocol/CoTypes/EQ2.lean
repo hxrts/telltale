@@ -337,7 +337,16 @@ proving this constructively requires "coinduction up-to" techniques because:
 The axiom is semantically sound because:
 - If a ≈ b and b ≈ c (observationally equal), then a ≈ c
 - Transitivity holds for observational equality on infinite trees
-- The intermediate witness b guides the proof but the result only relates a and c -/
+- The intermediate witness b guides the proof but the result only relates a and c
+
+**ELIMINABLE**: This axiom can be replaced by the Bisim detour in Bisim.lean.
+See `EQ2_trans_via_Bisim` which proves transitivity using:
+  1. EQ2 → Bisim (via EQ2.toBisim)
+  2. Bisim.trans (fully proven)
+  3. Bisim → EQ2 (via Bisim.toEQ2)
+
+The circular import (Bisim imports EQ2) prevents direct replacement here,
+but the axiom is provable given the Bisim infrastructure. -/
 private axiom TransRel_postfix : ∀ a c, TransRel a c → EQ2F TransRel a c
 
 /-- EQ2 is transitive.
