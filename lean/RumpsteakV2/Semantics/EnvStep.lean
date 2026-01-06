@@ -156,23 +156,4 @@ theorem envstepOnto_preserves_dom {S : List String} {env env' : ProjectedEnv}
 These definitions are kept for backward compatibility but should be migrated
 to use the fixed role set approach. -/
 
-/-- Global step preserves roles (DEPRECATED: use step_roles_subset instead).
-
-This axiom is semantically incorrect in general - roles can shrink during stepping.
-It is kept for backward compatibility with existing proofs that assume role equality.
-New code should use `step_roles_subset` and `projEnvOnto` instead. -/
-@[deprecated step_roles_subset (since := "2025-01-05")]
-axiom step_preserves_roles (g g' : GlobalType) (act : GlobalActionR)
-    (h : step g act g') : g.roles = g'.roles
-
-/-- Environment step preserves domain (uses deprecated step_preserves_roles). -/
-@[deprecated envstepOnto_preserves_dom (since := "2025-01-05")]
-theorem envstep_preserves_dom {env env' : ProjectedEnv} {act : GlobalActionR}
-    (hstep : EnvStep env act env') :
-    env.map Prod.fst = env'.map Prod.fst := by
-  cases hstep with
-  | of_global g g' _ hstep' =>
-      simp only [projEnv_dom]
-      exact step_preserves_roles g g' _ hstep'
-
 end RumpsteakV2.Semantics.EnvStep

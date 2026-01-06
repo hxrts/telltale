@@ -333,11 +333,15 @@ theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalType
       exact absurd hlt (by decide)
 termination_by sizeOf lt
 
-/-- trans produces muve types for non-participants.
-    When role doesn't participate in g, trans g role is muve.
+/-! ### Structural Well-Formedness
 
-    Proven by well-founded recursion on global type size. -/
--- Helper: wellFormed preservation for mu body
+Following the Coq development, we separate structural properties (allCommsNonEmpty, noSelfComm)
+from variable binding (allVarsBound). The structural properties compose well with mu bodies,
+while allVarsBound does not (body.allVarsBound [t] doesn't imply body.allVarsBound []).
+
+This avoids the semantic gap that arises from using full wellFormed. -/
+
+-- Helper: wellFormed preservation for mu body (structural parts only)
 private theorem wellFormed_mu_body (t : String) (body : GlobalType)
     (hwf : (GlobalType.mu t body).wellFormed = true) :
     body.allCommsNonEmpty = true ∧ body.noSelfComm = true := by
@@ -376,47 +380,36 @@ private theorem wellFormed_comm_cont (sender receiver : String) (pair : Label ×
   -- Goal: (avb ∧ acne) ∧ nsc (left-associative due to Bool.and_eq_true)
   exact ⟨⟨hwf.1.1.1, hwf.1.2.2.1⟩, hwf.2.2.1⟩
 
-theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
-    (hnotpart : ¬ part_of2 role g) (hwf : g.wellFormed = true) :
+/-- Auxiliary version using structural properties that compose with mu.
+    This avoids the semantic gap where body.allVarsBound [] cannot be proven
+    from (mu t body).wellFormed. -/
+private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
+    (hnotpart : ¬ part_of2 role g)
+    (hne : g.allCommsNonEmpty = true) (hnsc : g.noSelfComm = true) :
     isMuve (Trans.trans g role) = true := by
   match g with
   | .end =>
-      -- trans .end _ = .end, isMuve .end = true
       simp only [Trans.trans, isMuve]
   | .var _ =>
-      -- trans (.var t) _ = .var t, isMuve (.var t) = true
       simp only [Trans.trans, isMuve]
   | .mu t body =>
-      -- trans (.mu t body) role = if lcontractive then .mu t (trans body role) else .end
       rw [Trans.trans.eq_3]
       by_cases hlc : lcontractive body
-      · -- Contractive case: .mu t (trans body role)
-        simp only [hlc, ↓reduceIte, isMuve]
+      · simp only [hlc, ↓reduceIte, isMuve]
         have hnotpart_body : ¬ part_of2 role body := by
           intro hbody
           exact hnotpart (part_of2.intro _ (part_ofF.mu t body hbody))
-        -- For body wellFormedness, we can construct it from parts
-        have ⟨hne, hnsc⟩ := wellFormed_mu_body t body hwf
-        -- Need: body.allVarsBound [] = true for full wellFormed
-        -- This follows from mu wellFormedness + body only uses t
-        -- For now, use sorry for this part
-        have hwf_body : body.wellFormed = true := by
-          simp only [GlobalType.wellFormed, Bool.and_eq_true]
-          -- Goal: (body.allVarsBound ∧ body.allCommsNonEmpty) ∧ body.noSelfComm
-          -- We have hne : body.allCommsNonEmpty = true
-          -- We have hnsc : body.noSelfComm = true
-          -- For body.allVarsBound [], we need: all vars in body are bound
-          -- But mu t body wellFormed gives body.allVarsBound [t], not body.allVarsBound []
-          -- This is a semantic gap: body may reference t which is bound by mu
-          -- However, the proof doesn't actually need full wellFormed for correctness
-          -- Use sorry for the allVarsBound part
-          refine ⟨⟨?_, hne⟩, hnsc⟩
-          sorry
+        -- Extract structural properties for body (these DO compose with mu)
+        have hne_body : body.allCommsNonEmpty = true := by
+          simp only [GlobalType.allCommsNonEmpty] at hne
+          exact hne
+        have hnsc_body : body.noSelfComm = true := by
+          simp only [GlobalType.noSelfComm] at hnsc
+          exact hnsc
         have hlt : sizeOf body < sizeOf (GlobalType.mu t body) := by
           simp only [GlobalType.mu.sizeOf_spec]; omega
-        exact trans_muve_of_not_part_of2 body role hnotpart_body hwf_body
-      · -- Non-contractive case: .end
-        simp only [hlc, Bool.false_eq_true, ↓reduceIte, isMuve]
+        exact trans_muve_of_not_part_of2_aux body role hnotpart_body hne_body hnsc_body
+      · simp only [hlc, Bool.false_eq_true, ↓reduceIte, isMuve]
   | .comm sender receiver branches =>
       by_cases hrole_sender : role == sender
       · have hpart : part_of2 role (.comm sender receiver branches) := by
@@ -432,30 +425,44 @@ theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
           exact absurd hpart hnotpart
         · cases branches with
           | nil =>
-              rw [Trans.trans.eq_4]
-              simp only [hrole_sender, Bool.false_eq_true, ↓reduceIte, hrole_receiver, isMuve]
-          | cons pair rest =>
+              simp only [Trans.trans, hrole_sender, Bool.false_eq_true, ↓reduceIte,
+                         hrole_receiver, isMuve]
+          | cons first remaining =>
+              -- trans unfolds to trans first.2 role for non-participant
               rw [Trans.trans.eq_5]
               simp only [hrole_sender, Bool.false_eq_true, ↓reduceIte, hrole_receiver]
-              have hnotpart_cont : ¬ part_of2 role pair.2 := by
+              have hnotpart_cont : ¬ part_of2 role first.2 := by
                 intro hcont
-                have hpart : part_of2 role (.comm sender receiver (pair :: rest)) := by
-                  apply part_of2.intro
-                  apply part_ofF.comm_branch sender receiver pair.1 pair.2 (pair :: rest)
-                  · simp only [List.mem_cons, true_or]
-                  · exact hcont
-                exact absurd hpart hnotpart
-              have hwf_cont : pair.2.wellFormed = true := wellFormed_comm_cont sender receiver pair rest hwf
-              exact trans_muve_of_not_part_of2 pair.2 role hnotpart_cont hwf_cont
+                have hmem : (first.1, first.2) ∈ first :: remaining := by simp
+                exact hnotpart (part_of2.intro _ (part_ofF.comm_branch sender receiver
+                  first.1 first.2 (first :: remaining) hmem hcont))
+              -- Extract structural properties for first.2
+              have hne_cont : first.2.allCommsNonEmpty = true := by
+                simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                           Bool.and_eq_true] at hne
+                exact hne.2.1
+              have hnsc_cont : first.2.noSelfComm = true := by
+                simp only [GlobalType.noSelfComm, GlobalType.noSelfCommBranches,
+                           Bool.and_eq_true] at hnsc
+                exact hnsc.2.1
+              have hlt : sizeOf first.2 < sizeOf (GlobalType.comm sender receiver (first :: remaining)) :=
+                sizeOf_pair_snd_lt_comm sender receiver first remaining
+              exact trans_muve_of_not_part_of2_aux first.2 role hnotpart_cont hne_cont hnsc_cont
 termination_by sizeOf g
 decreasing_by
-  -- Both goals are sizeOf inequalities
   all_goals simp_wf
-  -- Goal 1 (mu case): sizeOf body < sizeOf (GlobalType.mu t body)
-  · omega
-  -- Goal 2 (comm case): After simp_wf, the goal has sizeOf_1 applied
-  -- Use sorry - the proof is semantically correct but needs proper simp setup
-  · sorry
+  · omega  -- mu case
+  · rename_i heq; subst heq
+    simp only [List.cons.sizeOf_spec]
+    have hfst : sizeOf first = 1 + sizeOf first.1 + sizeOf first.2 := rfl
+    simp only [hfst]; omega
+
+theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
+    (hnotpart : ¬ part_of2 role g) (hwf : g.wellFormed = true) :
+    isMuve (Trans.trans g role) = true := by
+  -- Extract structural properties from wellFormed
+  simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+  exact trans_muve_of_not_part_of2_aux g role hnotpart hwf.1.2 hwf.2
 
 /-- Relation for proving EQ2 .end X for closed muve types.
     ClosedMuveRel a b holds when a = .end and b is a closed muve type. -/
@@ -581,6 +588,82 @@ the local type candidate to be a "muve" type (mu-var-end chain). This is because
 Combined with wellFormedness (which implies closedness), this means non-participant
 projections are closed muve types, which are EQ2-equivalent to .end. -/
 
+/-- Auxiliary: Non-participant projections are muve types.
+    Uses structural properties only (allCommsNonEmpty, noSelfComm) to avoid the semantic gap
+    where body.allVarsBound [t] does not imply body.allVarsBound []. -/
+private theorem CProject_muve_of_not_part_of2_aux : (g : GlobalType) → (role : String) → (lt : LocalTypeR) →
+    CProject g role lt →
+    ¬part_of2 role g →
+    g.allCommsNonEmpty = true →
+    isMuve lt = true
+  | .end, _, lt, hproj, _, _ => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | «end» => rfl
+      | _ => exact False.elim hF
+  | .var _, _, lt, hproj, _, _ => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | var _ => rfl
+      | _ => exact False.elim (by simp_all)
+  | .mu t body, role, lt, hproj, hnotpart, hne => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | mu t' candBody =>
+          simp only [isMuve]
+          obtain ⟨_, _, hbody_proj⟩ := hF
+          have hnotpart_body : ¬part_of2 role body := not_part_of2_mu hnotpart
+          -- allCommsNonEmpty composes with mu
+          have hne_body : body.allCommsNonEmpty = true := by
+            simp only [GlobalType.allCommsNonEmpty] at hne; exact hne
+          exact CProject_muve_of_not_part_of2_aux body role candBody hbody_proj hnotpart_body hne_body
+      | «end» => exact False.elim (by simp_all)
+      | var _ => exact False.elim (by simp_all)
+      | send _ _ => exact False.elim (by simp_all)
+      | recv _ _ => exact False.elim (by simp_all)
+  | .comm _ _ [], _, _, _, _, hne => by
+      -- Empty branches contradicts allCommsNonEmpty: hne contains true = false
+      simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true,
+                 decide_eq_true_eq] at hne
+      exact Bool.noConfusion hne.1
+  | .comm sender receiver (first :: rest), role, lt, hproj, hnotpart, hne => by
+      have hF := CProject_destruct hproj
+      have hns : role ≠ sender := by
+        intro heq; subst heq
+        have hpart : part_of2 role (.comm role receiver (first :: rest)) :=
+          part_of2.intro _ (part_ofF.comm_direct _ _ _ (by simp [is_participant]))
+        exact hnotpart hpart
+      have hnr : role ≠ receiver := by
+        intro heq; subst heq
+        have hpart : part_of2 role (.comm sender role (first :: rest)) :=
+          part_of2.intro _ (part_ofF.comm_direct _ _ _ (by simp [is_participant]))
+        exact hnotpart hpart
+      dsimp only [CProjectF] at hF
+      simp only [hns, hnr, ↓reduceIte] at hF
+      -- hF : AllBranchesProj CProject (first :: rest) role lt
+      have hmem : first ∈ first :: rest := by simp
+      have hfirst_proj : CProject first.2 role lt := hF first hmem
+      have hnotpart_first : ¬part_of2 role first.2 := by
+        intro hpart
+        have hpart_g : part_of2 role (.comm sender receiver (first :: rest)) :=
+          part_of2.intro _ (part_ofF.comm_branch _ _ first.1 first.2 _ hmem hpart)
+        exact hnotpart hpart_g
+      -- allCommsNonEmpty composes with continuations
+      have hne_first : first.2.allCommsNonEmpty = true := by
+        simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                   Bool.and_eq_true] at hne
+        exact hne.2.1
+      exact CProject_muve_of_not_part_of2_aux first.2 role lt hfirst_proj hnotpart_first hne_first
+termination_by g _ _ _ _ _ => sizeOf g
+decreasing_by
+  all_goals simp_wf
+  all_goals
+    simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]
+    omega
+
 /-- Non-participant projections are muve types.
 
 If a role doesn't participate in a global type, any CProject candidate
@@ -592,13 +675,141 @@ theorem CProject_muve_of_not_part_of2 (g : GlobalType) (role : String) (lt : Loc
     (hnotpart : ¬part_of2 role g)
     (hwf : g.wellFormed = true) :
     isMuve lt = true := by
-  -- Use trans_muve_of_not_part_of2 and CProject_implies_EQ2_trans
-  -- trans produces muve for non-participants, and CProject implies EQ2 to trans
-  -- Muve is preserved under EQ2 for non-participants
-  -- Simpler: use that trans g role is muve, and lt is EQ2-equivalent
-  -- But CProject_implies_EQ2_trans is an axiom we're trying to prove later
-  -- So instead, directly analyze CProject structure
-  sorry
+  have hne : g.allCommsNonEmpty = true := by
+    simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+    exact hwf.1.2
+  exact CProject_muve_of_not_part_of2_aux g role lt hproj hnotpart hne
+
+/-- Auxiliary: Non-participant projections have free vars contained in bound vars.
+    This is the generalized version that tracks bound variables through mu bindings.
+
+    Key insight: allVarsBound bvars means freeVars ⊆ bvars. For mu, the bound var is
+    added to bvars, allowing the recursive call to track that var properly. -/
+private theorem CProject_freeVars_subset_bvars : (g : GlobalType) → (role : String) →
+    (lt : LocalTypeR) → (bvars : List String) →
+    CProject g role lt →
+    ¬part_of2 role g →
+    g.allVarsBound bvars = true →
+    g.allCommsNonEmpty = true →
+    ∀ v, v ∈ lt.freeVars → v ∈ bvars
+  | .end, _, lt, _, hproj, _, _, _ => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | «end» => intro v hv; simp [LocalTypeR.freeVars] at hv
+      | _ => exact False.elim hF
+  | .var t, _, lt, bvars, hproj, _, havb, _ => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | var s =>
+          intro v hv
+          simp only [LocalTypeR.freeVars, List.mem_singleton] at hv
+          -- hF should give us s = t (local var matches global var)
+          -- But CProjectF at var gives just `true` for any local type matching structure
+          -- Actually for var, CProjectF (var t) role lt = (lt = var t) in some sense
+          -- Let's extract: hF tells us lt = var t, but we already have lt = var s from pattern match
+          -- So s must equal t
+          -- CProjectF for .var t gives: ∃ s, lt = var s ∧ s = t (simplified)
+          simp only at hF
+          -- From hF we get that lt must be var t
+          -- Since we pattern matched lt = var s, we need s = t
+          -- The hF for var case in CProjectF is: lt = .var t
+          -- But we pattern matched lt = .var s, so...
+          -- Actually, after cases lt with | var s =>, hF should imply s = t
+          -- For var case, CProjectF (.var t) role (.var s) = (s = t)
+          have hst : s = t := hF.symm
+          subst hst
+          subst hv
+          -- Now we need to show t ∈ bvars
+          simp only [GlobalType.allVarsBound] at havb
+          simp only [List.contains] at havb
+          rw [List.elem_eq_mem] at havb
+          exact of_decide_eq_true havb
+      | _ => exact False.elim (by simp_all)
+  | .mu t body, role, lt, bvars, hproj, hnotpart, havb, hne => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | mu t' candBody =>
+          obtain ⟨heq, _, hbody_proj⟩ := hF
+          subst heq
+          intro v hv
+          -- freeVars of mu t candBody = candBody.freeVars.filter (· != t)
+          simp only [LocalTypeR.freeVars, List.mem_filter, bne_iff_ne, ne_eq] at hv
+          obtain ⟨hv_in, hv_ne⟩ := hv
+          -- By IH, candBody.freeVars ⊆ t :: bvars
+          have hnotpart_body : ¬part_of2 role body := not_part_of2_mu hnotpart
+          simp only [GlobalType.allVarsBound] at havb
+          simp only [GlobalType.allCommsNonEmpty] at hne
+          have hv_in_extended :=
+            CProject_freeVars_subset_bvars body role candBody (t :: bvars)
+              hbody_proj hnotpart_body havb hne v hv_in
+          -- hv_in_extended : v ∈ t :: bvars
+          simp only [List.mem_cons] at hv_in_extended
+          cases hv_in_extended with
+          | inl heq => exact False.elim (hv_ne heq)
+          | inr hin => exact hin
+      | «end» => exact False.elim (by simp_all)
+      | var _ => exact False.elim (by simp_all)
+      | send _ _ => exact False.elim (by simp_all)
+      | recv _ _ => exact False.elim (by simp_all)
+  | .comm _ _ [], _, _, _, _, _, _, hne => by
+      simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true,
+                 decide_eq_true_eq] at hne
+      exact Bool.noConfusion hne.1
+  | .comm sender receiver (first :: rest), role, lt, bvars, hproj, hnotpart, havb, hne => by
+      have hF := CProject_destruct hproj
+      have hns : role ≠ sender := by
+        intro heq; subst heq
+        have hpart : part_of2 role (.comm role receiver (first :: rest)) :=
+          part_of2.intro _ (part_ofF.comm_direct _ _ _ (by simp [is_participant]))
+        exact hnotpart hpart
+      have hnr : role ≠ receiver := by
+        intro heq; subst heq
+        have hpart : part_of2 role (.comm sender role (first :: rest)) :=
+          part_of2.intro _ (part_ofF.comm_direct _ _ _ (by simp [is_participant]))
+        exact hnotpart hpart
+      dsimp only [CProjectF] at hF
+      simp only [hns, hnr, ↓reduceIte] at hF
+      have hmem : first ∈ first :: rest := by simp
+      have hfirst_proj : CProject first.2 role lt := hF first hmem
+      have hnotpart_first : ¬part_of2 role first.2 := by
+        intro hpart
+        have hpart_g : part_of2 role (.comm sender receiver (first :: rest)) :=
+          part_of2.intro _ (part_ofF.comm_branch _ _ first.1 first.2 _ hmem hpart)
+        exact hnotpart hpart_g
+      have havb_first : first.2.allVarsBound bvars = true := by
+        simp only [GlobalType.allVarsBound, GlobalType.allVarsBoundBranches,
+                   Bool.and_eq_true] at havb
+        exact havb.1
+      have hne_first : first.2.allCommsNonEmpty = true := by
+        simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                   Bool.and_eq_true] at hne
+        exact hne.2.1
+      exact CProject_freeVars_subset_bvars first.2 role lt bvars
+        hfirst_proj hnotpart_first havb_first hne_first
+termination_by g _ _ _ _ _ _ _ => sizeOf g
+decreasing_by
+  all_goals simp_wf
+  all_goals
+    simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]
+    omega
+
+/-- Auxiliary: Non-participant projections are closed types.
+    Uses allVarsBound to show freeVars = [] for the candidate.
+
+    Key insight: CProject_freeVars_subset_bvars with bvars = [] gives freeVars ⊆ [],
+    which means freeVars = []. -/
+private theorem CProject_closed_of_not_part_of2_aux (g : GlobalType) (role : String) (lt : LocalTypeR)
+    (hproj : CProject g role lt)
+    (hnotpart : ¬part_of2 role g)
+    (havb : g.allVarsBound = true)
+    (hne : g.allCommsNonEmpty = true) :
+    isClosed lt = true := by
+  simp only [isClosed, beq_iff_eq, List.isEmpty_iff]
+  have hsub := CProject_freeVars_subset_bvars g role lt [] hproj hnotpart havb hne
+  exact List.subset_nil.mp (fun v hv => hsub v hv)
 
 /-- Non-participant projections are closed types.
 
@@ -606,11 +817,166 @@ If a role doesn't participate in a well-formed (closed) global type,
 any CProject candidate for that role must be closed (no free variables).
 
 Proof by well-founded induction on global type size. -/
-axiom CProject_closed_of_not_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
+theorem CProject_closed_of_not_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
     (hwf : g.wellFormed = true) :
-    isClosed lt = true
+    isClosed lt = true := by
+  simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+  exact CProject_closed_of_not_part_of2_aux g role lt hproj hnotpart hwf.1.1 hwf.1.2
+
+/-- Helper: sizeOf a member's continuation is less than sizeOf the list. -/
+private theorem sizeOf_mem_snd_lt {branches : List (Label × GlobalType)} {pair : Label × GlobalType}
+    (hmem : pair ∈ branches) :
+    sizeOf pair.2 < sizeOf branches := by
+  induction branches with
+  | nil => cases hmem
+  | cons head tail ih =>
+      cases hmem with
+      | head =>
+          simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
+          omega
+      | tail _ hmem' =>
+          have ih' := ih hmem'
+          simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1] at ih' ⊢
+          omega
+
+/-- Helper: sizeOf a member's continuation is less than sizeOf the comm. -/
+private theorem sizeOf_mem_snd_lt_comm {sender receiver : String} {branches : List (Label × GlobalType)}
+    {pair : Label × GlobalType} (hmem : pair ∈ branches) :
+    sizeOf pair.2 < sizeOf (GlobalType.comm sender receiver branches) := by
+  have h1 := sizeOf_mem_snd_lt hmem
+  have hcomm : sizeOf (GlobalType.comm sender receiver branches) =
+      1 + sizeOf sender + sizeOf receiver + sizeOf branches := by
+    simp only [GlobalType.comm.sizeOf_spec]
+  omega
+
+/-- Helper: allCommsNonEmpty for a branch list implies allCommsNonEmpty for each member. -/
+private theorem allCommsNonEmpty_of_mem {branches : List (Label × GlobalType)} {pair : Label × GlobalType}
+    (hmem : pair ∈ branches) (hne : allCommsNonEmptyBranches branches = true) :
+    pair.2.allCommsNonEmpty = true := by
+  induction branches with
+  | nil => cases hmem
+  | cons head tail ih =>
+      simp only [GlobalType.allCommsNonEmptyBranches, Bool.and_eq_true] at hne
+      cases hmem with
+      | head => exact hne.1
+      | tail _ hmem' => exact ih hmem' hne.2
+
+/-- Helper: noSelfComm for a branch list implies noSelfComm for each member. -/
+private theorem noSelfComm_of_mem {branches : List (Label × GlobalType)} {pair : Label × GlobalType}
+    (hmem : pair ∈ branches) (hnsc : noSelfCommBranches branches = true) :
+    pair.2.noSelfComm = true := by
+  induction branches with
+  | nil => cases hmem
+  | cons head tail ih =>
+      simp only [GlobalType.noSelfCommBranches, Bool.and_eq_true] at hnsc
+      cases hmem with
+      | head => exact hnsc.1
+      | tail _ hmem' => exact ih hmem' hnsc.2
+
+/-- Auxiliary: Participant projections are NOT muve types.
+    This is the converse of CProject_muve_of_not_part_of2.
+
+    If a role participates in a well-formed global type and has a valid projection,
+    then the projection must have send/recv at some level (not purely mu/var/end). -/
+private theorem CProject_not_muve_of_part_of2_aux : (g : GlobalType) → (role : String) →
+    (lt : LocalTypeR) →
+    CProject g role lt →
+    part_of2 role g →
+    g.allCommsNonEmpty = true →
+    isMuve lt = false
+  | .end, role, lt, hproj, hpart, _ => by
+      -- part_of2 role .end is impossible
+      exact False.elim (not_part_of2_end role hpart)
+  | .var t, role, lt, hproj, hpart, _ => by
+      -- part_of2 role (.var t) is impossible
+      exact False.elim (not_part_of2_var role t hpart)
+  | .mu t body, role, lt, hproj, hpart, hne => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | mu t' candBody =>
+          obtain ⟨heq, _, hbody_proj⟩ := hF
+          subst heq
+          simp only [isMuve]
+          -- part_of2 for mu means part_of2 for body
+          have hpart_body := part_of2_mu_inv hpart
+          have hne_body : body.allCommsNonEmpty = true := by
+            simp only [GlobalType.allCommsNonEmpty] at hne; exact hne
+          exact CProject_not_muve_of_part_of2_aux body role candBody hbody_proj hpart_body hne_body
+      | «end» => exact False.elim (by simp_all)
+      | var _ => exact False.elim (by simp_all)
+      | send _ _ => rfl
+      | recv _ _ => rfl
+  | .comm _ _ [], _, _, _, _, hne => by
+      simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true,
+                 decide_eq_true_eq] at hne
+      exact Bool.noConfusion hne.1
+  | .comm sender receiver (first :: rest), role, lt, hproj, hpart, hne => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      -- First handle the role conditions, then case on lt
+      by_cases hs : role = sender
+      · -- Role is sender: CProjectF expects send type
+        subst hs
+        simp only [beq_self_eq_true, ↓reduceIte] at hF
+        cases lt with
+        | send _ _ => rfl
+        | _ => exact False.elim hF
+      · by_cases hr : role = receiver
+        · -- Role is receiver: CProjectF expects recv type
+          subst hr
+          simp only [if_neg hs, if_pos rfl] at hF
+          cases lt with
+          | recv _ _ => rfl
+          | _ => exact False.elim hF
+        · -- Role is neither sender nor receiver: AllBranchesProj applies
+          simp only [if_neg hs, if_neg hr] at hF
+          -- hF : AllBranchesProj CProject (first :: rest) role lt
+          -- From part_of2, role participates somewhere
+          have hcomm_inv := part_of2_comm_inv hpart
+          cases hcomm_inv with
+          | inl hparticipant =>
+              simp only [is_participant, Bool.or_eq_true, beq_iff_eq] at hparticipant
+              cases hparticipant with
+              | inl hsend => exact False.elim (hs hsend)
+              | inr hrecv => exact False.elim (hr hrecv)
+          | inr hexists =>
+              -- Role participates in some branch
+              obtain ⟨label, cont, hmem, hpart_cont⟩ := hexists
+              have hcont_proj : CProject cont role lt := hF (label, cont) hmem
+              have hne_branches : allCommsNonEmptyBranches (first :: rest) = true := by
+                simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                           Bool.and_eq_true] at hne
+                simp only [GlobalType.allCommsNonEmptyBranches, Bool.and_eq_true]
+                exact ⟨hne.2.1, hne.2.2⟩
+              have hne_cont : cont.allCommsNonEmpty = true := allCommsNonEmpty_of_mem hmem hne_branches
+              -- By IH, if cont has participation and projects to lt, then isMuve lt = false
+              exact CProject_not_muve_of_part_of2_aux cont role lt hcont_proj hpart_cont hne_cont
+termination_by g _ _ _ _ _ => sizeOf g
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega
+    | -- For the comm case where cont comes from membership
+      have hmem_lt := sizeOf_mem_snd_lt (by assumption : (_ : Label × GlobalType) ∈ (_ :: _))
+      simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1] at hmem_lt ⊢
+      omega
+
+/-- Participant projections are NOT muve types.
+
+If a role participates in a well-formed global type and has a valid projection,
+then the projection must have send/recv at some level (not purely mu/var/end). -/
+theorem CProject_not_muve_of_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
+    (hproj : CProject g role lt)
+    (hpart : part_of2 role g)
+    (hwf : g.wellFormed = true) :
+    isMuve lt = false := by
+  have hne : g.allCommsNonEmpty = true := by
+    simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+    exact hwf.1.2
+  exact CProject_not_muve_of_part_of2_aux g role lt hproj hpart hne
 
 /-- If a role participates on some path (part_of2) and there is a valid projection (CProject),
     then the role participates on all branches (part_of_all2).
@@ -624,11 +990,122 @@ If role participates on some path but not all paths, then:
 - These would need to be the same (AllBranchesProj), which is impossible
 
 Proof by well-founded induction on global type size, using CProject structure. -/
-axiom CProject_part_of2_implies_part_of_all2 (g : GlobalType) (role : String) (lt : LocalTypeR)
+private theorem CProject_part_of2_implies_part_of_all2_aux : (g : GlobalType) → (role : String) →
+    (lt : LocalTypeR) →
+    CProject g role lt →
+    part_of2 role g →
+    g.allCommsNonEmpty = true →
+    g.noSelfComm = true →
+    part_of_all2 role g
+  | .end, role, _, _, hpart, _, _ =>
+      False.elim (not_part_of2_end role hpart)
+  | .var t, role, _, _, hpart, _, _ =>
+      False.elim (not_part_of2_var role t hpart)
+  | .mu t body, role, lt, hproj, hpart, hne, hnsc => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      cases lt with
+      | mu t' candBody =>
+          obtain ⟨heq, _, hbody_proj⟩ := hF
+          subst heq
+          have hpart_body := part_of2_mu_inv hpart
+          have hne_body : body.allCommsNonEmpty = true := by
+            simp only [GlobalType.allCommsNonEmpty] at hne; exact hne
+          have hnsc_body : body.noSelfComm = true := by
+            simp only [GlobalType.noSelfComm] at hnsc; exact hnsc
+          have ih := CProject_part_of2_implies_part_of_all2_aux body role candBody
+            hbody_proj hpart_body hne_body hnsc_body
+          exact part_of_all2.intro _ (part_of_allF.mu t body ih)
+      | «end» => exact False.elim (by simp_all)
+      | var _ => exact False.elim (by simp_all)
+      | send _ _ => exact False.elim (by simp_all)
+      | recv _ _ => exact False.elim (by simp_all)
+  | .comm _ _ [], _, _, _, _, hne, _ => by
+      simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true,
+                 decide_eq_true_eq] at hne
+      exact Bool.noConfusion hne.1
+  | .comm sender receiver (first :: rest), role, lt, hproj, hpart, hne, hnsc => by
+      have hF := CProject_destruct hproj
+      dsimp only [CProjectF] at hF
+      by_cases hs : role = sender
+      · -- Direct participant (sender)
+        exact part_of_all2.intro _ (part_of_allF.comm_direct sender receiver (first :: rest)
+          (by simp [is_participant, hs]))
+      · by_cases hr : role = receiver
+        · -- Direct participant (receiver)
+          exact part_of_all2.intro _ (part_of_allF.comm_direct sender receiver (first :: rest)
+            (by simp [is_participant, hr]))
+        · -- Non-direct participant: must participate in all branches
+          simp only [if_neg hs, if_neg hr] at hF
+          -- hF : AllBranchesProj CProject (first :: rest) role lt
+          -- Need to show part_of_all2 for all branches
+          apply part_of_all2.intro _ (part_of_allF.comm_all_branches sender receiver (first :: rest) _)
+          intro pair hmem
+          -- Get CProject for this branch
+          have hpair_proj : CProject pair.2 role lt := hF pair hmem
+          -- Need to show part_of_all2 role pair.2
+          -- First, show part_of2 role pair.2
+          -- Key: if ¬part_of2 role pair.2, then isMuve lt (by CProject_muve_of_not_part_of2_aux)
+          -- But from the witness branch where role participates, isMuve lt = false
+          -- Contradiction
+          -- First reconstruct branch-wise predicates
+          have hne_branches : allCommsNonEmptyBranches (first :: rest) = true := by
+            simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                       Bool.and_eq_true] at hne
+            simp only [GlobalType.allCommsNonEmptyBranches, Bool.and_eq_true]
+            exact ⟨hne.2.1, hne.2.2⟩
+          have hnsc_branches : noSelfCommBranches (first :: rest) = true := by
+            simp only [GlobalType.noSelfComm, GlobalType.noSelfCommBranches,
+                       Bool.and_eq_true] at hnsc
+            simp only [GlobalType.noSelfCommBranches, Bool.and_eq_true]
+            exact ⟨hnsc.2.1, hnsc.2.2⟩
+          by_cases hpart_pair : part_of2 role pair.2
+          · -- This branch has participation, recurse
+            have hne_pair : pair.2.allCommsNonEmpty = true := allCommsNonEmpty_of_mem hmem hne_branches
+            have hnsc_pair : pair.2.noSelfComm = true := noSelfComm_of_mem hmem hnsc_branches
+            exact CProject_part_of2_implies_part_of_all2_aux pair.2 role lt
+              hpair_proj hpart_pair hne_pair hnsc_pair
+          · -- This branch has no participation
+            -- By CProject_muve_of_not_part_of2_aux, isMuve lt = true
+            have hne_pair : pair.2.allCommsNonEmpty = true := allCommsNonEmpty_of_mem hmem hne_branches
+            have hmuve : isMuve lt = true :=
+              CProject_muve_of_not_part_of2_aux pair.2 role lt hpair_proj hpart_pair hne_pair
+            -- But from hpart (part_of2 for the comm), role participates in some branch
+            have hcomm_inv := part_of2_comm_inv hpart
+            cases hcomm_inv with
+            | inl hparticipant =>
+                simp only [is_participant, Bool.or_eq_true, beq_iff_eq] at hparticipant
+                cases hparticipant with
+                | inl hsend => exact False.elim (hs hsend)
+                | inr hrecv => exact False.elim (hr hrecv)
+            | inr hexists =>
+                -- Some branch has participation
+                obtain ⟨label, cont, hmem_wit, hpart_wit⟩ := hexists
+                have hwit_proj : CProject cont role lt := hF (label, cont) hmem_wit
+                have hne_wit : cont.allCommsNonEmpty = true := allCommsNonEmpty_of_mem hmem_wit hne_branches
+                -- For the witness branch, isMuve lt = false (because role participates there)
+                have hnot_muve : isMuve lt = false :=
+                  CProject_not_muve_of_part_of2_aux cont role lt hwit_proj hpart_wit hne_wit
+                -- Contradiction: isMuve lt can't be both true and false
+                rw [hmuve] at hnot_muve
+                exact Bool.noConfusion hnot_muve
+termination_by g _ _ _ _ _ _ => sizeOf g
+decreasing_by
+  all_goals simp_wf
+  all_goals first
+    | simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega
+    | -- For the comm case where cont comes from membership
+      have hmem_lt := sizeOf_mem_snd_lt (by assumption : (_ : Label × GlobalType) ∈ (_ :: _))
+      simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1] at hmem_lt ⊢
+      omega
+
+theorem CProject_part_of2_implies_part_of_all2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hpart : part_of2 role g)
     (hwf : g.wellFormed = true) :
-    part_of_all2 role g
+    part_of_all2 role g := by
+  simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+  exact CProject_part_of2_implies_part_of_all2_aux g role lt hproj hpart hwf.1.2 hwf.2
 
 /-- Classification: a role either participates or projects to EEnd.
 
@@ -732,64 +1209,59 @@ Use well-founded induction on global type size:
 
 ### Coq Reference
 
-See `subject_reduction/theories/Projection/indProj.v:180-192`. -/
-theorem part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
+See `subject_reduction/theories/Projection/indProj.v:180-192`.
+
+We use an auxiliary version with weaker preconditions (just allCommsNonEmpty)
+to avoid the semantic gap where body.allVarsBound [] cannot be proven from
+(mu t body).wellFormed. -/
+private theorem part_of_all2_implies_part_of2_aux (role : String) (g : GlobalType)
     (h : part_of_all2 role g)
-    (hwf : g.wellFormed = true) : part_of2 role g := by
-  -- By well-founded induction on global type size
+    (hne : g.allCommsNonEmpty = true) : part_of2 role g := by
   match g with
   | .end =>
-      -- end has no participants
       exact absurd h (not_part_of_all2_end role)
   | .var t =>
-      -- var has no participants
       exact absurd h (not_part_of_all2_var role t)
   | .mu t body =>
-      -- Invert part_of_all2: get part_of_all2 role body
       have hbody := part_of_all2_mu_inv h
-      -- wellFormed mu gives wellFormed body (with weakened bound)
-      have hwf_body : body.wellFormed = true := by
-        simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf ⊢
-        simp only [GlobalType.allVarsBound, GlobalType.allCommsNonEmpty, GlobalType.noSelfComm] at hwf
-        refine ⟨⟨?_, hwf.1.2⟩, hwf.2⟩
-        sorry -- body.allVarsBound [] doesn't follow from body.allVarsBound [t]
-      -- IH: part_of2 role body
-      have ih := part_of_all2_implies_part_of2 role body hbody hwf_body
-      -- Construct part_of2 for mu
+      have hne_body : body.allCommsNonEmpty = true := by
+        simp only [GlobalType.allCommsNonEmpty] at hne
+        exact hne
+      have ih := part_of_all2_implies_part_of2_aux role body hbody hne_body
       exact part_of2.intro _ (part_ofF.mu t body ih)
   | .comm sender receiver branches =>
-      -- Invert part_of_all2
       have h_or := part_of_all2_comm_inv h
       cases h_or with
       | inl hpart =>
-          -- Direct participant
           exact part_of2.intro _ (part_ofF.comm_direct sender receiver branches hpart)
       | inr hall =>
-          -- Participates on all branches, need to pick one
-          -- wellFormed ensures branches ≠ []
-          -- Take the first branch (if empty, hall has no witnesses to use)
           cases branches with
           | nil =>
-              -- branches = [], so wellFormed is false (branches.isEmpty = false required)
-              -- wellFormed (.comm s r []) has allCommsNonEmpty = [].isEmpty = false && ...
-              -- But [].isEmpty = true, so this requires true = false, which is absurd
-              -- This case is vacuously true but simp has trouble reducing the goal
-              sorry
+              simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true] at hne
+              exact absurd hne.1 (by decide)
           | cons first remaining =>
-              -- first.2 has part_of_all2 role, by hall
               have hmem : first ∈ first :: remaining := by simp only [List.mem_cons, true_or]
               have hpair : part_of_all2 role first.2 := hall first hmem
-              -- wellFormed cont from wellFormed comm
-              have hwf_cont : first.2.wellFormed = true := wellFormed_comm_cont sender receiver first remaining hwf
-              -- IH: part_of2 role first.2
-              have ih := part_of_all2_implies_part_of2 role first.2 hpair hwf_cont
-              -- Construct part_of2 for comm
+              have hne_cont : first.2.allCommsNonEmpty = true := by
+                simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                           Bool.and_eq_true] at hne
+                exact hne.2.1
+              have ih := part_of_all2_implies_part_of2_aux role first.2 hpair hne_cont
               exact part_of2.intro _ (part_ofF.comm_branch sender receiver first.1 first.2 (first :: remaining) hmem ih)
 termination_by sizeOf g
 decreasing_by
   all_goals simp_wf
-  · omega
-  · sorry
+  · omega  -- mu case
+  · rename_i heq; subst heq
+    simp only [List.cons.sizeOf_spec]
+    have hfst : sizeOf first = 1 + sizeOf first.1 + sizeOf first.2 := rfl
+    simp only [hfst]; omega
+
+theorem part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
+    (h : part_of_all2 role g)
+    (hwf : g.wellFormed = true) : part_of2 role g := by
+  simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+  exact part_of_all2_implies_part_of2_aux role g h hwf.1.2
 
 /-- Helper: if CProject gives lt and role doesn't participate, then lt is EQ2 to trans.
 
@@ -820,38 +1292,79 @@ private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : Stri
 
 If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
 then the local branches are EQ2-related. -/
-axiom BranchesProjRel_implies_BranchesRel_EQ2
+theorem BranchesProjRel_implies_BranchesRel_EQ2
     (gbs : List (Label × GlobalType)) (role : String)
     (lbs : List (Label × LocalTypeR)) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
     (h : BranchesProjRel CProject gbs role lbs) :
-    BranchesRel EQ2 lbs (transBranches gbs role)
+    BranchesRel EQ2 lbs (transBranches gbs role) := by
+  -- By induction on BranchesProjRel, show each pair is EQ2-related
+  -- Uses CProject_implies_EQ2_trans on each branch (mutual dependency)
+  sorry
 
 /-- AllBranchesProj with trans gives EQ2.
 
 For non-participants, AllBranchesProj CProject gbs role lt means all branches
 project to lt. The trans of the first branch should be EQ2 to lt. -/
-axiom AllBranchesProj_implies_EQ2_trans
+theorem AllBranchesProj_implies_EQ2_trans
     (sender receiver role : String) (gbs : List (Label × GlobalType)) (lt : LocalTypeR)
     (hns : role ≠ sender) (hnr : role ≠ receiver)
     (hall : AllBranchesProj CProject gbs role lt)
     (hne : gbs ≠ [])
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
-    EQ2 lt (trans (GlobalType.comm sender receiver gbs) role)
+    EQ2 lt (trans (GlobalType.comm sender receiver gbs) role) := by
+  -- trans for non-participant comm picks first branch
+  -- AllBranchesProj means first branch projects to lt
+  -- By CProject_implies_EQ2_trans on first branch, lt is EQ2 to trans of first branch
+  sorry
 
 /-! ### Main Theorem: CProject_implies_EQ2_trans -/
 
 /-- If CProject g role lt holds, then lt is EQ2-equivalent to trans g role.
 
-This axiom corresponds to the Coq lemma `proj_proj` from indProj.v (lines 221-260).
+This theorem corresponds to the Coq lemma `proj_proj` from indProj.v (lines 221-260).
 
 For non-participants, this follows from `CProject_implies_EQ2_trans_nonpart`.
-For participants, the proof requires coinduction with the `CProjectTransRel`. -/
-axiom CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
-    (h : CProject g role lt) : EQ2 lt (trans g role)
+For participants, the proof requires coinduction with the `CProjectTransRel`.
+
+### Proof Strategy (Coinduction)
+
+Define the relation:
+```
+CProjectTransRel a b := ∃ g role, CProject g role a ∧ b = trans g role
+```
+
+Show CProjectTransRel is a post-fixpoint of EQ2F by case analysis on CProject:
+- **end**: a = .end, trans = .end, EQ2F trivial
+- **var**: a = .var t, trans = .var t, EQ2F trivial
+- **mu**: a = .mu t abody, trans = if lcontractive then .mu t (trans body) else .end
+  Use EQ2F_mu case with IH on body
+- **comm participant**: role is sender/receiver, trans picks matching send/recv
+  Use BranchesRel with IH on branches
+- **comm non-participant**: AllBranchesProj means lt consistent
+  Use CProject_implies_EQ2_trans_nonpart
+
+### Coq Reference
+
+See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq proof. -/
+theorem CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
+    (h : CProject g role lt) : EQ2 lt (trans g role) := by
+  -- The full proof requires coinduction on EQ2 with CProjectTransRel
+  -- For now, we provide the structure with sorries for the coinductive cases
+  --
+  -- Key insight: CProject and trans have matching structure:
+  -- - end → end, var → var
+  -- - mu → mu (when contractive) or end (when not)
+  -- - comm participant → send/recv with matching branches
+  -- - comm non-participant → delegate to CProject_implies_EQ2_trans_nonpart
+  --
+  -- The coinductive proof uses:
+  -- 1. CProject_destruct to analyze h
+  -- 2. EQ2_coind with the relation CProjectTransRel
+  sorry
 
 /-- CProject is preserved under EQ2 equivalence.
 
-This axiom corresponds to the Coq lemma `Project_EQ2` from indProj.v (lines 263-300).
+This theorem corresponds to the Coq lemma `Project_EQ2` from indProj.v (lines 263-300).
 
 ### Proof Strategy
 
@@ -907,8 +1420,24 @@ e0 and e1 are EQ2-equivalent across unfolding steps, resolving these cases.
 
 See `subject_reduction/theories/Projection/indProj.v:263-300` for the Coq proof
 which uses `pcofix CIH` with participation predicates. -/
-axiom CProject_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
-    (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1
+theorem CProject_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
+    (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1 := by
+  -- The proof uses coinduction on CProject with EQ2_CProject_Rel
+  --
+  -- Key insight: EQ2 is an equivalence relation, and CProject is monotone
+  -- in the sense that if e0 and e1 are observationally equivalent (EQ2),
+  -- and e0 satisfies CProject, then e1 should too.
+  --
+  -- The difficulty is that CProjectF requires specific constructor matching,
+  -- but EQ2 allows mu-unfolding to relate different constructors.
+  --
+  -- The Coq proof uses pcofix (parametrized coinduction) which is not
+  -- directly available in Lean 4. We would need to:
+  -- 1. Define a custom coinduction-up-to principle for CProject
+  -- 2. Or use a simulation relation that handles mu-unfolding
+  --
+  -- For now, we provide the structure with sorry.
+  sorry
 
 /-- trans produces a valid projection when CProject holds for some candidate.
 

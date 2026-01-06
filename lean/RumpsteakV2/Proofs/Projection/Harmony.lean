@@ -105,16 +105,32 @@ axiom proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : St
 
 /-! ## Claims Bundle -/
 
+/-- Domain containment for EnvStep: post-step domain is subset of pre-step domain.
+
+Note: EnvStep does NOT preserve domain equality because global steps can shrink
+the role set (step_roles_subset). Instead, we have containment.
+
+For domain equality, use EnvStepOnto which projects onto a fixed role set. -/
+theorem envstep_dom_subset {env env' : ProjectedEnv} {act : GlobalActionR}
+    (h : EnvStep env act env') :
+    ∀ p, p ∈ env'.map Prod.fst → p ∈ env.map Prod.fst := by
+  cases h with
+  | of_global g g' _ hstep =>
+      intro p hp
+      simp only [projEnv_dom] at hp ⊢
+      exact step_roles_subset g g' _ hstep p hp
+
 /-- Claims bundle for harmony lemmas. -/
 structure Claims where
   /-- Global step induces environment step. -/
   harmony : ∀ g g' act, step g act g' → EnvStep (projEnv g) act (projEnv g')
-  /-- Domain is preserved through steps. -/
-  dom_preserved : ∀ env env' act, EnvStep env act env' → env.map Prod.fst = env'.map Prod.fst
+  /-- Domain containment through steps (post ⊆ pre). -/
+  dom_subset : ∀ env env' act, EnvStep env act env' →
+    ∀ p, p ∈ env'.map Prod.fst → p ∈ env.map Prod.fst
 
 /-- Build the claims bundle from proven theorems. -/
 def claims : Claims where
   harmony := step_harmony
-  dom_preserved := fun _ _ _ => envstep_preserves_dom
+  dom_subset := fun _ _ _ h => envstep_dom_subset h
 
 end RumpsteakV2.Proofs.Projection.Harmony

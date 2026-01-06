@@ -370,4 +370,12 @@ theorem substitute_mu_roles_subset (body : GlobalType) (t : String) :
       simp only [GlobalType.roles] at hr
       exact hr
 
+/-! ## Closedness Predicate (Coq-style)
+
+A global type is closed if it has no free type variables.
+This matches Coq's approach and is used for projection preservation. -/
+
+/-- A global type is closed if it has no free type variables. -/
+def GlobalType.isClosed (g : GlobalType) : Bool := g.freeVars.isEmpty
+
 end RumpsteakV2.Protocol.GlobalType

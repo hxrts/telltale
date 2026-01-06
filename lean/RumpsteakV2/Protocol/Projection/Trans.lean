@@ -306,4 +306,35 @@ mutual
       | exact sizeOf_tail_lt_cons _ _
 end
 
+/-! ## Closedness Preservation (Coq-style)
+
+These theorems establish that projection preserves closedness,
+which is the key insight from the Coq subject_reduction implementation.
+In Coq, this follows automatically from de Bruijn indices;
+here we prove it explicitly from `trans_freeVars_subset`. -/
+
+/-- If a global type is closed, then its projection is also closed.
+    This is the Coq-style theorem that sidesteps the allVarsBound semantic gap. -/
+theorem trans_closed_of_closed (g : GlobalType) (role : String)
+    (h : g.freeVars = []) : (trans g role).freeVars = [] := by
+  have hsub := trans_freeVars_subset g role
+  rw [h] at hsub
+  -- hsub : (trans g role).freeVars ⊆ []
+  -- A subset of [] must be []
+  exact List.subset_nil.mp hsub
+
+/-- Corollary using the isClosed predicate. -/
+theorem trans_isClosed_of_isClosed (g : GlobalType) (role : String)
+    (h : g.isClosed = true) : (trans g role).isClosed = true := by
+  simp only [LocalTypeR.isClosed, List.isEmpty_iff]
+  simp only [GlobalType.isClosed, List.isEmpty_iff] at h
+  exact trans_closed_of_closed g role h
+
+/-- The result of trans on a closed global type has no free vars matching
+    any specific variable name. This is useful for the mu case. -/
+theorem trans_freeVars_empty_of_closed (g : GlobalType) (role : String) (t : String)
+    (h : g.freeVars = []) : t ∉ (trans g role).freeVars := by
+  have hclosed := trans_closed_of_closed g role h
+  simp only [hclosed, List.mem_nil_iff, not_false_eq_true]
+
 end RumpsteakV2.Protocol.Projection.Trans
