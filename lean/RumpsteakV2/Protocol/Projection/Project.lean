@@ -120,13 +120,39 @@ theorem mu_closed_body_freeVars (t : String) (body : LocalTypeR)
       exact hne
   simp only [hclosed, List.not_mem_nil] at hfilter
 
+/-- Helper: if all vars in list equal t, then filtering out t gives empty list. -/
+private theorem filter_all_eq_nil {L : List String} {t : String}
+    (h : ∀ x, x ∈ L → x = t) :
+    L.filter (· != t) = [] := by
+  match L with
+  | [] => rfl
+  | hd :: tl =>
+      have hmem_hd : hd ∈ hd :: tl := by simp
+      have hhd : hd = t := h hd hmem_hd
+      have htl : ∀ x, x ∈ tl → x = t := by
+        intro x hx
+        have hmem : x ∈ hd :: tl := List.mem_cons_of_mem hd hx
+        exact h x hmem
+      simp only [List.filter, hhd, bne_self_eq_false]
+      exact filter_all_eq_nil htl
+termination_by L.length
+
 /-- allVarsBound with empty bound list implies no free variables.
 
 This relates the two notions of "closed":
 - allVarsBound g [] = true: every var in g is bound by some enclosing mu
 - freeVars g = []: no free type variables
 
-Proven by well-founded recursion on global type size. -/
+### Proof Strategy
+
+Use mutual well-founded recursion on global type/branches size:
+- end: freeVars = [], trivially true
+- var t: allVarsBound [] = [].contains t = false, so hypothesis is False
+- comm: delegate to branches helper
+- mu t body: allVarsBound [] = body.allVarsBound [t], IH gives freeVars ⊆ [t],
+  then filter removes t giving []
+
+The proof requires mutual recursion due to the nested GlobalType/branches structure. -/
 axiom allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
     (h : g.allVarsBound [] = true) :
     g.freeVars = []
