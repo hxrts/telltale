@@ -6,7 +6,8 @@ default: book
 # Run the same checks as GitHub CI
 ci-dry-run:
     cargo fmt --all -- --check
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
+    RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
     just book
     # WASM compilation checks
