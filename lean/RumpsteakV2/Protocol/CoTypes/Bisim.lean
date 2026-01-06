@@ -232,6 +232,116 @@ theorem CanRecv.deterministic {a : LocalTypeR} {p q : String}
   | base => cases hq; exact ⟨rfl, rfl⟩
   | @mu t body p' bs' _ ih => cases hq with | @mu _ _ _ _ h => exact ih h
 
+/-! ## Bounded Unfolding Paths
+
+These predicates track mu-unfolding with explicit bounds, following the pattern from
+QpfTypes PR #49. They are used to establish the connection between EQ2 (which handles
+mu-unfolding implicitly) and Bisim (which uses membership predicates).
+
+A bounded path witnesses that after n unfolding steps, a type reaches a specific
+observable form. -/
+
+/-- `UnfoldPathEndBounded n a` holds when `a` unfolds to `.end` in at most `n` mu-steps.
+
+    This is an explicit bound on the unfolding depth, used to prove extraction lemmas
+    by well-founded induction. -/
+inductive UnfoldPathEndBounded : ℕ → LocalTypeR → Prop where
+  | base : UnfoldPathEndBounded 0 .end
+  | step {n : ℕ} {t : String} {body : LocalTypeR} :
+      UnfoldPathEndBounded n (body.substitute t (.mu t body)) →
+      UnfoldPathEndBounded (n + 1) (.mu t body)
+
+/-- `UnfoldPathVarBounded n v a` holds when `a` unfolds to `.var v` in at most `n` mu-steps. -/
+inductive UnfoldPathVarBounded : ℕ → String → LocalTypeR → Prop where
+  | base {v : String} : UnfoldPathVarBounded 0 v (.var v)
+  | step {n : ℕ} {v : String} {t : String} {body : LocalTypeR} :
+      UnfoldPathVarBounded n v (body.substitute t (.mu t body)) →
+      UnfoldPathVarBounded (n + 1) v (.mu t body)
+
+/-- `CanSendPathBounded n p bs a` holds when `a` unfolds to a send in at most `n` mu-steps. -/
+inductive CanSendPathBounded : ℕ → String → List (Label × LocalTypeR) → LocalTypeR → Prop where
+  | base {p : String} {bs : List (Label × LocalTypeR)} :
+      CanSendPathBounded 0 p bs (.send p bs)
+  | step {n : ℕ} {p : String} {bs : List (Label × LocalTypeR)} {t : String} {body : LocalTypeR} :
+      CanSendPathBounded n p bs (body.substitute t (.mu t body)) →
+      CanSendPathBounded (n + 1) p bs (.mu t body)
+
+/-- `CanRecvPathBounded n p bs a` holds when `a` unfolds to a recv in at most `n` mu-steps. -/
+inductive CanRecvPathBounded : ℕ → String → List (Label × LocalTypeR) → LocalTypeR → Prop where
+  | base {p : String} {bs : List (Label × LocalTypeR)} :
+      CanRecvPathBounded 0 p bs (.recv p bs)
+  | step {n : ℕ} {p : String} {bs : List (Label × LocalTypeR)} {t : String} {body : LocalTypeR} :
+      CanRecvPathBounded n p bs (body.substitute t (.mu t body)) →
+      CanRecvPathBounded (n + 1) p bs (.mu t body)
+
+/-! ### Conversions between bounded and unbounded predicates -/
+
+/-- Bounded end path implies unbounded. -/
+theorem UnfoldPathEndBounded.toUnfoldsToEnd {n : ℕ} {a : LocalTypeR}
+    (h : UnfoldPathEndBounded n a) : UnfoldsToEnd a := by
+  induction h with
+  | base => exact UnfoldsToEnd.base
+  | step _ ih => exact UnfoldsToEnd.mu ih
+
+/-- Unbounded end unfold implies bounded (existentially). -/
+theorem UnfoldsToEnd.toBounded {a : LocalTypeR} (h : UnfoldsToEnd a) :
+    ∃ n, UnfoldPathEndBounded n a := by
+  induction h with
+  | base => exact ⟨0, UnfoldPathEndBounded.base⟩
+  | @mu t body _ ih =>
+    obtain ⟨n, hn⟩ := ih
+    exact ⟨n + 1, UnfoldPathEndBounded.step hn⟩
+
+/-- Bounded var path implies unbounded. -/
+theorem UnfoldPathVarBounded.toUnfoldsToVar {n : ℕ} {v : String} {a : LocalTypeR}
+    (h : UnfoldPathVarBounded n v a) : UnfoldsToVar a v := by
+  induction h with
+  | base => exact UnfoldsToVar.base
+  | step _ ih => exact UnfoldsToVar.mu ih
+
+/-- Unbounded var unfold implies bounded. -/
+theorem UnfoldsToVar.toBounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a v) :
+    ∃ n, UnfoldPathVarBounded n v a := by
+  induction h with
+  | base => exact ⟨0, UnfoldPathVarBounded.base⟩
+  | @mu t body v' _ ih =>
+    obtain ⟨n, hn⟩ := ih
+    exact ⟨n + 1, UnfoldPathVarBounded.step hn⟩
+
+/-- Bounded send path implies unbounded. -/
+theorem CanSendPathBounded.toCanSend {n : ℕ} {p : String}
+    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    (h : CanSendPathBounded n p bs a) : CanSend a p bs := by
+  induction h with
+  | base => exact CanSend.base
+  | step _ ih => exact CanSend.mu ih
+
+/-- Unbounded send implies bounded. -/
+theorem CanSend.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    (h : CanSend a p bs) : ∃ n, CanSendPathBounded n p bs a := by
+  induction h with
+  | base => exact ⟨0, CanSendPathBounded.base⟩
+  | @mu t body p' bs' _ ih =>
+    obtain ⟨n, hn⟩ := ih
+    exact ⟨n + 1, CanSendPathBounded.step hn⟩
+
+/-- Bounded recv path implies unbounded. -/
+theorem CanRecvPathBounded.toCanRecv {n : ℕ} {p : String}
+    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    (h : CanRecvPathBounded n p bs a) : CanRecv a p bs := by
+  induction h with
+  | base => exact CanRecv.base
+  | step _ ih => exact CanRecv.mu ih
+
+/-- Unbounded recv implies bounded. -/
+theorem CanRecv.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    (h : CanRecv a p bs) : ∃ n, CanRecvPathBounded n p bs a := by
+  induction h with
+  | base => exact ⟨0, CanRecvPathBounded.base⟩
+  | @mu t body p' bs' _ ih =>
+    obtain ⟨n, hn⟩ := ih
+    exact ⟨n + 1, CanRecvPathBounded.step hn⟩
+
 /-! ## Bisimulation Relation
 
 The key insight from PR #49: define the bisimulation functor using membership
