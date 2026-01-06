@@ -248,6 +248,38 @@ pub enum ChoreographyError {
     /// General execution error
     #[error("execution error: {0}")]
     ExecutionError(String),
+
+    /// Role family is empty after resolution
+    #[error("role family '{0}' resolved to empty set")]
+    EmptyRoleFamily(String),
+
+    /// Role family not found in adapter
+    #[error("role family '{0}' not found")]
+    RoleFamilyNotFound(String),
+
+    /// Role range is invalid
+    #[error("invalid role range for '{family}': [{start}, {end})")]
+    InvalidRoleRange {
+        /// The role family name
+        family: String,
+        /// Range start (inclusive)
+        start: u32,
+        /// Range end (exclusive)
+        end: u32,
+    },
+
+    /// Insufficient responses received from role family
+    #[error("insufficient responses: expected {expected}, received {received}")]
+    InsufficientResponses {
+        /// Expected minimum number of responses
+        expected: usize,
+        /// Actual number of responses received
+        received: usize,
+    },
+
+    /// Feature not implemented
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl ChoreographyError {

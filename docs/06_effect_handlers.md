@@ -257,6 +257,127 @@ InMemoryHandler and RumpsteakHandler both work in WASM environments. They use fu
 
 For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](13_wasm_guide.md) for details.
 
+## Role Family Resolution
+
+For protocols with parameterized roles (wildcards and ranges), use `ChoreographicAdapter` for role family resolution.
+
+### ChoreographicAdapter Trait
+
+The adapter trait provides methods for resolving role families at runtime.
+
+```rust
+pub trait ChoreographicAdapter: Sized {
+    type Role: RoleId;
+    type Error;
+
+    /// Resolve all instances of a parameterized role family.
+    fn resolve_family(&self, family: &str) -> Result<Vec<Self::Role>, Self::Error>;
+
+    /// Resolve a range of role instances [start, end).
+    fn resolve_range(&self, family: &str, start: u32, end: u32)
+        -> Result<Vec<Self::Role>, Self::Error>;
+
+    /// Get the number of instances in a role family.
+    fn family_size(&self, family: &str) -> Result<usize, Self::Error>;
+
+    /// Broadcast a message to all roles in the list.
+    async fn broadcast<M: Message>(&mut self, to: &[Self::Role], msg: M)
+        -> Result<(), Self::Error>;
+
+    /// Collect messages from all roles in the list.
+    async fn collect<M: Message>(&mut self, from: &[Self::Role])
+        -> Result<Vec<M>, Self::Error>;
+}
+```
+
+### TestAdapter for Role Families
+
+The `TestAdapter` implements `ChoreographicAdapter` for testing protocols with role families.
+
+```rust
+use rumpsteak_aura_choreography::runtime::test_adapter::TestAdapter;
+
+// Create adapter with configured role family
+let witnesses: Vec<Role> = (0..5).map(Role::Witness).collect();
+let adapter = TestAdapter::new(Role::Coordinator)
+    .with_family("Witness", witnesses);
+
+// Resolve all witnesses
+let all = adapter.resolve_family("Witness")?;  // 5 witnesses
+
+// Resolve subset for threshold operations
+let threshold = adapter.resolve_range("Witness", 0, 3)?;  // 3 witnesses
+
+// Get family size
+let size = adapter.family_size("Witness")?;  // 5
+```
+
+### Broadcast and Collect
+
+For one-to-many and many-to-one communication patterns:
+
+```rust
+// Broadcast to all witnesses
+let witnesses = adapter.resolve_family("Witness")?;
+adapter.broadcast(&witnesses, SigningRequest { ... }).await?;
+
+// Collect responses from threshold
+let threshold = adapter.resolve_range("Witness", 0, 3)?;
+let responses: Vec<PartialSignature> = adapter.collect(&threshold).await?;
+```
+
+### Execution Hints
+
+Annotations like `@parallel` and `@min_responses(N)` control how broadcast and collect operations execute. These are deployment hints, not protocol semantics. They affect code generation without changing the session type.
+
+```
+@parallel Coordinator -> Witness[*] : SignRequest
+@min_responses(3) Witness[*] -> Coordinator : PartialSignature
+```
+
+The `@parallel` annotation causes generated code to use `futures::future::join_all()` for concurrent execution instead of sequential iteration.
+
+The `@min_responses(N)` annotation generates threshold checking. The collect operation succeeds if at least N responses arrive. Fewer responses result in an `InsufficientResponses` error.
+
+Execution hints are extracted from annotations and passed separately to code generation. This keeps the `LocalType` pure for Lean verification while enabling runtime optimizations.
+
+```rust
+use rumpsteak_aura_choreography::ast::{ExecutionHints, ChoreographyWithHints};
+
+// Extract hints from a parsed choreography
+let with_hints = ChoreographyWithHints::from_choreography(choreography);
+
+// Hints are available for codegen
+let hints = &with_hints.hints;
+if hints.is_parallel(&path) {
+    // Generate parallel code
+}
+```
+
+Default behavior without hints is sequential execution with all responses required.
+
+### Topology Validation
+
+Role family constraints can be validated against topology configuration.
+
+```rust
+use rumpsteak_aura_choreography::topology::Topology;
+
+let config = r#"
+    topology Prod for Protocol {
+        role_constraints {
+            Witness: min = 3, max = 10
+        }
+    }
+"#;
+
+let topology = Topology::parse(config)?.topology;
+
+// Validate resolved family meets constraints
+let count = adapter.family_size("Witness")?;
+topology.validate_family("Witness", count)?;
+```
+
 ## Effect Interpretation
 
 Handlers interpret effect programs.

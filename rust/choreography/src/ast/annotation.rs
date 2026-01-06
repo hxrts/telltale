@@ -76,6 +76,26 @@ pub enum ProtocolAnnotation {
         on_missing_count: u32,
     },
 
+    /// Execute broadcast/collect operations in parallel.
+    ///
+    /// When applied to a message with a wildcard/range destination,
+    /// sends or receives are executed concurrently rather than sequentially.
+    Parallel,
+
+    /// Preserve strict message ordering.
+    ///
+    /// When applied to a collect operation, messages are returned in the
+    /// order specified by the role list. This is the default behavior
+    /// for sequential collect.
+    Ordered,
+
+    /// Minimum number of responses required for a collect operation.
+    ///
+    /// When applied to a collect with wildcard/range source, the operation
+    /// succeeds once at least `min` responses are received. Remaining responses
+    /// are discarded or handled asynchronously.
+    MinResponses(u32),
+
     /// Custom annotation for extensions or unknown types.
     ///
     /// Falls back to key-value string pairs for extensibility.
@@ -162,6 +182,24 @@ impl ProtocolAnnotation {
             interval: Duration::from_millis(interval_ms),
             on_missing_count,
         }
+    }
+
+    /// Create a parallel annotation.
+    #[must_use]
+    pub fn parallel() -> Self {
+        Self::Parallel
+    }
+
+    /// Create an ordered annotation.
+    #[must_use]
+    pub fn ordered() -> Self {
+        Self::Ordered
+    }
+
+    /// Create a min_responses annotation.
+    #[must_use]
+    pub fn min_responses(min: u32) -> Self {
+        Self::MinResponses(min)
     }
 
     /// Create a custom annotation.
@@ -254,6 +292,33 @@ impl ProtocolAnnotation {
         }
     }
 
+    /// Check if this is a parallel annotation.
+    #[must_use]
+    pub fn is_parallel(&self) -> bool {
+        matches!(self, Self::Parallel)
+    }
+
+    /// Check if this is an ordered annotation.
+    #[must_use]
+    pub fn is_ordered(&self) -> bool {
+        matches!(self, Self::Ordered)
+    }
+
+    /// Check if this is a min_responses annotation.
+    #[must_use]
+    pub fn is_min_responses(&self) -> bool {
+        matches!(self, Self::MinResponses(_))
+    }
+
+    /// Get the min_responses value, if this is a min_responses annotation.
+    #[must_use]
+    pub fn min_responses_value(&self) -> Option<u32> {
+        match self {
+            Self::MinResponses(n) => Some(*n),
+            _ => None,
+        }
+    }
+
     /// Check if this is a custom annotation with the given key.
     #[must_use]
     pub fn is_custom_key(&self, expected_key: &str) -> bool {
@@ -280,6 +345,9 @@ impl ProtocolAnnotation {
             Self::Trace { .. } => "trace",
             Self::RuntimeTimeout(_) => "runtime_timeout",
             Self::Heartbeat { .. } => "heartbeat",
+            Self::Parallel => "parallel",
+            Self::Ordered => "ordered",
+            Self::MinResponses(_) => "min_responses",
             Self::Custom { key, .. } => key,
         }
     }
@@ -343,6 +411,18 @@ impl ProtocolAnnotation {
             "runtime_timeout" => {
                 if let Ok(ms) = value.parse::<u64>() {
                     Self::RuntimeTimeout(Duration::from_millis(ms))
+                } else {
+                    Self::Custom {
+                        key: key.to_string(),
+                        value: value.to_string(),
+                    }
+                }
+            }
+            "parallel" if value.is_empty() || value == "true" => Self::Parallel,
+            "ordered" if value.is_empty() || value == "true" => Self::Ordered,
+            "min_responses" => {
+                if let Ok(n) = value.parse::<u32>() {
+                    Self::MinResponses(n)
                 } else {
                     Self::Custom {
                         key: key.to_string(),
@@ -457,6 +537,15 @@ impl Annotations {
                         on_missing_count.to_string(),
                     );
                 }
+                ProtocolAnnotation::Parallel => {
+                    map.insert("parallel".to_string(), "true".to_string());
+                }
+                ProtocolAnnotation::Ordered => {
+                    map.insert("ordered".to_string(), "true".to_string());
+                }
+                ProtocolAnnotation::MinResponses(n) => {
+                    map.insert("min_responses".to_string(), n.to_string());
+                }
                 ProtocolAnnotation::Custom { key, value } => {
                     map.insert(key.clone(), value.clone());
                 }
@@ -563,6 +652,30 @@ impl Annotations {
     #[must_use]
     pub fn runtime_timeout(&self) -> Option<Duration> {
         self.items.iter().find_map(|a| a.runtime_timeout_duration())
+    }
+
+    /// Check if has a parallel annotation.
+    #[must_use]
+    pub fn has_parallel(&self) -> bool {
+        self.items.iter().any(|a| a.is_parallel())
+    }
+
+    /// Check if has an ordered annotation.
+    #[must_use]
+    pub fn has_ordered(&self) -> bool {
+        self.items.iter().any(|a| a.is_ordered())
+    }
+
+    /// Check if has a min_responses annotation.
+    #[must_use]
+    pub fn has_min_responses(&self) -> bool {
+        self.items.iter().any(|a| a.is_min_responses())
+    }
+
+    /// Get min_responses value if present.
+    #[must_use]
+    pub fn min_responses(&self) -> Option<u32> {
+        self.items.iter().find_map(|a| a.min_responses_value())
     }
 
     /// Get a custom annotation value by key.
@@ -712,5 +825,74 @@ mod tests {
         // These work like the old HashMap::get
         assert_eq!(anns.get("timed_choice"), Some("true".to_string()));
         assert_eq!(anns.get("timeout_ms"), Some("5000".to_string()));
+    }
+
+    #[test]
+    fn test_parallel_annotation() {
+        let ann = ProtocolAnnotation::parallel();
+        assert!(ann.is_parallel());
+        assert!(!ann.is_ordered());
+        assert_eq!(ann.key(), "parallel");
+    }
+
+    #[test]
+    fn test_ordered_annotation() {
+        let ann = ProtocolAnnotation::ordered();
+        assert!(ann.is_ordered());
+        assert!(!ann.is_parallel());
+        assert_eq!(ann.key(), "ordered");
+    }
+
+    #[test]
+    fn test_min_responses_annotation() {
+        let ann = ProtocolAnnotation::min_responses(3);
+        assert!(ann.is_min_responses());
+        assert_eq!(ann.min_responses_value(), Some(3));
+        assert_eq!(ann.key(), "min_responses");
+    }
+
+    #[test]
+    fn test_annotations_parallel_ordered() {
+        let mut anns = Annotations::new();
+        anns.push(ProtocolAnnotation::parallel());
+        anns.push(ProtocolAnnotation::min_responses(5));
+
+        assert!(anns.has_parallel());
+        assert!(!anns.has_ordered());
+        assert!(anns.has_min_responses());
+        assert_eq!(anns.min_responses(), Some(5));
+    }
+
+    #[test]
+    fn test_from_legacy_parallel() {
+        // Test with "true" value (from legacy serialization)
+        let ann = ProtocolAnnotation::from_legacy("parallel", "true");
+        assert_eq!(ann, ProtocolAnnotation::Parallel);
+
+        let ann = ProtocolAnnotation::from_legacy("ordered", "true");
+        assert_eq!(ann, ProtocolAnnotation::Ordered);
+
+        // Test with empty value (from parser - @parallel, @ordered without args)
+        let ann = ProtocolAnnotation::from_legacy("parallel", "");
+        assert_eq!(ann, ProtocolAnnotation::Parallel);
+
+        let ann = ProtocolAnnotation::from_legacy("ordered", "");
+        assert_eq!(ann, ProtocolAnnotation::Ordered);
+
+        let ann = ProtocolAnnotation::from_legacy("min_responses", "3");
+        assert_eq!(ann, ProtocolAnnotation::MinResponses(3));
+    }
+
+    #[test]
+    fn test_to_legacy_map_new_annotations() {
+        let mut anns = Annotations::new();
+        anns.push(ProtocolAnnotation::Parallel);
+        anns.push(ProtocolAnnotation::Ordered);
+        anns.push(ProtocolAnnotation::MinResponses(5));
+
+        let map = anns.to_legacy_map();
+        assert_eq!(map.get("parallel"), Some(&"true".to_string()));
+        assert_eq!(map.get("ordered"), Some(&"true".to_string()));
+        assert_eq!(map.get("min_responses"), Some(&"5".to_string()));
     }
 }

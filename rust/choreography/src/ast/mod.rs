@@ -13,6 +13,9 @@ pub mod annotation;
 /// Choreography definitions (global protocols with metadata)
 pub mod choreography;
 
+/// Execution hints for code generation (deployment-level concerns)
+pub mod execution_hints;
+
 /// Conversion utilities between DSL types and theory types
 pub mod convert;
 
@@ -45,6 +48,10 @@ pub use rumpsteak_types::{
 // Re-export DSL-specific types
 pub use annotation::{Annotations, ProtocolAnnotation};
 pub use choreography::Choreography;
+pub use execution_hints::{
+    ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,
+    OperationStep,
+};
 pub use global_type::GlobalType; // Extended GlobalType with DSL features
 pub use local_type::LocalType; // Extended LocalType for code generation
 pub use message::MessageType;

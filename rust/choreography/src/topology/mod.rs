@@ -97,6 +97,82 @@ pub enum TopologyMode {
     Consul(Datacenter), // datacenter
 }
 
+/// Constraints on the number of instances for a role family.
+///
+/// Used to validate that wildcard/range role resolutions
+/// meet minimum and maximum requirements.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RoleFamilyConstraint {
+    /// Minimum number of instances required (default: 0)
+    pub min: u32,
+    /// Maximum number of instances allowed (default: unlimited)
+    pub max: Option<u32>,
+}
+
+impl RoleFamilyConstraint {
+    /// Create a new constraint with minimum only.
+    pub fn min_only(min: u32) -> Self {
+        Self { min, max: None }
+    }
+
+    /// Create a new constraint with both min and max.
+    pub fn bounded(min: u32, max: u32) -> Self {
+        Self {
+            min,
+            max: Some(max),
+        }
+    }
+
+    /// Validate a count against this constraint.
+    pub fn validate(&self, count: usize) -> Result<(), RoleFamilyConstraintError> {
+        let count = count as u32;
+        if count < self.min {
+            return Err(RoleFamilyConstraintError::BelowMinimum {
+                actual: count,
+                min: self.min,
+            });
+        }
+        if let Some(max) = self.max {
+            if count > max {
+                return Err(RoleFamilyConstraintError::AboveMaximum { actual: count, max });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Errors from role family constraint validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RoleFamilyConstraintError {
+    /// Actual count is below minimum.
+    BelowMinimum { actual: u32, min: u32 },
+    /// Actual count is above maximum.
+    AboveMaximum { actual: u32, max: u32 },
+}
+
+impl fmt::Display for RoleFamilyConstraintError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RoleFamilyConstraintError::BelowMinimum { actual, min } => {
+                write!(
+                    f,
+                    "role family has {} instances, minimum required is {}",
+                    actual, min
+                )
+            }
+            RoleFamilyConstraintError::AboveMaximum { actual, max } => {
+                write!(
+                    f,
+                    "role family has {} instances, maximum allowed is {}",
+                    actual, max
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for RoleFamilyConstraintError {}
+
 /// Topology maps roles to their deployment locations.
 ///
 /// Uses BTreeMap for deterministic iteration order.
@@ -108,6 +184,8 @@ pub struct Topology {
     pub locations: BTreeMap<RoleName, Location>,
     /// Deployment constraints
     pub constraints: Vec<TopologyConstraint>,
+    /// Role family instance count constraints
+    pub role_constraints: BTreeMap<String, RoleFamilyConstraint>,
 }
 
 impl Topology {
@@ -214,6 +292,34 @@ impl Topology {
         }
 
         TopologyValidation::Valid
+    }
+
+    /// Validate a resolved role family against configured constraints.
+    ///
+    /// # Arguments
+    ///
+    /// * `family` - The name of the role family (e.g., "Witness")
+    /// * `count` - The number of resolved instances
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the count satisfies constraints, or an error if not.
+    /// Returns `Ok(())` if no constraint is configured for this family.
+    pub fn validate_family(
+        &self,
+        family: &str,
+        count: usize,
+    ) -> Result<(), RoleFamilyConstraintError> {
+        if let Some(constraint) = self.role_constraints.get(family) {
+            constraint.validate(count)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Get the constraint for a role family, if configured.
+    pub fn get_family_constraint(&self, family: &str) -> Option<&RoleFamilyConstraint> {
+        self.role_constraints.get(family)
     }
 
     /// Load a topology from a DSL file.
@@ -507,5 +613,81 @@ mod tests {
             Err(TopologyLoadError::IoError(_)) => {}
             _ => panic!("Expected IoError"),
         }
+    }
+
+    #[test]
+    fn test_role_family_constraint_min_only() {
+        let constraint = RoleFamilyConstraint::min_only(3);
+        assert!(constraint.validate(3).is_ok());
+        assert!(constraint.validate(5).is_ok());
+        assert!(constraint.validate(100).is_ok());
+        assert!(constraint.validate(2).is_err());
+        assert!(constraint.validate(0).is_err());
+    }
+
+    #[test]
+    fn test_role_family_constraint_bounded() {
+        let constraint = RoleFamilyConstraint::bounded(2, 5);
+        assert!(constraint.validate(2).is_ok());
+        assert!(constraint.validate(3).is_ok());
+        assert!(constraint.validate(5).is_ok());
+        assert!(constraint.validate(1).is_err());
+        assert!(constraint.validate(6).is_err());
+    }
+
+    #[test]
+    fn test_role_family_constraint_error_messages() {
+        let constraint = RoleFamilyConstraint::bounded(3, 10);
+        let err = constraint.validate(2).unwrap_err();
+        assert!(err.to_string().contains("minimum required is 3"));
+
+        let err = constraint.validate(11).unwrap_err();
+        assert!(err.to_string().contains("maximum allowed is 10"));
+    }
+
+    #[test]
+    fn test_topology_validate_family() {
+        let input = r#"
+            topology Test for Protocol {
+                role_constraints {
+                    Witness: min = 3, max = 10
+                }
+            }
+        "#;
+        let parsed = Topology::parse(input).unwrap();
+        let topology = parsed.topology;
+
+        // Valid counts
+        assert!(topology.validate_family("Witness", 3).is_ok());
+        assert!(topology.validate_family("Witness", 5).is_ok());
+        assert!(topology.validate_family("Witness", 10).is_ok());
+
+        // Invalid counts
+        assert!(topology.validate_family("Witness", 2).is_err());
+        assert!(topology.validate_family("Witness", 11).is_err());
+
+        // Unknown family - no constraint, so any count is valid
+        assert!(topology.validate_family("Unknown", 0).is_ok());
+        assert!(topology.validate_family("Unknown", 100).is_ok());
+    }
+
+    #[test]
+    fn test_topology_get_family_constraint() {
+        let input = r#"
+            topology Test for Protocol {
+                role_constraints {
+                    Witness: min = 3
+                }
+            }
+        "#;
+        let parsed = Topology::parse(input).unwrap();
+        let topology = parsed.topology;
+
+        let constraint = topology.get_family_constraint("Witness");
+        assert!(constraint.is_some());
+        assert_eq!(constraint.unwrap().min, 3);
+
+        let unknown = topology.get_family_constraint("Unknown");
+        assert!(unknown.is_none());
     }
 }

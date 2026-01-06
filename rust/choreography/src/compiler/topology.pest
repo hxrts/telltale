@@ -9,7 +9,7 @@ topology = {
 }
 
 topology_body = {
-    topology_mode? ~ topology_mappings ~ topology_constraints?
+    topology_mode? ~ topology_mappings ~ role_constraints_block? ~ topology_constraints?
 }
 
 // Topology mode declaration
@@ -47,6 +47,19 @@ colocated_location = { "colocated" ~ "(" ~ ident ~ ")" }
 endpoint = @{
     (ASCII_ALPHANUMERIC | "_" | "-" | ".")+ ~ ":" ~ (ASCII_ALPHANUMERIC | "_" | "-" | "." | ":")+
 }
+
+// Role family constraints block
+role_constraints_block = { "role_constraints" ~ "{" ~ role_constraint_decl* ~ "}" }
+
+role_constraint_decl = { ident ~ ":" ~ role_constraint_spec ~ ";"? }
+
+role_constraint_spec = {
+    min_constraint ~ ("," ~ max_constraint)?
+    | max_constraint ~ ("," ~ min_constraint)?
+}
+
+min_constraint = { "min" ~ "=" ~ integer }
+max_constraint = { "max" ~ "=" ~ integer }
 
 // Topology constraints block
 topology_constraints = { "constraints" ~ "{" ~ constraint_decl* ~ "}" }

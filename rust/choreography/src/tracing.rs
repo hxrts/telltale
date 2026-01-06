@@ -378,6 +378,33 @@ impl<A: ChoreographicAdapter> ChoreographicAdapter for TracingAdapter<A> {
         }
         result
     }
+
+    fn resolve_family(&self, family: &str) -> Result<Vec<Self::Role>, Self::Error> {
+        debug!(
+            protocol = self.protocol,
+            role = self.role.as_str(),
+            family = family,
+            "resolving role family"
+        );
+        self.inner.resolve_family(family)
+    }
+
+    fn resolve_range(
+        &self,
+        family: &str,
+        start: u32,
+        end: u32,
+    ) -> Result<Vec<Self::Role>, Self::Error> {
+        debug!(
+            protocol = self.protocol,
+            role = self.role.as_str(),
+            family = family,
+            start = start,
+            end = end,
+            "resolving role range"
+        );
+        self.inner.resolve_range(family, start, end)
+    }
 }
 
 /// Phase guard for automatically tracking phase duration.

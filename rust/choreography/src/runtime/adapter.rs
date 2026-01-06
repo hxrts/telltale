@@ -170,6 +170,74 @@ pub trait ChoreographicAdapter: Send {
         let choice: ChoiceLabel<<Self::Role as RoleId>::Label> = self.recv(from).await?;
         Ok(choice.0)
     }
+
+    /// Resolve all instances of a parameterized role family.
+    ///
+    /// This method is used to resolve wildcards like `Worker[*]` to concrete
+    /// role instances. The default implementation returns an error indicating
+    /// that role families are not supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `family` - The role family name (e.g., "Worker" for `Worker[*]`)
+    ///
+    /// # Returns
+    ///
+    /// A vector of role instances belonging to the family.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // For a protocol with `Witness[*]`
+    /// let witnesses = adapter.resolve_family("Witness")?;
+    /// adapter.broadcast(&witnesses, msg).await?;
+    /// ```
+    fn resolve_family(&self, family: &str) -> Result<Vec<Self::Role>, Self::Error>;
+
+    /// Resolve a range of role instances [start, end).
+    ///
+    /// This method is used to resolve ranges like `Worker[0..3]` to concrete
+    /// role instances. The default implementation returns an error indicating
+    /// that role ranges are not supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `family` - The role family name (e.g., "Worker")
+    /// * `start` - The start index (inclusive)
+    /// * `end` - The end index (exclusive)
+    ///
+    /// # Returns
+    ///
+    /// A vector of role instances in the range [start, end).
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // For a protocol with `Witness[0..3]`
+    /// let witnesses = adapter.resolve_range("Witness", 0, 3)?;
+    /// adapter.broadcast(&witnesses, msg).await?;
+    /// ```
+    fn resolve_range(
+        &self,
+        family: &str,
+        start: u32,
+        end: u32,
+    ) -> Result<Vec<Self::Role>, Self::Error>;
+
+    /// Get the total count of instances in a role family.
+    ///
+    /// This is useful for validating constraints like minimum participant counts.
+    ///
+    /// # Arguments
+    ///
+    /// * `family` - The role family name
+    ///
+    /// # Returns
+    ///
+    /// The number of role instances in the family.
+    fn family_size(&self, family: &str) -> Result<usize, Self::Error> {
+        self.resolve_family(family).map(|v| v.len())
+    }
 }
 
 /// A choice label message for internal/external choice communication.

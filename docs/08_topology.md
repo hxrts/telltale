@@ -71,6 +71,79 @@ pub enum TopologyConstraint {
 
 Constraints are validated when binding a topology to a choreography.
 
+## Role Family Constraints
+
+For protocols with parameterized roles (wildcards and ranges), you can specify instance count constraints.
+
+```rust
+pub struct RoleFamilyConstraint {
+    min: u32,              // Minimum instances required
+    max: Option<u32>,      // Maximum instances allowed (None = unlimited)
+}
+```
+
+These constraints validate that resolved role families have an acceptable number of instances.
+
+### DSL Syntax
+
+Role constraints are specified in a `role_constraints` block.
+
+```rust
+topology ThresholdSig for ThresholdSignature {
+    Coordinator: localhost:8000
+
+    role_constraints {
+        Witness: min = 3, max = 10
+        Worker: min = 1
+    }
+
+    constraints {
+        region: Coordinator -> us_east_1
+    }
+}
+```
+
+The `min` specifies the minimum number of instances required. The `max` specifies the maximum allowed. If `max` is omitted, there is no upper limit.
+
+### Rust API
+
+Role constraints are available through the `Topology` struct.
+
+```rust
+use rumpsteak_aura_choreography::topology::{Topology, RoleFamilyConstraint};
+
+// Access constraint for a family
+let constraint = topology.get_family_constraint("Witness");
+if let Some(c) = constraint {
+    println!("Witness: min={}, max={:?}", c.min, c.max);
+}
+
+// Validate a resolved count
+let count = adapter.family_size("Witness")?;
+topology.validate_family("Witness", count)?;
+```
+
+The `validate_family` method returns an error if the count is below minimum or above maximum.
+
+### Integration with TestAdapter
+
+Role constraints integrate with the runtime adapter for validation at startup.
+
+```rust
+let topology = Topology::parse(config)?.topology;
+
+// Create adapter with role family
+let witnesses: Vec<Role> = (0..5).map(Role::Witness).collect();
+let adapter = TestAdapter::new(Role::Coordinator)
+    .with_family("Witness", witnesses);
+
+// Validate before running protocol
+let count = adapter.family_size("Witness")?;
+topology.validate_family("Witness", count)?;
+```
+
+This ensures the configured role family meets the deployment requirements before the protocol starts.
+
 ## DSL Syntax
 
 Topologies are defined using a DSL extension.

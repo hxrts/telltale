@@ -1366,4 +1366,109 @@ protocol QuickCheck =
             _ => panic!("Expected Send"),
         }
     }
+
+    #[test]
+    fn test_parse_parallel_annotation() {
+        let input = r#"
+protocol Broadcast =
+  roles Coordinator, Worker
+  @parallel Coordinator -> Worker : Task
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse @parallel: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(annotations.has_parallel(), "Expected parallel annotation");
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_ordered_annotation() {
+        let input = r#"
+protocol OrderedCollect =
+  roles Coordinator, Worker
+  @ordered Worker -> Coordinator : Result
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse @ordered: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(annotations.has_ordered(), "Expected ordered annotation");
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_min_responses_annotation() {
+        let input = r#"
+protocol ThresholdSign =
+  roles Coordinator, Signer
+  @min_responses(3) Signer -> Coordinator : Signature
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse @min_responses: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(
+                    annotations.has_min_responses(),
+                    "Expected min_responses annotation"
+                );
+                assert_eq!(annotations.min_responses(), Some(3));
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_combined_annotations() {
+        let input = r#"
+protocol ParallelThreshold =
+  roles Coordinator, Worker
+  @parallel @min_responses(2) Worker -> Coordinator : Vote
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse combined annotations: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send { annotations, .. } => {
+                assert!(annotations.has_parallel(), "Expected parallel annotation");
+                assert!(
+                    annotations.has_min_responses(),
+                    "Expected min_responses annotation"
+                );
+                assert_eq!(annotations.min_responses(), Some(2));
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
 }

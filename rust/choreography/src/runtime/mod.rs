@@ -35,6 +35,7 @@
 pub mod adapter;
 pub mod spawn;
 pub mod sync;
+pub mod test_adapter;
 
 // Re-export main types
 pub use adapter::{
@@ -42,3 +43,4 @@ pub use adapter::{
     ProtocolContext, ProtocolOutput,
 };
 pub use spawn::{spawn, spawn_local, AsyncRuntime};
+pub use test_adapter::TestAdapter;

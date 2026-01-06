@@ -1,9 +1,14 @@
 //! Example demonstrating dynamic role count support.
 //!
-//! This example parses protocols using the DSL string parser so dynamic roles
-//! and range expressions are fully supported.
+//! This example shows two aspects of dynamic roles:
+//! 1. DSL parsing of protocols with wildcards and ranges
+//! 2. Runtime resolution of role families using TestAdapter
 
 use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use rumpsteak_aura_choreography::effects::{LabelId, RoleId};
+use rumpsteak_aura_choreography::identifiers::RoleName;
+use rumpsteak_aura_choreography::runtime::adapter::ChoreographicAdapter;
+use rumpsteak_aura_choreography::runtime::test_adapter::TestAdapter;
 
 const THRESHOLD_SIGNATURE: &str = r#"
 module threshold_crypto exposing (ThresholdSignature)
@@ -69,10 +74,56 @@ protocol DynamicLoadBalancer = {
 }
 "#;
 
+// Role and Label types for runtime demonstration
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum SignerRole {
+    Coordinator,
+    Signer(u32),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+enum SignerLabel {
+    Sign,
+}
+
+impl LabelId for SignerLabel {
+    fn as_str(&self) -> &'static str {
+        "Sign"
+    }
+    fn from_str(s: &str) -> Option<Self> {
+        if s == "Sign" {
+            Some(SignerLabel::Sign)
+        } else {
+            None
+        }
+    }
+}
+
+impl RoleId for SignerRole {
+    type Label = SignerLabel;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            SignerRole::Coordinator => RoleName::from_static("Coordinator"),
+            SignerRole::Signer(_) => RoleName::from_static("Signer"),
+        }
+    }
+
+    fn role_index(&self) -> Option<u32> {
+        match self {
+            SignerRole::Signer(idx) => Some(*idx),
+            _ => None,
+        }
+    }
+}
+
 fn main() {
     println!("Dynamic Role Count Support Example");
-    println!("==================================");
+    println!("==================================\n");
 
+    // Part 1: DSL Parsing
+    println!("Part 1: DSL Parsing");
+    println!("-------------------");
     for (name, src) in [
         ("ThresholdSignature", THRESHOLD_SIGNATURE),
         ("PracticalByzantineFaultTolerance", PBFT),
@@ -80,6 +131,30 @@ fn main() {
         ("DynamicLoadBalancer", LOAD_BALANCER),
     ] {
         let choreo = parse_choreography_str(src).expect("Protocol should parse");
-        println!("Parsed {} with {} roles", name, choreo.roles.len());
+        println!("  Parsed {} with {} roles", name, choreo.roles.len());
     }
+
+    // Part 2: Runtime Resolution
+    println!("\nPart 2: Runtime Resolution");
+    println!("--------------------------");
+
+    // Create adapter with 5 signers
+    let signers: Vec<SignerRole> = (0..5).map(SignerRole::Signer).collect();
+    let adapter = TestAdapter::new(SignerRole::Coordinator).with_family("Signer", signers);
+
+    // Resolve all signers
+    let all = adapter.resolve_family("Signer").expect("resolve_family");
+    println!("  resolve_family(\"Signer\") -> {} roles", all.len());
+
+    // Resolve a threshold subset (first 3 signers)
+    let threshold = adapter
+        .resolve_range("Signer", 0, 3)
+        .expect("resolve_range");
+    println!("  resolve_range(\"Signer\", 0, 3) -> {} roles", threshold.len());
+
+    // Get family size
+    let size = adapter.family_size("Signer").expect("family_size");
+    println!("  family_size(\"Signer\") -> {}", size);
+
+    println!("\nAll dynamic role operations completed successfully!");
 }

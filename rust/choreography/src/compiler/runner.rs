@@ -31,7 +31,7 @@
 //! }
 //! ```
 
-use crate::ast::{LocalType, Role};
+use crate::ast::{ExecutionHints, LocalType, OperationPath, OperationStep, Role};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::BTreeSet;
@@ -49,6 +49,28 @@ use std::collections::BTreeSet;
 /// A TokenStream containing the `run_{role}` function.
 #[must_use]
 pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalType) -> TokenStream {
+    generate_runner_fn_with_hints(protocol_name, role, local_type, None)
+}
+
+/// Generate a runner function for a single role with optional execution hints.
+///
+/// # Arguments
+///
+/// * `protocol_name` - Name of the protocol
+/// * `role` - The role to generate a runner for
+/// * `local_type` - The projected local type for this role
+/// * `hints` - Optional execution hints for controlling broadcast/collect behavior
+///
+/// # Returns
+///
+/// A TokenStream containing the `run_{role}` function.
+#[must_use]
+pub fn generate_runner_fn_with_hints(
+    protocol_name: &str,
+    role: &Role,
+    local_type: &LocalType,
+    hints: Option<&ExecutionHints>,
+) -> TokenStream {
     let role_name = role.name();
     let fn_name = format_ident!("run_{}", role_name.to_string().to_lowercase());
     let output_type = format_ident!("{}Output", role_name);
@@ -60,7 +82,13 @@ pub fn generate_runner_fn(protocol_name: &str, role: &Role, local_type: &LocalTy
     };
 
     // Generate the function body from local type
-    let body = generate_runner_body(local_type, &mut RecursionContext::new());
+    let body = generate_runner_body_with_hints(
+        local_type,
+        &mut RecursionContext::new(),
+        hints,
+        &OperationPath::new(),
+        &mut HintCounters::default(),
+    );
 
     // Determine if this role is indexed
     let (fn_signature, ctx_creation) = if role.index().is_some() || role.param().is_some() {
@@ -140,6 +168,285 @@ impl RecursionContext {
     }
 }
 
+/// Counters for tracking operation indices during hint-aware code generation.
+#[derive(Default)]
+struct HintCounters {
+    send_count: usize,
+    recv_count: usize,
+}
+
+/// Generate the body of a runner function from a local type with execution hints.
+///
+/// This is the hints-aware version that can generate parallel broadcast/collect code.
+fn generate_runner_body_with_hints(
+    local_type: &LocalType,
+    ctx: &mut RecursionContext,
+    hints: Option<&ExecutionHints>,
+    path: &OperationPath,
+    counters: &mut HintCounters,
+) -> TokenStream {
+    match local_type {
+        LocalType::Send {
+            to,
+            message,
+            continuation,
+        } => {
+            let msg_type = &message.name;
+            let current_path = path.push(OperationStep::Send(counters.send_count));
+            counters.send_count += 1;
+
+            // Check for parallel hint
+            let is_parallel = hints.map(|h| h.is_parallel(&current_path)).unwrap_or(false);
+
+            let cont =
+                generate_runner_body_with_hints(continuation, ctx, hints, &current_path, counters);
+
+            // Check if destination is a wildcard or range (multi-destination)
+            if let Some(index) = to.index() {
+                match index {
+                    crate::ast::role::RoleIndex::Wildcard => {
+                        let family_name = to.name().to_string();
+                        return if is_parallel {
+                            // Parallel broadcast using join_all
+                            quote! {
+                                // Parallel broadcast to all #family_name instances
+                                let roles = adapter.resolve_family(#family_name)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let msg: #msg_type = adapter.provide_message(roles[0]).await?;
+                                {
+                                    use ::futures::future::join_all;
+                                    let futures: Vec<_> = roles.iter()
+                                        .map(|r| adapter.send(r.clone(), msg.clone()))
+                                        .collect();
+                                    let results = join_all(futures).await;
+                                    for result in results {
+                                        result?;
+                                    }
+                                }
+                                #cont
+                            }
+                        } else {
+                            // Sequential broadcast
+                            quote! {
+                                // Broadcast to all #family_name instances
+                                let roles = adapter.resolve_family(#family_name)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let msg: #msg_type = adapter.provide_message(roles[0]).await?;
+                                adapter.broadcast(&roles, msg).await?;
+                                #cont
+                            }
+                        };
+                    }
+                    crate::ast::role::RoleIndex::Range(range) => {
+                        let family_name = to.name().to_string();
+                        let (start_expr, end_expr) = generate_range_exprs(range);
+                        return if is_parallel {
+                            // Parallel broadcast to range using join_all
+                            quote! {
+                                // Parallel broadcast to #family_name range
+                                let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let msg: #msg_type = adapter.provide_message(roles[0]).await?;
+                                {
+                                    use ::futures::future::join_all;
+                                    let futures: Vec<_> = roles.iter()
+                                        .map(|r| adapter.send(r.clone(), msg.clone()))
+                                        .collect();
+                                    let results = join_all(futures).await;
+                                    for result in results {
+                                        result?;
+                                    }
+                                }
+                                #cont
+                            }
+                        } else {
+                            // Sequential broadcast
+                            quote! {
+                                // Broadcast to #family_name range
+                                let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let msg: #msg_type = adapter.provide_message(roles[0]).await?;
+                                adapter.broadcast(&roles, msg).await?;
+                                #cont
+                            }
+                        };
+                    }
+                    _ => {} // Fall through to normal send
+                }
+            }
+
+            // Normal single-destination send
+            let to_role = generate_role_id(to);
+            quote! {
+                // Send to #to
+                let msg: #msg_type = adapter.provide_message(#to_role).await?;
+                adapter.send(#to_role, msg).await?;
+                #cont
+            }
+        }
+
+        LocalType::Receive {
+            from,
+            message,
+            continuation,
+        } => {
+            let msg_type = &message.name;
+            let current_path = path.push(OperationStep::Recv(counters.recv_count));
+            counters.recv_count += 1;
+
+            // Check for parallel and min_responses hints
+            let is_parallel = hints.map(|h| h.is_parallel(&current_path)).unwrap_or(false);
+            let min_responses = hints.and_then(|h| h.min_responses(&current_path));
+
+            let cont =
+                generate_runner_body_with_hints(continuation, ctx, hints, &current_path, counters);
+
+            // Check if source is a wildcard or range (multi-source collect)
+            if let Some(index) = from.index() {
+                match index {
+                    crate::ast::role::RoleIndex::Wildcard => {
+                        let family_name = from.name().to_string();
+                        return if is_parallel {
+                            if let Some(min) = min_responses {
+                                // Parallel collect with threshold
+                                quote! {
+                                    // Parallel collect from all #family_name instances (min: #min)
+                                    let roles = adapter.resolve_family(#family_name)?;
+                                    if roles.is_empty() {
+                                        return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                            #family_name.to_string()
+                                        ).into());
+                                    }
+                                    let _msgs: Vec<#msg_type> = {
+                                        use ::futures::future::join_all;
+                                        let futures: Vec<_> = roles.iter()
+                                            .map(|r| adapter.recv::<#msg_type>(r.clone()))
+                                            .collect();
+                                        let results = join_all(futures).await;
+                                        let mut collected = Vec::new();
+                                        for result in results {
+                                            if let Ok(msg) = result {
+                                                collected.push(msg);
+                                            }
+                                        }
+                                        if collected.len() < #min as usize {
+                                            return Err(::rumpsteak_aura_choreography::ChoreographyError::InsufficientResponses {
+                                                expected: #min as usize,
+                                                received: collected.len(),
+                                            }.into());
+                                        }
+                                        collected
+                                    };
+                                    #cont
+                                }
+                            } else {
+                                // Parallel collect all
+                                quote! {
+                                    // Parallel collect from all #family_name instances
+                                    let roles = adapter.resolve_family(#family_name)?;
+                                    if roles.is_empty() {
+                                        return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                            #family_name.to_string()
+                                        ).into());
+                                    }
+                                    let _msgs: Vec<#msg_type> = {
+                                        use ::futures::future::join_all;
+                                        let futures: Vec<_> = roles.iter()
+                                            .map(|r| adapter.recv::<#msg_type>(r.clone()))
+                                            .collect();
+                                        let results = join_all(futures).await;
+                                        results.into_iter().collect::<Result<Vec<_>, _>>()?
+                                    };
+                                    #cont
+                                }
+                            }
+                        } else {
+                            // Sequential collect
+                            quote! {
+                                // Collect from all #family_name instances
+                                let roles = adapter.resolve_family(#family_name)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let _msgs: Vec<#msg_type> = adapter.collect(&roles).await?;
+                                #cont
+                            }
+                        };
+                    }
+                    crate::ast::role::RoleIndex::Range(range) => {
+                        let family_name = from.name().to_string();
+                        let (start_expr, end_expr) = generate_range_exprs(range);
+                        return if is_parallel {
+                            // Parallel collect from range
+                            quote! {
+                                // Parallel collect from #family_name range
+                                let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let _msgs: Vec<#msg_type> = {
+                                    use ::futures::future::join_all;
+                                    let futures: Vec<_> = roles.iter()
+                                        .map(|r| adapter.recv::<#msg_type>(r.clone()))
+                                        .collect();
+                                    let results = join_all(futures).await;
+                                    results.into_iter().collect::<Result<Vec<_>, _>>()?
+                                };
+                                #cont
+                            }
+                        } else {
+                            // Sequential collect
+                            quote! {
+                                // Collect from #family_name range
+                                let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
+                                if roles.is_empty() {
+                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        #family_name.to_string()
+                                    ).into());
+                                }
+                                let _msgs: Vec<#msg_type> = adapter.collect(&roles).await?;
+                                #cont
+                            }
+                        };
+                    }
+                    _ => {} // Fall through to normal receive
+                }
+            }
+
+            // Normal single-source receive
+            let from_role = generate_role_id(from);
+            quote! {
+                // Receive from #from
+                let _msg: #msg_type = adapter.recv(#from_role).await?;
+                #cont
+            }
+        }
+
+        // For other cases, delegate to the non-hints version
+        _ => generate_runner_body(local_type, ctx),
+    }
+}
+
 /// Generate the body of a runner function from a local type.
 ///
 /// This produces a `TokenStream` containing the async code that executes
@@ -157,10 +464,51 @@ pub(crate) fn generate_runner_body(
             message,
             continuation,
         } => {
-            let to_role = generate_role_id(to);
             let msg_type = &message.name;
             let cont = generate_runner_body(continuation, ctx);
 
+            // Check if destination is a wildcard or range (multi-destination)
+            if let Some(index) = to.index() {
+                match index {
+                    crate::ast::role::RoleIndex::Wildcard => {
+                        // Generate broadcast to all instances of the role family
+                        let family_name = to.name().to_string();
+                        return quote! {
+                            // Broadcast to all #family_name instances
+                            let roles = adapter.resolve_family(#family_name)?;
+                            if roles.is_empty() {
+                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    #family_name.to_string()
+                                ).into());
+                            }
+                            let msg: #msg_type = adapter.provide_message(roles[0]).await?;
+                            adapter.broadcast(&roles, msg).await?;
+                            #cont
+                        };
+                    }
+                    crate::ast::role::RoleIndex::Range(range) => {
+                        // Generate broadcast to a range of role instances
+                        let family_name = to.name().to_string();
+                        let (start_expr, end_expr) = generate_range_exprs(range);
+                        return quote! {
+                            // Broadcast to #family_name range
+                            let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
+                            if roles.is_empty() {
+                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    #family_name.to_string()
+                                ).into());
+                            }
+                            let msg: #msg_type = adapter.provide_message(roles[0]).await?;
+                            adapter.broadcast(&roles, msg).await?;
+                            #cont
+                        };
+                    }
+                    _ => {} // Fall through to normal send
+                }
+            }
+
+            // Normal single-destination send
+            let to_role = generate_role_id(to);
             quote! {
                 // Send to #to
                 let msg: #msg_type = adapter.provide_message(#to_role).await?;
@@ -174,10 +522,49 @@ pub(crate) fn generate_runner_body(
             message,
             continuation,
         } => {
-            let from_role = generate_role_id(from);
             let msg_type = &message.name;
             let cont = generate_runner_body(continuation, ctx);
 
+            // Check if source is a wildcard or range (multi-source collect)
+            if let Some(index) = from.index() {
+                match index {
+                    crate::ast::role::RoleIndex::Wildcard => {
+                        // Generate collect from all instances of the role family
+                        let family_name = from.name().to_string();
+                        return quote! {
+                            // Collect from all #family_name instances
+                            let roles = adapter.resolve_family(#family_name)?;
+                            if roles.is_empty() {
+                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    #family_name.to_string()
+                                ).into());
+                            }
+                            let _msgs: Vec<#msg_type> = adapter.collect(&roles).await?;
+                            #cont
+                        };
+                    }
+                    crate::ast::role::RoleIndex::Range(range) => {
+                        // Generate collect from a range of role instances
+                        let family_name = from.name().to_string();
+                        let (start_expr, end_expr) = generate_range_exprs(range);
+                        return quote! {
+                            // Collect from #family_name range
+                            let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
+                            if roles.is_empty() {
+                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    #family_name.to_string()
+                                ).into());
+                            }
+                            let _msgs: Vec<#msg_type> = adapter.collect(&roles).await?;
+                            #cont
+                        };
+                    }
+                    _ => {} // Fall through to normal receive
+                }
+            }
+
+            // Normal single-source receive
+            let from_role = generate_role_id(from);
             quote! {
                 // Receive from #from
                 let _msg: #msg_type = adapter.recv(#from_role).await?;
@@ -435,6 +822,31 @@ pub(crate) fn generate_runner_body(
     }
 }
 
+/// Generate TokenStream expressions for a role range.
+///
+/// Returns a tuple of (start_expr, end_expr) TokenStreams.
+fn generate_range_exprs(range: &crate::ast::role::RoleRange) -> (TokenStream, TokenStream) {
+    use crate::ast::role::RangeExpr;
+
+    let start_expr = match &range.start {
+        RangeExpr::Concrete(n) => quote! { #n },
+        RangeExpr::Symbolic(var) => {
+            let var_ident = format_ident!("{}", var);
+            quote! { #var_ident }
+        }
+    };
+
+    let end_expr = match &range.end {
+        RangeExpr::Concrete(n) => quote! { #n },
+        RangeExpr::Symbolic(var) => {
+            let var_ident = format_ident!("{}", var);
+            quote! { #var_ident }
+        }
+    };
+
+    (start_expr, end_expr)
+}
+
 /// Generate a runtime Role expression for a role.
 ///
 /// Converts an AST `Role` to a `TokenStream` that constructs the
@@ -459,16 +871,20 @@ pub(crate) fn generate_role_id(role: &Role) -> TokenStream {
                 }
             }
             RoleIndex::Wildcard => {
+                // This should be handled at the Send/Receive level, not here
+                // If we reach here, it's a context where wildcards aren't supported
                 quote! {{
                     return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
-                        "wildcard roles are not supported in generated runners".to_string()
+                        "wildcard roles in this context should use resolve_family() instead".to_string()
                     ).into());
                 }}
             }
             RoleIndex::Range(_) => {
+                // This should be handled at the Send/Receive level, not here
+                // If we reach here, it's a context where ranges aren't supported
                 quote! {{
                     return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
-                        "range roles are not supported in generated runners".to_string()
+                        "range roles in this context should use resolve_range() instead".to_string()
                     ).into());
                 }}
             }
@@ -791,5 +1207,133 @@ mod tests {
         let output = tokens.to_string();
         assert!(output.contains("ClientOutput"));
         assert!(output.contains("ServerOutput"));
+    }
+
+    #[test]
+    fn test_generate_runner_body_send_wildcard() {
+        use crate::ast::{role::RoleIndex, LocalType, MessageType};
+
+        // Create a role with wildcard index: Worker[*]
+        let worker = Role::with_index(format_ident!("Worker"), RoleIndex::Wildcard).unwrap();
+        let msg = MessageType {
+            name: format_ident!("Task"),
+            type_annotation: None,
+            payload: None,
+        };
+        let local_type = LocalType::Send {
+            to: worker,
+            message: msg,
+            continuation: Box::new(LocalType::End),
+        };
+
+        let tokens = generate_runner_body(&local_type, &mut RecursionContext::new());
+        let output = tokens.to_string();
+
+        // Check that we generate resolve_family and broadcast calls
+        assert!(
+            output.contains("resolve_family"),
+            "Should use resolve_family for wildcard"
+        );
+        assert!(
+            output.contains("broadcast"),
+            "Should use broadcast for wildcard send"
+        );
+    }
+
+    #[test]
+    fn test_generate_runner_body_send_range() {
+        use crate::ast::{
+            role::{RangeExpr, RoleIndex, RoleRange},
+            LocalType, MessageType,
+        };
+
+        // Create a role with range index: Worker[0..3]
+        let range = RoleRange {
+            start: RangeExpr::Concrete(0),
+            end: RangeExpr::Concrete(3),
+        };
+        let worker = Role::with_index(format_ident!("Worker"), RoleIndex::Range(range)).unwrap();
+        let msg = MessageType {
+            name: format_ident!("Task"),
+            type_annotation: None,
+            payload: None,
+        };
+        let local_type = LocalType::Send {
+            to: worker,
+            message: msg,
+            continuation: Box::new(LocalType::End),
+        };
+
+        let tokens = generate_runner_body(&local_type, &mut RecursionContext::new());
+        let output = tokens.to_string();
+
+        // Check that we generate resolve_range and broadcast calls
+        assert!(
+            output.contains("resolve_range"),
+            "Should use resolve_range for range"
+        );
+        assert!(
+            output.contains("broadcast"),
+            "Should use broadcast for range send"
+        );
+    }
+
+    #[test]
+    fn test_generate_runner_body_recv_wildcard() {
+        use crate::ast::{role::RoleIndex, LocalType, MessageType};
+
+        // Create a role with wildcard index: Worker[*]
+        let worker = Role::with_index(format_ident!("Worker"), RoleIndex::Wildcard).unwrap();
+        let msg = MessageType {
+            name: format_ident!("Result"),
+            type_annotation: None,
+            payload: None,
+        };
+        let local_type = LocalType::Receive {
+            from: worker,
+            message: msg,
+            continuation: Box::new(LocalType::End),
+        };
+
+        let tokens = generate_runner_body(&local_type, &mut RecursionContext::new());
+        let output = tokens.to_string();
+
+        // Check that we generate resolve_family and collect calls
+        assert!(
+            output.contains("resolve_family"),
+            "Should use resolve_family for wildcard"
+        );
+        assert!(
+            output.contains("collect"),
+            "Should use collect for wildcard receive"
+        );
+    }
+
+    #[test]
+    fn test_generate_range_exprs_concrete() {
+        use crate::ast::role::{RangeExpr, RoleRange};
+
+        let range = RoleRange {
+            start: RangeExpr::Concrete(1),
+            end: RangeExpr::Concrete(5),
+        };
+
+        let (start, end) = generate_range_exprs(&range);
+        assert_eq!(start.to_string(), "1u32");
+        assert_eq!(end.to_string(), "5u32");
+    }
+
+    #[test]
+    fn test_generate_range_exprs_symbolic() {
+        use crate::ast::role::{RangeExpr, RoleRange};
+
+        let range = RoleRange {
+            start: RangeExpr::Symbolic("start".to_string()),
+            end: RangeExpr::Symbolic("end".to_string()),
+        };
+
+        let (start, end) = generate_range_exprs(&range);
+        assert_eq!(start.to_string(), "start");
+        assert_eq!(end.to_string(), "end");
     }
 }

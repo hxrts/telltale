@@ -2,7 +2,7 @@
 //!
 //! Parses topology definitions from DSL source code.
 
-use super::{Location, Topology, TopologyConstraint, TopologyMode};
+use super::{Location, RoleFamilyConstraint, Topology, TopologyConstraint, TopologyMode};
 use crate::identifiers::{
     Datacenter, Endpoint as TopologyEndpoint, IdentifierError, Namespace, Region, RoleName,
 };
@@ -109,6 +109,14 @@ fn parse_topology_body(pair: pest::iterators::Pair<Rule>) -> Result<Topology, To
                 for constraint in inner.into_inner() {
                     if constraint.as_rule() == Rule::constraint_decl {
                         topology.constraints.push(parse_constraint(constraint)?);
+                    }
+                }
+            }
+            Rule::role_constraints_block => {
+                for decl in inner.into_inner() {
+                    if decl.as_rule() == Rule::role_constraint_decl {
+                        let (family, constraint) = parse_role_constraint_decl(decl)?;
+                        topology.role_constraints.insert(family, constraint);
                     }
                 }
             }
@@ -301,6 +309,70 @@ fn parse_constraint(
     }
 }
 
+fn parse_role_constraint_decl(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<(String, RoleFamilyConstraint), TopologyParseError> {
+    let mut inner = pair.into_inner();
+
+    // Get family name
+    let family = inner
+        .next()
+        .map(|p| p.as_str().to_string())
+        .ok_or_else(|| {
+            TopologyParseError::InvalidConstraint("role constraint missing family name".to_string())
+        })?;
+
+    // Get constraint spec
+    let spec = inner.next().ok_or_else(|| {
+        TopologyParseError::InvalidConstraint("role constraint missing specification".to_string())
+    })?;
+
+    let constraint = parse_role_constraint_spec(spec)?;
+    Ok((family, constraint))
+}
+
+fn parse_role_constraint_spec(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<RoleFamilyConstraint, TopologyParseError> {
+    let mut min: Option<u32> = None;
+    let mut max: Option<u32> = None;
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::min_constraint => {
+                let value = inner
+                    .into_inner()
+                    .next()
+                    .and_then(|p| p.as_str().parse::<u32>().ok())
+                    .ok_or_else(|| {
+                        TopologyParseError::InvalidConstraint(
+                            "min constraint requires integer value".to_string(),
+                        )
+                    })?;
+                min = Some(value);
+            }
+            Rule::max_constraint => {
+                let value = inner
+                    .into_inner()
+                    .next()
+                    .and_then(|p| p.as_str().parse::<u32>().ok())
+                    .ok_or_else(|| {
+                        TopologyParseError::InvalidConstraint(
+                            "max constraint requires integer value".to_string(),
+                        )
+                    })?;
+                max = Some(value);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(RoleFamilyConstraint {
+        min: min.unwrap_or(0),
+        max,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -406,5 +478,108 @@ mod tests {
                 .unwrap(),
             Location::Colocated(RoleName::from_static("Alice"))
         );
+    }
+
+    #[test]
+    fn test_parse_role_constraints_min_only() {
+        let input = r#"
+            topology ThresholdSig for Protocol {
+                Coordinator: localhost:8000
+
+                role_constraints {
+                    Witness: min = 3
+                }
+            }
+        "#;
+
+        let result = parse_topology(input).unwrap();
+        let constraint = result.topology.role_constraints.get("Witness").unwrap();
+        assert_eq!(constraint.min, 3);
+        assert_eq!(constraint.max, None);
+    }
+
+    #[test]
+    fn test_parse_role_constraints_min_and_max() {
+        let input = r#"
+            topology ThresholdSig for Protocol {
+                role_constraints {
+                    Witness: min = 3, max = 10
+                }
+            }
+        "#;
+
+        let result = parse_topology(input).unwrap();
+        let constraint = result.topology.role_constraints.get("Witness").unwrap();
+        assert_eq!(constraint.min, 3);
+        assert_eq!(constraint.max, Some(10));
+    }
+
+    #[test]
+    fn test_parse_role_constraints_max_first() {
+        let input = r#"
+            topology ThresholdSig for Protocol {
+                role_constraints {
+                    Worker: max = 5, min = 1
+                }
+            }
+        "#;
+
+        let result = parse_topology(input).unwrap();
+        let constraint = result.topology.role_constraints.get("Worker").unwrap();
+        assert_eq!(constraint.min, 1);
+        assert_eq!(constraint.max, Some(5));
+    }
+
+    #[test]
+    fn test_parse_role_constraints_multiple_families() {
+        let input = r#"
+            topology ThresholdSig for Protocol {
+                role_constraints {
+                    Witness: min = 3
+                    Worker: min = 1, max = 10
+                    Validator: max = 5
+                }
+            }
+        "#;
+
+        let result = parse_topology(input).unwrap();
+        assert_eq!(result.topology.role_constraints.len(), 3);
+
+        let witness = result.topology.role_constraints.get("Witness").unwrap();
+        assert_eq!(witness.min, 3);
+        assert_eq!(witness.max, None);
+
+        let worker = result.topology.role_constraints.get("Worker").unwrap();
+        assert_eq!(worker.min, 1);
+        assert_eq!(worker.max, Some(10));
+
+        let validator = result.topology.role_constraints.get("Validator").unwrap();
+        assert_eq!(validator.min, 0); // default min
+        assert_eq!(validator.max, Some(5));
+    }
+
+    #[test]
+    fn test_parse_role_constraints_with_mappings_and_constraints() {
+        let input = r#"
+            topology Prod for TwoPhaseCommit {
+                Coordinator: coordinator.internal:9000
+
+                role_constraints {
+                    Participant: min = 2, max = 100
+                }
+
+                constraints {
+                    region: Coordinator -> us_east_1
+                }
+            }
+        "#;
+
+        let result = parse_topology(input).unwrap();
+        assert_eq!(result.topology.role_constraints.len(), 1);
+        assert_eq!(result.topology.constraints.len(), 1);
+
+        let participant = result.topology.role_constraints.get("Participant").unwrap();
+        assert_eq!(participant.min, 2);
+        assert_eq!(participant.max, Some(100));
     }
 }

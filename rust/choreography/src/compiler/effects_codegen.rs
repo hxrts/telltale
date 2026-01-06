@@ -39,7 +39,10 @@ fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) 
                 ProtocolAnnotation::TimedChoice { .. }
                 | ProtocolAnnotation::Idempotent
                 | ProtocolAnnotation::Trace { .. }
-                | ProtocolAnnotation::Heartbeat { .. } => None,
+                | ProtocolAnnotation::Heartbeat { .. }
+                | ProtocolAnnotation::Parallel
+                | ProtocolAnnotation::Ordered
+                | ProtocolAnnotation::MinResponses(_) => None,
             }
         })
         .collect();
