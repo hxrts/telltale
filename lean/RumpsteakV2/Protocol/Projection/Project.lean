@@ -116,7 +116,7 @@ theorem mu_closed_body_freeVars (t : String) (body : LocalTypeR)
     rw [List.mem_filter]
     constructor
     · exact hx
-    · simp only [bne_iff_ne, ne_eq, decide_eq_true_eq]
+    · simp only [bne_iff_ne, ne_eq]
       exact hne
   simp only [hclosed, List.not_mem_nil] at hfilter
 
@@ -133,10 +133,40 @@ axiom allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
 
 /-- Muve types remain muve after substitution with muve replacements.
 
-    Proven by well-founded recursion on local type size. -/
-axiom isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
+    Proven by well-founded recursion on the local type size. -/
+theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
     (hlt : isMuve lt = true) (hrepl : isMuve repl = true) :
-    isMuve (lt.substitute varName repl) = true
+    isMuve (lt.substitute varName repl) = true := by
+  match lt with
+  | .end =>
+      -- .end.substitute = .end
+      simp only [LocalTypeR.substitute, isMuve]
+  | .var t =>
+      -- If t == varName, result is repl (muve by hrepl)
+      -- Otherwise, result is .var t (muve by definition)
+      simp only [LocalTypeR.substitute]
+      by_cases heq : t == varName
+      · simp only [heq, ↓reduceIte, hrepl]
+      · simp only [heq, Bool.false_eq_true, ↓reduceIte, isMuve]
+  | .mu t body =>
+      -- isMuve (.mu t body) = isMuve body, so hlt gives us isMuve body = true
+      simp only [isMuve] at hlt
+      simp only [LocalTypeR.substitute]
+      by_cases heq : t == varName
+      · -- Shadowed: substitute returns original
+        simp only [heq, ↓reduceIte, isMuve, hlt]
+      · -- Not shadowed: substitute into body
+        simp only [heq, Bool.false_eq_true, ↓reduceIte, isMuve]
+        exact isMuve_substitute body varName repl hlt hrepl
+  | .send _ _ =>
+      -- isMuve (.send ...) = false, contradicts hlt
+      simp only [isMuve] at hlt
+      exact absurd hlt (by decide)
+  | .recv _ _ =>
+      -- isMuve (.recv ...) = false, contradicts hlt
+      simp only [isMuve] at hlt
+      exact absurd hlt (by decide)
+termination_by sizeOf lt
 
 /-- trans produces muve types for non-participants.
     When role doesn't participate in g, trans g role is muve.
@@ -397,11 +427,27 @@ See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq refere
 
 The following helper lemmas and axioms support the proof of the main theorem. -/
 
-/-- Helper: part_of_all2 implies part_of2.
+/-- Helper: part_of_all2 implies part_of2 (requires wellFormed for non-empty branches).
 
-If a role participates on all branches, it certainly participates on some path. -/
+If a role participates on all branches, it certainly participates on some path.
+The wellFormed hypothesis ensures branches are non-empty.
+
+### Proof Strategy
+
+Use well-founded induction on global type size:
+- `comm_direct`: Trivially get `part_of2` via `part_of2.intro (.comm_direct ...)`
+- `comm_all_branches`: wellFormed ensures branches ≠ [], so pick first branch.
+  By IH on the continuation, get `part_of2 role cont`. Then construct
+  `part_of2.intro (.comm_branch ...)` with the membership witness.
+- `mu`: By IH on body, get `part_of2 role body`. Then construct
+  `part_of2.intro (.mu ...)`.
+
+### Coq Reference
+
+See `subject_reduction/theories/Projection/indProj.v:180-192`. -/
 axiom part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
-    (h : part_of_all2 role g) : part_of2 role g
+    (h : part_of_all2 role g)
+    (hwf : g.wellFormed = true) : part_of2 role g
 
 /-- Helper: if CProject gives lt and role doesn't participate, then lt is EQ2 to trans.
 
@@ -420,7 +466,7 @@ private theorem CProject_implies_EQ2_trans_nonpart (g : GlobalType) (role : Stri
   -- By part_of2_or_end, we get EQ2 lt .end
   have h_or := part_of2_or_end role g lt hproj hwf
   cases h_or with
-  | inl hpart_all => exact absurd (part_of_all2_implies_part_of2 role g hpart_all) hnotpart
+  | inl hpart_all => exact absurd (part_of_all2_implies_part_of2 role g hpart_all hwf) hnotpart
   | inr hlt_end =>
       -- hlt_end : EQ2 lt .end
       -- By EQ_end, we get EQ2 .end (trans g role)
