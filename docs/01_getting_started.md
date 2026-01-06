@@ -14,19 +14,11 @@ This adds the main facade crate and the choreographic programming layer.
 
 ### Understanding the Crates
 
-Rumpsteak-Aura is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence.
+Rumpsteak-Aura is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence. The `rumpsteak-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `rumpsteak-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
 
-The `rumpsteak-types` crate contains core type definitions. It provides `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. These types match the Lean definitions exactly.
+The `rumpsteak-aura-choreography` crate is the choreographic programming layer providing the DSL parser, effect handlers, and code generation. The `rumpsteak-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
 
-The `rumpsteak-theory` crate contains pure algorithms. It provides projection, merge, subtyping, and well-formedness checks. This crate has no IO or parsing dependencies.
-
-The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It provides the DSL parser, effect handlers, and code generation.
-
-The `rumpsteak-lean-bridge` crate enables cross-validation with Lean. It provides JSON import and export functions.
-
-The `rumpsteak-aura` crate is the main facade. It re-exports types from the other crates with feature flags.
-
-Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography`. The facade provides session types. The choreography layer provides the high-level DSL.
+The `rumpsteak-aura` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography` for session types and the high-level DSL.
 
 ### Feature Flags
 
@@ -42,8 +34,6 @@ The workspace provides granular feature flags to control dependencies and functi
 | `theory` | no | Session type algorithms via `rumpsteak-theory` |
 | `theory-async-subtyping` | no | POPL 2021 asynchronous subtyping algorithm |
 | `theory-bounded` | no | Bounded recursion strategies |
-| `lean-bridge` | no | Lean verification bridge (JSON export/import) |
-| `lean-runner` | no | LeanRunner for invoking Lean binary |
 | `full` | no | Enable all optional features |
 
 #### Theory Crate (`rumpsteak-theory`)
@@ -57,6 +47,8 @@ The workspace provides granular feature flags to control dependencies and functi
 | `bounded` | **yes** | Bounded recursion strategies |
 | `async-subtyping` | **yes** | POPL 2021 asynchronous subtyping |
 | `sync-subtyping` | **yes** | Synchronous subtyping |
+| `semantics` | **yes** | Async step semantics from ECOOP 2025 |
+| `coherence` | **yes** | Coherence predicates |
 
 #### Choreography Crate (`rumpsteak-aura-choreography`)
 
@@ -71,6 +63,8 @@ The workspace provides granular feature flags to control dependencies and functi
 |---------|---------|-------------|
 | `runner` | **yes** | LeanRunner for invoking Lean binary |
 | `cli` | no | Command-line interface binary |
+| `exporter` | no | Choreography exporter binary |
+| `golden` | no | Golden file management CLI |
 
 #### Example: Minimal Dependencies
 

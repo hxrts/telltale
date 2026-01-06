@@ -220,47 +220,47 @@ impl ChoreoHandler for DomainHandler {
         _ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &M,
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         println!("{:?} -> {:?}: sending message", self.role, to);
         Ok(())
     }
-    
+
     async fn recv<M: serde::de::DeserializeOwned + Send>(
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         Err(ChoreographyError::Transport("recv not implemented".into()))
     }
-    
+
     async fn choose(
         &mut self,
         _ep: &mut Self::Endpoint,
         _who: Self::Role,
-        label: Label,
-    ) -> Result<()> {
-        println!("{:?}: choosing {}", self.role, label.0);
+        label: <Self::Role as RoleId>::Label,
+    ) -> ChoreoResult<()> {
+        println!("{:?}: choosing {:?}", self.role, label);
         Ok(())
     }
-    
+
     async fn offer(
         &mut self,
         _ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<Label> {
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
         println!("{:?}: offering choice from {:?}", self.role, from);
-        Ok(Label("default"))
+        unimplemented!("offer not implemented for example")
     }
-    
+
     async fn with_timeout<F, T>(
         &mut self,
         _ep: &mut Self::Endpoint,
         _at: Self::Role,
         _dur: std::time::Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send,
+        F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         body.await
     }

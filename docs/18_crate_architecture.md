@@ -121,7 +121,7 @@ The `topology/` directory provides deployment configuration. See [Topology](08_t
 
 This crate is located in `rust/src/`. It is the main facade crate that re-exports from all other crates.
 
-The crate supports several feature flags. The `theory` feature includes `rumpsteak-theory` algorithms. The `lean-bridge` feature includes `rumpsteak-lean-bridge`. The `full` feature enables all features.
+The crate supports several feature flags. The `theory` feature includes `rumpsteak-theory` algorithms. The `full` feature enables all optional features. See [Getting Started](01_getting_started.md) for the complete feature flag reference.
 
 ```rust
 use rumpsteak_aura::prelude::*;

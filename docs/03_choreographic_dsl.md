@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The parser module is located in `rust/choreography/src/compiler/parser.rs`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
+The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
 
 ## Overview
 

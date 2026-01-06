@@ -119,7 +119,7 @@ Protocol is a recursive tree structure. It includes support for annotations at m
 
 ### Parser Module
 
-The parser module is located in `rust/choreography/src/compiler/parser.rs`. It converts DSL text into AST using the Pest parser generator.
+The parser module is located in `rust/choreography/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
 The parser validates role declarations. It builds the protocol tree from the input text.
 It runs a layout preprocessor before the grammar parse. This enables layout sensitive syntax with explicit braces for empty blocks.
@@ -147,7 +147,7 @@ Projection handles merging parallel branches. It also detects conflicts between 
 
 ### Code Generation Module
 
-The codegen module is located in `rust/choreography/src/compiler/codegen.rs`. It converts local types into Rust session types and effect programs.
+The codegen module is located in `rust/choreography/src/compiler/codegen/`. It converts local types into Rust session types and effect programs.
 
 The generator creates compile-time type-safe protocol implementations.
 
@@ -158,7 +158,6 @@ pub fn generate_choreography_code_with_dynamic_roles(choreography: &Choreography
 pub fn generate_choreography_code_with_namespacing(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
 pub fn generate_choreography_code_with_topology(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
 pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
-pub fn generate_helpers(roles: &[Role]) -> TokenStream
 pub fn generate_role_implementations(roles: &[Role]) -> TokenStream
 pub fn generate_topology_integration(choreography: &Choreography) -> TokenStream
 ```
@@ -172,14 +171,22 @@ The effect system is located in `rust/choreography/src/effects/`. It decouples p
 Protocols are represented as effect programs. Handlers interpret these programs.
 
 ```rust
-pub trait ChoreoHandler {
+pub trait ChoreoHandler: Send {
     type Role: RoleId;
-    type Endpoint;
+    type Endpoint: Endpoint;
 
-    async fn send<M>(&mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M) -> Result<()>;
-    async fn recv<M>(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<M>;
-    async fn choose(&mut self, ep: &mut Self::Endpoint, who: Self::Role, label: Label) -> Result<()>;
-    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label>;
+    async fn send<M: Serialize + Send + Sync>(
+        &mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M
+    ) -> ChoreoResult<()>;
+    async fn recv<M: DeserializeOwned + Send>(
+        &mut self, ep: &mut Self::Endpoint, from: Self::Role
+    ) -> ChoreoResult<M>;
+    async fn choose(
+        &mut self, ep: &mut Self::Endpoint, to: Self::Role, label: <Self::Role as RoleId>::Label
+    ) -> ChoreoResult<()>;
+    async fn offer(
+        &mut self, ep: &mut Self::Endpoint, from: Self::Role
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label>;
 }
 ```
 
@@ -334,6 +341,7 @@ rumpsteak-aura/
 │   │       ├── export.rs   Rust to JSON export
 │   │       ├── import.rs   JSON to Rust import
 │   │       └── runner.rs   Lean binary invocation
+│   ├── transport/          Transport abstractions (rumpsteak-transport)
 │   └── macros/             Procedural macros (rumpsteak-aura-macros)
 ├── lean/                   Lean 4 verification code
 ├── examples/               Example protocols
@@ -344,14 +352,8 @@ This tree outlines the workspace layout and crate locations. It helps map each c
 
 ### Crate Responsibilities
 
-This tree outlines the workspace layout. It maps each crate to a folder in the repository.
+The `rumpsteak-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `rumpsteak-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `rumpsteak-types`.
 
-The `rumpsteak-types` crate contains core type definitions. It provides `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. These types match the Lean definitions exactly. This crate has no internal dependencies.
+The `rumpsteak-aura-choreography` crate is the choreographic programming layer including the DSL parser, effect handlers, code generation, and runtime support. The `rumpsteak-lean-bridge` crate provides Lean integration through JSON export and import with a runner for invoking the verification binary.
 
-The `rumpsteak-theory` crate contains pure algorithms. It provides projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `rumpsteak-types`.
-
-The `rumpsteak-aura-choreography` crate is the choreographic programming layer. It includes the DSL parser, effect handlers, code generation, and runtime support.
-
-The `rumpsteak-lean-bridge` crate provides Lean integration. It exports Rust types to JSON and imports JSON from Lean. It includes a runner for invoking the Lean verification binary.
-
-The `rumpsteak-aura` crate is the main facade. It re-exports types from other crates with feature flags. Most users import from this crate.
+The `rumpsteak-aura` crate is the main facade that re-exports types from other crates with feature flags. Most users import from this crate.

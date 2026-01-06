@@ -362,6 +362,7 @@ match result {
 ```
 
 This pattern wraps a receive in `with_timeout`. It distinguishes timeout errors from other failures.
+
 ## Best Practices
 
 ### 1. Resource Management

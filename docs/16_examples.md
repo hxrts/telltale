@@ -26,9 +26,7 @@ The `fft.rs` example shows distributed Fast Fourier Transform. Computation is di
 
 ### Choice and Branching
 
-The `ring_choice.rs` example shows ring topology with choice points. Roles make decisions at each node.
-
-The `ring_choice.rs` example demonstrates choice constructs and branching patterns in a ring topology.
+The `ring_choice.rs` example shows ring topology with choice points. Roles make decisions at each node. The example demonstrates choice constructs and branching patterns.
 
 ### WASM
 

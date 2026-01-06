@@ -150,25 +150,26 @@ This transformation is internal to the serialization layer.
 
 ## Memoization
 
-Content IDs enable efficient memoization of expensive operations.
+Content IDs enable efficient memoization of expensive operations. A projection cache can use `(ContentId, Role)` pairs as keys. Repeated projections of the same global type return cached results.
 
 ```rust
-use rumpsteak_theory::ProjectionCache;
+use std::collections::HashMap;
+use rumpsteak_types::ContentId;
+use rumpsteak_theory::project;
 
-let cache = ProjectionCache::new();
-let local = cache.project(&global, "Alice")?;
+let mut cache: HashMap<(ContentId<_>, String), LocalTypeR> = HashMap::new();
+let cid = global.content_id_sha256()?;
+let key = (cid, "Alice".to_string());
+
+if let Some(cached) = cache.get(&key) {
+    // Use cached result
+} else {
+    let local = project(&global, "Alice")?;
+    cache.insert(key, local.clone());
+}
 ```
 
-The cache uses `(ContentId, Role)` pairs as keys. Repeated projections of the same global type return cached results.
-
-Cache statistics are available for performance analysis.
-
-```rust
-let stats = cache.stats();
-println!("Hits: {}, Misses: {}", stats.hits, stats.misses);
-```
-
-This reports cache hit and miss counts. It can be used in profiling runs.
+This pattern enables caching projection results by content ID.
 
 ## Content Store
 
@@ -221,7 +222,7 @@ Alpha equivalence holds when de Bruijn conversion produces identical results for
 
 ```rust
 use rumpsteak_types::{contentable::Contentable, ContentStore, GlobalType, Label};
-use rumpsteak_theory::ProjectionCache;
+use rumpsteak_theory::project;
 
 // Create a protocol
 let ping_pong = GlobalType::comm(
@@ -242,10 +243,9 @@ println!("Protocol CID: {:?}", cid);
 let mut store = ContentStore::new();
 store.insert(&ping_pong, ping_pong.clone())?;
 
-// Project with memoization
-let cache = ProjectionCache::new();
-let alice_type = cache.project(&ping_pong, "Alice")?;
-let bob_type = cache.project(&ping_pong, "Bob")?;
+// Project for each role
+let alice_type = project(&ping_pong, "Alice")?;
+let bob_type = project(&ping_pong, "Bob")?;
 ```
 
-This example demonstrates content ID computation, storage, and memoized projection.
+This example demonstrates content ID computation, storage, and projection.

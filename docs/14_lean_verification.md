@@ -4,13 +4,7 @@ Rumpsteak uses Lean 4 to formally verify the correctness of choreographic projec
 
 ## Verification Strategy
 
-The project employs a defense-in-depth approach with three layers:
-
-1. **Formal Proofs**: Core session type theory proven in Lean
-2. **Cross-Validation**: Two independent projection implementations compared for equivalence
-3. **Property Testing**: Randomized protocols validated against the Lean binary
-
-This layered approach ensures that bugs in one layer are caught by another.
+The project employs a defense-in-depth approach with three layers. Core session type theory is proven in Lean. Two independent projection implementations are compared for equivalence. Randomized protocols are validated against the Lean binary. This layered approach ensures that bugs in one layer are caught by another.
 
 ## What is Formally Proven
 
@@ -18,13 +12,7 @@ The following properties have complete proofs in `lean/Rumpsteak/Proofs/`:
 
 ### Merge Operator Properties
 
-The merge operator combines local types for non-participants in choices. Proofs establish:
-
-- **Reflexivity**: `merge lt lt = lt`
-- **Commutativity**: `merge a b = merge b a`
-- **Associativity**: `merge (merge a b) c = merge a (merge b c)`
-
-These properties ensure that merge order does not affect projection results.
+The merge operator combines local types for non-participants in choices. Proofs establish reflexivity (`merge lt lt = lt`), commutativity (`merge a b = merge b a`), and associativity (`merge (merge a b) c = merge a (merge b c)`). These properties ensure that merge order does not affect projection results.
 
 ### Subtyping and Ordering
 

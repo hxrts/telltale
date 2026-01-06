@@ -14,13 +14,9 @@ A session type describes a communication channel from one endpoint's perspective
 
 Multiparty session types extend binary session types to protocols with three or more participants. While session types handle point-to-point channels, MPST handles protocols where multiple parties interact. Each participant can communicate with multiple others. The type system ensures all interactions remain synchronized.
 
-MPST introduces new challenges beyond binary sessions. Participants must agree on the overall protocol flow. Messages between two participants affect what other participants can do next. The type system must track these dependencies to prevent global deadlocks.
+MPST introduces new challenges beyond binary sessions. Participants must agree on the overall protocol flow. Messages between two participants affect what other participants can do next. The type system must track these dependencies to prevent global deadlocks. Consider a three-party payment protocol where a customer requests a quote from a merchant, the merchant checks with a bank, and the bank approves or denies.
 
-Consider a three-party payment protocol. A customer requests a quote from a merchant. The merchant checks with a bank. The bank approves or denies.
-
-In MPST, each participant has a local view that includes all their partners. The customer's type shows communication with both merchant and bank. The system ensures all three views are compatible.
-
-For a more in-depth discussion of MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf). Advanced optimizations through asynchronous subtyping are covered in [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf).
+In MPST, each participant has a local view that includes all their partners. The customer's type shows communication with both merchant and bank. The system ensures all three views are compatible. For a more in-depth discussion of MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf). Advanced optimizations through asynchronous subtyping are covered in [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf).
 
 ## Global Types and Projection
 
@@ -75,15 +71,11 @@ The program specifies what messages to send and receive. The handler determines 
 
 ## Integration in Rumpsteak-Aura
 
-Rumpsteak-Aura combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system ensures protocol safety through MPST. Effect handlers provide flexible execution strategies.
+Rumpsteak-Aura combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system ensures protocol safety through MPST. Effect handlers provide flexible execution strategies. The choreography macro parses protocol definitions, generates role and message types automatically, and creates session types for each participant through projection.
 
-The choreography macro parses protocol definitions. It generates role types and message types automatically. Projection creates session types for each participant. These session types guarantee protocol compliance at compile time.
+The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection. The same choreography works across different deployment scenarios. Content addressing assigns cryptographic identities to all protocol artifacts, enabling memoization and structural sharing.
 
-The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection. The same choreography works across different deployment scenarios.
-
-Content addressing assigns cryptographic identities to all protocol artifacts. This enables memoization of projection results and structural sharing. Topology configuration separates deployment concerns from protocol logic. Resource heaps provide explicit state management with nullifier-based consumption tracking.
-
-This integration provides both safety and flexibility. The type system prevents protocol errors. The effect system allows diverse implementations. Together they make distributed programming reliable and maintainable.
+Topology configuration separates deployment concerns from protocol logic. Resource heaps provide explicit state management with nullifier-based consumption tracking. This integration provides both safety and flexibility through a type system that prevents protocol errors and an effect system that allows diverse implementations.
 
 ## Further Reading
 

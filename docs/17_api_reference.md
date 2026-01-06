@@ -637,26 +637,26 @@ pub trait ChoreoHandler: Send {
         ep: &mut Self::Endpoint,
         to: Self::Role,
         msg: &M,
-    ) -> Result<()>;
+    ) -> ChoreoResult<()>;
 
     async fn recv<M: DeserializeOwned + Send>(
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<M>;
+    ) -> ChoreoResult<M>;
 
     async fn choose(
         &mut self,
         ep: &mut Self::Endpoint,
         who: Self::Role,
         label: <Self::Role as RoleId>::Label,
-    ) -> Result<()>;
+    ) -> ChoreoResult<()>;
 
     async fn offer(
         &mut self,
         ep: &mut Self::Endpoint,
         from: Self::Role,
-    ) -> Result<<Self::Role as RoleId>::Label>;
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label>;
 
     async fn with_timeout<F, T>(
         &mut self,
@@ -664,16 +664,16 @@ pub trait ChoreoHandler: Send {
         at: Self::Role,
         dur: Duration,
         body: F,
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send;
+        F: std::future::Future<Output = ChoreoResult<T>> + Send;
 
     async fn broadcast<M: Serialize + Send + Sync>(
         &mut self,
         ep: &mut Self::Endpoint,
         recipients: &[Self::Role],
         msg: &M,
-    ) -> Result<()>;
+    ) -> ChoreoResult<()>;
 }
 ```
 

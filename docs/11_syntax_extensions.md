@@ -4,13 +4,9 @@ This guide covers the complete syntax extension system in rumpsteak-aura, which 
 
 ## Overview
 
-The rumpsteak-aura extension system provides a clean, elegant way for 3rd party projects to extend choreographic DSL syntax while automatically inheriting all core features, including:
+The rumpsteak-aura extension system provides a clean way for 3rd party projects to extend choreographic DSL syntax while automatically inheriting all core features.
 
-- **Full Feature Inheritance**: Choice constructs, loops, branch‑parallel, parameterized roles, protocol composition, error handling
-- **Extension Discovery**: Automatic discovery and registration of extensions
-- **Performance Optimization**: Cached grammar composition with 387x performance improvements
-- **Conflict Resolution**: Priority-based conflict resolution between extensions  
-- **Clean Architecture**: Preprocessing approach for simplicity and maintainability
+Core capabilities include full feature inheritance (choice constructs, loops, branch parallel, parameterized roles, protocol composition, error handling), automatic extension discovery and registration, cached grammar composition with 387x performance improvements, priority-based conflict resolution between extensions, and a preprocessing approach for simplicity and maintainability.
 
 ## Architecture
 
@@ -30,11 +26,7 @@ graph TD
     D --> E
 ```
 
-Key benefits:
-- **Simplicity**: Clean separation between extension and base parsing
-- **Performance**: Cached transformations with minimal overhead (387x faster when cached)
-- **Elegance**: No complex runtime grammar composition
-- **Compatibility**: Extensions compose with the current DSL (no legacy syntax required)
+Key benefits include clean separation between extension and base parsing, cached transformations with minimal overhead (387x faster when cached), no complex runtime grammar composition, and compatibility with the current DSL without requiring legacy syntax.
 
 ## Complete Integration Example
 
@@ -48,7 +40,7 @@ Here's the complete implementation:
 
 Two-crate architecture for maximum compatibility:
 
-**external-demo/Cargo.toml** (Regular crate):
+`external-demo/Cargo.toml` (Regular crate):
 ```toml
 [dependencies]
 # Re-export all rumpsteak-aura functionality  
@@ -60,7 +52,7 @@ external-demo-macros = { path = "../external-demo-macros" }
 
 This dependency set re-exports the core crates and the custom macro crate. It keeps the consumer crate in sync with the base APIs.
 
-**external-demo-macros/Cargo.toml** (Proc-macro crate):
+`external-demo-macros/Cargo.toml` (Proc-macro crate):
 ```toml
 [lib]
 proc-macro = true
@@ -275,11 +267,7 @@ impl GrammarComposer {
 
 This shows the cached path in the composer implementation. The cache avoids recomputing the composed grammar.
 
-Performance benefits:
-- **Caching**: 387x speedup for repeated compositions
-- **Memory optimization**: Pre-allocated string buffers
-- **Hash-based invalidation**: Efficient cache invalidation
-- **Optimized string operations**: Reduced allocations
+Performance benefits include 387x speedup for repeated compositions through caching, pre-allocated string buffers for memory optimization, hash-based cache invalidation, and optimized string operations with reduced allocations.
 
 ## Extension Parser System
 
@@ -562,11 +550,7 @@ This example uses the standard macro with an extension statement. It inherits al
 
 ### Performance Considerations
 
-The extension system is optimized for production use:
-
-- **Grammar composition**: ~3.6ms initial, ~9.3μs cached (387x speedup)
-- **Memory allocation**: Pre-allocated buffers reduce GC pressure
-- **Extension parsing**: Minimal overhead over standard parsing
+The extension system is optimized for production use. Grammar composition takes approximately 3.6ms initially and 9.3μs when cached (387x speedup). Pre-allocated buffers reduce GC pressure. Extension parsing adds minimal overhead over standard parsing.
 
 For performance-critical applications:
 - Reuse `GrammarComposer` instances to benefit from caching
@@ -577,10 +561,7 @@ For performance-critical applications:
 
 ### Common Issues
 
-1. **Grammar Conflicts**: Use namespaced rule names and appropriate priorities
-2. **Feature Loss**: Always use `parse_choreography_str` for full feature inheritance  
-3. **Performance**: Leverage caching by reusing composer instances
-4. **Role Mismatch**: Generate roles dynamically from choreography AST
+Grammar conflicts require namespaced rule names and appropriate priorities. Feature loss occurs when not using `parse_choreography_str` for full feature inheritance. Performance improves when reusing composer instances for caching. Role mismatch happens when not generating roles dynamically from the choreography AST.
 
 ### Debugging Tools
 
@@ -601,17 +582,11 @@ This snippet inspects the composed grammar and extension stats. It helps diagnos
 
 ## Complete Example: external-demo
 
-The `external-demo` project provides a complete working example of 3rd party integration using the two-crate pattern. Key features demonstrated:
-
-1. **Full Feature Inheritance**: All rumpsteak-aura features work automatically
-2. **Clean Integration**: Simple preprocessing approach
-3. **Dynamic Role Generation**: Roles extracted from choreography at compile time
-4. **Effect System Integration**: Extension data converted to effect system calls
-5. **Performance Optimization**: Leverages cached grammar composition
+The `external-demo` project provides a complete working example of 3rd party integration using the two-crate pattern. It demonstrates full feature inheritance where all rumpsteak-aura features work automatically. The integration uses a simple preprocessing approach. Roles are extracted from the choreography at compile time. Extension data converts to effect system calls. The implementation leverages cached grammar composition for performance.
 
 To see the complete implementation:
 ```bash
-cd /Users/hxrts/projects/rumpsteak-aura/external-demo
+cd external-demo
 cargo build --examples  # Verify compilation
 cargo run --example simple_ping_pong  # Run example
 cargo run --example threshold_ceremony  # Advanced features

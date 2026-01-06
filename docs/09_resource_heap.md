@@ -18,8 +18,8 @@ Resources are protocol artifacts with unique identifiers.
 
 ```rust
 pub struct ResourceId {
-    pub hash: [u8; 32],
-    pub counter: u64,
+    hash: [u8; 32],
+    counter: u64,
 }
 
 pub enum Resource {

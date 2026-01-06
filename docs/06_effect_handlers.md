@@ -11,31 +11,32 @@ A protocol executes by calling handler methods for each operation. Different han
 All handlers implement this trait.
 
 ```rust
-pub trait ChoreoHandler {
+pub trait ChoreoHandler: Send {
     type Role: RoleId;
-    type Endpoint;
-    
+    type Endpoint: Endpoint;
+
     async fn send<M: Serialize + Send + Sync>(
         &mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M
-    ) -> Result<()>;
-    
+    ) -> ChoreoResult<()>;
+
     async fn recv<M: DeserializeOwned + Send>(
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
-    ) -> Result<M>;
-    
+    ) -> ChoreoResult<M>;
+
     async fn choose(
-        &mut self, ep: &mut Self::Endpoint, who: Self::Role, label: Label
-    ) -> Result<()>;
-    
+        &mut self, ep: &mut Self::Endpoint, who: Self::Role,
+        label: <Self::Role as RoleId>::Label
+    ) -> ChoreoResult<()>;
+
     async fn offer(
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
-    ) -> Result<Label>;
+    ) -> ChoreoResult<<Self::Role as RoleId>::Label>;
 
     async fn with_timeout<F, T>(
         &mut self, ep: &mut Self::Endpoint, at: Self::Role, dur: Duration, body: F
-    ) -> Result<T>
+    ) -> ChoreoResult<T>
     where
-        F: Future<Output = Result<T>> + Send;
+        F: Future<Output = ChoreoResult<T>> + Send;
 }
 ```
 
