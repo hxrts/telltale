@@ -1,4 +1,5 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.Bisim
 import RumpsteakV2.Protocol.LocalTypeR
 
 /-! # EQ2_substitute: Substitution Preserves Equi-recursive Equality
@@ -116,9 +117,12 @@ satisfy the Barendregt convention. The proof has 2 remaining sorries for
 double-unfold edge cases that require more sophisticated coinductive reasoning.
 
 **Coq reference:** `subst_EQ2` in `subject_reduction/EQ2.v`
+
+**Status:** PROVEN via Bisim approach (see `EQ2_substitute_via_Bisim` in Bisim.lean).
 -/
-axiom EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR) :
-    EQ2 a b → EQ2 (a.substitute var repl) (b.substitute var repl)
+theorem EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR) :
+    EQ2 a b → EQ2 (a.substitute var repl) (b.substitute var repl) :=
+  RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_substitute_via_Bisim
 
 /-! ## Derived Lemmas -/
 
@@ -213,9 +217,12 @@ infinite communication trees.
 3. Use coinduction on the infinite tree to show semantic equivalence
 
 **Coq reference:** `full_eunf_subst` in `subject_reduction/coLocal.v`
+
+**Status:** PROVEN via Bisim approach (see `unfold_substitute_EQ2_via_Bisim` in Bisim.lean).
 -/
-axiom unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
-    EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl)
+theorem unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
+    EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) :=
+  RumpsteakV2.Protocol.CoTypes.Bisim.unfold_substitute_EQ2_via_Bisim t var repl
 
 /-- Unfold-substitute confluence for the reflexive case. -/
 theorem unfold_substitute_EQ2_refl (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
