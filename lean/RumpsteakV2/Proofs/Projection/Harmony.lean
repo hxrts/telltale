@@ -123,6 +123,25 @@ axiom proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
             EQ2 (projTrans g' act.receiver) cont ∨
     EQ2 (projTrans g' act.receiver) (projTrans g act.receiver)
 
+/-- BranchesStep preserves transBranches up to branch-wise EQ2 for non-participants.
+
+When branches step to branches' via BranchesStep, the transBranches are related
+by BranchesRel EQ2 for any role not involved in the action.
+
+This captures the semantic property that stepping inside branches doesn't affect
+non-participant projections: each branch steps, and projection commutes with stepping.
+
+Proof requires showing: for each pair (cont, cont') from corresponding branches,
+step cont act cont' ∧ role ≠ act.sender ∧ role ≠ act.receiver → EQ2 (trans cont' role) (trans cont role)
+
+This follows by induction on BranchesStep using proj_trans_other_step for each branch.
+The mutual dependency is resolved by well-founded induction on global type structure. -/
+axiom branches_step_preserves_trans (branches branches' : List (Label × GlobalType))
+    (act : GlobalActionR) (role : String)
+    (hstep : BranchesStep step branches act branches')
+    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
+    BranchesRel EQ2 (transBranches branches' role) (transBranches branches role)
+
 /-- Non-participating roles have unchanged projections through a step.
 
 This theorem captures the key harmony property: if a role is not involved in an action
@@ -180,23 +199,56 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
           exact hcoherent)
     -- Case 2: comm_async
     (fun sender receiver branches branches' act label cont hns_cond _hcond _hmem _hcan hbstep
-        ih_bstep role hns hnr => by
+        _ih_bstep role hns hnr => by
       -- g = comm sender receiver branches
       -- g' = comm sender receiver branches'
-      -- The action's sender/receiver may differ from comm's sender/receiver!
-      -- hns_cond : act.sender ≠ receiver
       -- hns : role ≠ act.sender, hnr : role ≠ act.receiver
+      -- hbstep : BranchesStep step branches act branches'
       --
-      -- For comm_async: the action is happening INSIDE one of the branches.
-      -- The role might be:
-      -- 1. role = sender (comm's sender): project as send, need transBranches to relate
-      -- 2. role = receiver (comm's receiver): project as recv, need transBranches to relate
-      -- 3. role ≠ sender ∧ role ≠ receiver: project via first branch, need first ≈ first'
-      --
-      -- For cases 1 and 2, we'd need branch-wise EQ2 for all branches, which requires
-      -- extending motive_2 to provide that. This is complex and requires additional axioms.
-      -- For now, we use sorry for this case.
-      sorry)
+      -- Use branches_step_preserves_trans to get branch-wise EQ2 preservation
+      have hbranch_rel := branches_step_preserves_trans branches branches' act role hbstep hns hnr
+      -- Case split on role's relationship to outer comm's sender/receiver
+      by_cases hrs : role = sender
+      · -- role = sender: project as send
+        simp only [projTrans, trans_comm_sender sender receiver role branches hrs,
+                   trans_comm_sender sender receiver role branches' hrs]
+        -- Goal: EQ2 (send receiver (transBranches branches' role)) (send receiver (transBranches branches role))
+        -- EQ2F EQ2 (send p bs) (send p cs) = p = p ∧ BranchesRel EQ2 bs cs
+        exact EQ2.construct ⟨rfl, hbranch_rel⟩
+      · by_cases hrr : role = receiver
+        · -- role = receiver: project as recv
+          simp only [projTrans, trans_comm_receiver sender receiver role branches hrr hrs,
+                     trans_comm_receiver sender receiver role branches' hrr hrs]
+          -- Goal: EQ2 (recv sender (transBranches branches' role)) (recv sender (transBranches branches role))
+          -- EQ2F EQ2 (recv p bs) (recv p cs) = p = p ∧ BranchesRel EQ2 bs cs
+          exact EQ2.construct ⟨rfl, hbranch_rel⟩
+        · -- role ≠ sender ∧ role ≠ receiver: project via first branch
+          -- Case split on branch structure
+          match hbranches : branches, hbranches' : branches' with
+          | [], [] =>
+              -- Both empty: trans_comm_other gives .end for both
+              simp only [trans_comm_other sender receiver role [] hrs hrr]
+              exact EQ2_refl _
+          | [], _ :: _ =>
+              -- BranchesStep from [] is only BranchesStep.nil to [], contradiction
+              cases hbstep
+          | _ :: _, [] =>
+              -- BranchesStep to [] requires branches = [], contradiction
+              cases hbstep
+          | (fl, fc) :: rest, (fl', fc') :: rest' =>
+              -- trans_comm_other gives: trans (comm s r ((l,c)::_)) role = trans c role
+              simp only [trans_comm_other sender receiver role ((fl, fc) :: rest) hrs hrr,
+                         trans_comm_other sender receiver role ((fl', fc') :: rest') hrs hrr]
+              -- Now goal is: EQ2 (trans fc' role) (trans fc role)
+              -- hbranch_rel is in expanded form
+              simp only [transBranches] at hbranch_rel
+              -- BranchesRel = Forall₂, cons case gives (pair_proof, tail_proof)
+              -- pair_proof : a.1 = b.1 ∧ EQ2 a.2 b.2
+              cases hbranch_rel with
+              | cons hpair htail =>
+                  -- hpair : (fl', trans fc' role).1 = (fl, trans fc role).1 ∧ EQ2 (fl', trans fc' role).2 (fl, trans fc role).2
+                  -- hpair.2 : EQ2 (trans fc' role) (trans fc role)
+                  exact hpair.2)
     -- Case 3: mu
     (fun t body act g' _hstep_sub ih_step role hns hnr => by
       -- g = mu t body
