@@ -1369,10 +1369,11 @@ termination_by sizeOf g
 decreasing_by
   all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
 
-/-- If CProject g role (.var v), then trans g role = .var v.
-    Proved by well-founded induction on g. -/
+/-- If CProject g role (.var v) and g has non-empty branches, then trans g role = .var v.
+    Proved by well-founded induction on g.
+    The allCommsNonEmpty precondition ensures branches are non-empty. -/
 private theorem CProject_var_trans_var (g : GlobalType) (role : String) (v : String)
-    (h : CProject g role (.var v)) : trans g role = .var v := by
+    (h : CProject g role (.var v)) (hwf : g.allCommsNonEmpty = true) : trans g role = .var v := by
   have hf := CProject_destruct h
   match g with
   | .end =>
@@ -1397,23 +1398,29 @@ private theorem CProject_var_trans_var (g : GlobalType) (role : String) (v : Str
           simp only [if_neg hrs, if_pos hrr] at hf
         · -- The remaining case is non-participant: hf is AllBranchesProj CProject gbs role (.var v)
           simp only [if_neg hrs, if_neg hrr] at hf
-          have htrans := trans_comm_other sender receiver role gbs hrs hrr
+          -- From hwf, branches are non-empty
+          simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at hwf
+          -- hwf.1 : gbs.isEmpty = false
           cases hgbs : gbs with
           | nil =>
-              -- Empty branches: trans returns .end, but we need .var v
-              -- hf : AllBranchesProj for empty list is vacuously true
-              -- But this case shouldn't arise in well-formed protocols.
-              simp only [hgbs] at htrans
-              -- htrans : trans ... = .end, but we need .var v
-              -- Mark as sorry - requires wellFormed assumption
-              sorry
+              -- Empty branches contradicts hwf.1 (nil.isEmpty = true = false)
+              simp only [hgbs, List.isEmpty] at hwf
+              -- hwf.1 : decide (true = false) = true, which is false = true
+              have hcontra := hwf.1
+              simp only [decide_eq_true_eq] at hcontra
+              -- hcontra : true = false
+              nomatch hcontra
           | cons first rest =>
-              simp only [hgbs] at htrans
+              have htrans := trans_comm_other sender receiver role (first :: rest) hrs hrr
               have hfirst : CProject first.2 role (.var v) := by
                 apply hf first
                 rw [hgbs]
                 exact List.Mem.head rest
-              have ih := CProject_var_trans_var first.2 role v hfirst
+              -- Extract allCommsNonEmpty for first.2
+              have hwf_first : first.2.allCommsNonEmpty = true := by
+                simp only [hgbs, allCommsNonEmptyBranches, Bool.and_eq_true] at hwf
+                exact hwf.2.1
+              have ih := CProject_var_trans_var first.2 role v hfirst hwf_first
               simp only [htrans, ih]
 termination_by sizeOf g
 decreasing_by
@@ -1719,7 +1726,7 @@ private theorem CProjectTransRel_postfix :
   | .comm sender receiver gbs, .var v =>
       -- Non-participant projecting to .var
       -- Use CProject_var_trans_var to show trans g role = .var v
-      have htrans_var := CProject_var_trans_var (.comm sender receiver gbs) role v hproj
+      have htrans_var := CProject_var_trans_var (.comm sender receiver gbs) role v hproj hwf
       rw [htrans, htrans_var]
       simp only [EQ2F]
   | .comm sender receiver gbs, .mu ltvar lbody =>
@@ -1785,14 +1792,26 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
           | mk lLabel lCont =>
               rcases hpair with ⟨hlab, hproj⟩
               -- Extract allCommsNonEmpty from wellFormed
-              -- NOTE: The hwf hypothesis needs careful handling due to List.Forall₂ induction
-              -- Using sorry temporarily; the proof structure is sound but needs type alignment
+              -- After induction, gbs = (gLabel, gCont) :: gbs_tail
+              -- hwf now applies to (gLabel, gCont) :: gbs_tail
+              have hmem_head : (gLabel, gCont) ∈ (gLabel, gCont) :: gbs_tail :=
+                List.mem_cons_self
+              have hwf_head : (gLabel, gCont).2.wellFormed = true := hwf _ hmem_head
               have haces : gCont.allCommsNonEmpty = true := by
-                sorry  -- Extract from hwf once type alignment is fixed
+                -- wellFormed = allVarsBound && allCommsNonEmpty && noSelfComm
+                -- This is (a && b) && c where a=allVarsBound, b=allCommsNonEmpty, c=noSelfComm
+                simp only [GlobalType.wellFormed] at hwf_head
+                -- hwf_head : (gCont.allVarsBound && gCont.allCommsNonEmpty) && gCont.noSelfComm = true
+                have h := Bool.and_eq_true_iff.mp hwf_head
+                -- h : (gCont.allVarsBound && gCont.allCommsNonEmpty) = true ∧ gCont.noSelfComm = true
+                have h2 := Bool.and_eq_true_iff.mp h.1
+                -- h2 : gCont.allVarsBound = true ∧ gCont.allCommsNonEmpty = true
+                exact h2.2
               have heq : EQ2 lCont (Trans.trans gCont role) :=
                 CProject_implies_EQ2_trans _ _ _ hproj haces
               have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
-                sorry  -- Propagate hwf to tail
+                intro gb' hmem'
+                exact hwf gb' (List.mem_cons_of_mem _ hmem')
               have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
               have htail' :
                   List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2 b.2)
@@ -1828,11 +1847,23 @@ theorem AllBranchesProj_implies_EQ2_trans
       -- Extract allCommsNonEmpty for first.2 from wellFormed
       -- wellFormed implies allCommsNonEmpty, which propagates to branches
       have haces_first : first.2.allCommsNonEmpty = true := by
-        -- wellFormed = allVarsBound && allCommsNonEmpty && noSelfComm
-        -- allCommsNonEmpty (comm s r bs) = (bs.isEmpty = false && allCommsNonEmptyBranches bs)
-        -- From wellFormed, extract allCommsNonEmptyBranches (first :: rest)
-        -- Then extract first.2.allCommsNonEmpty from allCommsNonEmptyBranches
-        sorry  -- Extract from hwf; proof structure is sound
+        -- wellFormed = (allVarsBound && allCommsNonEmpty) && noSelfComm
+        -- allCommsNonEmpty (comm s r bs) = (bs.isEmpty = false) && allCommsNonEmptyBranches bs
+        -- allCommsNonEmptyBranches (first :: rest) = first.2.allCommsNonEmpty && ...
+        simp only [GlobalType.wellFormed] at hwf
+        -- hwf : ((comm ...).allVarsBound && (comm ...).allCommsNonEmpty) && (comm ...).noSelfComm = true
+        have h1 := Bool.and_eq_true_iff.mp hwf
+        -- h1 : ((comm ...).allVarsBound && (comm ...).allCommsNonEmpty) = true ∧ (comm ...).noSelfComm = true
+        have h2 := Bool.and_eq_true_iff.mp h1.1
+        -- h2 : (comm ...).allVarsBound = true ∧ (comm ...).allCommsNonEmpty = true
+        simp only [GlobalType.allCommsNonEmpty, List.isEmpty_eq_false_iff] at h2
+        -- h2.2 : (_ ∧ allCommsNonEmptyBranches (first :: rest) = true)
+        have h3 := Bool.and_eq_true_iff.mp h2.2
+        -- h3 : (first :: rest ≠ []) = true ∧ allCommsNonEmptyBranches (first :: rest) = true
+        simp only [allCommsNonEmptyBranches] at h3
+        -- h3.2 : first.2.allCommsNonEmpty && allCommsNonEmptyBranches rest = true
+        have h4 := Bool.and_eq_true_iff.mp h3.2
+        exact h4.1
       have heq : EQ2 lt (Trans.trans first.2 role) :=
         CProject_implies_EQ2_trans _ _ _ hproj haces_first
       have htrans : trans (GlobalType.comm sender receiver (first :: rest)) role =
