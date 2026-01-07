@@ -1307,6 +1307,13 @@ Show CProjectTransRel is a post-fixpoint of EQ2F by case analysis on CProject:
 
 See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq proof. -/
 
+/-- Local copy of BranchesRel_mono (since the original is private in EQ2.lean). -/
+private theorem BranchesRel_mono {R S : Rel}
+    (h : ∀ a b, R a b → S a b) :
+    ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
+  intro bs cs hrel
+  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+
 /-- Witness relation for CProject_implies_EQ2_trans coinduction.
     Pairs local type lt with trans output when lt is a valid CProject output. -/
 private def CProjectTransRel : Rel := fun lt t =>
@@ -1351,13 +1358,13 @@ private theorem CProjectTransRel_postfix :
   | .end, .end =>
       -- Trans.trans .end role = .end
       subst htrans
-      simp only [Trans.trans, EQ2F, EQ2_closure]
+      simp only [Trans.trans, EQ2F]
   | .var vt, .var vlt =>
       -- CProjectF for var: vt = vlt
       -- Trans.trans (.var vt) role = .var vt
       simp only [CProjectF] at hf
       subst htrans hf
-      simp only [Trans.trans, EQ2F, EQ2_closure]
+      simp only [Trans.trans, EQ2F]
   | .mu muvar gbody, .mu ltvar lbody =>
       -- CProjectF for mu: muvar = ltvar, lcontractive gbody, CProject gbody role lbody
       simp only [CProjectF] at hf
@@ -1368,19 +1375,67 @@ private theorem CProjectTransRel_postfix :
       -- or EQ2 congruence lemmas. For now, use sorry and fix later.
       sorry
   | .comm sender receiver gbs, .send partner lbs =>
-      -- CProjectF comm-send: proven by case analysis on role
-      sorry
+      -- CProjectF comm-send: case analysis on role
+      simp only [CProjectF] at hf
+      by_cases hrs : role = sender
+      · -- Role is sender: partner = receiver, BranchesProjRel
+        simp only [hrs, ↓reduceIte] at hf
+        obtain ⟨hpartner, hbranches⟩ := hf
+        -- Rewrite goal to use explicit trans structure
+        rw [htrans, hrs, trans_comm_sender sender receiver sender gbs rfl, hpartner]
+        -- Goal: EQ2F (...) (.send receiver lbs) (.send receiver (transBranches gbs sender))
+        exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+            (branchesProjRel_to_branchesRel_CProjectTransRel gbs sender lbs hbranches)⟩
+      · -- Role is not sender
+        simp only [hrs, ↓reduceIte] at hf
+        by_cases hrr : role = receiver
+        · -- Role is receiver but lt is .send - contradiction from CProjectF
+          simp only [hrr, ↓reduceIte] at hf
+        · -- Non-participant case: trans reduces to first branch projection
+          -- This requires showing trans pair.2 role relates to .send partner lbs
+          -- via CProjectTransRel, but EQ2F needs constructor matching.
+          -- Use sorry; full proof requires analyzing pair.2 structure.
+          sorry
   | .comm sender receiver gbs, .recv partner lbs =>
       -- CProjectF comm-recv: similar to send case
-      sorry
+      simp only [CProjectF] at hf
+      by_cases hrs : role = sender
+      · -- Role is sender but lt is .recv - contradiction from CProjectF
+        simp only [hrs, ↓reduceIte] at hf
+      · -- Role is not sender
+        simp only [hrs, ↓reduceIte] at hf
+        by_cases hrr : role = receiver
+        · -- Role is receiver: partner = sender, BranchesProjRel
+          simp only [hrr, ↓reduceIte] at hf
+          obtain ⟨hpartner, hbranches⟩ := hf
+          -- For trans_comm_receiver: receiver ≠ sender
+          -- We have hrs : ¬(role = sender) and hrr : role = receiver
+          -- So receiver = role ≠ sender
+          have hne : receiver ≠ sender := fun heq => hrs (hrr ▸ heq)
+          -- Rewrite goal to use explicit trans structure
+          rw [htrans, hrr, trans_comm_receiver sender receiver receiver gbs rfl hne, hpartner]
+          -- Goal: EQ2F (...) (.recv sender lbs) (.recv sender (transBranches gbs receiver))
+          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+              (branchesProjRel_to_branchesRel_CProjectTransRel gbs receiver lbs hbranches)⟩
+        · -- Non-participant case: trans reduces to first branch projection
+          -- This requires showing trans pair.2 role relates to .recv partner lbs
+          -- via CProjectTransRel, but EQ2F needs constructor matching.
+          -- Use sorry; full proof requires analyzing pair.2 structure.
+          sorry
   | .comm sender receiver gbs, .end =>
       -- Non-participant projecting to .end
+      -- EQ2F needs constructor matching, but trans pair.2 role may not be .end
+      -- Full proof requires analyzing pair.2 structure based on CProject.
       sorry
   | .comm sender receiver gbs, .var v =>
       -- Non-participant projecting to .var
+      -- EQ2F needs constructor matching, but trans pair.2 role may not be .var
+      -- Full proof requires analyzing pair.2 structure based on CProject.
       sorry
   | .comm sender receiver gbs, .mu ltvar lbody =>
       -- Non-participant projecting to .mu
+      -- EQ2F needs constructor matching or mu-unfolding.
+      -- Full proof requires analyzing pair.2 structure based on CProject.
       sorry
   -- All remaining cases are contradictions from CProjectF
   | .end, .var _ => simp only [CProjectF] at hf
