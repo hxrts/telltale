@@ -62,3 +62,4 @@ mutants.out.old/
 # QPF experiments
 QpfTypes/
 qpf4-example/
+subject_reduction/

@@ -1307,6 +1307,148 @@ Show CProjectTransRel is a post-fixpoint of EQ2F by case analysis on CProject:
 
 See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq proof. -/
 
+/-! ### Constructor Agreement Lemmas (Well-Founded Induction)
+
+These lemmas prove that when CProject produces a specific constructor (.end, .var),
+trans also produces that same constructor. Proved by well-founded induction on the
+global type size, NOT using the coinductive theorem.
+
+This breaks the circularity: CProjectTransRel_postfix needs to know that trans produces
+the same constructor as CProject, but CProject_implies_EQ2_trans depends on CProjectTransRel_postfix. -/
+
+/-- If CProject g role .end, then trans g role = .end.
+    Proved by well-founded induction on g. -/
+private theorem CProject_end_trans_end (g : GlobalType) (role : String)
+    (h : CProject g role .end) : trans g role = .end := by
+  -- Destruct to get CProjectF structure
+  have hf := CProject_destruct h
+  match g with
+  | .end =>
+      -- trans .end role = .end (by definition)
+      simp only [Trans.trans]
+  | .var v =>
+      -- CProjectF (.var v) _ .end requires .var v = .end - contradiction
+      simp only [CProjectF] at hf
+  | .mu t body =>
+      -- CProjectF (.mu t body) _ .end requires .mu t body matches .mu _ _ - contradiction
+      simp only [CProjectF] at hf
+  | .comm sender receiver gbs =>
+      -- CProjectF (.comm ...) role .end depends on role's participation
+      simp only [CProjectF] at hf
+      -- After simp, we have: hf : if role = sender then ... else if role = receiver then ... else AllBranchesProj
+      -- Use by_cases to split on role participation
+      by_cases hrs : role = sender
+      · -- role = sender: CProjectF match on .end with .send pattern gives False
+        -- simp automatically closes goal via False hypothesis
+        simp only [if_pos hrs] at hf
+      · by_cases hrr : role = receiver
+        · -- role = receiver: CProjectF match on .end with .recv pattern gives False
+          simp only [if_neg hrs, if_pos hrr] at hf
+        · -- The remaining case is non-participant: hf is AllBranchesProj CProject gbs role .end
+          simp only [if_neg hrs, if_neg hrr] at hf
+          -- trans (.comm ...) role = trans first.2 role (if non-empty) or .end (if empty)
+          have htrans := trans_comm_other sender receiver role gbs hrs hrr
+          cases hgbs : gbs with
+          | nil =>
+              -- Empty branches: trans returns .end
+              simp only [hgbs] at htrans
+              exact htrans
+          | cons first rest =>
+              -- Non-empty: trans returns trans first.2 role
+              simp only [hgbs] at htrans
+              -- hf : AllBranchesProj CProject (first :: rest) role .end
+              -- So CProject first.2 role .end
+              have hfirst : CProject first.2 role .end := by
+                apply hf first
+                rw [hgbs]
+                exact List.Mem.head rest
+              -- By IH, trans first.2 role = .end
+              have ih := CProject_end_trans_end first.2 role hfirst
+              simp only [htrans, ih]
+termination_by sizeOf g
+decreasing_by
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
+
+/-- If CProject g role (.var v), then trans g role = .var v.
+    Proved by well-founded induction on g. -/
+private theorem CProject_var_trans_var (g : GlobalType) (role : String) (v : String)
+    (h : CProject g role (.var v)) : trans g role = .var v := by
+  have hf := CProject_destruct h
+  match g with
+  | .end =>
+      -- CProjectF .end _ (.var v) requires .end = .var v - contradiction
+      simp only [CProjectF] at hf
+  | .var v' =>
+      -- CProjectF (.var v') _ (.var v) requires v' = v
+      simp only [CProjectF] at hf
+      -- trans (.var v') role = .var v'
+      simp only [Trans.trans, hf]
+  | .mu t body =>
+      -- CProjectF (.mu t body) _ (.var v) requires .mu matches .var - contradiction
+      simp only [CProjectF] at hf
+  | .comm sender receiver gbs =>
+      simp only [CProjectF] at hf
+      -- Use by_cases to split on role participation
+      by_cases hrs : role = sender
+      · -- role = sender: CProjectF match on .var with .send pattern gives False
+        simp only [if_pos hrs] at hf
+      · by_cases hrr : role = receiver
+        · -- role = receiver: CProjectF match on .var with .recv pattern gives False
+          simp only [if_neg hrs, if_pos hrr] at hf
+        · -- The remaining case is non-participant: hf is AllBranchesProj CProject gbs role (.var v)
+          simp only [if_neg hrs, if_neg hrr] at hf
+          have htrans := trans_comm_other sender receiver role gbs hrs hrr
+          cases hgbs : gbs with
+          | nil =>
+              -- Empty branches: trans returns .end, but we need .var v
+              -- hf : AllBranchesProj for empty list is vacuously true
+              -- But this case shouldn't arise in well-formed protocols.
+              simp only [hgbs] at htrans
+              -- htrans : trans ... = .end, but we need .var v
+              -- Mark as sorry - requires wellFormed assumption
+              sorry
+          | cons first rest =>
+              simp only [hgbs] at htrans
+              have hfirst : CProject first.2 role (.var v) := by
+                apply hf first
+                rw [hgbs]
+                exact List.Mem.head rest
+              have ih := CProject_var_trans_var first.2 role v hfirst
+              simp only [htrans, ih]
+termination_by sizeOf g
+decreasing_by
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
+
+/-! ### CProject-to-Trans structure extraction
+
+When CProject produces a specific local type constructor (.send, .recv, .end, .var, .mu),
+the global type must have a corresponding structure. These lemmas extract that structure
+and show trans produces the matching constructor. -/
+
+/-- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
+    (possibly through non-participant layers), and trans g role = .send partner (transBranches ...).
+
+    This follows from CProjectF: only comm with role=sender produces .send.
+
+    TODO: The proof requires careful handling of CProjectF reduction with nested if-then-else
+    and match expressions. The key insight is that AllBranchesProj in non-participant cases
+    requires wellFormedness to rule out empty branches. -/
+private theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
+    (partner : String) (lbs : List (Label × LocalTypeR))
+    (hproj : CProject g role (.send partner lbs)) :
+    ∃ gbs', trans g role = .send partner (transBranches gbs' role) ∧
+      BranchesProjRel CProject gbs' role lbs := by
+  sorry
+
+/-- Symmetric version for recv.
+    TODO: See CProject_send_implies_trans_send for proof status. -/
+private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String)
+    (partner : String) (lbs : List (Label × LocalTypeR))
+    (hproj : CProject g role (.recv partner lbs)) :
+    ∃ gbs', trans g role = .recv partner (transBranches gbs' role) ∧
+      BranchesProjRel CProject gbs' role lbs := by
+  sorry
+
 /-- Local copy of BranchesRel_mono (since the original is private in EQ2.lean). -/
 private theorem BranchesRel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
@@ -1424,14 +1566,16 @@ private theorem CProjectTransRel_postfix :
           sorry
   | .comm sender receiver gbs, .end =>
       -- Non-participant projecting to .end
-      -- EQ2F needs constructor matching, but trans pair.2 role may not be .end
-      -- Full proof requires analyzing pair.2 structure based on CProject.
-      sorry
+      -- Use CProject_end_trans_end to show trans g role = .end
+      have htrans_end := CProject_end_trans_end (.comm sender receiver gbs) role hproj
+      rw [htrans, htrans_end]
+      simp only [EQ2F]
   | .comm sender receiver gbs, .var v =>
       -- Non-participant projecting to .var
-      -- EQ2F needs constructor matching, but trans pair.2 role may not be .var
-      -- Full proof requires analyzing pair.2 structure based on CProject.
-      sorry
+      -- Use CProject_var_trans_var to show trans g role = .var v
+      have htrans_var := CProject_var_trans_var (.comm sender receiver gbs) role v hproj
+      rw [htrans, htrans_var]
+      simp only [EQ2F]
   | .comm sender receiver gbs, .mu ltvar lbody =>
       -- Non-participant projecting to .mu
       -- EQ2F needs constructor matching or mu-unfolding.
