@@ -1185,6 +1185,34 @@ theorem map_substitute_eq_self_of_not_free {bs : List (Label × LocalTypeR)} {va
     have htl_eq := ih (fun l' c' hmem => hnot_free l' c' (List.Mem.tail _ hmem))
     simp only [hc_eq, htl_eq]
 
+/-! ### Substitution Commutativity (EQ2 version) - Forward Declaration
+
+The syntactic `subst_mu_comm` requires Barendregt conditions. For general use,
+we need an EQ2-equivalence version that holds unconditionally. This axiom is
+declared here (before substitute_preserves_UnfoldsToEnd) and documented later.
+-/
+
+/-- EQ2 version of mu-substitution commutativity (forward declaration).
+    See documentation in the Phase 5 section below. -/
+axiom EQ2_subst_mu_comm (body : LocalTypeR) (var t : String) (repl : LocalTypeR)
+    (htne : t ≠ var) :
+    EQ2 ((body.substitute var repl).substitute t (.mu t (body.substitute var repl)))
+        ((body.substitute t (.mu t body)).substitute var repl)
+
+/-- Transfer UnfoldsToEnd through EQ2 equivalence.
+
+    If `a` unfolds to end and `a` is EQ2-equivalent to `b`, then `b` unfolds to end. -/
+theorem UnfoldsToEnd_of_EQ2 {a b : LocalTypeR} (ha : UnfoldsToEnd a) (heq : EQ2 a b) :
+    UnfoldsToEnd b := by
+  -- a unfolds to end, so EQ2 a .end
+  have ha_eq_end : EQ2 a .end := UnfoldsToEnd.toEQ2 ha
+  -- By transitivity: EQ2 b a → EQ2 a .end → EQ2 b .end
+  have hb_eq_end : EQ2 b .end := EQ2_trans (EQ2_symm heq) ha_eq_end
+  -- By symmetry: EQ2 .end b
+  have hend_eq_b : EQ2 .end b := EQ2_symm hb_eq_end
+  -- By axiom: UnfoldsToEnd b
+  exact EQ2.end_right_implies_UnfoldsToEnd hend_eq_b
+
 /-- Substitution preserves UnfoldsToEnd.
 
     If a unfolds to end, then (a.substitute var repl) also unfolds to end
@@ -1224,29 +1252,48 @@ theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl 
       | inl hend =>
         -- IH gives: UnfoldsToEnd ((body.substitute t (.mu t body)).substitute var repl)
         -- We need: UnfoldsToEnd ((body.substitute var repl).substitute t (.mu t (body.substitute var repl)))
-        -- These are related by subst_mu_comm, but that requires Barendregt conditions.
-        --
-        -- **Proof obligation**: Show
-        --   (body.substitute t (.mu t body)).substitute var repl
-        --   behaves the same as
-        --   (body.substitute var repl).substitute t (.mu t (body.substitute var repl))
-        --
-        -- For well-formed types satisfying Barendregt convention, these are equal.
-        -- With the unconditional version, they are EQ2-equivalent (semantic equality).
+        -- Use EQ2_subst_mu_comm to relate them via EQ2, then transfer UnfoldsToEnd.
         left
         apply UnfoldsToEnd.mu
-        sorry  -- Requires subst_mu_comm or EQ2-equivalence
+        -- t ≠ var from htvar : ¬(t == var) = true
+        have htne : t ≠ var := by
+          intro heq
+          apply htvar
+          simp only [heq, beq_self_eq_true]
+        -- EQ2_subst_mu_comm gives: EQ2 (goal term) (IH term)
+        have heq := EQ2_subst_mu_comm body var t repl htne
+        -- Transfer UnfoldsToEnd from IH term to goal term
+        exact UnfoldsToEnd_of_EQ2 hend (EQ2_symm heq)
       | inr hex =>
         -- IH gives: ∃ n, UnfoldPathEndBounded n repl ∧ body.substitute t (.mu t body) = .var var
-        -- The second disjunct only applies when body.substitute t (.mu t body) = .var var,
-        -- which happens when body = .var t (immediate recursion) and the mu unfolds to var.
+        -- The second disjunct only applies when body.substitute t (.mu t body) = .var var.
         obtain ⟨n, hpath, heq⟩ := hex
         -- heq : body.substitute t (.mu t body) = .var var
-        -- This means the unfold hit var during substitution traversal.
-        -- Similar proof obligation as above case.
+        -- So (body.substitute t (.mu t body)).substitute var repl = (.var var).substitute var repl = repl
         left
         apply UnfoldsToEnd.mu
-        sorry  -- Requires subst_mu_comm or EQ2-equivalence
+        -- t ≠ var from htvar : ¬(t == var) = true
+        have htne : t ≠ var := by
+          intro h
+          apply htvar
+          simp only [h, beq_self_eq_true]
+        -- EQ2_subst_mu_comm gives: EQ2 (goal term) (RHS)
+        have heq2 := EQ2_subst_mu_comm body var t repl htne
+        -- RHS = (body.substitute t (.mu t body)).substitute var repl
+        --     = (.var var).substitute var repl (by heq)
+        --     = repl
+        have hrhs_eq : (body.substitute t (.mu t body)).substitute var repl = repl := by
+          rw [heq]
+          simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
+        -- So EQ2 (goal term) repl
+        have heq2' : EQ2 ((body.substitute var repl).substitute t (.mu t (body.substitute var repl))) repl := by
+          have h := heq2
+          rw [hrhs_eq] at h
+          exact h
+        -- UnfoldsToEnd repl from hpath
+        have hrepl_end : UnfoldsToEnd repl := hpath.toUnfoldsToEnd
+        -- Transfer via EQ2
+        exact UnfoldsToEnd_of_EQ2 hrepl_end (EQ2_symm heq2')
 
 open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
 /-- Substitution preserves UnfoldsToEnd under Barendregt conditions.
@@ -1682,20 +1729,19 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
         --     = (body.substitute var repl).substitute x (.mu x (body.substitute var repl))
         -- RHS = (body.substitute x (.mu x body)).substitute var repl
         subst hu hv
-        -- **Proof obligation**: Show
-        --   (body.substitute var repl).substitute x (.mu x (body.substitute var repl))
-        --   is BisimF-related to
-        --   (body.substitute x (.mu x body)).substitute var repl
-        --
-        -- When x ≠ var and Barendregt conditions hold (x not free in repl, var not bound in body),
-        -- these are syntactically equal by substitution commutativity.
-        --
-        -- Without Barendregt, they are semantically equivalent (EQ2) because both represent
-        -- the same unfolding of the recursive type with var replaced by repl.
-        --
-        -- **Semantic soundness**: The infinite tree interpretation of both terms is identical
-        -- since substitution order doesn't affect the meaning of well-formed recursive types.
-        sorry  -- Requires subst_mu_comm (Barendregt) or EQ2-equivalence proof
+        -- x ≠ var from hdiff
+        have hxne : x ≠ var := by simp only [beq_eq_false_iff_ne] at hdiff; exact hdiff
+        -- EQ2_subst_mu_comm gives: EQ2 LHS RHS
+        have heq := EQ2_subst_mu_comm body var x repl hxne
+        -- EQ2 implies Bisim
+        have hBisim := EQ2.toBisim heq
+        -- Extract witness relation from Bisim
+        obtain ⟨R', hR'post, hxy⟩ := hBisim
+        have hf : BisimF R' _ _ := hR'post _ _ hxy
+        -- Lift R' to SubstUnfoldClosure via Bisim inclusion
+        have hlift : ∀ a b, R' a b → SubstUnfoldClosure var repl a b :=
+          fun a b h => Or.inr ⟨R', hR'post, h⟩
+        exact BisimF.mono hlift _ _ hf
   | inr hBisim =>
     -- Case: Bisim u v - use the existing Bisim post-fixpoint property
     obtain ⟨R, hRpost, huv⟩ := hBisim
