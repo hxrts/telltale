@@ -482,15 +482,28 @@ theorem subst_mu_comm (body : LocalTypeR) (var t : String) (repl : LocalTypeR)
 
 This lemma shows that unfold and substitute commute under the Barendregt convention. -/
 
+/-- unfold is identity for non-mu types. -/
+theorem unfold_non_mu_eq_self (lt : LocalTypeR) (hnomu : ∀ t body, lt ≠ .mu t body) :
+    lt.unfold = lt := by
+  cases lt with
+  | «end» | var _ | send _ _ | recv _ _ => rfl
+  | mu t body => exact absurd rfl (hnomu t body)
+
 /-- Unfold and substitute confluence under Barendregt convention.
 
     For non-mu types, unfold is identity, so this is trivial.
     For mu types, this follows from subst_mu_comm.
 
     Note: The `t == var` case (where t is the mu binder) is impossible because
-    `notBoundAt var a = true` means var cannot be the mu binder. -/
+    `notBoundAt var a = true` means var cannot be the mu binder.
+
+    The precondition `hnomu` requires `repl` to not be a mu type at the top level.
+    This is needed for the var case where we substitute to `repl` and need
+    `repl.unfold = repl`. For mu-typed `repl`, use `unfold_substitute_EQ2_via_Bisim`
+    which gives EQ2 equivalence instead of syntactic equality. -/
 theorem unfold_subst_eq_subst_unfold (a : LocalTypeR) (var : String) (repl : LocalTypeR)
-    (hbar : notBoundAt var a = true) (hfresh : ∀ t, isFreeIn t repl = false) :
+    (hbar : notBoundAt var a = true) (hfresh : ∀ t, isFreeIn t repl = false)
+    (hnomu : ∀ t body, repl ≠ .mu t body) :
     (a.substitute var repl).unfold = (a.unfold).substitute var repl := by
   cases a with
   | «end» =>
@@ -499,14 +512,16 @@ theorem unfold_subst_eq_subst_unfold (a : LocalTypeR) (var : String) (repl : Loc
   | var v =>
       -- var case: requires case split on v == var
       by_cases hvvar : v == var
-      · -- v == var: LHS = repl.unfold, RHS = repl
-        -- These are equal only if repl.unfold = repl (repl is not a mu)
-        simp only [LocalTypeR.substitute, hvvar, ↓reduceIte, LocalTypeR.unfold]
-        -- For closed repl, we need repl.unfold = repl
-        -- This is true for non-mu types. For mu types, unfold changes the term.
-        -- Since we can't prove this in general, we use sorry for this case.
-        -- This case is semantically sound (same infinite tree) but not syntactically provable.
-        sorry
+      · -- v == var:
+        -- LHS = ((.var v).substitute var repl).unfold = repl.unfold
+        -- RHS = ((.var v).unfold).substitute var repl = (.var v).substitute var repl = repl
+        -- Goal: repl.unfold = repl, which holds by unfold_non_mu_eq_self
+        have heq1 : (LocalTypeR.var v).substitute var repl = repl := by
+          simp only [LocalTypeR.substitute, hvvar, ↓reduceIte]
+        have heq2 : (LocalTypeR.var v).unfold = .var v := rfl
+        simp only [heq1, heq2]
+        -- Goal: repl.unfold = repl
+        exact unfold_non_mu_eq_self repl hnomu
       · -- v != var: both sides are .var v
         simp only [LocalTypeR.substitute, hvvar, Bool.false_eq_true, ↓reduceIte, LocalTypeR.unfold]
   | send _ _ | recv _ _ =>
@@ -547,9 +562,14 @@ inductive SubstRel (var : String) (repl : LocalTypeR) : Rel where
 
 /-! ## The Flatten Lemma -/
 
-/-- Flatten pushes unfolds into the EQ2 witnesses. -/
+/-- Flatten pushes unfolds into the EQ2 witnesses.
+
+    Requires `hnomu : ∀ t body, repl ≠ .mu t body` (repl is not a mu type at top level).
+    This is needed for the unfold_subst_eq_subst_unfold lemma when the witness is a var
+    that matches the substitution variable. -/
 theorem SubstRel.flatten {var : String} {repl : LocalTypeR}
     (hfresh : ∀ t, isFreeIn t repl = false)
+    (hnomu : ∀ t body, repl ≠ .mu t body)
     {x y : LocalTypeR} (h : SubstRel var repl x y) :
     ∃ a b, EQ2 a b ∧
            notBoundAt var a = true ∧ notBoundAt var b = true ∧
@@ -562,13 +582,13 @@ theorem SubstRel.flatten {var : String} {repl : LocalTypeR}
     use a.unfold, b
     refine ⟨EQ2_unfold_left hab, notBoundAt_unfold var a hbarA, hbarB, ?_, hy⟩
     rw [hx]
-    exact unfold_subst_eq_subst_unfold a var repl hbarA hfresh
+    exact unfold_subst_eq_subst_unfold a var repl hbarA hfresh hnomu
   | unfold_right _ ih =>
     obtain ⟨a, b, hab, hbarA, hbarB, hx, hy⟩ := ih
     use a, b.unfold
     refine ⟨EQ2_unfold_right hab, hbarA, notBoundAt_unfold var b hbarB, hx, ?_⟩
     rw [hy]
-    exact unfold_subst_eq_subst_unfold b var repl hbarB hfresh
+    exact unfold_subst_eq_subst_unfold b var repl hbarB hfresh hnomu
 
 /-! ## Helper Lemmas for Substitution -/
 
@@ -1152,16 +1172,25 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
 
 /-! ## Main Theorem -/
 
-/-- EQ2 is preserved under substitution when the Barendregt convention holds. -/
+/-- EQ2 is preserved under substitution when Barendregt conditions hold.
+
+    This theorem requires:
+    - `notBoundAt var a = true` and `notBoundAt var b = true`: var is not used as a binder
+    - `hfresh`: repl is closed (no free variables)
+    - `hnomu`: repl is not a mu type at top level (needed for unfold_subst_eq_subst_unfold)
+
+    For general EQ2_substitute without the hnomu restriction, use the Bisim approach
+    in `EQ2_substitute_via_Bisim` (Bisim.lean) which uses EQ2 instead of syntactic equality. -/
 theorem EQ2_substitute_barendregt (a b : LocalTypeR) (var : String) (repl : LocalTypeR)
     (h : EQ2 a b)
     (hbarA : notBoundAt var a = true)
     (hbarB : notBoundAt var b = true)
-    (hfresh : ∀ t, isFreeIn t repl = false) :
+    (hfresh : ∀ t, isFreeIn t repl = false)
+    (hnomu : ∀ t body, repl ≠ .mu t body) :
     EQ2 (a.substitute var repl) (b.substitute var repl) := by
   apply EQ2_coind_upto (R := SubstRel var repl)
   · intro x y hsr
-    obtain ⟨a', b', hab', hbarA', hbarB', hx, hy⟩ := hsr.flatten hfresh
+    obtain ⟨a', b', hab', hbarA', hbarB', hx, hy⟩ := hsr.flatten hfresh hnomu
     subst hx hy
     have hf : EQ2F EQ2 a' b' := EQ2.destruct hab'
     exact SubstRel_postfix_standard var repl a' b' hab' hbarA' hbarB' hfresh hf

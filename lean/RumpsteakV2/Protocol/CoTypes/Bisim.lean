@@ -1242,6 +1242,51 @@ theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl 
         sorry
 
 open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
+/-- Substitution preserves UnfoldsToEnd under Barendregt conditions.
+
+    This version requires Barendregt conditions:
+    - `hbar`: var is not used as a binder in a
+    - `hfresh`: repl is closed (no free variables)
+
+    These conditions ensure substitution commutativity in the mu case. -/
+theorem substitute_preserves_UnfoldsToEnd_barendregt {a : LocalTypeR} {var : String} {repl : LocalTypeR}
+    (h : UnfoldsToEnd a)
+    (hbar : notBoundAt var a = true)
+    (hfresh : ∀ w, isFreeIn w repl = false) :
+    UnfoldsToEnd (a.substitute var repl) := by
+  induction h generalizing var repl with
+  | base =>
+    -- a = .end, substitute gives .end
+    simp only [LocalTypeR.substitute]
+    exact UnfoldsToEnd.base
+  | @mu t body _ ih =>
+    -- a = .mu t body
+    -- notBoundAt var (.mu t body) = (var != t) && notBoundAt var body = true
+    simp only [notBoundAt] at hbar
+    have ⟨hvt, hbar_body⟩ := Bool.and_eq_true_iff.mp hbar
+    have hvt' : var ≠ t := by simp only [bne_iff_ne, ne_eq] at hvt; exact hvt
+    have htv' : t ≠ var := hvt'.symm
+    -- Since var ≠ t, substitution goes through
+    have htvar : (t == var) = false := by
+      cases h : t == var
+      · rfl
+      · simp only [beq_iff_eq] at h; exact absurd h htv'
+    simp only [LocalTypeR.substitute, htvar, Bool.false_eq_true, ↓reduceIte]
+    -- Goal: UnfoldsToEnd (.mu t (body.substitute var repl))
+    -- We need UnfoldsToEnd ((body.substitute var repl).substitute t (.mu t (body.substitute var repl)))
+    apply UnfoldsToEnd.mu
+    -- Use subst_mu_comm to rewrite the goal
+    -- hcomm: (body.substitute var repl).substitute t (.mu t (body.substitute var repl))
+    --      = (body.substitute t (.mu t body)).substitute var repl
+    have hcomm := subst_mu_comm body var t repl hbar_body hfresh htv'
+    rw [hcomm]
+    -- Now goal: UnfoldsToEnd ((body.substitute t (.mu t body)).substitute var repl)
+    -- Apply IH: need notBoundAt var (body.substitute t (.mu t body))
+    have hbar_unfold : notBoundAt var (body.substitute t (.mu t body)) = true :=
+      notBoundAt_unfold var (.mu t body) (by simp [notBoundAt, hvt, hbar_body])
+    exact ih hbar_unfold hfresh
+
+open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
 /-- Substitution preserves UnfoldsToVar (when not the substituted variable).
 
     This version requires Barendregt conditions:
@@ -1427,33 +1472,10 @@ theorem substitute_compatible_barendregt (var : String) (repl : LocalTypeR)
   intro R x y hBisimF hbar_x hbar_y
   cases hBisimF with
   | eq_end hx hy =>
-    -- Both unfold to end
-    have hx' := @substitute_preserves_UnfoldsToEnd x var repl hx
-    have hy' := @substitute_preserves_UnfoldsToEnd y var repl hy
-    cases hx' with
-    | inl hx_end =>
-      cases hy' with
-      | inl hy_end => exact BisimF.eq_end hx_end hy_end
-      | inr hy_var =>
-        -- hy says y = .var var and repl unfolds to end
-        obtain ⟨_, hrepl_end, hy_eq⟩ := hy_var
-        have hrepl_unfolds : UnfoldsToEnd repl := hrepl_end.toUnfoldsToEnd
-        subst hy_eq
-        simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
-        exact BisimF.eq_end hx_end hrepl_unfolds
-    | inr hx_var =>
-      obtain ⟨_, hrepl_end, hx_eq⟩ := hx_var
-      have hrepl_unfolds : UnfoldsToEnd repl := hrepl_end.toUnfoldsToEnd
-      cases hy' with
-      | inl hy_end =>
-        subst hx_eq
-        simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
-        exact BisimF.eq_end hrepl_unfolds hy_end
-      | inr hy_var' =>
-        obtain ⟨_, _, hy_eq⟩ := hy_var'
-        subst hx_eq hy_eq
-        simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
-        exact BisimF.eq_end hrepl_unfolds hrepl_unfolds
+    -- Both unfold to end - use Barendregt version which gives direct result
+    have hx' := substitute_preserves_UnfoldsToEnd_barendregt hx hbar_x hfresh
+    have hy' := substitute_preserves_UnfoldsToEnd_barendregt hy hbar_y hfresh
+    exact BisimF.eq_end hx' hy'
   | eq_var hx hy =>
     -- Both unfold to same var v
     -- After substitution: if v ≠ var, still unfolds to v; if v = var, unfolds to repl
