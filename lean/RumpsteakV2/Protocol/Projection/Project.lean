@@ -1445,7 +1445,8 @@ private theorem CProject_send_implies_trans_send (g : GlobalType) (role : String
     (hproj : CProject g role (.send partner lbs))
     (hwf : g.allCommsNonEmpty = true) :
     ∃ gbs', trans g role = .send partner (transBranches gbs' role) ∧
-      BranchesProjRel CProject gbs' role lbs := by
+      BranchesProjRel CProject gbs' role lbs ∧
+      allCommsNonEmptyBranches gbs' = true := by
   have hf := CProject_destruct hproj
   match g with
   | .end =>
@@ -1465,12 +1466,15 @@ private theorem CProject_send_implies_trans_send (g : GlobalType) (role : String
         obtain ⟨hpartner, hbranches⟩ := hf
         -- Witness: gbs with role = sender
         use gbs
-        constructor
+        refine ⟨?_, ?_, ?_⟩
         · -- trans g role = .send partner (transBranches gbs role)
           rw [hrs, trans_comm_sender sender receiver sender gbs rfl, hpartner]
         · -- BranchesProjRel CProject gbs role lbs
           -- simp already substituted sender → role in hf using hrs
           exact hbranches
+        · -- allCommsNonEmptyBranches gbs = true
+          simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true, List.isEmpty_eq_false_iff] at hwf
+          exact hwf.2
       · -- Role is not sender
         simp only [if_neg hrs] at hf
         by_cases hrr : role = receiver
@@ -1501,11 +1505,12 @@ private theorem CProject_send_implies_trans_send (g : GlobalType) (role : String
               have hwf_first : first.2.allCommsNonEmpty = true := hrest.1
               -- Recursive call on first.2
               have ih := CProject_send_implies_trans_send first.2 role partner lbs hfirst hwf_first
-              obtain ⟨gbs', htrans', hbranches'⟩ := ih
+              obtain ⟨gbs', htrans', hbranches', hwf'⟩ := ih
               use gbs'
-              constructor
+              refine ⟨?_, ?_, ?_⟩
               · simp only [htrans, htrans']
               · exact hbranches'
+              · exact hwf'
 termination_by sizeOf g
 decreasing_by
   all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
@@ -1516,7 +1521,8 @@ private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String
     (hproj : CProject g role (.recv partner lbs))
     (hwf : g.allCommsNonEmpty = true) :
     ∃ gbs', trans g role = .recv partner (transBranches gbs' role) ∧
-      BranchesProjRel CProject gbs' role lbs := by
+      BranchesProjRel CProject gbs' role lbs ∧
+      allCommsNonEmptyBranches gbs' = true := by
   have hf := CProject_destruct hproj
   match g with
   | .end =>
@@ -1538,7 +1544,7 @@ private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String
           obtain ⟨hpartner, hbranches⟩ := hf
           -- Witness: gbs with role = receiver
           use gbs
-          constructor
+          refine ⟨?_, ?_, ?_⟩
           · -- trans g role = .recv partner (transBranches gbs role)
             -- hrs : ¬(role = sender), hrr : role = receiver
             -- Need: receiver ≠ sender
@@ -1546,6 +1552,9 @@ private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String
             rw [hrr, trans_comm_receiver sender receiver receiver gbs rfl hne, hpartner]
           · -- BranchesProjRel CProject gbs role lbs
             exact hbranches
+          · -- allCommsNonEmptyBranches gbs = true
+            simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true, List.isEmpty_eq_false_iff] at hwf
+            exact hwf.2
         · -- Non-participant case: hf is AllBranchesProj CProject gbs role (.recv partner lbs)
           simp only [if_neg hrr] at hf
           -- In non-participant case, trans projects first branch
@@ -1571,11 +1580,83 @@ private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String
               have hwf_first : first.2.allCommsNonEmpty = true := hrest.1
               -- Recursive call on first.2
               have ih := CProject_recv_implies_trans_recv first.2 role partner lbs hfirst hwf_first
-              obtain ⟨gbs', htrans', hbranches'⟩ := ih
+              obtain ⟨gbs', htrans', hbranches', hwf'⟩ := ih
               use gbs'
-              constructor
+              refine ⟨?_, ?_, ?_⟩
               · simp only [htrans, htrans']
               · exact hbranches'
+              · exact hwf'
+termination_by sizeOf g
+decreasing_by
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
+
+/-- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
+    Returns the global body and proof that trans produces .mu v (trans gbody role). -/
+private theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
+    (v : String) (body : LocalTypeR)
+    (hproj : CProject g role (.mu v body))
+    (hwf : g.allCommsNonEmpty = true) :
+    ∃ gbody, trans g role = .mu v (trans gbody role) ∧
+      lcontractive gbody = true ∧
+      CProject gbody role body ∧
+      gbody.allCommsNonEmpty = true := by
+  have hf := CProject_destruct hproj
+  match g with
+  | .end =>
+      simp only [CProjectF] at hf
+  | .var vt =>
+      simp only [CProjectF] at hf
+  | .mu t gbody =>
+      -- CProjectF for mu: t = v, lcontractive gbody, CProject gbody role body
+      simp only [CProjectF] at hf
+      rcases hf with ⟨heq, hcontr, hbody_proj⟩
+      subst heq
+      use gbody
+      refine ⟨?_, hcontr, hbody_proj, ?_⟩
+      · -- trans (.mu v gbody) role = .mu v (trans gbody role)
+        simp only [Trans.trans, hcontr, ↓reduceIte]
+      · -- gbody.allCommsNonEmpty
+        simp only [GlobalType.allCommsNonEmpty] at hwf
+        exact hwf
+  | .comm sender receiver gbs =>
+      simp only [CProjectF] at hf
+      by_cases hrs : role = sender
+      · -- Role is sender but lt is .mu - contradiction from CProjectF
+        simp only [if_pos hrs] at hf
+      · -- Role is not sender
+        simp only [if_neg hrs] at hf
+        by_cases hrr : role = receiver
+        · -- Role is receiver but lt is .mu - contradiction from CProjectF
+          simp only [if_pos hrr] at hf
+        · -- Non-participant case: hf is AllBranchesProj CProject gbs role (.mu v body)
+          simp only [if_neg hrr] at hf
+          -- In non-participant case, trans projects first branch
+          have htrans := trans_comm_other sender receiver role gbs hrs hrr
+          -- From hwf, we know gbs is non-empty
+          simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true, List.isEmpty_eq_false_iff,
+                     decide_eq_true_eq, ne_eq] at hwf
+          obtain ⟨hnonempty, hrest⟩ := hwf
+          cases hgbs : gbs with
+          | nil =>
+              -- Contradiction: gbs = [] but hwf says gbs is non-empty
+              simp only [hgbs, not_true_eq_false] at hnonempty
+          | cons first rest =>
+              -- Non-empty: trans g role = trans first.2 role
+              simp only [hgbs] at htrans hrest
+              -- Get CProject first.2 role (.mu v body)
+              have hfirst : CProject first.2 role (.mu v body) := by
+                apply hf first
+                rw [hgbs]
+                exact List.Mem.head rest
+              -- Get wellFormedness of first.2
+              simp only [allCommsNonEmptyBranches, Bool.and_eq_true] at hrest
+              have hwf_first : first.2.allCommsNonEmpty = true := hrest.1
+              -- Recursive call on first.2
+              have ih := CProject_mu_implies_trans_mu first.2 role v body hfirst hwf_first
+              obtain ⟨gbody, htrans_mu, hcontr, hbody_proj, hwf_body⟩ := ih
+              use gbody
+              refine ⟨?_, hcontr, hbody_proj, hwf_body⟩
+              simp only [htrans, htrans_mu]
 termination_by sizeOf g
 decreasing_by
   all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
@@ -1662,8 +1743,27 @@ private theorem CProjectTransRel_postfix :
       rcases hf with ⟨heq_var, hcontr, hbody_proj⟩
       subst heq_var htrans
       simp only [Trans.trans, hcontr, ↓reduceIte, EQ2F, EQ2_closure]
-      -- The mu case requires relating substituted bodies. This needs CProject on substituted terms
-      -- or EQ2 congruence lemmas. For now, use sorry and fix later.
+      -- Goal is now: (EQ2_closure ... (lbody.unfold) (mu ltvar t')) ∧ (EQ2_closure ... (mu ltvar lbody) (t'.unfold))
+      -- where t' = trans gbody role
+
+      -- The mu/mu case requires relating unfolded local types to global projections.
+      -- This needs either:
+      -- 1. CProject preservation under substitution (not yet proven)
+      -- 2. EQ2 facts which would be circular without paco-style accumulation
+      --
+      -- We have CProject gbody role lbody and need to show:
+      -- - lbody.unfold is EQ2_closure-related to .mu ltvar (trans gbody role)
+      -- - .mu ltvar lbody is EQ2_closure-related to (trans gbody role).unfold
+      --
+      -- The proof strategy requires CProject_substitute: if CProject g r l, then
+      -- CProject (g.substitute t repl) r (l.substitute t repl') for appropriate repl/repl'.
+      -- This is analogous to Coq's proj_subst lemma.
+      --
+      -- Extract hwf_body for potential future use
+      have _hwf_body : gbody.allCommsNonEmpty = true := by
+        simp only [GlobalType.allCommsNonEmpty] at hwf
+        exact hwf
+      -- For now, use sorry. Full proof requires CProject_substitute theorem.
       sorry
   | .comm sender receiver gbs, .send partner lbs =>
       -- CProjectF comm-send: case analysis on role
@@ -1686,9 +1786,17 @@ private theorem CProjectTransRel_postfix :
         by_cases hrr : role = receiver
         · -- Role is receiver but lt is .send - contradiction from CProjectF
           simp only [hrr, ↓reduceIte] at hf
-        · -- Non-participant case: CProject_send_implies_trans_send shows trans is .send
-          -- but we need wellFormedness on the returned gbs'. Requires extending helper.
-          sorry
+        · -- Non-participant case: Use extended helper to get gbs' with wellFormedness
+          simp only [if_neg hrr] at hf
+          -- Use CProject_send_implies_trans_send to get witness gbs' with all properties
+          have hexists := CProject_send_implies_trans_send
+              (.comm sender receiver gbs) role partner lbs hproj hwf
+          obtain ⟨gbs', htrans_send, hbranches', hwf_gbs'⟩ := hexists
+          -- Rewrite goal using trans equality
+          rw [htrans, htrans_send]
+          -- Goal: EQ2F (.send partner lbs) (.send partner (transBranches gbs' role))
+          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+              (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
   | .comm sender receiver gbs, .recv partner lbs =>
       -- CProjectF comm-recv: similar to send case
       simp only [CProjectF] at hf
@@ -1714,9 +1822,17 @@ private theorem CProjectTransRel_postfix :
           -- Goal: EQ2F (...) (.recv sender lbs) (.recv sender (transBranches gbs receiver))
           exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
               (branchesProjRel_to_branchesRel_CProjectTransRel gbs receiver lbs hbranches hwf_branches)⟩
-        · -- Non-participant case: CProject_recv_implies_trans_recv shows trans is .recv
-          -- but we need wellFormedness on the returned gbs'. Requires extending helper.
-          sorry
+        · -- Non-participant case: Use extended helper to get gbs' with wellFormedness
+          simp only [if_neg hrr] at hf
+          -- Use CProject_recv_implies_trans_recv to get witness gbs' with all properties
+          have hexists := CProject_recv_implies_trans_recv
+              (.comm sender receiver gbs) role partner lbs hproj hwf
+          obtain ⟨gbs', htrans_recv, hbranches', hwf_gbs'⟩ := hexists
+          -- Rewrite goal using trans equality
+          rw [htrans, htrans_recv]
+          -- Goal: EQ2F (.recv partner lbs) (.recv partner (transBranches gbs' role))
+          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+              (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
   | .comm sender receiver gbs, .end =>
       -- Non-participant projecting to .end
       -- Use CProject_end_trans_end to show trans g role = .end
@@ -1731,8 +1847,19 @@ private theorem CProjectTransRel_postfix :
       simp only [EQ2F]
   | .comm sender receiver gbs, .mu ltvar lbody =>
       -- Non-participant projecting to .mu
-      -- EQ2F needs constructor matching or mu-unfolding.
-      -- Full proof requires analyzing pair.2 structure based on CProject.
+      -- Use CProject_mu_implies_trans_mu to extract the global body structure
+      have hexists := CProject_mu_implies_trans_mu
+          (.comm sender receiver gbs) role ltvar lbody hproj hwf
+      obtain ⟨gbody, htrans_mu, hcontr, hbody_proj, hwf_body⟩ := hexists
+      -- Now: trans g role = .mu ltvar (trans gbody role), CProject gbody role lbody
+      rw [htrans, htrans_mu]
+      -- Goal: EQ2F (EQ2_closure CProjectTransRel) (.mu ltvar lbody) (.mu ltvar (trans gbody role))
+      simp only [EQ2F, EQ2_closure]
+      -- Same challenge as mu/mu case: need substitution preservation for CProject
+      -- We have CProject gbody role lbody but need:
+      -- - lbody.unfold is EQ2_closure-related to .mu ltvar (trans gbody role)
+      -- - .mu ltvar lbody is EQ2_closure-related to (trans gbody role).unfold
+      -- This requires CProject_substitute theorem (not yet proven).
       sorry
   -- All remaining cases are contradictions from CProjectF
   | .end, .var _ => simp only [CProjectF] at hf
