@@ -1,0 +1,215 @@
+import Paco
+import RumpsteakV2.Protocol.CoTypes.EQ2
+
+/-! # EQ2 Integration with Paco
+
+This module connects the EQ2 coinductive equality with paco-lean's parametrized
+coinduction framework. This enables:
+
+1. Transitivity proofs via accumulation
+2. Up-to techniques with compatible closures
+3. Compositional coinductive proofs
+
+## Main Results
+
+- `EQ2FMono`: EQ2F as a Paco.MonoRel
+- `EQ2_eq_paco_bot`: EQ2 equals paco EQ2FMono ⊥
+- `EQ2_paco_coind`: Parametrized coinduction for EQ2
+- `EQ2_paco_coind_acc`: Coinduction with accumulated hypotheses
+
+## Usage
+
+```lean
+-- Prove EQ2 a b using paco with witness relation R and accumulator r
+theorem my_eq2_proof : EQ2 a b := by
+  rw [EQ2_eq_paco_bot]
+  apply Paco.paco_coind EQ2FMono MyWitness ⊥
+  · intro x y hxy
+    -- Show MyWitness is a post-fixpoint of EQ2F
+    ...
+  · exact ...
+```
+-/
+
+namespace RumpsteakV2.Protocol.CoTypes.EQ2Paco
+
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.LocalTypeR
+open Paco
+
+/-! ## EQ2F as a Paco MonoRel -/
+
+/-- Convert our Rel to Paco.Rel (they're the same type but in different namespaces). -/
+def toPacoRel (R : EQ2.Rel) : Paco.Rel LocalTypeR := R
+
+/-- Convert Paco.Rel back to our Rel. -/
+def fromPacoRel (R : Paco.Rel LocalTypeR) : EQ2.Rel := R
+
+/-- EQ2F lifted to operate on Paco.Rel. -/
+def EQ2F_paco (R : Paco.Rel LocalTypeR) : Paco.Rel LocalTypeR :=
+  EQ2F (fromPacoRel R)
+
+/-- Local copy of BranchesRel_mono (since the original is private). -/
+private theorem BranchesRel_mono' {R S : EQ2.Rel}
+    (h : ∀ a b, R a b → S a b) :
+    ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
+  intro bs cs hrel
+  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+
+/-- Monotonicity of EQ2F in the Paco framework. -/
+theorem EQ2F_paco_mono : Paco.Monotone2 EQ2F_paco := by
+  intro R S hRS x y hxy
+  simp only [EQ2F_paco, fromPacoRel] at *
+  cases x <;> cases y <;> simp only [EQ2F] at hxy ⊢
+  all_goals
+    first
+    | exact hxy
+    | exact hRS _ _ hxy
+    | obtain ⟨h1, h2⟩ := hxy
+      first
+      | exact ⟨hRS _ _ h1, hRS _ _ h2⟩
+      | refine ⟨h1, ?_⟩
+        exact BranchesRel_mono' (fun _ _ hr => hRS _ _ hr) h2
+
+/-- EQ2F as a bundled monotone relation transformer for paco. -/
+def EQ2FMono : Paco.MonoRel LocalTypeR where
+  F := EQ2F_paco
+  mono := EQ2F_paco_mono
+
+/-! ## Equivalence between EQ2 and paco EQ2FMono ⊥ -/
+
+/-- EQ2 implies paco EQ2FMono ⊥. -/
+theorem EQ2_le_paco_bot : EQ2 ≤ paco EQ2FMono ⊥ := by
+  intro x y h
+  -- We use EQ2 itself as the witness relation
+  refine ⟨toPacoRel EQ2, ?_, h⟩
+  intro a b hab
+  -- hab : EQ2 a b
+  -- Need: EQ2FMono.F (EQ2 ⊔ ⊥) a b = EQ2F_paco EQ2 a b = EQ2F EQ2 a b
+  simp only [Paco.Rel.sup_bot]
+  -- EQ2FMono.F = EQ2F_paco = fun R => EQ2F (fromPacoRel R)
+  show EQ2F (fromPacoRel (toPacoRel EQ2)) a b
+  simp only [fromPacoRel, toPacoRel]
+  exact EQ2.destruct hab
+
+/-- paco EQ2FMono ⊥ implies EQ2. -/
+theorem paco_bot_le_EQ2 : paco EQ2FMono ⊥ ≤ EQ2 := by
+  intro x y ⟨R, hR, hxy⟩
+  -- R is a post-fixpoint: R ⊆ EQ2F_paco (R ⊔ ⊥) = EQ2F_paco R = EQ2F R
+  -- By standard coinduction, R ⊆ EQ2
+  have hpost : ∀ a b, R a b → EQ2F R a b := by
+    intro a b hab
+    simp only [Paco.Rel.sup_bot] at hR
+    have h := hR a b hab
+    -- h : EQ2FMono.F R a b = EQ2F_paco R a b = EQ2F R a b
+    exact h
+  exact EQ2_coind hpost x y hxy
+
+/-- EQ2 equals paco EQ2FMono ⊥. -/
+theorem EQ2_eq_paco_bot : EQ2 = paco EQ2FMono ⊥ :=
+  Paco.Rel.le_antisymm EQ2_le_paco_bot paco_bot_le_EQ2
+
+/-! ## Parametrized Coinduction for EQ2
+
+These lemmas provide paco-style coinduction principles specialized for EQ2.
+-/
+
+/-- Parametrized coinduction for EQ2.
+
+To prove EQ2 a b, provide a witness relation R and show:
+1. R is a post-fixpoint of EQ2F when extended by r
+2. R a b holds
+
+The parameter r can accumulate hypotheses during the proof. -/
+theorem EQ2_paco_coind (R : EQ2.Rel) (r : EQ2.Rel)
+    (hpost : ∀ a b, R a b → EQ2F (fun x y => R x y ∨ r x y) a b)
+    {x y : LocalTypeR} (hxy : R x y) :
+    paco EQ2FMono (toPacoRel r) x y := by
+  apply Paco.paco_coind EQ2FMono (toPacoRel R) (toPacoRel r)
+  · intro a b hab
+    -- hab : toPacoRel R a b = R a b
+    -- Need: EQ2FMono.F (toPacoRel R ⊔ toPacoRel r) a b
+    -- EQ2FMono.F = EQ2F_paco = fun R => EQ2F (fromPacoRel R)
+    -- So need: EQ2F (fromPacoRel (toPacoRel R ⊔ toPacoRel r)) a b
+    --        = EQ2F (R ⊔ r) a b
+    --        = EQ2F (fun x y => R x y ∨ r x y) a b
+    exact hpost a b hab
+  · exact hxy
+
+/-- Convert paco result back to EQ2 when parameter is empty. -/
+theorem paco_to_EQ2 {x y : LocalTypeR} (h : paco EQ2FMono ⊥ x y) : EQ2 x y :=
+  paco_bot_le_EQ2 x y h
+
+/-- Coinduction with accumulation: use previously proven facts. -/
+theorem EQ2_paco_coind_acc (R : EQ2.Rel) (r : EQ2.Rel)
+    (hpost : ∀ a b, R a b → EQ2F (fun x y => R x y ∨ (paco EQ2FMono (toPacoRel r) x y ∨ r x y)) a b)
+    {x y : LocalTypeR} (hxy : R x y) :
+    paco EQ2FMono (toPacoRel r) x y := by
+  apply Paco.paco_coind_acc EQ2FMono (toPacoRel R) (toPacoRel r)
+  · intro a b hab
+    -- hab : toPacoRel R a b = R a b
+    -- Need: EQ2FMono.F (toPacoRel R ⊔ upaco EQ2FMono (toPacoRel r)) a b
+    -- upaco EQ2FMono (toPacoRel r) = paco EQ2FMono (toPacoRel r) ⊔ toPacoRel r
+    -- So the target relation is R ⊔ paco ⊔ r, which matches hpost
+    exact hpost a b hab
+  · exact hxy
+
+/-! ## Transitivity via Paco
+
+The main application: proving transitivity of EQ2 using accumulation.
+-/
+
+/-- The relation for transitivity proofs: pairs connected by an intermediate. -/
+def TransRelPaco : EQ2.Rel := fun a c => ∃ b, EQ2 a b ∧ EQ2 b c
+
+/-- TransRelPaco relates to the paco accumulator pattern. -/
+theorem TransRelPaco_to_paco {a c : LocalTypeR} (h : TransRelPaco a c) :
+    paco EQ2FMono (toPacoRel EQ2) a c := by
+  obtain ⟨b, hab, hbc⟩ := h
+  -- We can accumulate EQ2 facts in the parameter
+  -- The proof proceeds by showing TransRelPaco is a post-fixpoint
+  -- when extended by EQ2 (the accumulator)
+  -- This is exactly what paco_coind enables
+  sorry  -- To be completed in Phase 1
+
+/-- Alternative transitivity proof using paco's native accumulation.
+
+This demonstrates the paco approach:
+1. Start with EQ2 a b (proven fact, goes into accumulator)
+2. Coinductively show EQ2 b c implies EQ2 a c
+3. The accumulator lets us "borrow" the a~b fact during the proof -/
+theorem EQ2_trans_via_paco {a b c : LocalTypeR}
+    (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
+  -- Convert to paco form
+  rw [EQ2_eq_paco_bot]
+  -- Use accumulation: put hab in the accumulator, prove a~c
+  -- This requires showing the witness relation is a post-fixpoint
+  -- of EQ2F extended by {(a,b)}
+  sorry  -- To be completed in Phase 1
+
+/-! ## Up-To Techniques
+
+Infrastructure for "up-to" coinduction using paco's closure operators.
+-/
+
+/-- Reflexive closure for EQ2 relations. -/
+def ReflClosure (R : EQ2.Rel) : EQ2.Rel :=
+  fun x y => x = y ∨ R x y
+
+/-- Symmetric closure for EQ2 relations. -/
+def SymmClosure (R : EQ2.Rel) : EQ2.Rel :=
+  fun x y => R x y ∨ R y x
+
+/-- Transitive closure for EQ2 relations. -/
+def TransClosure (R : EQ2.Rel) : EQ2.Rel :=
+  fun x y => ∃ n, TransClosureN R n x y
+where
+  TransClosureN (R : EQ2.Rel) : Nat → LocalTypeR → LocalTypeR → Prop
+    | 0, x, y => R x y
+    | n+1, x, z => ∃ y, R x y ∧ TransClosureN R n y z
+
+/-- Reflexive-symmetric-transitive (equivalence) closure. -/
+def EquivClosure (R : EQ2.Rel) : EQ2.Rel :=
+  TransClosure (SymmClosure (ReflClosure R))
+
+end RumpsteakV2.Protocol.CoTypes.EQ2Paco

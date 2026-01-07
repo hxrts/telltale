@@ -52,7 +52,7 @@ theorem projectR?_some_implies_projectb {g : GlobalType} {role : String}
         exact hproj
   · -- In this case, projectR? returns none, but hsome says it's some - contradiction
     rw [dif_neg hproj] at hsome
-    exact False.elim (Option.noConfusion hsome)
+    exact nomatch hsome
 
 /-- Soundness: if projectR? returns some, then CProject holds. -/
 theorem projectR?_sound {g : GlobalType} {role : String}
@@ -512,7 +512,7 @@ private theorem ClosedMuveRel_postfix :
       -- hclosed : isClosed (.var t) = true means ([t] == []) = true
       -- But [t] ≠ [], so this is false = true
       simp only [isClosed, LocalTypeR.freeVars, beq_iff_eq] at hclosed
-      exact List.noConfusion hclosed
+      exact nomatch hclosed
   | mu t body =>
       -- EQ2F ClosedMuveRel .end (.mu t body) = ClosedMuveRel .end (body.substitute t (.mu t body))
       simp only [EQ2F]
@@ -1157,7 +1157,7 @@ theorem part_of2_or_end (role : String) (g : GlobalType) (lt : LocalTypeR)
           -- isClosed (.var t) = ([t] == []) = false ≠ true
           simp only [isClosed, LocalTypeR.freeVars, beq_iff_eq] at hclosed_a
           -- hclosed_a : [t] = []
-          exact List.noConfusion hclosed_a
+          exact nomatch hclosed_a
       | mu t body =>
           -- EQ2F ClosedMuveRelSym (.mu t body) .end = ClosedMuveRelSym (body.substitute t (.mu t body)) .end
           simp only [EQ2F]

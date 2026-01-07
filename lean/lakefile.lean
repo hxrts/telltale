@@ -10,8 +10,13 @@ V1 (Rumpsteak) is intentionally excluded from build targets.
 package rumpsteakLean
 
 -- Mathlib provides standard lemmas and automation for proofs.
+-- Note: Using master to match paco-lean's mathlib requirement for Lean 4.27.0-rc1
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4" @ "v4.25.0"
+  "https://github.com/leanprover-community/mathlib4.git" @ "master"
+
+-- Paco provides parametrized coinduction for EQ2 proofs.
+require paco from git
+  "https://github.com/hxrts/paco-lean" @ "bfac3ec"
 
 /-- V2 library containing the new protocol semantics and proofs. -/
 @[default_target]
