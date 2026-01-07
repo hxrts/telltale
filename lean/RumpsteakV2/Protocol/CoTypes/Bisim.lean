@@ -1225,21 +1225,28 @@ theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl 
         -- IH gives: UnfoldsToEnd ((body.substitute t (.mu t body)).substitute var repl)
         -- We need: UnfoldsToEnd ((body.substitute var repl).substitute t (.mu t (body.substitute var repl)))
         -- These are related by subst_mu_comm, but that requires Barendregt conditions.
-        -- For now, use sorry for this case.
+        --
+        -- **Proof obligation**: Show
+        --   (body.substitute t (.mu t body)).substitute var repl
+        --   behaves the same as
+        --   (body.substitute var repl).substitute t (.mu t (body.substitute var repl))
+        --
+        -- For well-formed types satisfying Barendregt convention, these are equal.
+        -- With the unconditional version, they are EQ2-equivalent (semantic equality).
         left
         apply UnfoldsToEnd.mu
-        sorry
+        sorry  -- Requires subst_mu_comm or EQ2-equivalence
       | inr hex =>
         -- IH gives: ∃ n, UnfoldPathEndBounded n repl ∧ body.substitute t (.mu t body) = .var var
-        -- But .mu t body ≠ .var var, so the second disjunct can't apply to .mu t body
-        -- We return Or.inr with the impossible equation
+        -- The second disjunct only applies when body.substitute t (.mu t body) = .var var,
+        -- which happens when body = .var t (immediate recursion) and the mu unfolds to var.
         obtain ⟨n, hpath, heq⟩ := hex
         -- heq : body.substitute t (.mu t body) = .var var
-        -- This is a specific case where body.substitute t (.mu t body) equals .var var
-        -- Since .mu t body ≠ .var var, we use the first disjunct
+        -- This means the unfold hit var during substitution traversal.
+        -- Similar proof obligation as above case.
         left
         apply UnfoldsToEnd.mu
-        sorry
+        sorry  -- Requires subst_mu_comm or EQ2-equivalence
 
 open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
 /-- Substitution preserves UnfoldsToEnd under Barendregt conditions.
@@ -1579,12 +1586,22 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       by_cases heq : x = var
       · -- x = var: LHS = repl.unfold, RHS = repl
-        subst heq
-        simp only [beq_self_eq_true, ↓reduceIte] at hu hv
-        subst hu hv
-        -- Use Bisim.refl: repl.unfold and repl are Bisim via EQ2
-        -- This needs the observable_of_closed axiom for closed repl
-        sorry  -- Requires showing repl.unfold ~ repl
+        -- Use heq to rewrite x to var without destroying var
+        have hbeq : (x == var) = true := by simp [heq]
+        simp only [hbeq, ↓reduceIte] at hu hv
+        -- hu : u = LocalTypeR.unfold repl, hv : v = repl
+        rw [hu, hv]
+        -- Goal: BisimF (SubstUnfoldClosure var repl) (LocalTypeR.unfold repl) repl
+        -- LocalTypeR.unfold repl and repl are Bisim via EQ2_unfold_left
+        have hBisim : Bisim (LocalTypeR.unfold repl) repl :=
+          EQ2.toBisim (EQ2_unfold_left (EQ2_refl repl))
+        obtain ⟨R', hR'post, hxy⟩ := hBisim
+        have hf : BisimF R' (LocalTypeR.unfold repl) repl :=
+          hR'post (LocalTypeR.unfold repl) repl hxy
+        -- Lift R' ⊆ SubstUnfoldClosure via Or.inr (Bisim)
+        have hR'_to_closure : ∀ a b, R' a b → SubstUnfoldClosure var repl a b :=
+          fun a b h => Or.inr ⟨R', hR'post, h⟩
+        exact BisimF.mono hR'_to_closure (LocalTypeR.unfold repl) repl hf
       · -- x ≠ var: both sides are .var x
         have hne : (x == var) = false := by simp [heq]
         simp only [hne] at hu hv
@@ -1595,7 +1612,7 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       subst hu hv
       apply BisimF.eq_send CanSend.base CanSend.base
-      -- Both sides have identical branches, use Bisim.refl via closure
+      -- Both sides have identical branches, use Bisim.refl via EQ2_refl
       unfold BranchesRelBisim
       induction bs with
       | nil => exact List.Forall₂.nil
@@ -1604,14 +1621,15 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
           apply List.Forall₂.cons
           · constructor
             · rfl
-            -- Use Bisim.refl_of_observable for the continuation (both sides are c.substitute var repl)
-            · exact Or.inr (Bisim.refl_of_observable sorry)
+            -- Both sides are (b.2.substitute var repl), use EQ2_refl → Bisim
+            · exact Or.inr (EQ2.toBisim (EQ2_refl _))
           · exact ih
     | recv p bs =>
       -- t = .recv p bs: both sides are .recv p (substituteBranches bs var repl)
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       subst hu hv
       apply BisimF.eq_recv CanRecv.base CanRecv.base
+      -- Both sides have identical branches, use Bisim.refl via EQ2_refl
       unfold BranchesRelBisim
       induction bs with
       | nil => exact List.Forall₂.nil
@@ -1620,7 +1638,8 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
           apply List.Forall₂.cons
           · constructor
             · rfl
-            · exact Or.inr (Bisim.refl_of_observable sorry)
+            -- Both sides are (b.2.substitute var repl), use EQ2_refl → Bisim
+            · exact Or.inr (EQ2.toBisim (EQ2_refl _))
           · exact ih
     | mu x body =>
       -- t = .mu x body: the complex case
@@ -1648,10 +1667,14 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
           exact RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.substitute_not_free _ x repl hnotfree
         rw [hv_eq_u]
         -- Now we need BisimF (SubstUnfoldClosure var repl) u u where u = body.substitute x (.mu x body)
-        -- This requires observable extraction (paco-style coinduction).
-        -- The structural part is done: we've shown LHS = RHS.
-        -- Completing this requires: observable_of_closed or Bisim.refl with closedness proof.
-        sorry
+        -- Both sides are equal, use Bisim.refl via EQ2_refl
+        have hBisim : Bisim (body.substitute x (.mu x body)) (body.substitute x (.mu x body)) :=
+          EQ2.toBisim (EQ2_refl _)
+        obtain ⟨R', hR'post, hxy⟩ := hBisim
+        have hf := hR'post _ _ hxy
+        have hlift : ∀ a b, R' a b → SubstUnfoldClosure var repl a b :=
+          fun a b h => Or.inr ⟨R', hR'post, h⟩
+        exact BisimF.mono hlift _ _ hf
       · -- x ≠ var: substitution goes through
         have hdiff : (x == var) = false := by simp [hshadow]
         simp only [LocalTypeR.substitute, hdiff] at hu
@@ -1659,8 +1682,20 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR) :
         --     = (body.substitute var repl).substitute x (.mu x (body.substitute var repl))
         -- RHS = (body.substitute x (.mu x body)).substitute var repl
         subst hu hv
-        -- These require substitution commutativity when x ≠ var
-        sorry  -- Requires substitution commutativity
+        -- **Proof obligation**: Show
+        --   (body.substitute var repl).substitute x (.mu x (body.substitute var repl))
+        --   is BisimF-related to
+        --   (body.substitute x (.mu x body)).substitute var repl
+        --
+        -- When x ≠ var and Barendregt conditions hold (x not free in repl, var not bound in body),
+        -- these are syntactically equal by substitution commutativity.
+        --
+        -- Without Barendregt, they are semantically equivalent (EQ2) because both represent
+        -- the same unfolding of the recursive type with var replaced by repl.
+        --
+        -- **Semantic soundness**: The infinite tree interpretation of both terms is identical
+        -- since substitution order doesn't affect the meaning of well-formed recursive types.
+        sorry  -- Requires subst_mu_comm (Barendregt) or EQ2-equivalence proof
   | inr hBisim =>
     -- Case: Bisim u v - use the existing Bisim post-fixpoint property
     obtain ⟨R, hRpost, huv⟩ := hBisim
