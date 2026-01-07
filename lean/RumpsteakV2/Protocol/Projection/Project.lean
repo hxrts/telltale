@@ -1435,19 +1435,143 @@ and show trans produces the matching constructor. -/
     requires wellFormedness to rule out empty branches. -/
 private theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
     (partner : String) (lbs : List (Label × LocalTypeR))
-    (hproj : CProject g role (.send partner lbs)) :
+    (hproj : CProject g role (.send partner lbs))
+    (hwf : g.allCommsNonEmpty = true) :
     ∃ gbs', trans g role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs := by
-  sorry
+  have hf := CProject_destruct hproj
+  match g with
+  | .end =>
+      -- CProjectF (.end, .send) is False
+      simp only [CProjectF] at hf
+  | .var v =>
+      -- CProjectF (.var, .send) is False
+      simp only [CProjectF] at hf
+  | .mu t body =>
+      -- CProjectF (.mu, .send) is False
+      simp only [CProjectF] at hf
+  | .comm sender receiver gbs =>
+      simp only [CProjectF] at hf
+      by_cases hrs : role = sender
+      · -- Role is sender: direct case
+        simp only [if_pos hrs] at hf
+        obtain ⟨hpartner, hbranches⟩ := hf
+        -- Witness: gbs with role = sender
+        use gbs
+        constructor
+        · -- trans g role = .send partner (transBranches gbs role)
+          rw [hrs, trans_comm_sender sender receiver sender gbs rfl, hpartner]
+        · -- BranchesProjRel CProject gbs role lbs
+          -- simp already substituted sender → role in hf using hrs
+          exact hbranches
+      · -- Role is not sender
+        simp only [if_neg hrs] at hf
+        by_cases hrr : role = receiver
+        · -- Role is receiver but lt is .send - contradiction from CProjectF
+          simp only [if_pos hrr] at hf
+        · -- Non-participant case: hf is AllBranchesProj CProject gbs role (.send partner lbs)
+          simp only [if_neg hrr] at hf
+          -- In non-participant case, trans projects first branch
+          have htrans := trans_comm_other sender receiver role gbs hrs hrr
+          -- From hwf, we know gbs is non-empty
+          simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true, List.isEmpty_eq_false_iff,
+                     decide_eq_true_eq, ne_eq] at hwf
+          obtain ⟨hnonempty, hrest⟩ := hwf
+          cases hgbs : gbs with
+          | nil =>
+              -- Contradiction: gbs = [] but hwf says gbs is non-empty
+              simp only [hgbs, not_true_eq_false] at hnonempty
+          | cons first rest =>
+              -- Non-empty: trans g role = trans first.2 role
+              simp only [hgbs] at htrans hrest
+              -- Get CProject first.2 role (.send partner lbs)
+              have hfirst : CProject first.2 role (.send partner lbs) := by
+                apply hf first
+                rw [hgbs]
+                exact List.Mem.head rest
+              -- Get wellFormedness of first.2
+              simp only [allCommsNonEmptyBranches, Bool.and_eq_true] at hrest
+              have hwf_first : first.2.allCommsNonEmpty = true := hrest.1
+              -- Recursive call on first.2
+              have ih := CProject_send_implies_trans_send first.2 role partner lbs hfirst hwf_first
+              obtain ⟨gbs', htrans', hbranches'⟩ := ih
+              use gbs'
+              constructor
+              · simp only [htrans, htrans']
+              · exact hbranches'
+termination_by sizeOf g
+decreasing_by
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
 
-/-- Symmetric version for recv.
-    TODO: See CProject_send_implies_trans_send for proof status. -/
+/-- Symmetric version for recv. -/
 private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String)
     (partner : String) (lbs : List (Label × LocalTypeR))
-    (hproj : CProject g role (.recv partner lbs)) :
+    (hproj : CProject g role (.recv partner lbs))
+    (hwf : g.allCommsNonEmpty = true) :
     ∃ gbs', trans g role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs := by
-  sorry
+  have hf := CProject_destruct hproj
+  match g with
+  | .end =>
+      simp only [CProjectF] at hf
+  | .var v =>
+      simp only [CProjectF] at hf
+  | .mu t body =>
+      simp only [CProjectF] at hf
+  | .comm sender receiver gbs =>
+      simp only [CProjectF] at hf
+      by_cases hrs : role = sender
+      · -- Role is sender but lt is .recv - contradiction from CProjectF
+        simp only [if_pos hrs] at hf
+      · -- Role is not sender
+        simp only [if_neg hrs] at hf
+        by_cases hrr : role = receiver
+        · -- Role is receiver: direct case
+          simp only [if_pos hrr] at hf
+          obtain ⟨hpartner, hbranches⟩ := hf
+          -- Witness: gbs with role = receiver
+          use gbs
+          constructor
+          · -- trans g role = .recv partner (transBranches gbs role)
+            -- hrs : ¬(role = sender), hrr : role = receiver
+            -- Need: receiver ≠ sender
+            have hne : receiver ≠ sender := hrr ▸ hrs
+            rw [hrr, trans_comm_receiver sender receiver receiver gbs rfl hne, hpartner]
+          · -- BranchesProjRel CProject gbs role lbs
+            exact hbranches
+        · -- Non-participant case: hf is AllBranchesProj CProject gbs role (.recv partner lbs)
+          simp only [if_neg hrr] at hf
+          -- In non-participant case, trans projects first branch
+          have htrans := trans_comm_other sender receiver role gbs hrs hrr
+          -- From hwf, we know gbs is non-empty
+          simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true, List.isEmpty_eq_false_iff,
+                     decide_eq_true_eq, ne_eq] at hwf
+          obtain ⟨hnonempty, hrest⟩ := hwf
+          cases hgbs : gbs with
+          | nil =>
+              -- Contradiction: gbs = [] but hwf says gbs is non-empty
+              simp only [hgbs, not_true_eq_false] at hnonempty
+          | cons first rest =>
+              -- Non-empty: trans g role = trans first.2 role
+              simp only [hgbs] at htrans hrest
+              -- Get CProject first.2 role (.recv partner lbs)
+              have hfirst : CProject first.2 role (.recv partner lbs) := by
+                apply hf first
+                rw [hgbs]
+                exact List.Mem.head rest
+              -- Get wellFormedness of first.2
+              simp only [allCommsNonEmptyBranches, Bool.and_eq_true] at hrest
+              have hwf_first : first.2.allCommsNonEmpty = true := hrest.1
+              -- Recursive call on first.2
+              have ih := CProject_recv_implies_trans_recv first.2 role partner lbs hfirst hwf_first
+              obtain ⟨gbs', htrans', hbranches'⟩ := ih
+              use gbs'
+              constructor
+              · simp only [htrans, htrans']
+              · exact hbranches'
+termination_by sizeOf g
+decreasing_by
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
 
 /-- Local copy of BranchesRel_mono (since the original is private in EQ2.lean). -/
 private theorem BranchesRel_mono {R S : Rel}
