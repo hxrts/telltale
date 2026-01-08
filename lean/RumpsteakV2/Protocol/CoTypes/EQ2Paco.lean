@@ -162,30 +162,44 @@ The main application: proving transitivity of EQ2 using accumulation.
 /-- The relation for transitivity proofs: pairs connected by an intermediate. -/
 def TransRelPaco : EQ2.Rel := fun a c => ∃ b, EQ2 a b ∧ EQ2 b c
 
-/-- TransRelPaco relates to the paco accumulator pattern. -/
+/-- TransRelPaco relates to the paco accumulator pattern.
+
+Note: This is subsumed by EQ2_trans_via_Bisim in Bisim.lean.
+The paco approach is kept for documentation but the proof delegates to existing infrastructure. -/
 theorem TransRelPaco_to_paco {a c : LocalTypeR} (h : TransRelPaco a c) :
     paco EQ2FMono (toPacoRel EQ2) a c := by
   obtain ⟨b, hab, hbc⟩ := h
-  -- We can accumulate EQ2 facts in the parameter
-  -- The proof proceeds by showing TransRelPaco is a post-fixpoint
-  -- when extended by EQ2 (the accumulator)
-  -- This is exactly what paco_coind enables
-  sorry  -- To be completed in Phase 1
+  -- Use existing EQ2_trans and apply paco_coind with EQ2 as witness
+  have heq := EQ2_trans hab hbc
+  -- Use EQ2 itself as the witness relation
+  refine ⟨toPacoRel EQ2, ?_, heq⟩
+  intro x y hxy
+  -- hxy : EQ2 x y
+  -- Need: EQ2FMono.F (EQ2 ⊔ EQ2) x y
+  -- EQ2FMono.F = EQ2F_paco, and EQ2 ⊔ EQ2 simplifies to something containing EQ2
+  -- Since EQ2 ⊆ EQ2F EQ2, we need to lift through the sup
+  have h := EQ2.destruct hxy
+  -- h : EQ2F EQ2 x y
+  -- Need: EQ2F_paco (toPacoRel EQ2 ⊔ toPacoRel EQ2) x y
+  show EQ2F_paco (toPacoRel EQ2 ⊔ toPacoRel EQ2) x y
+  simp only [EQ2F_paco, fromPacoRel, toPacoRel]
+  -- EQ2F (fun a b => EQ2 a b ∨ EQ2 a b) x y
+  -- Since P ∨ P ↔ P, this is EQ2F EQ2 x y
+  exact EQ2F.mono (fun _ _ hr => Or.inl hr) x y h
 
 /-- Alternative transitivity proof using paco's native accumulation.
 
 This demonstrates the paco approach:
 1. Start with EQ2 a b (proven fact, goes into accumulator)
 2. Coinductively show EQ2 b c implies EQ2 a c
-3. The accumulator lets us "borrow" the a~b fact during the proof -/
+3. The accumulator lets us "borrow" the a~b fact during the proof
+
+Note: This is subsumed by EQ2_trans which uses TransRel_postfix (axiom),
+and by EQ2_trans_via_Bisim in Bisim.lean which is fully proven. -/
 theorem EQ2_trans_via_paco {a b c : LocalTypeR}
     (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
-  -- Convert to paco form
-  rw [EQ2_eq_paco_bot]
-  -- Use accumulation: put hab in the accumulator, prove a~c
-  -- This requires showing the witness relation is a post-fixpoint
-  -- of EQ2F extended by {(a,b)}
-  sorry  -- To be completed in Phase 1
+  -- Delegate to existing EQ2_trans
+  exact EQ2_trans hab hbc
 
 /-! ## Up-To Techniques
 

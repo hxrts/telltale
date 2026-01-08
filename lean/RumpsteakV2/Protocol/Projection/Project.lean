@@ -1668,11 +1668,135 @@ private theorem BranchesRel_mono {R S : Rel}
   intro bs cs hrel
   exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
 
+/-- Chain BranchesRel through an intermediate into the EQ2_closure.
+    Given BranchesRel (EQ2_closure R) bs cs and BranchesRel EQ2 cs ds,
+    produce BranchesRel (EQ2_closure R) bs ds.
+
+    Requires an extension hypothesis: R can be extended with EQ2 at the right
+    to produce another R. This is satisfied by CProjectTransRelComp. -/
+private theorem BranchesRel_trans_chain {R : Rel}
+    (hextend : ∀ a b c, R a b → EQ2 b c → R a c)
+    {bs cs ds : List (Label × LocalTypeR)}
+    (hbc : BranchesRel (EQ2_closure R) bs cs)
+    (hcd : BranchesRel EQ2 cs ds) :
+    BranchesRel (EQ2_closure R) bs ds := by
+  -- Use Forall₂ transitivity pattern
+  induction hbc generalizing ds with
+  | nil =>
+      cases hcd
+      exact List.Forall₂.nil
+  | cons h1 _ ih =>
+      cases hcd with
+      | cons h2 hcd_tail =>
+          constructor
+          · -- Labels chain: h1.1 says b.1 = c.1, h2.1 says c.1 = d.1
+            constructor
+            · exact h1.1.trans h2.1
+            · -- Continuations: use EQ2 side of closure and chain
+              -- We have h1.2 : EQ2_closure R a.2 b.2 and h2.2 : EQ2 b.2 c.2
+              cases h1.2 with
+              | inl hr =>
+                  -- hr : R a.2 b.2, h2.2 : EQ2 b.2 c.2
+                  -- Use extension hypothesis to get R a.2 c.2
+                  exact Or.inl (hextend _ _ _ hr h2.2)
+              | inr heq => exact Or.inr (EQ2_trans heq h2.2)
+          · exact ih hcd_tail
+
 /-- Witness relation for CProject_implies_EQ2_trans coinduction.
     Pairs local type lt with trans output when lt is a valid CProject output.
     Requires allCommsNonEmpty to handle non-participant cases (matching Coq size_pred). -/
 private def CProjectTransRel : Rel := fun lt t =>
   ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.allCommsNonEmpty = true
+
+/-- Composition witness: extends CProjectTransRel with EQ2 transitivity.
+
+    This is needed for the mu case where we have:
+    - EQ2 (lbody.unfold) (.mu v lbody) from EQ2_refl
+    - CProjectTransRel (.mu v lbody) (.mu v (trans gbody role))
+    - EQ2 (.mu v (trans gbody role)) ((trans gbody role).unfold) from EQ2_refl
+
+    The composition allows chaining these through intermediates:
+    - 2-hop: EQ2 → CProjectTransRel or CProjectTransRel → EQ2
+    - 3-hop: EQ2 → CProjectTransRel → EQ2 (for unfolded-to-unfolded chains) -/
+private def CProjectTransRelComp : Rel := fun a c =>
+  CProjectTransRel a c ∨
+  (∃ b, EQ2 a b ∧ CProjectTransRel b c) ∨
+  (∃ b, CProjectTransRel a b ∧ EQ2 b c) ∨
+  (∃ b b', EQ2 a b ∧ CProjectTransRel b b' ∧ EQ2 b' c)
+
+/-- CProjectTransRelComp can be extended with EQ2 at the right to produce another CProjectTransRelComp.
+    This is the key lemma that allows the BranchesRel_trans_chain helper to work. -/
+private theorem CProjectTransRelComp_extend_right
+    (h1 : CProjectTransRelComp a b) (h2 : EQ2 b c) :
+    CProjectTransRelComp a c := by
+  -- Case split on which disjunct of CProjectTransRelComp a b holds
+  rcases h1 with hbase | ⟨m, heq_am, hrel_mb⟩ | ⟨m, hrel_am, heq_mb⟩ | ⟨m, m', heq_am, hrel_mm', heq_m'b⟩
+  · -- Base: CProjectTransRel a b ∧ EQ2 b c → 2-hop suffix (a, c)
+    right; right; left
+    exact ⟨b, hbase, h2⟩
+  · -- 2-hop prefix: EQ2 a m ∧ CProjectTransRel m b ∧ EQ2 b c → 3-hop (a, c)
+    right; right; right
+    exact ⟨m, b, heq_am, hrel_mb, h2⟩
+  · -- 2-hop suffix: CProjectTransRel a m ∧ EQ2 m b ∧ EQ2 b c → 2-hop suffix with combined EQ2
+    right; right; left
+    exact ⟨m, hrel_am, EQ2_trans heq_mb h2⟩
+  · -- 3-hop: EQ2 a m ∧ CProjectTransRel m m' ∧ EQ2 m' b ∧ EQ2 b c → 3-hop with combined EQ2
+    right; right; right
+    exact ⟨m, m', heq_am, hrel_mm', EQ2_trans heq_m'b h2⟩
+
+/-- CProjectTransRelComp can be extended with EQ2 at the left to produce another CProjectTransRelComp.
+    This is the key lemma that allows the BranchesRel_trans_chain_rev helper to work. -/
+private theorem CProjectTransRelComp_extend_left
+    (h1 : EQ2 a b) (h2 : CProjectTransRelComp b c) :
+    CProjectTransRelComp a c := by
+  -- Case split on which disjunct of CProjectTransRelComp b c holds
+  rcases h2 with hbase | ⟨m, heq_bm, hrel_mc⟩ | ⟨m, hrel_bm, heq_mc⟩ | ⟨m, m', heq_bm, hrel_mm', heq_m'c⟩
+  · -- Base: EQ2 a b ∧ CProjectTransRel b c → 2-hop prefix (a, c)
+    right; left
+    exact ⟨b, h1, hbase⟩
+  · -- 2-hop prefix: EQ2 a b ∧ EQ2 b m ∧ CProjectTransRel m c → 2-hop prefix with combined EQ2
+    right; left
+    exact ⟨m, EQ2_trans h1 heq_bm, hrel_mc⟩
+  · -- 2-hop suffix: EQ2 a b ∧ CProjectTransRel b m ∧ EQ2 m c → 3-hop (a, c)
+    right; right; right
+    exact ⟨b, m, h1, hrel_bm, heq_mc⟩
+  · -- 3-hop: EQ2 a b ∧ EQ2 b m ∧ CProjectTransRel m m' ∧ EQ2 m' c → 3-hop with combined EQ2
+    right; right; right
+    exact ⟨m, m', EQ2_trans h1 heq_bm, hrel_mm', heq_m'c⟩
+
+/-- Chain BranchesRel with EQ2 first, then EQ2_closure (reverse direction).
+    Given BranchesRel EQ2 bs cs and BranchesRel (EQ2_closure R) cs ds,
+    produce BranchesRel (EQ2_closure R) bs ds.
+
+    Requires an extension hypothesis: R can be extended with EQ2 at the left
+    to produce another R. This is satisfied by CProjectTransRelComp. -/
+private theorem BranchesRel_trans_chain_rev {R : Rel}
+    (hextend : ∀ a b c, EQ2 a b → R b c → R a c)
+    {bs cs ds : List (Label × LocalTypeR)}
+    (hbc : BranchesRel EQ2 bs cs)
+    (hcd : BranchesRel (EQ2_closure R) cs ds) :
+    BranchesRel (EQ2_closure R) bs ds := by
+  -- Use Forall₂ transitivity pattern
+  induction hbc generalizing ds with
+  | nil =>
+      cases hcd
+      exact List.Forall₂.nil
+  | cons h1 _ ih =>
+      cases hcd with
+      | cons h2 hcd_tail =>
+          constructor
+          · -- Labels chain: h1.1 says b.1 = c.1, h2.1 says c.1 = d.1
+            constructor
+            · exact h1.1.trans h2.1
+            · -- Continuations: use EQ2 side of closure and chain
+              -- We have h1.2 : EQ2 a.2 b.2 and h2.2 : EQ2_closure R b.2 c.2
+              cases h2.2 with
+              | inl hr =>
+                  -- h1.2 : EQ2 a.2 b.2, hr : R b.2 c.2
+                  -- Use extension hypothesis to get R a.2 c.2
+                  exact Or.inl (hextend _ _ _ h1.2 hr)
+              | inr heq => exact Or.inr (EQ2_trans h1.2 heq)
+          · exact ih hcd_tail
 
 /-- Helper: Extract allCommsNonEmpty for a branch continuation from the branch list property. -/
 private theorem allCommsNonEmpty_of_mem_branch
@@ -1716,12 +1840,12 @@ private theorem branchesProjRel_to_branchesRel_CProjectTransRel
               · -- Tail relation
                 exact ih hwf.2
 
-/-- CProjectTransRel is a post-fixpoint of EQ2F (when extended by EQ2).
+/-- CProjectTransRel is a post-fixpoint of EQ2F (when extended by EQ2 via composition).
 
-This is the key lemma for coinduction: we show that CProjectTransRel ⊆ EQ2F (EQ2_closure CProjectTransRel).
-The EQ2_closure allows us to use transitivity and reflexivity facts. -/
+This is the key lemma for coinduction: we show that CProjectTransRel ⊆ EQ2F (EQ2_closure CProjectTransRelComp).
+The EQ2_closure with CProjectTransRelComp allows chaining EQ2 with CProjectTransRel for transitivity. -/
 private theorem CProjectTransRel_postfix :
-    ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRel) lt t := by
+    ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   intro lt t ⟨g, role, hproj, htrans, hwf⟩
   -- Destruct CProject to get CProjectF structure
   have hf := CProject_destruct hproj
@@ -1742,29 +1866,60 @@ private theorem CProjectTransRel_postfix :
       simp only [CProjectF] at hf
       rcases hf with ⟨heq_var, hcontr, hbody_proj⟩
       subst heq_var htrans
+      -- After subst, ltvar is eliminated and muvar remains
       simp only [Trans.trans, hcontr, ↓reduceIte, EQ2F, EQ2_closure]
-      -- Goal is now: (EQ2_closure ... (lbody.unfold) (mu ltvar t')) ∧ (EQ2_closure ... (mu ltvar lbody) (t'.unfold))
+      -- Goal is now: (EQ2_closure CProjectTransRelComp ((.mu muvar lbody).unfold) (mu muvar t')) ∧
+      --              (EQ2_closure CProjectTransRelComp (mu muvar lbody) ((.mu muvar t').unfold))
       -- where t' = trans gbody role
 
-      -- The mu/mu case requires relating unfolded local types to global projections.
-      -- This needs either:
-      -- 1. CProject preservation under substitution (not yet proven)
-      -- 2. EQ2 facts which would be circular without paco-style accumulation
-      --
-      -- We have CProject gbody role lbody and need to show:
-      -- - lbody.unfold is EQ2_closure-related to .mu ltvar (trans gbody role)
-      -- - .mu ltvar lbody is EQ2_closure-related to (trans gbody role).unfold
-      --
-      -- The proof strategy requires CProject_substitute: if CProject g r l, then
-      -- CProject (g.substitute t repl) r (l.substitute t repl') for appropriate repl/repl'.
-      -- This is analogous to Coq's proj_subst lemma.
-      --
-      -- Extract hwf_body for potential future use
-      have _hwf_body : gbody.allCommsNonEmpty = true := by
+      -- Extract hwf_body from hwf
+      have hwf_body : gbody.allCommsNonEmpty = true := by
         simp only [GlobalType.allCommsNonEmpty] at hwf
         exact hwf
-      -- For now, use sorry. Full proof requires CProject_substitute theorem.
-      sorry
+
+      -- Construct CProjectTransRel for the mu types
+      have hmu_rel : CProjectTransRel (.mu muvar lbody) (.mu muvar (trans gbody role)) := by
+        -- CProject (.mu muvar gbody) role (.mu muvar lbody) holds by CProjectF mu
+        have hmu_proj : CProject (.mu muvar gbody) role (.mu muvar lbody) :=
+          CProject_mu muvar gbody lbody role hcontr hbody_proj
+        -- trans (.mu muvar gbody) role = .mu muvar (trans gbody role)
+        have htrans_mu : trans (.mu muvar gbody) role = .mu muvar (trans gbody role) := by
+          simp only [Trans.trans, hcontr, ↓reduceIte]
+        -- (.mu muvar gbody).allCommsNonEmpty = gbody.allCommsNonEmpty = hwf_body
+        have hwf_mu : (.mu muvar gbody : GlobalType).allCommsNonEmpty = true := by
+          simp only [GlobalType.allCommsNonEmpty, hwf_body]
+        -- CProjectTransRel lt t = ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.allCommsNonEmpty
+        -- Need: t = trans g role, so use htrans_mu.symm
+        exact ⟨.mu muvar gbody, role, hmu_proj, htrans_mu.symm, hwf_mu⟩
+
+      -- Get EQ2 facts from EQ2_refl structure
+      -- EQ2F for mu/mu: R (body.substitute t (.mu t body)) (.mu s body') ∧ R (.mu t body) (body'.substitute s (.mu s body'))
+      -- EQ2_refl on (.mu muvar lbody) gives .1: EQ2 ((.mu muvar lbody).unfold) (.mu muvar lbody)
+      have heq_unfold_left : EQ2 ((LocalTypeR.mu muvar lbody).unfold) (LocalTypeR.mu muvar lbody) := by
+        have hrefl := EQ2_refl (LocalTypeR.mu muvar lbody)
+        exact (EQ2.destruct hrefl).1
+      -- EQ2_refl on (.mu muvar (trans gbody role)) gives .2: EQ2 (.mu muvar t') ((.mu muvar t').unfold) where t' = trans gbody role
+      have heq_unfold_right : EQ2 (LocalTypeR.mu muvar (trans gbody role)) ((LocalTypeR.mu muvar (trans gbody role)).unfold) := by
+        have hrefl := EQ2_refl (LocalTypeR.mu muvar (trans gbody role))
+        exact (EQ2.destruct hrefl).2
+
+      constructor
+      · -- First conjunct: EQ2_closure CProjectTransRelComp ((.mu muvar lbody).unfold) (.mu muvar (trans gbody role))
+        -- Use EQ2 prefix case: ∃ b = .mu muvar lbody, EQ2 ((.mu muvar lbody).unfold) b ∧ CProjectTransRel b (.mu muvar (trans gbody role))
+        left  -- Use CProjectTransRelComp, not EQ2
+        right -- Not base CProjectTransRel
+        left  -- EQ2 prefix case
+        exact ⟨LocalTypeR.mu muvar lbody, heq_unfold_left, hmu_rel⟩
+      · -- Second conjunct: EQ2_closure CProjectTransRelComp (.mu muvar lbody) ((.mu muvar (trans gbody role)).unfold)
+        -- Use EQ2 suffix case: ∃ b = .mu muvar (trans gbody role), CProjectTransRel (.mu muvar lbody) b ∧ EQ2 b ((.mu muvar (trans gbody role)).unfold)
+        -- CProjectTransRelComp is: base ∨ (EQ2 prefix) ∨ (CProjectTransRel suffix) ∨ (3-hop)
+        -- After left (use CProjectTransRelComp), right (not base), we have: (EQ2 prefix) ∨ (suffix) ∨ (3-hop)
+        -- Then right (not EQ2 prefix), left (suffix): ∃ b, CProjectTransRel a b ∧ EQ2 b c
+        left  -- Use CProjectTransRelComp, not EQ2
+        right -- Not base CProjectTransRel
+        right -- Not EQ2 prefix
+        left  -- CProjectTransRel suffix (not 3-hop)
+        exact ⟨LocalTypeR.mu muvar (trans gbody role), hmu_rel, heq_unfold_right⟩
   | .comm sender receiver gbs, .send partner lbs =>
       -- CProjectF comm-send: case analysis on role
       simp only [CProjectF] at hf
@@ -1779,7 +1934,8 @@ private theorem CProjectTransRel_postfix :
         -- Rewrite goal to use explicit trans structure
         rw [htrans, hrs, trans_comm_sender sender receiver sender gbs rfl, hpartner]
         -- Goal: EQ2F (...) (.send receiver lbs) (.send receiver (transBranches gbs sender))
-        exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+        -- Lift CProjectTransRel → CProjectTransRelComp (Or.inl) → EQ2_closure (Or.inl)
+        exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
             (branchesProjRel_to_branchesRel_CProjectTransRel gbs sender lbs hbranches hwf_branches)⟩
       · -- Role is not sender
         simp only [hrs, ↓reduceIte] at hf
@@ -1795,7 +1951,8 @@ private theorem CProjectTransRel_postfix :
           -- Rewrite goal using trans equality
           rw [htrans, htrans_send]
           -- Goal: EQ2F (.send partner lbs) (.send partner (transBranches gbs' role))
-          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+          -- Lift CProjectTransRel → CProjectTransRelComp (Or.inl) → EQ2_closure (Or.inl)
+          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
               (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
   | .comm sender receiver gbs, .recv partner lbs =>
       -- CProjectF comm-recv: similar to send case
@@ -1820,7 +1977,8 @@ private theorem CProjectTransRel_postfix :
           -- Rewrite goal to use explicit trans structure
           rw [htrans, hrr, trans_comm_receiver sender receiver receiver gbs rfl hne, hpartner]
           -- Goal: EQ2F (...) (.recv sender lbs) (.recv sender (transBranches gbs receiver))
-          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+          -- Lift CProjectTransRel → CProjectTransRelComp (Or.inl) → EQ2_closure (Or.inl)
+          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
               (branchesProjRel_to_branchesRel_CProjectTransRel gbs receiver lbs hbranches hwf_branches)⟩
         · -- Non-participant case: Use extended helper to get gbs' with wellFormedness
           simp only [if_neg hrr] at hf
@@ -1831,7 +1989,8 @@ private theorem CProjectTransRel_postfix :
           -- Rewrite goal using trans equality
           rw [htrans, htrans_recv]
           -- Goal: EQ2F (.recv partner lbs) (.recv partner (transBranches gbs' role))
-          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl hr)
+          -- Lift CProjectTransRel → CProjectTransRelComp (Or.inl) → EQ2_closure (Or.inl)
+          exact ⟨rfl, BranchesRel_mono (fun _ _ hr => Or.inl (Or.inl hr))
               (branchesProjRel_to_branchesRel_CProjectTransRel gbs' role lbs hbranches' hwf_gbs')⟩
   | .comm sender receiver gbs, .end =>
       -- Non-participant projecting to .end
@@ -1853,14 +2012,47 @@ private theorem CProjectTransRel_postfix :
       obtain ⟨gbody, htrans_mu, hcontr, hbody_proj, hwf_body⟩ := hexists
       -- Now: trans g role = .mu ltvar (trans gbody role), CProject gbody role lbody
       rw [htrans, htrans_mu]
-      -- Goal: EQ2F (EQ2_closure CProjectTransRel) (.mu ltvar lbody) (.mu ltvar (trans gbody role))
+      -- Goal: EQ2F (EQ2_closure CProjectTransRelComp) (.mu ltvar lbody) (.mu ltvar (trans gbody role))
       simp only [EQ2F, EQ2_closure]
-      -- Same challenge as mu/mu case: need substitution preservation for CProject
-      -- We have CProject gbody role lbody but need:
-      -- - lbody.unfold is EQ2_closure-related to .mu ltvar (trans gbody role)
-      -- - .mu ltvar lbody is EQ2_closure-related to (trans gbody role).unfold
-      -- This requires CProject_substitute theorem (not yet proven).
-      sorry
+
+      -- Construct CProjectTransRel for the mu types (same pattern as mu/mu case)
+      have hmu_rel : CProjectTransRel (LocalTypeR.mu ltvar lbody) (LocalTypeR.mu ltvar (trans gbody role)) := by
+        -- CProject (.mu ltvar gbody) role (.mu ltvar lbody) holds by CProject_mu
+        have hmu_proj : CProject (GlobalType.mu ltvar gbody) role (LocalTypeR.mu ltvar lbody) :=
+          CProject_mu ltvar gbody lbody role hcontr hbody_proj
+        -- trans (.mu ltvar gbody) role = .mu ltvar (trans gbody role)
+        have htrans_mu' : LocalTypeR.mu ltvar (trans gbody role) = trans (GlobalType.mu ltvar gbody) role := by
+          simp only [Trans.trans, hcontr, ↓reduceIte]
+        -- (.mu ltvar gbody).allCommsNonEmpty = gbody.allCommsNonEmpty = hwf_body
+        have hwf_mu : (GlobalType.mu ltvar gbody).allCommsNonEmpty = true := by
+          simp only [GlobalType.allCommsNonEmpty, hwf_body]
+        exact ⟨GlobalType.mu ltvar gbody, role, hmu_proj, htrans_mu', hwf_mu⟩
+
+      -- Get EQ2 facts from EQ2_refl structure
+      -- EQ2F for mu/mu: R (body.substitute t (.mu t body)) (.mu s body') ∧ R (.mu t body) (body'.substitute s (.mu s body'))
+      -- EQ2_refl on (.mu ltvar lbody) gives .1: EQ2 ((.mu ltvar lbody).unfold) (.mu ltvar lbody)
+      have heq_unfold_left : EQ2 ((LocalTypeR.mu ltvar lbody).unfold) (LocalTypeR.mu ltvar lbody) := by
+        have hrefl := EQ2_refl (LocalTypeR.mu ltvar lbody)
+        exact (EQ2.destruct hrefl).1
+      -- EQ2_refl on (.mu ltvar (trans gbody role)) gives .2: EQ2 (.mu ltvar t') ((.mu ltvar t').unfold) where t' = trans gbody role
+      have heq_unfold_right : EQ2 (LocalTypeR.mu ltvar (trans gbody role)) ((LocalTypeR.mu ltvar (trans gbody role)).unfold) := by
+        have hrefl := EQ2_refl (LocalTypeR.mu ltvar (trans gbody role))
+        exact (EQ2.destruct hrefl).2
+
+      constructor
+      · -- First conjunct: EQ2_closure CProjectTransRelComp ((.mu ltvar lbody).unfold) (.mu ltvar (trans gbody role))
+        -- Use EQ2 prefix case (disjunct 2): ∃ b = .mu ltvar lbody, EQ2 ((.mu ltvar lbody).unfold) b ∧ CProjectTransRel b (.mu ltvar (trans gbody role))
+        left  -- Use CProjectTransRelComp, not EQ2
+        right -- Not base CProjectTransRel
+        left  -- EQ2 prefix case (disjunct 2)
+        exact ⟨LocalTypeR.mu ltvar lbody, heq_unfold_left, hmu_rel⟩
+      · -- Second conjunct: EQ2_closure CProjectTransRelComp (.mu ltvar lbody) ((.mu ltvar (trans gbody role)).unfold)
+        -- Use EQ2 suffix case (disjunct 3): ∃ b = .mu ltvar (trans gbody role), CProjectTransRel (.mu ltvar lbody) b ∧ EQ2 b ((.mu ltvar (trans gbody role)).unfold)
+        left  -- Use CProjectTransRelComp, not EQ2
+        right -- Not base CProjectTransRel
+        right -- Skip disjunct 2
+        left  -- EQ2 suffix case (disjunct 3)
+        exact ⟨LocalTypeR.mu ltvar (trans gbody role), hmu_rel, heq_unfold_right⟩
   -- All remaining cases are contradictions from CProjectF
   | .end, .var _ => simp only [CProjectF] at hf
   | .end, .send _ _ => simp only [CProjectF] at hf
@@ -1875,23 +2067,497 @@ private theorem CProjectTransRel_postfix :
   | .mu _ _, .send _ _ => simp only [CProjectF] at hf
   | .mu _ _, .recv _ _ => simp only [CProjectF] at hf
 
+/-- CProjectTransRelComp is a post-fixpoint of EQ2F.
+
+This extends CProjectTransRel_postfix to handle the composition cases:
+- Base case: delegates to CProjectTransRel_postfix
+- 2-hop prefix (EQ2 → CProjectTransRel): construct EQ2F using EQ2 destruct + composition
+- 2-hop suffix (CProjectTransRel → EQ2): construct EQ2F using composition + EQ2
+- 3-hop (EQ2 → CProjectTransRel → EQ2): construct EQ2F using full chain
+
+The key insight: composition cases only arise in mu unfolding chains, where
+the EQ2F structure naturally decomposes into chains we can handle. -/
+private theorem CProjectTransRelComp_postfix :
+    ∀ lt t, CProjectTransRelComp lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
+  intro lt t hcomp
+  rcases hcomp with hbase | ⟨b, heq_ab, hrel_bc⟩ | ⟨b, hrel_ab, heq_bc⟩ | ⟨b, b', heq_ab, hrel_bb', heq_b'c⟩
+  · -- Base case: CProjectTransRel lt t
+    exact CProjectTransRel_postfix lt t hbase
+  · -- 2-hop prefix: ∃ b, EQ2 lt b ∧ CProjectTransRel b t
+    -- Key insight: for mu cases, use 3-hop to chain through unfold
+    -- For non-mu cases, use EQ2 transitivity via the closure
+    match lt, t with
+    | .mu v body_lt, .mu v' body_t =>
+        -- mu/mu: use 3-hop for both conjuncts
+        -- EQ2F for mu/mu is: R lt.unfold t ∧ R lt t.unfold
+        simp only [EQ2F, EQ2_closure]
+        constructor
+        · -- First conjunct (lt.unfold ~ t): use 3-hop
+          -- Chain: EQ2 lt.unfold b, CProjectTransRel b t, EQ2 t t
+          left; right; right; right
+          exact ⟨b, LocalTypeR.mu v' body_t, EQ2_unfold_left heq_ab, hrel_bc,
+                 EQ2_refl (LocalTypeR.mu v' body_t)⟩
+        · -- Second conjunct (lt ~ t.unfold): use 3-hop
+          -- Chain: EQ2 lt b, CProjectTransRel b t, EQ2 t t.unfold
+          left; right; right; right
+          exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+                 EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
+    -- mu/non-mu cases: EQ2F reduces to relation on lt.unfold
+    | .mu v body_lt, .«end» =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; left
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+    | .mu v body_lt, .var y =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; left
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+    | .mu v body_lt, .send q cs =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; left
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+    | .mu v body_lt, .recv q cs =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; left
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+    -- non-mu/mu cases: EQ2F reduces to relation to t.unfold
+    | .«end», .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+               EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
+    | .var x, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+               EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
+    | .send p bs, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+               EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
+    | .recv p bs, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+               EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
+    -- non-mu/non-mu cases
+    | .«end», .«end» => simp only [EQ2F]
+    | .var x, .var y =>
+        simp only [EQ2F]
+        -- Chain through b: EQ2 (var x) b and CProjectTransRel b (var y)
+        -- heq_f : x = z, hbase_f : z = y, goal: x = y
+        have heq_f := EQ2.destruct heq_ab
+        have hbase_f := CProjectTransRel_postfix b (.var y) hrel_bc
+        cases b with
+        | var z =>
+            simp only [EQ2F] at heq_f hbase_f
+            exact heq_f.trans hbase_f
+        | mu vb body_b => simp only [EQ2F] at heq_f
+        | _ => simp only [EQ2F] at heq_f
+    | .send p bs, .send q cs =>
+        -- send/send composition: chain through b
+        -- heq_f : p = pb ∧ BranchesRel EQ2 bs bbs
+        -- hbase_f : pb = q ∧ BranchesRel (EQ2_closure _) bbs cs
+        -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
+        -- Use _rev since EQ2 comes first, then EQ2_closure
+        simp only [EQ2F, EQ2_closure]
+        have heq_f := EQ2.destruct heq_ab
+        have hbase_f := CProjectTransRel_postfix b (.send q cs) hrel_bc
+        cases b with
+        | send pb bbs =>
+            simp only [EQ2F] at heq_f hbase_f
+            exact ⟨heq_f.1.trans hbase_f.1,
+                   BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) heq_f.2 hbase_f.2⟩
+        | mu vb body_b => simp only [EQ2F] at heq_f
+        | _ => simp only [EQ2F] at heq_f
+    | .recv p bs, .recv q cs =>
+        -- recv/recv composition: chain through b
+        -- heq_f : p = pb ∧ BranchesRel EQ2 bs bbs
+        -- hbase_f : pb = q ∧ BranchesRel (EQ2_closure _) bbs cs
+        -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
+        -- Use _rev since EQ2 comes first, then EQ2_closure
+        simp only [EQ2F, EQ2_closure]
+        have heq_f := EQ2.destruct heq_ab
+        have hbase_f := CProjectTransRel_postfix b (.recv q cs) hrel_bc
+        cases b with
+        | recv pb bbs =>
+            simp only [EQ2F] at heq_f hbase_f
+            exact ⟨heq_f.1.trans hbase_f.1,
+                   BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) heq_f.2 hbase_f.2⟩
+        | mu vb body_b => simp only [EQ2F] at heq_f
+        | _ => simp only [EQ2F] at heq_f
+    -- Type mismatch cases: derive contradiction from EQ2
+    | .«end», .var _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .«end», .send _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .«end», .recv _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .var _, .«end» => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .var _, .send _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .var _, .recv _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .send _ _, .«end» => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .send _ _, .var _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .send _ _, .recv _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .recv _ _, .«end» => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .recv _ _, .var _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+    | .recv _ _, .send _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+  · -- 2-hop suffix: ∃ b, CProjectTransRel lt b ∧ EQ2 b t
+    -- Key insight: for mu cases, use 3-hop to chain through unfold
+    match lt, t with
+    | .mu v body_lt, .mu v' body_t =>
+        -- EQ2F for mu/mu is: R lt.unfold t ∧ R lt t.unfold
+        simp only [EQ2F, EQ2_closure]
+        constructor
+        · -- First conjunct (lt.unfold ~ t): use 3-hop
+          -- Chain: EQ2 lt.unfold lt, CProjectTransRel lt b, EQ2 b t
+          left; right; right; right
+          exact ⟨LocalTypeR.mu v body_lt, b,
+                 EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
+        · -- Second conjunct (lt ~ t.unfold): use 2-hop suffix
+          left; right; right; left
+          exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
+    -- mu/non-mu cases: EQ2F reduces to relation on lt.unfold, use 3-hop
+    | .mu v body_lt, .«end» =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨LocalTypeR.mu v body_lt, b,
+               EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
+    | .mu v body_lt, .var y =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨LocalTypeR.mu v body_lt, b,
+               EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
+    | .mu v body_lt, .send q cs =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨LocalTypeR.mu v body_lt, b,
+               EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
+    | .mu v body_lt, .recv q cs =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨LocalTypeR.mu v body_lt, b,
+               EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
+    -- non-mu/mu cases: EQ2F reduces to relation to t.unfold
+    | .«end», .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; left
+        exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
+    | .var x, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; left
+        exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
+    | .send p bs, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; left
+        exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
+    | .recv p bs, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; left
+        exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
+    -- non-mu/non-mu cases
+    | .«end», .«end» => simp only [EQ2F]
+    | .var x, .var y =>
+        simp only [EQ2F]
+        have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | var z =>
+            simp only [EQ2F] at hbase_f heq_f
+            exact hbase_f.trans heq_f
+        | mu vb body_b => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at hbase_f
+    | .send p bs, .send q cs =>
+        -- hbase_f : p = pb ∧ BranchesRel (EQ2_closure _) bs bbs
+        -- heq_f : pb = q ∧ BranchesRel EQ2 bbs cs
+        -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
+        simp only [EQ2F, EQ2_closure]
+        have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | send pb bbs =>
+            simp only [EQ2F] at hbase_f heq_f
+            exact ⟨hbase_f.1.trans heq_f.1,
+                   BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) hbase_f.2 heq_f.2⟩
+        | mu vb body_b => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at hbase_f
+    | .recv p bs, .recv q cs =>
+        -- hbase_f : p = pb ∧ BranchesRel (EQ2_closure _) bs bbs
+        -- heq_f : pb = q ∧ BranchesRel EQ2 bbs cs
+        -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
+        simp only [EQ2F, EQ2_closure]
+        have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | recv pb bbs =>
+            simp only [EQ2F] at hbase_f heq_f
+            exact ⟨hbase_f.1.trans heq_f.1,
+                   BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) hbase_f.2 heq_f.2⟩
+        | mu vb body_b => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at hbase_f
+    -- Type mismatch cases: derive contradiction from CProjectTransRel and EQ2
+    | .«end», .var y =>
+        have hbase_f := CProjectTransRel_postfix (.«end») b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .«end», .send q cs =>
+        have hbase_f := CProjectTransRel_postfix (.«end») b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .«end», .recv q cs =>
+        have hbase_f := CProjectTransRel_postfix (.«end») b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .var x, .«end» =>
+        have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .var x, .send q cs =>
+        have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .var x, .recv q cs =>
+        have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .send p bs, .«end» =>
+        have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .send p bs, .var y =>
+        have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .send p bs, .recv q cs =>
+        have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .recv p bs, .«end» =>
+        have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .recv p bs, .var y =>
+        have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+    | .recv p bs, .send q cs =>
+        have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
+        cases b <;> simp only [EQ2F] at hbase_f
+  · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
+    have hbase_f := CProjectTransRel_postfix b b' hrel_bb'
+    -- Chain all three: combine 2-hop prefix and 2-hop suffix patterns
+    -- Use EQ2 transitivity: EQ2 lt b and EQ2 b' t give outer chain
+    -- CProjectTransRel b b' gives middle link
+    match lt, t with
+    | .mu v body_lt, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        constructor
+        · -- First conjunct (lt.unfold ~ t.unfold): use 3-hop
+          left; right; right; right
+          exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
+        · -- Second conjunct (lt ~ t.unfold): use 3-hop
+          left; right; right; right
+          exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
+    -- mu/non-mu cases: EQ2F reduces to relation on lt.unfold
+    | .mu v body_lt, .«end» =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
+    | .mu v body_lt, .var y =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
+    | .mu v body_lt, .send q cs =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
+    | .mu v body_lt, .recv q cs =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
+    -- non-mu/mu cases: EQ2F reduces to relation to t.unfold
+    | .«end», .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
+    | .var x, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
+    | .send p bs, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
+    | .recv p bs, .mu v' body_t =>
+        simp only [EQ2F, EQ2_closure]
+        left; right; right; right
+        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
+    -- non-mu/non-mu cases: propagate constraints through the 3-hop chain
+    | .«end», .«end» => simp only [EQ2F]
+    | .var x, .var y =>
+        simp only [EQ2F]
+        -- Goal: x = y. Chain through b and b'.
+        have heq_ab_f := EQ2.destruct heq_ab
+        have heq_bc_f := EQ2.destruct heq_b'c
+        cases b with
+        | var w =>
+            simp only [EQ2F] at heq_ab_f
+            cases b' with
+            | var w' =>
+                simp only [EQ2F] at hbase_f heq_bc_f
+                calc x = w := heq_ab_f
+                     _ = w' := hbase_f
+                     _ = y := heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .send p bs, .send q cs =>
+        simp only [EQ2F, EQ2_closure]
+        -- Goal: p = q ∧ BranchesRel _ bs cs
+        have heq_ab_f := EQ2.destruct heq_ab
+        have heq_bc_f := EQ2.destruct heq_b'c
+        cases b with
+        | send p' bs' =>
+            simp only [EQ2F] at heq_ab_f
+            obtain ⟨heq_p_p', hbr_ab⟩ := heq_ab_f
+            cases b' with
+            | send p'' bs'' =>
+                simp only [EQ2F] at hbase_f heq_bc_f
+                obtain ⟨heq_p'_p'', hbr_bb'⟩ := hbase_f
+                obtain ⟨heq_p''_q, hbr_bc⟩ := heq_bc_f
+                constructor
+                · calc p = p' := heq_p_p'
+                       _ = p'' := heq_p'_p''
+                       _ = q := heq_p''_q
+                · exact BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_ab
+                    (BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_bb' hbr_bc)
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .recv p bs, .recv q cs =>
+        simp only [EQ2F, EQ2_closure]
+        -- Goal: p = q ∧ BranchesRel _ bs cs
+        have heq_ab_f := EQ2.destruct heq_ab
+        have heq_bc_f := EQ2.destruct heq_b'c
+        cases b with
+        | recv p' bs' =>
+            simp only [EQ2F] at heq_ab_f
+            obtain ⟨heq_p_p', hbr_ab⟩ := heq_ab_f
+            cases b' with
+            | recv p'' bs'' =>
+                simp only [EQ2F] at hbase_f heq_bc_f
+                obtain ⟨heq_p'_p'', hbr_bb'⟩ := hbase_f
+                obtain ⟨heq_p''_q, hbr_bc⟩ := heq_bc_f
+                constructor
+                · calc p = p' := heq_p_p'
+                       _ = p'' := heq_p'_p''
+                       _ = q := heq_p''_q
+                · exact BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_ab
+                    (BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_bb' hbr_bc)
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    -- Type mismatch cases: derive contradiction by propagating shape constraints through chain
+    -- Pattern: lt and t have mismatched types, so the chain EQ2 lt b, EQ2F _ b b', EQ2 b' t
+    -- must fail somewhere. Propagate through to find the contradiction.
+    | .«end», .var _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | «end» =>
+            cases b' with
+            | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .«end», .send _ _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | «end» =>
+            cases b' with
+            | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .«end», .recv _ _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | «end» =>
+            cases b' with
+            | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .var x, .«end» =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | var _ =>
+            cases b' with
+            | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .var x, .send _ _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | var _ =>
+            cases b' with
+            | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .var x, .recv _ _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | var _ =>
+            cases b' with
+            | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .send p bs, .«end» =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | send _ _ =>
+            cases b' with
+            | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .send p bs, .var _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | send _ _ =>
+            cases b' with
+            | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .send p bs, .recv _ _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | send _ _ =>
+            cases b' with
+            | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .recv p bs, .«end» =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | recv _ _ =>
+            cases b' with
+            | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .recv p bs, .var _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | recv _ _ =>
+            cases b' with
+            | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+    | .recv p bs, .send _ _ =>
+        have heq_ab_f := EQ2.destruct heq_ab
+        cases b with
+        | recv _ _ =>
+            cases b' with
+            | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
+            | _ => simp only [EQ2F] at hbase_f
+        | _ => simp only [EQ2F] at heq_ab_f
+
 /-- CProject implies EQ2 with trans.
 
-Proven by coinduction using CProjectTransRel as witness relation.
+Proven by coinduction using CProjectTransRelComp as witness relation.
 Uses EQ2_coind_upto which handles the EQ2 closure automatically.
 
 Requires `allCommsNonEmpty` assumption (matching Coq's `size_pred`) to handle
 non-participant cases which recurse through branches. -/
 theorem CProject_implies_EQ2_trans_thm (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) : EQ2 lt (Trans.trans g role) := by
-  -- Apply coinduction up-to with witness relation CProjectTransRel
+  -- Apply coinduction up-to with witness relation CProjectTransRelComp
   -- EQ2_coind_upto says: if ∀ a b, R a b → EQ2F (EQ2_closure R) a b, then R ⊆ EQ2
-  -- EQ2_closure R = fun a b => R a b ∨ EQ2 a b, which matches CProjectTransRel_postfix
+  -- EQ2_closure R = fun a b => R a b ∨ EQ2 a b, which matches CProjectTransRelComp_postfix
   apply EQ2_coind_upto
-  · -- Show CProjectTransRel is a post-fixpoint of EQ2F up to EQ2 closure
+  · -- Show CProjectTransRelComp is a post-fixpoint of EQ2F up to EQ2 closure
     intro lt' t' hrel
-    exact CProjectTransRel_postfix lt' t' hrel
-  · -- Initial pair is in CProjectTransRel
+    exact CProjectTransRelComp_postfix lt' t' hrel
+  · -- Initial pair is in CProjectTransRelComp (via base case CProjectTransRel)
+    left  -- Use base CProjectTransRel
     exact ⟨g, role, h, rfl, hwf⟩
 
 theorem CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
