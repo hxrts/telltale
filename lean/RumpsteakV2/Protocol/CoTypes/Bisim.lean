@@ -186,10 +186,25 @@ theorem mus_shared_observable_contractive {t s : String} {body body' : LocalType
        BranchesRel EQ2 bs cs) ∨
     (∃ p bs cs, CanRecv (.mu t body) p bs ∧ CanRecv (.mu s body') p cs ∧
        BranchesRel EQ2 bs cs) := by
-  -- With contractiveness, both mus have guarded bound variables
-  -- By observable_of_closed_contractive (once proved), each has observable behavior
-  -- By EQ2 semantics, they must have the SAME observable classification
-  sorry
+  -- Extract BisimF structure from EQ2 using the mu/mu axiom
+  have hBisimF := EQ2_mus_to_BisimF h
+  -- Case analysis on the BisimF structure to extract shared observable
+  cases hBisimF with
+  | eq_end hx hy =>
+    -- Both mus unfold to end
+    exact Or.inl ⟨hx, hy⟩
+  | eq_var hx hy =>
+    -- Both mus unfold to the same variable
+    exact Or.inr (Or.inl ⟨_, hx, hy⟩)
+  | eq_send hx hy hbr =>
+    -- Both mus can send to the same partner with EQ2-related branches
+    -- Convert BranchesRelBisim EQ2 to BranchesRel EQ2
+    have hbr_eq2 := BranchesRelBisim_to_BranchesRel hbr
+    exact Or.inr (Or.inr (Or.inl ⟨_, _, _, hx, hy, hbr_eq2⟩))
+  | eq_recv hx hy hbr =>
+    -- Both mus can recv from the same partner with EQ2-related branches
+    have hbr_eq2 := BranchesRelBisim_to_BranchesRel hbr
+    exact Or.inr (Or.inr (Or.inr ⟨_, _, _, hx, hy, hbr_eq2⟩))
 
 
 /-! ## Basic Properties of Membership Predicates -/
