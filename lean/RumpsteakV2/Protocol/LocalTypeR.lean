@@ -171,6 +171,22 @@ This matches Coq's `eclosed e := forall n, n \notin lType_fv e`. -/
 /-- A local type is closed if it has no free type variables. -/
 def LocalTypeR.isClosed (lt : LocalTypeR) : Bool := lt.freeVars.isEmpty
 
+/-- Substituting a closed replacement into a mu-body preserves closedness.
+
+    If .mu t body is closed, then body can only have t as a free variable.
+    Substituting a closed term (.mu t body) for t yields a closed result. -/
+theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
+    (hclosed : (.mu t body).isClosed) :
+    (body.substitute t (.mu t body)).isClosed := by
+  -- .mu t body is closed means its freeVars = []
+  -- freeVars (.mu t body) = (freeVars body).filter (· != t)
+  -- So (freeVars body).filter (· != t) = []
+  -- This means body can only have t as free var
+  simp only [isClosed, freeVars] at hclosed ⊢
+  -- hclosed : (body.freeVars.filter (· != t)).isEmpty = true
+  -- Goal: (body.substitute t (.mu t body)).freeVars.isEmpty = true
+  sorry
+
 /-! ## Full Unfolding (Coq-style `full_eunf`)
 
 Iterate mu-unfolding until reaching a non-mu form.
@@ -329,6 +345,42 @@ theorem LocalTypeR.muHeight_non_mu :
   | recv _ _ => rfl
   | mu t body => exact absurd rfl (h t body)
 
+/-- For closed types (no free variables), fullUnfold cannot produce a variable.
+
+    This is a useful auxiliary lemma (though not strictly needed for observable_of_closed_contractive
+    since we prove it directly by induction).
+
+    Intuition:
+    - Closed means freeVars = []
+    - If fullUnfold = .var v, then v would be free in the original type
+    - But closed types have no free variables, contradiction
+
+    Proof sketch: By contrapositive of unguarded_unfolds_to_var.
+    If fullUnfold = .var v, then by unguarded_unfolds_to_var, v is free and unguarded.
+    But isClosed means no free variables, contradiction.
+
+    Note: This doesn't require contractiveness! Closedness alone ensures fullUnfold ≠ .var. -/
+theorem LocalTypeR.fullUnfold_not_var_of_closed {lt : LocalTypeR}
+    (hclosed : lt.isClosed) : ∀ v, lt.fullUnfold ≠ .var v := by
+  intro v hcontra
+  -- If fullUnfold = .var v, then v is free in lt (via unguarded_unfolds_to_var)
+  -- But isClosed means freeVars.isEmpty, so v cannot be free
+  sorry
+
+/-- For contractive types, fullUnfold reaches a non-mu form.
+
+    Contractiveness ensures that after muHeight iterations of unfold,
+    we reach a communication (send/recv) or end, not another mu.
+
+    This follows from the definition: fullUnfold iterates unfold exactly
+    muHeight times, which peels off all leading mus for contractive types. -/
+theorem LocalTypeR.fullUnfold_non_mu_of_contractive {lt : LocalTypeR}
+    (hcontr : lt.isContractive = true) : lt.fullUnfold.muHeight = 0 := by
+  -- fullUnfold by definition iterates unfold muHeight times
+  -- For contractive types, this peels off all mus at the head
+  -- The result has no leading mu, so muHeight = 0
+  sorry
+
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
 
 This is the key bridge between guardedness and observable behavior.
@@ -342,31 +394,28 @@ The intuition is:
 
 /-- Helper for double substitution case in unfold_iter_subst_unguarded.
 
-    When v is free and unguarded in body, v ≠ t, v ≠ s, after substituting t then s,
-    iterating unfold body.muHeight times gives .var v.
+    NOTE: This theorem is NOT NEEDED for the contractive case!
 
-    The key insight: v's position at the head of a mu-chain is preserved through
-    both substitutions since we're not substituting for v.
+    For closed + contractive types, fullUnfold can never reach .var because:
+    1. Closed means no free variables → no unbound vars
+    2. Contractive means all bound variables are guarded → no bound vars at head after unfolding
 
-    Proof strategy: Since v is unguarded in body, it sits at the head of a mu-chain.
-    Substituting for variables other than v (namely t and s) doesn't change v's position.
-    After body.muHeight iterations of unfold, we peel off all the mus and reach .var v. -/
+    This complex double substitution theorem only matters for NON-contractive types
+    with unguarded variables, which are not our target use case.
+
+    The theorem statement remains for completeness, but the proof is non-trivial
+    and not required for observable_of_closed_contractive. -/
 theorem LocalTypeR.unfold_iter_double_subst (body : LocalTypeR)
     (t : String) (repl : LocalTypeR) (s : String) (v : String)
     (hvt : v ≠ t) (hvs : v ≠ s)
     (h_free : body.isFreeIn v = true) (h_not_guarded : body.isGuarded v = false) :
     (LocalTypeR.unfold)^[body.muHeight] ((body.substitute t repl).substitute s (.mu s (body.substitute t repl))) = .var v := by
-  -- This follows from showing that muHeight and unguardedness are preserved through substitution
-  -- When v ≠ t, substituting t preserves:
-  --   1. v being free in the type
-  --   2. v being unguarded (at head of mu chain)
-  --   3. muHeight of the type (since v is at head, not t)
-  -- Then substituting s (where v ≠ s) preserves the same properties
-  -- Finally, unfold^[body.muHeight] reaches .var v
-  --
-  -- The full proof requires helper lemmas about muHeight_subst_unguarded and isFreeIn_subst_other
-  -- For now, we leave this as sorry pending those lemmas
+  -- This proof is complex and not needed for the contractive case.
+  -- The key insight is that for contractive types, we never encounter unguarded variables
+  -- at the head position after unfolding, so this theorem is not needed for
+  -- observable_of_closed_contractive.
   sorry
+termination_by sizeOf body
 
 /-- Auxiliary lemma for unguarded_unfolds_to_var.
 

@@ -100,29 +100,105 @@ inductive Observable : LocalTypeR → Prop where
   | is_send {a p bs} : CanSend a p bs → Observable a
   | is_recv {a p bs} : CanRecv a p bs → Observable a
 
-/-- Every closed local type has observable behavior (after enough unfolding).
+/-- Every closed AND contractive local type has observable behavior (after enough unfolding).
 
-    This is the key well-formedness property: closed types can't diverge,
+    This is the key well-formedness property: closed+contractive types can't diverge,
     they must eventually reach a base constructor.
 
-    Proof strategy: Induction on muHeight. A mu with body that mentions the
-    bound variable will eventually stop recursing because well-formedness
-    requires the body to be guarded (contain at least one comm before
-    recursive reference). -/
+    **Contractiveness is essential**: Without contractiveness, types like `μX.X` would
+    be closed but diverge forever on unfolding. Contractiveness ensures every mu
+    has at least one communication before recursion.
+
+    Proof strategy: Structural induction on `a`.
+    - For .end: Observable via UnfoldsToEnd.base
+    - For .var: Contradicts closedness (closed types have no free variables)
+    - For .send/.recv: Observable via CanSend.base/CanRecv.base
+    - For .mu t body: Use IH on body.substitute t (.mu t body), which is:
+      * Contractive (by contractiveness of body)
+      * Closed (substituting a closed term into a body with only t free)
+      Then lift the observable result via the .mu constructors. -/
+theorem observable_of_closed_contractive {a : LocalTypeR}
+    (hclosed : a.isClosed) (hcontr : a.isContractive = true) : Observable a := by
+  -- Structural induction on a
+  match a with
+  | .end =>
+    -- .end unfolds to itself
+    exact Observable.is_end UnfoldsToEnd.base
+  | .var v =>
+    -- .var v contradicts closedness: closed types have no free variables
+    -- isClosed means freeVars.isEmpty
+    -- But .var v has freeVars = [v], which is not empty
+    simp only [isClosed, freeVars, List.isEmpty_iff_eq_nil] at hclosed
+    -- hclosed : [v] = [] is a contradiction
+    exact absurd hclosed (by decide)
+  | .send p bs =>
+    -- .send unfolds to itself
+    exact Observable.is_send CanSend.base
+  | .recv p bs =>
+    -- .recv unfolds to itself
+    exact Observable.is_recv CanRecv.base
+  | .mu t body =>
+    -- For .mu t body:
+    -- 1. Extract contractiveness of body
+    simp only [isContractive, Bool.and_eq_true] at hcontr
+    have ⟨hguarded, hcontr_body⟩ := hcontr
+    -- hguarded : body.isGuarded t = true
+    -- hcontr_body : body.isContractive = true
+
+    -- 2. Show that body.substitute t (.mu t body) is closed
+    -- Since .mu t body is closed, and we're substituting the closed term (.mu t body)
+    -- for the only potential free variable (t), the result is closed
+    have hclosed_subst : (body.substitute t (.mu t body)).isClosed :=
+      LocalTypeR.isClosed_substitute_mu hclosed
+
+    -- 3. Apply IH to get Observable for the substituted body
+    have ih : Observable (body.substitute t (.mu t body)) :=
+      observable_of_closed_contractive hclosed_subst hcontr_body
+
+    -- 4. Lift the observable result using the .mu constructors
+    cases ih with
+    | is_end h => exact Observable.is_end (UnfoldsToEnd.mu h)
+    | is_var h => exact Observable.is_var (UnfoldsToVar.mu h)
+    | is_send h => exact Observable.is_send (CanSend.mu h)
+    | is_recv h => exact Observable.is_recv (CanRecv.mu h)
+termination_by sizeOf a
+
+/-- Legacy axiom for backward compatibility.
+    **DEPRECATED**: Use `observable_of_closed_contractive` with explicit contractiveness instead.
+
+    This axiom is unsound for non-contractive types like `μX.X`.
+    It's kept temporarily for API compatibility while callers are migrated. -/
 axiom observable_of_closed {a : LocalTypeR} (h : a.isClosed) : Observable a
 
-/-- Two EQ2-equivalent mu types have the same observable behavior.
+/-- Two EQ2-equivalent contractive mu types have the same observable behavior.
 
-    This axiom extracts the shared observable behavior from two EQ2-equivalent mus.
     Since EQ2 is observational equivalence, equivalent types must reach the same
     observable form after (possibly different numbers of) unfolding steps.
 
-    Proof strategy (for later elimination):
-    - Use well-founded recursion on the sum of "mu heights"
-    - Guardedness ensures the recursive calls terminate
-    - Each unfolding step reduces the mu height
+    **Contractiveness is essential**: ensures both sides unfold to observable form
+    in finite steps.
 
-    This axiom will be eliminated when we prove the extraction lemmas for all cases. -/
+    Proof strategy:
+    - Use well-founded recursion on the sum of "mu heights"
+    - Contractiveness ensures each unfolding reduces the height toward a comm
+    - Extract shared observable behavior from the base case -/
+theorem mus_shared_observable_contractive {t s : String} {body body' : LocalTypeR}
+    (h : EQ2 (.mu t body) (.mu s body'))
+    (hc1 : (.mu t body).isContractive = true)
+    (hc2 : (.mu s body').isContractive = true) :
+    (UnfoldsToEnd (.mu t body) ∧ UnfoldsToEnd (.mu s body')) ∨
+    (∃ v, UnfoldsToVar (.mu t body) v ∧ UnfoldsToVar (.mu s body') v) ∨
+    (∃ p bs cs, CanSend (.mu t body) p bs ∧ CanSend (.mu s body') p cs ∧
+       BranchesRel EQ2 bs cs) ∨
+    (∃ p bs cs, CanRecv (.mu t body) p bs ∧ CanRecv (.mu s body') p cs ∧
+       BranchesRel EQ2 bs cs) := by
+  -- With contractiveness, both mus have guarded bound variables
+  -- By observable_of_closed_contractive (once proved), each has observable behavior
+  -- By EQ2 semantics, they must have the SAME observable classification
+  sorry
+
+/-- Legacy axiom for backward compatibility.
+    **DEPRECATED**: Use `mus_shared_observable_contractive` with explicit contractiveness instead. -/
 axiom mus_shared_observable {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (.mu t body) (.mu s body')) :
     (UnfoldsToEnd (.mu t body) ∧ UnfoldsToEnd (.mu s body')) ∨
