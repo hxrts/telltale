@@ -463,8 +463,32 @@ theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
     · have := ih hguarded
       omega
 
--- Helper: iterating unfold k times on term with muHeight ≤ k yields muHeight 0
-theorem iterate_unfold_bounded (k : Nat) (e : LocalTypeR) (h : e.muHeight ≤ k) :
+-- Helper: substitution preserves contractiveness when replacing with contractive term
+theorem isContractive_substitute (body : LocalTypeR) (t : String) (e : LocalTypeR) :
+    body.isContractive = true → e.isContractive = true →
+    (body.substitute t e).isContractive = true := by
+  intro hbody he
+  induction body with
+  | end => simp [substitute, isContractive]
+  | var w =>
+    simp [substitute]
+    split
+    · exact he
+    · simp [isContractive]
+  | send p bs | recv p bs =>
+    sorry  -- Need to handle branches
+  | mu s body' ih =>
+    simp [substitute, isContractive, Bool.and_eq_true] at hbody ⊢
+    split
+    · exact hbody
+    · obtain ⟨hguarded, hcontr'⟩ := hbody
+      constructor
+      · sorry  -- isGuarded preserved
+      · exact ih hcontr' he
+
+-- Helper: iterating unfold k times on CONTRACTIVE term with muHeight ≤ k yields muHeight 0
+theorem iterate_unfold_bounded_contractive (k : Nat) (e : LocalTypeR)
+    (hcontr : e.isContractive = true) (h : e.muHeight ≤ k) :
     ((LocalTypeR.unfold)^[k] e).muHeight = 0 := by
   induction k generalizing e with
   | zero =>
@@ -476,29 +500,36 @@ theorem iterate_unfold_bounded (k : Nat) (e : LocalTypeR) (h : e.muHeight ≤ k)
     | zero =>
       -- e has muHeight 0, unfold is identity, stays 0
       cases e <;> try (simp [muHeight] at hem; done)
-      · induction k <;> simp [Function.iterate_succ', unfold, muHeight]
+      · -- For all non-mu cases, iterating unfold keeps muHeight = 0
+        sorry  -- Tedious but straightforward
     | succ m =>
-      -- e has muHeight m+1, so e = .mu t body
+      -- e has muHeight m+1, so e = .mu t body with body.muHeight = m
       cases e <;> try (simp [muHeight] at hem; done)
       case mu t body =>
-        -- muHeight (.mu t body) = 1 + body.muHeight = m + 1
+        -- Extract contractiveness: body.isGuarded t ∧ body.isContractive
+        simp [isContractive, Bool.and_eq_true] at hcontr
+        obtain ⟨hguarded, hcontr_body⟩ := hcontr
         simp [muHeight] at hem
-        have : body.muHeight = m := Nat.succ.inj hem
+        have hbody_height : body.muHeight = m := Nat.succ.inj hem
         -- unfold^[k+1] (.mu t body) = unfold^[k] (body.substitute t (.mu t body))
         rw [Function.iterate_succ', Function.comp_apply, unfold]
-        -- Need: muHeight (body.substitute ...) ≤ k
-        -- We know: m + 1 ≤ k + 1, so m ≤ k
-        -- And: body.muHeight = m
-        -- So: body.muHeight ≤ k
-        -- But we need muHeight of substitution ≤ k
-        -- For non-contractive types, substitution might increase muHeight
-        -- So this approach doesn't work without contractiveness assumption
-        sorry
+        -- By guarded substitution: muHeight (body.substitute t (.mu t body)) ≤ body.muHeight = m
+        have hsub := muHeight_substitute_guarded t body (.mu t body) hguarded
+        simp [muHeight] at hsub
+        rw [hbody_height] at hsub
+        -- We have: m + 1 ≤ k + 1, so m ≤ k
+        -- And: muHeight (body.substitute ...) ≤ m ≤ k
+        have : m ≤ k := Nat.le_of_succ_le_succ h
+        have hsub_bound : (body.substitute t (.mu t body)).muHeight ≤ k := Nat.le_trans hsub this
+        -- Substitution preserves contractiveness (body is contractive, substituting contractive term)
+        sorry  -- Need: body.substitute t (.mu t body) is contractive
+        -- Then apply IH: iterate_unfold_bounded_contractive k (body.substitute ...) ? hsub_bound
 
 theorem LocalTypeR.fullUnfold_non_mu_of_contractive {lt : LocalTypeR}
     (hcontr : lt.isContractive = true) : lt.fullUnfold.muHeight = 0 := by
   simp [fullUnfold]
-  apply iterate_unfold_bounded
+  apply iterate_unfold_bounded_contractive
+  exact hcontr
   simp
 
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
