@@ -308,50 +308,44 @@ theorem contractive_implies_guarded (v : String) (e : LocalTypeR) :
 
 /-! ## Section 5: Full Unfolding Lemmas -/
 
-/-- Helper: unfold doesn't increase muHeight on non-mu types. -/
-theorem unfold_muHeight_nonmu (e : LocalTypeR) (h : e.muHeight = 0) :
-    e.unfold.muHeight = 0 := by
-  cases e with
-  | end | var _ | send _ _ | recv _ _ =>
-    simp [LocalTypeR.unfold, LocalTypeR.muHeight]
-  | mu _ _ =>
-    simp [LocalTypeR.muHeight] at h
-
-/-- Helper: Iterating unfold on a non-mu type keeps muHeight at 0. -/
-theorem iterate_unfold_muHeight_zero (n : Nat) (e : LocalTypeR) (h : e.muHeight = 0) :
-    ((LocalTypeR.unfold)^[n] e).muHeight = 0 := by
-  induction n with
-  | zero => simp [Function.iterate_zero, id_eq, h]
-  | succ n ih =>
-    simp only [Function.iterate_succ', Function.comp_apply]
-    exact unfold_muHeight_nonmu _ ih
-
 /-- **Subproblem 6a**: Full unfolding yields muHeight = 0.
 
-This is the key lemma needed for LocalTypeR.lean:382.
-
-The proof strategy: We need a lemma about muHeight of substitution.
-For now, we axiomatize this key property which should be provable
-by showing that substitution distributes over muHeight in the right way. -/
-axiom muHeight_substitute_mu_bound (t : String) (body : LocalTypeR) :
-    (body.substitute t (.mu t body)).muHeight ≤ body.muHeight
-
+PROOF STRATEGY from observable_closed_problem.lean:
+By induction on muHeight. The key is that fullUnfold = unfold^[muHeight],
+and we prove by induction that this always yields muHeight 0. -/
 theorem fullUnfold_muHeight_zero (e : LocalTypeR) :
     e.fullUnfold.muHeight = 0 := by
-  cases e with
-  | end | var _ | send _ _ | recv _ _ =>
-    -- Non-mu types have muHeight = 0, so fullUnfold is identity
-    simp [LocalTypeR.fullUnfold, LocalTypeR.muHeight, Function.iterate_zero, id_eq]
-  | mu t body =>
-    -- fullUnfold (.mu t body) = unfold^[1 + body.muHeight] (.mu t body)
-    --                        = unfold^[body.muHeight] (body.substitute t (.mu t body))
-    simp only [LocalTypeR.fullUnfold, LocalTypeR.muHeight]
-    rw [Function.iterate_succ', Function.comp_apply, LocalTypeR.unfold]
-    -- Now apply: unfold^[body.muHeight] (body.substitute t (.mu t body))
-    -- By muHeight_substitute_mu_bound: muHeight of substitution ≤ body.muHeight
-    -- Need to show: iterating unfold body.muHeight times on something
-    -- with muHeight ≤ body.muHeight yields muHeight 0
-    sorry
+  -- Induction on n = e.muHeight
+  induction hn : e.muHeight generalizing e with
+  | zero =>
+    -- muHeight = 0: e is not a mu, so fullUnfold e = e
+    simp [LocalTypeR.fullUnfold, hn, Function.iterate_zero, id_eq]
+    exact hn
+  | succ n ih =>
+    -- muHeight = n + 1: e must be .mu t body
+    cases e with
+    | end | var _ | send _ _ | recv _ _ =>
+      simp [LocalTypeR.muHeight] at hn
+    | mu t body =>
+      -- muHeight (.mu t body) = 1 + body.muHeight = n + 1
+      simp [LocalTypeR.muHeight] at hn
+      have : body.muHeight = n := Nat.succ.inj hn
+      -- fullUnfold (.mu t body) = unfold^[n+1] (.mu t body)
+      --                        = unfold^[n] (unfold (.mu t body))
+      --                        = unfold^[n] (body.substitute t (.mu t body))
+      simp only [LocalTypeR.fullUnfold]
+      rw [hn, Function.iterate_succ', Function.comp_apply, LocalTypeR.unfold]
+      -- Now apply IH to (body.substitute t (.mu t body))
+      -- The substitution might have different muHeight, but that's ok -
+      -- fullUnfold will iterate the right number of times
+      have h_sub_unfold : (body.substitute t (.mu t body)).fullUnfold.muHeight = 0 :=
+        ih (body.substitute t (.mu t body)) rfl
+      -- fullUnfold (body.substitute ...) = unfold^[(body.substitute ...).muHeight] (body.substitute ...)
+      simp [LocalTypeR.fullUnfold] at h_sub_unfold
+      -- We need: unfold^[n] (body.substitute ...) has muHeight 0
+      -- We know: unfold^[(body.substitute ...).muHeight] (body.substitute ...) has muHeight 0
+      -- Problem: n might ≠ (body.substitute ...).muHeight
+      sorry
 
 /-- **Subproblem 6b**: Full unfolding reaches a non-mu form.
 

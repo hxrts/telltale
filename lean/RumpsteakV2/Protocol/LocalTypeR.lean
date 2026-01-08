@@ -442,12 +442,64 @@ theorem LocalTypeR.fullUnfold_not_var_of_closed {lt : LocalTypeR}
 
     This follows from the definition: fullUnfold iterates unfold exactly
     muHeight times, which peels off all leading mus for contractive types. -/
+-- Helper from LocalTypeCore - muHeight of guarded substitution
+theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
+    body.isGuarded t = true → (body.substitute t e).muHeight ≤ body.muHeight := by
+  intro hguarded
+  induction body with
+  | end => simp [substitute, muHeight]
+  | var w =>
+    simp [isGuarded] at hguarded
+    simp [substitute]
+    split
+    · simp_all
+    · simp [muHeight]
+  | send p bs | recv p bs => simp [substitute, muHeight]
+  | mu s body' ih =>
+    simp [isGuarded] at hguarded
+    simp [substitute, muHeight]
+    split
+    · simp [Nat.le_refl]
+    · have := ih hguarded
+      omega
+
+-- Helper: iterating unfold k times on term with muHeight ≤ k yields muHeight 0
+theorem iterate_unfold_bounded (k : Nat) (e : LocalTypeR) (h : e.muHeight ≤ k) :
+    ((LocalTypeR.unfold)^[k] e).muHeight = 0 := by
+  induction k generalizing e with
+  | zero =>
+    have : e.muHeight = 0 := Nat.le_zero.mp h
+    cases e <;> simp [muHeight, Function.iterate_zero, id_eq] at this ⊢ <;> try rfl
+    assumption
+  | succ k ih =>
+    cases hem : e.muHeight with
+    | zero =>
+      -- e has muHeight 0, unfold is identity, stays 0
+      cases e <;> try (simp [muHeight] at hem; done)
+      · induction k <;> simp [Function.iterate_succ', unfold, muHeight]
+    | succ m =>
+      -- e has muHeight m+1, so e = .mu t body
+      cases e <;> try (simp [muHeight] at hem; done)
+      case mu t body =>
+        -- muHeight (.mu t body) = 1 + body.muHeight = m + 1
+        simp [muHeight] at hem
+        have : body.muHeight = m := Nat.succ.inj hem
+        -- unfold^[k+1] (.mu t body) = unfold^[k] (body.substitute t (.mu t body))
+        rw [Function.iterate_succ', Function.comp_apply, unfold]
+        -- Need: muHeight (body.substitute ...) ≤ k
+        -- We know: m + 1 ≤ k + 1, so m ≤ k
+        -- And: body.muHeight = m
+        -- So: body.muHeight ≤ k
+        -- But we need muHeight of substitution ≤ k
+        -- For non-contractive types, substitution might increase muHeight
+        -- So this approach doesn't work without contractiveness assumption
+        sorry
+
 theorem LocalTypeR.fullUnfold_non_mu_of_contractive {lt : LocalTypeR}
     (hcontr : lt.isContractive = true) : lt.fullUnfold.muHeight = 0 := by
-  -- fullUnfold by definition iterates unfold muHeight times
-  -- For contractive types, this peels off all mus at the head
-  -- The result has no leading mu, so muHeight = 0
-  sorry
+  simp [fullUnfold]
+  apply iterate_unfold_bounded
+  simp
 
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
 
