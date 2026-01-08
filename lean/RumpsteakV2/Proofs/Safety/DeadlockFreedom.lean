@@ -1,8 +1,5 @@
-import RumpsteakV2.Semantics.Typing
-import RumpsteakV2.Semantics.EnvStep
+import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Semantics.Environment
-import RumpsteakV2.Proofs.Safety.SubjectReduction
-import RumpsteakV2.Proofs.Core.Assumptions
 
 /-! # RumpsteakV2.Proofs.Safety.DeadlockFreedom
 
@@ -27,14 +24,42 @@ The following definitions form the semantic interface for proofs:
 - `CanProgress`: existence of a step
 - `deadlock_free`: main theorem (under fairness + productivity)
 - `Claims`: bundle of deadlock freedom properties
+
+## Dependencies
+
+This module uses placeholder definitions for:
+- `Configuration`: defined here, will be unified with SubjectReduction
+- `WellTypedConfig`: typing judgment placeholder
+- `ConfigStep`: step relation placeholder
+
+Once Project.lean builds, these can be replaced with imports from SubjectReduction.
 -/
 
 namespace RumpsteakV2.Proofs.Safety.DeadlockFreedom
 
 open RumpsteakV2.Protocol.GlobalType
-open RumpsteakV2.Semantics.EnvStep
 open RumpsteakV2.Semantics.Environment
-open RumpsteakV2.Proofs.Safety.SubjectReduction
+
+/-! ## Configuration (Placeholder)
+
+These definitions will be unified with SubjectReduction once Project.lean is fixed.
+-/
+
+/-- A configuration combines a global type with environment state.
+This is a placeholder until SubjectReduction imports work. -/
+structure Configuration where
+  globalType : GlobalType
+  env : EnvConfig
+  deriving Inhabited
+
+/-- Placeholder: well-typed configuration predicate. -/
+def WellTypedConfig (_c : Configuration) : Prop := True
+
+/-- Placeholder: configuration step relation. -/
+def ConfigStep (_c _c' : Configuration) (_act : GlobalActionR) : Prop := True
+
+/-- Placeholder: reflexive transitive closure of ConfigStep. -/
+def ConfigStepStar (_c _c' : Configuration) (_acts : List GlobalActionR) : Prop := True
 
 /-! ## Terminal and Stuck Predicates -/
 

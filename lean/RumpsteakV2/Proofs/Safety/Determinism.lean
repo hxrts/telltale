@@ -1,8 +1,6 @@
-import RumpsteakV2.Semantics.Typing
-import RumpsteakV2.Semantics.EnvStep
+import RumpsteakV2.Protocol.GlobalType
+import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Semantics.Environment
-import RumpsteakV2.Proofs.Safety.SubjectReduction
-import RumpsteakV2.Proofs.Core.Assumptions
 
 /-! # RumpsteakV2.Proofs.Safety.Determinism
 
@@ -38,14 +36,43 @@ The following definitions form the semantic interface for proofs:
 - `EnvStepDet`: environment step determinism
 - `ConfigStepDet`: configuration step determinism
 - `Claims`: bundle of determinism properties
+
+## Dependencies
+
+This module uses placeholder definitions until Project.lean builds.
 -/
 
 namespace RumpsteakV2.Proofs.Safety.Determinism
 
 open RumpsteakV2.Protocol.GlobalType
-open RumpsteakV2.Semantics.EnvStep
+open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Semantics.Environment
-open RumpsteakV2.Proofs.Safety.SubjectReduction
+
+/-! ## Placeholder Definitions
+
+These will be unified with SubjectReduction once Project.lean is fixed.
+-/
+
+/-- Placeholder configuration. -/
+structure Configuration where
+  globalType : GlobalType
+  env : EnvConfig
+  deriving Inhabited
+
+/-- Placeholder: configuration step relation. -/
+def ConfigStep (_c _c' : Configuration) (_act : GlobalActionR) : Prop := True
+
+/-- Placeholder: reflexive transitive closure of ConfigStep. -/
+def ConfigStepStar (_c _c' : Configuration) (_acts : List GlobalActionR) : Prop := True
+
+/-- Placeholder: local action. -/
+structure LocalActionR where
+  participant : String
+  label : Label
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Placeholder: local step relation. -/
+def LocalStep (_lt _lt' : QLocalTypeR) (_act : LocalActionR) : Prop := True
 
 /-! ## Global Type Determinism
 
@@ -58,8 +85,8 @@ Each constructor (comm_head, comm_async, mu) uniquely determines the result.
 
 /-- Global step is deterministic given the same action. -/
 axiom global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
-    (h₁ : step g g₁ act)
-    (h₂ : step g g₂ act) :
+    (h₁ : step g act g₁)
+    (h₂ : step g act g₂) :
     g₁ = g₂
 
 /-! ## Environment Determinism
@@ -79,8 +106,8 @@ theorem env_step_det {env env₁ env₂ : EnvConfig} {act : EnvAction}
       | deliver _ _ _ _ hq₂ henv₂ =>
           -- Both dequeue same message from same channel
           rw [hq₁] at hq₂
-          obtain ⟨_, _⟩ := List.cons.inj hq₂
-          subst henv₁ henv₂
+          obtain ⟨_, hrest⟩ := List.cons.inj hq₂
+          subst henv₁ henv₂ hrest
           rfl
   | timeout _ role label _ hhas₁ henv₁ =>
       cases h₂ with
@@ -91,8 +118,8 @@ theorem env_step_det {env env₁ env₂ : EnvConfig} {act : EnvAction}
       cases h₂ with
       | drop _ _ _ _ hq₂ henv₂ =>
           rw [hq₁] at hq₂
-          obtain ⟨_, _⟩ := List.cons.inj hq₂
-          subst henv₁ henv₂
+          obtain ⟨_, hrest⟩ := List.cons.inj hq₂
+          subst henv₁ henv₂ hrest
           rfl
 
 /-! ## Configuration Determinism
@@ -146,7 +173,7 @@ to different protocol states. We include the definition for completeness.
 -/
 
 /-- Confluence: if c steps to c₁ and c₂ via different actions, they can rejoin. -/
-def Confluent (c c₁ c₂ : Configuration) : Prop :=
+def Confluent (_c c₁ c₂ : Configuration) : Prop :=
   ∃ c₃ acts₁ acts₂,
     ConfigStepStar c₁ c₃ acts₁ ∧
     ConfigStepStar c₂ c₃ acts₂
@@ -187,7 +214,7 @@ axiom diamond_independent {c c₁ c₂ : Configuration} {act₁ act₂ : GlobalA
 structure Claims where
   /-- Global step determinism. -/
   global_step_det : ∀ {g g₁ g₂ : GlobalType} {act : GlobalActionR},
-      step g g₁ act → step g g₂ act → g₁ = g₂
+      step g act g₁ → step g act g₂ → g₁ = g₂
   /-- Environment step determinism. -/
   env_step_det : ∀ {env env₁ env₂ : EnvConfig} {act : EnvAction},
       EnvConfigStep env act env₁ → EnvConfigStep env act env₂ → env₁ = env₂

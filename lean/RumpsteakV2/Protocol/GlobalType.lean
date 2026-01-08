@@ -148,9 +148,35 @@ mutual
     | (_, g) :: rest => g.noSelfComm && noSelfCommBranches rest
 end
 
+/- Productivity: every recursion cycle has a communication.
+
+A global type is productive if between any mu binder and its recursive
+variable usage, there is at least one communication. This prevents
+non-productive protocols like `mu X. X` that loop forever silently.
+
+The `unguarded` parameter tracks mu variables that have NOT yet seen
+a communication since their binding. When we see a comm, all variables
+become guarded (reset to empty). When we see a var, it must not be
+in the unguarded set. -/
+mutual
+  def GlobalType.isProductive (g : GlobalType) (unguarded : List String := []) : Bool :=
+    match g with
+    | .end => true
+    | .var t => !unguarded.contains t  -- var in unguarded mu is non-productive
+    | .mu t body => body.isProductive (t :: unguarded)  -- add t to unguarded
+    | .comm _ _ branches =>
+        -- After comm, all vars become guarded (reset unguarded to [])
+        isProductiveBranches branches []
+
+  def isProductiveBranches (branches : List (Label × GlobalType)) (unguarded : List String) : Bool :=
+    match branches with
+    | [] => true
+    | (_, g) :: rest => g.isProductive unguarded && isProductiveBranches rest unguarded
+end
+
 /-- Well-formedness predicate for global types. -/
 def GlobalType.wellFormed (g : GlobalType) : Bool :=
-  g.allVarsBound && g.allCommsNonEmpty && g.noSelfComm
+  g.allVarsBound && g.allCommsNonEmpty && g.noSelfComm && g.isProductive
 
 /-- Global action with payload label (sender, receiver, label). -/
 structure GlobalActionR where
