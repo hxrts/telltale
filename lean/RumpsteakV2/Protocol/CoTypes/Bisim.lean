@@ -163,12 +163,6 @@ theorem observable_of_closed_contractive {a : LocalTypeR}
     | is_recv h => exact Observable.is_recv (CanRecv.mu h)
 termination_by sizeOf a
 
-/-- Legacy axiom for backward compatibility.
-    **DEPRECATED**: Use `observable_of_closed_contractive` with explicit contractiveness instead.
-
-    This axiom is unsound for non-contractive types like `μX.X`.
-    It's kept temporarily for API compatibility while callers are migrated. -/
-axiom observable_of_closed {a : LocalTypeR} (h : a.isClosed) : Observable a
 
 /-- Two EQ2-equivalent contractive mu types have the same observable behavior.
 
@@ -197,16 +191,6 @@ theorem mus_shared_observable_contractive {t s : String} {body body' : LocalType
   -- By EQ2 semantics, they must have the SAME observable classification
   sorry
 
-/-- Legacy axiom for backward compatibility.
-    **DEPRECATED**: Use `mus_shared_observable_contractive` with explicit contractiveness instead. -/
-axiom mus_shared_observable {t s : String} {body body' : LocalTypeR}
-    (h : EQ2 (.mu t body) (.mu s body')) :
-    (UnfoldsToEnd (.mu t body) ∧ UnfoldsToEnd (.mu s body')) ∨
-    (∃ v, UnfoldsToVar (.mu t body) v ∧ UnfoldsToVar (.mu s body') v) ∨
-    (∃ p bs cs, CanSend (.mu t body) p bs ∧ CanSend (.mu s body') p cs ∧
-       BranchesRel EQ2 bs cs) ∨
-    (∃ p bs cs, CanRecv (.mu t body) p bs ∧ CanRecv (.mu s body') p cs ∧
-       BranchesRel EQ2 bs cs)
 
 /-! ## Basic Properties of Membership Predicates -/
 
@@ -513,45 +497,34 @@ theorem refl_of_observable {a : LocalTypeR} (hobs : Observable a) : Bisim a a :=
       apply BisimF.eq_recv CanRecv.base CanRecv.base
       exact BranchesRelBisim.refl (fun t => rfl) bs
     | .mu t body =>
-      -- For mu, use mus_shared_observable with EQ2_refl
-      have hrefl : EQ2 (.mu t body) (.mu t body) := EQ2_refl _
-      have hobs := mus_shared_observable hrefl
+      -- For mu, extract observable behavior from hobs
+      -- Since hobs : Observable (.mu t body), it must be one of the Observable constructors
       cases hobs with
-      | inl hEnd =>
-        exact BisimF.eq_end hEnd.1 hEnd.2
-      | inr hRest =>
-        cases hRest with
-        | inl hVar =>
-          obtain ⟨v, hx, hy⟩ := hVar
-          exact BisimF.eq_var hx hy
-        | inr hRest2 =>
-          cases hRest2 with
-          | inl hSend =>
-            obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hSend
-            apply BisimF.eq_send hx hy
-            -- R is equality, so we need BranchesRelBisim (· = ·) bs cs
-            -- But we only have BranchesRel EQ2 bs cs. Since bs and cs come from
-            -- the SAME mu type, they ARE equal.
-            -- The key: hx and hy both witness that (.mu t body) can send to p.
-            -- By CanSend.deterministic, bs = cs.
-            have ⟨_, heq⟩ := CanSend.deterministic hx hy
-            subst heq
-            exact BranchesRelBisim.refl (fun t => rfl) bs
-          | inr hRecv =>
-            obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hRecv
-            apply BisimF.eq_recv hx hy
-            have ⟨_, heq⟩ := CanRecv.deterministic hx hy
-            subst heq
-            exact BranchesRelBisim.refl (fun t => rfl) bs
+      | is_end hEnd =>
+        exact BisimF.eq_end hEnd hEnd
+      | is_var hVar =>
+        exact BisimF.eq_var hVar hVar
+      | is_send hSend =>
+        -- hSend : CanSend (.mu t body) p bs for some p and bs
+        apply BisimF.eq_send hSend hSend
+        exact BranchesRelBisim.refl (fun t => rfl) _
+      | is_recv hRecv =>
+        apply BisimF.eq_recv hRecv hRecv
+        exact BranchesRelBisim.refl (fun t => rfl) _
   · -- Show R a a
     rfl
 
-/-- Bisim is reflexive for closed types.
+/-- Bisim is reflexive for closed, contractive types.
 
-    All closed, well-formed types have observable behavior (they can't diverge),
-    so they are reflexively bisimilar. -/
-theorem refl (a : LocalTypeR) (h : a.isClosed := by decide) : Bisim a a :=
-  refl_of_observable (observable_of_closed h)
+    All closed, contractive types have observable behavior (they can't diverge),
+    so they are reflexively bisimilar.
+
+    **Note:** Contractiveness is required to ensure termination. Non-contractive
+    types like `μX.X` would diverge on unfolding. -/
+theorem refl (a : LocalTypeR)
+    (hclosed : a.isClosed := by decide)
+    (hcontr : a.isContractive = true := by decide) : Bisim a a :=
+  refl_of_observable (observable_of_closed_contractive hclosed hcontr)
 
 /-- BranchesRelBisim is symmetric when the underlying relation is. -/
 theorem BranchesRelBisim.symm {R : Rel} (hsymm : ∀ a b, R a b → R b a)
@@ -1075,13 +1048,13 @@ these axioms are sound in all practical use cases. The axioms remain as such bec
 proving them would require adding explicit contractiveness hypotheses, which would
 complicate the API without practical benefit. -/
 
-/-- For closed types, `EQ2 .end x` implies `UnfoldsToEnd x`.
+/-- For closed, contractive types, `EQ2 .end x` implies `UnfoldsToEnd x`.
 
-    Proof: By `observable_of_closed`, x has observable behavior. By the
+    Proof: By `observable_of_closed_contractive`, x has observable behavior. By the
     incompatibility lemmas above, the only possibility is `UnfoldsToEnd`. -/
 theorem EQ2.end_right_implies_UnfoldsToEnd_of_closed {x : LocalTypeR}
-    (hclosed : x.isClosed) (heq : EQ2 .end x) : UnfoldsToEnd x := by
-  have hobs := observable_of_closed hclosed
+    (hclosed : x.isClosed) (hcontr : x.isContractive = true) (heq : EQ2 .end x) : UnfoldsToEnd x := by
+  have hobs := observable_of_closed_contractive hclosed hcontr
   cases hobs with
   | is_end h => exact h
   | is_var h => exact absurd heq (EQ2_end_not_UnfoldsToVar h)
@@ -1220,30 +1193,11 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
     | mu t body =>
       cases y with
       | mu s body' =>
-        -- Both mus - use mus_shared_observable to extract shared behavior
-        have hobs := mus_shared_observable hxy
-        cases hobs with
-        | inl hEnd =>
-          -- Both unfold to end
-          exact BisimF.eq_end hEnd.1 hEnd.2
-        | inr hRest =>
-          cases hRest with
-          | inl hVar =>
-            -- Both unfold to same var
-            obtain ⟨v, hx, hy⟩ := hVar
-            exact BisimF.eq_var hx hy
-          | inr hRest2 =>
-            cases hRest2 with
-            | inl hSend =>
-              -- Both can send with EQ2-related branches
-              obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hSend
-              apply BisimF.eq_send hx hy
-              exact BranchesRel_to_BranchesRelBisim hbr
-            | inr hRecv =>
-              -- Both can recv with EQ2-related branches
-              obtain ⟨p, bs, cs, hx, hy, hbr⟩ := hRecv
-              apply BisimF.eq_recv hx hy
-              exact BranchesRel_to_BranchesRelBisim hbr
+        -- Both mus - need mus_shared_observable_contractive with contractiveness proofs
+        -- TODO: Add contractiveness hypotheses to EQ2.toBisim, or prove contractiveness
+        -- from EQ2 closure properties. For now, sorry as this requires contractiveness.
+        -- Note: All projected types are contractive, so this is semantically sound.
+        sorry
       | «end» =>
         -- x must unfold to end since EQ2 x end
         have hUnfold := EQ2.end_left_implies_UnfoldsToEnd hxy
