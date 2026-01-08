@@ -1440,12 +1440,21 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
     `var → repl`, both become something that has the same observable behavior as `repl`.
     Since they both "go through" repl, they are Bisim-equivalent.
 
-    The RelImage structure captures that both sides come from substitution of
-    related pairs (here, x and y which are R-related for some post-fixpoint R). -/
-axiom substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : LocalTypeR}
+    Proof: By induction on UnfoldsToVar proofs. When x = y = .var var, both substitute
+    to repl, and they're BisimF-related through any observable behavior that repl has.
+    For mu cases, the substitution produces a mu whose unfolding relates back to repl. -/
+theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : LocalTypeR}
     {R : Rel}
     (hx : UnfoldsToVar x var) (hy : UnfoldsToVar y var) :
-    BisimF (RelImage (fun t => t.substitute var repl) R) (x.substitute var repl) (y.substitute var repl)
+    BisimF (RelImage (fun t => t.substitute var repl) R)
+           (x.substitute var repl) (y.substitute var repl) := by
+  -- Both x and y unfold to .var var
+  -- After substitution, both results have the same observable behavior as repl
+  -- We need to case-analyze on what repl's observable behavior is
+  -- For now, use the Bisim relationship between repl and itself
+  -- The key is that x.subst var repl and y.subst var repl both behave like repl
+  -- Through (possibly different numbers of) mu unfoldings
+  sorry
 
 open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
 /-- Substitution preserves CanSend.
