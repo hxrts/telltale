@@ -1432,6 +1432,144 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       rw [← hcomm] at ih'
       exact UnfoldsToVar.mu ih'
 
+open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
+/-- If a variable is not free in a type, the type cannot unfold to that variable.
+
+    The proof is by induction on `UnfoldsToVar`:
+    - Base case `.var v`: `isFreeIn v (.var v) = true`, contradicts hypothesis.
+    - Mu case `.mu t body`: The induction hypothesis gives us that
+      `isFreeIn v (body.substitute t (.mu t body)) = false` implies
+      `¬UnfoldsToVar (body.substitute t (.mu t body)) v`, which contradicts the premise.
+
+    This lemma is key for proving that the `t = var` case in `UnfoldsToVar_substitute_EQ2`
+    is impossible: by `isFreeIn_subst_mu_self`, the bound variable is not free after unfolding,
+    so `UnfoldsToVar (body.substitute t (.mu t body)) t` cannot hold. -/
+theorem not_UnfoldsToVar_of_not_isFreeIn {x : LocalTypeR} {v : String}
+    (h : isFreeIn v x = false) : ¬UnfoldsToVar x v := by
+  intro hunf
+  induction hunf with
+  | base =>
+    -- x = .var v, but isFreeIn v (.var v) = (v == v) = true, contradicting h
+    simp only [isFreeIn, beq_self_eq_true] at h
+    cases h
+  | @mu t body v' hinner ih =>
+    -- x = .mu t body, with UnfoldsToVar (body.substitute t (.mu t body)) v'
+    -- h : isFreeIn v' (.mu t body) = false
+    -- ih : isFreeIn v' (body.substitute t (.mu t body)) = false → False
+    -- We need to show isFreeIn v' (body.substitute t (.mu t body)) = false
+    simp only [isFreeIn] at h
+    by_cases hvt : v' == t
+    · -- v' == t case: use isFreeIn_subst_mu_self
+      simp only [beq_iff_eq] at hvt
+      subst hvt
+      have hnotfree := isFreeIn_subst_mu_self body v'
+      exact ih hnotfree
+    · -- v' ≠ t case: isFreeIn v' (.mu t body) = isFreeIn v' body = false
+      simp only [hvt, Bool.false_eq_true, ↓reduceIte] at h
+      -- h : isFreeIn v' body = false
+      -- Need: isFreeIn v' (body.substitute t (.mu t body)) = false
+      -- v' is not free in body, and v' is not free in (.mu t body) (since v' ≠ t)
+      have hmu_notfree : isFreeIn v' (.mu t body) = false := by
+        simp only [isFreeIn, hvt, Bool.false_eq_true, ↓reduceIte, h]
+      -- By isFreeIn_subst_preserves: v' not free in body ∧ v' not free in repl → v' not free in result
+      have hsubst_notfree := isFreeIn_subst_preserves body v' t (.mu t body) h hmu_notfree
+      exact ih hsubst_notfree
+
+/-- When `UnfoldsToVar x var`, substituting `var → repl` yields something EQ2-equivalent to `repl`.
+
+    Proof sketch: By induction on `UnfoldsToVar x var`:
+    - Base case: x = .var var, so x.substitute var repl = repl, and EQ2_refl applies.
+    - Mu case: x = .mu t body where body.substitute t (.mu t body) unfolds to var.
+      The mu case with t = var is impossible (would require infinite proof).
+      For t ≠ var, use EQ2_subst_mu_comm and IH.
+
+    Key insight: if t = var, then body.substitute var (.mu var body) would need to unfold
+    to .var var, but each .var var gets replaced by .mu var body, creating infinite recursion.
+    So t ≠ var in all mu cases. -/
+theorem UnfoldsToVar_substitute_EQ2 {x : LocalTypeR} {var : String} {repl : LocalTypeR}
+    (h : UnfoldsToVar x var) : EQ2 (x.substitute var repl) repl := by
+  induction h with
+  | base =>
+    -- x = .var var, so x.substitute var repl = repl
+    simp only [LocalTypeR.substitute, beq_self_eq_true, ↓reduceIte]
+    exact EQ2_refl _
+  | @mu t body var' hinner ih =>
+    -- x = .mu t body, body.substitute t (.mu t body) unfolds to var'
+    -- Since h : UnfoldsToVar x var, we have var' = var
+    -- Show t ≠ var (if t = var, we'd have infinite recursion)
+    by_cases htv : t = var'
+    · -- Case t = var: IMPOSSIBLE
+      -- By isFreeIn_subst_mu_self: isFreeIn t (body.substitute t (.mu t body)) = false
+      -- But hinner : UnfoldsToVar (body.substitute t (.mu t body)) var'
+      -- Since t = var', this means UnfoldsToVar (body.substitute t (.mu t body)) t
+      -- By not_UnfoldsToVar_of_not_isFreeIn, this is a contradiction
+      have hnotfree := RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.isFreeIn_subst_mu_self body t
+      -- hnotfree : isFreeIn t (body.substitute t (.mu t body)) = false
+      -- hinner : UnfoldsToVar (body.substitute t (.mu t body)) var' where t = var'
+      -- Use htv to substitute t for var' in hinner's last argument
+      have hinner' : UnfoldsToVar (body.substitute t (.mu t body)) t := htv ▸ hinner
+      exact absurd hinner' (not_UnfoldsToVar_of_not_isFreeIn hnotfree)
+    · -- Case t ≠ var: use EQ2_subst_mu_comm
+      -- Convert htv : t ≠ var' to beq form
+      have htv_beq : (t == var') = false := beq_eq_false_iff_ne.mpr htv
+      -- Goal: EQ2 ((.mu t body).substitute var' repl) repl
+      -- (.mu t body).substitute var' repl = .mu t (body.substitute var' repl) when t ≠ var'
+      simp only [LocalTypeR.substitute, htv_beq, Bool.false_eq_true, ↓reduceIte]
+      -- Goal: EQ2 (.mu t (body.substitute var' repl)) repl
+      -- By EQ2_subst_mu_comm: the unfolded form is EQ2-equivalent to the IH term
+      have hcomm := EQ2_subst_mu_comm body var' t repl htv
+      have hunfolded : EQ2 ((body.substitute var' repl).substitute t (.mu t (body.substitute var' repl))) repl :=
+        EQ2_trans hcomm ih
+      -- Now we need EQ2 (.mu t (body.substitute var' repl)) repl from hunfolded
+      -- Use EQ2.construct which requires EQ2F EQ2 (.mu t X) repl
+      -- EQ2F depends on whether repl is a mu or not
+      apply EQ2.construct
+      -- Goal: EQ2F EQ2 (.mu t (body.substitute var' repl)) repl
+      cases repl with
+      | «end» =>
+        -- EQ2F at (mu, end) = EQ2 (X.substitute t ...) end
+        simp only [EQ2F]
+        exact hunfolded
+      | var v =>
+        -- EQ2F at (mu, var) = EQ2 (X.substitute t ...) (var v)
+        simp only [EQ2F]
+        exact hunfolded
+      | send p bs =>
+        -- EQ2F at (mu, send) = EQ2 (X.substitute t ...) (send p bs)
+        simp only [EQ2F]
+        exact hunfolded
+      | recv p bs =>
+        -- EQ2F at (mu, recv) = EQ2 (X.substitute t ...) (recv p bs)
+        simp only [EQ2F]
+        exact hunfolded
+      | mu s body' =>
+        -- EQ2F at (mu, mu) = EQ2 (X.substitute t ...) (mu s body') ∧ EQ2 (mu t X) (body'.substitute s ...)
+        simp only [EQ2F]
+        constructor
+        · -- First conjunct: EQ2 (X.substitute t ...) (mu s body') - from hunfolded
+          exact hunfolded
+        · -- Second conjunct: EQ2 (mu t X) (body'.substitute s (mu s body'))
+          -- Let X = body.substitute var' (mu s body')
+          -- We have: hunfolded : EQ2 (X.substitute t (mu t X)) (mu s body')
+          -- By EQ2_unfold_right: EQ2 (X.substitute t (mu t X)) (body'.substitute s (mu s body'))
+          -- By EQ2.destruct (EQ2_refl (mu t X)).2: EQ2 (mu t X) (X.substitute t (mu t X))
+          -- By EQ2_trans: EQ2 (mu t X) (body'.substitute s (mu s body'))
+          let X := body.substitute var' (.mu s body')
+          -- EQ2 (X.substitute t (mu t X)) (body'.substitute s (mu s body'))
+          have hunfolded_right : EQ2 (X.substitute t (.mu t X)) (body'.substitute s (.mu s body')) :=
+            EQ2_unfold_right hunfolded
+          -- EQ2 (mu t X) (X.substitute t (mu t X)) from EQ2_refl via destruct
+          -- EQ2.destruct on (mu, mu) case gives a pair, second component is what we need
+          have hrefl : EQ2 (.mu t X) (.mu t X) := EQ2_refl _
+          have hrefl_destruct : EQ2F EQ2 (.mu t X) (.mu t X) := EQ2.destruct hrefl
+          -- EQ2F at (mu t X, mu t X) = EQ2 (X.substitute t (mu t X)) (mu t X) ∧
+          --                            EQ2 (mu t X) (X.substitute t (mu t X))
+          have hmu_to_unfold : EQ2 (.mu t X) (X.substitute t (.mu t X)) := by
+            simp only [EQ2F] at hrefl_destruct
+            exact hrefl_destruct.2
+          -- Now by transitivity
+          exact EQ2_trans hmu_to_unfold hunfolded_right
+
 /-- When both types unfold to the substituted variable, their substitutions are BisimF-related.
 
     This is the key lemma for the eq_var case of substitute_compatible.
@@ -1448,13 +1586,53 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
     (hx : UnfoldsToVar x var) (hy : UnfoldsToVar y var) :
     BisimF (RelImage (fun t => t.substitute var repl) R)
            (x.substitute var repl) (y.substitute var repl) := by
-  -- Both x and y unfold to .var var
-  -- After substitution, both results have the same observable behavior as repl
-  -- We need to case-analyze on what repl's observable behavior is
-  -- For now, use the Bisim relationship between repl and itself
-  -- The key is that x.subst var repl and y.subst var repl both behave like repl
-  -- Through (possibly different numbers of) mu unfoldings
-  sorry
+  -- Both x.substitute var repl and y.substitute var repl are EQ2-equivalent to repl
+  have hxeq : EQ2 (x.substitute var repl) repl := UnfoldsToVar_substitute_EQ2 hx
+  have hyeq : EQ2 (y.substitute var repl) repl := UnfoldsToVar_substitute_EQ2 hy
+  -- So they're EQ2-equivalent to each other
+  have hxyeq : EQ2 (x.substitute var repl) (y.substitute var repl) :=
+    EQ2_trans hxeq (EQ2_symm hyeq)
+  -- Convert to Bisim
+  have hBisim : Bisim (x.substitute var repl) (y.substitute var repl) := EQ2.toBisim hxyeq
+  obtain ⟨R', hR'post, hxy'⟩ := hBisim
+  have hBisimF : BisimF R' (x.substitute var repl) (y.substitute var repl) := hR'post _ _ hxy'
+  -- Case on BisimF to determine observable behavior
+  cases hBisimF with
+  | eq_end hxend hyend =>
+    -- Both unfold to end, so BisimF.eq_end applies directly
+    exact BisimF.eq_end hxend hyend
+  | eq_var hxvar hyvar =>
+    -- Both unfold to the same var, so BisimF.eq_var applies directly
+    exact BisimF.eq_var hxvar hyvar
+  | eq_send hxsend hysend hbr =>
+    -- Both can send with R'-related branches
+    -- We need to convert BranchesRelBisim R' to BranchesRelBisim (RelImage f R)
+    -- The branch continuations in x.substitute and y.substitute are already substituted
+    -- Since x and y both unfold to var, their continuations also unfold to var
+    -- After substitution, all branch continuations become EQ2-equivalent to their repl versions
+    -- This requires showing that the branches satisfy RelImage f R
+    -- For simplicity, we use the weaker result: BranchesRelBisim with any relation that
+    -- contains the EQ2-equivalent pairs
+    -- We can use BisimF.mono to lift from R' to RelImage f R, but we need R' ⊆ RelImage f R
+    -- This is not generally true, so we use a direct construction
+    apply BisimF.eq_send hxsend hysend
+    -- Need: BranchesRelBisim (RelImage f R) bs cs
+    -- We have: BranchesRelBisim R' bs cs
+    -- The branches are the substituted branches, which are EQ2-related
+    -- For the eq_send case from Bisim, the branches come from the substituted types
+    -- We can show that EQ2-related branches satisfy RelImage via identity
+    -- Actually, for this specific case, both x and y unfold to var, so their
+    -- substitutions are EQ2 to repl. If repl has send behavior, the branches
+    -- ARE repl's branches (or EQ2-equivalent via unfolding).
+    -- The R' relationship on branches can be lifted to RelImage using the fact that
+    -- all branch continuations are derived from repl's continuations.
+    -- For a fully general proof, we need the EQ2 relationship on branches to be
+    -- transferable to RelImage. This is complex, so we use sorry for now.
+    sorry
+  | eq_recv hxrecv hyrecv hbr =>
+    -- Similar to eq_send case
+    apply BisimF.eq_recv hxrecv hyrecv
+    sorry
 
 open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
 /-- Substitution preserves CanSend.

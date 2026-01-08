@@ -321,4 +321,89 @@ theorem LocalTypeR.muHeight_non_mu :
   | recv _ _ => rfl
   | mu t body => exact absurd rfl (h t body)
 
+/-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
+
+This is the key bridge between guardedness and observable behavior.
+If a variable is free in a type but NOT guarded, then the type fully
+unfolds to that variable.
+
+The intuition is:
+- An unguarded free variable sits at the "head" position
+- Unfolding only substitutes under mu, so the variable stays at head
+- After enough unfolding, we reach just the variable -/
+
+/-- If a variable is not guarded in a type (appears at head position after unfolding),
+    then fully unfolding produces that variable.
+
+    This corresponds to Coq's `eguarded_test`:
+    ```coq
+    Lemma eguarded_test : forall e sigma i, ~~ eguarded i e ->
+      iter (emu_height e) eunf e [e sigma] = sigma i.
+    ```
+
+    Proof: By well-founded induction on muHeight.
+    - Base case (muHeight = 0): The type is either:
+      - .var v: If not guarded for v, then v is free and we're done
+      - .end/.send/.recv: Variable is trivially guarded (contradiction)
+    - Inductive case (.mu t body): If v is not guarded in .mu t body,
+      then v ≠ t (otherwise shadowed = guarded) and v is not guarded in body.
+      After unfolding: body.substitute t (.mu t body). The variable v is still
+      not guarded (unguardedness preserved through substitution when v ≠ t).
+      By IH on muHeight(body) < muHeight(.mu t body), we get the result. -/
+theorem LocalTypeR.unguarded_unfolds_to_var (lt : LocalTypeR) (v : String)
+    (h_free : lt.isFreeIn v = true) (h_not_guarded : lt.isGuarded v = false) :
+    lt.fullUnfold = .var v := by
+  match lt with
+  | .end =>
+    -- .end: v is not free in .end (contradiction)
+    simp only [isFreeIn] at h_free
+    exact absurd h_free (by decide)
+  | .var w =>
+    -- .var w: If v is free (w = v) and not guarded (w = v), then fullUnfold = .var w = .var v
+    simp only [isFreeIn, beq_iff_eq] at h_free
+    simp only [h_free, fullUnfold, muHeight, Function.iterate_zero, id_eq]
+  | .send _ _ =>
+    -- .send: variable is guarded in send (contradiction)
+    simp only [isGuarded] at h_not_guarded
+    exact absurd h_not_guarded (by decide)
+  | .recv _ _ =>
+    -- .recv: variable is guarded in recv (contradiction)
+    simp only [isGuarded] at h_not_guarded
+    exact absurd h_not_guarded (by decide)
+  | .mu t body =>
+    -- .mu t body: unguarded means v ≠ t and unguarded in body
+    simp only [isGuarded] at h_not_guarded
+    split at h_not_guarded
+    · -- v == t: Then isGuarded = true (contradiction)
+      contradiction
+    · -- v != t: Then isGuarded = body.isGuarded v = false
+      rename_i hvt_false
+      simp only [isFreeIn, hvt_false, ↓reduceIte] at h_free
+      -- h_free : body.isFreeIn v = true
+      -- h_not_guarded : body.isGuarded v = false
+      -- We need to show (.mu t body).fullUnfold = .var v
+      -- This requires well-founded recursion on muHeight, which is complex
+      -- For now, we leave this as sorry and note the proof strategy
+      sorry
+
+/-- The converse: if a free variable IS guarded, fullUnfold reaches a non-variable form.
+
+    This is the key property for proving observable_of_closed: closed types
+    (with all bound variables guarded) unfold to send/recv/end. -/
+theorem LocalTypeR.guarded_fullUnfold_not_var (lt : LocalTypeR) (v : String)
+    (h_guarded : lt.isGuarded v = true) :
+    ∀ w, lt.fullUnfold ≠ .var w ∨ lt.isFreeIn v = false := by
+  intro w
+  -- Either v is not free (trivial), or v is guarded (need to show fullUnfold ≠ var)
+  by_cases h_free : lt.isFreeIn v = true
+  · -- v is free and guarded: fullUnfold reaches non-var
+    left
+    -- This would follow from unguarded_unfolds_to_var by contraposition
+    -- If fullUnfold = .var w, then w must be unguarded, but we assumed guarded
+    sorry
+  · -- v is not free: trivial
+    right
+    simp only [Bool.not_eq_true] at h_free
+    exact h_free
+
 end RumpsteakV2.Protocol.LocalTypeR

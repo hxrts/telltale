@@ -255,6 +255,72 @@ theorem isFreeIn_subst_mu_self (body : LocalTypeR) (t : String) :
     isFreeIn t (body.substitute t (.mu t body)) = false :=
   isFreeIn_subst_self_general body t (.mu t body) (isFreeIn_mu_self t body)
 
+mutual
+  /-- If v is not free in e and not free in repl, then v is not free in e.substitute t repl.
+
+      The intuition is: substitution only replaces occurrences of t with repl.
+      - Original occurrences of v in e: still there unless v = t (but then v not free in e means none)
+      - New occurrences: only from repl copies, but v not free in repl
+
+      This handles the case v ≠ t (v not being the substituted variable). -/
+  theorem isFreeIn_subst_preserves (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
+      (hv_e : isFreeIn v e = false) (hv_repl : isFreeIn v repl = false) :
+      isFreeIn v (e.substitute t repl) = false := by
+    cases e with
+    | «end» => simp only [LocalTypeR.substitute, isFreeIn]
+    | var w =>
+        simp only [LocalTypeR.substitute]
+        by_cases hwt : w == t
+        · -- w == t: substitute returns repl, v not free in repl
+          simp only [hwt, ↓reduceIte]
+          exact hv_repl
+        · -- w != t: substitute returns .var w, v not free in .var w (since v not free in e)
+          simp only [hwt, Bool.false_eq_true, ↓reduceIte]
+          exact hv_e
+    | send p bs =>
+        simp only [LocalTypeR.substitute, isFreeIn]
+        simp only [isFreeIn] at hv_e
+        exact isFreeInBranches_subst_preserves bs v t repl hv_e hv_repl
+    | recv p bs =>
+        simp only [LocalTypeR.substitute, isFreeIn]
+        simp only [isFreeIn] at hv_e
+        exact isFreeInBranches_subst_preserves bs v t repl hv_e hv_repl
+    | mu s body =>
+        simp only [LocalTypeR.substitute]
+        by_cases hst : s == t
+        · -- s == t: substitution is shadowed
+          simp only [hst, ↓reduceIte]
+          exact hv_e
+        · -- s != t: recurse
+          simp only [hst, Bool.false_eq_true, ↓reduceIte, isFreeIn]
+          simp only [isFreeIn] at hv_e
+          by_cases hvs : v == s
+          · -- v == s: v is bound by mu, so not free
+            simp only [hvs, ↓reduceIte]
+          · -- v != s
+            simp only [hvs, Bool.false_eq_true, ↓reduceIte] at hv_e ⊢
+            exact isFreeIn_subst_preserves body v t repl hv_e hv_repl
+  termination_by sizeOf e
+
+  /-- Branch version of isFreeIn_subst_preserves. -/
+  theorem isFreeInBranches_subst_preserves (bs : List (Label × LocalTypeR)) (v t : String)
+      (repl : LocalTypeR)
+      (hv_bs : isFreeInBranches v bs = false) (hv_repl : isFreeIn v repl = false) :
+      isFreeInBranches v (LocalTypeR.substituteBranches bs t repl) = false := by
+    match bs with
+    | [] => simp only [LocalTypeR.substituteBranches, isFreeInBranches]
+    | (label, cont) :: rest =>
+        simp only [LocalTypeR.substituteBranches, isFreeInBranches, Bool.or_eq_false_iff]
+        simp only [isFreeInBranches, Bool.or_eq_false_iff] at hv_bs
+        exact ⟨isFreeIn_subst_preserves cont v t repl hv_bs.1 hv_repl,
+               isFreeInBranches_subst_preserves rest v t repl hv_bs.2 hv_repl⟩
+  termination_by sizeOf bs
+  decreasing_by
+    all_goals simp_wf
+    all_goals simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
+    all_goals omega
+end
+
 /-- Key helper: (mu t body).substitute var repl = mu t (body.substitute var repl) when t ≠ var. -/
 theorem mu_subst_ne (t : String) (body : LocalTypeR) (var : String) (repl : LocalTypeR)
     (htne : t ≠ var) :
