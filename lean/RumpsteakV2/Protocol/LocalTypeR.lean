@@ -274,13 +274,21 @@ theorem LocalTypeR.unfold_mu (t : String) (body : LocalTypeR) :
 /-- fullUnfold of mu unfolds via one step of unfold then iterate.
 
     This follows from the definition: fullUnfold (.mu t body) = unfold^[1 + body.muHeight] (.mu t body)
-    and Function.iterate_succ': f^[n+1] x = f^[n] (f x).
+    and Function.iterate_succ_apply: f^[n+1] x = f^[n] (f x).
 
-    TODO: Complete proof - currently blocked on Function.iterate unfolding. -/
+    Corresponds to Coq's `full_eunf_subst`. -/
 theorem LocalTypeR.fullUnfold_mu (t : String) (body : LocalTypeR) :
     (.mu t body : LocalTypeR).fullUnfold =
       LocalTypeR.unfold^[body.muHeight] (body.substitute t (.mu t body)) := by
-  sorry
+  -- fullUnfold (.mu t body) = unfold^[(.mu t body).muHeight] (.mu t body)
+  --                         = unfold^[1 + body.muHeight] (.mu t body)
+  --                         = unfold^[body.muHeight] (unfold (.mu t body))
+  --                         = unfold^[body.muHeight] (body.substitute t (.mu t body))
+  simp only [fullUnfold, muHeight]
+  -- Goal: unfold^[1 + body.muHeight] (.mu t body) = unfold^[body.muHeight] (body.substitute ...)
+  rw [Nat.add_comm, Function.iterate_succ_apply]
+  -- Goal: unfold^[body.muHeight] (unfold (.mu t body)) = unfold^[body.muHeight] (body.substitute ...)
+  rfl
 
 /-! ## Key Property: Contractive types reach observable form
 
@@ -332,6 +340,109 @@ The intuition is:
 - Unfolding only substitutes under mu, so the variable stays at head
 - After enough unfolding, we reach just the variable -/
 
+/-- Helper for double substitution case in unfold_iter_subst_unguarded.
+
+    When v is free and unguarded in body, v ≠ t, v ≠ s, after substituting t then s,
+    iterating unfold body.muHeight times gives .var v.
+
+    The key insight: v's position at the head of a mu-chain is preserved through
+    both substitutions since we're not substituting for v.
+
+    Proof strategy: Since v is unguarded in body, it sits at the head of a mu-chain.
+    Substituting for variables other than v (namely t and s) doesn't change v's position.
+    After body.muHeight iterations of unfold, we peel off all the mus and reach .var v. -/
+theorem LocalTypeR.unfold_iter_double_subst (body : LocalTypeR)
+    (t : String) (repl : LocalTypeR) (s : String) (v : String)
+    (hvt : v ≠ t) (hvs : v ≠ s)
+    (h_free : body.isFreeIn v = true) (h_not_guarded : body.isGuarded v = false) :
+    (LocalTypeR.unfold)^[body.muHeight] ((body.substitute t repl).substitute s (.mu s (body.substitute t repl))) = .var v := by
+  -- This follows from showing that muHeight and unguardedness are preserved through substitution
+  -- When v ≠ t, substituting t preserves:
+  --   1. v being free in the type
+  --   2. v being unguarded (at head of mu chain)
+  --   3. muHeight of the type (since v is at head, not t)
+  -- Then substituting s (where v ≠ s) preserves the same properties
+  -- Finally, unfold^[body.muHeight] reaches .var v
+  --
+  -- The full proof requires helper lemmas about muHeight_subst_unguarded and isFreeIn_subst_other
+  -- For now, we leave this as sorry pending those lemmas
+  sorry
+
+/-- Auxiliary lemma for unguarded_unfolds_to_var.
+
+    If v is free and unguarded in e, and v ≠ t, then iterating unfold e.muHeight
+    times on (e.substitute t repl) gives .var v.
+
+    This is the generalization of Coq's `eguarded_test` that handles arbitrary substitutions.
+    The key insight is that the iteration count is determined by the ORIGINAL type e,
+    not by the substituted type. Since v ≠ t, substituting t doesn't affect occurrences of v,
+    and after e.muHeight iterations, we reach .var v.
+
+    Proof: By structural induction on e. -/
+theorem LocalTypeR.unfold_iter_subst_unguarded (e : LocalTypeR) (t : String) (repl : LocalTypeR)
+    (v : String) (hvt : v ≠ t)
+    (h_free : e.isFreeIn v = true) (h_not_guarded : e.isGuarded v = false) :
+    (LocalTypeR.unfold)^[e.muHeight] (e.substitute t repl) = .var v := by
+  match e with
+  | .end =>
+    -- v not free in .end (contradiction)
+    simp only [isFreeIn] at h_free
+    exact absurd h_free (by decide)
+  | .var w =>
+    -- v free in .var w means w = v
+    -- v unguarded in .var w means w = v
+    simp only [isFreeIn, beq_iff_eq] at h_free
+    -- h_free : v = w
+    simp only [muHeight, Function.iterate_zero, id_eq, substitute]
+    -- Since v = w (h_free) and v ≠ t, substitute t repl leaves .var w unchanged
+    -- First show (v == t) = false directly
+    have hvt_beq : (v == t) = false := by
+      simp only [beq_eq_false_iff_ne, ne_eq]
+      exact hvt
+    -- Goal: (if (w == t) = true then repl else var w) = var v
+    simp only [← h_free, hvt_beq]
+    -- Goal: (if false = true then repl else var v) = var v
+    -- Use if_neg to reduce: false ≠ true, so if-then-else gives else branch
+    rw [if_neg (Bool.false_ne_true)]
+  | .send _ _ =>
+    -- v is guarded in send (contradiction)
+    simp only [isGuarded] at h_not_guarded
+    exact absurd h_not_guarded (by decide)
+  | .recv _ _ =>
+    -- v is guarded in recv (contradiction)
+    simp only [isGuarded] at h_not_guarded
+    exact absurd h_not_guarded (by decide)
+  | .mu s body =>
+    -- muHeight (.mu s body) = 1 + body.muHeight
+    -- We need: unfold^[1 + body.muHeight] ((.mu s body).substitute t repl) = .var v
+    simp only [isGuarded] at h_not_guarded
+    split at h_not_guarded
+    · -- v == s: guarded (contradiction)
+      contradiction
+    · -- v != s: body.isGuarded v = false
+      rename_i hvs_false
+      simp only [isFreeIn, hvs_false] at h_free
+      -- h_free : body.isFreeIn v = true
+      -- h_not_guarded : body.isGuarded v = false
+      have hvs : v ≠ s := fun h => hvs_false (beq_iff_eq.mpr h)
+      simp only [muHeight, Nat.add_comm 1, Function.iterate_succ_apply]
+      -- Goal: unfold^[body.muHeight] (unfold ((.mu s body).substitute t repl)) = .var v
+      simp only [substitute]
+      split
+      · -- s == t: substitution shadowed, (.mu s body).substitute t repl = .mu s body
+        -- unfold (.mu s body) = body.substitute s (.mu s body)
+        simp only [unfold]
+        -- IH with t' = s, repl' = .mu s body
+        exact unfold_iter_subst_unguarded body s (.mu s body) v hvs h_free h_not_guarded
+      · -- s != t: (.mu s body).substitute t repl = .mu s (body.substitute t repl)
+        rename_i hst_false
+        simp only [unfold]
+        -- Goal: unfold^[body.muHeight] ((body.substitute t repl).substitute s (.mu s (body.substitute t repl))) = .var v
+        -- We need a lemma about double substitution when v is free and unguarded
+        -- Since v ≠ s and v ≠ t, after both substitutions v remains at the head
+        exact unfold_iter_double_subst body t repl s v hvt hvs h_free h_not_guarded
+termination_by sizeOf e
+
 /-- If a variable is not guarded in a type (appears at head position after unfolding),
     then fully unfolding produces that variable.
 
@@ -381,10 +492,16 @@ theorem LocalTypeR.unguarded_unfolds_to_var (lt : LocalTypeR) (v : String)
       simp only [isFreeIn, hvt_false, ↓reduceIte] at h_free
       -- h_free : body.isFreeIn v = true
       -- h_not_guarded : body.isGuarded v = false
-      -- We need to show (.mu t body).fullUnfold = .var v
-      -- This requires well-founded recursion on muHeight, which is complex
-      -- For now, we leave this as sorry and note the proof strategy
-      sorry
+      -- Goal: (.mu t body).fullUnfold = .var v
+      -- By fullUnfold_mu: (.mu t body).fullUnfold = unfold^[body.muHeight] (body.substitute t (.mu t body))
+      rw [fullUnfold_mu]
+      -- Now we need: unfold^[body.muHeight] (body.substitute t (.mu t body)) = .var v
+      -- Key insight from Coq: the IH applies to body with updated substitution
+      -- Since v ≠ t (hvt_false : ¬(v == t)), substituting t doesn't affect v
+      -- By IH on body: body.fullUnfold = .var v, and substitution preserves this property
+      have hvt : v ≠ t := fun h => hvt_false (beq_iff_eq.mpr h)
+      -- Use the auxiliary lemma for iteration under substitution
+      exact unfold_iter_subst_unguarded body t (.mu t body) v hvt h_free h_not_guarded
 
 /-- The converse: if a free variable IS guarded, fullUnfold reaches a non-variable form.
 
