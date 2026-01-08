@@ -18,7 +18,7 @@ The difficulty: the obvious induction measure (`muHeight` = nesting depth of mus
 doesn't decrease through unfolding because `body.substitute t (mu t body)` can
 have higher muHeight than the original type.
 
-## Proof Strategy (from Coq reference)
+## Proof Strategy
 
 1. Don't induct on muHeight directly
 2. Use guardedness: in a contractive type, the bound variable only appears inside communications
@@ -81,7 +81,43 @@ theorem isGuarded_substitute (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
     (hv_repl : repl.isFreeIn v = false)
     (h_unguarded : e.isGuarded v = false) :
     (e.substitute t repl).isGuarded v = false := by
-  sorry
+  induction e with
+  | end =>
+    simp [LocalTypeR.isGuarded] at h_unguarded
+  | var w =>
+    simp [LocalTypeR.isGuarded] at h_unguarded ⊢
+    simp [LocalTypeR.substitute]
+    split
+    · -- w == t, so substitute gives repl
+      -- h_unguarded : (v != w) = false, so v = w
+      -- But hvt says v != t, and w = t from the split
+      -- So v = w = t, contradicting hvt
+      have : w = t := by simp_all
+      have : v = w := by
+        by_contra hne
+        simp [hne] at h_unguarded
+      rw [this.symm] at hvt
+      simp at hvt
+    · -- w != t, substitute is identity
+      exact h_unguarded
+  | send p bs | recv p bs =>
+    simp [LocalTypeR.isGuarded] at h_unguarded
+  | mu s body ih =>
+    simp [LocalTypeR.isGuarded] at h_unguarded ⊢
+    simp [LocalTypeR.substitute]
+    split at h_unguarded
+    · -- v == s, contradiction with h_unguarded
+      simp at h_unguarded
+    · -- v != s
+      split
+      · -- s == t
+        split
+        · simp_all
+        · exact h_unguarded
+      · -- s != t
+        split
+        · simp_all
+        · exact ih hv_repl h_unguarded
 
 /-! ## Subproblem 3: Free variable preserved through substitution
 
@@ -94,7 +130,44 @@ theorem isFreeIn_substitute (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
     (hvt : v ≠ t)
     (h_free : e.isFreeIn v = true) :
     (e.substitute t repl).isFreeIn v = true ∨ repl.isFreeIn v = true := by
-  sorry
+  induction e with
+  | end =>
+    simp [LocalTypeR.isFreeIn] at h_free
+  | var w =>
+    simp [LocalTypeR.isFreeIn] at h_free
+    simp [LocalTypeR.substitute]
+    split
+    · -- w == t
+      -- h_free : v == w, so v = w = t, but hvt says v != t
+      have : w = t := by simp_all
+      rw [←this] at hvt
+      have : v = w := by simp_all
+      rw [this] at hvt
+      simp at hvt
+    · -- w != t
+      left
+      simp [LocalTypeR.isFreeIn]
+      exact h_free
+  | send p bs | recv p bs =>
+    sorry -- Need helper for branches
+  | mu s body ih =>
+    simp [LocalTypeR.isFreeIn] at h_free ⊢
+    simp [LocalTypeR.substitute]
+    split at h_free
+    · simp at h_free
+    · split
+      · -- s == t
+        left
+        split
+        · simp_all
+        · exact h_free
+      · -- s != t
+        split
+        · simp_all
+        · have := ih h_free
+          cases this with
+          | inl h => left; exact h
+          | inr h => right; exact h
 
 /-! ## Subproblem 4: Contractive types have no unguarded free variables
 
@@ -109,7 +182,28 @@ theorem contractive_implies_guarded (e : LocalTypeR) (v : String)
     (h_contractive : e.isContractive = true)
     (h_free : e.isFreeIn v = true) :
     e.isGuarded v = true := by
-  sorry
+  induction e with
+  | end =>
+    simp [LocalTypeR.isFreeIn] at h_free
+  | var w =>
+    -- If v is free in (var w), then v = w
+    -- But isGuarded v (var w) = (v != w) = false when v = w
+    -- This case is impossible for closed types
+    simp [LocalTypeR.isFreeIn] at h_free
+    simp [LocalTypeR.isGuarded, h_free]
+  | send p bs | recv p bs =>
+    -- send/recv are always guarded
+    simp [LocalTypeR.isGuarded]
+  | mu t body ih =>
+    simp [LocalTypeR.isContractive, Bool.and_eq_true] at h_contractive
+    obtain ⟨hguarded_t, hcontr_body⟩ := h_contractive
+    simp [LocalTypeR.isFreeIn] at h_free
+    split at h_free
+    · simp at h_free
+    · simp [LocalTypeR.isGuarded]
+      split
+      · simp_all
+      · exact ih hcontr_body h_free
 
 /-! ## Subproblem 5: Closed contractive types unfold to non-variable
 
