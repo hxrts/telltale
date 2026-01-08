@@ -133,21 +133,9 @@ mutual
     | «end» => rfl
     | var w =>
         simp only [LocalTypeR.substitute]
-        -- hnot_free : isFreeIn x (var w) = (x == w) = false
         simp only [isFreeIn] at hnot_free
-        -- So x != w, meaning w != x
         have hwx : (w == x) = false := by
-          cases h : w == x
-          · rfl
-          · -- h : (w == x) = true, hnot_free : (x == w) = false
-            -- Both say the same thing but with different variable order
-            simp only [beq_iff_eq] at h
-            -- h : w = x
-            -- So x == w should be true, contradicting hnot_free
-            have hcontr : (x == w) = true := by simp only [beq_iff_eq]; exact h.symm
-            simp only [hcontr] at hnot_free
-            -- hnot_free : true = false is a contradiction
-            exact False.elim (by simp at hnot_free)
+          rw [beq_eq_false_iff_ne] at hnot_free ⊢; exact fun h => hnot_free h.symm
         simp only [hwx, Bool.false_eq_true, ↓reduceIte]
     | send p bs =>
         simp only [LocalTypeR.substitute]
@@ -165,17 +153,9 @@ mutual
         · simp only [hxt, ↓reduceIte]
         · simp only [hxt, Bool.false_eq_true, ↓reduceIte]
           congr 1
-          -- hnot_free : isFreeIn x (mu t body) = if (x == t) then false else isFreeIn x body = false
-          -- Since t != x, we have x != t, so the if goes to else branch
           simp only [isFreeIn] at hnot_free
           have hxt' : (x == t) = false := by
-            cases h : x == t
-            · rfl
-            · simp only [beq_iff_eq] at h
-              -- h : x = t, but we have hxt : (t == x) = false
-              have hcontr : (t == x) = true := by simp only [beq_iff_eq]; exact h.symm
-              simp only [hcontr] at hxt
-              exact False.elim (by simp at hxt)
+            simp only [beq_eq_false_iff_ne, ne_eq]; exact fun h => hxt (beq_iff_eq.mpr h.symm)
           simp only [hxt', Bool.false_eq_true, ↓reduceIte] at hnot_free
           exact substitute_not_free body x rx hnot_free
   termination_by sizeOf e
@@ -228,13 +208,8 @@ mutual
           simp only [hwt, ↓reduceIte]
           exact hrepl
         · -- w != t: substitute returns .var w
-          simp only [hwt, Bool.false_eq_true, ↓reduceIte, isFreeIn]
-          -- Need: isFreeIn t (.var w) = (t == w) = false
-          cases h : t == w
-          · rfl
-          · simp only [beq_iff_eq] at h
-            have hwt' : w ≠ t := by simp only [bne_iff_ne, ne_eq, beq_iff_eq] at hwt ⊢; exact hwt
-            exact absurd h.symm hwt'
+          simp only [hwt, Bool.false_eq_true, ↓reduceIte, isFreeIn, beq_eq_false_iff_ne, ne_eq]
+          exact fun h => hwt (beq_iff_eq.mpr h.symm)
     | send p bs =>
         simp only [LocalTypeR.substitute, isFreeIn]
         exact isFreeInBranches_subst_self_general bs t repl hrepl
@@ -251,11 +226,7 @@ mutual
         · -- s != t: returns .mu s (inner.substitute t repl)
           simp only [hst, Bool.false_eq_true, ↓reduceIte, isFreeIn]
           have hts : (t == s) = false := by
-            cases h : t == s
-            · rfl
-            · simp only [beq_iff_eq] at h
-              have hst' : s ≠ t := by simp only [bne_iff_ne, ne_eq, beq_iff_eq] at hst ⊢; exact hst
-              exact absurd h.symm hst'
+            simp only [beq_eq_false_iff_ne, ne_eq]; exact fun h => hst (beq_iff_eq.mpr h.symm)
           simp only [hts, Bool.false_eq_true, ↓reduceIte]
           exact isFreeIn_subst_self_general inner t repl hrepl
   termination_by sizeOf e
@@ -289,12 +260,7 @@ theorem mu_subst_ne (t : String) (body : LocalTypeR) (var : String) (repl : Loca
     (htne : t ≠ var) :
     (LocalTypeR.mu t body).substitute var repl = .mu t (body.substitute var repl) := by
   simp only [LocalTypeR.substitute]
-  have h : (t == var) = false := by
-    cases heq : t == var
-    · rfl
-    · simp only [beq_iff_eq] at heq
-      exact absurd heq htne
-  simp only [h, Bool.false_eq_true, ↓reduceIte]
+  simp only [beq_eq_false_iff_ne.mpr htne, Bool.false_eq_true, ↓reduceIte]
 
 /-! ## General Substitution Commutation
 
@@ -329,23 +295,12 @@ mutual
         by_cases hwx : w == x
         · -- w == x: first substitution gives rx
           simp only [LocalTypeR.substitute, hwx, ↓reduceIte]
-          -- LHS: rx.substitute y ry
-          -- RHS: (if w == y then ry' else .var w).substitute x rx
           simp only [beq_iff_eq] at hwx
           -- Since w = x and x ≠ y, we have w ≠ y
-          have hwy : (w == y) = false := by
-            cases h : w == y
-            · rfl
-            · simp only [beq_iff_eq] at h
-              rw [hwx] at h
-              exact absurd h hxy
+          have hwy : (w == y) = false := beq_eq_false_iff_ne.mpr (hwx ▸ hxy)
           simp only [hwy, Bool.false_eq_true, ↓reduceIte]
-          -- RHS: (.var w).substitute x rx = rx (since w == x)
           simp only [LocalTypeR.substitute, ← hwx, beq_self_eq_true, ↓reduceIte]
-          -- Now: LHS = rx.substitute y ry, RHS = rx
-          -- Since rx is closed, y is not free in rx
-          have hy_not_free_rx : isFreeIn y rx = false := hrx_closed y
-          rw [substitute_not_free rx y ry hy_not_free_rx]
+          rw [substitute_not_free rx y ry (hrx_closed y)]
         · -- w != x
           by_cases hwy : w == y
           · -- w == y: second substitution gives ry (on LHS) or ry' (on RHS)
@@ -363,26 +318,13 @@ mutual
         congr 1
         exact subst_subst_comm_branches_general bs x y rx ry ry' hxy hx_not_bound hrx_closed hry_rel
     | mu s inner =>
-        -- notBoundAt x (.mu s inner) = (x != s) && notBoundAt x inner = true
         simp only [notBoundAt] at hx_not_bound
         have ⟨hxs, hx_not_bound_inner⟩ := Bool.and_eq_true_iff.mp hx_not_bound
         have hxs' : x ≠ s := by simp only [bne_iff_ne, ne_eq] at hxs; exact hxs
-        have hsx' : s ≠ x := hxs'.symm
-        have hsx : (s == x) = false := by
-          cases h : s == x
-          · rfl
-          · simp only [beq_iff_eq] at h; exact absurd h hsx'
+        have hsx : (s == x) = false := beq_eq_false_iff_ne.mpr hxs'.symm
         by_cases hsy : s == y
-        · -- s == y: both sides shadowed on y-substitution
-          simp only [LocalTypeR.substitute, hsx, Bool.false_eq_true, ↓reduceIte, hsy]
-          -- Goal should now be: .mu s (inner.substitute x rx) = (.mu s inner).substitute x rx
-          -- But simp may have already solved it. If not, apply mu_subst_ne.
-        · -- s != y: y-substitution goes through
-          -- LHS: (.mu s (inner.substitute x rx)).substitute y ry
-          --    = .mu s ((inner.substitute x rx).substitute y ry)   [since s != y]
-          -- RHS: (.mu s (inner.substitute y ry')).substitute x rx
-          --    = .mu s ((inner.substitute y ry').substitute x rx)  [since s != x]
-          simp only [LocalTypeR.substitute, hsx, Bool.false_eq_true, ↓reduceIte, hsy]
+        · simp only [LocalTypeR.substitute, hsx, Bool.false_eq_true, ↓reduceIte, hsy]
+        · simp only [LocalTypeR.substitute, hsx, Bool.false_eq_true, ↓reduceIte, hsy]
           congr 1
           exact subst_subst_comm_general inner x y rx ry ry' hxy hx_not_bound_inner hrx_closed hry_rel
   termination_by sizeOf e
@@ -539,11 +481,7 @@ theorem unfold_subst_eq_subst_unfold (a : LocalTypeR) (var : String) (repl : Loc
       -- RHS: ((.mu t body).unfold).substitute var repl
       --    = (body.substitute t (.mu t body)).substitute var repl
       simp only [LocalTypeR.substitute]
-      have htvar : (t == var) = false := by
-        cases h : t == var
-        · rfl
-        · simp only [beq_iff_eq] at h; exact absurd h htv'
-      simp only [htvar, Bool.false_eq_true, ↓reduceIte, LocalTypeR.unfold]
+      simp only [beq_eq_false_iff_ne.mpr htv', Bool.false_eq_true, ↓reduceIte, LocalTypeR.unfold]
       -- Goal: (body.substitute var repl).substitute t (.mu t (body.substitute var repl))
       --     = (body.substitute t (.mu t body)).substitute var repl
       exact subst_mu_comm body var t repl hbar_body hfresh htv'
@@ -679,10 +617,7 @@ private theorem bne_of_notBoundAt_mu {v t : String} {body : LocalTypeR}
   unfold notBoundAt at hbar
   have ⟨hvt, _⟩ := Bool.and_eq_true_iff.mp hbar
   simp only [bne_iff_ne, ne_eq] at hvt
-  cases h : t == v
-  · rfl
-  · simp only [beq_iff_eq] at h
-    exact absurd h.symm hvt
+  exact beq_eq_false_iff_ne.mpr (Ne.symm hvt)
 
 /-- Standard one-step analysis for SubstRel after flattening. -/
 theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
@@ -741,16 +676,10 @@ theorem SubstRel_postfix_standard (var : String) (repl : LocalTypeR)
     unfold notBoundAt at hbarA hbarB
     have ⟨hvart, hbarBody⟩ := Bool.and_eq_true_iff.mp hbarA
     have ⟨hvars, hbarBody'⟩ := Bool.and_eq_true_iff.mp hbarB
-    have htvar : (t == var) = false := by
-      simp only [bne_iff_ne, ne_eq] at hvart
-      cases h : t == var; rfl
-      simp only [beq_iff_eq] at h; exact absurd h.symm hvart
-    have hsvar : (s == var) = false := by
-      simp only [bne_iff_ne, ne_eq] at hvars
-      cases h : s == var; rfl
-      simp only [beq_iff_eq] at h; exact absurd h.symm hvars
-    have htne : t ≠ var := by simp only [bne_iff_ne, ne_eq] at hvart; exact fun h => hvart h.symm
-    have hsne : s ≠ var := by simp only [bne_iff_ne, ne_eq] at hvars; exact fun h => hvars h.symm
+    have htne : t ≠ var := Ne.symm (bne_iff_ne.mp hvart)
+    have hsne : s ≠ var := Ne.symm (bne_iff_ne.mp hvars)
+    have htvar : (t == var) = false := beq_eq_false_iff_ne.mpr htne
+    have hsvar : (s == var) = false := beq_eq_false_iff_ne.mpr hsne
     -- notBoundAt for the mu constructors
     have hmu_t_bar : notBoundAt var (.mu t body) = true := by
       unfold notBoundAt; exact Bool.and_eq_true_iff.mpr ⟨hvart, hbarBody⟩
