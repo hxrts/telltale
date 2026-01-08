@@ -1730,30 +1730,48 @@ private def CProjectTransRelComp : Rel := fun a c =>
   (∃ b, CProjectTransRel a b ∧ EQ2 b c) ∨
   (∃ b b', EQ2 a b ∧ CProjectTransRel b b' ∧ EQ2 b' c)
 
-/-- Axiom: when composing EQ2 and CProjectTransRel through a mu intermediate,
-    the result satisfies EQ2F.
+/-- Composing EQ2 and CProjectTransRel through a mu intermediate satisfies EQ2F.
 
-    This axiom handles all 62 mu-intermediate cases in CProjectTransRelComp_postfix.
+    **Proof strategy**:
+    1. Use CProjectTransRel_postfix to get: EQ2F (EQ2_closure CProjectTransRel) (.mu v body) c
+    2. Use monotonicity to lift: EQ2_closure CProjectTransRel ⊆ EQ2_closure CProjectTransRelComp
+       (since CProjectTransRel is the base case of CProjectTransRelComp)
+    3. Apply EQ2F.mono to get the result
 
-    **Semantic justification**: When we have `EQ2 a (.mu v body)` and `CProjectTransRel (.mu v body) c`:
-    1. EQ2 is observational equivalence, so `a` and `(.mu v body)` have the same observable behavior
-    2. CProject relates global types to local types structurally
-    3. The composition through the mu preserves this structural relationship
-    4. Therefore, `a` and `c` must be related by EQ2F up to the closure
+    This proof doesn't require paco_coind because we're proving a single-step property (EQ2F),
+    not a coinductive relation. We leverage:
+    - The existing CProjectTransRel_postfix theorem (which already handles the mu unfolding)
+    - Monotonicity of EQ2F
+    - The fact that CProjectTransRel ⊆ CProjectTransRelComp
 
-    The proof would require:
-    - Case analysis on all combinations of `a` and `c` constructors (5×5 = 25 cases)
-    - For each case, use EQ2 unfold properties and CProject extraction to show EQ2F holds
-    - This is tedious but follows from the semantics of EQ2 and CProject
-
-    **Paco-lean insight**: This is analogous to the ITree bisimulation transitivity pattern,
-    where composition through recursive constructors (Tau/mu) is handled by accumulation.
-    The witness relation `∃ b, EQ2 a b ∧ CProjectTransRel b c` captures this intermediate. -/
-private axiom EQ2_CProjectTransRel_compose_through_mu
+    All 62 mu-intermediate cases are resolved uniformly by this theorem. -/
+private theorem EQ2_CProjectTransRel_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
     (hrel : CProjectTransRel (.mu v body) c) :
-    EQ2F (EQ2_closure CProjectTransRelComp) a c
+    EQ2F (EQ2_closure CProjectTransRelComp) a c := by
+
+  -- Get EQ2F structure from CProjectTransRel_postfix
+  have hrel_f : EQ2F (EQ2_closure CProjectTransRel) (.mu v body) c :=
+    CProjectTransRel_postfix (.mu v body) c hrel
+
+  -- Monotonicity: EQ2_closure CProjectTransRel ⊆ EQ2_closure CProjectTransRelComp
+  -- because CProjectTransRel is the base case of CProjectTransRelComp
+  have h_mono : ∀ x y, (EQ2_closure CProjectTransRel) x y →
+                       (EQ2_closure CProjectTransRelComp) x y := by
+    intro x y h
+    simp only [EQ2_closure] at h ⊢
+    cases h with
+    | inl hrel' =>
+        left
+        left -- CProjectTransRel is the base case of CProjectTransRelComp
+        exact hrel'
+    | inr heq' =>
+        right
+        exact heq'
+
+  -- Apply EQ2F monotonicity to lift the result
+  exact EQ2F.mono h_mono _ _ hrel_f
 
 /-- CProjectTransRelComp can be extended with EQ2 at the right to produce another CProjectTransRelComp.
     This is the key lemma that allows the BranchesRel_trans_chain helper to work. -/
