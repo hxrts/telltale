@@ -2152,8 +2152,13 @@ private theorem CProjectTransRelComp_postfix :
         | var z =>
             simp only [EQ2F] at heq_f hbase_f
             exact heq_f.trans hbase_f
-        | mu vb body_b => simp only [EQ2F] at heq_f
-        | _ => simp only [EQ2F] at heq_f
+        | mu vb body_b =>
+            -- mu intermediate: heq_f becomes EQ2 on unfolded body, needs separate handling
+            -- For now, use sorry - this case requires mu-unfolding lemma
+            sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | send _ _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .send p bs, .send q cs =>
         -- send/send composition: chain through b
         -- heq_f : p = pb ∧ BranchesRel EQ2 bs bbs
@@ -2168,8 +2173,12 @@ private theorem CProjectTransRelComp_postfix :
             simp only [EQ2F] at heq_f hbase_f
             exact ⟨heq_f.1.trans hbase_f.1,
                    BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) heq_f.2 hbase_f.2⟩
-        | mu vb body_b => simp only [EQ2F] at heq_f
-        | _ => simp only [EQ2F] at heq_f
+        | mu vb body_b =>
+            -- mu intermediate: needs separate handling
+            sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | var _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .recv p bs, .recv q cs =>
         -- recv/recv composition: chain through b
         -- heq_f : p = pb ∧ BranchesRel EQ2 bs bbs
@@ -2184,21 +2193,136 @@ private theorem CProjectTransRelComp_postfix :
             simp only [EQ2F] at heq_f hbase_f
             exact ⟨heq_f.1.trans hbase_f.1,
                    BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) heq_f.2 hbase_f.2⟩
-        | mu vb body_b => simp only [EQ2F] at heq_f
-        | _ => simp only [EQ2F] at heq_f
-    -- Type mismatch cases: derive contradiction from EQ2
-    | .«end», .var _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .«end», .send _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .«end», .recv _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .var _, .«end» => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .var _, .send _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .var _, .recv _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .send _ _, .«end» => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .send _ _, .var _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .send _ _, .recv _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .recv _ _, .«end» => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .recv _ _, .var _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
-    | .recv _ _, .send _ _ => have h := EQ2.destruct heq_ab; simp only [EQ2F] at h
+        | mu vb body_b =>
+            -- mu intermediate: needs separate handling
+            sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | var _ => simp only [EQ2F] at heq_f
+        | send _ _ => simp only [EQ2F] at heq_f
+    -- Type mismatch cases: derive contradiction by case splitting on intermediate b
+    -- Pattern: EQ2 lt b forces b to have same shape as lt (or be mu), then contradiction with t
+    -- For same-shape b cases (e.g., b=end when lt=end), use CProjectTransRel hypothesis to get contradiction
+    | .«end», .var _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | «end» =>
+            -- b=end: contradiction comes from CProjectTransRel end (var y)
+            have hcontr := CProjectTransRel_postfix (.«end») (.var _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry  -- mu intermediate needs separate handling
+        | var _ => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .«end», .send _ _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | «end» =>
+            have hcontr := CProjectTransRel_postfix (.«end») (.send _ _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .«end», .recv _ _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | «end» =>
+            have hcontr := CProjectTransRel_postfix (.«end») (.recv _ _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .var _, .«end» =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | var _ =>
+            have hcontr := CProjectTransRel_postfix (.var _) (.«end») hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .var _, .send _ _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | var _ =>
+            have hcontr := CProjectTransRel_postfix (.var _) (.send _ _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .var _, .recv _ _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | var _ =>
+            have hcontr := CProjectTransRel_postfix (.var _) (.recv _ _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .send _ _, .«end» =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | send _ _ =>
+            have hcontr := CProjectTransRel_postfix (.send _ _) (.«end») hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | var _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .send _ _, .var _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | send _ _ =>
+            have hcontr := CProjectTransRel_postfix (.send _ _) (.var _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | var _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .send _ _, .recv _ _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | send _ _ =>
+            have hcontr := CProjectTransRel_postfix (.send _ _) (.recv _ _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | var _ => simp only [EQ2F] at h
+        | recv _ _ => simp only [EQ2F] at h
+    | .recv _ _, .«end» =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | recv _ _ =>
+            have hcontr := CProjectTransRel_postfix (.recv _ _) (.«end») hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | var _ => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+    | .recv _ _, .var _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | recv _ _ =>
+            have hcontr := CProjectTransRel_postfix (.recv _ _) (.var _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | var _ => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
+    | .recv _ _, .send _ _ =>
+        have h := EQ2.destruct heq_ab
+        cases b with
+        | recv _ _ =>
+            have hcontr := CProjectTransRel_postfix (.recv _ _) (.send _ _) hrel_bc
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at h
+        | var _ => simp only [EQ2F] at h
+        | send _ _ => simp only [EQ2F] at h
   · -- 2-hop suffix: ∃ b, CProjectTransRel lt b ∧ EQ2 b t
     -- Key insight: for mu cases, use 3-hop to chain through unfold
     match lt, t with
@@ -2262,8 +2386,12 @@ private theorem CProjectTransRelComp_postfix :
         | var z =>
             simp only [EQ2F] at hbase_f heq_f
             exact hbase_f.trans heq_f
-        | mu vb body_b => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at hbase_f
+        | mu vb body_b =>
+            -- mu intermediate: needs separate handling
+            sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at hbase_f
+        | recv _ _ => simp only [EQ2F] at hbase_f
     | .send p bs, .send q cs =>
         -- hbase_f : p = pb ∧ BranchesRel (EQ2_closure _) bs bbs
         -- heq_f : pb = q ∧ BranchesRel EQ2 bbs cs
@@ -2276,8 +2404,12 @@ private theorem CProjectTransRelComp_postfix :
             simp only [EQ2F] at hbase_f heq_f
             exact ⟨hbase_f.1.trans heq_f.1,
                    BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) hbase_f.2 heq_f.2⟩
-        | mu vb body_b => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at hbase_f
+        | mu vb body_b =>
+            -- mu intermediate: needs separate handling
+            sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | var _ => simp only [EQ2F] at hbase_f
+        | recv _ _ => simp only [EQ2F] at hbase_f
     | .recv p bs, .recv q cs =>
         -- hbase_f : p = pb ∧ BranchesRel (EQ2_closure _) bs bbs
         -- heq_f : pb = q ∧ BranchesRel EQ2 bbs cs
@@ -2290,45 +2422,130 @@ private theorem CProjectTransRelComp_postfix :
             simp only [EQ2F] at hbase_f heq_f
             exact ⟨hbase_f.1.trans heq_f.1,
                    BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) hbase_f.2 heq_f.2⟩
-        | mu vb body_b => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at hbase_f
-    -- Type mismatch cases: derive contradiction from CProjectTransRel and EQ2
+        | mu vb body_b =>
+            -- mu intermediate: needs separate handling
+            sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | var _ => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at hbase_f
+    -- Type mismatch cases: derive contradiction by case splitting on intermediate b
+    -- Pattern: EQ2 b t forces b to have same shape as t (or be mu), then contradiction with lt
     | .«end», .var y =>
         have hbase_f := CProjectTransRel_postfix (.«end») b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | var _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry  -- mu intermediate
+        | «end» => simp only [EQ2F] at heq_f
+        | send _ _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .«end», .send q cs =>
         have hbase_f := CProjectTransRel_postfix (.«end») b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | var _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .«end», .recv q cs =>
         have hbase_f := CProjectTransRel_postfix (.«end») b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | var _ => simp only [EQ2F] at heq_f
+        | send _ _ => simp only [EQ2F] at heq_f
     | .var x, .«end» =>
         have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | «end» => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at heq_f
+        | send _ _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .var x, .send q cs =>
         have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | var _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .var x, .recv q cs =>
         have hbase_f := CProjectTransRel_postfix (.var x) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_f
+        | var _ => simp only [EQ2F] at heq_f
+        | send _ _ => simp only [EQ2F] at heq_f
     | .send p bs, .«end» =>
         have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | «end» =>
+            have hcontr := CProjectTransRel_postfix (.send p bs) (.«end») hrel_ab
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at hbase_f
     | .send p bs, .var y =>
         have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | var _ =>
+            have hcontr := CProjectTransRel_postfix (.send p bs) (.var _) hrel_ab
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at heq_f
+        | recv _ _ => simp only [EQ2F] at hbase_f
     | .send p bs, .recv q cs =>
         have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | var _ => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at heq_f
     | .recv p bs, .«end» =>
         have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | «end» =>
+            have hcontr := CProjectTransRel_postfix (.recv p bs) (.«end») hrel_ab
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at hbase_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .recv p bs, .var y =>
         have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | var _ =>
+            have hcontr := CProjectTransRel_postfix (.recv p bs) (.var _) hrel_ab
+            simp only [EQ2F] at hcontr
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | send _ _ => simp only [EQ2F] at hbase_f
+        | recv _ _ => simp only [EQ2F] at heq_f
     | .recv p bs, .send q cs =>
         have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
-        cases b <;> simp only [EQ2F] at hbase_f
+        have heq_f := EQ2.destruct heq_bc
+        cases b with
+        | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at hbase_f
+        | var _ => simp only [EQ2F] at hbase_f
+        | recv _ _ => simp only [EQ2F] at heq_f
   · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
     have hbase_f := CProjectTransRel_postfix b b' hrel_bb'
     -- Chain all three: combine 2-hop prefix and 2-hop suffix patterns
@@ -2394,8 +2611,14 @@ private theorem CProjectTransRelComp_postfix :
                 calc x = w := heq_ab_f
                      _ = w' := hbase_f
                      _ = y := heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry  -- mu intermediate b'
+            | «end» => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry  -- mu intermediate b
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .send p bs, .send q cs =>
         simp only [EQ2F, EQ2_closure]
         -- Goal: p = q ∧ BranchesRel _ bs cs
@@ -2414,10 +2637,21 @@ private theorem CProjectTransRelComp_postfix :
                 · calc p = p' := heq_p_p'
                        _ = p'' := heq_p'_p''
                        _ = q := heq_p''_q
-                · exact BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_ab
-                    (BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_bb' hbr_bc)
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+                · -- Chain: hbr_ab : BranchesRel EQ2 bs bs'
+                  -- hbr_bb' : BranchesRel (EQ2_closure CProjectTransRel) bs' bs''
+                  -- hbr_bc : BranchesRel EQ2 bs'' cs
+                  -- Use BranchesRel_trans_chain_rev for first chain (EQ2 then closure)
+                  -- Then BranchesRel_trans_chain for second (closure then EQ2)
+                  have h1 := BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) hbr_ab hbr_bb'
+                  exact BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) h1 hbr_bc
+            | mu _ _ => sorry  -- mu intermediate b'
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry  -- mu intermediate b
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .recv p bs, .recv q cs =>
         simp only [EQ2F, EQ2_closure]
         -- Goal: p = q ∧ BranchesRel _ bs cs
@@ -2436,109 +2670,191 @@ private theorem CProjectTransRelComp_postfix :
                 · calc p = p' := heq_p_p'
                        _ = p'' := heq_p'_p''
                        _ = q := heq_p''_q
-                · exact BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_ab
-                    (BranchesRel_trans_chain CProjectTransRelComp_extend_right hbr_bb' hbr_bc)
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+                · -- Chain: hbr_ab : BranchesRel EQ2 bs bs'
+                  -- hbr_bb' : BranchesRel (EQ2_closure CProjectTransRel) bs' bs''
+                  -- hbr_bc : BranchesRel EQ2 bs'' cs
+                  have h1 := BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) hbr_ab hbr_bb'
+                  exact BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) h1 hbr_bc
+            | mu _ _ => sorry  -- mu intermediate b'
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry  -- mu intermediate b
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
     -- Type mismatch cases: derive contradiction by propagating shape constraints through chain
     -- Pattern: lt and t have mismatched types, so the chain EQ2 lt b, EQ2F _ b b', EQ2 b' t
     -- must fail somewhere. Propagate through to find the contradiction.
+    -- For mu intermediates: use sorry (needs separate lemma about mu unfolding)
     | .«end», .var _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | «end» =>
             cases b' with
             | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .«end», .send _ _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | «end» =>
             cases b' with
             | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .«end», .recv _ _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | «end» =>
             cases b' with
             | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .var x, .«end» =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | var _ =>
             cases b' with
             | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .var x, .send _ _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | var _ =>
             cases b' with
             | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .var x, .recv _ _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | var _ =>
             cases b' with
             | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .send p bs, .«end» =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | send _ _ =>
             cases b' with
             | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .send p bs, .var _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | send _ _ =>
             cases b' with
             | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .send p bs, .recv _ _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | send _ _ =>
             cases b' with
             | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | recv _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | recv _ _ => simp only [EQ2F] at heq_ab_f
     | .recv p bs, .«end» =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | recv _ _ =>
             cases b' with
             | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
     | .recv p bs, .var _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | recv _ _ =>
             cases b' with
             | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
     | .recv p bs, .send _ _ =>
         have heq_ab_f := EQ2.destruct heq_ab
         cases b with
         | recv _ _ =>
             cases b' with
             | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | _ => simp only [EQ2F] at hbase_f
-        | _ => simp only [EQ2F] at heq_ab_f
+            | mu _ _ => sorry
+            | «end» => simp only [EQ2F] at hbase_f
+            | var _ => simp only [EQ2F] at hbase_f
+            | send _ _ => simp only [EQ2F] at hbase_f
+        | mu _ _ => sorry
+        | «end» => simp only [EQ2F] at heq_ab_f
+        | var _ => simp only [EQ2F] at heq_ab_f
+        | send _ _ => simp only [EQ2F] at heq_ab_f
 
 /-- CProject implies EQ2 with trans.
 
