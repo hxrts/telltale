@@ -3194,7 +3194,30 @@ This is because:
 
 The key insight is that EQ2 is a congruence: it preserves structure while allowing
 mu-unfolding. The projection relation is defined coinductively, so any finite
-observation of e1 can be matched by the corresponding observation of e0. -/
+observation of e1 can be matched by the corresponding observation of e0.
+
+**Proof strategy using coinduction:**
+1. Define witness relation: `∃ e0, CProject g role e0 ∧ EQ2 e0 e1`
+2. Show it's a post-fixpoint of CProjectF
+3. Use extraction axioms to convert EQ2 structure to constructor information about e1
+4. Apply CProject_coind
+
+The proof requires case analysis on the global type `g` and using the appropriate
+EQ2 extraction axioms (`EQ2.end_right_implies_UnfoldsToEnd`, etc.) to extract
+the shape of `e1` from `EQ2 e0 e1`.
+
+**Challenge**: CProjectF requires exact constructor matching (e.g., `.end` matches `.end`),
+but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction axioms give
+`UnfoldsTo*` predicates, but we need exact constructor equality for CProjectF.
+
+**Possible approaches**:
+1. Strengthen extraction axioms to provide constructor equality (not just unfolding)
+2. Use Bisim.toBisim and prove CProject is closed under Bisim
+3. Modify CProjectF to accept mu-wrapped candidates (major change)
+4. Prove auxiliary lemmas showing EQ2 preserves "canonical forms" for each constructor
+
+For now, this remains an axiom. The semantic justification is strong: EQ2 is observational
+equivalence, and CProject is defined coinductively over observations, so they must commute. -/
 axiom CProject_EQ2_axiom (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1
 
