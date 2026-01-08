@@ -175,6 +175,62 @@ def LocalTypeR.isClosed (lt : LocalTypeR) : Bool := lt.freeVars.isEmpty
 
     If .mu t body is closed, then body can only have t as a free variable.
     Substituting a closed term (.mu t body) for t yields a closed result. -/
+-- Helper: freeVars of substitute when replacing with closed term
+mutual
+theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTypeR) :
+    e.isClosed → ∀ v, v ∈ (body.substitute t e).freeVars → v ∈ body.freeVars ∧ v ≠ t := by
+  intro he v hv
+  induction body with
+  | end =>
+    simp [substitute, freeVars] at hv
+  | var w =>
+    simp [substitute, freeVars] at hv
+    split at hv
+    · -- w == t, so substitute gave e, but e is closed
+      simp [isClosed, List.isEmpty_iff_eq_nil] at he
+      rw [he] at hv
+      simp at hv
+    · -- w != t, so v = w
+      exact ⟨by simp [freeVars]; exact hv, by intro heq; subst heq; simp at hv⟩
+  | send p bs =>
+    simp [substitute, freeVars] at hv
+    have := freeVars_substituteBranches_closed bs t e he v hv
+    simp [freeVars] at this
+    exact this
+  | recv p bs =>
+    simp [substitute, freeVars] at hv
+    have := freeVars_substituteBranches_closed bs t e he v hv
+    simp [freeVars] at this
+    exact this
+  | mu s body' ih =>
+    simp [substitute, freeVars, List.mem_filter] at hv ⊢
+    split at hv
+    · -- s == t, no substitution happened
+      exact hv
+    · -- s != t, substitution in body'
+      obtain ⟨hv', hne_s⟩ := hv
+      have := ih he v hv'
+      obtain ⟨hmem, hne_t⟩ := this
+      exact ⟨⟨hmem, hne_s⟩, hne_t⟩
+
+theorem freeVars_substituteBranches_closed (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
+    e.isClosed → ∀ v, v ∈ freeVarsOfBranches (substituteBranches bs t e) →
+      v ∈ freeVarsOfBranches bs ∧ v ≠ t := by
+  intro he v hv
+  induction bs with
+  | nil => simp [freeVarsOfBranches, substituteBranches] at hv
+  | cons head tail ih =>
+    obtain ⟨label, cont⟩ := head
+    simp [freeVarsOfBranches, substituteBranches] at hv
+    cases hv with
+    | inl hleft =>
+      have := freeVars_substitute_closed cont t e he v hleft
+      exact ⟨Or.inl this.1, this.2⟩
+    | inr hright =>
+      have := ih hright
+      exact ⟨Or.inr this.1, this.2⟩
+end
+
 theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
     (hclosed : (.mu t body).isClosed) :
     (body.substitute t (.mu t body)).isClosed := by
@@ -182,10 +238,22 @@ theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
   -- freeVars (.mu t body) = (freeVars body).filter (· != t)
   -- So (freeVars body).filter (· != t) = []
   -- This means body can only have t as free var
-  simp only [isClosed, freeVars] at hclosed ⊢
-  -- hclosed : (body.freeVars.filter (· != t)).isEmpty = true
-  -- Goal: (body.substitute t (.mu t body)).freeVars.isEmpty = true
-  sorry
+  simp only [isClosed, freeVars, List.isEmpty_iff_eq_nil] at hclosed ⊢
+  -- hclosed : (body.freeVars.filter (· != t)).isEmpty = true becomes hclosed : filter = []
+  ext v
+  simp [List.mem_nil_iff]
+  intro hv
+  -- v ∈ (body.substitute t (.mu t body)).freeVars
+  -- By freeVars_substitute_closed: v ∈ body.freeVars ∧ v ≠ t
+  have := freeVars_substitute_closed body t (.mu t body) hclosed v hv
+  obtain ⟨hmem, hne⟩ := this
+  -- But hclosed says (body.freeVars.filter (· != t)) = []
+  -- So if v ∈ body.freeVars and v ≠ t, then v ∈ filter, contradiction
+  have : v ∈ body.freeVars.filter (· != t) := by
+    simp [List.mem_filter]
+    exact ⟨hmem, hne⟩
+  rw [hclosed] at this
+  simp at this
 
 /-! ## Full Unfolding (Coq-style `full_eunf`)
 
