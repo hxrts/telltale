@@ -347,9 +347,9 @@ This avoids the semantic gap that arises from using full wellFormed. -/
 private theorem wellFormed_mu_body (t : String) (body : GlobalType)
     (hwf : (GlobalType.mu t body).wellFormed = true) :
     body.allCommsNonEmpty = true ∧ body.noSelfComm = true := by
-  simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-  simp only [GlobalType.allCommsNonEmpty, GlobalType.noSelfComm] at hwf
-  exact ⟨hwf.1.2, hwf.2⟩
+  unfold GlobalType.wellFormed at hwf
+  simp only [GlobalType.allCommsNonEmpty, GlobalType.noSelfComm, Bool.and_eq_true] at hwf
+  simp_all only [and_self]
 
 -- Helper: sizeOf pair.2 < sizeOf (comm sender receiver (pair :: rest))
 -- This is needed for termination proof of trans_muve_of_not_part_of2
@@ -377,10 +377,9 @@ private theorem wellFormed_comm_cont (sender receiver : String) (pair : Label ×
   simp only [GlobalType.allVarsBound, GlobalType.allVarsBoundBranches,
              GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
              GlobalType.noSelfComm, GlobalType.noSelfCommBranches,
-             Bool.and_eq_true] at hwf
-  -- hwf structure: ((avb ∧ avb_rest) ∧ decide ... ∧ acne ∧ acne_rest) ∧ ((s != r) ∧ nsc_pair ∧ nsc_rest)
-  -- Goal: (avb ∧ acne) ∧ nsc (left-associative due to Bool.and_eq_true)
-  exact ⟨⟨hwf.1.1.1, hwf.1.2.2.1⟩, hwf.2.2.1⟩
+             GlobalType.isProductive, GlobalType.isProductiveBranches,
+             Bool.and_eq_true] at hwf ⊢
+  tauto
 
 /-- Auxiliary version using structural properties that compose with mu.
     This avoids the semantic gap where body.allVarsBound [] cannot be proven
@@ -461,8 +460,9 @@ theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g) (hwf : g.wellFormed = true) :
     isMuve (Trans.trans g role) = true := by
   -- Extract structural properties from wellFormed
+  -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-  exact trans_muve_of_not_part_of2_aux g role hnotpart hwf.1.2 hwf.2
+  exact trans_muve_of_not_part_of2_aux g role hnotpart hwf.1.1.2 hwf.1.2
 
 /-- Relation for proving EQ2 .end X for closed muve types.
     ClosedMuveRel a b holds when a = .end and b is a closed muve type. -/
@@ -562,8 +562,9 @@ theorem EQ_end (role : String) (g : GlobalType)
   have hclosed : isClosed (trans g role) = true := by
     rw [isClosed_eq_true_iff]
     -- wellFormed implies g is closed, and trans preserves closedness
+    -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-    have hbound := hwf.1.1
+    have hbound := hwf.1.1.1
     -- trans of a closed global type is a closed local type
     -- This follows from trans_freeVars_subset
     have hsub := trans_freeVars_subset g role
@@ -676,8 +677,9 @@ theorem CProject_muve_of_not_part_of2 (g : GlobalType) (role : String) (lt : Loc
     (hwf : g.wellFormed = true) :
     isMuve lt = true := by
   have hne : g.allCommsNonEmpty = true := by
+    -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-    exact hwf.1.2
+    exact hwf.1.1.2
   exact CProject_muve_of_not_part_of2_aux g role lt hproj hnotpart hne
 
 /-- Auxiliary: Non-participant projections have free vars contained in bound vars.
@@ -822,8 +824,9 @@ theorem CProject_closed_of_not_part_of2 (g : GlobalType) (role : String) (lt : L
     (hnotpart : ¬part_of2 role g)
     (hwf : g.wellFormed = true) :
     isClosed lt = true := by
+  -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-  exact CProject_closed_of_not_part_of2_aux g role lt hproj hnotpart hwf.1.1 hwf.1.2
+  exact CProject_closed_of_not_part_of2_aux g role lt hproj hnotpart hwf.1.1.1 hwf.1.1.2
 
 /-- Helper: sizeOf a member's continuation is less than sizeOf the list. -/
 private theorem sizeOf_mem_snd_lt {branches : List (Label × GlobalType)} {pair : Label × GlobalType}
@@ -974,8 +977,9 @@ theorem CProject_not_muve_of_part_of2 (g : GlobalType) (role : String) (lt : Loc
     (hwf : g.wellFormed = true) :
     isMuve lt = false := by
   have hne : g.allCommsNonEmpty = true := by
+    -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-    exact hwf.1.2
+    exact hwf.1.1.2
   exact CProject_not_muve_of_part_of2_aux g role lt hproj hpart hne
 
 /-- If a role participates on some path (part_of2) and there is a valid projection (CProject),
@@ -1104,8 +1108,9 @@ theorem CProject_part_of2_implies_part_of_all2 (g : GlobalType) (role : String) 
     (hpart : part_of2 role g)
     (hwf : g.wellFormed = true) :
     part_of_all2 role g := by
+  -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-  exact CProject_part_of2_implies_part_of_all2_aux g role lt hproj hpart hwf.1.2 hwf.2
+  exact CProject_part_of2_implies_part_of_all2_aux g role lt hproj hpart hwf.1.1.2 hwf.1.2
 
 /-- Classification: a role either participates or projects to EEnd.
 
@@ -1258,8 +1263,9 @@ decreasing_by
 theorem part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
     (h : part_of_all2 role g)
     (hwf : g.wellFormed = true) : part_of2 role g := by
+  -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
-  exact part_of_all2_implies_part_of2_aux role g h hwf.1.2
+  exact part_of_all2_implies_part_of2_aux role g h hwf.1.1.2
 
 /-- Helper: if CProject gives lt and role doesn't participate, then lt is EQ2 to trans.
 
@@ -2907,15 +2913,16 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
                 List.mem_cons_self
               have hwf_head : (gLabel, gCont).2.wellFormed = true := hwf _ hmem_head
               have haces : gCont.allCommsNonEmpty = true := by
-                -- wellFormed = allVarsBound && allCommsNonEmpty && noSelfComm
-                -- This is (a && b) && c where a=allVarsBound, b=allCommsNonEmpty, c=noSelfComm
+                -- wellFormed = (((allVarsBound && allCommsNonEmpty) && noSelfComm) && isProductive)
                 simp only [GlobalType.wellFormed] at hwf_head
-                -- hwf_head : (gCont.allVarsBound && gCont.allCommsNonEmpty) && gCont.noSelfComm = true
+                -- hwf_head : (((avb && acne) && nsc) && prod) = true
                 have h := Bool.and_eq_true_iff.mp hwf_head
-                -- h : (gCont.allVarsBound && gCont.allCommsNonEmpty) = true ∧ gCont.noSelfComm = true
+                -- h : (((avb && acne) && nsc) = true) ∧ (prod = true)
                 have h2 := Bool.and_eq_true_iff.mp h.1
-                -- h2 : gCont.allVarsBound = true ∧ gCont.allCommsNonEmpty = true
-                exact h2.2
+                -- h2 : ((avb && acne) = true) ∧ (nsc = true)
+                have h3 := Bool.and_eq_true_iff.mp h2.1
+                -- h3 : (avb = true) ∧ (acne = true)
+                exact h3.2
               have heq : EQ2 lCont (Trans.trans gCont role) :=
                 CProject_implies_EQ2_trans _ _ _ hproj haces
               have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
@@ -2956,15 +2963,17 @@ theorem AllBranchesProj_implies_EQ2_trans
       -- Extract allCommsNonEmpty for first.2 from wellFormed
       -- wellFormed implies allCommsNonEmpty, which propagates to branches
       have haces_first : first.2.allCommsNonEmpty = true := by
-        -- wellFormed = (allVarsBound && allCommsNonEmpty) && noSelfComm
+        -- wellFormed = (((allVarsBound && allCommsNonEmpty) && noSelfComm) && isProductive)
         -- allCommsNonEmpty (comm s r bs) = (bs.isEmpty = false) && allCommsNonEmptyBranches bs
         -- allCommsNonEmptyBranches (first :: rest) = first.2.allCommsNonEmpty && ...
         simp only [GlobalType.wellFormed] at hwf
-        -- hwf : ((comm ...).allVarsBound && (comm ...).allCommsNonEmpty) && (comm ...).noSelfComm = true
+        -- hwf : ((((avb && acne) && nsc) && prod) = true
         have h1 := Bool.and_eq_true_iff.mp hwf
-        -- h1 : ((comm ...).allVarsBound && (comm ...).allCommsNonEmpty) = true ∧ (comm ...).noSelfComm = true
-        have h2 := Bool.and_eq_true_iff.mp h1.1
-        -- h2 : (comm ...).allVarsBound = true ∧ (comm ...).allCommsNonEmpty = true
+        -- h1 : (((avb && acne) && nsc) = true) ∧ (prod = true)
+        have h1' := Bool.and_eq_true_iff.mp h1.1
+        -- h1' : ((avb && acne) = true) ∧ (nsc = true)
+        have h2 := Bool.and_eq_true_iff.mp h1'.1
+        -- h2 : (avb = true) ∧ (acne = true)
         simp only [GlobalType.allCommsNonEmpty, List.isEmpty_eq_false_iff] at h2
         -- h2.2 : (_ ∧ allCommsNonEmptyBranches (first :: rest) = true)
         have h3 := Bool.and_eq_true_iff.mp h2.2

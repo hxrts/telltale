@@ -149,16 +149,11 @@ theorem CanRecv.recv_refl (partner : String) (branches : List (Label × LocalTyp
     CanRecv (.recv partner branches) partner branches := CanRecv.base
 
 /-- Non-mu types that are not end cannot unfold to end. -/
-theorem UnfoldsToEnd.not_var {v : String} : ¬UnfoldsToEnd (.var v) := by
-  intro h; cases h
-
+theorem UnfoldsToEnd.not_var {v : String} : ¬UnfoldsToEnd (.var v) := nofun
 theorem UnfoldsToEnd.not_send {p : String} {bs : List (Label × LocalTypeR)} :
-    ¬UnfoldsToEnd (.send p bs) := by
-  intro h; cases h
-
+    ¬UnfoldsToEnd (.send p bs) := nofun
 theorem UnfoldsToEnd.not_recv {p : String} {bs : List (Label × LocalTypeR)} :
-    ¬UnfoldsToEnd (.recv p bs) := by
-  intro h; cases h
+    ¬UnfoldsToEnd (.recv p bs) := nofun
 
 /-- Unfolding targets are mutually exclusive. -/
 theorem UnfoldsToEnd.not_var_of_end {a : LocalTypeR} (h : UnfoldsToEnd a) :
