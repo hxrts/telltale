@@ -203,4 +203,122 @@ theorem LocalTypeR.fullUnfold_idemp (lt : LocalTypeR) :
     simpa [fullUnfold] using h
   simp [fullUnfold, h']
 
+/-! ## Guardedness Predicate (Coq-style `eguarded`)
+
+A variable is guarded in a type if it only appears inside a communication (send/recv).
+This is the key property for proving termination of mu-unfolding.
+
+Follows Coq's `eguarded n e` which checks if variable n is guarded at depth n. -/
+
+mutual
+  /-- Check if a variable appears free in a local type. -/
+  def LocalTypeR.isFreeIn (v : String) : LocalTypeR → Bool
+    | .end => false
+    | .var w => v == w
+    | .send _ bs => isFreeInBranches' v bs
+    | .recv _ bs => isFreeInBranches' v bs
+    | .mu t body => if v == t then false else body.isFreeIn v
+
+  /-- Helper: check if variable appears free in any branch. -/
+  def isFreeInBranches' (v : String) : List (Label × LocalTypeR) → Bool
+    | [] => false
+    | (_, c) :: rest => c.isFreeIn v || isFreeInBranches' v rest
+end
+
+/-- Check if a variable is guarded (only appears inside send/recv) in a local type.
+    A variable is guarded if it doesn't appear at the "head" position -
+    i.e., only inside the continuations of communications, not at mu bodies before communications.
+
+    This predicate checks if variable v is guarded at the current position:
+    - In end: trivially true (no v)
+    - In var w: must not be v (unguarded occurrence)
+    - In send/recv: any occurrence in branches is guarded (inside comm)
+    - In mu t body: if t = v, shadowed so ok; otherwise must check body -/
+def LocalTypeR.isGuarded (v : String) : LocalTypeR → Bool
+  | .end => true
+  | .var w => v != w  -- v appears unguarded if this IS v
+  | .send _ _ => true  -- Any occurrence of v in branches is guarded (inside comm)
+  | .recv _ _ => true  -- Any occurrence of v in branches is guarded (inside comm)
+  | .mu t body => if v == t then true else body.isGuarded v
+
+mutual
+  /-- A local type is contractive if every mu-bound variable is guarded in its body.
+      This ensures mu-unfolding eventually reaches a communication. -/
+  def LocalTypeR.isContractive : LocalTypeR → Bool
+    | .end => true
+    | .var _ => true
+    | .send _ bs => isContractiveBranches bs
+    | .recv _ bs => isContractiveBranches bs
+    | .mu t body => body.isGuarded t && body.isContractive
+
+  /-- Helper: check if all branches are contractive. -/
+  def isContractiveBranches : List (Label × LocalTypeR) → Bool
+    | [] => true
+    | (_, c) :: rest => c.isContractive && isContractiveBranches rest
+end
+
+/-! ## Guardedness and muHeight Properties -/
+
+/-- For non-mu types, unfold is identity. -/
+theorem LocalTypeR.unfold_non_mu (lt : LocalTypeR) :
+    (∀ t body, lt ≠ .mu t body) → lt.unfold = lt := by
+  intro h
+  match lt with
+  | .end | .var _ | .send _ _ | .recv _ _ => rfl
+  | .mu t body => exact absurd rfl (h t body)
+
+/-- The result of unfold on a mu is the substituted body. -/
+theorem LocalTypeR.unfold_mu (t : String) (body : LocalTypeR) :
+    (.mu t body : LocalTypeR).unfold = body.substitute t (.mu t body) := rfl
+
+/-- fullUnfold of mu unfolds via one step of unfold then iterate.
+
+    This follows from the definition: fullUnfold (.mu t body) = unfold^[1 + body.muHeight] (.mu t body)
+    and Function.iterate_succ': f^[n+1] x = f^[n] (f x).
+
+    TODO: Complete proof - currently blocked on Function.iterate unfolding. -/
+theorem LocalTypeR.fullUnfold_mu (t : String) (body : LocalTypeR) :
+    (.mu t body : LocalTypeR).fullUnfold =
+      LocalTypeR.unfold^[body.muHeight] (body.substitute t (.mu t body)) := by
+  sorry
+
+/-! ## Key Property: Contractive types reach observable form
+
+For closed, contractive types, fullUnfold always reaches a non-mu form.
+This is because:
+1. Contractive means all bound variables are guarded
+2. Guarded variables only appear inside send/recv
+3. So fullUnfold reaches send/recv/end (not var since closed) -/
+
+/-- Classification of fully unfolded types. -/
+inductive FullUnfoldResult where
+  | is_end : FullUnfoldResult
+  | is_var (v : String) : FullUnfoldResult
+  | is_send (p : String) (bs : List (Label × LocalTypeR)) : FullUnfoldResult
+  | is_recv (p : String) (bs : List (Label × LocalTypeR)) : FullUnfoldResult
+
+/-- Classify the result of full unfolding a non-mu type. -/
+def LocalTypeR.classifyNonMu : LocalTypeR → FullUnfoldResult
+  | .end => .is_end
+  | .var v => .is_var v
+  | .send p bs => .is_send p bs
+  | .recv p bs => .is_recv p bs
+  | .mu _ _ => .is_end  -- Shouldn't be called on mu, but need total function
+
+/-- For a type with muHeight 0 (non-mu at head), fullUnfold returns the type itself. -/
+theorem LocalTypeR.fullUnfold_muHeight_zero {lt : LocalTypeR} (h : lt.muHeight = 0) :
+    lt.fullUnfold = lt := by
+  simp [fullUnfold, h]
+
+/-- Non-mu types have muHeight 0. -/
+theorem LocalTypeR.muHeight_non_mu :
+    ∀ (lt : LocalTypeR), (∀ t body, lt ≠ .mu t body) → lt.muHeight = 0 := by
+  intro lt h
+  cases lt with
+  | «end» => rfl
+  | var _ => rfl
+  | send _ _ => rfl
+  | recv _ _ => rfl
+  | mu t body => exact absurd rfl (h t body)
+
 end RumpsteakV2.Protocol.LocalTypeR
