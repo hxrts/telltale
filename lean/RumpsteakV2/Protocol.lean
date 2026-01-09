@@ -1,6 +1,9 @@
 import RumpsteakV2.Protocol.Core
 import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Protocol.LocalTypeR
+import RumpsteakV2.Protocol.LocalTypeDB
+import RumpsteakV2.Protocol.LocalTypeConv
+import RumpsteakV2.Protocol.LocalTypeRDBBridge
 import RumpsteakV2.Protocol.Projection
 import RumpsteakV2.Protocol.CoTypes
 import RumpsteakV2.Protocol.Semantics

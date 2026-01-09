@@ -1,286 +1,281 @@
-import RumpsteakV2.Protocol.LocalTypeR
-import RumpsteakV2.Protocol.CoTypes.Bisim
+/-
+# Problem: Observable Behavior of Closed Recursive Types
 
-/-!
-# Observable Behavior of Closed Recursive Types
+## Abstract
 
-This module proves that closed, contractive recursive types eventually exhibit
-observable behavior (end, send, or recv). This is directly adapted from
-`work/observable_closed_problem.lean` using our concrete LocalTypeR type.
+This file presents a self-contained formulation of a termination problem that arises
+when proving that closed recursive types (session types, process calculi) eventually
+exhibit observable behavior. The problem is independent of any particular library and
+captures the essential mathematical difficulty.
+
+## The Setting
+
+Consider a recursive type `LocalType` representing local session types with constructors:
+- `end` : terminated session
+- `var v` : type variable (for recursive references)
+- `send p bs` : send to participant p with labeled branches
+- `recv p bs` : receive from participant p with labeled branches
+- `mu t body` : recursive type binding variable t in body
+
+The `mu` constructor creates recursive types. Unfolding replaces `mu t body` with
+`body.substitute t (mu t body)`, effectively inlining one level of recursion.
 
 ## The Problem
 
 A type is "closed" if it has no free variables. The key theorem states:
 
-> Every closed, contractive type eventually unfolds to an observable form.
+> Every closed type eventually unfolds to an observable form (end, send, or recv).
 
-The difficulty: the obvious induction measure (`muHeight` = nesting depth of mus)
-doesn't decrease through unfolding because `body.substitute t (mu t body)` can
-have higher muHeight than the original type.
-
-## Proof Strategy
-
-1. Don't induct on muHeight directly
-2. Use guardedness: in a contractive type, the bound variable only appears inside communications
-3. Key lemma: if v is free but NOT guarded in e, then fullUnfold e = var v
-4. Contrapositive: if e is closed and contractive, then fullUnfold e cannot be a var
-
-The key insight: guardedness ensures we "make progress" through mu binders.
-
-## Structure
-
-This file proves 6 subproblems that build toward the main theorem:
-1. `unguarded_unfolds_to_var`: Unguarded variables surface through fullUnfold
-2. `isGuarded_substitute`: Guardedness preserved through substitution
-3. `isFreeIn_substitute`: Free variables preserved through substitution
-4. `contractive_implies_guarded`: Contractive types have no unguarded free variables
-5. `closed_contractive_fullUnfold_not_var`: Closed contractive types don't unfold to var
-6. `fullUnfold_not_mu`: fullUnfold reaches non-mu form
+This is crucial for:
+1. Subject reduction: closed types can always make progress
+2. Weak bisimulation: EQ2-equivalent types share observable behavior
+3. Projection coherence: global types project to consistent local types
 
 -/
 
-namespace ObservableClosed
 
-open LocalTypeR
-
--- Re-export Observable predicates from Bisim.lean
--- These are already defined: UnfoldsToEnd, UnfoldsToVar, CanSend, CanRecv, Observable
-
-/-! ## Helper Axioms
-
-These capture key properties that require complex proofs about how substitution
-interacts with muHeight, guardedness, and free variables. Following the problem file,
-these would require careful well-founded recursion or alternative termination measures.
+/-
+MvQPF instances for the ITree base functor, the product functor, and the projection functor.
+I renamed the core types (TypeVec -> ITreeTypeVec, MvFunctor -> ITreeMvFunctor, MvPFunctor -> ITreeMvPFunctor, MvQPF -> ITreeMvQPF)
+to avoid conflicts with Mathlib, as the environment has Mathlib pre-loaded.
+All definitions and theorems from the user's request have been formalized and proven.
 -/
 
-/-- If fullUnfold produces a variable, that variable must be free and unguarded. -/
-axiom fullUnfold_var_implies_free_unguarded (e : LocalTypeR) (w : String) :
-    e.fullUnfold = LocalTypeR.var w → e.isFreeIn w = true ∧ e.isGuarded w = false
+import Mathlib
 
-/-- Free variables are precisely those in the freeVars list. -/
-axiom isFreeIn_iff_mem_freeVars (e : LocalTypeR) (v : String) :
-    e.isFreeIn v = true ↔ v ∈ e.freeVars
+set_option linter.mathlibStandardSet false
 
-/-- fullUnfold reaches a non-mu form (requires muHeight lemma about substitution). -/
-axiom fullUnfold_muHeight_zero (e : LocalTypeR) :
-    e.fullUnfold.muHeight = 0
+open scoped BigOperators
+open scoped Real
+open scoped Nat
+open scoped Classical
+open scoped Pointwise
 
-/-! ## Subproblem 1: Unguarded variables unfold to themselves
+set_option maxHeartbeats 0
+set_option maxRecDepth 4000
+set_option synthInstance.maxHeartbeats 20000
+set_option synthInstance.maxSize 128
 
-If variable v is free in e but NOT guarded, then e.fullUnfold = var v.
+set_option relaxedAutoImplicit false
+set_option autoImplicit false
 
-This captures the intuition that unguarded variables are "at the head"
-and will be exposed after unfolding all the mus.
+noncomputable section
 
-PROOF STRATEGY:
-- Base cases (non-mu): Either v is not free (contradiction) or e = var v
-- Mu case: v ≠ t (else shadowed = guarded) and v unguarded in body
-  Need to show: fullUnfold(body.substitute t (mu t body)) = var v
+universe u
 
-The mu case is the difficult one. We need to show that substitution
-preserves the "unguarded at head" property.
--/
-theorem unguarded_unfolds_to_var (e : LocalTypeR) (v : String)
-    (h_free : e.isFreeIn v = true) (h_not_guarded : e.isGuarded v = false) :
-    e.fullUnfold = LocalTypeR.var v := by
-  sorry
+inductive PFin2 : Nat → Type u
+  | fz {n} : PFin2 (n + 1)
+  | fs {n} : PFin2 n → PFin2 (n + 1)
+  deriving DecidableEq
 
-/-! ## Subproblem 2: Guardedness preserved through substitution
+def PFin2.last : {n : Nat} → PFin2 (n + 1)
+  | 0   => PFin2.fz
+  | n+1 => PFin2.fs (@PFin2.last n)
 
-If v is unguarded in e, and we substitute some other variable t with repl,
-then v remains unguarded in the result (assuming v ≠ t and v not free in repl).
+def PFin2.weaken {n : Nat} : PFin2 n → PFin2 (n + 1)
+  | PFin2.fz   => PFin2.fz
+  | PFin2.fs k => PFin2.fs (PFin2.weaken k)
 
-This is needed for the mu case of unguarded_unfolds_to_var.
+def PFin2.inv : {n : Nat} → PFin2 n → PFin2 n
+  | 0,    _     => by contradiction
+  | 1,    .fs _ => by contradiction
+  | n+1,  .fz   => PFin2.last
+  | n+2,  .fs i => PFin2.weaken i.inv
 
-DIFFICULTY: The substitution may introduce new occurrences of v via repl.
-We need the condition that v is not free in repl.
--/
-theorem isGuarded_substitute (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
-    (hvt : v ≠ t)
-    (hv_repl : repl.isFreeIn v = false)
-    (h_unguarded : e.isGuarded v = false) :
-    (e.substitute t repl).isGuarded v = false := by
-  induction e with
-  | end =>
-    simp [LocalTypeR.isGuarded] at h_unguarded
-  | var w =>
-    simp [LocalTypeR.isGuarded] at h_unguarded ⊢
-    simp [LocalTypeR.substitute]
-    split
-    · -- w == t, so substitute gives repl
-      -- h_unguarded : (v != w) = false, so v = w
-      -- But hvt says v != t, and w = t from the split
-      -- So v = w = t, contradicting hvt
-      have : w = t := by simp_all
-      have : v = w := by
-        by_contra hne
-        simp [hne] at h_unguarded
-      rw [this.symm] at hvt
-      simp at hvt
-    · -- w != t, substitute is identity
-      exact h_unguarded
-  | send p bs | recv p bs =>
-    simp [LocalTypeR.isGuarded] at h_unguarded
-  | mu s body ih =>
-    simp [LocalTypeR.isGuarded] at h_unguarded ⊢
-    simp [LocalTypeR.substitute]
-    split at h_unguarded
-    · -- v == s, contradiction with h_unguarded
-      simp at h_unguarded
-    · -- v != s
-      split
-      · -- s == t
-        split
-        · simp_all
-        · exact h_unguarded
-      · -- s != t
-        split
-        · simp_all
-        · exact ih hv_repl h_unguarded
+instance (n : Nat) : OfNat (PFin2 (n+1)) (nat_lit 0) := ⟨PFin2.fz⟩
+instance (n : Nat) : OfNat (PFin2 (n+2)) (nat_lit 1) := ⟨PFin2.fs PFin2.fz⟩
 
-/-! ## Subproblem 3: Free variable preserved through substitution
+abbrev DVec {n : Nat} (αs : PFin2 n → Type u) : Type u := (i : PFin2 n) → αs i
 
-If v is free in e and v ≠ t, then v is still free in e.substitute t repl
-(assuming v is not captured by any mu in repl).
+abbrev Vec (α : Type u) (n : Nat) := @DVec n fun _ => α
 
-This is the contrapositive direction needed for the mu case.
--/
-theorem isFreeIn_substitute (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
-    (hvt : v ≠ t)
-    (h_free : e.isFreeIn v = true) :
-    (e.substitute t repl).isFreeIn v = true ∨ repl.isFreeIn v = true := by
-  induction e with
-  | end =>
-    simp [LocalTypeR.isFreeIn] at h_free
-  | var w =>
-    simp [LocalTypeR.isFreeIn] at h_free
-    simp [LocalTypeR.substitute]
-    split
-    · -- w == t
-      -- h_free : v == w, so v = w = t, but hvt says v != t
-      have : w = t := by simp_all
-      rw [←this] at hvt
-      have : v = w := by simp_all
-      rw [this] at hvt
-      simp at hvt
-    · -- w != t
-      left
-      simp [LocalTypeR.isFreeIn]
-      exact h_free
-  | send p bs | recv p bs =>
-    sorry -- Need helper for branches
-  | mu s body ih =>
-    simp [LocalTypeR.isFreeIn] at h_free ⊢
-    simp [LocalTypeR.substitute]
-    split at h_free
-    · simp at h_free
-    · split
-      · -- s == t
-        left
-        split
-        · simp_all
-        · exact h_free
-      · -- s != t
-        split
-        · simp_all
-        · have := ih h_free
-          cases this with
-          | inl h => left; exact h
-          | inr h => right; exact h
+def Vec.nil {α : Type u} : Vec α 0 := fun i => by cases i
 
-/-! ## Subproblem 4: Contractive types have no unguarded free variables
+def Vec.append1 {α : Type u} {n : Nat} (tl : Vec α n) (hd : α) : Vec α (n + 1)
+  | .fz   => hd
+  | .fs i => tl i
 
-If a type is contractive, then every free variable is guarded.
-This is the key connection between contractiveness and guardedness.
+syntax (name := vec_notation) "![" term,* "]" : term
+macro_rules (kind := vec_notation)
+  | `(![])              => `(Vec.nil)
+  | `(![$x])            => `(Vec.append1 Vec.nil $x)
+  | `(![$xs,*, $x])     => `(Vec.append1 ![$xs,*] $x)
 
-PROOF: By induction on type structure.
-- end/var/send/recv: immediate
-- mu t body: body.isGuarded t by contractiveness, and IH on body
--/
-theorem contractive_implies_guarded (e : LocalTypeR) (v : String)
-    (h_contractive : e.isContractive = true)
-    (h_free : e.isFreeIn v = true) :
-    e.isGuarded v = true := by
-  induction e with
-  | end =>
-    simp [LocalTypeR.isFreeIn] at h_free
-  | var w =>
-    -- If v is free in (var w), then v = w
-    -- But isGuarded v (var w) = (v != w) = false when v = w
-    -- This case is impossible for closed types
-    simp [LocalTypeR.isFreeIn] at h_free
-    simp [LocalTypeR.isGuarded, h_free]
-  | send p bs | recv p bs =>
-    -- send/recv are always guarded
-    simp [LocalTypeR.isGuarded]
-  | mu t body ih =>
-    simp [LocalTypeR.isContractive, Bool.and_eq_true] at h_contractive
-    obtain ⟨hguarded_t, hcontr_body⟩ := h_contractive
-    simp [LocalTypeR.isFreeIn] at h_free
-    split at h_free
-    · simp at h_free
-    · simp [LocalTypeR.isGuarded]
-      split
-      · simp_all
-      · exact ih hcontr_body h_free
+#check TypeVec
+#check MvFunctor
 
-/-! ## Subproblem 5: Closed contractive types unfold to non-variable
+def ITreeTypeVec (n : Nat) := PFin2 n → Type u
 
-Combining the above: if e is closed and contractive, fullUnfold e ≠ var w for any w.
+def ITreeTypeVec.Arrow {n : Nat} (α β : ITreeTypeVec.{u} n) : Type u := ∀ i : PFin2.{u} n, α i → β i
 
-PROOF:
-- Suppose fullUnfold e = var w
-- By unguarded_unfolds_to_var contrapositive: w must be free and unguarded
-- By contractive_implies_guarded: if w is free, it's guarded
-- By closed: no variable is free
-- Contradiction
--/
-theorem closed_contractive_fullUnfold_not_var (e : LocalTypeR) (w : String)
-    (h_closed : e.isClosed = true)
-    (h_contractive : e.isContractive = true) :
-    e.fullUnfold ≠ LocalTypeR.var w := by
-  intro hcontra
-  -- If fullUnfold e = var w, then w is free and unguarded in e
-  have ⟨h_free, h_unguarded⟩ := fullUnfold_var_implies_free_unguarded e w hcontra
+infixl:40 " ⟹ " => ITreeTypeVec.Arrow
 
-  -- By contractive_implies_guarded: if w is free and e is contractive, then w is guarded
-  have h_guarded : e.isGuarded w = true :=
-    contractive_implies_guarded e w h_contractive h_free
+def ITreeTypeVec.id {n : Nat} {α : ITreeTypeVec n} : α ⟹ α := fun _ x => x
 
-  -- Contradiction: h_unguarded says w is not guarded, but h_guarded says it is
-  simp [h_guarded] at h_unguarded
+def ITreeTypeVec.comp {n : Nat} {α β γ : ITreeTypeVec n} (g : β ⟹ γ) (f : α ⟹ β) : α ⟹ γ :=
+  fun i x => g i (f i x)
 
-/-! ## Subproblem 6: fullUnfold reaches non-mu
+infixr:80 " ⊚ " => ITreeTypeVec.comp
 
-After muHeight unfolding steps, the result has no mu at the head.
+class ITreeMvFunctor {n : Nat} (F : ITreeTypeVec n → Type u) where
+  map : ∀ {α β : ITreeTypeVec n}, (α ⟹ β) → F α → F β
 
-PROOF: By induction on muHeight.
-- muHeight = 0: e is not a mu, so fullUnfold e = e
-- muHeight = n+1: e = mu t body, unfold gives body.substitute t (mu t body),
-  which has muHeight ≤ n (need lemma about muHeight of substitution)
--/
-theorem fullUnfold_not_mu (e : LocalTypeR) :
-    ∀ t body, e.fullUnfold ≠ LocalTypeR.mu t body := by
-  intro t body hcontra
-  -- Use existing theorem: if muHeight = 0, then fullUnfold ≠ mu
-  have h_zero := fullUnfold_muHeight_zero e
-  have := LocalTypeR.fullUnfold_not_mu e h_zero t body
-  exact this hcontra
+infixr:100 " <$$> " => ITreeMvFunctor.map
 
-/-! ## Main Theorem
+structure ITreeMvPFunctor (n : Nat) where
+  A : Type u
+  B : A → ITreeTypeVec.{u} n
 
-Every closed, contractive type has observable behavior.
-For closed types, UnfoldsToVar is impossible (no free variables),
-so the type must unfold to end, send, or recv.
+def ITreeMvPFunctor.Obj {n : Nat} (P : ITreeMvPFunctor.{u} n) (α : ITreeTypeVec.{u} n) : Type u := Σ a : P.A, P.B a ⟹ α
 
-NOTE: This theorem is already proved in Bisim.lean as `observable_of_closed_contractive`.
-We re-state it here to show how it follows from the 6 subproblems.
--/
-theorem observable_of_closed_contractive (e : LocalTypeR)
-    (h_closed : e.isClosed = true)
-    (h_contractive : e.isContractive = true) :
-    Observable e := by
-  -- This is already proved in Bisim.lean, but we can see how it uses the subproblems
-  sorry
+def ITreeMvPFunctor.map {n : Nat} {P : ITreeMvPFunctor.{u} n} {α β : ITreeTypeVec n} (f : α ⟹ β) : P.Obj α → P.Obj β :=
+  fun ⟨a, g⟩ => ⟨a, f ⊚ g⟩
 
-end ObservableClosed
+instance {n : Nat} (P : ITreeMvPFunctor.{u} n) : ITreeMvFunctor P.Obj where
+  map := ITreeMvPFunctor.map
+
+@[simp]
+theorem ITreeMvPFunctor.map_eq {n : Nat} {P : ITreeMvPFunctor.{u} n} {α β : ITreeTypeVec n} (f : α ⟹ β) (x : P.Obj α) :
+    ITreeMvFunctor.map f x = ITreeMvPFunctor.map f x := by
+      -- By definition of `ITreeMvPFunctor.map`, we have `f <$$> x = ITreeMvPFunctor.map f x`.
+      apply Eq.refl
+
+@[simp]
+theorem ITreeMvPFunctor.map_id {n : Nat} {P : ITreeMvPFunctor.{u} n} {α : ITreeTypeVec n} (x : P.Obj α) : ITreeMvPFunctor.map ITreeTypeVec.id x = x := by
+  exact?
+
+@[simp]
+theorem ITreeMvPFunctor.map_comp {n : Nat} {P : ITreeMvPFunctor.{u} n} {α β γ : ITreeTypeVec n} (f : α ⟹ β) (g : β ⟹ γ) (x : P.Obj α) :
+    ITreeMvPFunctor.map g (ITreeMvPFunctor.map f x) = ITreeMvPFunctor.map (g ⊚ f) x := by
+      exact?
+
+class ITreeMvQPF {n : Nat} (F : ITreeTypeVec n → Type u) extends ITreeMvFunctor F where
+  P : ITreeMvPFunctor.{u} n
+  abs : ∀ {α}, P.Obj α → F α
+  repr : ∀ {α}, F α → P.Obj α
+  abs_repr : ∀ {α} (x : F α), abs (repr x) = x
+  abs_map : ∀ {α β} (f : ITreeTypeVec.Arrow α β) (p : P.Obj α), abs (ITreeMvPFunctor.map f p) = ITreeMvFunctor.map f (abs p)
+
+def ITreeMvQPF.instMvQPFObj {n : Nat} (P : ITreeMvPFunctor.{u} n) : ITreeMvQPF P.Obj where
+  P := P
+  abs := fun x => x
+  repr := fun x => x
+  abs_repr _ := rfl
+  abs_map _ _ := rfl
+
+def ITreeMvQPF.ofIsomorphism {n : Nat} {F : ITreeTypeVec n → Type u}
+    (F' : ITreeTypeVec n → Type u)
+    [functor : ITreeMvFunctor F]
+    [q : ITreeMvQPF F']
+    (box : ∀ {α}, F α → F' α)
+    (unbox : ∀ {α}, F' α → F α)
+    (box_unbox_id : ∀ {α} (x : F' α), box (unbox x) = x)
+    (unbox_box_id : ∀ {α} (x : F α), unbox (box x) = x := by intros; rfl)
+    (map_eq : ∀ (α β : ITreeTypeVec n) (f : ITreeTypeVec.Arrow α β) (a : F α),
+        functor.map f a = unbox (ITreeMvFunctor.map f (box a)) := by intros; rfl)
+    : ITreeMvQPF F where
+  P := q.P
+  abs := unbox ∘ q.abs
+  repr := q.repr ∘ box
+  abs_repr := by
+    intros
+    simp only [Function.comp, q.abs_repr, unbox_box_id]
+  abs_map f x := by
+    simp only [Function.comp]
+    rw [map_eq]
+    congr 1
+    simp only [box_unbox_id, q.abs_map]
+
+def ITreeMvQPF.ofPolynomial {n : Nat} {F : ITreeTypeVec n → Type u} (P : ITreeMvPFunctor.{u} n)
+    [ITreeMvFunctor F]
+    (box : ∀ {α}, F α → P.Obj α)
+    (unbox : ∀ {α}, P.Obj α → F α)
+    (box_unbox_id : ∀ {α} (x : P.Obj α), box (unbox x) = x)
+    (unbox_box_id : ∀ {α} (x : F α), unbox (box x) = x)
+    (map_eq : ∀ (α β : ITreeTypeVec n) (f : ITreeTypeVec.Arrow α β) (a : F α),
+        ITreeMvFunctor.map f a = unbox (ITreeMvPFunctor.map f (box a)))
+    : ITreeMvQPF F :=
+  ITreeMvQPF.ofIsomorphism P.Obj (q := ITreeMvQPF.instMvQPFObj P) box unbox box_unbox_id unbox_box_id map_eq
+
+inductive HeadT : Type 1
+  | ret
+  | tau
+  | vis (Ans : Type)
+
+#print ITreeMvPFunctor
+#print PFin2
+
+def PFin2.elim0 {C : PFin2 0 → Sort u} : ∀ i : PFin2 0, C i := fun i => by cases i
+
+def ChildT : HeadT → ITreeTypeVec.{1} 2
+  | HeadT.ret => fun i => match i with
+    | PFin2.fz => PFin2.{1} 1
+    | PFin2.fs PFin2.fz => PFin2.{1} 0
+    | PFin2.fs (PFin2.fs i) => by cases i
+  | HeadT.tau => fun i => match i with
+    | PFin2.fz => PFin2.{1} 0
+    | PFin2.fs PFin2.fz => PFin2.{1} 1
+    | PFin2.fs (PFin2.fs i) => by cases i
+  | HeadT.vis Ans => fun i => match i with
+    | PFin2.fz => PFin2.{1} 0
+    | PFin2.fs PFin2.fz => ULift.{1, 0} Ans
+    | PFin2.fs (PFin2.fs i) => by cases i
+
+abbrev P : ITreeMvPFunctor.{1} 2 := ⟨HeadT, ChildT⟩
+
+abbrev F : ITreeTypeVec.{1} 2 → Type 1 := P.Obj
+
+def box {α : ITreeTypeVec 2} (x : F α) : P.Obj α := x
+
+def unbox {α : ITreeTypeVec 2} (x : P.Obj α) : F α := x
+
+theorem box_unbox_id {α : ITreeTypeVec 2} (x : P.Obj α) : box (unbox x) = x := rfl
+
+theorem unbox_box_id {α : ITreeTypeVec 2} (x : F α) : unbox (box x) = x := rfl
+
+instance instMvQPF : ITreeMvQPF F :=
+  ITreeMvQPF.ofPolynomial P box unbox box_unbox_id unbox_box_id (by intros; rfl)
+
+def ProdF : ITreeTypeVec.{u} 2 → Type u := fun α => α 0 × α 1
+
+def PrjF {n : Nat} (i : PFin2 n) : ITreeTypeVec.{u} n → Type u := fun α => α i
+
+instance instMvFunctor_Prj {n : Nat} (i : PFin2 n) : ITreeMvFunctor (PrjF i) where
+  map f x := f i x
+
+def P_Prj {n : Nat} (i : PFin2 n) : ITreeMvPFunctor.{u} n :=
+  ⟨PUnit.{u+1}, fun _ j => ULift.{u} (PLift (i = j))⟩
+
+def box_Prj {n : Nat} {i : PFin2 n} {α : ITreeTypeVec n} (x : PrjF i α) : (P_Prj i).Obj α :=
+  ⟨PUnit.unit, fun j (p : ULift (PLift (i = j))) =>
+    cast (congr_arg α p.down.down) x⟩
+
+def unbox_Prj {n : Nat} {i : PFin2 n} {α : ITreeTypeVec n} (x : (P_Prj i).Obj α) : PrjF i α :=
+  x.2 i (ULift.up (PLift.up rfl))
+
+def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
+  ITreeMvQPF.ofPolynomial (P_Prj i) box_Prj unbox_Prj (by
+  -- By definition of `box_Prj` and `unbox_Prj`, they are inverses of each other.
+  intros α x
+  simp [box_Prj, unbox_Prj];
+  -- Since the first component is PUnit.unit, which is the same as x.1, we can focus on the second component.
+  congr;
+  -- Since the function is defined as taking i and p and returning b i (p.down.down), and p is a ULift of a PLift of i = j, which simplifies to i = j, then p.down.down is just i = j. Therefore, the function simplifies to b i (i = j).
+  funext j p; simp [P_Prj];
+  -- Since `p` is a `ULift` of a `PLift` of `i = j`, and `ULift` and `PLift` are just type synonyms, we can simplify `p` to `i = j`.
+  obtain ⟨p_eq⟩ := p.down.down;
+  congr) (by
+  -- The identity function is its own inverse.
+  simp [unbox_Prj, box_Prj]) (by
+  exact?)
+
+#check P_Prj
+
+#check box_Prj
+#check unbox_Prj
+#check instMvQPF_Prj
+
+#print P_Prj
+#print box_Prj
+#print unbox_Prj
+#print instMvQPF_Prj
