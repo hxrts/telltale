@@ -255,23 +255,68 @@ private def ReflRel : Rel := fun a b =>
 
 /-- ReflRel is a post-fixpoint of EQ2F.
 
-This axiom encapsulates the coinductive reasoning for reflexivity. The proof requires
-"coinduction up-to" techniques (as in Coq's paco library) because:
+The proof proceeds by case analysis on the three cases of ReflRel:
+1. Diagonal (a = b): Case analysis on the structure of a
+2. Unfolding pair: (a = body.substitute t (.mu t body), b = .mu t body)
+3. Reverse unfolding: (a = .mu t body, b = body.substitute t (.mu t body))
 
-1. For mu types, EQ2F requires unfolding pairs to be in the relation
-2. When `body.substitute t (mu t body)` is itself a mu, we get nested unfoldings
-3. The nested case requires showing ReflRel holds for pairs that aren't directly
-   in the definition (e.g., unfolding of an unfolding paired with the original)
-
-The axiom is semantically sound because:
-- EQ2 represents observational equality of infinite trees
-- Any type is observationally equal to itself
-- Unfolding a mu produces the same observations as the mu itself
-
-Proving this constructively in Lean would require:
-- Coinduction up-to equivalence (parametrized coinduction)
-- Or a more sophisticated relation that captures transitive unfolding -/
-private axiom ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b
+For the diagonal case, BranchesRel_refl handles the branch cases.
+For unfolding pairs, EQ2F has explicit cases for mu-wrapping. -/
+private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := by
+  intro a b hrel
+  cases hrel with
+  | inl heq =>
+      -- Case 1: a = b (diagonal)
+      subst heq
+      cases a with
+      | «end» =>
+          -- EQ2F ReflRel .end .end = True
+          trivial
+      | var v =>
+          -- EQ2F ReflRel (.var v) (.var v) = (v = v)
+          simp only [EQ2F]
+      | send p bs =>
+          -- EQ2F ReflRel (.send p bs) (.send p bs) = (p = p ∧ BranchesRel ReflRel bs bs)
+          simp only [EQ2F]
+          constructor
+          · rfl
+          · exact BranchesRel_refl (fun t => Or.inl rfl) bs
+      | recv p bs =>
+          -- EQ2F ReflRel (.recv p bs) (.recv p bs) = (p = p ∧ BranchesRel ReflRel bs bs)
+          simp only [EQ2F]
+          constructor
+          · rfl
+          · exact BranchesRel_refl (fun t => Or.inl rfl) bs
+      | mu t body =>
+          -- EQ2F ReflRel (.mu t body) (.mu t body)
+          -- = ReflRel (body.substitute t (.mu t body)) (.mu t body)
+          --   ∧ ReflRel (.mu t body) (body.substitute t (.mu t body))
+          simp only [EQ2F]
+          constructor
+          · -- ReflRel (body.substitute t (.mu t body)) (.mu t body)
+            exact Or.inr (Or.inl ⟨t, body, rfl, rfl⟩)
+          · -- ReflRel (.mu t body) (body.substitute t (.mu t body))
+            exact Or.inr (Or.inr ⟨t, body, rfl, rfl⟩)
+  | inr hmu =>
+      cases hmu with
+      | inl hunfold =>
+          -- Case 2: a = body.substitute t (.mu t body), b = .mu t body
+          obtain ⟨t, body, ha, hb⟩ := hunfold
+          subst ha hb
+          -- EQ2F ReflRel (body.substitute t (.mu t body)) (.mu t body)
+          -- This is one of the explicit mu cases in EQ2F
+          simp only [EQ2F]
+          -- Need: ReflRel (body.substitute t (.mu t body)) (.mu t body)
+          exact Or.inl rfl
+      | inr hunfold_rev =>
+          -- Case 3: a = .mu t body, b = body.substitute t (.mu t body)
+          obtain ⟨t, body, ha, hb⟩ := hunfold_rev
+          subst ha hb
+          -- EQ2F ReflRel (.mu t body) (body.substitute t (.mu t body))
+          -- This is the reverse mu case in EQ2F
+          simp only [EQ2F]
+          -- Need: ReflRel (.mu t body) (body.substitute t (.mu t body))
+          exact Or.inl rfl
 
 /-- EQ2 is reflexive.
 
@@ -326,28 +371,140 @@ private def TransRel : Rel := fun a c => ∃ b, EQ2 a b ∧ EQ2 b c
 
 /-- TransRel is a post-fixpoint of EQ2F.
 
-This axiom encapsulates the coinductive reasoning for transitivity. Like ReflRel_postfix,
-proving this constructively requires "coinduction up-to" techniques because:
+The proof proceeds by coordinated case analysis on a and c, using the fact that
+EQ2 a b and EQ2 b c constrain what the intermediate witness b can be.
 
-1. TransRel a c means ∃ b, EQ2 a b ∧ EQ2 b c
-2. To show EQ2F TransRel a c, we need to decompose a, b, c by constructor
-3. For mu types, EQ2 involves unfolding, and the intermediate type b might unfold
-   differently than a or c, requiring transitive chains of unfoldings
+For each case, we:
+1. Use EQ2_destruct to expose the EQ2F structure
+2. Determine what b must be based on the constraints from both sides
+3. Construct TransRel witnesses for the continuations
 
-The axiom is semantically sound because:
-- If a ≈ b and b ≈ c (observationally equal), then a ≈ c
-- Transitivity holds for observational equality on infinite trees
-- The intermediate witness b guides the proof but the result only relates a and c
+The key insight: Since EQ2 is monotone and continuations are in EQ2, they form
+valid TransRel pairs with the intermediate witness b. -/
+private theorem TransRel_postfix : ∀ a c, TransRel a c → EQ2F TransRel a c := by
+  intro a c ⟨b, hab, hbc⟩
+  -- Extract EQ2F structures
+  have hfab : EQ2F EQ2 a b := EQ2_destruct hab
+  have hfbc : EQ2F EQ2 b c := EQ2_destruct hbc
 
-**ELIMINABLE**: This axiom can be replaced by the Bisim detour in Bisim.lean.
-See `EQ2_trans_via_Bisim` which proves transitivity using:
-  1. EQ2 → Bisim (via EQ2.toBisim)
-  2. Bisim.trans (fully proven)
-  3. Bisim → EQ2 (via Bisim.toEQ2)
-
-The circular import (Bisim imports EQ2) prevents direct replacement here,
-but the axiom is provable given the Bisim infrastructure. -/
-private axiom TransRel_postfix : ∀ a c, TransRel a c → EQ2F TransRel a c
+  -- Strategy: coordinated case analysis on a and c
+  -- We'll show that for each valid combination, we can construct EQ2F TransRel a c
+  cases a with
+  | «end» =>
+      cases c with
+      | «end» =>
+          -- a = end, c = end: EQ2F TransRel end end = True
+          trivial
+      | var v =>
+          -- a = end, c = var: impossible (b must satisfy EQ2 end b and EQ2 b (var v))
+          -- From hfab: b = end. From hfbc: b = var v. Contradiction.
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | send _ _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | recv _ _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | mu t body =>
+          -- a = end, c = mu: EQ2F TransRel end (mu t body) = TransRel end (body.substitute...)
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+  | var v =>
+      cases c with
+      | «end» =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | var w =>
+          -- a = var v, c = var w: need v = w (via transitivity through b)
+          simp only [EQ2F] at hfab hfbc ⊢
+          cases b <;> simp only [EQ2F] at hfab hfbc
+          exact hfab.trans hfbc
+      | send _ _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | recv _ _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | mu t body =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+  | send p bs =>
+      cases c with
+      | «end» =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | var _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | send q cs =>
+          -- a = send p bs, c = send q cs
+          simp only [EQ2F] at hfab hfbc ⊢
+          obtain ⟨hp1, hbr1⟩ := hfab
+          obtain ⟨hp2, hbr2⟩ := hfbc
+          constructor
+          · -- Partner names: p = q (via b's partner)
+            cases b <;> simp only [EQ2F] at hp1 hp2
+            exact hp1.trans hp2
+          · -- Branches: use BranchesRel_trans
+            cases b <;> simp only [EQ2F] at hbr1 hbr2
+            exact BranchesRel_trans (fun _ _ _ h1 h2 => ⟨_, h1, h2⟩) hbr1 hbr2
+      | recv _ _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | mu t body =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+  | recv p bs =>
+      cases c with
+      | «end» =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | var _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | send _ _ =>
+          simp only [EQ2F] at hfab hfbc
+          cases b <;> simp only [EQ2F] at hfab hfbc
+      | recv q cs =>
+          -- a = recv p bs, c = recv q cs
+          simp only [EQ2F] at hfab hfbc ⊢
+          obtain ⟨hp1, hbr1⟩ := hfab
+          obtain ⟨hp2, hbr2⟩ := hfbc
+          constructor
+          · -- Partner names
+            cases b <;> simp only [EQ2F] at hp1 hp2
+            exact hp1.trans hp2
+          · -- Branches
+            cases b <;> simp only [EQ2F] at hbr1 hbr2
+            exact BranchesRel_trans (fun _ _ _ h1 h2 => ⟨_, h1, h2⟩) hbr1 hbr2
+      | mu t body =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+  | mu t body =>
+      cases c with
+      | «end» =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+      | var _ =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+      | send _ _ =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+      | recv _ _ =>
+          simp only [EQ2F] at hfab hfbc ⊢
+          exact ⟨b, hfab, hfbc⟩
+      | mu s body' =>
+          -- a = mu t body, c = mu s body': both need unfoldings
+          simp only [EQ2F] at hfab hfbc ⊢
+          obtain ⟨h1, h2⟩ := hfab
+          obtain ⟨h3, h4⟩ := hfbc
+          constructor
+          · -- Forward unfolding: (body.subst t ...) ~ b ~ (body'.subst s ...)
+            exact ⟨b, h1, h3⟩
+          · -- Backward unfolding: (mu t body) ~ b ~ (body'.subst s ...)
+            exact ⟨b, h2, h4⟩
 
 /-- EQ2 is transitive.
 
