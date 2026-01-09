@@ -396,11 +396,61 @@ theorem LocalTypeR.muHeight_non_mu :
 mutual
   theorem isFreeIn_mem_freeVars (lt : LocalTypeR) (v : String) :
       lt.isFreeIn v = true → v ∈ lt.freeVars := by
-    sorry
+    intro h
+    cases lt with
+    | end =>
+        simp [LocalTypeR.isFreeIn, LocalTypeR.freeVars] at h
+    | var w =>
+        have hv : v = w := by
+          simpa [LocalTypeR.isFreeIn, beq_iff_eq] using h
+        subst hv
+        simp [LocalTypeR.freeVars]
+    | send _ bs =>
+        have h' : isFreeInBranches' v bs = true := by
+          simpa [LocalTypeR.isFreeIn] using h
+        have hmem := isFreeInBranches'_mem_freeVarsOfBranches bs v h'
+        simpa [LocalTypeR.freeVars] using hmem
+    | recv _ bs =>
+        have h' : isFreeInBranches' v bs = true := by
+          simpa [LocalTypeR.isFreeIn] using h
+        have hmem := isFreeInBranches'_mem_freeVarsOfBranches bs v h'
+        simpa [LocalTypeR.freeVars] using hmem
+    | mu t body =>
+        by_cases hvt : v = t
+        · have : (v == t) = true := by simpa [beq_iff_eq, hvt]
+          -- isFreeIn = false, contradiction
+          have hfalse : False := by
+            simpa [LocalTypeR.isFreeIn, this] using h
+          exact False.elim hfalse
+        · have hvne : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
+          have h' : body.isFreeIn v = true := by
+            simpa [LocalTypeR.isFreeIn, hvne] using h
+          have hmem : v ∈ body.freeVars := isFreeIn_mem_freeVars body v h'
+          apply (List.mem_filter).2
+          constructor
+          · exact hmem
+          · have hne : v ≠ t := hvt
+            exact bne_iff_ne.mpr hne
   
   theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List (Label × LocalTypeR)) (v : String) :
       isFreeInBranches' v bs = true → v ∈ freeVarsOfBranches bs := by
-    sorry
+    intro h
+    induction bs with
+    | nil =>
+        simp [isFreeInBranches', freeVarsOfBranches] at h
+    | cons head tail ih =>
+        cases head with
+        | mk label cont =>
+            -- isFreeInBranches' v (head::tail) = cont.isFreeIn v || isFreeInBranches' v tail
+            have h' : cont.isFreeIn v = true ∨ isFreeInBranches' v tail = true := by
+              simpa [isFreeInBranches', Bool.or_eq_true] using h
+            cases h' with
+            | inl hcont =>
+                have hmem : v ∈ cont.freeVars := isFreeIn_mem_freeVars cont v hcont
+                simp [freeVarsOfBranches, hmem]
+            | inr htail =>
+                have hmem := ih htail
+                simp [freeVarsOfBranches, hmem]
 end
 
 -- Helper: if fullUnfold = .var v, then isFreeIn v = true

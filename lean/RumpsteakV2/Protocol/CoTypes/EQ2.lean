@@ -129,6 +129,20 @@ theorem EQ2_unfold_right {a b : LocalTypeR} (h : EQ2 a b) :
   | _ =>
       simpa [LocalTypeR.unfold] using h
 
+/-- Unfold EQ2 on the right for n steps. -/
+theorem EQ2_unfold_right_iter {a : LocalTypeR} :
+    ∀ {b : LocalTypeR}, EQ2 a b → ∀ n, EQ2 a ((LocalTypeR.unfold)^[n] b) := by
+  intro b h n
+  induction n generalizing b with
+  | zero =>
+      intro b h'
+      simpa [Function.iterate_zero, id_eq] using h'
+  | succ n ih =>
+      intro b h'
+      have h'': EQ2 a (LocalTypeR.unfold b) := EQ2_unfold_right h'
+      have hstep : EQ2 a ((LocalTypeR.unfold)^[n] (LocalTypeR.unfold b)) := ih h''
+      simpa [Function.iterate_succ_apply] using hstep
+
 /-- Unfold EQ2 on both sides. -/
 theorem EQ2_unfold {a b : LocalTypeR} (h : EQ2 a b) :
     EQ2 (LocalTypeR.unfold a) (LocalTypeR.unfold b) := by

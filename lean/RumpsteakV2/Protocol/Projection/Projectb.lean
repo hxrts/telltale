@@ -223,6 +223,12 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
         AllBranchesProj R gbs role cand
   | _, _ => False
 
+/-- Unfolding-insensitive generator for CProject.
+    This mirrors Coq's `UnfProj` wrapper: we project on fully-unfolded
+    global and local types. -/
+def CProjectF_unfold (R : ProjRel) : ProjRel := fun g role cand =>
+  CProjectF R (GlobalType.fullUnfold g) role (LocalTypeR.fullUnfold cand)
+
 private theorem BranchesProjRel_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :
     ∀ {gbs lbs role}, BranchesProjRel R gbs role lbs → BranchesProjRel S gbs role lbs := by
@@ -254,13 +260,26 @@ private theorem CProjectF_mono : Monotone CProjectF := by
          | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
          | exact AllBranchesProj_mono h hrel)
 
+private theorem CProjectF_unfold_mono : Monotone CProjectF_unfold := by
+  intro R S h g role cand hrel
+  exact CProjectF_mono h _ _ _ hrel
+
 /-- CProject as the greatest fixed point of CProjectF.
     Uses the pointwise complete lattice structure on ProjRel. -/
 def CProject : ProjRel :=
   OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩
 
+/-- Unfolding-insensitive projection (Coq-style).
+    This is the gfp of CProjectF_unfold and is the target for the
+    Project_EQ2 refactor. -/
+def CProjectU : ProjRel :=
+  OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩
+
 private theorem CProject_fixed : CProjectF CProject = CProject := by
   simpa [CProject] using (OrderHom.isFixedPt_gfp ⟨CProjectF, CProjectF_mono⟩)
+
+private theorem CProjectU_fixed : CProjectF_unfold CProjectU = CProjectU := by
+  simpa [CProjectU] using (OrderHom.isFixedPt_gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩)
 
 /-- Coinduction principle for CProject: if R ⊆ CProjectF R, then R ⊆ CProject. -/
 theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CProjectF R g role cand) :
@@ -270,10 +289,23 @@ theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CPr
   have hgfp : R ≤ CProject := OrderHom.le_gfp ⟨CProjectF, CProjectF_mono⟩ hle
   exact hgfp g role cand hr
 
+theorem CProjectU_coind {R : ProjRel}
+    (h : ∀ g role cand, R g role cand → CProjectF_unfold R g role cand) :
+    ∀ g role cand, R g role cand → CProjectU g role cand := by
+  intro g role cand hr
+  have hle : R ≤ CProjectF_unfold R := fun x y z hxyz => h x y z hxyz
+  have hgfp : R ≤ CProjectU := OrderHom.le_gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩ hle
+  exact hgfp g role cand hr
+
 /-- Destruct CProject: if CProject holds, then CProjectF CProject holds. -/
 theorem CProject_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
     (h : CProject g role cand) : CProjectF CProject g role cand := by
   have hfix : CProjectF CProject = CProject := CProject_fixed
+  exact Eq.mp (congrFun (congrFun (congrFun hfix.symm g) role) cand) h
+
+theorem CProjectU_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
+    (h : CProjectU g role cand) : CProjectF_unfold CProjectU g role cand := by
+  have hfix : CProjectF_unfold CProjectU = CProjectU := CProjectU_fixed
   exact Eq.mp (congrFun (congrFun (congrFun hfix.symm g) role) cand) h
 
 /-! ## Constructor-style lemmas for CProject

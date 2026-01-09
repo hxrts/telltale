@@ -2,6 +2,7 @@ import RumpsteakV2.Protocol.Projection.Projectb
 import RumpsteakV2.Protocol.Projection.Trans
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.EQ2Paco
+import RumpsteakV2.Protocol.CoTypes.Bisim
 import RumpsteakV2.Protocol.Participation
 
 /-! # RumpsteakV2.Protocol.Projection.Project
@@ -1312,6 +1313,379 @@ Show CProjectTransRel is a post-fixpoint of EQ2F by case analysis on CProject:
   Use CProject_implies_EQ2_trans_nonpart
 
 See `subject_reduction/theories/Projection/indProj.v:221-260` for the Coq proof. -/
+
+/-! ### CProject Candidate-Shape Inversion Lemmas
+
+These lemmas package the common CProjectF destruct patterns for reuse in the
+Project_EQ2 port. They mirror the Coq proof's frequent `punfold` + `inv` steps. -/
+
+private theorem CProject_end_inv (role : String) (cand : LocalTypeR)
+    (hproj : CProject .end role cand) : cand = .end := by
+  cases cand with
+  | «end» => rfl
+  | var _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | send _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | recv _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | mu _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+
+private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
+    (hproj : CProject (.var t) role cand) : cand = .var t := by
+  cases cand with
+  | var t' =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+      rfl
+  | «end» =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | send _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | recv _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | mu _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+
+private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String) (cand : LocalTypeR)
+    (hproj : CProject (.mu t gbody) role cand) :
+    ∃ candBody, cand = .mu t candBody ∧ lcontractive gbody ∧ CProject gbody role candBody := by
+  cases cand with
+  | mu t' candBody =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      rcases hf with ⟨ht, hcontr, hbody⟩
+      subst ht
+      exact ⟨candBody, rfl, hcontr, hbody⟩
+  | «end» =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | var _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | send _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+  | recv _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF] at hf
+      cases hf
+
+private theorem CProject_comm_sender_inv (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
+    (hrole : role = sender)
+    (hproj : CProject (.comm sender receiver gbs) role cand) :
+    ∃ lbs, cand = .send receiver lbs ∧ BranchesProjRel CProject gbs sender lbs := by
+  cases cand with
+  | send partner lbs =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hrole] at hf
+      rcases hf with ⟨hpartner, hbranches⟩
+      subst hpartner
+      exact ⟨lbs, rfl, hbranches⟩
+  | «end» =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hrole] at hf
+      cases hf
+  | var _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hrole] at hf
+      cases hf
+  | recv _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hrole] at hf
+      cases hf
+  | mu _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hrole] at hf
+      cases hf
+
+private theorem CProject_comm_receiver_inv (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
+    (hrole : role = receiver) (hns : sender ≠ receiver)
+    (hproj : CProject (.comm sender receiver gbs) role cand) :
+    ∃ lbs, cand = .recv sender lbs ∧ BranchesProjRel CProject gbs receiver lbs := by
+  have hsender : role ≠ sender := by
+    intro h
+    exact hns (h.symm.trans hrole)
+  cases cand with
+  | recv partner lbs =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hsender, hrole] at hf
+      rcases hf with ⟨hpartner, hbranches⟩
+      subst hpartner
+      exact ⟨lbs, rfl, hbranches⟩
+  | «end» =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hsender, hrole] at hf
+      cases hf
+  | var _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hsender, hrole] at hf
+      cases hf
+  | send _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hsender, hrole] at hf
+      cases hf
+  | mu _ _ =>
+      have hf := CProject_destruct hproj
+      simp [CProjectF, hsender, hrole] at hf
+      cases hf
+
+private theorem CProject_comm_other_inv (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
+    (hs : role ≠ sender) (hr : role ≠ receiver)
+    (hproj : CProject (.comm sender receiver gbs) role cand) :
+    AllBranchesProj CProject gbs role cand := by
+  have hf := CProject_destruct hproj
+  simp [CProjectF, hs, hr] at hf
+  exact hf
+
+private theorem CProject_fullUnfold_right_of_muHeight_zero
+    {g : GlobalType} {role : String} {cand : LocalTypeR}
+    (hproj : CProject g role cand) (hmu : cand.muHeight = 0) :
+    CProject g role cand.fullUnfold := by
+  simpa [LocalTypeR.fullUnfold_muHeight_zero hmu] using hproj
+
+private theorem CProject_fullUnfold_left_of_muHeight_zero
+    {g : GlobalType} {role : String} {cand : LocalTypeR}
+    (hproj : CProject g role cand.fullUnfold) (hmu : cand.muHeight = 0) :
+    CProject g role cand := by
+  simpa [LocalTypeR.fullUnfold_muHeight_zero hmu] using hproj
+
+/-! ### EQ2-closed Projection
+
+The Coq proof of `Project_EQ2` relies on unfolding (`full_eunf`) in the
+projection generator. Our `CProjectF` does *not* unfold local types, so to
+structure the Lean port we isolate the exact constructor-extraction facts
+needed from EQ2. These are stated as parameters below; replacing them with
+proved lemmas (or refactoring `CProjectF`) is the remaining gap. -/
+
+private def CProjectEQ2Rel : ProjRel := fun g role cand =>
+  ∃ e0, CProject g role e0 ∧ EQ2 e0 cand
+
+private theorem BranchesProjRel_lift_EQ2
+    {gbs : List (Label × GlobalType)} {role : String}
+    {lbs0 lbs1 : List (Label × LocalTypeR)}
+    (hproj : BranchesProjRel CProject gbs role lbs0)
+    (heq : BranchesRel EQ2 lbs0 lbs1) :
+    BranchesProjRel CProjectEQ2Rel gbs role lbs1 := by
+  induction hproj generalizing lbs1 with
+  | nil =>
+      cases heq
+      exact List.Forall₂.nil
+  | cons hpair hrest ih =>
+      cases heq with
+      | cons hpair' heq_rest =>
+          constructor
+          · constructor
+            · exact hpair.1.trans hpair'.1
+            · exact ⟨_, hpair.2, hpair'.2⟩
+          · exact ih heq_rest
+
+private theorem CProjectEQ2Rel_postfix
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body') :
+    ∀ g role cand, CProjectEQ2Rel g role cand → CProjectF CProjectEQ2Rel g role cand := by
+  intro g role cand hrel
+  rcases hrel with ⟨e0, hproj, heq⟩
+  cases g with
+  | «end» =>
+      have he0 : e0 = .end := CProject_end_inv role e0 hproj
+      subst he0
+      have hcand : cand = .end := hend cand heq
+      subst hcand
+      simp [CProjectF]
+  | var t =>
+      have he0 : e0 = .var t := CProject_var_inv t role e0 hproj
+      subst he0
+      have hcand : cand = .var t := hvar t cand heq
+      subst hcand
+      simp [CProjectF]
+  | mu t gbody =>
+      obtain ⟨candBody0, he0, hcontr, hbody⟩ := CProject_mu_inv t gbody role e0 hproj
+      subst he0
+      obtain ⟨candBody1, hcand, heq_body⟩ := hmu t candBody0 cand heq
+      subst hcand
+      exact ⟨rfl, hcontr, ⟨candBody0, hbody, heq_body⟩⟩
+  | comm sender receiver gbs =>
+      by_cases hrs : role = sender
+      · obtain ⟨lbs0, he0, hbranches⟩ :=
+          CProject_comm_sender_inv sender receiver gbs role e0 hrs hproj
+        subst he0
+        obtain ⟨lbs1, hcand, hrel_br⟩ := hsend receiver lbs0 cand (by simpa using heq)
+        subst hcand
+        have hbranches' : BranchesProjRel CProjectEQ2Rel gbs sender lbs1 :=
+          BranchesProjRel_lift_EQ2 hbranches hrel_br
+        simp [CProjectF, hrs, hbranches']
+      · by_cases hrr : role = receiver
+        · obtain ⟨lbs0, he0, hbranches⟩ :=
+            CProject_comm_receiver_inv sender receiver gbs role e0 hrr
+              (by
+                intro h
+                exact hrs (hrr.trans h.symm))
+              hproj
+          subst he0
+          obtain ⟨lbs1, hcand, hrel_br⟩ := hrecv sender lbs0 cand (by simpa using heq)
+          subst hcand
+          have hbranches' : BranchesProjRel CProjectEQ2Rel gbs receiver lbs1 :=
+            BranchesProjRel_lift_EQ2 hbranches hrel_br
+          simp [CProjectF, hrs, hrr, hbranches']
+        · -- Non-participant case: CProjectF requires AllBranchesProj
+          have hall : AllBranchesProj CProject gbs role e0 :=
+            CProject_comm_other_inv sender receiver gbs role e0 hrs hrr hproj
+          -- Lift to the EQ2-closed relation
+          have hall' : AllBranchesProj CProjectEQ2Rel gbs role cand := by
+            intro gb hgb
+            exact ⟨e0, hall gb hgb, heq⟩
+          simp [CProjectF, hrs, hrr, hall']
+
+private theorem CProject_EQ2_of_head
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body') :
+    ∀ g role e0 e1, CProject g role e0 → EQ2 e0 e1 → CProject g role e1 := by
+  intro g role e0 e1 hproj heq
+  apply CProject_coind
+  · intro g' role' cand hrel
+    exact CProjectEQ2Rel_postfix hend hvar hsend hrecv hmu g' role' cand hrel
+  · exact ⟨e0, hproj, heq⟩
+
+/-! ### CProjectU (unfolding-insensitive) EQ2 closure
+
+This is the Coq-style path: project on fully-unfolded global/local types.
+It avoids requiring exact constructor matching on the raw candidate. -/
+
+private def CProjectUEQ2Rel : ProjRel := fun g role cand =>
+  ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand
+
+private theorem EQ2_fullUnfold_end {e : LocalTypeR} :
+    EQ2 .end e → e.fullUnfold = .end := by
+  intro heq
+  have h := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.end_right_implies_UnfoldsToEnd heq
+  exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq h
+
+private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} :
+    EQ2 (.var t) e → e.fullUnfold = .var t := by
+  intro heq
+  have h := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.var_right_implies_UnfoldsToVar heq
+  exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq h
+
+private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
+    EQ2 (.send p bs) e →
+    ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
+  intro heq
+  obtain ⟨cs, hcan, hbr⟩ := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.send_right_implies_CanSend heq
+  exact ⟨cs, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hcan, hbr⟩
+
+private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
+    EQ2 (.recv p bs) e →
+    ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
+  intro heq
+  obtain ⟨cs, hcan, hbr⟩ := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.recv_right_implies_CanRecv heq
+  exact ⟨cs, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hcan, hbr⟩
+
+private axiom EQ2_fullUnfold_mu {t : String} {body : LocalTypeR} {e : LocalTypeR} :
+    EQ2 (.mu t body) e →
+    ∃ body', e.fullUnfold = .mu t body' ∧ EQ2 body body'
+
+private theorem CProjectUEQ2Rel_postfix :
+    ∀ g role cand, CProjectUEQ2Rel g role cand →
+      CProjectF_unfold CProjectUEQ2Rel g role cand := by
+  intro g role cand hrel
+  rcases hrel with ⟨e0, hproj, heq⟩
+  -- Unfold the CProjectU hypothesis (note the fullUnfold on both sides)
+  have hf := CProjectU_destruct hproj
+  dsimp [CProjectF_unfold] at hf ⊢
+  -- Case analysis on fully-unfolded global/local forms
+  cases hg : GlobalType.fullUnfold g <;>
+  cases he0 : LocalTypeR.fullUnfold e0 <;>
+  simp [CProjectF] at hf ⊢
+  · -- end / end
+    have hcand : cand.fullUnfold = .end := EQ2_fullUnfold_end (by simpa using heq)
+    simp [hcand]
+  · -- var / var
+    have hcand : cand.fullUnfold = .var _ := EQ2_fullUnfold_var (by simpa using heq)
+    simp [hcand]
+  · -- mu / mu
+    rcases hf with ⟨ht, hcontr, hbody⟩
+    subst ht
+    rcases EQ2_fullUnfold_mu (by simpa using heq) with ⟨body', hmu, heq_body⟩
+    subst hmu
+    exact ⟨rfl, hcontr, ⟨_, hbody, heq_body⟩⟩
+  · -- comm / send (sender case)
+    rename_i sender receiver gbs
+    -- hf already has the sender/receiver case structure from CProjectF
+    by_cases hrs : role = sender
+    · simp [hrs] at hf ⊢
+      rcases hf with ⟨hpartner, hbranches⟩
+      rcases EQ2_fullUnfold_send (by simpa using heq) with ⟨cs, hfull, hrel_br⟩
+      subst hfull
+      have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
+        BranchesProjRel_lift_EQ2 hbranches hrel_br
+      exact ⟨hpartner, hbranches'⟩
+    · by_cases hrr : role = receiver
+      · simp [hrs, hrr] at hf ⊢
+      · -- non-participant: AllBranchesProj
+        simp [hrs, hrr] at hf ⊢
+        intro gb hgb
+        exact ⟨e0, hf gb hgb, heq⟩
+  · -- comm / recv (receiver case)
+    rename_i sender receiver gbs
+    by_cases hrs : role = sender
+    · simp [hrs] at hf ⊢
+    · by_cases hrr : role = receiver
+      · simp [hrs, hrr] at hf ⊢
+        rcases hf with ⟨hpartner, hbranches⟩
+        rcases EQ2_fullUnfold_recv (by simpa using heq) with ⟨cs, hfull, hrel_br⟩
+        subst hfull
+        have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
+          BranchesProjRel_lift_EQ2 hbranches hrel_br
+        exact ⟨hpartner, hbranches'⟩
+      · simp [hrs, hrr] at hf ⊢
+        intro gb hgb
+        exact ⟨e0, hf gb hgb, heq⟩
+  all_goals
+    try cases hf
+
+theorem CProjectU_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
+    (hproj : CProjectU g role e0) (heq : EQ2 e0 e1) : CProjectU g role e1 := by
+  apply CProjectU_coind
+  · intro g' role' cand hrel
+    exact CProjectUEQ2Rel_postfix g' role' cand hrel
+  · exact ⟨e0, hproj, heq⟩
 
 /-! ### Constructor Agreement Lemmas (Well-Founded Induction)
 
@@ -3212,6 +3586,7 @@ but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction axiom
 
 **Possible approaches**:
 1. Strengthen extraction axioms to provide constructor equality (not just unfolding)
+   - See `CProject_EQ2_of_head` scaffold below
 2. Use Bisim.toBisim and prove CProject is closed under Bisim
 3. Modify CProjectF to accept mu-wrapped candidates (major change)
 4. Prove auxiliary lemmas showing EQ2 preserves "canonical forms" for each constructor

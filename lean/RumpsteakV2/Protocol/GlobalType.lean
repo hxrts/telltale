@@ -404,4 +404,28 @@ This matches Coq's approach and is used for projection preservation. -/
 /-- A global type is closed if it has no free type variables. -/
 def GlobalType.isClosed (g : GlobalType) : Bool := g.freeVars.isEmpty
 
+/-! ## Unfolding for GlobalType (Coq-style `full_unf`)
+
+These helpers mirror LocalTypeR.fullUnfold and are used by the unfolding-
+insensitive projection refactor (CProjectU). -/
+
+/-- Unfold one level of recursion: μt.G ↦ G[μt.G/t]. -/
+def GlobalType.unfold : GlobalType → GlobalType
+  | g@(.mu t body) => body.substitute t g
+  | g => g
+
+/-- Height of leading mu binders. -/
+def GlobalType.muHeight : GlobalType → Nat
+  | .mu _ body => 1 + body.muHeight
+  | _ => 0
+
+/-- Fully unfold a global type by iterating unfold until non-mu form. -/
+def GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
+  (GlobalType.unfold)^[g.muHeight] g
+
+/-- If muHeight is 0, fullUnfold is identity. -/
+theorem GlobalType.fullUnfold_muHeight_zero {g : GlobalType} (h : g.muHeight = 0) :
+    g.fullUnfold = g := by
+  simp [GlobalType.fullUnfold, h]
+
 end RumpsteakV2.Protocol.GlobalType

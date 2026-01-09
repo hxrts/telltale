@@ -164,6 +164,41 @@ theorem observable_of_closed_contractive {a : LocalTypeR}
     | is_recv h => exact Observable.is_recv (CanRecv.mu h)
 termination_by sizeOf a
 
+/-- Every contractive local type has observable behavior.
+
+    This drops the closedness requirement: variables are allowed as observables. -/
+theorem observable_of_contractive {a : LocalTypeR}
+    (hcontr : a.isContractive = true) : Observable a := by
+  match a with
+  | .end =>
+    exact Observable.is_end UnfoldsToEnd.base
+  | .var v =>
+    exact Observable.is_var UnfoldsToVar.base
+  | .send p bs =>
+    exact Observable.is_send CanSend.base
+  | .recv p bs =>
+    exact Observable.is_recv CanRecv.base
+  | .mu t body =>
+    -- Extract contractiveness of body
+    simp only [isContractive, Bool.and_eq_true] at hcontr
+    have ⟨hguarded, hcontr_body⟩ := hcontr
+    -- mu is contractive by definition
+    have hmu_contr : (.mu t body : LocalTypeR).isContractive = true := by
+      simp [isContractive, hguarded, hcontr_body]
+    -- Substitution preserves contractiveness
+    have hsubst_contr : (body.substitute t (.mu t body)).isContractive = true :=
+      LocalTypeR.isContractive_substitute body t (.mu t body) hcontr_body hmu_contr
+    -- Recurse on the unfolded body
+    have ih : Observable (body.substitute t (.mu t body)) :=
+      observable_of_contractive hsubst_contr
+    -- Lift observable through mu
+    cases ih with
+    | is_end h => exact Observable.is_end (UnfoldsToEnd.mu h)
+    | is_var h => exact Observable.is_var (UnfoldsToVar.mu h)
+    | is_send h => exact Observable.is_send (CanSend.mu h)
+    | is_recv h => exact Observable.is_recv (CanRecv.mu h)
+termination_by sizeOf a
+
 
 /-- Two EQ2-equivalent contractive mu types have the same observable behavior.
 
@@ -414,6 +449,275 @@ theorem CanRecv.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : Lo
   | @mu t body p' bs' _ ih =>
     obtain ⟨n, hn⟩ := ih
     exact ⟨n + 1, CanRecvPathBounded.step hn⟩
+
+/-! ## Unfolding Shape Lemmas
+
+These lemmas connect the membership predicates with `fullUnfold`. They are used
+to extract constructor shapes from EQ2 via the UnfoldsTo/CanSend/CanRecv axioms. -/
+
+private theorem UnfoldPathEndBounded.not_mu_var (t : String) :
+    ∀ n, ¬ UnfoldPathEndBounded n (.mu t (.var t)) := by
+  intro n h
+  induction n with
+  | zero =>
+      cases h
+  | succ n ih =>
+      cases h with
+      | step h' => exact ih h'
+
+private theorem UnfoldPathVarBounded.not_mu_var (t : String) (v : String) :
+    ∀ n, ¬ UnfoldPathVarBounded n v (.mu t (.var t)) := by
+  intro n h
+  induction n with
+  | zero =>
+      cases h
+  | succ n ih =>
+      cases h with
+      | step h' => exact ih h'
+
+private theorem CanSendPathBounded.not_mu_var (t : String) (p : String) (bs : List (Label × LocalTypeR)) :
+    ∀ n, ¬ CanSendPathBounded n p bs (.mu t (.var t)) := by
+  intro n h
+  induction n with
+  | zero =>
+      cases h
+  | succ n ih =>
+      cases h with
+      | step h' => exact ih h'
+
+private theorem CanRecvPathBounded.not_mu_var (t : String) (p : String) (bs : List (Label × LocalTypeR)) :
+    ∀ n, ¬ CanRecvPathBounded n p bs (.mu t (.var t)) := by
+  intro n h
+  induction n with
+  | zero =>
+      cases h
+  | succ n ih =>
+      cases h with
+      | step h' => exact ih h'
+
+theorem UnfoldsToEnd.not_mu_var {t : String} : ¬ UnfoldsToEnd (.mu t (.var t)) := by
+  intro h
+  obtain ⟨n, hn⟩ := UnfoldsToEnd.toBounded h
+  exact UnfoldPathEndBounded.not_mu_var t n hn
+
+theorem UnfoldsToVar.not_mu_var {t v : String} : ¬ UnfoldsToVar (.mu t (.var t)) v := by
+  intro h
+  obtain ⟨n, hn⟩ := UnfoldsToVar.toBounded h
+  exact UnfoldPathVarBounded.not_mu_var t v n hn
+
+theorem CanSend.not_mu_var {t p : String} {bs : List (Label × LocalTypeR)} :
+    ¬ CanSend (.mu t (.var t)) p bs := by
+  intro h
+  obtain ⟨n, hn⟩ := CanSend.toBounded h
+  exact CanSendPathBounded.not_mu_var t p bs n hn
+
+theorem CanRecv.not_mu_var {t p : String} {bs : List (Label × LocalTypeR)} :
+    ¬ CanRecv (.mu t (.var t)) p bs := by
+  intro h
+  obtain ⟨n, hn⟩ := CanRecv.toBounded h
+  exact CanRecvPathBounded.not_mu_var t p bs n hn
+
+private theorem muHeight_substitute_mu_of_UnfoldsToEnd (t : String) (body : LocalTypeR)
+    (h : UnfoldsToEnd (body.substitute t (.mu t body))) :
+    (body.substitute t (.mu t body)).muHeight = body.muHeight := by
+  cases body <;> simp [LocalTypeR.substitute, LocalTypeR.muHeight] at h ⊢
+  case var v =>
+    by_cases hv : v = t
+    · subst hv
+      exact (False.elim (UnfoldsToEnd.not_mu_var (t:=t) h))
+    · simp [hv]
+
+private theorem muHeight_substitute_mu_of_UnfoldsToVar (t : String) (body : LocalTypeR) (v : String)
+    (h : UnfoldsToVar (body.substitute t (.mu t body)) v) :
+    (body.substitute t (.mu t body)).muHeight = body.muHeight := by
+  cases body <;> simp [LocalTypeR.substitute, LocalTypeR.muHeight] at h ⊢
+  case var v' =>
+    by_cases hv : v' = t
+    · subst hv
+      exact (False.elim (UnfoldsToVar.not_mu_var (t:=t) (v:=v) h))
+    · simp [hv]
+
+private theorem muHeight_substitute_mu_of_CanSend (t : String) (body : LocalTypeR)
+    (p : String) (bs : List (Label × LocalTypeR))
+    (h : CanSend (body.substitute t (.mu t body)) p bs) :
+    (body.substitute t (.mu t body)).muHeight = body.muHeight := by
+  cases body <;> simp [LocalTypeR.substitute, LocalTypeR.muHeight] at h ⊢
+  case var v' =>
+    by_cases hv : v' = t
+    · subst hv
+      exact (False.elim (CanSend.not_mu_var (t:=t) (p:=p) (bs:=bs) h))
+    · simp [hv]
+
+private theorem muHeight_substitute_mu_of_CanRecv (t : String) (body : LocalTypeR)
+    (p : String) (bs : List (Label × LocalTypeR))
+    (h : CanRecv (body.substitute t (.mu t body)) p bs) :
+    (body.substitute t (.mu t body)).muHeight = body.muHeight := by
+  cases body <;> simp [LocalTypeR.substitute, LocalTypeR.muHeight] at h ⊢
+  case var v' =>
+    by_cases hv : v' = t
+    · subst hv
+      exact (False.elim (CanRecv.not_mu_var (t:=t) (p:=p) (bs:=bs) h))
+    · simp [hv]
+
+theorem UnfoldsToEnd.fullUnfold_eq {a : LocalTypeR} (h : UnfoldsToEnd a) :
+    a.fullUnfold = .end := by
+  induction h with
+  | base => simp [LocalTypeR.fullUnfold, LocalTypeR.muHeight]
+  | @mu t body h ih =>
+      have hmh := muHeight_substitute_mu_of_UnfoldsToEnd t body h
+      have hfull : (LocalTypeR.unfold)^[body.muHeight] (body.substitute t (.mu t body)) =
+          (body.substitute t (.mu t body)).fullUnfold := by
+        simp [LocalTypeR.fullUnfold, hmh]
+      simp [LocalTypeR.fullUnfold_mu, hfull, ih]
+
+theorem UnfoldsToVar.fullUnfold_eq {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) :
+    a.fullUnfold = .var v := by
+  induction h with
+  | base => simp [LocalTypeR.fullUnfold, LocalTypeR.muHeight]
+  | @mu t body v h ih =>
+      have hmh := muHeight_substitute_mu_of_UnfoldsToVar t body v h
+      have hfull : (LocalTypeR.unfold)^[body.muHeight] (body.substitute t (.mu t body)) =
+          (body.substitute t (.mu t body)).fullUnfold := by
+        simp [LocalTypeR.fullUnfold, hmh]
+      simp [LocalTypeR.fullUnfold_mu, hfull, ih]
+
+theorem CanSend.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanSend a p bs) : a.fullUnfold = .send p bs := by
+  induction h with
+  | base => simp [LocalTypeR.fullUnfold, LocalTypeR.muHeight]
+  | @mu t body p bs h ih =>
+      have hmh := muHeight_substitute_mu_of_CanSend t body p bs h
+      have hfull : (LocalTypeR.unfold)^[body.muHeight] (body.substitute t (.mu t body)) =
+          (body.substitute t (.mu t body)).fullUnfold := by
+        simp [LocalTypeR.fullUnfold, hmh]
+      simp [LocalTypeR.fullUnfold_mu, hfull, ih]
+
+theorem CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecv a p bs) : a.fullUnfold = .recv p bs := by
+  induction h with
+  | base => simp [LocalTypeR.fullUnfold, LocalTypeR.muHeight]
+  | @mu t body p bs h ih =>
+      have hmh := muHeight_substitute_mu_of_CanRecv t body p bs h
+      have hfull : (LocalTypeR.unfold)^[body.muHeight] (body.substitute t (.mu t body)) =
+          (body.substitute t (.mu t body)).fullUnfold := by
+        simp [LocalTypeR.fullUnfold, hmh]
+      simp [LocalTypeR.fullUnfold_mu, hfull, ih]
+
+/-! ## Unfolding Converse Lemmas
+
+These lemmas go in the opposite direction: if fullUnfold (or a finite unfold
+iteration) yields a constructor, then the corresponding membership predicate holds.
+This is the bounded-path pattern from QpfTypes (RetPathBounded/VisPathBounded). -/
+
+private theorem unfold_iter_eq_end_to_UnfoldsToEnd (a : LocalTypeR) :
+    ∀ n, (LocalTypeR.unfold^[n] a = .end) → UnfoldsToEnd a := by
+  intro n
+  induction n with
+  | zero =>
+      intro h
+      have h' : a = .end := by
+        simpa [Function.iterate_zero, id_eq] using h
+      cases h'
+      exact UnfoldsToEnd.base
+  | succ n ih =>
+      intro h
+      cases a with
+      | mu t body =>
+          have h' : (LocalTypeR.unfold^[n] (body.substitute t (.mu t body))) = .end := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact UnfoldsToEnd.mu (ih h')
+      | end | var _ | send _ _ | recv _ _ =>
+          have h' : (LocalTypeR.unfold^[n] a) = .end := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact ih h'
+
+private theorem unfold_iter_eq_var_to_UnfoldsToVar (a : LocalTypeR) (v : String) :
+    ∀ n, (LocalTypeR.unfold^[n] a = .var v) → UnfoldsToVar a v := by
+  intro n
+  induction n with
+  | zero =>
+      intro h
+      have h' : a = .var v := by
+        simpa [Function.iterate_zero, id_eq] using h
+      cases h'
+      exact UnfoldsToVar.base
+  | succ n ih =>
+      intro h
+      cases a with
+      | mu t body =>
+          have h' : (LocalTypeR.unfold^[n] (body.substitute t (.mu t body))) = .var v := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact UnfoldsToVar.mu (ih h')
+      | end | var _ | send _ _ | recv _ _ =>
+          have h' : (LocalTypeR.unfold^[n] a) = .var v := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact ih h'
+
+private theorem unfold_iter_eq_send_to_CanSend (a : LocalTypeR) (p : String)
+    (bs : List (Label × LocalTypeR)) :
+    ∀ n, (LocalTypeR.unfold^[n] a = .send p bs) → CanSend a p bs := by
+  intro n
+  induction n with
+  | zero =>
+      intro h
+      have h' : a = .send p bs := by
+        simpa [Function.iterate_zero, id_eq] using h
+      cases h'
+      exact CanSend.base
+  | succ n ih =>
+      intro h
+      cases a with
+      | mu t body =>
+          have h' : (LocalTypeR.unfold^[n] (body.substitute t (.mu t body))) = .send p bs := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact CanSend.mu (ih h')
+      | end | var _ | send _ _ | recv _ _ =>
+          have h' : (LocalTypeR.unfold^[n] a) = .send p bs := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact ih h'
+
+private theorem unfold_iter_eq_recv_to_CanRecv (a : LocalTypeR) (p : String)
+    (bs : List (Label × LocalTypeR)) :
+    ∀ n, (LocalTypeR.unfold^[n] a = .recv p bs) → CanRecv a p bs := by
+  intro n
+  induction n with
+  | zero =>
+      intro h
+      have h' : a = .recv p bs := by
+        simpa [Function.iterate_zero, id_eq] using h
+      cases h'
+      exact CanRecv.base
+  | succ n ih =>
+      intro h
+      cases a with
+      | mu t body =>
+          have h' : (LocalTypeR.unfold^[n] (body.substitute t (.mu t body))) = .recv p bs := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact CanRecv.mu (ih h')
+      | end | var _ | send _ _ | recv _ _ =>
+          have h' : (LocalTypeR.unfold^[n] a) = .recv p bs := by
+            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
+          exact ih h'
+
+theorem UnfoldsToEnd.of_fullUnfold_eq {a : LocalTypeR} (h : a.fullUnfold = .end) :
+    UnfoldsToEnd a := by
+  apply unfold_iter_eq_end_to_UnfoldsToEnd a a.muHeight
+  simpa [LocalTypeR.fullUnfold] using h
+
+theorem UnfoldsToVar.of_fullUnfold_eq {a : LocalTypeR} {v : String} (h : a.fullUnfold = .var v) :
+    UnfoldsToVar a v := by
+  apply unfold_iter_eq_var_to_UnfoldsToVar a v a.muHeight
+  simpa [LocalTypeR.fullUnfold] using h
+
+theorem CanSend.of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : a.fullUnfold = .send p bs) : CanSend a p bs := by
+  apply unfold_iter_eq_send_to_CanSend a p bs a.muHeight
+  simpa [LocalTypeR.fullUnfold] using h
+
+theorem CanRecv.of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : a.fullUnfold = .recv p bs) : CanRecv a p bs := by
+  apply unfold_iter_eq_recv_to_CanRecv a p bs a.muHeight
+  simpa [LocalTypeR.fullUnfold] using h
 
 /-! ## Bisimulation Relation
 
@@ -1087,6 +1391,135 @@ theorem EQ2.end_right_implies_UnfoldsToEnd_of_closed {x : LocalTypeR}
   | is_send h => exact absurd heq (EQ2_end_not_CanSend h)
   | is_recv h => exact absurd heq (EQ2_end_not_CanRecv h)
 
+/-- For contractive types, `EQ2 .end x` implies `UnfoldsToEnd x`. -/
+theorem EQ2.end_right_implies_UnfoldsToEnd_of_contractive {x : LocalTypeR}
+    (hcontr : x.isContractive = true) (heq : EQ2 .end x) : UnfoldsToEnd x := by
+  have hobs := observable_of_contractive (a := x) hcontr
+  cases hobs with
+  | is_end h => exact h
+  | is_var h => exact absurd heq (EQ2_end_not_UnfoldsToVar h)
+  | is_send h => exact absurd heq (EQ2_end_not_CanSend h)
+  | is_recv h => exact absurd heq (EQ2_end_not_CanRecv h)
+
+/-- For contractive types, `EQ2 x .end` implies `UnfoldsToEnd x`. -/
+theorem EQ2.end_left_implies_UnfoldsToEnd_of_contractive {x : LocalTypeR}
+    (hcontr : x.isContractive = true) (heq : EQ2 x .end) : UnfoldsToEnd x :=
+  EQ2.end_right_implies_UnfoldsToEnd_of_contractive hcontr (EQ2_symm heq)
+
+/-- For contractive types, `EQ2 (.var v) x` implies `UnfoldsToVar x v`. -/
+theorem EQ2.var_right_implies_UnfoldsToVar_of_contractive {x : LocalTypeR} {v : String}
+    (hcontr : x.isContractive = true) (heq : EQ2 (.var v) x) : UnfoldsToVar x v := by
+  have hobs := observable_of_contractive (a := x) hcontr
+  cases hobs with
+  | is_end h => exact absurd heq (EQ2_var_not_UnfoldsToEnd h)
+  | is_var (v := v') h =>
+      by_cases hne : v' = v
+      · subst hne; exact h
+      · exact (False.elim (EQ2_var_not_UnfoldsToVar_diff h heq hne))
+  | is_send h => exact absurd heq (EQ2_var_not_CanSend h)
+  | is_recv h => exact absurd heq (EQ2_var_not_CanRecv h)
+
+/-- For contractive types, `EQ2 x (.var v)` implies `UnfoldsToVar x v`. -/
+theorem EQ2.var_left_implies_UnfoldsToVar_of_contractive {x : LocalTypeR} {v : String}
+    (hcontr : x.isContractive = true) (heq : EQ2 x (.var v)) : UnfoldsToVar x v :=
+  EQ2.var_right_implies_UnfoldsToVar_of_contractive hcontr (EQ2_symm heq)
+
+/-- For contractive types, `EQ2 (.send p bs) x` implies `CanSend x p cs` with matching branches. -/
+theorem EQ2.send_right_implies_CanSend_of_contractive {x : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (hcontr : x.isContractive = true)
+    (heq : EQ2 (.send p bs) x) : ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
+  have hobs := observable_of_contractive (a := x) hcontr
+  cases hobs with
+  | is_end hend =>
+      have hx_end : EQ2 x .end := UnfoldsToEnd.toEQ2 hend
+      have hsend_end : EQ2 (.send p bs) .end := EQ2_trans heq hx_end
+      have hfalse : False := by
+        have hf := EQ2.destruct hsend_end
+        simpa [EQ2F] using hf
+      exact (False.elim hfalse)
+  | is_var hvar =>
+      have hx_var : EQ2 x (.var _) := UnfoldsToVar.toEQ2 hvar
+      have hsend_var : EQ2 (.send p bs) (.var _) := EQ2_trans heq hx_var
+      have hfalse : False := by
+        have hf := EQ2.destruct hsend_var
+        simpa [EQ2F] using hf
+      exact (False.elim hfalse)
+  | is_recv hrecv =>
+      have hx_recv : EQ2 x (.recv _ _) := CanRecv.toEQ2 hrecv
+      have hsend_recv : EQ2 (.send p bs) (.recv _ _) := EQ2_trans heq hx_recv
+      have hfalse : False := by
+        have hf := EQ2.destruct hsend_recv
+        simpa [EQ2F] using hf
+      exact (False.elim hfalse)
+  | is_send (partner := p') (bs := cs) hsend =>
+      have hfull : x.fullUnfold = .send p' cs := CanSend.fullUnfold_eq hsend
+      have hiter := (EQ2_unfold_right_iter (a := .send p bs) (b := x) heq) x.muHeight
+      have hsend_full : EQ2 (.send p bs) x.fullUnfold := by
+        simpa [LocalTypeR.fullUnfold] using hiter
+      have hsend' : EQ2 (.send p bs) (.send p' cs) := by
+        simpa [hfull] using hsend_full
+      have hf := EQ2.destruct hsend'
+      have ⟨hp, hbr⟩ : p = p' ∧ BranchesRel EQ2 bs cs := by
+        simpa [EQ2F] using hf
+      subst hp
+      exact ⟨cs, hsend, hbr⟩
+
+/-- For contractive types, `EQ2 x (.send p cs)` implies `CanSend x p bs` with matching branches. -/
+theorem EQ2.send_left_implies_CanSend_of_contractive {x : LocalTypeR} {p : String}
+    {cs : List (Label × LocalTypeR)} (hcontr : x.isContractive = true)
+    (heq : EQ2 x (.send p cs)) : ∃ bs, CanSend x p bs ∧ BranchesRel EQ2 bs cs := by
+  have hsymm := EQ2_symm heq
+  obtain ⟨bs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend_of_contractive (x := x) hcontr hsymm
+  exact ⟨bs, hcan, BranchesRel_flip hbr⟩
+
+/-- For contractive types, `EQ2 (.recv p bs) x` implies `CanRecv x p cs` with matching branches. -/
+theorem EQ2.recv_right_implies_CanRecv_of_contractive {x : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (hcontr : x.isContractive = true)
+    (heq : EQ2 (.recv p bs) x) : ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
+  have hobs := observable_of_contractive (a := x) hcontr
+  cases hobs with
+  | is_end hend =>
+      have hx_end : EQ2 x .end := UnfoldsToEnd.toEQ2 hend
+      have hrecv_end : EQ2 (.recv p bs) .end := EQ2_trans heq hx_end
+      have hfalse : False := by
+        have hf := EQ2.destruct hrecv_end
+        simpa [EQ2F] using hf
+      exact (False.elim hfalse)
+  | is_var hvar =>
+      have hx_var : EQ2 x (.var _) := UnfoldsToVar.toEQ2 hvar
+      have hrecv_var : EQ2 (.recv p bs) (.var _) := EQ2_trans heq hx_var
+      have hfalse : False := by
+        have hf := EQ2.destruct hrecv_var
+        simpa [EQ2F] using hf
+      exact (False.elim hfalse)
+  | is_send hsend =>
+      have hx_send : EQ2 x (.send _ _) := CanSend.toEQ2 hsend
+      have hrecv_send : EQ2 (.recv p bs) (.send _ _) := EQ2_trans heq hx_send
+      have hfalse : False := by
+        have hf := EQ2.destruct hrecv_send
+        simpa [EQ2F] using hf
+      exact (False.elim hfalse)
+  | is_recv (partner := p') (bs := cs) hrecv =>
+      have hfull : x.fullUnfold = .recv p' cs := CanRecv.fullUnfold_eq hrecv
+      have hiter := (EQ2_unfold_right_iter (a := .recv p bs) (b := x) heq) x.muHeight
+      have hrecv_full : EQ2 (.recv p bs) x.fullUnfold := by
+        simpa [LocalTypeR.fullUnfold] using hiter
+      have hrecv' : EQ2 (.recv p bs) (.recv p' cs) := by
+        simpa [hfull] using hrecv_full
+      have hf := EQ2.destruct hrecv'
+      have ⟨hp, hbr⟩ : p = p' ∧ BranchesRel EQ2 bs cs := by
+        simpa [EQ2F] using hf
+      subst hp
+      exact ⟨cs, hrecv, hbr⟩
+
+/-- For contractive types, `EQ2 x (.recv p cs)` implies `CanRecv x p bs` with matching branches. -/
+theorem EQ2.recv_left_implies_CanRecv_of_contractive {x : LocalTypeR} {p : String}
+    {cs : List (Label × LocalTypeR)} (hcontr : x.isContractive = true)
+    (heq : EQ2 x (.recv p cs)) : ∃ bs, CanRecv x p bs ∧ BranchesRel EQ2 bs cs := by
+  have hsymm := EQ2_symm heq
+  obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv_of_contractive (x := x) hcontr hsymm
+  exact ⟨bs, hcan, BranchesRel_flip hbr⟩
+
 /-- If EQ2 .end x, then x unfolds to end.
 
     **Semantic constraint**: This axiom is only valid for contractive types.
@@ -1094,15 +1527,27 @@ theorem EQ2.end_right_implies_UnfoldsToEnd_of_closed {x : LocalTypeR}
 
     The unconditional version is kept as an axiom for API convenience, since all
     types in practice (from well-formed projections) are contractive. -/
-axiom EQ2.end_right_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x
+axiom EQ2.end_right_implies_UnfoldsToEnd_axiom {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x
+
+/-- Unconditional extraction: prefers the contractive proof when available. -/
+theorem EQ2.end_right_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x := by
+  by_cases hcontr : x.isContractive = true
+  · exact EQ2.end_right_implies_UnfoldsToEnd_of_contractive hcontr h
+  · exact EQ2.end_right_implies_UnfoldsToEnd_axiom h
 
 /-- If EQ2 x .end, then x unfolds to end. -/
 theorem EQ2.end_left_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 x .end) : UnfoldsToEnd x :=
   EQ2.end_right_implies_UnfoldsToEnd (EQ2_symm h)
 
 /-- If EQ2 (.var v) x, then x unfolds to var v. -/
-axiom EQ2.var_right_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
+axiom EQ2.var_right_implies_UnfoldsToVar_axiom {x : LocalTypeR} {v : String}
     (h : EQ2 (.var v) x) : UnfoldsToVar x v
+
+theorem EQ2.var_right_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
+    (h : EQ2 (.var v) x) : UnfoldsToVar x v := by
+  by_cases hcontr : x.isContractive = true
+  · exact EQ2.var_right_implies_UnfoldsToVar_of_contractive hcontr h
+  · exact EQ2.var_right_implies_UnfoldsToVar_axiom h
 
 /-- If EQ2 x (.var v), then x unfolds to var v. -/
 theorem EQ2.var_left_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
@@ -1110,9 +1555,16 @@ theorem EQ2.var_left_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
   EQ2.var_right_implies_UnfoldsToVar (EQ2_symm h)
 
 /-- If EQ2 (.send p bs) x, then x can send to p with EQ2-related branches. -/
-axiom EQ2.send_right_implies_CanSend {x : LocalTypeR} {p : String}
+axiom EQ2.send_right_implies_CanSend_axiom {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : EQ2 (.send p bs) x) :
     ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs
+
+theorem EQ2.send_right_implies_CanSend {x : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (h : EQ2 (.send p bs) x) :
+    ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
+  by_cases hcontr : x.isContractive = true
+  · exact EQ2.send_right_implies_CanSend_of_contractive (x := x) hcontr h
+  · exact EQ2.send_right_implies_CanSend_axiom h
 
 /-- Flip BranchesRel with symmetric relation. -/
 private theorem BranchesRel_flip {as bs : List (Label × LocalTypeR)}
@@ -1130,9 +1582,16 @@ theorem EQ2.send_left_implies_CanSend {x : LocalTypeR} {p : String}
   exact ⟨bs, hcan, BranchesRel_flip hbr⟩
 
 /-- If EQ2 (.recv p bs) x, then x can recv from p with EQ2-related branches. -/
-axiom EQ2.recv_right_implies_CanRecv {x : LocalTypeR} {p : String}
+axiom EQ2.recv_right_implies_CanRecv_axiom {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : EQ2 (.recv p bs) x) :
     ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs
+
+theorem EQ2.recv_right_implies_CanRecv {x : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (h : EQ2 (.recv p bs) x) :
+    ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
+  by_cases hcontr : x.isContractive = true
+  · exact EQ2.recv_right_implies_CanRecv_of_contractive (x := x) hcontr h
+  · exact EQ2.recv_right_implies_CanRecv_axiom h
 
 /-- If EQ2 x (.recv p cs), then x can recv from p with EQ2-related branches. -/
 theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
@@ -1150,9 +1609,52 @@ theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
 
     **Semantic soundness**: In practice, all types from well-formed projections are contractive,
     so this axiom holds for all practical use cases. -/
-axiom EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
+axiom EQ2_mus_to_BisimF_axiom {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (.mu t body) (.mu s body')) :
     BisimF EQ2 (.mu t body) (.mu s body')
+
+theorem EQ2_mus_to_BisimF_of_contractive {t s : String} {body body' : LocalTypeR}
+    (h : EQ2 (.mu t body) (.mu s body'))
+    (hc1 : (.mu t body).isContractive = true)
+    (hc2 : (.mu s body').isContractive = true) :
+    BisimF EQ2 (.mu t body) (.mu s body') := by
+  have hobs := observable_of_contractive (a := .mu t body) hc1
+  cases hobs with
+  | is_end hend =>
+      have ha_eq_end : EQ2 (.mu t body) .end := UnfoldsToEnd.toEQ2 hend
+      have hb_eq_end : EQ2 (.mu s body') .end := EQ2_trans (EQ2_symm h) ha_eq_end
+      have hEndB : UnfoldsToEnd (.mu s body') :=
+        EQ2.end_left_implies_UnfoldsToEnd_of_contractive (x := .mu s body') hc2 hb_eq_end
+      exact BisimF.eq_end hend hEndB
+  | is_var (v := v) hvar =>
+      have ha_eq_var : EQ2 (.mu t body) (.var v) := UnfoldsToVar.toEQ2 hvar
+      have hb_eq_var : EQ2 (.mu s body') (.var v) := EQ2_trans (EQ2_symm h) ha_eq_var
+      have hVarB : UnfoldsToVar (.mu s body') v :=
+        EQ2.var_left_implies_UnfoldsToVar_of_contractive (x := .mu s body') hc2 hb_eq_var
+      exact BisimF.eq_var hvar hVarB
+  | is_send (p := p) (bs := bs) hsend =>
+      have ha_eq_send : EQ2 (.mu t body) (.send p bs) := CanSend.toEQ2 hsend
+      have hb_eq_send : EQ2 (.mu s body') (.send p bs) := EQ2_trans (EQ2_symm h) ha_eq_send
+      obtain ⟨bs', hCanSend, hbr⟩ :=
+        EQ2.send_left_implies_CanSend_of_contractive (x := .mu s body') hc2 hb_eq_send
+      have hbr' : BranchesRel EQ2 bs bs' := BranchesRel_flip hbr
+      exact BisimF.eq_send hsend hCanSend (BranchesRel_to_BranchesRelBisim hbr')
+  | is_recv (p := p) (bs := bs) hrecv =>
+      have ha_eq_recv : EQ2 (.mu t body) (.recv p bs) := CanRecv.toEQ2 hrecv
+      have hb_eq_recv : EQ2 (.mu s body') (.recv p bs) := EQ2_trans (EQ2_symm h) ha_eq_recv
+      obtain ⟨bs', hCanRecv, hbr⟩ :=
+        EQ2.recv_left_implies_CanRecv_of_contractive (x := .mu s body') hc2 hb_eq_recv
+      have hbr' : BranchesRel EQ2 bs bs' := BranchesRel_flip hbr
+      exact BisimF.eq_recv hrecv hCanRecv (BranchesRel_to_BranchesRelBisim hbr')
+
+theorem EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
+    (h : EQ2 (.mu t body) (.mu s body')) :
+    BisimF EQ2 (.mu t body) (.mu s body') := by
+  by_cases hc1 : (.mu t body).isContractive = true
+  · by_cases hc2 : (.mu s body').isContractive = true
+    · exact EQ2_mus_to_BisimF_of_contractive h hc1 hc2
+    · exact EQ2_mus_to_BisimF_axiom h
+  · exact EQ2_mus_to_BisimF_axiom h
 
 /-- EQ2 implies Bisim.
 
@@ -1168,7 +1670,7 @@ axiom EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
     - Show EQ2 is a post-fixpoint of BisimF by destruct-ing EQ2 to EQ2F
     - Convert EQ2F structure to membership predicates using the extraction lemmas
     - For mu/mu case, use EQ2_mus_to_BisimF axiom -/
-theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
+theorem EQ2.toBisim_raw {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
   -- Use EQ2 as the witness relation
   use EQ2
   constructor
@@ -1259,6 +1761,100 @@ theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
   · -- Show EQ2 a b
     exact h
 
+/-! ## EQ2 to Bisim (Contractive Witness) -/
+
+theorem EQ2.toBisim_of_contractive {a b : LocalTypeR}
+    (ha : a.isContractive = true) (hb : b.isContractive = true) (h : EQ2 a b) : Bisim a b := by
+  -- Use a witness relation that tracks contractiveness on both sides
+  let R : Rel := fun x y => EQ2 x y ∧ x.isContractive = true ∧ y.isContractive = true
+  use R
+  constructor
+  · intro x y hR
+    rcases hR with ⟨hxy, hxcontr, hycontr⟩
+    have hf : EQ2F EQ2 x y := EQ2.destruct hxy
+    cases x with
+    | «end» =>
+      cases y with
+      | «end» => exact BisimF.eq_end UnfoldsToEnd.base UnfoldsToEnd.base
+      | mu _ _ =>
+        have hUnfold := EQ2.end_right_implies_UnfoldsToEnd_of_contractive (x := y) hycontr hxy
+        exact BisimF.eq_end UnfoldsToEnd.base hUnfold
+      | var _ => simp only [EQ2F] at hf
+      | send _ _ => simp only [EQ2F] at hf
+      | recv _ _ => simp only [EQ2F] at hf
+    | var v =>
+      cases y with
+      | var w =>
+        simp only [EQ2F] at hf
+        subst hf
+        exact BisimF.eq_var UnfoldsToVar.base UnfoldsToVar.base
+      | mu _ _ =>
+        have hUnfold := EQ2.var_right_implies_UnfoldsToVar_of_contractive (x := y) hycontr hxy
+        exact BisimF.eq_var UnfoldsToVar.base hUnfold
+      | «end» => simp only [EQ2F] at hf
+      | send _ _ => simp only [EQ2F] at hf
+      | recv _ _ => simp only [EQ2F] at hf
+    | send p bs =>
+      cases y with
+      | send q cs =>
+        simp only [EQ2F] at hf
+        have ⟨heq, hbr⟩ := hf
+        subst heq
+        apply BisimF.eq_send CanSend.base CanSend.base
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | mu _ _ =>
+        obtain ⟨cs, hCanSend, hbr⟩ :=
+          EQ2.send_right_implies_CanSend_of_contractive (x := y) hycontr hxy
+        apply BisimF.eq_send CanSend.base hCanSend
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | «end» => simp only [EQ2F] at hf
+      | var _ => simp only [EQ2F] at hf
+      | recv _ _ => simp only [EQ2F] at hf
+    | recv p bs =>
+      cases y with
+      | recv q cs =>
+        simp only [EQ2F] at hf
+        have ⟨heq, hbr⟩ := hf
+        subst heq
+        apply BisimF.eq_recv CanRecv.base CanRecv.base
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | mu _ _ =>
+        obtain ⟨cs, hCanRecv, hbr⟩ :=
+          EQ2.recv_right_implies_CanRecv_of_contractive (x := y) hycontr hxy
+        apply BisimF.eq_recv CanRecv.base hCanRecv
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | «end» => simp only [EQ2F] at hf
+      | var _ => simp only [EQ2F] at hf
+      | send _ _ => simp only [EQ2F] at hf
+    | mu t body =>
+      cases y with
+      | mu s body' =>
+        exact EQ2_mus_to_BisimF hxy
+      | «end» =>
+        have hUnfold := EQ2.end_right_implies_UnfoldsToEnd_of_contractive (x := x) hxcontr (EQ2_symm hxy)
+        exact BisimF.eq_end hUnfold UnfoldsToEnd.base
+      | var v =>
+        have hUnfold := EQ2.var_right_implies_UnfoldsToVar_of_contractive (x := x) hxcontr (EQ2_symm hxy)
+        exact BisimF.eq_var hUnfold UnfoldsToVar.base
+      | send q cs =>
+        obtain ⟨bs', hCanSend, hbr⟩ :=
+          EQ2.send_right_implies_CanSend_of_contractive (x := x) hxcontr (EQ2_symm hxy)
+        apply BisimF.eq_send hCanSend CanSend.base
+        exact BranchesRel_to_BranchesRelBisim hbr
+      | recv q cs =>
+        obtain ⟨bs', hCanRecv, hbr⟩ :=
+          EQ2.recv_right_implies_CanRecv_of_contractive (x := x) hxcontr (EQ2_symm hxy)
+        apply BisimF.eq_recv hCanRecv CanRecv.base
+        exact BranchesRel_to_BranchesRelBisim hbr
+  · exact ⟨h, ha, hb⟩
+
+theorem EQ2.toBisim {a b : LocalTypeR} (h : EQ2 a b) : Bisim a b := by
+  by_cases ha : a.isContractive = true
+  · by_cases hb : b.isContractive = true
+    · exact EQ2.toBisim_of_contractive ha hb h
+    · exact EQ2.toBisim_raw h
+  · exact EQ2.toBisim_raw h
+
 /-! ## EQ2 Transitivity via Bisim
 
 The Bisim detour provides an alternative proof of EQ2 transitivity that does not
@@ -1279,6 +1875,15 @@ theorem EQ2_trans_via_Bisim {a b c : LocalTypeR}
     (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
   have hBisim_ab := EQ2.toBisim hab
   have hBisim_bc := EQ2.toBisim hbc
+  have hBisim_ac := Bisim.trans hBisim_ab hBisim_bc
+  exact Bisim.toEQ2 hBisim_ac
+
+/-- EQ2 transitivity via Bisim, for contractive types. -/
+theorem EQ2_trans_via_Bisim_of_contractive {a b c : LocalTypeR}
+    (ha : a.isContractive = true) (hb : b.isContractive = true) (hc : c.isContractive = true)
+    (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
+  have hBisim_ab := EQ2.toBisim_of_contractive ha hb hab
+  have hBisim_bc := EQ2.toBisim_of_contractive hb hc hbc
   have hBisim_ac := Bisim.trans hBisim_ab hBisim_bc
   exact Bisim.toEQ2 hBisim_ac
 
