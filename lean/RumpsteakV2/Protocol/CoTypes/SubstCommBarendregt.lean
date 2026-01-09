@@ -102,6 +102,7 @@ mutual
 end
 
 /-- notBoundAt is preserved through unfolding. -/
+@[simp]
 theorem notBoundAt_unfold (v : String) (a : LocalTypeR)
     (hbar : notBoundAt v a = true) :
     notBoundAt v a.unfold = true := by
@@ -180,12 +181,14 @@ mutual
 end
 
 /-- Substituting into a closed type leaves it unchanged. -/
+@[simp]
 theorem substitute_closed (e : LocalTypeR) (x : String) (rx : LocalTypeR)
     (hclosed : ∀ v, isFreeIn v e = false) :
     e.substitute x rx = e :=
   substitute_not_free e x rx (hclosed x)
 
 /-- A variable bound by mu is not free in the mu type. -/
+@[simp]
 theorem isFreeIn_mu_self (t : String) (body : LocalTypeR) :
     isFreeIn t (.mu t body) = false := by
   simp only [isFreeIn, beq_self_eq_true, ↓reduceIte]
@@ -251,6 +254,7 @@ end
 /-- After substituting t with (mu t body), the variable t is not free.
 
     This is a special case of isFreeIn_subst_self_general where repl = .mu t body. -/
+@[simp]
 theorem isFreeIn_subst_mu_self (body : LocalTypeR) (t : String) :
     isFreeIn t (body.substitute t (.mu t body)) = false :=
   isFreeIn_subst_self_general body t (.mu t body) (isFreeIn_mu_self t body)
@@ -322,6 +326,7 @@ mutual
 end
 
 /-- Key helper: (mu t body).substitute var repl = mu t (body.substitute var repl) when t ≠ var. -/
+@[simp]
 theorem mu_subst_ne (t : String) (body : LocalTypeR) (var : String) (repl : LocalTypeR)
     (htne : t ≠ var) :
     (LocalTypeR.mu t body).substitute var repl = .mu t (body.substitute var repl) := by
@@ -597,18 +602,21 @@ theorem SubstRel.flatten {var : String} {repl : LocalTypeR}
 /-! ## Helper Lemmas for Substitution -/
 
 /-- Substitute on mu when bound variable differs from substitution variable. -/
+@[simp]
 theorem mu_substitute_ne (t : String) (body : LocalTypeR) (var : String) (repl : LocalTypeR)
     (hne : (t == var) = false) :
     (LocalTypeR.mu t body).substitute var repl = .mu t (body.substitute var repl) := by
   simp only [LocalTypeR.substitute, hne, Bool.false_eq_true, ite_false]
 
 /-- Substitute on var when variable equals substitution variable. -/
+@[simp]
 theorem var_substitute_eq (v : String) (var : String) (repl : LocalTypeR)
     (heq : (v == var) = true) :
     (LocalTypeR.var v).substitute var repl = repl := by
   simp only [LocalTypeR.substitute, heq, ite_true]
 
 /-- Substitute on var when variable differs from substitution variable. -/
+@[simp]
 theorem var_substitute_ne (v : String) (var : String) (repl : LocalTypeR)
     (hne : (v == var) = false) :
     (LocalTypeR.var v).substitute var repl = .var v := by
