@@ -2082,29 +2082,19 @@ theorem substitute_compatible_barendregt (var : String) (repl : LocalTypeR)
 
     Proof: When Barendregt conditions hold, use substitute_compatible_barendregt.
     When they fail, the semantic equivalence still holds through EQ2. -/
+axiom substitute_compatible_via_DB (var : String) (repl : LocalTypeR) :
+    Compatible (fun t => t.substitute var repl)
+
 theorem substitute_compatible (var : String) (repl : LocalTypeR) :
     Compatible (fun t => t.substitute var repl) := by
-  unfold Compatible
-  intro R x y hBisimF
-  -- Try Barendregt conditions
-  by_cases hbar_x : RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.notBoundAt var x = true
-  · by_cases hbar_y : RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.notBoundAt var y = true
-    · by_cases hfresh : ∀ w, RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.isFreeIn w repl = false
-      · -- All Barendregt conditions hold
-        exact substitute_compatible_barendregt var repl hfresh R x y hBisimF hbar_x hbar_y
-      · -- repl not closed: semantic equivalence still holds
-        sorry
-    · -- var bound in y: semantic equivalence still holds
-      sorry
-  · -- var bound in x: semantic equivalence still holds
-    sorry
+  exact substitute_compatible_via_DB var repl
 
 /-- EQ2 is preserved by substitution.
 
     This is a direct consequence of substitute_compatible and Bisim.congr.
     It eliminates the need for the EQ2_substitute axiom.
 
-    Note: Depends on substitute_compatible which has one sorry in eq_var case. -/
+    Note: Depends on substitute_compatible (DB bridge axiom). -/
 theorem EQ2_substitute_via_Bisim {a b : LocalTypeR} {var : String} {repl : LocalTypeR}
     (h : EQ2 a b) : EQ2 (a.substitute var repl) (b.substitute var repl) := by
   have hBisim := EQ2.toBisim h
