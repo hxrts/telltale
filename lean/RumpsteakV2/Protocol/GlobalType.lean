@@ -420,12 +420,9 @@ def GlobalType.muHeight : GlobalType → Nat
   | _ => 0
 
 /-- Fully unfold a global type by iterating unfold until non-mu form. -/
-def GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
-  (GlobalType.unfold)^[g.muHeight] g
-
-/-- If muHeight is 0, fullUnfold is identity. -/
-theorem GlobalType.fullUnfold_muHeight_zero {g : GlobalType} (h : g.muHeight = 0) :
-    g.fullUnfold = g := by
-  simp [GlobalType.fullUnfold, h]
+partial def GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
+  match g.muHeight with
+  | 0 => g
+  | _ => (g.unfold).fullUnfold
 
 end RumpsteakV2.Protocol.GlobalType

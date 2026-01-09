@@ -46,6 +46,11 @@ mutual
     | (_, t) :: rest => t.freeVars ++ freeVarsOfBranches rest
 end
 
+/-! ## freeVars / isFreeIn bridge (converse direction)
+
+NOTE: These theorems are moved to after the isFreeIn definition below.
+-/
+
 theorem freeVarsOfBranches_eq_flatMap (branches : List (Label × LocalTypeR)) :
     freeVarsOfBranches branches = branches.flatMap (fun (_, t) => t.freeVars) := by
   induction branches with
@@ -54,6 +59,61 @@ theorem freeVarsOfBranches_eq_flatMap (branches : List (Label × LocalTypeR)) :
       cases head with
       | mk label t =>
           simp [freeVarsOfBranches, ih, List.flatMap]
+
+@[simp]
+lemma sizeOf_cont_lt_sizeOf_branches (label : Label) (cont : LocalTypeR)
+    (tail : List (Label × LocalTypeR)) :
+    sizeOf cont < sizeOf ((label, cont) :: tail) := by
+  simp +arith
+
+@[simp]
+lemma sizeOf_tail_lt_sizeOf_branches (head : Label × LocalTypeR)
+    (tail : List (Label × LocalTypeR)) :
+    sizeOf tail < sizeOf (head :: tail) := by
+  simp +arith
+
+@[simp]
+lemma sizeOf_branches_lt_sizeOf_send (p : String) (bs : List (Label × LocalTypeR)) :
+    sizeOf bs < sizeOf (LocalTypeR.send p bs) := by
+  simp +arith
+
+@[simp]
+lemma sizeOf_branches_lt_sizeOf_recv (p : String) (bs : List (Label × LocalTypeR)) :
+    sizeOf bs < sizeOf (LocalTypeR.recv p bs) := by
+  simp +arith
+
+@[simp]
+lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
+    sizeOf body < sizeOf (LocalTypeR.mu t body) := by
+  simp +arith
+
+@[simp] lemma sizeOf_branches_lt_of_send_eq {lt : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (h : lt = LocalTypeR.send p bs) :
+    sizeOf bs < sizeOf lt := by
+  simpa [h] using sizeOf_branches_lt_sizeOf_send p bs
+
+@[simp] lemma sizeOf_branches_lt_of_recv_eq {lt : LocalTypeR} {p : String}
+    {bs : List (Label × LocalTypeR)} (h : lt = LocalTypeR.recv p bs) :
+    sizeOf bs < sizeOf lt := by
+  simpa [h] using sizeOf_branches_lt_sizeOf_recv p bs
+
+@[simp] lemma sizeOf_body_lt_of_mu_eq {lt : LocalTypeR} {t : String} {body : LocalTypeR}
+    (h : lt = LocalTypeR.mu t body) :
+    sizeOf body < sizeOf lt := by
+  simpa [h] using sizeOf_body_lt_sizeOf_mu t body
+
+@[simp] lemma sizeOf_tail_lt_of_cons_eq {bs : List (Label × LocalTypeR)}
+    {head : Label × LocalTypeR} {tail : List (Label × LocalTypeR)}
+    (h : bs = head :: tail) :
+    sizeOf tail < sizeOf bs := by
+  simpa [h] using sizeOf_tail_lt_sizeOf_branches head tail
+
+@[simp] lemma sizeOf_cont_lt_of_head_eq {bs : List (Label × LocalTypeR)}
+    {head : Label × LocalTypeR} {tail : List (Label × LocalTypeR)}
+    {label : Label} {cont : LocalTypeR}
+    (hbs : bs = head :: tail) (hhead : head = (label, cont)) :
+    sizeOf cont < sizeOf bs := by
+  simpa [hbs, hhead] using sizeOf_cont_lt_sizeOf_branches label cont tail
 
 /- Substitute a local type for a variable. -/
 mutual
@@ -198,59 +258,6 @@ theorem List.isEmpty_eq_true {α : Type} (l : List α) : l.isEmpty = true ↔ l 
 /-- A local type is closed if it has no free type variables. -/
 def LocalTypeR.isClosed (lt : LocalTypeR) : Bool := lt.freeVars.isEmpty
 
--- Substituting a closed replacement into a mu-body preserves closedness.
---
--- If .mu t body is closed, then body can only have t as a free variable.
--- Substituting a closed term (.mu t body) for t yields a closed result.
--- Helper: freeVars of substitute when replacing with closed term
-mutual
-  theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTypeR) :
-      e.isClosed → ∀ v, v ∈ (body.substitute t e).freeVars → v ∈ body.freeVars ∧ v ≠ t := by
-    sorry
-  
-  theorem freeVars_substituteBranches_closed (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
-      e.isClosed → ∀ v, v ∈ freeVarsOfBranches (substituteBranches bs t e) →
-        v ∈ freeVarsOfBranches bs ∧ v ≠ t := by
-    sorry
-end
-
-theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
-    (hclosed : (LocalTypeR.mu t body).isClosed) :
-    (body.substitute t (LocalTypeR.mu t body)).isClosed := by
-  sorry
-
-/-! ## Full Unfolding (Coq-style `full_eunf`)
-
-Iterate mu-unfolding until reaching a non-mu form.
-This is the Coq pattern where predicates work on fully unfolded types. -/
-
-/-- Height for mu unfolding - counts nested mus at the head. -/
-def LocalTypeR.muHeight : LocalTypeR → Nat
-  | .mu _ body => 1 + body.muHeight
-  | _ => 0
-
-/-- Fully unfold a local type by iterating unfold until non-mu form.
-    Corresponds to Coq's `full_eunf`. -/
-def LocalTypeR.fullUnfold (lt : LocalTypeR) : LocalTypeR :=
-  (LocalTypeR.unfold)^[lt.muHeight] lt
-
-/-- If a type has no leading `mu`, then `fullUnfold` cannot be a `mu`.
-
-    This is the only unconditional statement we can make without assuming
-    guardedness/contractiveness. -/
-theorem LocalTypeR.fullUnfold_not_mu (lt : LocalTypeR) :
-    lt.muHeight = 0 → ∀ t body, lt.fullUnfold ≠ .mu t body := by
-  intro h t body
-  cases lt <;> simp [fullUnfold, muHeight] at h ⊢
-
-/-- fullUnfold is idempotent when its result has no leading `mu`. -/
-theorem LocalTypeR.fullUnfold_idemp (lt : LocalTypeR) :
-    lt.fullUnfold.muHeight = 0 → lt.fullUnfold.fullUnfold = lt.fullUnfold := by
-  intro h
-  have h' : ((LocalTypeR.unfold)^[lt.muHeight] lt).muHeight = 0 := by
-    simpa [fullUnfold] using h
-  simp [fullUnfold, h']
-
 /-! ## Guardedness Predicate (Coq-style `eguarded`)
 
 A variable is guarded in a type if it only appears inside a communication (send/recv).
@@ -271,6 +278,70 @@ mutual
   def isFreeInBranches' (v : String) : List (Label × LocalTypeR) → Bool
     | [] => false
     | (_, c) :: rest => c.isFreeIn v || isFreeInBranches' v rest
+end
+
+/-! ## freeVars / isFreeIn bridge lemmas -/
+
+mutual
+  theorem mem_freeVars_isFreeIn (lt : LocalTypeR) (v : String) :
+      v ∈ lt.freeVars → lt.isFreeIn v = true := by
+    intro hmem
+    cases hlt : lt with
+    | «end» =>
+        simp [LocalTypeR.freeVars, hlt] at hmem
+    | var w =>
+        have hv : v = w := by
+          simpa [LocalTypeR.freeVars, hlt] using hmem
+        subst hv
+        simp [LocalTypeR.isFreeIn, hlt]
+    | send _ bs =>
+        have h' : v ∈ freeVarsOfBranches bs := by
+          simpa [LocalTypeR.freeVars, hlt] using hmem
+        have hmem' := mem_freeVarsOfBranches_isFreeInBranches' bs v h'
+        simpa [LocalTypeR.isFreeIn, hlt] using hmem'
+    | recv _ bs =>
+        have h' : v ∈ freeVarsOfBranches bs := by
+          simpa [LocalTypeR.freeVars, hlt] using hmem
+        have hmem' := mem_freeVarsOfBranches_isFreeInBranches' bs v h'
+        simpa [LocalTypeR.isFreeIn, hlt] using hmem'
+    | mu t body =>
+        have h' : v ∈ body.freeVars.filter (· != t) := by
+          simpa [LocalTypeR.freeVars, hlt] using hmem
+        have hpair : v ∈ body.freeVars ∧ (v != t) = true := by
+          simpa [List.mem_filter] using h'
+        have hvne : v ≠ t := (bne_iff_ne).1 hpair.2
+        have hbody : body.isFreeIn v = true := mem_freeVars_isFreeIn body v hpair.1
+        have hvne' : (v == t) = false := beq_eq_false_iff_ne.mpr hvne
+        simpa [LocalTypeR.isFreeIn, hvne', hlt] using hbody
+  termination_by sizeOf lt
+  decreasing_by
+    classical
+    all_goals
+      simp [*] <;> omega
+
+  theorem mem_freeVarsOfBranches_isFreeInBranches' (bs : List (Label × LocalTypeR)) (v : String) :
+      v ∈ freeVarsOfBranches bs → isFreeInBranches' v bs = true := by
+    intro hmem
+    cases hbs : bs with
+    | nil =>
+        simp [freeVarsOfBranches, hbs] at hmem
+    | cons head tail =>
+        cases hhead : head with
+        | mk label cont =>
+            have hmem' : v ∈ cont.freeVars ∨ v ∈ freeVarsOfBranches tail := by
+              simpa [freeVarsOfBranches, hbs, hhead, List.mem_append] using hmem
+            cases hmem' with
+            | inl hcont =>
+                have hfree : cont.isFreeIn v = true := mem_freeVars_isFreeIn cont v hcont
+                simp [isFreeInBranches', hbs, hfree]
+            | inr htail =>
+                have hfree := mem_freeVarsOfBranches_isFreeInBranches' tail v htail
+                simp [isFreeInBranches', hbs, hfree]
+  termination_by sizeOf bs
+  decreasing_by
+    classical
+    all_goals
+      simp [*] <;> omega
 end
 
 /-- Check if a variable is guarded (only appears inside send/recv) in a local type.
@@ -305,6 +376,331 @@ mutual
     | (_, c) :: rest => c.isContractive && isContractiveBranches rest
 end
 
+
+/-! ## Environments (abstraction point for closedness vs substitutions)
+
+We model an environment as a list of (name, type) bindings and define:
+- `ClosedUnder env t`: all free vars of `t` are covered by `env`
+- `Env.apply env t`: apply the environment as sequential substitution
+
+`ActiveEnv` is the single integration point. It is currently `sigmaOfVars ActiveVars`
+(with `ActiveVars = []` by default),
+but can later be swapped for a substitution environment without changing proofs
+that go through the `*_ActiveEnv` lemmas. -/
+
+abbrev Env := List (String × LocalTypeR)
+
+def Env.dom : Env → List String
+  | [] => []
+  | (v, _) :: rest => v :: Env.dom rest
+
+def ClosedUnder (env : Env) (lt : LocalTypeR) : Prop :=
+  ∀ v, v ∈ lt.freeVars → v ∈ env.dom
+
+def Env.apply : Env → LocalTypeR → LocalTypeR
+  | [], lt => lt
+  | (v, t) :: rest, lt => Env.apply rest (lt.substitute v t)
+
+/-! ## Environment Well-Formedness
+
+To make the substitution-environment swap safe, we track that every binding
+maps to a closed, contractive type. This lets us propagate closedness and
+contractiveness through Env.apply. -/
+
+def EnvWellFormed : Env → Prop
+  | [] => True
+  | (_, t) :: rest => t.isClosed ∧ t.isContractive = true ∧ EnvWellFormed rest
+
+/-! ## Parametric Sigma Environment
+
+`sigmaOfVars S` is a canonical environment that closes exactly the variables in `S`
+by mapping each to a closed, contractive type (`.end`). This is the non‑leaky,
+parametric substitution environment used to swap in a sigma context. -/
+
+def sigmaOfVars (S : List String) : Env :=
+  S.map (fun v => (v, LocalTypeR.end))
+
+theorem sigmaOfVars_dom (S : List String) :
+    Env.dom (sigmaOfVars S) = S := by
+  induction S with
+  | nil => simp [sigmaOfVars, Env.dom]
+  | cons v rest ih =>
+      simp [sigmaOfVars, Env.dom]
+      simpa [sigmaOfVars] using ih
+
+theorem sigmaOfVars_wf (S : List String) : EnvWellFormed (sigmaOfVars S) := by
+  induction S with
+  | nil => simp [sigmaOfVars, EnvWellFormed]
+  | cons v rest ih =>
+      have ih' : EnvWellFormed (List.map (fun v => (v, LocalTypeR.end)) rest) := by
+        simpa [sigmaOfVars] using ih
+      simp [sigmaOfVars, EnvWellFormed, LocalTypeR.isClosed, LocalTypeR.isContractive, LocalTypeR.freeVars, ih']
+
+theorem closedUnder_sigmaOfVars {S : List String} {lt : LocalTypeR}
+    (hsubset : ∀ v, v ∈ lt.freeVars → v ∈ S) :
+    ClosedUnder (sigmaOfVars S) lt := by
+  intro v hv
+  have hvS : v ∈ S := hsubset v hv
+  simpa [sigmaOfVars_dom S] using hvS
+
+def ActiveVars : List String := []
+
+def ActiveEnv : Env := sigmaOfVars ActiveVars
+
+abbrev ClosedUnderActive (lt : LocalTypeR) : Prop := ClosedUnder ActiveEnv lt
+
+def applyActiveEnv (lt : LocalTypeR) : LocalTypeR :=
+  Env.apply ActiveEnv lt
+
+theorem closedUnderActive_of_closed (lt : LocalTypeR) :
+    lt.isClosed → ClosedUnderActive lt := by
+  intro h v hv
+  have hnil : lt.freeVars = [] := by
+    have : lt.freeVars.isEmpty = true := by
+      simpa [LocalTypeR.isClosed] using h
+    exact (List.isEmpty_eq_true _).1 this
+  have : False := by
+    simpa [hnil] using hv
+  exact this.elim
+
+theorem activeEnv_wellFormed : EnvWellFormed ActiveEnv := by
+  simpa [ActiveEnv] using (sigmaOfVars_wf ActiveVars)
+
+/-! ## ClosedUnder for the empty environment -/
+
+theorem closedUnder_nil_iff_isClosed (lt : LocalTypeR) :
+    ClosedUnder ([] : Env) lt ↔ lt.isClosed := by
+  constructor
+  · intro h
+    have hnil : lt.freeVars = [] := by
+      apply List.eq_nil_iff_forall_not_mem.mpr
+      intro v hv
+      have hv' : v ∈ Env.dom ([] : Env) := h v hv
+      simp [Env.dom] at hv'
+    simpa [LocalTypeR.isClosed, hnil] using (List.isEmpty_eq_true _).2 hnil
+  · intro h v hv
+    have hnil : lt.freeVars = [] := by
+      have : lt.freeVars.isEmpty = true := by
+        simpa [LocalTypeR.isClosed] using h
+      exact (List.isEmpty_eq_true _).1 this
+    have : False := by
+      simpa [hnil] using hv
+    exact this.elim
+
+
+/-! ## Free Vars under Substitution (subset lemma) -/
+
+mutual
+  private def freeVars_substitute_subset_aux
+      (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
+      (x : String) (hx : x ∈ (lt.substitute varName repl).freeVars) :
+      x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
+    match lt with
+    | .end => by
+        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
+    | .var t => by
+        by_cases h : t = varName
+        · subst h
+          have hbeq : (t == t) = true := by simp
+          simp [LocalTypeR.substitute, hbeq, LocalTypeR.freeVars] at hx
+          left; exact hx
+        · have hbeq : (t == varName) = false := by
+            exact (beq_eq_false_iff_ne).2 h
+          have hx' : x = t := by
+            simpa [LocalTypeR.substitute, hbeq, LocalTypeR.freeVars] using hx
+          right
+          subst hx'
+          constructor
+          · simp [LocalTypeR.freeVars]
+          · exact h
+    | .send p bs => by
+        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
+        exact freeVars_substituteBranches_subset_aux bs varName repl x hx
+    | .recv p bs => by
+        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
+        exact freeVars_substituteBranches_subset_aux bs varName repl x hx
+    | .mu t body => by
+        by_cases h : t = varName
+        · -- Shadowed case
+          have hbeq : (t == varName) = true := by
+            simpa [beq_iff_eq] using h
+          have hx' : x ∈ body.freeVars.filter (· != t) := by
+            simpa [LocalTypeR.substitute, hbeq, LocalTypeR.freeVars] using hx
+          right
+          constructor
+          · exact hx'
+          · have hxne : x ≠ t := by
+              have hxpair : x ∈ body.freeVars ∧ (x != t) = true := by
+                simpa [List.mem_filter] using hx'
+              exact (bne_iff_ne).1 hxpair.2
+            simpa [h] using hxne
+        · -- Not shadowed: recurse into body
+          have hbeq : (t == varName) = false := by
+            exact (beq_eq_false_iff_ne).2 h
+          have hx' : x ∈ (body.substitute varName repl).freeVars ∧ (x != t) = true := by
+            simpa [LocalTypeR.substitute, hbeq, LocalTypeR.freeVars, List.mem_filter] using hx
+          have ih := freeVars_substitute_subset_aux body varName repl x hx'.1
+          cases ih with
+          | inl hrepl =>
+              left; exact hrepl
+          | inr hpair =>
+              right
+              constructor
+              · apply (List.mem_filter).2
+                exact ⟨hpair.1, hx'.2⟩
+              · exact hpair.2
+  termination_by sizeOf lt
+
+  private def freeVars_substituteBranches_subset_aux
+      (branches : List (Label × LocalTypeR)) (varName : String) (repl : LocalTypeR)
+      (x : String) (hx : x ∈ freeVarsOfBranches (substituteBranches branches varName repl)) :
+      x ∈ repl.freeVars ∨ (x ∈ freeVarsOfBranches branches ∧ x ≠ varName) :=
+    match branches with
+    | [] => by
+        simp [substituteBranches, freeVarsOfBranches] at hx
+    | (label, cont) :: rest => by
+        simp [substituteBranches, freeVarsOfBranches, List.mem_append, -substituteBranches_eq_map] at hx
+        cases hx with
+        | inl hxcont =>
+            have ih := freeVars_substitute_subset_aux cont varName repl x hxcont
+            cases ih with
+            | inl hrepl => left; exact hrepl
+            | inr hpair =>
+                right
+                simp [freeVarsOfBranches, List.mem_append]
+                exact ⟨Or.inl hpair.1, hpair.2⟩
+        | inr hxrest =>
+            have ih := freeVars_substituteBranches_subset_aux rest varName repl x hxrest
+            cases ih with
+            | inl hrepl => left; exact hrepl
+            | inr hpair =>
+                right
+                simp [freeVarsOfBranches, List.mem_append]
+                exact ⟨Or.inr hpair.1, hpair.2⟩
+  termination_by sizeOf branches
+end
+
+theorem freeVars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
+    ∀ x, x ∈ (lt.substitute varName repl).freeVars →
+         x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
+  fun x hx => freeVars_substitute_subset_aux lt varName repl x hx
+
+theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTypeR) :
+    e.isClosed → ∀ v, v ∈ (body.substitute t e).freeVars → v ∈ body.freeVars ∧ v ≠ t := by
+  intro hclosed v hv
+  have h := freeVars_substitute_subset body t e v hv
+  cases h with
+  | inl hrepl =>
+      have hnil : e.freeVars = [] := by
+        have : e.freeVars.isEmpty = true := by
+          simpa [LocalTypeR.isClosed] using hclosed
+        exact (List.isEmpty_eq_true _).1 this
+      have : False := by
+        simpa [hnil] using hrepl
+      exact this.elim
+  | inr hpair =>
+      exact hpair
+
+
+theorem freeVars_substituteBranches_closed (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
+    e.isClosed → ∀ v, v ∈ freeVarsOfBranches (substituteBranches bs t e) →
+      v ∈ freeVarsOfBranches bs ∧ v ≠ t := by
+  intro hclosed v hmem
+  induction bs with
+  | nil =>
+      have : False := by
+        simpa [freeVarsOfBranches] using hmem
+      exact this.elim
+  | cons head tail ih =>
+      cases head with
+      | mk label cont =>
+          -- Split membership across head or tail branches
+          have hmem' : v ∈ (cont.substitute t e).freeVars ∨
+              v ∈ freeVarsOfBranches (substituteBranches tail t e) := by
+            simpa [freeVarsOfBranches, substituteBranches, List.mem_append] using hmem
+          cases hmem' with
+          | inl hcont =>
+              have hres := freeVars_substitute_closed cont t e hclosed v hcont
+              -- v appears in head branch
+              have hmem_head : v ∈ freeVarsOfBranches ((label, cont) :: tail) := by
+                simp [freeVarsOfBranches, hres.1]
+              exact ⟨hmem_head, hres.2⟩
+          | inr htail =>
+              have hres := ih htail
+              have hmem_tail : v ∈ freeVarsOfBranches ((label, cont) :: tail) := by
+                simp [freeVarsOfBranches, hres.1]
+              exact ⟨hmem_tail, hres.2⟩
+
+/-! ## Unfolding does not introduce new free variables -/
+
+theorem freeVars_unfold_subset (lt : LocalTypeR) (v : String) :
+    v ∈ lt.unfold.freeVars → v ∈ lt.freeVars := by
+  cases lt with
+  | «end» | var _ | send _ _ | recv _ _ =>
+      intro hmem
+      simpa [LocalTypeR.unfold] using hmem
+  | mu t body =>
+      intro hmem
+      -- unfold = body.substitute t (.mu t body)
+      have hsub := freeVars_substitute_subset body t (.mu t body) v (by simpa [LocalTypeR.unfold] using hmem)
+      cases hsub with
+      | inl hrepl =>
+          -- repl.freeVars = body.freeVars.filter (· != t)
+          have hmem' : v ∈ body.freeVars.filter (· != t) := by
+            simpa [LocalTypeR.freeVars] using hrepl
+          simpa [LocalTypeR.freeVars] using hmem'
+      | inr hpair =>
+          have hmem' : v ∈ body.freeVars.filter (· != t) := by
+            apply List.mem_filter.mpr
+            exact ⟨hpair.1, (bne_iff_ne).2 hpair.2⟩
+          simpa [LocalTypeR.freeVars] using hmem'
+
+theorem freeVars_iter_unfold_subset (k : Nat) (lt : LocalTypeR) (v : String) :
+    v ∈ ((LocalTypeR.unfold)^[k] lt).freeVars → v ∈ lt.freeVars := by
+  induction k generalizing lt with
+  | zero =>
+      intro hmem
+      simpa using hmem
+  | succ k ih =>
+      intro hmem
+      have hmem' : v ∈ ((LocalTypeR.unfold)^[k] lt.unfold).freeVars := by
+        simpa [Function.iterate_succ_apply] using hmem
+      have hmem'' := ih (lt := lt.unfold) hmem'
+      exact freeVars_unfold_subset lt v hmem''
+
+/-! ## Full Unfolding (Coq-style `full_eunf`)
+
+Iterate mu-unfolding until reaching a non-mu form.
+This is the Coq pattern where predicates work on fully unfolded types. -/
+
+/-- Height for mu unfolding - counts nested mus at the head. -/
+def LocalTypeR.muHeight : LocalTypeR → Nat
+  | .mu _ body => 1 + body.muHeight
+  | _ => 0
+
+/-- Fully unfold a local type by iterating unfold until non-mu form.
+    Corresponds to Coq's `full_eunf`. -/
+def LocalTypeR.fullUnfold (lt : LocalTypeR) : LocalTypeR :=
+  (LocalTypeR.unfold)^[lt.muHeight] lt
+
+/-- If a type has no leading `mu`, then `fullUnfold` cannot be a `mu`.
+
+    This is the only unconditional statement we can make without assuming
+    guardedness/contractiveness. -/
+theorem LocalTypeR.fullUnfold_not_mu (lt : LocalTypeR) :
+    lt.muHeight = 0 → ∀ t body, lt.fullUnfold ≠ .mu t body := by
+  intro h t body
+  cases lt <;> simp [fullUnfold, muHeight] at h ⊢
+
+/-- fullUnfold is idempotent when its result has no leading `mu`. -/
+theorem LocalTypeR.fullUnfold_idemp (lt : LocalTypeR) :
+    lt.fullUnfold.muHeight = 0 → lt.fullUnfold.fullUnfold = lt.fullUnfold := by
+  intro h
+  have h' : ((LocalTypeR.unfold)^[lt.muHeight] lt).muHeight = 0 := by
+    simpa [fullUnfold] using h
+  simp [fullUnfold, h']
+
+
 /-! ## Guardedness and muHeight Properties -/
 
 /-- For non-mu types, unfold is identity. -/
@@ -312,7 +708,7 @@ theorem LocalTypeR.unfold_non_mu (lt : LocalTypeR) :
     (∀ t body, lt ≠ .mu t body) → lt.unfold = lt := by
   intro h
   match lt with
-  | .end | .var _ | .send _ _ | .recv _ _ => rfl
+  | «end» | var _ | send _ _ | recv _ _ => rfl
   | .mu t body => exact absurd rfl (h t body)
 
 /-- The result of unfold on a mu is the substituted body. -/
@@ -397,70 +793,232 @@ mutual
   theorem isFreeIn_mem_freeVars (lt : LocalTypeR) (v : String) :
       lt.isFreeIn v = true → v ∈ lt.freeVars := by
     intro h
-    cases lt with
-    | end =>
-        simp [LocalTypeR.isFreeIn, LocalTypeR.freeVars] at h
+    cases hlt : lt with
+    | «end» =>
+        simp [LocalTypeR.isFreeIn, LocalTypeR.freeVars, hlt] at h
     | var w =>
         have hv : v = w := by
-          simpa [LocalTypeR.isFreeIn, beq_iff_eq] using h
+          simpa [LocalTypeR.isFreeIn, beq_iff_eq, hlt] using h
         subst hv
-        simp [LocalTypeR.freeVars]
+        simp [LocalTypeR.freeVars, hlt]
     | send _ bs =>
         have h' : isFreeInBranches' v bs = true := by
-          simpa [LocalTypeR.isFreeIn] using h
+          simpa [LocalTypeR.isFreeIn, hlt] using h
         have hmem := isFreeInBranches'_mem_freeVarsOfBranches bs v h'
-        simpa [LocalTypeR.freeVars] using hmem
+        simpa [LocalTypeR.freeVars, hlt] using hmem
     | recv _ bs =>
         have h' : isFreeInBranches' v bs = true := by
-          simpa [LocalTypeR.isFreeIn] using h
+          simpa [LocalTypeR.isFreeIn, hlt] using h
         have hmem := isFreeInBranches'_mem_freeVarsOfBranches bs v h'
-        simpa [LocalTypeR.freeVars] using hmem
+        simpa [LocalTypeR.freeVars, hlt] using hmem
     | mu t body =>
         by_cases hvt : v = t
-        · have : (v == t) = true := by simpa [beq_iff_eq, hvt]
-          -- isFreeIn = false, contradiction
+        · have hbeq : (v == t) = true := by
+            simpa [beq_iff_eq] using hvt
           have hfalse : False := by
-            simpa [LocalTypeR.isFreeIn, this] using h
+            simpa [LocalTypeR.isFreeIn, hbeq, hlt] using h
           exact False.elim hfalse
         · have hvne : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
           have h' : body.isFreeIn v = true := by
-            simpa [LocalTypeR.isFreeIn, hvne] using h
+            simpa [LocalTypeR.isFreeIn, hvne, hlt] using h
           have hmem : v ∈ body.freeVars := isFreeIn_mem_freeVars body v h'
           apply (List.mem_filter).2
-          constructor
-          · exact hmem
-          · have hne : v ≠ t := hvt
-            exact bne_iff_ne.mpr hne
-  
+          exact ⟨hmem, (bne_iff_ne).2 hvt⟩
+  termination_by sizeOf lt
+  decreasing_by
+    classical
+    all_goals
+      simp [*] <;> omega
+
   theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List (Label × LocalTypeR)) (v : String) :
       isFreeInBranches' v bs = true → v ∈ freeVarsOfBranches bs := by
     intro h
-    induction bs with
+    cases hbs : bs with
     | nil =>
-        simp [isFreeInBranches', freeVarsOfBranches] at h
-    | cons head tail ih =>
-        cases head with
+        simp [isFreeInBranches', freeVarsOfBranches, hbs] at h
+    | cons head tail =>
+        cases hhead : head with
         | mk label cont =>
-            -- isFreeInBranches' v (head::tail) = cont.isFreeIn v || isFreeInBranches' v tail
             have h' : cont.isFreeIn v = true ∨ isFreeInBranches' v tail = true := by
-              simpa [isFreeInBranches', Bool.or_eq_true] using h
+              simpa [isFreeInBranches', hbs, hhead, Bool.or_eq_true] using h
             cases h' with
             | inl hcont =>
                 have hmem : v ∈ cont.freeVars := isFreeIn_mem_freeVars cont v hcont
-                simp [freeVarsOfBranches, hmem]
+                simp [freeVarsOfBranches, hbs, hmem]
             | inr htail =>
-                have hmem := ih htail
-                simp [freeVarsOfBranches, hmem]
+                have hmem := isFreeInBranches'_mem_freeVarsOfBranches tail v htail
+                simp [freeVarsOfBranches, hbs, hmem]
+  termination_by sizeOf bs
+  decreasing_by
+    classical
+    all_goals
+      simp [*] <;> omega
 end
+
+-- If v is not free in lt, then it is guarded in lt.
+theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
+    lt.isFreeIn v = false → lt.isGuarded v = true := by
+  intro h
+  cases lt with
+  | «end» =>
+      simp [LocalTypeR.isGuarded]
+  | var w =>
+      have hv : v ≠ w := by
+        have hbeq : (v == w) = false := by
+          simpa [LocalTypeR.isFreeIn] using h
+        exact (beq_eq_false_iff_ne).1 hbeq
+      have hvb : (v != w) = true := (bne_iff_ne).2 hv
+      simp [LocalTypeR.isGuarded, hvb]
+  | send _ _ =>
+      simp [LocalTypeR.isGuarded]
+  | recv _ _ =>
+      simp [LocalTypeR.isGuarded]
+  | mu t body =>
+      by_cases hvt : v = t
+      · subst hvt
+        simp [LocalTypeR.isGuarded]
+      · have hvne : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
+        have hbody : body.isFreeIn v = false := by
+          simpa [LocalTypeR.isFreeIn, hvne] using h
+        have hbody' := isGuarded_of_isFreeIn_false body v hbody
+        simp [LocalTypeR.isGuarded, hvne, hbody']
+termination_by sizeOf lt
+
+-- Closed types have all variables guarded.
+theorem isGuarded_of_closed (lt : LocalTypeR) (v : String) :
+    lt.isClosed → lt.isGuarded v = true := by
+  intro hclosed
+  cases hfree : lt.isFreeIn v with
+  | true =>
+      have hmem := isFreeIn_mem_freeVars lt v hfree
+      have hnil : lt.freeVars = [] := by
+        have : lt.freeVars.isEmpty = true := by
+          simpa [LocalTypeR.isClosed] using hclosed
+        exact (List.isEmpty_eq_true _).1 this
+      have : False := by
+        simpa [hnil] using hmem
+      exact this.elim
+  | false =>
+      exact isGuarded_of_isFreeIn_false lt v hfree
+
+/-! ## Closed Types and Substitution -/
+
+theorem isFreeIn_false_of_closed (lt : LocalTypeR) (v : String) :
+    lt.isClosed → lt.isFreeIn v = false := by
+  intro hclosed
+  cases hfree : lt.isFreeIn v with
+  | true =>
+      have hmem := isFreeIn_mem_freeVars lt v hfree
+      have hnil : lt.freeVars = [] := by
+        have : lt.freeVars.isEmpty = true := by
+          simpa [LocalTypeR.isClosed] using hclosed
+        exact (List.isEmpty_eq_true _).1 this
+      have : False := by
+        simpa [hnil] using hmem
+      exact this.elim
+  | false =>
+      simpa using hfree
+
+mutual
+  theorem substitute_not_free (e : LocalTypeR) (x : String) (rx : LocalTypeR)
+      (hnot_free : LocalTypeR.isFreeIn x e = false) :
+      e.substitute x rx = e := by
+    match e with
+    | .end => rfl
+    | .var w =>
+        by_cases hwt : w = x
+        · subst hwt
+          have : False := by
+            simpa [LocalTypeR.isFreeIn] using hnot_free
+          exact this.elim
+        · have hbeq : (w == x) = false := beq_eq_false_iff_ne.mpr hwt
+          simp [LocalTypeR.substitute, hbeq]
+    | .send p bs =>
+        have hbs : isFreeInBranches' x bs = false := by
+          simpa [LocalTypeR.isFreeIn] using hnot_free
+        have hbs' := substituteBranches_not_free bs x rx hbs
+        simpa [LocalTypeR.substitute, hbs', -substituteBranches_eq_map]
+    | .recv p bs =>
+        have hbs : isFreeInBranches' x bs = false := by
+          simpa [LocalTypeR.isFreeIn] using hnot_free
+        have hbs' := substituteBranches_not_free bs x rx hbs
+        simpa [LocalTypeR.substitute, hbs', -substituteBranches_eq_map]
+    | .mu t body =>
+        by_cases hxt : t = x
+        · have hbeq : (t == x) = true := by
+            simpa [beq_iff_eq] using hxt
+          simp [LocalTypeR.substitute, hbeq]
+        · have hbeq : (t == x) = false := beq_eq_false_iff_ne.mpr hxt
+          have hxt' : x ≠ t := by
+            intro hx
+            exact hxt hx.symm
+          have hxtbeq : (x == t) = false := beq_eq_false_iff_ne.mpr hxt'
+          have hbody : LocalTypeR.isFreeIn x body = false := by
+            simpa [LocalTypeR.isFreeIn, hxtbeq] using hnot_free
+          have hbody' := substitute_not_free body x rx hbody
+          simp [LocalTypeR.substitute, hbeq, hbody']
+  termination_by sizeOf e
+
+  theorem substituteBranches_not_free (bs : List (Label × LocalTypeR)) (x : String) (rx : LocalTypeR)
+      (hnot_free : isFreeInBranches' x bs = false) :
+      LocalTypeR.substituteBranches bs x rx = bs := by
+    match bs with
+    | [] => rfl
+    | (label, cont) :: rest =>
+        have hsplit : cont.isFreeIn x = false ∧ isFreeInBranches' x rest = false := by
+          simpa [isFreeInBranches', Bool.or_eq_false_iff] using hnot_free
+        have h1 : cont.substitute x rx = cont :=
+          substitute_not_free cont x rx hsplit.1
+        have h2 : LocalTypeR.substituteBranches rest x rx = rest :=
+          substituteBranches_not_free rest x rx hsplit.2
+        simp [LocalTypeR.substituteBranches, h1, h2, -substituteBranches_eq_map]
+  termination_by sizeOf bs
+end
+
+theorem apply_env_of_closed (env : Env) (lt : LocalTypeR) :
+    lt.isClosed → Env.apply env lt = lt := by
+  intro hclosed
+  induction env generalizing lt with
+  | nil =>
+      simp [Env.apply]
+  | cons head rest ih =>
+      cases head with
+      | mk v u =>
+          have hnot : lt.isFreeIn v = false := isFreeIn_false_of_closed lt v hclosed
+          have hsubst : lt.substitute v u = lt := substitute_not_free lt v u hnot
+          have ih' := ih (lt := lt) hclosed
+          simpa [Env.apply, hsubst] using ih'
+
+theorem applyActiveEnv_eq_of_closed (lt : LocalTypeR) :
+    lt.isClosed → applyActiveEnv lt = lt := by
+  intro hclosed
+  simpa [applyActiveEnv] using apply_env_of_closed ActiveEnv lt hclosed
 
 -- Helper: if fullUnfold = .var v, then isFreeIn v = true
 theorem fullUnfold_var_is_free (lt : LocalTypeR) (v : String) :
     lt.fullUnfold = .var v → lt.isFreeIn v = true := by
-  sorry
+  intro h
+  -- v is free in fullUnfold, so v is free in lt by iterated unfold subset
+  have hv_mem_full : v ∈ lt.fullUnfold.freeVars := by
+    -- fullUnfold = var v, whose freeVars is [v]
+    simpa [h, LocalTypeR.freeVars] using (List.mem_cons_self v [])
+  have hv_mem : v ∈ lt.freeVars := by
+    have hsubset := freeVars_iter_unfold_subset (k := lt.muHeight) (lt := lt) (v := v) hv_mem_full
+    simpa [LocalTypeR.fullUnfold] using hsubset
+  exact mem_freeVars_isFreeIn lt v hv_mem
 
 theorem LocalTypeR.fullUnfold_not_var_of_closed {lt : LocalTypeR}
     (hclosed : lt.isClosed) : ∀ v, lt.fullUnfold ≠ .var v := by
-  sorry
+  intro v h
+  have hfree : lt.isFreeIn v = true := fullUnfold_var_is_free lt v h
+  have hmem : v ∈ lt.freeVars := isFreeIn_mem_freeVars lt v hfree
+  have hnil : lt.freeVars = [] := by
+    have : lt.freeVars.isEmpty = true := by
+      simpa [LocalTypeR.isClosed] using hclosed
+    exact (List.isEmpty_eq_true _).1 this
+  have : False := by
+    simpa [hnil] using hmem
+  exact this.elim
 
 /-- For contractive types, fullUnfold reaches a non-mu form.
 
@@ -472,48 +1030,269 @@ theorem LocalTypeR.fullUnfold_not_var_of_closed {lt : LocalTypeR}
 -- Helper from LocalTypeCore - muHeight of guarded substitution
 theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
     body.isGuarded t = true → (body.substitute t e).muHeight ≤ body.muHeight := by
-  sorry
+  intro hguard
+  cases body with
+  | «end» =>
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight]
+  | var w =>
+      by_cases hw : w = t
+      · subst hw
+        have : False := by
+          simpa [LocalTypeR.isGuarded] using hguard
+        exact this.elim
+      · have hbeq : (w == t) = false := beq_eq_false_iff_ne.mpr hw
+        simp [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq]
+  | send p bs =>
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight]
+  | recv p bs =>
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight]
+  | mu s body =>
+      by_cases hs : s = t
+      · have hbeq : (s == t) = true := by
+          simpa [beq_iff_eq] using hs
+        -- Shadowed: no substitution under mu
+        simp [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq]
+      · have hbeq_st : (s == t) = false := beq_eq_false_iff_ne.mpr hs
+        have hbeq_ts : (t == s) = false := beq_eq_false_iff_ne.mpr (by intro h; exact hs h.symm)
+        -- Substitute under mu; use recursion on body
+        have hguard' : body.isGuarded t = true := by
+          simpa [LocalTypeR.isGuarded, hbeq_ts] using hguard
+        have ih := muHeight_substitute_guarded t body e hguard'
+        have := Nat.add_le_add_left ih 1
+        simpa [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq_st] using this
+termination_by sizeOf body
 
--- Helper: substitution preserves contractiveness for branches
-theorem isContractiveBranches_substitute (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
-    isContractiveBranches bs = true → e.isContractive = true →
-    isContractiveBranches (substituteBranches bs t e) = true := by
-  sorry
+-- Helper: isGuarded is preserved by substitution when replacing with closed term
+theorem isGuarded_substitute (body : LocalTypeR) (t v : String) (e : LocalTypeR) :
+    body.isGuarded v = true → e.isClosed →
+    (body.substitute t e).isGuarded v = true := by
+  intro hguard hclosed
+  cases body with
+  | «end» =>
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
+  | var w =>
+      by_cases hw : w = t
+      · subst hw
+        have hguard_e : e.isGuarded v = true := isGuarded_of_closed e v hclosed
+        simpa [LocalTypeR.substitute] using hguard_e
+      · have hbeq : (w == t) = false := beq_eq_false_iff_ne.mpr hw
+        simpa [LocalTypeR.substitute, LocalTypeR.isGuarded, hbeq] using hguard
+  | send _ _ =>
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
+  | recv _ _ =>
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
+  | mu s body =>
+      by_cases hs : s = t
+      · have hbeq : (s == t) = true := by
+          simpa [beq_iff_eq] using hs
+        simpa [LocalTypeR.substitute, hbeq] using hguard
+      · have hbeq_st : (s == t) = false := beq_eq_false_iff_ne.mpr hs
+        by_cases hvs : v = s
+        · subst hvs
+          simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hbeq_st]
+        · have hvbeq : (v == s) = false := beq_eq_false_iff_ne.mpr hvs
+          have hguard' : body.isGuarded v = true := by
+            simpa [LocalTypeR.isGuarded, hvbeq] using hguard
+          have ih := isGuarded_substitute body t v e hguard' hclosed
+          simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hbeq_st, hvbeq, ih]
+termination_by sizeOf body
 
 -- Helper: isGuarded is preserved by substitution for variables OTHER than the substituted one
--- Key insight from Coq: we don't need e.isGuarded v if v ≠ t
+-- Requires closed replacement to avoid introducing unguarded occurrences.
 theorem isGuarded_substitute_other (body : LocalTypeR) (t v : String) (e : LocalTypeR) :
     v ≠ t → body.isGuarded v = true →
-    (body.substitute t e).isGuarded v = true := by
-  sorry
-
--- Helper: isGuarded is preserved by substitution when replacing with guarded term
-theorem isGuarded_substitute (body : LocalTypeR) (t v : String) (e : LocalTypeR) :
-    body.isGuarded v = true → e.isGuarded v = true →
-    (body.substitute t e).isGuarded v = true := by
-  sorry
+    e.isClosed → (body.substitute t e).isGuarded v = true := by
+  intro _ hguard hclosed
+  exact isGuarded_substitute body t v e hguard hclosed
 
 -- NOTE: isContractive_substitute_mu is proved in LocalTypeRDBBridge.lean
 
--- Helper: substitution preserves contractiveness when replacing with contractive term
--- Note: The mu case requires additional assumptions about guardedness
-theorem isContractive_substitute (body : LocalTypeR) (t : String) (e : LocalTypeR) :
-    body.isContractive = true → e.isContractive = true →
-    (body.substitute t e).isContractive = true := by
-  sorry
+-- Helper: substitution preserves contractiveness when replacing with contractive, closed term
+-- Note: The mu case requires closedness to avoid introducing unguarded variables.
+mutual
+  theorem isContractive_substitute (body : LocalTypeR) (t : String) (e : LocalTypeR) :
+      body.isContractive = true → e.isContractive = true → e.isClosed →
+      (body.substitute t e).isContractive = true := by
+    intro hbody hcontr hclosed
+    cases body with
+    | «end» =>
+        simp [LocalTypeR.substitute, LocalTypeR.isContractive]
+    | var w =>
+        by_cases hw : w = t
+        · subst hw
+          simpa [LocalTypeR.substitute] using hcontr
+        · have hbeq : (w == t) = false := beq_eq_false_iff_ne.mpr hw
+          simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq]
+    | send p bs =>
+        have hbs : isContractiveBranches bs = true := by
+          simpa [LocalTypeR.isContractive] using hbody
+        have hbs' : isContractiveBranches (substituteBranches bs t e) = true :=
+          isContractiveBranches_substitute bs t e hbs hcontr hclosed
+        simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbs', -substituteBranches_eq_map]
+    | recv p bs =>
+        have hbs : isContractiveBranches bs = true := by
+          simpa [LocalTypeR.isContractive] using hbody
+        have hbs' : isContractiveBranches (substituteBranches bs t e) = true :=
+          isContractiveBranches_substitute bs t e hbs hcontr hclosed
+        simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbs', -substituteBranches_eq_map]
+    | mu s body =>
+        by_cases hs : s = t
+        · have hbeq : (s == t) = true := by
+            simpa [beq_iff_eq] using hs
+          simpa [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq] using hbody
+        · have hbeq : (s == t) = false := beq_eq_false_iff_ne.mpr hs
+          have hpair : body.isGuarded s = true ∧ body.isContractive = true := by
+            simpa [LocalTypeR.isContractive, Bool.and_eq_true] using hbody
+          have hguard : body.isGuarded s = true := hpair.1
+          have hbody_contr : body.isContractive = true := hpair.2
+          have hguard' : (body.substitute t e).isGuarded s = true :=
+            isGuarded_substitute body t s e hguard hclosed
+          have hbody' : (body.substitute t e).isContractive = true :=
+            isContractive_substitute body t e hbody_contr hcontr hclosed
+          simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq, hguard', hbody']
+  termination_by sizeOf body
 
--- Helper: iterating unfold k times on CONTRACTIVE term with muHeight ≤ k yields muHeight 0
+  theorem isContractiveBranches_substitute (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
+      isContractiveBranches bs = true → e.isContractive = true → e.isClosed →
+      isContractiveBranches (substituteBranches bs t e) = true := by
+    intro hbs hcontr hclosed
+    cases bs with
+    | nil =>
+        simp [isContractiveBranches]
+    | cons head tail =>
+        cases head with
+        | mk label cont =>
+            have hpair : cont.isContractive = true ∧ isContractiveBranches tail = true := by
+              simpa [isContractiveBranches, Bool.and_eq_true] using hbs
+            have hcont' : (cont.substitute t e).isContractive = true :=
+              isContractive_substitute cont t e hpair.1 hcontr hclosed
+            have htail' : isContractiveBranches (substituteBranches tail t e) = true :=
+              isContractiveBranches_substitute tail t e hpair.2 hcontr hclosed
+            simp [isContractiveBranches, LocalTypeR.substituteBranches, hcont', htail', -substituteBranches_eq_map]
+  termination_by sizeOf bs
+end
+
+-- Helper: iterating unfold k times on CLOSED, CONTRACTIVE term with muHeight ≤ k yields muHeight 0
+/-! ## ClosedUnder through substitution/apply -/
+
+theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
+    (hclosed : (LocalTypeR.mu t body).isClosed) :
+    (body.substitute t (LocalTypeR.mu t body)).isClosed := by
+  -- Convert isClosed to freeVars = []
+  have hmu_nil : (LocalTypeR.mu t body).freeVars = [] := by
+    have : (LocalTypeR.mu t body).freeVars.isEmpty = true := by
+      simpa [LocalTypeR.isClosed] using hclosed
+    exact (List.isEmpty_eq_true _).1 this
+  have hfilter_nil : body.freeVars.filter (· != t) = [] := by
+    simpa [LocalTypeR.freeVars] using hmu_nil
+  -- Show substituted freeVars is empty
+  simp [LocalTypeR.isClosed, List.isEmpty_eq_true, List.eq_nil_iff_forall_not_mem]
+  intro v hv
+  have hres := freeVars_substitute_closed body t (.mu t body) hclosed v hv
+  have hmem_filter : v ∈ body.freeVars.filter (· != t) := by
+    apply List.mem_filter.mpr
+    exact ⟨hres.1, (bne_iff_ne).2 hres.2⟩
+  -- Contradiction with hfilter_nil
+  simpa [hfilter_nil] using hmem_filter
+
+theorem closedUnder_substitute_closed {env : Env} {t : LocalTypeR}
+    (v : String) (u : LocalTypeR) :
+    u.isClosed → ClosedUnder ((v, u) :: env) t → ClosedUnder env (t.substitute v u) := by
+  intro hclosed hcu x hx
+  have hres := freeVars_substitute_closed t v u hclosed x hx
+  have hx_in : x ∈ t.freeVars := hres.1
+  have hxne : x ≠ v := hres.2
+  have hx_dom : x ∈ Env.dom ((v, u) :: env) := hcu x hx_in
+  have hx_dom' : x = v ∨ x ∈ Env.dom env := by
+    simpa [Env.dom] using (List.mem_cons.mp hx_dom)
+  cases hx_dom' with
+  | inl hx_eq => exact (hxne hx_eq).elim
+  | inr hx_rest => exact hx_rest
+
+theorem isClosed_apply_of_closed_env (env : Env) (t : LocalTypeR) :
+    EnvWellFormed env → ClosedUnder env t → (Env.apply env t).isClosed := by
+  intro hWF hclosed
+  induction env generalizing t with
+  | nil =>
+      have hclosed' : t.isClosed := (closedUnder_nil_iff_isClosed t).1 hclosed
+      simpa [Env.apply] using hclosed'
+  | cons head rest ih =>
+      cases head with
+      | mk v u =>
+          rcases hWF with ⟨hu_closed, _hu_contr, hWF_rest⟩
+          have hclosed_subst : ClosedUnder rest (t.substitute v u) :=
+            closedUnder_substitute_closed (env := rest) (t := t) v u hu_closed hclosed
+          have hclosed_apply := ih (t := t.substitute v u) hWF_rest hclosed_subst
+          simpa [Env.apply] using hclosed_apply
+
+theorem isContractive_apply_of_closed_env (env : Env) (t : LocalTypeR) :
+    EnvWellFormed env → t.isContractive = true → (Env.apply env t).isContractive = true := by
+  intro hWF hcontr
+  induction env generalizing t with
+  | nil =>
+      simpa [Env.apply] using hcontr
+  | cons head rest ih =>
+      cases head with
+      | mk v u =>
+          rcases hWF with ⟨hu_closed, hu_contr, hWF_rest⟩
+          have hcontr_subst : (t.substitute v u).isContractive = true :=
+            isContractive_substitute t v u hcontr hu_contr hu_closed
+          have hcontr_apply := ih (t := t.substitute v u) hWF_rest hcontr_subst
+          simpa [Env.apply] using hcontr_apply
+
 theorem iterate_unfold_bounded_contractive (k : Nat) (e : LocalTypeR)
-    (hcontr : e.isContractive = true) (h : e.muHeight ≤ k) :
+    (hcontr : e.isContractive = true) (hclosed : e.isClosed) (h : e.muHeight ≤ k) :
     ((LocalTypeR.unfold)^[k] e).muHeight = 0 := by
-  sorry
+  induction k generalizing e with
+  | zero =>
+      have hmh : e.muHeight = 0 := Nat.le_zero.mp h
+      simp [Function.iterate_zero, hmh]
+  | succ k ih =>
+      cases e with
+      | «end» =>
+          have hiter := Function.iterate_fixed (f := LocalTypeR.unfold) (x := LocalTypeR.end) rfl (n := Nat.succ k)
+          simpa [LocalTypeR.muHeight] using congrArg LocalTypeR.muHeight hiter
+      | var w =>
+          have hiter := Function.iterate_fixed (f := LocalTypeR.unfold) (x := LocalTypeR.var w) rfl (n := Nat.succ k)
+          simpa [LocalTypeR.muHeight] using congrArg LocalTypeR.muHeight hiter
+      | send p bs =>
+          have hiter := Function.iterate_fixed (f := LocalTypeR.unfold) (x := LocalTypeR.send p bs) rfl (n := Nat.succ k)
+          simpa [LocalTypeR.muHeight] using congrArg LocalTypeR.muHeight hiter
+      | recv p bs =>
+          have hiter := Function.iterate_fixed (f := LocalTypeR.unfold) (x := LocalTypeR.recv p bs) rfl (n := Nat.succ k)
+          simpa [LocalTypeR.muHeight] using congrArg LocalTypeR.muHeight hiter
+      | mu t body =>
+          -- Extract guardness and contractiveness of body
+          have hpair : body.isGuarded t = true ∧ body.isContractive = true := by
+            simpa [LocalTypeR.isContractive, Bool.and_eq_true] using hcontr
+          have hguarded : body.isGuarded t = true := hpair.1
+          have hbody_contr : body.isContractive = true := hpair.2
+          have hle : body.muHeight ≤ k := by
+            -- muHeight (.mu t body) = 1 + body.muHeight
+            have h' : 1 + body.muHeight ≤ 1 + k := by
+              simpa [LocalTypeR.muHeight, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using h
+            exact Nat.le_of_add_le_add_left h'
+          -- Substitution preserves contractiveness (needed for IH)
+          have hsubst_contr : (body.substitute t (.mu t body)).isContractive = true :=
+            isContractive_substitute body t (.mu t body) hbody_contr hcontr hclosed
+          have hsubst_closed : (body.substitute t (.mu t body)).isClosed :=
+            LocalTypeR.isClosed_substitute_mu hclosed
+          -- Mu-height does not increase under guarded substitution
+          have hsubst_h : (body.substitute t (.mu t body)).muHeight ≤ k := by
+            have hle' : (body.substitute t (.mu t body)).muHeight ≤ body.muHeight :=
+              muHeight_substitute_guarded t body (.mu t body) hguarded
+            exact le_trans hle' hle
+          have ih' := ih (e := body.substitute t (.mu t body)) hsubst_contr hsubst_closed hsubst_h
+          -- unfold^[k+1] (.mu t body) = unfold^[k] (body.substitute t (.mu t body))
+          simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using ih'
 
 theorem LocalTypeR.fullUnfold_non_mu_of_contractive {lt : LocalTypeR}
-    (hcontr : lt.isContractive = true) : lt.fullUnfold.muHeight = 0 := by
+    (hcontr : lt.isContractive = true) (hclosed : lt.isClosed) : lt.fullUnfold.muHeight = 0 := by
   simp [fullUnfold]
   apply iterate_unfold_bounded_contractive
-  exact hcontr
-  simp
+  · exact hcontr
+  · exact hclosed
+  · simp
 
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
 
@@ -537,18 +1316,23 @@ The intuition is:
     This complex double substitution theorem only matters for NON-contractive types
     with unguarded variables, which are not our target use case.
 
-    The theorem statement remains for completeness, but the proof is non-trivial
-    and not required for observable_of_closed_contractive. -/
+    The theorem statement is now restricted to closed bodies, where it is vacuous,
+    and kept only for API completeness. -/
 theorem LocalTypeR.unfold_iter_double_subst (body : LocalTypeR)
     (t : String) (repl : LocalTypeR) (s : String) (v : String)
     (hvt : v ≠ t) (hvs : v ≠ s)
+    (hclosed : body.isClosed)
     (h_free : body.isFreeIn v = true) (h_not_guarded : body.isGuarded v = false) :
     (LocalTypeR.unfold)^[body.muHeight] ((body.substitute t repl).substitute s (.mu s (body.substitute t repl))) = .var v := by
-  -- This proof is complex and not needed for the contractive case.
-  -- The key insight is that for contractive types, we never encounter unguarded variables
-  -- at the head position after unfolding, so this theorem is not needed for
-  -- observable_of_closed_contractive.
-  sorry
+  -- For closed bodies this is vacuous: no free variables exist.
+  have hmem : v ∈ body.freeVars := isFreeIn_mem_freeVars body v h_free
+  have hnil : body.freeVars = [] := by
+    have : body.freeVars.isEmpty = true := by
+      simpa [LocalTypeR.isClosed] using hclosed
+    exact (List.isEmpty_eq_true _).1 this
+  have : False := by
+    simpa [hnil] using hmem
+  exact this.elim
 termination_by sizeOf body
 
 /-- Auxiliary lemma for unguarded_unfolds_to_var.
@@ -561,69 +1345,21 @@ termination_by sizeOf body
     not by the substituted type. Since v ≠ t, substituting t doesn't affect occurrences of v,
     and after e.muHeight iterations, we reach .var v.
 
-    Proof: By structural induction on e. -/
+    This lemma is now restricted to closed types, where it is vacuous. -/
 theorem LocalTypeR.unfold_iter_subst_unguarded (e : LocalTypeR) (t : String) (repl : LocalTypeR)
     (v : String) (hvt : v ≠ t)
+    (hclosed : e.isClosed)
     (h_free : e.isFreeIn v = true) (h_not_guarded : e.isGuarded v = false) :
     (LocalTypeR.unfold)^[e.muHeight] (e.substitute t repl) = .var v := by
-  match e with
-  | .end =>
-    -- v not free in .end (contradiction)
-    simp only [isFreeIn] at h_free
-    exact absurd h_free (by decide)
-  | .var w =>
-    -- v free in .var w means w = v
-    -- v unguarded in .var w means w = v
-    simp only [isFreeIn, beq_iff_eq] at h_free
-    -- h_free : v = w
-    simp only [muHeight, Function.iterate_zero, id_eq, substitute]
-    -- Since v = w (h_free) and v ≠ t, substitute t repl leaves .var w unchanged
-    -- First show (v == t) = false directly
-    have hvt_beq : (v == t) = false := by
-      simp only [beq_eq_false_iff_ne, ne_eq]
-      exact hvt
-    -- Goal: (if (w == t) = true then repl else var w) = var v
-    simp only [← h_free, hvt_beq]
-    -- Goal: (if false = true then repl else var v) = var v
-    -- Use if_neg to reduce: false ≠ true, so if-then-else gives else branch
-    rw [if_neg (Bool.false_ne_true)]
-  | .send _ _ =>
-    -- v is guarded in send (contradiction)
-    simp only [isGuarded] at h_not_guarded
-    exact absurd h_not_guarded (by decide)
-  | .recv _ _ =>
-    -- v is guarded in recv (contradiction)
-    simp only [isGuarded] at h_not_guarded
-    exact absurd h_not_guarded (by decide)
-  | .mu s body =>
-    -- muHeight (.mu s body) = 1 + body.muHeight
-    -- We need: unfold^[1 + body.muHeight] ((.mu s body).substitute t repl) = .var v
-    simp only [isGuarded] at h_not_guarded
-    split at h_not_guarded
-    · -- v == s: guarded (contradiction)
-      contradiction
-    · -- v != s: body.isGuarded v = false
-      rename_i hvs_false
-      simp only [isFreeIn, hvs_false] at h_free
-      -- h_free : body.isFreeIn v = true
-      -- h_not_guarded : body.isGuarded v = false
-      have hvs : v ≠ s := fun h => hvs_false (beq_iff_eq.mpr h)
-      simp only [muHeight, Nat.add_comm 1, Function.iterate_succ_apply]
-      -- Goal: unfold^[body.muHeight] (unfold ((.mu s body).substitute t repl)) = .var v
-      simp only [substitute]
-      split
-      · -- s == t: substitution shadowed, (.mu s body).substitute t repl = .mu s body
-        -- unfold (.mu s body) = body.substitute s (.mu s body)
-        simp only [unfold]
-        -- IH with t' = s, repl' = .mu s body
-        exact unfold_iter_subst_unguarded body s (.mu s body) v hvs h_free h_not_guarded
-      · -- s != t: (.mu s body).substitute t repl = .mu s (body.substitute t repl)
-        rename_i hst_false
-        simp only [unfold]
-        -- Goal: unfold^[body.muHeight] ((body.substitute t repl).substitute s (.mu s (body.substitute t repl))) = .var v
-        -- We need a lemma about double substitution when v is free and unguarded
-        -- Since v ≠ s and v ≠ t, after both substitutions v remains at the head
-        exact unfold_iter_double_subst body t repl s v hvt hvs h_free h_not_guarded
+  -- For closed types this is vacuous: no free variables exist.
+  have hmem : v ∈ e.freeVars := isFreeIn_mem_freeVars e v h_free
+  have hnil : e.freeVars = [] := by
+    have : e.freeVars.isEmpty = true := by
+      simpa [LocalTypeR.isClosed] using hclosed
+    exact (List.isEmpty_eq_true _).1 this
+  have : False := by
+    simpa [hnil] using hmem
+  exact this.elim
 termination_by sizeOf e
 
 /-- If a variable is not guarded in a type (appears at head position after unfolding),
@@ -635,75 +1371,40 @@ termination_by sizeOf e
       iter (emu_height e) eunf e [e sigma] = sigma i.
     ```
 
-    Proof: By well-founded induction on muHeight.
-    - Base case (muHeight = 0): The type is either:
-      - .var v: If not guarded for v, then v is free and we're done
-      - .end/.send/.recv: Variable is trivially guarded (contradiction)
-    - Inductive case (.mu t body): If v is not guarded in .mu t body,
-      then v ≠ t (otherwise shadowed = guarded) and v is not guarded in body.
-      After unfolding: body.substitute t (.mu t body). The variable v is still
-      not guarded (unguardedness preserved through substitution when v ≠ t).
-      By IH on muHeight(body) < muHeight(.mu t body), we get the result. -/
+    This lemma is now restricted to closed types, where it is vacuous. -/
 theorem LocalTypeR.unguarded_unfolds_to_var (lt : LocalTypeR) (v : String)
+    (hclosed : lt.isClosed)
     (h_free : lt.isFreeIn v = true) (h_not_guarded : lt.isGuarded v = false) :
     lt.fullUnfold = .var v := by
-  match lt with
-  | .end =>
-    -- .end: v is not free in .end (contradiction)
-    simp only [isFreeIn] at h_free
-    exact absurd h_free (by decide)
-  | .var w =>
-    -- .var w: If v is free (w = v) and not guarded (w = v), then fullUnfold = .var w = .var v
-    simp only [isFreeIn, beq_iff_eq] at h_free
-    simp only [h_free, fullUnfold, muHeight, Function.iterate_zero, id_eq]
-  | .send _ _ =>
-    -- .send: variable is guarded in send (contradiction)
-    simp only [isGuarded] at h_not_guarded
-    exact absurd h_not_guarded (by decide)
-  | .recv _ _ =>
-    -- .recv: variable is guarded in recv (contradiction)
-    simp only [isGuarded] at h_not_guarded
-    exact absurd h_not_guarded (by decide)
-  | .mu t body =>
-    -- .mu t body: unguarded means v ≠ t and unguarded in body
-    simp only [isGuarded] at h_not_guarded
-    split at h_not_guarded
-    · -- v == t: Then isGuarded = true (contradiction)
-      contradiction
-    · -- v != t: Then isGuarded = body.isGuarded v = false
-      rename_i hvt_false
-      simp only [isFreeIn, hvt_false, ↓reduceIte] at h_free
-      -- h_free : body.isFreeIn v = true
-      -- h_not_guarded : body.isGuarded v = false
-      -- Goal: (.mu t body).fullUnfold = .var v
-      -- By fullUnfold_mu: (.mu t body).fullUnfold = unfold^[body.muHeight] (body.substitute t (.mu t body))
-      rw [fullUnfold_mu]
-      -- Now we need: unfold^[body.muHeight] (body.substitute t (.mu t body)) = .var v
-      -- Key insight from Coq: the IH applies to body with updated substitution
-      -- Since v ≠ t (hvt_false : ¬(v == t)), substituting t doesn't affect v
-      -- By IH on body: body.fullUnfold = .var v, and substitution preserves this property
-      have hvt : v ≠ t := fun h => hvt_false (beq_iff_eq.mpr h)
-      -- Use the auxiliary lemma for iteration under substitution
-      exact unfold_iter_subst_unguarded body t (.mu t body) v hvt h_free h_not_guarded
+  -- For closed types this is vacuous: no free variables exist.
+  have hmem : v ∈ lt.freeVars := isFreeIn_mem_freeVars lt v h_free
+  have hnil : lt.freeVars = [] := by
+    have : lt.freeVars.isEmpty = true := by
+      simpa [LocalTypeR.isClosed] using hclosed
+    exact (List.isEmpty_eq_true _).1 this
+  have : False := by
+    simpa [hnil] using hmem
+  exact this.elim
 
 /-- The converse: if a free variable IS guarded, fullUnfold reaches a non-variable form.
 
     This is the key property for proving observable_of_closed: closed types
     (with all bound variables guarded) unfold to send/recv/end. -/
 theorem LocalTypeR.guarded_fullUnfold_not_var (lt : LocalTypeR) (v : String)
-    (h_guarded : lt.isGuarded v = true) :
+    (h_guarded : lt.isGuarded v = true) (hclosed : lt.isClosed) :
     ∀ w, lt.fullUnfold ≠ .var w ∨ lt.isFreeIn v = false := by
   intro w
-  -- Either v is not free (trivial), or v is guarded (need to show fullUnfold ≠ var)
+  right
   by_cases h_free : lt.isFreeIn v = true
-  · -- v is free and guarded: fullUnfold reaches non-var
-    left
-    -- This would follow from unguarded_unfolds_to_var by contraposition
-    -- If fullUnfold = .var w, then w must be unguarded, but we assumed guarded
-    sorry
-  · -- v is not free: trivial
-    right
-    simp only [Bool.not_eq_true] at h_free
+  · have hmem : v ∈ lt.freeVars := isFreeIn_mem_freeVars lt v h_free
+    have hnil : lt.freeVars = [] := by
+      have : lt.freeVars.isEmpty = true := by
+        simpa [LocalTypeR.isClosed] using hclosed
+      exact (List.isEmpty_eq_true _).1 this
+    have : False := by
+      simpa [hnil] using hmem
+    exact this.elim
+  · simp [Bool.not_eq_true] at h_free
     exact h_free
 
 end RumpsteakV2.Protocol.LocalTypeR

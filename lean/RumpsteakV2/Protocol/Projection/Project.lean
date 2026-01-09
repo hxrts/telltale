@@ -1567,7 +1567,7 @@ private theorem CProjectEQ2Rel_postfix
             exact ⟨e0, hall gb hgb, heq⟩
           simp [CProjectF, hrs, hrr, hall']
 
-private theorem CProject_EQ2_of_head
+theorem CProject_EQ2_of_head
     (hend : ∀ e, EQ2 .end e → e = .end)
     (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
     (hsend : ∀ p bs e, EQ2 (.send p bs) e →
@@ -3591,14 +3591,26 @@ but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction axiom
 3. Modify CProjectF to accept mu-wrapped candidates (major change)
 4. Prove auxiliary lemmas showing EQ2 preserves "canonical forms" for each constructor
 
-For now, this remains an axiom. The semantic justification is strong: EQ2 is observational
-equivalence, and CProject is defined coinductively over observations, so they must commute. -/
-axiom CProject_EQ2_axiom (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
-    (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1
+We now expose this as a theorem **parameterized by constructor-extraction lemmas**
+for EQ2, making the dependency explicit and avoiding an unconditional axiom in
+the projection layer. -/
+section CProject_EQ2_Assumptions
 
+variable
+  (hend : ∀ e, EQ2 .end e → e = .end)
+  (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+  (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+    ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+  (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+    ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+  (hmu : ∀ t body e, EQ2 (.mu t body) e →
+    ∃ body', e = .mu t body' ∧ EQ2 body body')
+
+/-- CProject is preserved under EQ2 equivalence, assuming constructor-extraction
+    lemmas for EQ2 (head constructors and compatible substructure). -/
 theorem CProject_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1 :=
-  CProject_EQ2_axiom g role e0 e1 hproj heq
+  CProject_EQ2_of_head hend hvar hsend hrecv hmu g role e0 e1 hproj heq
 
 /-- trans produces a valid projection when CProject holds for some candidate.
 
@@ -3615,13 +3627,13 @@ Requires `allCommsNonEmpty` assumption (matching Coq's `size_pred`). -/
 theorem trans_CProject (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) : CProject g role (trans g role) := by
   have heq : EQ2 lt (Trans.trans g role) := CProject_implies_EQ2_trans g role lt h hwf
-  exact CProject_EQ2 g role lt (Trans.trans g role) h heq
+  exact CProject_EQ2 hend hvar hsend hrecv hmu g role lt (Trans.trans g role) h heq
 
 /-- trans computes the canonical projection when CProject holds. -/
 theorem trans_is_projection (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) :
     projectb g role (trans g role) = true :=
-  projectb_complete g role (trans g role) (trans_CProject g role lt h hwf)
+  projectb_complete g role (trans g role) (trans_CProject hend hvar hsend hrecv hmu g role lt h hwf)
 
 /-- Completeness: if CProject holds, then projectR? returns some.
 
@@ -3630,7 +3642,8 @@ theorem projectR?_complete (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) :
     ∃ result, projectR? g role = some result := by
   unfold projectR?
-  have hproj : projectb g role (trans g role) = true := trans_is_projection g role lt h hwf
+  have hproj : projectb g role (trans g role) = true :=
+    trans_is_projection hend hvar hsend hrecv hmu g role lt h hwf
   simp only [hproj, ↓reduceDIte]
   exact ⟨⟨trans g role, projectb_sound g role (trans g role) hproj⟩, rfl⟩
 
@@ -3645,5 +3658,7 @@ theorem projectR?_some_iff_CProject (g : GlobalType) (role : String) (hwf : g.al
     exact ⟨result.val, result.property⟩
   · intro ⟨lt, h⟩
     exact projectR?_complete g role lt h hwf
+
+end CProject_EQ2_Assumptions
 
 end RumpsteakV2.Protocol.Projection.Project

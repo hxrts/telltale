@@ -2,7 +2,6 @@ import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.DBBridge
 import RumpsteakV2.Protocol.CoTypes.Observables
-import RumpsteakV2.Protocol.Projection.Project
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
 
 /-! # RumpsteakV2.Protocol.CoTypes.Bisim
@@ -116,6 +115,24 @@ theorem observable_of_closed_contractive {a : LocalTypeR}
     | is_send h => exact Observable.is_send (CanSend.mu h)
     | is_recv h => exact Observable.is_recv (CanRecv.mu h)
 termination_by sizeOf a
+
+/-! ## Environment-Aware Observability -/
+
+theorem observable_of_env_contractive {env : Env} {a : LocalTypeR}
+    (hWF : EnvWellFormed env) (hclosed : ClosedUnder env a) (hcontr : a.isContractive = true) :
+    Observable (Env.apply env a) := by
+  have hclosed' : (Env.apply env a).isClosed :=
+    isClosed_apply_of_closed_env env a hWF hclosed
+  have hcontr' : (Env.apply env a).isContractive = true :=
+    isContractive_apply_of_closed_env env a hWF hcontr
+  exact observable_of_closed_contractive hclosed' hcontr'
+
+theorem observable_of_active_env_contractive {a : LocalTypeR}
+    (hclosed : LocalTypeR.ClosedUnderActive a) (hcontr : a.isContractive = true) :
+    Observable (LocalTypeR.applyActiveEnv a) := by
+  have hWF : EnvWellFormed ActiveEnv := LocalTypeR.activeEnv_wellFormed
+  simpa [LocalTypeR.applyActiveEnv] using
+    (observable_of_env_contractive (env := ActiveEnv) hWF hclosed hcontr)
 
 /-- Every contractive local type has observable behavior.
 
@@ -1234,10 +1251,27 @@ any recursive reference). For non-contractive types like `.mu t (.var t)`, the E
 relation can hold for `EQ2 .end (.mu t (.var t))` (via the gfp semantics allowing
 infinite chains), but `UnfoldsToEnd (.mu t (.var t))` is false (it cycles forever).
 
-All types arising from projection of well-formed global types are contractive, so
-these axioms are sound in all practical use cases. The axioms remain as such because
-proving them would require adding explicit contractiveness hypotheses, which would
-complicate the API without practical benefit. -/
+We expose a **layered extraction interface** so we can swap between:
+- a contractive-only extraction (axiom-free, requires proofs), and
+- an axiomatic extraction (unconditional), with
+- a hybrid default that prefers contractive proofs but falls back to axioms.
+
+The global default matches the substitution environment default: **no extra obligations**
+leak into downstream proofs, but we retain a single integration point for swapping. -/
+
+/-! ## EQ2 Extraction Layer (Swap Point) -/
+
+structure EQ2Extraction where
+  Good : LocalTypeR → Prop
+  end_right : ∀ {x}, Good x → EQ2 .end x → UnfoldsToEnd x
+  var_right : ∀ {x v}, Good x → EQ2 (.var v) x → UnfoldsToVar x v
+  send_right : ∀ {x p bs}, Good x → EQ2 (.send p bs) x →
+    ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs
+  recv_right : ∀ {x p bs}, Good x → EQ2 (.recv p bs) x →
+    ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs
+  mus_to_BisimF :
+    ∀ {t s body body'}, Good (.mu t body) → Good (.mu s body') →
+      EQ2 (.mu t body) (.mu s body') → BisimF EQ2 (.mu t body) (.mu s body')
 
 /-- For closed, contractive types, `EQ2 .end x` implies `UnfoldsToEnd x`.
 
@@ -1390,11 +1424,9 @@ theorem EQ2.recv_left_implies_CanRecv_of_contractive {x : LocalTypeR} {p : Strin
     types in practice (from well-formed projections) are contractive. -/
 axiom EQ2.end_right_implies_UnfoldsToEnd_axiom {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x
 
-/-- Unconditional extraction: prefers the contractive proof when available. -/
+/-- Unconditional extraction through the active layer (default: hybrid). -/
 theorem EQ2.end_right_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x := by
-  by_cases hcontr : x.isContractive = true
-  · exact EQ2.end_right_implies_UnfoldsToEnd_of_contractive hcontr h
-  · exact EQ2.end_right_implies_UnfoldsToEnd_axiom h
+  exact ActiveExtraction.end_right (x := x) (by trivial) h
 
 /-- If EQ2 x .end, then x unfolds to end. -/
 theorem EQ2.end_left_implies_UnfoldsToEnd {x : LocalTypeR} (h : EQ2 x .end) : UnfoldsToEnd x :=
@@ -1406,9 +1438,7 @@ axiom EQ2.var_right_implies_UnfoldsToVar_axiom {x : LocalTypeR} {v : String}
 
 theorem EQ2.var_right_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
     (h : EQ2 (.var v) x) : UnfoldsToVar x v := by
-  by_cases hcontr : x.isContractive = true
-  · exact EQ2.var_right_implies_UnfoldsToVar_of_contractive hcontr h
-  · exact EQ2.var_right_implies_UnfoldsToVar_axiom h
+  exact ActiveExtraction.var_right (x := x) (v := v) (by trivial) h
 
 /-- If EQ2 x (.var v), then x unfolds to var v. -/
 theorem EQ2.var_left_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
@@ -1423,9 +1453,7 @@ axiom EQ2.send_right_implies_CanSend_axiom {x : LocalTypeR} {p : String}
 theorem EQ2.send_right_implies_CanSend {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : EQ2 (.send p bs) x) :
     ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
-  by_cases hcontr : x.isContractive = true
-  · exact EQ2.send_right_implies_CanSend_of_contractive (x := x) hcontr h
-  · exact EQ2.send_right_implies_CanSend_axiom h
+  exact ActiveExtraction.send_right (x := x) (p := p) (bs := bs) (by trivial) h
 
 /-- Flip BranchesRel with symmetric relation. -/
 private theorem BranchesRel_flip {as bs : List (Label × LocalTypeR)}
@@ -1450,9 +1478,7 @@ axiom EQ2.recv_right_implies_CanRecv_axiom {x : LocalTypeR} {p : String}
 theorem EQ2.recv_right_implies_CanRecv {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : EQ2 (.recv p bs) x) :
     ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
-  by_cases hcontr : x.isContractive = true
-  · exact EQ2.recv_right_implies_CanRecv_of_contractive (x := x) hcontr h
-  · exact EQ2.recv_right_implies_CanRecv_axiom h
+  exact ActiveExtraction.recv_right (x := x) (p := p) (bs := bs) (by trivial) h
 
 /-- If EQ2 x (.recv p cs), then x can recv from p with EQ2-related branches. -/
 theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
@@ -1508,14 +1534,69 @@ theorem EQ2_mus_to_BisimF_of_contractive {t s : String} {body body' : LocalTypeR
       have hbr' : BranchesRel EQ2 bs bs' := BranchesRel_flip hbr
       exact BisimF.eq_recv hrecv hCanRecv (BranchesRel_to_BranchesRelBisim hbr')
 
+/-- Axiomatic extraction (unconditional). -/
+def AxiomaticExtraction : EQ2Extraction :=
+  { Good := fun _ => True
+    end_right := by intro _ _ h; exact EQ2.end_right_implies_UnfoldsToEnd_axiom h
+    var_right := by intro _ _ _ h; exact EQ2.var_right_implies_UnfoldsToVar_axiom h
+    send_right := by intro _ _ _ _ h; exact EQ2.send_right_implies_CanSend_axiom h
+    recv_right := by intro _ _ _ _ h; exact EQ2.recv_right_implies_CanRecv_axiom h
+    mus_to_BisimF := by intro _ _ _ _ _ _ h; exact EQ2_mus_to_BisimF_axiom h }
+
+/-- Contractive-only extraction (axiom-free). -/
+def ContractiveExtraction : EQ2Extraction :=
+  { Good := fun x => x.isContractive = true
+    end_right := by intro _ hgood h; exact EQ2.end_right_implies_UnfoldsToEnd_of_contractive hgood h
+    var_right := by intro _ _ hgood h; exact EQ2.var_right_implies_UnfoldsToVar_of_contractive hgood h
+    send_right := by intro _ _ _ hgood h; exact EQ2.send_right_implies_CanSend_of_contractive (x := _) hgood h
+    recv_right := by intro _ _ _ hgood h; exact EQ2.recv_right_implies_CanRecv_of_contractive (x := _) hgood h
+    mus_to_BisimF := by
+      intro t s body body' hgood1 hgood2 h
+      exact EQ2_mus_to_BisimF_of_contractive (t := t) (s := s) (body := body) (body' := body') h hgood1 hgood2 }
+
+/-- Hybrid extraction: prefers contractive proofs, falls back to axioms.
+
+    This is the default active extraction, matching the non-leaky global behavior. -/
+def HybridExtraction : EQ2Extraction :=
+  { Good := fun _ => True
+    end_right := by
+      intro x _ h
+      by_cases hcontr : x.isContractive = true
+      · exact EQ2.end_right_implies_UnfoldsToEnd_of_contractive hcontr h
+      · exact EQ2.end_right_implies_UnfoldsToEnd_axiom h
+    var_right := by
+      intro x v _ h
+      by_cases hcontr : x.isContractive = true
+      · exact EQ2.var_right_implies_UnfoldsToVar_of_contractive hcontr h
+      · exact EQ2.var_right_implies_UnfoldsToVar_axiom h
+    send_right := by
+      intro x p bs _ h
+      by_cases hcontr : x.isContractive = true
+      · exact EQ2.send_right_implies_CanSend_of_contractive (x := x) hcontr h
+      · exact EQ2.send_right_implies_CanSend_axiom h
+    recv_right := by
+      intro x p bs _ h
+      by_cases hcontr : x.isContractive = true
+      · exact EQ2.recv_right_implies_CanRecv_of_contractive (x := x) hcontr h
+      · exact EQ2.recv_right_implies_CanRecv_axiom h
+    mus_to_BisimF := by
+      intro t s body body' _ _ h
+      by_cases hc1 : (.mu t body).isContractive = true
+      · by_cases hc2 : (.mu s body').isContractive = true
+        · exact EQ2_mus_to_BisimF_of_contractive (t := t) (s := s) (body := body) (body' := body') h hc1 hc2
+        · exact EQ2_mus_to_BisimF_axiom h
+      · exact EQ2_mus_to_BisimF_axiom h }
+
+/-- Global swap point for extraction. Default matches the substitution environment default. -/
+def ActiveExtraction : EQ2Extraction := HybridExtraction
+
+abbrev ActiveGood : LocalTypeR → Prop := ActiveExtraction.Good
+
 theorem EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (.mu t body) (.mu s body')) :
     BisimF EQ2 (.mu t body) (.mu s body') := by
-  by_cases hc1 : (.mu t body).isContractive = true
-  · by_cases hc2 : (.mu s body').isContractive = true
-    · exact EQ2_mus_to_BisimF_of_contractive h hc1 hc2
-    · exact EQ2_mus_to_BisimF_axiom h
-  · exact EQ2_mus_to_BisimF_axiom h
+  exact ActiveExtraction.mus_to_BisimF
+    (t := t) (s := s) (body := body) (body' := body') (by trivial) (by trivial) h
 
 /-- EQ2 implies Bisim.
 

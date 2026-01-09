@@ -1,6 +1,6 @@
 [package]
 name = "rumpsteak-aura-choreography"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -15,10 +15,10 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [dependencies]
-rumpsteak-aura = { path = "../..", version = "0.8.1" }
-rumpsteak-aura-macros = { path = "../macros", version = "0.8.1" }
-rumpsteak-types = { path = "../types", version = "0.8.1" }
-rumpsteak-theory = { path = "../theory", version = "0.8.1" }
+rumpsteak-aura = { path = "../..", version = "0.8.2" }
+rumpsteak-aura-macros = { path = "../macros", version = "0.8.2" }
+rumpsteak-types = { path = "../types", version = "0.8.2" }
+rumpsteak-theory = { path = "../theory", version = "0.8.2" }
 futures = { workspace = true }
 async-trait = { workspace = true }
 async-recursion = { workspace = true }

@@ -1,6 +1,7 @@
 // Projection from global choreographies to local session types
 
 use crate::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role, RoleParam};
+use proc_macro2::Ident;
 use std::collections::HashMap;
 
 /// Project a choreography to a local session type for a specific role
@@ -597,55 +598,274 @@ impl<'a> ProjectionContext<'a> {
         &mut self,
         branches: &[Branch],
     ) -> Result<LocalType, ProjectionError> {
-        // Project each branch and find where we rejoin
-        let mut projections = Vec::new();
+        // Project each branch and preserve its label
+        let mut labeled_projections = Vec::new();
 
         for branch in branches {
-            projections.push(self.project_protocol(&branch.protocol)?);
+            let projection = self.project_protocol(&branch.protocol)?;
+            labeled_projections.push((branch.label.clone(), projection));
         }
 
         // Check if all projections are identical (common case)
-        if projections.windows(2).all(|w| w[0] == w[1]) {
-            Ok(projections
+        let projections_only: Vec<_> = labeled_projections.iter().map(|(_, p)| p).collect();
+        if projections_only.windows(2).all(|w| w[0] == w[1]) {
+            Ok(labeled_projections
                 .into_iter()
                 .next()
-                .expect("projections must be non-empty when windows returned true"))
+                .expect("projections must be non-empty when windows returned true")
+                .1)
         } else {
-            // Different projections per branch - need to merge
-            self.merge_local_types(projections)
+            // Different projections per branch - need to merge with label awareness
+            self.merge_local_types_labeled(labeled_projections)
         }
     }
 
-    /// Merge multiple local types using the merge algorithm.
+    /// Merge multiple labeled local types preserving choice labels.
     ///
-    /// This implements the merge operation from multiparty session type theory.
-    /// When a role is not involved in a choice, the projections of different
-    /// branches must be merged.
-    fn merge_local_types(&self, projections: Vec<LocalType>) -> Result<LocalType, ProjectionError> {
-        if projections.is_empty() {
+    /// This is used for merging choice continuations where we need to preserve
+    /// the original choice labels. When a receiver gets different messages per branch,
+    /// the resulting Branch node should use the semantic choice labels, not message names.
+    fn merge_local_types_labeled(
+        &self,
+        labeled_projections: Vec<(Ident, LocalType)>,
+    ) -> Result<LocalType, ProjectionError> {
+        if labeled_projections.is_empty() {
             return Ok(LocalType::End);
         }
 
         // Filter out End types as they're neutral for merging
-        let non_end: Vec<_> = projections
+        let non_end: Vec<_> = labeled_projections
             .into_iter()
-            .filter(|p| p != &LocalType::End)
+            .filter(|(_, p)| p != &LocalType::End)
             .collect();
 
         if non_end.is_empty() {
             return Ok(LocalType::End);
         }
 
-        // Fold the merge operation over all projections
+        // Fold the merge operation over all projections, preserving labels
         // Safety: non_end is non-empty (checked above)
         let mut iter = non_end.into_iter();
-        let mut result = iter.next().expect("non-empty after is_empty check");
+        let (first_label, first_type) = iter.next().expect("non-empty after is_empty check");
+        let mut result = LabeledLocalType {
+            label: first_label,
+            local_type: first_type,
+        };
 
-        for next in iter {
-            result = merge_local_types(&result, &next)?;
+        for (label, next) in iter {
+            result = merge_labeled_local_types(
+                &result,
+                &LabeledLocalType {
+                    label,
+                    local_type: next,
+                },
+            )?;
         }
 
-        Ok(result)
+        Ok(result.local_type)
+    }
+}
+
+/// A LocalType paired with its choice label.
+///
+/// Used during merging to preserve semantic choice labels when creating Branch nodes.
+struct LabeledLocalType {
+    label: Ident,
+    local_type: LocalType,
+}
+
+/// Merge two labeled LocalTypes, preserving choice labels.
+///
+/// When merging Receive operations with different messages, this uses the choice labels
+/// instead of message type names for the resulting Branch node.
+fn merge_labeled_local_types(
+    t1: &LabeledLocalType,
+    t2: &LabeledLocalType,
+) -> Result<LabeledLocalType, ProjectionError> {
+    // Fast path: identical types (label doesn't matter if types are identical)
+    if t1.local_type == t2.local_type {
+        return Ok(LabeledLocalType {
+            label: t1.label.clone(),
+            local_type: t1.local_type.clone(),
+        });
+    }
+
+    match (&t1.local_type, &t2.local_type) {
+        // End merges with End
+        (LocalType::End, LocalType::End) => Ok(LabeledLocalType {
+            label: t1.label.clone(),
+            local_type: LocalType::End,
+        }),
+
+        // End can merge with any type (End is neutral)
+        (LocalType::End, other) => Ok(LabeledLocalType {
+            label: t2.label.clone(),
+            local_type: other.clone(),
+        }),
+        (other, LocalType::End) => Ok(LabeledLocalType {
+            label: t1.label.clone(),
+            local_type: other.clone(),
+        }),
+
+        // Send with same target - must have same message
+        (
+            LocalType::Send {
+                to: to1,
+                message: msg1,
+                continuation: cont1,
+            },
+            LocalType::Send {
+                to: to2,
+                message: msg2,
+                continuation: cont2,
+            },
+        ) if to1 == to2 => {
+            if msg1.name == msg2.name {
+                // Same message - merge continuations
+                let merged_cont = merge_local_types(cont1, cont2)?;
+                Ok(LabeledLocalType {
+                    label: t1.label.clone(), // Label doesn't matter for Send
+                    local_type: LocalType::Send {
+                        to: to1.clone(),
+                        message: msg1.clone(),
+                        continuation: Box::new(merged_cont),
+                    },
+                })
+            } else {
+                // Different messages - error for sends
+                Err(ProjectionError::MergeFailure(format!(
+                    "cannot merge sends with different messages: '{}' vs '{}'",
+                    msg1.name, msg2.name
+                )))
+            }
+        }
+
+        // Receive with same source - merge into Branch using CHOICE LABELS
+        (
+            LocalType::Receive {
+                from: from1,
+                message: msg1,
+                continuation: cont1,
+            },
+            LocalType::Receive {
+                from: from2,
+                message: msg2,
+                continuation: cont2,
+            },
+        ) if from1 == from2 => {
+            if msg1.name == msg2.name {
+                // Same message - merge continuations
+                let merged_cont = merge_local_types(cont1, cont2)?;
+                Ok(LabeledLocalType {
+                    label: t1.label.clone(),
+                    local_type: LocalType::Receive {
+                        from: from1.clone(),
+                        message: msg1.clone(),
+                        continuation: Box::new(merged_cont),
+                    },
+                })
+            } else {
+                // Different messages - create a Branch with CHOICE LABELS (not message names!)
+                Ok(LabeledLocalType {
+                    label: t1.label.clone(), // Arbitrary choice; branch contains both
+                    local_type: LocalType::Branch {
+                        from: from1.clone(),
+                        branches: vec![
+                            (t1.label.clone(), *cont1.clone()), // Use choice label
+                            (t2.label.clone(), *cont2.clone()), // Use choice label
+                        ],
+                    },
+                })
+            }
+        }
+
+        // Merge Receive into existing Branch from same source
+        (
+            LocalType::Branch {
+                from: from1,
+                branches: br1,
+            },
+            LocalType::Receive {
+                from: from2,
+                message: msg2,
+                continuation: cont2,
+            },
+        ) if from1 == from2 => {
+            let mut new_branches = br1.clone();
+            // Check if label already exists
+            if let Some((_, existing_cont)) = new_branches.iter_mut().find(|(l, _)| l == &t2.label)
+            {
+                *existing_cont = merge_local_types(existing_cont, cont2)?;
+            } else {
+                new_branches.push((t2.label.clone(), *cont2.clone())); // Use choice label
+            }
+            Ok(LabeledLocalType {
+                label: t1.label.clone(),
+                local_type: LocalType::Branch {
+                    from: from1.clone(),
+                    branches: new_branches,
+                },
+            })
+        }
+
+        // Symmetric case: Receive into Branch
+        (
+            LocalType::Receive {
+                from: from1,
+                message: msg1,
+                continuation: cont1,
+            },
+            LocalType::Branch {
+                from: from2,
+                branches: br2,
+            },
+        ) if from1 == from2 => {
+            let mut new_branches = br2.clone();
+            // Check if label already exists
+            if let Some((_, existing_cont)) = new_branches.iter_mut().find(|(l, _)| l == &t1.label)
+            {
+                *existing_cont = merge_local_types(existing_cont, cont1)?;
+            } else {
+                new_branches.push((t1.label.clone(), *cont1.clone())); // Use choice label
+            }
+            Ok(LabeledLocalType {
+                label: t2.label.clone(),
+                local_type: LocalType::Branch {
+                    from: from2.clone(),
+                    branches: new_branches,
+                },
+            })
+        }
+
+        // Merge Branch with Branch from same source
+        (
+            LocalType::Branch {
+                from: from1,
+                branches: br1,
+            },
+            LocalType::Branch {
+                from: from2,
+                branches: br2,
+            },
+        ) if from1 == from2 => {
+            let merged_branches = merge_branch_branches(br1, br2)?;
+            Ok(LabeledLocalType {
+                label: t1.label.clone(),
+                local_type: LocalType::Branch {
+                    from: from1.clone(),
+                    branches: merged_branches,
+                },
+            })
+        }
+
+        // All other cases: fall back to unlabeled merge
+        _ => {
+            let merged = merge_local_types(&t1.local_type, &t2.local_type)?;
+            Ok(LabeledLocalType {
+                label: t1.label.clone(),
+                local_type: merged,
+            })
+        }
     }
 }
 
@@ -722,41 +942,33 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
                     continuation: Box::new(merged_cont),
                 })
             } else {
-                // Different messages - create a Branch with both options
-                Ok(LocalType::Branch {
-                    from: from1.clone(),
-                    branches: vec![
-                        (msg1.name.clone(), *cont1.clone()),
-                        (msg2.name.clone(), *cont2.clone()),
-                    ],
-                })
+                // Different messages - ERROR!
+                // This function has no label information. If we're merging receives with
+                // different messages from a choice, use merge_labeled_local_types instead.
+                Err(ProjectionError::MergeFailure(format!(
+                    "cannot merge receives with different messages without choice labels: '{}' vs '{}'. \
+                     This likely indicates a protocol structure error or requires label-aware merging.",
+                    msg1.name, msg2.name
+                )))
             }
         }
 
         // Merge Receive into existing Branch from same source
         (
-            LocalType::Branch {
-                from: from1,
-                branches: br1,
-            },
+            LocalType::Branch { from: from1, .. },
             LocalType::Receive {
                 from: from2,
                 message: msg2,
-                continuation: cont2,
+                ..
             },
         ) if from1 == from2 => {
-            let mut new_branches = br1.clone();
-            let msg_name = &msg2.name;
-            // Check if label already exists
-            if let Some((_, existing_cont)) = new_branches.iter_mut().find(|(l, _)| l == msg_name) {
-                *existing_cont = merge_local_types(existing_cont, cont2)?;
-            } else {
-                new_branches.push((msg2.name.clone(), *cont2.clone()));
-            }
-            Ok(LocalType::Branch {
-                from: from1.clone(),
-                branches: new_branches,
-            })
+            // ERROR: Cannot merge Receive into Branch without label information
+            // If the Branch has semantic labels, we don't know which branch this Receive belongs to
+            Err(ProjectionError::MergeFailure(format!(
+                "cannot merge receive of '{}' into branch without label information. \
+                 Use merge_labeled_local_types for choice continuations.",
+                msg2.name
+            )))
         }
 
         // Merge Branch with Branch from same source (recv semantics - union labels)
@@ -782,25 +994,16 @@ pub fn merge_local_types(t1: &LocalType, t2: &LocalType) -> Result<LocalType, Pr
             LocalType::Receive {
                 from: from1,
                 message: msg1,
-                continuation: cont1,
+                ..
             },
-            LocalType::Branch {
-                from: from2,
-                branches: br2,
-            },
+            LocalType::Branch { from: from2, .. },
         ) if from1 == from2 => {
-            let mut new_branches = br2.clone();
-            let msg_name = &msg1.name;
-            // Check if label already exists
-            if let Some((_, existing_cont)) = new_branches.iter_mut().find(|(l, _)| l == msg_name) {
-                *existing_cont = merge_local_types(existing_cont, cont1)?;
-            } else {
-                new_branches.push((msg1.name.clone(), *cont1.clone()));
-            }
-            Ok(LocalType::Branch {
-                from: from1.clone(),
-                branches: new_branches,
-            })
+            // ERROR: Cannot merge Receive into Branch without label information
+            Err(ProjectionError::MergeFailure(format!(
+                "cannot merge receive of '{}' into branch without label information. \
+                 Use merge_labeled_local_types for choice continuations.",
+                msg1.name
+            )))
         }
 
         // Select with same target - must have identical label sets (send semantics)
