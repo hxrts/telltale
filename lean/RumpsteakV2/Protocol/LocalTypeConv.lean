@@ -1,9 +1,29 @@
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.LocalTypeDB
+import RumpsteakV2.Protocol.LocalTypeConvProofs
 
 /-! # RumpsteakV2.Protocol.LocalTypeConv
 
 Conversions between named variables (LocalTypeR) and de Bruijn indices (LocalTypeDB).
+
+## Status
+
+**3 axioms eliminated** (out of 11 total):
+- ✓ `fromDB?_eq_fromDB_closed`: Safe conversion succeeds for closed terms
+- ✓ `fromDB_closed`: Closed DB terms convert to closed named terms
+- ✓ `toDB_closed`: Closed named terms convert to closed DB terms
+
+**8 axioms remaining**:
+- `toDB_fromDB_roundtrip_closed`: Roundtrip for closed terms (infrastructure proven, assembly pending)
+- `toDB_fromDB_roundtrip`: General roundtrip
+- `branches_toDB_fromDB_roundtrip`: Branch roundtrip
+- `isGuarded_toDB`: Guardedness preservation (named → DB)
+- `isGuarded_fromDB`: Guardedness preservation (DB → named)
+- `isContractive_toDB`: Contractiveness preservation (named → DB)
+- `isContractive_fromDB`: Contractiveness preservation (DB → named)
+- `isContractive_substitute_mu_via_DB`: Substitution contractiveness bridge
+
+All proven theorems are in `LocalTypeConvProofs.lean` with complete, axiom-free proofs.
 -/
 
 namespace RumpsteakV2.Protocol.LocalTypeConv
@@ -181,7 +201,7 @@ end RumpsteakV2.Protocol.LocalTypeDB
 /-! ## Safe Conversion Properties for Closed Terms
 
 For **closed terms** (no free variables), conversions are safe and should round-trip correctly.
-These properties are currently axiomatized but could be proven with sufficient infrastructure.
+These properties are now proven in LocalTypeConvProofs.lean.
 -/
 
 namespace RumpsteakV2.Protocol.LocalTypeConv
@@ -189,23 +209,35 @@ namespace RumpsteakV2.Protocol.LocalTypeConv
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.LocalTypeDB
 open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeConvProofs
 
-/-- For closed DB terms, the safe conversion succeeds and matches unsafe conversion. -/
-axiom fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  t.fromDB? [] = some (t.fromDB [])
+/-- For closed DB terms, the safe conversion succeeds and matches unsafe conversion.
 
-/-- Closed DB term converts to closed named term. -/
-axiom fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  (t.fromDB []).isClosed = true
+**Proven** in LocalTypeConvProofs.lean -/
+theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
+  t.fromDB? [] = some (t.fromDB []) :=
+  LocalTypeConvProofs.fromDB?_eq_fromDB_closed t hclosed
 
-/-- Closed named term converts to closed DB term. -/
-axiom toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
-  ∃ db, t.toDB? [] = some db ∧ db.isClosed = true
+/-- Closed DB term converts to closed named term.
+
+**Proven** in LocalTypeConvProofs.lean -/
+theorem fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
+  (t.fromDB []).isClosed = true :=
+  LocalTypeConvProofs.fromDB_closed t hclosed
+
+/-- Closed named term converts to closed DB term.
+
+**Proven** in LocalTypeConvProofs.lean -/
+theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
+  ∃ db, t.toDB? [] = some db ∧ db.isClosed = true :=
+  LocalTypeConvProofs.toDB_closed t hclosed
 
 /-- Round-trip for closed DB terms: fromDB then toDB gives original.
 
 This is the key property enabling DB-based proofs: we can convert to DB, prove something,
-then convert back, knowing we get the same term. -/
+then convert back, knowing we get the same term.
+
+**Status**: Proven infrastructure exists (get_indexOf_roundtrip), full proof pending. -/
 axiom toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
   (t.fromDB []).toDB? [] = some t
 
