@@ -24,4 +24,3 @@ lean_lib RumpsteakV2 where
   globs := #[`RumpsteakV2.*]
 
 -- Linter executables disabled due to module build complexity and cache issues
--- See LINTING.md for the approach (kept for future reference)
