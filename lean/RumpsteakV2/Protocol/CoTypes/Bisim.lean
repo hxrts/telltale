@@ -3,6 +3,7 @@ import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.CoTypes.DBBridge
 import RumpsteakV2.Protocol.CoTypes.Observables
+import RumpsteakV2.Protocol.CoTypes.Duality
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
 
 set_option linter.dupNamespace false
@@ -1291,44 +1292,23 @@ theorem EQ2.send_left_implies_CanSend_of_contractive {x : LocalTypeR} {p : Strin
 theorem EQ2.recv_right_implies_CanRecv_of_contractive {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
     (heq : EQ2 (.recv p bs) x) : ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
-  have hobs := observable_of_closed_contractive hclosed hcontr
-  cases hobs with
-  | is_end hend =>
-      have hx_end : EQ2 x .end := UnfoldsToEnd.toEQ2 hend
-      have hrecv_end : EQ2 (.recv p bs) .end := EQ2_trans heq hx_end
-      have hfalse : False := by
-        have hf := EQ2.destruct hrecv_end
-        simpa [EQ2F] using hf
-      exact (False.elim hfalse)
-  | is_var hvar =>
-      have hx_var : EQ2 x (.var _) := UnfoldsToVar.toEQ2 hvar
-      have hrecv_var : EQ2 (.recv p bs) (.var _) := EQ2_trans heq hx_var
-      have hfalse : False := by
-        have hf := EQ2.destruct hrecv_var
-        simpa [EQ2F] using hf
-      exact (False.elim hfalse)
-  | is_send hsend =>
-      have hx_send : EQ2 x (.send _ _) := CanSend.toEQ2 hsend
-      have hrecv_send : EQ2 (.recv p bs) (.send _ _) := EQ2_trans heq hx_send
-      have hfalse : False := by
-        have hf := EQ2.destruct hrecv_send
-        simpa [EQ2F] using hf
-      exact (False.elim hfalse)
-  | is_recv hrecv =>
-      rename_i p' cs
-      obtain ⟨n, hn⟩ := CanRecv.toBounded hrecv
-      have hiter := (EQ2_unfold_right_iter (a := .recv p bs) (b := x) heq) n
-      have hrecv_unfold : EQ2 (.recv p bs) ((LocalTypeR.unfold)^[n] x) := by
-        simpa using hiter
-      have hx : (LocalTypeR.unfold)^[n] x = .recv p' cs :=
-        CanRecvPathBounded.unfold_iter_eq hn
-      have hrecv' : EQ2 (.recv p bs) (.recv p' cs) := by
-        simpa [hx] using hrecv_unfold
-      have hf := EQ2.destruct hrecv'
-      have ⟨hp, hbr⟩ : p = p' ∧ BranchesRel EQ2 bs cs := by
-        simpa [EQ2F] using hf
-      subst hp
-      exact ⟨cs, hrecv, hbr⟩
+  -- Reduce recv to send via duality.
+  have hdual : EQ2 (.send p (LocalTypeR.dualBranches bs)) x.dual := by
+    have h' := EQ2_dual_compat (a := .recv p bs) (b := x) heq
+    simpa [LocalTypeR.dual] using h'
+  have hclosed' : x.dual.isClosed := by
+    simpa [LocalTypeR.dual_isClosed] using hclosed
+  have hcontr' : x.dual.isContractive = true := by
+    simpa [LocalTypeR.dual_isContractive] using hcontr
+  obtain ⟨cs, hcan, hbr⟩ :=
+    EQ2.send_right_implies_CanSend_of_contractive (x := x.dual) hclosed' hcontr' hdual
+  have hcan' : CanRecv x p (LocalTypeR.dualBranches cs) := by
+    have h' : CanRecv x.dual.dual p (LocalTypeR.dualBranches (LocalTypeR.dualBranches cs)) :=
+      CanSend.dual (t := x.dual) hcan
+    simpa [LocalTypeR.dual_involutive, LocalTypeR.dualBranches_involutive] using h'
+  have hbr' : BranchesRel EQ2 bs (LocalTypeR.dualBranches cs) :=
+    BranchesRel_dual_eq2 (bs := bs) (cs := cs) hbr
+  exact ⟨LocalTypeR.dualBranches cs, hcan', hbr'⟩
 
 /-- For contractive types, `EQ2 x (.recv p cs)` implies `CanRecv x p bs` with matching branches. -/
 theorem EQ2.recv_left_implies_CanRecv_of_contractive {x : LocalTypeR} {p : String}
@@ -2010,6 +1990,62 @@ theorem Bisim.congr (f : LocalTypeR → LocalTypeR) (hf : Compatible f)
     exact hf hf_ab
   · -- Show Rf (f x) (f y)
     exact ⟨x, y, hxy, rfl, rfl⟩
+
+/-- Duality is compatible with BisimF. -/
+theorem dual_compatible : Compatible LocalTypeR.dual := by
+  intro R x y h
+  cases h with
+  | eq_end hx hy =>
+      exact BisimF.eq_end (UnfoldsToEnd.dual hx) (UnfoldsToEnd.dual hy)
+  | eq_var hx hy =>
+      exact BisimF.eq_var (UnfoldsToVar.dual hx) (UnfoldsToVar.dual hy)
+  | eq_send hx hy hbr =>
+      rename_i p bsa bsb
+      have hx' : CanRecv x.dual p (LocalTypeR.dualBranches bsa) := CanSend.dual hx
+      have hy' : CanRecv y.dual p (LocalTypeR.dualBranches bsb) := CanSend.dual hy
+      have hbr' : BranchesRelBisim (RelImage LocalTypeR.dual R)
+          (LocalTypeR.dualBranches bsa) (LocalTypeR.dualBranches bsb) := by
+        simpa [LocalTypeR.dualBranches_eq_map] using
+          (BranchesRelBisim.map_image (f := LocalTypeR.dual) hbr)
+      exact BisimF.eq_recv hx' hy' hbr'
+  | eq_recv hx hy hbr =>
+      rename_i p bsa bsb
+      have hx' : CanSend x.dual p (LocalTypeR.dualBranches bsa) := CanRecv.dual hx
+      have hy' : CanSend y.dual p (LocalTypeR.dualBranches bsb) := CanRecv.dual hy
+      have hbr' : BranchesRelBisim (RelImage LocalTypeR.dual R)
+          (LocalTypeR.dualBranches bsa) (LocalTypeR.dualBranches bsb) := by
+        simpa [LocalTypeR.dualBranches_eq_map] using
+          (BranchesRelBisim.map_image (f := LocalTypeR.dual) hbr)
+      exact BisimF.eq_send hx' hy' hbr'
+
+/-- Duality is compatible with EQ2. -/
+theorem EQ2_dual_compat {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual := by
+  have hb : Bisim a b := EQ2.toBisim_raw h
+  have hb' : Bisim a.dual b.dual := Bisim.congr LocalTypeR.dual dual_compatible hb
+  exact Bisim.toEQ2 hb'
+
+/-- Flip BranchesRel EQ2 across duality on both sides. -/
+theorem BranchesRel_dual_eq2 {bs cs : List (Label × LocalTypeR)}
+    (h : BranchesRel EQ2 (LocalTypeR.dualBranches bs) cs) :
+    BranchesRel EQ2 bs (LocalTypeR.dualBranches cs) := by
+  induction bs generalizing cs with
+  | nil =>
+      cases h
+      exact List.Forall₂.nil
+  | cons head tail ih =>
+      cases cs with
+      | nil => cases h
+      | cons head' tail' =>
+          cases head with
+          | mk l t =>
+              cases head' with
+              | mk l' u =>
+                  cases h with
+                  | cons hbc htail =>
+                      have hdu : EQ2 t u.dual := by
+                        have h' := EQ2_dual_compat hbc.2
+                        simpa [LocalTypeR.dual_involutive] using h'
+                      exact List.Forall₂.cons ⟨hbc.1, hdu⟩ (ih htail)
 
 /-- BranchesRelBisim under RelImage. -/
 theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
