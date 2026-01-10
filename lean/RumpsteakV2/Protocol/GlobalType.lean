@@ -1,6 +1,8 @@
 import Mathlib.Data.List.Basic
 import Mathlib.Data.List.Dedup
 
+set_option linter.dupNamespace false
+
 /-! # RumpsteakV2.Protocol.GlobalType
 
 Global types for the V2 development.

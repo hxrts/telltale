@@ -16,9 +16,12 @@ require mathlib from git
 
 -- Paco provides parametrized coinduction for EQ2 proofs.
 require paco from git
-  "https://github.com/hxrts/paco-lean" @ "bfac3ec"
+  "https://github.com/hxrts/paco-lean" @ "fe436e1"
 
 /-- V2 library containing the new protocol semantics and proofs. -/
 @[default_target]
 lean_lib RumpsteakV2 where
   globs := #[`RumpsteakV2.*]
+
+-- Linter executables disabled due to module build complexity and cache issues
+-- See LINTING.md for the approach (kept for future reference)

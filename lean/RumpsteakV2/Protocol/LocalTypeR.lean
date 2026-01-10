@@ -4,6 +4,12 @@ import RumpsteakV2.Protocol.GlobalType
 -- Import after GlobalType to avoid circular dependencies
 -- import RumpsteakV2.Protocol.LocalTypeConv
 
+set_option linter.dupNamespace false
+set_option linter.unusedSimpArgs false
+set_option linter.unnecessarySimpa false
+set_option linter.unnecessarySeqFocus false
+set_option linter.unusedVariables false
+
 /-! # RumpsteakV2.Protocol.LocalTypeR
 
 Recursive local types for the V2 development.
@@ -1333,7 +1339,6 @@ theorem LocalTypeR.unfold_iter_double_subst (body : LocalTypeR)
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
-termination_by sizeOf body
 
 /-- Auxiliary lemma for unguarded_unfolds_to_var.
 
@@ -1360,7 +1365,6 @@ theorem LocalTypeR.unfold_iter_subst_unguarded (e : LocalTypeR) (t : String) (re
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
-termination_by sizeOf e
 
 /-- If a variable is not guarded in a type (appears at head position after unfolding),
     then fully unfolding produces that variable.

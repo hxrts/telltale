@@ -2,37 +2,14 @@
 # Conversion Proofs: LocalTypeR ↔ LocalTypeDB Roundtrip
 
 This module provides proven theorems for the conversion between named (LocalTypeR)
-and De Bruijn indexed (LocalTypeDB) representations of local types.
+and de Bruijn indexed (LocalTypeDB) representations of local types.
 
-These proofs eliminate the axioms in LocalTypeConv.lean by providing concrete
-proofs of:
-- Closedness preservation
-- Round-trip properties (toDB ∘ fromDB = id)
-- Guardedness preservation  
-- Contractiveness preservation
-
-## Reference
-
-Adapted from reference implementation with types updated to use Label structure
-for branch labels instead of raw strings.
-
-## Key Theorems
-
-- `fromDB?_eq_fromDB_closed`: Safe conversion succeeds for closed terms
-- `fromDB_closed`: Closed DB terms convert to closed named terms  
-- `toDB_closed`: Closed named terms convert to closed DB terms
-- `get_indexOf_roundtrip`: Context lookup correctness
-
-## Status
-
-All theorems are fully proven. This is a complete, axiom-free proof of the conversion
-infrastructure between LocalTypeR and LocalTypeDB representations.
+This file uses the canonical definitions from `RumpsteakV2.Protocol.LocalTypeConv`,
+`LocalTypeR`, and `LocalTypeDB`.
 -/
 
 import Mathlib
-import RumpsteakV2.Protocol.GlobalType
-import RumpsteakV2.Protocol.LocalTypeR
-import RumpsteakV2.Protocol.LocalTypeDB
+import RumpsteakV2.Protocol.LocalTypeConvDefs
 
 set_option linter.mathlibStandardSet false
 
@@ -55,725 +32,797 @@ noncomputable section
 namespace RumpsteakV2.Protocol.LocalTypeConvProofs
 
 open RumpsteakV2.Protocol.GlobalType
-open RumpsteakV2.Protocol.LocalTypeR  
+open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.LocalTypeDB
+open RumpsteakV2.Protocol.LocalTypeConv
 
-abbrev NameContext := List String
-abbrev Context := List String
+/-! ## Basic list helpers -/
 
-def NameContext.freshName (ctx : NameContext) : String :=
-  "_db" ++ toString ctx.length
+lemma get?_mem {ctx : NameContext} {i : Nat} {v : String}
+    (h : NameContext.get? ctx i = some v) : v ∈ ctx := by
+  induction ctx generalizing i with
+  | nil => cases h
+  | cons a ctx ih =>
+      cases i with
+      | zero =>
+          simp [NameContext.get?] at h
+          simp [h]
+      | succ i =>
+          simp [NameContext.get?] at h
+          exact Or.inr (ih h)
 
-def Context.indexOf (ctx : Context) (name : String) : Option Nat :=
-  ctx.findIdx? (· == name)
+lemma get?_some_of_lt {ctx : NameContext} {i : Nat} (h : i < ctx.length) :
+    ∃ v, NameContext.get? ctx i = some v := by
+  induction ctx generalizing i with
+  | nil => cases h
+  | cons a ctx ih =>
+      cases i with
+      | zero => exact ⟨a, by simp [NameContext.get?]⟩
+      | succ i =>
+          have h' : i < ctx.length := by simpa using h
+          obtain ⟨v, hv⟩ := ih h'
+          exact ⟨v, by simp [NameContext.get?, hv]⟩
 
-def NameContext.get? : NameContext → Nat → Option String
-  | [], _ => none
-  | x :: _, 0 => some x
-  | _ :: xs, n + 1 => NameContext.get? xs n
+/-! ## IndexOf helpers -/
+
+lemma indexOf_cons (a : String) (ctx : Context) (v : String) :
+    Context.indexOf (a :: ctx) v =
+      (if a = v then some 0 else Option.map Nat.succ (Context.indexOf ctx v)) := by
+  by_cases h : a = v
+  · subst h
+    simp [Context.indexOf]
+  · simp [Context.indexOf, h, List.findIdx?.go]
+
+lemma indexOf_eq_none_iff_not_mem (ctx : Context) (v : String) :
+    Context.indexOf ctx v = none ↔ v ∉ ctx := by
+  induction ctx with
+  | nil => simp [Context.indexOf]
+  | cons a ctx ih =>
+      by_cases h : a = v
+      · subst h
+        simp [indexOf_cons]
+      · simp [indexOf_cons, h, ih, List.mem_cons, not_or]
+
+lemma indexOf_lt_length {ctx : Context} {v : String} {i : Nat}
+    (h : Context.indexOf ctx v = some i) : i < ctx.length := by
+  induction ctx generalizing i with
+  | nil => simp [Context.indexOf] at h
+  | cons a ctx ih =>
+      by_cases h' : a = v
+      · subst h'
+        simp [indexOf_cons] at h
+        cases h
+        simp
+      · simp [indexOf_cons, h'] at h
+        rcases h with ⟨i, rfl⟩
+        have hlt := ih rfl
+        simpa using Nat.succ_lt_succ hlt
+
+lemma indexOf_get? {ctx : Context} {v : String} {i : Nat}
+    (h : Context.indexOf ctx v = some i) : NameContext.get? ctx i = some v := by
+  induction ctx generalizing i with
+  | nil => simp [Context.indexOf] at h
+  | cons a ctx ih =>
+      by_cases h' : a = v
+      · subst h'
+        simp [indexOf_cons] at h
+        cases h
+        simp [NameContext.get?]
+      · simp [indexOf_cons, h'] at h
+        rcases h with ⟨i, rfl⟩
+        simp [NameContext.get?, ih rfl]
+
+lemma indexOf_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
+    ∃ i, Context.indexOf ctx v = some i := by
+  by_cases hnone : Context.indexOf ctx v = none
+  · have : v ∉ ctx := (indexOf_eq_none_iff_not_mem _ _).1 hnone
+    contradiction
+  · cases hidx : Context.indexOf ctx v with
+    | none => cases hnone (by simpa [hidx])
+    | some i => exact ⟨i, hidx⟩
+
+
+lemma get?_inj_of_nodup {ctx : NameContext} (hnd : ctx.Nodup) {i j : Nat} {v : String}
+    (hi : NameContext.get? ctx i = some v) (hj : NameContext.get? ctx j = some v) : i = j := by
+  induction ctx generalizing i j with
+  | nil => cases hi
+  | cons a ctx ih =>
+      cases i <;> cases j <;> simp [NameContext.get?] at hi hj
+      · rfl
+      · have : v ∈ ctx := by
+          exact get?_mem hj
+        exact (hnd.not_mem this).elim
+      · have : v ∈ ctx := by
+          exact get?_mem hi
+        exact (hnd.not_mem this).elim
+      · have hnd' : ctx.Nodup := hnd.tail
+        exact congrArg Nat.succ (ih hnd' hi hj)
+
+lemma get_indexOf_roundtrip (ctx : NameContext) (i : Nat) (v : String)
+    (h_nodup : ctx.Nodup) (h_get : NameContext.get? ctx i = some v) :
+    Context.indexOf ctx v = some i := by
+  have hmem : v ∈ ctx := get?_mem h_get
+  obtain ⟨j, hidx⟩ := indexOf_eq_some_of_mem (ctx := ctx) (v := v) hmem
+  have hget_j := indexOf_get? (ctx := ctx) (v := v) (i := j) hidx
+  have hij := get?_inj_of_nodup h_nodup h_get hget_j
+  subst hij
+  exact hidx
+
+lemma indexOf_inj {ctx : Context} {x y : String} {i : Nat}
+    (hx : Context.indexOf ctx x = some i) (hy : Context.indexOf ctx y = some i) : x = y := by
+  have hx' := indexOf_get? (ctx := ctx) (v := x) (i := i) hx
+  have hy' := indexOf_get? (ctx := ctx) (v := y) (i := i) hy
+  simpa [hx'] using hy'
+
+
+lemma get?_append_right (xs ys : NameContext) (n : Nat) :
+    NameContext.get? (xs ++ ys) (xs.length + n) = NameContext.get? ys n := by
+  induction xs generalizing n with
+  | nil => simp [NameContext.get?]
+  | cons a xs ih =>
+      simp [NameContext.get?, ih, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+
+lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
+    ∃ k, Context.indexOf (pref ++ x :: ctx) x = some k ∧ k ≤ pref.length := by
+  induction pref with
+  | nil =>
+      refine ⟨0, ?_, by simp⟩
+      simp [Context.indexOf]
+  | cons a pref ih =>
+      by_cases hax : a = x
+      · subst hax
+        refine ⟨0, ?_, by simp⟩
+        simp [Context.indexOf]
+      · obtain ⟨k, hk, hkle⟩ := ih
+        refine ⟨k + 1, ?_, ?_⟩
+        · simp [indexOf_cons, hax, hk]
+        · exact Nat.succ_le_succ hkle
+
+/-! ## fromDB? correctness for closed terms -/
 
 mutual
-  def LocalTypeR.isClosed : LocalTypeR → Bool
-    | .end => true
-    | .var _ => false
-    | .send _ bs => isClosedList bs
-    | .recv _ bs => isClosedList bs
-    | .mu _ body => body.isClosed
+  theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
+      (hclosed : t.isClosedAt ctx.length = true) :
+      t.fromDB? ctx = some (t.fromDB ctx) := by
+    cases t with
+    | end => rfl
+    | var n =>
+        have hlt : n < ctx.length := by
+          simpa [LocalTypeDB.isClosedAt] using hclosed
+        obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
+        simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB, hget]
+    | send p bs =>
+        have hclosed' : LocalTypeDB.isClosedAtBranches ctx.length bs = true := by
+          simpa [LocalTypeDB.isClosedAt] using hclosed
+        have hbs : branchesFromDB? ctx bs = some (branchesFromDB ctx bs) :=
+          branchesFromDB?_eq_branchesFromDB bs ctx hclosed'
+        simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB, hbs]
+    | recv p bs =>
+        have hclosed' : LocalTypeDB.isClosedAtBranches ctx.length bs = true := by
+          simpa [LocalTypeDB.isClosedAt] using hclosed
+        have hbs : branchesFromDB? ctx bs = some (branchesFromDB ctx bs) :=
+          branchesFromDB?_eq_branchesFromDB bs ctx hclosed'
+        simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB, hbs]
+    | mu body =>
+        have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
+          simpa [LocalTypeDB.isClosedAt] using hclosed
+        have hbody := fromDB?_eq_fromDB_all_ctx body (NameContext.freshName ctx :: ctx) hclosed'
+        simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB, hbody]
 
-  def isClosedList : List (String × LocalTypeR) → Bool
-    | [] => true
-    | (_, t) :: rest => t.isClosed && isClosedList rest
-end
-
-mutual
-  def LocalTypeDB.isClosed : LocalTypeDB → Bool
-    | .end => true
-    | .var _ => false
-    | .send _ bs => isClosedListDB bs
-    | .recv _ bs => isClosedListDB bs
-    | .mu body => body.isClosed
-
-  def isClosedListDB : List (String × LocalTypeDB) → Bool
-    | [] => true
-    | (_, t) :: rest => t.isClosed && isClosedListDB rest
-end
-
-mutual
-  def LocalTypeR.substitute : LocalTypeR → String → LocalTypeR → LocalTypeR
-    | .end, _, _ => .end
-    | .var v, x, repl => if v = x then repl else .var v
-    | .send p bs, x, repl => .send p (substituteListR bs x repl)
-    | .recv p bs, x, repl => .recv p (substituteListR bs x repl)
-    | .mu t body, x, repl => if t = x then .mu t body else .mu t (body.substitute x repl)
-
-  def substituteListR : List (String × LocalTypeR) → String → LocalTypeR → List (String × LocalTypeR)
-    | [], _, _ => []
-    | (l, t) :: rest, x, repl => (l, t.substitute x repl) :: substituteListR rest x repl
-end
-
-mutual
-  def LocalTypeR.toDB? (ctx : Context) : LocalTypeR → Option LocalTypeDB
-    | .end => some .end
-    | .var v =>
-        (Context.indexOf ctx v).map LocalTypeDB.var
-    | .send p bs =>
-        branchesToDB? ctx bs |>.map (fun bs' => .send p bs')
-    | .recv p bs =>
-        branchesToDB? ctx bs |>.map (fun bs' => .recv p bs')
-    | .mu t body =>
-        (body.toDB? (t :: ctx)).map (fun body' => .mu body')
-
-  def branchesToDB? (ctx : Context) : List (String × LocalTypeR) → Option (List (String × LocalTypeDB))
-    | [] => some []
-    | (l, t) :: rest =>
-        match t.toDB? ctx, branchesToDB? ctx rest with
-        | some t', some rest' => some ((l, t') :: rest')
-        | _, _ => none
-end
-
-mutual
-  def LocalTypeDB.fromDB? (ctx : NameContext) : LocalTypeDB → Option LocalTypeR
-    | .end => some LocalTypeR.end
-    | .var n =>
-        (NameContext.get? ctx n).map LocalTypeR.var
-    | .send p bs =>
-        branchesFromDB? ctx bs |>.map (LocalTypeR.send p)
-    | .recv p bs =>
-        branchesFromDB? ctx bs |>.map (LocalTypeR.recv p)
-    | .mu body =>
-        let fresh := NameContext.freshName ctx
-        (body.fromDB? (fresh :: ctx)).map (LocalTypeR.mu fresh)
-
-  def branchesFromDB? (ctx : NameContext) : List (String × LocalTypeDB) → Option (List (String × LocalTypeR))
-    | [] => some []
-    | (l, t) :: rest =>
-        match t.fromDB? ctx, branchesFromDB? ctx rest with
-        | some t', some rest' => some ((l, t') :: rest')
-        | _, _ => none
-end
-
-mutual
-  def LocalTypeDB.fromDB (ctx : NameContext) : LocalTypeDB → LocalTypeR
-    | .end => LocalTypeR.end
-    | .var n =>
-        match NameContext.get? ctx n with
-        | some v => LocalTypeR.var v
-        | none => LocalTypeR.var ("_UNSAFE_db" ++ toString n)
-    | .send p bs => LocalTypeR.send p (branchesFromDB ctx bs)
-    | .recv p bs => LocalTypeR.recv p (branchesFromDB ctx bs)
-    | .mu body =>
-        let fresh := NameContext.freshName ctx
-        LocalTypeR.mu fresh (body.fromDB (fresh :: ctx))
-
-  def branchesFromDB (ctx : NameContext) : List (String × LocalTypeDB) → List (String × LocalTypeR)
-    | [] => []
-    | (l, t) :: rest => (l, t.fromDB ctx) :: branchesFromDB ctx rest
-end
-
-lemma closed_DB_no_vars (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-    ∀ n, t ≠ .var n := by
-  intro n h_eq
-  subst h_eq
-  simp [LocalTypeDB.isClosed] at hclosed
-
-/-
-Induction principle for LocalTypeDB.
--/
-theorem LocalTypeDB.induction {P : LocalTypeDB → Prop}
-  (h_end : P LocalTypeDB.end)
-  (h_var : ∀ n, P (LocalTypeDB.var n))
-  (h_send : ∀ p bs, (∀ l t, (l, t) ∈ bs → P t) → P (LocalTypeDB.send p bs))
-  (h_recv : ∀ p bs, (∀ l t, (l, t) ∈ bs → P t) → P (LocalTypeDB.recv p bs))
-  (h_mu : ∀ body, P body → P (LocalTypeDB.mu body)) :
-  ∀ t, P t := by
-    -- We'll use induction on the structure of `t`.
-    intro t
-    induction' t using LocalTypeDB.recOn with t ih;
-    exact h_end;
-    convert h_var t using 1;
-    exact h_send _ _ ( by tauto );
-    exact h_recv _ _ ( by tauto );
-    exact h_mu _ ‹_›;
-    all_goals norm_num [ Prod.ext_iff ];
-    exact fun l t h => h.elim ( fun h => h.2.symm ▸ by assumption ) fun h => by solve_by_elim;
-    assumption
-
-/-
-Helper lemma: branchesFromDB? matches branchesFromDB if all elements satisfy the property.
--/
-lemma branchesFromDB?_eq_branchesFromDB (bs : List (String × LocalTypeDB)) (ctx : NameContext)
-  (h_elem : ∀ l t, (l, t) ∈ bs → t.isClosed = true → t.fromDB? ctx = some (t.fromDB ctx))
-  (h_closed : isClosedListDB bs = true) :
-  branchesFromDB? ctx bs = some (branchesFromDB ctx bs) := by
+  theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
+      (hclosed : LocalTypeDB.isClosedAtBranches ctx.length bs = true) :
+      branchesFromDB? ctx bs = some (branchesFromDB ctx bs) := by
     induction bs with
     | nil => rfl
     | cons hd tl ih =>
-      obtain ⟨l, t⟩ := hd
-      have h_t_closed : t.isClosed = true := by
-        unfold isClosedListDB at h_closed; simp at h_closed; exact h_closed.1
-      have h_tl_closed : isClosedListDB tl = true := by
-        unfold isClosedListDB at h_closed; simp at h_closed; exact h_closed.2
-      have h_tl_elem : ∀ l' t', (l', t') ∈ tl → t'.isClosed = true → t'.fromDB? ctx = some (t'.fromDB ctx) :=
-        fun l' t' hlt' ht' => h_elem l' t' (List.mem_cons_of_mem _ hlt') ht'
-      simp only [branchesFromDB?, branchesFromDB]
-      rw [h_elem l t (List.mem_cons_self _ _) h_t_closed]
-      rw [ih h_tl_elem h_tl_closed]
+        obtain ⟨l, t⟩ := hd
+        have h_t_closed : t.isClosedAt ctx.length = true := by
+          simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+        have h_tl_closed : LocalTypeDB.isClosedAtBranches ctx.length tl = true := by
+          simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+        have ht := fromDB?_eq_fromDB_all_ctx t ctx h_t_closed
+        have htl := ih h_tl_closed
+        simp [LocalTypeDB.branchesFromDB?, LocalTypeDB.branchesFromDB, ht, htl]
+end
 
-/-
-Generalized version of fromDB?_eq_fromDB_closed that holds for any context.
--/
-theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) :
-    ∀ (ctx : NameContext), t.isClosed = true → t.fromDB? ctx = some (t.fromDB ctx) := by
-  induction t using LocalTypeDB.induction with
-  | h_end =>
-    intros ctx hclosed
-    rfl
-  | h_var n =>
-    intros ctx hclosed
-    simp [LocalTypeDB.isClosed] at hclosed
-  | h_send p bs ih =>
-    intros ctx hclosed
-    simp [LocalTypeDB.isClosed] at hclosed
-    simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB]
-    have h_branches : branchesFromDB? ctx bs = some (branchesFromDB ctx bs) := by
-      apply branchesFromDB?_eq_branchesFromDB
-      · intros l t h_mem h_t_closed
-        apply ih l t h_mem ctx h_t_closed
-      · exact hclosed
-    simp [h_branches]
-  | h_recv p bs ih =>
-    intros ctx hclosed
-    simp [LocalTypeDB.isClosed] at hclosed
-    simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB]
-    have h_branches : branchesFromDB? ctx bs = some (branchesFromDB ctx bs) := by
-      apply branchesFromDB?_eq_branchesFromDB
-      · intros l t h_mem h_t_closed
-        apply ih l t h_mem ctx h_t_closed
-      · exact hclosed
-    simp [h_branches]
-  | h_mu body ih =>
-    intros ctx hclosed
-    simp [LocalTypeDB.isClosed] at hclosed
-    simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB]
-    have h_body := ih (NameContext.freshName ctx :: ctx) hclosed
-    simp [h_body]
-
-/-
-Axiom 1.1: Safe Conversion Succeeds for Closed Terms.
--/
 theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
     t.fromDB? [] = some (t.fromDB []) := by
-  apply fromDB?_eq_fromDB_all_ctx
-  exact hclosed
+  have hclosed' : t.isClosedAt 0 = true := by
+    simpa [LocalTypeDB.isClosed] using hclosed
+  simpa using (fromDB?_eq_fromDB_all_ctx t [] hclosed')
 
-/-
-Helper lemma: branchesFromDB preserves closedness.
--/
-lemma branchesFromDB_closed (bs : List (String × LocalTypeDB)) (ctx : NameContext)
-  (h_elem : ∀ l t, (l, t) ∈ bs → t.isClosed = true → (t.fromDB ctx).isClosed = true)
-  (h_closed : isClosedListDB bs = true) :
-  isClosedList (branchesFromDB ctx bs) = true := by
-    have h_reward : ∀ (bs : List (String × LocalTypeDB)) (ctx : NameContext),
-      (isClosedListDB bs = true) → (∀ (l : String) (t : LocalTypeDB), (l, t) ∈ bs → t.isClosed = true → (t.fromDB ctx).isClosed = true) →
-      isClosedList (branchesFromDB ctx bs) = true := by
-        intros bs ctx h_closed h_elem; induction' bs with l t bs ih generalizing ctx; aesop;
-        simp +zetaDelta at *;
-        cases h : l.2.isClosed <;> simp_all +decide [ isClosedListDB ];
-        exact Bool.and_eq_true_iff.mpr ⟨ h_elem _ _ ( Or.inl rfl ) h, bs _ fun l t ht ht' => h_elem _ _ ( Or.inr ht ) ht' ⟩;
-    exact h_reward bs ctx h_closed h_elem
+/-! ## fromDB closedness -/
 
-/-
-Axiom 1.2: Closed DB Terms Convert to Closed Named Terms.
--/
+lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
+    (hclosed : t.isClosedAt ctx.length = true) :
+    ∀ v, v ∈ (t.fromDB ctx).freeVars → v ∈ ctx := by
+  intro v hv
+  induction t generalizing ctx with
+  | end => simp [LocalTypeR.freeVars] at hv
+  | var n =>
+      have hlt : n < ctx.length := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      obtain ⟨name, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
+      simp [LocalTypeDB.fromDB, NameContext.get?, hget, LocalTypeR.freeVars] at hv
+      subst hv
+      exact get?_mem hget
+  | send p bs ih =>
+      have hclosed' : LocalTypeDB.isClosedAtBranches ctx.length bs = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      -- analyze membership in concatenated freeVarsOfBranches
+      induction bs generalizing hv with
+      | nil => cases hv
+      | cons hd tl ihb =>
+          obtain ⟨l, t⟩ := hd
+          simp [LocalTypeDB.fromDB, LocalTypeR.freeVars, LocalTypeR.freeVarsOfBranches] at hv
+          rcases hv with hv | hv
+          · -- from head branch
+            have h_t_closed : t.isClosedAt ctx.length = true := by
+              simpa [LocalTypeDB.isClosedAtBranches] using hclosed'
+            exact ih t ctx h_t_closed _ hv
+          · -- from tail branches
+            have h_tl_closed : LocalTypeDB.isClosedAtBranches ctx.length tl = true := by
+              simpa [LocalTypeDB.isClosedAtBranches] using hclosed'
+            exact ihb h_tl_closed hv
+  | recv p bs ih =>
+      have hclosed' : LocalTypeDB.isClosedAtBranches ctx.length bs = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      induction bs generalizing hv with
+      | nil => cases hv
+      | cons hd tl ihb =>
+          obtain ⟨l, t⟩ := hd
+          simp [LocalTypeDB.fromDB, LocalTypeR.freeVars, LocalTypeR.freeVarsOfBranches] at hv
+          rcases hv with hv | hv
+          · have h_t_closed : t.isClosedAt ctx.length = true := by
+              simpa [LocalTypeDB.isClosedAtBranches] using hclosed'
+            exact ih t ctx h_t_closed _ hv
+          · have h_tl_closed : LocalTypeDB.isClosedAtBranches ctx.length tl = true := by
+              simpa [LocalTypeDB.isClosedAtBranches] using hclosed'
+            exact ihb h_tl_closed hv
+  | mu body ih =>
+      have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      -- freeVars of mu filters out the binder
+      simp [LocalTypeDB.fromDB, LocalTypeR.freeVars] at hv
+      rcases hv with ⟨hv, hne⟩
+      have hsub := ih body (NameContext.freshName ctx :: ctx) hclosed' v hv
+      cases hsub with
+      | head =>
+          contradiction
+      | tail hmem =>
+          exact hmem
+
 theorem fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
     (t.fromDB []).isClosed = true := by
-      have h_fromDB_closed : ∀ (t : LocalTypeDB) (ctx : NameContext), t.isClosed = true → (LocalTypeDB.fromDB ctx t).isClosed = true := by
-        intro t
-        induction t using LocalTypeDB.induction with
-        | h_end => intros; rfl
-        | h_var n => intros ctx ht; simp [LocalTypeDB.isClosed] at ht
-        | h_send p bs ih =>
-          intros ctx ht
-          apply branchesFromDB_closed
-          · simp [LocalTypeDB.isClosed] at ht; exact ht
-          · exact fun l t' hlt' ht' => ih l t' hlt' ctx ht'
-        | h_recv p bs ih =>
-          intros ctx ht
-          apply branchesFromDB_closed
-          · simp [LocalTypeDB.isClosed] at ht; exact ht
-          · exact fun l t' hlt' ht' => ih l t' hlt' ctx ht'
-        | h_mu body ih =>
-          intros ctx ht
-          simp [LocalTypeDB.fromDB, LocalTypeR.isClosed]
-          apply ih
-          simp [LocalTypeDB.isClosed] at ht; exact ht
-      exact h_fromDB_closed t [] hclosed
+  have hclosed' : t.isClosedAt 0 = true := by
+    simpa [LocalTypeDB.isClosed] using hclosed
+  have hsub := freeVars_fromDB_subset_ctx t [] hclosed'
+  apply (List.isEmpty_eq_true _).2
+  intro v hv
+  have : v ∈ ([] : List String) := hsub v hv
+  simpa using this
 
-/-
-Induction principle for LocalTypeR.
--/
-theorem LocalTypeR.induction {P : LocalTypeR → Prop}
-  (h_end : P LocalTypeR.end)
-  (h_var : ∀ v, P (LocalTypeR.var v))
-  (h_send : ∀ p bs, (∀ l t, (l, t) ∈ bs → P t) → P (LocalTypeR.send p bs))
-  (h_recv : ∀ p bs, (∀ l t, (l, t) ∈ bs → P t) → P (LocalTypeR.recv p bs))
-  (h_mu : ∀ t body, P body → P (LocalTypeR.mu t body)) :
-  ∀ t, P t := by
-    intros t;
-    -- By definition of `sizeOf`, we know that if `sizeOf t` is finite, then `t` is a finite structure.
-    have h_finite : ∀ t : LocalTypeR, P t := by
-      intros t
-      induction' n : sizeOf t using Nat.strong_induction_on with n ih generalizing t;
-      rcases t with ( _ | _ | _ | _ | _ ) <;> simp_all +decide;
-      · exact h_send _ _ fun l t ht => ih _ ( by linarith [ show sizeOf t ≤ sizeOf ‹List ( String × LocalTypeR ) › from by
-                                                              have h_size_le : ∀ (bs : List (String × LocalTypeR)), ∀ (l : String) (t : LocalTypeR), (l, t) ∈ bs → sizeOf t ≤ sizeOf bs := by
-                                                                intros bs l t ht; induction' bs with bs ih generalizing l t; aesop;
-                                                                simp +zetaDelta at *;
-                                                                rcases ht with ( rfl | ht ) <;> simp +arith +decide [ * ];
-                                                                linarith [ ‹∀ l t, ( l, t ) ∈ ih → sizeOf t ≤ sizeOf ih› l t ht ];
-                                                              exact h_size_le _ _ _ ht ] ) _ rfl;
-      · exact h_recv _ _ fun l t ht => ih _ ( by linarith [ show sizeOf t ≤ sizeOf ‹List ( String × LocalTypeR ) › from by
-                                                              have h_size_le : ∀ (bs : List (String × LocalTypeR)), ∀ (l : String) (t : LocalTypeR), (l, t) ∈ bs → sizeOf t ≤ sizeOf bs := by
-                                                                intros bs l t ht; induction' bs with bs ih generalizing l t; aesop;
-                                                                simp +zetaDelta at *;
-                                                                rcases ht with ( rfl | ht ) <;> simp +arith +decide [ * ];
-                                                                linarith [ ‹∀ l t, ( l, t ) ∈ ih → sizeOf t ≤ sizeOf ih› l t ht ];
-                                                              exact h_size_le _ _ _ ht ] ) _ rfl;
-      · exact h_mu _ _ ( ih _ ( by linarith ) _ rfl );
-    exact h_finite t
+/-! ## toDB? succeeds for closed terms -/
 
-/-
-Helper lemma: branchesToDB? succeeds and produces closed list if input is closed.
--/
-lemma branchesToDB_closed_gen (bs : List (String × LocalTypeR)) (ctx : Context)
-  (h_closed : isClosedList bs = true)
-  (ih : ∀ l t, (l, t) ∈ bs → ∀ ctx, t.isClosed = true → ∃ db, t.toDB? ctx = some db ∧ db.isClosed = true) :
-  ∃ dbs, branchesToDB? ctx bs = some dbs ∧ isClosedListDB dbs = true := by
-    revert h_closed;
-    -- We'll use induction on the list `bs`.
-    intro h_closed
-    induction' bs with bs ih bs ih;
-    · exists [ ];
-    · revert h_closed;
-      intro h_closed
-      obtain ⟨db, hdb⟩ : ∃ db, LocalTypeR.toDB? ctx (Prod.snd ‹_›) = some db ∧ db.isClosed = true := by
-        simp_all +decide [ isClosedList ];
-        exact ih _ _ ( Or.inl rfl ) _ h_closed.1;
-      obtain ⟨dbs, hdbs⟩ : ∃ dbs, branchesToDB? ctx ‹_› = some dbs ∧ isClosedListDB dbs = true := by
-        apply_assumption;
-        · exact fun l t ht ctx ht' => ih l t ( List.mem_cons_of_mem _ ht ) ctx ht';
-        · simp_all +decide [ isClosedList ];
-      -- By definition of branchesToDB?, if the first element's toDB? is some db and the rest's branchesToDB? is some dbs, then the branchesToDB? of the cons is some (l, db) :: dbs.
-      have h_cons : branchesToDB? ctx (‹String × LocalTypeR› :: ‹List (String × LocalTypeR)›) = some ((‹String × LocalTypeR›.1, db) :: dbs) := by
-        rw [ branchesToDB? ] ; aesop;
-      exact ⟨ _, h_cons, by unfold isClosedListDB; aesop ⟩
+mutual
+  theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
+      (hcov : Context.Covers ctx t) :
+      ∃ db, t.toDB? ctx = some db ∧ db.isClosedAt ctx.length = true := by
+    cases t with
+    | end =>
+        exact ⟨LocalTypeDB.end, rfl, by simp [LocalTypeDB.isClosedAt]⟩
+    | var v =>
+        have hv : v ∈ ctx := by
+          apply hcov
+          simp [LocalTypeR.freeVars]
+        obtain ⟨i, hidx⟩ := indexOf_eq_some_of_mem (ctx := ctx) (v := v) hv
+        refine ⟨LocalTypeDB.var i, ?_, ?_⟩
+        · simp [LocalTypeR.toDB?, hidx]
+        · have hlt := indexOf_lt_length (ctx := ctx) (v := v) (i := i) hidx
+          simp [LocalTypeDB.isClosedAt, hlt]
+    | send p bs =>
+        have hcov' : ∀ l t, (l, t) ∈ bs → Context.Covers ctx t := by
+          intro l t hmem v hv
+          apply hcov v
+          -- freeVars of branch are in freeVarsOfBranches
+          have : v ∈ LocalTypeR.freeVarsOfBranches bs := by
+            -- membership from branch
+            induction bs with
+            | nil => cases hmem
+            | cons hd tl ih =>
+                cases hmem with
+                | head =>
+                    simp [LocalTypeR.freeVarsOfBranches, hv]
+                | tail hmem' =>
+                    have h' := ih hmem'
+                    simp [LocalTypeR.freeVarsOfBranches, h', hv]
+          simpa [LocalTypeR.freeVars] using this
+        obtain ⟨dbs, hdbs, hclosed⟩ :=
+          branchesToDB?_some_of_covers bs ctx hcov'
+        refine ⟨LocalTypeDB.send p dbs, ?_, ?_⟩
+        · simp [LocalTypeR.toDB?, hdbs]
+        · simpa [LocalTypeDB.isClosedAt]
+    | recv p bs =>
+        have hcov' : ∀ l t, (l, t) ∈ bs → Context.Covers ctx t := by
+          intro l t hmem v hv
+          apply hcov v
+          have : v ∈ LocalTypeR.freeVarsOfBranches bs := by
+            induction bs with
+            | nil => cases hmem
+            | cons hd tl ih =>
+                cases hmem with
+                | head =>
+                    simp [LocalTypeR.freeVarsOfBranches, hv]
+                | tail hmem' =>
+                    have h' := ih hmem'
+                    simp [LocalTypeR.freeVarsOfBranches, h', hv]
+          simpa [LocalTypeR.freeVars] using this
+        obtain ⟨dbs, hdbs, hclosed⟩ :=
+          branchesToDB?_some_of_covers bs ctx hcov'
+        refine ⟨LocalTypeDB.recv p dbs, ?_, ?_⟩
+        · simp [LocalTypeR.toDB?, hdbs]
+        · simpa [LocalTypeDB.isClosedAt]
+    | mu t body =>
+        have hcov' : Context.Covers (t :: ctx) body := by
+          intro v hv
+          by_cases hvt : v = t
+          · simp [hvt]
+          · -- free vars of mu body are filtered, so v in body.freeVars implies v in ctx
+            have hmem : v ∈ body.freeVars := hv
+            have : v ∈ ctx := by
+              -- v is free in mu, so must be free in body and not equal t; use hcov
+              have : v ∈ (LocalTypeR.mu t body).freeVars := by
+                simp [LocalTypeR.freeVars, hmem, hvt]
+              exact hcov v this
+            simp [hvt, this]
+        obtain ⟨db, hdb, hclosed⟩ := toDB?_some_of_covers body (t :: ctx) hcov'
+        refine ⟨LocalTypeDB.mu db, ?_, ?_⟩
+        · simp [LocalTypeR.toDB?, hdb]
+        · simpa [LocalTypeDB.isClosedAt] using hclosed
 
-/-
-Lemma: toDB? is independent of context for closed terms.
--/
-theorem toDB?_eq_of_closed (t : LocalTypeR) (ctx1 ctx2 : Context)
-  (h_closed : t.isClosed = true) :
-  t.toDB? ctx1 = t.toDB? ctx2 := by
-    induction' t using LocalTypeR.induction with _ _ _ _ _ _ ih generalizing ctx1 ctx2;
-    · rfl;
-    · cases h_closed;
-    · -- By the induction hypothesis, each element in the list of branches is closed. Therefore, for any context ctx1 and ctx2, the toDB? of the element in the list should be the same.
-      have h_ind : ∀ l t, (l, t) ∈ ‹List (String × LocalTypeR)› → t.isClosed = true := by
-        have h_ind : isClosedList ‹List (String × LocalTypeR)› = true → ∀ l t, (l, t) ∈ ‹List (String × LocalTypeR)› → t.isClosed = true := by
-          intros h_closed l t ht;
-          have h_ind : ∀ (bs : List (String × LocalTypeR)), isClosedList bs = true → ∀ l t, (l, t) ∈ bs → t.isClosed = true := by
-            intros bs h_closed l t ht; induction' bs with l t bs ih generalizing l t; aesop;
-            rw [ isClosedList ] at h_closed ; aesop;
-          exact h_ind _ h_closed _ _ ht;
-        exact h_ind h_closed;
-      simp_all +decide [ LocalTypeR.toDB? ];
-      have h_ind : ∀ l t, (l, t) ∈ ‹List (String × LocalTypeR)› → ∀ ctx1 ctx2, LocalTypeR.toDB? ctx1 t = LocalTypeR.toDB? ctx2 t := by
-        aesop;
-      have h_ind : ∀ bs : List (String × LocalTypeR), (∀ l t, (l, t) ∈ bs → ∀ ctx1 ctx2, LocalTypeR.toDB? ctx1 t = LocalTypeR.toDB? ctx2 t) → ∀ ctx1 ctx2, branchesToDB? ctx1 bs = branchesToDB? ctx2 bs := by
-        intros bs h_ind ctx1 ctx2; induction' bs with l t bs ih generalizing ctx1 ctx2; aesop;
-        simp_all +decide [ branchesToDB? ];
-        rw [ h_ind _ _ ( Or.inl rfl ) ctx1 ctx2, bs fun l t ht => h_ind _ _ ( Or.inr ht ) ];
-      rw [ h_ind _ ‹_› ];
-    · -- Apply the induction hypothesis to each term in the branches.
-      have h_ind : ∀ l t, (l, t) ∈ ‹List (String × LocalTypeR)› → t.isClosed = true := by
-        intros l t hlt;
-        have h_ind : ∀ {bs : List (String × LocalTypeR)}, isClosedList bs = true → ∀ l t, (l, t) ∈ bs → t.isClosed = true := by
-          intros bs hbs l t hlt; induction' bs with l t bs ih generalizing l t; aesop;
-          simp_all +decide [ isClosedList ];
-          grind;
-        exact h_ind h_closed l t hlt;
-      have h_ind : branchesToDB? ctx1 ‹List (String × LocalTypeR)› = branchesToDB? ctx2 ‹List (String × LocalTypeR)› := by
-        -- Apply the induction hypothesis to each term in the branches, using the fact that they are closed.
-        have h_ind : ∀ l t, (l, t) ∈ ‹List (String × LocalTypeR)› → t.toDB? ctx1 = t.toDB? ctx2 := by
-          aesop;
-        have h_branches : ∀ (bs : List (String × LocalTypeR)), (∀ l t, (l, t) ∈ bs → LocalTypeR.toDB? ctx1 t = LocalTypeR.toDB? ctx2 t) → branchesToDB? ctx1 bs = branchesToDB? ctx2 bs := by
-          intros bs h_ind; induction' bs with l t bs ih generalizing ctx1 ctx2; aesop;
-          simp_all +decide [ branchesToDB? ];
-          rw [ h_ind _ _ ( Or.inl rfl ), bs ctx1 ctx2 ( by tauto ) ( by intros l t ht; exact h_ind l t ( Or.inr ht ) ) ];
-        exact h_branches _ h_ind;
-      rw [ LocalTypeR.toDB? ] at * ; aesop;
-    · -- By definition of `toDB?`, we know that `body.toDB? (t :: ctx1) = body.toDB? (t :: ctx2)`.
-      have h_body : ‹LocalTypeR›.toDB? (‹String› :: ctx1) = ‹LocalTypeR›.toDB? (‹String› :: ctx2) := by
-        aesop;
-      -- Since the body's toDB? is the same for both contexts, substituting t into the body with repl should also be the same.
-      simp [LocalTypeR.toDB?, h_body]
-
-/-
-Helper lemma: branchesToDB? succeeds for closed lists and produces closed results.
--/
-lemma branchesToDB_exists_of_closed (bs : List (String × LocalTypeR)) (ctx : Context)
-  (h_closed : isClosedList bs = true)
-  (h_ind : ∀ l t, (l, t) ∈ bs → t.isClosed = true → ∃ db : LocalTypeDB, t.toDB? ctx = some db ∧ db.isClosed = true) :
-  ∃ dbs : List (String × LocalTypeDB), branchesToDB? ctx bs = some dbs ∧ isClosedListDB dbs = true := by
+  theorem branchesToDB?_some_of_covers (bs : List (Label × LocalTypeR)) (ctx : Context)
+      (hcov : ∀ l t, (l, t) ∈ bs → Context.Covers ctx t) :
+      ∃ dbs, LocalTypeR.branchesToDB? ctx bs = some dbs ∧
+            LocalTypeDB.isClosedAtBranches ctx.length dbs = true := by
     induction bs with
     | nil => exact ⟨[], rfl, rfl⟩
     | cons hd tl ih =>
-      obtain ⟨l, t⟩ := hd
-      have h_t_closed : t.isClosed = true := by
-        unfold isClosedList at h_closed
-        simp at h_closed
-        exact h_closed.1
-      have h_tl_closed : isClosedList tl = true := by
-        unfold isClosedList at h_closed
-        simp at h_closed
-        exact h_closed.2
-      obtain ⟨db, h_db, h_db_closed⟩ := h_ind l t (List.mem_cons_self _ _) h_t_closed
-      obtain ⟨dbs, h_dbs, h_dbs_closed⟩ := ih h_tl_closed (fun l' t' hlt' ht' => h_ind l' t' (List.mem_cons_of_mem _ hlt') ht')
-      refine ⟨(l, db) :: dbs, ?_, ?_⟩
-      · simp only [branchesToDB?, h_db, h_dbs]
-      · unfold isClosedListDB
-        simp [h_db_closed, h_dbs_closed]
-
-/-
-Axiom 1.3: Closed Named Terms Convert to Closed DB Terms.
--/
-theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
-    ∃ db, t.toDB? [] = some db ∧ db.isClosed = true := by
-      -- Apply the induction hypothesis to each subterm of `t`.
-      have h_ind : ∀ (t : LocalTypeR) (ctx : Context), t.isClosed = true → ∃ db : LocalTypeDB, t.toDB? ctx = some db ∧ db.isClosed = true := by
-        intro t
-        induction t using LocalTypeR.induction with
-        | h_end => intros; exact ⟨LocalTypeDB.end, rfl, rfl⟩
-        | h_var v => intros ctx ht_closed; simp [LocalTypeR.isClosed] at ht_closed
-        | h_send p bs ih =>
-          intros ctx ht_closed
-          have h_bs_closed : isClosedList bs = true := by
-            simp [LocalTypeR.isClosed] at ht_closed; exact ht_closed
-          obtain ⟨dbs, hdbs, hdbs_closed⟩ := branchesToDB_exists_of_closed bs ctx h_bs_closed (fun l t hlt ht => ih l t hlt ctx ht)
-          exact ⟨LocalTypeDB.send p dbs, by simp [LocalTypeR.toDB?, hdbs], hdbs_closed⟩
-        | h_recv p bs ih =>
-          intros ctx ht_closed
-          have h_bs_closed : isClosedList bs = true := by
-            simp [LocalTypeR.isClosed] at ht_closed; exact ht_closed
-          obtain ⟨dbs, hdbs, hdbs_closed⟩ := branchesToDB_exists_of_closed bs ctx h_bs_closed (fun l t hlt ht => ih l t hlt ctx ht)
-          exact ⟨LocalTypeDB.recv p dbs, by simp [LocalTypeR.toDB?, hdbs], hdbs_closed⟩
-        | h_mu t body ih =>
-          intros ctx ht_closed
-          have h_body_closed : body.isClosed = true := by
-            simp [LocalTypeR.isClosed] at ht_closed; exact ht_closed
-          obtain ⟨db, h_db, h_closed_db⟩ := ih (t :: ctx) h_body_closed
-          exact ⟨LocalTypeDB.mu db, by simp [LocalTypeR.toDB?, h_db], h_closed_db⟩
-      exact h_ind t [] hclosed
-
-/-
-Lemma: toDB? is independent of context for closed terms.
--/
-theorem toDB?_eq_of_closed_v2 (t : LocalTypeR) (ctx1 ctx2 : Context)
-  (h_closed : t.isClosed = true) :
-  t.toDB? ctx1 = t.toDB? ctx2 := by
-    induction t using LocalTypeR.induction generalizing ctx1 ctx2 with
-    | h_end => rfl
-    | h_var v => simp [LocalTypeR.isClosed] at h_closed
-    | h_send p bs ih =>
-      simp only [LocalTypeR.toDB?]
-      have h_bs_closed : isClosedList bs = true := by simp [LocalTypeR.isClosed] at h_closed; exact h_closed
-      rw [branchesToDB_ctx_independent bs ctx1 ctx2 h_bs_closed ih]
-    | h_recv p bs ih =>
-      simp only [LocalTypeR.toDB?]
-      have h_bs_closed : isClosedList bs = true := by simp [LocalTypeR.isClosed] at h_closed; exact h_closed
-      rw [branchesToDB_ctx_independent bs ctx1 ctx2 h_bs_closed ih]
-    | h_mu t body ih =>
-      simp only [LocalTypeR.toDB?]
-      have h_body_closed : body.isClosed = true := by simp [LocalTypeR.isClosed] at h_closed; exact h_closed
-      rw [ih (t :: ctx1) (t :: ctx2) h_body_closed]
-
-/-
-Lemma: toDB? is independent of context for closed terms.
--/
-theorem toDB_ctx_independent_of_closed (t : LocalTypeR) (ctx1 ctx2 : Context)
-  (h_closed : t.isClosed = true) :
-  t.toDB? ctx1 = t.toDB? ctx2 := by
-    exact toDB?_eq_of_closed_v2 t ctx1 ctx2 h_closed
-
-/-
-Helper lemma for context independence of branchesToDB?.
--/
-lemma branchesToDB_ctx_independent (bs : List (String × LocalTypeR)) (ctx1 ctx2 : Context)
-  (h_closed : isClosedList bs = true)
-  (h_ind : ∀ l t, (l, t) ∈ bs → ∀ c1 c2, t.isClosed = true → t.toDB? c1 = t.toDB? c2) :
-  branchesToDB? ctx1 bs = branchesToDB? ctx2 bs := by
-    induction' bs with l bs ih generalizing ctx1 ctx2;
-    · rfl;
-    · norm_num +zetaDelta at *;
-      have h_closed_l : l.2.isClosed = true := by
-        unfold isClosedList at h_closed; simp_all;
-      have h_closed_bs : isClosedList bs = true := by
-        unfold isClosedList at h_closed; simp_all;
-      rw [ branchesToDB? ];
-      rw [ branchesToDB? ];
-      rw [ h_ind _ _ ( Or.inl rfl ) _ _ h_closed_l, ih _ _ h_closed_bs ( fun l t ht c1 c2 h => h_ind _ _ ( Or.inr ht ) _ _ h ) ]
-
-#check String
-
-#print String
-#print String.append
-
-/-
-Helper lemmas for String cancellation.
--/
-lemma String_data_append (s1 s2 : String) : (s1 ++ s2).data = s1.data ++ s2.data := by
-  cases s1
-  cases s2
-  rfl
-
-theorem String_append_left_cancel (p s1 s2 : String) : p ++ s1 = p ++ s2 → s1 = s2 := by
-  intro h
-  have h_data : (p ++ s1).data = (p ++ s2).data := congrArg String.data h
-  rw [String_data_append] at h_data
-  rw [String_data_append] at h_data
-  have h_cancel := List.append_cancel_left h_data
-  cases s1
-  cases s2
-  simp at h_cancel
-  simp [h_cancel]
-
-#print Nat.repr
-
-#print Nat.toDigits
-#print List.asString
-
-#print Nat.digitChar
-#check Nat.digitChar
-
-#check Nat.digits
-#print Nat.digits
-
-#check String.toNat!
-#check String.toNat?
-
-#check Nat.digits.injective
-
-#check List.asString_inj
-
-/-
-toDigits 10 n is "0" iff n is 0.
--/
-lemma toDigits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ n = 0 := by
-  constructor
-  · intro h
-    cases n
-    · rfl
-    · rename_i n'
-      -- toDigits 10 (succ n') is not ['0']
-      -- We can use the fact that the length is at least 1 and the first char is a digit of (succ n').
-      -- Or just that toDigits 10 (succ n') corresponds to digits which is not empty and not [0].
-      simp_all +arith +decide [ Nat.toDigits ];
-      cases n' <;> simp_all +arith +decide [ Nat.toDigitsCore ];
-      split_ifs at h <;> norm_num at h;
-      · interval_cases ( ‹_› : ℕ ) <;> contradiction;
-      · cases h.2;
-      · -- The length of the list produced by `Nat.toDigitsCore` is at least 3, which contradicts `h`.
-        have h_length : List.length (Nat.toDigitsCore 10 ‹_› ((‹_› + 2) / 10 / 10 / 10) [((‹_› + 2) / 10 / 10 % 10).digitChar, ((‹_› + 2) / 10 % 10).digitChar, ((‹_› + 2) % 10).digitChar]) ≥ 3 := by
-          have h_length : ∀ (n : ℕ) (m : ℕ) (l : List Char), List.length (Nat.toDigitsCore 10 n m l) ≥ List.length l := by
-            intros n m l; induction' n with n ih generalizing m l <;> simp +arith +decide [ Nat.toDigitsCore ] ;
-            split_ifs <;> simp_all +arith +decide;
-            exact le_trans ( by simp +arith +decide ) ( ih _ _ );
-          exact h_length _ _ _;
-        aesop
-  · intro h
-    subst h
-    rfl
-
-/-
-Injectivity of digitChar for digits < 10.
--/
-lemma digitChar_inj_of_lt_10 {n m : Nat} (hn : n < 10) (hm : m < 10) :
-  Nat.digitChar n = Nat.digitChar m → n = m := by
-  intro h
-  -- digitChar is defined by cases
-  -- Since n, m < 10, we can just check all cases
-  revert h
-  -- This can be done by `decide` or `interval_cases`
-  interval_cases n <;> interval_cases m <;> trivial
-
-/-
-Relation between toDigits and digits.
--/
-lemma toDigits_eq_reverse_digits_map (n : Nat) (h : n > 0) :
-  Nat.toDigits 10 n = (Nat.digits 10 n).reverse.map Nat.digitChar := by
-  -- This requires relating toDigitsCore to digits
-  -- toDigits 10 n = toDigitsCore 10 (n+1) n []
-  -- We need a generalized lemma for toDigitsCore
-  have h_toDigits_digits : ∀ (n : ℕ), n > 0 → Nat.toDigits 10 n = List.map Nat.digitChar (List.reverse (Nat.digits 10 n)) := by
-    intro n hn_pos; induction' n using Nat.strongRecOn with n ih; rcases n with ( _ | _ | _ | _ | _ | _ | _ | _ | _ | _ | _ | n ) <;> simp +arith +decide [ Nat.digits_add ] at *;
-    have := ih ( ( n + 11 ) / 10 ) ( by omega ) ( Nat.div_pos ( by omega ) ( by decide ) ) ; simp_all +decide [ Nat.toDigits ];
-    rw [ Nat.toDigitsCore ];
-    rw [ show Nat.toDigitsCore 10 ( n + 11 ) ( ( n + 11 ) / 10 ) [ ( ( n + 11 ) % 10 ).digitChar ] = List.append ( Nat.toDigitsCore 10 ( ( n + 11 ) / 10 + 1 ) ( ( n + 11 ) / 10 ) [] ) [ ( ( n + 11 ) % 10 ).digitChar ] from ?_ ];
-    · aesop;
-    · have h_append : ∀ (n : ℕ) (m : ℕ) (acc : List Char), n > m → Nat.toDigitsCore 10 n m acc = List.append (Nat.toDigitsCore 10 (m + 1) m []) acc := by
-        intros n m acc hnm; induction' n using Nat.strong_induction_on with n ih generalizing m acc; rcases n with ( _ | _ | n ) <;> simp_all +decide [ Nat.toDigitsCore ] ;
-        grind;
-      exact h_append _ _ _ ( Nat.div_lt_of_lt_mul <| by linarith );
-  exact h_toDigits_digits n h
-
-/-
-toDigits 10 n is not "0" for positive n.
--/
-lemma toDigits_ne_zero_of_pos (n : Nat) (h : n > 0) : Nat.toDigits 10 n ≠ ['0'] := by
-  have := toDigits_eq_singleton_zero_iff n; aesop;
-
-/-
-Helper lemma for Nat_toString_inj.
--/
-lemma digits_10_map_digitChar_inj {l1 l2 : List Nat}
-  (h1 : ∀ d ∈ l1, d < 10) (h2 : ∀ d ∈ l2, d < 10)
-  (h_eq : l1.map Nat.digitChar = l2.map Nat.digitChar) :
-  l1 = l2 := by
-  induction l1 generalizing l2
-  case nil =>
-    cases l2
-    case nil => rfl
-    case cons => contradiction
-  case cons head tail ih =>
-    cases l2
-    case nil => contradiction
-    case cons head2 tail2 =>
-      simp at h_eq
-      have h_head : head = head2 := by
-        apply digitChar_inj_of_lt_10
-        · apply h1; simp
-        · apply h2; simp
-        · exact h_eq.1
-      subst h_head
-      congr
-      apply ih
-      · intros d hd; apply h1; simp [hd]
-      · intros d hd; apply h2; simp [hd]
-      · exact h_eq.2
-
-/-
-Injectivity of Nat.toString.
--/
-theorem Nat_toString_inj (n m : Nat) : toString n = toString m → n = m := by
-  -- We split into cases based on whether `n` and `m` are zero or positive.
-  by_cases h0 : n = 0 ∨ m = 0;
-  · cases h0 <;> simp_all +decide [ String.ext_iff ];
-    · intro h; cases m <;> simp_all +decide [ Nat.toDigits ]; apply_rules [ toDigits_ne_zero_of_pos ]; omega;
-    · cases n <;> simp_all +decide [ Nat.toDigits ];
-      apply_rules [ toDigits_ne_zero_of_pos ] ; norm_num;
-  · -- Since `n` and `m` are positive, we can use the fact that `toString` is injective on positive integers.
-    have h_inj_pos : ∀ {n m : ℕ}, 0 < n → 0 < m → toString n = toString m → n = m := by
-      intros n m hn hm h_eq
-      have h_digits : Nat.digits 10 n = Nat.digits 10 m := by
-        -- Since `toString n = toString m`, their underlying lists of characters must be equal.
-        have h_digits_eq : (Nat.digits 10 n).reverse.map Nat.digitChar = (Nat.digits 10 m).reverse.map Nat.digitChar := by
-          have h_digits_eq : Nat.toDigits 10 n = Nat.toDigits 10 m := by
-            simp only [Nat.repr_eq_toDigits, repr] at h_eq; exact h_eq;
-          rw [ toDigits_eq_reverse_digits_map n hn, toDigits_eq_reverse_digits_map m hm ] at h_digits_eq ; aesop;
-        have h_digits_eq : (Nat.digits 10 n).reverse = (Nat.digits 10 m).reverse := by
-          have h_digits_eq : ∀ {l1 l2 : List Nat}, (∀ d ∈ l1, d < 10) → (∀ d ∈ l2, d < 10) → List.map Nat.digitChar l1 = List.map Nat.digitChar l2 → l1 = l2 := by
-            intros l1 l2 hl1 hl2 h_eq; exact (by
-            exact digits_10_map_digitChar_inj hl1 hl2 h_eq);
-          exact h_digits_eq ( fun d hd => Nat.digits_lt_base' <| List.mem_reverse.mp hd ) ( fun d hd => Nat.digits_lt_base' <| List.mem_reverse.mp hd ) ‹_›;
-        simpa using congr_arg List.reverse h_digits_eq;
-      rw [ ← Nat.ofDigits_digits 10 n, ← Nat.ofDigits_digits 10 m, h_digits ];
-    exact h_inj_pos ( Nat.pos_of_ne_zero ( mt Or.inl h0 ) ) ( Nat.pos_of_ne_zero ( mt Or.inr h0 ) )
-
-/-
-Definition of GeneratedContext and proof of elements property.
--/
-inductive GeneratedContext : NameContext → Prop where
-  | nil : GeneratedContext []
-  | cons {ctx} : GeneratedContext ctx → GeneratedContext (NameContext.freshName ctx :: ctx)
-
-theorem generated_elements (ctx : NameContext) (h : GeneratedContext ctx) :
-    ∀ s, s ∈ ctx → ∃ n < ctx.length, s = "_db" ++ toString n := by
-      -- We proceed by induction on the `GeneratedContext` hypothesis.
-      induction' h with r ctx h_ind h_gen
-      generalize_proofs at *;
-      · aesop;
-      · simp +zetaDelta at *;
-        exact ⟨ ⟨ r.length, Nat.lt_succ_self _, rfl ⟩, fun s hs => by obtain ⟨ n, hn, rfl ⟩ := h_ind s hs; exact ⟨ n, Nat.lt_succ_of_lt hn, rfl ⟩ ⟩
-
-/-
-freshName is not in a GeneratedContext.
--/
-theorem fresh_not_in_generated (ctx : NameContext) (h : GeneratedContext ctx) :
-    NameContext.freshName ctx ∉ ctx := by
-  intro h_in
-  obtain ⟨n, hn_lt, hn_eq⟩ := generated_elements ctx h _ h_in
-  simp [NameContext.freshName] at hn_eq
-  have h_len_eq : toString ctx.length = toString n := by
-    apply String_append_left_cancel _ _ _ hn_eq
-  have h_n_eq : ctx.length = n := Nat_toString_inj _ _ h_len_eq
-  linarith
-
-/-
-GeneratedContext has no duplicates.
--/
-theorem generated_nodup (ctx : NameContext) (h : GeneratedContext ctx) :
-    ctx.Nodup := by
-  induction h with
-  | nil => apply List.nodup_nil
-  | cons h_ctx ih =>
-    apply List.nodup_cons.mpr
-    constructor
-    · apply fresh_not_in_generated _ h_ctx
-    · exact ih
-
-/-
-Definition of isClosedAt.
--/
-mutual
-  def LocalTypeDB.isClosedAt (k : Nat) : LocalTypeDB → Bool
-    | .end => true
-    | .var n => n < k
-    | .send _ bs => isClosedAtList k bs
-    | .recv _ bs => isClosedAtList k bs
-    | .mu body => body.isClosedAt (k + 1)
-
-  def isClosedAtList (k : Nat) : List (String × LocalTypeDB) → Bool
-    | [] => true
-    | (_, t) :: rest => t.isClosedAt k && isClosedAtList k rest
+        obtain ⟨l, t⟩ := hd
+        have hcov_t : Context.Covers ctx t := hcov l t (List.mem_cons_self _ _)
+        have hcov_tl : ∀ l t, (l, t) ∈ tl → Context.Covers ctx t :=
+          fun l t hmem => hcov l t (List.mem_cons_of_mem _ hmem)
+        obtain ⟨db, hdb, hclosed⟩ := toDB?_some_of_covers t ctx hcov_t
+        obtain ⟨dbs, hdbs, hclosedbs⟩ := ih hcov_tl
+        refine ⟨(l, db) :: dbs, ?_, ?_⟩
+        · simp [LocalTypeR.branchesToDB?, hdb, hdbs]
+        · simp [LocalTypeDB.isClosedAtBranches, hclosed, hclosedbs]
 end
 
-/-
-Round-trip property for context lookup.
--/
-lemma get_indexOf_roundtrip (ctx : NameContext) (i : Nat) (v : String)
-  (h_nodup : ctx.Nodup) (h_get : NameContext.get? ctx i = some v) :
-  Context.indexOf ctx v = some i := by
-  -- This relates get? (which is List.get?) and indexOf (which is List.findIdx?)
-  -- Standard list lemma
-  unfold Context.indexOf;
-  induction' ctx with v' ctx ih generalizing i <;> simp_all +decide [ List.get? ];
-  · cases h_get;
-  · rcases i with ( _ | i ) <;> simp_all +decide [ List.findIdx? ];
-    · simp_all +decide [ NameContext.get? ];
-      simp +decide [ List.findIdx?.go ];
-    · simp_all +decide [ List.findIdx?.go ];
-      split_ifs <;> simp_all +decide [ NameContext.get? ];
-      · exact h_nodup.1 ( by
-          have h_mem : ∀ {l : List String} {i : ℕ}, NameContext.get? l i = some v → v ∈ l := by
-            intros l i h_get_some; induction' l with v' l ih generalizing i <;> simp_all +decide [ NameContext.get? ] ;
-            cases i <;> simp_all +decide [ NameContext.get? ];
-            exact Or.inr ( ih h_get_some );
-          exact h_mem h_get );
-      · convert congr_arg ( fun x => Option.map ( fun x => x + 1 ) x ) ( ih i h_get ) using 1;
-        -- By definition of `List.findIdx?.go`, we can prove this by induction on the list.
-        have h_findIdx_go : ∀ (l : List String) (p : String → Bool) (i : ℕ), List.findIdx?.go p l (i + 1) = Option.map (fun x => x + 1) (List.findIdx?.go p l i) := by
-          intros l p i; induction' l with hd tl ih generalizing i <;> simp_all +decide [ List.findIdx?.go ] ;
-          split_ifs <;> simp_all +decide [ add_comm, add_left_comm, add_assoc ];
-        exact h_findIdx_go _ _ _
+theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
+    ∃ db, t.toDB? [] = some db ∧ db.isClosed = true := by
+  have hcov : Context.Covers [] t := Context.covers_of_closed [] t hclosed
+  obtain ⟨db, hdb, hcloseddb⟩ := toDB?_some_of_covers t [] hcov
+  refine ⟨db, hdb, ?_⟩
+  simpa [LocalTypeDB.isClosed] using hcloseddb
+
+/-! ## Roundtrip (fromDB then toDB?) -/
+
+lemma branches_toDB_fromDB_roundtrip_closed (bs : List (Label × LocalTypeDB))
+    (hclosed : LocalTypeDB.isClosedAtBranches 0 bs = true) :
+    LocalTypeR.branchesToDB? [] (LocalTypeDB.branchesFromDB [] bs) = some bs := by
+  induction bs with
+  | nil => rfl
+  | cons hd tl ih =>
+      obtain ⟨l, t⟩ := hd
+      have h_t_closed : t.isClosedAt 0 = true := by
+        simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+      have h_tl_closed : LocalTypeDB.isClosedAtBranches 0 tl = true := by
+        simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+      have ht := toDB_fromDB_roundtrip_closed t (by simpa [LocalTypeDB.isClosed] using h_t_closed)
+      have htl := ih h_tl_closed
+      simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
+
+
+theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
+    (t.fromDB []).toDB? [] = some t := by
+  -- direct induction on closed DB terms
+  have hclosed' : t.isClosedAt 0 = true := by
+    simpa [LocalTypeDB.isClosed] using hclosed
+  revert hclosed'
+  induction t with
+  | end => simp [LocalTypeDB.fromDB, LocalTypeR.toDB?]
+  | var n =>
+      -- impossible for closed terms at depth 0
+      simp [LocalTypeDB.isClosedAt] at hclosed'
+  | send p bs ih =>
+      have hclosed' : LocalTypeDB.isClosedAtBranches 0 bs = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed'
+      have hbs := branches_toDB_fromDB_roundtrip_closed bs hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs]
+  | recv p bs ih =>
+      have hclosed' : LocalTypeDB.isClosedAtBranches 0 bs = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed'
+      have hbs := branches_toDB_fromDB_roundtrip_closed bs hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs]
+  | mu body ih =>
+      have hclosed' : body.isClosedAt 1 = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed'
+      have hbody := ih hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbody]
+
+/-! ## General roundtrip with adequate context -/
+
+theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
+    (hnodup : ctx.Nodup)
+    (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
+    (hclosed : t.isClosedAt ctx.length = true) :
+    (t.fromDB ctx).toDB? ctx = some t := by
+  -- mutual recursion on t and branches
+  induction t generalizing ctx with
+  | end => simp [LocalTypeDB.fromDB, LocalTypeR.toDB?]
+  | var n =>
+      have hlt : n < ctx.length := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
+      have hidx : Context.indexOf ctx v = some n := by
+        have hnodup := hnodup
+        exact get_indexOf_roundtrip ctx n v hnodup hget
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hget, hidx]
+  | send p bs ih =>
+      have hclosed' : LocalTypeDB.isClosedAtBranches ctx.length bs = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      have hbs := branches_toDB_fromDB_roundtrip bs ctx hnodup hfreshAll hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs]
+  | recv p bs ih =>
+      have hclosed' : LocalTypeDB.isClosedAtBranches ctx.length bs = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      have hbs := branches_toDB_fromDB_roundtrip bs ctx hnodup hfreshAll hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs]
+  | mu body ih =>
+      have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      have hnodup' : (NameContext.freshName ctx :: ctx).Nodup := by
+        apply List.nodup_cons.mpr
+        exact ⟨hfreshAll ctx, hnodup⟩
+      have hbody := ih (ctx := NameContext.freshName ctx :: ctx) hnodup' hfreshAll hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbody]
+
+and branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
+    (hnodup : ctx.Nodup)
+    (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
+    (hclosed : LocalTypeDB.isClosedAtBranches ctx.length bs = true) :
+    LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs) = some bs := by
+  induction bs with
+  | nil => rfl
+  | cons hd tl ih =>
+      obtain ⟨l, t⟩ := hd
+      have h_t_closed : t.isClosedAt ctx.length = true := by
+        simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+      have h_tl_closed : LocalTypeDB.isClosedAtBranches ctx.length tl = true := by
+        simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+      have ht := toDB_fromDB_roundtrip t ctx hnodup hfreshAll h_t_closed
+      have htl := ih hnodup hfreshAll h_tl_closed
+      simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
+
+/-! ## Guardedness / contractiveness preservation -/
+
+theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x : String) (i : Nat)
+    (db : LocalTypeDB) :
+    Context.indexOf ctx x = some i →
+    t.toDB? (pref ++ x :: ctx) = some db →
+    db.isGuarded (i + pref.length + 1) = true := by
+  intro hidx hdb
+  induction t generalizing pref ctx i db with
+  | end =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isGuarded] at hdb
+      simpa [hdb]
+  | var v =>
+      cases hvar : Context.indexOf (pref ++ x :: ctx) v with
+      | none =>
+          simp [LocalTypeR.toDB?, hvar] at hdb
+      | some j =>
+          simp [LocalTypeR.toDB?, hvar] at hdb
+          subst hdb
+          have hne : j ≠ i + pref.length + 1 := by
+            intro hj
+            have hidx_v : Context.indexOf (pref ++ x :: ctx) v = some (i + pref.length + 1) := by
+              simpa [hj] using hvar
+            have hget_v :=
+              indexOf_get? (ctx := pref ++ x :: ctx) (v := v) (i := i + pref.length + 1) hidx_v
+            have hget_x : NameContext.get? (pref ++ x :: ctx) (i + pref.length + 1) = some x := by
+              have hidx' : i + pref.length + 1 = pref.length + (i + 1) := by
+                simp [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+              calc
+                NameContext.get? (pref ++ x :: ctx) (i + pref.length + 1)
+                    = NameContext.get? (pref ++ x :: ctx) (pref.length + (i + 1)) := by
+                        simp [hidx']
+                _ = NameContext.get? (x :: ctx) (i + 1) := by
+                      simpa using
+                        (get?_append_right (xs := pref) (ys := x :: ctx) (n := i + 1))
+                _ = NameContext.get? ctx i := by
+                      simp [NameContext.get?]
+                _ = some x := by
+                      simpa using (indexOf_get? (ctx := ctx) (v := x) (i := i) hidx)
+            have hvx : v = x := by
+              have : (some v : Option String) = some x := by
+                simpa [hget_x] using hget_v
+              exact Option.some.inj this
+            obtain ⟨k, hk, hkle⟩ := indexOf_append_x_le (pref := pref) (ctx := ctx) (x := x)
+            have hk' : k = i + pref.length + 1 := by
+              have : (some k : Option Nat) = some (i + pref.length + 1) := by
+                simpa [hvx, hk] using hidx_v
+              exact Option.some.inj this
+            have hle : i + pref.length + 1 ≤ pref.length := by
+              have hkle' : i + pref.length + 1 ≤ pref.length := by
+                simpa [hk'] using hkle
+              exact hkle'
+            have hgt : pref.length < i + pref.length + 1 := by
+              have : pref.length < pref.length + (i + 1) := by
+                exact Nat.lt_add_of_pos_right _ (Nat.succ_pos _)
+              simpa [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using this
+            exact (Nat.not_le_of_gt hgt) hle
+          simp [LocalTypeDB.isGuarded, hne]
+  | send p bs ih =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isGuarded] at hdb
+      simpa [hdb]
+  | recv p bs ih =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isGuarded] at hdb
+      simpa [hdb]
+  | mu y body ih =>
+      cases hbody : body.toDB? (y :: pref ++ x :: ctx) with
+      | none =>
+          simp [LocalTypeR.toDB?, hbody] at hdb
+      | some db' =>
+          simp [LocalTypeR.toDB?, hbody] at hdb
+          subst hdb
+          have hguard' :
+              db'.isGuarded (i + (y :: pref).length + 1) = true := by
+            have hbody' : body.toDB? ((y :: pref) ++ x :: ctx) = some db' := by
+              simpa using hbody
+            exact ih (pref := y :: pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
+          have hguard'' : db'.isGuarded (i + pref.length + 1 + 1) = true := by
+            have : i + (y :: pref).length + 1 = i + pref.length + 1 + 1 := by
+              simp [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+            simpa [this] using hguard'
+          simpa [LocalTypeDB.isGuarded, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using hguard''
+
+theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
+    t.isGuarded x = true →
+    ctx.indexOf x = some i →
+    t.toDB? ctx = some db →
+    db.isGuarded i = true := by
+  intro hguard hidx hdb
+  induction t generalizing ctx i db with
+  | end =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isGuarded] at hdb
+      simpa [hdb]
+  | var v =>
+      simp [LocalTypeR.isGuarded] at hguard
+      cases hvar : Context.indexOf ctx v with
+      | none => simp [LocalTypeR.toDB?, hvar] at hdb
+      | some j =>
+          simp [LocalTypeR.toDB?, hvar] at hdb
+          subst hdb
+          have hne : j ≠ i := by
+            intro hij
+            have hx := indexOf_get? (ctx := ctx) (v := x) (i := i) hidx
+            have hv := indexOf_get? (ctx := ctx) (v := v) (i := i) (by simpa [hij] using hvar)
+            have : x = v := by simpa [hx] using hv
+            exact hguard (this.symm)
+          simp [LocalTypeDB.isGuarded, hne]
+  | send p bs ih =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isGuarded] at hdb
+      simpa [hdb]
+  | recv p bs ih =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isGuarded] at hdb
+      simpa [hdb]
+  | mu y body ih =>
+      by_cases hxy : x = y
+      · subst hxy
+        cases hbody : body.toDB? (x :: ctx) with
+        | none =>
+            simp [LocalTypeR.toDB?, hbody] at hdb
+        | some db' =>
+            have hdb' : db = LocalTypeDB.mu db' := by
+              simp [LocalTypeR.toDB?, hbody] at hdb
+              exact hdb
+            subst hdb'
+            have hguard' : db'.isGuarded (i + 1) = true := by
+              exact isGuarded_toDB_shadowed_prefix (t := body) (pref := []) (ctx := ctx)
+                (x := x) (i := i) (db := db') hidx (by simpa [hbody])
+            simpa [LocalTypeDB.isGuarded] using hguard'
+      · have hguard_body : body.isGuarded x = true := by
+          simp [LocalTypeR.isGuarded, hxy] at hguard
+          exact hguard
+        have hidx' : Context.indexOf (y :: ctx) x = some (i + 1) := by
+          have hne : y ≠ x := by exact hxy
+          simp [indexOf_cons, hne, hidx]
+        cases hbody : body.toDB? (y :: ctx) with
+        | none =>
+            simp [LocalTypeR.toDB?, hbody] at hdb
+        | some db' =>
+            have hdb' : db = LocalTypeDB.mu db' := by
+              simp [LocalTypeR.toDB?, hbody] at hdb
+              exact hdb
+            subst hdb'
+            have hguard' := ih (ctx := y :: ctx) (i := i + 1) (db := db') hguard_body hidx' (by simpa [hbody])
+            simpa [LocalTypeDB.isGuarded] using hguard'
+
+
+theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
+    t.isContractive = true →
+    t.toDB? ctx = some db →
+    db.isContractive = true := by
+  intro hcontr hdb
+  induction t generalizing ctx db with
+  | end =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isContractive] at hdb
+      simpa [hdb]
+  | var v =>
+      simp [LocalTypeR.toDB?, LocalTypeDB.isContractive] at hdb
+      simpa [hdb]
+  | send p bs ih =>
+      have hbs : isContractiveBranches bs = true := by
+        simpa [LocalTypeR.isContractive] using hcontr
+      cases hdbs : LocalTypeR.branchesToDB? ctx bs with
+      | none => simp [LocalTypeR.toDB?, hdbs] at hdb
+      | some dbs =>
+          simp [LocalTypeR.toDB?, hdbs] at hdb
+          subst hdb
+          -- show branches contractive
+          induction bs generalizing dbs with
+          | nil => simp [LocalTypeDB.isContractive]
+          | cons hd tl ih' =>
+              obtain ⟨l, t⟩ := hd
+              cases dbs with
+              | nil => simp at hdbs
+              | cons hd' tl' =>
+                  obtain ⟨l', t'⟩ := hd'
+                  simp [LocalTypeR.branchesToDB?, hdbs] at hdbs
+                  have htcontr : t.isContractive = true := by
+                    simpa [LocalTypeR.isContractive] using hbs
+                  have htdb : t.toDB? ctx = some t' := by
+                    simpa [LocalTypeR.branchesToDB?] using hdbs.1
+                  have ht := ih (ctx := ctx) (db := t') htcontr htdb
+                  have htl : isContractiveBranches tl = true := by
+                    simpa [LocalTypeR.isContractive] using hbs
+                  have htl' := ih' htl hdbs.2
+                  simp [LocalTypeDB.isContractive, ht, htl']
+  | recv p bs ih =>
+      have hbs : isContractiveBranches bs = true := by
+        simpa [LocalTypeR.isContractive] using hcontr
+      cases hdbs : LocalTypeR.branchesToDB? ctx bs with
+      | none => simp [LocalTypeR.toDB?, hdbs] at hdb
+      | some dbs =>
+          simp [LocalTypeR.toDB?, hdbs] at hdb
+          subst hdb
+          induction bs generalizing dbs with
+          | nil => simp [LocalTypeDB.isContractive]
+          | cons hd tl ih' =>
+              obtain ⟨l, t⟩ := hd
+              cases dbs with
+              | nil => simp at hdbs
+              | cons hd' tl' =>
+                  obtain ⟨l', t'⟩ := hd'
+                  simp [LocalTypeR.branchesToDB?, hdbs] at hdbs
+                  have htcontr : t.isContractive = true := by
+                    simpa [LocalTypeR.isContractive] using hbs
+                  have htdb : t.toDB? ctx = some t' := by
+                    simpa [LocalTypeR.branchesToDB?] using hdbs.1
+                  have ht := ih (ctx := ctx) (db := t') htcontr htdb
+                  have htl : isContractiveBranches tl = true := by
+                    simpa [LocalTypeR.isContractive] using hbs
+                  have htl' := ih' htl hdbs.2
+                  simp [LocalTypeDB.isContractive, ht, htl']
+  | mu x body ih =>
+      simp [LocalTypeR.isContractive] at hcontr
+      rcases hcontr with ⟨hguard, hbody⟩
+      cases hbody' : body.toDB? (x :: ctx) with
+      | none => simp [LocalTypeR.toDB?, hbody'] at hdb
+      | some db' =>
+          simp [LocalTypeR.toDB?, hbody'] at hdb
+          subst hdb
+          have hguard' : db'.isGuarded 0 = true := by
+            have hidx : Context.indexOf (x :: ctx) x = some 0 := by
+              simp [Context.indexOf]
+            exact isGuarded_toDB (t := body) (ctx := x :: ctx) (x := x) (i := 0) (db := db') hguard hidx (by simpa [hbody'])
+          have hbody' := ih (ctx := x :: ctx) (db := db') hbody (by simpa [hbody'])
+          simp [LocalTypeDB.isContractive, hguard', hbody']
+
+
+/-! ## Contractiveness preservation for fromDB -/
+
+lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
+    (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
+    (hclosed : t.isClosedAt (ctx.length + 1) = true)
+    (hguard : t.isGuarded 0 = true) :
+    (t.fromDB (NameContext.freshName ctx :: ctx)).isGuarded (NameContext.freshName ctx) = true := by
+  -- proof by induction on DB structure
+  induction t generalizing ctx with
+  | end => simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
+  | var n =>
+      have hne : n ≠ 0 := by
+        simpa [LocalTypeDB.isGuarded] using hguard
+      cases n with
+      | zero => cases hne rfl
+      | succ n =>
+          have hlt : n.succ < ctx.length + 1 := by
+            simpa [LocalTypeDB.isClosedAt] using hclosed
+          obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := NameContext.freshName ctx :: ctx) (i := n.succ) hlt
+          have hmem : v ∈ ctx := by
+            -- index >= 1, so v comes from tail
+            simpa [NameContext.get?, hget] using get?_mem hget
+          have hneq : v ≠ NameContext.freshName ctx := by
+            intro h_eq
+            have : NameContext.freshName ctx ∈ ctx := by
+              simpa [h_eq] using hmem
+            exact (hfreshAll ctx) this
+          simp [LocalTypeDB.fromDB, NameContext.get?, hget, LocalTypeR.isGuarded, hneq]
+  | send p bs ih =>
+      simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
+  | recv p bs ih =>
+      simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
+  | mu body ih =>
+      have hclosed' : body.isClosedAt (ctx.length + 2) = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      have hguard' : body.isGuarded 1 = true := by
+        simpa [LocalTypeDB.isGuarded] using hguard
+      -- binder is freshName ctx, shift guardness
+      have ih' := ih (ctx := NameContext.freshName ctx :: ctx) hfreshAll hclosed' hguard'
+      simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded, ih']
+
+
+theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
+    (hfreshAll : ∀ c, NameContext.freshName c ∉ c) :
+    t.isContractive = true →
+    t.isClosedAt (ctx.length) = true →
+    (t.fromDB ctx).isContractive = true := by
+  intro hcontr hclosed
+  induction t generalizing ctx with
+  | end => simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
+  | var n => simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
+  | send p bs ih =>
+      simp [LocalTypeDB.isContractive] at hcontr
+      -- branches
+      induction bs generalizing ctx with
+      | nil => simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
+      | cons hd tl ih' =>
+          obtain ⟨l, t⟩ := hd
+          have h_t_contr : t.isContractive = true := by
+            simpa [LocalTypeDB.isContractive] using hcontr
+          have h_t_closed : t.isClosedAt ctx.length = true := by
+            simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+          have h_t := ih (ctx := ctx) hfreshAll h_t_contr h_t_closed
+          have h_tl_contr : LocalTypeDB.isContractiveBranches tl = true := by
+            simpa [LocalTypeDB.isContractive] using hcontr
+          have h_tl_closed : LocalTypeDB.isClosedAtBranches ctx.length tl = true := by
+            simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+          have h_tl := ih' (ctx := ctx) hfreshAll h_tl_contr h_tl_closed
+          simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, h_t, h_tl]
+  | recv p bs ih =>
+      simp [LocalTypeDB.isContractive] at hcontr
+      induction bs generalizing ctx with
+      | nil => simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
+      | cons hd tl ih' =>
+          obtain ⟨l, t⟩ := hd
+          have h_t_contr : t.isContractive = true := by
+            simpa [LocalTypeDB.isContractive] using hcontr
+          have h_t_closed : t.isClosedAt ctx.length = true := by
+            simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+          have h_t := ih (ctx := ctx) hfreshAll h_t_contr h_t_closed
+          have h_tl_contr : LocalTypeDB.isContractiveBranches tl = true := by
+            simpa [LocalTypeDB.isContractive] using hcontr
+          have h_tl_closed : LocalTypeDB.isClosedAtBranches ctx.length tl = true := by
+            simpa [LocalTypeDB.isClosedAtBranches] using hclosed
+          have h_tl := ih' (ctx := ctx) hfreshAll h_tl_contr h_tl_closed
+          simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, h_t, h_tl]
+  | mu body ih =>
+      simp [LocalTypeDB.isContractive] at hcontr
+      rcases hcontr with ⟨hguard, hbody⟩
+      have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
+        simpa [LocalTypeDB.isClosedAt] using hclosed
+      have hguard' := isGuarded_fromDB_fresh body ctx hfreshAll hclosed' hguard
+      have hbody' := ih (ctx := NameContext.freshName ctx :: ctx) hfreshAll hbody hclosed'
+      simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hguard', hbody']
 
 end RumpsteakV2.Protocol.LocalTypeConvProofs

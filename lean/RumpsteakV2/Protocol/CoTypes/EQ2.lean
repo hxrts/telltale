@@ -3,6 +3,9 @@ import Mathlib.Order.FixedPoints
 import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Protocol.LocalTypeR
 
+set_option linter.dupNamespace false
+set_option linter.unusedTactic false
+
 /-! # RumpsteakV2.Protocol.CoTypes.EQ2
 
 Coinductive equality (EQ2) for local types.
@@ -135,12 +138,10 @@ theorem EQ2_unfold_right_iter {a : LocalTypeR} :
   intro b h n
   induction n generalizing b with
   | zero =>
-      intro b h'
-      simpa [Function.iterate_zero, id_eq] using h'
+      simpa [Function.iterate_zero, id_eq] using h
   | succ n ih =>
-      intro b h'
-      have h'': EQ2 a (LocalTypeR.unfold b) := EQ2_unfold_right h'
-      have hstep : EQ2 a ((LocalTypeR.unfold)^[n] (LocalTypeR.unfold b)) := ih h''
+      have h' : EQ2 a (LocalTypeR.unfold b) := EQ2_unfold_right h
+      have hstep : EQ2 a ((LocalTypeR.unfold)^[n] (LocalTypeR.unfold b)) := ih h'
       simpa [Function.iterate_succ_apply] using hstep
 
 /-- Unfold EQ2 on both sides. -/
