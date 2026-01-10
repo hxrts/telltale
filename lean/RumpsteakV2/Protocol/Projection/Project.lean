@@ -1639,28 +1639,64 @@ private theorem BranchesProjRel_lift_EQ2_U
 private theorem EQ2_fullUnfold_end {e : LocalTypeR} :
     EQ2 .end e → e.fullUnfold = .end := by
   intro heq
-  have h := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.end_right_implies_UnfoldsToEnd heq
-  exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq h
+  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
+    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_end
+      RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_end hb =>
+      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq hb
+  | is_var hb => cases hrel
+  | is_send hb => cases hrel
+  | is_recv hb => cases hrel
 
 private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} :
     EQ2 (.var t) e → e.fullUnfold = .var t := by
   intro heq
-  have h := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.var_right_implies_UnfoldsToVar heq
-  exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq h
+  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
+    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_var
+      (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t)))
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_var hb =>
+      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq hb
+  | is_end hb => cases hrel
+  | is_send hb => cases hrel
+  | is_recv hb => cases hrel
 
 private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
     EQ2 (.send p bs) e →
     ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq
-  obtain ⟨cs, hcan, hbr⟩ := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.send_right_implies_CanSend heq
-  exact ⟨cs, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hcan, hbr⟩
+  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
+    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_send
+      (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs)))
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_send hcan =>
+      cases hrel with
+      | is_send hbr =>
+          exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hcan, hbr⟩
+  | is_end hb => cases hrel
+  | is_var hb => cases hrel
+  | is_recv hb => cases hrel
 
 private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
     EQ2 (.recv p bs) e →
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq
-  obtain ⟨cs, hcan, hbr⟩ := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2.recv_right_implies_CanRecv heq
-  exact ⟨cs, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hcan, hbr⟩
+  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
+    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_recv
+      (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs)))
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_recv hcan =>
+      cases hrel with
+      | is_recv hbr =>
+          exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hcan, hbr⟩
+  | is_end hb => cases hrel
+  | is_var hb => cases hrel
+  | is_send hb => cases hrel
 
 private axiom EQ2_fullUnfold_mu {t : String} {body : LocalTypeR} {e : LocalTypeR} :
     EQ2 (.mu t body) e →

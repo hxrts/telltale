@@ -1433,28 +1433,70 @@ theorem EQ2.recv_right_implies_CanRecv_of_fullUnfold_nonmu {x : LocalTypeR} {p :
         simpa [LocalTypeR.muHeight, hx] using hmu
       exact (False.elim (Nat.succ_ne_zero _ hmu'))
 
-/-- If EQ2 .end x, then x unfolds to end.
+/-- Transfer observables across EQ2.
 
     **Semantic constraint**: This axiom is only valid for contractive types.
     See the section header for details.
 
     The unconditional version is kept as an axiom for API convenience, since all
     types in practice (from well-formed projections) are contractive. -/
-axiom EQ2.end_right_implies_UnfoldsToEnd_axiom {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x
+axiom EQ2_transfer_observable_axiom {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a) :
+    ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b
+
+/-- If EQ2 .end x, then x unfolds to end. -/
+theorem EQ2.end_right_implies_UnfoldsToEnd_axiom {x : LocalTypeR} (h : EQ2 .end x) : UnfoldsToEnd x := by
+  have hobs := EQ2_transfer_observable_axiom (a := .end) (b := x) h
+    (Observable.is_end UnfoldsToEnd.base)
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_end hb => exact hb
+  | is_var hb => cases hrel
+  | is_send hb => cases hrel
+  | is_recv hb => cases hrel
 
 /-- If EQ2 (.var v) x, then x unfolds to var v. -/
-axiom EQ2.var_right_implies_UnfoldsToVar_axiom {x : LocalTypeR} {v : String}
-    (h : EQ2 (.var v) x) : UnfoldsToVar x v
+theorem EQ2.var_right_implies_UnfoldsToVar_axiom {x : LocalTypeR} {v : String}
+    (h : EQ2 (.var v) x) : UnfoldsToVar x v := by
+  have hobs := EQ2_transfer_observable_axiom (a := .var v) (b := x) h
+    (Observable.is_var (UnfoldsToVar.base (v := v)))
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_var hb => exact hb
+  | is_end hb => cases hrel
+  | is_send hb => cases hrel
+  | is_recv hb => cases hrel
 
 /-- If EQ2 (.send p bs) x, then x can send to p with EQ2-related branches. -/
-axiom EQ2.send_right_implies_CanSend_axiom {x : LocalTypeR} {p : String}
+theorem EQ2.send_right_implies_CanSend_axiom {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : EQ2 (.send p bs) x) :
-    ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs
+    ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
+  have hobs := EQ2_transfer_observable_axiom (a := .send p bs) (b := x) h
+    (Observable.is_send (CanSend.base (partner := p) (branches := bs)))
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_send hcan =>
+      cases hrel with
+      | is_send hbr =>
+          exact ⟨_, hcan, hbr⟩
+  | is_end hb => cases hrel
+  | is_var hb => cases hrel
+  | is_recv hb => cases hrel
 
 /-- If EQ2 (.recv p bs) x, then x can recv from p with EQ2-related branches. -/
-axiom EQ2.recv_right_implies_CanRecv_axiom {x : LocalTypeR} {p : String}
+theorem EQ2.recv_right_implies_CanRecv_axiom {x : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : EQ2 (.recv p bs) x) :
-    ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs
+    ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
+  have hobs := EQ2_transfer_observable_axiom (a := .recv p bs) (b := x) h
+    (Observable.is_recv (CanRecv.base (partner := p) (branches := bs)))
+  rcases hobs with ⟨obs_b, hrel⟩
+  cases obs_b with
+  | is_recv hcan =>
+      cases hrel with
+      | is_recv hbr =>
+          exact ⟨_, hcan, hbr⟩
+  | is_end hb => cases hrel
+  | is_var hb => cases hrel
+  | is_send hb => cases hrel
 
 /-- For the mu/mu case in EQ2.toBisim: if EQ2 relates two mus, they have compatible
     observable behavior that can be expressed as BisimF.
@@ -1656,6 +1698,45 @@ theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
   have hsymm := EQ2_symm h
   obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv hsymm
   exact ⟨bs, hcan, BranchesRel_flip hbr⟩
+
+/-- Transfer observables across EQ2. -/
+theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a) :
+    ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
+  cases obs_a with
+  | is_end h_end =>
+      have h_end_eq : EQ2 .end b :=
+        EQ2_trans (EQ2_symm (UnfoldsToEnd.toEQ2 h_end)) h
+      have hb : UnfoldsToEnd b := EQ2.end_right_implies_UnfoldsToEnd h_end_eq
+      exact ⟨Observable.is_end hb, ObservableRel.is_end⟩
+  | is_var (v := v) h_var =>
+      have h_var_eq : EQ2 (.var v) b :=
+        EQ2_trans (EQ2_symm (UnfoldsToVar.toEQ2 h_var)) h
+      have hb : UnfoldsToVar b v := EQ2.var_right_implies_UnfoldsToVar h_var_eq
+      exact ⟨Observable.is_var hb, ObservableRel.is_var⟩
+  | is_send (p := p) (bs := bs) h_send =>
+      have h_send_eq : EQ2 (.send p bs) b :=
+        EQ2_trans (EQ2_symm (CanSend.toEQ2 h_send)) h
+      obtain ⟨cs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend h_send_eq
+      exact ⟨Observable.is_send hcan, ObservableRel.is_send hbr⟩
+  | is_recv (p := p) (bs := bs) h_recv =>
+      have h_recv_eq : EQ2 (.recv p bs) b :=
+        EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
+      obtain ⟨cs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv h_recv_eq
+      exact ⟨Observable.is_recv hcan, ObservableRel.is_recv hbr⟩
+
+/-- Observability is symmetric across EQ2. -/
+theorem EQ2_observable_symmetric {a b : LocalTypeR} (h : EQ2 a b) :
+    (∃ obs_a : Observable a, True) ↔ (∃ obs_b : Observable b, True) := by
+  constructor
+  · intro h_obs_a
+    obtain ⟨obs_a, _⟩ := h_obs_a
+    obtain ⟨obs_b, _⟩ := EQ2_transfer_observable h obs_a
+    exact ⟨obs_b, True.intro⟩
+  · intro h_obs_b
+    obtain ⟨obs_b, _⟩ := h_obs_b
+    have hsymm := EQ2_symm h
+    obtain ⟨obs_a, _⟩ := EQ2_transfer_observable hsymm obs_b
+    exact ⟨obs_a, True.intro⟩
 
 theorem EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (LocalTypeR.mu t body) (LocalTypeR.mu s body')) :

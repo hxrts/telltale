@@ -81,7 +81,7 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
 /-- Branch version of round-trip. -/
 theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
-    (hclosed : LocalTypeDB.isClosedAtBranches ctx.length bs = true) :
+    (hclosed : isClosedAtBranches ctx.length bs = true) :
   LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs) = some bs :=
   LocalTypeConvProofs.branches_toDB_fromDB_roundtrip bs ctx h_nodup h_fresh hclosed
 
@@ -128,6 +128,7 @@ theorem isContractive_substitute_mu_via_DB (body : LocalTypeR) (t : String)
   -- mu t body is closed since all free vars are covered by [t]
   have hclosed : (LocalTypeR.mu t body).isClosed := by
     apply (List.isEmpty_eq_true _).2
+    apply List.eq_nil_iff_forall_not_mem.mpr
     intro v hv
     have hv' : v ∈ body.freeVars ∧ v ≠ t := by
       simpa [LocalTypeR.freeVars] using hv
@@ -141,13 +142,13 @@ These wrappers make it explicit when conversions are guaranteed to be safe.
 -/
 
 /-- Convert closed named term to DB (guaranteed to succeed). -/
-def toDB_closed_safe (t : LocalTypeR) (hclosed : t.isClosed = true) : LocalTypeDB :=
+def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDB :=
   match t.toDB? [] with
   | some db => db
   | none => .end  -- Should never happen for closed terms
 
 /-- Convert closed DB term to named (safe version). -/
-def fromDB_closed_safe (t : LocalTypeDB) (hclosed : t.isClosed = true) : LocalTypeR :=
+def fromDB_closed_safe (t : LocalTypeDB) (_hclosed : t.isClosed = true) : LocalTypeR :=
   match t.fromDB? [] with
   | some r => r
   | none => .end  -- Should never happen for closed terms

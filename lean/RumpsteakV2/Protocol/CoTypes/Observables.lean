@@ -1,4 +1,5 @@
 import RumpsteakV2.Protocol.LocalTypeR
+import RumpsteakV2.Protocol.CoTypes.EQ2
 
 /-! # Observable Behavior Predicates
 
@@ -24,6 +25,7 @@ namespace RumpsteakV2.Protocol.CoTypes.Observables
 
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.EQ2
 
 /-! ## Membership Predicates
 
@@ -78,6 +80,25 @@ inductive Observable : LocalTypeR → Prop where
   | is_var {a v} : UnfoldsToVar a v → Observable a
   | is_send {a p bs} : CanSend a p bs → Observable a
   | is_recv {a p bs} : CanRecv a p bs → Observable a
+
+/-! ## Observable Relations -/
+
+/-- Relation between observables induced by a relation on local types. -/
+abbrev Rel := LocalTypeR → LocalTypeR → Prop
+
+inductive ObservableRel (R : Rel) : {a b : LocalTypeR} → Observable a → Observable b → Prop where
+  | is_end {a b : LocalTypeR} {ha : UnfoldsToEnd a} {hb : UnfoldsToEnd b} :
+      ObservableRel R (Observable.is_end ha) (Observable.is_end hb)
+  | is_var {a b : LocalTypeR} {v : String} {ha : UnfoldsToVar a v} {hb : UnfoldsToVar b v} :
+      ObservableRel R (Observable.is_var ha) (Observable.is_var hb)
+  | is_send {a b : LocalTypeR} {p : String} {bs cs : List (Label × LocalTypeR)}
+      {ha : CanSend a p bs} {hb : CanSend b p cs} :
+      BranchesRel R bs cs →
+      ObservableRel R (Observable.is_send ha) (Observable.is_send hb)
+  | is_recv {a b : LocalTypeR} {p : String} {bs cs : List (Label × LocalTypeR)}
+      {ha : CanRecv a p bs} {hb : CanRecv b p cs} :
+      BranchesRel R bs cs →
+      ObservableRel R (Observable.is_recv ha) (Observable.is_recv hb)
 
 /-! ## Basic Properties of Membership Predicates -/
 
