@@ -1,5 +1,6 @@
 import Paco
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco
 
 /-! # EQ2 Integration with Paco
 
@@ -125,7 +126,7 @@ theorem EQ2_paco_coind (R : EQ2.Rel) (r : EQ2.Rel)
     (hpost : ∀ a b, R a b → EQ2F (fun x y => R x y ∨ r x y) a b)
     {x y : LocalTypeR} (hxy : R x y) :
     paco EQ2FMono (toPacoRel r) x y := by
-  apply Paco.paco_coind EQ2FMono (toPacoRel R) (toPacoRel r)
+  apply RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco.coind_upto_pointwise EQ2FMono (toPacoRel R) (toPacoRel r)
   · intro a b hab
     -- hab : toPacoRel R a b = R a b
     -- Need: EQ2FMono.F (toPacoRel R ⊔ toPacoRel r) a b
@@ -145,7 +146,7 @@ theorem EQ2_paco_coind_acc (R : EQ2.Rel) (r : EQ2.Rel)
     (hpost : ∀ a b, R a b → EQ2F (fun x y => R x y ∨ (paco EQ2FMono (toPacoRel r) x y ∨ r x y)) a b)
     {x y : LocalTypeR} (hxy : R x y) :
     paco EQ2FMono (toPacoRel r) x y := by
-  apply Paco.paco_coind_acc EQ2FMono (toPacoRel R) (toPacoRel r)
+  apply RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco.coind_upto_acc EQ2FMono (toPacoRel R) (toPacoRel r)
   · intro a b hab
     -- hab : toPacoRel R a b = R a b
     -- Need: EQ2FMono.F (toPacoRel R ⊔ upaco EQ2FMono (toPacoRel r)) a b

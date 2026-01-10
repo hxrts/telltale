@@ -1,4 +1,5 @@
 import Mathlib.Order.FixedPoints
+import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.Projection.Trans
 
 /-! # RumpsteakV2.Protocol.Projection.Projectb
@@ -27,6 +28,7 @@ namespace RumpsteakV2.Protocol.Projection.Projectb
 
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 open RumpsteakV2.Protocol.Projection.Trans (lcontractive)
 
 private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
@@ -263,6 +265,10 @@ private theorem CProjectF_mono : Monotone CProjectF := by
 private theorem CProjectF_unfold_mono : Monotone CProjectF_unfold := by
   intro R S h g role cand hrel
   exact CProjectF_mono h _ _ _ hrel
+instance : CoinductiveRel ProjRel CProjectF := ⟨CProjectF_mono⟩
+
+instance : CoinductiveRel ProjRel CProjectF_unfold := ⟨CProjectF_unfold_mono⟩
+
 
 /-- CProject as the greatest fixed point of CProjectF.
     Uses the pointwise complete lattice structure on ProjRel. -/
@@ -275,27 +281,56 @@ def CProject : ProjRel :=
 def CProjectU : ProjRel :=
   OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩
 
+/-! Shared coinduction aliases (see `CoinductiveRel`). -/
+/-- Alias: CProject as gfp via CoinductiveRel. -/
+theorem CProject_gfp : CProject = CoinductiveRel.gfp (F := CProjectF) := rfl
+
+/-- Alias: CProjectU as gfp via CoinductiveRel. -/
+theorem CProjectU_gfp : CProjectU = CoinductiveRel.gfp (F := CProjectF_unfold) := rfl
+
+/-- Alias: coinduction via CoinductiveRel for CProject. -/
+theorem CProject_coind' {R : ProjRel} (h : R ≤ CProjectF R) : R ≤ CProject := by
+  simpa [CProject] using (CoinductiveRel.coind (F := CProjectF) h)
+
+/-- Alias: coinduction via CoinductiveRel for CProjectU. -/
+theorem CProjectU_coind' {R : ProjRel} (h : R ≤ CProjectF_unfold R) : R ≤ CProjectU := by
+  simpa [CProjectU] using (CoinductiveRel.coind (F := CProjectF_unfold) h)
+
+/-- Alias: unfold via CoinductiveRel for CProject. -/
+theorem CProject_unfold' : CProject ≤ CProjectF CProject := by
+  simpa [CProject] using (CoinductiveRel.unfold (F := CProjectF))
+
+/-- Alias: fold via CoinductiveRel for CProject. -/
+theorem CProject_fold' : CProjectF CProject ≤ CProject := by
+  simpa [CProject] using (CoinductiveRel.fold (F := CProjectF))
+
+/-- Alias: unfold via CoinductiveRel for CProjectU. -/
+theorem CProjectU_unfold' : CProjectU ≤ CProjectF_unfold CProjectU := by
+  simpa [CProjectU] using (CoinductiveRel.unfold (F := CProjectF_unfold))
+
+/-- Alias: fold via CoinductiveRel for CProjectU. -/
+theorem CProjectU_fold' : CProjectF_unfold CProjectU ≤ CProjectU := by
+  simpa [CProjectU] using (CoinductiveRel.fold (F := CProjectF_unfold))
+
 private theorem CProject_fixed : CProjectF CProject = CProject := by
-  simpa [CProject] using (OrderHom.isFixedPt_gfp ⟨CProjectF, CProjectF_mono⟩)
+  simpa [CProject] using (CoinductiveRel.gfp_fixed (F := CProjectF))
 
 private theorem CProjectU_fixed : CProjectF_unfold CProjectU = CProjectU := by
-  simpa [CProjectU] using (OrderHom.isFixedPt_gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩)
+  simpa [CProjectU] using (CoinductiveRel.gfp_fixed (F := CProjectF_unfold))
 
 /-- Coinduction principle for CProject: if R ⊆ CProjectF R, then R ⊆ CProject. -/
 theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CProjectF R g role cand) :
     ∀ g role cand, R g role cand → CProject g role cand := by
   intro g role cand hr
   have hle : R ≤ CProjectF R := fun x y z hxyz => h x y z hxyz
-  have hgfp : R ≤ CProject := OrderHom.le_gfp ⟨CProjectF, CProjectF_mono⟩ hle
-  exact hgfp g role cand hr
+  exact (CProject_coind' hle) g role cand hr
 
 theorem CProjectU_coind {R : ProjRel}
     (h : ∀ g role cand, R g role cand → CProjectF_unfold R g role cand) :
     ∀ g role cand, R g role cand → CProjectU g role cand := by
   intro g role cand hr
   have hle : R ≤ CProjectF_unfold R := fun x y z hxyz => h x y z hxyz
-  have hgfp : R ≤ CProjectU := OrderHom.le_gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩ hle
-  exact hgfp g role cand hr
+  exact (CProjectU_coind' hle) g role cand hr
 
 /-- Destruct CProject: if CProject holds, then CProjectF CProject holds. -/
 theorem CProject_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}

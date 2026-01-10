@@ -1,5 +1,6 @@
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.CoTypes.DBBridge
 import RumpsteakV2.Protocol.CoTypes.Observables
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
@@ -50,6 +51,7 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.CoTypes.EQ2
 open RumpsteakV2.Protocol.CoTypes.Observables
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 
 /-! ## Observable Behavior
 
@@ -600,6 +602,22 @@ theorem BisimF.mono : Monotone BisimF := by
     exact BisimF.eq_send ha hb (BranchesRelBisim.mono hrs hbr)
   | eq_recv ha hb hbr =>
     exact BisimF.eq_recv ha hb (BranchesRelBisim.mono hrs hbr)
+
+instance : CoinductiveRel Rel BisimF := ⟨BisimF.mono⟩
+
+/-! Shared coinduction aliases (see `CoinductiveRel`). -/
+/-- Greatest fixed point of BisimF (coinductive bisimulation). -/
+def Bisim_gfp : Rel := CoinductiveRel.gfp (F := BisimF)
+
+theorem Bisim_gfp_coind {R : Rel} (h : R ≤ BisimF R) : R ≤ Bisim_gfp := by
+  exact CoinductiveRel.coind (F := BisimF) h
+
+theorem Bisim_gfp_unfold : Bisim_gfp ≤ BisimF Bisim_gfp := by
+  exact CoinductiveRel.unfold (F := BisimF)
+
+theorem Bisim_gfp_fold : BisimF Bisim_gfp ≤ Bisim_gfp := by
+  exact CoinductiveRel.fold (F := BisimF)
+
 
 /-- Membership-based weak bisimulation.
 

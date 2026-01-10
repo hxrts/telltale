@@ -2,6 +2,7 @@ import Mathlib.Data.List.Forall2
 import Mathlib.Order.FixedPoints
 import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Protocol.LocalTypeR
+import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 
 set_option linter.dupNamespace false
 set_option linter.unusedTactic false
@@ -29,6 +30,7 @@ namespace RumpsteakV2.Protocol.CoTypes.EQ2
 
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 
 /-- Relation on local types. -/
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
@@ -68,13 +70,31 @@ private theorem EQ2F_mono : Monotone EQ2F := by
         first
         | exact ⟨h _ _ h1, h _ _ h2⟩
         | exact ⟨h1, BranchesRel_mono (fun _ _ hr => h _ _ hr) h2⟩
+instance : CoinductiveRel Rel EQ2F := ⟨EQ2F_mono⟩
+
 
 /-- EQ2 as the greatest fixed point of EQ2F. -/
 def EQ2 : Rel :=
   (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
 
+/-! Shared coinduction aliases (see `CoinductiveRel`). -/
+/-- Alias: EQ2 as gfp via CoinductiveRel. -/
+theorem EQ2_gfp : EQ2 = CoinductiveRel.gfp (F := EQ2F) := rfl
+
+/-- Alias: coinduction via CoinductiveRel. -/
+theorem EQ2_coind' {R : Rel} (h : R ≤ EQ2F R) : R ≤ EQ2 := by
+  simpa [EQ2] using (CoinductiveRel.coind (F := EQ2F) h)
+
+/-- Alias: unfold via CoinductiveRel. -/
+theorem EQ2_unfold' : EQ2 ≤ EQ2F EQ2 := by
+  simpa [EQ2] using (CoinductiveRel.unfold (F := EQ2F))
+
+/-- Alias: fold via CoinductiveRel. -/
+theorem EQ2_fold' : EQ2F EQ2 ≤ EQ2 := by
+  simpa [EQ2] using (CoinductiveRel.fold (F := EQ2F))
+
 private theorem EQ2_fixed : EQ2F EQ2 = EQ2 := by
-  simpa [EQ2] using (OrderHom.isFixedPt_gfp ⟨EQ2F, EQ2F_mono⟩)
+  simpa [EQ2] using (CoinductiveRel.gfp_fixed (F := EQ2F))
 
 private theorem EQ2_destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b := by
   have hfix : EQ2F EQ2 = EQ2 := EQ2_fixed
@@ -156,8 +176,7 @@ theorem EQ2_coind {R : Rel} (h : ∀ a b, R a b → EQ2F R a b) :
     ∀ a b, R a b → EQ2 a b := by
   intro a b hr
   have hle : R ≤ EQ2F R := fun x y hxy => h x y hxy
-  have hgfp : R ≤ EQ2 := OrderHom.le_gfp ⟨EQ2F, EQ2F_mono⟩ hle
-  exact hgfp a b hr
+  exact (EQ2_coind' hle) a b hr
 
 /-! ## Coinduction Up-To
 
