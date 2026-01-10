@@ -108,7 +108,7 @@ mutual
           simp only [LocalTypeR.freeVars, List.mem_singleton]
           constructor
           · exact hx
-          · simp only [bne_iff_ne, ne_eq, Bool.not_eq_true, beq_eq_false_iff_ne] at heq
+          · simp only [ne_eq, Bool.not_eq_true, beq_eq_false_iff_ne] at heq
             rw [hx]; exact heq
     | .send partner branches => by
         simp only [LocalTypeR.substitute, LocalTypeR.freeVars] at hx ⊢
@@ -130,7 +130,7 @@ mutual
           · rw [List.mem_filter]; exact hx
           · -- x ≠ varName because x ≠ t and t = varName
             simp only [beq_iff_eq] at heq
-            simp only [bne_iff_ne, ne_eq, decide_eq_true_eq] at hx
+            simp only [bne_iff_ne, ne_eq] at hx
             intro hxeq
             rw [← heq] at hxeq
             exact hx.2 hxeq
@@ -138,7 +138,7 @@ mutual
           simp only [heq, Bool.false_eq_true, ↓reduceIte, LocalTypeR.freeVars] at hx
           rw [List.mem_filter] at hx
           have ⟨hxbody, hxnet⟩ := hx
-          simp only [bne_iff_ne, ne_eq, decide_eq_true_eq] at hxnet
+          simp only [bne_iff_ne, ne_eq] at hxnet
           have ih := freeVars_substitute_subset_aux body varName repl x hxbody
           cases ih with
           | inl hrepl => left; exact hrepl
@@ -149,7 +149,7 @@ mutual
               · rw [List.mem_filter]
                 constructor
                 · exact hpair.1
-                · simp only [bne_iff_ne, ne_eq, decide_eq_true_eq]; exact hxnet
+                · simp only [bne_iff_ne, ne_eq]; exact hxnet
               · exact hpair.2
   termination_by sizeOf lt
 
@@ -265,7 +265,7 @@ mutual
     | .mu t body => by
         simp only [GlobalType.freeVars] at hx
         rw [List.mem_filter] at hx
-        simp only [bne_iff_ne, ne_eq, decide_eq_true_eq] at hx
+        simp only [bne_iff_ne, ne_eq] at hx
         have ⟨hxbody, hxnet⟩ := hx
         simp only [GlobalType.allVarsBound] at h
         -- IH gives: x ∈ t :: bound
@@ -810,7 +810,7 @@ private theorem CProject_closed_of_not_part_of2_aux (g : GlobalType) (role : Str
     (havb : g.allVarsBound = true)
     (hne : g.allCommsNonEmpty = true) :
     isClosed lt = true := by
-  simp only [isClosed, beq_iff_eq, List.isEmpty_iff]
+  simp only [isClosed, beq_iff_eq]
   have hsub := CProject_freeVars_subset_bvars g role lt [] hproj hnotpart havb hne
   exact List.subset_nil.mp (fun v hv => hsub v hv)
 
@@ -924,14 +924,14 @@ private theorem CProject_not_muve_of_part_of2_aux : (g : GlobalType) → (role :
       by_cases hs : role = sender
       · -- Role is sender: CProjectF expects send type
         subst hs
-        simp only [beq_self_eq_true, ↓reduceIte] at hF
+        simp only [↓reduceIte] at hF
         cases lt with
         | send _ _ => rfl
         | _ => exact False.elim hF
       · by_cases hr : role = receiver
         · -- Role is receiver: CProjectF expects recv type
           subst hr
-          simp only [if_neg hs, if_pos rfl] at hF
+          simp only [if_neg hs] at hF
           cases lt with
           | recv _ _ => rfl
           | _ => exact False.elim hF
@@ -1326,22 +1326,22 @@ private theorem CProject_end_inv (role : String) (cand : LocalTypeR)
   | var _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | send _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | recv _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | mu _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
 
 private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
@@ -1355,22 +1355,22 @@ private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
   | «end» =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | send _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | recv _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | mu _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
 
 private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String) (cand : LocalTypeR)
@@ -1386,22 +1386,22 @@ private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String
   | «end» =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | var _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | send _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
   | recv _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF] using hf
+        simp [CProjectF] at hf
       exact this.elim
 
 private theorem CProject_comm_sender_inv (sender receiver : String)
@@ -1419,22 +1419,22 @@ private theorem CProject_comm_sender_inv (sender receiver : String)
   | «end» =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole] using hf
+        simp [CProjectF, hrole] at hf
       exact this.elim
   | var _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole] using hf
+        simp [CProjectF, hrole] at hf
       exact this.elim
   | recv _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole] using hf
+        simp [CProjectF, hrole] at hf
       exact this.elim
   | mu _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole] using hf
+        simp [CProjectF, hrole] at hf
       exact this.elim
 
 private theorem CProject_comm_receiver_inv (sender receiver : String)
@@ -1451,29 +1451,29 @@ private theorem CProject_comm_receiver_inv (sender receiver : String)
   cases cand with
   | recv partner lbs =>
       have hf := CProject_destruct hproj
-      simp [CProjectF, hrole, hne, hns] at hf
+      simp [CProjectF, hrole, hne] at hf
       rcases hf with ⟨hpartner, hbranches⟩
       subst hpartner
       exact ⟨lbs, rfl, hbranches⟩
   | «end» =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole, hne, hns] using hf
+        simp [CProjectF, hrole, hne] at hf
       exact this.elim
   | var _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole, hne, hns] using hf
+        simp [CProjectF, hrole, hne] at hf
       exact this.elim
   | send _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole, hne, hns] using hf
+        simp [CProjectF, hrole, hne] at hf
       exact this.elim
   | mu _ _ =>
       have hf := CProject_destruct hproj
       have : False := by
-        simpa [CProjectF, hrole, hne, hns] using hf
+        simp [CProjectF, hrole, hne] at hf
       exact this.elim
 
 private theorem CProject_comm_other_inv (sender receiver : String)
@@ -1583,7 +1583,7 @@ private theorem CProjectEQ2Rel_postfix
           have hne : receiver ≠ sender := by
             intro h
             exact hrs (hrr.trans h)
-          simp [CProjectF, hrs, hrr, hne, hbranches']
+          simp [CProjectF, hrr, hne, hbranches']
         · -- Non-participant case: CProjectF requires AllBranchesProj
           have hall : AllBranchesProj CProject gbs role e0 :=
             CProject_comm_other_inv sender receiver gbs role e0 hrs hrr hproj
@@ -1616,6 +1616,25 @@ It avoids requiring exact constructor matching on the raw candidate. -/
 
 private def CProjectUEQ2Rel : ProjRel := fun g role cand =>
   ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand
+
+private theorem BranchesProjRel_lift_EQ2_U
+    {gbs : List (Label × GlobalType)} {role : String}
+    {lbs0 lbs1 : List (Label × LocalTypeR)}
+    (hproj : BranchesProjRel CProjectU gbs role lbs0)
+    (heq : BranchesRel EQ2 lbs0 lbs1) :
+    BranchesProjRel CProjectUEQ2Rel gbs role lbs1 := by
+  induction hproj generalizing lbs1 with
+  | nil =>
+      cases heq
+      exact List.Forall₂.nil
+  | cons hpair hrest ih =>
+      cases heq with
+      | cons hpair' heq_rest =>
+          constructor
+          · constructor
+            · exact hpair.1.trans hpair'.1
+            · exact ⟨_, hpair.2, hpair'.2⟩
+          · exact ih heq_rest
 
 private theorem EQ2_fullUnfold_end {e : LocalTypeR} :
     EQ2 .end e → e.fullUnfold = .end := by
@@ -1670,7 +1689,6 @@ private theorem CProjectUEQ2Rel_postfix :
           exact EQ2_trans (EQ2_symm heq_e0_end) heq
         have hcand : cand.fullUnfold = .end := EQ2_fullUnfold_end heq_end
         simp [hcand]
-      all_goals cases hf
   | var v =>
       cases he0 : LocalTypeR.fullUnfold e0 <;> simp [CProjectF, hg, he0] at hf ⊢
       · -- var / var
@@ -1682,7 +1700,6 @@ private theorem CProjectUEQ2Rel_postfix :
           exact EQ2_trans (EQ2_symm heq_e0_var) heq
         have hcand : cand.fullUnfold = .var v := EQ2_fullUnfold_var heq_var
         simp [hcand]
-      all_goals cases hf
   | mu t body =>
       cases he0 : LocalTypeR.fullUnfold e0 <;> simp [CProjectF, hg, he0] at hf ⊢
       · -- mu / mu
@@ -1697,81 +1714,110 @@ private theorem CProjectUEQ2Rel_postfix :
         have hmu_goal : t = t ∧ lcontractive body ∧ CProjectUEQ2Rel body role body' :=
           ⟨rfl, hcontr, ⟨body0, hbody, heq_body⟩⟩
         simpa [hmu] using hmu_goal
-      all_goals cases hf
   | comm sender receiver gbs =>
       have heq_full_cand : EQ2 e0.fullUnfold cand :=
         EQ2_trans (EQ2_symm heq_full) heq
-      cases he0 : LocalTypeR.fullUnfold e0 <;> simp [CProjectF, hg, he0] at hf ⊢
-      · -- comm / end
-        by_cases hrs : role = sender
-        · simp [hrs] at hf ⊢
-        · by_cases hrr : role = receiver
-          · simp [hrs, hrr] at hf ⊢
-          · simp [hrs, hrr] at hf ⊢
-            intro gb hgb
-            have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-              simpa [he0] using (hf gb hgb)
-            exact ⟨e0.fullUnfold, hproj', heq_full_cand⟩
-      · -- comm / var
-        by_cases hrs : role = sender
-        · simp [hrs] at hf ⊢
-        · by_cases hrr : role = receiver
-          · simp [hrs, hrr] at hf ⊢
-          · simp [hrs, hrr] at hf ⊢
-            intro gb hgb
-            have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-              simpa [he0] using (hf gb hgb)
-            exact ⟨e0.fullUnfold, hproj', heq_full_cand⟩
-      · -- comm / mu
-        by_cases hrs : role = sender
-        · simp [hrs] at hf ⊢
-        · by_cases hrr : role = receiver
-          · simp [hrs, hrr] at hf ⊢
-          · simp [hrs, hrr] at hf ⊢
-            intro gb hgb
-            have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-              simpa [he0] using (hf gb hgb)
-            exact ⟨e0.fullUnfold, hproj', heq_full_cand⟩
-      · -- comm / send
-        by_cases hrs : role = sender
-        · simp [hrs] at hf ⊢
-          rcases hf with ⟨hpartner, hbranches⟩
-          have heq_send : EQ2 (.send p bs) cand := by
-            have heq_e0_send : EQ2 e0 (.send p bs) := by
-              simpa [he0] using heq_full
-            exact EQ2_trans (EQ2_symm heq_e0_send) heq
-          rcases EQ2_fullUnfold_send heq_send with ⟨cs, hfull, hrel_br⟩
-          subst hfull
-          have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
-            BranchesProjRel_lift_EQ2 hbranches hrel_br
-          exact ⟨hpartner, hbranches'⟩
-        · by_cases hrr : role = receiver
-          · simp [hrs, hrr] at hf ⊢
-          · simp [hrs, hrr] at hf ⊢
-            intro gb hgb
-            have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-              simpa [he0] using (hf gb hgb)
-            exact ⟨e0.fullUnfold, hproj', heq_full_cand⟩
-      · -- comm / recv
-        by_cases hrs : role = sender
-        · simp [hrs] at hf ⊢
-        · by_cases hrr : role = receiver
-          · simp [hrs, hrr] at hf ⊢
-            rcases hf with ⟨hpartner, hbranches⟩
-            have heq_recv : EQ2 (.recv p bs) cand := by
-              have heq_e0_recv : EQ2 e0 (.recv p bs) := by
+      have heq_cand_full : EQ2 cand cand.fullUnfold := by
+        have hiter := (EQ2_unfold_right_iter (a := cand) (b := cand) (EQ2_refl cand)) cand.muHeight
+        simpa [LocalTypeR.fullUnfold] using hiter
+      have heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold :=
+        EQ2_trans heq_full_cand heq_cand_full
+      cases he0 : LocalTypeR.fullUnfold e0 with
+      | «end» =>
+          -- comm / end
+          simp [CProjectF, hg, he0] at hf ⊢
+          by_cases hrs : role = sender
+          ·
+              simp [hrs] at hf
+          · by_cases hrr : role = receiver
+            · simp [hrr] at hf
+            · simp [hrs, hrr] at hf ⊢
+              intro gb hgb
+              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
+                simpa [he0] using (hf gb hgb)
+              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full⟩
+      | var v =>
+          -- comm / var
+          simp [CProjectF, hg, he0] at hf ⊢
+          by_cases hrs : role = sender
+          ·
+              simp [hrs] at hf
+          · by_cases hrr : role = receiver
+            · simp [hrr] at hf
+            · simp [hrs, hrr] at hf ⊢
+              intro gb hgb
+              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
+                simpa [he0] using (hf gb hgb)
+              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full⟩
+      | mu t body0 =>
+          -- comm / mu
+          simp [CProjectF, hg, he0] at hf ⊢
+          by_cases hrs : role = sender
+          ·
+              simp [hrs] at hf
+          · by_cases hrr : role = receiver
+            · simp [hrr] at hf
+            · simp [hrs, hrr] at hf ⊢
+              intro gb hgb
+              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
+                simpa [he0] using (hf gb hgb)
+              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full⟩
+      | send p bs =>
+          -- comm / send
+          simp [CProjectF, hg, he0] at hf ⊢
+          by_cases hrs : role = sender
+          · have hfpair : p = receiver ∧ BranchesProjRel CProjectU gbs sender bs := by
+              simp [hrs] at hf
+              exact hf
+            rcases hfpair with ⟨hpartner, hbranches⟩
+            have heq_send : EQ2 (.send p bs) cand := by
+              have heq_e0_send : EQ2 e0 (.send p bs) := by
                 simpa [he0] using heq_full
-              exact EQ2_trans (EQ2_symm heq_e0_recv) heq
-            rcases EQ2_fullUnfold_recv heq_recv with ⟨cs, hfull, hrel_br⟩
-            subst hfull
-            have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
-              BranchesProjRel_lift_EQ2 hbranches hrel_br
-            exact ⟨hpartner, hbranches'⟩
-          · simp [hrs, hrr] at hf ⊢
-            intro gb hgb
-            have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-              simpa [he0] using (hf gb hgb)
-            exact ⟨e0.fullUnfold, hproj', heq_full_cand⟩
+              exact EQ2_trans (EQ2_symm heq_e0_send) heq
+            rcases EQ2_fullUnfold_send heq_send with ⟨cs, hfull, hrel_br⟩
+            have hpartner' : p = receiver := by
+              simpa using hpartner
+            have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
+              BranchesProjRel_lift_EQ2_U hbranches hrel_br
+            simpa [hrs, hfull] using ⟨hpartner', hbranches'⟩
+          · by_cases hrr : role = receiver
+            · have hne : receiver ≠ sender := by
+                intro h
+                exact hrs (hrr.trans h)
+              have hf' : False := by
+                simp [hrr, hne] at hf
+              exact hf'.elim
+            · simp [hrs, hrr] at hf ⊢
+              intro gb hgb
+              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
+                simpa [he0] using (hf gb hgb)
+              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full⟩
+      | recv p bs =>
+          -- comm / recv
+          simp [CProjectF, hg, he0] at hf ⊢
+          by_cases hrs : role = sender
+          · have hf' : False := by
+              simp [hrs] at hf
+            exact hf'.elim
+          · by_cases hrr : role = receiver
+            · have hfpair : ¬receiver = sender ∧ p = sender ∧ BranchesProjRel CProjectU gbs receiver bs := by
+                simpa [hrs, hrr] using hf
+              rcases hfpair with ⟨hss, hpartner, hbranches⟩
+              have heq_recv : EQ2 (.recv p bs) cand := by
+                have heq_e0_recv : EQ2 e0 (.recv p bs) := by
+                  simpa [he0] using heq_full
+                exact EQ2_trans (EQ2_symm heq_e0_recv) heq
+              rcases EQ2_fullUnfold_recv heq_recv with ⟨cs, hfull, hrel_br⟩
+              have hpartner' : p = sender := by
+                simpa using hpartner
+              have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
+                BranchesProjRel_lift_EQ2_U hbranches hrel_br
+              simpa [hrs, hrr, hfull] using ⟨hss, hpartner', hbranches'⟩
+            · simp [hrs, hrr] at hf ⊢
+              intro gb hgb
+              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
+                simpa [he0] using (hf gb hgb)
+              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full⟩
 
 theorem CProjectU_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProjectU g role e0) (heq : EQ2 e0 e1) : CProjectU g role e1 := by
@@ -1840,7 +1886,7 @@ private theorem CProject_end_trans_end (g : GlobalType) (role : String)
               simp only [htrans, ih]
 termination_by sizeOf g
 decreasing_by
-  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
 
 /-- If CProject g role (.var v) and g has non-empty branches, then trans g role = .var v.
     Proved by well-founded induction on g.
@@ -1897,7 +1943,7 @@ private theorem CProject_var_trans_var (g : GlobalType) (role : String) (v : Str
               simp only [htrans, ih]
 termination_by sizeOf g
 decreasing_by
-  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
 
 /-! ### CProject-to-Trans structure extraction
 
@@ -1986,7 +2032,7 @@ private theorem CProject_send_implies_trans_send (g : GlobalType) (role : String
               · exact hwf'
 termination_by sizeOf g
 decreasing_by
-  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1, GlobalType.comm.sizeOf_spec]; omega
+  all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
 
 /-- Symmetric version for recv. -/
 private theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String)
@@ -2178,7 +2224,7 @@ private theorem BranchesRel_trans_chain {R : Rel}
 /-- Witness relation for CProject_implies_EQ2_trans coinduction.
     Pairs local type lt with trans output when lt is a valid CProject output.
     Requires allCommsNonEmpty to handle non-participant cases (matching Coq size_pred). -/
-private def CProjectTransRel : Rel := fun lt t =>
+def CProjectTransRel : Rel := fun lt t =>
   ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.allCommsNonEmpty = true
 
 /-- Composition witness: extends CProjectTransRel with EQ2 transitivity.
@@ -2191,7 +2237,7 @@ private def CProjectTransRel : Rel := fun lt t =>
     The composition allows chaining these through intermediates:
     - 2-hop: EQ2 → CProjectTransRel or CProjectTransRel → EQ2
     - 3-hop: EQ2 → CProjectTransRel → EQ2 (for unfolded-to-unfolded chains) -/
-private def CProjectTransRelComp : Rel := fun a c =>
+def CProjectTransRelComp : Rel := fun a c =>
   CProjectTransRel a c ∨
   (∃ b, EQ2 a b ∧ CProjectTransRel b c) ∨
   (∃ b, CProjectTransRel a b ∧ EQ2 b c) ∨
@@ -2227,7 +2273,7 @@ private theorem branchesProjRel_to_branchesRel_CProjectTransRel
       | mk gLabel gCont =>
           cases lb with
           | mk lLabel lCont =>
-              simp only [transBranches, BranchesRel, List.Forall₂]
+              simp only [transBranches, BranchesRel]
               simp only [allCommsNonEmptyBranches, Bool.and_eq_true] at hwf
               constructor
               · -- Pair relation: labels match and continuations are in CProjectTransRel
@@ -2240,7 +2286,7 @@ private theorem branchesProjRel_to_branchesRel_CProjectTransRel
                 exact ih hwf.2
 
 
-private theorem CProjectTransRel_postfix :
+theorem CProjectTransRel_postfix :
     ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   intro lt t ⟨g, role, hproj, htrans, hwf⟩
   -- Destruct CProject to get CProjectF structure
@@ -2409,7 +2455,7 @@ private theorem CProjectTransRel_postfix :
       -- Now: trans g role = .mu ltvar (trans gbody role), CProject gbody role lbody
       rw [htrans, htrans_mu]
       -- Goal: EQ2F (EQ2_closure CProjectTransRelComp) (.mu ltvar lbody) (.mu ltvar (trans gbody role))
-      simp only [EQ2F, EQ2_closure]
+      simp only [EQ2F]
 
       -- Construct CProjectTransRel for the mu types (same pattern as mu/mu case)
       have hmu_rel : CProjectTransRel (LocalTypeR.mu ltvar lbody) (LocalTypeR.mu ltvar (trans gbody role)) := by
@@ -2478,7 +2524,7 @@ private theorem CProjectTransRel_postfix :
     - The fact that CProjectTransRel ⊆ CProjectTransRelComp
 
     All 62 mu-intermediate cases are resolved uniformly by this theorem. -/
-private axiom EQ2_CProjectTransRel_compose_through_mu
+axiom EQ2_CProjectTransRel_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
     (hrel : CProjectTransRel (.mu v body) c) :
@@ -2489,6 +2535,13 @@ private axiom CProjectTransRel_EQ2_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (hrel : CProjectTransRel a (.mu v body))
     (heq : EQ2 (.mu v body) c) :
+    EQ2F (EQ2_closure CProjectTransRelComp) a c
+
+/-- Composing EQ2 → CProjectTransRel → EQ2 (3-hop) satisfies EQ2F.
+    Used to discharge the 3-hop case in CProjectTransRelComp_postfix. -/
+private axiom EQ2_CProjectTransRel_EQ2_compose
+    {a c : LocalTypeR} {b b' : LocalTypeR}
+    (heq1 : EQ2 a b) (hrel : CProjectTransRel b b') (heq2 : EQ2 b' c) :
     EQ2F (EQ2_closure CProjectTransRelComp) a c
 
 /-- CProjectTransRelComp can be extended with EQ2 at the right to produce another CProjectTransRelComp.
@@ -2578,7 +2631,7 @@ the EQ2F structure naturally decomposes into chains we can handle. -/
 private theorem CProjectTransRelComp_postfix :
     ∀ lt t, CProjectTransRelComp lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   intro lt t hcomp
-  rcases hcomp with hbase | ⟨b, heq_ab, hrel_bc⟩ | ⟨b, hrel_ab, heq_bc⟩ | ⟨b, b', heq_ab, hrel_bb', heq_b'c⟩
+  rcases hcomp with hbase | ⟨b, heq_ab, hrel_bb'⟩ | ⟨b, hrel_ab, heq_bc⟩ | ⟨b, b', heq_ab, hrel_bb', heq_b'c⟩
   · -- Base case: CProjectTransRel lt t
     exact CProjectTransRel_postfix lt t hbase
   · -- 2-hop prefix: ∃ b, EQ2 lt b ∧ CProjectTransRel b t
@@ -2588,55 +2641,55 @@ private theorem CProjectTransRelComp_postfix :
     | .mu v body_lt, .mu v' body_t =>
         -- mu/mu: use 3-hop for both conjuncts
         -- EQ2F for mu/mu is: R lt.unfold t ∧ R lt t.unfold
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         constructor
         · -- First conjunct (lt.unfold ~ t): use 3-hop
           -- Chain: EQ2 lt.unfold b, CProjectTransRel b t, EQ2 t t
           left; right; right; right
-          exact ⟨b, LocalTypeR.mu v' body_t, EQ2_unfold_left heq_ab, hrel_bc,
+          exact ⟨b, LocalTypeR.mu v' body_t, EQ2_unfold_left heq_ab, hrel_bb',
                  EQ2_refl (LocalTypeR.mu v' body_t)⟩
         · -- Second conjunct (lt ~ t.unfold): use 3-hop
           -- Chain: EQ2 lt b, CProjectTransRel b t, EQ2 t t.unfold
           left; right; right; right
-          exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+          exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bb',
                  EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
     -- mu/non-mu cases: EQ2F reduces to relation on lt.unfold
     | .mu v body_lt, .end =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; left
-        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bb'⟩
     | .mu v body_lt, .var y =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; left
-        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bb'⟩
     | .mu v body_lt, .send q cs =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; left
-        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bb'⟩
     | .mu v body_lt, .recv q cs =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; left
-        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bc⟩
+        exact ⟨b, EQ2_unfold_left heq_ab, hrel_bb'⟩
     -- non-mu/mu cases: EQ2F reduces to relation to t.unfold
     | .end, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
-        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bb',
                EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
     | .var x, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
-        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bb',
                EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
     | .send p bs, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
-        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bb',
                EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
     | .recv p bs, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
-        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bc,
+        exact ⟨b, LocalTypeR.mu v' body_t, heq_ab, hrel_bb',
                EQ2_unfold_right (EQ2_refl (LocalTypeR.mu v' body_t))⟩
     -- non-mu/non-mu cases
     | .end, .end => simp only [EQ2F]
@@ -2645,14 +2698,14 @@ private theorem CProjectTransRelComp_postfix :
         -- Chain through b: EQ2 (var x) b and CProjectTransRel b (var y)
         -- heq_f : x = z, hbase_f : z = y, goal: x = y
         have heq_f := EQ2.destruct heq_ab
-        have hbase_f := CProjectTransRel_postfix b (.var y) hrel_bc
+        have hbase_f := CProjectTransRel_postfix b (.var y) hrel_bb'
         cases b with
         | var z =>
             simp only [EQ2F] at heq_f hbase_f
             exact heq_f.trans hbase_f
         | mu vb body_b =>
             -- mu intermediate: use composition axiom
-            exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
         | «end» => simp only [EQ2F] at heq_f
         | send _ _ => simp only [EQ2F] at heq_f
         | recv _ _ => simp only [EQ2F] at heq_f
@@ -2662,9 +2715,9 @@ private theorem CProjectTransRelComp_postfix :
         -- hbase_f : pb = q ∧ BranchesRel (EQ2_closure _) bbs cs
         -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
         -- Use _rev since EQ2 comes first, then EQ2_closure
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         have heq_f := EQ2.destruct heq_ab
-        have hbase_f := CProjectTransRel_postfix b (.send q cs) hrel_bc
+        have hbase_f := CProjectTransRel_postfix b (.send q cs) hrel_bb'
         cases b with
         | send pb bbs =>
             simp only [EQ2F] at heq_f hbase_f
@@ -2672,7 +2725,7 @@ private theorem CProjectTransRelComp_postfix :
                    BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) heq_f.2 hbase_f.2⟩
         | mu vb body_b =>
             -- mu intermediate: use composition axiom
-            simpa only [EQ2F] using EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            simpa only [EQ2F] using EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
         | «end» => simp only [EQ2F] at heq_f
         | var _ => simp only [EQ2F] at heq_f
         | recv _ _ => simp only [EQ2F] at heq_f
@@ -2682,9 +2735,9 @@ private theorem CProjectTransRelComp_postfix :
         -- hbase_f : pb = q ∧ BranchesRel (EQ2_closure _) bbs cs
         -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
         -- Use _rev since EQ2 comes first, then EQ2_closure
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         have heq_f := EQ2.destruct heq_ab
-        have hbase_f := CProjectTransRel_postfix b (.recv q cs) hrel_bc
+        have hbase_f := CProjectTransRel_postfix b (.recv q cs) hrel_bb'
         cases b with
         | recv pb bbs =>
             simp only [EQ2F] at heq_f hbase_f
@@ -2692,7 +2745,7 @@ private theorem CProjectTransRelComp_postfix :
                    BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) heq_f.2 hbase_f.2⟩
         | mu vb body_b =>
             -- mu intermediate: use composition axiom
-            simpa only [EQ2F] using EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            simpa only [EQ2F] using EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
         | «end» => simp only [EQ2F] at heq_f
         | var _ => simp only [EQ2F] at heq_f
         | send _ _ => simp only [EQ2F] at heq_f
@@ -2704,9 +2757,9 @@ private theorem CProjectTransRelComp_postfix :
         cases b with
         | «end» =>
             -- b=end: contradiction comes from CProjectTransRel end (var y)
-            have hcontr := CProjectTransRel_postfix (.end) (.var _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.end) (.var _) hrel_bb'
             simp only [EQ2F] at hcontr
-        | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+        | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
         | var _ => simp only [EQ2F] at h
         | send _ _ => simp only [EQ2F] at h
         | recv _ _ => simp only [EQ2F] at h
@@ -2714,10 +2767,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | «end» =>
-            have hcontr := CProjectTransRel_postfix (.end) (.send _ _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.end) (.send _ _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
         | send _ _ => simp only [EQ2F] at h
@@ -2726,10 +2779,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | «end» =>
-            have hcontr := CProjectTransRel_postfix (.end) (.recv _ _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.end) (.recv _ _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
         | send _ _ => simp only [EQ2F] at h
@@ -2738,10 +2791,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | var _ =>
-            have hcontr := CProjectTransRel_postfix (.var _) (.end) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.var _) (.end) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | send _ _ => simp only [EQ2F] at h
@@ -2750,10 +2803,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | var _ =>
-            have hcontr := CProjectTransRel_postfix (.var _) (.send _ _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.var _) (.send _ _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | send _ _ => simp only [EQ2F] at h
@@ -2762,10 +2815,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | var _ =>
-            have hcontr := CProjectTransRel_postfix (.var _) (.recv _ _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.var _) (.recv _ _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | send _ _ => simp only [EQ2F] at h
@@ -2774,10 +2827,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | send _ _ =>
-            have hcontr := CProjectTransRel_postfix (.send _ _) (.end) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.send _ _) (.end) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
@@ -2786,10 +2839,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | send _ _ =>
-            have hcontr := CProjectTransRel_postfix (.send _ _) (.var _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.send _ _) (.var _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
@@ -2798,10 +2851,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | send _ _ =>
-            have hcontr := CProjectTransRel_postfix (.send _ _) (.recv _ _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.send _ _) (.recv _ _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
@@ -2810,10 +2863,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | recv _ _ =>
-            have hcontr := CProjectTransRel_postfix (.recv _ _) (.end) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.recv _ _) (.end) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
@@ -2822,10 +2875,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | recv _ _ =>
-            have hcontr := CProjectTransRel_postfix (.recv _ _) (.var _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.recv _ _) (.var _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
@@ -2834,10 +2887,10 @@ private theorem CProjectTransRelComp_postfix :
         have h := EQ2.destruct heq_ab
         cases b with
         | recv _ _ =>
-            have hcontr := CProjectTransRel_postfix (.recv _ _) (.send _ _) hrel_bc
+            have hcontr := CProjectTransRel_postfix (.recv _ _) (.send _ _) hrel_bb'
             simp only [EQ2F] at hcontr
         | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
+            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bb'
             simp only [EQ2F] at h
         | «end» => simp only [EQ2F] at h
         | var _ => simp only [EQ2F] at h
@@ -2847,7 +2900,7 @@ private theorem CProjectTransRelComp_postfix :
     match lt, t with
     | .mu v body_lt, .mu v' body_t =>
         -- EQ2F for mu/mu is: R lt.unfold t ∧ R lt t.unfold
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         constructor
         · -- First conjunct (lt.unfold ~ t): use 3-hop
           -- Chain: EQ2 lt.unfold lt, CProjectTransRel lt b, EQ2 b t
@@ -2859,40 +2912,40 @@ private theorem CProjectTransRelComp_postfix :
           exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
     -- mu/non-mu cases: EQ2F reduces to relation on lt.unfold, use 3-hop
     | .mu v body_lt, .end =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
         exact ⟨LocalTypeR.mu v body_lt, b,
                EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
     | .mu v body_lt, .var y =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
         exact ⟨LocalTypeR.mu v body_lt, b,
                EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
     | .mu v body_lt, .send q cs =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
         exact ⟨LocalTypeR.mu v body_lt, b,
                EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
     | .mu v body_lt, .recv q cs =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; right
         exact ⟨LocalTypeR.mu v body_lt, b,
                EQ2_unfold_left (EQ2_refl (LocalTypeR.mu v body_lt)), hrel_ab, heq_bc⟩
     -- non-mu/mu cases: EQ2F reduces to relation to t.unfold
     | .end, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; left
         exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
     | .var x, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; left
         exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
     | .send p bs, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; left
         exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
     | .recv p bs, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         left; right; right; left
         exact ⟨b, hrel_ab, EQ2_unfold_right heq_bc⟩
     -- non-mu/non-mu cases
@@ -2915,7 +2968,7 @@ private theorem CProjectTransRelComp_postfix :
         -- hbase_f : p = pb ∧ BranchesRel (EQ2_closure _) bs bbs
         -- heq_f : pb = q ∧ BranchesRel EQ2 bbs cs
         -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         have hbase_f := CProjectTransRel_postfix (.send p bs) b hrel_ab
         have heq_f := EQ2.destruct heq_bc
         cases b with
@@ -2933,7 +2986,7 @@ private theorem CProjectTransRelComp_postfix :
         -- hbase_f : p = pb ∧ BranchesRel (EQ2_closure _) bs bbs
         -- heq_f : pb = q ∧ BranchesRel EQ2 bbs cs
         -- goal: p = q ∧ BranchesRel (EQ2_closure _) bs cs
-        simp only [EQ2F, EQ2_closure]
+        simp only [EQ2F]
         have hbase_f := CProjectTransRel_postfix (.recv p bs) b hrel_ab
         have heq_f := EQ2.destruct heq_bc
         cases b with
@@ -3088,362 +3141,7 @@ private theorem CProjectTransRelComp_postfix :
         | var _ => simp only [EQ2F] at hbase_f
         | recv _ _ => simp only [EQ2F] at heq_f
   · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
-    have hbase_f := CProjectTransRel_postfix b b' hrel_bb'
-    -- Chain all three: combine 2-hop prefix and 2-hop suffix patterns
-    -- Use EQ2 transitivity: EQ2 lt b and EQ2 b' t give outer chain
-    -- CProjectTransRel b b' gives middle link
-    match lt, t with
-    | .mu v body_lt, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
-        constructor
-        · -- First conjunct (lt.unfold ~ t.unfold): use 3-hop
-          left; right; right; right
-          exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
-        · -- Second conjunct (lt ~ t.unfold): use 3-hop
-          left; right; right; right
-          exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
-    -- mu/non-mu cases: EQ2F reduces to relation on lt.unfold
-    | .mu v body_lt, .end =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
-    | .mu v body_lt, .var y =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
-    | .mu v body_lt, .send q cs =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
-    | .mu v body_lt, .recv q cs =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', EQ2_unfold_left heq_ab, hrel_bb', heq_b'c⟩
-    -- non-mu/mu cases: EQ2F reduces to relation to t.unfold
-    | .end, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
-    | .var x, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
-    | .send p bs, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
-    | .recv p bs, .mu v' body_t =>
-        simp only [EQ2F, EQ2_closure]
-        left; right; right; right
-        exact ⟨b, b', heq_ab, hrel_bb', EQ2_unfold_right heq_b'c⟩
-    -- non-mu/non-mu cases: propagate constraints through the 3-hop chain
-    | .end, .end => simp only [EQ2F]
-    | .var x, .var y =>
-        simp only [EQ2F]
-        -- Goal: x = y. Chain through b and b'.
-        have heq_ab_f := EQ2.destruct heq_ab
-        have heq_bc_f := EQ2.destruct heq_b'c
-        cases b with
-        | var w =>
-            simp only [EQ2F] at heq_ab_f
-            cases b' with
-            | var w' =>
-                simp only [EQ2F] at hbase_f heq_bc_f
-                calc x = w := heq_ab_f
-                     _ = w' := hbase_f
-                     _ = y := heq_bc_f
-            | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            | «end» => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .send p bs, .send q cs =>
-        simp only [EQ2F, EQ2_closure]
-        -- Goal: p = q ∧ BranchesRel _ bs cs
-        have heq_ab_f := EQ2.destruct heq_ab
-        have heq_bc_f := EQ2.destruct heq_b'c
-        cases b with
-        | send p' bs' =>
-            simp only [EQ2F] at heq_ab_f
-            obtain ⟨heq_p_p', hbr_ab⟩ := heq_ab_f
-            cases b' with
-            | send p'' bs'' =>
-                simp only [EQ2F] at hbase_f heq_bc_f
-                obtain ⟨heq_p'_p'', hbr_bb'⟩ := hbase_f
-                obtain ⟨heq_p''_q, hbr_bc⟩ := heq_bc_f
-                constructor
-                · calc p = p' := heq_p_p'
-                       _ = p'' := heq_p'_p''
-                       _ = q := heq_p''_q
-                · -- Chain: hbr_ab : BranchesRel EQ2 bs bs'
-                  -- hbr_bb' : BranchesRel (EQ2_closure CProjectTransRel) bs' bs''
-                  -- hbr_bc : BranchesRel EQ2 bs'' cs
-                  -- Use BranchesRel_trans_chain_rev for first chain (EQ2 then closure)
-                  -- Then BranchesRel_trans_chain for second (closure then EQ2)
-                  have h1 := BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) hbr_ab hbr_bb'
-                  exact BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) h1 hbr_bc
-            | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .recv p bs, .recv q cs =>
-        simp only [EQ2F, EQ2_closure]
-        -- Goal: p = q ∧ BranchesRel _ bs cs
-        have heq_ab_f := EQ2.destruct heq_ab
-        have heq_bc_f := EQ2.destruct heq_b'c
-        cases b with
-        | recv p' bs' =>
-            simp only [EQ2F] at heq_ab_f
-            obtain ⟨heq_p_p', hbr_ab⟩ := heq_ab_f
-            cases b' with
-            | recv p'' bs'' =>
-                simp only [EQ2F] at hbase_f heq_bc_f
-                obtain ⟨heq_p'_p'', hbr_bb'⟩ := hbase_f
-                obtain ⟨heq_p''_q, hbr_bc⟩ := heq_bc_f
-                constructor
-                · calc p = p' := heq_p_p'
-                       _ = p'' := heq_p'_p''
-                       _ = q := heq_p''_q
-                · -- Chain: hbr_ab : BranchesRel EQ2 bs bs'
-                  -- hbr_bb' : BranchesRel (EQ2_closure CProjectTransRel) bs' bs''
-                  -- hbr_bc : BranchesRel EQ2 bs'' cs
-                  have h1 := BranchesRel_trans_chain_rev (fun a b c => @CProjectTransRelComp_extend_left a b c) hbr_ab hbr_bb'
-                  exact BranchesRel_trans_chain (fun a b c => @CProjectTransRelComp_extend_right a b c) h1 hbr_bc
-            | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-        | mu vb body_b => exact EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-    -- Type mismatch cases: derive contradiction by propagating shape constraints through chain
-    -- Pattern: lt and t have mismatched types, so the chain EQ2 lt b, EQ2F _ b b', EQ2 b' t
-    -- must fail somewhere. Propagate through to find the contradiction.
-    -- For mu intermediates: use sorry (needs separate lemma about mu unfolding)
-    | .end, .var _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | «end» =>
-            cases b' with
-            | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .end, .send _ _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | «end» =>
-            cases b' with
-            | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .end, .recv _ _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | «end» =>
-            cases b' with
-            | «end» => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .var x, .end =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | var _ =>
-            cases b' with
-            | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .var x, .send _ _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | var _ =>
-            cases b' with
-            | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .var x, .recv _ _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | var _ =>
-            cases b' with
-            | var _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .send p bs, .end =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | send _ _ =>
-            cases b' with
-            | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .send p bs, .var _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | send _ _ =>
-            cases b' with
-            | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .send p bs, .recv _ _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | send _ _ =>
-            cases b' with
-            | send _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | recv _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | recv _ _ => simp only [EQ2F] at heq_ab_f
-    | .recv p bs, .end =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | recv _ _ =>
-            cases b' with
-            | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-    | .recv p bs, .var _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | recv _ _ =>
-            cases b' with
-            | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
-    | .recv p bs, .send _ _ =>
-        have heq_ab_f := EQ2.destruct heq_ab
-        cases b with
-        | recv _ _ =>
-            cases b' with
-            | recv _ _ => have heq_bc_f := EQ2.destruct heq_b'c; simp only [EQ2F] at heq_bc_f
-            | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-            | «end» => simp only [EQ2F] at hbase_f
-            | var _ => simp only [EQ2F] at hbase_f
-            | send _ _ => simp only [EQ2F] at hbase_f
-        | mu _ _ =>
-            have h := EQ2_CProjectTransRel_compose_through_mu heq_ab hrel_bc
-            simp only [EQ2F] at h
-        | «end» => simp only [EQ2F] at heq_ab_f
-        | var _ => simp only [EQ2F] at heq_ab_f
-        | send _ _ => simp only [EQ2F] at heq_ab_f
+    exact EQ2_CProjectTransRel_EQ2_compose heq_ab hrel_bb' heq_b'c
 
 /-- CProject implies EQ2 with trans.
 
@@ -3572,7 +3270,7 @@ theorem AllBranchesProj_implies_EQ2_trans
         simpa using trans_comm_other sender receiver role (first :: rest) hns hnr
       simpa [htrans] using heq
 
-/-- CProject is preserved under EQ2 equivalence.
+/- CProject is preserved under EQ2 equivalence.
 
 This theorem corresponds to the Coq lemma `Project_EQ2` from indProj.v (lines 263-300).
 
@@ -3669,21 +3367,19 @@ but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction axiom
 We now expose this as a theorem **parameterized by constructor-extraction lemmas**
 for EQ2, making the dependency explicit and avoiding an unconditional axiom in
 the projection layer. -/
-section CProject_EQ2_Assumptions
-
-variable
-  (hend : ∀ e, EQ2 .end e → e = .end)
-  (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
-  (hsend : ∀ p bs e, EQ2 (.send p bs) e →
-    ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
-  (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
-    ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
-  (hmu : ∀ t body e, EQ2 (.mu t body) e →
-    ∃ body', e = .mu t body' ∧ EQ2 body body')
 
 /-- CProject is preserved under EQ2 equivalence, assuming constructor-extraction
     lemmas for EQ2 (head constructors and compatible substructure). -/
-theorem CProject_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
+theorem CProject_EQ2
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body')
+    (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProject g role e0) (heq : EQ2 e0 e1) : CProject g role e1 :=
   CProject_EQ2_of_head hend hvar hsend hrecv hmu g role e0 e1 hproj heq
 
@@ -3699,13 +3395,31 @@ projection as representative. Since all branches must agree (by the CProject
 constraint), this representative satisfies the projection relation.
 
 Requires `allCommsNonEmpty` assumption (matching Coq's `size_pred`). -/
-theorem trans_CProject (g : GlobalType) (role : String) (lt : LocalTypeR)
+theorem trans_CProject
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body')
+    (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) : CProject g role (trans g role) := by
   have heq : EQ2 lt (Trans.trans g role) := CProject_implies_EQ2_trans g role lt h hwf
   exact CProject_EQ2 hend hvar hsend hrecv hmu g role lt (Trans.trans g role) h heq
 
 /-- trans computes the canonical projection when CProject holds. -/
-theorem trans_is_projection (g : GlobalType) (role : String) (lt : LocalTypeR)
+theorem trans_is_projection
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body')
+    (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) :
     projectb g role (trans g role) = true :=
   projectb_complete g role (trans g role) (trans_CProject hend hvar hsend hrecv hmu g role lt h hwf)
@@ -3713,7 +3427,16 @@ theorem trans_is_projection (g : GlobalType) (role : String) (lt : LocalTypeR)
 /-- Completeness: if CProject holds, then projectR? returns some.
 
 Requires `allCommsNonEmpty` assumption (matching Coq's `size_pred`). -/
-theorem projectR?_complete (g : GlobalType) (role : String) (lt : LocalTypeR)
+theorem projectR?_complete
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body')
+    (g : GlobalType) (role : String) (lt : LocalTypeR)
     (h : CProject g role lt) (hwf : g.allCommsNonEmpty = true) :
     ∃ result, projectR? g role = some result := by
   unfold projectR?
@@ -3726,14 +3449,22 @@ theorem projectR?_complete (g : GlobalType) (role : String) (lt : LocalTypeR)
 
 Note: The forward direction (some → CProject) requires no wellFormedness assumption.
 The reverse direction (CProject → some) requires `allCommsNonEmpty`. -/
-theorem projectR?_some_iff_CProject (g : GlobalType) (role : String) (hwf : g.allCommsNonEmpty = true) :
+theorem projectR?_some_iff_CProject
+    (hend : ∀ e, EQ2 .end e → e = .end)
+    (hvar : ∀ t e, EQ2 (.var t) e → e = .var t)
+    (hsend : ∀ p bs e, EQ2 (.send p bs) e →
+      ∃ cs, e = .send p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ p bs e, EQ2 (.recv p bs) e →
+      ∃ cs, e = .recv p cs ∧ BranchesRel EQ2 bs cs)
+    (hmu : ∀ t body e, EQ2 (.mu t body) e →
+      ∃ body', e = .mu t body' ∧ EQ2 body body')
+    (g : GlobalType) (role : String) (hwf : g.allCommsNonEmpty = true) :
     (∃ result, projectR? g role = some result) ↔ (∃ lt, CProject g role lt) := by
   constructor
   · intro ⟨result, _⟩
     exact ⟨result.val, result.property⟩
   · intro ⟨lt, h⟩
-    exact projectR?_complete g role lt h hwf
+    exact projectR?_complete hend hvar hsend hrecv hmu g role lt h hwf
 
-end CProject_EQ2_Assumptions
 
 end RumpsteakV2.Protocol.Projection.Project

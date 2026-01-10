@@ -39,27 +39,7 @@ theorem EQ2_CProjectTransRel_compose_through_mu
     (heq : EQ2 a (.mu v body))
     (hrel : CProjectTransRel (.mu v body) c) :
     EQ2F (EQ2_closure CProjectTransRelComp) a c := by
+  exact RumpsteakV2.Protocol.Projection.Project.EQ2_CProjectTransRel_compose_through_mu heq hrel
 
-  -- Get EQ2F structure from CProjectTransRel_postfix
-  have hrel_f : EQ2F (EQ2_closure CProjectTransRel) (.mu v body) c :=
-    CProjectTransRel_postfix (.mu v body) c hrel
-
-  -- Monotonicity: EQ2_closure CProjectTransRel ⊆ EQ2_closure CProjectTransRelComp
-  -- because CProjectTransRel is the base case of CProjectTransRelComp
-  have h_mono : ∀ x y, (EQ2_closure CProjectTransRel) x y →
-                       (EQ2_closure CProjectTransRelComp) x y := by
-    intro x y h
-    simp only [EQ2_closure] at h ⊢
-    cases h with
-    | inl hrel' =>
-        left
-        left -- CProjectTransRel is the base case of CProjectTransRelComp
-        exact hrel'
-    | inr heq' =>
-        right
-        exact heq'
-
-  -- Apply EQ2F monotonicity
-  exact EQ2F.mono h_mono _ _ hrel_f
 
 end RumpsteakV2.Protocol.Projection.ProjectPaco

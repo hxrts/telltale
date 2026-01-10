@@ -173,7 +173,7 @@ mutual
   def projectbAllBranches :
       List (Label × GlobalType) → String → LocalTypeR → Bool
     | [], _, _ => true
-    | (label, cont) :: rest, role, cand =>
+    | (_, cont) :: rest, role, cand =>
         projectb cont role cand && projectbAllBranches rest role cand
   termination_by bs _ _ => sizeOf bs
   decreasing_by
@@ -706,7 +706,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       | mu t' candBody =>
           obtain ⟨heq, hcontr, hbody⟩ := hF
           subst heq
-          simp only [hg, projectb, beq_self_eq_true, hcontr, ↓reduceIte]
+          simp only [projectb, beq_self_eq_true, hcontr, ↓reduceIte]
           exact projectb_complete body role candBody hbody
       | «end» => exact hF.elim
       | var _ => exact hF.elim
@@ -719,7 +719,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
         cases cand with
         | send partner lbs =>
             obtain ⟨hpartner, hbranches⟩ := hF
-            simp only [hg, projectb]
+            simp only [projectb]
             subst hs hpartner
             simp only [beq_self_eq_true, ↓reduceIte]
             exact BranchesProjRel_to_projectbBranches gbs role lbs hbranches
@@ -732,10 +732,10 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
         cases cand with
         | recv partner lbs =>
             obtain ⟨hpartner, hbranches⟩ := hF
-            simp only [hg, projectb]
+            simp only [projectb]
             have hne : (role == sender) = false := by
               simp only [beq_eq_false_iff_ne, ne_eq]; exact hs
-            simp only [hne, ↓reduceIte]
+            simp only [hne]
             subst hr hpartner
             simp only [beq_self_eq_true, ↓reduceIte]
             exact BranchesProjRel_to_projectbBranches gbs role lbs hbranches
@@ -751,13 +751,12 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
           simp only [beq_eq_false_iff_ne, ne_eq]; exact hs
         have hne_r : (role == receiver) = false := by
           simp only [beq_eq_false_iff_ne, ne_eq]; exact hr
-        simp only [hne_s, hne_r, ↓reduceIte]
+        simp only [hne_s, hne_r]
         exact AllBranchesProj_to_projectbAllBranches gbs role cand hF
           (fun gb hmem hcp => projectb_complete gb.2 role cand hcp)
 termination_by g
 decreasing_by
   all_goals
-    simp_wf
     -- Now we have context like: hg : g = GlobalType... and hmem : gb ∈ gbs
     -- Use cases to match which termination goal we're in
     first

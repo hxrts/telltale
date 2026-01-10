@@ -3,6 +3,8 @@ import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.Projection.Trans
 
+set_option linter.dupNamespace false
+
 /-! # RumpsteakV2.Semantics.EnvStep
 
 Environment-step relation for V2.

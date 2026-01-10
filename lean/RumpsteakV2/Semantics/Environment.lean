@@ -294,7 +294,6 @@ theorem dequeue_length (env : EnvConfig) (ch : Channel) (msg : Message) (env' : 
       simp [hq] at hdeq
       obtain ⟨hmsg, henv'⟩ := hdeq
       subst henv' hmsg
-      have heq_true : (ch == ch) = true := beq_self_eq_true ch
-      simp only [heq_true, ↓reduceIte, List.length_cons]
+      simp only [↓reduceIte, List.length_cons]
 
 end RumpsteakV2.Semantics.Environment
