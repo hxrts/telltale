@@ -40,29 +40,12 @@ open RumpsteakV2.Protocol.LocalTypeConv
 /-! ## Basic list helpers -/
 
 lemma get?_mem {ctx : NameContext} {i : Nat} {v : String}
-    (h : NameContext.get? ctx i = some v) : v ∈ ctx := by
-  induction ctx generalizing i with
-  | nil => cases h
-  | cons a ctx ih =>
-      cases i with
-      | zero =>
-          simp [NameContext.get?] at h
-          simp [h]
-      | succ i =>
-          simp [NameContext.get?] at h
-          exact List.mem_cons_of_mem _ (ih h)
+    (h : NameContext.get? ctx i = some v) : v ∈ ctx :=
+  RumpsteakV2.Protocol.NameOnlyContext.get?_mem h
 
 lemma get?_some_of_lt {ctx : NameContext} {i : Nat} (h : i < ctx.length) :
-    ∃ v, NameContext.get? ctx i = some v := by
-  induction ctx generalizing i with
-  | nil => cases h
-  | cons a ctx ih =>
-      cases i with
-      | zero => exact ⟨a, by simp [NameContext.get?]⟩
-      | succ i =>
-          have h' : i < ctx.length := by simpa using h
-          obtain ⟨v, hv⟩ := ih h'
-          exact ⟨v, by simp [NameContext.get?, hv]⟩
+    ∃ v, NameContext.get? ctx i = some v :=
+  RumpsteakV2.Protocol.NameOnlyContext.get?_lt h
 
 lemma findIdx?_go_succ {α : Type} (p : α → Bool) (l : List α) (i : Nat) :
     List.findIdx?.go p l (i + 1) = Option.map Nat.succ (List.findIdx?.go p l i) := by
@@ -78,61 +61,29 @@ lemma findIdx?_go_succ {α : Type} (p : α → Bool) (l : List α) (i : Nat) :
 
 
 lemma indexOf_cons (a : String) (ctx : Context) (v : String) :
-    Context.indexOf (a :: ctx) v =
+    Context.indexOf (NameOnlyContext.cons a ctx) v =
       (if a == v then some 0 else Option.map Nat.succ (Context.indexOf ctx v)) := by
   by_cases h : a = v
   · subst h
-    simp [Context.indexOf, List.findIdx?, List.findIdx?.go]
-  · have hgo := findIdx?_go_succ (fun x => x == v) ctx 0
-    simp [Context.indexOf, List.findIdx?, List.findIdx?.go, h, hgo]
+    simp only [beq_self_eq_true, ↓reduceIte, Context.indexOf, NameOnlyContext.indexOf_cons_eq]
+  · have hne : (a == v) = false := beq_eq_false_iff_ne.mpr h
+    simp only [hne, ↓reduceIte, Context.indexOf]
+    exact NameOnlyContext.indexOf_cons_ne ctx h
 
 lemma indexOf_eq_none_iff_not_mem (ctx : Context) (v : String) :
     Context.indexOf ctx v = none ↔ v ∉ ctx := by
-  induction ctx with
-  | nil => simp [Context.indexOf]
-  | cons a ctx ih =>
-      by_cases h : a = v
-      · subst h
-        simp [indexOf_cons]
-      · have h' : v ≠ a := by intro hv; exact h hv.symm
-        simp [indexOf_cons, h, ih, List.mem_cons, h']
+  simp only [Context.indexOf, NameOnlyContext.mem_iff_mem_names]
+  exact NameOnlyContext.indexOf_eq_none_iff
 
 lemma indexOf_lt_length {ctx : Context} {v : String} {i : Nat}
     (h : Context.indexOf ctx v = some i) : i < ctx.length := by
-  induction ctx generalizing i with
-  | nil => simp [Context.indexOf] at h
-  | cons a ctx ih =>
-      by_cases h' : a = v
-      · subst h'
-        simp [indexOf_cons] at h
-        cases h
-        simp
-      · cases hctx : Context.indexOf ctx v with
-        | none =>
-            simp [indexOf_cons, h', hctx] at h
-        | some i' =>
-            simp [indexOf_cons, h', hctx] at h
-            cases h
-            have hlt := ih hctx
-            simpa using Nat.succ_lt_succ hlt
+  simp only [Context.indexOf] at h
+  exact NameOnlyContext.indexOf_lt h
 
 lemma indexOf_get? {ctx : Context} {v : String} {i : Nat}
     (h : Context.indexOf ctx v = some i) : NameContext.get? ctx i = some v := by
-  induction ctx generalizing i with
-  | nil => simp [Context.indexOf] at h
-  | cons a ctx ih =>
-      by_cases h' : a = v
-      · subst h'
-        simp [indexOf_cons] at h
-        cases h
-        simp [NameContext.get?]
-      · cases hctx : Context.indexOf ctx v with
-        | none =>
-            simp [indexOf_cons, h', hctx] at h
-        | some i' =>
-            simp [indexOf_cons, h', hctx] at h
-            cases h
-            simp [NameContext.get?, ih hctx]
+  simp only [Context.indexOf, NameContext.get?] at h ⊢
+  exact NameOnlyContext.indexOf_get? h
 
 lemma indexOf_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
     ∃ i, Context.indexOf ctx v = some i := by
@@ -146,20 +97,27 @@ lemma indexOf_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
 
 lemma get?_inj_of_nodup {ctx : NameContext} (hnd : ctx.Nodup) {i j : Nat} {v : String}
     (hi : NameContext.get? ctx i = some v) (hj : NameContext.get? ctx j = some v) : i = j := by
-  induction ctx generalizing i j with
-  | nil => cases hi
-  | cons a ctx ih =>
-      cases i <;> cases j <;> simp [NameContext.get?] at hi hj
+  induction ctx using NameOnlyContext.induction generalizing i j with
+  | h_empty => simp [NameContext.get?, NameOnlyContext.get?, TypeContext.getName?] at hi
+  | h_cons a ctx ih =>
+      cases i <;> cases j
       · rfl
-      · have hv : a = v := by simpa using hi
+      · simp only [NameContext.get?, NameOnlyContext.get?_cons_zero] at hi
+        have hv : a = v := Option.some.inj hi
         subst hv
+        simp only [NameContext.get?, NameOnlyContext.get?_cons_succ] at hj
         have : a ∈ ctx := get?_mem hj
-        exact (hnd.notMem this).elim
-      · have hv : a = v := by simpa using hj
+        have hnotmem := NameOnlyContext.notMem_of_Nodup_cons hnd
+        exact (hnotmem this).elim
+      · simp only [NameContext.get?, NameOnlyContext.get?_cons_zero] at hj
+        have hv : a = v := Option.some.inj hj
         subst hv
+        simp only [NameContext.get?, NameOnlyContext.get?_cons_succ] at hi
         have : a ∈ ctx := get?_mem hi
-        exact (hnd.notMem this).elim
-      · have hnd' : ctx.Nodup := hnd.tail
+        have hnotmem := NameOnlyContext.notMem_of_Nodup_cons hnd
+        exact (hnotmem this).elim
+      · simp only [NameContext.get?, NameOnlyContext.get?_cons_succ] at hi hj
+        have hnd' : ctx.Nodup := NameOnlyContext.Nodup_tail hnd
         exact congrArg Nat.succ (ih hnd' hi hj)
 
 lemma get_indexOf_roundtrip (ctx : NameContext) (i : Nat) (v : String)
@@ -181,25 +139,50 @@ lemma indexOf_inj {ctx : Context} {x y : String} {i : Nat}
 
 lemma get?_append_right (xs ys : NameContext) (n : Nat) :
     NameContext.get? (xs ++ ys) (xs.length + n) = NameContext.get? ys n := by
-  induction xs generalizing n with
-  | nil => simp
-  | cons a xs ih =>
-      simpa [NameContext.get?, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using (ih n)
+  induction xs using NameOnlyContext.induction generalizing n with
+  | h_empty =>
+      simp only [TypeContext.length_empty, Nat.zero_add]
+      rfl
+  | h_cons a xs ih =>
+      simp only [NameOnlyContext.cons_length, Nat.add_succ, Nat.succ_add]
+      have heq : NameOnlyContext.cons a xs ++ ys = NameOnlyContext.cons a (xs ++ ys) := by
+        congr 1
+        simp [NameOnlyContext.cons_bindings, NameOnlyContext.append_bindings]
+      rw [heq]
+      simp only [NameContext.get?, NameOnlyContext.get?_cons_succ]
+      exact ih n
+
+private lemma cons_append_eq_cons (a : String) (pref suffix : NameOnlyContext) :
+    NameOnlyContext.cons a pref ++ suffix = NameOnlyContext.cons a (pref ++ suffix) := by
+  congr 1
+  simp [NameOnlyContext.cons_bindings, NameOnlyContext.append_bindings]
+
+private lemma empty_append_eq (suffix : NameOnlyContext) :
+    (TypeContext.empty : NameOnlyContext) ++ suffix = suffix := by
+  congr 1
+  simp [NameOnlyContext.append_bindings, TypeContext.bindings_empty]
 
 lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
-    ∃ k, Context.indexOf (pref ++ x :: ctx) x = some k ∧ k ≤ pref.length := by
-  induction pref with
-  | nil =>
+    ∃ k, Context.indexOf (pref ++ NameOnlyContext.cons x ctx) x = some k ∧ k ≤ pref.length := by
+  induction pref using NameOnlyContext.induction with
+  | h_empty =>
       refine ⟨0, ?_, by simp⟩
-      simp [indexOf_cons]
-  | cons a pref ih =>
+      simp only [Context.indexOf]
+      rw [empty_append_eq]
+      exact NameOnlyContext.indexOf_cons_eq x ctx
+  | h_cons a pref ih =>
       by_cases hax : a = x
       · subst hax
         refine ⟨0, ?_, by simp⟩
-        simp [indexOf_cons]
+        simp only [Context.indexOf]
+        rw [cons_append_eq_cons]
+        exact NameOnlyContext.indexOf_cons_eq a (pref ++ NameOnlyContext.cons a ctx)
       · obtain ⟨k, hk, hkle⟩ := ih
         refine ⟨k + 1, ?_, ?_⟩
-        · simp [indexOf_cons, hax, hk]
+        · simp only [Context.indexOf] at hk ⊢
+          rw [cons_append_eq_cons]
+          rw [NameOnlyContext.indexOf_cons_ne _ hax, hk]
+          rfl
         · exact Nat.succ_le_succ hkle
 
 /-! ## String / Nat helpers for fresh-name proofs -/
@@ -358,40 +341,46 @@ theorem Nat_toString_inj (n m : Nat) : toString n = toString m → n = m := by
       exact (Nat.digits_inj_iff (b := 10) (n := n) (m := m)).1 hdigits'
 
 inductive GeneratedContext : NameContext → Prop where
-  | nil : GeneratedContext []
-  | cons {ctx} : GeneratedContext ctx → GeneratedContext (NameContext.freshName ctx :: ctx)
+  | empty : GeneratedContext TypeContext.empty
+  | cons {ctx} : GeneratedContext ctx → GeneratedContext (NameOnlyContext.cons (NameContext.freshName ctx) ctx)
 
 theorem generated_elements (ctx : NameContext) (h : GeneratedContext ctx) :
     ∀ s, s ∈ ctx → ∃ n < ctx.length, s = "_db" ++ toString n := by
-  induction' h with r ctx h_ind h_gen
-  generalize_proofs at *
-  · aesop
-  · simp +zetaDelta at *
-    exact ⟨⟨r.length, Nat.lt_succ_self _, rfl⟩,
-      fun s hs =>
-        by
-          obtain ⟨n, hn, rfl⟩ := h_ind s hs
-          exact ⟨n, Nat.lt_succ_of_lt hn, rfl⟩⟩
+  induction h with
+  | empty =>
+      intro s hs
+      simp [NameOnlyContext.mem_iff_mem_names, TypeContext.names_empty] at hs
+  | @cons inner_ctx h_ctx ih =>
+      intro s hs
+      simp only [NameOnlyContext.mem_cons_iff] at hs
+      cases hs with
+      | inl heq =>
+          subst heq
+          simp only [NameContext.freshName, NameOnlyContext.freshName, NameOnlyContext.cons_length]
+          exact ⟨inner_ctx.length, Nat.lt_succ_self _, rfl⟩
+      | inr hmem =>
+          obtain ⟨n, hn, hs_eq⟩ := ih s hmem
+          simp only [NameOnlyContext.cons_length]
+          exact ⟨n, Nat.lt_succ_of_lt hn, hs_eq⟩
 
 theorem fresh_not_in_generated (ctx : NameContext) (h : GeneratedContext ctx) :
     NameContext.freshName ctx ∉ ctx := by
   intro h_in
   obtain ⟨n, hn_lt, hn_eq⟩ := generated_elements ctx h _ h_in
-  simp [NameContext.freshName] at hn_eq
+  simp only [NameContext.freshName, NameOnlyContext.freshName] at hn_eq
   have h_len_eq : toString ctx.length = toString n := by
-    apply String_append_left_cancel _ _ _ hn_eq
+    apply String_append_left_cancel "_db" _ _ hn_eq
   have h_n_eq : ctx.length = n := Nat_toString_inj _ _ h_len_eq
-  linarith
+  omega
 
 theorem generated_nodup (ctx : NameContext) (h : GeneratedContext ctx) :
     ctx.Nodup := by
   induction h with
-  | nil => apply List.nodup_nil
-  | cons h_ctx ih =>
-    apply List.nodup_cons.mpr
-    constructor
-    · apply fresh_not_in_generated _ h_ctx
-    · exact ih
+  | empty => exact NameOnlyContext.Nodup_empty
+  | @cons inner_ctx h_ctx ih =>
+      apply NameOnlyContext.Nodup_cons
+      · exact fresh_not_in_generated _ h_ctx
+      · exact ih
 
 /-! ## fromDB? correctness for closed terms -/
 
@@ -430,7 +419,10 @@ theorem fromDB?_eq_fromDB_all_ctx (t : LocalTypeDB) (ctx : NameContext)
     · intro body hbody ctx hclosed
       have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hbody' := hbody (NameContext.freshName ctx :: ctx) hclosed'
+      have hclosed'' : body.isClosedAt (NameOnlyContext.cons (NameContext.freshName ctx) ctx).length = true := by
+        simp only [NameOnlyContext.cons_length]
+        exact hclosed'
+      have hbody' := hbody (NameOnlyContext.cons (NameContext.freshName ctx) ctx) hclosed''
       simp [LocalTypeDB.fromDB?, LocalTypeDB.fromDB, hbody']
     · intro ctx hclosed
       simp [LocalTypeDB.branchesFromDB?, LocalTypeDB.branchesFromDB]
@@ -461,10 +453,13 @@ theorem branchesFromDB?_eq_branchesFromDB (bs : List (Label × LocalTypeDB)) (ct
       simp [LocalTypeDB.branchesFromDB?, LocalTypeDB.branchesFromDB, ht, htl]
 
 theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-    t.fromDB? [] = some (t.fromDB []) := by
+    t.fromDB? TypeContext.empty = some (t.fromDB TypeContext.empty) := by
   have hclosed' : t.isClosedAt 0 = true := by
     simpa [LocalTypeDB.isClosed] using hclosed
-  simpa using (fromDB?_eq_fromDB_all_ctx t [] hclosed')
+  have hclosed'' : t.isClosedAt (TypeContext.empty : NameContext).length = true := by
+    simp only [TypeContext.length_empty]
+    exact hclosed'
+  exact fromDB?_eq_fromDB_all_ctx t TypeContext.empty hclosed''
 
 /-! ## fromDB closedness -/
 
@@ -512,7 +507,7 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       simp [LocalTypeDB.fromDB, LocalTypeR.freeVars] at hv
       rcases hv with ⟨hv, hne⟩
-      have hsub := hbody (NameContext.freshName ctx :: ctx) hclosed' v hv
+      have hsub := hbody (NameOnlyContext.cons (NameContext.freshName ctx) ctx) hclosed' v hv
       have : v ∈ ctx := by
         simpa [List.mem_cons, hne] using hsub
       exact this
@@ -536,15 +531,17 @@ lemma freeVars_fromDB_subset_ctx (t : LocalTypeDB) (ctx : NameContext)
   exact hrec ctx hclosed
 
 theorem fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-    (t.fromDB []).isClosed = true := by
+    (t.fromDB TypeContext.empty).isClosed = true := by
   have hclosed' : t.isClosedAt 0 = true := by
     simpa [LocalTypeDB.isClosed] using hclosed
-  have hsub := freeVars_fromDB_subset_ctx t [] hclosed'
-  have hnil : (t.fromDB []).freeVars = [] := by
+  have hclosed'' : t.isClosedAt (TypeContext.empty : NameContext).length = true := by
+    simp only [TypeContext.length_empty]; exact hclosed'
+  have hsub := freeVars_fromDB_subset_ctx t TypeContext.empty hclosed''
+  have hnil : (t.fromDB TypeContext.empty).freeVars = [] := by
     apply (List.eq_nil_iff_forall_not_mem).2
     intro v hv
-    have : v ∈ ([] : List String) := hsub v hv
-    cases this
+    have hmem : v ∈ (TypeContext.empty : NameContext) := hsub v hv
+    simp only [NameOnlyContext.mem_iff_mem_names, TypeContext.names_empty, List.not_mem_nil] at hmem
   simp [LocalTypeR.isClosed, hnil]
 
 /-! ## toDB? succeeds for closed terms -/
@@ -602,19 +599,20 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       · simp [LocalTypeR.toDB?, hdbs]
       · simpa [LocalTypeDB.isClosedAt] using hclosed
     · intro t body hbody ctx hcov
-      have hcov' : Context.Covers (t :: ctx) body := by
+      have hcov' : Context.Covers (NameOnlyContext.cons t ctx) body := by
         intro v hv
         by_cases hvt : v = t
-        · simp [hvt]
+        · simp only [hvt, NameOnlyContext.mem_cons_self]
         · have hmem : v ∈ body.freeVars := hv
           have : v ∈ (LocalTypeR.mu t body).freeVars := by
             simp [LocalTypeR.freeVars, hmem, hvt]
-          have : v ∈ ctx := hcov v this
-          simp [hvt, this]
-      obtain ⟨db, hdb, hclosed⟩ := hbody (t :: ctx) hcov'
+          have hmem_ctx : v ∈ ctx := hcov v this
+          exact NameOnlyContext.mem_cons_of_mem v t ctx hmem_ctx
+      obtain ⟨db, hdb, hclosed⟩ := hbody (NameOnlyContext.cons t ctx) hcov'
       refine ⟨LocalTypeDB.mu db, ?_, ?_⟩
       · simp [LocalTypeR.toDB?, hdb]
-      · simpa [LocalTypeDB.isClosedAt] using hclosed
+      · simp only [LocalTypeDB.isClosedAt, NameOnlyContext.cons_length] at hclosed ⊢
+        exact hclosed
     · intro v ctx hcov
       have hv : v ∈ ctx := by
         apply hcov
@@ -663,11 +661,12 @@ theorem branchesToDB?_some_of_covers (bs : List (Label × LocalTypeR)) (ctx : Co
       · simp [isClosedAtBranches, hclosed, hclosedbs]
 
 theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
-    ∃ db, t.toDB? [] = some db ∧ db.isClosed = true := by
-  have hcov : Context.Covers [] t := Context.covers_of_closed [] t hclosed
-  obtain ⟨db, hdb, hcloseddb⟩ := toDB?_some_of_covers t [] hcov
+    ∃ db, t.toDB? TypeContext.empty = some db ∧ db.isClosed = true := by
+  have hcov : Context.Covers TypeContext.empty t := Context.covers_of_closed TypeContext.empty t hclosed
+  obtain ⟨db, hdb, hcloseddb⟩ := toDB?_some_of_covers t TypeContext.empty hcov
   refine ⟨db, hdb, ?_⟩
-  simpa [LocalTypeDB.isClosed] using hcloseddb
+  simp only [LocalTypeDB.isClosed, TypeContext.length_empty] at hcloseddb ⊢
+  exact hcloseddb
 
 /-! ## Roundtrip (fromDB then toDB?) -/
 
@@ -714,9 +713,9 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
     · intro body hbody ctx hgen hclosed
       have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hgen' : GeneratedContext (NameContext.freshName ctx :: ctx) :=
+      have hgen' : GeneratedContext (NameOnlyContext.cons (NameContext.freshName ctx) ctx) :=
         GeneratedContext.cons hgen
-      have hbody' := hbody (ctx := NameContext.freshName ctx :: ctx) hgen' hclosed'
+      have hbody' := hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) hgen' hclosed'
       simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbody']
     · intro ctx hgen hclosed
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?]
@@ -747,15 +746,19 @@ theorem branches_toDB_fromDB_roundtrip_generated (bs : List (Label × LocalTypeD
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
 
 theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  (t.fromDB []).toDB? [] = some t := by
+  (t.fromDB TypeContext.empty).toDB? TypeContext.empty = some t := by
   have hclosed' : t.isClosedAt 0 = true := by
     simpa [LocalTypeDB.isClosed] using hclosed
-  simpa using toDB_fromDB_roundtrip_generated t [] GeneratedContext.nil hclosed'
+  have hclosed'' : t.isClosedAt (TypeContext.empty : NameContext).length = true := by
+    simp only [TypeContext.length_empty]; exact hclosed'
+  exact toDB_fromDB_roundtrip_generated t TypeContext.empty GeneratedContext.empty hclosed''
 
 theorem branches_toDB_fromDB_roundtrip_closed (bs : List (Label × LocalTypeDB))
     (hclosed : isClosedAtBranches 0 bs = true) :
-  LocalTypeR.branchesToDB? [] (LocalTypeDB.branchesFromDB [] bs) = some bs := by
-  simpa using branches_toDB_fromDB_roundtrip_generated bs [] GeneratedContext.nil hclosed
+  LocalTypeR.branchesToDB? TypeContext.empty (LocalTypeDB.branchesFromDB TypeContext.empty bs) = some bs := by
+  have hclosed' : isClosedAtBranches (TypeContext.empty : NameContext).length bs = true := by
+    simp only [TypeContext.length_empty]; exact hclosed
+  exact branches_toDB_fromDB_roundtrip_generated bs TypeContext.empty GeneratedContext.empty hclosed'
 
 /-! ## General roundtrip with adequate context -/
 
@@ -801,10 +804,10 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
     · intro body hbody ctx hnodup hfreshAll hclosed
       have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hnodup' : (NameContext.freshName ctx :: ctx).Nodup := by
+      have hnodup' : (NameOnlyContext.cons (NameContext.freshName ctx) ctx).Nodup := by
         apply List.nodup_cons.mpr
         exact ⟨hfreshAll ctx, hnodup⟩
-      have hbody' := hbody (ctx := NameContext.freshName ctx :: ctx) hnodup' hfreshAll hclosed'
+      have hbody' := hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) hnodup' hfreshAll hclosed'
       simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbody']
     · intro ctx hnodup hfreshAll hclosed
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?]
@@ -1188,10 +1191,10 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
           simpa [LocalTypeDB.isClosedAt] using hclosed
         have hguard' : body.isGuarded (i + 1) = true := by
           simpa [LocalTypeDB.isGuarded] using hguard
-        have hget' : NameContext.get? (NameContext.freshName ctx :: ctx) (i + 1) = some v := by
+        have hget' : NameContext.get? (NameOnlyContext.cons (NameContext.freshName ctx) ctx) (i + 1) = some v := by
           simpa [NameContext.get?] using hget
         have huniq' :
-            ∀ j, NameContext.get? (NameContext.freshName ctx :: ctx) j = some v → j = i + 1 := by
+            ∀ j, NameContext.get? (NameOnlyContext.cons (NameContext.freshName ctx) ctx) j = some v → j = i + 1 := by
           intro j hj
           cases j with
           | zero =>
@@ -1203,7 +1206,7 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
               have hidx := huniq j hj'
               simpa using congrArg Nat.succ hidx
         have hbody' :=
-          hbody (ctx := NameContext.freshName ctx :: ctx) (i := i + 1) (v := v)
+          hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) (i := i + 1) (v := v)
             hget' huniq' hclosed' hguard'
         simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded, hv, hbody']
     · exact True.intro
@@ -1217,7 +1220,7 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt (ctx.length + 1) = true)
     (hguard : t.isGuarded 0 = true) :
-    (t.fromDB (NameContext.freshName ctx :: ctx)).isGuarded (NameContext.freshName ctx) = true := by
+    (t.fromDB (NameOnlyContext.cons (NameContext.freshName ctx) ctx)).isGuarded (NameContext.freshName ctx) = true := by
   let fresh := NameContext.freshName ctx
   have hget : NameContext.get? (fresh :: ctx) 0 = some fresh := by
     simp [NameContext.get?]
@@ -1287,7 +1290,7 @@ theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       have hguard' := isGuarded_fromDB_fresh body ctx hfreshAll hclosed' hguard
       have hbody' :=
-        hbody (ctx := NameContext.freshName ctx :: ctx) hfreshAll hbody_contr hclosed'
+        hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) hfreshAll hbody_contr hclosed'
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hguard', hbody']
     · intro ctx hfreshAll hcontr hclosed
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.isContractiveBranches, isClosedAtBranches] at hcontr hclosed ⊢

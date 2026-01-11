@@ -13,12 +13,8 @@ This file contains only core definitions to avoid import cycles.
 
 ## Context Types
 
-This module uses `List String` for contexts to maintain backward compatibility with existing
-proofs. The unified `TypeContext` structure from `TypeContext.lean` provides:
-- `NameOnlyContext` - equivalent to `List String` for name-only contexts
-- Coercions between `List String` and `NameOnlyContext` for interoperability
-
-For new code, prefer using `NameOnlyContext` directly when possible.
+This module uses `NameOnlyContext` from `TypeContext.lean` for all context operations.
+The unified `TypeContext` structure provides a clean API for variable binding contexts.
 -/
 
 namespace RumpsteakV2.Protocol.LocalTypeConv
@@ -30,38 +26,21 @@ open RumpsteakV2.Protocol
 
 /-! ## Contexts
 
-We keep `Context` and `NameContext` as `List String` for backward compatibility with
-existing proofs. The `NameOnlyContext` type provides an equivalent unified representation.
+`Context` and `NameContext` are now unified as `NameOnlyContext`.
 -/
 
-abbrev Context := List String
-abbrev NameContext := List String
+abbrev Context := NameOnlyContext
+abbrev NameContext := NameOnlyContext
 
-/-! ### TypeContext Bridge
+/-! ### Context Operations -/
 
-These functions provide interoperability between the legacy `List String` contexts
-and the unified `NameOnlyContext` type.
--/
-
-/-- Convert Context to NameOnlyContext. -/
-def Context.toNameOnlyContext (ctx : Context) : NameOnlyContext :=
-  NameOnlyContext.fromList ctx
-
-/-- Convert NameOnlyContext to Context. -/
-def Context.ofNameOnlyContext (ctx : NameOnlyContext) : Context :=
-  ctx.toList
-
-/-- Convert NameContext to NameOnlyContext. -/
-def NameContext.toNameOnlyContext (ctx : NameContext) : NameOnlyContext :=
-  NameOnlyContext.fromList ctx
-
-/-- Convert NameOnlyContext to NameContext. -/
-def NameContext.ofNameOnlyContext (ctx : NameOnlyContext) : NameContext :=
-  ctx.toList
+-- Re-export Membership instance for Context/NameContext abbreviations
+instance : Membership String Context := inferInstance
+instance : Membership String NameContext := inferInstance
 
 /-- Find the de Bruijn index of a name in the context. -/
 def Context.indexOf (ctx : Context) (name : String) : Option Nat :=
-  ctx.findIdx? (· == name)
+  NameOnlyContext.indexOf ctx name
 
 /-- Coverage: all free variables are in the context. -/
 def Context.Covers (ctx : Context) (t : LocalTypeR) : Prop :=
@@ -86,14 +65,17 @@ theorem Context.covers_of_closed (ctx : Context) (t : LocalTypeR) :
   exact hv'.elim
 
 theorem Context.covers_of_closed_singleton (t : String) (body : LocalTypeR) :
-    body.isClosed = true → Context.Covers [t] body :=
-  Context.covers_of_closed [t] body
+    body.isClosed = true → Context.Covers (NameOnlyContext.cons t TypeContext.empty) body := by
+  intro hclosed v hv
+  have hcov := Context.covers_of_closed (NameOnlyContext.cons t TypeContext.empty) body hclosed
+  exact hcov v hv
 
 theorem Context.covers_of_mu_closed_singleton (t : String) (body : LocalTypeR) :
-    (LocalTypeR.mu t body).isClosed = true → Context.Covers [t] body := by
+    (LocalTypeR.mu t body).isClosed = true → Context.Covers (NameOnlyContext.cons t TypeContext.empty) body := by
   intro hclosed v hv
   by_cases hvt : v = t
-  · simp [hvt]
+  · simp only [hvt]
+    exact NameOnlyContext.mem_cons_self t TypeContext.empty
   · have hclosed' : (body.freeVars.filter (· != t)).isEmpty = true := by
       simpa only [LocalTypeR.isClosed, LocalTypeR.freeVars] using hclosed
     have hnil : body.freeVars.filter (· != t) = [] :=
@@ -104,14 +86,15 @@ theorem Context.covers_of_mu_closed_singleton (t : String) (body : LocalTypeR) :
       simpa [hnil] using hfilter
     exact this.elim
 
+/-! ### NameContext Operations -/
+
 /-- Fresh binder names for DB → named conversion (simple scheme). -/
 def NameContext.freshName (ctx : NameContext) : String :=
-  "_db" ++ toString ctx.length
+  NameOnlyContext.freshName ctx
 
-def NameContext.get? : NameContext → Nat → Option String
-  | [], _ => none
-  | x :: _, 0 => some x
-  | _ :: xs, n + 1 => NameContext.get? xs n
+/-- Get name at index. -/
+def NameContext.get? (ctx : NameContext) (i : Nat) : Option String :=
+  NameOnlyContext.get? ctx i
 
 end RumpsteakV2.Protocol.LocalTypeConv
 
@@ -120,19 +103,20 @@ end RumpsteakV2.Protocol.LocalTypeConv
 namespace RumpsteakV2.Protocol.LocalTypeR
 
 open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol
 
 mutual
   def LocalTypeR.toDB? (ctx : RumpsteakV2.Protocol.LocalTypeConv.Context) :
       LocalTypeR → Option RumpsteakV2.Protocol.LocalTypeDB
     | .end => some .end
     | .var v =>
-        (RumpsteakV2.Protocol.LocalTypeConv.Context.indexOf ctx v).map LocalTypeDB.var
+        (NameOnlyContext.indexOf ctx v).map LocalTypeDB.var
     | .send p bs =>
         branchesToDB? ctx bs |>.map (fun bs' => .send p bs')
     | .recv p bs =>
         branchesToDB? ctx bs |>.map (fun bs' => .recv p bs')
     | .mu t body =>
-        (body.toDB? (t :: ctx)).map (fun body' => .mu body')
+        (body.toDB? (NameOnlyContext.cons t ctx)).map (fun body' => .mu body')
   termination_by
     t => sizeOf t
 
@@ -153,6 +137,7 @@ namespace RumpsteakV2.Protocol.LocalTypeDB
 
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol
 
 /-! ## Safe Conversions with Option
 
@@ -175,7 +160,7 @@ mutual
         branchesFromDB? ctx bs |>.map (LocalTypeR.recv p)
     | .mu body =>
         let fresh := RumpsteakV2.Protocol.LocalTypeConv.NameContext.freshName ctx
-        (body.fromDB? (fresh :: ctx)).map (LocalTypeR.mu fresh)
+        (body.fromDB? (NameOnlyContext.cons fresh ctx)).map (LocalTypeR.mu fresh)
   termination_by
     t => sizeOf t
 
@@ -207,7 +192,7 @@ mutual
     | .recv p bs => LocalTypeR.recv p (branchesFromDB ctx bs)
     | .mu body =>
         let fresh := RumpsteakV2.Protocol.LocalTypeConv.NameContext.freshName ctx
-        LocalTypeR.mu fresh (body.fromDB (fresh :: ctx))
+        LocalTypeR.mu fresh (body.fromDB (NameOnlyContext.cons fresh ctx))
   termination_by
     t => sizeOf t
 

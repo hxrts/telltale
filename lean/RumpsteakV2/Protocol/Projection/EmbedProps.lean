@@ -313,14 +313,38 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
       cases gbody with
       | mu t' gbody' =>
           simp [CEmbedF] at hF
-          rcases hF with ⟨_, _, hinner⟩
-          cases body' <;> simp [LocalTypeR.lcontractive] at hcontr
-          · cases gbody' <;> simp [CEmbedF, RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hinner ⊢
-          · cases hcontr
-          · cases hcontr
-          · cases gbody' <;> simp [CEmbedF, RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hinner ⊢
-          · cases gbody' <;> simp [CEmbedF, RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hinner ⊢
-      | end =>
+          rcases hF with ⟨_, hcontr_gbody', hinner⟩
+          -- Destruct the inner embedding to constrain gbody'
+          have hinner' := CEmbed_destruct hinner
+          cases body' with
+          | «end» =>
+              -- body' = .end means gbody' must be .end (from CEmbedF)
+              cases gbody' with
+              | «end» => simp [RumpsteakV2.Protocol.Projection.Trans.lcontractive]
+              | var _ => simp [CEmbedF] at hinner'
+              | mu _ _ => simp [CEmbedF] at hinner'
+              | comm _ _ _ => simp [CEmbedF] at hinner'
+          | var _ =>
+              -- body' = .var contradicts hcontr (not contractive)
+              simp [LocalTypeR.lcontractive] at hcontr
+          | mu _ _ =>
+              -- body' = .mu contradicts hcontr (not contractive)
+              simp [LocalTypeR.lcontractive] at hcontr
+          | send _ _ =>
+              -- body' = .send means gbody' must be .comm (from CEmbedF)
+              cases gbody' with
+              | «end» => simp [CEmbedF] at hinner'
+              | var _ => simp [CEmbedF] at hinner'
+              | mu _ _ => simp [CEmbedF] at hinner'
+              | comm _ _ _ => simp [RumpsteakV2.Protocol.Projection.Trans.lcontractive]
+          | recv _ _ =>
+              -- body' = .recv means gbody' must be .comm (from CEmbedF)
+              cases gbody' with
+              | «end» => simp [CEmbedF] at hinner'
+              | var _ => simp [CEmbedF] at hinner'
+              | mu _ _ => simp [CEmbedF] at hinner'
+              | comm _ _ _ => simp [RumpsteakV2.Protocol.Projection.Trans.lcontractive]
+      | «end» =>
           simp [CEmbedF] at hF
       | var t' =>
           simp [CEmbedF] at hF
@@ -350,6 +374,8 @@ mutual
             have hwf'_body : ∀ partner, body.hasRecvFrom partner → role ≠ partner := by
               intro partner hrecv
               exact hwf' partner (LocalTypeR.hasRecvFrom_mu hrecv)
+            have _hterm : sizeOf body < sizeOf (LocalTypeR.mu t body) :=
+              LocalTypeR.sizeOf_body_lt_sizeOf_mu t body
             obtain ⟨gbody, hembed⟩ := localType_has_embed body role hwf_body hwf'_body
             have hcontr_gbody : RumpsteakV2.Protocol.Projection.Trans.lcontractive gbody = true :=
               embed_lcontractive_of_local hcontr hembed
@@ -372,6 +398,8 @@ mutual
         have hwf'_branches : ∀ lb ∈ lbs, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner := by
           intro lb hmem partner hrecv
           exact hwf' partner (LocalTypeR.hasRecvFrom_send_branch hmem hrecv)
+        have _hterm : sizeOf lbs < sizeOf (LocalTypeR.send receiver lbs) :=
+          LocalTypeR.sizeOf_branches_lt_sizeOf_send receiver lbs
         obtain ⟨gbs, hembed⟩ := branches_have_embed lbs role hwf_branches hwf'_branches
         use .comm role receiver gbs
         apply CEmbed_fold'
@@ -388,19 +416,14 @@ mutual
         have hwf'_branches : ∀ lb ∈ lbs, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner := by
           intro lb hmem partner hrecv
           exact hwf' partner (LocalTypeR.hasRecvFrom_recv_branch hmem hrecv)
+        have _hterm : sizeOf lbs < sizeOf (LocalTypeR.recv sender lbs) :=
+          LocalTypeR.sizeOf_branches_lt_sizeOf_recv sender lbs
         obtain ⟨gbs, hembed⟩ := branches_have_embed lbs role hwf_branches hwf'_branches
         use .comm sender role gbs
         apply CEmbed_fold'
         simp [CEmbedF]
         exact ⟨hne, hembed⟩
   termination_by sizeOf e
-  decreasing_by
-    classical
-    all_goals
-      first
-      | exact LocalTypeR.sizeOf_body_lt_sizeOf_mu _ _
-      | exact LocalTypeR.sizeOf_branches_lt_sizeOf_send _ _
-      | exact LocalTypeR.sizeOf_branches_lt_sizeOf_recv _ _
 
   theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
       (hwf : ∀ lb ∈ lbs, ∀ partner, lb.2.hasSendTo partner → role ≠ partner)
@@ -419,19 +442,15 @@ mutual
           fun lb hmem p h => hwf lb (List.Mem.tail hd hmem) p h
         have hwf'_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner :=
           fun lb hmem p h => hwf' lb (List.Mem.tail hd hmem) p h
+        have _hterm1 : sizeOf hd.2 < sizeOf (hd :: tl) :=
+          LocalTypeR.sizeOf_cont_lt_sizeOf_branches hd.1 hd.2 tl
+        have _hterm2 : sizeOf tl < sizeOf (hd :: tl) :=
+          LocalTypeR.sizeOf_tail_lt_sizeOf_branches hd tl
         obtain ⟨gcont, hcont⟩ := localType_has_embed hd.2 role hwf_hd hwf'_hd
         obtain ⟨gtl, htl⟩ := branches_have_embed tl role hwf_tl hwf'_tl
         use (hd.1, gcont) :: gtl
         exact List.Forall₂.cons ⟨rfl, hcont⟩ htl
   termination_by sizeOf lbs
-  decreasing_by
-    classical
-    all_goals
-      first
-      | exact LocalTypeR.sizeOf_tail_lt_sizeOf_branches hd tl
-      | (cases hd with
-        | mk label cont =>
-            exact LocalTypeR.sizeOf_cont_lt_sizeOf_branches label cont tl)
 end
 
 /-- If a role participates in a global type and we can project, some embedding exists.
