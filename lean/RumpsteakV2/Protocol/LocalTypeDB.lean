@@ -5,7 +5,7 @@ import RumpsteakV2.Protocol.GlobalType
 
 /-! # RumpsteakV2.Protocol.LocalTypeDB
 
-De Bruijn indexed local types for cleaner substitution proofs.
+De Bruijn indexed local types for clean substitution proofs.
 
 This module provides a de Bruijn representation of local types where:
 - Variables are natural numbers (de Bruijn indices)
@@ -133,63 +133,105 @@ end
 
 /-! ## Lift/Subst Interaction Laws -/
 
-mutual
-  private theorem lift_subst_cancel_at_depth_any (e : LocalTypeDB) (k : Nat) (s : LocalTypeDB) :
+private theorem lift_subst_cancel_at_depth_any (e : LocalTypeDB) (k : Nat) (s : LocalTypeDB) :
     (e.lift 1 (k + 1)).subst (k + 1) s = e := by
-    induction e generalizing k s with
-    | .end =>
-        simp [LocalTypeDB.lift, LocalTypeDB.subst]
-    | var n =>
-        by_cases hlt : n < k + 1
-        · have hne : n ≠ k + 1 := ne_of_lt hlt
-          have hgt : ¬ n > k + 1 := by
-            exact not_lt_of_ge (Nat.le_of_lt_succ hlt)
-          simp [LocalTypeDB.lift, LocalTypeDB.subst, hlt, hne, hgt]
-        · have hge : k + 1 ≤ n := Nat.le_of_not_lt hlt
-          have hgt : n + 1 > k + 1 := by
-            have h1 : k + 1 < k + 2 := Nat.lt_succ_self (k + 1)
-            have h2 : k + 2 ≤ n + 1 := Nat.succ_le_succ hge
-            exact lt_of_lt_of_le h1 h2
-          have hne : n + 1 ≠ k + 1 := ne_of_gt hgt
-          simp [LocalTypeDB.lift, LocalTypeDB.subst, hlt, hne, hgt]
-    | send p bs =>
-        simp [LocalTypeDB.lift, LocalTypeDB.subst]
-        exact liftBranches_substBranches_cancel_at_depth_any bs k s
-    | recv p bs =>
-        simp [LocalTypeDB.lift, LocalTypeDB.subst]
-        exact liftBranches_substBranches_cancel_at_depth_any bs k s
-    | mu body ih =>
-        simp [LocalTypeDB.lift, LocalTypeDB.subst]
-        exact ih (k + 1) (s.lift 1 0)
+  let P1 : LocalTypeDB → Prop :=
+    fun e => ∀ k s, (e.lift 1 (k + 1)).subst (k + 1) s = e
+  let P2 : List (Label × LocalTypeDB) → Prop :=
+    fun bs => ∀ k s, substBranches (liftBranches 1 (k + 1) bs) (k + 1) s = bs
+  let P3 : Label × LocalTypeDB → Prop :=
+    fun b => P1 b.2
+  have hrec : P1 e := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ e)
+    -- end case
+    · intro k s
+      simp [LocalTypeDB.lift, LocalTypeDB.subst]
+    -- var case
+    · intro n k s
+      by_cases hlt : n < k + 1
+      · have hne : n ≠ k + 1 := by omega
+        have hgt : ¬ n > k + 1 := by omega
+        simp [LocalTypeDB.lift, LocalTypeDB.subst, hlt, hne, hgt]
+      · have hge : k + 1 ≤ n := by omega
+        have hgt : n + 1 > k + 1 := by omega
+        have hne : n + 1 ≠ k + 1 := by omega
+        have hne' : n ≠ k := by omega
+        simp only [LocalTypeDB.lift, LocalTypeDB.subst, hlt, hgt, hne, ite_false, ite_true]
+        simp only [Nat.add_sub_cancel]
+    -- send case
+    · intro p bs hbs k s
+      simp [LocalTypeDB.lift, LocalTypeDB.subst]
+      exact hbs k s
+    -- recv case
+    · intro p bs hbs k s
+      simp [LocalTypeDB.lift, LocalTypeDB.subst]
+      exact hbs k s
+    -- mu case
+    · intro body hbody k s
+      simp [LocalTypeDB.lift, LocalTypeDB.subst]
+      exact hbody (k + 1) (s.lift 1 0)
+    -- nil case
+    · intro k s
+      simp [liftBranches, substBranches]
+    -- cons case
+    · intro head tail hhead htail k s
+      obtain ⟨l, t⟩ := head
+      simp [liftBranches, substBranches, hhead k s, htail k s]
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec k s
 
-  private theorem liftBranches_substBranches_cancel_at_depth_any
-      (bs : List (Label × LocalTypeDB)) (k : Nat) (s : LocalTypeDB) :
+private theorem liftBranches_substBranches_cancel_at_depth_any
+    (bs : List (Label × LocalTypeDB)) (k : Nat) (s : LocalTypeDB) :
     substBranches (liftBranches 1 (k + 1) bs) (k + 1) s = bs := by
-    induction bs with
-    | nil =>
-        simp [liftBranches, substBranches]
-    | cons head rest ih =>
-        cases head with
-        | mk l t =>
-            simp [liftBranches, substBranches, lift_subst_cancel_at_depth_any, ih]
-end
+  induction bs with
+  | nil => simp [liftBranches, substBranches]
+  | cons head rest ih =>
+      obtain ⟨l, t⟩ := head
+      simp [liftBranches, substBranches, lift_subst_cancel_at_depth_any, ih]
 
 theorem lift_subst_cancel (e : LocalTypeDB) (t : LocalTypeDB) :
-  (e.lift 1 0).subst 0 t = e := by
-  induction e generalizing t with
-  | .end =>
+    (e.lift 1 0).subst 0 t = e := by
+  let P1 : LocalTypeDB → Prop :=
+    fun e => ∀ t, (e.lift 1 0).subst 0 t = e
+  let P2 : List (Label × LocalTypeDB) → Prop :=
+    fun bs => ∀ t, substBranches (liftBranches 1 0 bs) 0 t = bs
+  let P3 : Label × LocalTypeDB → Prop :=
+    fun b => P1 b.2
+  have hrec : P1 e := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ e)
+    -- end case
+    · intro t
       simp [LocalTypeDB.lift, LocalTypeDB.subst]
-  | var n =>
+    -- var case
+    · intro n t
       have hne : n + 1 ≠ 0 := Nat.succ_ne_zero n
       have hgt : n + 1 > 0 := Nat.succ_pos n
       simp [LocalTypeDB.lift, LocalTypeDB.subst, hne, hgt]
-  | send p bs =>
-      simp [LocalTypeDB.lift, LocalTypeDB.subst, liftBranches_substBranches_cancel]
-  | recv p bs =>
-      simp [LocalTypeDB.lift, LocalTypeDB.subst, liftBranches_substBranches_cancel]
-  | mu body ih =>
+    -- send case
+    · intro p bs hbs t
+      simp [LocalTypeDB.lift, LocalTypeDB.subst, hbs t]
+    -- recv case
+    · intro p bs hbs t
+      simp [LocalTypeDB.lift, LocalTypeDB.subst, hbs t]
+    -- mu case
+    · intro body hbody t
       simp [LocalTypeDB.lift, LocalTypeDB.subst]
       exact lift_subst_cancel_at_depth_any body 0 (t.lift 1 0)
+    -- nil case
+    · intro t
+      simp [liftBranches, substBranches]
+    -- cons case
+    · intro head tail hhead htail t
+      obtain ⟨l, t'⟩ := head
+      simp [liftBranches, substBranches, hhead t, htail t]
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec t
 
 theorem lift_subst_cancel_at_depth (e : LocalTypeDB) (k : Nat) (t : LocalTypeDB) :
   (e.lift 1 (k + 1)).subst (k + 1) (t.lift 1 k) = e := by
@@ -213,46 +255,74 @@ theorem liftBranches_substBranches_cancel_at_depth
 
 /-! ## Closedness Preservation -/
 
-mutual
-  private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
+private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
     t.isClosedAt d = true → (t.lift c k).isClosedAt (d + c) = true := by
-    intro h
-    induction t generalizing k d c with
-    | .end =>
-        simp [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at *
-    | var n =>
-        simp [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
-        by_cases hnk : n < k
-        · simp [hnk]
-          exact Nat.lt_of_lt_of_le h (Nat.le_add_right _ _)
-        · simp [hnk]
-          exact Nat.add_lt_add_right h _
-    | send p bs =>
-        simp [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
-        exact isClosedAt_lift_at_branches bs c k d h
-    | recv p bs =>
-        simp [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
-        exact isClosedAt_lift_at_branches bs c k d h
-    | mu body ih =>
-        simp [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
-        exact ih h
+  intro h
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ c k d, t.isClosedAt d = true → (t.lift c k).isClosedAt (d + c) = true
+  let P2 : List (Label × LocalTypeDB) → Prop :=
+    fun bs => ∀ c k d, isClosedAtBranches d bs = true →
+      isClosedAtBranches (d + c) (liftBranches c k bs) = true
+  let P3 : Label × LocalTypeDB → Prop :=
+    fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro c k d h
+      simp [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at *
+    -- var case
+    · intro n c k d h
+      simp only [LocalTypeDB.isClosedAt, decide_eq_true_eq] at h
+      simp only [LocalTypeDB.lift]
+      by_cases hnk : n < k
+      · simp only [hnk, ite_true, LocalTypeDB.isClosedAt, decide_eq_true_eq]
+        exact Nat.lt_of_lt_of_le h (Nat.le_add_right d c)
+      · simp only [hnk, ite_false, LocalTypeDB.isClosedAt, decide_eq_true_eq]
+        exact Nat.add_lt_add_right h c
+    -- send case
+    · intro p bs hbs c k d h
+      simp only [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
+      exact hbs c k d h
+    -- recv case
+    · intro p bs hbs c k d h
+      simp only [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
+      exact hbs c k d h
+    -- mu case
+    · intro body hbody c k d h
+      simp only [LocalTypeDB.isClosedAt, LocalTypeDB.lift] at h ⊢
+      have heq : d + c + 1 = d + 1 + c := by omega
+      rw [heq]
+      exact hbody c (k + 1) (d + 1) h
+    -- nil case
+    · intro c k d h
+      simp [isClosedAtBranches, liftBranches] at h ⊢
+    -- cons case
+    · intro head tail hhead htail c k d h
+      obtain ⟨l, t⟩ := head
+      simp [isClosedAtBranches, liftBranches, Bool.and_eq_true] at h ⊢
+      rcases h with ⟨ht, hrest⟩
+      constructor
+      · exact hhead c k d ht
+      · exact htail c k d hrest
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec c k d h
 
-  private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (c k d : Nat) :
+private theorem isClosedAt_lift_at_branches (bs : List (Label × LocalTypeDB)) (c k d : Nat) :
     isClosedAtBranches d bs = true →
     isClosedAtBranches (d + c) (liftBranches c k bs) = true := by
-    intro h
-    induction bs with
-    | nil =>
-        simp [isClosedAtBranches, liftBranches] at h ⊢
-    | cons head rest ih =>
-        cases head with
-        | mk l t =>
-            simp [isClosedAtBranches, liftBranches, Bool.and_eq_true] at h ⊢
-            rcases h with ⟨ht, hrest⟩
-            constructor
-            · exact isClosedAt_lift_at t c k d ht
-            · exact ih hrest
-end
+  intro h
+  induction bs with
+  | nil => simp [isClosedAtBranches, liftBranches] at h ⊢
+  | cons head rest ih =>
+      obtain ⟨l, t⟩ := head
+      simp [isClosedAtBranches, liftBranches, Bool.and_eq_true] at h ⊢
+      rcases h with ⟨ht, hrest⟩
+      constructor
+      · exact isClosedAt_lift_at t c k d ht
+      · exact ih hrest
 
 theorem isClosedAt_lift (t : LocalTypeDB) (c k : Nat) :
   t.isClosedAt k = true → (t.lift c k).isClosedAt (k + c) = true := by
@@ -265,63 +335,97 @@ theorem isClosedAt_lift_branches (bs : List (Label × LocalTypeDB)) (c k : Nat) 
   intro h
   exact isClosedAt_lift_at_branches bs c k k h
 
-mutual
-  theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
+theorem isClosedAt_subst (t e : LocalTypeDB) (k : Nat) :
     t.isClosedAt (k + 1) = true → e.isClosedAt k = true →
     (t.subst k e).isClosedAt k = true := by
-    intro ht he
-    induction t generalizing k e with
-    | .end =>
-        simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at *
-    | var n =>
-        simp [LocalTypeDB.isClosedAt] at ht
-        by_cases hnk : n = k
-        · simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt, hnk, he]
-        · by_cases hgt : n > k
-          · have hge : k + 1 ≤ n := Nat.succ_le_of_lt hgt
-            have hcontra : False := (Nat.not_lt_of_ge hge) ht
-            exact (False.elim hcontra)
-          · have hle : n ≤ k := Nat.le_of_not_gt hgt
-            have hlt : n < k := Nat.lt_of_le_of_ne hle (Ne.symm hnk)
-            simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt, hnk, hgt, hlt]
-    | send p bs =>
-        simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
-        exact isClosedAt_subst_branches bs e k ht he
-    | recv p bs =>
-        simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
-        exact isClosedAt_subst_branches bs e k ht he
-    | mu body ih =>
-        simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
-        have h_lift : (e.lift 1 0).isClosedAt (k + 1) = true :=
-          isClosedAt_lift_at e 1 0 k he
-        exact ih ht h_lift
+  intro ht he
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ e k, t.isClosedAt (k + 1) = true → e.isClosedAt k = true →
+      (t.subst k e).isClosedAt k = true
+  let P2 : List (Label × LocalTypeDB) → Prop :=
+    fun bs => ∀ e k, isClosedAtBranches (k + 1) bs = true → e.isClosedAt k = true →
+      isClosedAtBranches k (substBranches bs k e) = true
+  let P3 : Label × LocalTypeDB → Prop :=
+    fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro e k ht he
+      simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at *
+    -- var case
+    · intro n e k ht he
+      simp [LocalTypeDB.isClosedAt] at ht
+      by_cases hnk : n = k
+      · simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt, hnk, he]
+      · by_cases hgt : n > k
+        · have hge : k + 1 ≤ n := Nat.succ_le_of_lt hgt
+          have hcontra : False := (Nat.not_lt_of_ge hge) ht
+          exact (False.elim hcontra)
+        · have hle : n ≤ k := Nat.le_of_not_gt hgt
+          have hlt : n < k := Nat.lt_of_le_of_ne hle hnk
+          simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt, hnk, hgt, hlt]
+    -- send case
+    · intro p bs hbs e k ht he
+      simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
+      exact hbs e k ht he
+    -- recv case
+    · intro p bs hbs e k ht he
+      simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
+      exact hbs e k ht he
+    -- mu case
+    · intro body hbody e k ht he
+      simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt] at ht ⊢
+      have h_lift : (e.lift 1 0).isClosedAt (k + 1) = true :=
+        isClosedAt_lift_at e 1 0 k he
+      exact hbody (e.lift 1 0) (k + 1) ht h_lift
+    -- nil case
+    · intro e k hbs he
+      simp [isClosedAtBranches, substBranches] at hbs ⊢
+    -- cons case
+    · intro head tail hhead htail e k hbs he
+      obtain ⟨l, t⟩ := head
+      simp [isClosedAtBranches, substBranches, Bool.and_eq_true] at hbs ⊢
+      rcases hbs with ⟨ht, hrest⟩
+      constructor
+      · exact hhead e k ht he
+      · exact htail e k hrest he
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec e k ht he
 
-  theorem isClosedAt_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
+theorem isClosedAt_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
     isClosedAtBranches (k + 1) bs = true → e.isClosedAt k = true →
     isClosedAtBranches k (substBranches bs k e) = true := by
-    intro hbs he
-    induction bs with
-    | nil =>
-        simp [isClosedAtBranches, substBranches] at hbs ⊢
-    | cons head rest ih =>
-        cases head with
-        | mk l t =>
-            simp [isClosedAtBranches, substBranches, Bool.and_eq_true] at hbs ⊢
-            rcases hbs with ⟨ht, hrest⟩
-            constructor
-            · exact isClosedAt_subst t e k ht he
-            · exact ih hrest he
-end
+  intro hbs he
+  induction bs with
+  | nil => simp [isClosedAtBranches, substBranches] at hbs ⊢
+  | cons head rest ih =>
+      obtain ⟨l, t⟩ := head
+      simp [isClosedAtBranches, substBranches, Bool.and_eq_true] at hbs ⊢
+      rcases hbs with ⟨ht, hrest⟩
+      constructor
+      · exact isClosedAt_subst t e k ht he
+      · exact ih hrest
 
 /-! ## Contractiveness Preservation -/
 
 theorem isGuarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
-  i < k → t.isGuarded i = true → (t.lift c k).isGuarded i = true := by
+    i < k → t.isGuarded i = true → (t.lift c k).isGuarded i = true := by
   intro hik hguard
-  induction t generalizing i c k with
-  | .end =>
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ i c k, i < k → t.isGuarded i = true → (t.lift c k).isGuarded i = true
+  let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
+  let P3 : Label × LocalTypeDB → Prop := fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift] at *
-  | var n =>
+    -- var case
+    · intro n i c k hik hguard
       by_cases hnk : n < k
       · simpa [LocalTypeDB.isGuarded, LocalTypeDB.lift, hnk] using hguard
       · have hle : k ≤ n := Nat.le_of_not_lt hnk
@@ -331,21 +435,40 @@ theorem isGuarded_lift_lt (t : LocalTypeDB) (i c k : Nat) :
         have hne : n + c ≠ i := ne_of_gt hlt
         have hbne : (n + c != i) = true := (bne_iff_ne).2 hne
         simpa [LocalTypeDB.isGuarded, LocalTypeDB.lift, hnk] using hbne
-  | send p bs =>
+    -- send case
+    · intro p bs _ i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift]
-  | recv p bs =>
+    -- recv case
+    · intro p bs _ i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift]
-  | mu body ih =>
+    -- mu case
+    · intro body hbody i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift] at hguard ⊢
-      exact ih (Nat.succ_lt_succ hik) hguard
+      exact hbody (i + 1) c (k + 1) (Nat.succ_lt_succ hik) hguard
+    -- nil case
+    · trivial
+    -- cons case
+    · intro _ _ _ _; trivial
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec i c k hik hguard
 
 theorem isGuarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
-  k ≤ i → t.isGuarded i = true → (t.lift c k).isGuarded (i + c) = true := by
+    k ≤ i → t.isGuarded i = true → (t.lift c k).isGuarded (i + c) = true := by
   intro hik hguard
-  induction t generalizing i c k with
-  | .end =>
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ i c k, k ≤ i → t.isGuarded i = true → (t.lift c k).isGuarded (i + c) = true
+  let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
+  let P3 : Label × LocalTypeDB → Prop := fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift] at *
-  | var n =>
+    -- var case
+    · intro n i c k hik hguard
       have hne : n ≠ i := (bne_iff_ne).1 hguard
       by_cases hnk : n < k
       · have hni : n < i := lt_of_lt_of_le hnk hik
@@ -357,35 +480,88 @@ theorem isGuarded_lift_ge (t : LocalTypeDB) (i c k : Nat) :
           exact fun h => hne (Nat.add_right_cancel h)
         have hbne : (n + c != i + c) = true := (bne_iff_ne).2 hne'
         simpa [LocalTypeDB.isGuarded, LocalTypeDB.lift, hnk] using hbne
-  | send p bs =>
+    -- send case
+    · intro p bs _ i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift]
-  | recv p bs =>
+    -- recv case
+    · intro p bs _ i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift]
-  | mu body ih =>
+    -- mu case
+    · intro body hbody i c k hik hguard
       simp [LocalTypeDB.isGuarded, LocalTypeDB.lift] at hguard ⊢
-      exact ih (Nat.succ_le_succ hik) hguard
+      have heq : i + c + 1 = i + 1 + c := by omega
+      rw [heq]
+      exact hbody (i + 1) c (k + 1) (Nat.succ_le_succ hik) hguard
+    -- nil case
+    · trivial
+    -- cons case
+    · intro _ _ _ _; trivial
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec i c k hik hguard
 
-theorem isGuarded_lift_zero (t : LocalTypeDB) : (t.lift 1 0).isGuarded 0 = true := by
-  induction t with
-  | .end =>
+/-- After lifting by 1 at cutoff k, index k cannot appear (it's in a gap). -/
+theorem isGuarded_lift_at_cutoff (t : LocalTypeDB) (k : Nat) :
+    (t.lift 1 k).isGuarded k = true := by
+  let P1 : LocalTypeDB → Prop := fun t => ∀ k, (t.lift 1 k).isGuarded k = true
+  let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
+  let P3 : Label × LocalTypeDB → Prop := fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro k
       simp [LocalTypeDB.lift, LocalTypeDB.isGuarded]
-  | var n =>
+    -- var case
+    · intro n k
+      by_cases hnk : n < k
+      · -- n stays as n, which is < k, so n ≠ k
+        have hne : n ≠ k := Nat.ne_of_lt hnk
+        simp [LocalTypeDB.lift, LocalTypeDB.isGuarded, hnk, bne_iff_ne, hne]
+      · -- n becomes n + 1, which is > k (since n >= k)
+        have hge : k ≤ n := Nat.le_of_not_lt hnk
+        have hgt : n + 1 > k := by omega
+        have hne : n + 1 ≠ k := Nat.ne_of_gt hgt
+        simp [LocalTypeDB.lift, LocalTypeDB.isGuarded, hnk, bne_iff_ne, hne]
+    -- send case
+    · intro p bs _ k
       simp [LocalTypeDB.lift, LocalTypeDB.isGuarded]
-  | send p bs ih =>
+    -- recv case
+    · intro p bs _ k
       simp [LocalTypeDB.lift, LocalTypeDB.isGuarded]
-  | recv p bs ih =>
+    -- mu case
+    · intro body hbody k
       simp [LocalTypeDB.lift, LocalTypeDB.isGuarded]
-  | mu body ih =>
-      simp [LocalTypeDB.lift, LocalTypeDB.isGuarded, ih]
+      exact hbody (k + 1)
+    -- nil case
+    · trivial
+    -- cons case
+    · intro _ _ _ _; trivial
+    -- pair case
+    · intro l t ht; exact ht
+  exact hrec k
+
+theorem isGuarded_lift_zero (t : LocalTypeDB) : (t.lift 1 0).isGuarded 0 = true :=
+  isGuarded_lift_at_cutoff t 0
 
 theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
-  i < k → t.isGuarded i = true → e.isGuarded i = true →
-  (t.subst k e).isGuarded i = true := by
+    i < k → t.isGuarded i = true → e.isGuarded i = true →
+    (t.subst k e).isGuarded i = true := by
   intro hik hguard heguard
-  induction t generalizing i k e with
-  | .end =>
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ e i k, i < k → t.isGuarded i = true → e.isGuarded i = true →
+      (t.subst k e).isGuarded i = true
+  let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
+  let P3 : Label × LocalTypeDB → Prop := fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro e i k hik hguard heguard
       simp [LocalTypeDB.subst, LocalTypeDB.isGuarded]
-  | var n =>
+    -- var case
+    · intro n e i k hik hguard heguard
       by_cases hnk : n = k
       · simpa [LocalTypeDB.subst, LocalTypeDB.isGuarded, hnk] using heguard
       · by_cases hgt : n > k
@@ -394,118 +570,177 @@ theorem isGuarded_subst_lt (t e : LocalTypeDB) (i k : Nat) :
           have hne : n - 1 ≠ i := ne_of_gt hlt
           have hbne : (n - 1 != i) = true := (bne_iff_ne).2 hne
           simpa [LocalTypeDB.subst, LocalTypeDB.isGuarded, hnk, hgt] using hbne
-        · have hlt : n < k := lt_of_le_of_ne (Nat.le_of_not_gt hgt) (Ne.symm hnk)
+        · have hlt : n < k := lt_of_le_of_ne (Nat.le_of_not_gt hgt) hnk
           simpa [LocalTypeDB.subst, LocalTypeDB.isGuarded, hnk, hgt, hlt] using hguard
-  | send p bs =>
+    -- send case
+    · intro p bs _ e i k hik hguard heguard
       simp [LocalTypeDB.subst, LocalTypeDB.isGuarded]
-  | recv p bs =>
+    -- recv case
+    · intro p bs _ e i k hik hguard heguard
       simp [LocalTypeDB.subst, LocalTypeDB.isGuarded]
-  | mu body ih =>
+    -- mu case
+    · intro body hbody e i k hik hguard heguard
       simp [LocalTypeDB.isGuarded] at hguard
       have hik' : i + 1 < k + 1 := Nat.succ_lt_succ hik
       have heguard' : (e.lift 1 0).isGuarded (i + 1) = true := by
         have hge := isGuarded_lift_ge e i 1 0 (Nat.zero_le i) heguard
         simpa using hge
-      have hsub := ih hik' hguard heguard'
+      have hsub := hbody (e.lift 1 0) (i + 1) (k + 1) hik' hguard heguard'
       simpa [LocalTypeDB.subst, LocalTypeDB.isGuarded] using hsub
+    -- nil case
+    · trivial
+    -- cons case
+    · intro _ _ _ _; trivial
+    -- pair case
+    · intro l t ht; exact ht
+  exact hrec e i k hik hguard heguard
 
-mutual
-  private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
+private theorem isContractive_lift (t : LocalTypeDB) (c k : Nat) :
     t.isContractive = true → (t.lift c k).isContractive = true := by
-    intro h
-    induction t generalizing c k with
-    | .end =>
-        simp [LocalTypeDB.isContractive, LocalTypeDB.lift] at *
-    | var n =>
-        simp [LocalTypeDB.isContractive, LocalTypeDB.lift] at *
-    | send p bs =>
-        have hbs : isContractiveBranches bs = true := by
-          simpa [LocalTypeDB.isContractive] using h
-        have hbs' := isContractiveBranches_lift bs c k hbs
-        simpa [LocalTypeDB.isContractive, LocalTypeDB.lift] using hbs'
-    | recv p bs =>
-        have hbs : isContractiveBranches bs = true := by
-          simpa [LocalTypeDB.isContractive] using h
-        have hbs' := isContractiveBranches_lift bs c k hbs
-        simpa [LocalTypeDB.isContractive, LocalTypeDB.lift] using hbs'
-    | mu body ih =>
-        have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
-          simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using h
-        rcases hpair with ⟨hguard, hcontr⟩
-        have hguard' : (body.lift c (k + 1)).isGuarded 0 = true :=
-          isGuarded_lift_lt body 0 c (k + 1) (Nat.succ_pos k) hguard
-        have hcontr' : (body.lift c (k + 1)).isContractive = true := ih hcontr
-        simp [LocalTypeDB.isContractive, LocalTypeDB.lift, hguard', hcontr']
+  intro h
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ c k, t.isContractive = true → (t.lift c k).isContractive = true
+  let P2 : List (Label × LocalTypeDB) → Prop :=
+    fun bs => ∀ c k, isContractiveBranches bs = true → isContractiveBranches (liftBranches c k bs) = true
+  let P3 : Label × LocalTypeDB → Prop := fun b => P1 b.2
+  have hrec : P1 t := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    -- end case
+    · intro c k h
+      simp [LocalTypeDB.isContractive, LocalTypeDB.lift] at *
+    -- var case
+    · intro n c k h
+      show (if n < k then LocalTypeDB.var n else LocalTypeDB.var (n + c)).isContractive = true
+      split <;> simp [LocalTypeDB.isContractive]
+    -- send case
+    · intro p bs hbs c k h
+      have hbs' : isContractiveBranches bs = true := by
+        simpa [LocalTypeDB.isContractive] using h
+      have hbs'' := hbs c k hbs'
+      simpa [LocalTypeDB.isContractive, LocalTypeDB.lift] using hbs''
+    -- recv case
+    · intro p bs hbs c k h
+      have hbs' : isContractiveBranches bs = true := by
+        simpa [LocalTypeDB.isContractive] using h
+      have hbs'' := hbs c k hbs'
+      simpa [LocalTypeDB.isContractive, LocalTypeDB.lift] using hbs''
+    -- mu case
+    · intro body hbody c k h
+      have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
+        simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using h
+      rcases hpair with ⟨hguard, hcontr⟩
+      have hguard' : (body.lift c (k + 1)).isGuarded 0 = true :=
+        isGuarded_lift_lt body 0 c (k + 1) (Nat.succ_pos k) hguard
+      have hcontr' : (body.lift c (k + 1)).isContractive = true := hbody c (k + 1) hcontr
+      simp [LocalTypeDB.isContractive, LocalTypeDB.lift, hguard', hcontr']
+    -- nil case
+    · intro c k h
+      simp [isContractiveBranches, liftBranches] at *
+    -- cons case
+    · intro head tail hhead htail c k h
+      obtain ⟨l, t⟩ := head
+      simp [isContractiveBranches, liftBranches, Bool.and_eq_true] at h ⊢
+      rcases h with ⟨ht, hrest⟩
+      constructor
+      · exact hhead c k ht
+      · exact htail c k hrest
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec c k h
 
-  private theorem isContractiveBranches_lift (bs : List (Label × LocalTypeDB)) (c k : Nat) :
+private theorem isContractiveBranches_lift (bs : List (Label × LocalTypeDB)) (c k : Nat) :
     isContractiveBranches bs = true → isContractiveBranches (liftBranches c k bs) = true := by
-    intro h
-    induction bs with
-    | nil =>
-        simp [isContractiveBranches, liftBranches] at *
-    | cons head rest ih =>
-        cases head with
-        | mk l t =>
-            simp [isContractiveBranches, liftBranches, Bool.and_eq_true] at h ⊢
-            rcases h with ⟨ht, hrest⟩
-            constructor
-            · exact isContractive_lift t c k ht
-            · exact ih hrest
-end
+  intro h
+  induction bs with
+  | nil => simp [isContractiveBranches, liftBranches] at *
+  | cons head rest ih =>
+      obtain ⟨l, t⟩ := head
+      simp [isContractiveBranches, liftBranches, Bool.and_eq_true] at h ⊢
+      rcases h with ⟨ht, hrest⟩
+      constructor
+      · exact isContractive_lift t c k ht
+      · exact ih hrest
 
-mutual
-  theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
+theorem isContractive_subst (body e : LocalTypeDB) (k : Nat) :
     body.isContractive = true → e.isContractive = true →
     (body.subst k e).isContractive = true := by
-    intro hbody he
-    induction body generalizing k e with
-    | .end =>
-        simp [LocalTypeDB.subst, LocalTypeDB.isContractive]
-    | var n =>
-        by_cases hnk : n = k
-        · simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hnk, he]
-        · by_cases hgt : n > k
-          · simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hnk, hgt]
-          · simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hnk, hgt]
-    | send p bs =>
-        have hbs : isContractiveBranches bs = true := by
-          simpa [LocalTypeDB.isContractive] using hbody
-        have hbs' := isContractive_subst_branches bs e k hbs he
-        simpa [LocalTypeDB.subst, LocalTypeDB.isContractive] using hbs'
-    | recv p bs =>
-        have hbs : isContractiveBranches bs = true := by
-          simpa [LocalTypeDB.isContractive] using hbody
-        have hbs' := isContractive_subst_branches bs e k hbs he
-        simpa [LocalTypeDB.subst, LocalTypeDB.isContractive] using hbs'
-    | mu body ih =>
-        have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
-          simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using hbody
-        rcases hpair with ⟨hguard, hcontr⟩
-        have he_lift : (e.lift 1 0).isContractive = true := isContractive_lift e 1 0 he
-        have hguard_subst : (body.subst (k + 1) (e.lift 1 0)).isGuarded 0 = true := by
-          have hlt : 0 < k + 1 := Nat.succ_pos k
-          have he_guard : (e.lift 1 0).isGuarded 0 = true := isGuarded_lift_zero e
-          exact isGuarded_subst_lt body (e.lift 1 0) 0 (k + 1) hlt hguard he_guard
-        have hcontr_subst : (body.subst (k + 1) (e.lift 1 0)).isContractive = true :=
-          ih hcontr he_lift
-        simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hguard_subst, hcontr_subst]
+  intro hbody he
+  let P1 : LocalTypeDB → Prop :=
+    fun t => ∀ e k, t.isContractive = true → e.isContractive = true →
+      (t.subst k e).isContractive = true
+  let P2 : List (Label × LocalTypeDB) → Prop :=
+    fun bs => ∀ e k, isContractiveBranches bs = true → e.isContractive = true →
+      isContractiveBranches (substBranches bs k e) = true
+  let P3 : Label × LocalTypeDB → Prop := fun b => P1 b.2
+  have hrec : P1 body := by
+    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ body)
+    -- end case
+    · intro e k hbody he
+      simp [LocalTypeDB.subst, LocalTypeDB.isContractive]
+    -- var case
+    · intro n e k hbody he
+      by_cases hnk : n = k
+      · simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hnk, he]
+      · by_cases hgt : n > k
+        · simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hnk, hgt]
+        · simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hnk, hgt]
+    -- send case
+    · intro p bs hbs e k hbody he
+      have hbs' : isContractiveBranches bs = true := by
+        simpa [LocalTypeDB.isContractive] using hbody
+      have hbs'' := hbs e k hbs' he
+      simpa [LocalTypeDB.subst, LocalTypeDB.isContractive] using hbs''
+    -- recv case
+    · intro p bs hbs e k hbody he
+      have hbs' : isContractiveBranches bs = true := by
+        simpa [LocalTypeDB.isContractive] using hbody
+      have hbs'' := hbs e k hbs' he
+      simpa [LocalTypeDB.subst, LocalTypeDB.isContractive] using hbs''
+    -- mu case
+    · intro body hbody_ih e k hbody he
+      have hpair : body.isGuarded 0 = true ∧ body.isContractive = true := by
+        simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using hbody
+      rcases hpair with ⟨hguard, hcontr⟩
+      have he_lift : (e.lift 1 0).isContractive = true := isContractive_lift e 1 0 he
+      have hguard_subst : (body.subst (k + 1) (e.lift 1 0)).isGuarded 0 = true := by
+        have hlt : 0 < k + 1 := Nat.succ_pos k
+        have he_guard : (e.lift 1 0).isGuarded 0 = true := isGuarded_lift_zero e
+        exact isGuarded_subst_lt body (e.lift 1 0) 0 (k + 1) hlt hguard he_guard
+      have hcontr_subst : (body.subst (k + 1) (e.lift 1 0)).isContractive = true :=
+        hbody_ih (e.lift 1 0) (k + 1) hcontr he_lift
+      simp [LocalTypeDB.subst, LocalTypeDB.isContractive, hguard_subst, hcontr_subst]
+    -- nil case
+    · intro e k hbs he
+      simp [isContractiveBranches, substBranches] at hbs ⊢
+    -- cons case
+    · intro head tail hhead htail e k hbs he
+      obtain ⟨l, t⟩ := head
+      simp [isContractiveBranches, substBranches, Bool.and_eq_true] at hbs ⊢
+      rcases hbs with ⟨ht, hrest⟩
+      constructor
+      · exact hhead e k ht he
+      · exact htail e k hrest he
+    -- pair case
+    · intro l t ht
+      exact ht
+  exact hrec e k hbody he
 
-  theorem isContractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
+theorem isContractive_subst_branches (bs : List (Label × LocalTypeDB)) (e : LocalTypeDB) (k : Nat) :
     isContractiveBranches bs = true → e.isContractive = true →
     isContractiveBranches (substBranches bs k e) = true := by
-    intro hbs he
-    induction bs with
-    | nil =>
-        simp [isContractiveBranches, substBranches] at hbs ⊢
-    | cons head rest ih =>
-        cases head with
-        | mk l t =>
-            simp [isContractiveBranches, substBranches, Bool.and_eq_true] at hbs ⊢
-            rcases hbs with ⟨ht, hrest⟩
-            constructor
-            · exact isContractive_subst t e k ht he
-            · exact ih hrest he
-end
+  intro hbs he
+  induction bs with
+  | nil => simp [isContractiveBranches, substBranches] at hbs ⊢
+  | cons head rest ih =>
+      obtain ⟨l, t⟩ := head
+      simp [isContractiveBranches, substBranches, Bool.and_eq_true] at hbs ⊢
+      rcases hbs with ⟨ht, hrest⟩
+      constructor
+      · exact isContractive_subst t e k ht he
+      · exact ih hrest
 
 theorem isContractive_subst_mu (body : LocalTypeDB) :
   body.isContractive = true → (LocalTypeDB.mu body).isContractive = true →
@@ -523,7 +758,7 @@ theorem isContractive_unfold (t : LocalTypeDB) :
           simpa [LocalTypeDB.isContractive, Bool.and_eq_true] using h
         exact hpair.2
       simpa [LocalTypeDB.unfold] using isContractive_subst body (LocalTypeDB.mu body) 0 hbody h
-  | end =>
+  | «end» =>
       simpa [LocalTypeDB.unfold] using h
   | var n =>
       simpa [LocalTypeDB.unfold] using h
