@@ -11,11 +11,11 @@ preservation properties needed to reduce send/recv duplication.
 
 namespace RumpsteakV2.Protocol.LocalTypeR
 
+open RumpsteakV2.Protocol.GlobalType
+
 /-- Duality is an involution (theorem alias). -/
 theorem dual_involutive (t : LocalTypeR) : t.dual.dual = t :=
   LocalTypeR.dual_dual t
-
-/-- Duality on branches is an involution (theorem alias). -/
 
 /-- dualBranches as a map (helper for branch proofs). -/
 theorem dualBranches_eq_map (bs : List (Label × LocalTypeR)) :
@@ -32,12 +32,40 @@ theorem dualBranches_involutive (bs : List (Label × LocalTypeR)) :
     dualBranches (dualBranches bs) = bs :=
   dualBranches_dualBranches bs
 
+/-- Duality preserves muHeight. -/
+theorem muHeight_dual : (t : LocalTypeR) → t.dual.muHeight = t.muHeight
+  | .end => rfl
+  | .var _ => rfl
+  | .send _ _ => rfl
+  | .recv _ _ => rfl
+  | .mu _ body => by
+      simp [LocalTypeR.dual, LocalTypeR.muHeight, muHeight_dual body]
+
+/-- Duality commutes with one unfold step. -/
+theorem unfold_dual (t : LocalTypeR) : (t.unfold).dual = (t.dual).unfold := by
+  cases t <;> simp [LocalTypeR.unfold, LocalTypeR.dual, LocalTypeR.dual_substitute]
+
+/-- Duality commutes with iterated unfold. -/
+theorem unfold_iter_dual : ∀ n, ∀ t : LocalTypeR,
+    ((LocalTypeR.unfold)^[n] t).dual = (LocalTypeR.unfold)^[n] t.dual
+  | 0, t => rfl
+  | Nat.succ n, t => by
+      -- unfold^[n+1] t = unfold^[n] (unfold t)
+      simp [Nat.iterate, unfold_dual, unfold_iter_dual n (t.unfold)]
+
+/-- Duality commutes with fullUnfold. -/
+theorem fullUnfold_dual (t : LocalTypeR) : t.dual.fullUnfold = (t.fullUnfold).dual := by
+  -- Reduce to iterated unfold with the same muHeight.
+  simp [LocalTypeR.fullUnfold, muHeight_dual]
+  exact (unfold_iter_dual t.muHeight t).symm
+
+
 mutual
   /-- Duality preserves free variables. -/
   theorem freeVars_dual : (t : LocalTypeR) → t.dual.freeVars = t.freeVars := by
     intro t
     cases t with
-    | end => rfl
+    | «end» => rfl
     | var v => rfl
     | send p bs =>
         simp [LocalTypeR.dual, LocalTypeR.freeVars, freeVarsOfBranches_dual]
@@ -63,24 +91,23 @@ theorem dual_isClosed (t : LocalTypeR) : t.isClosed = t.dual.isClosed := by
   simp [LocalTypeR.isClosed, freeVars_dual]
 
 /-- Duality preserves guardedness. -/
-theorem dual_isGuarded (t : LocalTypeR) (v : String) :
-    t.dual.isGuarded v = t.isGuarded v := by
-  induction t with
-  | end => rfl
-  | var w => simp [LocalTypeR.dual, LocalTypeR.isGuarded]
-  | send p bs => simp [LocalTypeR.dual, LocalTypeR.isGuarded]
-  | recv p bs => simp [LocalTypeR.dual, LocalTypeR.isGuarded]
-  | mu v' body ih =>
-      by_cases hv : v == v'
+theorem dual_isGuarded : (t : LocalTypeR) → (v : String) →
+    t.dual.isGuarded v = t.isGuarded v
+  | .end, _ => rfl
+  | .var w, v => by simp [LocalTypeR.dual, LocalTypeR.isGuarded]
+  | .send p bs, v => by simp [LocalTypeR.dual, LocalTypeR.isGuarded]
+  | .recv p bs, v => by simp [LocalTypeR.dual, LocalTypeR.isGuarded]
+  | .mu t body, v => by
+      by_cases hv : v == t
       · simp [LocalTypeR.dual, LocalTypeR.isGuarded, hv]
-      · simp [LocalTypeR.dual, LocalTypeR.isGuarded, hv, ih]
+      · simp [LocalTypeR.dual, LocalTypeR.isGuarded, hv, dual_isGuarded body v]
 
 mutual
   /-- Duality preserves contractiveness. -/
   theorem dual_isContractive : (t : LocalTypeR) → t.dual.isContractive = t.isContractive := by
     intro t
     cases t with
-    | end => rfl
+    | «end» => rfl
     | var v => rfl
     | send p bs =>
         simp [LocalTypeR.dual, LocalTypeR.isContractive, dual_isContractiveBranches]
@@ -107,13 +134,15 @@ namespace RumpsteakV2.Protocol.CoTypes.Observables
 
 open RumpsteakV2.Protocol.LocalTypeR
 
+open RumpsteakV2.Protocol.GlobalType
+
 /-- Unfolding to end is preserved by dual. -/
 theorem UnfoldsToEnd.dual {t : LocalTypeR} (h : UnfoldsToEnd t) : UnfoldsToEnd t.dual := by
   induction h with
   | base =>
       simpa [LocalTypeR.dual] using (UnfoldsToEnd.base)
   | @mu v body _ ih =>
-      have ih' : UnfoldsToEnd (body.dual.substitute v (.mu v body).dual) := by
+      have ih' : UnfoldsToEnd (body.dual.substitute v (LocalTypeR.mu v body).dual) := by
         simpa [LocalTypeR.dual_substitute] using ih
       simpa [LocalTypeR.dual] using (UnfoldsToEnd.mu (t := v) (body := body.dual) ih')
 
@@ -122,9 +151,9 @@ theorem UnfoldsToVar.dual {t : LocalTypeR} {v : String} (h : UnfoldsToVar t v) :
     UnfoldsToVar t.dual v := by
   induction h with
   | base =>
-      simpa [LocalTypeR.dual] using (UnfoldsToVar.base (v := v))
+      simpa [LocalTypeR.dual] using (UnfoldsToVar.base)
   | @mu t body v' _ ih =>
-      have ih' : UnfoldsToVar (body.dual.substitute t (.mu t body).dual) v' := by
+      have ih' : UnfoldsToVar (body.dual.substitute t (LocalTypeR.mu t body).dual) v' := by
         simpa [LocalTypeR.dual_substitute] using ih
       simpa [LocalTypeR.dual] using (UnfoldsToVar.mu (t := t) (body := body.dual) (v := v') ih')
 
@@ -133,9 +162,9 @@ theorem CanSend.dual {t : LocalTypeR} {p : String} {bs : List (Label × LocalTyp
     (h : CanSend t p bs) : CanRecv t.dual p (LocalTypeR.dualBranches bs) := by
   induction h with
   | base =>
-      simpa [LocalTypeR.dual] using (CanRecv.base (partner := p) (branches := LocalTypeR.dualBranches bs))
+      simpa [LocalTypeR.dual] using (CanRecv.base)
   | @mu t body p' bs' _ ih =>
-      have ih' : CanRecv (body.dual.substitute t (.mu t body).dual) p' (LocalTypeR.dualBranches bs') := by
+      have ih' : CanRecv (body.dual.substitute t (LocalTypeR.mu t body).dual) p' (LocalTypeR.dualBranches bs') := by
         simpa [LocalTypeR.dual_substitute] using ih
       simpa [LocalTypeR.dual] using (CanRecv.mu (t := t) (body := body.dual) (partner := p')
         (branches := LocalTypeR.dualBranches bs') ih')
@@ -145,9 +174,9 @@ theorem CanRecv.dual {t : LocalTypeR} {p : String} {bs : List (Label × LocalTyp
     (h : CanRecv t p bs) : CanSend t.dual p (LocalTypeR.dualBranches bs) := by
   induction h with
   | base =>
-      simpa [LocalTypeR.dual] using (CanSend.base (partner := p) (branches := LocalTypeR.dualBranches bs))
+      simpa [LocalTypeR.dual] using (CanSend.base)
   | @mu t body p' bs' _ ih =>
-      have ih' : CanSend (body.dual.substitute t (.mu t body).dual) p' (LocalTypeR.dualBranches bs') := by
+      have ih' : CanSend (body.dual.substitute t (LocalTypeR.mu t body).dual) p' (LocalTypeR.dualBranches bs') := by
         simpa [LocalTypeR.dual_substitute] using ih
       simpa [LocalTypeR.dual] using (CanSend.mu (t := t) (body := body.dual) (partner := p')
         (branches := LocalTypeR.dualBranches bs') ih')
@@ -173,3 +202,111 @@ theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List (Label
     simpa [LocalTypeR.dual_involutive, LocalTypeR.dualBranches_involutive] using h'
 
 end RumpsteakV2.Protocol.CoTypes.Observables
+
+namespace RumpsteakV2.Protocol.CoTypes.EQ2
+
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+
+/-! ## EQ2 Duality Compatibility
+
+This section shows that EQ2 is preserved by duality. The proof uses the
+coinduction-up-to principle with a relation that tracks EQ2 on the undualized
+pair and applies duals at the boundary.
+-/
+
+/-- Relation for duality: pairs that are duals of EQ2-equivalent types. -/
+private def DualRel : Rel := fun a' b' =>
+  ∃ a b, EQ2 a b ∧ a' = a.dual ∧ b' = b.dual
+
+/-- BranchesRel lifts through dualBranches. -/
+private theorem BranchesRel_dualBranches {bs cs : List (Label × LocalTypeR)}
+    (h : BranchesRel EQ2 bs cs) :
+    BranchesRel DualRel (dualBranches bs) (dualBranches cs) := by
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | @cons a b as bs' hhead _ ih =>
+      apply List.Forall₂.cons
+      · exact ⟨hhead.1, ⟨a.2, b.2, hhead.2, rfl, rfl⟩⟩
+      · exact ih
+
+/-- Convert BranchesRel DualRel to BranchesRel (EQ2_closure DualRel). -/
+private theorem BranchesRel_DualRel_to_closure {bs cs : List (Label × LocalTypeR)}
+    (h : BranchesRel DualRel bs cs) :
+    BranchesRel (EQ2_closure DualRel) bs cs := by
+  exact List.Forall₂.imp (fun _ _ hxy => ⟨hxy.1, Or.inl hxy.2⟩) h
+
+/-- DualRel is a post-fixpoint of EQ2F up to EQ2 closure. -/
+private theorem DualRel_postfix_upto :
+    ∀ a' b', DualRel a' b' → EQ2F (EQ2_closure DualRel) a' b' := by
+  intro a' b' ⟨a, b, hab, ha', hb'⟩
+  subst ha' hb'
+  have hf : EQ2F EQ2 a b := EQ2.destruct hab
+  cases a <;> cases b <;> simp only [EQ2F] at hf ⊢ <;> try exact hf
+  case send.send p bs q cs =>
+    obtain ⟨hp, hbranches⟩ := hf
+    simp only [LocalTypeR.dual]
+    exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+  case recv.recv p bs q cs =>
+    obtain ⟨hp, hbranches⟩ := hf
+    simp only [LocalTypeR.dual]
+    exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+  case mu.mu t body s body' =>
+    obtain ⟨hleft, hright⟩ := hf
+    simp only [LocalTypeR.dual]
+    constructor
+    · left
+      use body.substitute t (.mu t body), .mu s body'
+      refine ⟨hleft, ?_, rfl⟩
+      exact (LocalTypeR.dual_substitute body t (.mu t body)).symm
+    · left
+      use .mu t body, body'.substitute s (.mu s body')
+      refine ⟨hright, rfl, ?_⟩
+      exact (LocalTypeR.dual_substitute body' s (.mu s body')).symm
+  case mu.end t body =>
+    simp only [LocalTypeR.dual]
+    left
+    use body.substitute t (.mu t body), .end
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+  case mu.var t body v =>
+    simp only [LocalTypeR.dual]
+    left
+    use body.substitute t (.mu t body), .var v
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+  case mu.send t body p bs =>
+    simp only [LocalTypeR.dual]
+    left
+    use body.substitute t (.mu t body), .send p bs
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+  case mu.recv t body p bs =>
+    simp only [LocalTypeR.dual]
+    left
+    use body.substitute t (.mu t body), .recv p bs
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+  case end.mu s body' =>
+    simp only [LocalTypeR.dual]
+    left
+    use .end, body'.substitute s (.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+  case var.mu v s body' =>
+    simp only [LocalTypeR.dual]
+    left
+    use .var v, body'.substitute s (.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+  case send.mu p bs s body' =>
+    simp only [LocalTypeR.dual]
+    left
+    use .send p bs, body'.substitute s (.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+  case recv.mu p bs s body' =>
+    simp only [LocalTypeR.dual]
+    left
+    use .recv p bs, body'.substitute s (.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+
+/-- Duality respects EQ2: if two types are EQ2-equivalent, their duals are too. -/
+theorem EQ2_dual {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual := by
+  apply EQ2_coind_upto DualRel_postfix_upto
+  exact ⟨a, b, h, rfl, rfl⟩
+
+end RumpsteakV2.Protocol.CoTypes.EQ2

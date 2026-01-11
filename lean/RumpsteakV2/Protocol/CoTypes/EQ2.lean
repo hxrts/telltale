@@ -79,22 +79,25 @@ def EQ2 : Rel :=
 
 /-! Shared coinduction aliases (see `CoinductiveRel`). -/
 /-- Alias: EQ2 as gfp via CoinductiveRel. -/
-theorem EQ2_gfp : EQ2 = CoinductiveRel.gfp (F := EQ2F) := rfl
+theorem EQ2_gfp : EQ2 = RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp (F := EQ2F) := rfl
 
 /-- Alias: coinduction via CoinductiveRel. -/
 theorem EQ2_coind' {R : Rel} (h : R ≤ EQ2F R) : R ≤ EQ2 := by
-  simpa [EQ2] using (CoinductiveRel.coind (F := EQ2F) h)
+  simpa [EQ2] using (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.coind (F := EQ2F) h)
 
 /-- Alias: unfold via CoinductiveRel. -/
 theorem EQ2_unfold' : EQ2 ≤ EQ2F EQ2 := by
-  simpa [EQ2] using (CoinductiveRel.unfold (F := EQ2F))
+  change (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩) ≤ EQ2F (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.unfold (F := EQ2F)
 
 /-- Alias: fold via CoinductiveRel. -/
 theorem EQ2_fold' : EQ2F EQ2 ≤ EQ2 := by
-  simpa [EQ2] using (CoinductiveRel.fold (F := EQ2F))
+  change EQ2F (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩) ≤ (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.fold (F := EQ2F)
 
 private theorem EQ2_fixed : EQ2F EQ2 = EQ2 := by
-  simpa [EQ2] using (CoinductiveRel.gfp_fixed (F := EQ2F))
+  change EQ2F (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩) = (OrderHom.gfp ⟨EQ2F, EQ2F_mono⟩)
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp_fixed (F := EQ2F)
 
 private theorem EQ2_destruct {a b : LocalTypeR} (h : EQ2 a b) : EQ2F EQ2 a b := by
   have hfix : EQ2F EQ2 = EQ2 := EQ2_fixed

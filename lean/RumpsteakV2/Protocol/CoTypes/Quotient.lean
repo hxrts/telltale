@@ -1,4 +1,5 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.Duality
 import RumpsteakV2.Protocol.CoTypes.Substitute
 import RumpsteakV2.Protocol.LocalTypeR
 
@@ -70,119 +71,12 @@ theorem QLocalTypeR.substitute_ofLocal (t : LocalTypeR) (var : String) (repl : L
 
 /-! ## Duality Congruence -/
 
-/-- Relation for duality: pairs that are duals of EQ2-equivalent types. -/
-private def DualRel : Rel := fun a' b' =>
-  ∃ a b, EQ2 a b ∧ a' = a.dual ∧ b' = b.dual
-
-/-- BranchesRel lifts through dualBranches. -/
-private theorem BranchesRel_dualBranches {bs cs : List (Label × LocalTypeR)}
-    (h : BranchesRel EQ2 bs cs) :
-    BranchesRel DualRel (dualBranches bs) (dualBranches cs) := by
-  induction h with
-  | nil => exact List.Forall₂.nil
-  | @cons a b as bs' hhead _ ih =>
-      -- hhead : a.1 = b.1 ∧ EQ2 a.2 b.2
-      -- Goal: label = label' ∧ DualRel cont.dual cont'.dual
-      apply List.Forall₂.cons
-      · exact ⟨hhead.1, ⟨a.2, b.2, hhead.2, rfl, rfl⟩⟩
-      · exact ih
-
-/-- Convert BranchesRel DualRel to BranchesRel (EQ2_closure DualRel). -/
-private theorem BranchesRel_DualRel_to_closure {bs cs : List (Label × LocalTypeR)}
-    (h : BranchesRel DualRel bs cs) :
-    BranchesRel (EQ2_closure DualRel) bs cs := by
-  exact List.Forall₂.imp (fun _ _ hxy => ⟨hxy.1, Or.inl hxy.2⟩) h
-
-/-- DualRel is a post-fixpoint of EQ2F up to EQ2 closure.
-
-The proof uses dual_substitute to handle the mu case. -/
-private theorem DualRel_postfix_upto :
-    ∀ a' b', DualRel a' b' → EQ2F (EQ2_closure DualRel) a' b' := by
-  intro a' b' ⟨a, b, hab, ha', hb'⟩
-  subst ha' hb'
-  have hf : EQ2F EQ2 a b := EQ2.destruct hab
-  -- Case split on the structure revealed by EQ2F
-  cases a <;> cases b <;> simp only [EQ2F] at hf ⊢ <;> try exact hf
-  -- send-send case
-  case send.send p bs q cs =>
-    obtain ⟨hp, hbranches⟩ := hf
-    simp only [LocalTypeR.dual]
-    exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
-  -- recv-recv case
-  case recv.recv p bs q cs =>
-    obtain ⟨hp, hbranches⟩ := hf
-    simp only [LocalTypeR.dual]
-    exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
-  -- mu-mu case
-  case mu.mu t body s body' =>
-    obtain ⟨hleft, hright⟩ := hf
-    simp only [LocalTypeR.dual]
-    -- Need to show DualRel or EQ2 on unfolded pairs
-    constructor
-    · -- Left: (body.dual.subst t (mu t body.dual), (mu s body'.dual))
-      -- Use dual_substitute to rewrite, then DualRel with the original EQ2
-      left
-      use body.substitute t (.mu t body), .mu s body'
-      refine ⟨hleft, ?_, rfl⟩
-      exact (LocalTypeR.dual_substitute body t (.mu t body)).symm
-    · -- Right: (mu t body.dual, body'.dual.subst s (mu s body'.dual))
-      left
-      use .mu t body, body'.substitute s (.mu s body')
-      refine ⟨hright, rfl, ?_⟩
-      exact (LocalTypeR.dual_substitute body' s (.mu s body')).symm
-  -- mu-other cases (unfolding on left)
-  case mu.end t body =>
-    simp only [LocalTypeR.dual]
-    left
-    use body.substitute t (.mu t body), .end
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
-  case mu.var t body v =>
-    simp only [LocalTypeR.dual]
-    left
-    use body.substitute t (.mu t body), .var v
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
-  case mu.send t body p bs =>
-    simp only [LocalTypeR.dual]
-    left
-    use body.substitute t (.mu t body), .send p bs
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
-  case mu.recv t body p bs =>
-    simp only [LocalTypeR.dual]
-    left
-    use body.substitute t (.mu t body), .recv p bs
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
-  -- other-mu cases (unfolding on right)
-  case end.mu s body' =>
-    simp only [LocalTypeR.dual]
-    left
-    use .end, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
-  case var.mu v s body' =>
-    simp only [LocalTypeR.dual]
-    left
-    use .var v, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
-  case send.mu p bs s body' =>
-    simp only [LocalTypeR.dual]
-    left
-    use .send p bs, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
-  case recv.mu p bs s body' =>
-    simp only [LocalTypeR.dual]
-    left
-    use .recv p bs, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
-
+-- EQ2_dual is proved in CoTypes.Duality; we re-export a local alias here.
 /-- Duality respects EQ2: if two types are EQ2-equivalent, their duals
-    are also EQ2-equivalent.
-
-This theorem uses coinduction up-to with the DualRel relation.
-The key insight is that dual commutes with substitute (dual_substitute),
-which allows handling the mu cases in the coinduction. -/
+    are also EQ2-equivalent. -/
 theorem EQ2_dual (a b : LocalTypeR)
     (h : EQ2 a b) : EQ2 a.dual b.dual := by
-  apply EQ2_coind_upto DualRel_postfix_upto
-  exact ⟨a, b, h, rfl, rfl⟩
+  simpa using (RumpsteakV2.Protocol.CoTypes.EQ2.EQ2_dual h)
 
 /-- Dual on the quotient (well-defined by EQ2_dual). -/
 def QLocalTypeR.dual : QLocalTypeR → QLocalTypeR :=

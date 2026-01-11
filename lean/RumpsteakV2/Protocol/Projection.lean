@@ -1,5 +1,7 @@
 import RumpsteakV2.Protocol.Projection.Trans
 import RumpsteakV2.Protocol.Projection.Projectb
+import RumpsteakV2.Protocol.Projection.Embed
+import RumpsteakV2.Protocol.Projection.EmbedProps
 import RumpsteakV2.Protocol.Projection.Project
 import RumpsteakV2.Protocol.Projection.MutualTest
 import RumpsteakV2.Protocol.Projection.MutualTestSizeOf
@@ -23,6 +25,8 @@ namespace RumpsteakV2.Protocol.Projection
 
 export RumpsteakV2.Protocol.Projection.Trans (trans lcontractive)
 export RumpsteakV2.Protocol.Projection.Projectb (projectb CProject)
+export RumpsteakV2.Protocol.Projection.Embed (CEmbed embed_deterministic branches_embed_deterministic
+  embed_project_roundtrip branches_embed_project_roundtrip project_embed_roundtrip)
 -- TODO (Phase C): export RumpsteakV2.Protocol.Projection.Project (projectR?)
 
 end RumpsteakV2.Protocol.Projection

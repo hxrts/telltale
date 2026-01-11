@@ -3,7 +3,7 @@ import RumpsteakV2.Protocol.CoTypes.Quotient
 
 /-! # RumpsteakV2.Protocol.CoTypes
 
-Coinductive types and quotients for V2.
+Coinductive types and quotients.
 
 ## Expose
 

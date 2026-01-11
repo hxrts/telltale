@@ -3,7 +3,7 @@ import Paco
 /-! # CoinductiveRelPaco
 
 Thin wrappers around paco's coinduction principles for reuse.
--/-
+-/
 
 namespace RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco
 

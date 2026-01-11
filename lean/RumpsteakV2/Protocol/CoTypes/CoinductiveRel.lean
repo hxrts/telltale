@@ -1,5 +1,7 @@
 import Mathlib.Order.FixedPoints
 
+set_option linter.dupNamespace false
+
 /-! # CoinductiveRel
 
 Shared coinduction infrastructure for monotone endofunctors on complete lattices.
@@ -33,10 +35,10 @@ theorem coind {R : Type*} [CompleteLattice R] {F : R → R} [CoinductiveRel R F]
 
 theorem unfold {R : Type*} [CompleteLattice R] {F : R → R} [CoinductiveRel R F] :
     gfp (F := F) ≤ F (gfp (F := F)) := by
-  simpa [gfp_fixed (F := F)] using (le_of_eq (gfp_fixed (F := F)).symm)
+  exact (le_of_eq (gfp_fixed (F := F)).symm)
 
 theorem fold {R : Type*} [CompleteLattice R] {F : R → R} [CoinductiveRel R F] :
     F (gfp (F := F)) ≤ gfp (F := F) := by
-  simpa [gfp_fixed (F := F)] using (le_of_eq (gfp_fixed (F := F)))
+  exact (le_of_eq (gfp_fixed (F := F)))
 
 end RumpsteakV2.Protocol.CoTypes.CoinductiveRel

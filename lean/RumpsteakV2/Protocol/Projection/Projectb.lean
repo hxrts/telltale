@@ -283,40 +283,52 @@ def CProjectU : ProjRel :=
 
 /-! Shared coinduction aliases (see `CoinductiveRel`). -/
 /-- Alias: CProject as gfp via CoinductiveRel. -/
-theorem CProject_gfp : CProject = CoinductiveRel.gfp (F := CProjectF) := rfl
+theorem CProject_gfp : CProject = RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp (F := CProjectF) := rfl
 
 /-- Alias: CProjectU as gfp via CoinductiveRel. -/
-theorem CProjectU_gfp : CProjectU = CoinductiveRel.gfp (F := CProjectF_unfold) := rfl
+theorem CProjectU_gfp : CProjectU = RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp (F := CProjectF_unfold) := rfl
 
 /-- Alias: coinduction via CoinductiveRel for CProject. -/
 theorem CProject_coind' {R : ProjRel} (h : R ≤ CProjectF R) : R ≤ CProject := by
-  simpa [CProject] using (CoinductiveRel.coind (F := CProjectF) h)
+  simpa [CProject] using (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.coind (F := CProjectF) h)
 
 /-- Alias: coinduction via CoinductiveRel for CProjectU. -/
 theorem CProjectU_coind' {R : ProjRel} (h : R ≤ CProjectF_unfold R) : R ≤ CProjectU := by
-  simpa [CProjectU] using (CoinductiveRel.coind (F := CProjectF_unfold) h)
+  simpa [CProjectU] using (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.coind (F := CProjectF_unfold) h)
 
 /-- Alias: unfold via CoinductiveRel for CProject. -/
 theorem CProject_unfold' : CProject ≤ CProjectF CProject := by
-  simpa [CProject] using (CoinductiveRel.unfold (F := CProjectF))
+  change (OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩) ≤
+    CProjectF (OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩)
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.unfold (F := CProjectF)
 
 /-- Alias: fold via CoinductiveRel for CProject. -/
 theorem CProject_fold' : CProjectF CProject ≤ CProject := by
-  simpa [CProject] using (CoinductiveRel.fold (F := CProjectF))
+  change CProjectF (OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩) ≤
+    OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.fold (F := CProjectF)
 
 /-- Alias: unfold via CoinductiveRel for CProjectU. -/
 theorem CProjectU_unfold' : CProjectU ≤ CProjectF_unfold CProjectU := by
-  simpa [CProjectU] using (CoinductiveRel.unfold (F := CProjectF_unfold))
+  change (OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩) ≤
+    CProjectF_unfold (OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩)
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.unfold (F := CProjectF_unfold)
 
 /-- Alias: fold via CoinductiveRel for CProjectU. -/
 theorem CProjectU_fold' : CProjectF_unfold CProjectU ≤ CProjectU := by
-  simpa [CProjectU] using (CoinductiveRel.fold (F := CProjectF_unfold))
+  change CProjectF_unfold (OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩) ≤
+    OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.fold (F := CProjectF_unfold)
 
 private theorem CProject_fixed : CProjectF CProject = CProject := by
-  simpa [CProject] using (CoinductiveRel.gfp_fixed (F := CProjectF))
+  change CProjectF (OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩) =
+    OrderHom.gfp ⟨CProjectF, CProjectF_mono⟩
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp_fixed (F := CProjectF)
 
 private theorem CProjectU_fixed : CProjectF_unfold CProjectU = CProjectU := by
-  simpa [CProjectU] using (CoinductiveRel.gfp_fixed (F := CProjectF_unfold))
+  change CProjectF_unfold (OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩) =
+    OrderHom.gfp ⟨CProjectF_unfold, CProjectF_unfold_mono⟩
+  exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp_fixed (F := CProjectF_unfold)
 
 /-- Coinduction principle for CProject: if R ⊆ CProjectF R, then R ⊆ CProject. -/
 theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CProjectF R g role cand) :
