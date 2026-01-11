@@ -118,23 +118,36 @@ double-unfold edge cases that require more sophisticated coinductive reasoning.
 
 **Coq reference:** `subst_EQ2` in `subject_reduction/EQ2.v`
 
-**Status:** PROVEN via Bisim approach (see `EQ2_substitute_via_Bisim` in Bisim.lean).
+**Status:** PROVEN via Barendregt approach (see `EQ2_substitute_via_Bisim` in Bisim.lean).
 -/
 theorem EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR) :
-    EQ2 a b → EQ2 (a.substitute var repl) (b.substitute var repl) :=
+    EQ2 a b →
+    notBoundAt var a = true →
+    notBoundAt var b = true →
+    (∀ t, isFreeIn t repl = false) →
+    (∀ t body, repl ≠ .mu t body) →
+    EQ2 (a.substitute var repl) (b.substitute var repl) :=
   RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_substitute_via_Bisim
 
 /-! ## Derived Lemmas -/
 
 /-- Substitution preserves EQ2 with any replacement term. -/
 theorem EQ2_substitute' {a b : LocalTypeR} (var : String) (repl : LocalTypeR)
-    (h : EQ2 a b) : EQ2 (a.substitute var repl) (b.substitute var repl) :=
-  EQ2_substitute a b var repl h
+    (h : EQ2 a b)
+    (hbarA : notBoundAt var a = true)
+    (hbarB : notBoundAt var b = true)
+    (hfresh : ∀ t, isFreeIn t repl = false)
+    (hnomu : ∀ t body, repl ≠ .mu t body) :
+    EQ2 (a.substitute var repl) (b.substitute var repl) :=
+  EQ2_substitute a b var repl h hbarA hbarB hfresh hnomu
 
 /-- If two types are EQ2-equal, substituting in one gives an EQ2-equal result. -/
-theorem EQ2_substitute_left (a : LocalTypeR) (var : String) (repl : LocalTypeR) :
+theorem EQ2_substitute_left (a : LocalTypeR) (var : String) (repl : LocalTypeR)
+    (hbar : notBoundAt var a = true)
+    (hfresh : ∀ t, isFreeIn t repl = false)
+    (hnomu : ∀ t body, repl ≠ .mu t body) :
     EQ2 (a.substitute var repl) (a.substitute var repl) :=
-  EQ2_substitute a a var repl (EQ2_refl a)
+  EQ2_substitute a a var repl (EQ2_refl a) hbar hbar hfresh hnomu
 
 /-! ## Unfold-Substitute Confluence
 
@@ -220,12 +233,14 @@ infinite communication trees.
 
 **Status:** PROVEN via Bisim approach (see `unfold_substitute_EQ2_via_Bisim` in Bisim.lean).
 -/
-theorem unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
+theorem unfold_substitute_EQ2 (t : LocalTypeR) (var : String) (repl : LocalTypeR)
+    (hWFt : LocalTypeR.WellFormed t) (hWFrepl : LocalTypeR.WellFormed repl) :
     EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) :=
-  RumpsteakV2.Protocol.CoTypes.Bisim.unfold_substitute_EQ2_via_Bisim t var repl
+  RumpsteakV2.Protocol.CoTypes.Bisim.unfold_substitute_EQ2_via_Bisim t var repl hWFt hWFrepl
 
 /-- Unfold-substitute confluence for the reflexive case. -/
-theorem unfold_substitute_EQ2_refl (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
+theorem unfold_substitute_EQ2_refl (t : LocalTypeR) (var : String) (repl : LocalTypeR)
+    (_hWFt : LocalTypeR.WellFormed t) (_hWFrepl : LocalTypeR.WellFormed repl) :
     EQ2 ((t.substitute var repl).unfold) ((t.substitute var repl).unfold) :=
   EQ2_refl _
 

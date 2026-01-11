@@ -1714,14 +1714,15 @@ This is the Coq-style path: project on fully-unfolded global/local types.
 It avoids requiring exact constructor matching on the raw candidate. -/
 
 private def CProjectUEQ2Rel : ProjRel := fun g role cand =>
-  ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0
+  ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0 ∧ LocalTypeR.WellFormed cand
 
 private theorem BranchesProjRel_lift_EQ2_U
     {gbs : List (Label × GlobalType)} {role : String}
     {lbs0 lbs1 : List (Label × LocalTypeR)}
     (hproj : BranchesProjRel CProjectU gbs role lbs0)
     (heq : BranchesRel EQ2 lbs0 lbs1)
-    (hwf : ∀ lb ∈ lbs0, LocalTypeR.WellFormed lb.2) :
+    (hwf0 : ∀ lb ∈ lbs0, LocalTypeR.WellFormed lb.2)
+    (hwf1 : ∀ lb ∈ lbs1, LocalTypeR.WellFormed lb.2) :
     BranchesProjRel CProjectUEQ2Rel gbs role lbs1 := by
   induction hproj generalizing lbs1 with
   | nil =>
@@ -1731,51 +1732,27 @@ private theorem BranchesProjRel_lift_EQ2_U
       rename_i gb lb0 gbs' lbs0'
       cases heq with
       | cons hpair' heq_rest =>
-          have hwf_head : LocalTypeR.WellFormed lb0.2 :=
-            hwf lb0 (by simp)
-          have hwf_rest : ∀ lb ∈ lbs0', LocalTypeR.WellFormed lb.2 := by
+          rename_i lb1 lbs1'
+          have hwf_head0 : LocalTypeR.WellFormed lb0.2 :=
+            hwf0 lb0 (by simp)
+          have hwf_head1 : LocalTypeR.WellFormed lb1.2 :=
+            hwf1 lb1 (by simp)
+          have hwf_rest0 : ∀ lb ∈ lbs0', LocalTypeR.WellFormed lb.2 := by
             intro lb hmem
-            exact hwf lb (by simp [hmem])
+            exact hwf0 lb (by simp [hmem])
+          have hwf_rest1 : ∀ lb ∈ lbs1', LocalTypeR.WellFormed lb.2 := by
+            intro lb hmem
+            exact hwf1 lb (by simp [hmem])
           constructor
           · constructor
             · exact hpair.1.trans hpair'.1
-            · exact ⟨lb0.2, hpair.2, hpair'.2, hwf_head⟩
-          · exact ih heq_rest hwf_rest
+            · exact ⟨lb0.2, hpair.2, hpair'.2, hwf_head0, hwf_head1⟩
+          · exact ih heq_rest hwf_rest0 hwf_rest1
 
-private theorem EQ2_fullUnfold_end {e : LocalTypeR} :
+private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 .end e → e.fullUnfold = .end := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_end
-      RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
-  rcases hobs with ⟨_, hrel⟩
-  cases hrel with
-  | is_end =>
-      rename_i ha hb
-      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq hb
-  | is_var =>
-      rename_i v ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_var_of_end
-          (a := .end) (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)) v ha
-      cases hcontra
-  | is_send hbr =>
-      rename_i p bs cs ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_end (a := .end) (p := p) (bs := bs) ha)
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
-      cases hcontra
-  | is_recv hbr =>
-      rename_i p bs cs ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.not_end (a := .end) (p := p) (bs := bs) ha)
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
-      cases hcontra
-
-private theorem EQ2_fullUnfold_end_wf {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
-    EQ2 .end e → e.fullUnfold = .end := by
-  intro heq
-  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable_of_wellFormed heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_end
       RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base) hWF
   rcases hobs with ⟨_, hrel⟩
@@ -1802,43 +1779,15 @@ private theorem EQ2_fullUnfold_end_wf {e : LocalTypeR} (hWF : LocalTypeR.WellFor
           (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
       cases hcontra
 
+private theorem EQ2_fullUnfold_end_wf {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
+    EQ2 .end e → e.fullUnfold = .end := by
+  exact EQ2_fullUnfold_end hWF
 
-private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} :
+
+private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.var t) e → e.fullUnfold = .var t := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_var
-      (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t)))
-  rcases hobs with ⟨_, hrel⟩
-  cases hrel with
-  | is_var =>
-      rename_i v ha hb
-      have hv := RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.deterministic ha
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
-      subst hv
-      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq hb
-  | is_end =>
-      rename_i ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_var (v := t)) ha
-      cases hcontra
-  | is_send hbr =>
-      rename_i p bs cs ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_var (a := .var t) (p := p) (bs := bs) ha) t
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
-      cases hcontra
-  | is_recv hbr =>
-      rename_i p bs cs ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.not_var (a := .var t) (p := p) (bs := bs) ha) t
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
-      cases hcontra
-
-private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
-    EQ2 (.var t) e → e.fullUnfold = .var t := by
-  intro heq
-  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable_of_wellFormed heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_var
       (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))) hWF
   rcases hobs with ⟨_, hrel⟩
@@ -1867,14 +1816,19 @@ private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : Local
           (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
       cases hcontra
 
+private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
+    EQ2 (.var t) e → e.fullUnfold = .var t := by
+  exact EQ2_fullUnfold_var (t := t) hWF
 
-private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
+
+private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR}
+    (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.send p bs) e →
     ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_send
-      (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs)))
+      (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) hWF
   rcases hobs with ⟨_, hrel⟩
   cases hrel with
   | is_send hbr =>
@@ -1907,46 +1861,17 @@ private theorem EQ2_fullUnfold_send_wf {p : String} {bs : List (Label × LocalTy
     (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.send p bs) e →
     ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
-  intro heq
-  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable_of_wellFormed heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_send
-      (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) hWF
-  rcases hobs with ⟨_, hrel⟩
-  cases hrel with
-  | is_send hbr =>
-      rename_i p' bs' cs' ha hb
-      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanSend.deterministic ha
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))
-      subst hp hbs
-      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hb, hbr⟩
-  | is_end =>
-      rename_i ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_send (p := p) (bs := bs)) ha
-      cases hcontra
-  | is_var =>
-      rename_i v ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_var
-          (a := .send p bs) (p := p) (bs := bs)
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) v ha
-      cases hcontra
-  | is_recv hbr =>
-      rename_i p' bs' cs' ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_recv
-          (a := .send p bs) (p := p) (q := p') (bs := bs) (cs := bs')
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) ha
-      cases hcontra
+  exact EQ2_fullUnfold_send (p := p) (bs := bs) hWF
 
 
-private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
+private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR}
+    (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.recv p bs) e →
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_recv
-      (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs)))
+      (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))) hWF
   rcases hobs with ⟨_, hrel⟩
   cases hrel with
   | is_recv hbr =>
@@ -1979,37 +1904,7 @@ private theorem EQ2_fullUnfold_recv_wf {p : String} {bs : List (Label × LocalTy
     (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.recv p bs) e →
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
-  intro heq
-  have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable_of_wellFormed heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_recv
-      (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))) hWF
-  rcases hobs with ⟨_, hrel⟩
-  cases hrel with
-  | is_recv hbr =>
-      rename_i p' bs' cs' ha hb
-      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.deterministic ha
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))
-      subst hp hbs
-      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hb, hbr⟩
-  | is_end =>
-      rename_i ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_recv (p := p) (bs := bs)) ha
-      cases hcontra
-  | is_var =>
-      rename_i v ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.not_var
-          (a := .recv p bs) (p := p) (bs := bs)
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))) v ha
-      cases hcontra
-  | is_send hbr =>
-      rename_i p' bs' cs' ha hb
-      have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_recv
-          (a := .recv p bs) (p := p') (q := p) (bs := bs') (cs := bs) ha)
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))
-      cases hcontra
+  exact EQ2_fullUnfold_recv (p := p) (bs := bs) hWF
 
 
 
@@ -2017,7 +1912,7 @@ private theorem CProjectUEQ2Rel_postfix :
     ∀ g role cand, CProjectUEQ2Rel g role cand →
       CProjectF_unfold CProjectUEQ2Rel g role cand := by
   intro g role cand hrel
-  rcases hrel with ⟨e0, hproj, heq, hWF⟩
+  rcases hrel with ⟨e0, hproj, heq, hWF, hWFcand⟩
   -- Unfold the CProjectU hypothesis (note the fullUnfold on both sides)
   have hf := CProjectU_destruct hproj
   dsimp [CProjectF_unfold] at hf ⊢
@@ -2027,6 +1922,8 @@ private theorem CProjectUEQ2Rel_postfix :
     simpa [LocalTypeR.fullUnfold] using hiter
   have hWF_full : LocalTypeR.WellFormed e0.fullUnfold :=
     LocalTypeR.WellFormed.fullUnfold hWF
+  have hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold :=
+    LocalTypeR.WellFormed.fullUnfold hWFcand
   -- Case analysis on fully-unfolded global/local forms
   cases hg : GlobalType.fullUnfold g with
   | «end» =>
@@ -2036,7 +1933,7 @@ private theorem CProjectUEQ2Rel_postfix :
           have heq_e0_end : EQ2 e0 .end := by
             simpa [he0] using heq_full
           exact EQ2_trans (EQ2_symm heq_e0_end) heq
-        have hcand : cand.fullUnfold = .end := EQ2_fullUnfold_end heq_end
+        have hcand : cand.fullUnfold = .end := EQ2_fullUnfold_end hWFcand heq_end
         simp [hcand]
   | var v =>
       cases he0 : LocalTypeR.fullUnfold e0 <;> simp [CProjectF, hg, he0] at hf ⊢
@@ -2047,7 +1944,7 @@ private theorem CProjectUEQ2Rel_postfix :
           have heq_e0_var : EQ2 e0 (.var v) := by
             simpa [he0] using heq_full
           exact EQ2_trans (EQ2_symm heq_e0_var) heq
-        have hcand : cand.fullUnfold = .var v := EQ2_fullUnfold_var heq_var
+        have hcand : cand.fullUnfold = .var v := EQ2_fullUnfold_var hWFcand heq_var
         simp [hcand]
   | mu t body =>
       have hmu0 : e0.fullUnfold.muHeight = 0 :=
@@ -2074,7 +1971,7 @@ private theorem CProjectUEQ2Rel_postfix :
           AllBranchesProj CProjectUEQ2Rel gbs role cand.fullUnfold := by
         intro gb hgb
         have hproj' : CProjectU gb.2 role e0.fullUnfold := hall gb hgb
-        exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
+        exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full, hWFcand_full⟩
       cases he0 : LocalTypeR.fullUnfold e0 with
       | «end» =>
           -- comm / end
@@ -2124,15 +2021,19 @@ private theorem CProjectUEQ2Rel_postfix :
               have heq_e0_send : EQ2 e0 (.send p bs) := by
                 simpa [he0] using heq_full
               exact EQ2_trans (EQ2_symm heq_e0_send) heq
-            rcases EQ2_fullUnfold_send heq_send with ⟨cs, hfull, hrel_br⟩
+            rcases EQ2_fullUnfold_send hWFcand heq_send with ⟨cs, hfull, hrel_br⟩
             have hWF_send : LocalTypeR.WellFormed (.send p bs) := by
               simpa [he0] using hWF_full
             have hWF_branches : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
               LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWF_send
+            have hWF_send_cand : LocalTypeR.WellFormed (.send p cs) := by
+              simpa [hfull] using hWFcand_full
+            have hWF_branches_cand : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+              LocalTypeR.WellFormed.branches_of_send (p := p) (bs := cs) hWF_send_cand
             have hpartner' : p = receiver := by
               simpa using hpartner
             have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
-              BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches
+              BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
             simpa [hrs, hfull] using ⟨hpartner', hbranches'⟩
           · by_cases hrr : role = receiver
             · have hne : receiver ≠ sender := by
@@ -2160,15 +2061,19 @@ private theorem CProjectUEQ2Rel_postfix :
                 have heq_e0_recv : EQ2 e0 (.recv p bs) := by
                   simpa [he0] using heq_full
                 exact EQ2_trans (EQ2_symm heq_e0_recv) heq
-              rcases EQ2_fullUnfold_recv heq_recv with ⟨cs, hfull, hrel_br⟩
+              rcases EQ2_fullUnfold_recv hWFcand heq_recv with ⟨cs, hfull, hrel_br⟩
               have hWF_recv : LocalTypeR.WellFormed (.recv p bs) := by
                 simpa [he0] using hWF_full
               have hWF_branches : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
                 LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWF_recv
+              have hWF_recv_cand : LocalTypeR.WellFormed (.recv p cs) := by
+                simpa [hfull] using hWFcand_full
+              have hWF_branches_cand : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+                LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := cs) hWF_recv_cand
               have hpartner' : p = sender := by
                 simpa using hpartner
               have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
-                BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches
+                BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
               simpa [hrs, hrr, hfull] using ⟨hss, hpartner', hbranches'⟩
             · simp [hrs, hrr] at hf ⊢
               have hall : AllBranchesProj CProjectU gbs role e0.fullUnfold := by
@@ -2176,12 +2081,13 @@ private theorem CProjectUEQ2Rel_postfix :
               exact hnonpart hall
 
 theorem CProjectU_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
-    (hproj : CProjectU g role e0) (heq : EQ2 e0 e1) (hWF : LocalTypeR.WellFormed e0) :
+    (hproj : CProjectU g role e0) (heq : EQ2 e0 e1)
+    (hWF : LocalTypeR.WellFormed e0) (hWF' : LocalTypeR.WellFormed e1) :
     CProjectU g role e1 := by
   apply CProjectU_coind
   · intro g' role' cand hrel
     exact CProjectUEQ2Rel_postfix g' role' cand hrel
-  · exact ⟨e0, hproj, heq, hWF⟩
+  · exact ⟨e0, hproj, heq, hWF, hWF'⟩
 
 /-! ### Constructor Agreement Lemmas (Well-Founded Induction)
 

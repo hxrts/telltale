@@ -14,7 +14,6 @@ The following definitions form the semantic interface for proofs:
 - `QLocalTypeR`: quotient type for local types
 - `QLocalTypeR.ofLocal`: inject local type into quotient
 - `QLocalTypeR.unfold`: lifted unfold operation
-- `QLocalTypeR.substitute`: lifted substitution
 - `QLocalTypeR.dual`: lifted duality
 - `EQ2_dual`: duality respects EQ2
 
@@ -52,22 +51,11 @@ theorem QLocalTypeR.unfold_ofLocal (t : LocalTypeR) :
       QLocalTypeR.ofLocal (LocalTypeR.unfold t) := by
   rfl
 
-/-! ## Substitution Congruence -/
+/-! ## Substitution Congruence (Deferred)
 
--- EQ2_substitute is imported from RumpsteakV2.Protocol.CoTypes.Substitute
--- See that module for detailed documentation of the proof strategy.
-
-/-- Substitute on the quotient (well-defined by EQ2_substitute). -/
-def QLocalTypeR.substitute (q : QLocalTypeR) (var : String) (repl : LocalTypeR) : QLocalTypeR :=
-  Quot.map (fun t => t.substitute var repl) (by
-    intro a b h
-    exact EQ2_substitute a b var repl h) q
-
-/-- Substitution agrees with representatives. -/
-theorem QLocalTypeR.substitute_ofLocal (t : LocalTypeR) (var : String) (repl : LocalTypeR) :
-    QLocalTypeR.substitute (QLocalTypeR.ofLocal t) var repl =
-      QLocalTypeR.ofLocal (t.substitute var repl) := by
-  rfl
+Substitution on the quotient is deferred because the current EQ2_substitute proof
+requires Barendregt side conditions (notBoundAt + repl closed).
+-/
 
 /-! ## Duality Congruence -/
 
@@ -109,18 +97,8 @@ def QLocalTypeR.liftProp (P : LocalTypeR → Prop)
     intro a b h
     exact propext (hresp a b h))
 
--- unfold_substitute_EQ2 is imported from RumpsteakV2.Protocol.CoTypes.Substitute
--- See that module for detailed documentation of the proof strategy and
--- its circular dependency with EQ2_substitute.
-
-/-- Unfold commutes with substitute (on quotient). -/
-theorem QLocalTypeR.unfold_substitute (q : QLocalTypeR) (var : String) (repl : LocalTypeR) :
-    (q.substitute var repl).unfold = (q.unfold).substitute var repl := by
-  induction q using Quot.ind with
-  | mk t =>
-      show QLocalTypeR.ofLocal _ = QLocalTypeR.ofLocal _
-      apply QLocalTypeR.eq_of_EQ2
-      exact unfold_substitute_EQ2 t var repl
+-- unfold_substitute_EQ2 is imported from RumpsteakV2.Protocol.CoTypes.Substitute.
+-- See that module for detailed documentation of the proof strategy.
 
 /-- Dual is an involution (on quotient). -/
 theorem QLocalTypeR.dual_dual (q : QLocalTypeR) :
