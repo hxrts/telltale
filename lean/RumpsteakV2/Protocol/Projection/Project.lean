@@ -2069,6 +2069,12 @@ private theorem CProjectUEQ2Rel_postfix :
         simpa [LocalTypeR.fullUnfold] using hiter
       have heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold :=
         EQ2_trans heq_full_cand heq_cand_full
+      have hnonpart
+          (hall : AllBranchesProj CProjectU gbs role e0.fullUnfold) :
+          AllBranchesProj CProjectUEQ2Rel gbs role cand.fullUnfold := by
+        intro gb hgb
+        have hproj' : CProjectU gb.2 role e0.fullUnfold := hall gb hgb
+        exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
       cases he0 : LocalTypeR.fullUnfold e0 with
       | «end» =>
           -- comm / end
@@ -2079,10 +2085,9 @@ private theorem CProjectUEQ2Rel_postfix :
           · by_cases hrr : role = receiver
             · simp [hrr] at hf
             · simp [hrs, hrr] at hf ⊢
-              intro gb hgb
-              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-                simpa [he0] using (hf gb hgb)
-              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
+              have hall : AllBranchesProj CProjectU gbs role e0.fullUnfold := by
+                simpa [he0] using hf
+              exact hnonpart hall
       | var v =>
           -- comm / var
           simp [CProjectF, hg, he0] at hf ⊢
@@ -2092,10 +2097,9 @@ private theorem CProjectUEQ2Rel_postfix :
           · by_cases hrr : role = receiver
             · simp [hrr] at hf
             · simp [hrs, hrr] at hf ⊢
-              intro gb hgb
-              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-                simpa [he0] using (hf gb hgb)
-              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
+              have hall : AllBranchesProj CProjectU gbs role e0.fullUnfold := by
+                simpa [he0] using hf
+              exact hnonpart hall
       | mu t body0 =>
           -- comm / mu
           simp [CProjectF, hg, he0] at hf ⊢
@@ -2105,10 +2109,9 @@ private theorem CProjectUEQ2Rel_postfix :
           · by_cases hrr : role = receiver
             · simp [hrr] at hf
             · simp [hrs, hrr] at hf ⊢
-              intro gb hgb
-              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-                simpa [he0] using (hf gb hgb)
-              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
+              have hall : AllBranchesProj CProjectU gbs role e0.fullUnfold := by
+                simpa [he0] using hf
+              exact hnonpart hall
       | send p bs =>
           -- comm / send
           simp [CProjectF, hg, he0] at hf ⊢
@@ -2139,10 +2142,9 @@ private theorem CProjectUEQ2Rel_postfix :
                 simp [hrr, hne] at hf
               exact hf'.elim
             · simp [hrs, hrr] at hf ⊢
-              intro gb hgb
-              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-                simpa [he0] using (hf gb hgb)
-              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
+              have hall : AllBranchesProj CProjectU gbs role e0.fullUnfold := by
+                simpa [he0] using hf
+              exact hnonpart hall
       | recv p bs =>
           -- comm / recv
           simp [CProjectF, hg, he0] at hf ⊢
@@ -2169,10 +2171,9 @@ private theorem CProjectUEQ2Rel_postfix :
                 BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches
               simpa [hrs, hrr, hfull] using ⟨hss, hpartner', hbranches'⟩
             · simp [hrs, hrr] at hf ⊢
-              intro gb hgb
-              have hproj' : CProjectU gb.2 role e0.fullUnfold := by
-                simpa [he0] using (hf gb hgb)
-              exact ⟨e0.fullUnfold, hproj', heq_full_cand_full, hWF_full⟩
+              have hall : AllBranchesProj CProjectU gbs role e0.fullUnfold := by
+                simpa [he0] using hf
+              exact hnonpart hall
 
 theorem CProjectU_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProjectU g role e0) (heq : EQ2 e0 e1) (hWF : LocalTypeR.WellFormed e0) :
