@@ -155,6 +155,31 @@ theorem EQ2_paco_coind_acc (R : EQ2.Rel) (r : EQ2.Rel)
     exact hpost a b hab
   · exact hxy
 
+/-- Parametrized coinduction for EQ2 using gpaco (guarded accumulator). -/
+theorem EQ2_gpaco_coind (R r g : EQ2.Rel)
+    (hpost : ∀ a b, R a b →
+      EQ2F (fun x y => R x y ∨ gupaco EQ2FMono (toPacoRel r) (toPacoRel g) x y) a b ∨ r a b)
+    {x y : LocalTypeR} (hxy : R x y) :
+    gpaco EQ2FMono (toPacoRel r) (toPacoRel g) x y := by
+  apply RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco.gcoind_upto_pointwise
+    EQ2FMono (toPacoRel R) (toPacoRel r) (toPacoRel g)
+  · intro a b hab
+    -- hab : R a b
+    exact hpost a b hab
+  · exact hxy
+
+/-- gpaco without base case (R must always make one-step progress). -/
+theorem EQ2_gpaco_coind' (R r g : EQ2.Rel)
+    (hpost : ∀ a b, R a b →
+      EQ2F (fun x y => R x y ∨ gupaco EQ2FMono (toPacoRel r) (toPacoRel g) x y) a b) :
+    R ≤ gpaco EQ2FMono (toPacoRel r) (toPacoRel g) := by
+  intro x y hxy
+  apply RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco.gcoind_upto
+    EQ2FMono (toPacoRel R) (toPacoRel r) (toPacoRel g)
+  · intro a b hab
+    exact hpost a b hab
+  · exact hxy
+
 /-! ## Transitivity via Paco
 
 The main application: proving transitivity of EQ2 using accumulation.

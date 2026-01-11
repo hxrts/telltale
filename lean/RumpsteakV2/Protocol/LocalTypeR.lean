@@ -376,7 +376,115 @@ mutual
   def isContractiveBranches : List (Label × LocalTypeR) → Bool
     | [] => true
     | (_, c) :: rest => c.isContractive && isContractiveBranches rest
+
 end
+
+/-- Well-formed local types are closed and contractive. -/
+structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
+  closed : t.isClosed
+  contractive : t.isContractive = true
+
+
+/-! ## Lightweight Contractiveness and Partner Occurrence -/
+
+/-- Local contractiveness check mirroring global `lcontractive`. -/
+def LocalTypeR.lcontractive : LocalTypeR → Bool
+  | .end => true
+  | .var _ => true
+  | .send _ _ => true
+  | .recv _ _ => true
+  | .mu _ body =>
+      match body with
+      | .var _ => false
+      | .mu _ _ => false
+      | .send _ _ => true
+      | .recv _ _ => true
+      | .end => true
+
+/-- `hasSendTo e partner` holds when `e` can send to `partner` somewhere in its structure. -/
+inductive LocalTypeR.hasSendTo : LocalTypeR → String → Prop where
+  | send {partner : String} {branches : List (Label × LocalTypeR)} :
+      hasSendTo (.send partner branches) partner
+  | send_branch {receiver partner : String} {branches : List (Label × LocalTypeR)}
+      {lb : Label × LocalTypeR} :
+      lb ∈ branches → hasSendTo lb.2 partner → hasSendTo (.send receiver branches) partner
+  | recv_branch {sender partner : String} {branches : List (Label × LocalTypeR)}
+      {lb : Label × LocalTypeR} :
+      lb ∈ branches → hasSendTo lb.2 partner → hasSendTo (.recv sender branches) partner
+  | mu {t : String} {body : LocalTypeR} {partner : String} :
+      hasSendTo body partner → hasSendTo (.mu t body) partner
+  | noncontractive {t : String} {body : LocalTypeR} {partner : String} :
+      LocalTypeR.lcontractive body = false → hasSendTo (.mu t body) partner
+
+/-- `hasRecvFrom e partner` holds when `e` can receive from `partner` somewhere in its structure. -/
+inductive LocalTypeR.hasRecvFrom : LocalTypeR → String → Prop where
+  | recv {partner : String} {branches : List (Label × LocalTypeR)} :
+      hasRecvFrom (.recv partner branches) partner
+  | send_branch {receiver partner : String} {branches : List (Label × LocalTypeR)}
+      {lb : Label × LocalTypeR} :
+      lb ∈ branches → hasRecvFrom lb.2 partner → hasRecvFrom (.send receiver branches) partner
+  | recv_branch {sender partner : String} {branches : List (Label × LocalTypeR)}
+      {lb : Label × LocalTypeR} :
+      lb ∈ branches → hasRecvFrom lb.2 partner → hasRecvFrom (.recv sender branches) partner
+  | mu {t : String} {body : LocalTypeR} {partner : String} :
+      hasRecvFrom body partner → hasRecvFrom (.mu t body) partner
+  | noncontractive {t : String} {body : LocalTypeR} {partner : String} :
+      LocalTypeR.lcontractive body = false → hasRecvFrom (.mu t body) partner
+
+/-- Lift send partner occurrence through mu. -/
+theorem LocalTypeR.hasSendTo_mu {t : String} {body : LocalTypeR} {partner : String}
+    (h : body.hasSendTo partner) : (LocalTypeR.mu t body).hasSendTo partner :=
+  LocalTypeR.hasSendTo.mu h
+
+/-- Lift recv partner occurrence through mu. -/
+theorem LocalTypeR.hasRecvFrom_mu {t : String} {body : LocalTypeR} {partner : String}
+    (h : body.hasRecvFrom partner) : (LocalTypeR.mu t body).hasRecvFrom partner :=
+  LocalTypeR.hasRecvFrom.mu h
+
+/-- Direct send partner occurrence. -/
+theorem LocalTypeR.hasSendTo_send {partner : String} {branches : List (Label × LocalTypeR)} :
+    (LocalTypeR.send partner branches).hasSendTo partner :=
+  LocalTypeR.hasSendTo.send
+
+/-- Direct recv partner occurrence. -/
+theorem LocalTypeR.hasRecvFrom_recv {partner : String} {branches : List (Label × LocalTypeR)} :
+    (LocalTypeR.recv partner branches).hasRecvFrom partner :=
+  LocalTypeR.hasRecvFrom.recv
+
+/-- Propagate send partner occurrence through send branches. -/
+theorem LocalTypeR.hasSendTo_send_branch {receiver partner : String} {branches : List (Label × LocalTypeR)}
+    {lb : Label × LocalTypeR} (hmem : lb ∈ branches) (h : lb.2.hasSendTo partner) :
+    (LocalTypeR.send receiver branches).hasSendTo partner :=
+  LocalTypeR.hasSendTo.send_branch hmem h
+
+/-- Propagate send partner occurrence through recv branches. -/
+theorem LocalTypeR.hasSendTo_recv_branch {sender partner : String} {branches : List (Label × LocalTypeR)}
+    {lb : Label × LocalTypeR} (hmem : lb ∈ branches) (h : lb.2.hasSendTo partner) :
+    (LocalTypeR.recv sender branches).hasSendTo partner :=
+  LocalTypeR.hasSendTo.recv_branch hmem h
+
+/-- Propagate recv partner occurrence through send branches. -/
+theorem LocalTypeR.hasRecvFrom_send_branch {receiver partner : String} {branches : List (Label × LocalTypeR)}
+    {lb : Label × LocalTypeR} (hmem : lb ∈ branches) (h : lb.2.hasRecvFrom partner) :
+    (LocalTypeR.send receiver branches).hasRecvFrom partner :=
+  LocalTypeR.hasRecvFrom.send_branch hmem h
+
+/-- Propagate recv partner occurrence through recv branches. -/
+theorem LocalTypeR.hasRecvFrom_recv_branch {sender partner : String} {branches : List (Label × LocalTypeR)}
+    {lb : Label × LocalTypeR} (hmem : lb ∈ branches) (h : lb.2.hasRecvFrom partner) :
+    (LocalTypeR.recv sender branches).hasRecvFrom partner :=
+  LocalTypeR.hasRecvFrom.recv_branch hmem h
+
+/-- Any noncontractive mu counts as sending to every partner. -/
+theorem LocalTypeR.hasSendTo_noncontractive {t : String} {body : LocalTypeR} {partner : String}
+    (h : LocalTypeR.lcontractive body = false) : (LocalTypeR.mu t body).hasSendTo partner :=
+  LocalTypeR.hasSendTo.noncontractive h
+
+/-- Any noncontractive mu counts as receiving from every partner. -/
+theorem LocalTypeR.hasRecvFrom_noncontractive {t : String} {body : LocalTypeR} {partner : String}
+    (h : LocalTypeR.lcontractive body = false) : (LocalTypeR.mu t body).hasRecvFrom partner :=
+  LocalTypeR.hasRecvFrom.noncontractive h
+
 
 
 /-! ## Environments (abstraction point for closedness vs substitutions)
@@ -1289,6 +1397,96 @@ theorem LocalTypeR.fullUnfold_non_mu_of_contractive {lt : LocalTypeR}
   · exact hcontr
   · exact hclosed
   · simp
+
+/-! ## Well-formedness Preservation -/
+
+/-- Unfold preserves well-formedness. -/
+theorem LocalTypeR.WellFormed.unfold {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
+    LocalTypeR.WellFormed t.unfold := by
+  cases t with
+  | «end» | var _ | send _ _ | recv _ _ =>
+      simpa [LocalTypeR.unfold] using h
+  | mu t body =>
+      have hclosed : (body.substitute t (.mu t body)).isClosed :=
+        LocalTypeR.isClosed_substitute_mu (t := t) (body := body) h.closed
+      have hpair : body.isGuarded t = true ∧ body.isContractive = true := by
+        simpa [LocalTypeR.isContractive, Bool.and_eq_true] using h.contractive
+      have hbody_contr : body.isContractive = true := hpair.2
+      have hcontr : (body.substitute t (.mu t body)).isContractive = true :=
+        LocalTypeR.isContractive_substitute body t (.mu t body) hbody_contr h.contractive h.closed
+      exact ⟨hclosed, hcontr⟩
+
+/-- Iterated unfold preserves well-formedness. -/
+private theorem LocalTypeR.WellFormed.unfold_iter {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
+    ∀ n, LocalTypeR.WellFormed ((LocalTypeR.unfold)^[n] t) := by
+  intro n
+  induction n with
+  | zero =>
+      simpa using h
+  | succ n ih =>
+      simpa [Function.iterate_succ_apply'] using (LocalTypeR.WellFormed.unfold (t := (LocalTypeR.unfold)^[n] t) ih)
+
+/-- fullUnfold preserves well-formedness. -/
+theorem LocalTypeR.WellFormed.fullUnfold {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
+    LocalTypeR.WellFormed t.fullUnfold := by
+  simpa [LocalTypeR.fullUnfold] using (LocalTypeR.WellFormed.unfold_iter (t := t) h t.muHeight)
+
+private theorem LocalTypeR.branches_wellFormed_of_closed_contractive
+    (bs : List (Label × LocalTypeR))
+    (hclosed : freeVarsOfBranches bs = [])
+    (hcontr : isContractiveBranches bs = true) :
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+  induction bs with
+  | nil =>
+      intro lb hmem
+      cases hmem
+  | cons head tail ih =>
+      cases head with
+      | mk label cont =>
+          have happend : cont.freeVars ++ freeVarsOfBranches tail = [] := by
+            simpa [freeVarsOfBranches] using hclosed
+          have hcont_nil : cont.freeVars = [] := (List.append_eq_nil_iff.mp happend).1
+          have htail_nil : freeVarsOfBranches tail = [] := (List.append_eq_nil_iff.mp happend).2
+          have hcont_closed : cont.isClosed := by
+            simp [LocalTypeR.isClosed, List.isEmpty_eq_true, hcont_nil]
+          have hpair : cont.isContractive = true ∧ isContractiveBranches tail = true := by
+            simpa [isContractiveBranches, Bool.and_eq_true] using hcontr
+          have hcont_wf : LocalTypeR.WellFormed cont := ⟨hcont_closed, hpair.1⟩
+          have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2 :=
+            ih htail_nil hpair.2
+          intro lb hmem
+          have hmem' : lb = (label, cont) ∨ lb ∈ tail := by
+            simpa [List.mem_cons] using hmem
+          cases hmem' with
+          | inl h_eq =>
+              subst h_eq
+              exact hcont_wf
+          | inr hmem_tail =>
+              exact htail_wf lb hmem_tail
+
+/-- Well-formed send branches are well-formed. -/
+theorem LocalTypeR.WellFormed.branches_of_send {p : String} {bs : List (Label × LocalTypeR)}
+    (h : LocalTypeR.WellFormed (.send p bs)) :
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+  have hclosed : freeVarsOfBranches bs = [] := by
+    have hclosed' : (freeVarsOfBranches bs).isEmpty = true := by
+      simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using h.closed
+    exact (List.isEmpty_eq_true _).1 hclosed'
+  have hcontr : isContractiveBranches bs = true := by
+    simpa [LocalTypeR.isContractive] using h.contractive
+  exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
+
+/-- Well-formed recv branches are well-formed. -/
+theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List (Label × LocalTypeR)}
+    (h : LocalTypeR.WellFormed (.recv p bs)) :
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+  have hclosed : freeVarsOfBranches bs = [] := by
+    have hclosed' : (freeVarsOfBranches bs).isEmpty = true := by
+      simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using h.closed
+    exact (List.isEmpty_eq_true _).1 hclosed'
+  have hcontr : isContractiveBranches bs = true := by
+    simpa [LocalTypeR.isContractive] using h.contractive
+  exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
 
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
 

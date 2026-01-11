@@ -162,6 +162,11 @@ mu-unfolding implicitly) and Bisim (which uses membership predicates).
 A bounded path witnesses that after n unfolding steps, a type reaches a specific
 observable form. -/
 
+/-- Well-formed local types have observable behavior. -/
+theorem LocalTypeR.WellFormed.observable {t : LocalTypeR} (h : LocalTypeR.WellFormed t) :
+    Observable t :=
+  observable_of_closed_contractive h.closed h.contractive
+
 /-- `UnfoldPathEndBounded n a` holds when `a` unfolds to `.end` in at most `n` mu-steps.
 
     This is an explicit bound on the unfolding depth, used to prove extraction lemmas
@@ -1820,6 +1825,39 @@ theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observ
       have h_recv_eq : EQ2 (.recv p bs) b :=
         EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
       obtain ⟨cs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv h_recv_eq
+      exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
+
+/-- Transfer observables across EQ2 under well-formedness of the target. -/
+theorem EQ2_transfer_observable_of_wellFormed {a b : LocalTypeR} (h : EQ2 a b)
+    (obs_a : Observable a) (hWF : LocalTypeR.WellFormed b) :
+    ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
+  cases obs_a with
+  | is_end h_end =>
+      have h_end_eq : EQ2 .end b :=
+        EQ2_trans (EQ2_symm (UnfoldsToEnd.toEQ2 h_end)) h
+      have hb : UnfoldsToEnd b :=
+        EQ2.end_right_implies_UnfoldsToEnd_of_contractive hWF.closed hWF.contractive h_end_eq
+      exact ⟨Observable.is_end hb, ObservableRel.is_end (ha := h_end) (hb := hb)⟩
+  | is_var h_var =>
+      rename_i v
+      have h_var_eq : EQ2 (.var v) b :=
+        EQ2_trans (EQ2_symm (UnfoldsToVar.toEQ2 h_var)) h
+      have hb : UnfoldsToVar b v :=
+        EQ2.var_right_implies_UnfoldsToVar_of_contractive hWF.closed hWF.contractive h_var_eq
+      exact ⟨Observable.is_var hb, ObservableRel.is_var (ha := h_var) (hb := hb)⟩
+  | is_send h_send =>
+      rename_i p bs
+      have h_send_eq : EQ2 (.send p bs) b :=
+        EQ2_trans (EQ2_symm (CanSend.toEQ2 h_send)) h
+      obtain ⟨cs, hcan, hbr⟩ :=
+        EQ2.send_right_implies_CanSend_of_contractive (x := b) hWF.closed hWF.contractive h_send_eq
+      exact ⟨Observable.is_send hcan, ObservableRel.is_send (ha := h_send) (hb := hcan) hbr⟩
+  | is_recv h_recv =>
+      rename_i p bs
+      have h_recv_eq : EQ2 (.recv p bs) b :=
+        EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
+      obtain ⟨cs, hcan, hbr⟩ :=
+        EQ2.recv_right_implies_CanRecv_of_contractive (x := b) hWF.closed hWF.contractive h_recv_eq
       exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
 
 /-- Build EQ2 from compatible observables. -/
