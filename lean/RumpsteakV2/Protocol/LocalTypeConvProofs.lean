@@ -140,8 +140,8 @@ lemma indexOf_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
   · have : v ∉ ctx := (indexOf_eq_none_iff_not_mem _ _).1 hnone
     contradiction
   · cases hidx : Context.indexOf ctx v with
-    | none => cases hnone (by simp)
-    | some i => exact ⟨i, by simp⟩
+    | none => exact (hnone hidx).elim
+    | some i => exact ⟨i, rfl⟩
 
 
 lemma get?_inj_of_nodup {ctx : NameContext} (hnd : ctx.Nodup) {i j : Nat} {v : String}
@@ -1169,11 +1169,7 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
       obtain ⟨w, hgetn⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hne : n ≠ i := by
         intro hni
-        have : False := by
-          have hguard' := hguard
-          simp [LocalTypeDB.isGuarded, hni] at hguard'
-          exact hguard'
-        exact this.elim
+        simp [LocalTypeDB.isGuarded, hni] at hguard
       have hwne : v ≠ w := by
         intro hvw
         have hidx := huniq n (by simpa [hvw] using hgetn)

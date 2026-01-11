@@ -26,10 +26,8 @@ mutual
             | «end» => rfl
             | _ =>
                 simp [CEmbedF] at h2F
-                cases h2F
         | _ =>
             simp [CEmbedF] at h1F
-            cases h1F
     | var t =>
         cases g1 with
         | var t1 =>
@@ -42,10 +40,8 @@ mutual
                 rfl
             | _ =>
                 simp [CEmbedF] at h2F
-                cases h2F
         | _ =>
             simp [CEmbedF] at h1F
-            cases h1F
     | mu t body =>
         cases g1 with
         | mu t1 gbody1 =>
@@ -61,10 +57,8 @@ mutual
                 simp [hbody]
             | _ =>
                 simp [CEmbedF] at h2F
-                cases h2F
         | _ =>
             simp [CEmbedF] at h1F
-            cases h1F
     | send receiver lbs =>
         cases g1 with
         | comm sender1 receiver1 gbs1 =>
@@ -82,10 +76,8 @@ mutual
                 simp [hbs]
             | _ =>
                 simp [CEmbedF] at h2F
-                cases h2F
         | _ =>
             simp [CEmbedF] at h1F
-            cases h1F
     | recv sender lbs =>
         cases g1 with
         | comm sender1 receiver1 gbs1 =>
@@ -103,10 +95,8 @@ mutual
                 simp [hbs]
             | _ =>
                 simp [CEmbedF] at h2F
-                cases h2F
         | _ =>
             simp [CEmbedF] at h1F
-            cases h1F
 
   /-- Determinism for branch-wise embedding. -/
   theorem branches_embed_deterministic {lbs : List (Label × LocalTypeR)} {role : String}
@@ -159,10 +149,8 @@ mutual
             | «end» => rfl
             | _ =>
                 simp [CProjectF] at hP
-                cases hP
         | _ =>
             simp [CEmbedF] at hF
-            cases hF
     | var t =>
         cases g with
         | var t' =>
@@ -175,10 +163,8 @@ mutual
                 rfl
             | _ =>
                 simp [CProjectF] at hP
-                cases hP
         | _ =>
             simp [CEmbedF] at hF
-            cases hF
     | mu t body =>
         cases g with
         | mu t' gbody =>
@@ -194,10 +180,8 @@ mutual
                 simp [hbody]
             | _ =>
                 simp [CProjectF] at hP
-                cases hP
         | _ =>
             simp [CEmbedF] at hF
-            cases hF
     | send receiver lbs =>
         cases g with
         | comm sender receiver' gbs =>
@@ -214,10 +198,8 @@ mutual
                 simp [hbs]
             | _ =>
                 simp [CProjectF] at hP
-                cases hP
         | _ =>
             simp [CEmbedF] at hF
-            cases hF
     | recv sender lbs =>
         cases g with
         | comm sender' receiver gbs =>
@@ -237,10 +219,8 @@ mutual
                 simp [hbs]
             | _ =>
                 simp [CProjectF, hneq'] at hP
-                cases hP
         | _ =>
             simp [CEmbedF] at hF
-            cases hF
 
   /-- Embed/project roundtrip for branches. -/
   theorem branches_embed_project_roundtrip {lbs : List (Label × LocalTypeR)} {role : String}

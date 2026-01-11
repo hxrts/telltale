@@ -122,28 +122,43 @@ theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType
         cases g with
         | «end» =>
             simp [CProjectF]
-        | var _ | mu _ _ | comm _ _ _ =>
+        | var _ =>
             simp [CEmbedF] at hF
-            cases hF
+        | mu _ _ =>
+            simp [CEmbedF] at hF
+        | comm _ _ _ =>
+            simp [CEmbedF] at hF
     | var t =>
         cases g with
+        | «end» =>
+            simp [CEmbedF] at hF
         | var t' =>
             simp [CEmbedF] at hF
             exact hF.symm
-        | «end» | mu _ _ | comm _ _ _ =>
+        | mu _ _ =>
             simp [CEmbedF] at hF
-            cases hF
+        | comm _ _ _ =>
+            simp [CEmbedF] at hF
     | mu t body =>
         cases g with
+        | «end» =>
+            simp [CEmbedF] at hF
+        | var _ =>
+            simp [CEmbedF] at hF
         | mu t' gbody =>
             simp [CEmbedF] at hF
             rcases hF with ⟨ht, hcontr, hbody⟩
             exact ⟨ht.symm, hcontr, hbody⟩
-        | «end» | var _ | comm _ _ _ =>
+        | comm _ _ _ =>
             simp [CEmbedF] at hF
-            cases hF
     | send receiver lbs =>
         cases g with
+        | «end» =>
+            simp [CEmbedF] at hF
+        | var _ =>
+            simp [CEmbedF] at hF
+        | mu _ _ =>
+            simp [CEmbedF] at hF
         | comm sender receiver' gbs =>
             simp [CEmbedF] at hF
             rcases hF with ⟨hrole, _, hrecv, hbr⟩
@@ -152,11 +167,14 @@ theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType
               BranchesEmbedRel_to_Proj hbr
             simp [CProjectF]
             exact ⟨hrecv, hbr'⟩
-        | «end» | var _ | mu _ _ =>
-            simp [CEmbedF] at hF
-            cases hF
     | recv sender lbs =>
         cases g with
+        | «end» =>
+            simp [CEmbedF] at hF
+        | var _ =>
+            simp [CEmbedF] at hF
+        | mu _ _ =>
+            simp [CEmbedF] at hF
         | comm sender' receiver gbs =>
             simp [CEmbedF] at hF
             rcases hF with ⟨hrole, hneq, hsend, hbr⟩
@@ -168,9 +186,6 @@ theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType
               BranchesEmbedRel_to_Proj hbr
             simp [CProjectF, hneq']
             exact ⟨hsend, hbr'⟩
-        | «end» | var _ | mu _ _ =>
-            simp [CEmbedF] at hF
-            cases hF
   exact CProject_coind (R := fun g r e => CEmbed e r g) hpost g role e h
 
 /-- Alias: embedding implies projection. -/

@@ -300,12 +300,8 @@ mutual
           simpa [LocalTypeR.freeVars, hlt] using hmem
         subst hv
         simp [LocalTypeR.isFreeIn, hlt]
-    | send _ bs =>
-        have h' : v ∈ freeVarsOfBranches bs := by
-          simpa [LocalTypeR.freeVars, hlt] using hmem
-        have hmem' := mem_freeVarsOfBranches_isFreeInBranches' bs v h'
-        simpa [LocalTypeR.isFreeIn, hlt] using hmem'
-    | recv _ bs =>
+    | send _ bs | recv _ bs =>
+        -- Send and recv cases are identical (symmetric under duality)
         have h' : v ∈ freeVarsOfBranches bs := by
           simpa [LocalTypeR.freeVars, hlt] using hmem
         have hmem' := mem_freeVarsOfBranches_isFreeInBranches' bs v h'
@@ -1083,9 +1079,8 @@ theorem isGuarded_substitute (body : LocalTypeR) (t v : String) (e : LocalTypeR)
         simpa [LocalTypeR.substitute] using hguard_e
       · have hbeq : (w == t) = false := beq_eq_false_iff_ne.mpr hw
         simpa [LocalTypeR.substitute, LocalTypeR.isGuarded, hbeq] using hguard
-  | send _ _ =>
-      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
-  | recv _ _ =>
+  | send _ _ | recv _ _ =>
+      -- Send and recv cases are identical (symmetric under duality)
       simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
   | mu s body =>
       by_cases hs : s = t
@@ -1129,13 +1124,8 @@ mutual
           simpa [LocalTypeR.substitute] using hcontr
         · have hbeq : (w == t) = false := beq_eq_false_iff_ne.mpr hw
           simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq]
-    | send p bs =>
-        have hbs : isContractiveBranches bs = true := by
-          simpa [LocalTypeR.isContractive] using hbody
-        have hbs' : isContractiveBranches (substituteBranches bs t e) = true :=
-          isContractiveBranches_substitute bs t e hbs hcontr hclosed
-        simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbs', -substituteBranches_eq_map]
-    | recv p bs =>
+    | send p bs | recv p bs =>
+        -- Send and recv cases are identical (symmetric under duality)
         have hbs : isContractiveBranches bs = true := by
           simpa [LocalTypeR.isContractive] using hbody
         have hbs' : isContractiveBranches (substituteBranches bs t e) = true :=

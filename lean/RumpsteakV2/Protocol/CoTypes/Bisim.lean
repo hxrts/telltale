@@ -195,6 +195,50 @@ inductive CanRecvPathBounded : ℕ → String → List (Label × LocalTypeR) →
       CanRecvPathBounded n p bs (body.substitute t (.mu t body)) →
       CanRecvPathBounded (n + 1) p bs (.mu t body)
 
+/-! ### Send/Recv Duality for Bounded Paths
+
+These lemmas establish the duality between `CanSendPathBounded` and `CanRecvPathBounded`,
+allowing recv lemmas to be derived from send lemmas. -/
+
+/-- CanSendPathBounded on dual type gives CanRecvPathBounded. -/
+theorem CanSendPathBounded.to_CanRecvPathBounded_dual {n : ℕ} {p : String}
+    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    (h : CanSendPathBounded n p bs a) :
+    CanRecvPathBounded n p (dualBranches bs) a.dual := by
+  induction h with
+  | base => exact CanRecvPathBounded.base
+  | @step n p bs t body _ ih =>
+      simp only [LocalTypeR.dual]
+      have heq : (body.substitute t (.mu t body)).dual =
+          body.dual.substitute t (.mu t body.dual) := LocalTypeR.dual_substitute body t (.mu t body)
+      rw [heq] at ih
+      exact CanRecvPathBounded.step ih
+
+/-- CanRecvPathBounded on dual type gives CanSendPathBounded. -/
+theorem CanRecvPathBounded.to_CanSendPathBounded_dual {n : ℕ} {p : String}
+    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    (h : CanRecvPathBounded n p bs a) :
+    CanSendPathBounded n p (dualBranches bs) a.dual := by
+  induction h with
+  | base => exact CanSendPathBounded.base
+  | @step n p bs t body _ ih =>
+      simp only [LocalTypeR.dual]
+      have heq : (body.substitute t (.mu t body)).dual =
+          body.dual.substitute t (.mu t body.dual) := LocalTypeR.dual_substitute body t (.mu t body)
+      rw [heq] at ih
+      exact CanSendPathBounded.step ih
+
+/-- CanRecvPathBounded is equivalent to CanSendPathBounded on dual type with dual branches. -/
+theorem CanRecvPathBounded_iff_CanSendPathBounded_dual {n : ℕ} {p : String}
+    {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
+    CanRecvPathBounded n p bs a ↔ CanSendPathBounded n p (dualBranches bs) a.dual := by
+  constructor
+  · exact CanRecvPathBounded.to_CanSendPathBounded_dual
+  · intro h
+    have h' := CanSendPathBounded.to_CanRecvPathBounded_dual h
+    simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at h'
+    exact h'
+
 /-! ### Conversions between bounded and unbounded predicates -/
 
 /-- Bounded end path implies unbounded. -/
@@ -246,22 +290,26 @@ theorem CanSend.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : Lo
     obtain ⟨n, hn⟩ := ih
     exact ⟨n + 1, CanSendPathBounded.step hn⟩
 
-/-- Bounded recv path implies unbounded. -/
+/-- Bounded recv path implies unbounded.
+    Derived from `CanSendPathBounded.toCanSend` via duality. -/
 theorem CanRecvPathBounded.toCanRecv {n : ℕ} {p : String}
     {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
     (h : CanRecvPathBounded n p bs a) : CanRecv a p bs := by
-  induction h with
-  | base => exact CanRecv.base
-  | step _ ih => exact CanRecv.mu ih
+  have hsend := CanSendPathBounded.toCanSend (CanRecvPathBounded.to_CanSendPathBounded_dual h)
+  have hrecv := CanSend.dual hsend
+  simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at hrecv
+  exact hrecv
 
-/-- Unbounded recv implies bounded. -/
+/-- Unbounded recv implies bounded.
+    Derived from `CanSend.toBounded` via duality. -/
 theorem CanRecv.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
     (h : CanRecv a p bs) : ∃ n, CanRecvPathBounded n p bs a := by
-  induction h with
-  | base => exact ⟨0, CanRecvPathBounded.base⟩
-  | @mu t body p' bs' _ ih =>
-    obtain ⟨n, hn⟩ := ih
-    exact ⟨n + 1, CanRecvPathBounded.step hn⟩
+  have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
+  obtain ⟨n, hn⟩ := CanSend.toBounded hsend
+  use n
+  have hrecv := CanSendPathBounded.to_CanRecvPathBounded_dual hn
+  simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at hrecv
+  exact hrecv
 
 
 /-- Bounded end path yields a concrete unfold iteration. -/
@@ -292,15 +340,25 @@ private theorem CanSendPathBounded.unfold_iter_eq {n : ℕ} {p : String}
   | step h ih =>
       simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using ih
 
-/-- Bounded recv path yields a concrete unfold iteration. -/
+/-- Bounded recv path yields a concrete unfold iteration.
+    Derived from `CanSendPathBounded.unfold_iter_eq` via duality. -/
 private theorem CanRecvPathBounded.unfold_iter_eq {n : ℕ} {p : String}
     {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
     CanRecvPathBounded n p bs a → (LocalTypeR.unfold^[n] a = .recv p bs) := by
   intro h
-  induction h with
-  | base => simp [Function.iterate_zero, id_eq]
-  | step h ih =>
-      simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using ih
+  have hsend := CanRecvPathBounded.to_CanSendPathBounded_dual h
+  have heq := CanSendPathBounded.unfold_iter_eq hsend
+  -- heq : unfold^[n] a.dual = .send p (dualBranches bs)
+  -- Use unfold_iter_dual: (unfold^[n] a).dual = unfold^[n] a.dual
+  have hdual := unfold_iter_dual n a
+  -- hdual : (unfold^[n] a).dual = unfold^[n] a.dual
+  rw [heq] at hdual
+  -- hdual : (unfold^[n] a).dual = .send p (dualBranches bs)
+  -- Apply dual to both sides and use involution
+  have hinv := congrArg LocalTypeR.dual hdual
+  simp only [LocalTypeR.dual_dual, LocalTypeR.dual, dualBranches_dualBranches] at hinv
+  -- hinv : unfold^[n] a = .recv p bs
+  exact hinv
 /-! ## Unfolding Shape Lemmas
 
 These lemmas connect the membership predicates with `fullUnfold`. They are used
@@ -342,17 +400,13 @@ private theorem CanSendPathBounded.not_mu_var (t : String) (p : String) (bs : Li
       have h'' := by simpa [LocalTypeR.substitute] using h'
       exact ih h''
 
+/-- Derived from `CanSendPathBounded.not_mu_var` via duality. -/
 private theorem CanRecvPathBounded.not_mu_var (t : String) (p : String) (bs : List (Label × LocalTypeR)) :
     ∀ n, ¬ CanRecvPathBounded n p bs (.mu t (.var t)) := by
   intro n h
-  induction n with
-  | zero =>
-      cases h
-  | succ n ih =>
-      cases h with
-      | step h' =>
-      have h'' := by simpa [LocalTypeR.substitute] using h'
-      exact ih h''
+  have hsend := CanRecvPathBounded.to_CanSendPathBounded_dual h
+  simp only [LocalTypeR.dual] at hsend
+  exact CanSendPathBounded.not_mu_var t p (dualBranches bs) n hsend
 
 theorem UnfoldsToEnd.not_mu_var {t : String} : ¬ UnfoldsToEnd (.mu t (.var t)) := by
   intro h
@@ -370,17 +424,19 @@ theorem CanSend.not_mu_var {t p : String} {bs : List (Label × LocalTypeR)} :
   obtain ⟨n, hn⟩ := CanSend.toBounded h
   exact CanSendPathBounded.not_mu_var t p bs n hn
 
+/-- Derived from `CanSend.not_mu_var` via duality. -/
 theorem CanRecv.not_mu_var {t p : String} {bs : List (Label × LocalTypeR)} :
-    ¬ CanRecv (.mu t (.var t)) p bs := by
+    ¬ CanRecv (LocalTypeR.mu t (LocalTypeR.var t)) p bs := by
   intro h
-  obtain ⟨n, hn⟩ := CanRecv.toBounded h
-  exact CanRecvPathBounded.not_mu_var t p bs n hn
+  have hsend : CanSend (LocalTypeR.mu t (LocalTypeR.var t)).dual p (dualBranches bs) := CanRecv.dual h
+  simp only [LocalTypeR.dual] at hsend
+  exact CanSend.not_mu_var hsend
 
 /-! ## Unfolding Converse Lemmas
 
 These lemmas go in the opposite direction: if fullUnfold (or a finite unfold
-iteration) yields a constructor, then the corresponding membership predicate holds.
-This is the bounded-path pattern from QpfTypes (RetPathBounded/VisPathBounded). -/
+iteration) yields a constructor, then the corresponding membership predicate holds,
+i.e. bounded-path pattern. -/
 
 private theorem unfold_iter_eq_end_to_UnfoldsToEnd (a : LocalTypeR) :
     ∀ n, (LocalTypeR.unfold^[n] a = .end) → UnfoldsToEnd a := by
@@ -485,40 +541,27 @@ private theorem unfold_iter_eq_send_to_CanSend (a : LocalTypeR) (p : String)
             simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
           exact ih (a := .recv q cs) h'
 
+/-- Derived from `unfold_iter_eq_send_to_CanSend` via duality. -/
 private theorem unfold_iter_eq_recv_to_CanRecv (a : LocalTypeR) (p : String)
     (bs : List (Label × LocalTypeR)) :
-    ∀ n, (LocalTypeR.unfold^[n] a = .recv p bs) → CanRecv a p bs := by
-  intro n
-  induction n generalizing a with
-  | zero =>
-      intro h
-      have h' : a = .recv p bs := by
-        simpa [Function.iterate_zero, id_eq] using h
-      cases h'
-      exact CanRecv.base
-  | succ n ih =>
-      intro h
-      cases a with
-      | mu t body =>
-          have h' : (LocalTypeR.unfold^[n] (body.substitute t (.mu t body))) = .recv p bs := by
-            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
-          exact CanRecv.mu (ih (a := body.substitute t (.mu t body)) h')
-      | «end» =>
-          have h' : (LocalTypeR.unfold^[n] .end) = .recv p bs := by
-            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
-          exact ih (a := .end) h'
-      | var v =>
-          have h' : (LocalTypeR.unfold^[n] (.var v)) = .recv p bs := by
-            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
-          exact ih (a := .var v) h'
-      | send q cs =>
-          have h' : (LocalTypeR.unfold^[n] (.send q cs)) = .recv p bs := by
-            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
-          exact ih (a := .send q cs) h'
-      | recv q cs =>
-          have h' : (LocalTypeR.unfold^[n] (.recv q cs)) = .recv p bs := by
-            simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using h
-          exact ih (a := .recv q cs) h'
+    ∀ n, (LocalTypeR.unfold^[n] a = LocalTypeR.recv p bs) → CanRecv a p bs := by
+  intro n h
+  -- unfold^[n] a = .recv p bs
+  -- Taking duals: (unfold^[n] a).dual = .send p (dualBranches bs)
+  have hdual_eq : (LocalTypeR.unfold^[n] a).dual = (LocalTypeR.recv p bs).dual := congrArg LocalTypeR.dual h
+  -- Use unfold_iter_dual: (unfold^[n] a).dual = unfold^[n] a.dual
+  have hcommute := unfold_iter_dual n a
+  rw [hcommute] at hdual_eq
+  -- So unfold^[n] a.dual = .send p (dualBranches bs)
+  -- hdual_eq : unfold^[n] a.dual = .send p (dualBranches bs)
+  simp only [LocalTypeR.dual] at hdual_eq
+  -- Apply unfold_iter_eq_send_to_CanSend
+  have hsend := unfold_iter_eq_send_to_CanSend a.dual p (dualBranches bs) n hdual_eq
+  -- CanSend a.dual p (dualBranches bs)
+  -- Apply CanSend.dual to get CanRecv a.dual.dual p (dualBranches (dualBranches bs))
+  have hrecv := CanSend.dual hsend
+  simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at hrecv
+  exact hrecv
 
 theorem UnfoldsToEnd_of_fullUnfold_eq {a : LocalTypeR} (h : a.fullUnfold = .end) :
     UnfoldsToEnd a := by
@@ -535,10 +578,18 @@ theorem CanSend_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label
   apply unfold_iter_eq_send_to_CanSend a p bs a.muHeight
   simpa [LocalTypeR.fullUnfold] using h
 
+/-- Derived from `CanSend_of_fullUnfold_eq` via duality. -/
 theorem CanRecv_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
-    (h : a.fullUnfold = .recv p bs) : CanRecv a p bs := by
-  apply unfold_iter_eq_recv_to_CanRecv a p bs a.muHeight
-  simpa [LocalTypeR.fullUnfold] using h
+    (h : a.fullUnfold = LocalTypeR.recv p bs) : CanRecv a p bs := by
+  -- fullUnfold a = .recv p bs
+  -- Taking duals: a.dual.fullUnfold = (fullUnfold a).dual = .send p (dualBranches bs)
+  have hdual_eq : a.dual.fullUnfold = (LocalTypeR.recv p bs).dual := by
+    rw [fullUnfold_dual a, h]
+  simp only [LocalTypeR.dual] at hdual_eq
+  have hsend := CanSend_of_fullUnfold_eq hdual_eq
+  have hrecv := CanSend.dual hsend
+  simp only [dualBranches_dualBranches, LocalTypeR.dual_dual] at hrecv
+  exact hrecv
 
 
 /-- Axioms: fullUnfold reflects observable predicates (used by Projection proofs). -/
@@ -553,9 +604,9 @@ axiom CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × L
 
 /-! ## Bisimulation Relation
 
-The key insight from PR #49: define the bisimulation functor using membership
-predicates, not constructor matching. This avoids the quotient elimination
-issues that block standard coinduction. -/
+Key insight is to define the bisimulation functor using membership predicates,
+not constructor matching. This avoids the quotient elimination issues that block
+standard coinduction. -/
 
 /-- Relation on local types. -/
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
@@ -1770,6 +1821,86 @@ theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observ
         EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
       obtain ⟨cs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv h_recv_eq
       exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
+
+/-- Build EQ2 from compatible observables. -/
+theorem ObservableRel.toEQ2 {a b : LocalTypeR} {obs_a : Observable a} {obs_b : Observable b}
+    (hrel : ObservableRel EQ2 obs_a obs_b) : EQ2 a b := by
+  cases hrel with
+  | is_end =>
+      rename_i ha hb
+      have ha_eq : EQ2 a .end := UnfoldsToEnd.toEQ2 ha
+      have hb_eq : EQ2 b .end := UnfoldsToEnd.toEQ2 hb
+      exact EQ2_trans ha_eq (EQ2_symm hb_eq)
+  | is_var =>
+      rename_i v ha hb
+      have ha_eq : EQ2 a (.var v) := UnfoldsToVar.toEQ2 ha
+      have hb_eq : EQ2 b (.var v) := UnfoldsToVar.toEQ2 hb
+      exact EQ2_trans ha_eq (EQ2_symm hb_eq)
+  | is_send hbr =>
+      rename_i p bs cs ha hb
+      have ha_eq : EQ2 a (.send p bs) := CanSend.toEQ2 ha
+      have hb_eq : EQ2 b (.send p cs) := CanSend.toEQ2 hb
+      have hsend : EQ2F EQ2 (.send p bs) (.send p cs) := by
+        exact ⟨rfl, hbr⟩
+      have hsend_eq : EQ2 (.send p bs) (.send p cs) := EQ2.construct hsend
+      exact EQ2_trans ha_eq (EQ2_trans hsend_eq (EQ2_symm hb_eq))
+  | is_recv hbr =>
+      rename_i p bs cs ha hb
+      have ha_eq : EQ2 a (.recv p bs) := CanRecv.toEQ2 ha
+      have hb_eq : EQ2 b (.recv p cs) := CanRecv.toEQ2 hb
+      have hrecv : EQ2F EQ2 (.recv p bs) (.recv p cs) := by
+        exact ⟨rfl, hbr⟩
+      have hrecv_eq : EQ2 (.recv p bs) (.recv p cs) := EQ2.construct hrecv
+      exact EQ2_trans ha_eq (EQ2_trans hrecv_eq (EQ2_symm hb_eq))
+
+
+/-- BranchesRel is reflexive for EQ2. -/
+private theorem BranchesRel_refl : ∀ bs, BranchesRel EQ2 bs bs := by
+  intro bs
+  induction bs with
+  | nil => exact List.Forall₂.nil
+  | cons head tail ih =>
+      exact List.Forall₂.cons ⟨rfl, EQ2_refl head.2⟩ ih
+
+/-- Observable relation is reflexive. -/
+theorem ObservableRel.refl {a : LocalTypeR} (obs : Observable a) :
+    ObservableRel EQ2 obs obs := by
+  cases obs with
+  | is_end h =>
+      exact ObservableRel.is_end (ha := h) (hb := h)
+  | is_var h =>
+      exact ObservableRel.is_var (ha := h) (hb := h)
+  | is_send h =>
+      exact ObservableRel.is_send (ha := h) (hb := h) (BranchesRel_refl _)
+  | is_recv h =>
+      exact ObservableRel.is_recv (ha := h) (hb := h) (BranchesRel_refl _)
+
+/-- Observable relation is symmetric. -/
+theorem ObservableRel.symm {a b : LocalTypeR} {obs_a : Observable a} {obs_b : Observable b}
+    (h : ObservableRel EQ2 obs_a obs_b) : ObservableRel EQ2 obs_b obs_a := by
+  cases h with
+  | is_end =>
+      rename_i ha hb
+      exact ObservableRel.is_end (ha := hb) (hb := ha)
+  | is_var =>
+      rename_i v ha hb
+      exact ObservableRel.is_var (ha := hb) (hb := ha)
+  | is_send hbr =>
+      rename_i p bs cs ha hb
+      exact ObservableRel.is_send (ha := hb) (hb := ha) (BranchesRel_flip hbr)
+  | is_recv hbr =>
+      rename_i p bs cs ha hb
+      exact ObservableRel.is_recv (ha := hb) (hb := ha) (BranchesRel_flip hbr)
+
+/-- EQ2 equivalence iff observables correspond. -/
+theorem EQ2_iff_observable_correspond {a b : LocalTypeR} (obs_a : Observable a) :
+    EQ2 a b ↔ ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
+  constructor
+  · intro h
+    exact EQ2_transfer_observable h obs_a
+  · intro h
+    obtain ⟨obs_b, hrel⟩ := h
+    exact ObservableRel.toEQ2 hrel
 
 /-- Observability is symmetric across EQ2. -/
 theorem EQ2_observable_symmetric {a b : LocalTypeR} (h : EQ2 a b) :

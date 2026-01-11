@@ -97,6 +97,18 @@ axiom trans_substitute_unfold (t : String) (body : GlobalType) (role : String) :
     EQ2 (projTrans (body.substitute t (GlobalType.mu t body)) role)
         ((projTrans (GlobalType.mu t body) role).unfold)
 
+/-! ### Participant Projection Axioms
+
+The following two axioms are duals of each other, capturing how sender and receiver
+projections evolve after a step. They share the same structure:
+- Either the participant sees a transition matching the action, or
+- The participant's projection is unchanged (EQ2-equivalent)
+
+**Duality relationship**: `proj_trans_sender_step` and `proj_trans_receiver_step` are
+symmetric under send/recv duality. If proven, one could potentially derive the other
+via the duality transformation on LocalTypeR.
+-/
+
 /-- After a global step, the sender's local type transitions appropriately.
     The sender's projection after the step matches the expected continuation.
 
@@ -116,7 +128,7 @@ axiom proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
     EQ2 (projTrans g' act.sender) (projTrans g act.sender)
 
 /-- After a global step, the receiver's local type transitions appropriately.
-    Similar to sender case but for recv. -/
+    Dual to `proj_trans_sender_step` - see duality note above. -/
 axiom proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') :
     ∃ cont, projTrans g act.receiver = .recv act.sender [(act.label, cont)] ∧

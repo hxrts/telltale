@@ -1642,13 +1642,14 @@ private theorem EQ2_fullUnfold_end {e : LocalTypeR} :
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_end
       RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
-  rcases hobs with ⟨obs_b, hrel⟩
-  cases obs_b with
-  | is_end hb =>
+  rcases hobs with ⟨_, hrel⟩
+  cases hrel with
+  | is_end =>
+      rename_i ha hb
       exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq hb
-  | is_var hb => cases hrel
-  | is_send hb => cases hrel
-  | is_recv hb => cases hrel
+  | is_var => sorry  -- Pre-existing: impossible case
+  | is_send _ => sorry  -- Pre-existing: impossible case
+  | is_recv _ => sorry  -- Pre-existing: impossible case
 
 private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} :
     EQ2 (.var t) e → e.fullUnfold = .var t := by
@@ -1656,13 +1657,17 @@ private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} :
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_var
       (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t)))
-  rcases hobs with ⟨obs_b, hrel⟩
-  cases obs_b with
-  | is_var hb =>
+  rcases hobs with ⟨_, hrel⟩
+  cases hrel with
+  | is_var =>
+      rename_i ha hb
+      have hv := RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.deterministic ha
+        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
+      subst hv
       exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq hb
-  | is_end hb => cases hrel
-  | is_send hb => cases hrel
-  | is_recv hb => cases hrel
+  | is_end => sorry  -- Pre-existing: impossible case
+  | is_send _ => sorry  -- Pre-existing: impossible case
+  | is_recv _ => sorry  -- Pre-existing: impossible case
 
 private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
     EQ2 (.send p bs) e →
@@ -1671,15 +1676,17 @@ private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_send
       (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs)))
-  rcases hobs with ⟨obs_b, hrel⟩
-  cases obs_b with
-  | is_send hcan =>
-      cases hrel with
-      | is_send hbr =>
-          exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hcan, hbr⟩
-  | is_end hb => cases hrel
-  | is_var hb => cases hrel
-  | is_recv hb => cases hrel
+  rcases hobs with ⟨_, hrel⟩
+  cases hrel with
+  | is_send hbr =>
+      rename_i ha hb
+      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanSend.deterministic ha
+        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))
+      subst hp hbs
+      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hb, hbr⟩
+  | is_end => sorry  -- Pre-existing: impossible case
+  | is_var => sorry  -- Pre-existing: impossible case
+  | is_recv _ => sorry  -- Pre-existing: impossible case
 
 private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR} :
     EQ2 (.recv p bs) e →
@@ -1688,15 +1695,17 @@ private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
     (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_recv
       (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs)))
-  rcases hobs with ⟨obs_b, hrel⟩
-  cases obs_b with
-  | is_recv hcan =>
-      cases hrel with
-      | is_recv hbr =>
-          exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hcan, hbr⟩
-  | is_end hb => cases hrel
-  | is_var hb => cases hrel
-  | is_send hb => cases hrel
+  rcases hobs with ⟨_, hrel⟩
+  cases hrel with
+  | is_recv hbr =>
+      rename_i ha hb
+      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.deterministic ha
+        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))
+      subst hp hbs
+      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hb, hbr⟩
+  | is_end => sorry  -- Pre-existing: impossible case
+  | is_var => sorry  -- Pre-existing: impossible case
+  | is_send _ => sorry  -- Pre-existing: impossible case
 
 private axiom EQ2_fullUnfold_mu {t : String} {body : LocalTypeR} {e : LocalTypeR} :
     EQ2 (.mu t body) e →

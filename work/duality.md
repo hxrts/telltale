@@ -20,3 +20,10 @@ closedness/contractiveness and enables code reduction by reusing send/recv proof
 - `LocalTypeR.dual` already exists in `LocalTypeR.lean`; we should **reuse**, not duplicate.
 - Aim for short mutual-recursion lemmas and `simp`-friendly statements.
 - Use the new duality lemma to collapse send/recv proof duplication in `Bisim.lean`.
+
+## Further Leverage Duality
+
+- [x] **Collapse send/recv lemma pairs** in `CoTypes/Bisim.lean` (contractive + fullUnfold cases) using duality.
+- [x] **Reduce observable-transfer axioms** by deriving recv variants via duality where possible.
+- [x] **Factor mismatch/contradiction lemmas** (send/recv incompatibilities) via duality.
+- [x] **Simplify BranchesRel transport** with duality helpers (reduce duplicated list proofs).
