@@ -274,7 +274,7 @@ theorem UnfoldsToVar.toBounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a
     ∃ n, UnfoldPathVarBounded n v a := by
   induction h with
   | base => exact ⟨0, UnfoldPathVarBounded.base⟩
-  | @mu t body v' _ ih =>
+  | @mu t body _ _ ih =>
     obtain ⟨n, hn⟩ := ih
     exact ⟨n + 1, UnfoldPathVarBounded.step hn⟩
 
@@ -291,7 +291,7 @@ theorem CanSend.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : Lo
     (h : CanSend a p bs) : ∃ n, CanSendPathBounded n p bs a := by
   induction h with
   | base => exact ⟨0, CanSendPathBounded.base⟩
-  | @mu t body p' bs' _ ih =>
+  | @mu t body _ _ _ ih =>
     obtain ⟨n, hn⟩ := ih
     exact ⟨n + 1, CanSendPathBounded.step hn⟩
 
@@ -597,15 +597,109 @@ theorem CanRecv_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label
   exact hrecv
 
 
-/-- Axioms: fullUnfold reflects observable predicates (used by Projection proofs). -/
-axiom UnfoldsToEnd.fullUnfold_eq {a : LocalTypeR} (h : UnfoldsToEnd a) :
-    a.fullUnfold = .end
-axiom UnfoldsToVar.fullUnfold_eq {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) :
-    a.fullUnfold = .var v
-axiom CanSend.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
-    (h : CanSend a p bs) : a.fullUnfold = .send p bs
-axiom CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
-    (h : CanRecv a p bs) : a.fullUnfold = .recv p bs
+/-- fullUnfold reflects observable predicates for well-formed types. -/
+theorem UnfoldsToEnd.fullUnfold_eq {a : LocalTypeR} (h : UnfoldsToEnd a)
+    (hWF : LocalTypeR.WellFormed a) : a.fullUnfold = .end := by
+  have hmu : a.fullUnfold.muHeight = 0 :=
+    LocalTypeR.fullUnfold_non_mu_of_contractive (lt := a) hWF.contractive hWF.closed
+  cases hfull : a.fullUnfold with
+  | «end» => rfl
+  | var v =>
+      have hcontra := (LocalTypeR.fullUnfold_not_var_of_closed (lt := a) hWF.closed v)
+      exact (False.elim (hcontra (by simpa [hfull])))
+  | send p bs =>
+      have hcan : CanSend a p bs := CanSend_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanSend.not_end (a := a) (p := p) (bs := bs) hcan) h
+      exact hcontra.elim
+  | recv p bs =>
+      have hcan : CanRecv a p bs := CanRecv_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanRecv.not_end (a := a) (p := p) (bs := bs) hcan) h
+      exact hcontra.elim
+  | mu t body =>
+      have hcontra : Nat.succ body.muHeight = 0 := by
+        simpa [LocalTypeR.muHeight, hfull] using hmu
+      exact (False.elim (Nat.succ_ne_zero _ hcontra))
+
+/-- fullUnfold reflects var unfolding for well-formed types. -/
+theorem UnfoldsToVar.fullUnfold_eq {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v)
+    (hWF : LocalTypeR.WellFormed a) : a.fullUnfold = .var v := by
+  have hmu : a.fullUnfold.muHeight = 0 :=
+    LocalTypeR.fullUnfold_non_mu_of_contractive (lt := a) hWF.contractive hWF.closed
+  cases hfull : a.fullUnfold with
+  | var w =>
+      have hvar : UnfoldsToVar a w := UnfoldsToVar_of_fullUnfold_eq (by simpa [hfull])
+      have hw : w = v := UnfoldsToVar.deterministic hvar h
+      simp only [hw]
+  | «end» =>
+      have hend : UnfoldsToEnd a := UnfoldsToEnd_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (UnfoldsToVar.not_end_of_var h) hend
+      exact hcontra.elim
+  | send p bs =>
+      have hcan : CanSend a p bs := CanSend_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanSend.not_var (a := a) (p := p) (bs := bs) hcan) v h
+      exact hcontra.elim
+  | recv p bs =>
+      have hcan : CanRecv a p bs := CanRecv_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanRecv.not_var (a := a) (p := p) (bs := bs) hcan) v h
+      exact hcontra.elim
+  | mu t body =>
+      have hcontra : Nat.succ body.muHeight = 0 := by
+        simpa [LocalTypeR.muHeight, hfull] using hmu
+      exact (False.elim (Nat.succ_ne_zero _ hcontra))
+
+/-- fullUnfold reflects send unfolding for well-formed types. -/
+theorem CanSend.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanSend a p bs) (hWF : LocalTypeR.WellFormed a) : a.fullUnfold = .send p bs := by
+  have hmu : a.fullUnfold.muHeight = 0 :=
+    LocalTypeR.fullUnfold_non_mu_of_contractive (lt := a) hWF.contractive hWF.closed
+  cases hfull : a.fullUnfold with
+  | send q cs =>
+      have hcan' : CanSend a q cs := CanSend_of_fullUnfold_eq (by simpa [hfull])
+      obtain ⟨hp, hbs⟩ := CanSend.deterministic h hcan'
+      simp only [hp, hbs]
+  | «end» =>
+      have hend : UnfoldsToEnd a := UnfoldsToEnd_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanSend.not_end (a := a) (p := p) (bs := bs) h) hend
+      exact hcontra.elim
+  | var v =>
+      have hvar : UnfoldsToVar a v := UnfoldsToVar_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanSend.not_var (a := a) (p := p) (bs := bs) h) v hvar
+      exact hcontra.elim
+  | recv q cs =>
+      have hcan : CanRecv a q cs := CanRecv_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanSend.not_recv (a := a) (p := p) (q := q) (bs := bs) (cs := cs) h) hcan
+      exact hcontra.elim
+  | mu t body =>
+      have hcontra : Nat.succ body.muHeight = 0 := by
+        simpa [LocalTypeR.muHeight, hfull] using hmu
+      exact (False.elim (Nat.succ_ne_zero _ hcontra))
+
+/-- fullUnfold reflects recv unfolding for well-formed types. -/
+theorem CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecv a p bs) (hWF : LocalTypeR.WellFormed a) : a.fullUnfold = .recv p bs := by
+  have hmu : a.fullUnfold.muHeight = 0 :=
+    LocalTypeR.fullUnfold_non_mu_of_contractive (lt := a) hWF.contractive hWF.closed
+  cases hfull : a.fullUnfold with
+  | recv q cs =>
+      have hcan' : CanRecv a q cs := CanRecv_of_fullUnfold_eq (by simpa [hfull])
+      obtain ⟨hp, hbs⟩ := CanRecv.deterministic h hcan'
+      simp only [hp, hbs]
+  | «end» =>
+      have hend : UnfoldsToEnd a := UnfoldsToEnd_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanRecv.not_end (a := a) (p := p) (bs := bs) h) hend
+      exact hcontra.elim
+  | var v =>
+      have hvar : UnfoldsToVar a v := UnfoldsToVar_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanRecv.not_var (a := a) (p := p) (bs := bs) h) v hvar
+      exact hcontra.elim
+  | send q cs =>
+      have hcan : CanSend a q cs := CanSend_of_fullUnfold_eq (by simpa [hfull])
+      have hcontra : False := (CanSend.not_recv (a := a) (p := q) (q := p) (bs := cs) (cs := bs) hcan) h
+      exact hcontra.elim
+  | mu t body =>
+      have hcontra : Nat.succ body.muHeight = 0 := by
+        simpa [LocalTypeR.muHeight, hfull] using hmu
+      exact (False.elim (Nat.succ_ne_zero _ hcontra))
 
 /-! ## Bisimulation Relation
 
@@ -639,6 +733,94 @@ inductive BisimF (R : Rel) : Rel where
       CanRecv a partner bsa → CanRecv b partner bsb →
       BranchesRelBisim R bsa bsb →
       BisimF R a b
+
+/-- Unfold the left-hand side of a BisimF step. -/
+theorem BisimF.unfold_left {R : Rel} {a b : LocalTypeR} (h : BisimF R a b) :
+    BisimF R (LocalTypeR.unfold a) b := by
+  cases h with
+  | eq_end ha hb =>
+      rcases UnfoldsToEnd.cases ha with ha_end | ⟨t, body, ha_mu, ha'⟩
+      · simpa [LocalTypeR.unfold, ha_end] using (BisimF.eq_end ha hb)
+      · subst ha_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_end ha' hb)
+  | eq_var ha hb =>
+      rcases UnfoldsToVar.cases ha with ha_var | ⟨t, body, ha_mu, ha'⟩
+      · simpa [LocalTypeR.unfold, ha_var] using (BisimF.eq_var ha hb)
+      · subst ha_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_var ha' hb)
+  | eq_send ha hb hbr =>
+      rcases CanSend.cases ha with ha_send | ⟨t, body, ha_mu, ha'⟩
+      · simpa [LocalTypeR.unfold, ha_send] using (BisimF.eq_send ha hb hbr)
+      · subst ha_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_send ha' hb hbr)
+  | eq_recv ha hb hbr =>
+      rcases CanRecv.cases ha with ha_recv | ⟨t, body, ha_mu, ha'⟩
+      · simpa [LocalTypeR.unfold, ha_recv] using (BisimF.eq_recv ha hb hbr)
+      · subst ha_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_recv ha' hb hbr)
+
+/-- Unfold the right-hand side of a BisimF step. -/
+theorem BisimF.unfold_right {R : Rel} {a b : LocalTypeR} (h : BisimF R a b) :
+    BisimF R a (LocalTypeR.unfold b) := by
+  cases h with
+  | eq_end ha hb =>
+      rcases UnfoldsToEnd.cases hb with hb_end | ⟨t, body, hb_mu, hb'⟩
+      · simpa [LocalTypeR.unfold, hb_end] using (BisimF.eq_end ha hb)
+      · subst hb_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_end ha hb')
+  | eq_var ha hb =>
+      rcases UnfoldsToVar.cases hb with hb_var | ⟨t, body, hb_mu, hb'⟩
+      · simpa [LocalTypeR.unfold, hb_var] using (BisimF.eq_var ha hb)
+      · subst hb_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_var ha hb')
+  | eq_send ha hb hbr =>
+      rcases CanSend.cases hb with hb_send | ⟨t, body, hb_mu, hb'⟩
+      · simpa [LocalTypeR.unfold, hb_send] using (BisimF.eq_send ha hb hbr)
+      · subst hb_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_send ha hb' hbr)
+  | eq_recv ha hb hbr =>
+      rcases CanRecv.cases hb with hb_recv | ⟨t, body, hb_mu, hb'⟩
+      · simpa [LocalTypeR.unfold, hb_recv] using (BisimF.eq_recv ha hb hbr)
+      · subst hb_mu
+        simpa [LocalTypeR.unfold] using (BisimF.eq_recv ha hb' hbr)
+
+/-- Unfold both sides of a BisimF step. -/
+theorem BisimF.unfold {R : Rel} {a b : LocalTypeR} (h : BisimF R a b) :
+    BisimF R (LocalTypeR.unfold a) (LocalTypeR.unfold b) := by
+  exact BisimF.unfold_right (BisimF.unfold_left h)
+
+/-- Unfold the left-hand side for n steps. -/
+theorem BisimF.unfold_left_iter {R : Rel} {a b : LocalTypeR} :
+    ∀ n, BisimF R a b → BisimF R ((LocalTypeR.unfold)^[n] a) b := by
+  intro n h
+  induction n generalizing a with
+  | zero =>
+      simpa [Function.iterate_zero, id_eq] using h
+  | succ n ih =>
+      have h' : BisimF R (LocalTypeR.unfold a) b := BisimF.unfold_left h
+      have h'' : BisimF R ((LocalTypeR.unfold)^[n] (LocalTypeR.unfold a)) b :=
+        ih (a := LocalTypeR.unfold a) h'
+      simpa [Function.iterate_succ_apply] using h''
+
+/-- Unfold the right-hand side for n steps. -/
+theorem BisimF.unfold_right_iter {R : Rel} {a b : LocalTypeR} :
+    ∀ n, BisimF R a b → BisimF R a ((LocalTypeR.unfold)^[n] b) := by
+  intro n h
+  induction n generalizing b with
+  | zero =>
+      simpa [Function.iterate_zero, id_eq] using h
+  | succ n ih =>
+      have h' : BisimF R a (LocalTypeR.unfold b) := BisimF.unfold_right h
+      have h'' : BisimF R a ((LocalTypeR.unfold)^[n] (LocalTypeR.unfold b)) :=
+        ih (b := LocalTypeR.unfold b) h'
+      simpa [Function.iterate_succ_apply] using h''
+
+/-- Unfold both sides for n steps. -/
+theorem BisimF.unfold_iter {R : Rel} {a b : LocalTypeR} :
+    ∀ n, BisimF R a b → BisimF R ((LocalTypeR.unfold)^[n] a) ((LocalTypeR.unfold)^[n] b) := by
+  intro n h
+  have h' : BisimF R ((LocalTypeR.unfold)^[n] a) b := BisimF.unfold_left_iter (n := n) h
+  exact BisimF.unfold_right_iter (n := n) h'
 
 /-- BranchesRelBisim is monotone. -/
 theorem BranchesRelBisim.mono {R S : Rel} (hrs : ∀ a b, R a b → S a b)
@@ -958,7 +1140,7 @@ theorem UnfoldsToVar.toEQ2 {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) 
     EQ2 a (.var v) := by
   induction h with
   | base => exact EQ2_refl _
-  | @mu t body v' _ ih =>
+  | @mu t body _ _ ih =>
     exact EQ2.construct ih
 
 /-- Helper: can-send implies EQ2 to the corresponding send type. -/
@@ -966,7 +1148,7 @@ theorem CanSend.toEQ2 {a : LocalTypeR} {p : String} {bs : List (Label × LocalTy
     (h : CanSend a p bs) : EQ2 a (.send p bs) := by
   induction h with
   | base => exact EQ2_refl _
-  | @mu t body p' bs' _ ih =>
+  | @mu t body _ _ _ ih =>
     exact EQ2.construct ih
 
 /-- Helper: can-recv implies EQ2 to the corresponding recv type. -/
@@ -974,7 +1156,7 @@ theorem CanRecv.toEQ2 {a : LocalTypeR} {p : String} {bs : List (Label × LocalTy
     (h : CanRecv a p bs) : EQ2 a (.recv p bs) := by
   induction h with
   | base => exact EQ2_refl _
-  | @mu t body p' bs' _ ih =>
+  | @mu t body _ _ _ ih =>
     exact EQ2.construct ih
 
 /-- Convert BranchesRelBisim to BranchesRel EQ2 when the underlying relation implies EQ2. -/
@@ -1128,11 +1310,11 @@ theorem EQ2_end_not_CanSend {x : LocalTypeR} {p : String} {bs : List (Label × L
     -- x = .send p bs, EQ2 .end (.send p bs) contradicts EQ2F definition
     have hf := EQ2.destruct heq
     simp only [EQ2F] at hf
-  | mu _ ih =>
-    -- x = .mu t body, by destruct: EQ2 .end (body.substitute t (.mu t body))
-    have hf := EQ2.destruct heq
-    simp only [EQ2F] at hf
-    exact ih hf
+  | @mu t body _ _ _ ih =>
+    -- x = .mu t body, unfold the EQ2 on the right
+    have heq' : EQ2 .end (body.substitute t (.mu t body)) := by
+      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .end) (b := .mu t body) heq)
+    exact ih heq'
 
 /-- `EQ2 .end x` is incompatible with `CanRecv x p bs`. -/
 theorem EQ2_end_not_CanRecv {x : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
@@ -1151,11 +1333,11 @@ theorem EQ2_end_not_UnfoldsToVar {x : LocalTypeR} {v : String}
     -- x = .var v, EQ2 .end (.var v) contradicts EQ2F definition
     have hf := EQ2.destruct heq
     simp only [EQ2F] at hf
-  | mu _ ih =>
-    -- x = .mu t body, by destruct: EQ2 .end (body.substitute t (.mu t body))
-    have hf := EQ2.destruct heq
-    simp only [EQ2F] at hf
-    exact ih hf
+  | @mu t body _ _ ih =>
+    -- x = .mu t body, unfold the EQ2 on the right
+    have heq' : EQ2 .end (body.substitute t (.mu t body)) := by
+      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .end) (b := .mu t body) heq)
+    exact ih heq'
 
 /-- `EQ2 (.var v) x` is incompatible with `UnfoldsToEnd x`. -/
 theorem EQ2_var_not_UnfoldsToEnd {x : LocalTypeR} {v : String}
@@ -1165,10 +1347,10 @@ theorem EQ2_var_not_UnfoldsToEnd {x : LocalTypeR} {v : String}
     -- x = .end, EQ2 (.var v) .end contradicts EQ2F definition
     have hf := EQ2.destruct heq
     simp only [EQ2F] at hf
-  | mu _ ih =>
-    have hf := EQ2.destruct heq
-    simp only [EQ2F] at hf
-    exact ih hf
+  | @mu t body _ ih =>
+    have heq' : EQ2 (.var v) (body.substitute t (.mu t body)) := by
+      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .var v) (b := .mu t body) heq)
+    exact ih heq'
 
 /-- `EQ2 (.var v) x` is incompatible with `UnfoldsToVar x w` when w ≠ v. -/
 theorem EQ2_var_not_UnfoldsToVar_diff {x : LocalTypeR} {v w : String}
@@ -1179,10 +1361,10 @@ theorem EQ2_var_not_UnfoldsToVar_diff {x : LocalTypeR} {v w : String}
     have hf := EQ2.destruct heq
     simp only [EQ2F] at hf
     exact hne hf.symm
-  | mu _ ih =>
-    have hf := EQ2.destruct heq
-    simp only [EQ2F] at hf
-    exact ih hf hne
+  | @mu t body _ _ ih =>
+    have heq' : EQ2 (.var v) (body.substitute t (.mu t body)) := by
+      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .var v) (b := .mu t body) heq)
+    exact ih heq' hne
 
 /-- `EQ2 (.var v) x` is incompatible with `CanSend x p bs`. -/
 theorem EQ2_var_not_CanSend {x : LocalTypeR} {v : String} {p : String}
@@ -1192,10 +1374,10 @@ theorem EQ2_var_not_CanSend {x : LocalTypeR} {v : String} {p : String}
   | base =>
     have hf := EQ2.destruct heq
     simp only [EQ2F] at hf
-  | mu _ ih =>
-    have hf := EQ2.destruct heq
-    simp only [EQ2F] at hf
-    exact ih hf
+  | @mu t body _ _ _ ih =>
+    have heq' : EQ2 (.var v) (body.substitute t (.mu t body)) := by
+      simpa [LocalTypeR.unfold] using (EQ2_unfold_right (a := .var v) (b := .mu t body) heq)
+    exact ih heq'
 
 /-- `EQ2 (.var v) x` is incompatible with `CanRecv x p bs`. -/
 theorem EQ2_var_not_CanRecv {x : LocalTypeR} {v : String} {p : String}
@@ -1799,66 +1981,54 @@ theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
   obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv hsymm
   exact ⟨bs, hcan, BranchesRel_flip hbr⟩
 
+private theorem EQ2_transfer_observable_core {a b : LocalTypeR} (h : EQ2 a b)
+    (obs_a : Observable a)
+    (hend : ∀ {b}, EQ2 .end b → UnfoldsToEnd b)
+    (hvar : ∀ {b v}, EQ2 (.var v) b → UnfoldsToVar b v)
+    (hsend : ∀ {b p bs}, EQ2 (.send p bs) b → ∃ cs, CanSend b p cs ∧ BranchesRel EQ2 bs cs)
+    (hrecv : ∀ {b p bs}, EQ2 (.recv p bs) b → ∃ cs, CanRecv b p cs ∧ BranchesRel EQ2 bs cs) :
+    ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
+  cases obs_a with
+  | is_end h_end =>
+      have h_end_eq : EQ2 .end b :=
+        EQ2_trans (EQ2_symm (UnfoldsToEnd.toEQ2 h_end)) h
+      have hb : UnfoldsToEnd b := hend h_end_eq
+      exact ⟨Observable.is_end hb, ObservableRel.is_end (ha := h_end) (hb := hb)⟩
+  | is_var h_var =>
+      rename_i v
+      have h_var_eq : EQ2 (.var v) b :=
+        EQ2_trans (EQ2_symm (UnfoldsToVar.toEQ2 h_var)) h
+      have hb : UnfoldsToVar b v := hvar h_var_eq
+      exact ⟨Observable.is_var hb, ObservableRel.is_var (ha := h_var) (hb := hb)⟩
+  | is_send h_send =>
+      rename_i p bs
+      have h_send_eq : EQ2 (.send p bs) b :=
+        EQ2_trans (EQ2_symm (CanSend.toEQ2 h_send)) h
+      obtain ⟨cs, hcan, hbr⟩ := hsend h_send_eq
+      exact ⟨Observable.is_send hcan, ObservableRel.is_send (ha := h_send) (hb := hcan) hbr⟩
+  | is_recv h_recv =>
+      rename_i p bs
+      have h_recv_eq : EQ2 (.recv p bs) b :=
+        EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
+      obtain ⟨cs, hcan, hbr⟩ := hrecv h_recv_eq
+      exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
+
 /-- Transfer observables across EQ2. -/
 theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a) :
     ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
-  cases obs_a with
-  | is_end h_end =>
-      have h_end_eq : EQ2 .end b :=
-        EQ2_trans (EQ2_symm (UnfoldsToEnd.toEQ2 h_end)) h
-      have hb : UnfoldsToEnd b := EQ2.end_right_implies_UnfoldsToEnd h_end_eq
-      exact ⟨Observable.is_end hb, ObservableRel.is_end (ha := h_end) (hb := hb)⟩
-  | is_var h_var =>
-      rename_i v
-      have h_var_eq : EQ2 (.var v) b :=
-        EQ2_trans (EQ2_symm (UnfoldsToVar.toEQ2 h_var)) h
-      have hb : UnfoldsToVar b v := EQ2.var_right_implies_UnfoldsToVar h_var_eq
-      exact ⟨Observable.is_var hb, ObservableRel.is_var (ha := h_var) (hb := hb)⟩
-  | is_send h_send =>
-      rename_i p bs
-      have h_send_eq : EQ2 (.send p bs) b :=
-        EQ2_trans (EQ2_symm (CanSend.toEQ2 h_send)) h
-      obtain ⟨cs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend h_send_eq
-      exact ⟨Observable.is_send hcan, ObservableRel.is_send (ha := h_send) (hb := hcan) hbr⟩
-  | is_recv h_recv =>
-      rename_i p bs
-      have h_recv_eq : EQ2 (.recv p bs) b :=
-        EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
-      obtain ⟨cs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv h_recv_eq
-      exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
+  exact EQ2_transfer_observable_core h obs_a
+    (hend := EQ2.end_right_implies_UnfoldsToEnd)
+    (hvar := EQ2.var_right_implies_UnfoldsToVar)
+    (hsend := EQ2.send_right_implies_CanSend)
+    (hrecv := EQ2.recv_right_implies_CanRecv)
 
-/-- Transfer observables across EQ2 under well-formedness of the target. -/
+/-- Transfer observables across EQ2 under well-formedness of the target.
+    Note: This is equivalent to `EQ2_transfer_observable` - the well-formedness
+    hypothesis is not needed since EQ2 already preserves observability. -/
 theorem EQ2_transfer_observable_of_wellFormed {a b : LocalTypeR} (h : EQ2 a b)
-    (obs_a : Observable a) (hWF : LocalTypeR.WellFormed b) :
-    ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
-  cases obs_a with
-  | is_end h_end =>
-      have h_end_eq : EQ2 .end b :=
-        EQ2_trans (EQ2_symm (UnfoldsToEnd.toEQ2 h_end)) h
-      have hb : UnfoldsToEnd b :=
-        EQ2.end_right_implies_UnfoldsToEnd_of_contractive hWF.closed hWF.contractive h_end_eq
-      exact ⟨Observable.is_end hb, ObservableRel.is_end (ha := h_end) (hb := hb)⟩
-  | is_var h_var =>
-      rename_i v
-      have h_var_eq : EQ2 (.var v) b :=
-        EQ2_trans (EQ2_symm (UnfoldsToVar.toEQ2 h_var)) h
-      have hb : UnfoldsToVar b v :=
-        EQ2.var_right_implies_UnfoldsToVar_of_contractive hWF.closed hWF.contractive h_var_eq
-      exact ⟨Observable.is_var hb, ObservableRel.is_var (ha := h_var) (hb := hb)⟩
-  | is_send h_send =>
-      rename_i p bs
-      have h_send_eq : EQ2 (.send p bs) b :=
-        EQ2_trans (EQ2_symm (CanSend.toEQ2 h_send)) h
-      obtain ⟨cs, hcan, hbr⟩ :=
-        EQ2.send_right_implies_CanSend_of_contractive (x := b) hWF.closed hWF.contractive h_send_eq
-      exact ⟨Observable.is_send hcan, ObservableRel.is_send (ha := h_send) (hb := hcan) hbr⟩
-  | is_recv h_recv =>
-      rename_i p bs
-      have h_recv_eq : EQ2 (.recv p bs) b :=
-        EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
-      obtain ⟨cs, hcan, hbr⟩ :=
-        EQ2.recv_right_implies_CanRecv_of_contractive (x := b) hWF.closed hWF.contractive h_recv_eq
-      exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
+    (obs_a : Observable a) (_hWF : LocalTypeR.WellFormed b) :
+    ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b :=
+  EQ2_transfer_observable h obs_a
 
 /-- Build EQ2 from compatible observables. -/
 theorem ObservableRel.toEQ2 {a b : LocalTypeR} {obs_a : Observable a} {obs_b : Observable b}
@@ -1939,6 +2109,17 @@ theorem EQ2_iff_observable_correspond {a b : LocalTypeR} (obs_a : Observable a) 
   · intro h
     obtain ⟨obs_b, hrel⟩ := h
     exact ObservableRel.toEQ2 hrel
+
+/-- Round-trip: extract then inject recovers EQ2 (by proof irrelevance). -/
+theorem extract_inject_roundtrip {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a) :
+    ObservableRel.toEQ2 (EQ2_transfer_observable h obs_a).2 = h :=
+  Subsingleton.elim _ _
+
+/-- Round-trip: inject then extract recovers the observable (by proof irrelevance). -/
+theorem inject_extract_roundtrip {a b : LocalTypeR} {obs_a : Observable a} {obs_b : Observable b}
+    (hrel : ObservableRel EQ2 obs_a obs_b) :
+    EQ2_transfer_observable (ObservableRel.toEQ2 hrel) obs_a = ⟨obs_b, hrel⟩ :=
+  Subsingleton.elim _ _
 
 /-- Observability is symmetric across EQ2. -/
 theorem EQ2_observable_symmetric {a b : LocalTypeR} (h : EQ2 a b) :
@@ -2477,7 +2658,7 @@ theorem substitute_preserves_UnfoldsToVar {a : LocalTypeR} {var v : String} {rep
       simp only [beq_iff_eq] at hveq
       exact absurd hveq hne
     · exact UnfoldsToVar.base
-  | @mu t body v' _ ih =>
+  | @mu t body _ _ ih =>
     simp only [LocalTypeR.substitute]
     split
     · -- t == var is true: substitution is shadowed
@@ -2791,7 +2972,7 @@ theorem substitute_preserves_CanSend {a : LocalTypeR} {var : String} {repl : Loc
     simp only [LocalTypeR.substitute]
     rw [substituteBranches_eq_map]
     exact CanSend.base
-  | @mu t body p' bs' _ ih =>
+  | @mu t body _ _ _ ih =>
     simp only [LocalTypeR.substitute]
     split
     · -- t == var is true: substitution is shadowed
@@ -2838,7 +3019,7 @@ theorem substitute_preserves_CanRecv {a : LocalTypeR} {var : String} {repl : Loc
     simp only [LocalTypeR.substitute]
     rw [substituteBranches_eq_map]
     exact CanRecv.base
-  | @mu t body p' bs' _ ih =>
+  | @mu t body _ _ _ ih =>
     simp only [LocalTypeR.substitute]
     split
     · -- t == var is true: substitution is shadowed

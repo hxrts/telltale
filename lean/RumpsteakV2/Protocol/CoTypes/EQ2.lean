@@ -108,23 +108,13 @@ theorem EQ2_unfold_left {a b : LocalTypeR} (h : EQ2 a b) :
     EQ2 (LocalTypeR.unfold a) b := by
   cases a with
   | mu t body =>
+      have h' : EQ2F EQ2 (.mu t body) b := EQ2_destruct h
       cases b with
       | mu s body' =>
-          have h' : EQ2F EQ2 (.mu t body) (.mu s body') := EQ2_destruct h
           have hleft : EQ2 (body.substitute t (.mu t body)) (.mu s body') := by
             simpa [EQ2F] using h'.1
           simpa [LocalTypeR.unfold] using hleft
-      | «end» =>
-          have h' : EQ2F EQ2 (.mu t body) .end := EQ2_destruct h
-          simpa [EQ2F, LocalTypeR.unfold] using h'
-      | var v =>
-          have h' : EQ2F EQ2 (.mu t body) (.var v) := EQ2_destruct h
-          simpa [EQ2F, LocalTypeR.unfold] using h'
-      | send p bs =>
-          have h' : EQ2F EQ2 (.mu t body) (.send p bs) := EQ2_destruct h
-          simpa [EQ2F, LocalTypeR.unfold] using h'
-      | recv p bs =>
-          have h' : EQ2F EQ2 (.mu t body) (.recv p bs) := EQ2_destruct h
+      | _ =>
           simpa [EQ2F, LocalTypeR.unfold] using h'
   | _ =>
       simpa [LocalTypeR.unfold] using h
@@ -134,23 +124,13 @@ theorem EQ2_unfold_right {a b : LocalTypeR} (h : EQ2 a b) :
     EQ2 a (LocalTypeR.unfold b) := by
   cases b with
   | mu t body =>
+      have h' : EQ2F EQ2 a (.mu t body) := EQ2_destruct h
       cases a with
       | mu s body' =>
-          have h' : EQ2F EQ2 (.mu s body') (.mu t body) := EQ2_destruct h
           have hright : EQ2 (.mu s body') (body.substitute t (.mu t body)) := by
             simpa [EQ2F] using h'.2
           simpa [LocalTypeR.unfold] using hright
-      | «end» =>
-          have h' : EQ2F EQ2 .end (.mu t body) := EQ2_destruct h
-          simpa [EQ2F, LocalTypeR.unfold] using h'
-      | var v =>
-          have h' : EQ2F EQ2 (.var v) (.mu t body) := EQ2_destruct h
-          simpa [EQ2F, LocalTypeR.unfold] using h'
-      | send p bs =>
-          have h' : EQ2F EQ2 (.send p bs) (.mu t body) := EQ2_destruct h
-          simpa [EQ2F, LocalTypeR.unfold] using h'
-      | recv p bs =>
-          have h' : EQ2F EQ2 (.recv p bs) (.mu t body) := EQ2_destruct h
+      | _ =>
           simpa [EQ2F, LocalTypeR.unfold] using h'
   | _ =>
       simpa [LocalTypeR.unfold] using h

@@ -69,6 +69,63 @@ inductive CanRecv : LocalTypeR → String → List (Label × LocalTypeR) → Pro
       CanRecv (body.substitute t (.mu t body)) partner branches →
       CanRecv (.mu t body) partner branches
 
+/-! ## One-Step Inversion Lemmas
+
+These lemmas expose the single-step structure of the membership predicates.
+They are useful for unfolding-style proofs without manual `cases` every time. -/
+
+theorem UnfoldsToEnd.cases {a : LocalTypeR} (h : UnfoldsToEnd a) :
+    a = .end ∨ ∃ t body, a = .mu t body ∧ UnfoldsToEnd (body.substitute t (.mu t body)) := by
+  cases h with
+  | base => exact Or.inl rfl
+  | mu h' => exact Or.inr ⟨_, _, rfl, h'⟩
+
+theorem UnfoldsToEnd.mu_inv {t : String} {body : LocalTypeR}
+    (h : UnfoldsToEnd (.mu t body)) : UnfoldsToEnd (body.substitute t (.mu t body)) := by
+  cases h with
+  | mu h' => exact h'
+
+theorem UnfoldsToVar.cases {a : LocalTypeR} {v : String} (h : UnfoldsToVar a v) :
+    a = .var v ∨ ∃ t body, a = .mu t body ∧ UnfoldsToVar (body.substitute t (.mu t body)) v := by
+  cases h with
+  | base => exact Or.inl rfl
+  | mu h' => exact Or.inr ⟨_, _, rfl, h'⟩
+
+theorem UnfoldsToVar.mu_inv {t : String} {body : LocalTypeR} {v : String}
+    (h : UnfoldsToVar (.mu t body) v) : UnfoldsToVar (body.substitute t (.mu t body)) v := by
+  cases h with
+  | mu h' => exact h'
+
+theorem CanSend.cases {a : LocalTypeR} {partner : String} {branches : List (Label × LocalTypeR)}
+    (h : CanSend a partner branches) :
+    a = .send partner branches ∨
+      ∃ t body, a = .mu t body ∧ CanSend (body.substitute t (.mu t body)) partner branches := by
+  cases h with
+  | base => exact Or.inl rfl
+  | mu h' => exact Or.inr ⟨_, _, rfl, h'⟩
+
+theorem CanSend.mu_inv {t : String} {body : LocalTypeR} {partner : String}
+    {branches : List (Label × LocalTypeR)}
+    (h : CanSend (.mu t body) partner branches) :
+    CanSend (body.substitute t (.mu t body)) partner branches := by
+  cases h with
+  | mu h' => exact h'
+
+theorem CanRecv.cases {a : LocalTypeR} {partner : String} {branches : List (Label × LocalTypeR)}
+    (h : CanRecv a partner branches) :
+    a = .recv partner branches ∨
+      ∃ t body, a = .mu t body ∧ CanRecv (body.substitute t (.mu t body)) partner branches := by
+  cases h with
+  | base => exact Or.inl rfl
+  | mu h' => exact Or.inr ⟨_, _, rfl, h'⟩
+
+theorem CanRecv.mu_inv {t : String} {body : LocalTypeR} {partner : String}
+    {branches : List (Label × LocalTypeR)}
+    (h : CanRecv (.mu t body) partner branches) :
+    CanRecv (body.substitute t (.mu t body)) partner branches := by
+  cases h with
+  | mu h' => exact h'
+
 /-! ## Observable Behavior Classification
 
 Every closed, well-formed local type has exactly one observable behavior after

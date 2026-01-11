@@ -1,5 +1,6 @@
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.LocalTypeDB
+import RumpsteakV2.Protocol.TypeContext
 
 set_option linter.dupNamespace false
 
@@ -9,6 +10,15 @@ set_option linter.unnecessarySimpa false
 
 Definitions for conversions between named variables (LocalTypeR) and de Bruijn indices (LocalTypeDB).
 This file contains only core definitions to avoid import cycles.
+
+## Context Types
+
+This module uses `List String` for contexts to maintain backward compatibility with existing
+proofs. The unified `TypeContext` structure from `TypeContext.lean` provides:
+- `NameOnlyContext` - equivalent to `List String` for name-only contexts
+- Coercions between `List String` and `NameOnlyContext` for interoperability
+
+For new code, prefer using `NameOnlyContext` directly when possible.
 -/
 
 namespace RumpsteakV2.Protocol.LocalTypeConv
@@ -16,11 +26,38 @@ namespace RumpsteakV2.Protocol.LocalTypeConv
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.LocalTypeDB
 open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol
 
-/-! ## Contexts -/
+/-! ## Contexts
+
+We keep `Context` and `NameContext` as `List String` for backward compatibility with
+existing proofs. The `NameOnlyContext` type provides an equivalent unified representation.
+-/
 
 abbrev Context := List String
 abbrev NameContext := List String
+
+/-! ### TypeContext Bridge
+
+These functions provide interoperability between the legacy `List String` contexts
+and the unified `NameOnlyContext` type.
+-/
+
+/-- Convert Context to NameOnlyContext. -/
+def Context.toNameOnlyContext (ctx : Context) : NameOnlyContext :=
+  NameOnlyContext.fromList ctx
+
+/-- Convert NameOnlyContext to Context. -/
+def Context.ofNameOnlyContext (ctx : NameOnlyContext) : Context :=
+  ctx.toList
+
+/-- Convert NameContext to NameOnlyContext. -/
+def NameContext.toNameOnlyContext (ctx : NameContext) : NameOnlyContext :=
+  NameOnlyContext.fromList ctx
+
+/-- Convert NameOnlyContext to NameContext. -/
+def NameContext.ofNameOnlyContext (ctx : NameOnlyContext) : NameContext :=
+  ctx.toList
 
 /-- Find the de Bruijn index of a name in the context. -/
 def Context.indexOf (ctx : Context) (name : String) : Option Nat :=

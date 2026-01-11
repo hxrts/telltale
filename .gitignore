@@ -38,9 +38,11 @@ rust-project.json
 
 # Working
 work/
+ext/
 
 # Generated documentation
 /docs/book/
+/docs/SUMMARY.md
 
 # mdbook-mermaid generated files
 /docs/mermaid.min.js

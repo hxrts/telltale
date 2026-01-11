@@ -98,6 +98,7 @@ book: summary
     mdbook-mermaid install .
     mv mermaid.min.js mermaid-init.js docs/ 2>/dev/null || true
     mdbook build
+    rm -f docs/mermaid-init.js docs/mermaid.min.js
 
 # Serve locally with live reload
 serve: summary

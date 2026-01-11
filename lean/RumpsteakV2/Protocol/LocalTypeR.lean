@@ -1,6 +1,7 @@
 import Mathlib.Data.List.Basic
 import Mathlib.Logic.Function.Iterate
 import RumpsteakV2.Protocol.GlobalType
+import RumpsteakV2.Protocol.TypeContext
 -- Import after GlobalType to avoid circular dependencies
 -- import RumpsteakV2.Protocol.LocalTypeConv
 
@@ -575,6 +576,55 @@ theorem closedUnderActive_of_closed (lt : LocalTypeR) :
 
 theorem activeEnv_wellFormed : EnvWellFormed ActiveEnv := by
   simpa [ActiveEnv] using (sigmaOfVars_wf ActiveVars)
+
+/-! ## SubstContext: Unified Substitution Environment
+
+`SubstContext` is the TypeContext-based representation of substitution environments,
+providing a unified interface with `NameOnlyContext` from `TypeContext.lean`.
+
+For backward compatibility, `Env` remains as `List (String × LocalTypeR)` with
+bridge functions to convert between the two representations.
+-/
+
+open RumpsteakV2.Protocol
+
+/-- Substitution context using the unified TypeContext structure. -/
+abbrev SubstContext := TypeContext String LocalTypeR
+
+namespace SubstContext
+
+/-- Domain of a substitution context (list of variable names). -/
+def dom (ctx : SubstContext) : List String := ctx.names
+
+/-- Apply substitution context to a local type. -/
+def apply (ctx : SubstContext) : LocalTypeR → LocalTypeR :=
+  ctx.bindings.foldr (fun (v, t) acc => acc.substitute v t)
+
+/-- Check if environment is well-formed (all bindings are closed and contractive). -/
+def WellFormed : SubstContext → Prop
+  | ⟨[]⟩ => True
+  | ⟨(_, t) :: rest⟩ => t.isClosed ∧ t.isContractive = true ∧ WellFormed ⟨rest⟩
+
+/-- Convert SubstContext to Env. -/
+def toEnv (ctx : SubstContext) : Env := ctx.bindings
+
+/-- Convert Env to SubstContext. -/
+def ofEnv (env : Env) : SubstContext := ⟨env⟩
+
+@[simp]
+theorem toEnv_ofEnv (env : Env) : (ofEnv env).toEnv = env := rfl
+
+@[simp]
+theorem ofEnv_toEnv (ctx : SubstContext) : ofEnv ctx.toEnv = ctx := by
+  cases ctx; rfl
+
+theorem dom_eq_Env_dom (ctx : SubstContext) : ctx.dom = Env.dom ctx.toEnv := by
+  simp only [dom, toEnv, TypeContext.names]
+  induction ctx.bindings with
+  | nil => rfl
+  | cons hd tl ih => simp [Env.dom, ih]
+
+end SubstContext
 
 /-! ## ClosedUnder for the empty environment -/
 
