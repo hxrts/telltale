@@ -135,25 +135,6 @@ axiom proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
             EQ2 (projTrans g' act.receiver) cont ∨
     EQ2 (projTrans g' act.receiver) (projTrans g act.receiver)
 
-/-- BranchesStep preserves transBranches up to branch-wise EQ2 for non-participants.
-
-When branches step to branches' via BranchesStep, the transBranches are related
-by BranchesRel EQ2 for any role not involved in the action.
-
-This captures the semantic property that stepping inside branches doesn't affect
-non-participant projections: each branch steps, and projection commutes with stepping.
-
-Proof requires showing: for each pair (cont, cont') from corresponding branches,
-step cont act cont' ∧ role ≠ act.sender ∧ role ≠ act.receiver → EQ2 (trans cont' role) (trans cont role)
-
-This follows by induction on BranchesStep using proj_trans_other_step for each branch.
-The mutual dependency is resolved by well-founded induction on global type structure. -/
-axiom branches_step_preserves_trans (branches branches' : List (Label × GlobalType))
-    (act : GlobalActionR) (role : String)
-    (hstep : BranchesStep step branches act branches')
-    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
-    BranchesRel EQ2 (transBranches branches' role) (transBranches branches role)
-
 /-- Non-participating roles have unchanged projections through a step.
 
 This theorem captures the key harmony property: if a role is not involved in an action
@@ -183,12 +164,10 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
     -- motive_1: for step g act g', non-participant role has EQ2 (projTrans g' role) (projTrans g role)
     (motive_1 := fun g act g' _ =>
       ∀ role, role ≠ act.sender → role ≠ act.receiver → EQ2 (projTrans g' role) (projTrans g role))
-    -- motive_2: for BranchesStep bs act bs', non-participant role has first branches relate under EQ2
+    -- motive_2: for BranchesStep bs act bs', non-participant has BranchesRel on transBranches
     (motive_2 := fun bs act bs' _ =>
       ∀ role, role ≠ act.sender → role ≠ act.receiver →
-        (∀ (fl : Label) (fc : GlobalType) (fl' : Label) (fc' : GlobalType),
-          bs = (fl, fc) :: bs.tail → bs' = (fl', fc') :: bs'.tail →
-          EQ2 (projTrans fc' role) (projTrans fc role)))
+        BranchesRel EQ2 (transBranches bs' role) (transBranches bs role))
     -- Case 1: comm_head
     (fun sender receiver branches label cont hmem role hns hnr => by
       -- g = comm sender receiver branches, g' = cont
@@ -210,15 +189,15 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
           rw [htrans_g]
           exact hcoherent)
     -- Case 2: comm_async
-    (fun sender receiver branches branches' act label cont hns_cond _hcond _hmem _hcan hbstep
-        _ih_bstep role hns hnr => by
+    (fun sender receiver branches branches' act label cont hns_cond _hcond _hmem _hcan _hbstep
+        ih_bstep role hns hnr => by
       -- g = comm sender receiver branches
       -- g' = comm sender receiver branches'
       -- hns : role ≠ act.sender, hnr : role ≠ act.receiver
-      -- hbstep : BranchesStep step branches act branches'
+      -- ih_bstep : BranchesRel EQ2 (transBranches branches' role) (transBranches branches role)
       --
-      -- Use branches_step_preserves_trans to get branch-wise EQ2 preservation
-      have hbranch_rel := branches_step_preserves_trans branches branches' act role hbstep hns hnr
+      -- Get branch-wise EQ2 preservation from motive_2 IH
+      have hbranch_rel := ih_bstep role hns hnr
       -- Case split on role's relationship to outer comm's sender/receiver
       by_cases hrs : role = sender
       · -- role = sender: project as send
@@ -243,10 +222,10 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
               exact EQ2_refl _
           | [], _ :: _ =>
               -- BranchesStep from [] is only BranchesStep.nil to [], contradiction
-              cases hbstep
+              cases _hbstep
           | _ :: _, [] =>
               -- BranchesStep to [] requires branches = [], contradiction
-              cases hbstep
+              cases _hbstep
           | (fl, fc) :: rest, (fl', fc') :: rest' =>
               -- trans_comm_other gives: trans (comm s r ((l,c)::_)) role = trans c role
               simp only [trans_comm_other sender receiver role ((fl, fc) :: rest) hrs hrr,
@@ -274,30 +253,48 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
       -- Chain: g' ≈ subst ≈ unfold ≈ mu
       exact EQ2_trans hih (EQ2_trans hsub (EQ2_symm hunf)))
     -- Case 4: BranchesStep.nil
-    (fun _act _role _hns _hnr fl fc _fl' _fc' hnil _hnil' => by
-      -- hnil : [] = (fl, fc) :: [].tail = [(fl, fc)]
-      -- This is a contradiction: [] ≠ [(fl, fc)]
-      exact absurd hnil (by simp [List.tail_nil]))
+    (fun _act role _hns _hnr => by
+      simp only [transBranches]
+      exact List.Forall₂.nil)
     -- Case 5: BranchesStep.cons
-    (fun label g g' rest rest' act _hstep_g _hbstep_rest ih_step _ih_bstep
-        role hns hnr fl fc fl' fc' hbs hbs' => by
-      -- bs = (label, g) :: rest, bs' = (label, g') :: rest'
-      -- hbs says ((label, g) :: rest) = (fl, fc) :: ((label, g) :: rest).tail
-      -- This means (label, g) = (fl, fc), so fl = label and fc = g
-      -- Similarly for hbs'
-      simp only [List.tail_cons, List.cons.injEq] at hbs hbs'
-      -- hbs : (label, g) = (fl, fc) ∧ rest = rest
-      -- hbs' : (label, g') = (fl', fc') ∧ rest' = rest'
-      have heq_fc : fc = g := by
-        simp only [Prod.mk.injEq] at hbs
-        exact hbs.1.2.symm
-      have heq_fc' : fc' = g' := by
-        simp only [Prod.mk.injEq] at hbs'
-        exact hbs'.1.2.symm
-      rw [heq_fc, heq_fc']
-      -- ih_step : ∀ role, role ≠ act.sender → role ≠ act.receiver → EQ2 (trans g' role) (trans g role)
-      exact ih_step role hns hnr)
+    (fun label g g' rest rest' act _hstep_g _hbstep_rest ih_step ih_bstep role hns hnr => by
+      simp only [transBranches]
+      apply List.Forall₂.cons
+      · -- Head: (label, trans g' role) and (label, trans g role)
+        constructor
+        · rfl  -- labels match
+        · -- Need: EQ2 (trans g' role) (trans g role)
+          -- ih_step gives exactly this
+          exact ih_step role hns hnr
+      · -- Tail: IH gives BranchesRel for rest
+        exact ih_bstep role hns hnr)
     g act g' hstep role hns hnr
+
+/-- BranchesStep preserves transBranches up to branch-wise EQ2 for non-participants.
+
+When branches step to branches' via BranchesStep, the transBranches are related
+by BranchesRel EQ2 for any role not involved in the action.
+
+This captures the semantic property that stepping inside branches doesn't affect
+non-participant projections: each branch steps, and projection commutes with stepping.
+
+Proven by induction on BranchesStep, using proj_trans_other_step for each branch. -/
+theorem branches_step_preserves_trans (branches branches' : List (Label × GlobalType))
+    (act : GlobalActionR) (role : String)
+    (hstep : BranchesStep step branches act branches')
+    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
+    BranchesRel EQ2 (transBranches branches' role) (transBranches branches role) := by
+  induction hstep with
+  | nil =>
+      simp only [transBranches]
+      exact List.Forall₂.nil
+  | cons label g g' rest rest' act hstep_g _hbstep_rest ih =>
+      simp only [transBranches]
+      apply List.Forall₂.cons
+      · constructor
+        · rfl
+        · exact proj_trans_other_step g g' act role hstep_g hns hnr
+      · exact ih hns hnr
 
 /-! ## Claims Bundle -/
 
