@@ -1,3 +1,5 @@
+import Mathlib
+
 /-! # RumpsteakV2.Protocol.ObservableClosed
 
 ## Problem: Observable Behavior of Closed Recursive Types
@@ -42,8 +44,6 @@ The core types are renamed to avoid conflicts with Mathlib:
 - `MvPFunctor` → `ITreeMvPFunctor`
 - `MvQPF` → `ITreeMvQPF`
 -/
-
-import Mathlib
 
 set_option linter.mathlibStandardSet false
 

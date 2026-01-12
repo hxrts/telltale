@@ -37,6 +37,7 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.LocalTypeDB
 open RumpsteakV2.Protocol.LocalTypeConv
+open RumpsteakV2.Protocol.NameOnlyContext
 
 /-! ## Basic list helpers -/
 
@@ -186,6 +187,57 @@ lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
           rw [NameOnlyContext.indexOf_cons_ne _ hax, hk]
           rfl
         · exact Nat.succ_le_succ hkle
+
+/-- If v ≠ x and j > pref.length, then v was found in ctx and we can extract its index -/
+lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
+    (hvx : v ≠ x)
+    (hj : Context.indexOf (pref ++ NameOnlyContext.cons x ctx) v = some j)
+    (hjgt : j > pref.length) :
+    Context.indexOf ctx v = some (j - pref.length - 1) := by
+  induction pref using NameOnlyContext.induction generalizing j with
+  | h_empty =>
+      simp only [TypeContext.length_empty] at hjgt
+      simp only [Context.indexOf] at hj ⊢
+      rw [empty_append_eq] at hj
+      -- hj : (cons x ctx).indexOf v = some j, hjgt : j > 0
+      -- Since v ≠ x, v must be found in ctx at position j - 1
+      -- indexOf_cons_ne requires x ≠ v (the element at cons position ≠ the lookup key)
+      rw [NameOnlyContext.indexOf_cons_ne ctx (Ne.symm hvx)] at hj
+      -- hj : Option.map Nat.succ (ctx.indexOf v) = some j
+      cases hctx : NameOnlyContext.indexOf ctx v with
+      | none => simp [hctx] at hj
+      | some k =>
+          simp only [hctx, Option.map, Option.some.injEq] at hj
+          -- hj : k + 1 = j, goal is indexOf ctx v = some (j - 0 - 1) = some (j - 1)
+          -- Since k + 1 = j, we have k = j - 1
+          simp only [TypeContext.length_empty, Nat.add_zero, hctx]
+          congr 1
+          omega
+  | h_cons a pref ih =>
+      simp only [Context.indexOf] at hj ⊢
+      rw [cons_append_eq_cons] at hj
+      by_cases hav : a = v
+      · subst hav
+        simp only [NameOnlyContext.indexOf_cons_eq] at hj
+        cases hj
+        simp only [NameOnlyContext.cons_length] at hjgt
+        omega
+      · rw [NameOnlyContext.indexOf_cons_ne _ hav] at hj
+        cases hpref : NameOnlyContext.indexOf (pref ++ NameOnlyContext.cons x ctx) v with
+        | none => simp [hpref] at hj
+        | some k =>
+            simp only [hpref, Option.map, Option.some.injEq] at hj
+            -- hj : k + 1 = j
+            have hjgt' : k > pref.length := by
+              simp only [NameOnlyContext.cons_length] at hjgt
+              omega
+            have hpref' : Context.indexOf (pref ++ NameOnlyContext.cons x ctx) v = some k := by
+              simp only [Context.indexOf]
+              exact hpref
+            have ih' := ih hpref' hjgt'
+            have heq : j - (pref.length + 1) - 1 = k - pref.length - 1 := by omega
+            simp only [NameOnlyContext.cons_length, heq]
+            exact ih'
 
 /-! ## String / Nat helpers for fresh-name proofs -/
 
@@ -869,7 +921,8 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
       cases hdb
       simp [LocalTypeDB.isGuarded]
     · intro p bs hbs pref ctx i db hidx hdb
-      cases hdbs : LocalTypeR.branchesToDB? (pref ++ x :: ctx) bs with
+      simp only [fromList_cons_toList] at hdb
+      cases hdbs : LocalTypeR.branchesToDB? (pref ++ NameOnlyContext.cons x ctx) bs with
       | none =>
           simp [LocalTypeR.toDB?, hdbs] at hdb
       | some dbs =>
@@ -877,7 +930,8 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           subst hdb
           simp [LocalTypeDB.isGuarded]
     · intro p bs hbs pref ctx i db hidx hdb
-      cases hdbs : LocalTypeR.branchesToDB? (pref ++ x :: ctx) bs with
+      simp only [fromList_cons_toList] at hdb
+      cases hdbs : LocalTypeR.branchesToDB? (pref ++ NameOnlyContext.cons x ctx) bs with
       | none =>
           simp [LocalTypeR.toDB?, hdbs] at hdb
       | some dbs =>
@@ -885,7 +939,8 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           subst hdb
           simp [LocalTypeDB.isGuarded]
     · intro y body hbody pref ctx i db hidx hdb
-      cases hbody_db : body.toDB? (y :: (pref ++ x :: ctx)) with
+      simp only [fromList_cons_toList, fromList_toList, fromList_cons, fromList_append] at hdb
+      cases hbody_db : body.toDB? (cons y (pref ++ cons x ctx)) with
       | none =>
           simp [LocalTypeR.toDB?, hbody_db, Option.map] at hdb
       | some db' =>
@@ -894,61 +949,48 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
             simpa using hdb.symm
           subst hdb'
           have hguard' :
-              db'.isGuarded (i + (y :: pref).length + 1) = true := by
-            have hbody' : body.toDB? ((y :: pref) ++ x :: ctx) = some db' := by
+              db'.isGuarded (i + (cons y pref).length + 1) = true := by
+            have hbody' : body.toDB? ((cons y pref) ++ fromList (x :: toList ctx)) = some db' := by
+              simp only [fromList_cons_toList]
               simpa using hbody_db
-            exact hbody (pref := y :: pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
+            exact hbody (pref := cons y pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
           have hguard'' : db'.isGuarded (i + pref.length + 1 + 1) = true := by
-            have : i + (y :: pref).length + 1 = i + pref.length + 1 + 1 := by
-              simp [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+            have : i + (cons y pref).length + 1 = i + pref.length + 1 + 1 := by
+              simp [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm, cons_length]
             simpa [this] using hguard'
           simpa [LocalTypeDB.isGuarded, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using hguard''
     · intro v pref ctx i db hidx hdb
-      cases hvar : Context.indexOf (pref ++ x :: ctx) v with
-      | none =>
-          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
+      simp only [LocalTypeR.toDB?, fromList_cons_toList] at hdb
+      cases hj : NameOnlyContext.indexOf (pref ++ NameOnlyContext.cons x ctx) v with
+      | none => simp [hj] at hdb
       | some j =>
-          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
+          simp only [hj, Option.map, Option.some.injEq] at hdb
           subst hdb
-          have hne : j ≠ i + pref.length + 1 := by
-            intro hj
-            have hidx_v : Context.indexOf (pref ++ x :: ctx) v = some (i + pref.length + 1) := by
-              simpa [hj] using hvar
-            have hget_v :=
-              indexOf_get? (ctx := pref ++ x :: ctx) (v := v) (i := i + pref.length + 1) hidx_v
-            have hget_x : NameContext.get? (pref ++ x :: ctx) (i + pref.length + 1) = some x := by
-              have hidx' : i + pref.length + 1 = pref.length + (i + 1) := by
-                simp [Nat.add_assoc, Nat.add_left_comm]
-              calc
-                NameContext.get? (pref ++ x :: ctx) (i + pref.length + 1)
-                    = NameContext.get? (pref ++ x :: ctx) (pref.length + (i + 1)) := by
-                        simp [hidx']
-                _ = NameContext.get? (x :: ctx) (i + 1) := by
-                      simpa using
-                        (get?_append_right (xs := pref) (ys := x :: ctx) (n := i + 1))
-                _ = NameContext.get? ctx i := by
-                      simp [NameContext.get?]
-                _ = some x := by
-                      simpa using (indexOf_get? (ctx := ctx) (v := x) (i := i) hidx)
-            have hvx : v = x := by
-              have : (some x : Option String) = some v := by
-                simpa [hget_x] using hget_v
-              exact (Option.some.inj this).symm
-            obtain ⟨k, hk, hkle⟩ := indexOf_append_x_le (pref := pref) (ctx := ctx) (x := x)
-            have hk' : k = i + pref.length + 1 := by
-              have : (some k : Option Nat) = some (i + pref.length + 1) := by
-                simpa [hvx, hk] using hidx_v
-              exact Option.some.inj this
-            have hle : i + pref.length + 1 ≤ pref.length := by
-              have hkle' : i + pref.length + 1 ≤ pref.length := by
-                simpa [hk'] using hkle
-              exact hkle'
-            have hgt : pref.length < i + pref.length + 1 := by
-              have : pref.length < pref.length + (i + 1) := by
-                exact Nat.lt_add_of_pos_right (n := pref.length) (k := i + 1) (h := Nat.succ_pos _)
-              simpa [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using this
-            exact (Nat.not_le_of_gt hgt) hle
-          simp [LocalTypeDB.isGuarded, hne]
+          simp only [LocalTypeDB.isGuarded, bne_iff_ne, ne_eq]
+          intro heq
+          -- heq: j = i + pref.length + 1
+          -- Need to derive contradiction by showing j ≤ pref.length or j = pref.length + 1 + k for some k ≠ i
+          -- Use indexOf_append_x_le to show x appears at position ≤ pref.length
+          have ⟨k, hk, hkle⟩ := indexOf_append_x_le pref ctx x
+          simp only [Context.indexOf] at hk hj
+          -- If v = x, then j = k ≤ pref.length < i + pref.length + 1, contradiction
+          -- If v ≠ x, then j > pref.length (since x appears first), and j = pref.length + 1 + m
+          -- where m is the index of v in ctx. Since indexOf ctx x = i and v ≠ x, m ≠ i.
+          by_cases hjle : j ≤ pref.length
+          · -- j ≤ pref.length contradicts heq: j = i + pref.length + 1 ≥ pref.length + 1
+            omega
+          · -- j > pref.length, so v ≠ x (since x appears at position ≤ pref.length)
+            push_neg at hjle
+            have hvx : v ≠ x := by
+              intro hvx
+              subst hvx
+              have hjk : j = k := Option.some.inj (hj.symm.trans hk)
+              omega
+            have hctx := indexOf_append_suffix hvx (by simp only [Context.indexOf]; exact hj) hjle
+            have heq' : j - pref.length - 1 = i := by omega
+            simp only [heq'] at hctx
+            have hvx' := indexOf_inj (ctx := ctx) hctx hidx
+            exact hvx hvx'
     · exact True.intro
     · intro _ _ _ _
       exact True.intro
@@ -995,58 +1037,55 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
           subst hdb
           simp [LocalTypeDB.isGuarded]
     · intro y body hbody ctx x i db hguard hidx hdb
-      by_cases hxy : x = y
-      · subst hxy
-        cases hbody_db : body.toDB? (x :: ctx) with
-        | none =>
-            simp [LocalTypeR.toDB?, hbody_db] at hdb
-        | some db' =>
-            have hdb' : db = LocalTypeDB.mu db' := by
-              have : some (LocalTypeDB.mu db') = some db := by
-                simpa [LocalTypeR.toDB?, hbody_db] using hdb
-              exact (Option.some.inj this).symm
-            subst hdb'
-            have hguard' : db'.isGuarded (i + 1) = true := by
-              exact isGuarded_toDB_shadowed_prefix (t := body) (pref := []) (ctx := ctx)
-                (x := x) (i := i) (db := db') hidx (by simp [hbody_db])
-            simpa [LocalTypeDB.isGuarded] using hguard'
-      · have hguard_body : body.isGuarded x = true := by
-          simp [LocalTypeR.isGuarded, hxy] at hguard
-          exact hguard
-        have hidx' : Context.indexOf (y :: ctx) x = some (i + 1) := by
-          have hne : y ≠ x := by
-            intro h
-            exact hxy h.symm
-          simp [indexOf_cons, hne, hidx]
-        cases hbody_db : body.toDB? (y :: ctx) with
-        | none =>
-            simp [LocalTypeR.toDB?, hbody_db] at hdb
-        | some db' =>
-            have hdb' : db = LocalTypeDB.mu db' := by
-              have : some (LocalTypeDB.mu db') = some db := by
-                simpa [LocalTypeR.toDB?, hbody_db] using hdb
-              exact (Option.some.inj this).symm
-            subst hdb'
-            have hguard' :=
-              hbody (ctx := y :: ctx) (x := x) (i := i + 1) (db := db')
-                hguard_body hidx' (by simp [hbody_db])
-            simpa [LocalTypeDB.isGuarded] using hguard'
-    · intro v ctx x i db hguard hidx hdb
-      have hne_v : x ≠ v := by
-        intro hxeq
-        subst hxeq
-        simp [LocalTypeR.isGuarded] at hguard
-      cases hvar : Context.indexOf ctx v with
-      | none =>
-          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
-      | some j =>
-          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
+      simp only [LocalTypeR.toDB?] at hdb
+      cases hbody_db : body.toDB? (NameOnlyContext.cons y ctx) with
+      | none => simp [hbody_db, Option.map] at hdb
+      | some db' =>
+          simp only [hbody_db, Option.map, Option.some.injEq] at hdb
           subst hdb
-          have hne : j ≠ i := by
-            intro hij
-            have hx := indexOf_inj (hx := hidx) (hy := by simpa [hij] using hvar)
-            exact hne_v hx
-          simp [LocalTypeDB.isGuarded, hne]
+          simp only [LocalTypeDB.isGuarded]
+          by_cases hxy : x = y
+          · -- Case x = y: variable is shadowed by the mu binder
+            -- Use isGuarded_toDB_shadowed_prefix with empty prefix
+            subst hxy
+            have hbody' : body.toDB? (TypeContext.empty ++ (x :: (ctx : List String) : Context)) = some db' := by
+              simp only [empty_append_eq, fromList_cons_toList]
+              exact hbody_db
+            have hguard' := isGuarded_toDB_shadowed_prefix body TypeContext.empty ctx x i db' hidx hbody'
+            simp only [TypeContext.length_empty, Nat.add_zero] at hguard'
+            exact hguard'
+          · -- Case x ≠ y: use IH on body
+            have hguard_body : body.isGuarded x = true := by
+              simp only [LocalTypeR.isGuarded] at hguard
+              have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
+              simp only [hbeq, Bool.false_eq_true, ↓reduceIte] at hguard
+              exact hguard
+            have hidx' : (NameOnlyContext.cons y ctx).indexOf x = some (i + 1) := by
+              show NameOnlyContext.indexOf (NameOnlyContext.cons y ctx) x = some (i + 1)
+              rw [NameOnlyContext.indexOf_cons_ne ctx (Ne.symm hxy)]
+              show Option.map Nat.succ (NameOnlyContext.indexOf ctx x) = some (i + 1)
+              have hidx'' : NameOnlyContext.indexOf ctx x = some i := hidx
+              rw [hidx'']
+              rfl
+            exact hbody (NameOnlyContext.cons y ctx) x (i + 1) db' hguard_body hidx' hbody_db
+    · intro v ctx x i db hguard hidx hdb
+      simp only [LocalTypeR.toDB?] at hdb
+      cases hj : NameOnlyContext.indexOf ctx v with
+      | none => simp [hj] at hdb
+      | some j =>
+          simp only [hj, Option.map, Option.some.injEq] at hdb
+          subst hdb
+          simp only [LocalTypeDB.isGuarded, bne_iff_ne, ne_eq]
+          -- v ≠ x from hguard, indexOf ctx v = some j, indexOf ctx x = some i
+          -- By indexOf_inj contrapositive, j ≠ i
+          have hvx : v ≠ x := by
+            simp only [LocalTypeR.isGuarded, bne_iff_ne, ne_eq] at hguard
+            exact Ne.symm hguard
+          intro hjei
+          have hjei' : Context.indexOf ctx v = some i := by
+            simp only [Context.indexOf, hj, hjei]
+          have hvx' := indexOf_inj hjei' hidx
+          exact hvx hvx'
     · exact True.intro
     · intro _ _ _ _
       exact True.intro
@@ -1100,27 +1139,29 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
           have hdbs_contr := hbs ctx dbs hbs_contr hdbs
           simp [LocalTypeDB.isContractive, hdbs_contr]
     · intro x body hbody ctx db hcontr hdb
-      simp [LocalTypeR.isContractive] at hcontr
+      simp only [LocalTypeR.isContractive, Bool.and_eq_true] at hcontr
       rcases hcontr with ⟨hguard, hbody_contr⟩
-      cases hbody_db : body.toDB? (x :: ctx) with
-      | none =>
-          simp [LocalTypeR.toDB?, hbody_db] at hdb
+      simp only [LocalTypeR.toDB?] at hdb
+      cases hbody_db : body.toDB? (NameOnlyContext.cons x ctx) with
+      | none => simp [hbody_db, Option.map] at hdb
       | some db' =>
-          simp [LocalTypeR.toDB?, hbody_db] at hdb
+          simp only [hbody_db, Option.map, Option.some.injEq] at hdb
           subst hdb
-          have hguard' : db'.isGuarded 0 = true := by
-            have hidx : Context.indexOf (x :: ctx) x = some 0 := by
-              simp [indexOf_cons]
-            exact isGuarded_toDB (t := body) (ctx := x :: ctx) (x := x) (i := 0) (db := db')
-              hguard hidx (by simp [hbody_db])
-          have hbody' := hbody (ctx := x :: ctx) (db := db') hbody_contr (by simp [hbody_db])
-          simp [LocalTypeDB.isContractive, hguard', hbody']
+          simp only [LocalTypeDB.isContractive, Bool.and_eq_true]
+          constructor
+          · -- Show db'.isGuarded 0 = true
+            have hidx : (NameOnlyContext.cons x ctx).indexOf x = some 0 := by
+              simp only [Context.indexOf, NameOnlyContext.indexOf_cons_eq]
+            exact isGuarded_toDB body (NameOnlyContext.cons x ctx) x 0 db' hguard hidx hbody_db
+          · -- Show db'.isContractive = true using IH
+            exact hbody (NameOnlyContext.cons x ctx) db' hbody_contr hbody_db
     · intro v ctx db hcontr hdb
-      cases hvar : Context.indexOf ctx v with
-      | none =>
-          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
+      -- Variables are always contractive in both representations
+      simp only [LocalTypeR.toDB?] at hdb
+      cases hj : NameOnlyContext.indexOf ctx v with
+      | none => simp [hj] at hdb
       | some j =>
-          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
+          simp only [hj, Option.map, Option.some.injEq] at hdb
           subst hdb
           simp [LocalTypeDB.isContractive]
     · intro ctx dbs hcontr hdbs

@@ -2,6 +2,8 @@ import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.Bisim
 import RumpsteakV2.Protocol.LocalTypeR
 
+open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
+
 /-! # EQ2_substitute: Substitution Preserves Equi-recursive Equality
 
 This module establishes that EQ2 (the coinductive equi-recursive equality) is
@@ -72,25 +74,13 @@ open RumpsteakV2.Protocol.CoTypes.EQ2
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 
-/-! ## Freshness Predicate -/
+/-! ## Freshness Predicate
 
-mutual
-  /-- Check if a variable appears free in a local type. -/
-  def isFreeIn (v : String) : LocalTypeR → Bool
-    | .end => false
-    | .var w => v == w
-    | .send _ bs => isFreeInBranches v bs
-    | .recv _ bs => isFreeInBranches v bs
-    | .mu t body => if v == t then false else isFreeIn v body
-
-  /-- Check if a variable appears free in any branch. -/
-  def isFreeInBranches (v : String) : List (Label × LocalTypeR) → Bool
-    | [] => false
-    | (_, cont) :: rest => isFreeIn v cont || isFreeInBranches v rest
-end
+The `isFreeIn` and `isFreeInBranches` functions are defined in `SubstCommBarendregt.lean`.
+-/
 
 /-- A variable is fresh for a type if it doesn't appear free. -/
-def Fresh (v : String) (t : LocalTypeR) : Prop := isFreeIn v t = false
+def Fresh (v : String) (t : LocalTypeR) : Prop := SubstCommBarendregt.isFreeIn v t = false
 
 /-! ## The Main Axiom -/
 
@@ -110,7 +100,7 @@ Barendregt convention (bound variables are fresh w.r.t. external terms).
 **Proven version:** See `EQ2_substitute_barendregt` in `SubstCommBarendregt.lean` which
 proves this under explicit Barendregt preconditions:
 - `notBoundAt var a` and `notBoundAt var b` (no shadowing of var)
-- `∀ t, isFreeIn t repl = false` (repl is closed, so no capture)
+- `∀ t, SubstCommBarendregt.isFreeIn t repl = false` (repl is closed, so no capture)
 
 The unconditional axiom here is semantically sound because well-formed types
 satisfy the Barendregt convention. The proof has 2 remaining sorries for
@@ -124,10 +114,10 @@ theorem EQ2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR) :
     EQ2 a b →
     notBoundAt var a = true →
     notBoundAt var b = true →
-    (∀ t, isFreeIn t repl = false) →
+    (∀ t, SubstCommBarendregt.isFreeIn t repl = false) →
     (∀ t body, repl ≠ .mu t body) →
     EQ2 (a.substitute var repl) (b.substitute var repl) :=
-  RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_substitute_via_Bisim
+  RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_substitute_via_Bisim (a := a) (b := b) (var := var) (repl := repl)
 
 /-! ## Derived Lemmas -/
 
@@ -136,7 +126,7 @@ theorem EQ2_substitute' {a b : LocalTypeR} (var : String) (repl : LocalTypeR)
     (h : EQ2 a b)
     (hbarA : notBoundAt var a = true)
     (hbarB : notBoundAt var b = true)
-    (hfresh : ∀ t, isFreeIn t repl = false)
+    (hfresh : ∀ t, SubstCommBarendregt.isFreeIn t repl = false)
     (hnomu : ∀ t body, repl ≠ .mu t body) :
     EQ2 (a.substitute var repl) (b.substitute var repl) :=
   EQ2_substitute a b var repl h hbarA hbarB hfresh hnomu
@@ -144,7 +134,7 @@ theorem EQ2_substitute' {a b : LocalTypeR} (var : String) (repl : LocalTypeR)
 /-- If two types are EQ2-equal, substituting in one gives an EQ2-equal result. -/
 theorem EQ2_substitute_left (a : LocalTypeR) (var : String) (repl : LocalTypeR)
     (hbar : notBoundAt var a = true)
-    (hfresh : ∀ t, isFreeIn t repl = false)
+    (hfresh : ∀ t, SubstCommBarendregt.isFreeIn t repl = false)
     (hnomu : ∀ t body, repl ≠ .mu t body) :
     EQ2 (a.substitute var repl) (a.substitute var repl) :=
   EQ2_substitute a a var repl (EQ2_refl a) hbar hbar hfresh hnomu

@@ -34,21 +34,21 @@ open RumpsteakV2.Protocol.LocalTypeConvProofs
 
 **Proven** in LocalTypeConvProofs.lean -/
 theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  t.fromDB? [] = some (t.fromDB []) :=
+  t.fromDB? TypeContext.empty = some (t.fromDB TypeContext.empty) :=
   LocalTypeConvProofs.fromDB?_eq_fromDB_closed t hclosed
 
 /-- Closed DB term converts to closed named term.
 
 **Proven** in LocalTypeConvProofs.lean -/
 theorem fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  (t.fromDB []).isClosed = true :=
+  (t.fromDB TypeContext.empty).isClosed = true :=
   LocalTypeConvProofs.fromDB_closed t hclosed
 
 /-- Closed named term converts to closed DB term.
 
 **Proven** in LocalTypeConvProofs.lean -/
 theorem toDB_closed (t : LocalTypeR) (hclosed : t.isClosed = true) :
-  ∃ db, t.toDB? [] = some db ∧ db.isClosed = true :=
+  ∃ db, t.toDB? TypeContext.empty = some db ∧ db.isClosed = true :=
   LocalTypeConvProofs.toDB_closed t hclosed
 
 /-- Round-trip for closed DB terms: fromDB then toDB gives original.
@@ -58,7 +58,7 @@ then convert back, knowing we get the same term.
 
 **Status**: Proven infrastructure exists (get_indexOf_roundtrip), full proof pending. -/
 theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  (t.fromDB []).toDB? [] = some t :=
+  (t.fromDB TypeContext.empty).toDB? TypeContext.empty = some t :=
   LocalTypeConvProofs.toDB_fromDB_roundtrip_closed t hclosed
 
 /-! ## General Conversion Properties (require adequate context)
@@ -143,13 +143,13 @@ These wrappers make it explicit when conversions are guaranteed to be safe.
 
 /-- Convert closed named term to DB (guaranteed to succeed). -/
 def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDB :=
-  match t.toDB? [] with
+  match t.toDB? TypeContext.empty with
   | some db => db
   | none => .end  -- Should never happen for closed terms
 
 /-- Convert closed DB term to named (safe version). -/
 def fromDB_closed_safe (t : LocalTypeDB) (_hclosed : t.isClosed = true) : LocalTypeR :=
-  match t.fromDB? [] with
+  match t.fromDB? TypeContext.empty with
   | some r => r
   | none => .end  -- Should never happen for closed terms
 

@@ -184,7 +184,20 @@ instance : Coe (List String) NameOnlyContext where
 instance : Coe NameOnlyContext (List String) where
   coe ctx := ctx.toList
 
--- Note: For `v :: ctx` syntax, use `cons v ctx` or rely on List coercion
+/-! ### fromList cons lemma -/
+
+/-- When we coerce `x :: ctx.toList`, we get `cons x ctx` after fromList.
+    This bridges the List syntax to NameOnlyContext operations. -/
+@[simp]
+theorem fromList_cons_toList (x : String) (ctx : NameOnlyContext) :
+    fromList (x :: ctx.toList) = cons x ctx := by
+  simp only [fromList, toList, TypeContext.names, cons, TypeContext.extend]
+  congr 1
+  simp only [List.map_cons, List.map_map, Function.comp_def]
+  congr 1
+  induction ctx.bindings with
+  | nil => rfl
+  | cons h t ih => simp [ih]
 
 /-! ### Operations matching List String -/
 
@@ -442,6 +455,37 @@ theorem indexOf_mem {ctx : NameOnlyContext} {v : String} (hmem : v ∈ ctx.names
 /-- String membership in NameOnlyContext: a string is in a context if it's in the names list. -/
 instance instMembershipStringNameOnlyContext : Membership String NameOnlyContext where
   mem := fun (ctx : NameOnlyContext) (v : String) => List.Mem v ctx.names
+
+/-! ### Roundtrip and Distribution Lemmas for Coercion -/
+
+/-- Roundtrip: fromList ∘ toList = id -/
+@[simp]
+theorem fromList_toList (ctx : NameOnlyContext) : fromList ctx.toList = ctx := by
+  simp only [fromList, toList, TypeContext.names]
+  congr 1
+  induction ctx.bindings with
+  | nil => rfl
+  | cons h t ih => simp [ih]
+
+/-- toList distributes over append -/
+@[simp]
+theorem toList_append (ctx1 ctx2 : NameOnlyContext) :
+    (ctx1 ++ ctx2).toList = ctx1.toList ++ ctx2.toList := by
+  simp only [toList, TypeContext.names, append_bindings, List.map_append]
+
+/-- fromList distributes over append -/
+@[simp]
+theorem fromList_append (xs ys : List String) :
+    fromList (xs ++ ys) = fromList xs ++ fromList ys := by
+  show (⟨_⟩ : NameOnlyContext) = _
+  congr 1
+  simp only [List.map_append, fromList]
+
+/-- cons of (toList) simplifies -/
+@[simp]
+theorem fromList_cons (x : String) (xs : List String) :
+    fromList (x :: xs) = cons x (fromList xs) := by
+  simp only [fromList, cons, TypeContext.extend, List.map_cons]
 
 /-- Decidable equality for NameOnlyContext membership. -/
 instance instDecidableMemStringNameOnlyContext (v : String) (ctx : NameOnlyContext) :

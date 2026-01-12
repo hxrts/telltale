@@ -1759,7 +1759,7 @@ private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed
   cases hrel with
   | is_end =>
       rename_i ha hb
-      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq hb
+      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToEnd.fullUnfold_eq hb hWF
   | is_var =>
       rename_i v ha hb
       have hcontra : False :=
@@ -1797,7 +1797,7 @@ private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} (hWF : LocalTyp
       have hv := RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.deterministic ha
         (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
       subst hv
-      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq hb
+      exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq hb hWF
   | is_end =>
       rename_i ha hb
       have hcontra : False :=
@@ -1836,7 +1836,7 @@ private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR
       have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanSend.deterministic ha
         (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))
       subst hp hbs
-      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hb, hbr⟩
+      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hb hWF, hbr⟩
   | is_end =>
       rename_i ha hb
       have hcontra : False :=
@@ -1879,7 +1879,7 @@ private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR
       have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.deterministic ha
         (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))
       subst hp hbs
-      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hb, hbr⟩
+      exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hb hWF, hbr⟩
   | is_end =>
       rename_i ha hb
       have hcontra : False :=
