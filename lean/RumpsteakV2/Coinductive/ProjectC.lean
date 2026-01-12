@@ -130,14 +130,14 @@ def ProjectC : ProjRelC :=
 
 theorem ProjectC_destruct {g : GlobalType} {role : String} {cand : LocalTypeC}
     (h : ProjectC g role cand) : ProjectC_step ProjectC g role cand := by
-  have hle : ProjectC ≤ ProjectC_step ProjectC := by
-    simpa [ProjectC] using (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.unfold (F := ProjectC_step))
+  have hle : ProjectC ≤ ProjectC_step ProjectC :=
+    (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.unfold (F := ProjectC_step))
   exact hle _ _ _ h
 
 theorem ProjectC_fold {g : GlobalType} {role : String} {cand : LocalTypeC}
     (h : ProjectC_step ProjectC g role cand) : ProjectC g role cand := by
-  have hle : ProjectC_step ProjectC ≤ ProjectC := by
-    simpa [ProjectC] using (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.fold (F := ProjectC_step))
+  have hle : ProjectC_step ProjectC ≤ ProjectC :=
+    (RumpsteakV2.Protocol.CoTypes.CoinductiveRel.fold (F := ProjectC_step))
   exact hle _ _ _ h
 
 /-! ## Unfolding utilities -/
@@ -248,16 +248,14 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
         | «end» =>
             have hne : ∀ x, head l1 ≠ .mu x := by
               intro x hx
-              have : LocalTypeHead.end = LocalTypeHead.mu x := by simpa [hmatch] using hx
-              cases this
+              simp_all
             have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.end, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
         | var t =>
             have hne : ∀ x, head l1 ≠ .mu x := by
               intro x hx
-              have : LocalTypeHead.var t = LocalTypeHead.mu x := by simpa [hmatch] using hx
-              cases this
+              simp_all
             have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.var t, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
@@ -267,9 +265,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
                 rcases hsender with ⟨hrole, labels, hhead, hbr⟩
                 have hne : ∀ x, head l1 ≠ .mu x := by
                   intro x hx
-                  have : LocalTypeHead.send receiver labels = LocalTypeHead.mu x := by
-                    simpa [hhead] using hx
-                  cases this
+                  simp_all
                 have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
                 subst cand
                 refine ⟨.comm sender receiver gbs, l1, hg1, Relation.ReflTransGen.refl, ?_⟩
@@ -280,9 +276,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
                     rcases hreceiver with ⟨hrole, labels, hhead, hbr⟩
                     have hne : ∀ x, head l1 ≠ .mu x := by
                       intro x hx
-                      have : LocalTypeHead.recv sender labels = LocalTypeHead.mu x := by
-                        simpa [hhead] using hx
-                      cases this
+                      simp_all
                     have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
                     subst cand
                     refine ⟨.comm sender receiver gbs, l1, hg1, Relation.ReflTransGen.refl, ?_⟩
