@@ -6,6 +6,7 @@ import RumpsteakV2.Coinductive.Observable
 import RumpsteakV2.Coinductive.ProjectC
 import RumpsteakV2.Coinductive.Bisim
 import RumpsteakV2.Coinductive.EQ2C
+import RumpsteakV2.Coinductive.EQ2CProps
 import RumpsteakV2.Coinductive.FiniteSystem
 import RumpsteakV2.Coinductive.RegularSystemBisim
 import RumpsteakV2.Coinductive.WellFormed

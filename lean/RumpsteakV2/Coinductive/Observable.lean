@@ -35,6 +35,18 @@ def branchesOf (t : LocalTypeC) : List (Label × LocalTypeC) :=
       List.ofFn g
   | _ => []
 
+@[simp]
+lemma branchesOf_mkSend (p : String) (bs : List (Label × LocalTypeC)) :
+    branchesOf (mkSend p bs) = bs := by
+  -- expand `branchesOf` on the `mkSend` constructor
+  simp [branchesOf, mkSend, List.ext_get, List.get_ofFn]
+
+@[simp]
+lemma branchesOf_mkRecv (p : String) (bs : List (Label × LocalTypeC)) :
+    branchesOf (mkRecv p bs) = bs := by
+  -- expand `branchesOf` on the `mkRecv` constructor
+  simp [branchesOf, mkRecv, List.ext_get, List.get_ofFn]
+
 /-- Unfolds to end after finitely many `mu` steps. -/
 def UnfoldsToEndC (t : LocalTypeC) : Prop :=
   ∃ u, UnfoldsToC t u ∧ head u = .end

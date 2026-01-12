@@ -43,8 +43,9 @@ private theorem dest_dualC (t : LocalTypeC) :
       | ⟨.mu x, f⟩ => ⟨.mu x, fun _ => dualC (f ())⟩
       | ⟨.send p labels, f⟩ => ⟨.recv p labels, fun i => dualC (f i)⟩
       | ⟨.recv p labels, f⟩ => ⟨.send p labels, fun i => dualC (f i)⟩ := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  cases hdest : PFunctor.M.dest t with
+  | mk s f =>
+      simpa [dualC, dualStep, hdest] using (PFunctor.M.dest_corec (g := dualStep) t)
 
 private theorem dest_dualC_twice (t : LocalTypeC) :
     PFunctor.M.dest (dualC (dualC t)) =
@@ -54,12 +55,20 @@ private theorem dest_dualC_twice (t : LocalTypeC) :
       | ⟨.mu x, f⟩ => ⟨.mu x, fun _ => dualC (dualC (f ()))⟩
       | ⟨.send p labels, f⟩ => ⟨.send p labels, fun i => dualC (dualC (f i))⟩
       | ⟨.recv p labels, f⟩ => ⟨.recv p labels, fun i => dualC (dualC (f i))⟩ := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  cases hdest : PFunctor.M.dest t with
+  | mk s f =>
+      simpa [dest_dualC, hdest] using (dest_dualC (dualC t))
 
 /-- Duality is involutive. -/
 theorem dualC_involutive (t : LocalTypeC) : dualC (dualC t) = t := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  refine (PFunctor.M.bisim (P := LocalTypeF) (R := fun x y => x = dualC (dualC y)) ?_) _ _ rfl
+  intro x y hxy
+  subst hxy
+  cases hdest : PFunctor.M.dest y with
+  | mk s f =>
+      refine ⟨s, (fun i => dualC (dualC (f i))), f, ?_, hdest, ?_⟩
+      · simpa [dest_dualC_twice, hdest]
+      · intro i
+        rfl
 
 end RumpsteakV2.Coinductive

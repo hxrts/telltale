@@ -52,8 +52,77 @@ def RegularBisim (t : LocalTypeC) (h : Regular t)
 /-- The regular bisimulation is a bisimulation. -/
 theorem RegularBisim_isBisimulation (t : LocalTypeC) (h : Regular t) :
     IsBisimulation (RegularBisim t h (RegularSystem t h)) := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  intro s1 s2 hrel
+  rcases hrel with ⟨s, hs, rfl, rfl⟩
+  rcases hdest : PFunctor.M.dest s1 with ⟨hd, f⟩
+  -- helper: show a child is in the reachable list
+  have hclosed := reachable_is_closed_set t h
+  have hs_fin : s1 ∈ Set.Finite.toFinset h := by
+    simpa [ReachableList, Finset.mem_toList] using hs
+  have hchild_mem :
+      ∀ i : LocalTypeChild hd, f i ∈ ReachableList t h := by
+    intro i
+    have hchild : childRel s1 (f i) := by
+      exact ⟨hd, f, i, hdest, rfl⟩
+    have hfin : f i ∈ Set.Finite.toFinset h := mem_of_closed_child hclosed hs_fin hchild
+    simpa [ReachableList, Finset.mem_toList] using hfin
+  cases hd with
+  | «end» =>
+      let g : LocalTypeChild LocalTypeHead.end → LocalTypeC :=
+        PFunctor.M.corec (RegularSystem t h) ∘ fun x => PEmpty.elim x
+      refine ⟨LocalTypeHead.end, f, g, ?_, ?_, ?_⟩
+      · rfl
+      · have hsys := RegularSystem_at_index t h s1 hs
+        simp [hdest] at hsys
+        simp [SystemToCoind, PFunctor.M.dest_corec, hsys, g]
+        rfl
+      · intro i
+        cases i
+  | var v =>
+      let g : LocalTypeChild (LocalTypeHead.var v) → LocalTypeC :=
+        PFunctor.M.corec (RegularSystem t h) ∘ fun x => PEmpty.elim x
+      refine ⟨LocalTypeHead.var v, f, g, ?_, ?_, ?_⟩
+      · rfl
+      · have hsys := RegularSystem_at_index t h s1 hs
+        simp [hdest] at hsys
+        simp [SystemToCoind, PFunctor.M.dest_corec, hsys, g]
+        rfl
+      · intro i
+        cases i
+  | mu v =>
+      let g : LocalTypeChild (LocalTypeHead.mu v) → LocalTypeC :=
+        PFunctor.M.corec (RegularSystem t h) ∘ fun _ => StateIndex t h (f ())
+      refine ⟨LocalTypeHead.mu v, f, g, ?_, ?_, ?_⟩
+      · rfl
+      · have hsys := RegularSystem_at_index t h s1 hs
+        simp [hdest] at hsys
+        simp [SystemToCoind, PFunctor.M.dest_corec, hsys, g]
+        rfl
+      · intro i
+        cases i
+        refine ⟨f (), hchild_mem (), rfl, rfl⟩
+  | send p labels =>
+      let g : LocalTypeChild (LocalTypeHead.send p labels) → LocalTypeC :=
+        PFunctor.M.corec (RegularSystem t h) ∘ fun i => StateIndex t h (f i)
+      refine ⟨LocalTypeHead.send p labels, f, g, ?_, ?_, ?_⟩
+      · rfl
+      · have hsys := RegularSystem_at_index t h s1 hs
+        simp [hdest] at hsys
+        simp [SystemToCoind, PFunctor.M.dest_corec, hsys, g]
+        rfl
+      · intro i
+        refine ⟨f i, hchild_mem i, rfl, rfl⟩
+  | recv p labels =>
+      let g : LocalTypeChild (LocalTypeHead.recv p labels) → LocalTypeC :=
+        PFunctor.M.corec (RegularSystem t h) ∘ fun i => StateIndex t h (f i)
+      refine ⟨LocalTypeHead.recv p labels, f, g, ?_, ?_, ?_⟩
+      · rfl
+      · have hsys := RegularSystem_at_index t h s1 hs
+        simp [hdest] at hsys
+        simp [SystemToCoind, PFunctor.M.dest_corec, hsys, g]
+        rfl
+      · intro i
+        refine ⟨f i, hchild_mem i, rfl, rfl⟩
 
 /-- Regular coinductive types are bisimilar to their finite-system presentation. -/
 theorem Regular_implies_System (t : LocalTypeC) (h : Regular t) :

@@ -20,6 +20,12 @@ def BranchesRelC (R : LocalTypeC → LocalTypeC → Prop)
     (bs cs : List (Label × LocalTypeC)) : Prop :=
   List.Forall₂ (fun b c => b.1 = c.1 ∧ R b.2 c.2) bs cs
 
+lemma BranchesRelC_mono {R S : LocalTypeC → LocalTypeC → Prop}
+    (h : ∀ a b, R a b → S a b) :
+    ∀ {bs cs}, BranchesRelC R bs cs → BranchesRelC S bs cs := by
+  intro bs cs hrel
+  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+
 lemma BranchesRelC_refl (R : LocalTypeC → LocalTypeC → Prop)
     (h : ∀ t, R t t) : ∀ bs, BranchesRelC R bs bs := by
   intro bs
@@ -42,11 +48,33 @@ lemma BranchesRelC_flip {R : LocalTypeC → LocalTypeC → Prop}
       · exact ⟨hlabel.symm, h _ _ hrel⟩
       · exact ih
 
+lemma BranchesRelC_swap (R : LocalTypeC → LocalTypeC → Prop) :
+    ∀ {bs cs}, BranchesRelC R bs cs → BranchesRelC (fun x y => R y x) cs bs := by
+  intro bs cs hrel
+  induction hrel with
+  | nil => exact List.Forall₂.nil
+  | cons hbc hrest ih =>
+      rcases hbc with ⟨hlabel, hrel⟩
+      constructor
+      · exact ⟨hlabel.symm, hrel⟩
+      · exact ih
+
 lemma BranchesRelC_comp {R S : LocalTypeC → LocalTypeC → Prop}
     (T : LocalTypeC → LocalTypeC → Prop) (hT : ∀ a c, T a c ↔ ∃ b, R a b ∧ S b c) :
     ∀ {bs cs ds}, BranchesRelC R bs cs → BranchesRelC S cs ds → BranchesRelC T bs ds := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  intro bs cs ds hrel1 hrel2
+  induction hrel1 generalizing ds with
+  | nil =>
+      cases hrel2
+      exact List.Forall₂.nil
+  | cons hbc hrest ih =>
+      cases hrel2 with
+      | cons hcd hrest2 =>
+          rcases hbc with ⟨hlab1, hR⟩
+          rcases hcd with ⟨hlab2, hS⟩
+          have hT' : T _ _ := (hT _ _).2 ⟨_, hR, hS⟩
+          refine List.Forall₂.cons ?_ (ih hrest2)
+          exact ⟨hlab1.trans hlab2, hT'⟩
 
 /-- Observable relation between two coinductive types, parameterized by `R`. -/
 inductive ObservableRelC (R : LocalTypeC → LocalTypeC → Prop) :
@@ -87,13 +115,43 @@ lemma ObservableRelC_symm {R : LocalTypeC → LocalTypeC → Prop}
   | is_recv p bs cs ha hb hbr =>
       exact ObservableRelC.is_recv p cs bs hb ha (BranchesRelC_flip hR hbr)
 
+/-- Observable relation is monotone in the underlying relation. -/
+lemma ObservableRelC_mono {R S : LocalTypeC → LocalTypeC → Prop}
+    (h : ∀ a b, R a b → S a b) :
+    ∀ {a b} {obs_a : ObservableC a} {obs_b : ObservableC b},
+      ObservableRelC R obs_a obs_b → ObservableRelC S obs_a obs_b := by
+  intro a b obs_a obs_b hrel
+  cases hrel with
+  | is_end ha hb => exact ObservableRelC.is_end ha hb
+  | is_var v ha hb => exact ObservableRelC.is_var v ha hb
+  | is_send p bs cs ha hb hbr =>
+      exact ObservableRelC.is_send p bs cs ha hb (BranchesRelC_mono h hbr)
+  | is_recv p bs cs ha hb hbr =>
+      exact ObservableRelC.is_recv p bs cs ha hb (BranchesRelC_mono h hbr)
+
 /-- Observable relation composes through relational composition. -/
 lemma ObservableRelC_comp {R S : LocalTypeC → LocalTypeC → Prop}
     (T : LocalTypeC → LocalTypeC → Prop) (hT : ∀ a c, T a c ↔ ∃ b, R a b ∧ S b c) :
     ∀ {a b c} {obs_a : ObservableC a} {obs_b : ObservableC b} {obs_c : ObservableC c},
       ObservableRelC R obs_a obs_b → ObservableRelC S obs_b obs_c → ObservableRelC T obs_a obs_c := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  intro a b c obs_a obs_b obs_c hrel1 hrel2
+  cases hrel1 with
+  | is_end ha hb =>
+      cases hrel2 with
+      | is_end hb' hc => exact ObservableRelC.is_end ha hc
+  | is_var v ha hb =>
+      cases hrel2 with
+      | is_var _ hb' hc => exact ObservableRelC.is_var v ha hc
+  | is_send p bs cs ha hb hbr1 =>
+      cases hrel2 with
+      | is_send _ cs' ds hb' hc hbr2 =>
+          have hbr : BranchesRelC T bs ds := BranchesRelC_comp T hT hbr1 hbr2
+          exact ObservableRelC.is_send p bs ds ha hc hbr
+  | is_recv p bs cs ha hb hbr1 =>
+      cases hrel2 with
+      | is_recv _ cs' ds hb' hc hbr2 =>
+          have hbr : BranchesRelC T bs ds := BranchesRelC_comp T hT hbr1 hbr2
+          exact ObservableRelC.is_recv p bs ds ha hc hbr
 
 /-- A relation is an EQ2C-bisimulation if it relates observable heads. -/
 def IsBisimulationC (R : LocalTypeC → LocalTypeC → Prop) : Prop :=
@@ -103,15 +161,27 @@ def IsBisimulationC (R : LocalTypeC → LocalTypeC → Prop) : Prop :=
 def EQ2C (a b : LocalTypeC) : Prop :=
   ∃ R, IsBisimulationC R ∧ R a b
 
-/-- Reflexivity for observable states. -/
-lemma EQ2C_refl_of_observable {a : LocalTypeC} (obs : ObservableC a) : EQ2C a a := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
-
 /-- Symmetry. -/
 lemma EQ2C_symm {a b : LocalTypeC} (h : EQ2C a b) : EQ2C b a := by
-  -- TODO: Fix after TypeContext refactoring
-  sorry
+  rcases h with ⟨R, hR, hab⟩
+  let R' : LocalTypeC → LocalTypeC → Prop := fun x y => R y x
+  have hswap :
+      ∀ {x y} {obs_x : ObservableC x} {obs_y : ObservableC y},
+        ObservableRelC R obs_x obs_y → ObservableRelC R' obs_y obs_x := by
+    intro x y obs_x obs_y hrel
+    cases hrel with
+    | is_end ha hb => exact ObservableRelC.is_end hb ha
+    | is_var v ha hb => exact ObservableRelC.is_var v hb ha
+    | is_send p bs cs ha hb hbr =>
+        have hbr' : BranchesRelC R' cs bs := BranchesRelC_swap R hbr
+        exact ObservableRelC.is_send p cs bs hb ha hbr'
+    | is_recv p bs cs ha hb hbr =>
+        have hbr' : BranchesRelC R' cs bs := BranchesRelC_swap R hbr
+        exact ObservableRelC.is_recv p cs bs hb ha hbr'
+  refine ⟨R', ?_, hab⟩
+  intro x y hxy
+  obtain ⟨obs_y, obs_x, hrel⟩ := hR y x hxy
+  exact ⟨obs_x, obs_y, hswap hrel⟩
 
 /-- Transitivity. -/
 lemma EQ2C_trans {a b c : LocalTypeC} (hab : EQ2C a b) (hbc : EQ2C b c) : EQ2C a c := by
