@@ -3,6 +3,7 @@ import RumpsteakV2.Coinductive.Regularity
 import RumpsteakV2.Coinductive.Bridge
 import RumpsteakV2.Coinductive.ToInductive
 import RumpsteakV2.Coinductive.Observable
+import RumpsteakV2.Coinductive.ProjectC
 import RumpsteakV2.Coinductive.Bisim
 import RumpsteakV2.Coinductive.EQ2C
 import RumpsteakV2.Coinductive.FiniteSystem
