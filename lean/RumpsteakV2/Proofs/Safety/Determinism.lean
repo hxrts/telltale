@@ -212,11 +212,19 @@ A configuration combines global type and environment. Determinism follows
 from determinism of each component.
 -/
 
-/-- Configuration step is deterministic given the same action. -/
-axiom config_step_det {c c₁ c₂ : Configuration} {act : GlobalActionR}
-    (h₁ : ConfigStep c c₁ act)
-    (h₂ : ConfigStep c c₂ act) :
-    c₁ = c₂
+/-- Configuration step is deterministic given the same action.
+
+Note: Currently uses placeholder ConfigStep (always True).
+When ConfigStep is properly defined using global_step_det + env_step_det,
+this proof would combine those determinism results.
+-/
+theorem config_step_det {c c₁ c₂ : Configuration} {act : GlobalActionR}
+    (_h₁ : ConfigStep c c₁ act)
+    (_h₂ : ConfigStep c c₂ act) :
+    c₁ = c₂ := by
+  -- Placeholder: ConfigStep is defined as True
+  -- Real proof would use global_step_det and env_step_det
+  sorry
 
 /-! ## Local Type Determinism
 
@@ -224,11 +232,19 @@ For projected local types, transitions are also deterministic.
 This follows from global determinism + projection coherence.
 -/
 
-/-- Local step is deterministic (follows from global determinism). -/
-axiom local_step_det {lt lt₁ lt₂ : QLocalTypeR} {act : LocalActionR}
-    (h₁ : LocalStep lt lt₁ act)
-    (h₂ : LocalStep lt lt₂ act) :
-    lt₁ = lt₂
+/-- Local step is deterministic (follows from global determinism).
+
+Note: Currently uses placeholder LocalStep (always True).
+When LocalStep is properly defined via projection from global step,
+this would follow from global_step_det + projection coherence.
+-/
+theorem local_step_det {lt lt₁ lt₂ : QLocalTypeR} {act : LocalActionR}
+    (_h₁ : LocalStep lt lt₁ act)
+    (_h₂ : LocalStep lt lt₂ act) :
+    lt₁ = lt₂ := by
+  -- Placeholder: LocalStep is defined as True
+  -- Real proof would use global_step_det + projection coherence
+  sorry
 
 /-! ## Uniqueness of Enabled Actions
 
@@ -285,12 +301,19 @@ def IndependentActions (act₁ act₂ : GlobalActionR) : Prop :=
 
 If two independent actions are both enabled, they commute:
 taking them in either order reaches the same final configuration.
+
+Note: Currently uses placeholder ConfigStep (always True).
+Real proof would show that independent actions (disjoint role pairs)
+can be reordered without affecting the final configuration.
 -/
-axiom diamond_independent {c c₁ c₂ : Configuration} {act₁ act₂ : GlobalActionR}
-    (hind : IndependentActions act₁ act₂)
-    (h₁ : ConfigStep c c₁ act₁)
-    (h₂ : ConfigStep c c₂ act₂) :
-    ∃ c₃, ConfigStep c₁ c₃ act₂ ∧ ConfigStep c₂ c₃ act₁
+theorem diamond_independent {c c₁ c₂ : Configuration} {act₁ act₂ : GlobalActionR}
+    (_hind : IndependentActions act₁ act₂)
+    (_h₁ : ConfigStep c c₁ act₁)
+    (_h₂ : ConfigStep c c₂ act₂) :
+    ∃ c₃, ConfigStep c₁ c₃ act₂ ∧ ConfigStep c₂ c₃ act₁ := by
+  -- Placeholder: ConfigStep is always True, so we can pick any c₃
+  -- Real proof would construct c₃ by applying both steps in sequence
+  sorry
 
 /-! ## Claims Bundle -/
 
