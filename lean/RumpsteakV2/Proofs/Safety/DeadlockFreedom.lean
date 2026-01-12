@@ -98,11 +98,18 @@ axiom productive_implies_canStep (g : GlobalType)
 /-- Helper: if a global type can step, a well-typed configuration can step.
 
 This requires the environment to provide message delivery for the action.
-Under fair environment, pending messages are eventually delivered. -/
-axiom canStep_implies_configStep (c : Configuration) (act : GlobalActionR)
-    (htyped : WellTypedConfig c)
-    (hcan : canStep c.globalType act) :
-    ∃ c', ConfigStep c c' act
+Under fair environment, pending messages are eventually delivered.
+
+Note: Currently uses placeholder ConfigStep (always True).
+Real proof would construct the stepped configuration from global step + env step. -/
+theorem canStep_implies_configStep (c : Configuration) (act : GlobalActionR)
+    (_htyped : WellTypedConfig c)
+    (_hcan : canStep c.globalType act) :
+    ∃ c', ConfigStep c c' act := by
+  -- Placeholder: ConfigStep is always True, so any c' works
+  -- Real proof would construct c' = { globalType := g', env := env' }
+  -- from step c.globalType act g' and EnvConfigStep c.env act env'
+  exact ⟨c, trivial⟩
 
 /-- Deadlock freedom: well-typed productive configurations are not stuck.
 
