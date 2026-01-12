@@ -1068,10 +1068,11 @@ private theorem BranchesRel_to_BranchesRelBisim_EQ2WF
     BranchesRelBisim (fun x y => EQ2 x y ∧ LocalTypeR.WellFormed x ∧ LocalTypeR.WellFormed y) bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
-  | cons hbc _ ih =>
-      rename_i hd_bs hd_cs
-      have hWFt : LocalTypeR.WellFormed hd_bs.2 := hWFbs hd_bs (List.mem_cons_self _ _)
-      have hWFu : LocalTypeR.WellFormed hd_cs.2 := hWFcs hd_cs (List.mem_cons_self _ _)
+  | @cons hd_bs hd_cs tl_bs tl_cs hbc _ ih =>
+      have hmem_hd_bs : hd_bs ∈ hd_bs :: tl_bs := List.mem_cons_self
+      have hmem_hd_cs : hd_cs ∈ hd_cs :: tl_cs := List.mem_cons_self
+      have hWFt : LocalTypeR.WellFormed hd_bs.2 := hWFbs hd_bs hmem_hd_bs
+      have hWFu : LocalTypeR.WellFormed hd_cs.2 := hWFcs hd_cs hmem_hd_cs
       apply List.Forall₂.cons
       · exact ⟨hbc.1, ⟨hbc.2, hWFt, hWFu⟩⟩
       · exact ih (fun lb hmem => hWFbs lb (List.mem_cons_of_mem _ hmem))
@@ -1873,11 +1874,11 @@ private theorem EQ2_transfer_observable_core {a b : LocalTypeR} (h : EQ2 a b)
 theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a)
     (hWF : LocalTypeR.WellFormed b) :
     ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
-  exact EQ2_transfer_observable_core h obs_a
-    (hend := fun {b} h => EQ2.end_right_implies_UnfoldsToEnd hWF h)
-    (hvar := fun {b v} h => EQ2.var_right_implies_UnfoldsToVar hWF h)
-    (hsend := fun {b p bs} h => EQ2.send_right_implies_CanSend hWF h)
-    (hrecv := fun {b p bs} h => EQ2.recv_right_implies_CanRecv hWF h)
+  exact @EQ2_transfer_observable_core a b h obs_a
+    (fun h' => EQ2.end_right_implies_UnfoldsToEnd hWF h')
+    (fun h' => EQ2.var_right_implies_UnfoldsToVar hWF h')
+    (fun h' => EQ2.send_right_implies_CanSend hWF h')
+    (fun h' => EQ2.recv_right_implies_CanRecv hWF h')
 
 /-- Transfer observables across EQ2 under well-formedness of the target. -/
 theorem EQ2_transfer_observable_of_wellFormed {a b : LocalTypeR} (h : EQ2 a b)

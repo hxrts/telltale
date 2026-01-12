@@ -1,3 +1,9 @@
+import Mathlib
+import Batteries.Data.Nat.Digits
+import RumpsteakV2.Protocol.LocalTypeConvDefs
+
+set_option linter.mathlibStandardSet false
+
 /-! # RumpsteakV2.Protocol.LocalTypeConvProofs
 
 Conversion Proofs: LocalTypeR ↔ LocalTypeDB Roundtrip.
@@ -8,12 +14,6 @@ and de Bruijn indexed (LocalTypeDB) representations of local types.
 This file uses the canonical definitions from `RumpsteakV2.Protocol.LocalTypeConv`,
 `LocalTypeR`, and `LocalTypeDB`.
 -/
-
-import Mathlib
-import Batteries.Data.Nat.Digits
-import RumpsteakV2.Protocol.LocalTypeConvDefs
-
-set_option linter.mathlibStandardSet false
 
 open scoped BigOperators
 open scoped Real
@@ -621,7 +621,9 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
         simp [LocalTypeR.freeVars]
       obtain ⟨i, hidx⟩ := indexOf_eq_some_of_mem (ctx := ctx) (v := v) hv
       refine ⟨LocalTypeDB.var i, ?_, ?_⟩
-      · simp [LocalTypeR.toDB?, Context.indexOf, hidx]
+      · simp only [LocalTypeR.toDB?]
+        rw [Context.indexOf_eq] at hidx
+        simp only [hidx, Option.map]
       · have hlt := indexOf_lt_length (ctx := ctx) (v := v) (i := i) hidx
         simp [LocalTypeDB.isClosedAt, hlt]
     · intro ctx hcov
@@ -701,7 +703,9 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hnodup : ctx.Nodup := generated_nodup ctx hgen
       have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, Context.indexOf, hget, hidx]
+      simp only [LocalTypeDB.fromDB, LocalTypeR.toDB?, hget]
+      rw [Context.indexOf_eq] at hidx
+      simp only [hidx, Option.map]
     · intro p bs hbs ctx hgen hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -792,7 +796,9 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, Context.indexOf, hget, hidx]
+      simp only [LocalTypeDB.fromDB, LocalTypeR.toDB?, hget]
+      rw [Context.indexOf_eq] at hidx
+      simp only [hidx, Option.map]
     · intro p bs hbs ctx hnodup hfreshAll hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed

@@ -39,8 +39,8 @@ inductive LocalTypeR where
   | var : String → LocalTypeR
   deriving Repr, Inhabited
 
-/-- Extract free type variables from a local type. -/
 mutual
+  /-- Extract free type variables from a local type. -/
   def LocalTypeR.freeVars : LocalTypeR → List String
     | .end => []
     | .send _ branches => freeVarsOfBranches branches
@@ -122,8 +122,8 @@ lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
     sizeOf cont < sizeOf bs := by
   simpa [hbs, hhead] using sizeOf_cont_lt_sizeOf_branches label cont tail
 
-/-- Substitute a local type for a variable: `t.substitute v repl` replaces free occurrences of `v` in `t` with `repl`. -/
 mutual
+  /-- Substitute a local type for a variable: `t.substitute v repl` replaces free occurrences of `v` in `t` with `repl`. -/
   def LocalTypeR.substitute : LocalTypeR → String → LocalTypeR → LocalTypeR
     | .end, _, _ => .end
     | .send partner branches, varName, replacement =>
@@ -180,8 +180,8 @@ def LocalTypeR.unfold : LocalTypeR → LocalTypeR
   | lt@(.mu t body) => body.substitute t lt
   | lt => lt
 
-/-- Dualize a local type by swapping send/recv. -/
 mutual
+  /-- Dualize a local type by swapping send/recv. -/
   def LocalTypeR.dual : LocalTypeR → LocalTypeR
     | .end => .end
     | .send partner branches => .recv partner (dualBranches branches)
@@ -1262,9 +1262,9 @@ theorem isGuarded_substitute_other (body : LocalTypeR) (t v : String) (e : Local
 
 -- NOTE: isContractive_substitute_mu is proved in LocalTypeRDBBridge.lean
 
-/-- Substitution preserves contractiveness when the replacement is closed and contractive.
-    The mu case requires closedness to avoid introducing unguarded variables. -/
 mutual
+  /-- Substitution preserves contractiveness when the replacement is closed and contractive.
+      The mu case requires closedness to avoid introducing unguarded variables. -/
   theorem isContractive_substitute (body : LocalTypeR) (t : String) (e : LocalTypeR) :
       body.isContractive = true → e.isContractive = true → e.isClosed →
       (body.substitute t e).isContractive = true := by

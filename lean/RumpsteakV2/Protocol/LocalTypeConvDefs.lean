@@ -42,6 +42,10 @@ instance : Membership String NameContext := inferInstance
 def Context.indexOf (ctx : Context) (name : String) : Option Nat :=
   NameOnlyContext.indexOf ctx name
 
+@[simp]
+theorem Context.indexOf_eq (ctx : Context) (name : String) :
+    Context.indexOf ctx name = NameOnlyContext.indexOf ctx name := rfl
+
 /-- Coverage: all free variables are in the context. -/
 def Context.Covers (ctx : Context) (t : LocalTypeR) : Prop :=
   ∀ v, v ∈ t.freeVars → v ∈ ctx
