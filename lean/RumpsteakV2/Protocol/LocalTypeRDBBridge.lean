@@ -10,8 +10,8 @@ namespace RumpsteakV2.Protocol.LocalTypeR
 
 open RumpsteakV2.Protocol.LocalTypeConv
 
--- Helper: Substituting a mu-expression preserves contractiveness.
--- This specialized version is sufficient for our needs in iterate_unfold_bounded_contractive.
+/-- Substituting a mu-expression preserves contractiveness.
+    This specialized version requires a `Covers` witness for the bound variable. -/
 theorem isContractive_substitute_mu (body : LocalTypeR) (t : String)
     (hcov : Context.Covers [t] body)
     (h_body : body.isContractive = true)
@@ -20,6 +20,8 @@ theorem isContractive_substitute_mu (body : LocalTypeR) (t : String)
   simpa using
     RumpsteakV2.Protocol.LocalTypeConv.isContractive_substitute_mu_via_DB body t hcov h_body h_mu
 
+/-- Substituting a mu-expression preserves contractiveness (for closed bodies).
+    Derives the `Covers` witness from closedness. -/
 theorem isContractive_substitute_mu_closed (body : LocalTypeR) (t : String)
     (hclosed : body.isClosed = true)
     (h_body : body.isContractive = true)
@@ -30,6 +32,8 @@ theorem isContractive_substitute_mu_closed (body : LocalTypeR) (t : String)
   · exact h_body
   · exact h_mu
 
+/-- Substituting a mu-expression preserves contractiveness (for closed mu types).
+    Derives the `Covers` witness from the mu type being closed. -/
 theorem isContractive_substitute_mu_muClosed (body : LocalTypeR) (t : String)
     (hclosed : (LocalTypeR.mu t body).isClosed = true)
     (h_body : body.isContractive = true)
