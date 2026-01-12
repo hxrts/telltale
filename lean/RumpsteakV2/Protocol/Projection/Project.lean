@@ -2787,11 +2787,196 @@ theorem CProjectTransRel_postfix :
     - The fact that CProjectTransRel ⊆ CProjectTransRelComp
 
     All 62 mu-intermediate cases are resolved uniformly by this theorem. -/
-axiom EQ2_CProjectTransRel_compose_through_mu
+theorem EQ2_CProjectTransRel_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
     (hrel : CProjectTransRel (.mu v body) c) :
-    EQ2F (EQ2_closure CProjectTransRelComp) a c
+    EQ2F (EQ2_closure CProjectTransRelComp) a c := by
+  -- Get EQ2F structure from CProjectTransRel_postfix
+  have hmid : EQ2F (EQ2_closure CProjectTransRelComp) (.mu v body) c :=
+    CProjectTransRel_postfix (.mu v body) c hrel
+  -- Case analysis on a
+  cases a with
+  | mu av abody =>
+      -- Both a and intermediate are mu
+      -- Get EQ2F structure from heq
+      have heq_f : EQ2F EQ2 (.mu av abody) (.mu v body) := EQ2.destruct heq
+      -- EQ2F for mu/mu gives us:
+      -- EQ2 (abody.substitute av (.mu av abody)) (.mu v body)
+      -- EQ2 (.mu av abody) (body.substitute v (.mu v body))
+      simp only [EQ2F] at heq_f
+      obtain ⟨heq_unfold_left, heq_unfold_right⟩ := heq_f
+      -- Now case analysis on c
+      cases c with
+      | mu cv cbody =>
+          -- mu/mu case: need two conditions
+          simp only [EQ2F] at hmid ⊢
+          obtain ⟨hmid_left, hmid_right⟩ := hmid
+          -- Need EQ2 from (.mu cv cbody) to its unfold
+          have heq_unfold_c : EQ2 (.mu cv cbody) (cbody.substitute cv (.mu cv cbody)) := by
+            have hrefl := EQ2_refl (.mu cv cbody)
+            exact (EQ2.destruct hrefl).2
+          constructor
+          · -- Need: R (abody.substitute av (.mu av abody)) (.mu cv cbody)
+            -- Use 2-hop: EQ2 prefix
+            left
+            right; left
+            exact ⟨.mu v body, heq_unfold_left, hrel⟩
+          · -- Need: R (.mu av abody) (cbody.substitute cv (.mu cv cbody))
+            -- Use 3-hop: EQ2 → CProjectTransRel → EQ2
+            left
+            right; right; right
+            exact ⟨.mu v body, .mu cv cbody, heq, hrel, heq_unfold_c⟩
+      | «end» =>
+          -- mu/end case: R (abody.substitute ...) .end
+          simp only [EQ2F] at hmid ⊢
+          -- hmid : R (body.substitute v (.mu v body)) .end
+          -- Need: R (abody.substitute av (.mu av abody)) .end
+          -- Chain through EQ2
+          left
+          right; left
+          exact ⟨.mu v body, heq_unfold_left, hrel⟩
+      | var cv =>
+          -- mu/var case
+          simp only [EQ2F] at hmid ⊢
+          left
+          right; left
+          exact ⟨.mu v body, heq_unfold_left, hrel⟩
+      | send cp cbs =>
+          -- mu/send case
+          simp only [EQ2F] at hmid ⊢
+          left
+          right; left
+          exact ⟨.mu v body, heq_unfold_left, hrel⟩
+      | recv cp cbs =>
+          -- mu/recv case
+          simp only [EQ2F] at hmid ⊢
+          left
+          right; left
+          exact ⟨.mu v body, heq_unfold_left, hrel⟩
+  | «end» =>
+      -- a = .end
+      have heq_f : EQ2F EQ2 .end (.mu v body) := EQ2.destruct heq
+      simp only [EQ2F] at heq_f
+      -- heq_f : EQ2 .end (body.substitute v (.mu v body))
+      cases c with
+      | mu cv cbody =>
+          simp only [EQ2F] at hmid ⊢
+          -- Need: R .end (cbody.substitute cv (.mu cv cbody))
+          -- Use 3-hop: EQ2 → CProjectTransRel → EQ2
+          have heq_unfold_c : EQ2 (.mu cv cbody) (cbody.substitute cv (.mu cv cbody)) := by
+            have hrefl := EQ2_refl (.mu cv cbody)
+            exact (EQ2.destruct hrefl).2
+          left
+          right; right; right
+          exact ⟨.mu v body, .mu cv cbody, heq, hrel, heq_unfold_c⟩
+      | «end» =>
+          simp only [EQ2F]
+      | var _ =>
+          -- Contradiction: end vs var (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | send _ _ =>
+          -- Contradiction: end vs send (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | recv _ _ =>
+          -- Contradiction: end vs recv (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+  | var av =>
+      have heq_f : EQ2F EQ2 (.var av) (.mu v body) := EQ2.destruct heq
+      simp only [EQ2F] at heq_f
+      cases c with
+      | mu cv cbody =>
+          simp only [EQ2F] at hmid ⊢
+          -- Need: R (.var av) (cbody.substitute cv (.mu cv cbody))
+          -- Use 3-hop: EQ2 → CProjectTransRel → EQ2
+          have heq_unfold_c : EQ2 (.mu cv cbody) (cbody.substitute cv (.mu cv cbody)) := by
+            have hrefl := EQ2_refl (.mu cv cbody)
+            exact (EQ2.destruct hrefl).2
+          left
+          right; right; right
+          exact ⟨.mu v body, .mu cv cbody, heq, hrel, heq_unfold_c⟩
+      | var cv =>
+          simp only [EQ2F] at hmid ⊢
+          -- Need: av = cv
+          -- From EQ2 (.var av) (.mu v body) and CProjectTransRel (.mu v body) (.var cv)
+          -- The mu must unfold to .var av, and project to .var cv
+          -- By EQ2: av = cv (both project to same var through EQ2 transitivity)
+          sorry -- Need extraction lemma
+      | «end» =>
+          -- Contradiction: var vs end (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | send _ _ =>
+          -- Contradiction: var vs send (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | recv _ _ =>
+          -- Contradiction: var vs recv (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+  | send ap abs =>
+      have heq_f : EQ2F EQ2 (.send ap abs) (.mu v body) := EQ2.destruct heq
+      simp only [EQ2F] at heq_f
+      cases c with
+      | mu cv cbody =>
+          simp only [EQ2F] at hmid ⊢
+          -- Need: R (.send ap abs) (cbody.substitute cv (.mu cv cbody))
+          -- Use 3-hop: EQ2 → CProjectTransRel → EQ2
+          have heq_unfold_c : EQ2 (.mu cv cbody) (cbody.substitute cv (.mu cv cbody)) := by
+            have hrefl := EQ2_refl (.mu cv cbody)
+            exact (EQ2.destruct hrefl).2
+          left
+          right; right; right
+          exact ⟨.mu v body, .mu cv cbody, heq, hrel, heq_unfold_c⟩
+      | send cp cbs =>
+          simp only [EQ2F] at hmid ⊢
+          -- Need: ap = cp ∧ BranchesRel R abs cbs
+          -- Complex: need to connect through the mu intermediate
+          sorry -- Need branch relation transfer
+      | «end» =>
+          -- Contradiction: send vs end (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | var _ =>
+          -- Contradiction: send vs var (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | recv _ _ =>
+          -- Contradiction: send vs recv (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+  | recv ap abs =>
+      have heq_f : EQ2F EQ2 (.recv ap abs) (.mu v body) := EQ2.destruct heq
+      simp only [EQ2F] at heq_f
+      cases c with
+      | mu cv cbody =>
+          simp only [EQ2F] at hmid ⊢
+          -- Need: R (.recv ap abs) (cbody.substitute cv (.mu cv cbody))
+          -- Use 3-hop: EQ2 → CProjectTransRel → EQ2
+          have heq_unfold_c : EQ2 (.mu cv cbody) (cbody.substitute cv (.mu cv cbody)) := by
+            have hrefl := EQ2_refl (.mu cv cbody)
+            exact (EQ2.destruct hrefl).2
+          left
+          right; right; right
+          exact ⟨.mu v body, .mu cv cbody, heq, hrel, heq_unfold_c⟩
+      | recv cp cbs =>
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need branch relation transfer
+      | «end» =>
+          -- Contradiction: recv vs end (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | var _ =>
+          -- Contradiction: recv vs var (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
+      | send _ _ =>
+          -- Contradiction: recv vs send (observable mismatch)
+          simp only [EQ2F] at hmid ⊢
+          sorry -- Need observable contradiction
 
 /-- Composing CProjectTransRel and EQ2 through a mu intermediate (suffix case). -/
 private axiom CProjectTransRel_EQ2_compose_through_mu
