@@ -1,7 +1,6 @@
-/-
-# Problem: Observable Behavior of Closed Recursive Types
+/-! # RumpsteakV2.Protocol.ObservableClosed
 
-## Abstract
+## Problem: Observable Behavior of Closed Recursive Types
 
 This file presents a self-contained formulation of a termination problem that arises
 when proving that closed recursive types (session types, process calculi) eventually
@@ -30,15 +29,18 @@ This is crucial for:
 1. Subject reduction: closed types can always make progress
 2. Weak bisimulation: EQ2-equivalent types share observable behavior
 3. Projection coherence: global types project to consistent local types
-
 -/
 
 
-/-
+/-! ## MvQPF Infrastructure
+
 MvQPF instances for the ITree base functor, the product functor, and the projection functor.
-I renamed the core types (TypeVec -> ITreeTypeVec, MvFunctor -> ITreeMvFunctor, MvPFunctor -> ITreeMvPFunctor, MvQPF -> ITreeMvQPF)
-to avoid conflicts with Mathlib, as the environment has Mathlib pre-loaded.
-All definitions and theorems from the user's request have been formalized and proven.
+
+The core types are renamed to avoid conflicts with Mathlib:
+- `TypeVec` → `ITreeTypeVec`
+- `MvFunctor` → `ITreeMvFunctor`
+- `MvPFunctor` → `ITreeMvPFunctor`
+- `MvQPF` → `ITreeMvQPF`
 -/
 
 import Mathlib
