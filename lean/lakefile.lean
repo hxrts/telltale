@@ -42,4 +42,8 @@ require paco from git
 lean_lib RumpsteakV2 where
   globs := #[`RumpsteakV2.*]
 
+/-- Session types with async effects - formalized preservation proofs. -/
+lean_lib Effects where
+  globs := #[`Effects.*]
+
 -- Linter executables disabled due to module build complexity and cache issues
