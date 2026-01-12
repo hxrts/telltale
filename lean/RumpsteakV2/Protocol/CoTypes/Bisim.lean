@@ -1874,10 +1874,26 @@ private theorem EQ2_transfer_observable_core {a b : LocalTypeR} (h : EQ2 a b)
 theorem EQ2_transfer_observable {a b : LocalTypeR} (h : EQ2 a b) (obs_a : Observable a)
     (hWF : LocalTypeR.WellFormed b) :
     ∃ obs_b : Observable b, ObservableRel EQ2 obs_a obs_b := by
-  -- The helper function `EQ2_transfer_observable_core` expects universally quantified
-  -- functions, but in practice only calls them with the specific `b` from `EQ2 a b`.
-  -- TODO: Fix the type signature of EQ2_transfer_observable_core to avoid this issue
-  sorry
+  cases obs_a with
+  | is_end h_end =>
+      have h_end_eq : EQ2 .end b := EQ2_trans (EQ2_symm (UnfoldsToEnd.toEQ2 h_end)) h
+      have hb : UnfoldsToEnd b := EQ2.end_right_implies_UnfoldsToEnd hWF h_end_eq
+      exact ⟨Observable.is_end hb, ObservableRel.is_end (ha := h_end) (hb := hb)⟩
+  | is_var h_var =>
+      rename_i v
+      have h_var_eq : EQ2 (.var v) b := EQ2_trans (EQ2_symm (UnfoldsToVar.toEQ2 h_var)) h
+      have hb : UnfoldsToVar b v := EQ2.var_right_implies_UnfoldsToVar hWF h_var_eq
+      exact ⟨Observable.is_var hb, ObservableRel.is_var (ha := h_var) (hb := hb)⟩
+  | is_send h_send =>
+      rename_i p bs
+      have h_send_eq : EQ2 (.send p bs) b := EQ2_trans (EQ2_symm (CanSend.toEQ2 h_send)) h
+      obtain ⟨cs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend hWF h_send_eq
+      exact ⟨Observable.is_send hcan, ObservableRel.is_send (ha := h_send) (hb := hcan) hbr⟩
+  | is_recv h_recv =>
+      rename_i p bs
+      have h_recv_eq : EQ2 (.recv p bs) b := EQ2_trans (EQ2_symm (CanRecv.toEQ2 h_recv)) h
+      obtain ⟨cs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv hWF h_recv_eq
+      exact ⟨Observable.is_recv hcan, ObservableRel.is_recv (ha := h_recv) (hb := hcan) hbr⟩
 
 /-- Transfer observables across EQ2 under well-formedness of the target. -/
 theorem EQ2_transfer_observable_of_wellFormed {a b : LocalTypeR} (h : EQ2 a b)
@@ -2002,23 +2018,63 @@ theorem EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
     (t := t) (s := s) (body := body) (body' := body')
     ⟨hWF1.closed, hWF1.contractive⟩ ⟨hWF2.closed, hWF2.contractive⟩ h
 
+private theorem BranchesRelBisim_strengthen {bs cs : List (Label × LocalTypeR)}
+    (hbr : BranchesRelBisim EQ2 bs cs)
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
+    (hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2) :
+    BranchesRelBisim (fun a b => EQ2 a b ∧ LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed b) bs cs := by
+  induction hbr with
+  | nil => exact List.Forall₂.nil
+  | cons hhead htail ih =>
+      rename_i b c bs' cs'
+      constructor
+      · exact ⟨hhead.1, hhead.2, hWFbs b (List.Mem.head _), hWFcs c (List.Mem.head _)⟩
+      · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
+                 (fun lc hm => hWFcs lc (List.Mem.tail _ hm))
+
 private theorem BisimF_EQ2_to_EQ2WF {x y : LocalTypeR} (h : BisimF EQ2 x y)
     (hWFx : LocalTypeR.WellFormed x) (hWFy : LocalTypeR.WellFormed y) :
     BisimF (fun a b => EQ2 a b ∧ LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed b) x y := by
-  -- TODO: Fix type inference issues after TypeContext refactoring
-  sorry
+  cases h with
+  | eq_end ha hb => exact BisimF.eq_end ha hb
+  | eq_var ha hb => exact BisimF.eq_var ha hb
+  | eq_send ha hb hbr =>
+      apply BisimF.eq_send ha hb
+      exact BranchesRelBisim_strengthen hbr
+        (WellFormed_branches_of_CanSend ha hWFx)
+        (WellFormed_branches_of_CanSend hb hWFy)
+  | eq_recv ha hb hbr =>
+      apply BisimF.eq_recv ha hb
+      exact BranchesRelBisim_strengthen hbr
+        (WellFormed_branches_of_CanRecv ha hWFx)
+        (WellFormed_branches_of_CanRecv hb hWFy)
 theorem mus_shared_observable_contractive {t s : String} {body body' : LocalTypeR}
     (h : EQ2 (LocalTypeR.mu t body) (LocalTypeR.mu s body'))
-    (_hc1 : (LocalTypeR.mu t body).isContractive = true)
-    (_hc2 : (LocalTypeR.mu s body').isContractive = true) :
+    (hcl1 : (LocalTypeR.mu t body).isClosed)
+    (hc1 : (LocalTypeR.mu t body).isContractive = true)
+    (hcl2 : (LocalTypeR.mu s body').isClosed)
+    (hc2 : (LocalTypeR.mu s body').isContractive = true) :
     (UnfoldsToEnd (LocalTypeR.mu t body) ∧ UnfoldsToEnd (LocalTypeR.mu s body')) ∨
     (∃ v, UnfoldsToVar (LocalTypeR.mu t body) v ∧ UnfoldsToVar (LocalTypeR.mu s body') v) ∨
     (∃ p bs cs, CanSend (LocalTypeR.mu t body) p bs ∧ CanSend (LocalTypeR.mu s body') p cs ∧
        BranchesRel EQ2 bs cs) ∨
     (∃ p bs cs, CanRecv (LocalTypeR.mu t body) p bs ∧ CanRecv (LocalTypeR.mu s body') p cs ∧
        BranchesRel EQ2 bs cs) := by
-  -- TODO: Fix cases tactic issue after TypeContext refactoring
-  sorry
+  -- Use the contractive extraction to get BisimF
+  have hbf := EQ2_mus_to_BisimF_of_contractive h hcl1 hc1 hcl2 hc2
+  -- Case split on the BisimF result
+  cases hbf with
+  | eq_end ha hb =>
+      exact Or.inl ⟨ha, hb⟩
+  | eq_var ha hb =>
+      rename_i v
+      exact Or.inr (Or.inl ⟨v, ha, hb⟩)
+  | eq_send ha hb hbr =>
+      rename_i p bs cs
+      exact Or.inr (Or.inr (Or.inl ⟨p, bs, cs, ha, hb, BranchesRelBisim_to_BranchesRel hbr⟩))
+  | eq_recv ha hb hbr =>
+      rename_i p bs cs
+      exact Or.inr (Or.inr (Or.inr ⟨p, bs, cs, ha, hb, BranchesRelBisim_to_BranchesRel hbr⟩))
 
 
 
@@ -2038,8 +2094,36 @@ theorem mus_shared_observable_contractive {t s : String} {body body' : LocalType
     - For mu/mu case, use EQ2_mus_to_BisimF axiom -/
 theorem EQ2.toBisim_raw {a b : LocalTypeR} (h : EQ2 a b)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) : Bisim a b := by
-  -- TODO: Fix scope/variable issues after TypeContext refactoring
-  sorry
+  -- Define the witness relation
+  let R : Rel := fun x y => EQ2 x y ∧ LocalTypeR.WellFormed x ∧ LocalTypeR.WellFormed y
+  -- Show R is a post-fixpoint of BisimF
+  have hpostfix : ∀ x y, R x y → BisimF R x y := by
+    intro x y ⟨hEQ2, hWFx, hWFy⟩
+    -- Get observables for both types
+    have obs_x := LocalTypeR.WellFormed.observable hWFx
+    obtain ⟨obs_y, hrel⟩ := EQ2_transfer_observable hEQ2 obs_x hWFy
+    -- Convert ObservableRel to BisimF
+    cases hrel with
+    | is_end =>
+        rename_i ha hb
+        exact BisimF.eq_end ha hb
+    | is_var =>
+        rename_i ha hb
+        exact BisimF.eq_var ha hb
+    | is_send hbr =>
+        rename_i p bs cs ha hb
+        apply BisimF.eq_send ha hb
+        exact BranchesRelBisim_strengthen hbr
+          (WellFormed_branches_of_CanSend ha hWFx)
+          (WellFormed_branches_of_CanSend hb hWFy)
+    | is_recv hbr =>
+        rename_i p bs cs ha hb
+        apply BisimF.eq_recv ha hb
+        exact BranchesRelBisim_strengthen hbr
+          (WellFormed_branches_of_CanRecv ha hWFx)
+          (WellFormed_branches_of_CanRecv hb hWFy)
+  -- Apply the coinduction principle
+  exact ⟨R, hpostfix, h, hWFa, hWFb⟩
 
 /-! ## EQ2 to Bisim (Well-Formed Witness) -/
 
@@ -2295,10 +2379,17 @@ theorem substitute_preserves_UnfoldsToEnd {a : LocalTypeR} {var : String} {repl 
     left
     simp only [LocalTypeR.substitute]
     exact UnfoldsToEnd.base
-  | @mu t body _ ih =>
-    -- TODO: Fix variable shadowing issue with `var` named argument
-    -- The proof has complex IH application with naming conflicts
-    sorry
+  | @mu t body _ _ =>
+    -- For closed types, substitution is identity since no variable is free.
+    -- hWFa : WellFormed (.mu t body) implies .mu t body is closed.
+    left
+    have hclosed : (LocalTypeR.mu t body).isClosed := hWFa.closed
+    have hnotfree : LocalTypeR.isFreeIn var (.mu t body) = false :=
+      LocalTypeR.isFreeIn_false_of_closed (.mu t body) var hclosed
+    have hsubst : (LocalTypeR.mu t body).substitute var repl = .mu t body :=
+      LocalTypeR.substitute_not_free (.mu t body) var repl hnotfree
+    rw [hsubst]
+    exact UnfoldsToEnd.mu ‹UnfoldsToEnd (body.substitute t (.mu t body))›
 
 open RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt in
 /-- Substitution preserves UnfoldsToEnd under Barendregt conditions.
@@ -2589,8 +2680,44 @@ private theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
 private theorem WellFormed_mu_substitute {body repl : LocalTypeR} (x var : String)
     (hWFmu : LocalTypeR.WellFormed (.mu x body)) (hWFrepl : LocalTypeR.WellFormed repl) :
     LocalTypeR.WellFormed (.mu x (body.substitute var repl)) := by
-  -- TODO: Fix proof - issues with List.mem_filter and simpa on isContractive
-  sorry
+  -- Extract properties from hWFmu
+  have hmu_closed : (.mu x body : LocalTypeR).isClosed := hWFmu.closed
+  have hmu_contr : (.mu x body : LocalTypeR).isContractive = true := hWFmu.contractive
+  -- Break down isContractive for mu
+  simp only [LocalTypeR.isContractive, Bool.and_eq_true] at hmu_contr
+  obtain ⟨hguarded, hbody_contr⟩ := hmu_contr
+  -- Prove closedness of the result
+  have hclosed_result : (.mu x (body.substitute var repl) : LocalTypeR).isClosed := by
+    simp only [LocalTypeR.isClosed, LocalTypeR.freeVars]
+    have hbody_fvs : (body.freeVars.filter (· != x)).isEmpty = true := by
+      simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using hmu_closed
+    have hrepl_closed : repl.isClosed := hWFrepl.closed
+    -- Substitution with closed repl preserves closedness modulo binder
+    simp only [List.isEmpty_eq_true, List.filter_eq_nil_iff] at hbody_fvs ⊢
+    intro v hv
+    have hv' := LocalTypeR.freeVars_substitute_subset body var repl v hv
+    cases hv' with
+    | inl hrepl =>
+        have hrepl_fvs_nil : repl.freeVars = [] := by
+          have : repl.freeVars.isEmpty = true := by
+            simpa [LocalTypeR.isClosed] using hrepl_closed
+          exact (List.isEmpty_eq_true _).1 this
+        simp only [hrepl_fvs_nil, List.not_mem_nil] at hrepl
+    | inr hbody =>
+        have hvne : v ≠ var := hbody.2
+        have hv_in : v ∈ body.freeVars := hbody.1
+        have hv_ne_x : ¬(v != x) = true := hbody_fvs v hv_in
+        simp only [bne_iff_ne, ne_eq, not_not] at hv_ne_x
+        subst hv_ne_x
+        simp only [bne_self_eq_false]
+        decide
+  -- Prove contractiveness of the result
+  have hcontr_result : (.mu x (body.substitute var repl) : LocalTypeR).isContractive = true := by
+    simp only [LocalTypeR.isContractive, Bool.and_eq_true]
+    constructor
+    · exact LocalTypeR.isGuarded_substitute body var x repl hguarded hWFrepl.closed
+    · exact LocalTypeR.isContractive_substitute body var repl hbody_contr hWFrepl.contractive hWFrepl.closed
+  exact ⟨hclosed_result, hcontr_result⟩
 
 /-- When both types unfold to the substituted variable, their substitutions are BisimF-related.
 
@@ -2891,6 +3018,21 @@ theorem unfold_mu (x : String) (body : LocalTypeR) :
 def SubstUnfoldClosure (var : String) (repl : LocalTypeR) : Rel :=
   fun u v => SubstUnfoldRel var repl u v ∨ Bisim u v
 
+/-- BranchesRelBisim reflexivity for SubstUnfoldClosure when all branches are well-formed. -/
+private theorem BranchesRelBisim_SubstUnfoldClosure_refl (var : String) (repl : LocalTypeR)
+    (hWFrepl : LocalTypeR.WellFormed repl)
+    (bs : List (Label × LocalTypeR)) (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+    BranchesRelBisim (SubstUnfoldClosure var repl)
+      (LocalTypeR.substituteBranches bs var repl)
+      (LocalTypeR.substituteBranches bs var repl) := by
+  induction bs with
+  | nil => exact List.Forall₂.nil
+  | cons b rest ih =>
+      constructor
+      · exact ⟨rfl, Or.inr (Bisim_refl (b.2.substitute var repl)
+          (WellFormed_substitute var (hWFbs b (List.Mem.head _)) hWFrepl))⟩
+      · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
+
 /-- SubstUnfoldClosure is a post-fixpoint of BisimF.
     This is the key lemma for proving unfold_substitute_EQ2. -/
 theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
@@ -2939,15 +3081,15 @@ theorem SubstUnfoldClosure_postfix (var : String) (repl : LocalTypeR)
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       subst hu hv
       apply BisimF.eq_send CanSend.base CanSend.base
-      -- TODO: Fix induction on branches - IH requires reconstructing WellFormed proofs
-      sorry
+      exact BranchesRelBisim_SubstUnfoldClosure_refl var repl hWFrepl bs
+        (LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWFt)
     | recv p bs =>
       -- t = .recv p bs: both sides are .recv p (substituteBranches bs var repl)
       simp only [LocalTypeR.substitute, LocalTypeR.unfold] at hu hv
       subst hu hv
       apply BisimF.eq_recv CanRecv.base CanRecv.base
-      -- TODO: Fix induction on branches - IH requires reconstructing WellFormed proofs
-      sorry
+      exact BranchesRelBisim_SubstUnfoldClosure_refl var repl hWFrepl bs
+        (LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWFt)
     | mu x body =>
       -- t = .mu x body: the complex case
       -- LHS: ((.mu x body).substitute var repl).unfold
