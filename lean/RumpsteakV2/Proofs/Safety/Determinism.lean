@@ -88,6 +88,14 @@ axiom global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
     (h₁ : step g act g₁)
     (h₂ : step g act g₂) :
     g₁ = g₂
+-- Note: Proof blocked due to step being a nested inductive type.
+-- Would require mutual recursion with BranchesStep determinism.
+-- Proof outline:
+-- | comm_head/comm_head: action.label uniquely determines continuation
+-- | comm_head/comm_async: contradiction (result is cont vs comm)
+-- | comm_async/comm_head: symmetric contradiction
+-- | comm_async/comm_async: BranchesStep determinism
+-- | mu/mu: induction on inner step
 
 /-! ## Environment Determinism
 
