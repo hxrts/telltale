@@ -49,7 +49,7 @@ inductive GlobalType where
   | var : String → GlobalType
   deriving Repr, Inhabited
 
-/- Extract all role names from a global type. -/
+/-- Extract all role names from a global type. -/
 mutual
   def GlobalType.roles : GlobalType → List String
     | .end => []
@@ -64,7 +64,7 @@ mutual
     | (_, g) :: rest => g.roles ++ rolesOfBranches rest
 end
 
-/- Extract free type variables from a global type. -/
+/-- Extract free type variables from a global type. -/
 mutual
   def GlobalType.freeVars : GlobalType → List String
     | .end => []
@@ -86,7 +86,7 @@ theorem freeVarsOfBranches_eq_flatMap (branches : List (Label × GlobalType)) :
       | mk label g =>
           simp [freeVarsOfBranches, ih, List.flatMap]
 
-/- Substitute a global type for a variable. -/
+/-- Substitute a global type for a variable: `g.substitute v repl` replaces free occurrences of `v` in `g` with `repl`. -/
 mutual
   def GlobalType.substitute : GlobalType → String → GlobalType → GlobalType
     | .end, _, _ => .end
@@ -107,7 +107,7 @@ mutual
           substituteBranches rest varName replacement
 end
 
-/- Check if all recursion variables are bound. -/
+/-- Check if all recursion variables are bound. -/
 mutual
   def GlobalType.allVarsBound (g : GlobalType) (bound : List String := []) : Bool :=
     match g with
@@ -122,7 +122,7 @@ mutual
     | (_, g) :: rest => g.allVarsBound bound && allVarsBoundBranches rest bound
 end
 
-/- Check that all communications have at least one branch. -/
+/-- Check that all communications have at least one branch. -/
 mutual
   def GlobalType.allCommsNonEmpty : GlobalType → Bool
     | .end => true
@@ -136,7 +136,7 @@ mutual
     | (_, g) :: rest => g.allCommsNonEmpty && allCommsNonEmptyBranches rest
 end
 
-/- Disallow self-communication in all subterms. -/
+/-- Disallow self-communication in all subterms. -/
 mutual
   def GlobalType.noSelfComm : GlobalType → Bool
     | .end => true
@@ -150,16 +150,16 @@ mutual
     | (_, g) :: rest => g.noSelfComm && noSelfCommBranches rest
 end
 
-/- Productivity: every recursion cycle has a communication.
+/-- Productivity: every recursion cycle has a communication.
 
-A global type is productive if between any mu binder and its recursive
-variable usage, there is at least one communication. This prevents
-non-productive protocols like `mu X. X` that loop forever silently.
+    A global type is productive if between any mu binder and its recursive
+    variable usage, there is at least one communication. This prevents
+    non-productive protocols like `mu X. X` that loop forever silently.
 
-The `unguarded` parameter tracks mu variables that have NOT yet seen
-a communication since their binding. When we see a comm, all variables
-become guarded (reset to empty). When we see a var, it must not be
-in the unguarded set. -/
+    The `unguarded` parameter tracks mu variables that have NOT yet seen
+    a communication since their binding. When we see a comm, all variables
+    become guarded (reset to empty). When we see a var, it must not be
+    in the unguarded set. -/
 mutual
   def GlobalType.isProductive (g : GlobalType) (unguarded : List String := []) : Bool :=
     match g with

@@ -39,7 +39,7 @@ inductive LocalTypeR where
   | var : String → LocalTypeR
   deriving Repr, Inhabited
 
-/- Extract free type variables from a local type. -/
+/-- Extract free type variables from a local type. -/
 mutual
   def LocalTypeR.freeVars : LocalTypeR → List String
     | .end => []
@@ -122,7 +122,7 @@ lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
     sizeOf cont < sizeOf bs := by
   simpa [hbs, hhead] using sizeOf_cont_lt_sizeOf_branches label cont tail
 
-/- Substitute a local type for a variable. -/
+/-- Substitute a local type for a variable: `t.substitute v repl` replaces free occurrences of `v` in `t` with `repl`. -/
 mutual
   def LocalTypeR.substitute : LocalTypeR → String → LocalTypeR → LocalTypeR
     | .end, _, _ => .end
@@ -180,7 +180,7 @@ def LocalTypeR.unfold : LocalTypeR → LocalTypeR
   | lt@(.mu t body) => body.substitute t lt
   | lt => lt
 
-/- Dualize a local type by swapping send/recv. -/
+/-- Dualize a local type by swapping send/recv. -/
 mutual
   def LocalTypeR.dual : LocalTypeR → LocalTypeR
     | .end => .end
@@ -1015,7 +1015,7 @@ mutual
       simp [*] <;> omega
 end
 
--- If v is not free in lt, then it is guarded in lt.
+/-- If `v` is not free in `lt`, then `v` is guarded in `lt`. -/
 theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
     lt.isFreeIn v = false → lt.isGuarded v = true := by
   intro h
@@ -1044,7 +1044,7 @@ theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
         simp [LocalTypeR.isGuarded, hvne, hbody']
 termination_by sizeOf lt
 
--- Closed types have all variables guarded.
+/-- Closed types have all variables guarded (vacuously, since they have no free variables). -/
 theorem isGuarded_of_closed (lt : LocalTypeR) (v : String) :
     lt.isClosed → lt.isGuarded v = true := by
   intro hclosed
@@ -1154,7 +1154,7 @@ theorem applyActiveEnv_eq_of_closed (lt : LocalTypeR) :
   intro hclosed
   simpa [applyActiveEnv] using apply_env_of_closed ActiveEnv lt hclosed
 
--- Helper: if fullUnfold = .var v, then isFreeIn v = true
+/-- If `fullUnfold lt = .var v`, then `v` is free in `lt`. -/
 theorem fullUnfold_var_is_free (lt : LocalTypeR) (v : String) :
     lt.fullUnfold = .var v → lt.isFreeIn v = true := by
   intro h
@@ -1180,14 +1180,10 @@ theorem LocalTypeR.fullUnfold_not_var_of_closed {lt : LocalTypeR}
     simpa [hnil] using hmem
   exact this.elim
 
-/-- For contractive types, fullUnfold reaches a non-mu form.
+/-- Substituting a term for a guarded variable does not increase `muHeight`.
 
     Contractiveness ensures that after muHeight iterations of unfold,
-    we reach a communication (send/recv) or end, not another mu.
-
-    This follows from the definition: fullUnfold iterates unfold exactly
-    muHeight times, which peels off all leading mus for contractive types. -/
--- Helper from LocalTypeCore - muHeight of guarded substitution
+    we reach a communication (send/recv) or end, not another mu. -/
 theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
     body.isGuarded t = true → (body.substitute t e).muHeight ≤ body.muHeight := by
   intro hguard
@@ -1222,7 +1218,7 @@ theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
         simpa [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq_st] using this
 termination_by sizeOf body
 
--- Helper: isGuarded is preserved by substitution when replacing with closed term
+/-- Guardedness is preserved by substitution when the replacement is closed. -/
 theorem isGuarded_substitute (body : LocalTypeR) (t v : String) (e : LocalTypeR) :
     body.isGuarded v = true → e.isClosed →
     (body.substitute t e).isGuarded v = true := by
@@ -1256,8 +1252,8 @@ theorem isGuarded_substitute (body : LocalTypeR) (t v : String) (e : LocalTypeR)
           simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hbeq_st, hvbeq, ih]
 termination_by sizeOf body
 
--- Helper: isGuarded is preserved by substitution for variables OTHER than the substituted one
--- Requires closed replacement to avoid introducing unguarded occurrences.
+/-- Guardedness of `v` is preserved when substituting for a different variable `t`.
+    Requires closed replacement to avoid introducing unguarded occurrences of `v`. -/
 theorem isGuarded_substitute_other (body : LocalTypeR) (t v : String) (e : LocalTypeR) :
     v ≠ t → body.isGuarded v = true →
     e.isClosed → (body.substitute t e).isGuarded v = true := by
@@ -1266,8 +1262,8 @@ theorem isGuarded_substitute_other (body : LocalTypeR) (t v : String) (e : Local
 
 -- NOTE: isContractive_substitute_mu is proved in LocalTypeRDBBridge.lean
 
--- Helper: substitution preserves contractiveness when replacing with contractive, closed term
--- Note: The mu case requires closedness to avoid introducing unguarded variables.
+/-- Substitution preserves contractiveness when the replacement is closed and contractive.
+    The mu case requires closedness to avoid introducing unguarded variables. -/
 mutual
   theorem isContractive_substitute (body : LocalTypeR) (t : String) (e : LocalTypeR) :
       body.isContractive = true → e.isContractive = true → e.isClosed →
@@ -1326,7 +1322,6 @@ mutual
   termination_by sizeOf bs
 end
 
--- Helper: iterating unfold k times on CLOSED, CONTRACTIVE term with muHeight ≤ k yields muHeight 0
 /-! ## ClosedUnder through substitution/apply -/
 
 theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
@@ -1394,6 +1389,7 @@ theorem isContractive_apply_of_closed_env (env : Env) (t : LocalTypeR) :
           have hcontr_apply := ih (t := t.substitute v u) hWF_rest hcontr_subst
           simpa [Env.apply] using hcontr_apply
 
+/-- Iterating `unfold` at least `muHeight` times on a closed, contractive type yields `muHeight = 0`. -/
 theorem iterate_unfold_bounded_contractive (k : Nat) (e : LocalTypeR)
     (hcontr : e.isContractive = true) (hclosed : e.isClosed) (h : e.muHeight ≤ k) :
     ((LocalTypeR.unfold)^[k] e).muHeight = 0 := by
