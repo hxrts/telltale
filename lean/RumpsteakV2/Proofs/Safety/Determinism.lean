@@ -83,19 +83,95 @@ there is exactly one next global type.
 Each constructor (comm_head, comm_async, mu) uniquely determines the result.
 -/
 
-/-- Global step is deterministic given the same action. -/
-axiom global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
+/-- Global step is deterministic given the same action.
+
+Proof sketch: by case analysis on step constructors via @step.rec.
+- comm_head/comm_head: both select same label (from action), membership gives same cont
+- comm_head/comm_async: actions differ (head has receiver in action, async doesn't)
+- comm_async/comm_async: IH on BranchesStep
+- mu/mu: IH on the unfolded body step
+
+Uses @step.rec to handle the nested inductive + mutual recursion with BranchesStep.
+-/
+theorem global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
     (h₁ : step g act g₁)
     (h₂ : step g act g₂) :
-    g₁ = g₂
--- Note: Proof blocked due to step being a nested inductive type.
--- Would require mutual recursion with BranchesStep determinism.
--- Proof outline:
--- | comm_head/comm_head: action.label uniquely determines continuation
--- | comm_head/comm_async: contradiction (result is cont vs comm)
--- | comm_async/comm_head: symmetric contradiction
--- | comm_async/comm_async: BranchesStep determinism
--- | mu/mu: induction on inner step
+    g₁ = g₂ :=
+  (@step.rec
+    (motive_1 := fun g act g' _ => ∀ g₂, step g act g₂ → g' = g₂)
+    (motive_2 := fun bs act bs' _ => ∀ bs₂, BranchesStep step bs act bs₂ → bs' = bs₂)
+    -- Case 1: comm_head
+    (fun sender receiver branches label cont (hmem : (label, cont) ∈ branches)
+        (g₂ : GlobalType) (h₂ : step (.comm sender receiver branches)
+          { sender := sender, receiver := receiver, label := label } g₂) => by
+      cases h₂ with
+      | comm_head _ _ _ label' cont' hmem' =>
+          -- Both comm_head: action is { sender, receiver, label } = { sender, receiver, label' }
+          -- So label = label' by structure equality (the action determines the label)
+          -- hmem : (label, cont) ∈ branches
+          -- hmem' : (label, cont') ∈ branches  (same label since label = label')
+          --
+          -- For cont = cont', we need: unique labels in branches
+          -- i.e., if (l, c) ∈ branches and (l, c') ∈ branches then c = c'
+          --
+          -- This is a well-formedness property of global types that should be
+          -- ensured by the MPST type system (branch labels must be distinct).
+          -- TODO: Add UniqueBranchLabels predicate and proof
+          sorry
+      | comm_async _ _ _ _ _ _ _ _ hcond' _ _ _ =>
+          -- comm_head action: { sender := sender, receiver := receiver, label := label }
+          -- So act.sender = sender, act.receiver = receiver
+          -- comm_async condition hcond': act.sender = sender → act.receiver ≠ receiver
+          -- Since act.sender = sender, we get: act.receiver ≠ receiver
+          -- But act.receiver = receiver, contradiction!
+          exact absurd rfl (hcond' rfl))
+    -- Case 2: comm_async
+    (fun sender receiver branches branches' act' label cont hns hcond hmem hcan
+        (_hbstep : BranchesStep step branches act' branches')
+        (ih_bstep : ∀ bs₂, BranchesStep step branches act' bs₂ → branches' = bs₂)
+        (g₂ : GlobalType) (h₂ : step (.comm sender receiver branches) act' g₂) => by
+      cases h₂ with
+      | comm_head _ _ _ _ _ _ =>
+          -- comm_head constructs action { sender, receiver, label' }
+          -- So the action act' = { sender := sender, receiver := receiver, label := label' }
+          -- This means act'.sender = sender and act'.receiver = receiver
+          -- But from comm_async we have hcond: act'.sender = sender → act'.receiver ≠ receiver
+          -- Since act'.sender = sender, we get act'.receiver ≠ receiver
+          -- But act'.receiver = receiver, contradiction!
+          exact absurd rfl (hcond rfl)
+      | comm_async _ _ _ branches₂ _ _ _ _ _ _ _ hbstep₂ =>
+          have heq := ih_bstep branches₂ hbstep₂
+          subst heq
+          rfl)
+    -- Case 3: mu
+    (fun t body act' g' (_hstep : step (body.substitute t (.mu t body)) act' g')
+        (ih : ∀ g₂, step (body.substitute t (.mu t body)) act' g₂ → g' = g₂)
+        (g₂ : GlobalType) (h₂ : step (.mu t body) act' g₂) => by
+      cases h₂ with
+      | mu _ _ _ _ hstep₂ =>
+          -- hstep₂ : step (body.substitute t (.mu t body)) act' g₂
+          -- ih : ∀ g₂, step (body.substitute t (.mu t body)) act' g₂ → g' = g₂
+          exact ih g₂ hstep₂)
+    -- Case 4: BranchesStep.nil
+    (fun act' (bs₂ : List (Label × GlobalType))
+        (h₂ : BranchesStep step [] act' bs₂) => by
+      cases h₂ with
+      | nil => rfl)
+    -- Case 5: BranchesStep.cons
+    (fun lbl gHead gHead' restTail restTail' act'
+        (_hstep : step gHead act' gHead')
+        (_hbstep : BranchesStep step restTail act' restTail')
+        (ih_step : ∀ g₂, step gHead act' g₂ → gHead' = g₂)
+        (ih_bstep : ∀ bs₂, BranchesStep step restTail act' bs₂ → restTail' = bs₂)
+        (bs₂ : List (Label × GlobalType))
+        (h₂ : BranchesStep step ((lbl, gHead) :: restTail) act' bs₂) => by
+      cases h₂ with
+      | cons _ _ gNew _ restNew _ hstep₂ hbstep₂ =>
+          have hg := ih_step gNew hstep₂
+          have hrest := ih_bstep restNew hbstep₂
+          subst hg hrest
+          rfl)
+    (t := h₁)) g₂ h₂
 
 /-! ## Environment Determinism
 
