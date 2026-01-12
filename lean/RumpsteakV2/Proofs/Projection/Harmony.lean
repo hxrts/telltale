@@ -58,44 +58,85 @@ They involve coinductive reasoning on trans and the step relation. -/
 This is the coherence condition: in a projectable global type, non-participants
 see the same local type regardless of which branch is taken.
 
-Proof requires coinduction on trans to show:
-- trans cont role ≈ trans first_cont role for any (_, cont) ∈ branches
-- When role is not sender or receiver
-
-**Semantic justification:** This property holds for projectable global types because
-CProject requires AllBranchesProj: all branch continuations project to the same
-local type for non-participants.
+**Proof strategy:** This requires showing that `trans` produces coherent projections
+for all branches. For CProject-able types, this follows from `AllBranchesProj`:
+- `AllBranchesProj R gbs role cand` means all branches project to `cand`
+- `project_deterministic` ensures uniqueness
+- Therefore all branches project EQ2-equivalently
 
 **Not universally true:** For arbitrary (non-projectable) global types, this can fail.
-However, the step relation only fires on types where canStep holds, and in practice
-we only care about well-formed global types.
+The axiom is stated without a well-formedness precondition because in practice
+it's only used for types that arise from global steps, which preserve projectability.
+
+**Note:** A complete proof would either:
+1. Add a CProject or well-formedness hypothesis, or
+2. Show that `trans` produces coherent results for any type (which is false in general)
 
 Coq reference: This follows from the AllBranchesProj condition in CProject
 (indProj.v, coProj.v). -/
-axiom branches_project_coherent (first_label : Label) (first_cont : GlobalType)
+theorem branches_project_coherent (first_label : Label) (first_cont : GlobalType)
     (rest : List (Label × GlobalType)) (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ ((first_label, first_cont) :: rest)) :
-    EQ2 (projTrans cont role) (projTrans first_cont role)
+    EQ2 (projTrans cont role) (projTrans first_cont role) := by
+  -- Requires CProject/well-formedness assumption to establish AllBranchesProj
+  -- For CProject-able types: use AllBranchesProj + project_deterministic
+  cases hmem with
+  | head _ => exact EQ2_refl _
+  | tail _ hmem_rest =>
+      -- Need to show: EQ2 (trans cont role) (trans first_cont role)
+      --
+      -- BLOCKED: Requires one of:
+      -- 1. CProject/AllBranchesProj hypothesis (proves all branches project equally)
+      -- 2. Well-formedness hypothesis on the global type
+      -- 3. Coinductive proof using EQ2 bisimulation
+      --
+      -- Without these, the statement is false for arbitrary non-projectable types.
+      -- In practice, this is only used for types arising from global steps.
+      sorry
 
 /-- Projection commutes with mu-substitution up to EQ2.
 
 projTrans (body.substitute t (mu t body)) role ≈ (projTrans (mu t body) role).unfold
 
-For **contractive** types:
-- projTrans (mu t body) role = mu t (projTrans body role)
-- unfold (mu t (projTrans body role)) = (projTrans body role).substitute t (mu t (projTrans body role))
-- The EQ2 equivalence comes from correspondence between global and local substitution
+**Proof strategy:** Case split on contractiveness:
 
-For **non-contractive** types:
-- projTrans (mu t body) role = .end
-- .end.unfold = .end
-- Need: projTrans (body.substitute t (mu t body)) role ≈ .end
-- This holds because non-contractive types are degenerate (immediate recursion)
+**Contractive case** (`lcontractive body = true`):
+- `projTrans (mu t body) role = mu t (projTrans body role)`
+- `unfold (mu t (projTrans body role)) = (projTrans body role).substitute t (mu t (projTrans body role))`
+- Need: `EQ2 (projTrans (body.substitute t (mu t body)) role) (local_body.substitute t (mu t local_body))`
+- This requires showing global and local substitution commute through projection
+
+**Non-contractive case** (`lcontractive body = false`):
+- `projTrans (mu t body) role = .end`
+- `.end.unfold = .end`
+- Need: `EQ2 (projTrans (body.substitute t (mu t body)) role) .end`
+- Non-contractive types are degenerate (immediate/unguarded recursion)
 
 Coq reference: This follows from full_eunf_subst in coLocal.v. -/
-axiom trans_substitute_unfold (t : String) (body : GlobalType) (role : String) :
+theorem trans_substitute_unfold (t : String) (body : GlobalType) (role : String) :
     EQ2 (projTrans (body.substitute t (GlobalType.mu t body)) role)
-        ((projTrans (GlobalType.mu t body) role).unfold)
+        ((projTrans (GlobalType.mu t body) role).unfold) := by
+  -- Case split on contractiveness
+  cases hc : lcontractive body with
+  | true =>
+      -- Contractive: projTrans (mu t body) role = mu t (projTrans body role)
+      -- unfold (mu t x) = x.substitute t (mu t x)
+      -- Need to show global/local substitution correspondence
+      -- Goal: EQ2 (projTrans (body.substitute t (mu t body)) role)
+      --           ((projTrans body role).substitute t (mu t (projTrans body role)))
+      --
+      -- BLOCKED: Requires showing global and local substitution commute through projection.
+      -- This is a deep semantic property requiring coinductive reasoning on projTrans.
+      -- Coq reference: full_eunf_subst in coLocal.v uses coinductive bisimulation.
+      sorry
+  | false =>
+      -- Non-contractive: projTrans (mu t body) role = .end
+      -- Goal: EQ2 (projTrans (body.substitute t (mu t body)) role) .end
+      -- Non-contractive means immediate/unguarded recursion
+      --
+      -- BLOCKED: Requires showing non-contractive substitutions collapse to .end.
+      -- The projection of a non-productive recursion degenerates to .end.
+      sorry
 
 /-! ### Participant Projection Axioms
 
@@ -112,28 +153,57 @@ via the duality transformation on LocalTypeR.
 /-- After a global step, the sender's local type transitions appropriately.
     The sender's projection after the step matches the expected continuation.
 
-This axiom captures the key semantic property: when a global type steps via
+This theorem captures the key semantic property: when a global type steps via
 action (s, r, l), the sender s's local type should transition from
 `send r [... (l, T) ...]` to `T` (the continuation for label l).
 
-Proving this constructively requires showing:
-1. projTrans (g.step act) s = (projTrans g s after local step for label l)
-2. The local step for send is: unfold, then select branch l
+**Proof strategy:** By induction on `step g act g'`:
 
-This involves coinductive reasoning on projTrans and the step relation. -/
-axiom proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
+**comm_head case**: `g = comm sender receiver branches`, `g' = cont` where `(act.label, cont) ∈ branches`
+- For the sender: `trans g sender = send receiver (transBranches branches sender)` by `trans_comm_sender`
+- The result follows from finding the matching branch
+
+**comm_async case**: `g = comm sender receiver branches`, `g' = comm sender receiver branches'`
+- The action is for a nested communication, so sender ≠ act.sender
+- Projection is unchanged (second disjunct)
+
+**mu case**: `step (body.substitute t (mu t body)) act g'`
+- Use IH on the substituted body
+- Connect via `trans_substitute_unfold`
+
+**Duality:** This and `proj_trans_receiver_step` are dual under send/recv. -/
+theorem proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') :
     ∃ cont, projTrans g act.sender = .send act.receiver [(act.label, cont)] ∧
             EQ2 (projTrans g' act.sender) cont ∨
-    EQ2 (projTrans g' act.sender) (projTrans g act.sender)
+    EQ2 (projTrans g' act.sender) (projTrans g act.sender) := by
+  -- Proof by induction on step requires careful analysis of projection + trans_comm_sender/receiver
+  -- The main cases are:
+  -- 1. comm_head: sender's projection transitions via the selected branch
+  -- 2. comm_async: nested action, sender may be unchanged
+  -- 3. mu: unfold recursion and apply IH
+  --
+  -- BLOCKED: Requires step induction with projection analysis.
+  -- Key lemma needed: trans_comm_sender shows sender's projection structure.
+  -- The proof follows the Coq harmony theorem structure (harmony.v).
+  sorry
 
 /-- After a global step, the receiver's local type transitions appropriately.
-    Dual to `proj_trans_sender_step` - see duality note above. -/
-axiom proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
+    Dual to `proj_trans_sender_step` - see duality note above.
+
+**Proof strategy:** Dual to sender case, using `trans_comm_receiver` instead of `trans_comm_sender`.
+The proof structure mirrors `proj_trans_sender_step` exactly. -/
+theorem proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') :
     ∃ cont, projTrans g act.receiver = .recv act.sender [(act.label, cont)] ∧
             EQ2 (projTrans g' act.receiver) cont ∨
-    EQ2 (projTrans g' act.receiver) (projTrans g act.receiver)
+    EQ2 (projTrans g' act.receiver) (projTrans g act.receiver) := by
+  -- Dual to proj_trans_sender_step - same proof structure with recv instead of send
+  --
+  -- BLOCKED: Requires step induction with projection analysis (dual to sender case).
+  -- Key lemma needed: trans_comm_receiver shows receiver's projection structure.
+  -- The proof follows the Coq harmony theorem structure (harmony.v).
+  sorry
 
 /-- Non-participating roles have unchanged projections through a step.
 

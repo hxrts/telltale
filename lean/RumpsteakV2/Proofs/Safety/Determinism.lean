@@ -83,77 +83,69 @@ there is exactly one next global type.
 Each constructor (comm_head, comm_async, mu) uniquely determines the result.
 -/
 
-/-- Global step is deterministic given the same action.
+/-- Global step is deterministic given the same action (requires unique branch labels).
 
 Proof sketch: by case analysis on step constructors via @step.rec.
-- comm_head/comm_head: both select same label (from action), membership gives same cont
+- comm_head/comm_head: both select same label (from action), uniqueness gives same cont
 - comm_head/comm_async: actions differ (head has receiver in action, async doesn't)
 - comm_async/comm_async: IH on BranchesStep
 - mu/mu: IH on the unfolded body step
 
 Uses @step.rec to handle the nested inductive + mutual recursion with BranchesStep.
--/
+
+**Requires:** `g.uniqueBranchLabels = true` to ensure branch labels are distinct.
+Without this, two branches with the same label could have different continuations. -/
 theorem global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
+    (huniq : g.uniqueBranchLabels = true)
     (h₁ : step g act g₁)
     (h₂ : step g act g₂) :
     g₁ = g₂ :=
   (@step.rec
-    (motive_1 := fun g act g' _ => ∀ g₂, step g act g₂ → g' = g₂)
-    (motive_2 := fun bs act bs' _ => ∀ bs₂, BranchesStep step bs act bs₂ → bs' = bs₂)
+    (motive_1 := fun g act g' _ => g.uniqueBranchLabels = true → ∀ g₂, step g act g₂ → g' = g₂)
+    (motive_2 := fun bs act bs' _ => uniqueBranchLabelsBranches bs = true → ∀ bs₂, BranchesStep step bs act bs₂ → bs' = bs₂)
     -- Case 1: comm_head
     (fun sender receiver branches label cont (hmem : (label, cont) ∈ branches)
+        (huniq : (GlobalType.comm sender receiver branches).uniqueBranchLabels = true)
         (g₂ : GlobalType) (h₂ : step (.comm sender receiver branches)
           { sender := sender, receiver := receiver, label := label } g₂) => by
       cases h₂ with
       | comm_head _ _ _ label' cont' hmem' =>
-          -- Both comm_head: action is { sender, receiver, label } = { sender, receiver, label' }
-          -- So label = label' by structure equality (the action determines the label)
-          -- hmem : (label, cont) ∈ branches
-          -- hmem' : (label, cont') ∈ branches  (same label since label = label')
-          --
-          -- For cont = cont', we need: unique labels in branches
-          -- i.e., if (l, c) ∈ branches and (l, c') ∈ branches then c = c'
-          --
-          -- This is a well-formedness property of global types that should be
-          -- ensured by the MPST type system (branch labels must be distinct).
-          -- TODO: Add UniqueBranchLabels predicate and proof
-          sorry
+          -- Both comm_head with same action, so label = label'
+          simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true, decide_eq_true_eq] at huniq
+          have hnodup := huniq.1
+          exact mem_branch_unique_label hnodup hmem hmem'
       | comm_async _ _ _ _ _ _ _ _ hcond' _ _ _ =>
-          -- comm_head action: { sender := sender, receiver := receiver, label := label }
-          -- So act.sender = sender, act.receiver = receiver
-          -- comm_async condition hcond': act.sender = sender → act.receiver ≠ receiver
-          -- Since act.sender = sender, we get: act.receiver ≠ receiver
-          -- But act.receiver = receiver, contradiction!
           exact absurd rfl (hcond' rfl))
     -- Case 2: comm_async
     (fun sender receiver branches branches' act' label cont hns hcond hmem hcan
         (_hbstep : BranchesStep step branches act' branches')
-        (ih_bstep : ∀ bs₂, BranchesStep step branches act' bs₂ → branches' = bs₂)
+        (ih_bstep : uniqueBranchLabelsBranches branches = true → ∀ bs₂, BranchesStep step branches act' bs₂ → branches' = bs₂)
+        (huniq : (GlobalType.comm sender receiver branches).uniqueBranchLabels = true)
         (g₂ : GlobalType) (h₂ : step (.comm sender receiver branches) act' g₂) => by
       cases h₂ with
       | comm_head _ _ _ _ _ _ =>
-          -- comm_head constructs action { sender, receiver, label' }
-          -- So the action act' = { sender := sender, receiver := receiver, label := label' }
-          -- This means act'.sender = sender and act'.receiver = receiver
-          -- But from comm_async we have hcond: act'.sender = sender → act'.receiver ≠ receiver
-          -- Since act'.sender = sender, we get act'.receiver ≠ receiver
-          -- But act'.receiver = receiver, contradiction!
           exact absurd rfl (hcond rfl)
       | comm_async _ _ _ branches₂ _ _ _ _ _ _ _ hbstep₂ =>
-          have heq := ih_bstep branches₂ hbstep₂
+          simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq
+          have huniq_branches := huniq.2
+          have heq := ih_bstep huniq_branches branches₂ hbstep₂
           subst heq
           rfl)
     -- Case 3: mu
     (fun t body act' g' (_hstep : step (body.substitute t (.mu t body)) act' g')
-        (ih : ∀ g₂, step (body.substitute t (.mu t body)) act' g₂ → g' = g₂)
+        (ih : (body.substitute t (.mu t body)).uniqueBranchLabels = true → ∀ g₂, step (body.substitute t (.mu t body)) act' g₂ → g' = g₂)
+        (huniq : (GlobalType.mu t body).uniqueBranchLabels = true)
         (g₂ : GlobalType) (h₂ : step (.mu t body) act' g₂) => by
       cases h₂ with
       | mu _ _ _ _ hstep₂ =>
-          -- hstep₂ : step (body.substitute t (.mu t body)) act' g₂
-          -- ih : ∀ g₂, step (body.substitute t (.mu t body)) act' g₂ → g' = g₂
-          exact ih g₂ hstep₂)
+          -- uniqueBranchLabels preserved through substitution
+          simp only [GlobalType.uniqueBranchLabels] at huniq
+          have huniq_sub : (body.substitute t (GlobalType.mu t body)).uniqueBranchLabels = true :=
+            GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq huniq
+          exact ih huniq_sub g₂ hstep₂)
     -- Case 4: BranchesStep.nil
-    (fun act' (bs₂ : List (Label × GlobalType))
+    (fun act' (huniq : uniqueBranchLabelsBranches [] = true)
+        (bs₂ : List (Label × GlobalType))
         (h₂ : BranchesStep step [] act' bs₂) => by
       cases h₂ with
       | nil => rfl)
@@ -161,17 +153,33 @@ theorem global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
     (fun lbl gHead gHead' restTail restTail' act'
         (_hstep : step gHead act' gHead')
         (_hbstep : BranchesStep step restTail act' restTail')
-        (ih_step : ∀ g₂, step gHead act' g₂ → gHead' = g₂)
-        (ih_bstep : ∀ bs₂, BranchesStep step restTail act' bs₂ → restTail' = bs₂)
+        (ih_step : gHead.uniqueBranchLabels = true → ∀ g₂, step gHead act' g₂ → gHead' = g₂)
+        (ih_bstep : uniqueBranchLabelsBranches restTail = true → ∀ bs₂, BranchesStep step restTail act' bs₂ → restTail' = bs₂)
+        (huniq : uniqueBranchLabelsBranches ((lbl, gHead) :: restTail) = true)
         (bs₂ : List (Label × GlobalType))
         (h₂ : BranchesStep step ((lbl, gHead) :: restTail) act' bs₂) => by
       cases h₂ with
       | cons _ _ gNew _ restNew _ hstep₂ hbstep₂ =>
-          have hg := ih_step gNew hstep₂
-          have hrest := ih_bstep restNew hbstep₂
+          simp only [uniqueBranchLabelsBranches, Bool.and_eq_true] at huniq
+          have hg := ih_step huniq.1 gNew hstep₂
+          have hrest := ih_bstep huniq.2 restNew hbstep₂
           subst hg hrest
           rfl)
-    (t := h₁)) g₂ h₂
+    (t := h₁)) huniq g₂ h₂
+
+/-- Global step determinism without uniqueBranchLabels (legacy signature, uses sorry).
+
+This version exists for backwards compatibility. Use `global_step_det` with
+the uniqueBranchLabels hypothesis for a complete proof. -/
+theorem global_step_det' {g g₁ g₂ : GlobalType} {act : GlobalActionR}
+    (h₁ : step g act g₁)
+    (h₂ : step g act g₂) :
+    g₁ = g₂ := by
+  by_cases huniq : g.uniqueBranchLabels = true
+  · exact global_step_det huniq h₁ h₂
+  · -- Without unique labels, we cannot prove determinism
+    -- This case represents ill-formed global types
+    sorry
 
 /-! ## Environment Determinism
 
@@ -278,11 +286,26 @@ def Confluent (_c c₁ c₂ : Configuration) : Prop :=
     ConfigStepStar c₁ c₃ acts₁ ∧
     ConfigStepStar c₂ c₃ acts₂
 
-/-- MPST is NOT confluent in general (branch choices diverge). -/
-axiom not_confluent_general :
+/-- MPST is NOT confluent in general (branch choices diverge).
+
+**Proof strategy:** Construct a counterexample protocol where:
+1. A branch choice leads to two different configurations c₁ and c₂
+2. The branches have incompatible continuations that can never rejoin
+
+Example: `comm A B [(l1, comm A C ...), (l2, comm A D ...)]`
+- Choosing l1 leads to A communicating with C
+- Choosing l2 leads to A communicating with D
+- These configurations can never reach the same state if C and D have different behaviors
+
+**Note:** With placeholder ConfigStep/ConfigStepStar (always True), Confluent is
+trivially satisfiable. This theorem requires proper step definitions to prove.
+-/
+theorem not_confluent_general :
     ¬∀ c c₁ c₂ act₁ act₂,
       ConfigStep c c₁ act₁ → ConfigStep c c₂ act₂ → act₁ ≠ act₂ →
-      Confluent c c₁ c₂
+      Confluent c c₁ c₂ := by
+  -- Requires concrete counterexample with proper ConfigStep definitions
+  sorry
 
 /-! ## Diamond Property for Independent Actions
 
@@ -319,9 +342,9 @@ theorem diamond_independent {c c₁ c₂ : Configuration} {act₁ act₂ : Globa
 
 /-- Claims bundle for determinism. -/
 structure Claims where
-  /-- Global step determinism. -/
+  /-- Global step determinism (requires uniqueBranchLabels). -/
   global_step_det : ∀ {g g₁ g₂ : GlobalType} {act : GlobalActionR},
-      step g act g₁ → step g act g₂ → g₁ = g₂
+      g.uniqueBranchLabels = true → step g act g₁ → step g act g₂ → g₁ = g₂
   /-- Environment step determinism. -/
   env_step_det : ∀ {env env₁ env₂ : EnvConfig} {act : EnvAction},
       EnvConfigStep env act env₁ → EnvConfigStep env act env₂ → env₁ = env₂
