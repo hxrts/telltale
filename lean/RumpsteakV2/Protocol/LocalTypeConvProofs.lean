@@ -1,5 +1,6 @@
-/-
-# Conversion Proofs: LocalTypeR ↔ LocalTypeDB Roundtrip
+/-! # RumpsteakV2.Protocol.LocalTypeConvProofs
+
+Conversion Proofs: LocalTypeR ↔ LocalTypeDB Roundtrip.
 
 This module provides proven theorems for the conversion between named (LocalTypeR)
 and de Bruijn indexed (LocalTypeDB) representations of local types.
@@ -134,7 +135,8 @@ lemma indexOf_inj {ctx : Context} {x y : String} {i : Nat}
     (hx : Context.indexOf ctx x = some i) (hy : Context.indexOf ctx y = some i) : x = y := by
   have hx' := indexOf_get? (ctx := ctx) (v := x) (i := i) hx
   have hy' := indexOf_get? (ctx := ctx) (v := y) (i := i) hy
-  simpa [hx'] using hy'
+  have heq : some x = some y := hx'.symm.trans hy'
+  exact Option.some.inj heq
 
 
 lemma get?_append_right (xs ys : NameContext) (n : Nat) :
@@ -146,21 +148,21 @@ lemma get?_append_right (xs ys : NameContext) (n : Nat) :
   | h_cons a xs ih =>
       simp only [NameOnlyContext.cons_length, Nat.add_succ, Nat.succ_add]
       have heq : NameOnlyContext.cons a xs ++ ys = NameOnlyContext.cons a (xs ++ ys) := by
+        show TypeContext.mk _ = TypeContext.mk _
         congr 1
-        simp [NameOnlyContext.cons_bindings, NameOnlyContext.append_bindings]
       rw [heq]
       simp only [NameContext.get?, NameOnlyContext.get?_cons_succ]
       exact ih n
 
 private lemma cons_append_eq_cons (a : String) (pref suffix : NameOnlyContext) :
     NameOnlyContext.cons a pref ++ suffix = NameOnlyContext.cons a (pref ++ suffix) := by
+  show TypeContext.mk _ = TypeContext.mk _
   congr 1
-  simp [NameOnlyContext.cons_bindings, NameOnlyContext.append_bindings]
 
 private lemma empty_append_eq (suffix : NameOnlyContext) :
     (TypeContext.empty : NameOnlyContext) ++ suffix = suffix := by
+  show TypeContext.mk _ = TypeContext.mk _
   congr 1
-  simp [NameOnlyContext.append_bindings, TypeContext.bindings_empty]
 
 lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
     ∃ k, Context.indexOf (pref ++ NameOnlyContext.cons x ctx) x = some k ∧ k ≤ pref.length := by
@@ -619,7 +621,7 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
         simp [LocalTypeR.freeVars]
       obtain ⟨i, hidx⟩ := indexOf_eq_some_of_mem (ctx := ctx) (v := v) hv
       refine ⟨LocalTypeDB.var i, ?_, ?_⟩
-      · simp [LocalTypeR.toDB?, hidx]
+      · simp [LocalTypeR.toDB?, Context.indexOf, hidx]
       · have hlt := indexOf_lt_length (ctx := ctx) (v := v) (i := i) hidx
         simp [LocalTypeDB.isClosedAt, hlt]
     · intro ctx hcov
@@ -699,7 +701,7 @@ theorem toDB_fromDB_roundtrip_generated (t : LocalTypeDB) (ctx : NameContext)
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hnodup : ctx.Nodup := generated_nodup ctx hgen
       have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hget, hidx]
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, Context.indexOf, hget, hidx]
     · intro p bs hbs ctx hgen hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -790,7 +792,7 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hget, hidx]
+      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, Context.indexOf, hget, hidx]
     · intro p bs hbs ctx hnodup hfreshAll hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -898,9 +900,9 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
     · intro v pref ctx i db hidx hdb
       cases hvar : Context.indexOf (pref ++ x :: ctx) v with
       | none =>
-          simp [LocalTypeR.toDB?, hvar] at hdb
+          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
       | some j =>
-          simp [LocalTypeR.toDB?, hvar] at hdb
+          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
           subst hdb
           have hne : j ≠ i + pref.length + 1 := by
             intro hj
@@ -1030,9 +1032,9 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
         simp [LocalTypeR.isGuarded] at hguard
       cases hvar : Context.indexOf ctx v with
       | none =>
-          simp [LocalTypeR.toDB?, hvar] at hdb
+          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
       | some j =>
-          simp [LocalTypeR.toDB?, hvar] at hdb
+          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
           subst hdb
           have hne : j ≠ i := by
             intro hij
@@ -1110,9 +1112,9 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
     · intro v ctx db hcontr hdb
       cases hvar : Context.indexOf ctx v with
       | none =>
-          simp [LocalTypeR.toDB?, hvar] at hdb
+          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
       | some j =>
-          simp [LocalTypeR.toDB?, hvar] at hdb
+          simp [LocalTypeR.toDB?, Context.indexOf, hvar] at hdb
           subst hdb
           simp [LocalTypeDB.isContractive]
     · intro ctx dbs hcontr hdbs
@@ -1222,20 +1224,24 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
     (hguard : t.isGuarded 0 = true) :
     (t.fromDB (NameOnlyContext.cons (NameContext.freshName ctx) ctx)).isGuarded (NameContext.freshName ctx) = true := by
   let fresh := NameContext.freshName ctx
-  have hget : NameContext.get? (fresh :: ctx) 0 = some fresh := by
-    simp [NameContext.get?]
-  have huniq : ∀ j, NameContext.get? (fresh :: ctx) j = some fresh → j = 0 := by
+  let ctx' := NameOnlyContext.cons fresh ctx
+  have hget : NameContext.get? ctx' 0 = some fresh := by
+    show NameOnlyContext.get? (NameOnlyContext.cons fresh ctx) 0 = some fresh
+    simp only [NameOnlyContext.get?_cons_zero]
+  have huniq : ∀ j, NameContext.get? ctx' j = some fresh → j = 0 := by
     intro j hj
     cases j with
     | zero => rfl
     | succ j =>
         have hj' : NameContext.get? ctx j = some fresh := by
-          simpa [NameContext.get?] using hj
+          simpa only [NameOnlyContext.get?_cons_succ] using hj
         have hmem : fresh ∈ ctx := get?_mem hj'
         exact (hfreshAll ctx hmem).elim
-  have hclosed' : t.isClosedAt (fresh :: ctx).length = true := by
-    simpa using hclosed
-  exact isGuarded_fromDB_at t (fresh :: ctx) 0 fresh hget huniq hclosed' hguard
+  have hclosed' : t.isClosedAt ctx'.length = true := by
+    show t.isClosedAt (NameOnlyContext.cons fresh ctx).length = true
+    simp only [NameOnlyContext.cons_length]
+    exact hclosed
+  exact isGuarded_fromDB_at t ctx' 0 fresh hget huniq hclosed' hguard
 
 theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c) :
