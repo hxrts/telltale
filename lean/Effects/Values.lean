@@ -6,6 +6,17 @@ import Effects.LocalType
 This module defines the runtime values for multiparty session types.
 Values include base types (unit, bool, nat, string), products, and
 channel endpoints that carry session identifiers and role names.
+
+## Linear Capability Tokens
+
+For proof-carrying runtime, we extend values with linear capability tokens.
+A token `tok e S` represents the capability to use endpoint `e` with local
+type `S`. Tokens are:
+- **Linear**: Cannot be duplicated or discarded
+- **Unforgeable**: Only created by the monitor during session creation
+
+The monitor tracks tokens in a linear context (`LinCtx`) and ensures
+proper consumption/production during protocol steps.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -86,6 +97,69 @@ theorem sidLt_chan (e : Endpoint) (n : SessionId) (h : e.sid < n) : (Value.chan 
   exact h
 
 end Value
+
+/-! ## Linear Capability Tokens -/
+
+/-- A capability token represents the right to use an endpoint with a specific type.
+
+Tokens are created by the monitor during session initialization and consumed/
+produced during protocol steps. They are the key to proof-carrying runtime:
+- The token type matches the expected local type at the endpoint
+- Token consumption corresponds to performing the head action
+- Token production provides the continuation capability -/
+structure Token where
+  /-- The endpoint this token grants access to -/
+  endpoint : Endpoint
+  /-- The current local type at this endpoint -/
+  localType : LocalType
+  deriving Repr
+
+/-- Linear context: tracks which tokens are currently available.
+    Each entry is an endpoint with its current local type. -/
+abbrev LinCtx := List (Endpoint × LocalType)
+
+namespace LinCtx
+
+/-- Empty linear context. -/
+def empty : LinCtx := []
+
+/-- Look up a token for an endpoint. -/
+def find (ctx : LinCtx) (e : Endpoint) : Option LocalType :=
+  ctx.lookup e
+
+/-- Remove a token from the context (consume it).
+    Returns None if the token doesn't exist. -/
+def consumeToken (ctx : LinCtx) (e : Endpoint) : Option (LinCtx × LocalType) :=
+  match ctx with
+  | [] => none
+  | (e', S') :: rest =>
+    if e = e' then
+      some (rest, S')
+    else
+      match consumeToken rest e with
+      | some (ctx', S) => some ((e', S') :: ctx', S)
+      | none => none
+
+/-- Add a token to the context (produce it). -/
+def produceToken (ctx : LinCtx) (e : Endpoint) (S : LocalType) : LinCtx :=
+  (e, S) :: ctx
+
+/-- Consume one token and produce another (for protocol steps).
+    Returns the old type that was consumed. -/
+def stepToken (ctx : LinCtx) (e : Endpoint) (newS : LocalType) : Option (LinCtx × LocalType) :=
+  match consumeToken ctx e with
+  | some (ctx', oldS) => some (produceToken ctx' e newS, oldS)
+  | none => none
+
+/-- Check if context contains a token for endpoint. -/
+def contains (ctx : LinCtx) (e : Endpoint) : Bool :=
+  ctx.any fun (e', _) => e == e'
+
+/-- Get all endpoints in the context. -/
+def endpoints (ctx : LinCtx) : List Endpoint :=
+  ctx.map Prod.fst
+
+end LinCtx
 
 /-! ## Buffer Value Predicates -/
 
