@@ -150,62 +150,158 @@ def initBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
 def initDEnv (sid : SessionId) (roles : RoleSet) : DEnv :=
   (RoleSet.allEdges sid roles).map fun e => (e, [])
 
-/-! ## Environment Lemmas
-
-### Proof Technique for lookup/update Lemmas
-
-The proofs follow a standard pattern for association list operations:
-
-**For `lookup_update_eq`**: Show that looking up key k after updating (k, v) returns v.
-- Unfold `update` definition: prepends (k, v) after erasing k
-- Unfold `lookup` definition: returns first match
-- Since (k, v) is at the head, lookup immediately returns v
-- Key lemma: `List.lookup_cons` + decidable equality
-
-**For `lookup_update_neq`**: Show that looking up k' ≠ k after updating (k, v) is unchanged.
-- Unfold both definitions
-- The new (k, v) at head doesn't match k' (by hne)
-- Continue through erased list
-- By induction: if (k', v') was in original, it's in erased list (k' ≠ k)
-- Key lemma: membership in erase when key differs
-
-**Alternative: Use generic Assoc module**
-The binary session types use a generic `Assoc` module with these lemmas proven once.
-MPST could import it via: `import Effects.Assoc` and define:
-  `def lookupG (env : GEnv) (e : Endpoint) := Assoc.lookup env e`
-This would give the lemmas for free via `Assoc.lookup_update_eq`.
--/
+/-! ## Environment Lemmas -/
 
 theorem lookupStr_update_eq (store : Store) (x : Var) (v : Value) :
     lookupStr (updateStr store x v) x = some v := by
-  sorry  -- Proof: unfold updateStr, see (x, v) at head, lookup returns v
+  induction store with
+  | nil =>
+    simp only [updateStr, lookupStr, List.lookup, beq_self_eq_true]
+  | cons hd tl ih =>
+    simp only [updateStr]
+    split_ifs with h
+    · simp only [lookupStr, List.lookup, beq_self_eq_true]
+    · simp only [lookupStr, List.lookup]
+      have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr h
+      simp only [hne]
+      exact ih
 
 theorem lookupStr_update_neq (store : Store) (x y : Var) (v : Value) (hne : x ≠ y) :
     lookupStr (updateStr store x v) y = lookupStr store y := by
-  sorry  -- Proof: (x, v) at head doesn't match y, induction on rest
+  induction store with
+  | nil =>
+    simp only [updateStr, lookupStr, List.lookup]
+    have h : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+    simp only [h]
+  | cons hd tl ih =>
+    simp only [updateStr]
+    split_ifs with h
+    · -- h : x = hd.1, so y ≠ x implies y ≠ hd.1
+      simp only [lookupStr, List.lookup]
+      have hyx : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+      have hyh : (y == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
+      simp only [hyx, hyh]
+    · simp only [lookupStr, List.lookup]
+      by_cases hy : y = hd.1
+      · simp only [hy, beq_self_eq_true]
+      · have hne' : (y == hd.1) = false := beq_eq_false_iff_ne.mpr hy
+        simp only [hne']
+        exact ih
 
 theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by
-  sorry  -- Proof: same pattern as lookupStr_update_eq
+  induction env with
+  | nil =>
+    simp only [updateG, lookupG, List.lookup, beq_self_eq_true]
+  | cons hd tl ih =>
+    simp only [updateG]
+    split_ifs with h
+    · simp only [lookupG, List.lookup, beq_self_eq_true]
+    · simp only [lookupG, List.lookup]
+      have hne : (e == hd.1) = false := beq_eq_false_iff_ne.mpr h
+      simp only [hne]
+      exact ih
 
 theorem lookupG_update_neq (env : GEnv) (e e' : Endpoint) (L : LocalType) (hne : e ≠ e') :
     lookupG (updateG env e L) e' = lookupG env e' := by
-  sorry  -- Proof: same pattern as lookupStr_update_neq
+  induction env with
+  | nil =>
+    simp only [updateG, lookupG, List.lookup]
+    have h : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+    simp only [h]
+  | cons hd tl ih =>
+    simp only [updateG]
+    split_ifs with h
+    · -- h : e = hd.1, so e' ≠ e implies e' ≠ hd.1
+      simp only [lookupG, List.lookup]
+      have h1 : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+      have h2 : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
+      simp only [h1, h2]
+    · simp only [lookupG, List.lookup]
+      by_cases hy : e' = hd.1
+      · simp only [hy, beq_self_eq_true]
+      · have hne' : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr hy
+        simp only [hne']
+        exact ih
 
 theorem lookupBuf_update_eq (bufs : Buffers) (e : Edge) (buf : Buffer) :
     lookupBuf (updateBuf bufs e buf) e = buf := by
-  sorry  -- Proof: same pattern, but lookupBuf uses getD [] for default
+  induction bufs with
+  | nil =>
+    simp only [updateBuf, lookupBuf, List.lookup, beq_self_eq_true, Option.getD]
+  | cons hd tl ih =>
+    simp only [updateBuf]
+    split_ifs with h
+    · simp only [lookupBuf, List.lookup, beq_self_eq_true, Option.getD]
+    · simp only [lookupBuf, List.lookup]
+      have hne : (e == hd.1) = false := beq_eq_false_iff_ne.mpr h
+      simp only [hne, Option.getD]
+      have ih' := ih
+      simp only [lookupBuf, Option.getD] at ih'
+      exact ih'
 
 theorem lookupBuf_update_neq (bufs : Buffers) (e e' : Edge) (buf : Buffer) (hne : e ≠ e') :
     lookupBuf (updateBuf bufs e buf) e' = lookupBuf bufs e' := by
-  sorry  -- Proof: same pattern
+  induction bufs with
+  | nil =>
+    simp only [updateBuf, lookupBuf, List.lookup]
+    have h : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+    simp only [h, Option.getD]
+  | cons hd tl ih =>
+    simp only [updateBuf]
+    split_ifs with h
+    · -- h : e = hd.1, so e' ≠ e implies e' ≠ hd.1
+      simp only [lookupBuf, List.lookup]
+      have h1 : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+      have h2 : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
+      simp only [h1, h2, Option.getD]
+    · simp only [lookupBuf, List.lookup]
+      by_cases hy : e' = hd.1
+      · simp only [hy, beq_self_eq_true, Option.getD]
+      · have hne' : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr hy
+        simp only [hne', Option.getD]
+        have ih' := ih
+        simp only [lookupBuf, Option.getD] at ih'
+        exact ih'
 
 theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     lookupD (updateD env e ts) e = ts := by
-  sorry  -- Proof: same pattern, lookupD uses getD [] for default
+  induction env with
+  | nil =>
+    simp only [updateD, lookupD, List.lookup, beq_self_eq_true, Option.getD]
+  | cons hd tl ih =>
+    simp only [updateD]
+    split_ifs with h
+    · simp only [lookupD, List.lookup, beq_self_eq_true, Option.getD]
+    · simp only [lookupD, List.lookup]
+      have hne : (e == hd.1) = false := beq_eq_false_iff_ne.mpr h
+      simp only [hne, Option.getD]
+      have ih' := ih
+      simp only [lookupD, Option.getD] at ih'
+      exact ih'
 
 theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     lookupD (updateD env e ts) e' = lookupD env e' := by
-  sorry  -- Proof: same pattern
+  induction env with
+  | nil =>
+    simp only [updateD, lookupD, List.lookup]
+    have h : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+    simp only [h, Option.getD]
+  | cons hd tl ih =>
+    simp only [updateD]
+    split_ifs with h
+    · -- h : e = hd.1, so e' ≠ e implies e' ≠ hd.1
+      simp only [lookupD, List.lookup]
+      have h1 : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+      have h2 : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
+      simp only [h1, h2, Option.getD]
+    · simp only [lookupD, List.lookup]
+      by_cases hy : e' = hd.1
+      · simp only [hy, beq_self_eq_true, Option.getD]
+      · have hne' : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr hy
+        simp only [hne', Option.getD]
+        have ih' := ih
+        simp only [lookupD, Option.getD] at ih'
+        exact ih'
 
 end
