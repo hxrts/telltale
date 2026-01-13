@@ -192,9 +192,12 @@ theorem Coherent_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
     (hCoh : Coherent G D)
     (hG : lookupG G senderEp = some (.send receiverRole T L)) :
-    let e := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
-    Coherent (updateG G senderEp L) (updateD D e (lookupD D e ++ [T])) := by
-  sorry  -- Full proof requires 3-way edge case analysis as described above
+    let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
+    Coherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
+  -- The key insight: we need to show EdgeCoherent for every edge in the updated environment
+  -- Using a sorry for now - this requires careful reasoning about how appending to trace
+  -- affects the Consume function and what it means for coherence
+  sorry
 
 /-- Coherence is preserved when we receive a value at q from p.
     Receiving updates:
@@ -228,13 +231,21 @@ theorem Coherent_recv_preserved
     (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     Coherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
-  sorry  -- Full proof requires 3-way edge case analysis as described above
+  -- Similar to send_preserved, requires 3-way edge case analysis
+  -- Using sorry for now - the key insight is that popping from trace
+  -- corresponds to receiver advancing past recv
+  sorry
 
 /-! ## Initialization Lemma -/
 
 /-- Empty environments are coherent. -/
 theorem Coherent_empty : Coherent [] [] := by
-  sorry  -- Trivial case analysis
+  intro e Lsender Lrecv hGsender hGrecv
+  -- lookupG [] _ = none for any endpoint
+  unfold lookupG at hGsender
+  simp only [List.lookup] at hGsender
+  -- hGsender : none = some Lsender is a contradiction
+  exact (Option.some_ne_none Lsender hGsender.symm).elim
 
 /-- Initialize coherent environments for a new session with local types. -/
 def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType) :
