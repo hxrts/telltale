@@ -79,7 +79,21 @@ theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : Store}
     (hv : HasTypeVal G v T)
     (hNonChan : ¬T.isLinear) :
     StoreTyped G (updateSEnv S x T) (updateStr store x v) := by
-  sorry  -- Proof requires careful case analysis
+  intro y w U hy hU
+  by_cases hyx : y = x
+  · -- y = x: use the new value
+    subst hyx
+    rw [lookupStr_update_eq] at hy
+    rw [lookupSEnv_update_eq] at hU
+    have hw : w = v := Option.some_injective _ hy.symm
+    have hUT : U = T := Option.some_injective _ hU.symm
+    subst hw hUT
+    exact hv
+  · -- y ≠ x: use the original typing
+    have hyx' : x ≠ y := Ne.symm hyx
+    rw [lookupStr_update_neq _ _ _ _ hyx'] at hy
+    rw [lookupSEnv_update_neq _ _ _ _ hyx'] at hU
+    exact hST y w U hy hU
 
 /-- BuffersTyped is preserved when enqueuing a well-typed value. -/
 theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
@@ -87,7 +101,22 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
     (hBT : BuffersTyped G D bufs)
     (hv : HasTypeVal G v T) :
     BuffersTyped G (updateD D e (lookupD D e ++ [T])) (enqueueBuf bufs e v) := by
-  sorry  -- Proof requires index manipulation
+  intro a
+  unfold BufferTyped
+  by_cases ha : a = e
+  · -- a = e: the edge we're enqueuing on
+    subst ha
+    -- The proof requires showing that appending v to buffer and T to trace
+    -- preserves the element-wise typing relationship
+    -- Using sorry for now - this requires List.get lemmas for append
+    sorry
+  · -- a ≠ e: unaffected edge
+    -- The buffers and trace at edge a are unchanged.
+    -- Proof requires dependent type rewriting which is complex in Lean 4.
+    -- Key facts:
+    --   lookupBuf (enqueueBuf bufs e v) a = lookupBuf bufs a  (by lookupBuf_update_neq)
+    --   lookupD (updateD D e _) a = lookupD D a  (by lookupD_update_neq)
+    sorry
 
 /-! ## Preservation for Individual Steps -/
 
@@ -108,7 +137,16 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
          - If y ≠ k: use lookupG_update_neq for stability
        - BuffersTyped: use `BuffersTyped_enqueue` with HasTypeVal for v
        - Coherent: use `Coherent_send_preserved`
-       - Process typing: skip is well-typed -/
+       - Process typing: skip is well-typed
+
+    **NOTE**: There's a design tension in the typing rules:
+    - `HasTypeProcN.send` produces a judgment with post-update G (G[e] := L)
+    - This theorem assumes G has the send type at e (pre-update)
+    - Resolution options:
+      1. Change typing to use pre-update environments (standard approach)
+      2. Change preservation theorem to match current typing discipline
+      3. Use an auxiliary "expected type" function
+    This sorry marks the need to resolve this design issue. -/
 theorem preservation_send
     (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C : Config)
     (k x : Var) (e : Endpoint) (target : Role) (v : Value)
@@ -140,7 +178,10 @@ theorem preservation_send
        - StoreTyped: Store updated with (x, v); use HasTypeVal from step 3
        - BuffersTyped: buffer at edge dequeued, trace at edge tailed
        - Coherent: use `Coherent_recv_preserved`
-       - Process typing: skip is well-typed -/
+       - Process typing: skip is well-typed
+
+    **NOTE**: Same design tension as preservation_send - the recv typing
+    rule uses post-update S and G, but this theorem assumes pre-update. -/
 theorem preservation_recv
     (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C : Config)
     (k x : Var) (e : Endpoint) (source : Role) (v : Value) (vs : List Value)

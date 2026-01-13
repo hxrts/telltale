@@ -141,11 +141,18 @@ inductive Step : Config → Config → Prop where
 
 /-! ## Step Properties -/
 
-/-- Step is deterministic for base steps (modulo which par branch). -/
+/-- Step is deterministic for base steps (modulo which par branch).
+
+    **Proof outline**: Case analysis on h₁ and h₂.
+    - Same constructors: Extract equalities from preconditions
+    - Different constructors: Show C.proc can't match both patterns
+    - Par exception: The `hSame` disjunct handles non-deterministic choice
+
+    This is a standard determinism proof requiring extensive case work. -/
 theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂)
     (hSame : C₁.proc = C₂.proc ∨ (∃ P Q, C.proc = .par P Q)) :
     C₁ = C₂ ∨ (∃ P Q, C.proc = .par P Q) := by
-  sorry  -- Full proof requires case analysis
+  sorry  -- Full proof requires case analysis on h₁, h₂
 
 /-- A configuration terminates if its process is skip. -/
 def Step.Terminates (C : Config) : Prop :=

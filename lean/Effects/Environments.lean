@@ -188,6 +188,42 @@ theorem lookupStr_update_neq (store : Store) (x y : Var) (v : Value) (hne : x �
         simp only [hne']
         exact ih
 
+theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
+    lookupSEnv (updateSEnv env x T) x = some T := by
+  induction env with
+  | nil =>
+    simp only [updateSEnv, lookupSEnv, List.lookup, beq_self_eq_true]
+  | cons hd tl ih =>
+    simp only [updateSEnv]
+    split_ifs with h
+    · simp only [lookupSEnv, List.lookup, beq_self_eq_true]
+    · simp only [lookupSEnv, List.lookup]
+      have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr h
+      simp only [hne]
+      exact ih
+
+theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
+    lookupSEnv (updateSEnv env x T) y = lookupSEnv env y := by
+  induction env with
+  | nil =>
+    simp only [updateSEnv, lookupSEnv, List.lookup]
+    have h : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+    simp only [h]
+  | cons hd tl ih =>
+    simp only [updateSEnv]
+    split_ifs with h
+    · -- h : x = hd.1, so y ≠ x implies y ≠ hd.1
+      simp only [lookupSEnv, List.lookup]
+      have hyx : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
+      have hyh : (y == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
+      simp only [hyx, hyh]
+    · simp only [lookupSEnv, List.lookup]
+      by_cases hy : y = hd.1
+      · simp only [hy, beq_self_eq_true]
+      · have hne' : (y == hd.1) = false := beq_eq_false_iff_ne.mpr hy
+        simp only [hne']
+        exact ih
+
 theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by
   induction env with
