@@ -1,17 +1,14 @@
-/-
-Copyright (c) 2025 Rumpsteak Authors. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
--/
 import Mathlib
 
 /-!
-# Basic Definitions for Async Session Effects
+# MPST Basic Definitions
 
-This module defines the foundational types for channel endpoints:
-- `Polarity`: distinguishes the two ends of a channel
-- `ChanId`: unique identifiers for channels
-- `Endpoint`: a channel endpoint is a (ChanId, Polarity) pair
-- Duality operations on polarities and endpoints
+This module defines the foundational types for multiparty session types:
+- `SessionId`: unique identifier for a session instance
+- `Role`: participant identifier within a session
+- `Endpoint`: a (SessionId × Role) pair representing a participant's view
+- `Label`: branch/select labels for choice
+- `Edge`: directed communication edge (sender, receiver) within a session
 -/
 
 set_option linter.mathlibStandardSet false
@@ -22,75 +19,85 @@ open scoped Classical
 
 noncomputable section
 
-/-- Polarity of a channel endpoint. Each channel has a left (L) and right (R) endpoint. -/
-inductive Polarity where
-  | L
-  | R
-  deriving Repr, DecidableEq
+/-- Session identifiers are natural numbers. -/
+abbrev SessionId := Nat
 
-namespace Polarity
+/-- Role identifiers for participants in a session. -/
+abbrev Role := String
 
-/-- The dual polarity: L ↔ R. -/
-def dual : Polarity → Polarity
-  | .L => .R
-  | .R => .L
+/-- Labels for branching and selection in protocols. -/
+abbrev Label := String
 
-@[simp]
-theorem dual_dual (p : Polarity) : p.dual.dual = p := by
-  cases p <;> rfl
-
-@[simp]
-theorem dual_ne_self (p : Polarity) : p.dual ≠ p := by
-  cases p <;> simp [dual]
-
-end Polarity
-
-/-- Channel identifiers are natural numbers. -/
-abbrev ChanId := Nat
-
-/-- An endpoint is a pair of channel ID and polarity. -/
-abbrev Endpoint := ChanId × Polarity
+/-- An endpoint is a (SessionId × Role) pair, representing a participant's
+    view of a particular session. -/
+structure Endpoint where
+  sid : SessionId
+  role : Role
+  deriving Repr, DecidableEq, Hashable
 
 namespace Endpoint
 
-/-- The dual endpoint: same channel, opposite polarity. -/
-def dual : Endpoint → Endpoint
-  | (n, p) => (n, p.dual)
+/-- Create an endpoint from session ID and role. -/
+def mk' (s : SessionId) (r : Role) : Endpoint := { sid := s, role := r }
 
-@[simp]
-theorem dual_dual (e : Endpoint) : e.dual.dual = e := by
-  cases e with
-  | mk n p => simp [dual, Polarity.dual_dual]
-
-@[simp]
-theorem dual_fst (e : Endpoint) : e.dual.1 = e.1 := by
-  cases e; rfl
-
-@[simp]
-theorem dual_ne_self (e : Endpoint) : e.dual ≠ e := by
-  cases e with
-  | mk n p =>
-    simp [dual]
-    exact Polarity.dual_ne_self p
-
-/-- Two endpoints are duals iff they have the same channel ID but opposite polarities. -/
-def areDual (e₁ e₂ : Endpoint) : Prop :=
-  e₁.1 = e₂.1 ∧ e₁.2 = e₂.2.dual
-
-theorem areDual_iff_dual_eq (e₁ e₂ : Endpoint) : areDual e₁ e₂ ↔ e₁ = e₂.dual := by
-  constructor
-  · intro ⟨hid, hpol⟩
-    cases e₁; cases e₂
-    simp only [dual] at *
-    simp [hid, hpol, Polarity.dual_dual]
-  · intro h
-    subst h
-    simp [areDual, dual, Polarity.dual_dual]
+instance : Inhabited Endpoint := ⟨{ sid := 0, role := "" }⟩
 
 end Endpoint
 
--- Export commonly used definitions
-export Polarity (dual)
-export Endpoint (dual areDual)
+/-- A directed edge represents a communication channel from one role to another
+    within a session. Messages flow from `sender` to `receiver`. -/
+structure Edge where
+  sid : SessionId
+  sender : Role
+  receiver : Role
+  deriving Repr, DecidableEq, Hashable
+
+namespace Edge
+
+/-- Create an edge from session ID and role pair. -/
+def mk' (s : SessionId) (p q : Role) : Edge := { sid := s, sender := p, receiver := q }
+
+/-- The reverse edge (swap sender and receiver). -/
+def reverse (e : Edge) : Edge := { sid := e.sid, sender := e.receiver, receiver := e.sender }
+
+/-- Two edges are reverse of each other. -/
+def areReverse (e₁ e₂ : Edge) : Prop :=
+  e₁.sid = e₂.sid ∧ e₁.sender = e₂.receiver ∧ e₁.receiver = e₂.sender
+
+theorem reverse_reverse (e : Edge) : e.reverse.reverse = e := by
+  simp [reverse]
+
+theorem reverse_ne_self (e : Edge) (h : e.sender ≠ e.receiver) : e.reverse ≠ e := by
+  intro heq
+  simp only [reverse] at heq
+  have h1 : e.receiver = e.sender := by
+    have := congrArg Edge.sender heq
+    simp at this
+    exact this
+  exact h h1.symm
+
+instance : Inhabited Edge := ⟨{ sid := 0, sender := "", receiver := "" }⟩
+
+end Edge
+
+/-- A role set is the collection of participants in a session. -/
+abbrev RoleSet := List Role
+
+namespace RoleSet
+
+/-- Check if a role is in the role set. -/
+def contains (rs : RoleSet) (r : Role) : Bool :=
+  rs.elem r
+
+/-- Get all directed edges between roles in a session. -/
+def allEdges (sid : SessionId) (rs : RoleSet) : List Edge :=
+  rs.flatMap fun p => rs.filterMap fun q =>
+    if p ≠ q then some { sid := sid, sender := p, receiver := q } else none
+
+/-- Get all endpoints for a session. -/
+def allEndpoints (sid : SessionId) (rs : RoleSet) : List Endpoint :=
+  rs.map fun r => { sid := sid, role := r }
+
+end RoleSet
 
 end

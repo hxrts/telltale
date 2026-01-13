@@ -1,19 +1,11 @@
-/-
-Copyright (c) 2025 Rumpsteak Authors. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
--/
-import Effects.Basic
-import Effects.Types
+import Effects.LocalType
 
 /-!
-# Runtime Values
+# MPST Runtime Values
 
-This module defines the runtime values that can be stored and transmitted
-in async session effects:
-- Unit values
-- Boolean values
-- Channel endpoints (carrying polarity information)
-- Heap locations (references)
+This module defines the runtime values for multiparty session types.
+Values include base types (unit, bool, nat, string), products, and
+channel endpoints that carry session identifiers and role names.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -24,64 +16,102 @@ open scoped Classical
 
 noncomputable section
 
-/-- Runtime values that can be stored in variables and transmitted over channels. -/
+/-- Runtime values for MPST. -/
 inductive Value where
   | unit : Value
   | bool : Bool → Value
-  | chan : Endpoint → Value
-  | loc : Nat → Value
-  deriving Repr, DecidableEq, Inhabited
+  | nat : Nat → Value
+  | string : String → Value
+  | prod : Value → Value → Value
+  | chan : Endpoint → Value  -- channel endpoint (sid, role)
+  deriving Repr, DecidableEq
 
 namespace Value
 
-/-- Extract the channel ID from a channel value, if present. -/
-def chanId? : Value → Option ChanId
-  | .chan (n, _) => some n
+/-- Extract session ID from a channel value, if it is one. -/
+def sessionId? : Value → Option SessionId
+  | .chan e => some e.sid
   | _ => none
 
-/-- Extract the endpoint from a channel value, if present. -/
+/-- Extract role from a channel value, if it is one. -/
+def role? : Value → Option Role
+  | .chan e => some e.role
+  | _ => none
+
+/-- Extract endpoint from a channel value, if it is one. -/
 def endpoint? : Value → Option Endpoint
   | .chan e => some e
   | _ => none
 
 /-- Check if a value is a channel. -/
-def isChannel : Value → Bool
+def isChan : Value → Bool
   | .chan _ => true
   | _ => false
 
-/-- Check if a value's channel ID (if any) is less than n. -/
-def idLt (n : Nat) : Value → Prop
-  | .unit => True
-  | .bool _ => True
-  | .loc _ => True
-  | .chan (id, _) => id < n
+/-- Check if a session ID appears in a value. -/
+def containsSid (sid : SessionId) : Value → Bool
+  | .chan e => e.sid == sid
+  | .prod v₁ v₂ => containsSid sid v₁ || containsSid sid v₂
+  | _ => false
 
-instance : Decidable (Value.idLt n v) := by
-  cases v <;> simp [idLt] <;> infer_instance
+/-- All session IDs in a value are less than n. -/
+def sidLt (v : Value) (n : SessionId) : Prop :=
+  ∀ sid, v.containsSid sid → sid < n
 
-@[simp]
-theorem idLt_unit (n : Nat) : idLt n .unit = True := rfl
+/-- simdLt for unit is trivial. -/
+theorem sidLt_unit (n : SessionId) : Value.unit.sidLt n := by
+  intro sid hcontains
+  simp only [containsSid, Bool.false_eq_true] at hcontains
 
-@[simp]
-theorem idLt_bool (n : Nat) (b : Bool) : idLt n (.bool b) = True := rfl
+/-- sidLt for bool is trivial. -/
+theorem sidLt_bool (b : Bool) (n : SessionId) : (Value.bool b).sidLt n := by
+  intro sid hcontains
+  simp only [containsSid, Bool.false_eq_true] at hcontains
 
-@[simp]
-theorem idLt_loc (n : Nat) (l : Nat) : idLt n (.loc l) = True := rfl
+/-- sidLt for nat is trivial. -/
+theorem sidLt_nat (m : Nat) (n : SessionId) : (Value.nat m).sidLt n := by
+  intro sid hcontains
+  simp only [containsSid, Bool.false_eq_true] at hcontains
 
-@[simp]
-theorem idLt_chan (n : Nat) (id : ChanId) (p : Polarity) :
-    idLt n (.chan (id, p)) ↔ id < n := by
-  simp [idLt]
+/-- sidLt for string is trivial. -/
+theorem sidLt_string (s : String) (n : SessionId) : (Value.string s).sidLt n := by
+  intro sid hcontains
+  simp only [containsSid, Bool.false_eq_true] at hcontains
 
-theorem idLt_mono {m n : Nat} (v : Value) (hmn : m ≤ n) :
-    idLt m v → idLt n v := by
-  cases v <;> simp [idLt]
-  intro h
-  exact Nat.lt_of_lt_of_le h hmn
+/-- sidLt for chan. -/
+theorem sidLt_chan (e : Endpoint) (n : SessionId) (h : e.sid < n) : (Value.chan e).sidLt n := by
+  intro sid hcontains
+  simp only [containsSid, beq_iff_eq] at hcontains
+  rw [← hcontains]
+  exact h
 
 end Value
 
-/-- Variable names are strings. -/
-abbrev Var := String
+/-! ## Buffer Value Predicates -/
+
+/-- All values in a buffer have session IDs less than n. -/
+def Buffer.sidLt (buf : List Value) (n : SessionId) : Prop :=
+  ∀ v, v ∈ buf → v.sidLt n
+
+theorem Buffer.sidLt_nil (n : SessionId) : Buffer.sidLt [] n := by
+  intro v hv
+  simp at hv
+
+theorem Buffer.sidLt_cons (v : Value) (buf : List Value) (n : SessionId)
+    (hv : v.sidLt n) (hbuf : Buffer.sidLt buf n) : Buffer.sidLt (v :: buf) n := by
+  intro w hw
+  simp only [List.mem_cons] at hw
+  cases hw with
+  | inl h => rw [h]; exact hv
+  | inr h => exact hbuf w h
+
+theorem Buffer.sidLt_append (buf₁ buf₂ : List Value) (n : SessionId)
+    (h₁ : Buffer.sidLt buf₁ n) (h₂ : Buffer.sidLt buf₂ n) :
+    Buffer.sidLt (buf₁ ++ buf₂) n := by
+  intro v hv
+  simp only [List.mem_append] at hv
+  cases hv with
+  | inl h => exact h₁ v h
+  | inr h => exact h₂ v h
 
 end

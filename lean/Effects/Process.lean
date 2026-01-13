@@ -1,29 +1,19 @@
-/-
-Copyright (c) 2025 Rumpsteak Authors. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
--/
-import Effects.Basic
-import Effects.Types
-import Effects.Values
-import Effects.Environments
+import Effects.Coherence
 
 /-!
-# Process Language
+# MPST Process Language
 
-This module defines the minimal process language for async session effects:
-- `skip`: terminated process
-- `seq P Q`: sequential composition
-- `par P Q`: parallel composition
-- `send k x`: send value at x over channel k
-- `recv k x`: receive into variable x from channel k
-- `newChan kL kR T`: create a fresh channel with endpoints kL and kR
-- `assign x v`: assign value v to variable x
+This module defines the process language for multiparty session types.
 
-Also defines the runtime configuration combining:
-- Next available channel ID
-- Variable store
-- Message buffers
-- Current process
+The process language is similar to the binary session types language,
+but operations are multiparty-aware:
+- `send k x`: send value in x through channel k (target role is in the type)
+- `recv k x`: receive into x through channel k (source role is in the type)
+- `select k ℓ`: select label ℓ on channel k
+- `branch k bs`: branch on incoming label from channel k
+
+Channels carry `Endpoint = (SessionId, Role)` pairs, and the local type
+determines which role we communicate with.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -34,24 +24,29 @@ open scoped Classical
 
 noncomputable section
 
-/-- Process terms for the minimal async session calculus. -/
+/-- Process language for MPST.
+
+- `skip`: terminated process
+- `seq P Q`: sequential composition
+- `par P Q`: parallel composition
+- `send k x`: send value in variable x through channel k
+- `recv k x`: receive a value into variable x through channel k
+- `select k ℓ`: send label ℓ through channel k
+- `branch k bs`: receive a label through k and branch to corresponding process
+- `newSession roles f`: create a new session with given roles,
+                         binding channel variables via f
+- `assign x v`: assign a non-linear value to variable x
+-/
 inductive Process where
-  /-- Terminated process. -/
   | skip : Process
-  /-- Sequential composition: run P then Q. -/
   | seq : Process → Process → Process
-  /-- Parallel composition: run P and Q concurrently. -/
   | par : Process → Process → Process
-  /-- Send the value at variable x over channel variable k. -/
-  | send : Var → Var → Process
-  /-- Receive a value from channel variable k into variable x. -/
-  | recv : Var → Var → Process
-  /-- Create a new channel with left endpoint kL and right endpoint kR.
-      The channel has session type T at the left endpoint. -/
-  | newChan : Var → Var → SType → Process
-  /-- Assign value v to variable x. -/
+  | send : Var → Var → Process  -- send k x: send x through channel k
+  | recv : Var → Var → Process  -- recv k x: receive into x through channel k
+  | select : Var → Label → Process  -- select k ℓ
+  | branch : Var → List (Label × Process) → Process  -- branch k [(ℓ₁, P₁), ...]
+  | newSession : RoleSet → (Role → Var) → Process → Process
   | assign : Var → Value → Process
-  deriving Repr, DecidableEq
 
 namespace Process
 
@@ -60,49 +55,74 @@ def isSkip : Process → Bool
   | .skip => true
   | _ => false
 
-/-- Check if a process can make progress (is not skip). -/
-def canStep : Process → Bool
-  | .skip => false
-  | _ => true
+/-- Get immediate free variables in a process (non-recursive for branches). -/
+def freeVarsImmediate : Process → List Var
+  | .skip => []
+  | .seq P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
+  | .par P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
+  | .send k x => [k, x]
+  | .recv k x => [k]  -- x is bound
+  | .select k _ => [k]
+  | .branch k _ => [k]  -- simplified: don't recurse into branch processes
+  | .newSession _ _ P => P.freeVarsImmediate  -- f's range is bound
+  | .assign _ _ => []
 
 end Process
 
-/-- Runtime configuration for process execution. -/
+/-! ## Runtime Configuration -/
+
+/-- Runtime configuration for MPST.
+
+- `proc`: the process being executed
+- `store`: variable store
+- `bufs`: per-edge message buffers
+- `nextSid`: next fresh session ID
+-/
 structure Config where
-  /-- Next available channel ID for allocation. -/
-  nextId : ChanId
-  /-- Variable store mapping names to values. -/
-  store : Store
-  /-- Message buffers for each endpoint. -/
-  bufs : Buffers
-  /-- Current process being executed. -/
   proc : Process
-  deriving Repr, DecidableEq
+  store : Store
+  bufs : Buffers
+  nextSid : SessionId
 
 namespace Config
 
-/-- Create an initial configuration for a process. -/
+/-- Initial configuration with just a process. -/
 def init (P : Process) : Config :=
-  { nextId := 0
-    store := []
-    bufs := []
-    proc := P }
+  { proc := P, store := [], bufs := [], nextSid := 0 }
 
-/-- Check if the configuration has terminated. -/
-def isDone (C : Config) : Bool := C.proc.isSkip
-
-/-- Update just the process in a configuration. -/
-def withProc (C : Config) (P : Process) : Config :=
-  { C with proc := P }
-
-/-- Update just the store in a configuration. -/
-def withStore (C : Config) (st : Store) : Config :=
-  { C with store := st }
-
-/-- Update just the buffers in a configuration. -/
-def withBufs (C : Config) (B : Buffers) : Config :=
-  { C with bufs := B }
+/-- Check if configuration has terminated. -/
+def isTerminated (C : Config) : Bool :=
+  C.proc.isSkip
 
 end Config
+
+/-! ## Configuration Update Helpers -/
+
+/-- Update configuration after a send on edge e. -/
+def sendStep (C : Config) (e : Edge) (v : Value) : Config :=
+  { C with
+    proc := .skip
+    bufs := enqueueBuf C.bufs e v }
+
+/-- Update configuration after a receive on edge e. -/
+def recvStep (C : Config) (e : Edge) (x : Var) (v : Value) : Config :=
+  match dequeueBuf C.bufs e with
+  | some (bufs', _) =>
+    { C with
+      proc := .skip
+      store := updateStr C.store x v
+      bufs := bufs' }
+  | none => C  -- shouldn't happen if well-typed
+
+/-- Update configuration after creating a new session. -/
+def newSessionStep (C : Config) (roles : RoleSet) (f : Role → Var) : Config :=
+  let sid := C.nextSid
+  let store' := roles.foldl (fun s r => updateStr s (f r) (.chan ⟨sid, r⟩)) C.store
+  let bufs' := initBuffers sid roles ++ C.bufs
+  { C with
+    proc := .skip
+    store := store'
+    bufs := bufs'
+    nextSid := sid + 1 }
 
 end
