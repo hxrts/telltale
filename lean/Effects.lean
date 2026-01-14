@@ -11,6 +11,11 @@ import Effects.Process
 import Effects.Typing
 import Effects.Semantics
 import Effects.Preservation
+import Effects.DeadlockFreedom
+import Effects.Monitor
+import Effects.Spatial
+import Effects.Determinism
+import Effects.Deployment
 
 /-!
 # Session Types with Async Effects
@@ -72,6 +77,11 @@ with buffered communication. The key features are:
 - `Typing`: Value/buffer typing, store typing
 - `Semantics`: Async operational semantics
 - `Preservation`: Subject reduction theorem
+- `DeadlockFreedom`: Progress guarantees with guardedness
+- `Monitor`: Proof-carrying runtime with linear tokens
+- `Spatial`: Spatial requirements and topology satisfaction
+- `Determinism`: Unique branch labels and diamond property
+- `Deployment`: Deployed protocol bundles and linking
 
 ## References
 
