@@ -18,6 +18,7 @@ import Effects.Determinism
 import Effects.Deployment
 import Effects.Examples
 import Effects.Simulation
+import Effects.Decidability
 
 /-!
 # Session Types with Async Effects
@@ -86,6 +87,7 @@ with buffered communication. The key features are:
 - `Deployment`: Deployed protocol bundles and linking
 - `Examples`: Concrete protocol examples (Ping-Pong, Two-Buyer)
 - `Simulation`: Executable step function and trace utilities
+- `Decidability`: Decidable instances and boolean checkers
 
 ## References
 
