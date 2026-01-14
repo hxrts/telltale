@@ -4,13 +4,26 @@ import RumpsteakV2.Coinductive.WellFormed
 
 set_option linter.dupNamespace false
 
-/-!
-# EQ2C helper lemmas
+/-
+The Problem. EQ2C is defined as an existentially quantified bisimulation, but
+practical proofs need lemmas showing how EQ2C interacts with smart constructors
+and mu-unfolding.
 
-Auxiliary lemmas for reasoning about EQ2C, including left/right μ-unfolding.
+The difficulty is that mu-unfolding on one side of an EQ2C relation requires
+constructing a new bisimulation that accounts for the unfolding step. Similarly,
+congruence for send/recv requires lifting branch-wise EQ2C to the full type.
+
+Solution Structure.
+1. Base cases: EQ2C_end and EQ2C_var establish reflexivity at terminals
+2. EQ2C_mkVar_left/right_unfolds extract the unfolding witness from EQ2C
+3. EQ2C_send and EQ2C_recv give congruence for communication types
+4. EQ2C_unfold_left/right allow mu-wrapping on either side
+5. ObservableRelC_mu_left/right lift observable relations through mu
 -/
 
 namespace RumpsteakV2.Coinductive
+
+/-! ## Variable unfolding utilities -/
 
 lemma unfoldsToC_mkVar {x : String} {u : LocalTypeC}
     (h : UnfoldsToC (mkVar x) u) : u = mkVar x := by
@@ -29,6 +42,8 @@ lemma unfoldsToVarC_mkVar {x v : String} (h : UnfoldsToVarC (mkVar x) v) : v = x
   subst hu
   simp [head_mkVar] at hhead
   exact hhead.symm
+
+/-! ## Base cases: end and var -/
 
 /-- Base EQ2C proof for `end`. -/
 lemma EQ2C_end : EQ2C mkEnd mkEnd := by
@@ -53,6 +68,8 @@ lemma EQ2C_var (v : String) : EQ2C (mkVar v) (mkVar v) := by
     have hvar : UnfoldsToVarC (mkVar v) v := ⟨mkVar v, Relation.ReflTransGen.refl, head_mkVar v⟩
     exact ⟨obs, obs, ObservableRelC.is_var v hvar hvar⟩
   exact ⟨R, hR, ⟨rfl, rfl⟩⟩
+
+/-! ## Extracting unfold witnesses from EQ2C -/
 
 lemma EQ2C_mkVar_left_unfolds {x : String} {b : LocalTypeC}
     (h : EQ2C (mkVar x) b) : UnfoldsToVarC b x := by
@@ -85,6 +102,8 @@ lemma EQ2C_mkVar_right_unfolds {x : String} {a : LocalTypeC}
     (h : EQ2C a (mkVar x)) : UnfoldsToVarC a x := by
   have h' : EQ2C (mkVar x) a := EQ2C_symm h
   exact EQ2C_mkVar_left_unfolds h'
+
+/-! ## Communication congruence -/
 
 /-- EQ2C is closed under send, given branch-wise EQ2C. -/
 lemma EQ2C_send {p : String} {bs cs : List (Label × LocalTypeC)}
@@ -145,6 +164,8 @@ lemma EQ2C_recv {p : String} {bs cs : List (Label × LocalTypeC)}
         exact ⟨obs_a, obs_b, ObservableRelC.is_recv p bs cs ha_recv hb_recv hbr'⟩
   refine ⟨R', hR', ?_⟩
   exact Or.inl ⟨rfl, rfl⟩
+
+/-! ## Mu-unfolding congruence -/
 
 /-- Wrap a bisimulation on the left with a μ constructor. -/
 lemma EQ2C_unfold_left {t u : LocalTypeC} (h : EQ2C t u) (x : String) :

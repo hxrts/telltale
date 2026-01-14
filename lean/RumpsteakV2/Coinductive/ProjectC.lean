@@ -7,18 +7,29 @@ import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 
 set_option linter.dupNamespace false
 
-/-!
-# Coinductive Projection (ProjectC)
+/-
+The Problem. Projection extracts a local type for a role from a global protocol.
+For coinductive types, projection must be defined as a greatest fixed point to
+handle infinite/recursive protocols correctly.
 
-Defines a coinductive projection relation from global protocols to coinductive
-local types, together with unfolding relations used to make projection stable
-under µ-unfolding.
+The difficulty is that both global and local types can unfold through mu nodes,
+so the projection relation must be stable under unfolding on both sides. The
+standard approach is to allow finite unfolding before matching the head shape.
+
+Solution Structure.
+1. UnfoldsG/UnfoldsToG define global type unfolding (mu substitution)
+2. BranchesProjRelC aligns branches with label equality
+3. ProjectC_step is the one-step generator allowing finite unfolding
+4. ProjectC is the greatest fixed point via CoinductiveRel
+5. ProjectC_unfoldG/unfoldC show stability under mu-unfolding
 -/
 
 namespace RumpsteakV2.Coinductive
 
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
+
+/-! ## Global type unfolding -/
 
 /-- One-step global unfolding: µt.G ↦ G[µt.G/t]. -/
 def UnfoldsG (g g' : GlobalType) : Prop :=
@@ -27,6 +38,8 @@ def UnfoldsG (g g' : GlobalType) : Prop :=
 /-- Finite global unfolding closure. -/
 def UnfoldsToG (g g' : GlobalType) : Prop :=
   Relation.ReflTransGen UnfoldsG g g'
+
+/-! ## Branch relations -/
 
 /-- Projection relation type (global × role × coinductive local). -/
 abbrev ProjRelC := GlobalType → String → LocalTypeC → Prop
@@ -56,6 +69,8 @@ private lemma AllBranchesProjC_mono {R S : ProjRelC}
     ∀ {gbs role cand}, AllBranchesProjC R gbs role cand → AllBranchesProjC S gbs role cand := by
   intro gbs role cand hall gb hmem
   exact h _ _ _ (hall gb hmem)
+
+/-! ## Projection step generator -/
 
 private def ProjectC_comm (R : ProjRelC) (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (l' : LocalTypeC) : Prop :=
@@ -121,6 +136,8 @@ private theorem ProjectC_step_mono : Monotone ProjectC_step := by
               exact Or.inr (Or.inr ⟨hns, hnr, AllBranchesProjC_mono h hall⟩)
 
 instance : CoinductiveRel ProjRelC ProjectC_step := ⟨ProjectC_step_mono⟩
+
+/-! ## Coinductive projection -/
 
 /-- Coinductive projection as the greatest fixed point of `ProjectC_step`. -/
 def ProjectC : ProjRelC :=

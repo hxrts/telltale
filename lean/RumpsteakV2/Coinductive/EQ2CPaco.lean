@@ -4,11 +4,20 @@ import RumpsteakV2.Coinductive.EQ2C
 
 set_option linter.dupNamespace false
 
-/-!
-# EQ2C and paco
+/-
+The Problem. EQ2C is defined via an existentially quantified bisimulation, which
+makes coinductive proofs awkward. The paco library provides a cleaner coinduction
+principle through parametrized greatest fixed points.
 
-Connects `EQ2C` with a paco-style greatest fixed point over observable relations.
-This enables coinductive proof principles analogous to `EQ2Paco`.
+The difficulty is connecting our observable-based bisimulation definition with
+paco's monotone relation transformers. We need EQ2C = paco EQ2CMono ⊥.
+
+Solution Structure.
+1. Define EQ2C_step_paco wrapping ObservableRelC for paco
+2. Prove monotonicity (EQ2C_step_mono)
+3. Show EQ2C ≤ paco ⊥ by exhibiting the witness
+4. Show paco ⊥ ≤ EQ2C by extracting the bisimulation
+5. Conclude EQ2C = EQ2C_paco
 -/
 
 namespace RumpsteakV2.Coinductive

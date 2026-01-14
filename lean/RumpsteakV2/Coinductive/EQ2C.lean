@@ -4,16 +4,30 @@ import RumpsteakV2.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-!
-# EQ2C: Equi-recursive equality on LocalTypeC
+/-
+The Problem. Coinductive types can have different structural representations
+that are semantically equivalent. In particular, mu-unfolding should be silent:
+`mu x. T` should equal `T[x := mu x. T]`. We need an equi-recursive equality
+relation EQ2C that captures this.
 
-Defines an observable-based bisimulation that treats μ-unfolding as silent.
+The difficulty is defining a relation that:
+1. Allows mu-unfolding on either side (ObservableRelC)
+2. Is a proper bisimulation (matches observable heads, relates children)
+3. Forms an equivalence relation
+
+Solution Structure.
+1. BranchesRelC: pointwise relation on branch lists
+2. ObservableRelC: one-step observable equality (after mu-unfolding)
+3. EQ2CStep: the bisimulation step function
+4. EQ2C: greatest fixpoint of EQ2CStep (using Paco-style iteration)
 -/
 
 namespace RumpsteakV2.Coinductive
 
 -- Alias Label to avoid ambiguity
 abbrev Label := RumpsteakV2.Protocol.GlobalType.Label
+
+/-! ## Branch relation -/
 
 /-- Branch relation: labels match and continuations are related by `R`. -/
 def BranchesRelC (R : LocalTypeC → LocalTypeC → Prop)
@@ -75,6 +89,8 @@ lemma BranchesRelC_comp {R S : LocalTypeC → LocalTypeC → Prop}
           have hT' : T _ _ := (hT _ _).2 ⟨_, hR, hS⟩
           refine List.Forall₂.cons ?_ (ih hrest2)
           exact ⟨hlab1.trans hlab2, hT'⟩
+
+/-! ## Observable relation -/
 
 /-- Observable relation between two coinductive types, parameterized by `R`.
 
@@ -197,6 +213,8 @@ lemma observable_head_deterministic {t u1 u2 : LocalTypeC}
   have := UnfoldsToC_unique hunf1 hunf2 hnomu1 hnomu2
   simp [this]
 
+/-! ## Exclusion lemmas -/
+
 /-- If a type unfolds to end, it cannot unfold to a var. -/
 lemma not_end_and_var {t : LocalTypeC} (hend : UnfoldsToEndC t) (v : String) :
     ¬ UnfoldsToVarC t v := by
@@ -264,6 +282,8 @@ lemma not_send_and_recv {t : LocalTypeC} (p : String) (bs : List (Label × Local
   have := observable_head_deterministic hunf1 hunf2 hnomu1 hnomu2
   simp [hhead1, hhead2] at this
 
+/-! ## Uniqueness of communication observables -/
+
 /-- If two CanSendC hold for the same type, they have the same participant and branches. -/
 lemma CanSendC_unique {t : LocalTypeC} {p1 p2 : String}
     {bs1 bs2 : List (Label × LocalTypeC)}
@@ -293,6 +313,8 @@ lemma CanRecvC_unique {t : LocalTypeC} {p1 p2 : String}
   constructor
   · exact hhead2.1
   · simp [hbs1, hbs2]
+
+/-! ## Observable relation composition -/
 
 /-- Observable relation composes through relational composition.
 
@@ -348,6 +370,8 @@ lemma ObservableRelC_comp {R S : LocalTypeC → LocalTypeC → Prop}
           subst hp hcs
           exact ObservableRelC.is_recv p bs ds ha hc (BranchesRelC_comp T hT hbr1 hbr2)
 
+/-! ## EQ2C: Equi-recursive equality -/
+
 /-- A relation is an EQ2C-bisimulation if it relates observable heads. -/
 def IsBisimulationC (R : LocalTypeC → LocalTypeC → Prop) : Prop :=
   ∀ a b, R a b → ∃ (_obs_a : ObservableC a) (_obs_b : ObservableC b), ObservableRelC R a b
@@ -355,6 +379,8 @@ def IsBisimulationC (R : LocalTypeC → LocalTypeC → Prop) : Prop :=
 /-- Equi-recursive equality on `LocalTypeC`. -/
 def EQ2C (a b : LocalTypeC) : Prop :=
   ∃ R, IsBisimulationC R ∧ R a b
+
+/-! ## EQ2C is an equivalence -/
 
 /-- Symmetry. -/
 lemma EQ2C_symm {a b : LocalTypeC} (h : EQ2C a b) : EQ2C b a := by

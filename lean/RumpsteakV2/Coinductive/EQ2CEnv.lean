@@ -7,12 +7,22 @@ import RumpsteakV2.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-!
-# EQ2CE: Environment-aware coinductive equivalence for LocalTypeC
+/-
+The Problem. EQ2C relates coinductive types directly, but cannot handle finite
+syntax with explicit variable nodes that represent back-edges. When converting
+between inductive and coinductive representations, variables name cycles.
 
-Interprets `var` nodes as back-edges through an explicit environment, using
-parametrized coinduction (paco). This relation is intended to relate finite
-syntax (with `var`) to cyclic coinductive structures.
+The difficulty is that these variables must be interpreted through an environment
+that tracks what each name refers to. EQ2CE (environment-aware EQ2C) uses paco
+(parametrized coinduction) to handle this, allowing the relation to unfold mu
+nodes while recording bindings for later variable resolution.
+
+Solution Structure.
+1. Define Env and EnvPair to track name-to-node mappings
+2. EnvResolves ensures environment respects EQ2C at back-edges
+3. EQ2CE_step gives one-step bisimulation with environment threading
+4. EQ2CE is the paco greatest fixed point of EQ2CE_step
+5. EQ2CE_coind provides the coinduction principle
 -/
 
 namespace RumpsteakV2.Coinductive
@@ -59,6 +69,8 @@ def EnvResolvesL (ρ : EnvPair) : Prop :=
 def EnvVarR (ρ : EnvPair) : Prop :=
   ∀ x c, c ∈ envR ρ x → c = mkVar x
 
+/-! ## Unfolding from environment membership -/
+
 lemma EnvResolves_unfolds_left {ρ : EnvPair} {x : String} {c : LocalTypeC}
     (hρ : EnvResolves ρ) (hmem : c ∈ envL ρ x) : UnfoldsToVarC c x := by
   exact EQ2C_mkVar_left_unfolds (hρ.1 _ _ hmem)
@@ -70,6 +82,8 @@ lemma EnvResolves_unfolds_right {ρ : EnvPair} {x : String} {c : LocalTypeC}
 lemma EnvResolvesL_unfolds {ρ : EnvPair} {x : String} {c : LocalTypeC}
     (hρ : EnvResolvesL ρ) (hmem : c ∈ envL ρ x) : UnfoldsToVarC c x := by
   exact EQ2C_mkVar_left_unfolds (hρ _ _ hmem)
+
+/-! ## EnvResolves preservation under insert -/
 
 lemma EnvResolves_insertL {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvResolves ρ) (hvar : EQ2C (mkVar x) b) :
@@ -138,6 +152,8 @@ lemma EnvResolvesL_insertR {ρ : EnvPair} {x : String} {a : LocalTypeC}
   have hmem' : c ∈ envL ρ y := by
     simpa [envInsertR] using hmem
   exact hρ _ _ hmem'
+
+/-! ## EnvVarR preservation -/
 
 lemma EnvVarR_insertL {ρ : EnvPair} {x : String} {b : LocalTypeC}
     (hρ : EnvVarR ρ) : EnvVarR (envInsertL ρ x b) := by
