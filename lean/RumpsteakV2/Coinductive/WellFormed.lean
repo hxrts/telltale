@@ -6,130 +6,120 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-!
-# WellFormedC preservation
+/-
+The Problem. WellFormedC (closed + observable) is the key property for working
+with coinductive types. We need preservation lemmas showing that:
+1. Smart constructors produce well-formed types
+2. The toCoind embedding preserves observability
 
-Basic preservation lemmas for `WellFormedC` across core constructors and the
-embedding `toCoind`.
+The difficulty is that closedness and observability interact: a mu-wrapper
+preserves both if its body has both, but var creates open types.
+
+Solution Structure.
+1. Prove observability for each smart constructor
+2. Prove closedness preservation for mkMu
+3. Combine into wellFormed_mkEnd and wellFormed_mkMu
+4. Prove observable_toCoind by structural induction
 -/
 
 namespace RumpsteakV2.Coinductive
 
 open RumpsteakV2.Protocol.LocalTypeR
 
-/-- `mkEnd` is observable. -/
+/-! ## Observability of Smart Constructors -/
+
+/-- mkEnd is immediately observable as end. -/
 lemma observable_mkEnd : ObservableC mkEnd := by
   apply ObservableC.is_end
-  refine ⟨mkEnd, Relation.ReflTransGen.refl, ?_⟩
-  simp [head_mkEnd]
+  exact ⟨mkEnd, Relation.ReflTransGen.refl, by simp [head_mkEnd]⟩
 
-/-- `mkVar` is observable as a variable. -/
+/-- mkVar is observable as a variable (but not closed). -/
 lemma observable_mkVar (x : String) : ObservableC (mkVar x) := by
   apply ObservableC.is_var x
-  refine ⟨mkVar x, Relation.ReflTransGen.refl, ?_⟩
-  simp [head_mkVar]
+  exact ⟨mkVar x, Relation.ReflTransGen.refl, by simp [head_mkVar]⟩
 
-/-- `mkSend` is observable as a send. -/
+/-- mkSend is immediately observable as send. -/
 lemma observable_mkSend (p : String) (bs : List (RumpsteakV2.Protocol.GlobalType.Label × LocalTypeC)) :
     ObservableC (mkSend p bs) := by
   refine ObservableC.is_send p (branchesOf (mkSend p bs)) ?_
-  refine ⟨mkSend p bs, bs.map Prod.fst, Relation.ReflTransGen.refl, ?_, rfl⟩
-  simp [head_mkSend]
+  exact ⟨mkSend p bs, bs.map Prod.fst, Relation.ReflTransGen.refl, by simp [head_mkSend], rfl⟩
 
-/-- `mkRecv` is observable as a recv. -/
+/-- mkRecv is immediately observable as recv. -/
 lemma observable_mkRecv (p : String) (bs : List (RumpsteakV2.Protocol.GlobalType.Label × LocalTypeC)) :
     ObservableC (mkRecv p bs) := by
   refine ObservableC.is_recv p (branchesOf (mkRecv p bs)) ?_
-  refine ⟨mkRecv p bs, bs.map Prod.fst, Relation.ReflTransGen.refl, ?_, rfl⟩
-  simp [head_mkRecv]
+  exact ⟨mkRecv p bs, bs.map Prod.fst, Relation.ReflTransGen.refl, by simp [head_mkRecv], rfl⟩
 
-/-- `mkEnd` is well-formed. -/
+/-! ## Well-Formedness of End -/
+
+/-- mkEnd is well-formed: closed (trivially) and observable. -/
 lemma wellFormed_mkEnd : WellFormedC mkEnd := by
   refine ⟨?_, observable_mkEnd⟩
-  intro v hvar
-  rcases hvar with ⟨u, hsteps, hhead⟩
-  cases (Relation.ReflTransGen.cases_head hsteps) with
-  | inl heq =>
-      subst heq
-      simp [head_mkEnd] at hhead
+  intro v ⟨u, hsteps, hhead⟩
+  cases Relation.ReflTransGen.cases_head hsteps with
+  | inl heq => subst heq; simp [head_mkEnd] at hhead
   | inr hexists =>
-      rcases hexists with ⟨y, hstep, _⟩
-      rcases hstep with ⟨x, f, hdest, _⟩
-      -- hdest : PFunctor.M.dest mkEnd = ⟨LocalTypeHead.mu x, f⟩
-      -- But mkEnd has head .end, so this is impossible
+      rcases hexists with ⟨y, ⟨x, f, hdest, _⟩, _⟩
       simp only [mkEnd, PFunctor.M.dest_mk] at hdest
-      -- hdest : ⟨.end, fun x => PEmpty.elim x⟩ = ⟨.mu x, f⟩
-      injection hdest with h1 _
-      cases h1
+      injection hdest with h1 _; cases h1
 
-/-- `mkVar` is not closed. -/
-lemma not_closed_mkVar (x : String) : ¬ ClosedC (mkVar x) := by
+/-! ## Closedness -/
+
+/-- mkVar is not closed: it unfolds to itself as a variable. -/
+lemma not_closed_mkVar (x : String) : ¬ClosedC (mkVar x) := by
   intro h
-  have : UnfoldsToVarC (mkVar x) x := by
-    refine ⟨mkVar x, Relation.ReflTransGen.refl, ?_⟩
-    simp [head_mkVar]
-  exact (h x) this
+  have : UnfoldsToVarC (mkVar x) x :=
+    ⟨mkVar x, Relation.ReflTransGen.refl, by simp [head_mkVar]⟩
+  exact h x this
 
-/-- Closedness preserved by `mkMu` if body is closed. -/
+/-- Closedness is preserved by mkMu if the body is closed.
+    Any variable reachable from mkMu x t must be reachable from t. -/
 lemma closed_mkMu {x : String} {t : LocalTypeC} (hclosed : ClosedC t) : ClosedC (mkMu x t) := by
-  intro v hvar
-  rcases hvar with ⟨u, hsteps, hhead⟩
-  cases (Relation.ReflTransGen.cases_head hsteps) with
-  | inl heq =>
-      subst heq
-      simp [head_mkMu] at hhead
+  intro v ⟨u, hsteps, hhead⟩
+  cases Relation.ReflTransGen.cases_head hsteps with
+  | inl heq => subst heq; simp [head_mkMu] at hhead
   | inr hexists =>
-      rcases hexists with ⟨y, hstep, hrest⟩
-      rcases hstep with ⟨x', f, hdest, rfl⟩
-      -- hdest : PFunctor.M.dest (mkMu x t) = ⟨LocalTypeHead.mu x', f⟩
+      rcases hexists with ⟨y, ⟨x', f, hdest, rfl⟩, hrest⟩
       simp only [mkMu, PFunctor.M.dest_mk] at hdest
-      -- hdest : ⟨.mu x, fun _ => t⟩ = ⟨.mu x', f⟩
       injection hdest with h1 h2
-      injection h1 with hx
-      subst hx
-      -- Now f = fun _ => t, so f () = t
+      injection h1 with hx; subst hx
       have hfeq : f = fun _ => t := h2.symm
       simp only [hfeq] at hrest
-      have : UnfoldsToVarC t v := ⟨u, hrest, hhead⟩
-      exact hclosed v this
+      exact hclosed v ⟨u, hrest, hhead⟩
 
-/-- Observability preserved by `mkMu` if body is observable. -/
+/-! ## Observability Preservation -/
+
+/-- Observability is preserved by mkMu: unfold one step and use body's observability. -/
 lemma observable_mkMu {x : String} {t : LocalTypeC} (hobs : ObservableC t) :
     ObservableC (mkMu x t) := by
-  have hstep : UnfoldsC (mkMu x t) t := by
-    refine ⟨x, fun _ => t, ?_, rfl⟩
-    simp [mkMu]
+  have hstep : UnfoldsC (mkMu x t) t := ⟨x, fun _ => t, by simp [mkMu], rfl⟩
   cases hobs with
   | is_end hend =>
       rcases hend with ⟨u, hsteps, hhead⟩
-      apply ObservableC.is_end
-      exact ⟨u, Relation.ReflTransGen.head hstep hsteps, hhead⟩
+      exact ObservableC.is_end ⟨u, Relation.ReflTransGen.head hstep hsteps, hhead⟩
   | is_var v hvar =>
       rcases hvar with ⟨u, hsteps, hhead⟩
-      apply ObservableC.is_var v
-      exact ⟨u, Relation.ReflTransGen.head hstep hsteps, hhead⟩
+      exact ObservableC.is_var v ⟨u, Relation.ReflTransGen.head hstep hsteps, hhead⟩
   | is_send p bs hsend =>
       rcases hsend with ⟨u, labels, hsteps, hhead, hbs⟩
-      apply ObservableC.is_send p bs
-      exact ⟨u, labels, Relation.ReflTransGen.head hstep hsteps, hhead, hbs⟩
+      exact ObservableC.is_send p bs ⟨u, labels, Relation.ReflTransGen.head hstep hsteps, hhead, hbs⟩
   | is_recv p bs hrecv =>
       rcases hrecv with ⟨u, labels, hsteps, hhead, hbs⟩
-      apply ObservableC.is_recv p bs
-      exact ⟨u, labels, Relation.ReflTransGen.head hstep hsteps, hhead, hbs⟩
+      exact ObservableC.is_recv p bs ⟨u, labels, Relation.ReflTransGen.head hstep hsteps, hhead, hbs⟩
 
-/-- WellFormed preserved by `mkMu`. -/
+/-- mkMu preserves well-formedness. -/
 lemma wellFormed_mkMu {x : String} {t : LocalTypeC} (hWF : WellFormedC t) :
     WellFormedC (mkMu x t) :=
   ⟨closed_mkMu hWF.closed, observable_mkMu hWF.observable⟩
 
-/-- toCoind preserves observability for inductive constructors. -/
+/-! ## toCoind Preserves Observability -/
+
+/-- The toCoind embedding preserves observability for all inductive types. -/
 lemma observable_toCoind : ∀ t : LocalTypeR, ObservableC (toCoind t)
-  | .end => observable_mkEnd
-  | .var x => observable_mkVar x
+  | .end       => observable_mkEnd
+  | .var x     => observable_mkVar x
   | .mu x body => observable_mkMu (observable_toCoind body)
-  | .send _ _ => by
-      simpa [toCoind] using observable_mkSend _ _
-  | .recv _ _ => by
-      simpa [toCoind] using observable_mkRecv _ _
+  | .send _ _  => by simpa [toCoind] using observable_mkSend _ _
+  | .recv _ _  => by simpa [toCoind] using observable_mkRecv _ _
 
 end RumpsteakV2.Coinductive

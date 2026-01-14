@@ -6,11 +6,20 @@ import RumpsteakV2.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-!
-# Regular systems and bisimulation
+/-
+The Problem. We defined RegularSystem to extract a finite coalgebra from a
+regular coinductive type. We need to prove that reconstructing from this
+system via SystemToCoind yields a bisimilar (hence equal) type.
 
-Builds a bisimulation between a regular coinductive type and the coinductive
-term generated from its finite system presentation.
+The difficulty is constructing the bisimulation witness. We define RegularBisim
+which relates a reachable state `s` to its finite-system reconstruction, then
+prove this relation satisfies the IsBisimulation property.
+
+Solution Structure.
+1. get_StateIndex: StateIndex correctly retrieves the indexed state
+2. RegularSystem_at_index: the system at index i matches dest of state i
+3. RegularBisim: the relation connecting states to their reconstructions
+4. RegularBisim_isBisimulation: proof that this is a valid bisimulation
 -/
 
 namespace RumpsteakV2.Coinductive

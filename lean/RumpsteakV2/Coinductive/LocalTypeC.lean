@@ -3,50 +3,60 @@ import RumpsteakV2.Protocol.GlobalType
 
 set_option linter.dupNamespace false
 
-/-!
-# LocalTypeC (Coinductive Session Types)
+/-
+The Problem. Session types in Lean are naturally inductive, but some operations
+(like bisimulation and coinductive equivalence) require an infinite/coinductive
+representation. We need a coinductive local type that can represent potentially
+infinite session type trees while still supporting pattern matching on heads.
 
-This module defines a coinductive session type `LocalTypeC` as the M-type of a
-polynomial functor. It provides smart constructors and basic head/injectivity
-lemmas to support case analysis and distinctness proofs.
+The difficulty is that Lean's M-types (coinductive types via polynomial functors)
+don't directly support the same syntax as inductive types. We need smart constructors
+and lemmas to make the coinductive type usable.
+
+Solution Structure.
+1. Define LocalTypeHead as the finite set of constructor tags
+2. Define LocalTypeChild as the number of children for each tag
+3. Build the polynomial functor LocalTypeF and its M-type LocalTypeC
+4. Provide smart constructors (mkEnd, mkVar, mkMu, mkSend, mkRecv)
+5. Prove simp lemmas for head extraction and children access
+6. Prove injectivity and distinctness lemmas for case analysis
 -/
 
 namespace RumpsteakV2.Coinductive
 
 open RumpsteakV2.Protocol.GlobalType
 
-/-- Constructor tags for coinductive local types. -/
+/-! ## Polynomial Functor Components -/
+
+/-- Constructor tags for coinductive local types.
+    These are the "shapes" of nodes in the infinite tree. -/
 inductive LocalTypeHead where
-  | end : LocalTypeHead
-  | var : String → LocalTypeHead
-  | mu : String → LocalTypeHead
+  | end  : LocalTypeHead
+  | var  : String → LocalTypeHead
+  | mu   : String → LocalTypeHead
   | send : String → List Label → LocalTypeHead
   | recv : String → List Label → LocalTypeHead
   deriving Repr, DecidableEq
 
-/-- Children positions for each constructor tag. -/
+/-- Children positions for each constructor tag.
+    - end/var: no children (PEmpty)
+    - mu: one child (Unit)
+    - send/recv: one child per branch label (Fin n) -/
 def LocalTypeChild : LocalTypeHead → Type
-  | .end => PEmpty
-  | .var _ => PEmpty
-  | .mu _ => Unit
-  | .send _ labels => Fin labels.length
-  | .recv _ labels => Fin labels.length
+  | .end       => PEmpty
+  | .var _     => PEmpty
+  | .mu _      => Unit
+  | .send _ ls => Fin ls.length
+  | .recv _ ls => Fin ls.length
 
-instance : Fintype PEmpty := by
-  refine ⟨∅, ?_⟩
-  intro x
-  cases x
+instance : Fintype PEmpty := ⟨∅, fun x => x.elim⟩
 
 instance (h : LocalTypeHead) : Fintype (LocalTypeChild h) :=
   match h with
   | .end =>
-      ⟨∅, by
-        intro x
-        cases x⟩
+      ⟨∅, by intro x; cases x⟩
   | .var _ =>
-      ⟨∅, by
-        intro x
-        cases x⟩
+      ⟨∅, by intro x; cases x⟩
   | .mu _ =>
       (inferInstance : Fintype Unit)
   | .send _ labels =>
@@ -54,65 +64,69 @@ instance (h : LocalTypeHead) : Fintype (LocalTypeChild h) :=
   | .recv _ labels =>
       (inferInstance : Fintype (Fin labels.length))
 
+/-! ## The Coinductive Type -/
+
 /-- Base functor for coinductive local types. -/
 def LocalTypeF : PFunctor := ⟨LocalTypeHead, LocalTypeChild⟩
 
-/-- Coinductive local types as an M-type. -/
+/-- Coinductive local types as an M-type (greatest fixpoint of LocalTypeF). -/
 abbrev LocalTypeC := PFunctor.M LocalTypeF
 
-/-- Access the head tag of a coinductive local type. -/
-def head (t : LocalTypeC) : LocalTypeHead := (PFunctor.M.dest t).fst
+/-! ## Accessors -/
 
-/-- Access the child function of a coinductive local type. -/
+/-- Extract the head tag of a coinductive local type. -/
+def head (t : LocalTypeC) : LocalTypeHead :=
+  (PFunctor.M.dest t).fst
+
+/-- Extract the child function of a coinductive local type. -/
 def children (t : LocalTypeC) : LocalTypeChild (head t) → LocalTypeC :=
   (PFunctor.M.dest t).snd
 
-/-- Cast a `Fin` index across an equality of lengths. -/
-def castFin {n m : Nat} (h : n = m) : Fin n → Fin m := fun i =>
-  ⟨i.1, by simpa [h] using i.2⟩
+/-- Cast a Fin index across an equality of lengths. -/
+def castFin {n m : Nat} (h : n = m) : Fin n → Fin m :=
+  fun i => ⟨i.1, by simpa [h] using i.2⟩
 
-/-- Smart constructor for `.end`. -/
+/-! ## Smart Constructors -/
+
+/-- Construct the terminated session type. -/
 def mkEnd : LocalTypeC :=
-  PFunctor.M.mk ⟨LocalTypeHead.end, fun x => PEmpty.elim x⟩
+  PFunctor.M.mk ⟨.end, PEmpty.elim⟩
 
-/-- Smart constructor for `.var`. -/
+/-- Construct a type variable reference. -/
 def mkVar (x : String) : LocalTypeC :=
-  PFunctor.M.mk ⟨LocalTypeHead.var x, fun x => PEmpty.elim x⟩
+  PFunctor.M.mk ⟨.var x, PEmpty.elim⟩
 
-/-- Smart constructor for `.mu`. -/
+/-- Construct a recursive type (mu-binding). -/
 def mkMu (x : String) (body : LocalTypeC) : LocalTypeC :=
-  PFunctor.M.mk ⟨LocalTypeHead.mu x, fun _ => body⟩
+  PFunctor.M.mk ⟨.mu x, fun _ => body⟩
 
-/-- Smart constructor for `.send` with branch labels. -/
+/-- Construct a send type with labeled branches. -/
 def mkSend (p : String) (bs : List (Label × LocalTypeC)) : LocalTypeC :=
   let labels := bs.map Prod.fst
-  let hlen : labels.length = bs.length := by
-    simp [labels]
+  let hlen : labels.length = bs.length := by simp [labels]
   let f : Fin labels.length → LocalTypeC := fun i =>
-    let i' : Fin bs.length := castFin hlen i
-    (bs.get i').2
-  PFunctor.M.mk ⟨LocalTypeHead.send p labels, f⟩
+    (bs.get (castFin hlen i)).2
+  PFunctor.M.mk ⟨.send p labels, f⟩
 
-/-- Smart constructor for `.recv` with branch labels. -/
+/-- Construct a receive type with labeled branches. -/
 def mkRecv (p : String) (bs : List (Label × LocalTypeC)) : LocalTypeC :=
   let labels := bs.map Prod.fst
-  let hlen : labels.length = bs.length := by
-    simp [labels]
+  let hlen : labels.length = bs.length := by simp [labels]
   let f : Fin labels.length → LocalTypeC := fun i =>
-    let i' : Fin bs.length := castFin hlen i
-    (bs.get i').2
-  PFunctor.M.mk ⟨LocalTypeHead.recv p labels, f⟩
+    (bs.get (castFin hlen i)).2
+  PFunctor.M.mk ⟨.recv p labels, f⟩
 
-@[simp] theorem head_mkEnd : head mkEnd = LocalTypeHead.end := rfl
-@[simp] theorem head_mkVar (x : String) : head (mkVar x) = LocalTypeHead.var x := rfl
-@[simp] theorem head_mkMu (x : String) (body : LocalTypeC) :
-    head (mkMu x body) = LocalTypeHead.mu x := rfl
+/-! ## Head Extraction Lemmas -/
 
+@[simp] theorem head_mkEnd : head mkEnd = .end := rfl
+@[simp] theorem head_mkVar (x : String) : head (mkVar x) = .var x := rfl
+@[simp] theorem head_mkMu (x : String) (body : LocalTypeC) : head (mkMu x body) = .mu x := rfl
 @[simp] theorem head_mkSend (p : String) (bs : List (Label × LocalTypeC)) :
-    head (mkSend p bs) = LocalTypeHead.send p (bs.map Prod.fst) := rfl
-
+    head (mkSend p bs) = .send p (bs.map Prod.fst) := rfl
 @[simp] theorem head_mkRecv (p : String) (bs : List (Label × LocalTypeC)) :
-    head (mkRecv p bs) = LocalTypeHead.recv p (bs.map Prod.fst) := rfl
+    head (mkRecv p bs) = .recv p (bs.map Prod.fst) := rfl
+
+/-! ## Children Access Lemmas -/
 
 @[simp] lemma children_mkSend (p : String) (bs : List (Label × LocalTypeC))
     (i : Fin (bs.map Prod.fst).length) :
@@ -124,29 +138,19 @@ def mkRecv (p : String) (bs : List (Label × LocalTypeC)) : LocalTypeC :=
     children (mkRecv p bs) i = (bs.get (castFin (by simp) i)).2 := by
   simp [children, mkRecv]
 
-/-- Injectivity for `mkVar` via head tags. -/
+/-! ## Injectivity and Distinctness -/
+
 @[simp] theorem mkVar_inj {x y : String} (h : mkVar x = mkVar y) : x = y := by
-  have h' := congrArg head h
-  cases h'
-  rfl
+  have h' := congrArg head h; cases h'; rfl
 
-/-- Injectivity for `mkMu` via head tags. -/
 @[simp] theorem mkMu_inj {x y : String} {a b : LocalTypeC} (h : mkMu x a = mkMu y b) : x = y := by
-  have h' := congrArg head h
-  cases h'
-  rfl
+  have h' := congrArg head h; cases h'; rfl
 
-/-- Distinctness: `.end` is not a `.var`. -/
 @[simp] theorem mkEnd_ne_mkVar (x : String) : mkEnd ≠ mkVar x := by
-  intro h
-  have h' := congrArg head h
-  cases h'
+  intro h; have h' := congrArg head h; cases h'
 
-/-- Distinctness: `.send` is not a `.recv`. -/
 @[simp] theorem mkSend_ne_mkRecv (p q : String) (bs cs : List (Label × LocalTypeC)) :
     mkSend p bs ≠ mkRecv q cs := by
-  intro h
-  have h' := congrArg head h
-  cases h'
+  intro h; have h' := congrArg head h; cases h'
 
 end RumpsteakV2.Coinductive

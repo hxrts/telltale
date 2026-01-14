@@ -4,157 +4,137 @@ import RumpsteakV2.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-!
-# Dual for LocalTypeC
+/-
+The Problem. Session type duality swaps send and recv. For coinductive types,
+we need a corecursive definition of duality and a proof that it's involutive
+(dual(dual(t)) = t).
 
-Corecursive definition swapping send/recv.
+The difficulty is that coinductive proofs require bisimulation: we must show
+that dual(dual(t)) and t have the same head and their children are related
+by the same relation, recursively forever.
+
+Solution Structure.
+1. Define dualHead: swap send/recv in the head tag
+2. Define dualStep: one-step coalgebra for duality
+3. Define dualC: the corecursive dual operation
+4. Prove helper lemmas about dest of dualC for each constructor
+5. Prove dualC_involutive via bisimulation
 -/
 
 namespace RumpsteakV2.Coinductive
 
-/-- Swap send/recv in the head tag. -/
-def dualHead : LocalTypeHead → LocalTypeHead
-  | .end => .end
-  | .var x => .var x
-  | .mu x => .mu x
-  | .send p labels => .recv p labels
-  | .recv p labels => .send p labels
+/-! ## Duality Definition -/
 
-/-- One-step coalgebra for `dualC`. -/
+/-- Swap send and recv in the head tag; leave other constructors unchanged. -/
+def dualHead : LocalTypeHead → LocalTypeHead
+  | .end         => .end
+  | .var x       => .var x
+  | .mu x        => .mu x
+  | .send p ls   => .recv p ls
+  | .recv p ls   => .send p ls
+
+/-- One-step coalgebra for dualC: swap send/recv, keep children. -/
 def dualStep (t : LocalTypeC) : LocalTypeF.Obj LocalTypeC :=
   match PFunctor.M.dest t with
-  | ⟨.end, _⟩ => ⟨.end, fun x => PEmpty.elim x⟩
-  | ⟨.var x, _⟩ => ⟨.var x, fun x => PEmpty.elim x⟩
-  | ⟨.mu x, f⟩ => ⟨.mu x, fun _ => f ()⟩
-  | ⟨.send p labels, f⟩ => ⟨.recv p labels, fun i => f i⟩
-  | ⟨.recv p labels, f⟩ => ⟨.send p labels, fun i => f i⟩
+  | ⟨.end, _⟩      => ⟨.end, PEmpty.elim⟩
+  | ⟨.var x, _⟩    => ⟨.var x, PEmpty.elim⟩
+  | ⟨.mu x, f⟩     => ⟨.mu x, fun _ => f ()⟩
+  | ⟨.send p ls, f⟩ => ⟨.recv p ls, f⟩
+  | ⟨.recv p ls, f⟩ => ⟨.send p ls, f⟩
 
-/-- Coinductive duality. -/
+/-- Coinductive duality: swap send/recv throughout the infinite tree. -/
 def dualC : LocalTypeC → LocalTypeC :=
   PFunctor.M.corec dualStep
 
-/-! ## Involution -/
+/-! ## Destructor Lemmas -/
 
-/-- Helper: dest of dualC for end. -/
 private theorem dest_dualC_end (f : LocalTypeF.B .end → LocalTypeC) :
-    PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.end, f⟩)) = ⟨.end, fun x => PEmpty.elim x⟩ := by
+    PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.end, f⟩)) = ⟨.end, PEmpty.elim⟩ := by
   simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk, PFunctor.map]
-  congr 1
-  funext x
-  cases x
+  congr 1; funext x; cases x
 
-/-- Helper: dest of dualC for var. -/
 private theorem dest_dualC_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
-    PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.var x, f⟩)) = ⟨.var x, fun x => PEmpty.elim x⟩ := by
+    PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.var x, f⟩)) = ⟨.var x, PEmpty.elim⟩ := by
   simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk, PFunctor.map]
-  congr 1
-  funext y
-  cases y
+  congr 1; funext y; cases y
 
-/-- Helper: dest of dualC for mu. -/
 private theorem dest_dualC_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.mu x, f⟩)) = ⟨.mu x, fun _ => dualC (f ())⟩ := by
-  simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]
-  rfl
+  simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]; rfl
 
-/-- Helper: dest of dualC for send. -/
 private theorem dest_dualC_send (p : String) (labels : List RumpsteakV2.Protocol.GlobalType.Label)
     (f : LocalTypeF.B (.send p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.send p labels, f⟩)) =
       ⟨.recv p labels, fun i => dualC (f i)⟩ := by
-  simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]
-  rfl
+  simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]; rfl
 
-/-- Helper: dest of dualC for recv. -/
 private theorem dest_dualC_recv (p : String) (labels : List RumpsteakV2.Protocol.GlobalType.Label)
     (f : LocalTypeF.B (.recv p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (PFunctor.M.mk ⟨.recv p labels, f⟩)) =
       ⟨.send p labels, fun i => dualC (f i)⟩ := by
-  simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]
-  rfl
+  simp only [dualC, PFunctor.M.dest_corec, dualStep, PFunctor.M.dest_mk]; rfl
 
-/-- Helper: dest of dualC twice for end. -/
+/-! ## Double Dual Lemmas -/
+
 private theorem dest_dualC_twice_end (f : LocalTypeF.B .end → LocalTypeC) :
-    PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.end, f⟩))) =
-      ⟨.end, fun x => PEmpty.elim x⟩ := by
-  -- First, dualC (mk ⟨.end, f⟩) = mk ⟨.end, fun x => PEmpty.elim x⟩
+    PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.end, f⟩))) = ⟨.end, PEmpty.elim⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.end, f⟩))]
-  rw [dest_dualC_end]
-  -- Now have: dualC (mk ⟨.end, fun x => PEmpty.elim x⟩)
-  rw [dest_dualC_end]
+  rw [dest_dualC_end, dest_dualC_end]
 
-/-- Helper: dest of dualC twice for var. -/
 private theorem dest_dualC_twice_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
-    PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.var x, f⟩))) =
-      ⟨.var x, fun x => PEmpty.elim x⟩ := by
+    PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.var x, f⟩))) = ⟨.var x, PEmpty.elim⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.var x, f⟩))]
   rw [dest_dualC_var, dest_dualC_var]
 
-/-- Helper: dest of dualC twice for mu. -/
 private theorem dest_dualC_twice_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.mu x, f⟩))) =
       ⟨.mu x, fun _ => dualC (dualC (f ()))⟩ := by
-  -- First rewrite inner dualC: mk ⟨mu x, f⟩ -> mk ⟨mu x, fun _ => dualC (f ())⟩
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.mu x, f⟩))]
-  rw [dest_dualC_mu]
-  -- Now have: dualC (PFunctor.M.mk ⟨mu x, fun _ => dualC (f ())⟩)
-  rw [dest_dualC_mu]
+  rw [dest_dualC_mu, dest_dualC_mu]
 
-/-- Helper: dest of dualC twice for send. -/
 private theorem dest_dualC_twice_send (p : String) (labels : List RumpsteakV2.Protocol.GlobalType.Label)
     (f : LocalTypeF.B (.send p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.send p labels, f⟩))) =
       ⟨.send p labels, fun i => dualC (dualC (f i))⟩ := by
-  -- First rewrite inner dualC: mk ⟨send p labels, f⟩ -> mk ⟨recv p labels, fun i => dualC (f i)⟩
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.send p labels, f⟩))]
-  rw [dest_dualC_send]
-  -- Now have: dualC (PFunctor.M.mk ⟨recv p labels, fun i => dualC (f i)⟩)
-  rw [dest_dualC_recv]
+  rw [dest_dualC_send, dest_dualC_recv]
 
-/-- Helper: dest of dualC twice for recv. -/
 private theorem dest_dualC_twice_recv (p : String) (labels : List RumpsteakV2.Protocol.GlobalType.Label)
     (f : LocalTypeF.B (.recv p labels) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.recv p labels, f⟩))) =
       ⟨.recv p labels, fun i => dualC (dualC (f i))⟩ := by
-  -- First rewrite inner dualC: mk ⟨recv p labels, f⟩ -> mk ⟨send p labels, fun i => dualC (f i)⟩
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.recv p labels, f⟩))]
-  rw [dest_dualC_recv]
-  -- Now have: dualC (PFunctor.M.mk ⟨send p labels, fun i => dualC (f i)⟩)
-  rw [dest_dualC_send]
+  rw [dest_dualC_recv, dest_dualC_send]
 
-/-- Duality is involutive. -/
+/-! ## Involution -/
+
+/-- Duality is involutive: dual(dual(t)) = t.
+    Proof by bisimulation with R x y := x = dualC (dualC y). -/
 theorem dualC_involutive (t : LocalTypeC) : dualC (dualC t) = t := by
   refine (PFunctor.M.bisim (P := LocalTypeF) (R := fun x y => x = dualC (dualC y)) ?_) _ _ rfl
   intro x y hxy
   subst hxy
-  -- Reconstruct y from its dest
   conv_rhs => rw [← PFunctor.M.mk_dest y]
   cases hdest : PFunctor.M.dest y with
   | mk s f =>
-      -- Now y = PFunctor.M.mk ⟨s, f⟩
       cases s with
       | «end» =>
-          -- For end: children are PEmpty, so the function equality is trivial
-          have heq : (fun i : LocalTypeF.B .end => dualC (dualC (f i))) =
-                     (fun x => PEmpty.elim x) := by funext i; cases i
-          refine ⟨.end, (fun i => dualC (dualC (f i))), f, ?_, rfl, ?_⟩
-          · rw [heq]; exact dest_dualC_twice_end f
-          · intro i; cases i
+          have heq : (fun i : LocalTypeF.B .end => dualC (dualC (f i))) = PEmpty.elim := by
+            funext i; cases i
+          refine ⟨.end, fun i => dualC (dualC (f i)), f, ?_, rfl, fun i => i.elim⟩
+          rw [heq]; exact dest_dualC_twice_end f
       | var x =>
-          -- For var: children are PEmpty, so the function equality is trivial
-          have heq : (fun i : LocalTypeF.B (.var x) => dualC (dualC (f i))) =
-                     (fun x => PEmpty.elim x) := by funext i; cases i
-          refine ⟨.var x, (fun i => dualC (dualC (f i))), f, ?_, rfl, ?_⟩
-          · rw [heq]; exact dest_dualC_twice_var x f
-          · intro i; cases i
+          have heq : (fun i : LocalTypeF.B (.var x) => dualC (dualC (f i))) = PEmpty.elim := by
+            funext i; cases i
+          refine ⟨.var x, fun i => dualC (dualC (f i)), f, ?_, rfl, fun i => i.elim⟩
+          rw [heq]; exact dest_dualC_twice_var x f
       | mu x =>
-          refine ⟨.mu x, (fun _ => dualC (dualC (f ()))), f, dest_dualC_twice_mu x f, rfl, ?_⟩
-          intro _; rfl
+          exact ⟨.mu x, fun _ => dualC (dualC (f ())), f, dest_dualC_twice_mu x f, rfl, fun _ => rfl⟩
       | send p labels =>
-          refine ⟨.send p labels, (fun i => dualC (dualC (f i))), f, dest_dualC_twice_send p labels f, rfl, ?_⟩
-          intro _; rfl
+          exact ⟨.send p labels, fun i => dualC (dualC (f i)), f,
+                 dest_dualC_twice_send p labels f, rfl, fun _ => rfl⟩
       | recv p labels =>
-          refine ⟨.recv p labels, (fun i => dualC (dualC (f i))), f, dest_dualC_twice_recv p labels f, rfl, ?_⟩
-          intro _; rfl
+          exact ⟨.recv p labels, fun i => dualC (dualC (f i)), f,
+                 dest_dualC_twice_recv p labels f, rfl, fun _ => rfl⟩
 
 end RumpsteakV2.Coinductive
