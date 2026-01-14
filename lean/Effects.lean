@@ -16,6 +16,7 @@ import Effects.Monitor
 import Effects.Spatial
 import Effects.Determinism
 import Effects.Deployment
+import Effects.Examples
 
 /-!
 # Session Types with Async Effects
@@ -82,6 +83,7 @@ with buffered communication. The key features are:
 - `Spatial`: Spatial requirements and topology satisfaction
 - `Determinism`: Unique branch labels and diamond property
 - `Deployment`: Deployed protocol bundles and linking
+- `Examples`: Concrete protocol examples (Ping-Pong, Two-Buyer)
 
 ## References
 
