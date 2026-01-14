@@ -200,7 +200,52 @@ theorem not_confluent_general :
       (∃ C₂', Step C C₂') →
       C₁ ≠ C₂ →
       ∃ C₃, Steps C₁ C₃ ∧ Steps C₂ C₃ := by
-  sorry  -- Proof by counterexample construction
+  intro h
+  -- Counterexample: Two terminated configs with different nextSid
+  -- Since skip can't step, Steps from a skip config only reaches itself
+  let C₁ : Config := { proc := .skip, store := [], bufs := [], nextSid := 0 }
+  let C₂ : Config := { proc := .skip, store := [], bufs := [], nextSid := 1 }
+  -- C₁ ≠ C₂ because nextSid differs
+  have hne : C₁ ≠ C₂ := by simp [C₁, C₂]
+  -- We need some C that can step (to satisfy the premises)
+  let C : Config := { proc := .assign "x" .unit, store := [], bufs := [], nextSid := 0 }
+  have hStep : ∃ C', Step C C' :=
+    ⟨{ C with proc := .skip, store := [("x", .unit)] }, Step.base (StepBase.assign rfl)⟩
+  -- Apply h to get a reconvergence
+  obtain ⟨C₃, hC₁, hC₂⟩ := h C C₁ C₂ hStep hStep hne
+  -- A skip config can only reach itself via Steps (we use Classical reasoning here)
+  -- Since both C₁ and C₂ reach C₃, and C₁ ≠ C₂, we have a contradiction
+  -- The key insight: if proc = skip, no Step is possible, so ReflTransGen only has refl
+  have skip_stuck : ∀ C' : Config, C'.proc = .skip → ∀ C'', ¬Step C' C'' := by
+    intro C' hproc C'' hstep
+    cases hstep with
+    | base hbase =>
+      cases hbase <;> simp_all
+    | seq_left hproc' _ =>
+      simp_all
+    | par_left hproc' _ =>
+      simp_all
+    | par_right hproc' _ =>
+      simp_all
+  have hC₁_only_self : ∀ C', Steps C₁ C' → C₁ = C' := by
+    intro C' hsteps
+    induction hsteps with
+    | refl => rfl
+    | tail _ hstep ih =>
+      exfalso
+      -- ih says the intermediate config equals C₁
+      -- So that config also has proc = .skip, hence can't step
+      rw [← ih] at hstep
+      exact skip_stuck C₁ rfl _ hstep
+  have hC₂_only_self : ∀ C', Steps C₂ C' → C₂ = C' := by
+    intro C' hsteps
+    induction hsteps with
+    | refl => rfl
+    | tail _ hstep ih =>
+      exfalso
+      rw [← ih] at hstep
+      exact skip_stuck C₂ rfl _ hstep
+  exact hne ((hC₁_only_self C₃ hC₁).trans (hC₂_only_self C₃ hC₂).symm)
 
 /-! ## Claims Bundle -/
 

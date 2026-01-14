@@ -151,6 +151,9 @@ structure DeployedProtocol where
   /-- Unique branch labels for determinism. -/
   uniqueLabels_cert : ∀ r, r ∈ roles → reachesCommDecide (localTypes r) = true
 
+  /-- The session ID is registered in the interface. -/
+  sessionId_in_interface : sessionId ∈ interface.sessionIds
+
 namespace DeployedProtocol
 
 /-- Get the initial monitor state for this protocol. -/
@@ -318,8 +321,28 @@ their composition is also deadlock-free.
 theorem disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂) :
     p₁.sessionId ≠ p₂.sessionId := by
-  -- From disjointSessions: [s₁] ∩ [s₂] = ∅ implies s₁ ≠ s₂
-  sorry  -- Proof from interface.disjointSessions
+  -- From disjointSessions: all of p₁'s sessions are not in p₂'s sessions
+  obtain ⟨hDisjoint, _, _⟩ := hLink
+  intro heq
+  -- p₁.sessionId ∈ p₁.interface.sessionIds
+  have h₁ := p₁.sessionId_in_interface
+  -- p₂.sessionId ∈ p₂.interface.sessionIds
+  have h₂ := p₂.sessionId_in_interface
+  -- disjointSessions means all s in p₁'s list are not in p₂'s list
+  unfold InterfaceType.disjointSessions at hDisjoint
+  -- p₁.sessionId is in p₁.interface.sessionIds, so it should not be in p₂'s
+  have hAll := List.all_eq_true.mp hDisjoint p₁.sessionId h₁
+  -- hAll : !(p₂.interface.sessionIds.contains p₁.sessionId) = true
+  -- i.e., p₂.interface.sessionIds.contains p₁.sessionId = false
+  have hNotContains : p₂.interface.sessionIds.contains p₁.sessionId = false := by
+    simpa using hAll
+  -- But if p₁.sessionId = p₂.sessionId, and p₂.sessionId ∈ p₂.interface.sessionIds,
+  -- then p₂.interface.sessionIds.contains p₁.sessionId = true - contradiction
+  have hContains : p₂.interface.sessionIds.contains p₁.sessionId = true := by
+    rw [heq, List.contains_iff_exists_mem_beq]
+    exact ⟨p₂.sessionId, h₂, beq_self_eq_true _⟩
+  rw [hNotContains] at hContains
+  exact Bool.false_ne_true hContains
 
 /-- Composition preserves deadlock freedom.
 

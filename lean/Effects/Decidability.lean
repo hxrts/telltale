@@ -69,10 +69,7 @@ theorem edgeCoherent_empty_trace (G : GEnv) (D : DEnv) (e : Edge)
     (hTrace : lookupD D e = []) :
     EdgeCoherent G D e := by
   unfold EdgeCoherent
-  intro Lsender Lrecv _ _
-  -- The trace is lookupD D e, which equals [] by hTrace
-  -- Consume _ Lrecv [] = some Lrecv, so .isSome = true
-  sorry  -- Proof requires showing simp can use hTrace in the let binding
+  simp only [hTrace, Consume, Option.isSome_some, implies_true]
 
 /-- For a DEnv where all entries have empty traces, coherence holds. -/
 theorem coherent_all_empty (G : GEnv) (D : DEnv)
@@ -89,10 +86,9 @@ theorem bufferTyped_empty (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge)
     (hTrace : lookupD D e = []) :
     BufferTyped G D bufs e := by
   unfold BufferTyped
-  -- buf = lookupBuf bufs e = [] by hBuf
-  -- trace = lookupD D e = [] by hTrace
-  -- Need to show ∃ h : [].length = [].length, (vacuously true for all i < 0)
-  sorry  -- Proof requires showing simp can use hBuf, hTrace
+  simp only [hBuf, hTrace, List.length_nil]
+  -- Goal is: ∃ (h : True), ∀ (i : ℕ) (hi : i < 0), ...
+  exact ⟨trivial, fun i hi => (Nat.not_lt_zero i hi).elim⟩
 
 /-- For environments where all buffers and traces are empty, BuffersTyped holds. -/
 theorem buffersTyped_all_empty (G : GEnv) (D : DEnv) (bufs : Buffers)
