@@ -565,9 +565,11 @@ lemma toInductiveAux_mu_head {root : LocalTypeC} {all visited : Finset LocalType
 /-- toInductiveAux for mu: the body is the recursive call on child.
     Uses proof irrelevance to handle the membership proofs.
 
-    Note: This lemma is justified but complex to prove directly due to
-    dependent pattern matching in toInductiveAux. We use sorry here
-    and rely on EQ2C properties instead in the main theorem. -/
+    The proof navigates through the definition's structure:
+    1. b ∉ visited → take else branch (not a back-edge)
+    2. head b = .mu x → outer match produces .mu x body
+    3. PFunctor.M.dest b = ⟨.mu x, k⟩ → inner match produces recursive call on k ()
+    4. By proof irrelevance, the proof terms in recursive call match our h_visited', h_child_mem -/
 lemma toInductiveAux_mu_eq {root : LocalTypeC} {all visited : Finset LocalTypeC}
     {b : LocalTypeC} {h_closed : IsClosedSet all}
     {h_visited : visited ⊆ all} {h_current : b ∈ all}
@@ -579,13 +581,78 @@ lemma toInductiveAux_mu_eq {root : LocalTypeC} {all visited : Finset LocalTypeC}
     let h_child_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
     toInductiveAux root all visited b h_closed h_visited h_current =
       .mu x (toInductiveAux root all (insert b visited) child h_closed h_visited' h_child_mem) := by
-  -- The proof is complex due to the dependent pattern matching in toInductiveAux.
-  -- Structurally, when b ∉ visited and head b = .mu x:
-  -- 1. The if-branch takes the else case
-  -- 2. The body match on PFunctor.M.dest b hits the mu case
-  -- 3. The result is .mu x (recursive call on child)
-  -- By proof irrelevance, the proof terms align.
-  sorry
+  -- Intro the let bindings
+  intro child h_visited' hchild h_child_mem
+  -- Unfold using the equation lemma
+  rw [toInductiveAux.eq_1]
+  -- The if-branch: b ∉ visited, so take else
+  simp only [dif_neg hnotvis]
+  -- head b = .mu x
+  have hhead : head b = .mu x := by simp only [head, hdest]
+  -- Match on head b in outer match
+  simp only [hhead]
+  -- Now need to show body from inner match = toInductiveAux ... child ...
+  -- and that wrapping with .mu x gives equality
+  -- The inner match is on PFunctor.M.dest b which equals ⟨.mu x, k⟩
+  -- This is complex because we need to align the internal match variable with hdest
+  -- Using congr to handle the equality
+  congr 1
+  -- Goal: body from match = toInductiveAux ... (k ()) ...
+  -- The body comes from: match hdest' : PFunctor.M.dest b with | ⟨.mu y, k'⟩ => ...
+  -- Since PFunctor.M.dest b = ⟨.mu x, k⟩, the match gives toInductiveAux ... (k ()) ...
+  -- The proof terms are irrelevant, so equality holds
+  -- The challenge is navigating the dependent match with hdest
+  -- Use split to navigate the match cases
+  split
+  · -- end case - contradiction
+    next kend hend =>
+    -- hend : PFunctor.M.dest b = ⟨.end, kend⟩
+    have heq : (⟨.mu x, k⟩ : Σ s, LocalTypeF.B s → LocalTypeC) = ⟨.end, kend⟩ := by
+      calc ⟨.mu x, k⟩ = PFunctor.M.dest b := hdest.symm
+        _ = ⟨.end, kend⟩ := hend
+    have h := Sigma.mk.inj_iff.mp heq
+    exact absurd h.1 (by intro h'; injection h')
+  · -- var case - contradiction
+    next y kvar hvar =>
+    -- hvar : PFunctor.M.dest b = ⟨.var y, kvar⟩
+    have heq : (⟨.mu x, k⟩ : Σ s, LocalTypeF.B s → LocalTypeC) = ⟨.var y, kvar⟩ := by
+      calc ⟨.mu x, k⟩ = PFunctor.M.dest b := hdest.symm
+        _ = ⟨.var y, kvar⟩ := hvar
+    have h := Sigma.mk.inj_iff.mp heq
+    exact absurd h.1 (by intro h'; injection h')
+  · -- mu case - this is the case we need
+    next y k' hdest' =>
+    -- hdest' : PFunctor.M.dest b = ⟨.mu y, k'⟩
+    -- hdest  : PFunctor.M.dest b = ⟨.mu x, k⟩
+    -- So y = x and k' = k
+    have heq : (⟨.mu x, k⟩ : Σ s, LocalTypeF.B s → LocalTypeC) = ⟨.mu y, k'⟩ := by
+      calc ⟨.mu x, k⟩ = PFunctor.M.dest b := hdest.symm
+        _ = ⟨.mu y, k'⟩ := hdest'
+    have hxy : x = y := by
+      have h := Sigma.mk.inj_iff.mp heq
+      injection h.1
+    subst hxy
+    have hk : k = k' := by
+      have h := Sigma.mk.inj_iff.mp heq
+      exact eq_of_heq h.2
+    subst hk
+    -- Now goal should be toInductiveAux ... (k ()) ... = toInductiveAux ... child ...
+    -- where child = k ()
+    rfl
+  · -- send case - contradiction
+    next p labels k' hsend =>
+    have heq : (⟨.mu x, k⟩ : Σ s, LocalTypeF.B s → LocalTypeC) = ⟨.send p labels, k'⟩ := by
+      calc ⟨.mu x, k⟩ = PFunctor.M.dest b := hdest.symm
+        _ = ⟨.send p labels, k'⟩ := hsend
+    have h := Sigma.mk.inj_iff.mp heq
+    exact absurd h.1 (by intro h'; injection h')
+  · -- recv case - contradiction
+    next p labels k' hrecv =>
+    have heq : (⟨.mu x, k⟩ : Σ s, LocalTypeF.B s → LocalTypeC) = ⟨.recv p labels, k'⟩ := by
+      calc ⟨.mu x, k⟩ = PFunctor.M.dest b := hdest.symm
+        _ = ⟨.recv p labels, k'⟩ := hrecv
+    have h := Sigma.mk.inj_iff.mp heq
+    exact absurd h.1 (by intro h'; injection h')
 
 /-!
 ## toInductiveAux_eq2c - Main Round-Trip Theorem
