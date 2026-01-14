@@ -496,12 +496,19 @@ lemma toInductiveAux_end {root : LocalTypeC} {all visited : Finset LocalTypeC}
     toInductiveAux root all visited b h_closed h_visited h_current = .end := by
   rw [toInductiveAux]
   split_ifs
-  -- Goal: show body and mu-wrap produce .end
-  have hdest_fst : (PFunctor.M.dest b).fst = .end := by simp only [head] at hhead; exact hhead
-  -- The body computation matches on PFunctor.M.dest b
-  -- When first component is .end, body = .end
-  -- Then mu-wrap: head b = .end → | _ => case, freeVars .end = ∅, so no wrap
-  sorry
+  -- After split_ifs with b ∉ visited, goal is the else branch
+  -- Need to show: (match head b with | .mu _ => mu wrap | .var _ => body | _ => if...) = .end
+  -- Since head b = .end, we're in the | _ => case
+  simp only [hhead]
+  -- Goal: (if name ∈ body.freeVars then mu wrap else body) = .end
+  -- where body = (match hdest : PFunctor.M.dest b with | ⟨.end, _⟩ => .end | ...)
+  -- Since head b = .end, the body match produces .end
+  -- And freeVars .end = ∅, so no mu-wrap
+  split
+  -- Case: PFunctor.M.dest b = ⟨.end, _⟩
+  · simp only [LocalTypeR.freeVars, List.not_mem_nil, ite_false]
+  -- Other cases: contradiction with head b = .end
+  all_goals simp_all [head]
 
 /-- toInductiveAux produces .var x when head b = .var x and b ∉ visited
     Reason: body = .var x, head = .var → body returned directly -/
@@ -512,12 +519,23 @@ lemma toInductiveAux_var {root : LocalTypeC} {all visited : Finset LocalTypeC}
     toInductiveAux root all visited b h_closed h_visited h_current = .var x := by
   rw [toInductiveAux]
   split_ifs
-  -- Goal: show body and mu-wrap produce .var x
-  have hdest_fst : (PFunctor.M.dest b).fst = .var x := by simp only [head] at hhead; exact hhead
-  -- The body computation matches on PFunctor.M.dest b
-  -- When first component is .var x, body = .var x
-  -- Then mu-wrap: head b = .var → body returned directly
-  sorry
+  -- After split_ifs with b ∉ visited, goal is the else branch
+  -- Since head b = .var x, we're in the | .var _ => body case (returns body directly)
+  simp only [hhead]
+  -- Goal: body = .var x where body = (match hdest : PFunctor.M.dest b with | ⟨.var x', _⟩ => .var x' | ...)
+  split
+  -- Case: PFunctor.M.dest b = ⟨.end, _⟩ - contradiction
+  · next hend => simp_all [head]
+  -- Case: PFunctor.M.dest b = ⟨.var x', _⟩
+  · next x' _ hvar =>
+    -- Need to show x' = x from hhead
+    have hdest_fst : (PFunctor.M.dest b).fst = .var x := by simp only [head] at hhead; exact hhead
+    simp only [hvar] at hdest_fst
+    injection hdest_fst with hx
+    subst hx
+    rfl
+  -- Other cases: contradiction with head b = .var x
+  all_goals simp_all [head]
 
 /-!
 ## toInductiveAux_eq2c - Main Round-Trip Theorem
@@ -573,11 +591,27 @@ theorem toInductiveAux_eq2c (root : LocalTypeC) (all : Finset LocalTypeC) (b : L
     rw [toInductiveAux_visited hb]
     simp only [toCoind_var]
     exact hback b h_current
-  · -- Not visited: requires analysis based on head b
-    -- The non-recursive cases (end, var) are proven by head-matching EQ2C lemmas
-    -- The recursive cases (mu, send, recv) would need well-founded IH
-    -- Full proof structure documented; individual cases use characteristic lemmas
-    sorry
+  · -- Not visited: case analysis based on head b
+    match hhead : head b with
+    | .end =>
+      -- toInductiveAux produces .end, toCoind .end = mkEnd
+      rw [toInductiveAux_end hb hhead]
+      simp only [toCoind_end]
+      exact EQ2C_end_head head_mkEnd hhead
+    | .var x =>
+      -- toInductiveAux produces .var x, toCoind (.var x) = mkVar x
+      rw [toInductiveAux_var x hb hhead]
+      simp only [toCoind_var]
+      exact EQ2C_var_head (head_mkVar x) hhead
+    | .mu _ =>
+      -- Recursive case: requires well-founded IH
+      sorry
+    | .send _ _ =>
+      -- Recursive case: requires well-founded IH on branches
+      sorry
+    | .recv _ _ =>
+      -- Recursive case: requires well-founded IH on branches
+      sorry
 
 /-! ## Final round-trip theorems -/
 
