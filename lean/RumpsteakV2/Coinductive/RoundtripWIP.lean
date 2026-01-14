@@ -18,25 +18,33 @@ set_option linter.dupNamespace false
 
 This module proves that `toCoind (toInductive t) ≃ t` for regular coinductive types.
 
-### Status (4 sorries remaining):
-1. `EQ2CE_resolved'_implies_EQ2C` (line ~120): Termination - justified by coinductive guardedness
-2. `RoundtripRel_postfix` (line ~395): Postfixpoint property for bisimulation relation
-3. `toInductiveAux_mu_eq` (line ~561): Characterization lemma - complex due to dependent pattern matching
-4. `toInductiveAux_eq2c` send/recv (line ~622): Similar complexity to mu case
+### Status (3 sorries remaining):
+1. `EQ2CE_resolved'_implies_EQ2C` (line ~130): Termination - justified by coinductive guardedness
+2. `RoundtripRel_postfix` (line ~405): Postfixpoint property for bisimulation relation
+3. `toInductiveAux_eq2c` send/recv (line ~699): Branch correspondence via IH
 
 ### Completed:
 - `toInductiveAux_visited`: When b ∈ visited, returns .var (nameOf b all)
 - `toInductiveAux_end`: When head b = .end and b ∉ visited, returns .end
 - `toInductiveAux_var`: When head b = .var x and b ∉ visited, returns .var x
 - `toInductiveAux_mu_head`: When head b = .mu x, result has form .mu x body
-- `toInductiveAux_eq2c` visited/end/var/mu cases: EQ2C preservation for non-branching cases
+- `toInductiveAux_mu_eq`: Full characterization - result = .mu x (recursive call on child)
+- `toInductiveAux_eq2c` visited/end/var/mu cases: EQ2C preservation proven
 - `EQ2C_mu_cong`, `EQ2C_send_cong`, `EQ2C_recv_cong`: Congruence lemmas
+
+### Proof Structure for send/recv (remaining):
+1. Show `toInductiveAux` produces `.send p (List.ofFn f)` where `f i = (labels.get i, recursive call)`
+2. `toCoind` of that equals `mkSend p (toCoindBranches ...)`
+3. `branchesOf` extracts the branches on both sides
+4. Apply IH to each branch: `toCoind (recursive call on k i) ≃ k i`
+5. Use `EQ2C_send_head` with branch-wise EQ2C
 
 ### Dependencies:
 - ToCoindInjectivity.lean: injectivity proofs (working)
 - RoundtripHelpers.lean: helper lemmas (working)
 - ToInductive.lean: current toInductiveAux definition
 - EQ2C/EQ2CE/EQ2CProps.lean: bisimulation definitions and properties
+- BisimHelpers.lean: EQ2C_send_head, EQ2C_recv_head lemmas
 -/
 
 namespace RumpsteakV2.Coinductive
@@ -752,22 +760,37 @@ theorem toInductiveAux_eq2c (root : LocalTypeC) (all : Finset LocalTypeC) (b : L
       obtain ⟨⟨s, k⟩, hdest⟩ : ∃ p : Σ s, LocalTypeF.B s → LocalTypeC, PFunctor.M.dest b = ⟨p.1, p.2⟩ := ⟨PFunctor.M.dest b, rfl⟩
       have hs : s = .send p labels := by simp only [head, hdest] at hhead; exact hhead
       subst hs
-      -- For each i : Fin labels.length, child i := k i
       let h_visited' : insert b visited ⊆ all := subset_insert_of_mem h_current h_visited
-      -- b is equivalent to mkSend p (branches)
-      -- toInductiveAux produces .send p (branches with recursive calls)
-      -- Each branch's continuation is EQ2C to k i by IH
-      -- The characterization and IH application is complex due to
-      -- dependent pattern matching and branch correspondence.
-      -- We delegate to a sorry here - the structure mirrors mu case.
+      -- For each i : Fin labels.length, child i := k i is in all
+      have hchild_mem : ∀ i : Fin labels.length, k i ∈ all := by
+        intro i
+        have hchild : childRel b (k i) := ⟨.send p labels, k, i, hdest, rfl⟩
+        exact mem_of_closed_child h_closed h_current hchild
+      -- Use EQ2C_send_head with:
+      -- - head (toCoind (toInductiveAux ... b ...)) = .send p labels' for some labels'
+      -- - head b = .send p labels
+      -- - Branch-wise EQ2C via IH
+      -- The characterization lemma and branch correspondence are complex.
+      -- Proof outline:
+      -- 1. toInductiveAux produces .send p (List.ofFn f) where f i = (labels.get i, recursive call on k i)
+      -- 2. toCoind of that = mkSend p (toCoindBranches (List.ofFn f))
+      -- 3. branchesOf (toCoind ...) corresponds to (labels.get i, toCoind (recursive call)) for each i
+      -- 4. branchesOf b = List.ofFn (fun i => (labels.get i, k i))
+      -- 5. By IH, each toCoind (recursive call on k i) ≃ k i
+      -- 6. Apply EQ2C_send_head
+      -- The detailed proof is similar to toInductiveAux_mu_eq but for branches.
       sorry
     | .recv p labels =>
-      -- Recursive case: recv (similar to send)
-      -- Same structure as send case
+      -- Recursive case: recv (symmetric to send)
       obtain ⟨⟨s, k⟩, hdest⟩ : ∃ p : Σ s, LocalTypeF.B s → LocalTypeC, PFunctor.M.dest b = ⟨p.1, p.2⟩ := ⟨PFunctor.M.dest b, rfl⟩
       have hs : s = .recv p labels := by simp only [head, hdest] at hhead; exact hhead
       subst hs
       let h_visited' : insert b visited ⊆ all := subset_insert_of_mem h_current h_visited
+      have hchild_mem : ∀ i : Fin labels.length, k i ∈ all := by
+        intro i
+        have hchild : childRel b (k i) := ⟨.recv p labels, k, i, hdest, rfl⟩
+        exact mem_of_closed_child h_closed h_current hchild
+      -- Same structure as send case
       sorry
 termination_by all.card - visited.card
 decreasing_by
