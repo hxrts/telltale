@@ -138,4 +138,13 @@ theorem Regular_implies_System (t : LocalTypeC) (h : Regular t) :
   have ht' : t ∈ Set.Finite.toFinset h := (Set.Finite.mem_toFinset h).2 ht
   simpa [ReachableList] using ht'
 
+/-- Regular coinductive types coincide with their finite-system presentation. -/
+theorem Regular_implies_System_eq (t : LocalTypeC) (h : Regular t) :
+    ∃ (n : Nat) (sys : FiniteSystem n) (start : Fin n),
+      t = SystemToCoind sys start := by
+  rcases Regular_implies_System t h with ⟨n, sys, start, hbisim⟩
+  have hEq : t = SystemToCoind sys start :=
+    (Bisim_eq_iff t (SystemToCoind sys start)).1 hbisim
+  exact ⟨n, sys, start, hEq⟩
+
 end RumpsteakV2.Coinductive

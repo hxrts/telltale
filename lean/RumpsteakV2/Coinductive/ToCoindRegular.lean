@@ -14,15 +14,34 @@ namespace RumpsteakV2.Coinductive
 
 open RumpsteakV2.Protocol.LocalTypeR
 
-private lemma children_mkSend (p : String) (bs : List (RumpsteakV2.Protocol.GlobalType.Label × LocalTypeC))
-    (i : Fin (bs.map Prod.fst).length) :
-    children (mkSend p bs) i = (bs.get (castFin (by simp) i)).2 := by
-  simp [children, mkSend]
-
-private lemma children_mkRecv (p : String) (bs : List (RumpsteakV2.Protocol.GlobalType.Label × LocalTypeC))
-    (i : Fin (bs.map Prod.fst).length) :
-    children (mkRecv p bs) i = (bs.get (castFin (by simp) i)).2 := by
-  simp [children, mkRecv]
+/-- Helper for regularity of branches. -/
+private theorem toCoindBranches_regular_aux :
+    (bs : List (RumpsteakV2.Protocol.GlobalType.Label × LocalTypeR)) →
+    (hrec : ∀ cont : LocalTypeR, sizeOf cont < sizeOf bs → Regular (toCoind cont)) →
+    ∀ b ∈ toCoindBranches bs, Regular b.2
+  | [], _, b, hb => by simp [toCoindBranches] at hb
+  | head :: tail, hrec, b, hb => by
+      simp only [toCoindBranches, List.mem_cons] at hb
+      cases hb with
+      | inl h =>
+          subst h
+          have hsz : sizeOf head.2 < sizeOf (head :: tail) := by
+            -- sizeOf (head :: tail) = 1 + sizeOf head + sizeOf tail
+            -- sizeOf head ≥ sizeOf head.2 (for products)
+            -- So sizeOf head.2 < 1 + sizeOf head + sizeOf tail
+            have hhead : sizeOf head.2 < 1 + sizeOf head := by
+              cases head; simp only [Prod.snd, Prod.mk.sizeOf_spec]; omega
+            simp only [List.cons.sizeOf_spec]
+            omega
+          exact hrec head.2 hsz
+      | inr h =>
+          have htail_lt : sizeOf tail < sizeOf (head :: tail) := by
+            simp only [List.cons.sizeOf_spec]
+            omega
+          have htail_rec : ∀ cont : LocalTypeR, sizeOf cont < sizeOf tail → Regular (toCoind cont) := by
+            intro cont hcont
+            exact hrec cont (Nat.lt_trans hcont htail_lt)
+          exact toCoindBranches_regular_aux tail htail_rec b h
 
 /-- `toCoind` produces a regular coinductive type. -/
 theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
@@ -38,20 +57,11 @@ theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
       cases i
       simpa [toCoind] using toCoind_regular body
   | .send p bs => by
-      have hreg :
-          ∀ b ∈ toCoindBranches bs, Regular b.2 := by
-        intro b hb
-        induction bs with
-        | nil =>
-            cases hb
-        | cons head tail ih =>
-            simp [toCoindBranches] at hb
-            cases hb with
-            | inl h =>
-                subst h
-                exact toCoind_regular head.2
-            | inr h =>
-                exact ih _ h
+      have hreg := toCoindBranches_regular_aux bs (fun cont hsz => by
+        have hsz' : sizeOf cont < sizeOf (LocalTypeR.send p bs) := by
+          simp only [LocalTypeR.send.sizeOf_spec]
+          omega
+        exact toCoind_regular cont)
       apply regular_of_children
       intro i
       have hchild :
@@ -64,20 +74,11 @@ theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
       have hreg' := hreg _ hmem
       simpa [hchild] using hreg'
   | .recv p bs => by
-      have hreg :
-          ∀ b ∈ toCoindBranches bs, Regular b.2 := by
-        intro b hb
-        induction bs with
-        | nil =>
-            cases hb
-        | cons head tail ih =>
-            simp [toCoindBranches] at hb
-            cases hb with
-            | inl h =>
-                subst h
-                exact toCoind_regular head.2
-            | inr h =>
-                exact ih _ h
+      have hreg := toCoindBranches_regular_aux bs (fun cont hsz => by
+        have hsz' : sizeOf cont < sizeOf (LocalTypeR.recv p bs) := by
+          simp only [LocalTypeR.recv.sizeOf_spec]
+          omega
+        exact toCoind_regular cont)
       apply regular_of_children
       intro i
       have hchild :
@@ -89,5 +90,6 @@ theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
         List.get_mem (l := toCoindBranches bs) (n := castFin (by simp) i)
       have hreg' := hreg _ hmem
       simpa [hchild] using hreg'
+termination_by t => sizeOf t
 
 end RumpsteakV2.Coinductive

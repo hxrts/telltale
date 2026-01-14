@@ -39,13 +39,29 @@ def branchesOf (t : LocalTypeC) : List (Label × LocalTypeC) :=
 lemma branchesOf_mkSend (p : String) (bs : List (Label × LocalTypeC)) :
     branchesOf (mkSend p bs) = bs := by
   -- expand `branchesOf` on the `mkSend` constructor
-  simp [branchesOf, mkSend, List.ext_get, List.get_ofFn]
+  simp only [branchesOf, mkSend, PFunctor.M.dest_mk]
+  apply List.ext_getElem
+  · simp only [List.length_ofFn, List.length_map]
+  · intro n h1 h2
+    simp only [List.getElem_ofFn, castFin]
+    -- Goal: ((bs.map Prod.fst).get ⟨n, _⟩, bs.get ⟨n, _⟩.2) = bs[n]
+    ext
+    · simp [List.get_eq_getElem]
+    · simp [List.get_eq_getElem]
 
 @[simp]
 lemma branchesOf_mkRecv (p : String) (bs : List (Label × LocalTypeC)) :
     branchesOf (mkRecv p bs) = bs := by
   -- expand `branchesOf` on the `mkRecv` constructor
-  simp [branchesOf, mkRecv, List.ext_get, List.get_ofFn]
+  simp only [branchesOf, mkRecv, PFunctor.M.dest_mk]
+  apply List.ext_getElem
+  · simp only [List.length_ofFn, List.length_map]
+  · intro n h1 h2
+    simp only [List.getElem_ofFn, castFin]
+    -- Goal: ((bs.map Prod.fst).get ⟨n, _⟩, bs.get ⟨n, _⟩.2) = bs[n]
+    ext
+    · simp [List.get_eq_getElem]
+    · simp [List.get_eq_getElem]
 
 /-- Unfolds to end after finitely many `mu` steps. -/
 def UnfoldsToEndC (t : LocalTypeC) : Prop :=

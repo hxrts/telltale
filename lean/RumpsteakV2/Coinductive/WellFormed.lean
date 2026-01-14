@@ -49,15 +49,18 @@ lemma wellFormed_mkEnd : WellFormedC mkEnd := by
   intro v hvar
   rcases hvar with ⟨u, hsteps, hhead⟩
   cases (Relation.ReflTransGen.cases_head hsteps) with
-  | refl =>
+  | inl heq =>
+      subst heq
       simp [head_mkEnd] at hhead
-  | tail hstep _ =>
+  | inr hexists =>
+      rcases hexists with ⟨y, hstep, _⟩
       rcases hstep with ⟨x, f, hdest, _⟩
-      have hdest' :
-          (⟨LocalTypeHead.end, fun x => PEmpty.elim x⟩ : LocalTypeF LocalTypeC) =
-            ⟨LocalTypeHead.mu x, f⟩ := by
-        simpa [mkEnd] using hdest
-      cases hdest'
+      -- hdest : PFunctor.M.dest mkEnd = ⟨LocalTypeHead.mu x, f⟩
+      -- But mkEnd has head .end, so this is impossible
+      simp only [mkEnd, PFunctor.M.dest_mk] at hdest
+      -- hdest : ⟨.end, fun x => PEmpty.elim x⟩ = ⟨.mu x, f⟩
+      injection hdest with h1 _
+      cases h1
 
 /-- `mkVar` is not closed. -/
 lemma not_closed_mkVar (x : String) : ¬ ClosedC (mkVar x) := by
@@ -72,15 +75,21 @@ lemma closed_mkMu {x : String} {t : LocalTypeC} (hclosed : ClosedC t) : ClosedC 
   intro v hvar
   rcases hvar with ⟨u, hsteps, hhead⟩
   cases (Relation.ReflTransGen.cases_head hsteps) with
-  | refl =>
+  | inl heq =>
+      subst heq
       simp [head_mkMu] at hhead
-  | tail hstep hrest =>
+  | inr hexists =>
+      rcases hexists with ⟨y, hstep, hrest⟩
       rcases hstep with ⟨x', f, hdest, rfl⟩
-      have hdest' :
-          (⟨LocalTypeHead.mu x, fun _ => t⟩ : LocalTypeF LocalTypeC) =
-            ⟨LocalTypeHead.mu x', f⟩ := by
-        simpa [mkMu] using hdest
-      cases hdest'
+      -- hdest : PFunctor.M.dest (mkMu x t) = ⟨LocalTypeHead.mu x', f⟩
+      simp only [mkMu, PFunctor.M.dest_mk] at hdest
+      -- hdest : ⟨.mu x, fun _ => t⟩ = ⟨.mu x', f⟩
+      injection hdest with h1 h2
+      injection h1 with hx
+      subst hx
+      -- Now f = fun _ => t, so f () = t
+      have hfeq : f = fun _ => t := h2.symm
+      simp only [hfeq] at hrest
       have : UnfoldsToVarC t v := ⟨u, hrest, hhead⟩
       exact hclosed v this
 
@@ -94,19 +103,19 @@ lemma observable_mkMu {x : String} {t : LocalTypeC} (hobs : ObservableC t) :
   | is_end hend =>
       rcases hend with ⟨u, hsteps, hhead⟩
       apply ObservableC.is_end
-      exact ⟨u, Relation.ReflTransGen.tail hstep hsteps, hhead⟩
+      exact ⟨u, Relation.ReflTransGen.head hstep hsteps, hhead⟩
   | is_var v hvar =>
       rcases hvar with ⟨u, hsteps, hhead⟩
       apply ObservableC.is_var v
-      exact ⟨u, Relation.ReflTransGen.tail hstep hsteps, hhead⟩
+      exact ⟨u, Relation.ReflTransGen.head hstep hsteps, hhead⟩
   | is_send p bs hsend =>
       rcases hsend with ⟨u, labels, hsteps, hhead, hbs⟩
       apply ObservableC.is_send p bs
-      exact ⟨u, labels, Relation.ReflTransGen.tail hstep hsteps, hhead, hbs⟩
+      exact ⟨u, labels, Relation.ReflTransGen.head hstep hsteps, hhead, hbs⟩
   | is_recv p bs hrecv =>
       rcases hrecv with ⟨u, labels, hsteps, hhead, hbs⟩
       apply ObservableC.is_recv p bs
-      exact ⟨u, labels, Relation.ReflTransGen.tail hstep hsteps, hhead, hbs⟩
+      exact ⟨u, labels, Relation.ReflTransGen.head hstep hsteps, hhead, hbs⟩
 
 /-- WellFormed preserved by `mkMu`. -/
 lemma wellFormed_mkMu {x : String} {t : LocalTypeC} (hWF : WellFormedC t) :
