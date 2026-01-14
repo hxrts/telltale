@@ -249,27 +249,103 @@ def LinkOK (p₁ p₂ : DeployedProtocol) : Prop :=
   p₁.interface.exportsMatchImports p₂.interface = true ∧
   p₂.interface.exportsMatchImports p₁.interface = true
 
-/-- Linking preserves well-typedness (placeholder). -/
+/-! ## Protocol Composition
+
+Compose two protocols into a single protocol bundle.
+-/
+
+/-- Merge two GEnvs (disjoint union). -/
+def mergeGEnv (G₁ G₂ : GEnv) : GEnv := G₁ ++ G₂
+
+/-- Merge two DEnvs (disjoint union). -/
+def mergeDEnv (D₁ D₂ : DEnv) : DEnv := D₁ ++ D₂
+
+/-- Merge two buffer maps (disjoint union). -/
+def mergeBufs (B₁ B₂ : Buffers) : Buffers := B₁ ++ B₂
+
+/-- Merge two linear contexts (disjoint union). -/
+def mergeLin (L₁ L₂ : LinCtx) : LinCtx := L₁ ++ L₂
+
+/-- Compose two monitor states into one. -/
+def composeMonitorState (ms₁ ms₂ : MonitorState) : MonitorState where
+  G := mergeGEnv ms₁.G ms₂.G
+  D := mergeDEnv ms₁.D ms₂.D
+  bufs := mergeBufs ms₁.bufs ms₂.bufs
+  Lin := mergeLin ms₁.Lin ms₂.Lin
+  supply := max ms₁.supply ms₂.supply
+
+/-- Compose two protocol bundles into one.
+
+Note: This creates a combined bundle without proofs. For a full
+DeployedProtocol, additional certificates would need to be constructed.
+-/
+def composeBundle (p₁ p₂ : ProtocolBundle) : ProtocolBundle where
+  name := p₁.name ++ "+" ++ p₂.name
+  roles := p₁.roles ++ p₂.roles
+  localTypes := fun r =>
+    if p₁.roles.elem r then p₁.localTypes r
+    else if p₂.roles.elem r then p₂.localTypes r
+    else .end_
+  sessionId := max p₁.sessionId p₂.sessionId + 1  -- New session for composed
+  interface := p₁.interface.merge p₂.interface
+  spatialReq := p₁.spatialReq &&& p₂.spatialReq
+
+/-! ## Linking Theorems -/
+
+/-- Linking preserves well-typedness.
+
+When two protocols with compatible interfaces are linked:
+1. Their merged GEnv contains all endpoints
+2. Their merged DEnv contains all edges
+3. Coherence is preserved (disjoint sessions don't interfere)
+-/
 theorem link_preserves_WTMon (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂)
     (hWT₁ : WTMon p₁.initMonitorState)
     (hWT₂ : WTMon p₂.initMonitorState) :
-    True := by  -- Placeholder: actual theorem would prove merged state is well-typed
-  trivial
+    WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState) := by
+  -- The key insight is that disjoint sessions maintain coherence independently
+  -- Each session's endpoints and edges don't interfere with the other
+  sorry  -- Full proof requires showing merge preserves invariants
 
-/-! ## Composition Preserves Deadlock Freedom (Preview)
+/-! ## Composition Preserves Deadlock Freedom
 
 The key theorem for safe composition: if both protocols are deadlock-free,
 their composition is also deadlock-free.
 -/
 
-/-- Composition preserves deadlock freedom (placeholder). -/
+/-- Disjoint sessions maintain independence. -/
+theorem disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
+    (hLink : LinkOK p₁ p₂) :
+    p₁.sessionId ≠ p₂.sessionId := by
+  -- From disjointSessions: [s₁] ∩ [s₂] = ∅ implies s₁ ≠ s₂
+  sorry  -- Proof from interface.disjointSessions
+
+/-- Composition preserves deadlock freedom.
+
+If both protocols can reach communication independently,
+the composed protocol can also make progress.
+-/
 theorem compose_deadlock_free (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂)
     (hDF₁ : ∀ r, r ∈ p₁.roles → ReachesComm (p₁.localTypes r))
     (hDF₂ : ∀ r, r ∈ p₂.roles → ReachesComm (p₂.localTypes r)) :
-    True := by  -- Placeholder: actual theorem would prove composed protocol is deadlock-free
-  trivial
+    ∀ r, r ∈ p₁.roles ++ p₂.roles →
+      ReachesComm ((composeBundle (ProtocolBundle.fromDeployed p₁) (ProtocolBundle.fromDeployed p₂)).localTypes r) := by
+  intro r hr
+  simp only [composeBundle, ProtocolBundle.fromDeployed]
+  by_cases h₁ : r ∈ p₁.roles
+  · -- r is in p₁.roles
+    simp only [h₁, List.elem_eq_mem, ↓reduceIte]
+    exact hDF₁ r h₁
+  · -- r is in p₂.roles
+    have h₂ : r ∈ p₂.roles := by
+      simp only [List.mem_append] at hr
+      cases hr with
+      | inl h => exact absurd h h₁
+      | inr h => exact h
+    simp only [h₁, List.elem_eq_mem, Bool.false_eq_true, ↓reduceIte, h₂]
+    exact hDF₂ r h₂
 
 end
 
