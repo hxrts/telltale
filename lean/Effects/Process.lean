@@ -76,19 +76,27 @@ end Process
 - `proc`: the process being executed
 - `store`: variable store
 - `bufs`: per-edge message buffers
+- `G`: type environment mapping endpoints to local types
+- `D`: trace environment mapping edges to in-flight message types
 - `nextSid`: next fresh session ID
 -/
 structure Config where
   proc : Process
   store : Store
   bufs : Buffers
+  G : GEnv
+  D : DEnv
   nextSid : SessionId
 
 namespace Config
 
-/-- Initial configuration with just a process. -/
+/-- Initial configuration with just a process and empty environments. -/
 def init (P : Process) : Config :=
-  { proc := P, store := [], bufs := [], nextSid := 0 }
+  { proc := P, store := [], bufs := [], G := [], D := [], nextSid := 0 }
+
+/-- Initial configuration with type environments. -/
+def initWithEnv (P : Process) (G : GEnv) (D : DEnv) : Config :=
+  { proc := P, store := [], bufs := [], G := G, D := D, nextSid := 0 }
 
 /-- Check if configuration has terminated. -/
 def isTerminated (C : Config) : Bool :=
@@ -98,20 +106,33 @@ end Config
 
 /-! ## Configuration Update Helpers -/
 
-/-- Update configuration after a send on edge e. -/
-def sendStep (C : Config) (e : Edge) (v : Value) : Config :=
+/-- Update configuration after a send on edge e from endpoint ep.
+    - Process becomes skip
+    - Buffer at edge e gets v enqueued
+    - G[ep] advances from `send target T L` to `L`
+    - D[e] grows by appending T -/
+def sendStep (C : Config) (ep : Endpoint) (e : Edge) (v : Value) (T : ValType) (L : LocalType) : Config :=
   { C with
     proc := .skip
-    bufs := enqueueBuf C.bufs e v }
+    bufs := enqueueBuf C.bufs e v
+    G := updateG C.G ep L
+    D := updateD C.D e (lookupD C.D e ++ [T]) }
 
-/-- Update configuration after a receive on edge e. -/
-def recvStep (C : Config) (e : Edge) (x : Var) (v : Value) : Config :=
+/-- Update configuration after a receive on edge e at endpoint ep.
+    - Process becomes skip
+    - Variable x gets value v
+    - Buffer at edge e loses head element
+    - G[ep] advances from `recv source T L` to `L`
+    - D[e] shrinks by removing head -/
+def recvStep (C : Config) (ep : Endpoint) (e : Edge) (x : Var) (v : Value) (L : LocalType) : Config :=
   match dequeueBuf C.bufs e with
   | some (bufs', _) =>
     { C with
       proc := .skip
       store := updateStr C.store x v
-      bufs := bufs' }
+      bufs := bufs'
+      G := updateG C.G ep L
+      D := updateD C.D e (lookupD C.D e).tail }
   | none => C  -- shouldn't happen if well-typed
 
 /-- Update configuration after creating a new session. -/

@@ -36,51 +36,62 @@ noncomputable section
 /-- Base step relation: head reductions.
 
 Each rule consumes the current process and produces a configuration
-with `skip` as the process (indicating the action completed). -/
+with `skip` as the process (indicating the action completed).
+
+**Key design**: Target/source roles are determined by the type environment G,
+ensuring determinism. -/
 inductive StepBase : Config → Config → Prop where
   /-- Send: enqueue value at directed edge.
       Preconditions:
       - k maps to channel endpoint e
       - x maps to value v
-      Effect: enqueue v at edge (e.sid, e.role, target_role) -/
-  | send {C k x e v target} :
+      - G[e] = send(target, T, L) determines the target role
+      Effect: enqueue v at edge, advance type to L -/
+  | send {C k x e v target T L} :
       C.proc = .send k x →
       lookupStr C.store k = some (.chan e) →
       lookupStr C.store x = some v →
-      -- target role comes from the local type (implicit in well-typed)
-      StepBase C (sendStep C { sid := e.sid, sender := e.role, receiver := target } v)
+      lookupG C.G e = some (.send target T L) →
+      StepBase C (sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L)
 
   /-- Recv: dequeue value from directed edge.
       Preconditions:
       - k maps to channel endpoint e
+      - G[e] = recv(source, T, L) determines the source role
       - buffer at (sid, source, e.role) is non-empty
-      Effect: dequeue value into variable x -/
-  | recv {C k x e v source} :
+      Effect: dequeue value into variable x, advance type to L -/
+  | recv {C k x e v source T L} :
       C.proc = .recv k x →
       lookupStr C.store k = some (.chan e) →
+      lookupG C.G e = some (.recv source T L) →
       lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = v :: _ →
-      StepBase C (recvStep C { sid := e.sid, sender := source, receiver := e.role } x v)
+      StepBase C (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L)
 
   /-- Select: enqueue label at directed edge.
-      Similar to send but for labels (represented as string values). -/
-  | select {C k e ℓ target} :
+      G[e] = select(target, branches) determines the target role. -/
+  | select {C k e ℓ target branches L} :
       C.proc = .select k ℓ →
       lookupStr C.store k = some (.chan e) →
-      StepBase C (sendStep C { sid := e.sid, sender := e.role, receiver := target } (.string ℓ))
+      lookupG C.G e = some (.select target branches) →
+      branches.find? (fun b => b.1 == ℓ) = some (ℓ, L) →
+      StepBase C (sendStep C e { sid := e.sid, sender := e.role, receiver := target } (.string ℓ) .string L)
 
   /-- Branch: dequeue label and select branch.
       Preconditions:
       - k maps to channel endpoint e
-      - buffer has a label value
-      - label matches one of the branches
-      Effect: continue with selected branch process -/
-  | branch {C k e ℓ source bs P bufs'} :
-      C.proc = .branch k bs →
+      - G[e] = branch(source, typeBranches) determines source role
+      - buffer has a label value ℓ
+      - both process and type branches have entry for ℓ
+      Effect: continue with selected branch process, advance type -/
+  | branch {C k e ℓ source procBranches typeBranches P L bufs'} :
+      C.proc = .branch k procBranches →
       lookupStr C.store k = some (.chan e) →
+      lookupG C.G e = some (.branch source typeBranches) →
       lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = .string ℓ :: _ →
-      bs.find? (fun b => b.1 == ℓ) = some (ℓ, P) →
+      procBranches.find? (fun b => b.1 == ℓ) = some (ℓ, P) →
+      typeBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L) →
       dequeueBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = some (bufs', _) →
-      StepBase C { C with proc := P, bufs := bufs' }
+      StepBase C { C with proc := P, bufs := bufs', G := updateG C.G e L, D := updateD C.D { sid := e.sid, sender := source, receiver := e.role } (lookupD C.D { sid := e.sid, sender := source, receiver := e.role }).tail }
 
   /-- NewSession: create a new session with fresh ID.
       Effect:
@@ -141,18 +152,165 @@ inductive Step : Config → Config → Prop where
 
 /-! ## Step Properties -/
 
-/-- Step is deterministic for base steps (modulo which par branch).
+/-- Step is deterministic for base steps (modulo par).
 
-    **Proof outline**: Case analysis on h₁ and h₂.
-    - Same constructors: Extract equalities from preconditions
-    - Different constructors: Show C.proc can't match both patterns
-    - Par exception: The `hSame` disjunct handles non-deterministic choice
-
-    This is a standard determinism proof requiring extensive case work. -/
-theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂)
-    (hSame : C₁.proc = C₂.proc ∨ (∃ P Q, C.proc = .par P Q)) :
+    Since target/source roles are now determined by G, the only source of
+    non-determinism is `par skip skip` which can reduce via either
+    `par_skip_left` or `par_skip_right`. -/
+theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂) :
     C₁ = C₂ ∨ (∃ P Q, C.proc = .par P Q) := by
-  sorry  -- Full proof requires case analysis on h₁, h₂
+  cases h₁ with
+  | send hProc₁ hk₁ hx₁ hG₁ =>
+    cases h₂ with
+    | send hProc₂ hk₂ hx₂ hG₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.send.injEq] at heq
+      obtain ⟨hk_eq, hx_eq⟩ := heq
+      subst hk_eq hx_eq
+      rw [hk₁] at hk₂
+      rw [hx₁] at hx₂
+      simp only [Option.some.injEq, Value.chan.injEq] at hk₂ hx₂
+      subst hk₂ hx₂
+      -- Now G lookups must match since same endpoint
+      rw [hG₁] at hG₂
+      simp only [Option.some.injEq, LocalType.send.injEq] at hG₂
+      obtain ⟨htgt, hT, hL⟩ := hG₂
+      subst htgt hT hL
+      rfl
+    | _ => simp_all
+  | recv hProc₁ hk₁ hG₁ hBuf₁ =>
+    cases h₂ with
+    | recv hProc₂ hk₂ hG₂ hBuf₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.recv.injEq] at heq
+      obtain ⟨hk_eq, hx_eq⟩ := heq
+      subst hk_eq hx_eq
+      rw [hk₁] at hk₂
+      simp only [Option.some.injEq, Value.chan.injEq] at hk₂
+      subst hk₂
+      -- G lookups must match
+      rw [hG₁] at hG₂
+      simp only [Option.some.injEq, LocalType.recv.injEq] at hG₂
+      obtain ⟨hsrc, hT, hL⟩ := hG₂
+      subst hsrc hT hL
+      -- Buffer lookups at same edge must match
+      rw [hBuf₁] at hBuf₂
+      simp only [List.cons.injEq] at hBuf₂
+      obtain ⟨hv, _⟩ := hBuf₂
+      subst hv
+      rfl
+    | _ => simp_all
+  | select hProc₁ hk₁ hG₁ hFind₁ =>
+    cases h₂ with
+    | select hProc₂ hk₂ hG₂ hFind₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.select.injEq] at heq
+      obtain ⟨hk_eq, hℓ_eq⟩ := heq
+      subst hk_eq hℓ_eq
+      rw [hk₁] at hk₂
+      simp only [Option.some.injEq, Value.chan.injEq] at hk₂
+      subst hk₂
+      rw [hG₁] at hG₂
+      simp only [Option.some.injEq, LocalType.select.injEq] at hG₂
+      obtain ⟨htgt, hbs⟩ := hG₂
+      subst htgt hbs
+      rw [hFind₁] at hFind₂
+      simp only [Option.some.injEq, Prod.mk.injEq] at hFind₂
+      obtain ⟨_, hL⟩ := hFind₂
+      subst hL
+      rfl
+    | _ => simp_all
+  | branch hProc₁ hk₁ hG₁ hBuf₁ hFindP₁ hFindT₁ hDq₁ =>
+    cases h₂ with
+    | branch hProc₂ hk₂ hG₂ hBuf₂ hFindP₂ hFindT₂ hDq₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.branch.injEq] at heq
+      obtain ⟨hk_eq, hbs_eq⟩ := heq
+      subst hk_eq hbs_eq
+      rw [hk₁] at hk₂
+      simp only [Option.some.injEq, Value.chan.injEq] at hk₂
+      subst hk₂
+      -- Extract type branch equality via injection
+      rw [hG₁] at hG₂
+      simp only [Option.some.injEq] at hG₂
+      cases hG₂
+      -- Same buffer lookup
+      rw [hBuf₁] at hBuf₂
+      simp only [List.cons.injEq, Value.string.injEq] at hBuf₂
+      obtain ⟨hℓ_eq, _⟩ := hBuf₂
+      subst hℓ_eq
+      -- Same process branch lookup (same procBranches, same ℓ)
+      rw [hFindP₁] at hFindP₂
+      simp only [Option.some.injEq, Prod.mk.injEq] at hFindP₂
+      obtain ⟨_, hP_eq⟩ := hFindP₂
+      subst hP_eq
+      -- Same type branch lookup (same typeBranches, same ℓ)
+      rw [hFindT₁] at hFindT₂
+      simp only [Option.some.injEq, Prod.mk.injEq] at hFindT₂
+      obtain ⟨_, hL_eq⟩ := hFindT₂
+      subst hL_eq
+      -- Same dequeue result
+      rw [hDq₁] at hDq₂
+      simp only [Option.some.injEq, Prod.mk.injEq] at hDq₂
+      obtain ⟨hbufs_eq, _⟩ := hDq₂
+      subst hbufs_eq
+      rfl
+    | _ => simp_all
+  | newSession hProc₁ =>
+    cases h₂ with
+    | newSession hProc₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.newSession.injEq] at heq
+      obtain ⟨hr_eq, hf_eq, hP_eq⟩ := heq
+      simp only [hr_eq, hf_eq, hP_eq]
+    | _ => simp_all
+  | assign hProc₁ =>
+    cases h₂ with
+    | assign hProc₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.assign.injEq] at heq
+      obtain ⟨hx_eq, hv_eq⟩ := heq
+      simp only [hx_eq, hv_eq]
+    | _ => simp_all
+  | seq2 hProc₁ =>
+    cases h₂ with
+    | seq2 hProc₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.seq.injEq] at heq
+      obtain ⟨_, hQ_eq⟩ := heq
+      simp only [hQ_eq]
+    | _ => simp_all
+  | par_skip_left hProc₁ =>
+    cases h₂ with
+    | par_skip_left hProc₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.par.injEq] at heq
+      obtain ⟨_, hQ_eq⟩ := heq
+      simp only [hQ_eq]
+    | par_skip_right hProc₂ =>
+      right
+      exact ⟨_, _, hProc₁⟩
+    | _ => simp_all
+  | par_skip_right hProc₁ =>
+    cases h₂ with
+    | par_skip_right hProc₂ =>
+      left
+      have heq := hProc₁.symm.trans hProc₂
+      simp only [Process.par.injEq] at heq
+      obtain ⟨hP_eq, _⟩ := heq
+      simp only [hP_eq]
+    | par_skip_left hProc₂ =>
+      right
+      exact ⟨_, _, hProc₁⟩
+    | _ => simp_all
 
 /-- A configuration terminates if its process is skip. -/
 def Step.Terminates (C : Config) : Prop :=
@@ -168,23 +326,33 @@ def Steps : Config → Config → Prop :=
 
 /-! ## Progress Lemmas -/
 
-/-- A recv can step if its buffer is non-empty. -/
-theorem recv_can_step {C k x e source} (hProc : C.proc = .recv k x)
+/-- A recv can step if:
+    - The process is recv k x
+    - k maps to endpoint e
+    - G[e] says recv from source with type T and continuation L
+    - The buffer at (sid, source, e.role) is non-empty -/
+theorem recv_can_step {C k x e source T L} (hProc : C.proc = .recv k x)
     (hk : lookupStr C.store k = some (.chan e))
+    (hG : lookupG C.G e = some (.recv source T L))
     (hBuf : (lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role }).length > 0) :
     ∃ C', Step C C' := by
   obtain ⟨v, vs, hEq⟩ : ∃ v vs, lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = v :: vs := by
     cases h : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
     | nil => simp_all
     | cons v vs => exact ⟨v, vs, rfl⟩
-  exact ⟨_, Step.base (StepBase.recv hProc hk hEq)⟩
+  exact ⟨_, Step.base (StepBase.recv hProc hk hG hEq)⟩
 
-/-- A send can always step (async semantics). -/
-theorem send_can_step {C : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role}
+/-- A send can step if:
+    - The process is send k x
+    - k maps to endpoint e
+    - x maps to value v
+    - G[e] says send to target with type T and continuation L -/
+theorem send_can_step {C : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role} {T : ValType} {L : LocalType}
     (hProc : C.proc = .send k x)
     (hk : lookupStr C.store k = some (.chan e))
-    (hx : lookupStr C.store x = some v) :
+    (hx : lookupStr C.store x = some v)
+    (hG : lookupG C.G e = some (.send target T L)) :
     ∃ C', Step C C' :=
-  ⟨_, Step.base (StepBase.send (target := target) hProc hk hx)⟩
+  ⟨_, Step.base (StepBase.send hProc hk hx hG)⟩
 
 end
