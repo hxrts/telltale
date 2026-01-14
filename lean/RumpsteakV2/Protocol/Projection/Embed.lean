@@ -35,7 +35,8 @@ def CEmbedF (R : EmbedRel) : EmbedRel := fun e role g =>
   | .end, .end => True
   | .var t, .var t' => t = t'
   | .mu t body, .mu t' gbody =>
-      t = t' ∧ lcontractive gbody ∧ R body role gbody
+      -- Match CProjectF: check body.isGuarded t (local type guardedness)
+      t = t' ∧ body.isGuarded t ∧ R body role gbody
   | .send receiver lbs, .comm sender receiver' gbs =>
       role = sender ∧ role ≠ receiver' ∧ receiver = receiver' ∧ BranchesEmbedRel R lbs role gbs
   | .recv sender lbs, .comm sender' receiver gbs =>

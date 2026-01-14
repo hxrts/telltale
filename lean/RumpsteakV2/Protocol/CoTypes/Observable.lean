@@ -21,7 +21,7 @@ This file is extracted from Bisim.lean to avoid circular dependencies:
 
 -/
 
-namespace RumpsteakV2.Protocol.CoTypes.Observables
+namespace RumpsteakV2.Protocol.CoTypes.Observable
 
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType
@@ -260,4 +260,4 @@ theorem CanRecv.deterministic {a : LocalTypeR} {p q : String}
   | base => cases hq; exact ⟨rfl, rfl⟩
   | @mu t body p' bs' _ ih => cases hq with | @mu _ _ _ _ h => exact ih h
 
-end RumpsteakV2.Protocol.CoTypes.Observables
+end RumpsteakV2.Protocol.CoTypes.Observable

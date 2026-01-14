@@ -150,6 +150,93 @@ def initBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
 def initDEnv (sid : SessionId) (roles : RoleSet) : DEnv :=
   (RoleSet.allEdges sid roles).map fun e => (e, [])
 
+/-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
+theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (hMem : e ∈ RoleSet.allEdges sid roles) :
+    (initBuffers sid roles).lookup e = some [] := by
+  simp only [initBuffers]
+  generalize hEdges : RoleSet.allEdges sid roles = edges at hMem
+  clear hEdges
+  induction edges with
+  | nil => simp only [List.mem_nil_iff] at hMem
+  | cons hd tl ih =>
+    simp only [List.map, List.lookup]
+    simp only [List.mem_cons] at hMem
+    cases hMem with
+    | inl heq =>
+      subst heq
+      simp only [beq_self_eq_true]
+    | inr hTl =>
+      by_cases heq : e = hd
+      · subst heq; simp only [beq_self_eq_true]
+      · have hNeq : (e == hd) = false := beq_eq_false_iff_ne.mpr heq
+        simp only [hNeq]
+        exact ih hTl
+
+/-- Looking up an edge in initDEnv returns empty if edge is in allEdges. -/
+theorem initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (hMem : e ∈ RoleSet.allEdges sid roles) :
+    (initDEnv sid roles).lookup e = some [] := by
+  simp only [initDEnv]
+  generalize hEdges : RoleSet.allEdges sid roles = edges at hMem
+  clear hEdges
+  induction edges with
+  | nil => simp only [List.mem_nil_iff] at hMem
+  | cons hd tl ih =>
+    simp only [List.map, List.lookup]
+    simp only [List.mem_cons] at hMem
+    cases hMem with
+    | inl heq =>
+      subst heq
+      simp only [beq_self_eq_true]
+    | inr hTl =>
+      by_cases heq : e = hd
+      · subst heq; simp only [beq_self_eq_true]
+      · have hNeq : (e == hd) = false := beq_eq_false_iff_ne.mpr heq
+        simp only [hNeq]
+        exact ih hTl
+
+/-- Looking up an edge with a different sid in initDEnv returns none. -/
+theorem initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (hne : e.sid ≠ sid) :
+    (initDEnv sid roles).lookup e = none := by
+  simp only [initDEnv]
+  have hNotIn : e ∉ RoleSet.allEdges sid roles := by
+    intro hmem
+    exact hne (RoleSet.allEdges_sid sid roles e hmem)
+  generalize RoleSet.allEdges sid roles = edges at hNotIn
+  induction edges with
+  | nil => simp only [List.map, List.lookup]
+  | cons hd tl ih =>
+    simp only [List.mem_cons, not_or] at hNotIn
+    simp only [List.map, List.lookup]
+    have hNeEdge : e ≠ hd := hNotIn.1
+    have hBeqFalse : (e == hd) = false := beq_eq_false_iff_ne.mpr hNeEdge
+    simp only [hBeqFalse]
+    exact ih hNotIn.2
+
+/-- Looking up an edge with a different sid in initBuffers returns none. -/
+theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (hne : e.sid ≠ sid) :
+    (initBuffers sid roles).lookup e = none := by
+  simp only [initBuffers]
+  -- Every edge in allEdges has .sid = sid, so e cannot be in the list
+  have hNotIn : e ∉ RoleSet.allEdges sid roles := by
+    intro hmem
+    exact hne (RoleSet.allEdges_sid sid roles e hmem)
+  -- Use induction with the membership constraint carried through
+  generalize hlist : RoleSet.allEdges sid roles = edges at hNotIn
+  clear hlist
+  induction edges with
+  | nil => simp only [List.map, List.lookup]
+  | cons hd tl ih =>
+    simp only [List.mem_cons, not_or] at hNotIn
+    simp only [List.map, List.lookup]
+    have hNeEdge : e ≠ hd := hNotIn.1
+    have hBeqFalse : (e == hd) = false := beq_eq_false_iff_ne.mpr hNeEdge
+    simp only [hBeqFalse]
+    exact ih hNotIn.2
+
 /-! ## Environment Lemmas -/
 
 theorem lookupStr_update_eq (store : Store) (x : Var) (v : Value) :
@@ -260,6 +347,80 @@ theorem lookupG_update_neq (env : GEnv) (e e' : Endpoint) (L : LocalType) (hne :
         simp only [hne']
         exact ih
 
+/-- If (e', S') ∈ updateG env e L, then either (e' = e and S' = L), or (e', S') was in env. -/
+theorem updateG_mem_of (env : GEnv) (e : Endpoint) (L : LocalType) (e' : Endpoint) (S' : LocalType)
+    (h : (e', S') ∈ updateG env e L) :
+    (e' = e ∧ S' = L) ∨ (e', S') ∈ env := by
+  induction env with
+  | nil =>
+    simp only [updateG, List.mem_singleton] at h
+    exact Or.inl (Prod.mk.inj h)
+  | cons hd tl ih =>
+    simp only [updateG] at h
+    split_ifs at h with heq
+    · -- e = hd.1: replaced the head
+      simp only [List.mem_cons] at h
+      cases h with
+      | inl hhead =>
+        exact Or.inl (Prod.mk.inj hhead)
+      | inr htl =>
+        exact Or.inr (List.mem_cons_of_mem _ htl)
+    · -- e ≠ hd.1: head preserved, recurse
+      simp only [List.mem_cons] at h
+      cases h with
+      | inl hhead =>
+        exact Or.inr (List.mem_cons.mpr (Or.inl hhead))
+      | inr htl =>
+        cases ih htl with
+        | inl heq' => exact Or.inl heq'
+        | inr hmem => exact Or.inr (List.mem_cons.mpr (Or.inr hmem))
+
+/-- updateG preserves supply_fresh: if all endpoints in env have sid < supply,
+    and e.sid < supply, then all endpoints in (updateG env e L) have sid < supply. -/
+theorem updateG_preserves_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalType)
+    (supply : SessionId)
+    (hFresh : ∀ e' S', (e', S') ∈ env → e'.sid < supply)
+    (heFresh : e.sid < supply) :
+    ∀ e' S', (e', S') ∈ updateG env e L → e'.sid < supply := by
+  intro e' S' hMem
+  cases updateG_mem_of env e L e' S' hMem with
+  | inl heq =>
+    rw [heq.1]
+    exact heFresh
+  | inr hmem =>
+    exact hFresh e' S' hmem
+
+/-- If lookupG returns some L, then (e, L) is in the list. -/
+theorem lookupG_mem (env : GEnv) (e : Endpoint) (L : LocalType)
+    (h : lookupG env e = some L) :
+    (e, L) ∈ env := by
+  simp only [lookupG] at h
+  induction env with
+  | nil =>
+    simp only [List.lookup] at h
+    exact Option.noConfusion h
+  | cons hd tl ih =>
+    simp only [List.lookup] at h
+    split at h
+    · simp only [Option.some.injEq] at h
+      rename_i heq
+      simp only [beq_iff_eq] at heq
+      simp only [List.mem_cons]
+      left
+      exact Prod.ext heq h.symm
+    · simp only [List.mem_cons]
+      right
+      exact ih h
+
+/-- If lookupG returns some L, then e.sid < supply (using supply_fresh_G). -/
+theorem lookupG_supply_fresh (env : GEnv) (e : Endpoint) (L : LocalType)
+    (supply : SessionId)
+    (hFresh : ∀ e' S', (e', S') ∈ env → e'.sid < supply)
+    (h : lookupG env e = some L) :
+    e.sid < supply := by
+  have hMem := lookupG_mem env e L h
+  exact hFresh e L hMem
+
 theorem lookupBuf_update_eq (bufs : Buffers) (e : Edge) (buf : Buffer) :
     lookupBuf (updateBuf bufs e buf) e = buf := by
   induction bufs with
@@ -339,5 +500,196 @@ theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne :
         have ih' := ih
         simp only [lookupD, Option.getD] at ih'
         exact ih'
+
+/-! ## Session Renaming Infrastructure -/
+
+/-- Session renaming: an injective function on session IDs. -/
+structure SessionRenaming where
+  f : SessionId → SessionId
+  inj : ∀ s1 s2, f s1 = f s2 → s1 = s2
+
+/-- Rename an endpoint's session ID. -/
+def renameEndpoint (ρ : SessionRenaming) (e : Endpoint) : Endpoint :=
+  { sid := ρ.f e.sid, role := e.role }
+
+/-- Rename an edge's session ID. -/
+def renameEdge (ρ : SessionRenaming) (e : Edge) : Edge :=
+  { sid := ρ.f e.sid, sender := e.sender, receiver := e.receiver }
+
+/-- Rename all endpoints in GEnv. -/
+def renameGEnv (ρ : SessionRenaming) (G : GEnv) : GEnv :=
+  G.map fun (e, L) => (renameEndpoint ρ e, L)
+
+/-- Rename all edges in DEnv. -/
+def renameDEnv (ρ : SessionRenaming) (D : DEnv) : DEnv :=
+  D.map fun (e, ts) => (renameEdge ρ e, ts)
+
+/-- Rename all edges in Buffers. -/
+def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
+  bufs.map fun (e, buf) => (renameEdge ρ e, buf)
+
+/-! ## Renaming Injectivity Lemmas -/
+
+/-- Renaming preserves endpoint equality (injective). -/
+theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
+    renameEndpoint ρ e1 = renameEndpoint ρ e2 → e1 = e2 := by
+  intro h
+  have hsid : ρ.f e1.sid = ρ.f e2.sid := by
+    have := congrArg Endpoint.sid h
+    simp only [renameEndpoint] at this
+    exact this
+  have hrole : e1.role = e2.role := by
+    have := congrArg Endpoint.role h
+    simp only [renameEndpoint] at this
+    exact this
+  have hsid' : e1.sid = e2.sid := ρ.inj _ _ hsid
+  cases e1; cases e2
+  simp only at hsid' hrole
+  subst hsid' hrole
+  rfl
+
+/-- Renaming preserves edge equality (injective). -/
+theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
+    renameEdge ρ e1 = renameEdge ρ e2 → e1 = e2 := by
+  intro h
+  have hsid : ρ.f e1.sid = ρ.f e2.sid := by
+    have := congrArg Edge.sid h
+    simp only [renameEdge] at this
+    exact this
+  have hsender : e1.sender = e2.sender := by
+    have := congrArg Edge.sender h
+    simp only [renameEdge] at this
+    exact this
+  have hrecv : e1.receiver = e2.receiver := by
+    have := congrArg Edge.receiver h
+    simp only [renameEdge] at this
+    exact this
+  have hsid' : e1.sid = e2.sid := ρ.inj _ _ hsid
+  cases e1; cases e2
+  simp only at hsid' hsender hrecv
+  subst hsid' hsender hrecv
+  rfl
+
+/-! ## Renaming Lookup Lemmas -/
+
+/-- Looking up a renamed endpoint in a renamed GEnv. -/
+theorem lookupG_rename (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) :
+    lookupG (renameGEnv ρ G) (renameEndpoint ρ e) = lookupG G e := by
+  induction G with
+  | nil => simp only [renameGEnv, lookupG, List.lookup, List.map]
+  | cons hd tl ih =>
+    simp only [renameGEnv, List.map, lookupG, List.lookup]
+    by_cases heq : e = hd.1
+    case pos =>
+      subst heq
+      simp only [beq_self_eq_true]
+    case neg =>
+      have hne : renameEndpoint ρ e ≠ renameEndpoint ρ hd.1 := fun h =>
+        heq (renameEndpoint_inj ρ _ _ h)
+      have hbeq1 : (e == hd.1) = false := beq_eq_false_iff_ne.mpr heq
+      have hbeq2 : (renameEndpoint ρ e == renameEndpoint ρ hd.1) = false :=
+        beq_eq_false_iff_ne.mpr hne
+      simp only [hbeq1, hbeq2]
+      exact ih
+
+/-- Looking up a renamed edge in a renamed DEnv. -/
+theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
+    lookupD (renameDEnv ρ D) (renameEdge ρ e) = lookupD D e := by
+  induction D with
+  | nil => simp only [renameDEnv, lookupD, List.lookup, List.map, Option.getD]
+  | cons hd tl ih =>
+    simp only [renameDEnv, List.map, lookupD, List.lookup, Option.getD]
+    by_cases heq : e = hd.1
+    case pos =>
+      subst heq
+      simp only [beq_self_eq_true]
+    case neg =>
+      have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
+        heq (renameEdge_inj ρ _ _ h)
+      have hbeq1 : (e == hd.1) = false := beq_eq_false_iff_ne.mpr heq
+      have hbeq2 : (renameEdge ρ e == renameEdge ρ hd.1) = false :=
+        beq_eq_false_iff_ne.mpr hne
+      simp only [hbeq1, hbeq2]
+      exact ih
+
+/-- Looking up a renamed edge in renamed buffers. -/
+theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
+    lookupBuf (renameBufs ρ bufs) (renameEdge ρ e) = lookupBuf bufs e := by
+  induction bufs with
+  | nil => simp only [renameBufs, lookupBuf, List.lookup, List.map, Option.getD]
+  | cons hd tl ih =>
+    simp only [renameBufs, List.map, lookupBuf, List.lookup, Option.getD]
+    by_cases heq : e = hd.1
+    case pos =>
+      subst heq
+      simp only [beq_self_eq_true]
+    case neg =>
+      have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
+        heq (renameEdge_inj ρ _ _ h)
+      have hbeq1 : (e == hd.1) = false := beq_eq_false_iff_ne.mpr heq
+      have hbeq2 : (renameEdge ρ e == renameEdge ρ hd.1) = false :=
+        beq_eq_false_iff_ne.mpr hne
+      simp only [hbeq1, hbeq2]
+      exact ih
+
+/-! ## Inverse Lookup Lemmas -/
+
+/-- If lookup succeeds in renamed GEnv, the preimage endpoint exists. -/
+theorem lookupG_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L : LocalType) :
+    lookupG (renameGEnv ρ G) e = some L →
+    ∃ e', e = renameEndpoint ρ e' ∧ lookupG G e' = some L := by
+  intro h
+  induction G with
+  | nil =>
+    simp only [renameGEnv, lookupG, List.lookup, List.map] at h
+    exact Option.noConfusion h
+  | cons hd tl ih =>
+    simp only [renameGEnv, List.map, lookupG, List.lookup] at h
+    by_cases heq : e = renameEndpoint ρ hd.1
+    case pos =>
+      simp only [heq, beq_self_eq_true, Option.some.injEq] at h
+      refine ⟨hd.1, heq, ?_⟩
+      simp only [lookupG, List.lookup, beq_self_eq_true]
+      exact congrArg some h
+    case neg =>
+      have hbeq : (e == renameEndpoint ρ hd.1) = false := beq_eq_false_iff_ne.mpr heq
+      simp only [hbeq] at h
+      obtain ⟨e', he', hLookup⟩ := ih h
+      refine ⟨e', he', ?_⟩
+      simp only [lookupG, List.lookup]
+      have hne : e' ≠ hd.1 := by
+        intro heq'
+        subst heq'
+        exact heq he'
+      simp only [beq_eq_false_iff_ne.mpr hne]
+      exact hLookup
+
+/-- If lookup succeeds (non-empty) in renamed DEnv, the preimage edge exists. -/
+theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
+    lookupD (renameDEnv ρ D) e ≠ [] →
+    ∃ e', e = renameEdge ρ e' ∧ lookupD D e' = lookupD (renameDEnv ρ D) e := by
+  intro h
+  induction D with
+  | nil =>
+    simp only [renameDEnv, lookupD, List.lookup, List.map, Option.getD, ne_eq,
+               not_true_eq_false] at h
+  | cons hd tl ih =>
+    simp only [renameDEnv, List.map, lookupD, List.lookup, Option.getD] at h ⊢
+    by_cases heq : e = renameEdge ρ hd.1
+    case pos =>
+      refine ⟨hd.1, heq, ?_⟩
+      subst heq
+      simp only [beq_self_eq_true]
+    case neg =>
+      have hbeq : (e == renameEdge ρ hd.1) = false := beq_eq_false_iff_ne.mpr heq
+      simp only [hbeq] at h ⊢
+      obtain ⟨e', he', hLookup⟩ := ih h
+      have hne : e' ≠ hd.1 := by
+        intro heq'
+        subst heq'
+        exact heq he'
+      refine ⟨e', he', ?_⟩
+      simp only [beq_eq_false_iff_ne.mpr hne]
+      exact hLookup
 
 end

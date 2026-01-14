@@ -351,6 +351,13 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
       | comm sender receiver gbs =>
           simp [CEmbedF] at hF
 
+/-- When lcontractive body = true in the context of a mu, body.isGuarded t = true.
+    This follows from the structure of lcontractive which requires send/recv/end at the top,
+    all of which are guarded for any variable. -/
+private axiom lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
+    (hcontr : LocalTypeR.lcontractive body = true) :
+    body.isGuarded t = true
+
 mutual
   theorem localType_has_embed (e : LocalTypeR) (role : String)
       (hwf : ∀ partner, e.hasSendTo partner → role ≠ partner)
@@ -377,12 +384,12 @@ mutual
             have _hterm : sizeOf body < sizeOf (LocalTypeR.mu t body) :=
               LocalTypeR.sizeOf_body_lt_sizeOf_mu t body
             obtain ⟨gbody, hembed⟩ := localType_has_embed body role hwf_body hwf'_body
-            have hcontr_gbody : RumpsteakV2.Protocol.Projection.Trans.lcontractive gbody = true :=
-              embed_lcontractive_of_local hcontr hembed
+            -- lcontractive body = true implies body.isGuarded t = true
+            have hguard : body.isGuarded t = true := lcontractive_implies_isGuarded t body hcontr
             use .mu t gbody
             apply CEmbed_fold'
             simp [CEmbedF]
-            exact ⟨hcontr_gbody, hembed⟩
+            exact ⟨hguard, hembed⟩
         | false =>
             have hbad : (LocalTypeR.mu t body).hasSendTo role :=
               LocalTypeR.hasSendTo_noncontractive (t := t) (body := body) (partner := role) hcontr

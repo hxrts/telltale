@@ -76,9 +76,52 @@ def empty : InterfaceType where
 def disjointSessions (i₁ i₂ : InterfaceType) : Bool :=
   i₁.sessionIds.all fun s => !i₂.sessionIds.contains s
 
-/-- Check if i₁'s exports match i₂'s imports (by endpoint). -/
+/-- Propositional version of disjoint sessions. -/
+def DisjointSessions (i₁ i₂ : InterfaceType) : Prop :=
+  ∀ s, s ∈ i₁.sessionIds → s ∉ i₂.sessionIds
+
+/-- Check if i₁'s exports match i₂'s imports (by endpoint only). -/
 def exportsMatchImports (i₁ i₂ : InterfaceType) : Bool :=
   i₂.imports.all fun (e, _) => i₁.exports.any fun (e', _) => e == e'
+
+/-! ### Type Compatibility (6.7.1)
+
+Two endpoint-type pairs are compatible if they have the same endpoint
+and dual types. For composition, i₁'s exports should be dual to i₂'s imports.
+-/
+
+/-- Check if two local types are dual (one sends what the other receives).
+    For now, we use a simplified structural check at the head. -/
+def dualTypes (L₁ L₂ : LocalType) : Bool :=
+  match L₁, L₂ with
+  | .send r₁ T₁ _, .recv r₂ T₂ _ =>
+    r₁ == r₂ && T₁ == T₂
+  | .recv r₁ T₁ _, .send r₂ T₂ _ =>
+    r₁ == r₂ && T₁ == T₂
+  | .select r₁ bs₁, .branch r₂ bs₂ =>
+    r₁ == r₂ && bs₁.length == bs₂.length &&
+    (bs₁.zip bs₂).all fun ((ℓ₁, _), (ℓ₂, _)) => ℓ₁ == ℓ₂
+  | .branch r₁ bs₁, .select r₂ bs₂ =>
+    r₁ == r₂ && bs₁.length == bs₂.length &&
+    (bs₁.zip bs₂).all fun ((ℓ₁, _), (ℓ₂, _)) => ℓ₁ == ℓ₂
+  | .end_, .end_ => true
+  | _, _ => false
+
+/-- Check if an export from i₁ is compatible with an import from i₂.
+    Compatible means same endpoint and dual types. -/
+def compatiblePair (exp : Endpoint × LocalType) (imp : Endpoint × LocalType) : Bool :=
+  exp.1 == imp.1 && dualTypes exp.2 imp.2
+
+/-- Check if i₁'s exports are compatible with i₂'s imports.
+    Every import in i₂ must have a compatible export in i₁. -/
+def exportsCompatibleWithImports (i₁ i₂ : InterfaceType) : Bool :=
+  i₂.imports.all fun imp =>
+    i₁.exports.any fun exp => compatiblePair exp imp
+
+/-- Propositional version: i₁'s exports satisfy i₂'s imports with type compatibility. -/
+def ExportsCompatibleWithImports (i₁ i₂ : InterfaceType) : Prop :=
+  ∀ imp, imp ∈ i₂.imports →
+    ∃ exp, exp ∈ i₁.exports ∧ exp.1 = imp.1 ∧ dualTypes exp.2 imp.2 = true
 
 /-- Merge two interfaces (for composed protocols). -/
 def merge (i₁ i₂ : InterfaceType) : InterfaceType where
@@ -88,6 +131,13 @@ def merge (i₁ i₂ : InterfaceType) : InterfaceType where
              i₂.exports.filter (fun (e, _) => !i₁.imports.any (fun (e', _) => e == e'))
   imports := i₁.imports.filter (fun (e, _) => !i₂.exports.any (fun (e', _) => e == e')) ++
              i₂.imports.filter (fun (e, _) => !i₁.exports.any (fun (e', _) => e == e'))
+
+/-- All session IDs in the interface. -/
+def allSessionIds (i : InterfaceType) : List SessionId := i.sessionIds
+
+/-- Check if an endpoint belongs to this interface. -/
+def hasEndpoint (i : InterfaceType) (e : Endpoint) : Bool :=
+  i.exports.any (fun (e', _) => e == e') || i.imports.any (fun (e', _) => e == e')
 
 end InterfaceType
 
@@ -169,10 +219,22 @@ theorem initMonitorState_wellTyped (p : DeployedProtocol) :
     WTMon p.initMonitorState := by
   constructor
   · exact p.coherence_cert
+  · -- headCoherent: buffer heads match expected receive types
+    sorry  -- Requires HeadCoherent for initial state
+  · -- validLabels: branch labels in buffers are valid
+    sorry  -- Requires ValidLabels for initial state
   · exact p.buffers_typed_cert
   · -- lin_valid: tokens match G
     intro e S hIn
     sorry  -- Proof requires showing initLin entries match initGEnv
+  · -- lin_unique: no duplicate endpoints
+    sorry  -- Requires initLin has no duplicates
+  · -- supply_fresh: Lin endpoints below supply
+    intro e S hIn
+    sorry  -- Requires initLin endpoints have sid < supply
+  · -- supply_fresh_G: G endpoints below supply
+    intro e S hIn
+    sorry  -- Requires initGEnv endpoints have sid < supply
 
 /-- Get all endpoints for this protocol. -/
 def endpoints (p : DeployedProtocol) : List Endpoint :=
@@ -238,13 +300,21 @@ def mkDefaultInterface (roles : RoleSet) (sid : SessionId) (localTypes : Role �
   exports := roles.map fun r => ({ sid := sid, role := r }, localTypes r)
   imports := []
 
-/-! ## Linking Judgment (Preview)
+/-! ## Linking Judgment (6.7.2)
 
 The linking judgment determines when two protocols can be safely composed.
-Full implementation is in Phase 12.
+This is the full LinkOK predicate with all required conditions.
 -/
 
-/-- Two protocols can be linked if their interfaces are compatible. -/
+/-- Decidable version: Two protocols can be linked if their interfaces are compatible. -/
+def linkOK (p₁ p₂ : DeployedProtocol) : Bool :=
+  -- Disjoint sessions
+  p₁.interface.disjointSessions p₂.interface &&
+  -- Compatible exports/imports (with type checking)
+  p₁.interface.exportsCompatibleWithImports p₂.interface &&
+  p₂.interface.exportsCompatibleWithImports p₁.interface
+
+/-- Two protocols can be linked if their interfaces are compatible (legacy, Bool version). -/
 def LinkOK (p₁ p₂ : DeployedProtocol) : Prop :=
   -- Disjoint sessions
   p₁.interface.disjointSessions p₂.interface = true ∧
@@ -252,9 +322,9 @@ def LinkOK (p₁ p₂ : DeployedProtocol) : Prop :=
   p₁.interface.exportsMatchImports p₂.interface = true ∧
   p₂.interface.exportsMatchImports p₁.interface = true
 
-/-! ## Protocol Composition
+/-! ## Environment Merging
 
-Compose two protocols into a single protocol bundle.
+Merge operations for composing protocol environments.
 -/
 
 /-- Merge two GEnvs (disjoint union). -/
@@ -268,6 +338,39 @@ def mergeBufs (B₁ B₂ : Buffers) : Buffers := B₁ ++ B₂
 
 /-- Merge two linear contexts (disjoint union). -/
 def mergeLin (L₁ L₂ : LinCtx) : LinCtx := L₁ ++ L₂
+
+/-- Full linking judgment (6.7.2): Propositional version with all conditions.
+
+Two deployed protocols can be safely composed when:
+1. Their session IDs are disjoint (no interference)
+2. p₁'s exports are compatible with p₂'s imports (dual types)
+3. p₂'s exports are compatible with p₁'s imports (dual types)
+4. The merged environments remain coherent
+-/
+def LinkOKFull (p₁ p₂ : DeployedProtocol) : Prop :=
+  -- 1. Disjoint sessions
+  InterfaceType.DisjointSessions p₁.interface p₂.interface ∧
+  -- 2. p₁'s exports compatible with p₂'s imports
+  InterfaceType.ExportsCompatibleWithImports p₁.interface p₂.interface ∧
+  -- 3. p₂'s exports compatible with p₁'s imports
+  InterfaceType.ExportsCompatibleWithImports p₂.interface p₁.interface ∧
+  -- 4. Merged environments remain coherent
+  Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv)
+
+/-- LinkOKFull implies the basic LinkOK (useful for backwards compatibility). -/
+theorem LinkOKFull_implies_disjoint (p₁ p₂ : DeployedProtocol)
+    (h : LinkOKFull p₁ p₂) :
+    InterfaceType.DisjointSessions p₁.interface p₂.interface := h.1
+
+/-- LinkOKFull gives us merged coherence directly. -/
+theorem LinkOKFull_coherent (p₁ p₂ : DeployedProtocol)
+    (h : LinkOKFull p₁ p₂) :
+    Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) := h.2.2.2
+
+/-! ## Protocol Composition
+
+Compose two protocols into a single protocol bundle.
+-/
 
 /-- Compose two monitor states into one. -/
 def composeMonitorState (ms₁ ms₂ : MonitorState) : MonitorState where
@@ -295,13 +398,57 @@ def composeBundle (p₁ p₂ : ProtocolBundle) : ProtocolBundle where
 
 /-! ## Linking Theorems -/
 
-/-- Linking preserves well-typedness.
+/-! ### Helper Lemmas for Merge Operations -/
 
-When two protocols with compatible interfaces are linked:
-1. Their merged GEnv contains all endpoints
-2. Their merged DEnv contains all edges
-3. Coherence is preserved (disjoint sessions don't interfere)
--/
+/-- Merged buffers preserve typing when sessions are disjoint. -/
+theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffers)
+    (hTyped₁ : BuffersTyped G₁ D₁ B₁)
+    (hTyped₂ : BuffersTyped G₂ D₂ B₂)
+    (hDisjoint : ∀ e, (∃ L, (e, L) ∈ G₁) → ∀ L', (e, L') ∉ G₂) :
+    BuffersTyped (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂) := by
+  intro e
+  simp only [BufferTyped, mergeGEnv, mergeDEnv, mergeBufs, lookupBuf, lookupD]
+  -- For each edge, either it's in D₁/B₁ or D₂/B₂ (or neither)
+  simp only [List.lookup_append]
+  sorry  -- Requires case analysis on which session the edge belongs to
+
+/-- Merged linear context is valid when sessions are disjoint. -/
+theorem mergeLin_valid (G₁ G₂ : GEnv) (L₁ L₂ : LinCtx)
+    (hValid₁ : ∀ e S, (e, S) ∈ L₁ → lookupG G₁ e = some S)
+    (hValid₂ : ∀ e S, (e, S) ∈ L₂ → lookupG G₂ e = some S)
+    (hDisjoint : ∀ e, (∃ S, (e, S) ∈ L₁) → ∀ S', (e, S') ∉ L₂) :
+    ∀ e S, (e, S) ∈ mergeLin L₁ L₂ → lookupG (mergeGEnv G₁ G₂) e = some S := by
+  intro e S hMem
+  simp only [mergeLin, List.mem_append] at hMem
+  simp only [mergeGEnv, lookupG, List.lookup_append]
+  cases hMem with
+  | inl h₁ =>
+    have hLookup := hValid₁ e S h₁
+    simp only [lookupG] at hLookup
+    simp only [hLookup, Option.some_or]
+  | inr h₂ =>
+    have hLookup := hValid₂ e S h₂
+    simp only [lookupG] at hLookup
+    -- Need to show lookup in G₁ fails (disjoint sessions)
+    sorry  -- Requires showing e not in G₁ by disjointness
+
+/-- Merged linear context preserves uniqueness when sessions are disjoint. -/
+theorem mergeLin_unique (L₁ L₂ : LinCtx)
+    (hUnique₁ : L₁.Pairwise (fun a b => a.1 ≠ b.1))
+    (hUnique₂ : L₂.Pairwise (fun a b => a.1 ≠ b.1))
+    (hDisjoint : ∀ e, (∃ S, (e, S) ∈ L₁) → ∀ S', (e, S') ∉ L₂) :
+    (mergeLin L₁ L₂).Pairwise (fun a b => a.1 ≠ b.1) := by
+  simp only [mergeLin, List.pairwise_append]
+  refine ⟨hUnique₁, hUnique₂, ?_⟩
+  intro a ha b hb
+  -- a is in L₁, b is in L₂, so a.1 ≠ b.1 by disjointness
+  intro heq
+  have hEx : ∃ S, (a.1, S) ∈ L₁ := ⟨a.2, by rw [Prod.eta]; exact ha⟩
+  have hNotIn := hDisjoint a.1 hEx b.2
+  rw [heq] at hNotIn
+  exact hNotIn (by rw [Prod.eta]; exact hb)
+
+/-- Linking preserves well-typedness (legacy version). -/
 theorem link_preserves_WTMon (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂)
     (hWT₁ : WTMon p₁.initMonitorState)
@@ -310,6 +457,31 @@ theorem link_preserves_WTMon (p₁ p₂ : DeployedProtocol)
   -- The key insight is that disjoint sessions maintain coherence independently
   -- Each session's endpoints and edges don't interfere with the other
   sorry  -- Full proof requires showing merge preserves invariants
+
+/-- Linking preserves well-typedness (full version with merged coherence). -/
+theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
+    (hLink : LinkOKFull p₁ p₂)
+    (hWT₁ : WTMon p₁.initMonitorState)
+    (hWT₂ : WTMon p₂.initMonitorState) :
+    WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState) := by
+  simp only [composeMonitorState, DeployedProtocol.initMonitorState]
+  constructor
+  · -- coherent: Follows directly from LinkOKFull
+    exact hLink.2.2.2
+  · -- headCoherent
+    sorry  -- Requires merged HeadCoherent
+  · -- validLabels
+    sorry  -- Requires merged ValidLabels
+  · -- buffers_typed
+    sorry  -- Requires mergeBufs_typed with session disjointness
+  · -- lin_valid
+    sorry  -- Requires mergeLin_valid with session disjointness
+  · -- lin_unique
+    sorry  -- Requires mergeLin_unique with session disjointness
+  · -- supply_fresh
+    sorry  -- Requires showing max supply maintains freshness
+  · -- supply_fresh_G
+    sorry  -- Requires showing merged G entries are fresh
 
 /-! ## Composition Preserves Deadlock Freedom
 

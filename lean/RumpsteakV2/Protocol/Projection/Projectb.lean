@@ -121,7 +121,8 @@ mutual
         match cand with
         | .mu t' candBody =>
             if t == t' then
-              if lcontractive body then
+              -- Match CProjectF: check candBody.isGuarded t' (Coq-style)
+              if candBody.isGuarded t' then
                 projectb body role candBody
               else
                 false
@@ -211,7 +212,9 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
   | .end, .end => True
   | .var t, .var t' => t = t'
   | .mu t body, .mu t' candBody =>
-      t = t' ∧ lcontractive body ∧ R body role candBody
+      -- Matches Coq: trans (.mu t body) role = .mu t e iff e.isGuarded t
+      -- The candBody must be guarded by t' for the mu structure to be preserved
+      t = t' ∧ candBody.isGuarded t' ∧ R body role candBody
   | .comm sender receiver gbs, cand =>
       if role = sender then
         match cand with
@@ -371,14 +374,15 @@ theorem CProject_var (t : String) (role : String) : CProject (.var t) role (.var
   have hf : CProjectF CProject (.var t) role (.var t) := by simp only [CProjectF]
   exact Eq.mp (congrFun (congrFun (congrFun hfix (.var t)) role) (.var t)) hf
 
-/-- CProject for mu-mu. -/
+/-- CProject for mu-mu.
+    Now requires candBody.isGuarded t to match new trans semantics. -/
 theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (role : String)
-    (hcontr : lcontractive body) (hbody : CProject body role candBody) :
+    (hguard : candBody.isGuarded t = true) (hbody : CProject body role candBody) :
     CProject (.mu t body) role (.mu t candBody) := by
   have hfix : CProjectF CProject = CProject := CProject_fixed
   have hf : CProjectF CProject (.mu t body) role (.mu t candBody) := by
     dsimp only [CProjectF]
-    exact ⟨rfl, hcontr, hbody⟩
+    exact ⟨rfl, hguard, hbody⟩
   exact Eq.mp (congrFun (congrFun (congrFun hfix (.mu t body)) role) (.mu t candBody)) hf
 
 /-- CProject for comm-send (role is sender). -/
@@ -462,11 +466,12 @@ theorem projectb_var_var (t t' : String) (role : String) :
     projectb (.var t) role (.var t') = (t == t') := by
   unfold projectb; rfl
 
-/-- Reflection: projectb for mu-mu case. -/
+/-- Reflection: projectb for mu-mu case.
+    Note: We check `candBody.isGuarded t'` (Coq-style) instead of `lcontractive body`. -/
 theorem projectb_mu_mu (t t' : String) (body : GlobalType) (candBody : LocalTypeR) (role : String) :
     projectb (.mu t body) role (.mu t' candBody) =
       (if t == t' then
-        if lcontractive body then projectb body role candBody
+        if candBody.isGuarded t' then projectb body role candBody
         else false
       else false) := by
   simp only [projectb]

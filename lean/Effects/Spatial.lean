@@ -308,11 +308,17 @@ def branchesReq (reqs : List SpatialReq) : SpatialReq :=
 Convenience functions for constructing topologies.
 -/
 
+/-- Default capabilities with network and timeout enabled. -/
+def SiteCapabilities.enabled : SiteCapabilities where
+  hasNetwork := true
+  hasTimeout := true
+
 /-- Create a topology where all roles share a single site. -/
 def Topology.allColocated (site : Site) : Topology where
   sites := [site]
   assign := fun _ => site
   edges := [(site, site)]
+  capabilities := fun _ => SiteCapabilities.enabled
 
 /-- Create a topology with each role on its own site, fully connected. -/
 def Topology.fullyConnected (roles : List RoleName) : Topology where

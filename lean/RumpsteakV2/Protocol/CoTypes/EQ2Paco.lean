@@ -1,6 +1,7 @@
 import Paco
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.CoinductiveRelPaco
+import RumpsteakV2.Protocol.CoTypes.Bisim
 
 /-! # EQ2 Integration with Paco
 
@@ -35,6 +36,7 @@ theorem my_eq2_proof : EQ2 a b := by
 namespace RumpsteakV2.Protocol.CoTypes.EQ2Paco
 
 open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.Bisim
 open RumpsteakV2.Protocol.LocalTypeR
 open Paco
 
@@ -185,47 +187,33 @@ theorem EQ2_gpaco_coind' (R r g : EQ2.Rel)
 The main application: proving transitivity of EQ2 using accumulation.
 -/
 
-/-- The relation for transitivity proofs: pairs connected by an intermediate. -/
-def TransRelPaco : EQ2.Rel := fun a c => ∃ b, EQ2 a b ∧ EQ2 b c
+/-- The relation for transitivity proofs: pairs connected by WellFormed intermediate. -/
+def TransRelPacoWF : EQ2.Rel := fun a c =>
+  ∃ b, EQ2 a b ∧ EQ2 b c ∧
+  LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed b ∧ LocalTypeR.WellFormed c
 
-/-- TransRelPaco relates to the paco accumulator pattern.
-
-Note: This is subsumed by EQ2_trans_via_Bisim in Bisim.lean.
-The paco approach is kept for documentation but the proof delegates to existing infrastructure. -/
-theorem TransRelPaco_to_paco {a c : LocalTypeR} (h : TransRelPaco a c) :
+/-- TransRelPacoWF with WellFormed hypotheses can use EQ2_trans_via_Bisim. -/
+theorem TransRelPacoWF_to_paco {a c : LocalTypeR} (h : TransRelPacoWF a c) :
     paco EQ2FMono (toPacoRel EQ2) a c := by
-  obtain ⟨b, hab, hbc⟩ := h
-  -- Use existing EQ2_trans and apply paco_coind with EQ2 as witness
-  have heq := EQ2_trans hab hbc
-  -- Use EQ2 itself as the witness relation
+  obtain ⟨b, hab, hbc, hWFa, hWFb, hWFc⟩ := h
+  have heq : EQ2 a c := EQ2_trans_via_Bisim hab hbc hWFa hWFb hWFc
   refine ⟨toPacoRel EQ2, ?_, heq⟩
   intro x y hxy
-  -- hxy : EQ2 x y
-  -- Need: EQ2FMono.F (EQ2 ⊔ EQ2) x y
-  -- EQ2FMono.F = EQ2F_paco, and EQ2 ⊔ EQ2 simplifies to something containing EQ2
-  -- Since EQ2 ⊆ EQ2F EQ2, we need to lift through the sup
-  have h := EQ2.destruct hxy
-  -- h : EQ2F EQ2 x y
-  -- Need: EQ2F_paco (toPacoRel EQ2 ⊔ toPacoRel EQ2) x y
+  have h' := EQ2.destruct hxy
   show EQ2F_paco (toPacoRel EQ2 ⊔ toPacoRel EQ2) x y
   simp only [EQ2F_paco, fromPacoRel, toPacoRel]
-  -- EQ2F (fun a b => EQ2 a b ∨ EQ2 a b) x y
-  -- Since P ∨ P ↔ P, this is EQ2F EQ2 x y
-  exact EQ2F.mono (fun _ _ hr => Or.inl hr) x y h
+  exact EQ2F.mono (fun _ _ hr => Or.inl hr) x y h'
 
-/-- Alternative transitivity proof using paco's native accumulation.
+/-- Transitivity for EQ2 via paco (requires WellFormed).
 
-This demonstrates the paco approach:
-1. Start with EQ2 a b (proven fact, goes into accumulator)
-2. Coinductively show EQ2 b c implies EQ2 a c
-3. The accumulator lets us "borrow" the a~b fact during the proof
-
-Note: This is subsumed by EQ2_trans which uses TransRel_postfix (axiom),
-and by EQ2_trans_via_Bisim in Bisim.lean which is fully proven. -/
+This version includes explicit WellFormed hypotheses and delegates to
+EQ2_trans_via_Bisim from Bisim.lean. For transitivity without WellFormed,
+use specialized lemmas like EQ2_trans_via_end or EQ2_trans_via_var. -/
 theorem EQ2_trans_via_paco {a b c : LocalTypeR}
-    (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
-  -- Delegate to existing EQ2_trans
-  exact EQ2_trans hab hbc
+    (hab : EQ2 a b) (hbc : EQ2 b c)
+    (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b)
+    (hWFc : LocalTypeR.WellFormed c) : EQ2 a c :=
+  EQ2_trans_via_Bisim hab hbc hWFa hWFb hWFc
 
 /-! ## Up-To Techniques
 

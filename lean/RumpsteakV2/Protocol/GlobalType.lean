@@ -512,6 +512,124 @@ theorem substitute_mu_roles_subset (body : GlobalType) (t : String) :
 These lemmas show that unfolding a mu-type preserves well-formedness.
 Key property: if `mu t body` is well-formed, then `body.substitute t (mu t body)` is well-formed. -/
 
+-- Helper lemmas for allVarsBound
+
+/-- If t is in (x :: xs) and t ≠ x, then t is in xs. -/
+theorem contains_cons_ne' {t x : String} {xs : List String}
+    (hcontains : (x :: xs).contains t = true)
+    (hne : t ≠ x) :
+    xs.contains t = true := by
+  rw [List.contains_cons] at hcontains
+  simp only [Bool.or_eq_true] at hcontains
+  cases hcontains with
+  | inl heq =>
+      simp only [beq_iff_eq] at heq
+      exact absurd heq hne
+  | inr hmem => exact hmem
+
+-- allVarsBound is monotonic: if vars are bound with bound1, they're bound with any superset.
+mutual
+  theorem allVarsBound_mono (g : GlobalType) (bound₁ bound₂ : List String)
+      (hsub : ∀ x, bound₁.contains x = true → bound₂.contains x = true)
+      (hbound : g.allVarsBound bound₁ = true) :
+      g.allVarsBound bound₂ = true := by
+    match g with
+    | .end => simp [GlobalType.allVarsBound]
+    | .var t =>
+        simp only [GlobalType.allVarsBound] at hbound ⊢
+        exact hsub t hbound
+    | .mu t body =>
+        simp only [GlobalType.allVarsBound] at hbound ⊢
+        apply allVarsBound_mono body (t :: bound₁) (t :: bound₂)
+        · intro x hx
+          rw [List.contains_cons] at hx ⊢
+          simp only [Bool.or_eq_true] at hx ⊢
+          cases hx with
+          | inl heq => left; exact heq
+          | inr hmem => right; exact hsub x hmem
+        · exact hbound
+    | .comm _ _ branches =>
+        simp only [GlobalType.allVarsBound] at hbound ⊢
+        exact allVarsBoundBranches_mono branches bound₁ bound₂ hsub hbound
+
+  theorem allVarsBoundBranches_mono (branches : List (Label × GlobalType))
+      (bound₁ bound₂ : List String)
+      (hsub : ∀ x, bound₁.contains x = true → bound₂.contains x = true)
+      (hbound : allVarsBoundBranches branches bound₁ = true) :
+      allVarsBoundBranches branches bound₂ = true := by
+    match branches with
+    | [] => rfl
+    | (_, g) :: rest =>
+        simp only [allVarsBoundBranches, Bool.and_eq_true] at hbound ⊢
+        exact ⟨allVarsBound_mono g bound₁ bound₂ hsub hbound.1,
+               allVarsBoundBranches_mono rest bound₁ bound₂ hsub hbound.2⟩
+end
+
+/-- Adding a duplicate element to bound doesn't change allVarsBound. -/
+theorem allVarsBound_cons_dup (g : GlobalType) (x : String) (bound : List String)
+    (hbound : g.allVarsBound (x :: bound) = true) :
+    g.allVarsBound (x :: x :: bound) = true := by
+  apply allVarsBound_mono g (x :: bound) (x :: x :: bound)
+  · intro y hy
+    rw [List.contains_cons] at hy ⊢
+    simp only [Bool.or_eq_true] at hy ⊢
+    cases hy with
+    | inl heq => left; exact heq
+    | inr hmem =>
+        right
+        rw [List.contains_cons]
+        simp only [Bool.or_eq_true]
+        right; exact hmem
+  · exact hbound
+
+/-- Removing a duplicate from bound preserves allVarsBound. -/
+theorem allVarsBound_cons_dedup (g : GlobalType) (x : String) (bound : List String)
+    (hbound : g.allVarsBound (x :: x :: bound) = true) :
+    g.allVarsBound (x :: bound) = true := by
+  apply allVarsBound_mono g (x :: x :: bound) (x :: bound)
+  · intro y hy
+    rw [List.contains_cons] at hy ⊢
+    simp only [Bool.or_eq_true] at hy ⊢
+    cases hy with
+    | inl heq => left; exact heq
+    | inr hmem =>
+        rw [List.contains_cons] at hmem
+        simp only [Bool.or_eq_true] at hmem
+        cases hmem with
+        | inl heq => left; exact heq
+        | inr hmem' => right; exact hmem'
+  · exact hbound
+
+/-- Swapping adjacent elements in bound preserves allVarsBound. -/
+theorem allVarsBound_swap (g : GlobalType) (x y : String) (bound : List String)
+    (hbound : g.allVarsBound (x :: y :: bound) = true) :
+    g.allVarsBound (y :: x :: bound) = true := by
+  apply allVarsBound_mono g (x :: y :: bound) (y :: x :: bound)
+  · intro z hz
+    rw [List.contains_cons] at hz ⊢
+    simp only [Bool.or_eq_true] at hz ⊢
+    cases hz with
+    | inl heq =>
+        -- z == x, so z is in (y :: x :: bound) via second element
+        right
+        rw [List.contains_cons]
+        simp only [Bool.or_eq_true]
+        left; exact heq
+    | inr hmem =>
+        rw [List.contains_cons] at hmem
+        simp only [Bool.or_eq_true] at hmem
+        cases hmem with
+        | inl heq =>
+            -- z == y, so z is at the head
+            left; exact heq
+        | inr hmem' =>
+            -- z in bound
+            right
+            rw [List.contains_cons]
+            simp only [Bool.or_eq_true]
+            right; exact hmem'
+  · exact hbound
+
 mutual
   /-- allVarsBound is preserved when substituting a closed type for a bound variable.
 
@@ -530,31 +648,45 @@ mutual
         · -- t = varName, so we substitute repl
           exact hrepl
         · -- t ≠ varName, so var t stays
-          -- Need to show: if t ∈ (varName :: bound) and t ≠ varName, then t ∈ bound
-          -- This is a basic list membership property
-          sorry
+          rename_i hne
+          simp only [GlobalType.allVarsBound] at hg ⊢
+          -- hne: (t == varName) = false, which means t ≠ varName
+          have hne' : t ≠ varName := by
+            intro heq
+            simp only [heq, beq_self_eq_true] at hne
+            exact absurd trivial hne
+          exact contains_cons_ne' hg hne'
     | .mu t inner =>
         simp only [GlobalType.substitute]
         split
         · -- t = varName, shadowed, so no substitution in inner
+          rename_i heq
           simp only [GlobalType.allVarsBound] at hg ⊢
-          -- The inner body was bound with (t :: varName :: bound) = (varName :: varName :: bound)
-          -- but since t = varName, it's actually the same
-          -- We need to show inner.allVarsBound (t :: bound) = true
-          -- hg gives us inner.allVarsBound (t :: varName :: bound) = true
-          -- But t = varName, so this is inner.allVarsBound (varName :: varName :: bound)
-          -- Actually we need the stronger fact: bound ⊆ varName::bound preserves allVarsBound
-          -- This requires a monotonicity lemma
-          sorry
+          -- heq: (t == varName) = true, so t = varName
+          have heq' : t = varName := by simp only [beq_iff_eq] at heq; exact heq
+          -- hg: inner.allVarsBound (t :: varName :: bound) = true
+          -- Since t = varName, this is inner.allVarsBound (varName :: varName :: bound)
+          rw [heq'] at hg ⊢
+          -- Now hg: inner.allVarsBound (varName :: varName :: bound) = true
+          -- Goal: inner.allVarsBound (varName :: bound) = true
+          exact allVarsBound_cons_dedup inner varName bound hg
         · -- t ≠ varName
           simp only [GlobalType.allVarsBound] at hg ⊢
           -- hg: inner.allVarsBound (t :: varName :: bound) = true
           -- Need: (inner.substitute varName repl).allVarsBound (t :: bound) = true
-          -- But inner may reference varName which needs to be bound by t::bound after substitution
-          -- Actually, for the substituted result, we need (t :: bound) to contain all free vars
-          -- The IH requires inner to have varName bound in (varName :: t :: bound)
-          -- This is subtle - need to permute the bound list
-          sorry
+          -- Use IH with bound' = (t :: bound)
+          -- Need: inner.allVarsBound (varName :: t :: bound) = true (from swap)
+          -- Need: repl.allVarsBound (t :: bound) = true (from mono)
+          have hg' : inner.allVarsBound (varName :: t :: bound) = true :=
+            allVarsBound_swap inner t varName bound hg
+          have hrepl' : repl.allVarsBound (t :: bound) = true := by
+            apply allVarsBound_mono repl bound (t :: bound)
+            · intro x hx
+              rw [List.contains_cons]
+              simp only [Bool.or_eq_true]
+              right; exact hx
+            · exact hrepl
+          exact allVarsBound_substitute inner varName repl (t :: bound) hg' hrepl'
     | .comm sender receiver branches =>
         simp only [GlobalType.substitute, GlobalType.allVarsBound] at hg ⊢
         exact allVarsBoundBranches_substitute branches varName repl bound hg hrepl
@@ -650,6 +782,264 @@ mutual
                noSelfCommBranches_substitute rest varName repl hg.2 hrepl⟩
 end
 
+-- Helper lemmas for isProductive monotonicity with respect to unguarded list
+
+-- isProductive is monotonic: adding elements to unguarded can only make it false, not true.
+-- Equivalently, if productive with more elements in unguarded, productive with fewer.
+mutual
+  theorem isProductive_mono (g : GlobalType) (ug1 ug2 : List String)
+      (hsub : ∀ x, ug1.contains x = true → ug2.contains x = true)
+      (hprod : g.isProductive ug2 = true) :
+      g.isProductive ug1 = true := by
+    match g with
+    | .end => rfl
+    | .var t =>
+        simp only [GlobalType.isProductive, Bool.not_eq_true'] at hprod ⊢
+        -- hprod: ug2.contains t = false
+        -- Goal: ug1.contains t = false
+        -- Proof by contrapositive: if ug1.contains t = true, then ug2.contains t = true
+        by_contra hug1
+        simp only [Bool.not_eq_false] at hug1
+        have h := hsub t hug1
+        rw [hprod] at h
+        exact Bool.false_ne_true h
+    | .mu t body =>
+        simp only [GlobalType.isProductive] at hprod ⊢
+        apply isProductive_mono body (t :: ug1) (t :: ug2)
+        · intro x hx
+          rw [List.contains_cons] at hx ⊢
+          simp only [Bool.or_eq_true] at hx ⊢
+          cases hx with
+          | inl heq => left; exact heq
+          | inr hmem => right; exact hsub x hmem
+        · exact hprod
+    | .comm _ _ branches =>
+        simp only [GlobalType.isProductive] at hprod ⊢
+        exact hprod  -- comm resets unguarded to [], so independent of ug1/ug2
+
+  theorem isProductiveBranches_mono (branches : List (Label × GlobalType))
+      (ug1 ug2 : List String)
+      (hsub : ∀ x, ug1.contains x = true → ug2.contains x = true)
+      (hprod : isProductiveBranches branches ug2 = true) :
+      isProductiveBranches branches ug1 = true := by
+    match branches with
+    | [] => rfl
+    | (_, g) :: rest =>
+        simp only [isProductiveBranches, Bool.and_eq_true] at hprod ⊢
+        exact ⟨isProductive_mono g ug1 ug2 hsub hprod.1,
+               isProductiveBranches_mono rest ug1 ug2 hsub hprod.2⟩
+end
+
+/-- Removing a duplicate from unguarded preserves isProductive. -/
+theorem isProductive_cons_dedup (g : GlobalType) (x : String) (unguarded : List String)
+    (hprod : g.isProductive (x :: x :: unguarded) = true) :
+    g.isProductive (x :: unguarded) = true := by
+  apply isProductive_mono g (x :: unguarded) (x :: x :: unguarded)
+  · intro y hy
+    rw [List.contains_cons] at hy ⊢
+    simp only [Bool.or_eq_true] at hy ⊢
+    cases hy with
+    | inl heq => left; exact heq
+    | inr hmem =>
+        right
+        rw [List.contains_cons]
+        simp only [Bool.or_eq_true]
+        right; exact hmem
+  · exact hprod
+
+/-- Swapping adjacent elements in unguarded preserves isProductive. -/
+theorem isProductive_swap (g : GlobalType) (x y : String) (unguarded : List String)
+    (hprod : g.isProductive (x :: y :: unguarded) = true) :
+    g.isProductive (y :: x :: unguarded) = true := by
+  apply isProductive_mono g (y :: x :: unguarded) (x :: y :: unguarded)
+  · intro z hz
+    rw [List.contains_cons] at hz ⊢
+    simp only [Bool.or_eq_true] at hz ⊢
+    cases hz with
+    | inl heq =>
+        right
+        rw [List.contains_cons]
+        simp only [Bool.or_eq_true]
+        left; exact heq
+    | inr hmem =>
+        rw [List.contains_cons] at hmem
+        simp only [Bool.or_eq_true] at hmem
+        cases hmem with
+        | inl heq => left; exact heq
+        | inr hmem' =>
+            right
+            rw [List.contains_cons]
+            simp only [Bool.or_eq_true]
+            right; exact hmem'
+  · exact hprod
+
+-- isProductive is unaffected by extending unguarded with variables not in the type.
+-- If a variable x is not used in g (i.e., x is not in any var constructor), then
+-- adding x to unguarded doesn't affect isProductive.
+
+-- Key lemma: if body.allVarsBound bound = true and body.isProductive bound = true,
+-- then body.isProductive (bound ++ extra) = true for any extra.
+-- This is because extra vars don't appear in body (due to allVarsBound).
+
+mutual
+  /-- If a type has all its vars bound and is productive, adding extra elements to
+      unguarded preserves productivity (since those vars don't appear in the type). -/
+  theorem isProductive_extend (g : GlobalType) (bound extra : List String)
+      (hbound : g.allVarsBound bound = true)
+      (hprod : g.isProductive bound = true) :
+      g.isProductive (bound ++ extra) = true := by
+    match g with
+    | .end => rfl
+    | .var t =>
+        simp only [GlobalType.allVarsBound] at hbound
+        simp only [GlobalType.isProductive, Bool.not_eq_true'] at hprod ⊢
+        -- hbound: bound.contains t = true
+        -- hprod: bound.contains t = false
+        -- These are contradictory!
+        rw [hbound] at hprod
+        exact (Bool.false_ne_true hprod.symm).elim
+    | .mu t body =>
+        simp only [GlobalType.allVarsBound] at hbound
+        simp only [GlobalType.isProductive] at hprod ⊢
+        -- hbound: body.allVarsBound (t :: bound) = true
+        -- hprod: body.isProductive (t :: bound) = true
+        -- Goal: body.isProductive (t :: (bound ++ extra)) = true
+        have h : t :: (bound ++ extra) = (t :: bound) ++ extra := rfl
+        rw [h]
+        exact isProductive_extend body (t :: bound) extra hbound hprod
+    | .comm _ _ branches =>
+        simp only [GlobalType.allVarsBound] at hbound
+        simp only [GlobalType.isProductive] at hprod ⊢
+        -- Comm resets unguarded to [], so the proof is trivial
+        -- Actually, we need to show isProductiveBranches branches [] = true
+        -- which is exactly hprod
+        exact hprod
+
+  theorem isProductiveBranches_extend (branches : List (Label × GlobalType))
+      (bound extra : List String)
+      (hbound : allVarsBoundBranches branches bound = true)
+      (hprod : isProductiveBranches branches bound = true) :
+      isProductiveBranches branches (bound ++ extra) = true := by
+    match branches with
+    | [] => rfl
+    | (_, g) :: rest =>
+        simp only [allVarsBoundBranches, Bool.and_eq_true] at hbound
+        simp only [isProductiveBranches, Bool.and_eq_true] at hprod ⊢
+        exact ⟨isProductive_extend g bound extra hbound.1 hprod.1,
+               isProductiveBranches_extend rest bound extra hbound.2 hprod.2⟩
+end
+
+/-- Corollary: If (mu t body) is productive, then it's productive for any unguarded list. -/
+theorem mu_isProductive_forall (t : String) (body : GlobalType)
+    (hbound : body.allVarsBound [t] = true)
+    (hprod : body.isProductive [t] = true) :
+    ∀ ug, (GlobalType.mu t body).isProductive ug = true := by
+  intro ug
+  simp only [GlobalType.isProductive]
+  -- Goal: body.isProductive (t :: ug) = true
+  -- We have: body.allVarsBound [t] = true and body.isProductive [t] = true
+  -- Use isProductive_extend with bound = [t] and extra = ug
+  have h : [t] ++ ug = t :: ug := rfl
+  rw [← h]
+  exact isProductive_extend body [t] ug hbound hprod
+
+-- isProductive preservation under substitution
+--
+-- Key insight: When g.isProductive (varName :: unguarded) = true, any occurrence of
+-- var varName in g must be after a comm (which resets unguarded to []). So the replacement
+-- only needs to be productive with [].
+
+mutual
+  /-- isProductive is preserved under substitution.
+
+  The replacement must be productive for any unguarded list it might encounter.
+  This is satisfied when repl.isProductive [] = true, because comm resets unguarded. -/
+  theorem isProductive_substitute (g : GlobalType) (varName : String) (repl : GlobalType)
+      (unguarded : List String)
+      (hg : g.isProductive (varName :: unguarded) = true)
+      (hrepl : ∀ ug, repl.isProductive ug = true) :
+      (g.substitute varName repl).isProductive unguarded = true := by
+    match g with
+    | .end => simp [GlobalType.substitute, GlobalType.isProductive]
+    | .var t =>
+        simp only [GlobalType.substitute]
+        split
+        · -- t = varName, substitute repl
+          exact hrepl unguarded
+        · -- t ≠ varName, keep var t
+          rename_i hne
+          simp only [GlobalType.isProductive, Bool.not_eq_true'] at hg ⊢
+          by_contra hunguarded
+          simp only [Bool.not_eq_false] at hunguarded
+          have h : (varName :: unguarded).contains t = true := by
+            rw [List.contains_cons]
+            simp only [Bool.or_eq_true]
+            right; exact hunguarded
+          rw [hg] at h
+          exact Bool.false_ne_true h
+    | .mu t inner =>
+        simp only [GlobalType.substitute]
+        split
+        · -- t = varName, shadowed - no substitution
+          rename_i heq
+          simp only [GlobalType.isProductive] at hg ⊢
+          have heq' : t = varName := by simp only [beq_iff_eq] at heq; exact heq
+          rw [heq'] at hg ⊢
+          exact isProductive_cons_dedup inner varName unguarded hg
+        · -- t ≠ varName
+          simp only [GlobalType.isProductive] at hg ⊢
+          have hg' : inner.isProductive (varName :: t :: unguarded) = true :=
+            isProductive_swap inner t varName unguarded hg
+          exact isProductive_substitute inner varName repl (t :: unguarded) hg' hrepl
+    | .comm sender receiver branches =>
+        simp only [GlobalType.substitute, GlobalType.isProductive] at hg ⊢
+        -- comm resets unguarded to [], so hg : isProductiveBranches branches [] = true
+        -- Goal: isProductiveBranches (substituteBranches branches varName repl) [] = true
+        exact isProductiveBranches_substitute_any branches varName repl [] hg hrepl
+
+  -- For branches, if replacement is always productive, substitution preserves productivity
+  -- regardless of whether varName is in unguarded
+  theorem isProductiveBranches_substitute_any (branches : List (Label × GlobalType))
+      (varName : String) (repl : GlobalType) (unguarded : List String)
+      (hg : isProductiveBranches branches unguarded = true)
+      (hrepl : ∀ ug, repl.isProductive ug = true) :
+      isProductiveBranches (substituteBranches branches varName repl) unguarded = true := by
+    match branches with
+    | [] => rfl
+    | (label, cont) :: rest =>
+        simp only [substituteBranches, isProductiveBranches, Bool.and_eq_true] at hg ⊢
+        exact ⟨isProductive_substitute_any cont varName repl unguarded hg.1 hrepl,
+               isProductiveBranches_substitute_any rest varName repl unguarded hg.2 hrepl⟩
+
+  -- If replacement is always productive, substitution preserves productivity
+  -- This is a more general version that doesn't require varName in unguarded
+  theorem isProductive_substitute_any (g : GlobalType) (varName : String) (repl : GlobalType)
+      (unguarded : List String)
+      (hg : g.isProductive unguarded = true)
+      (hrepl : ∀ ug, repl.isProductive ug = true) :
+      (g.substitute varName repl).isProductive unguarded = true := by
+    match g with
+    | .end => simp [GlobalType.substitute, GlobalType.isProductive]
+    | .var t =>
+        simp only [GlobalType.substitute]
+        split
+        · -- t = varName, substitute repl
+          exact hrepl unguarded
+        · -- t ≠ varName, keep var t
+          exact hg
+    | .mu t inner =>
+        simp only [GlobalType.substitute]
+        split
+        · -- t = varName, shadowed - no substitution
+          exact hg
+        · -- t ≠ varName
+          simp only [GlobalType.isProductive] at hg ⊢
+          exact isProductive_substitute_any inner varName repl (t :: unguarded) hg hrepl
+    | .comm sender receiver branches =>
+        simp only [GlobalType.substitute, GlobalType.isProductive] at hg ⊢
+        exact isProductiveBranches_substitute_any branches varName repl [] hg hrepl
+end
+
 /-- Mu-unfolding preserves well-formedness components that don't depend on variable binding.
 
 This is a simplified version that shows noSelfComm and allCommsNonEmpty are preserved.
@@ -680,25 +1070,38 @@ This works because:
 theorem allVarsBound_mu_unfold (t : String) (body : GlobalType)
     (hbound : (GlobalType.mu t body).allVarsBound [] = true) :
     (body.substitute t (GlobalType.mu t body)).allVarsBound [] = true := by
-  -- The proof requires showing that substituting a closed type preserves closedness
-  -- This is a deep structural property requiring mutual induction on GlobalType
-  sorry
+  -- hbound: (mu t body).allVarsBound [] = true
+  -- which unfolds to: body.allVarsBound [t] = true
+  simp only [GlobalType.allVarsBound] at hbound
+  -- Now hbound: body.allVarsBound [t] = true
+  -- Apply allVarsBound_substitute with bound = []
+  -- Need: body.allVarsBound (t :: []) = body.allVarsBound [t] = true ✓
+  -- Need: (mu t body).allVarsBound [] = true
+  have hrepl : (GlobalType.mu t body).allVarsBound [] = true := by
+    simp only [GlobalType.allVarsBound]
+    exact hbound
+  exact allVarsBound_substitute body t (GlobalType.mu t body) [] hbound hrepl
 
 /-- Mu-unfolding preserves isProductive.
 
-**Key insight**: If `mu t body` is productive (has guarded recursion),
+**Key insight**: If `mu t body` is productive AND has all vars bound,
 then `body.substitute t (mu t body)` is also productive.
 
-Note: This is actually not generally true without additional assumptions.
-The unfolding can create non-productive infinite loops. However, if the
-original type is productive AND we're only doing one level of unfolding,
-productivity is preserved because the guards are maintained. -/
+This requires both productivity (for guarded recursion) and allVarsBound
+(so we know the replacement (mu t body) is productive for any unguarded list). -/
 theorem isProductive_mu_unfold (t : String) (body : GlobalType)
+    (hbound : (GlobalType.mu t body).allVarsBound [] = true)
     (hprod : (GlobalType.mu t body).isProductive = true) :
     (body.substitute t (GlobalType.mu t body)).isProductive = true := by
-  -- The proof requires careful analysis of guarded recursion
-  -- through substitution. This is a deep semantic property.
-  sorry
+  simp only [GlobalType.allVarsBound] at hbound
+  simp only [GlobalType.isProductive] at hprod
+  -- hbound: body.allVarsBound [t] = true
+  -- hprod: body.isProductive [t] = true
+  -- Goal: (body.substitute t (mu t body)).isProductive [] = true
+  -- Use isProductive_substitute with hrepl from mu_isProductive_forall
+  have hrepl : ∀ ug, (GlobalType.mu t body).isProductive ug = true :=
+    mu_isProductive_forall t body hbound hprod
+  exact isProductive_substitute body t (GlobalType.mu t body) [] hprod hrepl
 
 /-- Mu-unfolding preserves full well-formedness.
 
@@ -718,7 +1121,7 @@ theorem wellFormed_mu_unfold (t : String) (body : GlobalType)
   · exact allVarsBound_mu_unfold t body hbound
   · exact allCommsNonEmpty_substitute body t (GlobalType.mu t body) hne hne
   · exact noSelfComm_substitute body t (GlobalType.mu t body) hns hns
-  · exact isProductive_mu_unfold t body hprod
+  · exact isProductive_mu_unfold t body hbound hprod
 
 /-! ## Closedness Predicate (Coq-style)
 
@@ -727,6 +1130,293 @@ This matches Coq's approach and is used for projection preservation. -/
 
 /-- A global type is closed if it has no free type variables. -/
 def GlobalType.isClosed (g : GlobalType) : Bool := g.freeVars.isEmpty
+
+/-! ### Closedness Lemmas
+
+These lemmas establish structural properties of closedness, following the Coq approach
+in `coGlobal.v` and `coLocal.v`. The key insight is that:
+- `freeVars` for `comm` is the concatenation of branch continuations' free vars
+- Substitution with a closed term doesn't introduce new free variables -/
+
+/-- Helper: if a list is empty, all appended sublists must be empty. -/
+private theorem freeVarsOfBranches_nil_iff (branches : List (Label × GlobalType)) :
+    freeVarsOfBranches branches = [] ↔ ∀ p ∈ branches, p.2.freeVars = [] := by
+  induction branches with
+  | nil =>
+      simp only [freeVarsOfBranches, List.not_mem_nil, false_implies, implies_true]
+  | cons hd tl ih =>
+      simp only [freeVarsOfBranches, List.append_eq_nil_iff, List.mem_cons, forall_eq_or_imp]
+      constructor
+      · intro h
+        exact ⟨h.1, ih.mp h.2⟩
+      · intro h
+        exact ⟨h.1, ih.mpr h.2⟩
+
+/-- A closed comm has closed branch continuations.
+
+If `(comm sender receiver branches).isClosed = true`, then each branch continuation is closed.
+This follows directly from the definition: freeVars of comm is the concatenation of branch freeVars.
+
+**Coq reference:** Follows from `gType_fv` definition in `coGlobal.v`. -/
+theorem GlobalType.isClosed_comm_branches (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (hclosed : (GlobalType.comm sender receiver branches).isClosed = true) :
+    ∀ p ∈ branches, p.2.isClosed = true := by
+  simp only [GlobalType.isClosed, GlobalType.freeVars, List.isEmpty_iff] at hclosed
+  have hbranches := freeVarsOfBranches_nil_iff branches
+  intro p hp
+  simp only [GlobalType.isClosed, List.isEmpty_iff]
+  exact (hbranches.mp hclosed) p hp
+
+/-- Helper for freeVars_substitute_subset: branches case with explicit IH.
+
+Free variables of a substituted term are bounded by original free vars (minus t) plus repl's free vars.
+This is the key structural lemma for closedness preservation.
+
+**Coq reference:** `gType_fv_subst` in `coGlobal.v` (line 753). -/
+private def freeVars_substituteBranches_subset_aux
+    {n : Nat} {t : String} {repl : GlobalType}
+    (ih : ∀ g' : GlobalType, sizeOf g' < n →
+          ∀ v, v ∈ (g'.substitute t repl).freeVars →
+          (v ∈ g'.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars)
+    (branches : List (Label × GlobalType))
+    (hsize : ∀ p ∈ branches, sizeOf p.2 < n)
+    (v : String)
+    (hv : v ∈ freeVarsOfBranches (substituteBranches branches t repl)) :
+    (v ∈ freeVarsOfBranches branches ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
+  match branches with
+  | [] =>
+      simp only [substituteBranches, freeVarsOfBranches, List.not_mem_nil] at hv
+  | hd :: tl =>
+      simp only [substituteBranches, freeVarsOfBranches, List.mem_append] at hv
+      cases hv with
+      | inl hv_hd =>
+          have hsize_hd : sizeOf hd.2 < n := hsize hd List.mem_cons_self
+          have hsub := ih hd.2 hsize_hd v hv_hd
+          cases hsub with
+          | inl h =>
+              left
+              simp only [freeVarsOfBranches, List.mem_append]
+              exact ⟨Or.inl h.1, h.2⟩
+          | inr hmem =>
+              right
+              exact hmem
+      | inr hv_tl =>
+          have hsize_tl : ∀ p ∈ tl, sizeOf p.2 < n := fun p hp =>
+            hsize p (List.mem_cons_of_mem hd hp)
+          have hsub := freeVars_substituteBranches_subset_aux ih tl hsize_tl v hv_tl
+          cases hsub with
+          | inl h =>
+              left
+              simp only [freeVarsOfBranches, List.mem_append]
+              exact ⟨Or.inr h.1, h.2⟩
+          | inr hmem =>
+              right
+              exact hmem
+
+/-- Strong induction principle for freeVars_substitute_subset. -/
+private theorem freeVars_substitute_subset_strong (n : Nat) :
+    ∀ body : GlobalType, sizeOf body ≤ n →
+    ∀ t repl v, v ∈ (body.substitute t repl).freeVars →
+    (v ∈ body.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    intro body hsize t repl v hv
+    match body with
+    | .end =>
+        simp only [GlobalType.substitute, GlobalType.freeVars, List.not_mem_nil] at hv
+    | .var w =>
+        simp only [GlobalType.substitute] at hv
+        split at hv
+        · -- w = t: substitute returns repl
+          right
+          exact hv
+        · -- w ≠ t: substitute returns .var w
+          simp only [GlobalType.freeVars, List.mem_singleton] at hv
+          rename_i hwt
+          -- hwt : ¬(w == t) = true, i.e., (w == t) ≠ true
+          have hne : w ≠ t := by
+            intro heq
+            rw [heq] at hwt
+            simp at hwt
+          left
+          exact ⟨hv ▸ List.mem_singleton_self w, hv ▸ hne⟩
+    | .mu s inner =>
+        simp only [GlobalType.substitute] at hv
+        split at hv
+        · -- s = t: substitution shadowed, body unchanged
+          rename_i hst
+          simp only [beq_iff_eq] at hst
+          simp only [GlobalType.freeVars, List.mem_filter] at hv
+          left
+          simp only [GlobalType.freeVars, List.mem_filter]
+          constructor
+          · exact hv
+          · -- v ∈ inner.freeVars.filter (· != s) means v != s
+            have hvs := hv.2
+            simp only [bne_iff_ne, ne_eq] at hvs
+            rw [hst] at hvs
+            exact hvs
+        · -- s ≠ t: recurse into inner
+          rename_i hst
+          have hsne : s ≠ t := by
+            intro heq
+            rw [heq] at hst
+            simp at hst
+          simp only [GlobalType.freeVars, List.mem_filter] at hv
+          have hvs := hv.2
+          simp only [bne_iff_ne, ne_eq] at hvs
+          -- inner is smaller than .mu s inner
+          have hinner_size : sizeOf inner < sizeOf (GlobalType.mu s inner) := by
+            simp only [GlobalType.mu.sizeOf_spec]; omega
+          have hinner_le : sizeOf inner < n := Nat.lt_of_lt_of_le hinner_size hsize
+          have hsub := ih (sizeOf inner) hinner_le inner (Nat.le_refl _) t repl v hv.1
+          cases hsub with
+          | inl hcase =>
+              left
+              simp only [GlobalType.freeVars, List.mem_filter, bne_iff_ne, ne_eq]
+              exact ⟨⟨hcase.1, hvs⟩, hcase.2⟩
+          | inr hmem =>
+              right
+              exact hmem
+    | .comm sender receiver branches =>
+        simp only [GlobalType.substitute, GlobalType.freeVars] at hv
+        -- All branch continuations are smaller than the comm
+        have hbranch_sizes : ∀ p ∈ branches, sizeOf p.2 < n := by
+          intro p hp
+          have h1 : sizeOf p.2 < sizeOf p := by
+            cases p with | mk l g => simp only [Prod.mk.sizeOf_spec]; omega
+          have h2 : sizeOf p < 1 + sizeOf branches := by
+            have := List.sizeOf_lt_of_mem hp
+            omega
+          -- sizeOf (GlobalType.comm s r bs) = 1 + sizeOf s + sizeOf r + sizeOf bs
+          -- We need to show: 1 + sizeOf branches < sizeOf (GlobalType.comm sender receiver branches)
+          -- This is equivalent to: 0 < sizeOf sender + sizeOf receiver
+          have h3 : 1 + sizeOf branches < sizeOf (GlobalType.comm sender receiver branches) := by
+            simp only [GlobalType.comm.sizeOf_spec]
+            -- Need: 0 < sizeOf sender + sizeOf receiver
+            -- For String s, sizeOf s = 1 + sizeOf s.bytes + sizeOf s.isValidUTF8 ≥ 1
+            have hs : 0 < sizeOf sender := by
+              have : sizeOf sender = 1 + sizeOf sender.bytes + sizeOf sender.isValidUTF8 := rfl
+              omega
+            have hr : 0 < sizeOf receiver := by
+              have : sizeOf receiver = 1 + sizeOf receiver.bytes + sizeOf receiver.isValidUTF8 := rfl
+              omega
+            omega
+          have h4 : sizeOf p.2 < sizeOf (GlobalType.comm sender receiver branches) := by omega
+          exact Nat.lt_of_lt_of_le h4 hsize
+        -- Build the induction hypothesis for the helper
+        have ih' : ∀ g' : GlobalType, sizeOf g' < n →
+              ∀ v', v' ∈ (g'.substitute t repl).freeVars →
+              (v' ∈ g'.freeVars ∧ v' ≠ t) ∨ v' ∈ repl.freeVars := by
+          intro g' hg' v' hv'
+          exact ih (sizeOf g') hg' g' (Nat.le_refl _) t repl v' hv'
+        have hsub := freeVars_substituteBranches_subset_aux ih' branches hbranch_sizes v hv
+        cases hsub with
+        | inl hcase =>
+            left
+            simp only [GlobalType.freeVars]
+            exact hcase
+        | inr hmem =>
+            right
+            exact hmem
+
+/-- Main theorem: free vars of substituted type are bounded. -/
+theorem freeVars_substitute_subset (body : GlobalType) (t : String) (repl : GlobalType)
+    (v : String) (hv : v ∈ (body.substitute t repl).freeVars) :
+    (v ∈ body.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars :=
+  freeVars_substitute_subset_strong (sizeOf body) body (Nat.le_refl _) t repl v hv
+
+/-- Corollary for branches: free vars of substituted branches are bounded. -/
+theorem freeVars_substituteBranches_subset (branches : List (Label × GlobalType))
+    (t : String) (repl : GlobalType) (v : String)
+    (hv : v ∈ freeVarsOfBranches (substituteBranches branches t repl)) :
+    (v ∈ freeVarsOfBranches branches ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
+  match branches with
+  | [] =>
+      simp only [substituteBranches, freeVarsOfBranches, List.not_mem_nil] at hv
+  | hd :: tl =>
+      simp only [substituteBranches, freeVarsOfBranches, List.mem_append] at hv
+      cases hv with
+      | inl hv_hd =>
+          have hsub := freeVars_substitute_subset hd.2 t repl v hv_hd
+          cases hsub with
+          | inl hcase =>
+              left
+              simp only [freeVarsOfBranches, List.mem_append]
+              exact ⟨Or.inl hcase.1, hcase.2⟩
+          | inr hmem =>
+              right
+              exact hmem
+      | inr hv_tl =>
+          have hsub := freeVars_substituteBranches_subset tl t repl v hv_tl
+          cases hsub with
+          | inl hcase =>
+              left
+              simp only [freeVarsOfBranches, List.mem_append]
+              exact ⟨Or.inr hcase.1, hcase.2⟩
+          | inr hmem =>
+              right
+              exact hmem
+
+/-- Substitution preserves closedness when both repl is closed AND body has no free vars other than t.
+
+This is the precise property needed for mu-unfolding: if `(mu t body).isClosed`, then:
+1. `repl = mu t body` is closed
+2. `body.freeVars ⊆ [t]` (body has no free vars other than t)
+Therefore `(body.substitute t repl).isClosed`.
+
+**Coq reference:** Follows from `gType_fv_subst` in `coGlobal.v`. -/
+theorem GlobalType.isClosed_substitute_of_closed' (body : GlobalType) (t : String) (repl : GlobalType)
+    (hrepl_closed : repl.isClosed = true)
+    (hbody_only_t : ∀ v ∈ body.freeVars, v = t) :
+    (body.substitute t repl).isClosed = true := by
+  simp only [GlobalType.isClosed, List.isEmpty_iff]
+  simp only [GlobalType.isClosed, List.isEmpty_iff] at hrepl_closed
+  by_contra hne
+  have ⟨v, hv⟩ := List.exists_mem_of_ne_nil _ hne
+  have hsub := freeVars_substitute_subset body t repl v hv
+  cases hsub with
+  | inl h =>
+      -- v is in body.freeVars and v ≠ t
+      -- But hbody_only_t says all vars in body.freeVars equal t
+      -- Contradiction!
+      have heq := hbody_only_t v h.1
+      exact h.2 heq
+  | inr hmem =>
+      simp only [hrepl_closed, List.not_mem_nil] at hmem
+
+/-- Mu type closedness implies body has only the bound variable free.
+
+If `(mu t body).isClosed = true`, then `body.freeVars ⊆ [t]`. -/
+theorem GlobalType.isClosed_mu_body_freeVars (t : String) (body : GlobalType)
+    (hclosed : (GlobalType.mu t body).isClosed = true) :
+    ∀ v ∈ body.freeVars, v = t := by
+  simp only [GlobalType.isClosed, GlobalType.freeVars, List.isEmpty_iff] at hclosed
+  intro v hv
+  -- hclosed : body.freeVars.filter (· != t) = []
+  -- hv : v ∈ body.freeVars
+  -- Goal: v = t
+  by_contra hne
+  have hfilter : v ∈ body.freeVars.filter (fun x => x != t) := by
+    simp only [List.mem_filter, bne_iff_ne]
+    exact ⟨hv, hne⟩
+  simp only [hclosed, List.not_mem_nil] at hfilter
+
+/-- Mu-unfolding preserves closedness: if `(mu t body).isClosed`, then `(body.substitute t (mu t body)).isClosed`.
+
+This is the key property needed for the mu case in step induction.
+It combines:
+1. `(mu t body).isClosed` → `mu t body` has no free vars
+2. `(mu t body).isClosed` → body has only `t` as free var (`isClosed_mu_body_freeVars`)
+3. Substitution doesn't add free vars beyond repl's vars (`isClosed_substitute_of_closed'`)
+
+**Coq reference:** Follows from `gType_fv_subst` in `coGlobal.v`. -/
+theorem GlobalType.isClosed_substitute_mu (t : String) (body : GlobalType)
+    (hclosed : (GlobalType.mu t body).isClosed = true) :
+    (body.substitute t (GlobalType.mu t body)).isClosed = true := by
+  apply isClosed_substitute_of_closed' body t (.mu t body) hclosed
+  exact isClosed_mu_body_freeVars t body hclosed
 
 /-! ## Unfolding for GlobalType (Coq-style `full_unf`)
 

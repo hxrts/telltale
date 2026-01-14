@@ -160,7 +160,7 @@ theorem preservation_send
       WTConfigN n S
         (updateG G e L)
         (updateD D { sid := e.sid, sender := e.role, receiver := target } (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [T]))
-        (sendStep C { sid := e.sid, sender := e.role, receiver := target } v) := by
+        (sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L) := by
   sorry  -- Proof requires inversion on typing as outlined above
 
 /-- Preservation for recv step.
@@ -194,7 +194,7 @@ theorem preservation_recv
       WTConfigN n (updateSEnv S x T)
         (updateG G e L)
         (updateD D { sid := e.sid, sender := source, receiver := e.role } (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
-        (recvStep C { sid := e.sid, sender := source, receiver := e.role } x v) := by
+        (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L) := by
   sorry  -- Proof requires inversion on typing as outlined above
 
 /-! ## Main Preservation Theorem -/
@@ -248,5 +248,127 @@ theorem progress
       lookupStr C.store k = some (.chan e) ∧
       lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = []) := by
   sorry  -- Full proof requires case analysis on process typing
+
+/-! ## Progress Lemmas for Individual Process Forms
+
+These lemmas prove progress for specific process forms using pre-update typing.
+They form the building blocks for the full progress theorem.
+Reference: `work/effects/008.lean:323-376, 487-516` -/
+
+/-- Blocked recv predicate: recv is waiting on an empty buffer.
+    Reference: `work/effects/008.lean:259-269` -/
+def BlockedRecv (C : Config) : Prop :=
+  (∃ k x source T L, ∃ e : Endpoint,
+    C.proc = .recv k x ∧
+    lookupStr C.store k = some (.chan e) ∧
+    lookupG C.G e = some (.recv source T L) ∧
+    lookupBuf C.bufs ⟨e.sid, source, e.role⟩ = []) ∨
+  (∃ k procs source bs, ∃ e : Endpoint,
+    C.proc = .branch k procs ∧
+    lookupStr C.store k = some (.chan e) ∧
+    lookupG C.G e = some (.branch source bs) ∧
+    lookupBuf C.bufs ⟨e.sid, source, e.role⟩ = [])
+
+/-- Progress for send: send always steps (it just enqueues to buffer).
+    Reference: `work/effects/008.lean:323-336` -/
+theorem progress_send {C : Config} {S : SEnv} {k x : Var}
+    (hEq : C.proc = .send k x)
+    (hProc : HasTypeProcPre S C.G (.send k x))
+    (hStore : StoreTypedStrong C.G S C.store) :
+    ∃ C', Step C C' := by
+  -- 1. Inversion: extract (e, q, T, L) from typing
+  obtain ⟨e, q, T, L, hSk, hGe, hSx⟩ := inversion_send hProc
+  -- 2. Bridge: get channel value vk from store
+  obtain ⟨vk, hvk1, hvk2⟩ := store_lookup_of_senv_lookup hStore hSk
+  -- 3. Bridge: get payload value v from store
+  obtain ⟨v, hv1, _hv2⟩ := store_lookup_of_senv_lookup hStore hSx
+  -- 4. Inversion: channel value must be .chan e
+  have hChanEq := HasTypeVal_chan_inv hvk2
+  subst hChanEq
+  -- 5. Construct step witness
+  use sendStep C e ⟨e.sid, e.role, q⟩ v T L
+  apply Step.base
+  apply StepBase.send hEq hvk1 hv1 hGe
+
+/-- Progress for recv: recv steps if buffer non-empty, otherwise blocked.
+    Reference: `work/effects/008.lean:341-357` -/
+theorem progress_recv {C : Config} {S : SEnv} {k x : Var}
+    (hEq : C.proc = .recv k x)
+    (hProc : HasTypeProcPre S C.G (.recv k x))
+    (hStore : StoreTypedStrong C.G S C.store) :
+    (∃ C', Step C C') ∨ BlockedRecv C := by
+  -- 1. Inversion: extract (e, p, T, L) from typing
+  obtain ⟨e, p, T, L, hSk, hGe⟩ := inversion_recv hProc
+  -- 2. Bridge: get channel value vk from store
+  obtain ⟨vk, hvk1, hvk2⟩ := store_lookup_of_senv_lookup hStore hSk
+  -- 3. Inversion: channel value must be .chan e
+  have hChanEq := HasTypeVal_chan_inv hvk2
+  subst hChanEq
+  -- 4. Case split on buffer contents
+  cases hBuf : lookupBuf C.bufs ⟨e.sid, p, e.role⟩ with
+  | nil =>
+    -- Empty buffer → BlockedRecv
+    right
+    left
+    exact ⟨k, x, p, T, L, e, hEq, hvk1, hGe, hBuf⟩
+  | cons v vs =>
+    -- Non-empty buffer → Step
+    left
+    use recvStep C e ⟨e.sid, p, e.role⟩ x v L
+    apply Step.base
+    apply StepBase.recv hEq hvk1 hGe hBuf
+
+/-- Progress for select: select always steps (it just enqueues label to buffer).
+    Reference: `work/effects/008.lean:362-376, 500-516` -/
+theorem progress_select {C : Config} {S : SEnv} {k : Var} {l : Label}
+    (hEq : C.proc = .select k l)
+    (hProc : HasTypeProcPre S C.G (.select k l))
+    (hStore : StoreTypedStrong C.G S C.store) :
+    ∃ C', Step C C' := by
+  -- 1. Inversion: extract (e, q, bs, L) from typing
+  obtain ⟨e, q, bs, L, hSk, hGe, hFind⟩ := inversion_select hProc
+  -- 2. Bridge: get channel value vk from store
+  obtain ⟨vk, hvk1, hvk2⟩ := store_lookup_of_senv_lookup hStore hSk
+  -- 3. Inversion: channel value must be .chan e
+  have hChanEq := HasTypeVal_chan_inv hvk2
+  subst hChanEq
+  -- 4. Construct step witness (select uses sendStep with string label)
+  use sendStep C e ⟨e.sid, e.role, q⟩ (.string l) .string L
+  apply Step.base
+  apply StepBase.select hEq hvk1 hGe hFind
+
+/-- Progress for branch: branch steps if buffer non-empty, otherwise blocked.
+    This requires ValidLabels to ensure the received label is valid. -/
+theorem progress_branch {C : Config} {S : SEnv} {k : Var} {procs : List (Label × Process)}
+    (hEq : C.proc = .branch k procs)
+    (hProc : HasTypeProcPre S C.G (.branch k procs))
+    (hStore : StoreTypedStrong C.G S C.store)
+    (hValidLabels : ∀ (ep : Endpoint) bs l vs,
+      lookupG C.G ep = some (.branch ep.role bs) →
+      lookupBuf C.bufs ⟨ep.sid, ep.role, ep.role⟩ = (.string l) :: vs →
+      (bs.find? (fun b => b.1 == l)).isSome) :
+    (∃ C', Step C C') ∨ BlockedRecv C := by
+  -- 1. Inversion: extract (e, p, bs) from typing
+  obtain ⟨e, p, bs, hSk, hGe, hLen, hLabels⟩ := inversion_branch hProc
+  -- 2. Bridge: get channel value vk from store
+  obtain ⟨vk, hvk1, hvk2⟩ := store_lookup_of_senv_lookup hStore hSk
+  -- 3. Inversion: channel value must be .chan e
+  have hChanEq := HasTypeVal_chan_inv hvk2
+  subst hChanEq
+  -- 4. Case split on buffer contents
+  cases hBuf : lookupBuf C.bufs ⟨e.sid, p, e.role⟩ with
+  | nil =>
+    -- Empty buffer → BlockedRecv
+    right
+    right
+    exact ⟨k, procs, p, bs, e, hEq, hvk1, hGe, hBuf⟩
+  | cons v vs =>
+    -- Non-empty buffer - need to handle string label
+    -- For now, we prove the step exists when buffer is non-empty
+    -- Full proof requires ValidLabels + HeadCoherent hypothesis
+    left
+    -- The buffer head should be a string label
+    -- This is guaranteed by BufferTyping + HeadCoherent
+    sorry  -- Requires HeadCoherent to know v is a string label
 
 end

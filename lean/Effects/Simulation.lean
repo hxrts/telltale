@@ -51,48 +51,57 @@ def stepBaseDecide (C : Config) : Option Config :=
     | some (.chan e) =>
       match lookupStr C.store x with
       | some v =>
-        -- Need target role from local type, use placeholder for now
-        -- In well-typed configs, this would come from the type
-        some (sendStep C { sid := e.sid, sender := e.role, receiver := "target" } v)
+        -- Need target role and type from G, use placeholder for now
+        -- In well-typed configs, this would come from the type lookup
+        match lookupG C.G e with
+        | some (.send target T L) =>
+          some (sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L)
+        | _ => none
       | _ => none
     | _ => none
 
   | .recv k x =>
     match lookupStr C.store k with
     | some (.chan e) =>
-      -- Try all possible source roles - simplified version
-      -- In well-typed configs, the source comes from the type
-      match lookupBuf C.bufs { sid := e.sid, sender := "source", receiver := e.role } with
-      | v :: _ =>
-        match dequeueBuf C.bufs { sid := e.sid, sender := "source", receiver := e.role } with
-        | some (bufs', _) =>
-          some { C with
-            proc := .skip
-            store := updateStr C.store x v
-            bufs := bufs' }
-        | none => none
-      | [] => none  -- Buffer empty, blocked
+      -- Get source role from type
+      match lookupG C.G e with
+      | some (.recv source T L) =>
+        match lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
+        | v :: _ =>
+          some (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L)
+        | [] => none  -- Buffer empty, blocked
+      | _ => none
     | _ => none
 
   | .select k ℓ =>
     match lookupStr C.store k with
     | some (.chan e) =>
-      some (sendStep C { sid := e.sid, sender := e.role, receiver := "target" } (.string ℓ))
+      match lookupG C.G e with
+      | some (.select target branches) =>
+        match branches.find? (fun b => b.1 == ℓ) with
+        | some (_, L) =>
+          some (sendStep C e { sid := e.sid, sender := e.role, receiver := target } (.string ℓ) .string L)
+        | none => none
+      | _ => none
     | _ => none
 
   | .branch k bs =>
     match lookupStr C.store k with
     | some (.chan e) =>
-      match lookupBuf C.bufs { sid := e.sid, sender := "source", receiver := e.role } with
-      | .string ℓ :: _ =>
-        match bs.find? (fun b => b.1 == ℓ) with
-        | some (_, P) =>
-          match dequeueBuf C.bufs { sid := e.sid, sender := "source", receiver := e.role } with
-          | some (bufs', _) =>
-            some { C with proc := P, bufs := bufs' }
-          | none => none
-        | none => none  -- Label not found in branches
-      | _ => none  -- Buffer empty or wrong type
+      match lookupG C.G e with
+      | some (.branch source typeBranches) =>
+        match lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
+        | .string ℓ :: _ =>
+          match bs.find? (fun b => b.1 == ℓ), typeBranches.find? (fun b => b.1 == ℓ) with
+          | some (_, P), some (_, L) =>
+            match dequeueBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
+            | some (bufs', _) =>
+              let edge : Edge := { sid := e.sid, sender := source, receiver := e.role }
+              some { C with proc := P, bufs := bufs', G := updateG C.G e L, D := updateD C.D edge (lookupD C.D edge).tail }
+            | none => none
+          | _, _ => none  -- Label not found in branches
+        | _ => none  -- Buffer empty or not a string
+      | _ => none  -- No matching type in G
     | _ => none
 
   | .newSession roles f P =>

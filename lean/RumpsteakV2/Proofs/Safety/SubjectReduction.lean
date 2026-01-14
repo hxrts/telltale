@@ -149,12 +149,15 @@ theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
     EQ2 (trans g' act.receiver) (trans g' act.receiver) :=
   EQ2_refl _
 
-/-- Non-participants have unchanged types (up to EQ2) after a step. -/
+/-- Non-participants have unchanged types (up to EQ2) after a step.
+
+**Note:** Requires g to be closed (standard for protocol verification). -/
 theorem other_type_preserved (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
+    (hclosed : g.isClosed = true)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
     EQ2 (trans g' role) (trans g role) :=
-  proj_trans_other_step g g' act role hstep hns hnr
+  proj_trans_other_step g g' act role hstep hclosed hns hnr
 
 /-! ## Claims Bundle -/
 

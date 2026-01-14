@@ -94,6 +94,17 @@ def allEdges (sid : SessionId) (rs : RoleSet) : List Edge :=
   rs.flatMap fun p => rs.filterMap fun q =>
     if p ≠ q then some { sid := sid, sender := p, receiver := q } else none
 
+/-- All edges in allEdges have the specified session ID. -/
+theorem allEdges_sid (sid : SessionId) (rs : RoleSet) :
+    ∀ e ∈ allEdges sid rs, e.sid = sid := by
+  intro e he
+  simp only [allEdges, List.mem_flatMap, List.mem_filterMap] at he
+  obtain ⟨p, _, q, _, hite⟩ := he
+  split at hite
+  · simp only [Option.some.injEq] at hite
+    rw [← hite]
+  · exact Option.noConfusion hite
+
 /-- Get all endpoints for a session. -/
 def allEndpoints (sid : SessionId) (rs : RoleSet) : List Endpoint :=
   rs.map fun r => { sid := sid, role := r }

@@ -122,6 +122,22 @@ lemma sizeOf_body_lt_sizeOf_mu (t : String) (body : LocalTypeR) :
     sizeOf cont < sizeOf bs := by
   simpa [hbs, hhead] using sizeOf_cont_lt_sizeOf_branches label cont tail
 
+/-- Size of continuation is less than size of branch list when the continuation is in the list. -/
+lemma sizeOf_cont_lt_sizeOf_branches_mem {cont : LocalTypeR}
+    {bs : List (Label × LocalTypeR)} (hmem : cont ∈ bs.map Prod.snd) :
+    sizeOf cont < sizeOf bs := by
+  induction bs with
+  | nil => simp only [List.map_nil, List.not_mem_nil] at hmem
+  | cons hd tl ih =>
+      simp only [List.map_cons, List.mem_cons] at hmem
+      cases hmem with
+      | inl heq =>
+          subst heq
+          exact sizeOf_cont_lt_sizeOf_branches hd.1 hd.2 tl
+      | inr hmem' =>
+          have h1 := ih hmem'
+          exact Nat.lt_trans h1 (sizeOf_tail_lt_sizeOf_branches hd tl)
+
 mutual
   /-- Substitute a local type for a variable: `t.substitute v repl` replaces free occurrences of `v` in `t` with `repl`. -/
   def LocalTypeR.substitute : LocalTypeR → String → LocalTypeR → LocalTypeR
@@ -385,6 +401,10 @@ structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
   closed : t.isClosed
   contractive : t.isContractive = true
 
+/-- `.end` is well-formed. -/
+theorem LocalTypeR.WellFormed_end : LocalTypeR.WellFormed .end :=
+  ⟨by simp [LocalTypeR.isClosed, LocalTypeR.freeVars],
+   by simp [LocalTypeR.isContractive]⟩
 
 /-! ## Lightweight Contractiveness and Partner Occurrence -/
 
@@ -1533,6 +1553,63 @@ theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List (Label ×
   have hcontr : isContractiveBranches bs = true := by
     simpa [LocalTypeR.isContractive] using h.contractive
   exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
+
+/-- If all branches are well-formed, then `freeVarsOfBranches` is empty. -/
+private theorem freeVarsOfBranches_of_wellFormed (bs : List (Label × LocalTypeR))
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+    freeVarsOfBranches bs = [] := by
+  induction bs with
+  | nil => simp [freeVarsOfBranches]
+  | cons head tail ih =>
+      cases head with
+      | mk label cont =>
+          have hcont_wf := hWFbs (label, cont) (List.Mem.head _)
+          have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2 :=
+            fun lb hm => hWFbs lb (List.Mem.tail _ hm)
+          have hcont_closed : cont.freeVars = [] := by
+            have h := hcont_wf.closed
+            simp [LocalTypeR.isClosed, List.isEmpty_eq_true] at h
+            exact h
+          have htail_nil := ih htail_wf
+          simp [freeVarsOfBranches, hcont_closed, htail_nil]
+
+/-- If all branches are well-formed, then `isContractiveBranches` is true. -/
+private theorem isContractiveBranches_of_wellFormed (bs : List (Label × LocalTypeR))
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+    isContractiveBranches bs = true := by
+  induction bs with
+  | nil => simp [isContractiveBranches]
+  | cons head tail ih =>
+      cases head with
+      | mk label cont =>
+          have hcont_wf := hWFbs (label, cont) (List.Mem.head _)
+          have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2 :=
+            fun lb hm => hWFbs lb (List.Mem.tail _ hm)
+          simp [isContractiveBranches, hcont_wf.contractive, ih htail_wf]
+
+/-- Well-formed send: if all branches are well-formed, then the send type is well-formed. -/
+theorem LocalTypeR.WellFormed_send {p : String} {bs : List (Label × LocalTypeR)}
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+    LocalTypeR.WellFormed (.send p bs) := by
+  constructor
+  · -- isClosed
+    simp [LocalTypeR.isClosed, LocalTypeR.freeVars, List.isEmpty_eq_true]
+    exact freeVarsOfBranches_of_wellFormed bs hWFbs
+  · -- isContractive
+    simp [LocalTypeR.isContractive]
+    exact isContractiveBranches_of_wellFormed bs hWFbs
+
+/-- Well-formed recv: if all branches are well-formed, then the recv type is well-formed. -/
+theorem LocalTypeR.WellFormed_recv {p : String} {bs : List (Label × LocalTypeR)}
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+    LocalTypeR.WellFormed (.recv p bs) := by
+  constructor
+  · -- isClosed
+    simp [LocalTypeR.isClosed, LocalTypeR.freeVars, List.isEmpty_eq_true]
+    exact freeVarsOfBranches_of_wellFormed bs hWFbs
+  · -- isContractive
+    simp [LocalTypeR.isContractive]
+    exact isContractiveBranches_of_wellFormed bs hWFbs
 
 /-! ## Unguarded Variable Theorem (Coq's `eguarded_test`)
 

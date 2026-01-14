@@ -188,4 +188,151 @@ theorem recv_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} {k x : V
   cases h with
   | recv hk hG => exact ⟨_, _, _, _, _, _, hk, hG, rfl, rfl⟩
 
+/-- Inversion for select typing.
+    Note: The select constructor produces a judgment with updated G.
+    Reference: `work/effects/008.lean:287-292` -/
+theorem select_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv} {k : Var} {l : Label}
+    (h : HasTypeProcN n S G D (.select k l)) :
+    ∃ e q bs L G',
+      lookupSEnv S k = some (.chan e.sid e.role) ∧
+      lookupG G' e = some (.select q bs) ∧
+      bs.find? (fun b => b.1 == l) = some (l, L) ∧
+      G = updateG G' e L := by
+  cases h with
+  | select hk hG hbs => exact ⟨_, _, _, _, _, hk, hG, hbs, rfl⟩
+
+/-- Inversion for branch typing.
+    Reference: `work/effects/008.lean:294-300` -/
+theorem branch_typed_inv {n : SessionId} {S : SEnv} {G : GEnv} {D : DEnv}
+    {k : Var} {procs : List (Label × Process)}
+    (h : HasTypeProcN n S G D (.branch k procs)) :
+    ∃ e p bs,
+      lookupSEnv S k = some (.chan e.sid e.role) ∧
+      lookupG G e = some (.branch p bs) ∧
+      bs.length = procs.length ∧
+      (∀ i (hi : i < bs.length) (hip : i < procs.length),
+        (procs.get ⟨i, hip⟩).1 = (bs.get ⟨i, hi⟩).1) ∧
+      (∀ i (hi : i < bs.length) (hip : i < procs.length),
+        HasTypeProcN n S (updateG G e (bs.get ⟨i, hi⟩).2) D (procs.get ⟨i, hip⟩).2) := by
+  cases h with
+  | branch hk hG hLen hLabels hBodies =>
+    exact ⟨_, _, _, hk, hG, hLen, hLabels, hBodies⟩
+
+/-! ## Progress-Oriented Typing
+
+For the progress theorem, we need a typing relation that uses "pre-update"
+environments (the actual runtime state), not "post-update" environments.
+This matches the approach in `work/effects/008.lean`.
+
+Reference: `work/effects/008.lean:151-176` -/
+
+/-- Pre-update style process typing for progress theorem.
+    Unlike HasTypeProcN which uses post-update environments, this relation
+    uses the environment as-is, making it suitable for connecting to runtime state.
+
+    This is an alternative view of typing where:
+    - HasTypeProcN says "after effects, we have these types"
+    - HasTypeProcPre says "given current types, this process is well-formed" -/
+inductive HasTypeProcPre : SEnv → GEnv → Process → Prop where
+  /-- Skip is always well-typed. -/
+  | skip {S G} : HasTypeProcPre S G .skip
+
+  /-- Send: channel k points to endpoint e, e has send type, payload x has correct type. -/
+  | send {S G k x e q T L} :
+      lookupSEnv S k = some (.chan e.sid e.role) →
+      lookupG G e = some (.send q T L) →
+      lookupSEnv S x = some T →
+      HasTypeProcPre S G (.send k x)
+
+  /-- Recv: channel k points to endpoint e, e has recv type. -/
+  | recv {S G k x e p T L} :
+      lookupSEnv S k = some (.chan e.sid e.role) →
+      lookupG G e = some (.recv p T L) →
+      HasTypeProcPre S G (.recv k x)
+
+  /-- Select: channel k points to endpoint e, e has select type with label l. -/
+  | select {S G k l e q bs L} :
+      lookupSEnv S k = some (.chan e.sid e.role) →
+      lookupG G e = some (.select q bs) →
+      bs.find? (fun b => b.1 == l) = some (l, L) →
+      HasTypeProcPre S G (.select k l)
+
+  /-- Branch: channel k points to endpoint e, e has branch type, all branches typed. -/
+  | branch {S G k procs e p bs} :
+      lookupSEnv S k = some (.chan e.sid e.role) →
+      lookupG G e = some (.branch p bs) →
+      bs.length = procs.length →
+      (∀ i (hi : i < bs.length) (hip : i < procs.length),
+        (procs.get ⟨i, hip⟩).1 = (bs.get ⟨i, hi⟩).1) →
+      (∀ i (hi : i < bs.length) (hip : i < procs.length),
+        HasTypeProcPre S (updateG G e (bs.get ⟨i, hi⟩).2) (procs.get ⟨i, hip⟩).2) →
+      HasTypeProcPre S G (.branch k procs)
+
+  /-- Sequential composition. -/
+  | seq {S G P Q} :
+      HasTypeProcPre S G P →
+      HasTypeProcPre S G Q →
+      HasTypeProcPre S G (.seq P Q)
+
+  /-- Parallel composition. -/
+  | par {S G P Q} :
+      HasTypeProcPre S G P →
+      HasTypeProcPre S G Q →
+      HasTypeProcPre S G (.par P Q)
+
+  /-- Assignment. -/
+  | assign {S G x v T} :
+      HasTypeVal G v T →
+      HasTypeProcPre S G (.assign x v)
+
+/-! ### Inversion Lemmas for Pre-Update Typing
+
+These lemmas directly extract type information from pre-update typing judgments.
+Reference: `work/effects/008.lean:274-300` -/
+
+/-- Inversion for send (pre-update style).
+    Reference: `work/effects/008.lean:274-279` -/
+theorem inversion_send {S : SEnv} {G : GEnv} {k x : Var}
+    (h : HasTypeProcPre S G (.send k x)) :
+    ∃ e q T L,
+      lookupSEnv S k = some (.chan e.sid e.role) ∧
+      lookupG G e = some (.send q T L) ∧
+      lookupSEnv S x = some T := by
+  cases h with
+  | send hk hG hx => exact ⟨_, _, _, _, hk, hG, hx⟩
+
+/-- Inversion for recv (pre-update style).
+    Reference: `work/effects/008.lean:281-285` -/
+theorem inversion_recv {S : SEnv} {G : GEnv} {k x : Var}
+    (h : HasTypeProcPre S G (.recv k x)) :
+    ∃ e p T L,
+      lookupSEnv S k = some (.chan e.sid e.role) ∧
+      lookupG G e = some (.recv p T L) := by
+  cases h with
+  | recv hk hG => exact ⟨_, _, _, _, hk, hG⟩
+
+/-- Inversion for select (pre-update style).
+    Reference: `work/effects/008.lean:287-292` -/
+theorem inversion_select {S : SEnv} {G : GEnv} {k : Var} {l : Label}
+    (h : HasTypeProcPre S G (.select k l)) :
+    ∃ e q bs L,
+      lookupSEnv S k = some (.chan e.sid e.role) ∧
+      lookupG G e = some (.select q bs) ∧
+      bs.find? (fun b => b.1 == l) = some (l, L) := by
+  cases h with
+  | select hk hG hbs => exact ⟨_, _, _, _, hk, hG, hbs⟩
+
+/-- Inversion for branch (pre-update style).
+    Reference: `work/effects/008.lean:294-300` -/
+theorem inversion_branch {S : SEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
+    (h : HasTypeProcPre S G (.branch k procs)) :
+    ∃ e p bs,
+      lookupSEnv S k = some (.chan e.sid e.role) ∧
+      lookupG G e = some (.branch p bs) ∧
+      bs.length = procs.length ∧
+      (∀ i (hi : i < bs.length) (hip : i < procs.length),
+        (procs.get ⟨i, hip⟩).1 = (bs.get ⟨i, hi⟩).1) := by
+  cases h with
+  | branch hk hG hLen hLabels _ => exact ⟨_, _, _, hk, hG, hLen, hLabels⟩
+
 end

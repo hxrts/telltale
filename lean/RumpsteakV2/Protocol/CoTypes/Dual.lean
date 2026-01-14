@@ -1,5 +1,5 @@
 import RumpsteakV2.Protocol.LocalTypeR
-import RumpsteakV2.Protocol.CoTypes.Observables
+import RumpsteakV2.Protocol.CoTypes.Observable
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
 /-! # LocalTypeR Duality
@@ -130,7 +130,7 @@ end
 
 end RumpsteakV2.Protocol.LocalTypeR
 
-namespace RumpsteakV2.Protocol.CoTypes.Observables
+namespace RumpsteakV2.Protocol.CoTypes.Observable
 
 open RumpsteakV2.Protocol.LocalTypeR
 
@@ -201,7 +201,7 @@ theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List (Label
       CanSend.dual (t := t.dual) h
     simpa [LocalTypeR.dual_involutive, LocalTypeR.dualBranches_involutive] using h'
 
-end RumpsteakV2.Protocol.CoTypes.Observables
+end RumpsteakV2.Protocol.CoTypes.Observable
 
 namespace RumpsteakV2.Protocol.CoTypes.EQ2
 

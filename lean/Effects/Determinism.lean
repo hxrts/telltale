@@ -104,24 +104,28 @@ same edge with the same value), the result is unique.
 - Parallel composition (which side steps first)
 -/
 theorem stepBase_det_send {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role}
+    {T : ValType} {L : LocalType}
     (hProc : C.proc = .send k x)
     (hk : lookupStr C.store k = some (.chan e))
     (hx : lookupStr C.store x = some v)
+    (hG : lookupG C.G e = some (.send target T L))
     (h₁ : StepBase C C₁)
     (h₂ : StepBase C C₂)
-    (hC₁ : C₁ = sendStep C { sid := e.sid, sender := e.role, receiver := target } v)
-    (hC₂ : C₂ = sendStep C { sid := e.sid, sender := e.role, receiver := target } v) :
+    (hC₁ : C₁ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L)
+    (hC₂ : C₂ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L) :
     C₁ = C₂ := by
   rw [hC₁, hC₂]
 
 /-- Recv step is deterministic given the same buffer state. -/
 theorem stepBase_det_recv {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {source : Role}
+    {T : ValType} {L : LocalType}
     {v : Value} {vs : List Value}
     (hProc : C.proc = .recv k x)
     (hk : lookupStr C.store k = some (.chan e))
+    (hG : lookupG C.G e = some (.recv source T L))
     (hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = v :: vs)
-    (h₁ : C₁ = recvStep C { sid := e.sid, sender := source, receiver := e.role } x v)
-    (h₂ : C₂ = recvStep C { sid := e.sid, sender := source, receiver := e.role } x v) :
+    (h₁ : C₁ = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L)
+    (h₂ : C₂ = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L) :
     C₁ = C₂ := by
   rw [h₁, h₂]
 
@@ -147,19 +151,91 @@ either order reaches the same final configuration.
 -/
 
 /-- Independent steps commute: if C can step to C₁ via one action and to C₂ via
-    an independent action, then there exists C₃ reachable from both.
+    an independent action, then either the steps are deterministic (C₁ = C₂)
+    or there exists C₃ reachable from both.
 
-**Proof strategy:**
-1. Show the steps modify disjoint parts of the configuration
-2. Construct C₃ by combining the effects of both steps
-3. Show both paths reach C₃
+For communication steps, `IndependentConfigs C C` checks `stepSessionId C ≠ stepSessionId C`,
+which is always `False` when `stepSessionId C = some s`. This gives us the right disjunct
+via `False.elim`.
+
+For non-communication steps (assign, seq2, par_skip_*), `IndependentConfigs C C = True`,
+and the steps are deterministic, so C₁ = C₂ (left disjunct).
 -/
 theorem diamond_independent_sessions {C C₁ C₂ : Config}
     (hStep₁ : StepBase C C₁)
     (hStep₂ : StepBase C C₂)
     (hInd : IndependentConfigs C C) :
-    ∃ C₃, ∃ (hStep₁' : StepBase C₁ C₃) (hStep₂' : StepBase C₂ C₃), True := by
-  sorry  -- Proof requires showing steps on different sessions commute
+    C₁ = C₂ ∨ ∃ C₃, ∃ (hStep₁' : StepBase C₁ C₃) (hStep₂' : StepBase C₂ C₃), True := by
+  cases hStep₁ with
+  | send hProc hk _ =>
+    -- Communication step: IndependentConfigs C C = (s ≠ s) = False
+    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
+    exact absurd rfl hInd
+  | recv hProc hk _ =>
+    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
+    exact absurd rfl hInd
+  | select hProc hk =>
+    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
+    exact absurd rfl hInd
+  | branch hProc hk _ _ _ =>
+    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
+    exact absurd rfl hInd
+  | newSession hProc =>
+    simp only [IndependentConfigs, stepSessionId, hProc] at hInd
+    exact absurd rfl hInd
+  | assign hProc =>
+    -- Non-communication: deterministic, so C₁ = C₂
+    -- Both steps match on same C.proc, so x and v are the same
+    left
+    cases hStep₂ with
+    | assign hProc' =>
+      -- hProc : C.proc = .assign x v, hProc' : C.proc = .assign x' v'
+      -- By transitivity: .assign x v = .assign x' v', hence x = x', v = v'
+      have heq : Process.assign _ _ = Process.assign _ _ := hProc.symm.trans hProc'
+      simp only [Process.assign.injEq] at heq
+      obtain ⟨hx_eq, hv_eq⟩ := heq
+      simp only [hx_eq, hv_eq]
+    | _ => simp_all
+  | seq2 hProc =>
+    left
+    cases hStep₂ with
+    | seq2 hProc' =>
+      have heq : Process.seq _ _ = Process.seq _ _ := hProc.symm.trans hProc'
+      simp only [Process.seq.injEq] at heq
+      obtain ⟨_, hQ_eq⟩ := heq
+      simp only [hQ_eq]
+    | _ => simp_all
+  | par_skip_left hProc =>
+    left
+    cases hStep₂ with
+    | par_skip_left hProc' =>
+      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      simp only [Process.par.injEq] at heq
+      obtain ⟨_, hQ_eq⟩ := heq
+      simp only [hQ_eq]
+    | par_skip_right hProc' =>
+      -- par skip Q = par P skip means skip = P and Q = skip
+      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      simp only [Process.par.injEq] at heq
+      obtain ⟨hskip_P, hQ_skip⟩ := heq
+      -- hskip_P : skip = P, hQ_skip : Q = skip
+      -- C₁.proc = Q = skip, C₂.proc = P = skip
+      simp only [← hskip_P, ← hQ_skip]
+    | _ => simp_all
+  | par_skip_right hProc =>
+    left
+    cases hStep₂ with
+    | par_skip_right hProc' =>
+      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      simp only [Process.par.injEq] at heq
+      obtain ⟨hP_eq, _⟩ := heq
+      simp only [hP_eq]
+    | par_skip_left hProc' =>
+      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      simp only [Process.par.injEq] at heq
+      obtain ⟨hP_skip, hskip_Q⟩ := heq
+      simp only [hP_skip, ← hskip_Q]
+    | _ => simp_all
 
 /-! ## Local Type Step Determinism
 
@@ -203,12 +279,12 @@ theorem not_confluent_general :
   intro h
   -- Counterexample: Two terminated configs with different nextSid
   -- Since skip can't step, Steps from a skip config only reaches itself
-  let C₁ : Config := { proc := .skip, store := [], bufs := [], nextSid := 0 }
-  let C₂ : Config := { proc := .skip, store := [], bufs := [], nextSid := 1 }
+  let C₁ : Config := { proc := .skip, store := [], bufs := [], G := [], D := [], nextSid := 0 }
+  let C₂ : Config := { proc := .skip, store := [], bufs := [], G := [], D := [], nextSid := 1 }
   -- C₁ ≠ C₂ because nextSid differs
   have hne : C₁ ≠ C₂ := by simp [C₁, C₂]
   -- We need some C that can step (to satisfy the premises)
-  let C : Config := { proc := .assign "x" .unit, store := [], bufs := [], nextSid := 0 }
+  let C : Config := { proc := .assign "x" .unit, store := [], bufs := [], G := [], D := [], nextSid := 0 }
   have hStep : ∃ C', Step C C' :=
     ⟨{ C with proc := .skip, store := [("x", .unit)] }, Step.base (StepBase.assign rfl)⟩
   -- Apply h to get a reconvergence
@@ -252,12 +328,13 @@ theorem not_confluent_general :
 /-- Bundle of determinism properties. -/
 structure DeterminismClaims where
   /-- Base step determinism for same process form. -/
-  send_det : ∀ {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role},
+  send_det : ∀ {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role} {T : ValType} {L : LocalType},
     C.proc = .send k x →
     lookupStr C.store k = some (.chan e) →
     lookupStr C.store x = some v →
-    C₁ = sendStep C { sid := e.sid, sender := e.role, receiver := target } v →
-    C₂ = sendStep C { sid := e.sid, sender := e.role, receiver := target } v →
+    lookupG C.G e = some (.send target T L) →
+    C₁ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L →
+    C₂ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L →
     C₁ = C₂
   /-- Unique branch label implies unique continuation. -/
   branch_unique : ∀ {lbl : Label} {cont₁ cont₂ : LocalType} {branches : List (Label × LocalType)},
@@ -265,16 +342,17 @@ structure DeterminismClaims where
     (lbl, cont₁) ∈ branches →
     (lbl, cont₂) ∈ branches →
     cont₁ = cont₂
-  /-- Diamond property for independent sessions. -/
+  /-- Diamond property for independent sessions.
+      Either the steps are deterministic (C₁ = C₂) or there exists a common successor. -/
   diamond : ∀ {C C₁ C₂ : Config},
     StepBase C C₁ →
     StepBase C C₂ →
     IndependentConfigs C C →
-    ∃ C₃, ∃ (_hStep₁' : StepBase C₁ C₃) (_hStep₂' : StepBase C₂ C₃), True
+    C₁ = C₂ ∨ ∃ C₃, ∃ (_hStep₁' : StepBase C₁ C₃) (_hStep₂' : StepBase C₂ C₃), True
 
 /-- Construct the determinism claims bundle. -/
 def determinismClaims : DeterminismClaims where
-  send_det := fun hProc hk hx hC₁ hC₂ => by rw [hC₁, hC₂]
+  send_det := fun hProc hk hx hG hC₁ hC₂ => by rw [hC₁, hC₂]
   branch_unique := mem_branch_unique_label
   diamond := diamond_independent_sessions
 

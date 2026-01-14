@@ -98,9 +98,12 @@ def subst (n : Nat) (replacement : LocalType) : LocalType → LocalType
   | .var m => if m = n then replacement else .var m
   | .mu L => .mu (subst (n + 1) replacement L)
 
-/-- Unfold a recursive type one level. -/
+/-- Unfold a recursive type one level.
+    For μ X. L, unfold gives L[μ X. L / X], i.e., substitute var 0 with the whole μ-type.
+    NOTE: We use explicit function application since dot notation puts the receiver
+    in the replacement position, not the type-to-substitute-in position. -/
 def unfold : LocalType → LocalType
-  | .mu L => L.subst 0 (.mu L)
+  | .mu L => LocalType.subst 0 (.mu L) L
   | L => L
 
 /-- Check if a local type expects to send to role r next. -/

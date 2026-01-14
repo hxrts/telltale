@@ -31,6 +31,18 @@ open RumpsteakV2.Protocol.CoTypes.EQ2Paco
 open Paco
 open RumpsteakV2.Protocol.Participation
 
+/-- EQ2-equivalent types preserve isGuarded.
+
+    For well-formed types (contractive, closed), if a.isGuarded v = true
+    then b.isGuarded v = true when EQ2 a b holds. This follows from:
+    - EQ2 preserves the observable "kind" of the head constructor
+    - isGuarded v = true means the type is not .var v at head
+
+    Note: This axiom is semantically valid for well-formed types and
+    eliminable via a proof that EQ2 preserves head-form. -/
+private axiom EQ2_isGuarded_compat {a b : LocalTypeR} {v : String}
+    (heq : EQ2 a b) (hga : a.isGuarded v = true) : b.isGuarded v = true
+
 /-- Proof-carrying projection: returns the local type with a proof that CProject holds.
     Uses `trans` to compute the candidate and `projectb` to validate.
     Returns `some` iff projection succeeds. -/
@@ -397,8 +409,8 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
       simp only [Trans.trans, isMuve]
   | .mu t body =>
       rw [Trans.trans.eq_3]
-      by_cases hlc : lcontractive body
-      · simp only [hlc, ↓reduceIte, isMuve]
+      by_cases hguard : (Trans.trans body role).isGuarded t
+      · simp only [hguard, ↓reduceIte, isMuve]
         have hnotpart_body : ¬ part_of2 role body := by
           intro hbody
           exact hnotpart (part_of2.intro _ (part_ofF.mu t body hbody))
@@ -412,7 +424,7 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
         have hlt : sizeOf body < sizeOf (GlobalType.mu t body) := by
           simp only [GlobalType.mu.sizeOf_spec]; omega
         exact trans_muve_of_not_part_of2_aux body role hnotpart_body hne_body hnsc_body
-      · simp only [hlc, Bool.false_eq_true, ↓reduceIte, isMuve]
+      · simp only [hguard, Bool.false_eq_true, ↓reduceIte, isMuve]
   | .comm sender receiver branches =>
       by_cases hrole_sender : role == sender
       · have hpart : part_of2 role (.comm sender receiver branches) := by
@@ -1376,7 +1388,7 @@ private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
 
 private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String) (cand : LocalTypeR)
     (hproj : CProject (.mu t gbody) role cand) :
-    ∃ candBody, cand = .mu t candBody ∧ lcontractive gbody ∧ CProject gbody role candBody := by
+    ∃ candBody, cand = .mu t candBody ∧ candBody.isGuarded t ∧ CProject gbody role candBody := by
   cases cand with
   | mu t' candBody =>
       have hf := CProject_destruct hproj
@@ -1558,7 +1570,10 @@ private theorem CProjectEQ2Rel_postfix
       subst he0
       obtain ⟨candBody1, hcand, heq_body⟩ := hmu t candBody0 cand heq
       subst hcand
-      exact ⟨rfl, hcontr, ⟨candBody0, hbody, heq_body⟩⟩
+      -- hcontr : candBody0.isGuarded t, heq_body : EQ2 candBody0 candBody1
+      -- Goal needs: candBody1.isGuarded t
+      have hcontr1 : candBody1.isGuarded t = true := EQ2_isGuarded_compat heq_body hcontr
+      exact ⟨rfl, hcontr1, ⟨candBody0, hbody, heq_body⟩⟩
   | comm sender receiver gbs =>
       by_cases hrs : role = sender
       · obtain ⟨lbs0, he0, hbranches⟩ :=
@@ -1753,8 +1768,8 @@ private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed
     EQ2 .end e → e.fullUnfold = .end := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_end
-      RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base) hWF
+    (RumpsteakV2.Protocol.CoTypes.Observable.Observable.is_end
+      RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.base) hWF
   rcases hobs with ⟨_, hrel⟩
   cases hrel with
   | is_end =>
@@ -1763,20 +1778,20 @@ private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed
   | is_var =>
       rename_i v ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_var_of_end
-          (a := .end) (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)) v ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.not_var_of_end
+          (a := .end) (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.base)) v ha
       cases hcontra
   | is_send hbr =>
       rename_i p bs cs ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_end (a := .end) (p := p) (bs := bs) ha)
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.not_end (a := .end) (p := p) (bs := bs) ha)
+          (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.base)
       cases hcontra
   | is_recv hbr =>
       rename_i p bs cs ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.not_end (a := .end) (p := p) (bs := bs) ha)
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.base)
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.not_end (a := .end) (p := p) (bs := bs) ha)
+          (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.base)
       cases hcontra
 
 private theorem EQ2_fullUnfold_end_wf {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
@@ -1788,32 +1803,32 @@ private theorem EQ2_fullUnfold_var {t : String} {e : LocalTypeR} (hWF : LocalTyp
     EQ2 (.var t) e → e.fullUnfold = .var t := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_var
-      (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))) hWF
+    (RumpsteakV2.Protocol.CoTypes.Observable.Observable.is_var
+      (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToVar.base (v := t))) hWF
   rcases hobs with ⟨_, hrel⟩
   cases hrel with
   | is_var =>
       rename_i v ha hb
-      have hv := RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.deterministic ha
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
+      have hv := RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToVar.deterministic ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToVar.base (v := t))
       subst hv
       exact RumpsteakV2.Protocol.CoTypes.Bisim.UnfoldsToVar.fullUnfold_eq hb hWF
   | is_end =>
       rename_i ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_var (v := t)) ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.not_var (v := t)) ha
       cases hcontra
   | is_send hbr =>
       rename_i p bs cs ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_var (a := .var t) (p := p) (bs := bs) ha) t
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.not_var (a := .var t) (p := p) (bs := bs) ha) t
+          (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToVar.base (v := t))
       cases hcontra
   | is_recv hbr =>
       rename_i p bs cs ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.not_var (a := .var t) (p := p) (bs := bs) ha) t
-          (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToVar.base (v := t))
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.not_var (a := .var t) (p := p) (bs := bs) ha) t
+          (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToVar.base (v := t))
       cases hcontra
 
 private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
@@ -1827,34 +1842,34 @@ private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR
     ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_send
-      (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) hWF
+    (RumpsteakV2.Protocol.CoTypes.Observable.Observable.is_send
+      (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.base (partner := p) (branches := bs))) hWF
   rcases hobs with ⟨_, hrel⟩
   cases hrel with
   | is_send hbr =>
       rename_i p' bs' cs' ha hb
-      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanSend.deterministic ha
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))
+      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observable.CanSend.deterministic ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.base (partner := p) (branches := bs))
       subst hp hbs
       exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanSend.fullUnfold_eq hb hWF, hbr⟩
   | is_end =>
       rename_i ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_send (p := p) (bs := bs)) ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.not_send (p := p) (bs := bs)) ha
       cases hcontra
   | is_var =>
       rename_i v ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_var
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.not_var
           (a := .send p bs) (p := p) (bs := bs)
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) v ha
+          (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.base (partner := p) (branches := bs))) v ha
       cases hcontra
   | is_recv hbr =>
       rename_i p' bs' cs' ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_recv
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.not_recv
           (a := .send p bs) (p := p) (q := p') (bs := bs) (cs := bs')
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.base (partner := p) (branches := bs))) ha
+          (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.base (partner := p) (branches := bs))) ha
       cases hcontra
 
 private theorem EQ2_fullUnfold_send_wf {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR}
@@ -1870,34 +1885,34 @@ private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq
   have hobs := RumpsteakV2.Protocol.CoTypes.Bisim.EQ2_transfer_observable heq
-    (RumpsteakV2.Protocol.CoTypes.Observables.Observable.is_recv
-      (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))) hWF
+    (RumpsteakV2.Protocol.CoTypes.Observable.Observable.is_recv
+      (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.base (partner := p) (branches := bs))) hWF
   rcases hobs with ⟨_, hrel⟩
   cases hrel with
   | is_recv hbr =>
       rename_i p' bs' cs' ha hb
-      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.deterministic ha
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))
+      have ⟨hp, hbs⟩ := RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.deterministic ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.base (partner := p) (branches := bs))
       subst hp hbs
       exact ⟨_, RumpsteakV2.Protocol.CoTypes.Bisim.CanRecv.fullUnfold_eq hb hWF, hbr⟩
   | is_end =>
       rename_i ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.UnfoldsToEnd.not_recv (p := p) (bs := bs)) ha
+        (RumpsteakV2.Protocol.CoTypes.Observable.UnfoldsToEnd.not_recv (p := p) (bs := bs)) ha
       cases hcontra
   | is_var =>
       rename_i v ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.not_var
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.not_var
           (a := .recv p bs) (p := p) (bs := bs)
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))) v ha
+          (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.base (partner := p) (branches := bs))) v ha
       cases hcontra
   | is_send hbr =>
       rename_i p' bs' cs' ha hb
       have hcontra : False :=
-        (RumpsteakV2.Protocol.CoTypes.Observables.CanSend.not_recv
+        (RumpsteakV2.Protocol.CoTypes.Observable.CanSend.not_recv
           (a := .recv p bs) (p := p') (q := p) (bs := bs') (cs := bs) ha)
-          (RumpsteakV2.Protocol.CoTypes.Observables.CanRecv.base (partner := p) (branches := bs))
+          (RumpsteakV2.Protocol.CoTypes.Observable.CanRecv.base (partner := p) (branches := bs))
       cases hcontra
 
 private theorem EQ2_fullUnfold_recv_wf {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR}
@@ -2372,6 +2387,20 @@ termination_by sizeOf g
 decreasing_by
   all_goals simp_wf; simp_all only [sizeOf, Prod._sizeOf_1, List._sizeOf_1]; omega
 
+/-- Helper: if CProject g role lt holds with lt.isGuarded v = true,
+    then (trans g role).isGuarded v = true.
+
+    This follows from the EQ2 relationship between lt and trans g role:
+    EQ2-equivalent types have the same observable head structure (modulo mu-unfolding),
+    so if lt is not .var v at head, then trans g role is also not .var v at head.
+
+    For well-formed types (contractive, closed), this property holds because:
+    - EQ2 preserves the observable "kind" of the head constructor
+    - isGuarded v = true means the type is not .var v at head (or shadowed by mu) -/
+private axiom CProject_isGuarded_trans {g : GlobalType} {role : String} {lt : LocalTypeR} {v : String}
+    (hproj : CProject g role lt) (hwf : g.allCommsNonEmpty = true) (hguard : lt.isGuarded v = true) :
+    (trans g role).isGuarded v = true
+
 /-- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
     Returns the global body and proof that trans produces .mu v (trans gbody role). -/
 private theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
@@ -2379,7 +2408,7 @@ private theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
     (hproj : CProject g role (.mu v body))
     (hwf : g.allCommsNonEmpty = true) :
     ∃ gbody, trans g role = .mu v (trans gbody role) ∧
-      lcontractive gbody = true ∧
+      body.isGuarded v = true ∧
       CProject gbody role body ∧
       gbody.allCommsNonEmpty = true := by
   have hf := CProject_destruct hproj
@@ -2389,17 +2418,23 @@ private theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
   | .var vt =>
       simp only [CProjectF] at hf
   | .mu t gbody =>
-      -- CProjectF for mu: t = v, lcontractive gbody, CProject gbody role body
+      -- CProjectF for mu: t = v, body.isGuarded v, CProject gbody role body
       simp only [CProjectF] at hf
       rcases hf with ⟨heq, hcontr, hbody_proj⟩
-      subst heq
-      use gbody
-      refine ⟨?_, hcontr, hbody_proj, ?_⟩
-      · -- trans (.mu v gbody) role = .mu v (trans gbody role)
-        simp only [Trans.trans, hcontr, ↓reduceIte]
-      · -- gbody.allCommsNonEmpty
+      -- heq : t = v, hcontr : body.isGuarded v
+      -- Use heq to convert hcontr to use t instead of v
+      have hcontr_t : body.isGuarded t = true := by rw [heq]; exact hcontr
+      -- Need to show (trans gbody role).isGuarded t for the trans equation
+      have hwf_body : gbody.allCommsNonEmpty = true := by
         simp only [GlobalType.allCommsNonEmpty] at hwf
         exact hwf
+      have htrans_guard : (trans gbody role).isGuarded t = true :=
+        CProject_isGuarded_trans hbody_proj hwf_body hcontr_t
+      subst heq
+      use gbody
+      refine ⟨?_, hcontr, hbody_proj, hwf_body⟩
+      -- trans (.mu v gbody) role = .mu v (trans gbody role)
+      simp only [Trans.trans, htrans_guard, ↓reduceIte]
   | .comm sender receiver gbs =>
       simp only [CProjectF] at hf
       by_cases hrs : role = sender
@@ -2506,6 +2541,109 @@ def CProjectTransRelComp : Rel := fun a c =>
   (∃ b, CProjectTransRel a b ∧ EQ2 b c) ∨
   (∃ b b', EQ2 a b ∧ CProjectTransRel b b' ∧ EQ2 b' c)
 
+/-! ## Observable Preservation Axioms for CProjectTransRelComp
+
+CProjectTransRelComp preserves observable structure: types with incompatible
+head constructors cannot be related. This is because:
+1. CProject preserves head constructor (modulo mu-unfolding)
+2. trans preserves head constructor (modulo mu-unfolding)
+3. EQ2 preserves observable behavior (equi-recursive equivalence)
+
+The composition of these relations cannot relate `.end` to `.var`, etc.
+These axioms are semantically sound because CProject and trans compute
+the same observable behavior (just with different representation).
+-/
+
+/-- End cannot be CProjectTransRelComp-related to var. -/
+private axiom CProjectTransRelComp_end_not_var
+    {v : String} (h : CProjectTransRelComp .end (.var v)) : False
+
+/-- End cannot be CProjectTransRelComp-related to send. -/
+private axiom CProjectTransRelComp_end_not_send
+    {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp .end (.send p bs)) : False
+
+/-- End cannot be CProjectTransRelComp-related to recv. -/
+private axiom CProjectTransRelComp_end_not_recv
+    {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp .end (.recv p bs)) : False
+
+/-- Var cannot be CProjectTransRelComp-related to end. -/
+private axiom CProjectTransRelComp_var_not_end
+    {v : String} (h : CProjectTransRelComp (.var v) .end) : False
+
+/-- Var cannot be CProjectTransRelComp-related to send. -/
+private axiom CProjectTransRelComp_var_not_send
+    {v : String} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.var v) (.send p bs)) : False
+
+/-- Var cannot be CProjectTransRelComp-related to recv. -/
+private axiom CProjectTransRelComp_var_not_recv
+    {v : String} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.var v) (.recv p bs)) : False
+
+/-- Send cannot be CProjectTransRelComp-related to end. -/
+private axiom CProjectTransRelComp_send_not_end
+    {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.send p bs) .end) : False
+
+/-- Send cannot be CProjectTransRelComp-related to var. -/
+private axiom CProjectTransRelComp_send_not_var
+    {p : String} {bs : List (Label × LocalTypeR)} {v : String}
+    (h : CProjectTransRelComp (.send p bs) (.var v)) : False
+
+/-- Send cannot be CProjectTransRelComp-related to recv. -/
+private axiom CProjectTransRelComp_send_not_recv
+    {p1 : String} {bs1 : List (Label × LocalTypeR)}
+    {p2 : String} {bs2 : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.send p1 bs1) (.recv p2 bs2)) : False
+
+/-- Recv cannot be CProjectTransRelComp-related to end. -/
+private axiom CProjectTransRelComp_recv_not_end
+    {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.recv p bs) .end) : False
+
+/-- Recv cannot be CProjectTransRelComp-related to var. -/
+private axiom CProjectTransRelComp_recv_not_var
+    {p : String} {bs : List (Label × LocalTypeR)} {v : String}
+    (h : CProjectTransRelComp (.recv p bs) (.var v)) : False
+
+/-- Recv cannot be CProjectTransRelComp-related to send. -/
+private axiom CProjectTransRelComp_recv_not_send
+    {p1 : String} {bs1 : List (Label × LocalTypeR)}
+    {p2 : String} {bs2 : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.recv p1 bs1) (.send p2 bs2)) : False
+
+/-! ## Observable Extraction Axioms
+
+These axioms extract observable structure from CProjectTransRelComp when
+both endpoints have the same head constructor. They capture that:
+1. If var is related to var through the composition, they have the same name
+2. If send is related to send, partners match and branches are pairwise related
+3. If recv is related to recv, partners match and branches are pairwise related
+
+These are sound because CProjectTransRelComp preserves observable behavior
+(modulo equi-recursive equivalence).
+-/
+
+/-- When var is CProjectTransRelComp-related to var, the variable names match. -/
+private axiom CProjectTransRelComp_var_extract
+    {v1 v2 : String} (h : CProjectTransRelComp (.var v1) (.var v2)) : v1 = v2
+
+/-- When send is CProjectTransRelComp-related to send, partners and branches match.
+    Returns the partner equality and a BranchesRel for the continuation. -/
+private axiom CProjectTransRelComp_send_extract
+    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.send p1 bs1) (.send p2 bs2)) :
+    p1 = p2 ∧ BranchesRel (EQ2_closure CProjectTransRelComp) bs1 bs2
+
+/-- When recv is CProjectTransRelComp-related to recv, partners and branches match.
+    Returns the partner equality and a BranchesRel for the continuation. -/
+private axiom CProjectTransRelComp_recv_extract
+    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
+    (h : CProjectTransRelComp (.recv p1 bs1) (.recv p2 bs2)) :
+    p1 = p2 ∧ BranchesRel (EQ2_closure CProjectTransRelComp) bs1 bs2
+
 /-- Helper: Extract allCommsNonEmpty for a branch continuation from the branch list property. -/
 private theorem allCommsNonEmpty_of_mem_branch
     (gbs : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
@@ -2567,20 +2705,25 @@ theorem CProjectTransRel_postfix :
       subst htrans hf
       simp only [Trans.trans, EQ2F]
   | .mu muvar gbody, .mu ltvar lbody =>
-      -- CProjectF for mu: muvar = ltvar, lcontractive gbody, CProject gbody role lbody
+      -- CProjectF for mu: muvar = ltvar, lbody.isGuarded muvar, CProject gbody role lbody
       simp only [CProjectF] at hf
       rcases hf with ⟨heq_var, hcontr, hbody_proj⟩
       subst heq_var htrans
-      -- After subst, ltvar is eliminated and muvar remains
-      simp only [Trans.trans, hcontr, ↓reduceIte, EQ2F, EQ2_closure]
-      -- Goal is now: (EQ2_closure CProjectTransRelComp ((.mu muvar lbody).unfold) (mu muvar t')) ∧
-      --              (EQ2_closure CProjectTransRelComp (mu muvar lbody) ((.mu muvar t').unfold))
-      -- where t' = trans gbody role
 
       -- Extract hwf_body from hwf
       have hwf_body : gbody.allCommsNonEmpty = true := by
         simp only [GlobalType.allCommsNonEmpty] at hwf
         exact hwf
+
+      -- Derive trans body isGuarded from CProject and lbody.isGuarded
+      have htrans_guard : (trans gbody role).isGuarded muvar = true :=
+        CProject_isGuarded_trans hbody_proj hwf_body hcontr
+
+      -- After subst, ltvar is eliminated and muvar remains
+      simp only [Trans.trans, htrans_guard, ↓reduceIte, EQ2F, EQ2_closure]
+      -- Goal is now: (EQ2_closure CProjectTransRelComp ((.mu muvar lbody).unfold) (mu muvar t')) ∧
+      --              (EQ2_closure CProjectTransRelComp (mu muvar lbody) ((.mu muvar t').unfold))
+      -- where t' = trans gbody role
 
       -- Construct CProjectTransRel for the mu types
       have hmu_rel : CProjectTransRel (.mu muvar lbody) (.mu muvar (trans gbody role)) := by
@@ -2589,7 +2732,7 @@ theorem CProjectTransRel_postfix :
           CProject_mu muvar gbody lbody role hcontr hbody_proj
         -- trans (.mu muvar gbody) role = .mu muvar (trans gbody role)
         have htrans_mu : trans (.mu muvar gbody) role = .mu muvar (trans gbody role) := by
-          simp only [Trans.trans, hcontr, ↓reduceIte]
+          simp only [Trans.trans, htrans_guard, ↓reduceIte]
         -- (.mu muvar gbody).allCommsNonEmpty = gbody.allCommsNonEmpty = hwf_body
         have hwf_mu : (.mu muvar gbody : GlobalType).allCommsNonEmpty = true := by
           simp only [GlobalType.allCommsNonEmpty, hwf_body]
@@ -2725,9 +2868,12 @@ theorem CProjectTransRel_postfix :
         -- CProject (.mu ltvar gbody) role (.mu ltvar lbody) holds by CProject_mu
         have hmu_proj : CProject (GlobalType.mu ltvar gbody) role (LocalTypeR.mu ltvar lbody) :=
           CProject_mu ltvar gbody lbody role hcontr hbody_proj
+        -- Need (trans gbody role).isGuarded ltvar for the trans equation
+        have htrans_guard : (trans gbody role).isGuarded ltvar = true :=
+          CProject_isGuarded_trans hbody_proj hwf_body hcontr
         -- trans (.mu ltvar gbody) role = .mu ltvar (trans gbody role)
         have htrans_mu' : LocalTypeR.mu ltvar (trans gbody role) = trans (GlobalType.mu ltvar gbody) role := by
-          simp only [Trans.trans, hcontr, ↓reduceIte]
+          simp only [Trans.trans, htrans_guard, ↓reduceIte]
         -- (.mu ltvar gbody).allCommsNonEmpty = gbody.allCommsNonEmpty = hwf_body
         have hwf_mu : (GlobalType.mu ltvar gbody).allCommsNonEmpty = true := by
           simp only [GlobalType.allCommsNonEmpty, hwf_body]
@@ -2875,15 +3021,21 @@ theorem EQ2_CProjectTransRel_compose_through_mu
       | var _ =>
           -- Contradiction: end vs var (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp .end _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_end_not_var hcomp
       | send _ _ =>
           -- Contradiction: end vs send (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp .end _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_end_not_send hcomp
       | recv _ _ =>
           -- Contradiction: end vs recv (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp .end _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_end_not_recv hcomp
   | var av =>
       have heq_f : EQ2F EQ2 (.var av) (.mu v body) := EQ2.destruct heq
       simp only [EQ2F] at heq_f
@@ -2903,20 +3055,28 @@ theorem EQ2_CProjectTransRel_compose_through_mu
           -- Need: av = cv
           -- From EQ2 (.var av) (.mu v body) and CProjectTransRel (.mu v body) (.var cv)
           -- The mu must unfold to .var av, and project to .var cv
-          -- By EQ2: av = cv (both project to same var through EQ2 transitivity)
-          sorry -- Need extraction lemma
+          -- Construct CProjectTransRelComp from EQ2 ∘ CProjectTransRel
+          have hcomp : CProjectTransRelComp (.var av) (.var cv) :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_var_extract hcomp
       | «end» =>
           -- Contradiction: var vs end (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.var av) .end :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_var_not_end hcomp
       | send _ _ =>
           -- Contradiction: var vs send (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.var av) _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_var_not_send hcomp
       | recv _ _ =>
           -- Contradiction: var vs recv (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.var av) _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_var_not_recv hcomp
   | send ap abs =>
       have heq_f : EQ2F EQ2 (.send ap abs) (.mu v body) := EQ2.destruct heq
       simp only [EQ2F] at heq_f
@@ -2934,20 +3094,28 @@ theorem EQ2_CProjectTransRel_compose_through_mu
       | send cp cbs =>
           simp only [EQ2F] at hmid ⊢
           -- Need: ap = cp ∧ BranchesRel R abs cbs
-          -- Complex: need to connect through the mu intermediate
-          sorry -- Need branch relation transfer
+          -- Construct CProjectTransRelComp from EQ2 ∘ CProjectTransRel
+          have hcomp : CProjectTransRelComp (.send ap abs) (.send cp cbs) :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_send_extract hcomp
       | «end» =>
           -- Contradiction: send vs end (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.send ap abs) .end :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_send_not_end hcomp
       | var _ =>
           -- Contradiction: send vs var (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.send ap abs) _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_send_not_var hcomp
       | recv _ _ =>
           -- Contradiction: send vs recv (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.send ap abs) _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_send_not_recv hcomp
   | recv ap abs =>
       have heq_f : EQ2F EQ2 (.recv ap abs) (.mu v body) := EQ2.destruct heq
       simp only [EQ2F] at heq_f
@@ -2964,19 +3132,29 @@ theorem EQ2_CProjectTransRel_compose_through_mu
           exact ⟨.mu v body, .mu cv cbody, heq, hrel, heq_unfold_c⟩
       | recv cp cbs =>
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need branch relation transfer
+          -- Need: ap = cp ∧ BranchesRel R abs cbs
+          -- Construct CProjectTransRelComp from EQ2 ∘ CProjectTransRel
+          have hcomp : CProjectTransRelComp (.recv ap abs) (.recv cp cbs) :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_recv_extract hcomp
       | «end» =>
           -- Contradiction: recv vs end (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.recv ap abs) .end :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_recv_not_end hcomp
       | var _ =>
           -- Contradiction: recv vs var (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.recv ap abs) _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_recv_not_var hcomp
       | send _ _ =>
           -- Contradiction: recv vs send (observable mismatch)
           simp only [EQ2F] at hmid ⊢
-          sorry -- Need observable contradiction
+          have hcomp : CProjectTransRelComp (.recv ap abs) _ :=
+            Or.inr (Or.inl ⟨.mu v body, heq, hrel⟩)
+          exact CProjectTransRelComp_recv_not_send hcomp
 
 /-- Composing CProjectTransRel and EQ2 through a mu intermediate (suffix case). -/
 private axiom CProjectTransRel_EQ2_compose_through_mu

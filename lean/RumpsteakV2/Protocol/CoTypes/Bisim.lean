@@ -2,8 +2,8 @@ import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.CoTypes.DBBridge
-import RumpsteakV2.Protocol.CoTypes.Observables
-import RumpsteakV2.Protocol.CoTypes.Duality
+import RumpsteakV2.Protocol.CoTypes.Observable
+import RumpsteakV2.Protocol.CoTypes.Dual
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
 
 set_option linter.dupNamespace false
@@ -51,13 +51,13 @@ namespace RumpsteakV2.Protocol.CoTypes.Bisim
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.CoTypes.EQ2
-open RumpsteakV2.Protocol.CoTypes.Observables
+open RumpsteakV2.Protocol.CoTypes.Observable
 open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 
 /-! ## Observable Behavior
 
 The membership predicates (UnfoldsToEnd, UnfoldsToVar, CanSend, CanRecv) and their
-basic properties are defined in Observables.lean to avoid circular dependencies. -/
+basic properties are defined in Observable.lean to avoid circular dependencies. -/
 
 /-- Every closed AND contractive local type has observable behavior (after enough unfolding).
 

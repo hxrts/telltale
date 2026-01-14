@@ -1,4 +1,5 @@
 import Effects.Deployment
+import Effects.Decidability
 
 /-!
 # MPST Concrete Examples
@@ -108,19 +109,21 @@ def initLin : LinCtx := [
 
 /-! ### Coherence Proof -/
 
-/-- Initial configuration is coherent.
-
-The key insight: with empty traces (no in-flight messages),
-EdgeCoherent reduces to `(Consume from L []).isSome`,
-which is always true since `Consume from L [] = some L`. -/
-theorem initCoherent : Coherent initG initD := by
+/-- Helper: lookupD initD returns [] for any edge. -/
+theorem initD_all_empty : ∀ e, lookupD initD e = [] := by
   intro e
-  unfold EdgeCoherent
-  intro Lsender Lrecv _ _
-  -- The trace lookupD initD e is [] for any edge (either explicitly in initD or by default)
-  -- Consume from_ Lrecv [] = some Lrecv, so .isSome is true
-  -- TODO: prove that lookupD returns [] for our specific initD structure
-  sorry
+  unfold initD lookupD
+  simp only [List.lookup]
+  by_cases h1 : e == aliceToBob
+  · simp [h1]
+  · simp only [h1, Bool.false_eq_true, ↓reduceIte]
+    by_cases h2 : e == bobToAlice
+    · simp [h2]
+    · simp [h2]
+
+/-- Initial configuration is coherent. -/
+theorem initCoherent : Coherent initG initD :=
+  coherent_all_empty initG initD initD_all_empty
 
 /-! ### Deadlock Freedom -/
 
@@ -152,14 +155,21 @@ theorem bobReachesCommDecide : reachesCommDecide bobType = true := rfl
 
 /-! ### Buffer Typing -/
 
-/-- Empty buffers are trivially typed (empty list has length 0 = length of empty trace) -/
-theorem initBuffersTyped : BuffersTyped initG initD initBufs := by
+/-- Helper: lookupBuf initBufs returns [] for any edge. -/
+theorem initBufs_all_empty : ∀ e, lookupBuf initBufs e = [] := by
   intro e
-  unfold BufferTyped
-  -- For any edge, both lookupBuf and lookupD return []
-  -- We need to show ∃ h : buf.length = trace.length, ...
-  -- TODO: prove that lookupBuf and lookupD return [] for our specific structures
-  sorry
+  unfold initBufs lookupBuf
+  simp only [List.lookup]
+  by_cases h1 : e == aliceToBob
+  · simp [h1]
+  · simp only [h1, Bool.false_eq_true, ↓reduceIte]
+    by_cases h2 : e == bobToAlice
+    · simp [h2]
+    · simp [h2]
+
+/-- Empty buffers are trivially typed. -/
+theorem initBuffersTyped : BuffersTyped initG initD initBufs :=
+  buffersTyped_all_empty initG initD initBufs initBufs_all_empty initD_all_empty
 
 /-! ### Spatial Requirements -/
 
@@ -172,11 +182,13 @@ def localTopo : Topology :=
   Topology.allColocated "localhost"
 
 theorem localTopo_satisfies : Satisfies localTopo spatialReq := by
-  -- Satisfies is defined recursively on SpatialReq
-  -- For .conj, it requires both conjuncts to be satisfied
-  -- For .netCapable site, it requires topo.siteHasNetwork site = true
-  -- TODO: needs decidability instance for Topology.siteHasNetwork
-  constructor <;> sorry
+  constructor
+  · -- netCapable Alice: need siteHasNetwork "Alice" = true
+    simp only [Satisfies, localTopo, Topology.siteHasNetwork, Topology.allColocated,
+               SiteCapabilities.enabled]
+  · -- netCapable Bob: need siteHasNetwork "Bob" = true
+    simp only [Satisfies, localTopo, Topology.siteHasNetwork, Topology.allColocated,
+               SiteCapabilities.enabled]
 
 /-! ### Interface -/
 
@@ -302,13 +314,33 @@ def initBufs : Buffers := [
 
 /-! ### Coherence -/
 
-/-- Two-buyer initial state is coherent (all traces empty) -/
-theorem initCoherent : Coherent initG initD := by
+/-- Helper: lookupD initD returns [] for any edge. -/
+theorem initD_all_empty : ∀ e, lookupD initD e = [] := by
   intro e
-  unfold EdgeCoherent
-  intro Lsender Lrecv _ _
-  -- TODO: prove that lookupD returns [] for our specific initD structure
-  sorry
+  unfold initD lookupD
+  simp only [List.lookup]
+  by_cases h1 : e == b1ToB2
+  · simp [h1]
+  · simp only [h1, Bool.false_eq_true, ↓reduceIte]
+    by_cases h2 : e == b1ToS
+    · simp [h2]
+    · simp only [h2, Bool.false_eq_true, ↓reduceIte]
+      by_cases h3 : e == b2ToB1
+      · simp [h3]
+      · simp only [h3, Bool.false_eq_true, ↓reduceIte]
+        by_cases h4 : e == b2ToS
+        · simp [h4]
+        · simp only [h4, Bool.false_eq_true, ↓reduceIte]
+          by_cases h5 : e == sToB1
+          · simp [h5]
+          · simp only [h5, Bool.false_eq_true, ↓reduceIte]
+            by_cases h6 : e == sToB2
+            · simp [h6]
+            · simp [h6]
+
+/-- Two-buyer initial state is coherent (all traces empty) -/
+theorem initCoherent : Coherent initG initD :=
+  coherent_all_empty initG initD initD_all_empty
 
 /-! ### Deadlock Freedom -/
 
@@ -329,11 +361,32 @@ theorem allReachComm : ∀ r, r ∈ roles → ReachesComm (localTypes r) := by
 
 /-! ### Buffer Typing -/
 
-theorem initBuffersTyped : BuffersTyped initG initD initBufs := by
+/-- Helper: lookupBuf initBufs returns [] for any edge. -/
+theorem initBufs_all_empty : ∀ e, lookupBuf initBufs e = [] := by
   intro e
-  unfold BufferTyped
-  -- TODO: prove that lookupBuf and lookupD return [] for our specific structures
-  sorry
+  unfold initBufs lookupBuf
+  simp only [List.lookup]
+  by_cases h1 : e == b1ToB2
+  · simp [h1]
+  · simp only [h1, Bool.false_eq_true, ↓reduceIte]
+    by_cases h2 : e == b1ToS
+    · simp [h2]
+    · simp only [h2, Bool.false_eq_true, ↓reduceIte]
+      by_cases h3 : e == b2ToB1
+      · simp [h3]
+      · simp only [h3, Bool.false_eq_true, ↓reduceIte]
+        by_cases h4 : e == b2ToS
+        · simp [h4]
+        · simp only [h4, Bool.false_eq_true, ↓reduceIte]
+          by_cases h5 : e == sToB1
+          · simp [h5]
+          · simp only [h5, Bool.false_eq_true, ↓reduceIte]
+            by_cases h6 : e == sToB2
+            · simp [h6]
+            · simp [h6]
+
+theorem initBuffersTyped : BuffersTyped initG initD initBufs :=
+  buffersTyped_all_empty initG initD initBufs initBufs_all_empty initD_all_empty
 
 /-! ### Summary -/
 

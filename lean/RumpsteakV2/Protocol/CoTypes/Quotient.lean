@@ -1,5 +1,5 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
-import RumpsteakV2.Protocol.CoTypes.Duality
+import RumpsteakV2.Protocol.CoTypes.Dual
 import RumpsteakV2.Protocol.CoTypes.Substitute
 import RumpsteakV2.Protocol.LocalTypeR
 
@@ -59,7 +59,7 @@ requires Barendregt side conditions (notBoundAt + repl closed).
 
 /-! ## Duality Congruence -/
 
--- EQ2_dual is proved in CoTypes.Duality; we re-export a local alias here.
+-- EQ2_dual is proved in CoTypes.Dual; we re-export a local alias here.
 /-- Duality respects EQ2: if two types are EQ2-equivalent, their duals
     are also EQ2-equivalent. -/
 theorem EQ2_dual (a b : LocalTypeR)
