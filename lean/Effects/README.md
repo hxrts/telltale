@@ -34,20 +34,16 @@ Coherent(G, D) :=
     the receiver's local type can consume the pending messages
 ```
 
-## Architecture
+At the core is an **asynchronous multiparty session calculus** where a running system state is explicit: processes execute while messages sit in **unbounded FIFO buffers**. Instead of a binary endpoint `(id, L/R)`, an endpoint is a **session id plus role** `(sid, r)`, and messages flow along directed edges `(sid, p → q)`. The operational semantics is “real”: a send by role `p` to `q` **enqueues** immediately (no rendezvous), and a receive by `q` from `p` **dequeues** when the corresponding buffer edge is nonempty. Session creation allocates a fresh `sid` and initializes empty buffers for all relevant role-to-role edges (or mailboxes, depending on the delivery model you pick).
 
-```
-Effects/
-├── Basic.lean         # SessionId, Role, Endpoint, Edge
-├── LocalType.lean     # Local types with role-directed actions
-├── Values.lean        # Runtime values with endpoint channels
-├── Environments.lean  # Per-edge buffers and type environments
-├── Coherence.lean     # Multiparty coherence invariant
-├── Process.lean       # MPST process language
-├── Typing.lean        # Process typing rules
-├── Semantics.lean     # Async operational semantics
-└── Preservation.lean  # Subject reduction theorem
-```
+Typing is split into three coupled environments that are checked and evolved together. First, `G` maps each role endpoint `(sid, r)` to a **local session type** (MPST local types: `!q(T).L`, `?p(T).L`, plus labeled selection/branching). Second, `D` maps each directed edge `(sid, p→q)` to a **type-level shadow queue**—a list of message types (and labels) that predicts exactly what values are currently in flight on that edge. Third, `S` (and a heap typing if you include state) tracks ordinary values, references, and effect capabilities. The crucial invariant is that runtime buffers `B` are related to `D` by `BuffersTyped`: every queued runtime value on `(sid, p→q)` matches the head types recorded in `D(sid, p→q)`.
+
+“Global correctness” is expressed as a semantics-dependent **coherence condition** over `(G, D)` rather than a simple binary duality. Coherence says: if you “consume” the queued traces `D` against the local types in `G` (a function like your `Consume`, generalized to directed edges and labels), then all roles’ remaining local types are mutually compatible—equivalently, they are consistent with some global conversation shape (either explicitly stored as a global type and checked by projection, or implicitly by a compatibility relation). This is what makes the system robust under real asynchrony: coherence talks about **in-flight messages**, so connecting components is safe even when buffers are non-empty, and protocol agreement is stated relative to the actual delivery discipline (FIFO-per-edge first, then generalize).
+
+Composable effects fit in by making “communication state” and “effect state” coexist without collapsing guarantees. The process typing judgment is effect-aware: a process is typed not just with `(S,G,D)` but also with an **effect context** (exceptions/cancellation, transactions/rollback, shared state via references, etc.) and explicit side conditions that preserve session invariants. The discipline is: linear resources (endpoints/tokens) cannot be duplicated or stored in shared locations unless mediated by a controlled capability; effect steps may interleave freely with communication steps, but any effect that can abort or roll back must do so in a way that keeps `(G,D,B)` coherent (e.g., a receive that “fails” cannot partially consume the queue trace). The result is a conditional but crisp theorem package: preservation always, and progress/non-stuckness relative to stated delivery/scheduler and effect assumptions.
+
+Finally, to support **safe runtime composition between untrusted nodes**, you wrap the boundary in a **proof-carrying runtime monitor**. Each node presents a compact *boundary certificate* describing the endpoints it owns, the local types it claims for them, and (critically) the shadow traces `D` for edges it shares; the monitor checks a decidable “link” condition (linearity/non-aliasing + buffer/type-trace agreement + coherence after consuming queued traces). After linking, nodes don’t directly enqueue/dequeue—every send/recv goes through the verified monitor, which updates `B`, `D`, and `G` in lockstep and issues fresh linear tokens so endpoints can’t be misused or aliased. The big meta-theorem you aim for is: **if the monitor accepts steps, the global invariant holds forever**, so no participant can ever observe a protocol mismatch even under unbounded buffering, dynamic composition, and interleaved effects.
+
 
 ## Module Details
 
