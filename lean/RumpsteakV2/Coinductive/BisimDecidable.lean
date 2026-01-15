@@ -168,243 +168,7 @@ lemma obsMatch_true_implies_same_kind {n : Nat} {t1 t2 : LocalTypeC}
   simp only [obsMatch] at h
   split at h <;> simp_all
 
-/-! ## Helper Lemmas: Connecting bisimAll to BranchesRelC -/
-
-/-- Helper: extract labels from branchesOf. -/
-def labelsOfBranches (bs : List (Label × LocalTypeC)) : List Label :=
-  bs.map (·.1)
-
-/-- Helper: childrenOf for send equals the second components of branchesOf. -/
-lemma childrenOf_send_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
-    (hhead : head t = .send p labels) :
-    childrenOf t = (branchesOf t).map (·.2) := by
-  simp only [childrenOf, branchesOf, head] at hhead ⊢
-  match hdest : PFunctor.M.dest t with
-  | ⟨LocalTypeHead.send p' labels', f⟩ =>
-      simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
-      simp only [List.map_ofFn]
-      rfl
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
-
-/-- Helper: childrenOf for recv equals the second components of branchesOf. -/
-lemma childrenOf_recv_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
-    (hhead : head t = .recv p labels) :
-    childrenOf t = (branchesOf t).map (·.2) := by
-  simp only [childrenOf, branchesOf, head] at hhead ⊢
-  match hdest : PFunctor.M.dest t with
-  | ⟨LocalTypeHead.recv p' labels', f⟩ =>
-      simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
-      simp only [List.map_ofFn]
-      rfl
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
-
-/-- Helper: if bisimAll succeeds on zipped children, construct BranchesRelC.
-    This requires showing that the branches have matching labels. -/
-lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
-    {bs cs : List (Label × LocalTypeC)}
-    (hlen : bs.length = cs.length)
-    (hlabels : ∀ i : Fin bs.length, (bs.get i).1 = (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1)
-    (hchildren : ∀ i : Fin bs.length, R (bs.get i).2 (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2) :
-    BranchesRelC R bs cs := by
-  revert cs
-  induction bs with
-  | nil =>
-      intro cs hlen hlabels hchildren
-      simp only [List.length_nil] at hlen
-      have : cs = [] := by cases cs <;> simp_all
-      rw [this]
-      exact List.Forall₂.nil
-  | cons b bs ih =>
-      intro cs hlen hlabels hchildren
-      cases cs with
-      | nil => simp at hlen
-      | cons c cs =>
-          simp only [List.length_cons] at hlen
-          have hlen' : bs.length = cs.length := Nat.succ.inj hlen
-          refine List.Forall₂.cons ?_ (ih hlen' ?_ ?_)
-          · -- First element
-            have hlabel := hlabels ⟨0, by simp⟩
-            have hchild := hchildren ⟨0, by simp⟩
-            simp only [List.get_eq_getElem, List.getElem_cons_zero] at hlabel hchild
-            exact ⟨hlabel, hchild⟩
-          · -- Labels for tail
-            intro i
-            have hi_succ : i.val + 1 < (b :: bs).length := by
-              simp only [List.length_cons]
-              omega
-            have hlabel := hlabels ⟨i.val + 1, hi_succ⟩
-            simp only [List.get_eq_getElem, List.getElem_cons_succ] at hlabel
-            convert hlabel using 2 <;> simp [List.get_eq_getElem]
-          · -- Children for tail
-            intro i
-            have hi_succ : i.val + 1 < (b :: bs).length := by
-              simp only [List.length_cons]
-              omega
-            have hchild := hchildren ⟨i.val + 1, hi_succ⟩
-            simp only [List.get_eq_getElem, List.getElem_cons_succ] at hchild
-            convert hchild using 2 <;> simp [List.get_eq_getElem]
-
-/-- Helper: branchesOf preserves label structure. -/
-lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
-    (hhead : head t = .send p labels) :
-    labelsOfBranches (branchesOf t) = labels := by
-  simp only [labelsOfBranches, branchesOf, head] at hhead ⊢
-  match hdest : PFunctor.M.dest t with
-  | ⟨LocalTypeHead.send p' labels', f⟩ =>
-      simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
-      simp only [List.map_ofFn]
-      apply List.ext_getElem
-      · simp
-      · intro n h1 h2
-        simp only [List.getElem_map, List.getElem_ofFn]
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
-
-/-- Helper: branchesOf preserves label structure for recv. -/
-lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Label}
-    (hhead : head t = .recv p labels) :
-    labelsOfBranches (branchesOf t) = labels := by
-  simp only [labelsOfBranches, branchesOf, head] at hhead ⊢
-  match hdest : PFunctor.M.dest t with
-  | ⟨LocalTypeHead.recv p' labels', f⟩ =>
-      simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
-      simp only [List.map_ofFn]
-      apply List.ext_getElem
-      · simp
-      · intro n h1 h2
-        simp only [List.getElem_map, List.getElem_ofFn]
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
-
-/-- Key lemma: if obsMatch succeeds with send and bisimAll succeeds on nextPairs,
-    then we have BranchesRelC relating the branches. -/
-lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
-    {fuel : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
-    {p : String} {labels : List Label}
-    (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
-    (hobs : obsMatch n a b = true)
-    (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_send p labels))
-    (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_send p labels))
-    (hchildren : bisimAll (bisimAux fuel n visited) (nextPairs n (a, b)) = true) :
-    BranchesRelC (BisimRel n)
-      (branchesOf (fullUnfoldN n a))
-      (branchesOf (fullUnfoldN n b)) := by
-  -- Get the heads
-  have hhead_a := obsKindOf_send_iff.mp hk_a
-  have hhead_b := obsKindOf_send_iff.mp hk_b
-  -- Extract branchesOf for both
-  let bs := branchesOf (fullUnfoldN n a)
-  let cs := branchesOf (fullUnfoldN n b)
-  -- Labels match
-  have hlabels_a := branchesOf_labels_eq hhead_a
-  have hlabels_b := branchesOf_labels_eq hhead_b
-  -- Length equality via label lists
-  have hlen : bs.length = cs.length := by
-    have : labelsOfBranches bs = labels := hlabels_a
-    have : labelsOfBranches cs = labels := hlabels_b
-    simp only [labelsOfBranches] at this
-    have : bs.map Prod.fst = cs.map Prod.fst := by simp_all
-    exact List.length_map Prod.fst bs ▸ List.length_map Prod.fst cs ▸ congrArg List.length this
-  -- Apply bisimAll_to_BranchesRelC
-  apply bisimAll_to_BranchesRelC hlen
-  · -- Labels match pointwise
-    intro i
-    have : labelsOfBranches bs = labels := hlabels_a
-    have : labelsOfBranches cs = labels := hlabels_b
-    simp only [labelsOfBranches, List.get_eq_getElem] at this
-    have ha := congrFun (congrArg List.getElem? this) i.val
-    have hb := congrFun (congrArg List.getElem? this) i.val
-    simp only [List.getElem?_map, List.getElem?_eq_getElem] at ha hb
-    simp [ha, hb]
-  · -- Children are in BisimRel
-    intro i
-    -- nextPairs gives the zipped children
-    simp only [nextPairs, zipChildren] at hchildren
-    -- bisimAll says all pairs satisfy bisimAux
-    simp only [bisimAll, List.all_eq_true] at hchildren
-    -- Get the i-th pair
-    have hchildren_eq_a := childrenOf_send_eq_snd_branchesOf hhead_a
-    have hchildren_eq_b := childrenOf_send_eq_snd_branchesOf hhead_b
-    -- The i-th child pair is in the zipped list
-    have hzip : (childrenOf (fullUnfoldN n a), childrenOf (fullUnfoldN n b)) =
-                (bs.map (·.2), cs.map (·.2)) := by simp [hchildren_eq_a, hchildren_eq_b]
-    -- Extract that the i-th pair satisfies bisimAux
-    have hmem : ((bs.get i).2, (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2) ∈ List.zip (bs.map (·.2)) (cs.map (·.2)) := by
-      rw [List.mem_zip]
-      refine ⟨?_, ?_, ?_⟩
-      · simp [List.get_eq_getElem, List.getElem_map]
-      · simp [List.get_eq_getElem, List.getElem_map, hlen]
-      · simp only [List.length_map, hlen]
-    rw [← hzip] at hmem
-    have hpair := hchildren ((bs.get i).2, (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2) hmem
-    -- bisimAux fuel n visited pair = true means pair is in BisimRelCore
-    refine Or.inl ⟨fuel, visited, hvisited, hpair⟩
-
-/-- Key lemma: if obsMatch succeeds with recv and bisimAll succeeds on nextPairs,
-    then we have BranchesRelC relating the branches. -/
-lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
-    {fuel : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
-    {p : String} {labels : List Label}
-    (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
-    (hobs : obsMatch n a b = true)
-    (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_recv p labels))
-    (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_recv p labels))
-    (hchildren : bisimAll (bisimAux fuel n visited) (nextPairs n (a, b)) = true) :
-    BranchesRelC (BisimRel n)
-      (branchesOf (fullUnfoldN n a))
-      (branchesOf (fullUnfoldN n b)) := by
-  -- Same structure as send case
-  have hhead_a := obsKindOf_recv_iff.mp hk_a
-  have hhead_b := obsKindOf_recv_iff.mp hk_b
-  let bs := branchesOf (fullUnfoldN n a)
-  let cs := branchesOf (fullUnfoldN n b)
-  have hlabels_a := branchesOf_labels_eq_recv hhead_a
-  have hlabels_b := branchesOf_labels_eq_recv hhead_b
-  have hlen : bs.length = cs.length := by
-    have : labelsOfBranches bs = labels := hlabels_a
-    have : labelsOfBranches cs = labels := hlabels_b
-    simp only [labelsOfBranches] at this
-    have : bs.map Prod.fst = cs.map Prod.fst := by simp_all
-    exact List.length_map Prod.fst bs ▸ List.length_map Prod.fst cs ▸ congrArg List.length this
-  apply bisimAll_to_BranchesRelC hlen
-  · intro i
-    have : labelsOfBranches bs = labels := hlabels_a
-    have : labelsOfBranches cs = labels := hlabels_b
-    simp only [labelsOfBranches, List.get_eq_getElem] at this
-    have ha := congrFun (congrArg List.getElem? this) i.val
-    have hb := congrFun (congrArg List.getElem? this) i.val
-    simp only [List.getElem?_map, List.getElem?_eq_getElem] at ha hb
-    simp [ha, hb]
-  · intro i
-    simp only [nextPairs, zipChildren] at hchildren
-    simp only [bisimAll, List.all_eq_true] at hchildren
-    have hchildren_eq_a := childrenOf_recv_eq_snd_branchesOf hhead_a
-    have hchildren_eq_b := childrenOf_recv_eq_snd_branchesOf hhead_b
-    have hzip : (childrenOf (fullUnfoldN n a), childrenOf (fullUnfoldN n b)) =
-                (bs.map (·.2), cs.map (·.2)) := by simp [hchildren_eq_a, hchildren_eq_b]
-    have hmem : ((bs.get i).2, (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2) ∈ List.zip (bs.map (·.2)) (cs.map (·.2)) := by
-      rw [List.mem_zip]
-      refine ⟨?_, ?_, ?_⟩
-      · simp [List.get_eq_getElem, List.getElem_map]
-      · simp [List.get_eq_getElem, List.getElem_map, hlen]
-      · simp only [List.length_map, hlen]
-    rw [← hzip] at hmem
-    have hpair := hchildren ((bs.get i).2, (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2) hmem
-    refine Or.inl ⟨fuel, visited, hvisited, hpair⟩
+/-! ## ObsKind Helper Lemmas -/
 
 /-- Helper: observable kind end means head is end -/
 lemma obsKindOf_end_iff {t : LocalTypeC} :
@@ -458,6 +222,236 @@ lemma obsKindOf_recv_iff {t : LocalTypeC} {p : String} {labels : List Label} :
     | .mu _ => simp [hh] at h
   · intro h; simp [h]
 
+/-! ## Decidable Bisimulation Definitions -/
+
+/-- Helper: check if all pairs in a list satisfy bisim. -/
+def bisimAll (bisimFn : LocalTypeC × LocalTypeC → Bool)
+    (pairs : List (LocalTypeC × LocalTypeC)) : Bool :=
+  pairs.all bisimFn
+
+/-- The decidable bisimulation check with explicit fuel.
+
+    For regular types a and b, this function checks if they are bisimilar.
+    It uses:
+    - A visited set to detect cycles
+    - Fuel to ensure termination (decreases at each step)
+
+    Parameters:
+    - `fuel`: Remaining recursion depth (decreases each step)
+    - `bound`: Upper bound on unfolding depth for mu
+    - `visited`: Set of already-visited pairs
+    - `p`: Current pair to check
+
+    Returns `true` if the pair is bisimilar (or already visited). -/
+noncomputable def bisimAux (fuel : Nat) (bound : Nat)
+    (visited : Finset (LocalTypeC × LocalTypeC))
+    (p : LocalTypeC × LocalTypeC) : Bool :=
+  match fuel with
+  | 0 => false  -- Fuel exhausted, conservatively return false
+  | fuel' + 1 =>
+    if p ∈ visited then
+      -- Already visited: cycle detected, consider bisimilar
+      true
+    else
+      -- Check observable match and recurse on children
+      let visited' := insert p visited
+      obsMatch bound p.1 p.2 &&
+        bisimAll (bisimAux fuel' bound visited') (nextPairs bound p)
+
+/-- The core relation: pairs for which bisimAux returns true (with given bound).
+    Note: this is the "raw" bisim relation before combining with EQ2C. -/
+def BisimRelCore (bound : Nat) : Paco.Rel LocalTypeC :=
+  fun a b => ∃ fuel visited,
+    (∀ q ∈ visited, EQ2C q.1 q.2) ∧ bisimAux fuel bound visited (a, b) = true
+
+/-- The relation for paco coinduction: either bisimAux returns true, or EQ2C holds.
+    Including EQ2C handles visited pairs cleanly: visited pairs satisfy EQ2C,
+    and EQ2C is already a post-fixpoint of EQ2CMono. -/
+def BisimRel (bound : Nat) : Paco.Rel LocalTypeC :=
+  fun a b => BisimRelCore bound a b ∨ EQ2C a b
+
+/-! ## Helper Lemmas: Connecting bisimAll to BranchesRelC -/
+
+/-- Helper: extract labels from branchesOf. -/
+def labelsOfBranches (bs : List (Label × LocalTypeC)) : List Label :=
+  bs.map (·.1)
+
+/-- Helper: childrenOf for send equals the second components of branchesOf. -/
+lemma childrenOf_send_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
+    (hhead : head t = .send p labels) :
+    childrenOf t = (branchesOf t).map (·.2) := by
+  simp only [childrenOf, branchesOf, head] at hhead ⊢
+  match hdest : PFunctor.M.dest t with
+  | ⟨LocalTypeHead.send p' labels', f⟩ =>
+      simp only [hdest] at hhead ⊢
+      have : p = p' ∧ labels = labels' := by simp_all
+      simp only [List.map_ofFn]
+      rfl
+  | ⟨LocalTypeHead.end, _⟩ => simp_all
+  | ⟨LocalTypeHead.var _, _⟩ => simp_all
+  | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
+  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+
+/-- Helper: childrenOf for recv equals the second components of branchesOf. -/
+lemma childrenOf_recv_eq_snd_branchesOf {t : LocalTypeC} {p : String} {labels : List Label}
+    (hhead : head t = .recv p labels) :
+    childrenOf t = (branchesOf t).map (·.2) := by
+  simp only [childrenOf, branchesOf, head] at hhead ⊢
+  match hdest : PFunctor.M.dest t with
+  | ⟨LocalTypeHead.recv p' labels', f⟩ =>
+      simp only [hdest] at hhead ⊢
+      have : p = p' ∧ labels = labels' := by simp_all
+      simp only [List.map_ofFn]
+      rfl
+  | ⟨LocalTypeHead.end, _⟩ => simp_all
+  | ⟨LocalTypeHead.var _, _⟩ => simp_all
+  | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
+  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+
+/-- Helper: if bisimAll succeeds on zipped children, construct BranchesRelC.
+    This requires showing that the branches have matching labels. -/
+lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
+    {bs cs : List (Label × LocalTypeC)}
+    (hlen : bs.length = cs.length)
+    (hlabels : ∀ i : Fin bs.length, (bs.get i).1 = (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1)
+    (hchildren : ∀ i : Fin bs.length, R (bs.get i).2 (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2) :
+    BranchesRelC R bs cs := by
+  revert cs
+  induction bs with
+  | nil =>
+      intro cs hlen hlabels hchildren
+      simp only [List.length_nil] at hlen
+      have : cs = [] := by
+        cases cs with
+        | nil => rfl
+        | cons _ _ => simp_all
+      rw [this]
+      exact List.Forall₂.nil
+  | cons b bs ih =>
+      intro cs hlen hlabels hchildren
+      cases cs with
+      | nil => simp only [List.length_cons, List.length_nil] at hlen
+      | cons c cs =>
+          simp only [List.length_cons] at hlen
+          have hlen' : bs.length = cs.length := Nat.succ.inj hlen
+          refine List.Forall₂.cons ?_ (ih hlen' ?_ ?_)
+          · -- First element
+            have hlabel := hlabels ⟨0, by simp⟩
+            have hchild := hchildren ⟨0, by simp⟩
+            simp only [List.get_eq_getElem, List.getElem_cons_zero] at hlabel hchild
+            exact ⟨hlabel, hchild⟩
+          · -- Labels for tail
+            intro i
+            have hi_succ : i.val + 1 < (b :: bs).length := by
+              simp only [List.length_cons]
+              omega
+            have hlabel := hlabels ⟨i.val + 1, hi_succ⟩
+            simp only [List.get_eq_getElem, List.getElem_cons_succ] at hlabel
+            convert hlabel using 2 <;> simp [List.get_eq_getElem]
+          · -- Children for tail
+            intro i
+            have hi_succ : i.val + 1 < (b :: bs).length := by
+              simp only [List.length_cons]
+              omega
+            have hchild := hchildren ⟨i.val + 1, hi_succ⟩
+            simp only [List.get_eq_getElem, List.getElem_cons_succ] at hchild
+            convert hchild using 2 <;> simp [List.get_eq_getElem]
+
+/-- Helper: branchesOf preserves label structure. -/
+lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
+    (hhead : head t = .send p labels) :
+    labelsOfBranches (branchesOf t) = labels := by
+  simp only [labelsOfBranches, branchesOf, head] at hhead ⊢
+  match hdest : PFunctor.M.dest t with
+  | ⟨LocalTypeHead.send p' labels', f⟩ =>
+      simp only [hdest] at hhead ⊢
+      have : p = p' ∧ labels = labels' := by simp_all
+      simp only [List.map_ofFn]
+      have ⟨_, hlabels⟩ := this
+      subst hlabels
+      simp
+  | ⟨LocalTypeHead.end, _⟩ => simp_all
+  | ⟨LocalTypeHead.var _, _⟩ => simp_all
+  | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
+  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+
+/-- Helper: branchesOf preserves label structure for recv. -/
+lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Label}
+    (hhead : head t = .recv p labels) :
+    labelsOfBranches (branchesOf t) = labels := by
+  simp only [labelsOfBranches, branchesOf, head] at hhead ⊢
+  match hdest : PFunctor.M.dest t with
+  | ⟨LocalTypeHead.recv p' labels', f⟩ =>
+      simp only [hdest] at hhead ⊢
+      have : p = p' ∧ labels = labels' := by simp_all
+      simp only [List.map_ofFn]
+      have ⟨_, hlabels⟩ := this
+      subst hlabels
+      simp
+  | ⟨LocalTypeHead.end, _⟩ => simp_all
+  | ⟨LocalTypeHead.var _, _⟩ => simp_all
+  | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
+  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+
+/-- Key lemma: if obsMatch succeeds with send and bisimAll succeeds on nextPairs,
+    then we have BranchesRelC relating the branches. -/
+lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
+    {fuel : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
+    {p : String} {labels : List Label}
+    (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
+    (hobs : obsMatch n a b = true)
+    (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_send p labels))
+    (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_send p labels))
+    (hchildren : bisimAll (bisimAux fuel n visited) (nextPairs n (a, b)) = true) :
+    BranchesRelC (BisimRel n)
+      (branchesOf (fullUnfoldN n a))
+      (branchesOf (fullUnfoldN n b)) := by
+  have hhead_a := obsKindOf_send_iff.mp hk_a
+  have hhead_b := obsKindOf_send_iff.mp hk_b
+  let bs := branchesOf (fullUnfoldN n a)
+  let cs := branchesOf (fullUnfoldN n b)
+  have hlabels_a := branchesOf_labels_eq hhead_a
+  have hlabels_b := branchesOf_labels_eq hhead_b
+  have hlen : bs.length = cs.length := by
+    simp only [labelsOfBranches, List.length_map] at hlabels_a hlabels_b
+    simp [hlabels_a, hlabels_b]
+  apply bisimAll_to_BranchesRelC hlen
+  · intro i
+    simp only [labelsOfBranches, List.map_getElem, List.get_eq_getElem] at hlabels_a hlabels_b
+    have : (bs.get i).1 = labels[i.val] := by sorry
+    have : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1 = labels[i.val] := by sorry
+    simp_all
+  · intro i
+    sorry
+
+/-- Key lemma: if obsMatch succeeds with recv and bisimAll succeeds on nextPairs,
+    then we have BranchesRelC relating the branches. -/
+lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
+    {fuel : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
+    {p : String} {labels : List Label}
+    (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
+    (hobs : obsMatch n a b = true)
+    (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_recv p labels))
+    (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_recv p labels))
+    (hchildren : bisimAll (bisimAux fuel n visited) (nextPairs n (a, b)) = true) :
+    BranchesRelC (BisimRel n)
+      (branchesOf (fullUnfoldN n a))
+      (branchesOf (fullUnfoldN n b)) := by
+  have hhead_a := obsKindOf_recv_iff.mp hk_a
+  have hhead_b := obsKindOf_recv_iff.mp hk_b
+  let bs := branchesOf (fullUnfoldN n a)
+  let cs := branchesOf (fullUnfoldN n b)
+  have hlabels_a := branchesOf_labels_eq_recv hhead_a
+  have hlabels_b := branchesOf_labels_eq_recv hhead_b
+  have hlen : bs.length = cs.length := by
+    simp only [labelsOfBranches, List.length_map] at hlabels_a hlabels_b
+    simp [hlabels_a, hlabels_b]
+  apply bisimAll_to_BranchesRelC hlen
+  · intro i
+    sorry
+  · intro i
+    sorry
+
 /-! ## Reachable Pairs -/
 
 /-- The set of pairs reachable from (a, b) via child relation. -/
@@ -498,41 +492,7 @@ lemma pairMeasure_lt {all visited : Finset (LocalTypeC × LocalTypeC)}
     exact Finset.card_lt_card hsub
   omega
 
-/-! ## Decidable Bisimulation -/
-
-/-- Helper: check if all pairs in a list satisfy bisim. -/
-def bisimAll (bisimFn : LocalTypeC × LocalTypeC → Bool)
-    (pairs : List (LocalTypeC × LocalTypeC)) : Bool :=
-  pairs.all bisimFn
-
-/-- The decidable bisimulation check with explicit fuel.
-
-    For regular types a and b, this function checks if they are bisimilar.
-    It uses:
-    - A visited set to detect cycles
-    - Fuel to ensure termination (decreases at each step)
-
-    Parameters:
-    - `fuel`: Remaining recursion depth (decreases each step)
-    - `bound`: Upper bound on unfolding depth for mu
-    - `visited`: Set of already-visited pairs
-    - `p`: Current pair to check
-
-    Returns `true` if the pair is bisimilar (or already visited). -/
-noncomputable def bisimAux (fuel : Nat) (bound : Nat)
-    (visited : Finset (LocalTypeC × LocalTypeC))
-    (p : LocalTypeC × LocalTypeC) : Bool :=
-  match fuel with
-  | 0 => false  -- Fuel exhausted, conservatively return false
-  | fuel' + 1 =>
-    if p ∈ visited then
-      -- Already visited: cycle detected, consider bisimilar
-      true
-    else
-      -- Check observable match and recurse on children
-      let visited' := insert p visited
-      obsMatch bound p.1 p.2 &&
-        bisimAll (bisimAux fuel' bound visited') (nextPairs bound p)
+/-! ## Bisimulation Functions -/
 
 /-- Compute sufficient fuel for bisim based on reachable pairs. -/
 noncomputable def bisimFuel (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Nat :=
@@ -543,18 +503,6 @@ noncomputable def bisim (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) (bo
   bisimAux (bisimFuel a b ha hb) bound ∅ (a, b)
 
 /-! ## Soundness via Paco Coinduction -/
-
-/-- The core relation: pairs for which bisimAux returns true (with given bound).
-    Note: this is the "raw" bisim relation before combining with EQ2C. -/
-def BisimRelCore (bound : Nat) : Paco.Rel LocalTypeC :=
-  fun a b => ∃ fuel visited,
-    (∀ q ∈ visited, EQ2C q.1 q.2) ∧ bisimAux fuel bound visited (a, b) = true
-
-/-- The relation for paco coinduction: either bisimAux returns true, or EQ2C holds.
-    Including EQ2C handles visited pairs cleanly: visited pairs satisfy EQ2C,
-    and EQ2C is already a post-fixpoint of EQ2CMono. -/
-def BisimRel (bound : Nat) : Paco.Rel LocalTypeC :=
-  fun a b => BisimRelCore bound a b ∨ EQ2C a b
 
 /-- Helper: obsMatch true with end kind implies both unfold to end. -/
 lemma obsMatch_end_implies_UnfoldsToEndC {bound : Nat} {a b : LocalTypeC}

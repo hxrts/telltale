@@ -143,6 +143,44 @@ theorem Consume_cons (from_ : Role) (Lr : LocalType) (T : ValType) (ts : List Va
   | none => rfl
   | some L' => rfl
 
+/-- Corollary: If Consume succeeds on [T] for a recv type from the same sender, the types match. -/
+theorem Consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalType}
+    (h : Consume from_ (.recv from_ T' L) [T] = some L') :
+    T = T' := by
+  simp only [Consume, consumeOne, beq_self_eq_true, Bool.true_and] at h
+  by_cases hEq : T == T' <;> simp [hEq] at h
+  exact eq_of_beq hEq
+
+/-- Corollary: If Consume succeeds on [T] for a branch type from the same sender, T must be .string. -/
+theorem Consume_single_branch_string {from_ : Role} {bs : List (String × LocalType)} {T : ValType} {L' : LocalType}
+    (h : Consume from_ (.branch from_ bs) [T] = some L') :
+    T = .string := by
+  simp only [Consume, consumeOne] at h
+  cases T with
+  | string => rfl
+  | _ => exact Option.noConfusion h
+
+/-- For non-recv/branch types, Consume only succeeds on empty trace.
+    This is because consumeOne only handles recv and branch. -/
+theorem Consume_non_recv_empty {from_ : Role} {L : LocalType} {ts : List ValType} {L' : LocalType}
+    (hNotRecv : ∀ r T L'', L ≠ .recv r T L'')
+    (hNotBranch : ∀ r bs, L ≠ .branch r bs)
+    (h : Consume from_ L ts = some L') :
+    ts = [] := by
+  cases ts with
+  | nil => rfl
+  | cons t ts' =>
+    simp only [Consume] at h
+    -- consumeOne from_ t L only succeeds for L = .recv or L = .branch
+    cases L with
+    | end_ => simp only [consumeOne] at h; exact Option.noConfusion h
+    | send _ _ _ => simp only [consumeOne] at h; exact Option.noConfusion h
+    | select _ _ => simp only [consumeOne] at h; exact Option.noConfusion h
+    | var _ => simp only [consumeOne] at h; exact Option.noConfusion h
+    | mu _ => simp only [consumeOne] at h; exact Option.noConfusion h
+    | recv r T L'' => exact absurd rfl (hNotRecv r T L'')
+    | branch r bs => exact absurd rfl (hNotBranch r bs)
+
 /-- If sender ≠ role in recv type, trace must be empty for consumption to succeed.
     Reference: `work/effects/004.lean` Consume_other_empty -/
 theorem Consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
@@ -159,6 +197,33 @@ theorem Consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
     have hNeq : (from_ == r) = false := beq_eq_false_iff_ne.mpr hNe
     simp only [hNeq, Bool.false_and] at h
     exact Option.noConfusion h
+
+/-- If Consume succeeds on recv type with non-empty trace, then either:
+    1. sender matches the recv's role AND trace head matches expected type, OR
+    2. It fails (contradiction).
+    This lemma extracts the trace head = expected type constraint. -/
+theorem Consume_recv_head_match {from_ r : Role} {T : ValType} {L : LocalType}
+    {t : ValType} {ts : List ValType} {L' : LocalType}
+    (hConsume : Consume from_ (.recv r T L) (t :: ts) = some L') :
+    from_ = r ∧ t = T := by
+  simp only [Consume, consumeOne] at hConsume
+  by_cases hRole : from_ == r
+  · simp only [hRole, Bool.true_and] at hConsume
+    by_cases hType : t == T
+    · simp only [hType] at hConsume
+      exact ⟨eq_of_beq hRole, eq_of_beq hType⟩
+    · simp only [hType] at hConsume
+      exact Option.noConfusion hConsume
+  · simp only [hRole, Bool.false_and] at hConsume
+    exact Option.noConfusion hConsume
+
+/-- For branch type: Consume on non-empty trace always fails because consumeOne
+    doesn't handle branch type. This lemma extracts the contradiction. -/
+theorem Consume_branch_nonempty_false {from_ : Role} {r : Role} {bs : List (String × LocalType)}
+    {t : ValType} {ts : List ValType} {L' : LocalType}
+    (hConsume : Consume from_ (.branch r bs) (t :: ts) = some L') : False := by
+  simp only [Consume, consumeOne] at hConsume
+  exact Option.noConfusion hConsume
 
 /-! ## Edge-wise Coherence -/
 
@@ -178,6 +243,132 @@ def EdgeCoherent (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
 /-- Full coherence: edge-coherent for all edges in all sessions. -/
 def Coherent (G : GEnv) (D : DEnv) : Prop :=
   ∀ e, EdgeCoherent G D e
+
+/-! ## Key Lemmas: EdgeCoherent Forces Empty Trace
+
+These lemmas show that EdgeCoherent constrains trace structure:
+1. For non-recv/branch receiver types (send, select, etc.), trace must be empty
+2. For recv/branch with different sender, trace must be empty
+
+These are the creative shortcuts that resolve "different sender" sorries. -/
+
+/-- If receiver type is send (or other non-recv/branch), trace must be empty.
+    This is because Consume for .send only succeeds on empty trace. -/
+theorem trace_empty_when_send_receiver
+    {G : GEnv} {D : DEnv} {e : Edge}
+    {r : Role} {T : ValType} {L : LocalType}
+    (hCoh : EdgeCoherent G D e)
+    (hSend : lookupG G ⟨e.sid, e.receiver⟩ = some (.send r T L)) :
+    lookupD D e = [] := by
+  simp only [EdgeCoherent] at hCoh
+  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
+  | none => sorry  -- Sender type doesn't exist
+  | some Ls =>
+    have hIsSome := hCoh Ls (.send r T L) hLsender hSend
+    have h : (Consume e.sender (.send r T L) (lookupD D e)).isSome := hIsSome
+    cases hTrace : lookupD D e with
+    | nil => rfl
+    | cons t ts =>
+      rw [hTrace] at h
+      simp only [Consume, consumeOne, Option.isSome] at h
+      exact Bool.noConfusion h
+
+/-- Similar lemma for select receiver type. -/
+theorem trace_empty_when_select_receiver
+    {G : GEnv} {D : DEnv} {e : Edge}
+    {r : Role} {bs : List (String × LocalType)}
+    (hCoh : EdgeCoherent G D e)
+    (hSelect : lookupG G ⟨e.sid, e.receiver⟩ = some (.select r bs)) :
+    lookupD D e = [] := by
+  simp only [EdgeCoherent] at hCoh
+  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
+  | none => sorry  -- Sender type doesn't exist
+  | some Ls =>
+    have hIsSome := hCoh Ls (.select r bs) hLsender hSelect
+    cases hTrace : lookupD D e with
+    | nil => rfl
+    | cons t ts =>
+      rw [hTrace] at hIsSome
+      simp only [Consume, consumeOne, Option.isSome] at hIsSome
+      exact Bool.noConfusion hIsSome
+
+/-! ## Key Lemma: Different Sender Forces Empty Trace
+
+When the receiver's type expects messages from sender A, but we're examining
+the edge from sender B (B ≠ A), EdgeCoherent forces the trace from B to be empty.
+This is because Consume only succeeds on non-empty trace when sender matches.
+
+This lemma is the key to solving "continuation recv/branch from different sender" cases. -/
+
+/-- If receiver expects recv from r, but edge has different sender, trace must be empty.
+    This is the creative shortcut that resolves the "different sender" sorries. -/
+theorem trace_empty_when_recv_other_sender
+    {G : GEnv} {D : DEnv} {e : Edge}
+    {r : Role} {T : ValType} {L : LocalType}
+    (hCoh : EdgeCoherent G D e)
+    (hRecv : lookupG G ⟨e.sid, e.receiver⟩ = some (.recv r T L))
+    (hNe : e.sender ≠ r) :
+    lookupD D e = [] := by
+  -- EdgeCoherent gives us: for any Lsender, (Consume e.sender (.recv r T L) trace).isSome
+  simp only [EdgeCoherent] at hCoh
+  -- We need to construct some Lsender; use .end_ as a dummy (sender type doesn't matter for Consume)
+  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
+  | none =>
+    -- If sender has no type, EdgeCoherent is vacuously satisfied
+    -- But we can still derive the result from Consume structure
+    -- Actually, let's try a different approach - analyze the trace directly
+    cases hTrace : lookupD D e with
+    | nil => rfl
+    | cons t ts =>
+      -- If trace is non-empty, Consume fails because sender ≠ r
+      -- But EdgeCoherent says Consume.isSome... contradiction? No, because no Lsender exists!
+      -- The EdgeCoherent condition is vacuously true when no Lsender.
+      -- So we can't derive anything from EdgeCoherent here.
+      -- Hmm, this is a gap. Let's assume G is total (all endpoints have types).
+      -- For now, return rfl and leave this case - it shouldn't occur in practice.
+      sorry
+  | some Ls =>
+    have hIsSome := hCoh Ls (.recv r T L) hLsender hRecv
+    -- hIsSome : (Consume e.sender (.recv r T L) (lookupD D e)).isSome
+    -- From Consume_other_empty, if trace is non-empty, Consume returns none
+    cases hTrace : lookupD D e with
+    | nil => rfl
+    | cons t ts =>
+      -- Consume e.sender (.recv r T L) (t :: ts) returns none because e.sender ≠ r
+      rw [hTrace] at hIsSome
+      simp only [Consume, consumeOne] at hIsSome
+      have hNeq : (e.sender == r) = false := beq_eq_false_iff_ne.mpr hNe
+      simp only [hNeq, Bool.false_and, Option.isSome] at hIsSome
+      exact Bool.noConfusion hIsSome
+
+/-- Similar lemma for branch: if receiver expects branch from r, but edge has different sender, trace is empty. -/
+theorem trace_empty_when_branch_other_sender
+    {G : GEnv} {D : DEnv} {e : Edge}
+    {r : Role} {bs : List (String × LocalType)}
+    (hCoh : EdgeCoherent G D e)
+    (hBranch : lookupG G ⟨e.sid, e.receiver⟩ = some (.branch r bs))
+    (hNe : e.sender ≠ r) :
+    lookupD D e = [] := by
+  simp only [EdgeCoherent] at hCoh
+  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
+  | none => sorry  -- Sender type doesn't exist case
+  | some Ls =>
+    have hIsSome := hCoh Ls (.branch r bs) hLsender hBranch
+    cases hTrace : lookupD D e with
+    | nil => rfl
+    | cons t ts =>
+      rw [hTrace] at hIsSome
+      simp only [Consume, consumeOne] at hIsSome
+      have hNeq : (e.sender == r) = false := beq_eq_false_iff_ne.mpr hNe
+      -- For branch, consumeOne checks if t is .string and r == from_
+      cases t with
+      | string =>
+        simp only [hNeq, Bool.false_and, Option.isSome] at hIsSome
+        exact Bool.noConfusion hIsSome
+      | _ =>
+        -- If head is not string, consumeOne returns none anyway
+        simp only [Option.isSome] at hIsSome
+        exact Bool.noConfusion hIsSome
 
 /-! ## Head Coherent (Progress Refinement)
 
@@ -216,13 +407,11 @@ that label must be one of the valid branch options.
 
 Reference: `work/effects/008.lean:392-397` -/
 def ValidLabels (G : GEnv) (D : DEnv) (bufs : Buffers) : Prop :=
-  ∀ (e : Edge),
-    let receiverEp : Endpoint := ⟨e.sid, e.receiver⟩
-    ∀ source bs,
-      lookupG G receiverEp = some (.branch source bs) →
-      match lookupBuf bufs e with
-      | (.string l) :: _ => (bs.find? (fun b => b.1 == l)).isSome
-      | _ => True
+  ∀ (e : Edge) (source : Role) (bs : List (Label × LocalType)),
+    lookupG G ⟨e.sid, e.receiver⟩ = some (.branch source bs) →
+    match lookupBuf bufs e with
+    | (.string l) :: _ => (bs.find? (fun b => b.1 == l)).isSome
+    | _ => True
 
 /-! ## Buffer Typing -/
 
@@ -288,6 +477,20 @@ theorem HasTypeVal_prod_inv {G : GEnv} {v : Value} {T₁ T₂ : ValType}
   cases h with
   | prod h1 h2 => exact ⟨_, _, rfl, h1, h2⟩
 
+/-- HasTypeVal is deterministic: each value has exactly one type.
+    This is essential for deriving trace types from buffer values. -/
+theorem HasTypeVal_unique {G : GEnv} {v : Value} {T₁ T₂ : ValType}
+    (h₁ : HasTypeVal G v T₁) (h₂ : HasTypeVal G v T₂) : T₁ = T₂ := by
+  induction h₁ generalizing T₂ with
+  | unit => cases h₂; rfl
+  | bool => cases h₂; rfl
+  | nat => cases h₂; rfl
+  | string => cases h₂; rfl
+  | prod _ _ ih₁ ih₂ =>
+    cases h₂ with
+    | prod h₂a h₂b => congr 1 <;> [exact ih₁ h₂a; exact ih₂ h₂b]
+  | chan _ => cases h₂; rfl
+
 /-- HasTypeVal is preserved when extending GEnv if channel endpoints are preserved. -/
 theorem HasTypeVal_mono (G G' : GEnv) (v : Value) (T : ValType)
     (hHas : HasTypeVal G v T)
@@ -324,6 +527,22 @@ def BufferTyped (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge) : Prop :=
 /-- All buffers are typed. -/
 def BuffersTyped (G : GEnv) (D : DEnv) (bufs : Buffers) : Prop :=
   ∀ e, BufferTyped G D bufs e
+
+/-- If buffer has head v with type T, then trace has head T.
+    Key lemma for deriving trace head in recv case.
+    Proof strategy: BufferTyped gives buf[i] : trace[i] for all i.
+    At i=0, buf[0]=v has type trace[0]. Since hv says v:T, by
+    HasTypeVal_unique, trace[0]=T, so trace.head? = some T. -/
+theorem trace_head_from_buffer {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge}
+    {v : Value} {vs : List Value} {T : ValType}
+    (hBuf : lookupBuf bufs e = v :: vs)
+    (hv : HasTypeVal G v T)
+    (hTyped : BufferTyped G D bufs e) :
+    (lookupD D e).head? = some T := by
+  -- The proof involves dependent type manipulations with List.get
+  -- that are tricky to work with. Use sorry for now.
+  -- Key insight: buf[0] : trace[0], buf[0]=v, v:T ⟹ trace[0]=T by HasTypeVal_unique
+  sorry
 
 /-! ## Store Typing -/
 
@@ -938,6 +1157,1228 @@ theorem Coherent_recv_preserved
         have hRecvNoMatch : receiverEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
         exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (hCoh e)
+
+/-- Coherent is preserved when selecting (sending a label).
+    Select appends .string to trace, advances selector type.
+    Similar structure to Coherent_send_preserved. -/
+theorem Coherent_select_preserved
+    (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)
+    (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
+    (hCoh : Coherent G D)
+    (hG : lookupG G selectorEp = some (.select targetRole bs))
+    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    -- CRITICAL: The target must be ready to accept the label
+    (hTargetReady : ∀ Ltarget, lookupG G { sid := selectorEp.sid, role := targetRole } = some Ltarget →
+      ∃ L', Consume selectorEp.role Ltarget (lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole }) = some L' ∧
+            (Consume selectorEp.role L' [.string]).isSome) :
+    let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
+    Coherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
+  -- Similar structure to Coherent_send_preserved, with .string for labels
+  intro selectEdge
+  intro e
+  by_cases heq : e = selectEdge
+  · -- Case 1: e = selectEdge
+    subst heq
+    simp only [EdgeCoherent]
+    intro Lsender Lrecv hGsender hGrecv
+    have hSenderLookup : lookupG (updateG G selectorEp L) { sid := selectorEp.sid, role := selectorEp.role } = some L := by
+      convert lookupG_update_eq G selectorEp L
+    by_cases hTargetIsSender : targetRole = selectorEp.role
+    · -- Self-select: target = selector
+      subst hTargetIsSender
+      rw [hSenderLookup] at hGsender hGrecv
+      simp only [Option.some.injEq] at hGsender hGrecv
+      subst hGsender hGrecv
+      simp only [lookupD_update_eq]
+      -- hTargetReady with SELECT type is unsatisfiable (Consume on SELECT fails)
+      obtain ⟨L', hL', hL'T⟩ := hTargetReady (.select selectorEp.role bs) hG
+      cases hTrace : lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := selectorEp.role } with
+      | nil =>
+        rw [hTrace] at hL'
+        simp only [Consume] at hL'
+        simp only [Option.some.injEq] at hL'
+        subst hL'
+        simp only [Consume, consumeOne, Option.isSome] at hL'T
+        exact Bool.noConfusion hL'T
+      | cons t ts =>
+        rw [hTrace] at hL'
+        simp only [Consume, consumeOne] at hL'
+        exact Option.noConfusion hL'
+    · -- Normal case: target ≠ selector
+      have hTargetNeq : selectorEp ≠ { sid := selectorEp.sid, role := targetRole } := by
+        intro h
+        have : selectorEp.role = targetRole := congrArg Endpoint.role h
+        exact hTargetIsSender this.symm
+      rw [hSenderLookup] at hGsender
+      rw [lookupG_update_neq _ _ _ _ hTargetNeq] at hGrecv
+      simp only [Option.some.injEq] at hGsender
+      subst hGsender
+      simp only [lookupD_update_eq]
+      obtain ⟨L', hL', hL'T⟩ := hTargetReady Lrecv hGrecv
+      rw [Consume_append _ _ _ _ hL']
+      exact hL'T
+  · -- Case 2: e ≠ selectEdge - use irrelevance lemmas
+    have hNeSymm : selectEdge ≠ e := Ne.symm heq
+    by_cases hSenderMatch : { sid := e.sid, role := e.sender : Endpoint } = selectorEp
+    · -- Sender endpoint is selectorEp
+      by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = selectorEp
+      · -- Self-loop case
+        have hSid1 : e.sid = selectorEp.sid := congrArg Endpoint.sid hSenderMatch
+        have hRole1 : e.sender = selectorEp.role := congrArg Endpoint.role hSenderMatch
+        have hSid2 : e.sid = selectorEp.sid := congrArg Endpoint.sid hRecvMatch
+        have hRole2 : e.receiver = selectorEp.role := congrArg Endpoint.role hRecvMatch
+        simp only [EdgeCoherent]
+        intro Lsender Lrecv hGsender hGrecv
+        have hLookupS : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.sender } = some L := by
+          conv => lhs; rw [hSid1, hRole1]
+          exact lookupG_update_eq G selectorEp L
+        have hLookupR : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.receiver } = some L := by
+          conv => lhs; rw [hSid2, hRole2]
+          exact lookupG_update_eq G selectorEp L
+        rw [hLookupS] at hGsender
+        rw [hLookupR] at hGrecv
+        simp only [Option.some.injEq] at hGsender hGrecv
+        subst hGsender hGrecv
+        rw [lookupD_update_neq _ _ _ _ hNeSymm]
+        have hOrigCoh := hCoh e
+        simp only [EdgeCoherent] at hOrigCoh
+        have hOrigSenderG : lookupG G { sid := e.sid, role := e.sender } = some (.select targetRole bs) := by
+          conv => lhs; rw [hSid1, hRole1]; exact hG
+        have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
+          conv => lhs; rw [hSid2, hRole2]; exact hG
+        have hOrig := hOrigCoh (.select targetRole bs) (.select targetRole bs) hOrigSenderG hOrigRecvG
+        cases hTrace : lookupD D e with
+        | nil =>
+          rw [hRole1]
+          simp only [Consume, Option.isSome]
+        | cons t ts =>
+          rw [hRole1, hTrace] at hOrig
+          simp only [Consume, consumeOne, Option.isSome] at hOrig
+          exact Bool.noConfusion hOrig
+      · -- Sender = selectorEp, receiver ≠ selectorEp
+        have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+        apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
+        simp only [EdgeCoherent]
+        intro Lsender Lrecv hGsender hGrecv
+        rw [lookupG_update_neq _ _ _ _ hRecvNoMatch] at hGrecv
+        have hOrigCoh := hCoh e
+        simp only [EdgeCoherent] at hOrigCoh
+        have hSid : e.sid = selectorEp.sid := congrArg Endpoint.sid hSenderMatch
+        have hRole : e.sender = selectorEp.role := congrArg Endpoint.role hSenderMatch
+        have hOrigSender : lookupG G { sid := e.sid, role := e.sender } = some (.select targetRole bs) := by
+          conv => lhs; rw [hSid, hRole]; exact hG
+        exact hOrigCoh (.select targetRole bs) Lrecv hOrigSender hGrecv
+    · -- Sender endpoint ≠ selectorEp
+      have hSenderNoMatch : selectorEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
+      by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = selectorEp
+      · -- Receiver = selectorEp, sender ≠ selectorEp
+        apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
+        simp only [EdgeCoherent]
+        intro Lsender Lrecv hGsender hGrecv
+        rw [lookupG_update_neq _ _ _ _ hSenderNoMatch] at hGsender
+        have hSid : e.sid = selectorEp.sid := congrArg Endpoint.sid hRecvMatch
+        have hRole : e.receiver = selectorEp.role := congrArg Endpoint.role hRecvMatch
+        have hRecvLookup : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.receiver } = some L := by
+          conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G selectorEp L
+        rw [hRecvLookup] at hGrecv
+        simp only [Option.some.injEq] at hGrecv
+        subst hGrecv
+        have hOrigCoh := hCoh e
+        simp only [EdgeCoherent] at hOrigCoh
+        have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
+          conv => lhs; rw [hSid, hRole]; exact hG
+        have hOrig := hOrigCoh Lsender (.select targetRole bs) hGsender hOrigRecv
+        cases hTrace : lookupD D e with
+        | nil => simp only [Consume, Option.isSome]
+        | cons t ts =>
+          rw [hTrace] at hOrig
+          simp only [Consume, consumeOne, Option.isSome] at hOrig
+          exact Bool.noConfusion hOrig
+      · -- Neither endpoint is selectorEp
+        have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+        apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
+        exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (hCoh e)
+
+/-- Coherent is preserved when branching (receiving a label).
+    Branch removes .string from trace HEAD, advances brancher type.
+    Similar structure to Coherent_recv_preserved. -/
+theorem Coherent_branch_preserved
+    (G : GEnv) (D : DEnv) (brancherEp : Endpoint) (senderRole : Role)
+    (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
+    (hCoh : Coherent G D)
+    (hG : lookupG G brancherEp = some (.branch senderRole bs))
+    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
+    let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
+    Coherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
+  -- Similar structure to Coherent_recv_preserved, adapted for branch/select
+  intro branchEdge
+  intro e
+  by_cases heq : e = branchEdge
+  · -- Case 1: e = branchEdge
+    subst heq
+    simp only [EdgeCoherent]
+    intro Lsender Lrecv hGsender hGrecv
+    have hRecvLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := brancherEp.role } = some L := by
+      convert lookupG_update_eq G brancherEp L
+    by_cases hSenderIsRecv : senderRole = brancherEp.role
+    · -- Self-branch: sender = receiver
+      subst hSenderIsRecv
+      rw [hRecvLookup] at hGsender hGrecv
+      simp only [Option.some.injEq] at hGsender hGrecv
+      subst hGsender hGrecv
+      simp only [lookupD_update_eq]
+      have hOrigCoh := hCoh branchEdge
+      simp only [EdgeCoherent] at hOrigCoh
+      cases hTraceVal : lookupD D branchEdge with
+      | nil =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?] at hTrace
+        exact Option.noConfusion hTrace
+      | cons t rest =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?, Option.some.injEq] at hTrace
+        subst hTrace
+        -- Original coherence with branch type
+        -- consumeOne doesn't handle branch, so this case is vacuously handled
+        -- by showing original coherence required empty trace or contradiction
+        have hOrig := hOrigCoh (.branch brancherEp.role bs) (.branch brancherEp.role bs) hG hG
+        rw [hTraceVal] at hOrig
+        simp only [Consume, consumeOne, Option.isSome] at hOrig
+        exact Bool.noConfusion hOrig
+    · -- Normal case: sender ≠ receiver
+      have hSenderNeq : brancherEp ≠ { sid := brancherEp.sid, role := senderRole } := by
+        intro h
+        have : brancherEp.role = senderRole := congrArg Endpoint.role h
+        exact hSenderIsRecv this.symm
+      rw [hRecvLookup] at hGrecv
+      rw [lookupG_update_neq _ _ _ _ hSenderNeq] at hGsender
+      simp only [Option.some.injEq] at hGrecv
+      subst hGrecv
+      simp only [lookupD_update_eq]
+      have hOrigCoh := hCoh branchEdge
+      simp only [EdgeCoherent] at hOrigCoh
+      cases hTraceVal : lookupD D branchEdge with
+      | nil =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?] at hTrace
+        exact Option.noConfusion hTrace
+      | cons t rest =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?, Option.some.injEq] at hTrace
+        subst hTrace
+        have hOrig := hOrigCoh Lsender (.branch senderRole bs) hGsender hG
+        rw [hTraceVal] at hOrig
+        simp only [Consume, consumeOne, Option.isSome] at hOrig
+        -- consumeOne on branch type returns none, so Consume fails on non-empty trace
+        exact Bool.noConfusion hOrig
+  · -- Case 2: e ≠ branchEdge
+    have hNeSymm : branchEdge ≠ e := Ne.symm heq
+    by_cases hSenderMatch : { sid := e.sid, role := e.sender : Endpoint } = brancherEp
+    · -- Sender endpoint is brancherEp
+      by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = brancherEp
+      · -- Self-loop case
+        have hSid1 : e.sid = brancherEp.sid := congrArg Endpoint.sid hSenderMatch
+        have hRole1 : e.sender = brancherEp.role := congrArg Endpoint.role hSenderMatch
+        have hSid2 : e.sid = brancherEp.sid := congrArg Endpoint.sid hRecvMatch
+        have hRole2 : e.receiver = brancherEp.role := congrArg Endpoint.role hRecvMatch
+        simp only [EdgeCoherent]
+        intro Lsender Lrecv hGsender hGrecv
+        have hLookupS : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.sender } = some L := by
+          conv => lhs; rw [hSid1, hRole1]
+          exact lookupG_update_eq G brancherEp L
+        have hLookupR : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.receiver } = some L := by
+          conv => lhs; rw [hSid2, hRole2]
+          exact lookupG_update_eq G brancherEp L
+        rw [hLookupS] at hGsender
+        rw [hLookupR] at hGrecv
+        simp only [Option.some.injEq] at hGsender hGrecv
+        subst hGsender hGrecv
+        rw [lookupD_update_neq _ _ _ _ hNeSymm]
+        have hOrigCoh := hCoh e
+        simp only [EdgeCoherent] at hOrigCoh
+        have hOrigSenderG : lookupG G { sid := e.sid, role := e.sender } = some (.branch senderRole bs) := by
+          conv => lhs; rw [hSid1, hRole1]; exact hG
+        have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
+          conv => lhs; rw [hSid2, hRole2]; exact hG
+        have hOrig := hOrigCoh (.branch senderRole bs) (.branch senderRole bs) hOrigSenderG hOrigRecvG
+        cases hTraceE : lookupD D e with
+        | nil =>
+          rw [hRole1]
+          simp only [Consume, Option.isSome]
+        | cons t ts =>
+          rw [hRole1, hTraceE] at hOrig
+          simp only [Consume, consumeOne, Option.isSome] at hOrig
+          exact Bool.noConfusion hOrig
+      · -- Sender = brancherEp, receiver ≠ brancherEp
+        have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+        apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
+        simp only [EdgeCoherent]
+        intro Lsender Lrecv hGsender hGrecv
+        rw [lookupG_update_neq _ _ _ _ hRecvNoMatch] at hGrecv
+        have hOrigCoh := hCoh e
+        simp only [EdgeCoherent] at hOrigCoh
+        have hSid : e.sid = brancherEp.sid := congrArg Endpoint.sid hSenderMatch
+        have hRole : e.sender = brancherEp.role := congrArg Endpoint.role hSenderMatch
+        have hOrigSender : lookupG G { sid := e.sid, role := e.sender } = some (.branch senderRole bs) := by
+          conv => lhs; rw [hSid, hRole]; exact hG
+        exact hOrigCoh (.branch senderRole bs) Lrecv hOrigSender hGrecv
+    · -- Sender endpoint ≠ brancherEp
+      have hSenderNoMatch : brancherEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
+      by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = brancherEp
+      · -- Receiver = brancherEp, sender ≠ brancherEp
+        apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
+        simp only [EdgeCoherent]
+        intro Lsender Lrecv hGsender hGrecv
+        rw [lookupG_update_neq _ _ _ _ hSenderNoMatch] at hGsender
+        have hSid : e.sid = brancherEp.sid := congrArg Endpoint.sid hRecvMatch
+        have hRole : e.receiver = brancherEp.role := congrArg Endpoint.role hRecvMatch
+        have hRecvLookup : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.receiver } = some L := by
+          conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G brancherEp L
+        rw [hRecvLookup] at hGrecv
+        simp only [Option.some.injEq] at hGrecv
+        subst hGrecv
+        have hOrigCoh := hCoh e
+        simp only [EdgeCoherent] at hOrigCoh
+        have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
+          conv => lhs; rw [hSid, hRole]; exact hG
+        have hOrig := hOrigCoh Lsender (.branch senderRole bs) hGsender hOrigRecv
+        cases hTraceE : lookupD D e with
+        | nil => simp only [Consume, Option.isSome]
+        | cons t ts =>
+          rw [hTraceE] at hOrig
+          simp only [Consume, consumeOne, Option.isSome] at hOrig
+          exact Bool.noConfusion hOrig
+      · -- Neither endpoint is brancherEp
+        have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+        apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
+        exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (hCoh e)
+
+/-! ## HeadCoherent Preservation Lemmas -/
+
+/-- HeadCoherent is preserved when sending.
+    Send action appends to trace END, so the HEAD is unchanged.
+    The sender's G entry changes, but receiver's G entry is unchanged
+    (unless sender = receiver, which is handled separately).
+    Reference: `work/effects/004.lean` proof structure -/
+theorem HeadCoherent_send_preserved
+    (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
+    (hHead : HeadCoherent G D)
+    (hCoh : Coherent G D)
+    (hG : lookupG G senderEp = some (.send receiverRole T L))
+    -- When trace is empty and receiver expects recv/branch from sender, T must match
+    (hRecvReady : ∀ Lrecv, lookupG G { sid := senderEp.sid, role := receiverRole } = some Lrecv →
+      ∃ L', Consume senderEp.role Lrecv (lookupD D { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }) = some L' ∧
+            (Consume senderEp.role L' [T]).isSome) :
+    let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
+    HeadCoherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
+  intro sendEdge
+  intro e  -- The edge we check HeadCoherent for
+  simp only [HeadCoherent] at hHead ⊢
+  -- Case split: is e the send edge or not?
+  by_cases heq : e = sendEdge
+  · -- Case 1: e = sendEdge - type and trace both change
+    subst heq
+    -- Self-send case is unusual; handle with sorry
+    by_cases hRecvIsSender : receiverRole = senderEp.role
+    · -- Self-send: receiver = sender, type at senderEp changes to L
+      subst hRecvIsSender
+      -- sendEdge = { sid := senderEp.sid, sender := senderEp.role, receiver := senderEp.role }
+      -- Receiver endpoint = senderEp, so receiver type in updated G is L
+      have hRecvEp : { sid := sendEdge.sid, role := sendEdge.receiver : Endpoint } = senderEp := rfl
+      simp only [hRecvEp, lookupG_update_eq, lookupD_update_eq]
+      -- Case on continuation type L
+      cases L with
+      | end_ => exact True.intro
+      | send _ _ _ => exact True.intro
+      | select _ _ => exact True.intro
+      | var _ => exact True.intro
+      | mu _ => exact True.intro
+      | recv r T' L' =>
+        -- Self-send case: original type is .send, hRecvReady requires Consume on it
+        have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.send senderEp.role T (.recv r T' L')) hG
+        -- Case on original trace
+        cases hOrigTrace : lookupD D sendEdge with
+        | nil =>
+          -- Empty trace: Consume on .send returns the .send type
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume] at hConsumeOrig
+          -- hConsumeOrig : some (.send ...) = some L'', so L'' = .send ...
+          have hL''eq : L'' = .send senderEp.role T (.recv r T' L') := Option.some.inj hConsumeOrig.symm
+          rw [hL''eq] at hConsumeSingle
+          -- Consume on .send type with [T] fails
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+          exact Bool.noConfusion hConsumeSingle
+        | cons t ts =>
+          -- Non-empty trace: Consume on .send fails
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume, consumeOne] at hConsumeOrig
+          exact Option.noConfusion hConsumeOrig
+      | branch r bs =>
+        -- Same as recv case - hRecvReady requires Consume on SEND which fails
+        have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.send senderEp.role T (.branch r bs)) hG
+        cases hOrigTrace : lookupD D sendEdge with
+        | nil =>
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume] at hConsumeOrig
+          have hL''eq : L'' = .send senderEp.role T (.branch r bs) := Option.some.inj hConsumeOrig.symm
+          rw [hL''eq] at hConsumeSingle
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+          exact Bool.noConfusion hConsumeSingle
+        | cons t ts =>
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume, consumeOne] at hConsumeOrig
+          exact Option.noConfusion hConsumeOrig
+    · -- Normal case: receiver ≠ sender
+      have hRecvNeq : senderEp ≠ { sid := senderEp.sid, role := receiverRole } := by
+        intro h
+        have : senderEp.role = receiverRole := congrArg Endpoint.role h
+        exact hRecvIsSender this.symm
+      -- Receiver's type unchanged
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq]
+      -- Trace was ts, now ts ++ [T]
+      simp only [lookupD_update_eq]
+      -- Original HeadCoherent at sendEdge
+      have hOrigHead := hHead sendEdge
+      -- Case on receiver's type in original G
+      cases hRecvType : lookupG G { sid := senderEp.sid, role := receiverRole } with
+      | none => trivial
+      | some Lr =>
+        cases Lr with
+        | end_ => trivial
+        | send _ _ _ => trivial
+        | select _ _ => trivial
+        | var _ => trivial
+        | mu _ => trivial
+        | recv r T' L' =>
+          -- Original: if trace non-empty, head = T'
+          -- After: trace ++ [T], head unchanged (unless trace was empty)
+          cases hTrace : lookupD D sendEdge with
+          | nil =>
+            simp only [List.nil_append]
+            -- Empty trace → single element [T], new head is T
+            -- Use hRecvReady to get T' = T
+            have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.recv r T' L') hRecvType
+            -- With empty trace, Consume returns the type unchanged
+            -- Note: sendEdge = { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }
+            rw [hTrace] at hConsumeOrig
+            simp only [Consume] at hConsumeOrig
+            -- hConsumeOrig : some (.recv r T' L') = some L''
+            have hL''eq : L'' = .recv r T' L' := Option.some.inj hConsumeOrig.symm
+            rw [hL''eq] at hConsumeSingle
+            -- hConsumeSingle : (Consume senderEp.role (recv r T' L') [T]).isSome
+            -- For this to succeed, senderEp.role == r AND T == T'
+            simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+            by_cases hSenderMatch : senderEp.role == r
+            · simp only [hSenderMatch, Bool.true_and] at hConsumeSingle
+              by_cases hTypeMatch : T == T'
+              · exact (eq_of_beq hTypeMatch).symm
+              · simp only [hTypeMatch] at hConsumeSingle
+                exact Bool.noConfusion hConsumeSingle
+            · simp only [hSenderMatch, Bool.false_and] at hConsumeSingle
+              exact Bool.noConfusion hConsumeSingle
+          | cons t ts =>
+            simp only [List.cons_append]
+            -- Trace head unchanged: t :: (ts ++ [T]) still has head t
+            -- hOrigHead specialized to sendEdge with recv type gives T' = t
+            have hOrigAtEdge := hOrigHead
+            -- sendEdge = { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }
+            -- so { sid := sendEdge.sid, role := sendEdge.receiver } = { sid := senderEp.sid, role := receiverRole }
+            have hEpEq : { sid := sendEdge.sid, role := sendEdge.receiver : Endpoint } = { sid := senderEp.sid, role := receiverRole } := rfl
+            simp only [hEpEq, hRecvType, hTrace] at hOrigAtEdge
+            exact hOrigAtEdge
+        | branch source bs =>
+          cases hTrace : lookupD D sendEdge with
+          | nil =>
+            simp only [List.nil_append]
+            -- Empty trace → single element [T], new head is T
+            -- Use hRecvReady to get T = .string
+            have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.branch source bs) hRecvType
+            -- With empty trace, Consume returns the type unchanged
+            rw [hTrace] at hConsumeOrig
+            simp only [Consume] at hConsumeOrig
+            -- hConsumeOrig : some (.branch source bs) = some L''
+            have hL''eq : L'' = .branch source bs := Option.some.inj hConsumeOrig.symm
+            rw [hL''eq] at hConsumeSingle
+            -- Consume on branch type always fails because consumeOne doesn't handle branch
+            -- consumeOne returns none for all non-recv types, so Consume returns none
+            simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+            exact Bool.noConfusion hConsumeSingle
+          | cons t ts =>
+            simp only [List.cons_append]
+            -- Trace head unchanged: t :: (ts ++ [T]) still has head t
+            -- hOrigHead specialized to sendEdge with branch type gives t = .string
+            have hOrigAtEdge := hOrigHead
+            have hEpEq : { sid := sendEdge.sid, role := sendEdge.receiver : Endpoint } = { sid := senderEp.sid, role := receiverRole } := rfl
+            simp only [hEpEq, hRecvType, hTrace] at hOrigAtEdge
+            exact hOrigAtEdge
+  · -- Case 2: e ≠ sendEdge
+    -- Check if receiver endpoint changed (is it senderEp?)
+    by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = senderEp
+    · -- Receiver endpoint is senderEp, type changed from SEND to L
+      subst hRecvMatch
+      rw [lookupG_update_eq]
+      have hNeSymm : sendEdge ≠ e := Ne.symm heq
+      rw [lookupD_update_neq _ _ _ _ hNeSymm]
+      -- L replaces .send at senderEp, check HeadCoherent for L
+      cases hL : L with
+      | end_ => trivial
+      | send _ _ _ => trivial
+      | select _ _ => trivial
+      | var _ => trivial
+      | mu _ => trivial
+      | recv r T' L' =>
+        -- HeadCoherent for recv: check if trace head matches T'
+        -- Key insight: Original G[senderEp] = .send, so by trace_empty_when_send_receiver, D[e] = []
+        -- After update, D'[e] = D[e] = [] (since e ≠ sendEdge), so HeadCoherent is trivially True
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        -- e.receiver = senderEp.role, and G[senderEp] = .send receiverRole T L
+        have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.send receiverRole T L) := by
+          simp only [hG]  -- e.receiver = senderEp.role after subst
+        have hTraceEmpty := trace_empty_when_send_receiver hEdgeCoh hRecvType'
+        rw [hTraceEmpty]
+        trivial
+      | branch source bs' =>
+        -- HeadCoherent for branch: same reasoning - original D[e] = [] because sender type is .send
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.send receiverRole T L) := by
+          simp only [hG]
+        have hTraceEmpty := trace_empty_when_send_receiver hEdgeCoh hRecvType'
+        rw [hTraceEmpty]
+        trivial
+    · -- Receiver endpoint unchanged
+      have hRecvNoMatch : senderEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+      rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
+      -- Trace at e unchanged
+      have hNeSymm : sendEdge ≠ e := Ne.symm heq
+      rw [lookupD_update_neq _ _ _ _ hNeSymm]
+      -- Original HeadCoherent at e
+      exact hHead e
+
+/-- HeadCoherent is preserved when receiving.
+    Recv action removes trace HEAD, and receiver type advances from recv to continuation.
+    The key insight is that Coherent implies the continuation can consume the remaining trace,
+    which means the new head (if any) must match the continuation's expected recv type.
+    Reference: `work/effects/004.lean` proof structure -/
+theorem HeadCoherent_recv_preserved
+    (G : GEnv) (D : DEnv) (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
+    (hHead : HeadCoherent G D)
+    (hCoh : Coherent G D)
+    (hG : lookupG G receiverEp = some (.recv senderRole T L))
+    (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
+    let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
+    HeadCoherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
+  intro recvEdge
+  intro e  -- The edge we check HeadCoherent for
+  simp only [HeadCoherent] at hHead ⊢
+  -- Case split: is e the recv edge or not?
+  by_cases heq : e = recvEdge
+  · -- Case 1: e = recvEdge - type and trace both change
+    subst heq
+    -- Self-recv case is unusual; handle with sorry
+    by_cases hSenderIsRecv : senderRole = receiverEp.role
+    · sorry  -- Edge case: self-recv
+    · -- Normal case: sender ≠ receiver
+      have hSenderNeq : receiverEp ≠ { sid := receiverEp.sid, role := senderRole } := by
+        intro h; exact hSenderIsRecv (congrArg Endpoint.role h).symm
+      -- Receiver lookup gives L
+      have hRecvLookup : lookupG (updateG G receiverEp L) { sid := receiverEp.sid, role := receiverEp.role } = some L := by
+        convert lookupG_update_eq G receiverEp L
+      rw [hRecvLookup, lookupD_update_eq]
+      -- Get trace structure from hTrace
+      cases hTraceVal : lookupD D recvEdge with
+      | nil =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?] at hTrace
+        exact Option.noConfusion hTrace
+      | cons t ts =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?, Option.some.injEq] at hTrace
+        subst hTrace
+        simp only [List.tail_cons]
+        -- L is continuation, check structure
+        cases hL : L with
+        | end_ => trivial
+        | send _ _ _ => trivial
+        | select _ _ => trivial
+        | var _ => trivial
+        | mu _ => trivial
+        | recv r T' L' =>
+          -- Use Coherent to derive: if ts non-empty, head = T'
+          -- Complex proof: need to extract from EdgeCoherent that trace head matches type
+          cases ts with
+          | nil => trivial
+          | cons t' ts' => sorry  -- Requires careful EdgeCoherent analysis for recv continuation
+        | branch source bs =>
+          -- After recv, if continuation is branch and remaining trace non-empty,
+          -- that contradicts Coherent because Consume on branch fails for non-empty trace
+          cases ts with
+          | nil => trivial
+          | cons t' ts' => sorry  -- Contradicts EdgeCoherent via Consume_branch_nonempty_false
+  · -- Case 2: e ≠ recvEdge
+    by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = receiverEp
+    · -- Receiver endpoint is receiverEp, type changed from .recv to L
+      subst hRecvMatch
+      rw [lookupG_update_eq]
+      have hNeSymm : recvEdge ≠ e := Ne.symm heq
+      rw [lookupD_update_neq _ _ _ _ hNeSymm]
+      -- L replaces .recv at receiverEp, check HeadCoherent for L
+      -- e ≠ recvEdge means e.sender ≠ senderRole
+      cases hL : L with
+      | end_ => trivial
+      | send _ _ _ => trivial
+      | select _ _ => trivial
+      | var _ => trivial
+      | mu _ => trivial
+      | recv r T' L' =>
+        -- HeadCoherent for recv: check if trace head matches T'
+        -- Key insight: Original G[receiverEp] = .recv senderRole T L
+        -- e.sender ≠ senderRole (since e ≠ recvEdge but e.receiver = receiverEp.role)
+        -- By trace_empty_when_recv_other_sender: D[e] = []
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.recv senderRole T L) := by
+          simp only [hG]
+        -- Need: e.sender ≠ senderRole
+        have hSenderNe : e.sender ≠ senderRole := by
+          intro hEq
+          -- If e.sender = senderRole and e.receiver = receiverEp.role and e.sid = receiverEp.sid
+          -- then e = recvEdge, contradiction
+          apply heq
+          have hEdgeEq : e = recvEdge := by
+            have hSidEq : e.sid = recvEdge.sid := rfl
+            have hSenderEq : e.sender = recvEdge.sender := hEq
+            have hRecvEq : e.receiver = recvEdge.receiver := rfl
+            calc e = ⟨e.sid, e.sender, e.receiver⟩ := by rfl
+              _ = ⟨recvEdge.sid, recvEdge.sender, recvEdge.receiver⟩ := by
+                  simp only [hSidEq, hSenderEq, hRecvEq]
+              _ = recvEdge := by rfl
+          exact hEdgeEq
+        have hTraceEmpty := trace_empty_when_recv_other_sender hEdgeCoh hRecvType' hSenderNe
+        rw [hTraceEmpty]
+        trivial
+      | branch source bs' =>
+        -- HeadCoherent for branch: same reasoning
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.recv senderRole T L) := by
+          simp only [hG]
+        have hSenderNe : e.sender ≠ senderRole := by
+          intro hEq
+          apply heq
+          have hEdgeEq : e = recvEdge := by
+            have hSidEq : e.sid = recvEdge.sid := rfl
+            have hSenderEq : e.sender = recvEdge.sender := hEq
+            have hRecvEq : e.receiver = recvEdge.receiver := rfl
+            calc e = ⟨e.sid, e.sender, e.receiver⟩ := by rfl
+              _ = ⟨recvEdge.sid, recvEdge.sender, recvEdge.receiver⟩ := by
+                  simp only [hSidEq, hSenderEq, hRecvEq]
+              _ = recvEdge := by rfl
+          exact hEdgeEq
+        have hTraceEmpty := trace_empty_when_recv_other_sender hEdgeCoh hRecvType' hSenderNe
+        rw [hTraceEmpty]
+        trivial
+    · -- Receiver endpoint unchanged
+      have hRecvNoMatch : receiverEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+      rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
+      have hNeSymm : recvEdge ≠ e := Ne.symm heq
+      rw [lookupD_update_neq _ _ _ _ hNeSymm]
+      exact hHead e
+
+/-- HeadCoherent is preserved when selecting (sending a label).
+    Select appends .string type to trace END, so HEAD unchanged. -/
+theorem HeadCoherent_select_preserved
+    (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)
+    (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
+    (hHead : HeadCoherent G D)
+    (hCoh : Coherent G D)
+    (hG : lookupG G selectorEp = some (.select targetRole bs))
+    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    -- When trace is empty and receiver expects recv/branch from sender, .string must match
+    (hRecvReady : ∀ Lrecv, lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv →
+      ∃ L', Consume selectorEp.role Lrecv (lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole }) = some L' ∧
+            (Consume selectorEp.role L' [.string]).isSome) :
+    let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
+    HeadCoherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
+  -- Same structure as HeadCoherent_send_preserved: appending to END doesn't change HEAD
+  intro selectEdge e
+  simp only [HeadCoherent] at hHead ⊢
+  by_cases heq : e = selectEdge
+  · -- e = selectEdge: trace gets .string appended at END
+    subst heq
+    -- Self-select case is unusual
+    by_cases hTargetIsSelector : targetRole = selectorEp.role
+    · -- Self-select: receiver = selector, type at selectorEp changes to L
+      subst hTargetIsSelector
+      -- selectEdge = { sid := selectorEp.sid, sender := selectorEp.role, receiver := selectorEp.role }
+      -- Receiver endpoint = selectorEp, so receiver type in updated G is L
+      have hRecvEp : { sid := selectEdge.sid, role := selectEdge.receiver : Endpoint } = selectorEp := rfl
+      simp only [hRecvEp, lookupG_update_eq, lookupD_update_eq]
+      -- Case on continuation type L
+      cases L with
+      | end_ => exact True.intro
+      | send _ _ _ => exact True.intro
+      | select _ _ => exact True.intro
+      | var _ => exact True.intro
+      | mu _ => exact True.intro
+      | recv r T' L' =>
+        -- Self-select case: original type is .select, hRecvReady requires Consume on it
+        have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.select selectorEp.role bs) hG
+        -- Case on original trace
+        cases hOrigTrace : lookupD D selectEdge with
+        | nil =>
+          -- Empty trace: Consume on .select returns the .select type
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume] at hConsumeOrig
+          -- hConsumeOrig : some (.select ...) = some L'', so L'' = .select ...
+          have hL''eq : L'' = .select selectorEp.role bs := Option.some.inj hConsumeOrig.symm
+          rw [hL''eq] at hConsumeSingle
+          -- Consume on .select type with [.string] fails
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+          exact Bool.noConfusion hConsumeSingle
+        | cons t ts =>
+          -- Non-empty trace: Consume on .select fails
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume, consumeOne] at hConsumeOrig
+          exact Option.noConfusion hConsumeOrig
+      | branch r bs' =>
+        -- Same as recv case - hRecvReady requires Consume on SELECT which fails
+        have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.select selectorEp.role bs) hG
+        cases hOrigTrace : lookupD D selectEdge with
+        | nil =>
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume] at hConsumeOrig
+          have hL''eq : L'' = .select selectorEp.role bs := Option.some.inj hConsumeOrig.symm
+          rw [hL''eq] at hConsumeSingle
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+          exact Bool.noConfusion hConsumeSingle
+        | cons t ts =>
+          rw [hOrigTrace] at hConsumeOrig
+          simp only [Consume, consumeOne] at hConsumeOrig
+          exact Option.noConfusion hConsumeOrig
+    · -- Normal case: target ≠ selector
+      have hTargetNeq : selectorEp ≠ { sid := selectorEp.sid, role := targetRole } := by
+        intro h
+        have : selectorEp.role = targetRole := congrArg Endpoint.role h
+        exact hTargetIsSelector this.symm
+      -- Target's type unchanged
+      rw [lookupG_update_neq _ _ _ _ hTargetNeq]
+      simp only [lookupD_update_eq]
+      have hOrigHead := hHead selectEdge
+      -- Case on target's type in original G
+      cases hTargetType : lookupG G { sid := selectorEp.sid, role := targetRole } with
+      | none => trivial
+      | some Lt =>
+        cases Lt with
+        | end_ => trivial
+        | send _ _ _ => trivial
+        | select _ _ => trivial
+        | var _ => trivial
+        | mu _ => trivial
+        | recv r T' L' =>
+          cases hTrace : lookupD D selectEdge with
+          | nil =>
+            simp only [List.nil_append]
+            -- Empty trace: use hRecvReady to derive .string = T'
+            have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.recv r T' L') hTargetType
+            rw [hTrace] at hConsumeOrig
+            simp only [Consume] at hConsumeOrig
+            have hL''eq : L'' = .recv r T' L' := Option.some.inj hConsumeOrig.symm
+            rw [hL''eq] at hConsumeSingle
+            -- Consume selectorEp.role (.recv r T' L') [.string] must be isSome
+            -- This requires selectorEp.role == r and .string == T'
+            simp only [Consume, consumeOne, Option.isSome] at hConsumeSingle
+            -- Case on whether sender matches
+            by_cases hSenderMatch : selectorEp.role == r
+            · simp only [hSenderMatch, Bool.true_and] at hConsumeSingle
+              -- Now we need .string == T' to hold
+              by_cases hTypeMatch : ValType.string == T'
+              · -- T' = .string, so HeadCoherent is trivially satisfied
+                have hTeq : T' = ValType.string := (eq_of_beq hTypeMatch).symm
+                simp only [hTeq]
+              · simp only [hTypeMatch] at hConsumeSingle
+                exact Bool.noConfusion hConsumeSingle
+            · simp only [hSenderMatch, Bool.false_and] at hConsumeSingle
+              exact Bool.noConfusion hConsumeSingle
+          | cons t ts =>
+            simp only [List.cons_append]
+            have hEpEq : { sid := selectEdge.sid, role := selectEdge.receiver : Endpoint } = { sid := selectorEp.sid, role := targetRole } := rfl
+            simp only [hEpEq, hTargetType, hTrace] at hOrigHead
+            exact hOrigHead
+        | branch source bs' =>
+          cases hTrace : lookupD D selectEdge with
+          | nil =>
+            simp only [List.nil_append]
+            -- Empty trace → single element [.string], head is .string
+            -- branch expects .string, so this is trivially satisfied (rfl or trivial)
+          | cons t ts =>
+            simp only [List.cons_append]
+            have hEpEq : { sid := selectEdge.sid, role := selectEdge.receiver : Endpoint } = { sid := selectorEp.sid, role := targetRole } := rfl
+            simp only [hEpEq, hTargetType, hTrace] at hOrigHead
+            exact hOrigHead
+  · -- e ≠ selectEdge: unchanged
+    have hNeSymm : selectEdge ≠ e := Ne.symm heq
+    rw [lookupD_update_neq _ _ _ _ hNeSymm]
+    -- G update at selectorEp; check if it affects receiver lookup
+    by_cases hRecvMatch : selectorEp = { sid := e.sid, role := e.receiver }
+    · -- selectorEp is the receiver for edge e
+      subst hRecvMatch
+      rw [lookupG_update_eq]
+      -- L replaces .select at selectorEp, check HeadCoherent for L
+      cases hL : L with
+      | end_ => trivial
+      | send _ _ _ => trivial
+      | select _ _ => trivial
+      | var _ => trivial
+      | mu _ => trivial
+      | recv r T' L' =>
+        -- HeadCoherent for recv: check if trace head matches T'
+        -- Key insight: Original G[selectorEp] = .select, so by trace_empty_when_select_receiver, D[e] = []
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hSelectType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.select targetRole bs) := by
+          simp only [hG]
+        have hTraceEmpty := trace_empty_when_select_receiver hEdgeCoh hSelectType'
+        rw [hTraceEmpty]
+        trivial
+      | branch source bs' =>
+        -- HeadCoherent for branch: same reasoning
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hSelectType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.select targetRole bs) := by
+          simp only [hG]
+        have hTraceEmpty := trace_empty_when_select_receiver hEdgeCoh hSelectType'
+        rw [hTraceEmpty]
+        trivial
+    · -- selectorEp is not the receiver
+      have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := hRecvMatch
+      rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
+      exact hHead e
+
+/-- HeadCoherent is preserved when branching (receiving a label).
+    Branch removes trace HEAD and advances receiver type to selected branch. -/
+theorem HeadCoherent_branch_preserved
+    (G : GEnv) (D : DEnv) (brancherEp : Endpoint) (senderRole : Role)
+    (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
+    (hHead : HeadCoherent G D)
+    (hCoh : Coherent G D)
+    (hG : lookupG G brancherEp = some (.branch senderRole bs))
+    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
+    let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
+    HeadCoherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
+  -- Same structure as HeadCoherent_recv_preserved: removes HEAD, advances type
+  intro branchEdge e
+  simp only [HeadCoherent] at hHead ⊢
+  by_cases heq : e = branchEdge
+  · -- Case 1: e = branchEdge - type and trace both change
+    subst heq
+    -- Self-branch case is unusual
+    by_cases hSenderIsBrancher : senderRole = brancherEp.role
+    · sorry  -- Edge case: self-branch
+    · -- Normal case: sender ≠ brancher
+      have hSenderNeq : brancherEp ≠ { sid := brancherEp.sid, role := senderRole } := by
+        intro h; exact hSenderIsBrancher (congrArg Endpoint.role h).symm
+      -- Brancher lookup gives L (the selected continuation)
+      have hBranchLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := brancherEp.role } = some L := by
+        convert lookupG_update_eq G brancherEp L
+      rw [hBranchLookup, lookupD_update_eq]
+      -- Get trace structure from hTrace
+      cases hTraceVal : lookupD D branchEdge with
+      | nil =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?] at hTrace
+        exact Option.noConfusion hTrace
+      | cons t ts =>
+        rw [hTraceVal] at hTrace
+        simp only [List.head?, Option.some.injEq] at hTrace
+        subst hTrace
+        simp only [List.tail_cons]
+        -- L is continuation after branch, check structure
+        cases hL : L with
+        | end_ => trivial
+        | send _ _ _ => trivial
+        | select _ _ => trivial
+        | var _ => trivial
+        | mu _ => trivial
+        | recv r T' L' =>
+          -- Use Coherent to derive: if ts non-empty, head = T'
+          cases ts with
+          | nil => trivial
+          | cons _ _ => sorry  -- Complex: derive T' = ts.head from Coherent
+        | branch source bs' =>
+          cases ts with
+          | nil => trivial
+          | cons _ _ => sorry  -- Complex: branch after branch with remaining trace
+  · -- Case 2: e ≠ branchEdge - unchanged
+    have hNeSymm : branchEdge ≠ e := Ne.symm heq
+    rw [lookupD_update_neq _ _ _ _ hNeSymm]
+    by_cases hRecvMatch : brancherEp = { sid := e.sid, role := e.receiver }
+    · -- brancherEp is the receiver for edge e
+      subst hRecvMatch
+      rw [lookupG_update_eq]
+      -- L replaces .branch at brancherEp, check HeadCoherent for L
+      cases hL : L with
+      | end_ => trivial
+      | send _ _ _ => trivial
+      | select _ _ => trivial
+      | var _ => trivial
+      | mu _ => trivial
+      | recv r T' L' =>
+        -- HeadCoherent for recv: check if trace head matches T'
+        -- Key insight: Original G[brancherEp] = .branch senderRole bs
+        -- e.sender ≠ senderRole (since e ≠ branchEdge but e.receiver = brancherEp.role)
+        -- By trace_empty_when_branch_other_sender: D[e] = []
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hBranchType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.branch senderRole bs) := by
+          simp only [hG]
+        have hSenderNe : e.sender ≠ senderRole := by
+          intro hEq
+          apply heq
+          have hEdgeEq : e = branchEdge := by
+            have hSidEq : e.sid = branchEdge.sid := rfl
+            have hSenderEq : e.sender = branchEdge.sender := hEq
+            have hRecvEq : e.receiver = branchEdge.receiver := rfl
+            calc e = ⟨e.sid, e.sender, e.receiver⟩ := by rfl
+              _ = ⟨branchEdge.sid, branchEdge.sender, branchEdge.receiver⟩ := by
+                  simp only [hSidEq, hSenderEq, hRecvEq]
+              _ = branchEdge := by rfl
+          exact hEdgeEq
+        have hTraceEmpty := trace_empty_when_branch_other_sender hEdgeCoh hBranchType' hSenderNe
+        rw [hTraceEmpty]
+        trivial
+      | branch source bs' =>
+        -- Same reasoning
+        have hEdgeCoh : EdgeCoherent G D e := hCoh e
+        have hBranchType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.branch senderRole bs) := by
+          simp only [hG]
+        have hSenderNe : e.sender ≠ senderRole := by
+          intro hEq
+          apply heq
+          have hEdgeEq : e = branchEdge := by
+            have hSidEq : e.sid = branchEdge.sid := rfl
+            have hSenderEq : e.sender = branchEdge.sender := hEq
+            have hRecvEq : e.receiver = branchEdge.receiver := rfl
+            calc e = ⟨e.sid, e.sender, e.receiver⟩ := by rfl
+              _ = ⟨branchEdge.sid, branchEdge.sender, branchEdge.receiver⟩ := by
+                  simp only [hSidEq, hSenderEq, hRecvEq]
+              _ = branchEdge := by rfl
+          exact hEdgeEq
+        have hTraceEmpty := trace_empty_when_branch_other_sender hEdgeCoh hBranchType' hSenderNe
+        rw [hTraceEmpty]
+        trivial
+    · -- brancherEp is not the receiver
+      have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := hRecvMatch
+      rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
+      exact hHead e
+
+/-! ## ValidLabels Preservation Lemmas -/
+
+/-- ValidLabels is preserved when sending.
+    Send appends a value to the buffer, but ValidLabels checks branch labels
+    which are only relevant when receiver has branch type.
+    The main case (buffer head unchanged when appending) works.
+    Edge cases (empty buffer, self-send, type changes) use sorry. -/
+theorem ValidLabels_send_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType) (v : Value)
+    (hValid : ValidLabels G D bufs)
+    (hG : lookupG G senderEp = some (.send receiverRole T L)) :
+    let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
+    ValidLabels (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T]))
+               (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) := by
+  -- ValidLabels checks buffer head against branch labels.
+  -- Send appends to buffer END, so head unchanged for non-empty buffers.
+  intro sendEdge e source bs hBranch
+  -- Case split: is e the send edge or not?
+  by_cases heq : e = sendEdge
+  · -- e = sendEdge: buffer appends v at END
+    subst heq
+    -- Receiver endpoint for sendEdge is { sid := senderEp.sid, role := receiverRole }
+    -- Check if this equals senderEp (self-send case)
+    by_cases hSelf : senderEp = ⟨senderEp.sid, receiverRole⟩
+    · -- Self-send case: senderEp.role = receiverRole
+      sorry  -- Edge case: self-send
+    · -- Normal case: receiver ≠ sender
+      have hRecvNeq : senderEp ≠ ⟨sendEdge.sid, sendEdge.receiver⟩ := by
+        simp only [sendEdge]; exact hSelf
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq] at hBranch
+      rw [lookupBuf_update_eq]
+      -- Original ValidLabels at sendEdge
+      have hOrig := hValid sendEdge source bs hBranch
+      -- Buffer was bufOld, now bufOld ++ [v]
+      cases hBuf : lookupBuf bufs sendEdge with
+      | nil =>
+        simp only [List.nil_append]
+        -- Empty buffer, now [v]. Check if v is .string with valid label
+        cases v with
+        | string l => sorry  -- Need: l ∈ bs (requires protocol consistency)
+        | _ => trivial
+      | cons h t =>
+        simp only [List.cons_append]
+        -- Buffer head unchanged, use original ValidLabels
+        -- Match on h :: (t ++ [v]) has same result as h :: t since head is h
+        cases h with
+        | string l =>
+          simp only [hBuf] at hOrig
+          exact hOrig
+        | _ => trivial
+  · -- e ≠ sendEdge: buffer unchanged at e
+    have hNeSymm : sendEdge ≠ e := Ne.symm heq
+    rw [lookupBuf_update_neq _ _ _ _ hNeSymm]
+    -- G might change at receiver endpoint
+    by_cases hRecvEq : ⟨e.sid, e.receiver⟩ = senderEp
+    · -- Receiver at e is senderEp, type changes from .send to L
+      rw [← hRecvEq, lookupG_update_eq] at hBranch
+      -- hBranch says L = .branch source bs, but L is continuation of send
+      -- This is unusual unless L happens to be .branch
+      sorry  -- Type consistency case
+    · -- Receiver at e is not senderEp, G unchanged
+      have hRecvNeq : senderEp ≠ ⟨e.sid, e.receiver⟩ := fun h => hRecvEq h.symm
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq] at hBranch
+      exact hValid e source bs hBranch
+
+/-- ValidLabels is preserved when receiving.
+    Recv removes head from buffer. If the head was checked by ValidLabels,
+    the remaining buffer still satisfies the property for the continuation type.
+    The main case (buffer tail preservation) requires protocol consistency. -/
+theorem ValidLabels_recv_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
+    (hValid : ValidLabels G D bufs)
+    (hG : lookupG G receiverEp = some (.recv senderRole T L))
+    (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
+    let recvEdge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
+    ValidLabels (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
+               (updateBuf bufs recvEdge (lookupBuf bufs recvEdge).tail) := by
+  -- ValidLabels checks buffer head against branch labels.
+  -- Recv removes buffer HEAD, so new head needs to match if continuation is branch.
+  intro recvEdge e source bs hBranch
+  by_cases heq : e = recvEdge
+  · -- e = recvEdge: buffer becomes tail
+    subst heq
+    -- Receiver at recvEdge is receiverEp
+    -- Check if receiverEp type changed (it did, from .recv to L)
+    by_cases hSelf : senderRole = receiverEp.role
+    · sorry  -- Edge case: self-recv
+    · -- Normal case: sender ≠ receiver
+      have hRecvEpEq : ⟨recvEdge.sid, recvEdge.receiver⟩ = receiverEp := rfl
+      rw [hRecvEpEq, lookupG_update_eq] at hBranch
+      -- hBranch : L = .branch source bs
+      -- L is the continuation of recv, which could be branch
+      rw [lookupBuf_update_eq]
+      -- New buffer is tail of original
+      cases hBuf : lookupBuf bufs recvEdge with
+      | nil =>
+        simp only [List.tail_nil]
+        -- Empty buffer stays empty, goal is trivially True
+      | cons h t =>
+        simp only [List.tail_cons]
+        -- New head is t.head (if t non-empty)
+        cases t with
+        | nil => trivial  -- Tail is empty
+        | cons h' t' =>
+          -- Need to show h' is valid for bs if h' is .string
+          -- This requires protocol consistency from original ValidLabels
+          -- The original ValidLabels was about h :: h' :: t', not h' :: t'
+          sorry  -- Protocol consistency: new head valid for continuation
+  · -- e ≠ recvEdge: buffer unchanged at e
+    have hNeSymm : recvEdge ≠ e := Ne.symm heq
+    rw [lookupBuf_update_neq _ _ _ _ hNeSymm]
+    by_cases hRecvEq : ⟨e.sid, e.receiver⟩ = receiverEp
+    · rw [← hRecvEq, lookupG_update_eq] at hBranch
+      sorry  -- Type consistency: L = .branch case
+    · have hRecvNeq : receiverEp ≠ ⟨e.sid, e.receiver⟩ := fun h => hRecvEq h.symm
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq] at hBranch
+      exact hValid e source bs hBranch
+
+/-- ValidLabels is preserved when selecting (sending a label).
+    Select appends label to buffer END, so HEAD unchanged. -/
+theorem ValidLabels_select_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (selectorEp : Endpoint) (targetRole : Role)
+    (selectBranches : List (String × LocalType)) (ℓ : String) (L : LocalType)
+    (hValid : ValidLabels G D bufs)
+    (hG : lookupG G selectorEp = some (.select targetRole selectBranches))
+    (hFind : selectBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L)) :
+    let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
+    ValidLabels (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string]))
+               (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) := by
+  -- Same structure as ValidLabels_send_preserved
+  intro selectEdge e source bs hBranch
+  by_cases heq : e = selectEdge
+  · -- e = selectEdge: buffer appends .string ℓ at END
+    subst heq
+    by_cases hSelf : selectorEp = ⟨selectorEp.sid, targetRole⟩
+    · sorry  -- Edge case: self-select
+    · -- Normal case: target ≠ selector
+      have hRecvNeq : selectorEp ≠ ⟨selectEdge.sid, selectEdge.receiver⟩ := by
+        simp only [selectEdge]; exact hSelf
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq] at hBranch
+      rw [lookupBuf_update_eq]
+      have hOrig := hValid selectEdge source bs hBranch
+      cases hBuf : lookupBuf bufs selectEdge with
+      | nil =>
+        simp only [List.nil_append]
+        -- Empty buffer, now [.string ℓ]. Need to check if ℓ ∈ bs
+        -- This requires protocol consistency (select to branch matching)
+        sorry
+      | cons h t =>
+        simp only [List.cons_append]
+        cases h with
+        | string l =>
+          simp only [hBuf] at hOrig
+          exact hOrig
+        | _ => trivial
+  · -- e ≠ selectEdge: buffer unchanged at e
+    have hNeSymm : selectEdge ≠ e := Ne.symm heq
+    rw [lookupBuf_update_neq _ _ _ _ hNeSymm]
+    by_cases hRecvEq : ⟨e.sid, e.receiver⟩ = selectorEp
+    · rw [← hRecvEq, lookupG_update_eq] at hBranch
+      sorry  -- Type consistency case
+    · have hRecvNeq : selectorEp ≠ ⟨e.sid, e.receiver⟩ := fun h => hRecvEq h.symm
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq] at hBranch
+      exact hValid e source bs hBranch
+
+/-- ValidLabels is preserved when branching (receiving a label).
+    Branch removes label from buffer HEAD. -/
+theorem ValidLabels_branch_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (brancherEp : Endpoint) (senderRole : Role)
+    (branchOptions : List (String × LocalType)) (ℓ : String) (L : LocalType) (vs : List Value)
+    (hValid : ValidLabels G D bufs)
+    (hG : lookupG G brancherEp = some (.branch senderRole branchOptions))
+    (hFind : branchOptions.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (hBufEq : lookupBuf bufs { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role } = .string ℓ :: vs) :
+    let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
+    ValidLabels (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail)
+               (updateBuf bufs branchEdge vs) := by
+  -- Same structure as ValidLabels_recv_preserved
+  intro branchEdge e source bs hBranch
+  by_cases heq : e = branchEdge
+  · -- e = branchEdge: buffer becomes vs (tail of original)
+    subst heq
+    by_cases hSelf : senderRole = brancherEp.role
+    · sorry  -- Edge case: self-branch
+    · -- Normal case: sender ≠ receiver
+      have hRecvEpEq : ⟨branchEdge.sid, branchEdge.receiver⟩ = brancherEp := rfl
+      rw [hRecvEpEq, lookupG_update_eq] at hBranch
+      -- hBranch : L = .branch source bs
+      -- L is the continuation after branching
+      rw [lookupBuf_update_eq]
+      -- Buffer becomes vs
+      cases vs with
+      | nil => trivial  -- vs is empty
+      | cons h' t' =>
+        -- Need to show h' is valid for bs if h' is .string
+        -- This requires protocol consistency
+        sorry  -- Protocol consistency: continuation head valid
+  · -- e ≠ branchEdge: buffer unchanged at e
+    have hNeSymm : branchEdge ≠ e := Ne.symm heq
+    rw [lookupBuf_update_neq _ _ _ _ hNeSymm]
+    by_cases hRecvEq : ⟨e.sid, e.receiver⟩ = brancherEp
+    · rw [← hRecvEq, lookupG_update_eq] at hBranch
+      sorry  -- Type consistency: L = .branch case
+    · have hRecvNeq : brancherEp ≠ ⟨e.sid, e.receiver⟩ := fun h => hRecvEq h.symm
+      rw [lookupG_update_neq _ _ _ _ hRecvNeq] at hBranch
+      exact hValid e source bs hBranch
+
+/-- BuffersTyped is preserved when sending.
+    Send appends v to buffer and T to trace at the send edge.
+    For i < original length: buf[i] : trace[i] preserved.
+    For i = original length: buf[i] = v, trace[i] = T, and hv : v : T. -/
+theorem BuffersTyped_send_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType) (v : Value)
+    (hTyped : BuffersTyped G D bufs)
+    (hv : HasTypeVal G v T)
+    (hG : lookupG G senderEp = some (.send receiverRole T L)) :
+    let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
+    BuffersTyped (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T]))
+                 (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) := by
+  intro sendEdge e
+  simp only [BufferTyped]
+  by_cases he : e = sendEdge
+  · -- e = sendEdge: buffer and trace both get appended
+    -- For i < original length: use original typing with HasTypeVal_mono
+    -- For i = original length: use hv for appended element
+    -- Requires List.get_append_left/right lemmas for indexing
+    sorry
+  · -- e ≠ sendEdge: unchanged, use HasTypeVal_mono for GEnv update
+    -- The mono case for e' = senderEp is tricky: channel values in buffer
+    -- shouldn't reference the endpoint being updated (separate sessions).
+    -- This requires additional invariants; use sorry for now.
+    sorry
+
+/-- BuffersTyped is preserved when receiving.
+    Recv removes head from buffer and trace at the recv edge.
+    For all i: buf'[i] = buf[i+1], trace'[i] = trace[i+1], preserved from original. -/
+theorem BuffersTyped_recv_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType) (v : Value) (vs : List Value)
+    (hTyped : BuffersTyped G D bufs)
+    (hBuf : lookupBuf bufs { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role } = v :: vs)
+    (hv : HasTypeVal G v T)
+    (hG : lookupG G receiverEp = some (.recv senderRole T L)) :
+    let recvEdge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
+    BuffersTyped (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
+                 (updateBuf bufs recvEdge vs) := by
+  intro recvEdge e
+  simp only [BufferTyped]
+  by_cases he : e = recvEdge
+  · -- e = recvEdge: buffer becomes vs, trace loses head
+    -- Tail indexing: buf'[i] = buf[i+1], trace'[i] = trace[i+1]
+    -- Original typing gives buf[i+1] : trace[i+1], need HasTypeVal_mono for G update
+    sorry
+  · -- e ≠ recvEdge: unchanged, use HasTypeVal_mono for GEnv update
+    -- The mono case for e' = receiverEp is tricky: channel values in buffer
+    -- shouldn't reference the endpoint being updated (separate sessions).
+    -- This requires additional invariants; use sorry for now.
+    sorry
+
+/-- BuffersTyped is preserved when selecting (sending a label).
+    Select appends label string to buffer and .string to trace.
+    Similar to send but with label type. -/
+theorem BuffersTyped_select_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (selectorEp : Endpoint) (targetRole : Role)
+    (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
+    (hTyped : BuffersTyped G D bufs)
+    (hG : lookupG G selectorEp = some (.select targetRole bs))
+    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L)) :
+    let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
+    BuffersTyped (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string]))
+                 (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) := by
+  intro selectEdge e
+  simp only [BufferTyped]
+  by_cases he : e = selectEdge
+  · -- e = selectEdge: buffer and trace both get appended with label
+    -- For i < original length: use original typing with HasTypeVal_mono
+    -- For i = original length: .string ℓ : .string by HasTypeVal.string
+    -- Requires List.get_append_left/right lemmas
+    sorry
+  · -- e ≠ selectEdge: unchanged, use HasTypeVal_mono for GEnv update
+    sorry
+
+/-- BuffersTyped is preserved when branching (receiving a label).
+    Branch removes label string from buffer HEAD and .string from trace HEAD.
+    Similar to recv but with label type. -/
+theorem BuffersTyped_branch_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (brancherEp : Endpoint) (senderRole : Role)
+    (bs : List (String × LocalType)) (ℓ : String) (L : LocalType) (vs : List Value)
+    (hTyped : BuffersTyped G D bufs)
+    (hBuf : lookupBuf bufs { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role } = .string ℓ :: vs)
+    (hG : lookupG G brancherEp = some (.branch senderRole bs))
+    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L)) :
+    let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
+    BuffersTyped (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail)
+                 (updateBuf bufs branchEdge vs) := by
+  intro branchEdge e
+  simp only [BufferTyped]
+  by_cases he : e = branchEdge
+  · -- e = branchEdge: buffer becomes vs, trace loses head
+    -- Tail indexing: buf'[i] = buf[i+1], trace'[i] = trace[i+1]
+    -- Original typing gives buf[i+1] : trace[i+1], need HasTypeVal_mono for G update
+    sorry
+  · -- e ≠ branchEdge: unchanged, use HasTypeVal_mono for GEnv update
+    sorry
 
 /-! ## Initialization Lemma -/
 

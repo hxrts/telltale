@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "aho-corasick"
-version = "1.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -140,7 +131,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "external-demo-macros"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "proc-macro2",
@@ -305,6 +296,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoa"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+
+[[package]]
 name = "js-sys"
 version = "0.3.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -313,12 +310,6 @@ dependencies = [
  "once_cell",
  "wasm-bindgen",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
@@ -516,37 +507,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex"
-version = "1.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843bc0191f75f3e22651ae5f1e72939ab2f72a4bc30fa80a066bd66edefc24d4"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-automata",
- "regex-syntax",
-]
-
-[[package]]
-name = "regex-automata"
-version = "0.4.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5276caf25ac86c8d810222b3dbb938e512c55c6831a10f3e6ed1c93b84041f1c"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-syntax",
-]
-
-[[package]]
-name = "regex-syntax"
-version = "0.8.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
-
-[[package]]
 name = "rumpsteak-aura"
-version = "0.5.0"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -558,6 +520,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rumpsteak-aura-macros",
+ "rumpsteak-types",
  "serde",
  "syn",
  "thiserror",
@@ -572,7 +535,7 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-choreography"
-version = "0.5.0"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -582,15 +545,17 @@ dependencies = [
  "futures",
  "getrandom 0.2.16",
  "hex",
- "lazy_static",
+ "parking_lot 0.12.5",
  "pest",
  "pest_derive",
  "proc-macro2",
  "quote",
- "regex",
  "rumpsteak-aura",
  "rumpsteak-aura-macros",
+ "rumpsteak-theory",
+ "rumpsteak-types",
  "serde",
+ "sha2",
  "syn",
  "thiserror",
  "time",
@@ -605,11 +570,29 @@ dependencies = [
 
 [[package]]
 name = "rumpsteak-aura-macros"
-version = "0.5.0"
+version = "0.8.2"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "rumpsteak-theory"
+version = "0.8.2"
+dependencies = [
+ "rumpsteak-types",
+ "thiserror",
+]
+
+[[package]]
+name = "rumpsteak-types"
+version = "0.8.2"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]
@@ -652,6 +635,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.149"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+dependencies = [
+ "itoa",
+ "memchr",
+ "serde",
+ "serde_core",
+ "zmij",
 ]
 
 [[package]]
@@ -1125,3 +1121,9 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "zmij"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd8f3f50b848df28f887acb68e41201b5aea6bc8a8dacc00fb40635ff9a72fea"

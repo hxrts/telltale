@@ -335,4 +335,197 @@ theorem inversion_branch {S : SEnv} {G : GEnv} {k : Var} {procs : List (Label ×
   cases h with
   | branch hk hG hLen hLabels _ => exact ⟨_, _, _, hk, hG, hLen, hLabels⟩
 
+/-! ## Linear Resource Transition Typing
+
+**Core Judgment**: `TypedStep G D S C C' G' D' S'`
+
+**Reading**: Configuration C consumes resources (G, D, S) and steps to C',
+producing resources (G', D', S').
+
+This design ensures preservation by making the pre/post-state distinction
+intrinsic to the typing judgment.
+
+**References**: Theoretical foundation: Wadler (2012) "Propositions as Sessions"
+
+## Key Properties
+
+1. **Preservation**: Trivial (the judgment itself proves it)
+2. **Progress**: Structured case analysis on configuration
+3. **Coherence**: Uses existing `Coherent_send_preserved`, `Coherent_recv_preserved`
+4. **Soundness**: TypedStep refines Step -/
+
+/-! ### Resource Disjointness Predicates -/
+
+/-- Session type environment disjointness.
+    Two environments are disjoint if no endpoint appears in both. -/
+def DisjointG (G₁ G₂ : GEnv) : Prop :=
+  ∀ e L₁ L₂, (e, L₁) ∈ G₁ → (e, L₂) ∈ G₂ → False
+
+/-- Delayed type environment disjointness.
+    Two environments are disjoint if no edge has non-empty traces in both. -/
+def DisjointD (D₁ D₂ : DEnv) : Prop :=
+  ∀ edge, lookupD D₁ edge ≠ [] → lookupD D₂ edge ≠ [] → False
+
+/-- Value type environment disjointness.
+    Two environments are disjoint if no variable appears in both. -/
+def DisjointS (S₁ S₂ : SEnv) : Prop :=
+  ∀ x T₁ T₂, lookupSEnv S₁ x = some T₁ → lookupSEnv S₂ x = some T₂ → False
+
+/-! ### TypedStep Inductive Definition -/
+
+/-- Linear resource transition typing judgment.
+
+    **Interpretation**: Configuration C transitions from resource state (G, D, S)
+    to configuration C' with resource state (G', D', S').
+
+    **Linear Resources**:
+    - Each endpoint in G is consumed exactly once and produces a continuation
+    - Buffers and traces evolve consistently (append on send, pop on recv)
+    - Variables are typed as they're assigned
+
+    **Compositionality**: Parallel processes have disjoint resources -/
+inductive TypedStep : GEnv → DEnv → SEnv → Config →
+                      Config → GEnv → DEnv → SEnv → Prop
+  | send {G D S store bufs k x e target T L v} :
+      -- Pre-conditions (resources consumed)
+      lookupStr store k = some (.chan e) →
+      lookupStr store x = some v →
+      lookupG G e = some (.send target T L) →
+      lookupSEnv S x = some T →
+      HasTypeVal G v T →
+
+      -- Resource transition
+      let sendEdge : Edge := { sid := e.sid, sender := e.role, receiver := target }
+      let G' := updateG G e L
+      let D' := appendD D sendEdge T
+      let bufs' := enqueueBuf bufs sendEdge v
+
+      -- Judgment
+      TypedStep G D S
+                ⟨store, bufs, .send k x⟩
+                ⟨store, bufs', .skip⟩
+                G' D' S
+
+  | recv {G D S store bufs k x e source T L v vs} :
+      -- Pre-conditions (resources consumed)
+      lookupStr store k = some (.chan e) →
+      lookupG G e = some (.recv source T L) →
+      let recvEdge : Edge := { sid := e.sid, sender := source, receiver := e.role }
+      lookupBuf bufs recvEdge = v :: vs →
+      HasTypeVal G v T →  -- derived from BuffersTyped invariant
+
+      -- Resource transition
+      let G' := updateG G e L
+      let D' := updateD D recvEdge (lookupD D recvEdge).tail
+      let S' := updateSEnv S x T
+      let store' := updateStr store x v
+      let bufs' := updateBuf bufs recvEdge vs
+
+      -- Judgment
+      TypedStep G D S
+                ⟨store, bufs, .recv k x⟩
+                ⟨store', bufs', .skip⟩
+                G' D' S'
+
+  | assign {G D S store bufs x v T} :
+      -- Pre-condition: value is well-typed (no endpoint dependencies)
+      lookupStr store x = some v →
+      HasTypeVal ∅ v T →
+
+      -- Resource transition (only S changes)
+      let S' := updateSEnv S x T
+
+      -- Judgment
+      TypedStep G D S
+                ⟨store, bufs, .assign x (valueToExpr v)⟩
+                ⟨store, bufs, .skip⟩
+                G D S'
+
+  | newSession {G D S store bufs supply roles localTypes} :
+      -- Pre-conditions: fresh session ID allocation
+      let sid := supply
+      let (G', D', bufs') := initSession sid roles localTypes
+      (∀ e L, (e, L) ∈ G' → e.sid = sid) →  -- all new endpoints have sid
+      (∀ e L, (e, L) ∈ G → e.sid ≠ sid) →   -- sid is fresh
+
+      -- Resource transition: merge fresh resources
+      let G'' := G ++ G'  -- disjoint merge
+      let D'' := D ++ D'
+      let bufs'' := bufs ++ bufs'
+
+      -- Judgment
+      TypedStep G D S
+                ⟨store, bufs, .newSession roles localTypes⟩
+                ⟨store, bufs'', .skip⟩
+                G'' D'' S
+
+  | seq_step {G D S G' D' S' store bufs P P' Q} :
+      -- Resources flow through first process
+      TypedStep G D S
+                ⟨store, bufs, P⟩
+                ⟨store, bufs, P'⟩
+                G' D' S' →
+
+      TypedStep G D S
+                ⟨store, bufs, .seq P Q⟩
+                ⟨store, bufs, .seq P' Q⟩
+                G' D' S'
+
+  | seq_skip {G D S store bufs Q} :
+      -- Skip elimination (identity transition)
+      TypedStep G D S
+                ⟨store, bufs, .seq .skip Q⟩
+                ⟨store, bufs, Q⟩
+                G D S
+
+  | par_left {G₁ G₂ D₁ D₂ S₁ S₂ G₁' D₁' S₁' store bufs P P' Q} :
+      -- Left process transitions with its resources
+      TypedStep G₁ D₁ S₁
+                ⟨store, bufs, P⟩
+                ⟨store, bufs, P'⟩
+                G₁' D₁' S₁' →
+
+      -- Resources must be disjoint for parallel composition
+      DisjointG G₁ G₂ →
+      DisjointD D₁ D₂ →
+      DisjointS S₁ S₂ →
+
+      -- Combined transition
+      TypedStep (G₁ ++ G₂) (D₁ ++ D₂) (S₁ ++ S₂)
+                ⟨store, bufs, .par P Q⟩
+                ⟨store, bufs, .par P' Q⟩
+                (G₁' ++ G₂) (D₁' ++ D₂) (S₁' ++ S₂)
+
+  | par_right {G₁ G₂ D₁ D₂ S₁ S₂ G₂' D₂' S₂' store bufs P Q Q'} :
+      -- Right process transitions with its resources
+      TypedStep G₂ D₂ S₂
+                ⟨store, bufs, Q⟩
+                ⟨store, bufs, Q'⟩
+                G₂' D₂' S₂' →
+
+      -- Resources must be disjoint
+      DisjointG G₁ G₂ →
+      DisjointD D₁ D₂ →
+      DisjointS S₁ S₂ →
+
+      -- Combined transition
+      TypedStep (G₁ ++ G₂) (D₁ ++ D₂) (S₁ ++ S₂)
+                ⟨store, bufs, .par P Q⟩
+                ⟨store, bufs, .par P Q'⟩
+                (G₁ ++ G₂') (D₁ ++ D₂') (S₁ ++ S₂')
+
+  | par_skip_left {G D S store bufs Q} :
+      -- Skip elimination from parallel
+      TypedStep G D S
+                ⟨store, bufs, .par .skip Q⟩
+                ⟨store, bufs, Q⟩
+                G D S
+
+  | par_skip_right {G D S store bufs P} :
+      -- Skip elimination from parallel
+      TypedStep G D S
+                ⟨store, bufs, .par P .skip⟩
+                ⟨store, bufs, P⟩
+                G D S
+
 end

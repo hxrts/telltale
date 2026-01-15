@@ -105,18 +105,57 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
   unfold BufferTyped
   by_cases ha : a = e
   · -- a = e: the edge we're enqueuing on
+    -- Get the original typing before substituting
+    have hOrig := hBT e
+    unfold BufferTyped at hOrig
+    obtain ⟨hLen, hTyping⟩ := hOrig
     subst ha
-    -- The proof requires showing that appending v to buffer and T to trace
-    -- preserves the element-wise typing relationship
-    -- Using sorry for now - this requires List.get lemmas for append
-    sorry
+    -- The buffer becomes: lookupBuf bufs a ++ [v]
+    -- The trace becomes: lookupD D a ++ [T]
+    simp only [enqueueBuf, lookupBuf_update_eq, lookupD_update_eq]
+    -- New lengths are equal
+    have hNewLen : (lookupBuf bufs a ++ [v]).length = (lookupD D a ++ [T]).length := by
+      simp only [List.length_append, List.length_singleton]
+      omega
+    refine ⟨hNewLen, ?_⟩
+    intro i hi
+    -- Case split: is i < original length or i = original length?
+    by_cases hOld : i < (lookupBuf bufs a).length
+    · -- i < old length: use original typing
+      have hTrace : i < (lookupD D a).length := hLen ▸ hOld
+      have hBufGet : (lookupBuf bufs a ++ [v])[i] = (lookupBuf bufs a)[i] := by
+        simp only [List.getElem_append hOld]
+      have hTraceGet : (lookupD D a ++ [T])[i] = (lookupD D a)[i] := by
+        simp only [List.getElem_append hTrace]
+      simp only [hBufGet, hTraceGet]
+      convert hTyping i hOld using 2
+      · simp only [List.get_eq_getElem]
+      · simp only [List.get_eq_getElem]
+    · -- i >= old length: must be the newly added element
+      have hEq : i = (lookupBuf bufs a).length := by omega
+      have hTraceEq : i = (lookupD D a).length := hLen ▸ hEq
+      have hBufGet : (lookupBuf bufs a ++ [v])[i] = v := by
+        rw [hEq]
+        simp only [List.getElem_append_right (by omega), List.length_singleton,
+                   Nat.add_sub_cancel, List.getElem_singleton]
+      have hTraceGet : (lookupD D a ++ [T])[i] = T := by
+        rw [hTraceEq]
+        simp only [List.getElem_append_right (by omega), List.length_singleton,
+                   Nat.add_sub_cancel, List.getElem_singleton]
+      simp only [List.get_eq_getElem]
+      rw [hBufGet, hTraceGet]
+      exact hv
   · -- a ≠ e: unaffected edge
-    -- The buffers and trace at edge a are unchanged.
-    -- Proof requires dependent type rewriting which is complex in Lean 4.
-    -- Key facts:
-    --   lookupBuf (enqueueBuf bufs e v) a = lookupBuf bufs a  (by lookupBuf_update_neq)
-    --   lookupD (updateD D e _) a = lookupD D a  (by lookupD_update_neq)
-    sorry
+    have hOrig := hBT a
+    unfold BufferTyped at hOrig
+    obtain ⟨hLen, hTyping⟩ := hOrig
+    simp only [enqueueBuf]
+    have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
+    have hTraceEq : lookupD (updateD D e (lookupD D e ++ [T])) a = lookupD D a := by
+      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
+    simp only [hBufEq, hTraceEq]
+    exact ⟨hLen, hTyping⟩
 
 /-! ## Preservation for Individual Steps -/
 

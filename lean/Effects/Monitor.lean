@@ -468,11 +468,23 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       sorry  -- Coherent_send_preserved with receiver readiness from EdgeCoherent
     · -- HeadCoherent: send preserves head coherence
       -- The receiver's expected type doesn't change (only sender advances)
-      sorry  -- HeadCoherent_send_preserved
+      -- Need hRecvReady: receiver can accept T after consuming current buffer
+      have hRecvReady : ∀ Lrecv, lookupG ms.G { sid := e.sid, role := target } = some Lrecv →
+          ∃ L', Consume e.role Lrecv (lookupD ms.D { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
+                (Consume e.role L' [T]).isSome := by
+        -- This follows from protocol well-formedness + EdgeCoherent
+        sorry  -- TODO: derive from protocol duality or add as WTMon invariant
+      have h := HeadCoherent_send_preserved ms.G ms.D e target T L hWT.headCoherent hWT.coherent hG hRecvReady
+      simp only [MonitorState.sendEdge]
+      exact h
     · -- ValidLabels: send preserves valid labels (no label changes)
-      sorry  -- ValidLabels_send_preserved
+      have h := ValidLabels_send_preserved ms.G ms.D ms.bufs e target T L v hWT.validLabels hG
+      simp only [MonitorState.sendEdge, enqueueBuf]
+      exact h
     · -- BuffersTyped: enqueue preserves buffer typing
-      sorry  -- Buffer v : T appended, trace T appended
+      have h := BuffersTyped_send_preserved ms.G ms.D ms.bufs e target T L v hWT.buffers_typed hv hG
+      simp only [MonitorState.sendEdge, enqueueBuf]
+      exact h
     · -- lin_valid: produced token matches updated G
       intro e' S' hMem
       simp only [LinCtx.produceToken, List.mem_cons] at hMem
@@ -512,13 +524,35 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
     rename_i e source T L vs lin'
     constructor
     · -- Coherent: use Coherent_recv_preserved
-      sorry  -- Need trace head = T from buffer typing
+      have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
+      have hTrace := trace_head_from_buffer hBuf hv hTyped
+      have h := Coherent_recv_preserved ms.G ms.D e source T L hWT.coherent hG hTrace
+      simp only [MonitorState.recvEdge] at h ⊢
+      exact h
     · -- HeadCoherent: recv advances receiver, preserves head coherence
-      sorry  -- HeadCoherent_recv_preserved
+      -- Derive hTrace from BufferTyped using trace_head_from_buffer
+      have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
+      have hTrace := trace_head_from_buffer hBuf hv hTyped
+      have h := HeadCoherent_recv_preserved ms.G ms.D e source T L hWT.headCoherent hWT.coherent hG hTrace
+      simp only [MonitorState.recvEdge]
+      exact h
     · -- ValidLabels: recv dequeues from buffer, preserves valid labels
-      sorry  -- ValidLabels_recv_preserved
+      -- Derive hTrace from BufferTyped using trace_head_from_buffer
+      have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
+      have hTrace := trace_head_from_buffer hBuf hv hTyped
+      have h := ValidLabels_recv_preserved ms.G ms.D ms.bufs e source T L hWT.validLabels hG hTrace
+      -- h: ValidLabels G' D' (updateBuf bufs e (lookupBuf bufs e).tail)
+      -- Goal: ValidLabels G' D' (updateBuf bufs e vs)
+      -- From hBuf: lookupBuf bufs e = v :: vs, so (lookupBuf bufs e).tail = vs
+      simp only [MonitorState.recvEdge] at h hBuf ⊢
+      have hTail : (lookupBuf ms.bufs { sid := e.sid, sender := source, receiver := e.role }).tail = vs := by
+        rw [hBuf]; rfl
+      rw [hTail] at h
+      exact h
     · -- BuffersTyped: dequeue preserves buffer typing
-      sorry  -- Head removed from buffer and trace
+      have h := BuffersTyped_recv_preserved ms.G ms.D ms.bufs e source T L v vs hWT.buffers_typed hBuf hv hG
+      simp only [MonitorState.recvEdge]
+      exact h
     · -- lin_valid
       intro e' S' hMem
       simp only [LinCtx.produceToken, List.mem_cons] at hMem
@@ -554,10 +588,24 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
     -- Select case: like send but with label
     rename_i e target bs ℓ L lin'
     constructor
-    · sorry  -- Coherent for select
-    · sorry  -- HeadCoherent for select
-    · sorry  -- ValidLabels for select
-    · sorry  -- BuffersTyped for label enqueue
+    · -- Coherent: use Coherent_select_preserved
+      sorry  -- Coherent_select_preserved with receiver readiness from EdgeCoherent
+    · -- HeadCoherent: select preserves head coherence (appends to END)
+      have hRecvReady : ∀ Lrecv, lookupG ms.G { sid := e.sid, role := target } = some Lrecv →
+          ∃ L', Consume e.role Lrecv (lookupD ms.D { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
+                (Consume e.role L' [.string]).isSome := by
+        sorry  -- TODO: derive from protocol duality or add as WTMon invariant
+      have h := HeadCoherent_select_preserved ms.G ms.D e target bs ℓ L hWT.headCoherent hWT.coherent hG hFind hRecvReady
+      simp only [MonitorState.sendEdge]
+      exact h
+    · -- ValidLabels: select preserves valid labels (enqueues label at END)
+      have h := ValidLabels_select_preserved ms.G ms.D ms.bufs e target bs ℓ L hWT.validLabels hG hFind
+      simp only [MonitorState.sendEdge, enqueueBuf]
+      exact h
+    · -- BuffersTyped: select enqueues label, preserves buffer typing
+      have h := BuffersTyped_select_preserved ms.G ms.D ms.bufs e target bs ℓ L hWT.buffers_typed hG hFind
+      simp only [MonitorState.sendEdge, enqueueBuf]
+      exact h
     · -- lin_valid
       intro e' S' hMem
       simp only [LinCtx.produceToken, List.mem_cons] at hMem
@@ -593,10 +641,29 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
     -- Branch case: like recv but with label selection
     rename_i e source bs ℓ L vs lin'
     constructor
-    · sorry  -- Coherent for branch
-    · sorry  -- HeadCoherent for branch
-    · sorry  -- ValidLabels for branch
-    · sorry  -- BuffersTyped for label dequeue
+    · -- Coherent: use Coherent_branch_preserved
+      have hv : HasTypeVal ms.G (.string ℓ) .string := HasTypeVal.string ℓ
+      have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
+      have hTrace := trace_head_from_buffer hBuf hv hTyped
+      have h := Coherent_branch_preserved ms.G ms.D e source bs ℓ L hWT.coherent hG hFind hTrace
+      simp only [MonitorState.recvEdge] at h ⊢
+      exact h
+    · -- HeadCoherent: branch dequeues label, preserves head coherence
+      -- Derive hTrace from BufferTyped using trace_head_from_buffer
+      have hv : HasTypeVal ms.G (.string ℓ) .string := HasTypeVal.string ℓ
+      have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
+      have hTrace := trace_head_from_buffer hBuf hv hTyped
+      have h := HeadCoherent_branch_preserved ms.G ms.D e source bs ℓ L hWT.headCoherent hWT.coherent hG hFind hTrace
+      simp only [MonitorState.recvEdge]
+      exact h
+    · -- ValidLabels: branch dequeues label from buffer, preserves valid labels
+      have h := ValidLabels_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs hWT.validLabels hG hFind hBuf
+      simp only [MonitorState.recvEdge] at h ⊢
+      exact h
+    · -- BuffersTyped: branch dequeues label, preserves buffer typing
+      have h := BuffersTyped_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs hWT.buffers_typed hBuf hG hFind
+      simp only [MonitorState.recvEdge]
+      exact h
     · -- lin_valid
       intro e' S' hMem
       simp only [LinCtx.produceToken, List.mem_cons] at hMem
