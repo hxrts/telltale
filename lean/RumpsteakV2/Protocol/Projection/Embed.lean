@@ -187,7 +187,14 @@ theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType
         | mu t' gbody =>
             simp [CEmbedF] at hF
             rcases hF with ⟨ht, hcontr, hbody⟩
-            exact ⟨ht.symm, hcontr, hbody⟩
+            -- Goal: CProjectF (fun g r e => CEmbed e r g) (GlobalType.mu t' gbody) role (LocalTypeR.mu t body)
+            -- CProjectF for mu: ∃ candBody, R gbody role candBody ∧ ((candBody.isGuarded t' = true ∧ cand = .mu t' candBody) ∨ ...)
+            use body
+            constructor
+            · exact hbody
+            · left
+              subst ht
+              exact ⟨hcontr, rfl⟩
         | comm _ _ _ =>
             simp [CEmbedF] at hF
     | send receiver lbs =>
