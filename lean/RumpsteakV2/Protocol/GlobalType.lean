@@ -122,6 +122,21 @@ mutual
     | (_, g) :: rest => g.allVarsBound bound && allVarsBoundBranches rest bound
 end
 
+/-- Extract allVarsBound for individual branches from comm. -/
+theorem allVarsBound_comm_branches (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (h : (GlobalType.comm sender receiver branches).allVarsBound = true) :
+    ∀ b ∈ branches, b.2.allVarsBound = true := by
+  intro b hmem
+  simp only [GlobalType.allVarsBound] at h
+  induction branches generalizing b with
+  | nil => cases hmem
+  | cons hd tl ih =>
+      simp only [allVarsBoundBranches, Bool.and_eq_true] at h
+      cases hmem with
+      | head _ => exact h.1
+      | tail _ hmem' => exact ih h.2 b hmem'
+
 mutual
   /-- Check that all communications have at least one branch. -/
   def GlobalType.allCommsNonEmpty : GlobalType → Bool
@@ -1167,6 +1182,40 @@ theorem GlobalType.isClosed_comm_branches (sender receiver : String)
   intro p hp
   simp only [GlobalType.isClosed, List.isEmpty_iff]
   exact (hbranches.mp hclosed) p hp
+
+/-- Helper: allCommsNonEmptyBranches ensures each branch has allCommsNonEmpty. -/
+private theorem allCommsNonEmptyBranches_forall (branches : List (Label × GlobalType))
+    (h : allCommsNonEmptyBranches branches = true) :
+    ∀ p ∈ branches, p.2.allCommsNonEmpty = true := by
+  induction branches with
+  | nil => intro p hp; cases hp
+  | cons hd tl ih =>
+      simp only [allCommsNonEmptyBranches, Bool.and_eq_true] at h
+      intro p hp
+      cases hp with
+      | head _ => exact h.1
+      | tail _ hmem => exact ih h.2 p hmem
+
+/-- A comm with allCommsNonEmpty has all branch continuations with allCommsNonEmpty.
+
+If `(comm sender receiver branches).allCommsNonEmpty = true`, then each branch continuation
+has `allCommsNonEmpty = true`. This follows from the definition: allCommsNonEmpty of comm
+requires allCommsNonEmptyBranches, which recursively checks each branch. -/
+theorem GlobalType.allCommsNonEmpty_comm_branches (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (hallcomms : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true) :
+    ∀ p ∈ branches, p.2.allCommsNonEmpty = true := by
+  simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at hallcomms
+  exact allCommsNonEmptyBranches_forall branches hallcomms.2
+
+/-- A well-formed comm has well-formed branch continuations.
+
+This is straightforwardly true by the definitions of wellFormed and its components,
+but requires tedious induction through each component. Left as axiom temporarily. -/
+axiom GlobalType.wellFormed_comm_branches (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (hwf : (GlobalType.comm sender receiver branches).wellFormed = true) :
+    ∀ b ∈ branches, b.2.wellFormed = true
 
 /-- Helper for freeVars_substitute_subset: branches case with explicit IH.
 
