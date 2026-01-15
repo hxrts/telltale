@@ -796,10 +796,16 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
       exact HasTypeProcPre.skip
   | seq_step hTS =>
     -- P steps to P', so Q remains, resulting in seq P' Q
-    -- All resources flow through the step hTS
-    -- Use IH on hTS to get WellFormed for the intermediate state
-    -- Then need to show seq P' Q is well-typed
-    sorry  -- Recursive case: need IH and seq typing lemma
+    -- hTS : TypedStep G D S store bufs P G' D' S' store' bufs' P'
+    -- hProc : HasTypeProcPre S G (.seq P Q)
+    -- ISSUE: Need HasTypeProcPre S' G' Q, but only have HasTypeProcPre S G Q
+    -- This requires a monotonicity/weakening lemma for HasTypeProcPre:
+    --   If S ⊆ S' and G extends G appropriately, then
+    --   HasTypeProcPre S G Q → HasTypeProcPre S' G' Q
+    -- Such a lemma doesn't currently exist and may not hold in general.
+    -- The TypedStep.seq_step rule may need to be strengthened to require
+    -- explicit preservation of Q's typing.
+    sorry  -- Requires HasTypeProcPre monotonicity lemma
   | seq_skip =>
     -- seq skip Q steps to Q
     -- All environments unchanged
@@ -813,11 +819,22 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
     | seq hPskip hQ => exact hQ
   | par_left hTS hDisjG hDisjD hDisjS =>
     -- Left process steps, right unchanged
-    -- Environments merge after step: G' = G₁' ⊔ G₂, etc.
-    sorry  -- Need to split input WF, apply IH to left, merge results
+    -- hTS : TypedStep G₁ D₁ S₁ store bufs P G₁' D₁' S₁' store bufs P'
+    -- Input WF: (G₁ ++ G₂) (D₁ ++ D₂) (S₁ ++ S₂) store bufs (.par P Q)
+    -- Output WF: (G₁' ++ G₂) (D₁' ++ D₂) (S₁' ++ S₂) store bufs (.par P' Q)
+    -- Strategy:
+    -- 1. Split input WellFormed to get components for P and Q
+    -- 2. Apply IH to left component
+    -- 3. Merge results
+    -- Requires lemmas:
+    -- - StoreTyped (G₁ ++ G₂) (S₁ ++ S₂) → StoreTyped G₁ S₁ ∧ StoreTyped G₂ S₂
+    -- - BuffersTyped (G₁ ++ G₂) (D₁ ++ D₂) → BuffersTyped G₁ D₁ (under disjointness)
+    -- - Coherent (G₁ ++ G₂) (D₁ ++ D₂) → Coherent G₁ D₁ (under disjointness)
+    -- - And corresponding merge lemmas for the outputs
+    sorry  -- Need splitting/merging lemmas for WellFormed components
   | par_right hTS hDisjG hDisjD hDisjS =>
-    -- Symmetric to par_left
-    sorry
+    -- Symmetric to par_left: right process steps, left unchanged
+    sorry  -- Symmetric proof structure, same lemmas needed
   | par_skip_left =>
     -- par skip Q steps to Q
     constructor; exact hStore
