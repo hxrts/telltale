@@ -396,13 +396,13 @@ lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Lab
 /-- Key lemma: if obsMatch succeeds with send and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
 lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
-    {fuel : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
+    {fuel : Nat} {visited_any : Finset (LocalTypeC × LocalTypeC)}
     {p : String} {labels : List Label}
-    (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
+    (hvisited : ∀ q ∈ visited_any, EQ2C q.1 q.2)
     (hobs : obsMatch n a b = true)
     (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_send p labels))
     (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_send p labels))
-    (hchildren : bisimAll (bisimAux fuel n visited) (nextPairs n (a, b)) = true) :
+    (hchildren : bisimAll (bisimAux fuel n visited_any) (nextPairs n (a, b)) = true) :
     BranchesRelC (BisimRel n)
       (branchesOf (fullUnfoldN n a))
       (branchesOf (fullUnfoldN n b)) := by
@@ -413,27 +413,38 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   have hlabels_a := branchesOf_labels_eq hhead_a
   have hlabels_b := branchesOf_labels_eq hhead_b
   have hlen : bs.length = cs.length := by
-    simp only [labelsOfBranches, List.length_map] at hlabels_a hlabels_b
-    simp [hlabels_a, hlabels_b]
+    simp only [labelsOfBranches] at hlabels_a hlabels_b
+    have ha : bs.length = labels.length := by
+      have := congrArg List.length hlabels_a
+      simp only [List.length_map] at this
+      exact this
+    have hb : cs.length = labels.length := by
+      have := congrArg List.length hlabels_b
+      simp only [List.length_map] at this
+      exact this
+    omega
   apply bisimAll_to_BranchesRelC hlen
   · intro i
-    simp only [labelsOfBranches, List.map_getElem, List.get_eq_getElem] at hlabels_a hlabels_b
-    have : (bs.get i).1 = labels[i.val] := by sorry
-    have : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1 = labels[i.val] := by sorry
-    simp_all
+    -- Labels match pointwise because labelsOfBranches bs = labels = labelsOfBranches cs
+    -- This follows from hlabels_a and hlabels_b
+    sorry
   · intro i
+    -- Children are in BisimRel because bisimAll succeeds on nextPairs
+    -- nextPairs zips the children, and hchildren says bisimAux holds for all pairs in the zip
+    -- The i-th pair corresponds to ((bs.get i).2, (cs.get i).2), which must be in BisimRel
+    -- This uses BisimRelCore with fuel and visited_any
     sorry
 
 /-- Key lemma: if obsMatch succeeds with recv and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
 lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
-    {fuel : Nat} {visited : Finset (LocalTypeC × LocalTypeC)}
+    {fuel : Nat} {visited_any : Finset (LocalTypeC × LocalTypeC)}
     {p : String} {labels : List Label}
-    (hvisited : ∀ q ∈ visited, EQ2C q.1 q.2)
+    (hvisited : ∀ q ∈ visited_any, EQ2C q.1 q.2)
     (hobs : obsMatch n a b = true)
     (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_recv p labels))
     (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_recv p labels))
-    (hchildren : bisimAll (bisimAux fuel n visited) (nextPairs n (a, b)) = true) :
+    (hchildren : bisimAll (bisimAux fuel n visited_any) (nextPairs n (a, b)) = true) :
     BranchesRelC (BisimRel n)
       (branchesOf (fullUnfoldN n a))
       (branchesOf (fullUnfoldN n b)) := by
@@ -444,12 +455,22 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   have hlabels_a := branchesOf_labels_eq_recv hhead_a
   have hlabels_b := branchesOf_labels_eq_recv hhead_b
   have hlen : bs.length = cs.length := by
-    simp only [labelsOfBranches, List.length_map] at hlabels_a hlabels_b
-    simp [hlabels_a, hlabels_b]
+    simp only [labelsOfBranches] at hlabels_a hlabels_b
+    have ha : bs.length = labels.length := by
+      have := congrArg List.length hlabels_a
+      simp only [List.length_map] at this
+      exact this
+    have hb : cs.length = labels.length := by
+      have := congrArg List.length hlabels_b
+      simp only [List.length_map] at this
+      exact this
+    omega
   apply bisimAll_to_BranchesRelC hlen
   · intro i
+    -- Labels match pointwise (same as send case)
     sorry
   · intro i
+    -- Children are in BisimRel (same as send case)
     sorry
 
 /-! ## Reachable Pairs -/
