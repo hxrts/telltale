@@ -183,6 +183,32 @@ theorem trans_branches_coherent_EQ2
     -- Chain: EQ2 (trans b.2 role) .end ∧ EQ2 .end (trans first.2 role)
     exact EQ2_trans hb_end (EQ2_symm hfirst_end)
 
+/-- Helper: transBranches produces branches satisfying BranchesProjRel with the witness relation. -/
+private theorem transBranches_satisfies_BranchesProjRel
+    (gbs : List (Label × GlobalType)) (role : String)
+    (hwf : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true) :
+    BranchesProjRel (fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
+      gbs role (transBranches gbs role) := by
+  induction gbs with
+  | nil =>
+      simp only [transBranches, BranchesProjRel]
+      exact List.Forall₂.nil
+  | cons hd tl ih =>
+      -- BranchesProjRel (hd :: tl) role (transBranches (hd :: tl) role)
+      unfold transBranches BranchesProjRel
+      -- Goal: List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ R gb.2 role lb.2) (hd :: tl) ((hd.1, trans hd.2 role) :: transBranches tl role)
+      refine List.Forall₂.cons ?head ?tail
+      case head =>
+        -- Show: hd.1 = hd.1 ∧ R hd.2 role (trans hd.2 role)
+        constructor
+        · rfl
+        · constructor
+          · rfl
+          · exact hwf hd (List.Mem.head tl)
+      case tail =>
+        -- Show: BranchesProjRel for tl
+        exact ih (fun gb hmem => hwf gb (List.Mem.tail hd hmem))
+
 /-- trans produces a valid projection that satisfies CProject.
 
 This theorem establishes that for well-formed global types, the computational trans function
@@ -200,16 +226,16 @@ theorem trans_produces_CProject (g : GlobalType) (role : String)
   apply CProject_coind (R := fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
   · intro g' role' cand hrel
     have ⟨hcand, hwf'⟩ := hrel
-    -- Rewrite cand using hcand, then case on g'
-    rw [hcand]
-    -- Show: CProjectF R g' role' (projTrans g' role')
+    -- Case on g' to get structural information, then show CProjectF holds
     cases g' with
     | «end» =>
-        -- projTrans .end _ reduces to .end, so CProjectF reduces to True
-        sorry  -- TODO: need exact tactic sequence to reduce projTrans + CProjectF match
+        -- cand = trans .end role' = .end, so goal is CProjectF R .end role' .end
+        rw [hcand]
+        simp only [projTrans, Trans.trans, CProjectF]
     | var t =>
-        -- projTrans (.var t) _ reduces to .var t, so CProjectF reduces to t = t
-        sorry  -- TODO: need exact tactic sequence to reduce projTrans + CProjectF match
+        -- cand = trans (.var t) role' = .var t, so goal is CProjectF R (.var t) role' (.var t)
+        rw [hcand]
+        simp only [projTrans, Trans.trans, CProjectF]
     | mu t body =>
         -- trans (.mu t body) role = if (trans body role).isGuarded t then .mu t (trans body role) else .end
         sorry  -- TODO: prove mu case (guardedness + recursive relation)

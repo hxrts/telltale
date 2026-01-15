@@ -458,9 +458,11 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   · intro i
     -- Labels match pointwise: bs.map (·.1) = labels and cs.map (·.1) = labels
     simp only [labelsOfBranches] at hlabels_a hlabels_b
-    have ha := congrFun (congrArg List.get hlabels_a) ⟨i.val, by simp [i.isLt]⟩
-    have hb := congrFun (congrArg List.get hlabels_b) ⟨i.val, by simp [hlen, i.isLt]⟩
-    rw [← List.get_map' (·.1) bs i, ← List.get_map' (·.1) cs ⟨i.val, hlen ▸ i.isLt⟩, ha, hb]
+    simp only [List.get_map', hlabels_a, hlabels_b]
+    -- Indices match because hlen : bs.length = cs.length
+    congr 1
+    ext
+    exact hlen ▸ rfl
   · intro i
     -- Children are in BisimRel: extract from bisimAll on nextPairs
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
@@ -477,7 +479,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
                  (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩) ∈
                 List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
-      simp [hlen]
+      rw [List.length_map, List.length_map, hlen]
     rw [hchildren_eq_a, hchildren_eq_b] at hmem
     -- bisimAll says this pair satisfies bisimAux
     have hpair := hchildren _ hmem
@@ -519,9 +521,11 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   · intro i
     -- Labels match pointwise (same proof as send case)
     simp only [labelsOfBranches] at hlabels_a hlabels_b
-    have ha := congrFun (congrArg List.get hlabels_a) ⟨i.val, by simp [i.isLt]⟩
-    have hb := congrFun (congrArg List.get hlabels_b) ⟨i.val, by simp [hlen, i.isLt]⟩
-    rw [← List.get_map' (·.1) bs i, ← List.get_map' (·.1) cs ⟨i.val, hlen ▸ i.isLt⟩, ha, hb]
+    simp only [List.get_map', hlabels_a, hlabels_b]
+    -- Indices match because hlen : bs.length = cs.length
+    congr 1
+    ext
+    exact hlen ▸ rfl
   · intro i
     -- Children are in BisimRel (same proof as send case)
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
@@ -535,7 +539,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
                  (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩) ∈
                 List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
-      simp [hlen]
+      rw [List.length_map, List.length_map, hlen]
     rw [hchildren_eq_a, hchildren_eq_b] at hmem
     have hpair := hchildren _ hmem
     rw [ha_child, hb_child, hchildren_eq_a, hchildren_eq_b]

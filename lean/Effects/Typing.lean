@@ -592,6 +592,193 @@ theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : Store} {x : V
     rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
     exact hST y w T' hStoreY hSY
 
+/-- BuffersTyped is preserved when updating G: all values in buffers remain well-typed
+    because HasTypeVal_updateG_weaken preserves typing for all values. -/
+theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Endpoint} {L : LocalType} :
+    BuffersTyped G D bufs →
+    BuffersTyped (updateG G e L) D bufs := by
+  intro hBT edge
+  have hOrig := hBT edge
+  unfold BufferTyped at hOrig ⊢
+  obtain ⟨hLen, hTyping⟩ := hOrig
+  refine ⟨hLen, ?_⟩
+  intro i hi
+  have hVal := hTyping i hi
+  exact HasTypeVal_updateG_weaken hVal
+
+/-- For the recv case: StoreTyped is preserved when receiving a value into the store.
+    The received value has type T in G, so it has type T in (updateG G e L) by weakening. -/
+theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : Store} {e : Endpoint} {L : LocalType}
+    {x : Var} {v : Value} {T : ValType} :
+    StoreTyped G S store →
+    HasTypeVal G v T →
+    StoreTyped (updateG G e L) (updateSEnv S x T) (updateStr store x v) := by
+  intro hST hv
+  unfold StoreTyped at hST ⊢
+  intro y w T' hStoreY hSY
+  by_cases heq : y = x
+  · -- y = x case: use the received value's typing
+    subst heq
+    rw [lookupSEnv_update_eq] at hSY
+    simp at hSY
+    cases hSY
+    rw [lookupStr_update_eq] at hStoreY
+    simp at hStoreY
+    cases hStoreY
+    exact HasTypeVal_updateG_weaken hv
+  · -- y ≠ x case: use original typing with G weakening
+    rw [lookupSEnv_update_neq S x y T (Ne.symm heq)] at hSY
+    rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
+    have hValOrig := hST y w T' hStoreY hSY
+    exact HasTypeVal_updateG_weaken hValOrig
+
+/-- BuffersTyped is preserved when enqueuing a well-typed value. -/
+theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
+    {e : Edge} {v : Value} {T : ValType}
+    (hBT : BuffersTyped G D bufs)
+    (hv : HasTypeVal G v T) :
+    BuffersTyped G (updateD D e (lookupD D e ++ [T])) (enqueueBuf bufs e v) := by
+  intro a
+  unfold BufferTyped
+  by_cases ha : a = e
+  · -- a = e: the edge we're enqueuing on
+    -- Get the original typing before substituting
+    have hOrig := hBT e
+    unfold BufferTyped at hOrig
+    obtain ⟨hLen, hTyping⟩ := hOrig
+    subst ha
+    -- The buffer becomes: lookupBuf bufs a ++ [v]
+    -- The trace becomes: lookupD D a ++ [T]
+    simp only [enqueueBuf, lookupBuf_update_eq, lookupD_update_eq]
+    -- New lengths are equal
+    have hNewLen : (lookupBuf bufs a ++ [v]).length = (lookupD D a ++ [T]).length := by
+      simp only [List.length_append, List.length_singleton]
+      omega
+    refine ⟨hNewLen, ?_⟩
+    intro i hi
+    -- Case split: is i < original length or i = original length?
+    by_cases hOld : i < (lookupBuf bufs a).length
+    · -- i < old length: use original typing
+      have hTrace : i < (lookupD D a).length := hLen ▸ hOld
+      have hBufGet : (lookupBuf bufs a ++ [v])[i] = (lookupBuf bufs a)[i] := by
+        simp only [List.getElem_append hOld]
+      have hTraceGet : (lookupD D a ++ [T])[i] = (lookupD D a)[i] := by
+        simp only [List.getElem_append hTrace]
+      simp only [hBufGet, hTraceGet]
+      convert hTyping i hOld using 2
+      · simp only [List.get_eq_getElem]
+      · simp only [List.get_eq_getElem]
+    · -- i >= old length: must be the newly added element
+      have hEq : i = (lookupBuf bufs a).length := by omega
+      have hTraceEq : i = (lookupD D a).length := hLen ▸ hEq
+      have hBufGet : (lookupBuf bufs a ++ [v])[i] = v := by
+        rw [hEq]
+        simp only [List.getElem_append_right (by omega), List.length_singleton,
+                   Nat.add_sub_cancel, List.getElem_singleton]
+      have hTraceGet : (lookupD D a ++ [T])[i] = T := by
+        rw [hTraceEq]
+        simp only [List.getElem_append_right (by omega), List.length_singleton,
+                   Nat.add_sub_cancel, List.getElem_singleton]
+      simp only [List.get_eq_getElem]
+      rw [hBufGet, hTraceGet]
+      exact hv
+  · -- a ≠ e: unaffected edge
+    have hOrig := hBT a
+    unfold BufferTyped at hOrig
+    obtain ⟨hLen, hTyping⟩ := hOrig
+    simp only [enqueueBuf]
+    have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
+    have hTraceEq : lookupD (updateD D e (lookupD D e ++ [T])) a = lookupD D a := by
+      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
+    simp only [hBufEq, hTraceEq]
+    exact ⟨hLen, hTyping⟩
+
+/-- BuffersTyped is preserved when dequeuing a buffer: removing the head preserves typing
+    for the remaining elements (which shift down by one index). -/
+theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
+    {recvEdge : Edge} {v : Value} {vs : List Value} {T : ValType} :
+    BuffersTyped G D bufs →
+    lookupBuf bufs recvEdge = v :: vs →
+    (lookupD D recvEdge).head? = some T →
+    BuffersTyped G (updateD D recvEdge (lookupD D recvEdge).tail) (updateBuf bufs recvEdge vs) := by
+  intro hBT hBuf hTrace
+  intro e
+  unfold BufferTyped
+  by_cases he : e = recvEdge
+  · -- e = recvEdge: the edge being dequeued
+    subst he
+    have hOrig := hBT e
+    unfold BufferTyped at hOrig
+    obtain ⟨hLen, hTyping⟩ := hOrig
+    -- Buffer becomes vs, trace becomes tail
+    simp only [lookupBuf_update_eq, lookupD_update_eq]
+    -- The buffer was v :: vs, so had length (lookupD D e).length
+    have hBufEq : lookupBuf bufs e = v :: vs := hBuf
+    rw [hBufEq] at hLen
+    simp only [List.length_cons] at hLen
+    -- The trace must have been T :: tail
+    have hTraceNonEmpty : (lookupD D e).length > 0 := by
+      cases hd : lookupD D e with
+      | nil => simp [List.head?] at hTrace
+      | cons hd tl => omega
+    have hTraceCons : ∃ tl, lookupD D e = T :: tl := by
+      cases hd : lookupD D e with
+      | nil => simp [List.head?] at hTrace
+      | cons hd' tl =>
+        simp [List.head?] at hTrace
+        cases hTrace
+        exact ⟨tl, rfl⟩
+    obtain ⟨traceTail, hTraceTail⟩ := hTraceCons
+    -- Now vs.length = traceTail.length
+    have hNewLen : vs.length = traceTail.length := by
+      rw [hTraceTail] at hLen
+      simp [List.length_cons] at hLen
+      omega
+    refine ⟨?_, ?_⟩
+    · -- Length equality
+      rw [hTraceTail]
+      simp [List.tail_cons]
+      exact hNewLen
+    · -- Typing preservation: vs[i] was originally (v::vs)[i+1], typed by trace[i+1]
+      intro i hi
+      -- Get the original typing for index i+1
+      -- Need: i + 1 < List.length (lookupBuf bufs e)
+      -- Have: hBufEq : lookupBuf bufs e = v :: vs, so List.length (lookupBuf bufs e) = (v :: vs).length
+      have hOldIdx : i + 1 < (v :: vs).length := by omega
+      have hOldIdx' : i + 1 < List.length (lookupBuf bufs e) := by
+        rw [hBufEq]
+        exact hOldIdx
+      have hValTyping := hTyping (i + 1) hOldIdx'
+      -- (v :: vs)[i + 1] = vs[i]
+      have hGetEq : (v :: vs)[i + 1] = vs[i] := by
+        simp [List.getElem_cons_succ]
+      -- trace[i + 1] where trace = T :: traceTail
+      rw [hTraceTail] at hValTyping
+      have hTraceGetEq : (T :: traceTail)[i + 1] = traceTail[i] := by
+        simp [List.getElem_cons_succ]
+      simp only [List.get_eq_getElem, hGetEq, hTraceGetEq] at hValTyping
+      rw [hBufEq] at hValTyping
+      rw [hTraceTail]
+      simp [List.tail_cons, List.get_eq_getElem]
+      exact hValTyping
+  · -- e ≠ recvEdge: unchanged edge
+    have hOrig := hBT e
+    unfold BufferTyped at hOrig
+    obtain ⟨hLen, hTyping⟩ := hOrig
+    have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) e = lookupBuf bufs e := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm he)
+    have hTraceEq : lookupD (updateD D recvEdge (lookupD D recvEdge).tail) e = lookupD D e := by
+      exact lookupD_update_neq _ _ _ _ (Ne.symm he)
+    -- Use equalities to show the updated buffer/trace match the original
+    refine ⟨?_, ?_⟩
+    · rw [hBufEq, hTraceEq]; exact hLen
+    · intro i hi
+      rw [hBufEq, hTraceEq] at hi
+      have hVal := hTyping i hi
+      simp only [hBufEq, hTraceEq, List.get_eq_getElem]
+      exact hVal
+
 /-! ## Preservation Theorems -/
 
 /-- TypedStep preserves coherence.
@@ -669,8 +856,13 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
       rw [hG']
       exact StoreTyped_send_preserved hStore
     constructor
-    · -- BuffersTyped: buffer enqueued with well-typed value
-      sorry  -- Use BuffersTyped_enqueue
+    · -- BuffersTyped: buffer enqueued with well-typed value, then G updated
+      -- From TypedStep.send: D' = appendD D sendEdge T, bufs' = enqueueBuf bufs sendEdge v
+      -- Step 1: Rewrite goal using the equalities
+      rw [hBufs', hD', hG']
+      unfold appendD
+      -- Step 2: Apply BuffersTyped_updateG_weaken ∘ BuffersTyped_enqueue
+      exact BuffersTyped_updateG_weaken (BuffersTyped_enqueue hBufs hv)
     constructor
     · -- Coherent: proven by typed_step_preserves_coherence
       exact typed_step_preserves_coherence (.send hk hx hG hS hv hRecvReady hEdge hG' hD' hBufs') hCoh
@@ -682,11 +874,18 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
     -- Coherent preserved by typed_step_preserves_coherence
     -- Process becomes skip
     constructor
-    · -- StoreTyped: store' = updateStr store x v, S' = updateSEnv S x T
-      sorry  -- Need StoreTyped update lemma for linear values (channels)
+    · -- StoreTyped: store' = updateStr store x v, S' = updateSEnv S x T, G' = updateG G e L
+      rw [hG', hS', hStore']
+      exact StoreTyped_recv_preserved hStore hv
     constructor
-    · -- BuffersTyped: buffer dequeued
-      sorry  -- Buffer removal preserves typing
+    · -- BuffersTyped: buffer dequeued from recvEdge, then G updated
+      -- From TypedStep.recv: D' = updateD D recvEdge (lookupD D recvEdge).tail
+      --                      bufs' = updateBuf bufs recvEdge vs
+      -- Step 1: Apply BuffersTyped_dequeue to get BuffersTyped G D' bufs'
+      have hBufsDequeued := BuffersTyped_dequeue hBufs hBuf hTrace
+      -- Step 2: Apply BuffersTyped_updateG_weaken to get BuffersTyped G' D' bufs'
+      rw [hG', hD', hBufs']
+      exact BuffersTyped_updateG_weaken hBufsDequeued
     constructor
     · -- Coherent: proven by typed_step_preserves_coherence
       exact typed_step_preserves_coherence (.recv hk hG hEdge hBuf hv hTrace hG' hD' hS' hStore' hBufs') hCoh
