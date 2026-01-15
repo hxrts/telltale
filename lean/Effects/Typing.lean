@@ -720,7 +720,10 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
     constructor; exact hBufs
     constructor; exact hCoh
     -- Q must have been well-typed from the input (seq skip Q was well-typed)
-    sorry  -- Extract Q typing from input HasTypeProcPre (seq skip Q)
+    -- hProc : HasTypeProcPre S G (.seq .skip Q)
+    -- By inversion on seq constructor, we get HasTypeProcPre S G Q
+    cases hProc with
+    | seq hPskip hQ => exact hQ
   | par_left hTS hDisjG hDisjD hDisjS =>
     -- Left process steps, right unchanged
     -- Environments merge after step: G' = G₁' ⊔ G₂, etc.
@@ -734,14 +737,20 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
     constructor; exact hBufs
     constructor; exact hCoh
     -- Q must have been well-typed from input
-    sorry  -- Extract Q typing from input HasTypeProcPre (par skip Q)
+    -- hProc : HasTypeProcPre S G (.par .skip Q)
+    -- By inversion on par constructor, we get HasTypeProcPre S G Q
+    cases hProc with
+    | par hPskip hQ => exact hQ
   | par_skip_right =>
     -- par P skip steps to P
     constructor; exact hStore
     constructor; exact hBufs
     constructor; exact hCoh
     -- P must have been well-typed from input
-    sorry  -- Extract P typing from input HasTypeProcPre (par P skip)
+    -- hProc : HasTypeProcPre S G (.par P .skip)
+    -- By inversion on par constructor, we get HasTypeProcPre S G P
+    cases hProc with
+    | par hP hQskip => exact hP
 
 /-- Progress theorem: A well-formed process can either step or is in a final/blocked state.
 
@@ -794,10 +803,23 @@ theorem progress_typed {G D S store bufs P} :
     -- Recursive calls on P and Q, use par_left/par_right/par_skip_*
     sorry
   | assign hv =>
-    -- Assign can always step (value already in store)
+    -- Assign can always step
     -- Construct TypedStep.assign
+    -- We have: HasTypeVal G v T (from hv)
+    -- Need: HasTypeVal ∅ v T (stronger condition)
+    -- This requires v to be a pure value (no channel dependencies)
     right; left
-    sorry
+    rename_i x v T
+    use G, D, (updateSEnv S x T), (updateStr store x v), bufs, .skip
+    apply TypedStep.assign
+    · -- HasTypeVal ∅ v T: this should hold for assignment values (pure values)
+      -- But hv : HasTypeVal G v T, and we need to weaken to empty environment
+      -- This is only valid for non-channel values
+      sorry -- Need: values in assign are pure (no channels)
+    · -- S' = updateSEnv S x T
+      rfl
+    · -- store' = updateStr store x v
+      rfl
 
 /-  Subject reduction (soundness) theorem moved to Effects.Preservation
     to avoid circular dependency (Step is defined in Semantics which imports Typing).
