@@ -231,11 +231,21 @@ theorem trans_produces_CProject (g : GlobalType) (role : String)
     | «end» =>
         -- cand = trans .end role' = .end, so goal is CProjectF R .end role' .end
         rw [hcand]
-        simp only [projTrans, Trans.trans, CProjectF]
+        show CProjectF (fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
+          GlobalType.end role' (Trans.trans GlobalType.end role')
+        -- Trans.trans GlobalType.end role' reduces to LocalTypeR.end
+        conv_rhs => unfold Trans.trans
+        -- Now CProjectF GlobalType.end role' LocalTypeR.end reduces to True
+        rfl
     | var t =>
         -- cand = trans (.var t) role' = .var t, so goal is CProjectF R (.var t) role' (.var t)
         rw [hcand]
-        simp only [projTrans, Trans.trans, CProjectF]
+        show CProjectF (fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
+          (GlobalType.var t) role' (Trans.trans (GlobalType.var t) role')
+        -- Trans.trans (.var t) role' reduces to LocalTypeR.var t
+        conv_rhs => unfold Trans.trans
+        -- Now CProjectF (.var t) role' (.var t) reduces to t = t
+        rfl
     | mu t body =>
         -- trans (.mu t body) role = if (trans body role).isGuarded t then .mu t (trans body role) else .end
         sorry  -- TODO: prove mu case (guardedness + recursive relation)

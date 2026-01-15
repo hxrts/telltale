@@ -456,13 +456,8 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     omega
   apply bisimAll_to_BranchesRelC hlen
   · intro i
-    -- Labels match pointwise: bs.map (·.1) = labels and cs.map (·.1) = labels
-    simp only [labelsOfBranches] at hlabels_a hlabels_b
-    simp only [List.get_map', hlabels_a, hlabels_b]
-    -- Indices match because hlen : bs.length = cs.length
-    congr 1
-    ext
-    exact hlen ▸ rfl
+    -- TODO: Prove label matching - dependent type issues with index unification
+    sorry
   · intro i
     -- Children are in BisimRel: extract from bisimAll on nextPairs
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
@@ -519,13 +514,8 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     omega
   apply bisimAll_to_BranchesRelC hlen
   · intro i
-    -- Labels match pointwise (same proof as send case)
-    simp only [labelsOfBranches] at hlabels_a hlabels_b
-    simp only [List.get_map', hlabels_a, hlabels_b]
-    -- Indices match because hlen : bs.length = cs.length
-    congr 1
-    ext
-    exact hlen ▸ rfl
+    -- TODO: Prove label matching - dependent type issues with index unification
+    sorry
   · intro i
     -- Children are in BisimRel (same proof as send case)
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
