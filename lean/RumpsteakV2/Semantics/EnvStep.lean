@@ -5,6 +5,23 @@ import RumpsteakV2.Protocol.Projection.Trans
 
 set_option linter.dupNamespace false
 
+/-
+The Problem. Given a global type and its stepping semantics, we need a way
+to represent the local view of each participant. The challenge is that global
+types step as a whole, but each role only sees its local session type.
+
+We must connect global steps to local environment updates in a way that:
+1. Preserves the relationship between global and local types via projection
+2. Handles the fact that role sets can shrink during execution
+3. Supports reasoning about multi-role configurations
+
+Solution Structure. We define:
+1. ProjectedEnv: maps roles to their local types (via trans projection)
+2. projEnv/projEnvOnto: construct environments from global types
+3. EnvStep/EnvStepOnto: lift global steps to environment transitions
+4. Preservation theorems showing domain consistency
+-/
+
 /-! # RumpsteakV2.Semantics.EnvStep
 
 Environment-step relation for V2.
@@ -29,6 +46,8 @@ open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.CoTypes.Quotient
 
+/-! ## Basic Definitions -/
+
 /-- Projected environment mapping roles to local types (quotiented). -/
 abbrev ProjectedEnv := List (String × QLocalTypeR)
 
@@ -50,17 +69,22 @@ def set (env : ProjectedEnv) (role : String) (lt : QLocalTypeR) : ProjectedEnv :
 
 end ProjectedEnv
 
+/-! ## Projection and Environment Steps -/
+
 /-- Project a global type into a role-indexed environment. -/
 def projEnv (g : GlobalType) : ProjectedEnv :=
   g.roles.map fun role => (role, QLocalTypeR.ofLocal (trans g role))
 
-/-- Environment step induced by a global step through projection. -/
+/-- Environment step induced by a global step through projection.
+
+This lifts global type transitions to environment-level transitions by
+projecting both the source and target global types. -/
 inductive EnvStep : ProjectedEnv → GlobalActionR → ProjectedEnv → Prop where
   | of_global (g g' : GlobalType) (act : GlobalActionR) :
       step g act g' →
       EnvStep (projEnv g) act (projEnv g')
 
-/-! ## Derived theorems -/
+/-! ## Derived Theorems -/
 
 /-- Global step implies environment step (via projection). -/
 theorem step_to_envstep (g g' : GlobalType) (act : GlobalActionR)
@@ -68,7 +92,7 @@ theorem step_to_envstep (g g' : GlobalType) (act : GlobalActionR)
     EnvStep (projEnv g) act (projEnv g') :=
   EnvStep.of_global g g' act hstep
 
-/-- Helper: projEnv produces an environment with the same domain as roles. -/
+/-- projEnv produces an environment with the same domain as g.roles. -/
 theorem projEnv_dom (g : GlobalType) :
     (projEnv g).map Prod.fst = g.roles := by
   simp only [projEnv, List.map_map, Function.comp_def, List.map_id']
@@ -123,7 +147,7 @@ theorem step_roles_subset (g g' : GlobalType) (act : GlobalActionR)
       | inr hr => right; exact ih_bstep p hr)
     (t := h)
 
-/-! ## Projection onto a fixed role set
+/-! ## Projection onto Fixed Role Set
 
 Following the Coq mechanization (ECOOP 2025), we project onto a fixed role set S
 rather than g.roles. This handles the case where roles shrink during stepping. -/
@@ -137,7 +161,10 @@ theorem projEnvOnto_dom (g : GlobalType) (S : List String) :
     (projEnvOnto g S).map Prod.fst = S := by
   simp only [projEnvOnto, List.map_map, Function.comp_def, List.map_id']
 
-/-- Environment step onto a fixed role set. -/
+/-- Environment step onto a fixed role set.
+
+This variant requires that the initial global type's roles are contained in S,
+ensuring that projection is well-defined even as roles shrink during execution. -/
 inductive EnvStepOnto (S : List String) :
     ProjectedEnv → GlobalActionR → ProjectedEnv → Prop where
   | of_global (g g' : GlobalType) (act : GlobalActionR) :
@@ -145,7 +172,10 @@ inductive EnvStepOnto (S : List String) :
       (∀ p, p ∈ g.roles → p ∈ S) →
       EnvStepOnto S (projEnvOnto g S) act (projEnvOnto g' S)
 
-/-- Environment step onto fixed role set preserves domain. -/
+/-- Environment step onto fixed role set preserves domain.
+
+The domain remains S throughout execution, even as the active roles
+in the global type may shrink. -/
 theorem envstepOnto_preserves_dom {S : List String} {env env' : ProjectedEnv}
     {act : GlobalActionR} (hstep : EnvStepOnto S env act env') :
     env.map Prod.fst = env'.map Prod.fst := by
