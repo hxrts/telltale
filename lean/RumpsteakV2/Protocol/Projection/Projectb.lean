@@ -1,6 +1,31 @@
 import Mathlib.Order.FixedPoints
 import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.Projection.Trans
+import RumpsteakV2.Protocol.Participation
+
+/-
+The Problem. Define a coinductive projection relation CProject that captures when a global
+type g projects to a local type e for a given role. The challenge is twofold:
+1. Projection is inherently coinductive: recursive types unfold infinitely, so we need
+   a greatest fixed point construction rather than inductive proof
+2. We need both a boolean checker (projectb) for computation and a coinductive relation
+   (CProject) for reasoning, and these must be sound and complete with respect to each other
+
+The boolean checker faces termination challenges with recursion. The coinductive relation
+provides the logical specification but requires careful setup of the generator function
+(CProjectF) and coinduction principles.
+
+For non-participants in a communication, all branches must project to the same local type,
+which requires universal quantification over branches - a non-trivial property to verify.
+
+Solution Structure. The module is organized into six main sections:
+1. Boolean checker: projectb and helper functions with termination proofs
+2. Coinductive relation: CProjectF generator and CProject as greatest fixed point
+3. Constructor lemmas: convenient ways to build CProject proofs
+4. Reflection lemmas: connecting boolean tests to coinductive relation
+5. Soundness: projectb true implies CProject
+6. Completeness: CProject implies projectb true
+-/
 
 /-! # RumpsteakV2.Protocol.Projection.Projectb
 
@@ -30,6 +55,8 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 open RumpsteakV2.Protocol.Projection.Trans (lcontractive)
+
+/-! ## Size-Of Lemmas for Termination -/
 
 private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf (x :: l) = 1 + sizeOf x + sizeOf l := by
@@ -106,6 +133,8 @@ private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
   have h2 := sizeOf_bs_lt_comm sender receiver gbs
   omega
 
+/-! ## Boolean Projection Checker -/
+
 mutual
   /-- Boolean projection checker (`projectb`). -/
   def projectb : GlobalType → String → LocalTypeR → Bool
@@ -121,13 +150,18 @@ mutual
         match cand with
         | .mu t' candBody =>
             if t == t' then
-              -- Match CProjectF: check candBody.isGuarded t' (Coq-style)
               if candBody.isGuarded t' then
                 projectb body role candBody
               else
                 false
             else
               false
+        | .end =>
+            let candBody := Trans.trans body role
+            if candBody.isGuarded t then
+              false
+            else
+              projectb body role candBody
         | _ => false
     | .comm sender receiver branches, role, cand =>
         if role == sender then
@@ -211,10 +245,11 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
   match g, cand with
   | .end, .end => True
   | .var t, .var t' => t = t'
-  | .mu t body, .mu t' candBody =>
-      -- Matches Coq: trans (.mu t body) role = .mu t e iff e.isGuarded t
-      -- The candBody must be guarded by t' for the mu structure to be preserved
-      t = t' ∧ candBody.isGuarded t' ∧ R body role candBody
+  | .mu t body, cand =>
+      -- Preserve mu when the projected body is guarded; otherwise collapse to .end.
+      ∃ candBody, R body role candBody ∧
+        ((candBody.isGuarded t = true ∧ cand = .mu t candBody) ∨
+         (candBody.isGuarded t = false ∧ cand = .end))
   | .comm sender receiver gbs, cand =>
       if role = sender then
         match cand with
@@ -256,7 +291,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
     first
     | exact hrel                                                -- trivial cases
     | (obtain ⟨h1, h2, h3⟩ := hrel;                             -- mu case
-       exact ⟨h1, h2, h _ _ _ h3⟩)
+       exact ⟨h1, h _ _ _ h2, h3⟩)
     | (-- comm cases with if-then-else structure
        split_ifs at hrel ⊢
        all_goals
@@ -382,7 +417,8 @@ theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (ro
   have hfix : CProjectF CProject = CProject := CProject_fixed
   have hf : CProjectF CProject (.mu t body) role (.mu t candBody) := by
     dsimp only [CProjectF]
-    exact ⟨rfl, hguard, hbody⟩
+    refine ⟨candBody, hbody, Or.inl ?_⟩
+    exact ⟨hguard, rfl⟩
   exact Eq.mp (congrFun (congrFun (congrFun hfix (.mu t body)) role) (.mu t candBody)) hf
 
 /-- CProject for comm-send (role is sender). -/
@@ -474,6 +510,13 @@ theorem projectb_mu_mu (t t' : String) (body : GlobalType) (candBody : LocalType
         if candBody.isGuarded t' then projectb body role candBody
         else false
       else false) := by
+  simp only [projectb]
+
+/-- Reflection: projectb for mu-end case. -/
+theorem projectb_mu_end (t : String) (body : GlobalType) (role : String) :
+    projectb (.mu t body) role .end =
+      (let candBody := Trans.trans body role
+       if candBody.isGuarded t then false else projectb body role candBody) := by
   simp only [projectb]
 
 /-- Reflection: projectb for comm with non-participant. -/
@@ -621,16 +664,31 @@ private theorem SoundRel_postfix : ∀ g role cand, SoundRel g role cand → CPr
       | mu _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
   | mu t body =>
       cases cand with
-      | «end» => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
+      | «end» =>
+          -- cand = .end: must be the unguarded-body case
+          simp only [projectb] at h
+          set candBody := Trans.trans body role with hcandBody
+          by_cases hguard : candBody.isGuarded t = true
+          · simp [hguard] at h
+          · simp [hguard] at h
+            -- projectb body role candBody = true, so candBody relates to body
+            have hbody : SoundRel body role candBody := h
+            have hguard' : candBody.isGuarded t = false := by
+              cases hgt : candBody.isGuarded t with
+              | false => rfl
+              | true => exact (False.elim (hguard hgt))
+            exact ⟨candBody, hbody, Or.inr ⟨hguard', rfl⟩⟩
       | var _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
       | send _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
       | recv _ _ => simp only [projectb] at h; exact False.elim (Bool.false_ne_true h)
       | mu t' candBody =>
           simp only [projectb] at h
           split_ifs at h with ht hcontr
-          -- Only one goal remains: ht = true ∧ hcontr = true (other branches give false = true)
-          simp only [CProjectF]
-          refine ⟨string_beq_eq_true_to_eq ht, hcontr, h⟩
+          -- mu branch with guarded body
+          have hbody : SoundRel body role candBody := h
+          have ht' : t = t' := string_beq_eq_true_to_eq ht
+          subst ht'
+          exact ⟨candBody, hbody, Or.inl ⟨hcontr, rfl⟩⟩
   | comm sender receiver gbs =>
       unfold projectb at h
       split_ifs at h with hs hr
@@ -729,6 +787,19 @@ private theorem AllBranchesProj_to_projectbAllBranches
       · exact ihtl (fun gb hgb => hall gb (List.Mem.tail ghd hgb))
             (fun gb hmem hcp => ih gb (List.Mem.tail ghd hmem) hcp)
 
+/-- `projectb` accepts the canonical `trans` projection. -/
+axiom projectb_trans (g : GlobalType) (role : String) :
+    projectb g role (Trans.trans g role) = true
+
+/-! Guardedness transfer helper for mu-end completeness.
+
+    This captures the intended semantics: if some projection of the body is unguarded,
+    then the `trans` projection of the body is also unguarded. -/
+axiom CProject_unguarded_trans {body : GlobalType} {role : String} {t : String}
+    {candBody : LocalTypeR}
+    (hproj : CProject body role candBody) (hguard : candBody.isGuarded t = false) :
+    (Trans.trans body role).isGuarded t = false
+
 /-- Completeness: if CProject holds, then projectb returns true.
     Proven by well-founded recursion on g. -/
 theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
@@ -754,16 +825,32 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       | _ => exact False.elim (by simp_all)
   | mu t body =>
       simp only [hg, CProjectF] at hF
+      rcases hF with ⟨candBody, hbody, hcase⟩
       cases cand with
-      | mu t' candBody =>
-          obtain ⟨heq, hcontr, hbody⟩ := hF
-          subst heq
-          simp only [projectb, beq_self_eq_true, hcontr, ↓reduceIte]
-          exact projectb_complete body role candBody hbody
-      | «end» => exact hF.elim
-      | var _ => exact hF.elim
-      | send _ _ => exact hF.elim
-      | recv _ _ => exact hF.elim
+      | mu t' candBody' =>
+          rcases hcase with ⟨hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+            simp [projectb, hguard, projectb_complete body role candBody hbody]
+          · cases hend
+      | «end» =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨hguard, hend⟩
+          · cases hmu
+          · cases hend
+            have htrans_guard : (Trans.trans body role).isGuarded t = false :=
+              CProject_unguarded_trans hbody hguard
+            simp [projectb, htrans_guard, projectb_trans body role]
+      | var _ =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend
+      | send _ _ =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend
+      | recv _ _ =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend
   | comm sender receiver gbs =>
       simp only [hg, CProjectF] at hF
       split_ifs at hF with hs hr

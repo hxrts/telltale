@@ -3,6 +3,24 @@ import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.Projection.Trans
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
+/-
+The Problem. Prove that projection commutes with substitution in global types:
+trans (g.substitute t G) role = (trans g role).substitute t (trans G role)
+
+This property is essential for eliminating mu-unfold axioms. When a recursive type μt.body
+is unfolded to body[t := μt.body], we must show that projecting the unfolded type is the
+same as unfolding the projected type. The difficulty is that the mu case requires careful
+guardedness analysis to ensure that the substitution preserves well-formedness.
+
+Solution Structure. The Coq proof (indProj.v:173) proceeds by induction on g:
+1. Base cases (.end, .var) are trivial equalities
+2. Communication case (.comm) recurses on branch continuations
+3. Mu case (.mu s body) is the complex case requiring guardedness preservation
+
+This module axiomatizes the main theorem and provides specialized corollaries for
+the mu-self substitution case needed by Harmony.lean.
+-/
+
 /-! # Projection-Substitution Commutation
 
 This module provides the projection-substitution commutation axiom, following the Coq

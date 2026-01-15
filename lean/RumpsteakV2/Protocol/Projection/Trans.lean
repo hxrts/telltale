@@ -2,6 +2,32 @@ import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.Participation
 
+/-
+The Problem. Define a candidate projection function `trans : GlobalType → String → LocalTypeR`
+that extracts a role's local view from a global choreography. The key challenge is handling
+recursive types (μt.body): we must project the body and then decide whether to keep the
+recursion or collapse it to end based on guardedness.
+
+The Coq approach checks guardedness of the PROJECTED type (trans body role), not the global
+type body. This creates a termination challenge: to check guardedness of the projection,
+we must first compute it, but computing it requires checking guardedness. The solution is
+to use Lean's well-founded recursion on the structural size of the global type, which
+ensures termination independent of guardedness checks.
+
+Additional challenges arise from branch processing in communications:
+1. Sender/receiver get explicit send/recv with projected branches
+2. Non-participants get the projection of the first branch continuation
+3. Free variables must be preserved through projection
+4. Well-formedness properties must be maintained
+
+Solution Structure. The module is organized into five main sections:
+1. Core definitions: trans, transBranches, lcontractive, and termination proofs
+2. Shape lemmas: trans_comm_sender, trans_comm_receiver, trans_comm_other
+3. Closedness preservation: trans_freeVars_subset and derived theorems
+4. Well-formedness: preservation of structure through projection
+5. Participation: relating contractiveness to participation properties
+-/
+
 /-! # RumpsteakV2.Protocol.Projection.Trans
 
 Candidate projection for V2 (Coq-style `trans`).
@@ -25,6 +51,8 @@ namespace RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 
+/-! ## Contractiveness Predicate -/
+
 /-- Check if a global type is locally contractive (guarded recursion).
     A type is contractive if:
     - `end`, `var`, and `comm` are always contractive
@@ -41,6 +69,8 @@ def lcontractive : GlobalType → Bool
       | .mu _ _ => false   -- Nested mu without guard
       | .comm _ _ _ => true
       | .end => true       -- Degenerate but contractive
+
+/-! ## Size-Of Lemmas for Termination -/
 
 private theorem sizeOf_cons {α : Type} [SizeOf α] (x : α) (l : List α) :
     sizeOf (x :: l) = 1 + sizeOf x + sizeOf l := by
@@ -104,6 +134,8 @@ private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
   simp only [sizeOf, GlobalType._sizeOf_1]
   omega
 
+/-! ## Core Projection Functions -/
+
 mutual
   /-- Coq-style candidate projection (`trans`).
       Matches Coq: `GRec g0 => let e := trans p g0 in if eguarded 0 e then ERec e else EEnd`
@@ -148,6 +180,8 @@ mutual
       | exact sizeOf_cont_lt_cons _ _ _
       | exact sizeOf_tail_lt_cons _ _
 end
+
+/-! ## Shape Lemmas for Communications -/
 
 /-- Sender shape lemma for `trans` on communications. -/
 theorem trans_comm_sender
@@ -206,6 +240,8 @@ theorem trans_comm_other
       | mk label cont =>
           rw [trans.eq_5]
           simp [hsender, hreceiver]
+
+/-! ## Free Variables Preservation -/
 
 mutual
   /-- Free variables of `trans` are contained in global free variables. -/

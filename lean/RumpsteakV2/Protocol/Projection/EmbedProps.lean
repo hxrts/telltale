@@ -2,6 +2,27 @@ import RumpsteakV2.Protocol.Projection.Embed
 import RumpsteakV2.Protocol.Projection.Projectb
 import RumpsteakV2.Protocol.Participation
 
+/-
+The Problem. Prove that embedding and projection are inverses and that embedding is
+deterministic. Given a local type e and a global type g, we want to establish:
+1. If e embeds into both g1 and g2, then g1 = g2 (determinism)
+2. If e embeds into g and g projects to e', then e = e' (roundtrip)
+3. If g projects to e and e embeds into g', then g = g' (roundtrip)
+
+The difficulty is that these operations are defined by mutual recursion with branch
+processing, requiring simultaneous induction on types and branch lists. The roundtrip
+properties require careful case analysis to show that CEmbed and CProject are structural
+inverses at each constructor level.
+
+Solution Structure. The proof is organized in three main sections:
+1. Determinism: mutual induction proves embed_deterministic and branches_embed_deterministic
+2. Roundtrip (embed → project): mutual induction proves embed_project_roundtrip
+3. Existence: localType_has_embed shows any well-formed local type can be embedded
+
+The well-formedness conditions (role ≠ partner in communications) prevent pathological
+cases where a role sends to itself, ensuring the embedding is always possible.
+-/
+
 /-! # RumpsteakV2.Protocol.Projection.EmbedProps
 
 Determinism and round-trip properties for CEmbed/CProject.
@@ -13,6 +34,10 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Projection.Projectb
 open RumpsteakV2.Protocol.Participation
+
+/-! ## Determinism
+
+Embedding is deterministic: a local type embeds into at most one global type. -/
 
 mutual
   /-- Determinism for embedding: a local type embeds into at most one global type. -/
@@ -136,6 +161,10 @@ mutual
                                     cases hcont
                                     simp [htail_eq]
 end
+
+/-! ## Roundtrip Properties
+
+Embedding and projection are inverses: embed then project yields the original local type. -/
 
 mutual
   /-- Embed then project gives back the same local type. -/
@@ -270,28 +299,19 @@ mutual
                                             simp [htail_eq]
 end
 
-/-- Project then embed gives back the same global type (fixed form). -/
+/-- Project then embed gives back the same global type (follows from determinism). -/
 theorem project_embed_roundtrip {g g' : GlobalType} {role : String} {e : LocalTypeR}
     (_hp : CProject g role e) (he : CEmbed e role g) (he' : CEmbed e role g') : g = g' :=
   embed_deterministic he he'
 
-/-! ## Participant Gating
+/-! ## Embedding Existence
 
-If a role participates in a global type, then the projection can be embedded back.
-This gates embedding existence on participation, avoiding the non-participant counterexample.
+Any well-formed local type can be embedded into some global type. -/
 
-Note: The full theorem requires a well-formedness assumption (sender ≠ receiver in comm nodes).
-We provide both the conditional version and an existential version. -/
+/-! ### Helper Lemmas -/
 
-/-- Any local type can be embedded into some global type for the role that produced it.
-    This is proven by structural recursion on the local type.
-
-    The key insight is that CEmbed's structure mirrors LocalTypeR exactly:
-    - end embeds as end
-    - var t embeds as var t
-    - mu t body embeds as mu t (embed body)
-    - send receiver lbs embeds as comm role receiver (embed lbs)
-    - recv sender lbs embeds as comm sender role (embed lbs) -/
+/-- If a local type body is contractive, then embedding preserves the contractiveness
+    property in the global type. This is used in the mu case of localType_has_embed. -/
 private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {gbody : GlobalType}
     (hcontr : LocalTypeR.lcontractive body = true) (hembed : CEmbed body role gbody) :
     RumpsteakV2.Protocol.Projection.Trans.lcontractive gbody = true := by
@@ -358,7 +378,17 @@ private axiom lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
     (hcontr : LocalTypeR.lcontractive body = true) :
     body.isGuarded t = true
 
+/-! ### Main Existence Theorems -/
+
 mutual
+  /-- Any well-formed local type can be embedded into some global type.
+
+      The well-formedness conditions ensure that:
+      - The role never sends to itself
+      - The role never receives from itself
+
+      This proof proceeds by structural recursion on the local type, with mutual
+      induction handling branch lists. -/
   theorem localType_has_embed (e : LocalTypeR) (role : String)
       (hwf : ∀ partner, e.hasSendTo partner → role ≠ partner)
       (hwf' : ∀ partner, e.hasRecvFrom partner → role ≠ partner) :
@@ -432,6 +462,7 @@ mutual
         exact ⟨hne, hembed⟩
   termination_by sizeOf e
 
+  /-- Helper theorem for embedding branch lists. -/
   theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
       (hwf : ∀ lb ∈ lbs, ∀ partner, lb.2.hasSendTo partner → role ≠ partner)
       (hwf' : ∀ lb ∈ lbs, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner) :
@@ -459,6 +490,8 @@ mutual
         exact List.Forall₂.cons ⟨rfl, hcont⟩ htl
   termination_by sizeOf lbs
 end
+
+/-! ### Participant Gating -/
 
 /-- If a role participates in a global type and we can project, some embedding exists.
     This is the existential form used for participant gating.

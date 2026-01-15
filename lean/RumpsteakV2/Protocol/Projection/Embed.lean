@@ -2,6 +2,22 @@ import Mathlib.Order.FixedPoints
 import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.Projection.Projectb
 
+/-
+The Problem. Given a local session type for a specific role, can we embed it
+back into a global type? This is the inverse of projection. The challenge is
+that embedding is partial: not all local types correspond to valid global types,
+and non-participant roles create ambiguity.
+
+We must define CEmbed such that:
+1. CEmbed e role g implies CProject g role e (embedding sound for projection)
+2. Only participant roles (sender/receiver) are embedded
+3. Avoids the known counterexample for project-then-embed on non-participants
+
+Solution Structure. Define CEmbedF as a one-step generator matching participants
+only, prove it's monotone, take the greatest fixed point, and prove embedding
+implies projection via coinduction.
+-/
+
 /-! # RumpsteakV2.Protocol.Projection.Embed
 
 Coinductive embedding relation for local-to-global types.
@@ -21,15 +37,29 @@ open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 open RumpsteakV2.Protocol.Projection.Projectb
 open RumpsteakV2.Protocol.Projection.Trans (lcontractive)
 
-/-- Ternary relation for embedding. -/
+/-! ## Embedding Relations -/
+
+/-- Ternary relation for embedding: LocalType → Role → GlobalType → Prop. -/
 abbrev EmbedRel := LocalTypeR → String → GlobalType → Prop
 
-/-- Branch-wise embedding relation for send/recv. -/
+/-- Branch-wise embedding relation for send/recv.
+
+Labels must match and each branch continuation must embed under R. -/
 def BranchesEmbedRel (R : EmbedRel)
     (lbs : List (Label × LocalTypeR)) (role : String) (gbs : List (Label × GlobalType)) : Prop :=
   List.Forall₂ (fun lb gb => lb.1 = gb.1 ∧ R lb.2 role gb.2) lbs gbs
 
-/-- One-step generator for CEmbed. -/
+/-! ## One-Step Generator -/
+
+/-- One-step generator for CEmbed.
+
+This defines the structural embedding rules:
+- end embeds in end
+- var embeds in matching var
+- mu embeds in mu with matching variable and guardedness
+- send embeds as comm sender (participant role)
+- recv embeds as comm receiver (participant role)
+- No non-participant case (intentionally partial) -/
 def CEmbedF (R : EmbedRel) : EmbedRel := fun e role g =>
   match e, g with
   | .end, .end => True
@@ -43,6 +73,8 @@ def CEmbedF (R : EmbedRel) : EmbedRel := fun e role g =>
       role = receiver ∧ sender' ≠ role ∧ sender = sender' ∧ BranchesEmbedRel R lbs role gbs
   | _, _ => False
 
+/-! ## Monotonicity -/
+
 private theorem BranchesEmbedRel_mono {R S : EmbedRel}
     (h : ∀ e r g, R e r g → S e r g) :
     ∀ {lbs gbs role}, BranchesEmbedRel R lbs role gbs → BranchesEmbedRel S lbs role gbs := by
@@ -52,6 +84,7 @@ private theorem BranchesEmbedRel_mono {R S : EmbedRel}
   | cons hpair _ ih =>
       exact List.Forall₂.cons ⟨hpair.1, h _ _ _ hpair.2⟩ ih
 
+/-- CEmbedF is monotone, enabling coinductive definition. -/
 private theorem CEmbedF_mono : Monotone CEmbedF := by
   intro R S h e role g hrel
   cases e <;> cases g <;> simp only [CEmbedF] at hrel ⊢
@@ -64,29 +97,34 @@ private theorem CEmbedF_mono : Monotone CEmbedF := by
 
 instance : CoinductiveRel EmbedRel CEmbedF := ⟨CEmbedF_mono⟩
 
+/-! ## Coinductive Definition -/
+
 /-- CEmbed as the greatest fixed point of CEmbedF. -/
 def CEmbed : EmbedRel :=
   OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩
 
+/-! ## Fixed Point Properties -/
+
 /-- Alias: CEmbed as gfp via CoinductiveRel. -/
 theorem CEmbed_gfp : CEmbed = RumpsteakV2.Protocol.CoTypes.CoinductiveRel.gfp (F := CEmbedF) := rfl
 
-/-- Alias: coinduction via CoinductiveRel for CEmbed. -/
+/-- Coinduction principle for CEmbed. -/
 theorem CEmbed_coind' {R : EmbedRel} (h : R ≤ CEmbedF R) : R ≤ CEmbed := by
   exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.coind (F := CEmbedF) h
 
-/-- Alias: unfold via CoinductiveRel for CEmbed. -/
+/-- Unfold CEmbed one step. -/
 theorem CEmbed_unfold' : CEmbed ≤ CEmbedF CEmbed := by
   change (OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩) ≤
     CEmbedF (OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩)
   exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.unfold (F := CEmbedF)
 
-/-- Alias: fold via CoinductiveRel for CEmbed. -/
+/-- Fold CEmbedF CEmbed back to CEmbed. -/
 theorem CEmbed_fold' : CEmbedF CEmbed ≤ CEmbed := by
   change CEmbedF (OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩) ≤
     OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩
   exact RumpsteakV2.Protocol.CoTypes.CoinductiveRel.fold (F := CEmbedF)
 
+/-- CEmbed is a fixed point. -/
 private theorem CEmbed_fixed : CEmbedF CEmbed = CEmbed := by
   change CEmbedF (OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩) =
     OrderHom.gfp ⟨CEmbedF, CEmbedF_mono⟩

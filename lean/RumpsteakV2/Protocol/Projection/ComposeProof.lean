@@ -1,6 +1,18 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.Projection.Project
 
+/-
+The Problem. When composing projection relations through mu types, we need to
+show that EQ2 equivalence composes with CProjectTransRel. The challenge is
+that mu introduces coinductive structure, but we don't want full coinduction.
+
+We must prove: if a EQ2 (.mu v body) and (.mu v body) CProjectTransRel c,
+then a EQ2F CProjectTransRelComp c (single-step without coinduction).
+
+Solution Structure. Use monotonicity and subset reasoning rather than paco
+coinduction, since we're proving a single-step property EQ2F, not EQ2.
+-/
+
 /-! # Direct Proof for CProjectTransRel Composition
 
 This module provides a direct proof for composing EQ2 and CProjectTransRel through mu.

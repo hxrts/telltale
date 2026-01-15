@@ -5,6 +5,42 @@ import RumpsteakV2.Protocol.CoTypes.EQ2Paco
 import RumpsteakV2.Protocol.CoTypes.Bisim
 import RumpsteakV2.Protocol.Participation
 
+/-
+The Problem. Provide a proof-carrying projection API that combines the candidate projection
+function (trans) with the coinductive validation (CProject) to produce verified local types
+from global choreographies. The central challenge is proving that CProject is equivalent to
+EQ2-equivalence with trans:
+
+    CProject g role e ↔ EQ2 e (trans g role)
+
+This equivalence is non-trivial because:
+1. CProject is coinductively defined (greatest fixed point)
+2. EQ2 is a bisimulation (also coinductive)
+3. trans is a recursive function defined by well-founded recursion
+4. Non-participants project to "muve" types (mu-var-end chains) that must be shown EQ2-
+   equivalent to .end when closed
+
+Additional challenges include:
+- Handling guardedness conditions in recursive types
+- Proving that all branches project to the same candidate for non-participants
+- Managing the interaction between substitution, free variables, and EQ2
+- Using paco (parametric coinduction) to reason about nested coinductive relations
+
+Solution Structure. This large module (4000+ lines) is organized into major sections:
+
+1. **Core API** (lines 1-100): projectR? function and basic soundness/completeness
+2. **Muve Types** (lines 80-600): Theory of mu-var-end chains and EQ_end theorem
+3. **Projection-EQ2 Congruence** (lines 1207-1500): CProject implies EQ2 with trans
+4. **Paco Infrastructure** (lines 1500-2100): Parametric coinduction setup
+5. **Constructor Agreement** (lines 2100-2600): Well-founded shape extraction
+6. **Observable Preservation** (lines 2600-3000): Axioms for projection behavior
+7. **Completeness Proof** (lines 3000-4100): EQ2 with trans implies CProject
+
+The proof uses a combination of techniques: coinduction for infinite unfoldings,
+well-founded recursion for structural decomposition, and paco for managing the
+interplay between CProject and EQ2.
+-/
+
 /-! # RumpsteakV2.Protocol.Projection.Project
 
 Proof-carrying projection API for V2.
@@ -30,6 +66,8 @@ open RumpsteakV2.Protocol.CoTypes.EQ2
 open RumpsteakV2.Protocol.CoTypes.EQ2Paco
 open Paco
 open RumpsteakV2.Protocol.Participation
+
+/-! ## Core Projection API -/
 
 /-- EQ2-equivalent types preserve isGuarded.
 
@@ -626,19 +664,34 @@ private theorem CProject_muve_of_not_part_of2_aux : (g : GlobalType) → (role :
   | .mu t body, role, lt, hproj, hnotpart, hne => by
       have hF := CProject_destruct hproj
       dsimp only [CProjectF] at hF
+      rcases hF with ⟨candBody, hbody_proj, hcase⟩
       cases lt with
-      | mu t' candBody =>
-          simp only [isMuve]
-          obtain ⟨_, _, hbody_proj⟩ := hF
-          have hnotpart_body : ¬part_of2 role body := not_part_of2_mu hnotpart
-          -- allCommsNonEmpty composes with mu
-          have hne_body : body.allCommsNonEmpty = true := by
-            simp only [GlobalType.allCommsNonEmpty] at hne; exact hne
-          exact CProject_muve_of_not_part_of2_aux body role candBody hbody_proj hnotpart_body hne_body
-      | «end» => exact False.elim (by simp_all)
-      | var _ => exact False.elim (by simp_all)
-      | send _ _ => exact False.elim (by simp_all)
-      | recv _ _ => exact False.elim (by simp_all)
+      | mu t' candBody' =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+            simp only [isMuve]
+            have hnotpart_body : ¬part_of2 role body := not_part_of2_mu hnotpart
+            -- allCommsNonEmpty composes with mu
+            have hne_body : body.allCommsNonEmpty = true := by
+              simp only [GlobalType.allCommsNonEmpty] at hne; exact hne
+            exact CProject_muve_of_not_part_of2_aux body role candBody hbody_proj hnotpart_body hne_body
+          · cases hend
+      | «end» =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend; rfl
+      | var _ =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend
+      | send _ _ =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend
+      | recv _ _ =>
+          rcases hcase with ⟨_hguard, hmu⟩ | ⟨_hguard, hend⟩
+          · cases hmu
+          · cases hend
   | .comm _ _ [], _, _, _, _, hne => by
       -- Empty branches contradicts allCommsNonEmpty: hne contains true = false
       simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true,
@@ -1388,34 +1441,10 @@ private theorem CProject_var_inv (t role : String) (cand : LocalTypeR)
 
 private theorem CProject_mu_inv (t : String) (gbody : GlobalType) (role : String) (cand : LocalTypeR)
     (hproj : CProject (.mu t gbody) role cand) :
-    ∃ candBody, cand = .mu t candBody ∧ candBody.isGuarded t ∧ CProject gbody role candBody := by
-  cases cand with
-  | mu t' candBody =>
-      have hf := CProject_destruct hproj
-      simp [CProjectF] at hf
-      rcases hf with ⟨ht, hcontr, hbody⟩
-      subst ht
-      exact ⟨candBody, rfl, hcontr, hbody⟩
-  | «end» =>
-      have hf := CProject_destruct hproj
-      have : False := by
-        simp [CProjectF] at hf
-      exact this.elim
-  | var _ =>
-      have hf := CProject_destruct hproj
-      have : False := by
-        simp [CProjectF] at hf
-      exact this.elim
-  | send _ _ =>
-      have hf := CProject_destruct hproj
-      have : False := by
-        simp [CProjectF] at hf
-      exact this.elim
-  | recv _ _ =>
-      have hf := CProject_destruct hproj
-      have : False := by
-        simp [CProjectF] at hf
-      exact this.elim
+    ∃ candBody, CProject gbody role candBody ∧
+      ((candBody.isGuarded t = true ∧ cand = .mu t candBody) ∨
+       (candBody.isGuarded t = false ∧ cand = .end)) := by
+  simpa [CProjectF] using (CProject_destruct hproj)
 
 private theorem CProject_comm_sender_inv (sender receiver : String)
     (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
@@ -1566,14 +1595,24 @@ private theorem CProjectEQ2Rel_postfix
       subst hcand
       simp [CProjectF]
   | mu t gbody =>
-      obtain ⟨candBody0, he0, hcontr, hbody⟩ := CProject_mu_inv t gbody role e0 hproj
-      subst he0
-      obtain ⟨candBody1, hcand, heq_body⟩ := hmu t candBody0 cand heq
-      subst hcand
-      -- hcontr : candBody0.isGuarded t, heq_body : EQ2 candBody0 candBody1
-      -- Goal needs: candBody1.isGuarded t
-      have hcontr1 : candBody1.isGuarded t = true := EQ2_isGuarded_compat heq_body hcontr
-      exact ⟨rfl, hcontr1, ⟨candBody0, hbody, heq_body⟩⟩
+      rcases CProject_mu_inv t gbody role e0 hproj with ⟨candBody0, hbody0, hmu0⟩
+      cases hmu0 with
+      | inl hguard0 =>
+          rcases hguard0 with ⟨hcontr0, he0⟩
+          subst he0
+          obtain ⟨candBody1, hcand, heq_body⟩ := hmu t candBody0 cand heq
+          subst hcand
+          have hcontr1 : candBody1.isGuarded t = true := EQ2_isGuarded_compat heq_body hcontr0
+          refine ⟨candBody1, ?_, Or.inl ?_⟩
+          · exact ⟨candBody0, hbody0, heq_body⟩
+          · exact ⟨hcontr1, rfl⟩
+      | inr hunguard0 =>
+          rcases hunguard0 with ⟨hcontr0, he0⟩
+          subst he0
+          have hcand : cand = .end := hend cand heq
+          subst hcand
+          refine ⟨candBody0, hbody0, Or.inr ?_⟩
+          exact ⟨hcontr0, rfl⟩
   | comm sender receiver gbs =>
       by_cases hrs : role = sender
       · obtain ⟨lbs0, he0, hbranches⟩ :=
@@ -2127,8 +2166,15 @@ private theorem CProject_end_trans_end (g : GlobalType) (role : String)
       -- CProjectF (.var v) _ .end requires .var v = .end - contradiction
       simp only [CProjectF] at hf
   | .mu t body =>
-      -- CProjectF (.mu t body) _ .end requires .mu t body matches .mu _ _ - contradiction
+      -- Use the mu/end branch of CProjectF: body projection is unguarded
       simp only [CProjectF] at hf
+      rcases hf with ⟨candBody, hbody, hcase⟩
+      rcases hcase with ⟨_hguard, hmu⟩ | ⟨hguard, hend⟩
+      · cases hmu
+      · cases hend
+        have htrans_guard : (trans body role).isGuarded t = false :=
+          CProject_unguarded_trans hbody hguard
+        simp [Trans.trans, htrans_guard]
   | .comm sender receiver gbs =>
       -- CProjectF (.comm ...) role .end depends on role's participation
       simp only [CProjectF] at hf
@@ -2420,21 +2466,23 @@ private theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
   | .mu t gbody =>
       -- CProjectF for mu: t = v, body.isGuarded v, CProject gbody role body
       simp only [CProjectF] at hf
-      rcases hf with ⟨heq, hcontr, hbody_proj⟩
-      -- heq : t = v, hcontr : body.isGuarded v
-      -- Use heq to convert hcontr to use t instead of v
-      have hcontr_t : body.isGuarded t = true := by rw [heq]; exact hcontr
-      -- Need to show (trans gbody role).isGuarded t for the trans equation
-      have hwf_body : gbody.allCommsNonEmpty = true := by
-        simp only [GlobalType.allCommsNonEmpty] at hwf
-        exact hwf
-      have htrans_guard : (trans gbody role).isGuarded t = true :=
-        CProject_isGuarded_trans hbody_proj hwf_body hcontr_t
-      subst heq
-      use gbody
-      refine ⟨?_, hcontr, hbody_proj, hwf_body⟩
-      -- trans (.mu v gbody) role = .mu v (trans gbody role)
-      simp only [Trans.trans, htrans_guard, ↓reduceIte]
+      rcases hf with ⟨candBody, hbody_proj, hcase⟩
+      -- candBody must be the given body, and cand = .mu v body so we are in guarded branch
+      rcases hcase with ⟨hguard, hmu⟩ | ⟨_hguard, hend⟩
+      · -- guarded branch: cand = .mu t candBody
+        cases hmu
+        -- Need to show (trans gbody role).isGuarded t for the trans equation
+        have hwf_body : gbody.allCommsNonEmpty = true := by
+          simp only [GlobalType.allCommsNonEmpty] at hwf
+          exact hwf
+        have htrans_guard : (trans gbody role).isGuarded t = true :=
+          CProject_isGuarded_trans hbody_proj hwf_body hguard
+        use gbody
+        refine ⟨?_, hguard, hbody_proj, hwf_body⟩
+        -- trans (.mu t gbody) role = .mu t (trans gbody role)
+        simp only [Trans.trans, htrans_guard, ↓reduceIte]
+      · -- unguarded branch would force cand = .end, contradiction
+        cases hend
   | .comm sender receiver gbs =>
       simp only [CProjectF] at hf
       by_cases hrs : role = sender
@@ -2707,8 +2755,12 @@ theorem CProjectTransRel_postfix :
   | .mu muvar gbody, .mu ltvar lbody =>
       -- CProjectF for mu: muvar = ltvar, lbody.isGuarded muvar, CProject gbody role lbody
       simp only [CProjectF] at hf
-      rcases hf with ⟨heq_var, hcontr, hbody_proj⟩
-      subst heq_var htrans
+      rcases hf with ⟨candBody, hbody_proj, hcase⟩
+      rcases hcase with ⟨hcontr, hmu⟩ | ⟨_hcontr, hend⟩
+      · cases hmu
+      · cases hend
+      -- After cases, ltvar = muvar and lbody = candBody
+      subst htrans
 
       -- Extract hwf_body from hwf
       have hwf_body : gbody.allCommsNonEmpty = true := by
@@ -2768,6 +2820,18 @@ theorem CProjectTransRel_postfix :
         right -- Not EQ2 prefix
         left  -- CProjectTransRel suffix (not 3-hop)
         exact ⟨LocalTypeR.mu muvar (trans gbody role), hmu_rel, heq_unfold_right⟩
+  | .mu muvar gbody, .end =>
+      simp only [CProjectF] at hf
+      rcases hf with ⟨candBody, hbody_proj, hcase⟩
+      rcases hcase with ⟨_hguard, hmu⟩ | ⟨hguard, hend⟩
+      · cases hmu
+      · cases hend
+        have htrans_guard : (trans gbody role).isGuarded muvar = false :=
+          CProject_unguarded_trans hbody_proj hguard
+        have htrans_end : trans (.mu muvar gbody) role = .end := by
+          simp [Trans.trans, htrans_guard]
+        subst htrans
+        simp [htrans_end, EQ2F]
   | .comm sender receiver gbs, .send partner lbs =>
       -- CProjectF comm-send: case analysis on role
       simp only [CProjectF] at hf
@@ -2913,7 +2977,6 @@ theorem CProjectTransRel_postfix :
   | .var _, .send _ _ => simp only [CProjectF] at hf
   | .var _, .recv _ _ => simp only [CProjectF] at hf
   | .var _, .mu _ _ => simp only [CProjectF] at hf
-  | .mu _ _, .end => simp only [CProjectF] at hf
   | .mu _ _, .var _ => simp only [CProjectF] at hf
   | .mu _ _, .send _ _ => simp only [CProjectF] at hf
   | .mu _ _, .recv _ _ => simp only [CProjectF] at hf

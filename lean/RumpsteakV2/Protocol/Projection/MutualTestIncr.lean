@@ -1,6 +1,15 @@
 import Mathlib.Tactic
 import RumpsteakV2.Protocol.Projection.MutualTestSizeOf
 
+/-
+The Problem. Testing progressive complexity in mutual recursion patterns. We
+start with structural termination (Step1), move to explicit sizeOf proofs
+(Step2), then demonstrate mutually recursive property proofs (Step3).
+
+Solution Structure. Three incremental steps building on each other, showing
+different termination proof techniques and culminating in mutual property proofs.
+-/
+
 /-! # RumpsteakV2.Protocol.Projection.MutualTestIncr
 
 Incremental mutual recursion examples to debug syntax/termination.
@@ -10,6 +19,8 @@ It is not part of the semantic interface and does not export definitions for pro
 -/
 
 namespace RumpsteakV2.Protocol.Projection.MutualTestIncr
+
+/-! ## Step 1: Structural Termination -/
 
 namespace Step1
 
@@ -41,6 +52,8 @@ end
   simp [countList]
 
 end Step1
+
+/-! ## Step 2: Explicit sizeOf Termination -/
 
 namespace Step2
 
@@ -99,6 +112,8 @@ end
 
 end Step2
 
+/-! ## Step 3: Mutually Recursive Property Proofs -/
+
 namespace Step3
 
 open Step2
@@ -119,6 +134,7 @@ private theorem sizeOf_list_lt_node (xs : List MT) :
   omega
 
 mutual
+  /-- Every tree has at least one node. -/
   theorem countNodes_ge_one : ∀ t : MT, 1 ≤ Step2.countNodes t
     | .leaf _ => by
         simp
@@ -133,6 +149,7 @@ mutual
     all_goals
       exact sizeOf_list_lt_node _
 
+  /-- Node count over a list is non-negative. -/
   theorem countList_nonneg : ∀ xs : List MT, 0 ≤ Step2.countList xs
     | [] => by
         simp
