@@ -168,16 +168,17 @@ theorem trans_branches_coherent_EQ2
         | [] => exact absurd rfl hne
         | hd :: tl => exact ⟨hd, tl, rfl⟩
       obtain ⟨hd, tl, heq⟩ := hne_list
-      subst heq
+      have hmem_hd : hd ∈ branches := by rw [heq]; exact List.Mem.head tl
+      rw [heq]
       simp only [List.head!]
-      have hnopart_first : ¬ part_of2 role hd.2 := hnotbranch hd (List.Mem.head tl)
+      have hnopart_first : ¬ part_of2 role hd.2 := hnotbranch hd hmem_hd
       have hwf_first : hd.2.wellFormed = true := by
-        sorry  -- GlobalType.wellFormed_comm_branches (need sender/receiver from context)
+        exact GlobalType.wellFormed_comm_branches sender receiver branches hwf hd hmem_hd
       exact EQ2_symm (EQ_end role hd.2 hnopart_first hwf_first)
     have hb_end : EQ2 (projTrans b.2 role) .end := by
       have hnopart_b : ¬ part_of2 role b.2 := hnotbranch b hmem
       have hwf_b : b.2.wellFormed = true := by
-        sorry  -- GlobalType.wellFormed_comm_branches (need sender/receiver from context)
+        exact GlobalType.wellFormed_comm_branches sender receiver branches hwf b hmem
       exact EQ2_symm (EQ_end role b.2 hnopart_b hwf_b)
     -- Chain: EQ2 (trans b.2 role) .end ∧ EQ2 .end (trans first.2 role)
     exact EQ2_trans hb_end (EQ2_symm hfirst_end)
@@ -198,11 +199,40 @@ theorem trans_produces_CProject (g : GlobalType) (role : String)
   -- Coinduction on CProject with R g role cand := (cand = projTrans g role ∧ g.allCommsNonEmpty)
   apply CProject_coind (R := fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
   · intro g' role' cand hrel
-    -- hrel : cand = projTrans g' role' ∧ g'.allCommsNonEmpty = true
     have ⟨hcand, hwf'⟩ := hrel
-    subst hcand
+    -- Rewrite cand using hcand, then case on g'
+    rw [hcand]
     -- Show: CProjectF R g' role' (projTrans g' role')
-    sorry  -- TODO: Case analysis on g', using trans_branches_coherent_EQ2 for non-participant comm
+    cases g' with
+    | «end» =>
+        -- projTrans .end _ reduces to .end, so CProjectF reduces to True
+        sorry  -- TODO: need exact tactic sequence to reduce projTrans + CProjectF match
+    | var t =>
+        -- projTrans (.var t) _ reduces to .var t, so CProjectF reduces to t = t
+        sorry  -- TODO: need exact tactic sequence to reduce projTrans + CProjectF match
+    | mu t body =>
+        -- trans (.mu t body) role = if (trans body role).isGuarded t then .mu t (trans body role) else .end
+        sorry  -- TODO: prove mu case (guardedness + recursive relation)
+    | comm sender receiver branches =>
+        simp only [projTrans, Trans.trans, GlobalType.allCommsNonEmpty] at hwf' ⊢
+        by_cases hs : role' == sender
+        · -- Case: role' = sender, trans returns .send receiver (transBranches branches role')
+          have hs_eq : role' = sender := beq_iff_eq.mp hs
+          subst hs_eq
+          -- trans (.comm sender receiver branches) sender = .send receiver (transBranches branches sender)
+          -- Need: CProjectF R (.comm sender receiver branches) sender (.send receiver (transBranches branches sender))
+          sorry  -- TODO: show match reduces and prove BranchesProjRel
+        · by_cases hr : role' == receiver
+          · -- Case: role' = receiver, trans returns .recv sender (transBranches branches role')
+            have hr_eq : role' = receiver := beq_iff_eq.mp hr
+            subst hr_eq
+            -- trans (.comm sender receiver branches) receiver = .recv sender (transBranches branches receiver)
+            -- Need: CProjectF R (.comm sender receiver branches) receiver (.recv sender (transBranches branches receiver))
+            sorry  -- TODO: show match reduces and prove BranchesProjRel
+          · -- Case: role' ≠ sender ∧ role' ≠ receiver (non-participant)
+            -- trans projects first branch for non-participants
+            -- Need: AllBranchesProj R branches role' (trans first_branch role')
+            sorry  -- TODO: use trans_branches_coherent_EQ2 + wellFormedness to establish AllBranchesProj
   · constructor
     · rfl
     · exact hwf

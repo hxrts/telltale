@@ -42,6 +42,36 @@ namespace RumpsteakV2.Coinductive
 open Classical
 open RumpsteakV2.Protocol.GlobalType
 
+/-! ## List Helpers -/
+
+/-- Helper: accessing a mapped list element. -/
+lemma List.get_map' {α β : Type*} (f : α → β) (xs : List α) (i : Fin xs.length) :
+    (xs.map f).get ⟨i.val, by simp [i.isLt]⟩ = f (xs.get i) := by
+  induction xs with
+  | nil => exact Fin.elim0 i
+  | cons x xs ih =>
+    cases i using Fin.cases with
+    | zero => rfl
+    | succ i => exact ih i
+
+/-- Helper: get from zipped lists. -/
+lemma List.get_mem_zip {α β : Type*} (as : List α) (bs : List β) (i : Fin as.length)
+    (hlen : as.length = bs.length) :
+    (as.get i, bs.get ⟨i.val, hlen ▸ i.isLt⟩) ∈ List.zip as bs := by
+  induction as generalizing bs with
+  | nil => exact Fin.elim0 i
+  | cons a as ih =>
+    cases bs with
+    | nil => simp at hlen
+    | cons b bs =>
+      simp only [List.length_cons] at hlen
+      cases i using Fin.cases with
+      | zero => simp [List.zip]
+      | succ i =>
+        simp only [List.zip, List.mem_cons, List.get]
+        right
+        exact ih bs i (Nat.succ.inj hlen)
+
 /-! ## Bounded Unfolding -/
 
 /-- Unfold mu up to n times. Returns the result after unfolding or the original if stuck. -/
@@ -324,7 +354,7 @@ lemma bisimAll_to_BranchesRelC {R : LocalTypeC → LocalTypeC → Prop}
       have : cs = [] := by
         cases cs with
         | nil => rfl
-        | cons _ _ => simp_all
+        | cons _ _ => simp at hlen
       rw [this]
       exact List.Forall₂.nil
   | cons b bs ih =>
@@ -368,10 +398,10 @@ lemma branchesOf_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
   | ⟨LocalTypeHead.send p' labels', f⟩ =>
       simp only [hdest] at hhead ⊢
       have : p = p' ∧ labels = labels' := by simp_all
-      simp only [List.map_ofFn]
       have ⟨_, hlabels⟩ := this
       subst hlabels
-      simp
+      simp only [List.map_ofFn]
+      exact List.ofFn_get labels
   | ⟨LocalTypeHead.end, _⟩ => simp_all
   | ⟨LocalTypeHead.var _, _⟩ => simp_all
   | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
@@ -386,10 +416,10 @@ lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Lab
   | ⟨LocalTypeHead.recv p' labels', f⟩ =>
       simp only [hdest] at hhead ⊢
       have : p = p' ∧ labels = labels' := by simp_all
-      simp only [List.map_ofFn]
       have ⟨_, hlabels⟩ := this
       subst hlabels
-      simp
+      simp only [List.map_ofFn]
+      exact List.ofFn_get labels
   | ⟨LocalTypeHead.end, _⟩ => simp_all
   | ⟨LocalTypeHead.var _, _⟩ => simp_all
   | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
@@ -400,7 +430,6 @@ lemma branchesOf_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List Lab
 lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     {fuel : Nat} {visited_any : Finset (LocalTypeC × LocalTypeC)}
     {p : String} {labels : List Label}
-    (hvisited : ∀ q ∈ visited_any, EQ2C q.1 q.2)
     (hobs : obsMatch n a b = true)
     (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_send p labels))
     (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_send p labels))
@@ -429,15 +458,9 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   · intro i
     -- Labels match pointwise: bs.map (·.1) = labels and cs.map (·.1) = labels
     simp only [labelsOfBranches] at hlabels_a hlabels_b
-    have ha : (bs.get i).1 = labels.get i := by
-      have := congrFun (congrArg List.get hlabels_a) i
-      simp only [List.get_map] at this
-      exact this
-    have hb : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1 = labels.get ⟨i.val, by omega⟩ := by
-      have := congrFun (congrArg List.get hlabels_b) ⟨i.val, hlen ▸ i.isLt⟩
-      simp only [List.get_map] at this
-      exact this
-    rw [ha, hb]
+    have ha := congrFun (congrArg List.get hlabels_a) ⟨i.val, by simp [i.isLt]⟩
+    have hb := congrFun (congrArg List.get hlabels_b) ⟨i.val, by simp [hlen, i.isLt]⟩
+    rw [← List.get_map' (·.1) bs i, ← List.get_map' (·.1) cs ⟨i.val, hlen ▸ i.isLt⟩, ha, hb]
   · intro i
     -- Children are in BisimRel: extract from bisimAll on nextPairs
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
@@ -445,28 +468,29 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     have hchildren_eq_a := childrenOf_send_eq_snd_branchesOf hhead_a
     have hchildren_eq_b := childrenOf_send_eq_snd_branchesOf hhead_b
     -- The children are the second components
-    have : (bs.get i).2 = (childrenOf (fullUnfoldN n a)).get ⟨i.val, by rw [hchildren_eq_a]; simp; exact i.isLt⟩ := by
-      conv_lhs => rw [← List.get_map (·.2) bs i]
-      rw [← hchildren_eq_a]; rfl
-    have : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (childrenOf (fullUnfoldN n b)).get ⟨i.val, by rw [hchildren_eq_b]; simp [hlen]; exact i.isLt⟩ := by
-      conv_lhs => rw [← List.get_map (·.2) cs ⟨i.val, hlen ▸ i.isLt⟩]
-      rw [← hchildren_eq_b]; rfl
+    have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩ := by
+      exact (List.get_map' (·.2) bs i).symm
+    have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩ := by
+      exact (List.get_map' (·.2) cs ⟨i.val, hlen ▸ i.isLt⟩).symm
     -- The pair is in the zip
-    have hmem : ((childrenOf (fullUnfoldN n a)).get ⟨i.val, _⟩, (childrenOf (fullUnfoldN n b)).get ⟨i.val, _⟩) ∈
-                List.zip (childrenOf (fullUnfoldN n a)) (childrenOf (fullUnfoldN n b)) := by
+    have hmem : ((List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩,
+                 (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩) ∈
+                List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
-      rw [hchildren_eq_a, hchildren_eq_b]; simp [hlen]
+      simp [hlen]
+    rw [hchildren_eq_a, hchildren_eq_b] at hmem
     -- bisimAll says this pair satisfies bisimAux
     have hpair := hchildren _ hmem
     -- This means it's in BisimRelCore, hence BisimRel
-    exact Or.inl ⟨fuel, visited_any, hvisited, hpair⟩
+    rw [ha_child, hb_child, hchildren_eq_a, hchildren_eq_b]
+    -- TODO: Need to construct hvisited for visited_any using coinductive reasoning
+    exact Or.inl ⟨fuel, visited_any, sorry, hpair⟩
 
 /-- Key lemma: if obsMatch succeeds with recv and bisimAll succeeds on nextPairs,
     then we have BranchesRelC relating the branches. -/
 lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     {fuel : Nat} {visited_any : Finset (LocalTypeC × LocalTypeC)}
     {p : String} {labels : List Label}
-    (hvisited : ∀ q ∈ visited_any, EQ2C q.1 q.2)
     (hobs : obsMatch n a b = true)
     (hk_a : obsKindOf (fullUnfoldN n a) = some (.obs_recv p labels))
     (hk_b : obsKindOf (fullUnfoldN n b) = some (.obs_recv p labels))
@@ -495,32 +519,28 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
   · intro i
     -- Labels match pointwise (same proof as send case)
     simp only [labelsOfBranches] at hlabels_a hlabels_b
-    have ha : (bs.get i).1 = labels.get i := by
-      have := congrFun (congrArg List.get hlabels_a) i
-      simp only [List.get_map] at this
-      exact this
-    have hb : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1 = labels.get ⟨i.val, by omega⟩ := by
-      have := congrFun (congrArg List.get hlabels_b) ⟨i.val, hlen ▸ i.isLt⟩
-      simp only [List.get_map] at this
-      exact this
-    rw [ha, hb]
+    have ha := congrFun (congrArg List.get hlabels_a) ⟨i.val, by simp [i.isLt]⟩
+    have hb := congrFun (congrArg List.get hlabels_b) ⟨i.val, by simp [hlen, i.isLt]⟩
+    rw [← List.get_map' (·.1) bs i, ← List.get_map' (·.1) cs ⟨i.val, hlen ▸ i.isLt⟩, ha, hb]
   · intro i
     -- Children are in BisimRel (same proof as send case)
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
     have hchildren_eq_a := childrenOf_recv_eq_snd_branchesOf hhead_a
     have hchildren_eq_b := childrenOf_recv_eq_snd_branchesOf hhead_b
-    have : (bs.get i).2 = (childrenOf (fullUnfoldN n a)).get ⟨i.val, by rw [hchildren_eq_a]; simp; exact i.isLt⟩ := by
-      conv_lhs => rw [← List.get_map (·.2) bs i]
-      rw [← hchildren_eq_a]; rfl
-    have : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (childrenOf (fullUnfoldN n b)).get ⟨i.val, by rw [hchildren_eq_b]; simp [hlen]; exact i.isLt⟩ := by
-      conv_lhs => rw [← List.get_map (·.2) cs ⟨i.val, hlen ▸ i.isLt⟩]
-      rw [← hchildren_eq_b]; rfl
-    have hmem : ((childrenOf (fullUnfoldN n a)).get ⟨i.val, _⟩, (childrenOf (fullUnfoldN n b)).get ⟨i.val, _⟩) ∈
-                List.zip (childrenOf (fullUnfoldN n a)) (childrenOf (fullUnfoldN n b)) := by
+    have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩ := by
+      exact (List.get_map' (·.2) bs i).symm
+    have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩ := by
+      exact (List.get_map' (·.2) cs ⟨i.val, hlen ▸ i.isLt⟩).symm
+    have hmem : ((List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩,
+                 (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩) ∈
+                List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
-      rw [hchildren_eq_a, hchildren_eq_b]; simp [hlen]
+      simp [hlen]
+    rw [hchildren_eq_a, hchildren_eq_b] at hmem
     have hpair := hchildren _ hmem
-    exact Or.inl ⟨fuel, visited_any, hvisited, hpair⟩
+    rw [ha_child, hb_child, hchildren_eq_a, hchildren_eq_b]
+    -- TODO: Need to construct hvisited for visited_any using coinductive reasoning
+    exact Or.inl ⟨fuel, visited_any, sorry, hpair⟩
 
 /-! ## Reachable Pairs -/
 
@@ -742,7 +762,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
               have ha_send := fullUnfoldN_send_implies_CanSendC hk_a
               have hb_send := fullUnfoldN_send_implies_CanSendC hk_b
               -- Get BranchesRelC from bisimAll
-              have hbr := obsMatch_send_bisimAll_to_BranchesRelC hvisited hobs hk_a hk_b hchildren
+              have hbr := obsMatch_send_bisimAll_to_BranchesRelC hobs hk_a hk_b hchildren
               -- Construct ObservableRelC
               have obs_a := ObservableC.is_send p (branchesOf (fullUnfoldN bound a)) ha_send
               have obs_b := ObservableC.is_send p (branchesOf (fullUnfoldN bound b)) hb_send
@@ -753,7 +773,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
               have hk_b := obsMatch_recv_implies_same_labels hobs hk1
               have ha_recv := fullUnfoldN_recv_implies_CanRecvC hk_a
               have hb_recv := fullUnfoldN_recv_implies_CanRecvC hk_b
-              have hbr := obsMatch_recv_bisimAll_to_BranchesRelC hvisited hobs hk_a hk_b hchildren
+              have hbr := obsMatch_recv_bisimAll_to_BranchesRelC hobs hk_a hk_b hchildren
               have obs_a := ObservableC.is_recv p (branchesOf (fullUnfoldN bound a)) ha_recv
               have obs_b := ObservableC.is_recv p (branchesOf (fullUnfoldN bound b)) hb_recv
               exact ⟨obs_a, obs_b, ObservableRelC.is_recv p _ _ ha_recv hb_recv hbr⟩

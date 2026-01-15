@@ -429,17 +429,17 @@ inductive TypedStep : GEnv → DEnv → SEnv → Store → Buffers → Process �
       TypedStep G D S store bufs (.recv k x)
                 G' D' S' store' bufs' .skip
 
-  | assign {G D S store bufs x v T S'} :
+  | assign {G D S store bufs x v T S' store'} :
       -- Pre-condition: value is well-typed (no endpoint dependencies)
-      lookupStr store x = some v →
       HasTypeVal ∅ v T →
 
-      -- Resource transition definition (only S changes)
+      -- Resource transition definitions (S and store change)
       S' = updateSEnv S x T →
+      store' = updateStr store x v →
 
       -- Judgment
       TypedStep G D S store bufs (.assign x v)
-                G D S' store bufs .skip
+                G D S' store' bufs .skip
 
   | seq_step {G D S G' D' S' store bufs P P' Q} :
       -- Resources flow through first process
@@ -541,22 +541,20 @@ theorem HasTypeVal_updateG_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v :
   | string s => exact HasTypeVal.string s
   | prod h₁ h₂ =>
     exact HasTypeVal.prod (HasTypeVal_updateG_weaken h₁) (HasTypeVal_updateG_weaken h₂)
-  | chan {e' L'} h =>
-    -- Channel case: need to show lookupG (updateG G e L) e' = some L'
-    apply HasTypeVal.chan
+  | chan h =>
+    -- Channel case: need to show lookupG (updateG G e L) e' = some L''
+    -- e' and L' are implicit arguments from the chan constructor
+    rename_i e' L'
     by_cases heq : e' = e
-    · -- e' = e: this means the value v is the channel being sent, which contradicts well-formedness
-      -- In a well-formed configuration, we can't have the sent channel in the store
-      -- For now, we'll accept this case exists (it shouldn't in practice)
-      subst heq
-      rw [lookupG_update_eq]
-      -- We have lookupG G e = some L', but after update lookupG (updateG G e L) e = some L
-      -- This case shouldn't happen in practice (sent channel not in store)
-      sorry
+    · -- e' = e: the channel endpoint was updated
+      -- After update, lookupG (updateG G e L) e = some L
+      rw [heq]
+      apply HasTypeVal.chan
+      apply lookupG_update_eq
     · -- e' ≠ e: use update_neq lemma
-      rw [lookupG_update_neq]
+      apply HasTypeVal.chan
+      rw [lookupG_update_neq G e e' L (Ne.symm heq)]
       exact h
-      exact heq
 
 /-- For the send case: StoreTyped is trivially preserved because store is unchanged.
     We just need to weaken G, which works for all values (with caveat for sent channel). -/
@@ -569,15 +567,14 @@ theorem StoreTyped_send_preserved {G : GEnv} {S : SEnv} {store : Store} {e : End
   have hVal := hST x v T hStore hS
   exact HasTypeVal_updateG_weaken hVal
 
-/-- For the assign case: StoreTyped with updated S.
-    The value in the store already has type T in empty environment (from TypedStep.assign premise),
-    so it has type T in G by weakening. -/
+/-- For the assign case: StoreTyped with updated S and updated store.
+    The value v has type T in empty environment (from TypedStep.assign premise),
+    so it has type T in G by weakening. After update, store[x] = v and S[x] = T match. -/
 theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : Store} {x : Var} {v : Value} {T : ValType} :
     StoreTyped G S store →
-    lookupStr store x = some v →
     HasTypeVal ∅ v T →
-    StoreTyped G (updateSEnv S x T) store := by
-  intro hST hStore hv
+    StoreTyped G (updateSEnv S x T) (updateStr store x v) := by
+  intro hST hv
   unfold StoreTyped at hST ⊢
   intro y w T' hStoreY hSY
   by_cases heq : y = x
@@ -586,14 +583,14 @@ theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : Store} {x : V
     rw [lookupSEnv_update_eq] at hSY
     simp at hSY
     cases hSY
-    rw [hStore] at hStoreY
+    rw [lookupStr_update_eq] at hStoreY
     simp at hStoreY
     cases hStoreY
     exact HasTypeVal_weaken hv
-  · -- y ≠ x case: use old typing
-    rw [lookupSEnv_update_neq] at hSY
+  · -- y ≠ x case: use original typing from unchanged variables
+    rw [lookupSEnv_update_neq S x y T (Ne.symm heq)] at hSY
+    rw [lookupStr_update_neq store x y v (Ne.symm heq)] at hStoreY
     exact hST y w T' hStoreY hSY
-    exact Ne.symm heq
 
 /-! ## Preservation Theorems -/
 
@@ -695,13 +692,13 @@ theorem preservation_typed {G D S store bufs P G' D' S' store' bufs' P'} :
       exact typed_step_preserves_coherence (.recv hk hG hEdge hBuf hv hTrace hG' hD' hS' hStore' hBufs') hCoh
     · -- Process typing: skip is well-typed
       exact HasTypeProcPre.skip
-  | assign hx hv hS' =>
-    -- Store unchanged (value already in store), S updated with x:T
-    -- TypedStep.assign has: lookupStr store x = some v, HasTypeVal ∅ v T, S' = updateSEnv S x T
+  | assign hv hS' hStore' =>
+    -- Store and S both updated: store' = updateStr store x v, S' = updateSEnv S x T
+    -- TypedStep.assign has: HasTypeVal ∅ v T, S' = updateSEnv S x T, store' = updateStr store x v
     constructor
-    · -- StoreTyped: store unchanged, S updated with x:T
-      rw [hS']
-      exact StoreTyped_assign_preserved hStore hx hv
+    · -- StoreTyped: both store and S updated with x:T
+      rw [hS', hStore']
+      exact StoreTyped_assign_preserved hStore hv
     constructor
     · -- BuffersTyped: buffers unchanged
       exact hBufs
