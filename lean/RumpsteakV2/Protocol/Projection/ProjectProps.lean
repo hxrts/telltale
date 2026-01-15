@@ -39,6 +39,38 @@ theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTyp
     RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e2 hp2 hne
   exact EQ2_trans h1 (EQ2_symm h2)
 
+/-- Helper: cons case for branches_proj_deterministic. -/
+private theorem branches_proj_deterministic_cons
+    (lb1 : Label × LocalTypeR) (lbs1' : List (Label × LocalTypeR))
+    (lb2 : Label × LocalTypeR) (lbs2' : List (Label × LocalTypeR))
+    (gb : Label × GlobalType) (gbs' : List (Label × GlobalType))
+    {role : String}
+    (hpair1 : gb.1 = lb1.1 ∧ CProject gb.2 role lb1.2)
+    (htail1 : BranchesProjRel CProject gbs' role lbs1')
+    (hpair2 : gb.1 = lb2.1 ∧ CProject gb.2 role lb2.2)
+    (htail2 : BranchesProjRel CProject gbs' role lbs2')
+    (hne : GlobalType.allCommsNonEmptyBranches (gb :: gbs') = true)
+    (branches_det : ∀ {lbs1 lbs2}, BranchesProjRel CProject gbs' role lbs1 →
+      BranchesProjRel CProject gbs' role lbs2 →
+      GlobalType.allCommsNonEmptyBranches gbs' = true → BranchesRel EQ2 lbs1 lbs2) :
+    BranchesRel EQ2 (lb1 :: lbs1') (lb2 :: lbs2') := by
+  cases gb with
+  | mk l gcont =>
+      cases lb1 with
+      | mk l1 t1 =>
+          cases lb2 with
+          | mk l2 t2 =>
+              rcases hpair1 with ⟨hlabel1, hcont1⟩
+              rcases hpair2 with ⟨hlabel2, hcont2⟩
+              have hne' : gcont.allCommsNonEmpty = true ∧
+                  GlobalType.allCommsNonEmptyBranches gbs' = true := by
+                simpa [GlobalType.allCommsNonEmptyBranches] using hne
+              have hcont_eq : EQ2 t1 t2 := project_deterministic hcont1 hcont2 hne'.1
+              have hlabel_eq : l1 = l2 := hlabel1.symm.trans hlabel2
+              have htail_eq := branches_det htail1 htail2 hne'.2
+              cases hlabel_eq
+              exact List.Forall₂.cons ⟨rfl, hcont_eq⟩ htail_eq
+
 /-- Determinism for branch-wise projection up to EQ2 (assuming non-empty comm branches). -/
 theorem branches_proj_deterministic {gbs : List (Label × GlobalType)} {role : String}
     {lbs1 lbs2 : List (Label × LocalTypeR)}
@@ -62,23 +94,8 @@ theorem branches_proj_deterministic {gbs : List (Label × GlobalType)} {role : S
               | cons hpair1 htail1 =>
                   cases h2 with
                   | cons hpair2 htail2 =>
-                      cases gb with
-                      | mk l gcont =>
-                          cases lb1 with
-                          | mk l1 t1 =>
-                              cases lb2 with
-                              | mk l2 t2 =>
-                                  rcases hpair1 with ⟨hlabel1, hcont1⟩
-                                  rcases hpair2 with ⟨hlabel2, hcont2⟩
-                                  have hne' : gcont.allCommsNonEmpty = true ∧
-                                      GlobalType.allCommsNonEmptyBranches gbs' = true := by
-                                    simpa [GlobalType.allCommsNonEmptyBranches] using hne
-                                  have hcont_eq : EQ2 t1 t2 :=
-                                    project_deterministic hcont1 hcont2 hne'.1
-                                  have hlabel_eq : l1 = l2 := hlabel1.symm.trans hlabel2
-                                  have htail_eq :=
-                                    branches_proj_deterministic htail1 htail2 hne'.2
-                                  cases hlabel_eq
-                                  exact List.Forall₂.cons ⟨rfl, hcont_eq⟩ htail_eq
+                      exact branches_proj_deterministic_cons lb1 lbs1' lb2 lbs2' gb gbs'
+                        hpair1 htail1 hpair2 htail2 hne
+                        (fun h1 h2 hne' => branches_proj_deterministic h1 h2 hne')
 
 end RumpsteakV2.Protocol.Projection.Projectb
