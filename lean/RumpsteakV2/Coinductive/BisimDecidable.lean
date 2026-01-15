@@ -456,7 +456,12 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     omega
   apply bisimAll_to_BranchesRelC hlen
   · intro i
-    -- TODO: Prove label matching - dependent type issues with index unification
+    -- TODO: Prove (bs.get i).1 = (cs.get ⟨i.val, hlen ▸ i.isLt⟩).1
+    -- Given:
+    --   hlabels_a : bs.map (·.1) = labels
+    --   hlabels_b : cs.map (·.1) = labels
+    -- Both sides equal labels[i] but have different Fin index types.
+    -- Requires heterogeneous equality or explicit cast reasoning.
     sorry
   · intro i
     -- Children are in BisimRel: extract from bisimAll on nextPairs
@@ -484,7 +489,7 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     -- bisimAll says this pair satisfies bisimAux
     have hpair := hchildren _ hmem'
     -- This means it's in BisimRelCore, hence BisimRel
-    rw [ha_child, hb_child, hchildren_eq_a, hchildren_eq_b]
+    rw [ha_child, hb_child]
     -- TODO: Need to construct hvisited for visited_any using coinductive reasoning
     exact Or.inl ⟨fuel, visited_any, sorry, hpair⟩
 
@@ -519,7 +524,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     omega
   apply bisimAll_to_BranchesRelC hlen
   · intro i
-    -- TODO: Prove label matching - dependent type issues with index unification
+    -- TODO: Same proof as send case - label matching with dependent type indices
     sorry
   · intro i
     -- Children are in BisimRel (same proof as send case)
@@ -542,7 +547,7 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
       rw [hchildren_eq_a, hchildren_eq_b]
       exact hmem
     have hpair := hchildren _ hmem'
-    rw [ha_child, hb_child, hchildren_eq_a, hchildren_eq_b]
+    rw [ha_child, hb_child]
     -- TODO: Need to construct hvisited for visited_any using coinductive reasoning
     exact Or.inl ⟨fuel, visited_any, sorry, hpair⟩
 
