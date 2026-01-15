@@ -341,9 +341,10 @@ impl GlobalType {
     /// 1. All recursion variables are bound
     /// 2. Each communication has at least one branch
     /// 3. Sender ≠ receiver in each communication
+    /// 4. All recursion is guarded (no immediate recursion without communication)
     #[must_use]
     pub fn well_formed(&self) -> bool {
-        self.all_vars_bound() && self.all_comms_non_empty() && self.no_self_comm()
+        self.all_vars_bound() && self.all_comms_non_empty() && self.no_self_comm() && self.is_guarded()
     }
 
     /// Check if a role participates in the global type.
@@ -514,6 +515,7 @@ mod tests {
         // μt. t is not guarded (immediate recursion)
         let unguarded = GlobalType::mu("t", GlobalType::var("t"));
         assert!(!unguarded.is_guarded());
+        assert!(!unguarded.well_formed()); // Unguarded recursion should fail well_formed()
 
         // μt. A -> B: msg. t is guarded
         let guarded = GlobalType::mu(
@@ -521,5 +523,6 @@ mod tests {
             GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
         );
         assert!(guarded.is_guarded());
+        assert!(guarded.well_formed()); // Guarded recursion should pass well_formed()
     }
 }

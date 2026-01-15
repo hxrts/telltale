@@ -548,6 +548,261 @@ fn prop_unguarded_recursion_is_ill_formed() {
 }
 
 // ============================================================================
+// Invariant Tests: Guardedness Enforcement
+// ============================================================================
+
+/// Strategy for generating unguarded global types
+///
+/// A type is unguarded if the body of a mu is either:
+/// - A direct variable reference: μt. t
+/// - Another mu: μt. μs. ...
+fn unguarded_global_strategy() -> BoxedStrategy<GlobalType> {
+    prop_oneof![
+        // Direct unguarded recursion: μt. t
+        Just(GlobalType::mu("t", GlobalType::var("t"))),
+        // Nested unguarded: μt. μs. t
+        Just(GlobalType::mu(
+            "t",
+            GlobalType::mu("s", GlobalType::var("t"))
+        )),
+        // Double unguarded: μt. μs. s
+        Just(GlobalType::mu(
+            "t",
+            GlobalType::mu("s", GlobalType::var("s"))
+        )),
+    ]
+    .boxed()
+}
+
+/// Strategy for generating unguarded local types
+///
+/// A type is unguarded if the body of a mu is either:
+/// - A direct variable reference: μt. t
+/// - Another mu: μt. μs. ...
+fn unguarded_local_strategy() -> BoxedStrategy<LocalTypeR> {
+    prop_oneof![
+        // Direct unguarded recursion: μt. t
+        Just(LocalTypeR::mu("t", LocalTypeR::var("t"))),
+        // Nested unguarded: μt. μs. t
+        Just(LocalTypeR::mu(
+            "t",
+            LocalTypeR::mu("s", LocalTypeR::var("t"))
+        )),
+        // Double unguarded: μt. μs. s
+        Just(LocalTypeR::mu(
+            "t",
+            LocalTypeR::mu("s", LocalTypeR::var("s"))
+        )),
+    ]
+    .boxed()
+}
+
+#[test]
+fn prop_well_formed_global_implies_guarded() {
+    let mut runner = TestRunner::new_with_rng(
+        Config {
+            cases: 100,
+            ..Config::default()
+        },
+        TestRng::from_seed(RngAlgorithm::ChaCha, &SEED),
+    );
+
+    let strategy = global_type_strategy(3);
+
+    for _ in 0..100 {
+        let tree = strategy.new_tree(&mut runner).unwrap();
+        let g = tree.current();
+
+        if g.well_formed() {
+            assert!(
+                g.is_guarded(),
+                "All well-formed global types must be guarded.\nType: {:?}",
+                g
+            );
+        }
+    }
+}
+
+#[test]
+fn prop_well_formed_local_implies_guarded() {
+    let mut runner = TestRunner::new_with_rng(
+        Config {
+            cases: 100,
+            ..Config::default()
+        },
+        TestRng::from_seed(RngAlgorithm::ChaCha, &SEED),
+    );
+
+    let strategy = local_type_strategy(3);
+
+    for _ in 0..100 {
+        let tree = strategy.new_tree(&mut runner).unwrap();
+        let lt = tree.current();
+
+        if lt.well_formed() {
+            assert!(
+                lt.is_guarded(),
+                "All well-formed local types must be guarded.\nType: {:?}",
+                lt
+            );
+        }
+    }
+}
+
+#[test]
+fn prop_unguarded_global_not_well_formed() {
+    let mut runner = TestRunner::new_with_rng(
+        Config {
+            cases: 50,
+            ..Config::default()
+        },
+        TestRng::from_seed(RngAlgorithm::ChaCha, &SEED),
+    );
+
+    let strategy = unguarded_global_strategy();
+
+    for _ in 0..50 {
+        let tree = strategy.new_tree(&mut runner).unwrap();
+        let g = tree.current();
+
+        assert!(
+            !g.is_guarded(),
+            "Generated type should be unguarded.\nType: {:?}",
+            g
+        );
+        assert!(
+            !g.well_formed(),
+            "Unguarded global types must not be well-formed.\nType: {:?}",
+            g
+        );
+    }
+}
+
+#[test]
+fn prop_unguarded_local_not_well_formed() {
+    let mut runner = TestRunner::new_with_rng(
+        Config {
+            cases: 50,
+            ..Config::default()
+        },
+        TestRng::from_seed(RngAlgorithm::ChaCha, &SEED),
+    );
+
+    let strategy = unguarded_local_strategy();
+
+    for _ in 0..50 {
+        let tree = strategy.new_tree(&mut runner).unwrap();
+        let lt = tree.current();
+
+        assert!(
+            !lt.is_guarded(),
+            "Generated type should be unguarded.\nType: {:?}",
+            lt
+        );
+        assert!(
+            !lt.well_formed(),
+            "Unguarded local types must not be well-formed.\nType: {:?}",
+            lt
+        );
+    }
+}
+
+#[test]
+fn prop_guardedness_equivalence_global() {
+    // Verify that well_formed() and is_guarded() are properly linked
+    // For types that only differ in guardedness, well_formed() should match is_guarded()
+
+    // Unguarded: μt. t
+    let unguarded = GlobalType::mu("t", GlobalType::var("t"));
+    assert!(!unguarded.is_guarded());
+    assert!(!unguarded.well_formed());
+
+    // Guarded: μt. A -> B: msg. t
+    let guarded = GlobalType::mu(
+        "t",
+        GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
+    );
+    assert!(guarded.is_guarded());
+    assert!(guarded.well_formed());
+
+    // Nested mu without guard: μt. μs. t
+    let nested_unguarded = GlobalType::mu("t", GlobalType::mu("s", GlobalType::var("t")));
+    assert!(!nested_unguarded.is_guarded());
+    assert!(!nested_unguarded.well_formed());
+}
+
+#[test]
+fn prop_guardedness_equivalence_local() {
+    // Verify that well_formed() and is_guarded() are properly linked
+
+    // Unguarded: μt. t
+    let unguarded = LocalTypeR::mu("t", LocalTypeR::var("t"));
+    assert!(!unguarded.is_guarded());
+    assert!(!unguarded.well_formed());
+
+    // Guarded: μt. !B{msg.t}
+    let guarded = LocalTypeR::mu(
+        "t",
+        LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("t")),
+    );
+    assert!(guarded.is_guarded());
+    assert!(guarded.well_formed());
+
+    // Nested mu without guard: μt. μs. t
+    let nested_unguarded = LocalTypeR::mu("t", LocalTypeR::mu("s", LocalTypeR::var("t")));
+    assert!(!nested_unguarded.is_guarded());
+    assert!(!nested_unguarded.well_formed());
+}
+
+#[test]
+fn prop_generated_global_types_are_guarded() {
+    let mut runner = TestRunner::new_with_rng(
+        Config {
+            cases: 100,
+            ..Config::default()
+        },
+        TestRng::from_seed(RngAlgorithm::ChaCha, &SEED),
+    );
+
+    let strategy = global_type_strategy(3);
+
+    for _ in 0..100 {
+        let tree = strategy.new_tree(&mut runner).unwrap();
+        let g = tree.current();
+
+        assert!(
+            g.is_guarded(),
+            "Generated global types should always be guarded.\nType: {:?}",
+            g
+        );
+    }
+}
+
+#[test]
+fn prop_generated_local_types_are_guarded() {
+    let mut runner = TestRunner::new_with_rng(
+        Config {
+            cases: 100,
+            ..Config::default()
+        },
+        TestRng::from_seed(RngAlgorithm::ChaCha, &SEED),
+    );
+
+    let strategy = local_type_strategy(3);
+
+    for _ in 0..100 {
+        let tree = strategy.new_tree(&mut runner).unwrap();
+        let lt = tree.current();
+
+        assert!(
+            lt.is_guarded(),
+            "Generated local types should always be guarded.\nType: {:?}",
+            lt
+        );
+    }
+}
+
+// ============================================================================
 // Invariant Tests: Semantics (Async Step)
 // ============================================================================
 

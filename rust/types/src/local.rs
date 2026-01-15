@@ -276,9 +276,10 @@ impl LocalTypeR {
     /// A local type is well-formed if:
     /// 1. All recursion variables are bound
     /// 2. Each choice has at least one branch
+    /// 3. All recursion is guarded (no immediate recursion without communication)
     #[must_use]
     pub fn well_formed(&self) -> bool {
-        self.all_vars_bound() && self.all_choices_non_empty()
+        self.all_vars_bound() && self.all_choices_non_empty() && self.is_guarded()
     }
 
     /// Count the depth of a local type (for termination proofs).
@@ -451,6 +452,7 @@ mod tests {
         // μt. t is not guarded
         let unguarded = LocalTypeR::mu("t", LocalTypeR::var("t"));
         assert!(!unguarded.is_guarded());
+        assert!(!unguarded.well_formed()); // Unguarded recursion should fail well_formed()
 
         // μt. !B{msg.t} is guarded
         let guarded = LocalTypeR::mu(
@@ -458,6 +460,7 @@ mod tests {
             LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("t")),
         );
         assert!(guarded.is_guarded());
+        assert!(guarded.well_formed()); // Guarded recursion should pass well_formed()
     }
 
     #[test]
