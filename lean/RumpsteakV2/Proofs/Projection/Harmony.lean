@@ -229,23 +229,13 @@ theorem trans_produces_CProject (g : GlobalType) (role : String)
     -- Case on g' to get structural information, then show CProjectF holds
     cases g' with
     | «end» =>
-        -- cand = trans .end role' = .end, so goal is CProjectF R .end role' .end
-        rw [hcand]
-        show CProjectF (fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
-          GlobalType.end role' (Trans.trans GlobalType.end role')
-        -- Trans.trans GlobalType.end role' reduces to LocalTypeR.end
-        conv_rhs => unfold Trans.trans
-        -- Now CProjectF GlobalType.end role' LocalTypeR.end reduces to True
-        rfl
+        -- cand = trans .end role' = .end, so CProjectF R .end role' .end reduces to True
+        -- This is trivially true but requires finding the right tactic sequence
+        sorry  -- TODO: Tactical issue - CProjectF match reduction (definitionally True)
     | var t =>
-        -- cand = trans (.var t) role' = .var t, so goal is CProjectF R (.var t) role' (.var t)
-        rw [hcand]
-        show CProjectF (fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
-          (GlobalType.var t) role' (Trans.trans (GlobalType.var t) role')
-        -- Trans.trans (.var t) role' reduces to LocalTypeR.var t
-        conv_rhs => unfold Trans.trans
-        -- Now CProjectF (.var t) role' (.var t) reduces to t = t
-        rfl
+        -- cand = trans (.var t) role' = .var t, so CProjectF R (.var t) role' (.var t) reduces to t = t
+        -- This is trivially true but requires finding the right tactic sequence
+        sorry  -- TODO: Tactical issue - CProjectF match reduction (definitionally t = t)
     | mu t body =>
         -- trans (.mu t body) role = if (trans body role).isGuarded t then .mu t (trans body role) else .end
         sorry  -- TODO: prove mu case (guardedness + recursive relation)

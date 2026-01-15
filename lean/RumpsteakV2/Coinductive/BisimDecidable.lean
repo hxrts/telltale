@@ -465,13 +465,13 @@ lemma obsMatch_send_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     have hchildren_eq_a := childrenOf_send_eq_snd_branchesOf hhead_a
     have hchildren_eq_b := childrenOf_send_eq_snd_branchesOf hhead_b
     -- The children are the second components
-    have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩ := by
+    have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by rw [List.length_map]; exact i.isLt⟩ := by
       exact (List.get_map' (·.2) bs i).symm
-    have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩ := by
+    have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by rw [List.length_map, hlen]; exact i.isLt⟩ := by
       exact (List.get_map' (·.2) cs ⟨i.val, hlen ▸ i.isLt⟩).symm
     -- The pair is in the zip
-    have hmem : ((List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩,
-                 (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩) ∈
+    have hmem : ((List.map (·.2) bs).get ⟨i.val, by rw [List.length_map]; exact i.isLt⟩,
+                 (List.map (·.2) cs).get ⟨i.val, by rw [List.length_map, hlen]; exact i.isLt⟩) ∈
                 List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
       rw [List.length_map, List.length_map, hlen]
@@ -521,12 +521,12 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     simp only [nextPairs, zipChildren, bisimAll, List.all_eq_true] at hchildren
     have hchildren_eq_a := childrenOf_recv_eq_snd_branchesOf hhead_a
     have hchildren_eq_b := childrenOf_recv_eq_snd_branchesOf hhead_b
-    have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩ := by
+    have ha_child : (bs.get i).2 = (List.map (·.2) bs).get ⟨i.val, by rw [List.length_map]; exact i.isLt⟩ := by
       exact (List.get_map' (·.2) bs i).symm
-    have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩ := by
+    have hb_child : (cs.get ⟨i.val, hlen ▸ i.isLt⟩).2 = (List.map (·.2) cs).get ⟨i.val, by rw [List.length_map, hlen]; exact i.isLt⟩ := by
       exact (List.get_map' (·.2) cs ⟨i.val, hlen ▸ i.isLt⟩).symm
-    have hmem : ((List.map (·.2) bs).get ⟨i.val, by simp [i.isLt]⟩,
-                 (List.map (·.2) cs).get ⟨i.val, by simp [hlen, i.isLt]⟩) ∈
+    have hmem : ((List.map (·.2) bs).get ⟨i.val, by rw [List.length_map]; exact i.isLt⟩,
+                 (List.map (·.2) cs).get ⟨i.val, by rw [List.length_map, hlen]; exact i.isLt⟩) ∈
                 List.zip (List.map (·.2) bs) (List.map (·.2) cs) := by
       apply List.get_mem_zip
       rw [List.length_map, List.length_map, hlen]

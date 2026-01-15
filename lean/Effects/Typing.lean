@@ -695,10 +695,21 @@ theorem typed_step_preserves_coherence {G D S store bufs P G' D' S' store' bufs'
     hCoh
   | .par_left hTS hDisjG hDisjD hDisjS, hCoh => by
     -- Left transition preserves its part, right unchanged
-    sorry  -- Need to extract G₁ coherence from merged coherence and apply IH
+    -- hCoh : Coherent (G₁ ++ G₂) (D₁ ++ D₂)
+    -- Goal: Coherent (G₁' ++ G₂) (D₁' ++ D₂)
+    -- Strategy: For any edge e, EdgeCoherent looks up in merged envs
+    -- Since G₁, G₂ disjoint, lookup in (G₁ ++ G₂) either finds in G₁ or G₂
+    -- If found in G₁ (updated to G₁'), use IH; if in G₂ (unchanged), use original
+    intro e
+    unfold EdgeCoherent
+    -- The proof requires reasoning about which environment e belongs to
+    -- and using disjointness to show lookups commute with updates
+    sorry  -- Need lemmas about lookup_append and disjointness
   | .par_right hTS hDisjG hDisjD hDisjS, hCoh => by
     -- Symmetric to par_left
-    sorry  -- Need to extract G₂ coherence from merged coherence and apply IH
+    intro e
+    unfold EdgeCoherent
+    sorry  -- Symmetric proof to par_left
   | .par_skip_left, hCoh =>
     hCoh
   | .par_skip_right, hCoh =>
