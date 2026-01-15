@@ -148,90 +148,81 @@ private theorem BranchesEmbedRel_to_Proj {lbs : List (Label × LocalTypeR)}
   | cons hpair _ ih =>
       exact List.Forall₂.cons ⟨hpair.1.symm, hpair.2⟩ ih
 
+/-- Helper: embed implies project for end case. -/
+private theorem embed_implies_project_end {g : GlobalType} {role : String}
+    (hF : CEmbedF CEmbed LocalTypeR.end role g) :
+    CProjectF (fun g r e => CEmbed e r g) g role LocalTypeR.end := by
+  cases g with
+  | «end» => simp [CProjectF]
+  | var _ | mu _ _ | comm _ _ _ => simp [CEmbedF] at hF
+
+/-- Helper: embed implies project for var case. -/
+private theorem embed_implies_project_var {t : String} {g : GlobalType} {role : String}
+    (hF : CEmbedF CEmbed (LocalTypeR.var t) role g) :
+    CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.var t) := by
+  cases g with
+  | var t' => simp [CEmbedF] at hF; exact hF.symm
+  | «end» | mu _ _ | comm _ _ _ => simp [CEmbedF] at hF
+
+/-- Helper: embed implies project for mu case. -/
+private theorem embed_implies_project_mu {t : String} {body : LocalTypeR}
+    {g : GlobalType} {role : String}
+    (hF : CEmbedF CEmbed (LocalTypeR.mu t body) role g) :
+    CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.mu t body) := by
+  cases g with
+  | mu t' gbody =>
+      simp [CEmbedF] at hF
+      rcases hF with ⟨ht, hcontr, hbody⟩
+      use body
+      constructor
+      · exact hbody
+      · left
+        subst ht
+        exact ⟨hcontr, rfl⟩
+  | «end» | var _ | comm _ _ _ => simp [CEmbedF] at hF
+
+/-- Helper: embed implies project for send case. -/
+private theorem embed_implies_project_send {receiver : String}
+    {lbs : List (Label × LocalTypeR)} {g : GlobalType} {role : String}
+    (hF : CEmbedF CEmbed (LocalTypeR.send receiver lbs) role g) :
+    CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.send receiver lbs) := by
+  cases g with
+  | comm sender receiver' gbs =>
+      simp [CEmbedF] at hF
+      rcases hF with ⟨hrole, _, hrecv, hbr⟩
+      subst hrole
+      simp [CProjectF]
+      exact ⟨hrecv, BranchesEmbedRel_to_Proj hbr⟩
+  | «end» | var _ | mu _ _ => simp [CEmbedF] at hF
+
+/-- Helper: embed implies project for recv case. -/
+private theorem embed_implies_project_recv {sender : String}
+    {lbs : List (Label × LocalTypeR)} {g : GlobalType} {role : String}
+    (hF : CEmbedF CEmbed (LocalTypeR.recv sender lbs) role g) :
+    CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.recv sender lbs) := by
+  cases g with
+  | comm sender' receiver gbs =>
+      simp [CEmbedF] at hF
+      rcases hF with ⟨hrole, hneq, hsend, hbr⟩
+      subst hrole
+      have hneq' : role ≠ sender' := fun h => hneq h.symm
+      simp [CProjectF, hneq']
+      exact ⟨hsend, BranchesEmbedRel_to_Proj hbr⟩
+  | «end» | var _ | mu _ _ => simp [CEmbedF] at hF
+
 /-- Embedding implies projection (CEmbed ⊆ CProject with swapped arguments). -/
 theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType}
     (h : CEmbed e role g) : CProject g role e := by
-  -- Coinduction on CProject using the relation R g role e := CEmbed e role g.
   have hpost : ∀ g role e, (fun g r e => CEmbed e r g) g role e →
       CProjectF (fun g r e => CEmbed e r g) g role e := by
     intro g role e he
     have hF := CEmbed_destruct he
     cases e with
-    | «end» =>
-        cases g with
-        | «end» =>
-            simp [CProjectF]
-        | var _ =>
-            simp [CEmbedF] at hF
-        | mu _ _ =>
-            simp [CEmbedF] at hF
-        | comm _ _ _ =>
-            simp [CEmbedF] at hF
-    | var t =>
-        cases g with
-        | «end» =>
-            simp [CEmbedF] at hF
-        | var t' =>
-            simp [CEmbedF] at hF
-            exact hF.symm
-        | mu _ _ =>
-            simp [CEmbedF] at hF
-        | comm _ _ _ =>
-            simp [CEmbedF] at hF
-    | mu t body =>
-        cases g with
-        | «end» =>
-            simp [CEmbedF] at hF
-        | var _ =>
-            simp [CEmbedF] at hF
-        | mu t' gbody =>
-            simp [CEmbedF] at hF
-            rcases hF with ⟨ht, hcontr, hbody⟩
-            -- Goal: CProjectF (fun g r e => CEmbed e r g) (GlobalType.mu t' gbody) role (LocalTypeR.mu t body)
-            -- CProjectF for mu: ∃ candBody, R gbody role candBody ∧ ((candBody.isGuarded t' = true ∧ cand = .mu t' candBody) ∨ ...)
-            use body
-            constructor
-            · exact hbody
-            · left
-              subst ht
-              exact ⟨hcontr, rfl⟩
-        | comm _ _ _ =>
-            simp [CEmbedF] at hF
-    | send receiver lbs =>
-        cases g with
-        | «end» =>
-            simp [CEmbedF] at hF
-        | var _ =>
-            simp [CEmbedF] at hF
-        | mu _ _ =>
-            simp [CEmbedF] at hF
-        | comm sender receiver' gbs =>
-            simp [CEmbedF] at hF
-            rcases hF with ⟨hrole, _, hrecv, hbr⟩
-            subst hrole
-            have hbr' : BranchesProjRel (fun g r e => CEmbed e r g) gbs role lbs :=
-              BranchesEmbedRel_to_Proj hbr
-            simp [CProjectF]
-            exact ⟨hrecv, hbr'⟩
-    | recv sender lbs =>
-        cases g with
-        | «end» =>
-            simp [CEmbedF] at hF
-        | var _ =>
-            simp [CEmbedF] at hF
-        | mu _ _ =>
-            simp [CEmbedF] at hF
-        | comm sender' receiver gbs =>
-            simp [CEmbedF] at hF
-            rcases hF with ⟨hrole, hneq, hsend, hbr⟩
-            subst hrole
-            have hneq' : role ≠ sender' := by
-              intro hrole'
-              exact hneq hrole'.symm
-            have hbr' : BranchesProjRel (fun g r e => CEmbed e r g) gbs role lbs :=
-              BranchesEmbedRel_to_Proj hbr
-            simp [CProjectF, hneq']
-            exact ⟨hsend, hbr'⟩
+    | «end» => exact embed_implies_project_end hF
+    | var t => exact embed_implies_project_var hF
+    | mu t body => exact embed_implies_project_mu hF
+    | send receiver lbs => exact embed_implies_project_send hF
+    | recv sender lbs => exact embed_implies_project_recv hF
   exact CProject_coind (R := fun g r e => CEmbed e r g) hpost g role e h
 
 /-- Alias: embedding implies projection. -/
