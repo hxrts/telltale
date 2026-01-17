@@ -1208,14 +1208,64 @@ theorem GlobalType.allCommsNonEmpty_comm_branches (sender receiver : String)
   simp only [GlobalType.allCommsNonEmpty, Bool.and_eq_true] at hallcomms
   exact allCommsNonEmptyBranches_forall branches hallcomms.2
 
-/-- A well-formed comm has well-formed branch continuations.
+private theorem noSelfCommBranches_forall (branches : List (Label × GlobalType))
+    (h : noSelfCommBranches branches = true) :
+    ∀ p ∈ branches, p.2.noSelfComm = true := by
+  induction branches with
+  | nil => intro p hp; cases hp
+  | cons hd tl ih =>
+      simp only [noSelfCommBranches, Bool.and_eq_true] at h
+      intro p hp
+      cases hp with
+      | head _ => exact h.1
+      | tail _ hmem => exact ih h.2 p hmem
 
-This is straightforwardly true by the definitions of wellFormed and its components,
-but requires tedious induction through each component. Left as axiom temporarily. -/
-axiom GlobalType.wellFormed_comm_branches (sender receiver : String)
+/-- A comm with noSelfComm has all branch continuations with noSelfComm. -/
+theorem GlobalType.noSelfComm_comm_branches (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (hns : (GlobalType.comm sender receiver branches).noSelfComm = true) :
+    ∀ p ∈ branches, p.2.noSelfComm = true := by
+  simp only [GlobalType.noSelfComm, Bool.and_eq_true] at hns
+  exact noSelfCommBranches_forall branches hns.2
+
+private theorem isProductiveBranches_forall (branches : List (Label × GlobalType))
+    (unguarded : List String)
+    (h : isProductiveBranches branches unguarded = true) :
+    ∀ p ∈ branches, p.2.isProductive unguarded = true := by
+  induction branches with
+  | nil => intro p hp; cases hp
+  | cons hd tl ih =>
+      simp only [isProductiveBranches, Bool.and_eq_true] at h
+      intro p hp
+      cases hp with
+      | head _ => exact h.1
+      | tail _ hmem => exact ih h.2 p hmem
+
+/-- A comm that is productive has productive branch continuations. -/
+theorem GlobalType.isProductive_comm_branches (sender receiver : String)
+    (branches : List (Label × GlobalType))
+    (hprod : (GlobalType.comm sender receiver branches).isProductive = true) :
+    ∀ p ∈ branches, p.2.isProductive = true := by
+  simp only [GlobalType.isProductive] at hprod
+  exact isProductiveBranches_forall branches [] hprod
+
+/-- A well-formed comm has well-formed branch continuations. -/
+theorem GlobalType.wellFormed_comm_branches (sender receiver : String)
     (branches : List (Label × GlobalType))
     (hwf : (GlobalType.comm sender receiver branches).wellFormed = true) :
-    ∀ b ∈ branches, b.2.wellFormed = true
+    ∀ b ∈ branches, b.2.wellFormed = true := by
+  intro b hb
+  simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+  obtain ⟨⟨⟨hvars, hallcomms⟩, hnoself⟩, hprod⟩ := hwf
+  have hvars_b : b.2.allVarsBound = true :=
+    allVarsBound_comm_branches sender receiver branches hvars b hb
+  have hallcomms_b : b.2.allCommsNonEmpty = true :=
+    GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hallcomms b hb
+  have hnoself_b : b.2.noSelfComm = true :=
+    GlobalType.noSelfComm_comm_branches sender receiver branches hnoself b hb
+  have hprod_b : b.2.isProductive = true :=
+    GlobalType.isProductive_comm_branches sender receiver branches hprod b hb
+  simp [GlobalType.wellFormed, hvars_b, hallcomms_b, hnoself_b, hprod_b]
 
 /-- Helper for freeVars_substitute_subset: branches case with explicit IH.
 
@@ -1487,5 +1537,11 @@ partial def GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
   match g.muHeight with
   | 0 => g
   | _ => (g.unfold).fullUnfold
+
+/-- Fully unfold a global type by iterating `unfold` exactly `muHeight` times.
+    This matches the Coq `full_unf` definition used in the reference proofs. -/
+def GlobalType.fullUnfoldIter (g : GlobalType) : GlobalType :=
+  Nat.rec (motive := fun _ => GlobalType) g
+    (fun _ acc => GlobalType.unfold acc) g.muHeight
 
 end RumpsteakV2.Protocol.GlobalType
