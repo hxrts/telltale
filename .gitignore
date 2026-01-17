@@ -39,6 +39,7 @@ rust-project.json
 # Working
 work/
 ext/
+iris-lean/
 
 # Generated documentation
 /docs/book/
