@@ -88,6 +88,23 @@ def CanSendC (t : LocalTypeC) (p : String) (bs : List (Label × LocalTypeC)) : P
 def CanRecvC (t : LocalTypeC) (p : String) (bs : List (Label × LocalTypeC)) : Prop :=
   ∃ u labels, UnfoldsToC t u ∧ head u = .recv p labels ∧ bs = branchesOf u
 
+/-! ## Base cases from head equality -/
+
+lemma UnfoldsToEndC_of_head {t : LocalTypeC} (h : head t = .end) : UnfoldsToEndC t := by
+  exact ⟨t, Relation.ReflTransGen.refl, h⟩
+
+lemma UnfoldsToVarC_of_head {t : LocalTypeC} {v : String} (h : head t = .var v) :
+    UnfoldsToVarC t v := by
+  exact ⟨t, Relation.ReflTransGen.refl, h⟩
+
+lemma CanSendC_of_head {t : LocalTypeC} {p : String} {labels : List Label}
+    (h : head t = .send p labels) : CanSendC t p (branchesOf t) := by
+  exact ⟨t, labels, Relation.ReflTransGen.refl, h, rfl⟩
+
+lemma CanRecvC_of_head {t : LocalTypeC} {p : String} {labels : List Label}
+    (h : head t = .recv p labels) : CanRecvC t p (branchesOf t) := by
+  exact ⟨t, labels, Relation.ReflTransGen.refl, h, rfl⟩
+
 /-! ## Observability -/
 
 /-- A coinductive type is observable if it reaches some communication head

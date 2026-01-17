@@ -5,9 +5,9 @@ import RumpsteakV2.Coinductive.WellFormed
 set_option linter.dupNamespace false
 
 /-
-The Problem. EQ2C is defined as an existentially quantified bisimulation, but
-practical proofs need lemmas showing how EQ2C interacts with smart constructors
-and mu-unfolding.
+EQ2C is defined as an existentially quantified bisimulation, but practical
+proofs need lemmas showing how EQ2C interacts with smart constructors and
+mu-unfolding.
 
 The difficulty is that mu-unfolding on one side of an EQ2C relation requires
 constructing a new bisimulation that accounts for the unfolding step. Similarly,
@@ -22,6 +22,32 @@ Solution Structure.
 -/
 
 namespace RumpsteakV2.Coinductive
+
+/-! ## Local helpers (dest equality / mu eta) -/
+
+private lemma eq_of_dest_eq {a b : LocalTypeC} (h : PFunctor.M.dest a = PFunctor.M.dest b) :
+    a = b := by
+  refine PFunctor.M.bisim (R := fun x y => PFunctor.M.dest x = PFunctor.M.dest y) ?_ a b h
+  intro x y hxy
+  cases hx : x.dest with
+  | mk a f =>
+      have hy : y.dest = ⟨a, f⟩ := by
+        simpa [hx] using hxy.symm
+      refine ⟨a, f, f, rfl, hy, ?_⟩
+      intro i
+      rfl
+
+private lemma mu_eta {b : LocalTypeC} {x : String} {k : Unit → LocalTypeC}
+    (hdest : PFunctor.M.dest b = ⟨LocalTypeHead.mu x, k⟩) : b = mkMu x (k ()) := by
+  have hk : k = fun _ => k () := by
+    funext u
+    cases u
+    rfl
+  have hdest' : PFunctor.M.dest b = ⟨LocalTypeHead.mu x, fun _ => k ()⟩ := by
+    have hdest' := hdest
+    rw [hk] at hdest'
+    exact hdest'
+  exact eq_of_dest_eq hdest'
 
 /-! ## Variable unfolding utilities -/
 
@@ -102,6 +128,16 @@ lemma EQ2C_mkVar_right_unfolds {x : String} {a : LocalTypeC}
     (h : EQ2C a (mkVar x)) : UnfoldsToVarC a x := by
   have h' : EQ2C (mkVar x) a := EQ2C_symm h
   exact EQ2C_mkVar_left_unfolds h'
+
+/-! ## Observable step from EQ2C -/
+
+lemma EQ2C_observableRel {a b : LocalTypeC} (h : EQ2C a b) :
+    ∃ _ : ObservableC a, ∃ _ : ObservableC b, ObservableRelC EQ2C a b := by
+  rcases h with ⟨R, hR, hab⟩
+  obtain ⟨obs_a, obs_b, hrel⟩ := hR _ _ hab
+  -- Any bisimulation witness is contained in EQ2C by definition.
+  have hR_le : R ≤ EQ2C := fun x y hxy => ⟨R, hR, hxy⟩
+  exact ⟨obs_a, obs_b, ObservableRelC_mono hR_le hrel⟩
 
 /-! ## Communication congruence -/
 
@@ -294,5 +330,122 @@ lemma ObservableRelC_mu_right {R : LocalTypeC → LocalTypeC → Prop} {x : Stri
       have hmu : CanRecvC (mkMu x u) p cs :=
         ⟨uu, labels, Relation.ReflTransGen.head hstep hsteps_u, hhead_u, hcs⟩
       exact ObservableRelC.is_recv p bs cs ht hmu hbr
+
+/-! ## ObservableRelC stability under μ-unfolding -/
+
+lemma ObservableRelC_unfoldsC_left {R : LocalTypeC → LocalTypeC → Prop}
+    {a a' b : LocalTypeC} (hstep : UnfoldsC a a') (hrel : ObservableRelC R a' b) :
+    ObservableRelC R a b := by
+  rcases hstep with ⟨x, f, hdest, rfl⟩
+  have ha : a = mkMu x (f ()) := mu_eta (b := a) (x := x) (k := f) hdest
+  have hrel' : ObservableRelC R (mkMu x (f ())) b := ObservableRelC_mu_left (x := x) hrel
+  simpa [ha] using hrel'
+
+
+lemma ObservableRelC_unfoldsC_right {R : LocalTypeC → LocalTypeC → Prop}
+    {a b b' : LocalTypeC} (hstep : UnfoldsC b b') (hrel : ObservableRelC R a b') :
+    ObservableRelC R a b := by
+  rcases hstep with ⟨x, f, hdest, rfl⟩
+  have hb : b = mkMu x (f ()) := mu_eta (b := b) (x := x) (k := f) hdest
+  have hrel' : ObservableRelC R a (mkMu x (f ())) := ObservableRelC_mu_right (x := x) hrel
+  simpa [hb] using hrel'
+
+
+lemma ObservableRelC_unfoldsTo_left {R : LocalTypeC → LocalTypeC → Prop}
+    {a a' b : LocalTypeC} (hsteps : UnfoldsToC a a') (hrel : ObservableRelC R a' b) :
+    ObservableRelC R a b := by
+  induction hsteps generalizing b with
+  | refl => exact hrel
+  | tail hsteps hstep ih =>
+      have hrel' : ObservableRelC R _ b := ObservableRelC_unfoldsC_left hstep hrel
+      exact ih hrel'
+
+lemma ObservableRelC_unfoldsTo_right {R : LocalTypeC → LocalTypeC → Prop}
+    {a b b' : LocalTypeC} (hsteps : UnfoldsToC b b') (hrel : ObservableRelC R a b') :
+    ObservableRelC R a b := by
+  induction hsteps generalizing a with
+  | refl => exact hrel
+  | tail hsteps hstep ih =>
+      have hrel' : ObservableRelC R a _ := ObservableRelC_unfoldsC_right hstep hrel
+      exact ih hrel'
+
+/-! ## ObservableRelC inversion through μ-unfolding -/
+
+private lemma UnfoldsC_rightUnique : Relator.RightUnique UnfoldsC := by
+  intro a b c hab hac
+  rcases hab with ⟨x, f, hdest, rfl⟩
+  rcases hac with ⟨y, g, hdest', rfl⟩
+  have hpair :
+      (⟨LocalTypeHead.mu x, f⟩ : LocalTypeF LocalTypeC) =
+        ⟨LocalTypeHead.mu y, g⟩ := by
+    exact hdest.symm.trans hdest'
+  cases hpair
+  rfl
+
+private lemma UnfoldsToC_tail_of_step {a a' u : LocalTypeC}
+    (hstep : UnfoldsC a a') (hunf : UnfoldsToC a u)
+    (hnomu : ¬ (∃ x, head u = .mu x)) : UnfoldsToC a' u := by
+  rcases Relation.ReflTransGen.cases_head hunf with (hEq | hstep')
+  · -- refl: u = a, but a is mu by hstep, contradiction with hnomu
+    subst hEq
+    rcases hstep with ⟨x, f, hdest, rfl⟩
+    have hmu : head a = .mu x := by
+      simp [head, hdest]
+    exact (hnomu ⟨x, hmu⟩).elim
+  · rcases hstep' with ⟨c, hstep', hrest⟩
+    have hc : c = a' := by
+      exact UnfoldsC_rightUnique hstep' hstep
+    subst hc
+    exact hrest
+
+lemma ObservableRelC_unfoldsC_left_inv {R : LocalTypeC → LocalTypeC → Prop}
+    {a a' b : LocalTypeC} (hstep : UnfoldsC a a') (hrel : ObservableRelC R a b) :
+    ObservableRelC R a' b := by
+  cases hrel with
+  | is_end ha hb =>
+      rcases ha with ⟨u, hunf, hhead⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC a' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_end ⟨u, hunf', hhead⟩ hb
+  | is_var v ha hb =>
+      rcases ha with ⟨u, hunf, hhead⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC a' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_var v ⟨u, hunf', hhead⟩ hb
+  | is_send p bs cs ha hb hbr =>
+      rcases ha with ⟨u, labels, hunf, hhead, hbs⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC a' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_send p bs cs ⟨u, labels, hunf', hhead, hbs⟩ hb hbr
+  | is_recv p bs cs ha hb hbr =>
+      rcases ha with ⟨u, labels, hunf, hhead, hbs⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC a' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_recv p bs cs ⟨u, labels, hunf', hhead, hbs⟩ hb hbr
+
+lemma ObservableRelC_unfoldsC_right_inv {R : LocalTypeC → LocalTypeC → Prop}
+    {a b b' : LocalTypeC} (hstep : UnfoldsC b b') (hrel : ObservableRelC R a b) :
+    ObservableRelC R a b' := by
+  cases hrel with
+  | is_end ha hb =>
+      rcases hb with ⟨u, hunf, hhead⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC b' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_end ha ⟨u, hunf', hhead⟩
+  | is_var v ha hb =>
+      rcases hb with ⟨u, hunf, hhead⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC b' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_var v ha ⟨u, hunf', hhead⟩
+  | is_send p bs cs ha hb hbr =>
+      rcases hb with ⟨u, labels, hunf, hhead, hbs⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC b' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_send p bs cs ha ⟨u, labels, hunf', hhead, hbs⟩ hbr
+  | is_recv p bs cs ha hb hbr =>
+      rcases hb with ⟨u, labels, hunf, hhead, hbs⟩
+      have hnomu : ¬ (∃ x, head u = .mu x) := by simp [hhead]
+      have hunf' : UnfoldsToC b' u := UnfoldsToC_tail_of_step hstep hunf hnomu
+      exact ObservableRelC.is_recv p bs cs ha ⟨u, labels, hunf', hhead, hbs⟩ hbr
 
 end RumpsteakV2.Coinductive
