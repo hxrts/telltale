@@ -156,15 +156,27 @@ fn test_guarded_recursion_accepted() {
         local_a.is_guarded(),
         "Projected local type for A should be guarded"
     );
-    assert!(local_a.well_formed(), "Projected local type should be well-formed");
-    assert!(validate_local(&local_a).is_ok(), "Projected type should validate");
+    assert!(
+        local_a.well_formed(),
+        "Projected local type should be well-formed"
+    );
+    assert!(
+        validate_local(&local_a).is_ok(),
+        "Projected type should validate"
+    );
 
     assert!(
         local_b.is_guarded(),
         "Projected local type for B should be guarded"
     );
-    assert!(local_b.well_formed(), "Projected local type should be well-formed");
-    assert!(validate_local(&local_b).is_ok(), "Projected type should validate");
+    assert!(
+        local_b.well_formed(),
+        "Projected local type should be well-formed"
+    );
+    assert!(
+        validate_local(&local_b).is_ok(),
+        "Projected type should validate"
+    );
 }
 
 // ============================================================================
@@ -221,11 +233,7 @@ fn test_various_unguarded_patterns_all_rejected() {
     ];
 
     for (name, protocol) in unguarded_patterns {
-        assert!(
-            !protocol.is_guarded(),
-            "{} should be unguarded",
-            name
-        );
+        assert!(!protocol.is_guarded(), "{} should be unguarded", name);
         assert!(
             !protocol.well_formed(),
             "{} should not be well-formed",
@@ -373,8 +381,14 @@ fn test_realistic_deadlock_scenario() {
     assert!(local_b.is_ok(), "Should project for role B");
 
     // Both projected types should be guarded
-    assert!(local_a.unwrap().is_guarded(), "A's local type should be guarded");
-    assert!(local_b.unwrap().is_guarded(), "B's local type should be guarded");
+    assert!(
+        local_a.unwrap().is_guarded(),
+        "A's local type should be guarded"
+    );
+    assert!(
+        local_b.unwrap().is_guarded(),
+        "B's local type should be guarded"
+    );
 }
 
 // ============================================================================

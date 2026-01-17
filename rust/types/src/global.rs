@@ -344,7 +344,10 @@ impl GlobalType {
     /// 4. All recursion is guarded (no immediate recursion without communication)
     #[must_use]
     pub fn well_formed(&self) -> bool {
-        self.all_vars_bound() && self.all_comms_non_empty() && self.no_self_comm() && self.is_guarded()
+        self.all_vars_bound()
+            && self.all_comms_non_empty()
+            && self.no_self_comm()
+            && self.is_guarded()
     }
 
     /// Check if a role participates in the global type.
