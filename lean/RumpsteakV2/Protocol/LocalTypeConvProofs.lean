@@ -1360,4 +1360,16 @@ theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
       exact hsnd
   exact hrec ctx hfreshAll hcontr hclosed
 
+/-! ## Substitution (Named → DB) -/
+
+/-- If a variable is not free, named substitution is a no-op and conversion is unchanged. -/
+theorem toDB?_substitute_not_free
+    (t repl : LocalTypeR) (ctx : Context) (x : String) (db : LocalTypeDB)
+    (hdb : t.toDB? ctx = some db)
+    (hfree : LocalTypeR.isFreeIn x t = false) :
+    (t.substitute x repl).toDB? ctx = some db := by
+  have hsub : t.substitute x repl = t :=
+    LocalTypeR.substitute_not_free t x repl hfree
+  simpa [hsub] using hdb
+
 end RumpsteakV2.Protocol.LocalTypeConvProofs

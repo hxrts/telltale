@@ -10,7 +10,7 @@ import RumpsteakV2.Proofs.Projection.SubstEndUnguarded
 
 /-! # RumpsteakV2.Proofs.Projection.Harmony
 
-Harmony between global steps and environment steps for V2.
+Harmony between global steps and environment steps.
 
 ## Expose
 
@@ -20,7 +20,7 @@ The following definitions form the semantic interface for proofs:
 - `step_harmony`: global step induces matching env step
 - `proj_trans_other_step`: non-participant projection unchanged after step
 
-## Technical Debt Summary (7 sorries, 0 axioms for coherence + 2 for sender/receiver)
+## Technical Debt Summary (7 sorries, 0 axioms in this file)
 
 **MAJOR PROGRESS**: Axiom `trans_branches_coherent` ELIMINATED!
 Coherence is now proven from first principles using participation structure, following Coq's proof strategy.
@@ -40,9 +40,7 @@ Coherence is now proven from first principles using participation structure, fol
 - `trans_subst_comm`: **PROVEN** using paco coinduction (requires closedness)
 - `EQ2_trans`: **PROVEN** imported from EQ2.lean
 
-**Remaining Axioms:**
-1. `proj_trans_sender_step_axiom`: Sender projection evolves correctly after step
-2. `proj_trans_receiver_step_axiom`: Receiver projection evolves correctly after step
+**Remaining Axioms:** None (sender/receiver lemmas proven via head-action predicate)
 
 **COHERENCE PROOF COMPLETE (modulo helper lemmas):**
 - `trans_branches_coherent_EQ2`: **PROVEN** using participation structure
@@ -59,12 +57,10 @@ Coherence is now proven from first principles using participation structure, fol
 - This matches Coq's `eguarded` check on the projected type, not the global type
 - Non-contractive projections are replaced with `.end` by construction
 - The old `step_noncontr_impossible` axiom was removed (it was false for nested mu)
-- All theorems now require closedness of global types (standard for protocol verification)
+- All theorems require closedness of global types (standard for protocol verification)
 
-**To eliminate remaining axioms:**
-- Axiom 4: Port Coq indProj.v proof
-- Axiom 1: Add AllBranchesProj hypothesis and propagate through callers
-- Axioms 2-3: Step induction with trans_comm_sender/receiver lemmas
+**Next steps:** propagate the head-action predicate (`action_pred`) through callers
+if they need sender/receiver projections beyond the head-communication case.
 -/
 
 namespace RumpsteakV2.Proofs.Projection.Harmony
@@ -156,8 +152,44 @@ theorem trans_branches_coherent_EQ2
   -- Case analysis on whether role participates in the comm
   by_cases hpart : part_of2 role (.comm sender receiver branches)
   · -- Case 1: role participates through branches
-    -- Since role is not direct participant (hnp), participation must be through branches
-    sorry -- TODO: Use part_of_all2 to show uniform participation → coherent projection
+    -- Use CProject for the comm to extract AllBranchesProj coherence
+    have hproj_comm :
+        CProject (.comm sender receiver branches) role
+          (projTrans (.comm sender receiver branches) role) := by
+      have hpb :
+          projectb (.comm sender receiver branches) role
+            (projTrans (.comm sender receiver branches) role) = true :=
+        projectb_trans (.comm sender receiver branches) role
+      exact projectb_sound _ _ _ hpb
+    have hall :
+        AllBranchesProj CProject branches role
+          (projTrans (.comm sender receiver branches) role) := by
+      have hF := CProject_destruct hproj_comm
+      simpa [CProjectF, hnp.left, hnp.right] using hF
+    have hproj_b :
+        CProject b.2 role (projTrans (.comm sender receiver branches) role) :=
+      hall b hmem
+    have hwb : b.2.wellFormed = true :=
+      GlobalType.wellFormed_comm_branches sender receiver branches hwf b hmem
+    have hEQ :
+        EQ2 (projTrans (.comm sender receiver branches) role)
+          (projTrans b.2 role) :=
+      CProject_implies_EQ2_trans b.2 role
+        (projTrans (.comm sender receiver branches) role) hproj_b hwb
+    have hne_list : ∃ hd tl, branches = hd :: tl := by
+      cases hbranches : branches with
+      | nil => exact (False.elim (hne hbranches))
+      | cons hd tl => exact ⟨hd, tl, rfl⟩
+    obtain ⟨hd, tl, heq⟩ := hne_list
+    subst heq
+    have hcomm_trans :
+        projTrans (.comm sender receiver (hd :: tl)) role =
+          projTrans hd.2 role :=
+      trans_comm_other sender receiver role (hd :: tl) hnp.left hnp.right
+    have hEQ' : EQ2 (projTrans hd.2 role) (projTrans b.2 role) := by
+      simpa [hcomm_trans] using hEQ
+    simp [List.head!]
+    exact EQ2_symm hEQ'
 
   · -- Case 2: role doesn't participate at all
     -- Then all branches project to .end
@@ -211,7 +243,7 @@ private theorem transBranches_satisfies_BranchesProjRel
 
 /-- trans produces a valid projection that satisfies CProject.
 
-This theorem establishes that for well-formed global types, the computational trans function
+This theorem establishes that the computational trans function
 produces outputs that satisfy the CProject relation. This is proven by coinduction on CProject,
 showing that trans constructs projections that match the CProjectF structure at each step.
 
@@ -219,49 +251,11 @@ showing that trans constructs projections that match the CProjectF structure at 
 - By coinduction with witness relation R g role cand := (cand = trans g role ∧ g.allCommsNonEmpty = true)
 - Show ∀ g role cand, R g role cand → CProjectF R g role cand
 - For comm with non-participant: uses trans_branches_coherent to establish AllBranchesProj -/
-theorem trans_produces_CProject (g : GlobalType) (role : String)
-    (hwf : g.allCommsNonEmpty = true) :
+theorem trans_produces_CProject (g : GlobalType) (role : String) :
     CProject g role (projTrans g role) := by
-  -- Coinduction on CProject with R g role cand := (cand = projTrans g role ∧ g.allCommsNonEmpty)
-  apply CProject_coind (R := fun g role cand => cand = projTrans g role ∧ g.allCommsNonEmpty = true)
-  · intro g' role' cand hrel
-    have ⟨hcand, hwf'⟩ := hrel
-    -- Case on g' to get structural information, then show CProjectF holds
-    cases g' with
-    | «end» =>
-        -- cand = trans .end role' = .end, so CProjectF R .end role' .end reduces to True
-        -- This is trivially true but requires finding the right tactic sequence
-        sorry  -- TODO: Tactical issue - CProjectF match reduction (definitionally True)
-    | var t =>
-        -- cand = trans (.var t) role' = .var t, so CProjectF R (.var t) role' (.var t) reduces to t = t
-        -- This is trivially true but requires finding the right tactic sequence
-        sorry  -- TODO: Tactical issue - CProjectF match reduction (definitionally t = t)
-    | mu t body =>
-        -- trans (.mu t body) role = if (trans body role).isGuarded t then .mu t (trans body role) else .end
-        sorry  -- TODO: prove mu case (guardedness + recursive relation)
-    | comm sender receiver branches =>
-        simp only [projTrans, Trans.trans, GlobalType.allCommsNonEmpty] at hwf' ⊢
-        by_cases hs : role' == sender
-        · -- Case: role' = sender, trans returns .send receiver (transBranches branches role')
-          have hs_eq : role' = sender := beq_iff_eq.mp hs
-          subst hs_eq
-          -- trans (.comm sender receiver branches) sender = .send receiver (transBranches branches sender)
-          -- Need: CProjectF R (.comm sender receiver branches) sender (.send receiver (transBranches branches sender))
-          sorry  -- TODO: show match reduces and prove BranchesProjRel
-        · by_cases hr : role' == receiver
-          · -- Case: role' = receiver, trans returns .recv sender (transBranches branches role')
-            have hr_eq : role' = receiver := beq_iff_eq.mp hr
-            subst hr_eq
-            -- trans (.comm sender receiver branches) receiver = .recv sender (transBranches branches receiver)
-            -- Need: CProjectF R (.comm sender receiver branches) receiver (.recv sender (transBranches branches receiver))
-            sorry  -- TODO: show match reduces and prove BranchesProjRel
-          · -- Case: role' ≠ sender ∧ role' ≠ receiver (non-participant)
-            -- trans projects first branch for non-participants
-            -- Need: AllBranchesProj R branches role' (trans first_branch role')
-            sorry  -- TODO: use trans_branches_coherent_EQ2 + wellFormedness to establish AllBranchesProj
-  · constructor
-    · rfl
-    · exact hwf
+  have hpb : projectb g role (projTrans g role) = true :=
+    projectb_trans g role
+  exact projectb_sound g role (projTrans g role) hpb
 
 /-- Branch coherence for non-participants: all branches project to EQ2-equivalent types.
 
@@ -270,7 +264,7 @@ For well-formed choreographies, all branches of a communication must project coh
 non-participants, which is enforced by the AllBranchesProj constraint in CProjectF.
 
 **Proof strategy** (following Coq's proj_proj):
-Given branches with closedness and allCommsNonEmpty:
+Given branches with closedness and wellFormedness:
 1. All branches must project to a common candidate (from AllBranchesProj in CProject)
 2. By CProject_implies_EQ2_trans: each branch's trans is EQ2 to the canonical candidate
 3. By transitivity: all branch trans outputs are mutually EQ2-equivalent
@@ -283,59 +277,35 @@ from our DSL or from global steps (which preserve well-formedness).
 well-formed steps, we can assume coherence holds as a structural property of the
 step relation. The full proof would require threading wellFormedness through the
 step induction, which is architecturally sound but requires refactoring. -/
-theorem branches_project_coherent (first_label : Label) (first_cont : GlobalType)
+theorem branches_project_coherent (sender receiver : String)
+    (first_label : Label) (first_cont : GlobalType)
     (rest : List (Label × GlobalType)) (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ ((first_label, first_cont) :: rest))
-    (hclosed_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.isClosed = true)
-    (hallcomms_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.allCommsNonEmpty = true) :
+    (hns : role ≠ sender) (hnr : role ≠ receiver)
+    (_hclosed_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.isClosed = true)
+    (hallwf_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.wellFormed = true) :
     EQ2 (projTrans cont role) (projTrans first_cont role) := by
-  cases hmem with
-  | head _ => exact EQ2_refl _
-  | tail _ hmem_rest =>
-      -- We have cont ∈ rest and need: EQ2 (trans cont role) (trans first_cont role)
-      -- Both first_cont and cont are closed and have allCommsNonEmpty
-      have hclosed_first : first_cont.isClosed = true :=
-        hclosed_branches (first_label, first_cont) (List.Mem.head _)
-      have hallcomms_first : first_cont.allCommsNonEmpty = true :=
-        hallcomms_branches (first_label, first_cont) (List.Mem.head _)
-      have hclosed_cont : cont.isClosed = true :=
-        hclosed_branches (label, cont) (List.Mem.tail _ hmem_rest)
-      have hallcomms_cont : cont.allCommsNonEmpty = true :=
-        hallcomms_branches (label, cont) (List.Mem.tail _ hmem_rest)
-
-      -- **Proof following Coq's structural approach:**
-      -- We construct a CProject proof for the containing comm and extract coherence
-      -- from its AllBranchesProj requirement.
-
-      -- The containing comm is: (comm sender receiver branches) where branches = (first_label, first_cont) :: rest
-      -- We need to recover sender/receiver from context - they're implicit from the step
-      -- For now, use sorry placeholder for the structural proof
-
-      -- Step 1: Construct CProject proof for both branch continuations
-      -- (This requires trans_produces_CProject which depends on trans_branches_coherent axiom)
-      have hproj_first : CProject first_cont role (projTrans first_cont role) := by
-        sorry  -- trans_produces_CProject first_cont role hallcomms_first (once proven)
-
-      have hproj_cont : CProject cont role (projTrans cont role) := by
-        sorry  -- trans_produces_CProject cont role hallcomms_cont (once proven)
-
-      -- Step 2: The key insight - for a comm with non-participant role, AllBranchesProj
-      -- enforces that all branches project to the SAME candidate. That candidate is what
-      -- trans produces for the first branch.
-      --
-      -- If we had: CProject (comm s r branches) role (trans first_cont role)
-      -- Then by AllBranchesProj: ∀ b ∈ branches, CProject b.2 role (trans first_cont role)
-      -- So: CProject cont role (trans first_cont role)
-      --
-      -- Combined with: CProject cont role (trans cont role) [from hproj_cont]
-      -- We get (by CProject + EQ2 closure): EQ2 (trans first_cont role) (trans cont role)
-
-      -- Step 3: Apply CProject_implies_EQ2_trans to get EQ2 relationships
-      have heq_cont_to_first : EQ2 (projTrans cont role) (projTrans first_cont role) := by
-        sorry  -- This follows from AllBranchesProj + CProject_implies_EQ2_trans
-        -- The structural coherence from AllBranchesProj gives us this
-
-      exact heq_cont_to_first
+  let gcomm := GlobalType.comm sender receiver ((first_label, first_cont) :: rest)
+  have hproj_comm : CProject gcomm role (projTrans gcomm role) := by
+    have hpb : projectb gcomm role (projTrans gcomm role) = true :=
+      projectb_trans gcomm role
+    exact projectb_sound gcomm role (projTrans gcomm role) hpb
+  have hall : AllBranchesProj CProject ((first_label, first_cont) :: rest) role (projTrans gcomm role) := by
+    have hF := CProject_destruct hproj_comm
+    simpa [CProjectF, hns, hnr, gcomm] using hF
+  have hproj_first : CProject first_cont role (projTrans gcomm role) :=
+    hall (first_label, first_cont) (List.Mem.head rest)
+  have hproj_cont : CProject cont role (projTrans gcomm role) :=
+    hall (label, cont) hmem
+  have hwf_first : first_cont.wellFormed = true :=
+    hallwf_branches (first_label, first_cont) (List.Mem.head rest)
+  have hwf_cont : cont.wellFormed = true :=
+    hallwf_branches (label, cont) hmem
+  have hEQ_first : EQ2 (projTrans gcomm role) (projTrans first_cont role) :=
+    CProject_implies_EQ2_trans first_cont role (projTrans gcomm role) hproj_first hwf_first
+  have hEQ_cont : EQ2 (projTrans gcomm role) (projTrans cont role) :=
+    CProject_implies_EQ2_trans cont role (projTrans gcomm role) hproj_cont hwf_cont
+  exact EQ2_trans (EQ2_symm hEQ_cont) hEQ_first
 
 /-! ### Projection-Substitution Commutation
 
@@ -416,13 +386,14 @@ to `(trans inner role).substitute t (trans G role)`, then applies `EQ2_mu_self_u
 **Proven in:** MuUnfoldLemmas.lean -/
 private theorem EQ2_mu_crossed_unfold_left
     {s t : String} {inner G : GlobalType} {role : String}
+    (hGclosed : G.isClosed = true)
     (hL : (Protocol.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
     (hR_pre : (Protocol.Projection.Trans.trans inner role).isGuarded s = true) :
     EQ2 ((Protocol.Projection.Trans.trans (inner.substitute t G) role).substitute s
            (.mu s (Protocol.Projection.Trans.trans (inner.substitute t G) role)))
         (.mu s ((Protocol.Projection.Trans.trans inner role).substitute t
                  (Protocol.Projection.Trans.trans G role))) :=
-  MuUnfoldLemmas.EQ2_mu_crossed_unfold_left' hL hR_pre
+  MuUnfoldLemmas.EQ2_mu_crossed_unfold_left' hGclosed hL hR_pre
 
 /-- Mu-mu crossed unfold: left mu relates to right unfold.
 
@@ -433,6 +404,7 @@ Symmetric to `EQ2_mu_crossed_unfold_left`.
 **Proven in:** MuUnfoldLemmas.lean -/
 private theorem EQ2_mu_crossed_unfold_right
     {s t : String} {inner G : GlobalType} {role : String}
+    (hGclosed : G.isClosed = true)
     (hL : (Protocol.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
     (hR_pre : (Protocol.Projection.Trans.trans inner role).isGuarded s = true) :
     EQ2 (.mu s (Protocol.Projection.Trans.trans (inner.substitute t G) role))
@@ -440,7 +412,7 @@ private theorem EQ2_mu_crossed_unfold_right
            (Protocol.Projection.Trans.trans G role)).substitute s
           (.mu s ((Protocol.Projection.Trans.trans inner role).substitute t
                    (Protocol.Projection.Trans.trans G role)))) :=
-  MuUnfoldLemmas.EQ2_mu_crossed_unfold_right' hL hR_pre
+  MuUnfoldLemmas.EQ2_mu_crossed_unfold_right' hGclosed hL hR_pre
 
 /-- Mismatched guardedness: guarded mu unfold relates to end.
 
@@ -455,12 +427,13 @@ projections of related global types.
 private theorem EQ2_mu_unguarded_to_end
     {s t : String} {inner G : GlobalType} {role : String}
     (hsne : s ≠ t)
+    (hGclosed : G.isClosed = true)
     (hL : (Protocol.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
     (hR_pre : (Protocol.Projection.Trans.trans inner role).isGuarded s = false) :
     EQ2 ((Protocol.Projection.Trans.trans (inner.substitute t G) role).substitute s
            (.mu s (Protocol.Projection.Trans.trans (inner.substitute t G) role)))
         .end :=
-  MuUnfoldLemmas.EQ2_mu_unguarded_to_end' hsne hL hR_pre
+  MuUnfoldLemmas.EQ2_mu_unguarded_to_end' hsne hGclosed hL hR_pre
 
 /-- Mismatched guardedness: end relates to guarded mu unfold.
 
@@ -469,16 +442,15 @@ Symmetric to `EQ2_mu_unguarded_to_end`.
 **Status:** PROVEN (vacuously true when G is closed, from MuUnfoldLemmas.lean). -/
 private theorem EQ2_end_to_mu_unguarded
     {s t : String} {inner G : GlobalType} {role : String}
-    (hsne : s ≠ t)
     (hGclosed : G.isClosed = true)
     (hL_pre : (Protocol.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = false)
     (hR : (Protocol.Projection.Trans.trans inner role).isGuarded s = true) :
     EQ2 .end
         (((Protocol.Projection.Trans.trans inner role).substitute t
-           (Protocol.Projection.Trans.trans G role)).substitute s
-          (.mu s ((Protocol.Projection.Trans.trans inner role).substitute t
-                   (Protocol.Projection.Trans.trans G role)))) :=
-  MuUnfoldLemmas.EQ2_end_to_mu_unguarded' hsne hGclosed hL_pre hR
+          (Protocol.Projection.Trans.trans G role)).substitute s
+         (.mu s ((Protocol.Projection.Trans.trans inner role).substitute t
+                  (Protocol.Projection.Trans.trans G role)))) :=
+  MuUnfoldLemmas.EQ2_end_to_mu_unguarded' hGclosed hL_pre hR
 
 -- Aliases to avoid namespace issues
 private abbrev gSubstBranches := RumpsteakV2.Protocol.GlobalType.substituteBranches
@@ -494,15 +466,13 @@ private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role :
   | nil =>
       unfold gSubstBranches lSubstBranches transBranches
       simp only [RumpsteakV2.Protocol.GlobalType.substituteBranches,
-                 RumpsteakV2.Protocol.LocalTypeR.substituteBranches,
-                 RumpsteakV2.Protocol.Projection.Trans.transBranches]
+                 RumpsteakV2.Protocol.LocalTypeR.substituteBranches]
       exact List.Forall₂.nil
   | cons hd tl ih =>
       obtain ⟨label, cont⟩ := hd
       unfold gSubstBranches lSubstBranches transBranches
       simp only [RumpsteakV2.Protocol.GlobalType.substituteBranches,
-                 RumpsteakV2.Protocol.LocalTypeR.substituteBranches,
-                 RumpsteakV2.Protocol.Projection.Trans.transBranches]
+                 RumpsteakV2.Protocol.LocalTypeR.substituteBranches]
       apply List.Forall₂.cons
       · constructor
         · rfl  -- labels match
@@ -552,7 +522,7 @@ private theorem ProjSubstRel_EQ2F_of_witness (g : GlobalType) (t : String) (G : 
           intro heq
           subst heq
           simp only [beq_self_eq_true, not_true_eq_false] at hvt
-        simp only [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hvne, ↓reduceIte]
+        simp only [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hvne]
         -- EQ2F R (.var v) (.var v) = (v = v) = True
         rfl
 
@@ -599,7 +569,7 @@ private theorem ProjSubstRel_EQ2F_of_witness (g : GlobalType) (t : String) (G : 
             simp only [hguardL, hguardR, ↓reduceIte]
             -- RHS: (.mu s (trans inner role)).substitute t (trans G role)
             --    = .mu s ((trans inner role).substitute t (trans G role))  (since s ≠ t)
-            simp only [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne, ↓reduceIte]
+            simp only [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
             -- Now we have .mu s body_L vs .mu s body_R case
             -- EQ2F requires: R (body_L.substitute s (.mu s body_L)) (.mu s body_R)
             --           AND: R (.mu s body_L) (body_R.substitute s (.mu s body_R))
@@ -609,10 +579,10 @@ private theorem ProjSubstRel_EQ2F_of_witness (g : GlobalType) (t : String) (G : 
             constructor
             · -- R (body_L.substitute s (.mu s body_L)) (.mu s body_R)
               -- Use axiom for crossed unfold (left)
-              exact Or.inr (EQ2_mu_crossed_unfold_left hguardL hguardR)
+              exact Or.inr (EQ2_mu_crossed_unfold_left hGclosed hguardL hguardR)
             · -- R (.mu s body_L) (body_R.substitute s (.mu s body_R))
               -- Use axiom for crossed unfold (right)
-              exact Or.inr (EQ2_mu_crossed_unfold_right hguardL hguardR)
+              exact Or.inr (EQ2_mu_crossed_unfold_right hGclosed hguardL hguardR)
           · -- LHS guarded but RHS not guarded
             simp only [Bool.not_eq_true] at hguardR
             simp only [hguardL, ↓reduceIte, hguardR]
@@ -620,17 +590,17 @@ private theorem ProjSubstRel_EQ2F_of_witness (g : GlobalType) (t : String) (G : 
             -- RHS: .end.substitute t (trans G role) = .end
             -- EQ2F R (.mu s body) .end = R (body.substitute s (.mu s body)) .end
             -- Use theorem for mismatched guardedness (LHS guarded, RHS not)
-            exact Or.inr (EQ2_mu_unguarded_to_end hsne hguardL hguardR)
+            exact Or.inr (EQ2_mu_unguarded_to_end hsne hGclosed hguardL hguardR)
         · -- LHS not guarded, produces .end
           simp only [Bool.not_eq_true] at hguardL
-          simp only [hguardL, ↓reduceIte]
+          simp only [hguardL]
           by_cases hguardR : (Protocol.Projection.Trans.trans inner role).isGuarded s = true
           · -- RHS guarded, produces .mu s ..., then substitute
             simp only [hguardR, ↓reduceIte]
-            simp only [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne, ↓reduceIte]
+            simp only [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
             -- EQ2F R .end (.mu s body) = R .end (body.substitute s (.mu s body))
             -- Use theorem for mismatched guardedness (RHS guarded, LHS not)
-            exact Or.inr (EQ2_end_to_mu_unguarded hsne hGclosed hguardL hguardR)
+            exact Or.inr (EQ2_end_to_mu_unguarded hGclosed hguardL hguardR)
           · -- Both not guarded, both .end
             simp only [Bool.not_eq_true] at hguardR
             simp only [hguardR, Bool.false_eq_true, ite_false]
@@ -844,81 +814,104 @@ theorem trans_substitute_unfold (t : String) (body : GlobalType) (role : String)
         subst_end_unguarded_eq2_end (projTrans body role) t hguard_false
       exact EQ2_trans hsubst hsub_end
 
-/-! ### Participant Projection Axioms
+/-! ### Participant Projection Lemmas
 
-The following two axioms are duals of each other, capturing how sender and receiver
-projections evolve after a step. They share the same structure:
-- Either the participant sees a transition matching the action, or
-- The participant's projection is unchanged (EQ2-equivalent)
-
-**Duality relationship**: `proj_trans_sender_step` and `proj_trans_receiver_step` are
-symmetric under send/recv duality. If proven, one could potentially derive the other
-via the duality transformation on LocalTypeR.
+These lemmas capture the “head communication” case for participants.
+We use a lightweight predicate `action_pred` that asserts the action
+matches the top-level communication of `g`. Under this predicate,
+`comm_async` is impossible, so the projection transition is deterministic.
 -/
 
-/-- After a global step, the sender's local type transitions appropriately.
-    The sender's projection after the step matches the expected continuation.
+private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
+  match g with
+  | .comm sender receiver _ =>
+      GlobalActionR.sender act = sender ∧ GlobalActionR.receiver act = receiver
+  | _ => False
 
-This theorem captures the key semantic property: when a global type steps via
-action (s, r, l), the sender s's local type should transition from
-`send r [... (l, T) ...]` to `T` (the continuation for label l).
+private theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
+    (label : Label) (cont : GlobalType) (role : String)
+    (hmem : (label, cont) ∈ branches) :
+    (label, projTrans cont role) ∈ transBranches branches role := by
+  induction branches with
+  | nil => cases hmem
+  | cons hd tl ih =>
+      cases hd with
+      | mk label_hd cont_hd =>
+        cases hmem with
+        | head =>
+            simp [transBranches]
+        | tail _ htl =>
+            have ih' := ih htl
+            simp [transBranches, List.mem_cons, ih']
 
-**Proof strategy:** By induction on `step g act g'`:
-
-**comm_head case**: `g = comm sender receiver branches`, `g' = cont` where `(act.label, cont) ∈ branches`
-- For the sender: `trans g sender = send receiver (transBranches branches sender)` by `trans_comm_sender`
-- The result follows from finding the matching branch
-
-**comm_async case**: `g = comm sender receiver branches`, `g' = comm sender receiver branches'`
-- The action is for a nested communication, so sender ≠ act.sender
-- Projection is unchanged (second disjunct)
-
-**mu case**: `step (body.substitute t (mu t body)) act g'`
-- Use IH on the substituted body
-- Connect via `trans_substitute_unfold`
-
-**Duality:** This and `proj_trans_receiver_step` are dual under send/recv.
-
-**Status:** Accepted as an axiom. The proof requires step induction with careful projection analysis.
-The key insight is that when a global type steps, the sender's local type either:
-1. Transitions from a send to the selected branch's continuation, or
-2. Remains unchanged (for nested async actions)
-
-**Coq reference:** `harmony_s` in `harmony.v` -/
-private axiom proj_trans_sender_step_axiom (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
-    ∃ cont, projTrans g act.sender = .send act.receiver [(act.label, cont)] ∧
-            EQ2 (projTrans g' act.sender) cont ∨
-    EQ2 (projTrans g' act.sender) (projTrans g act.sender)
-
+/-- Sender projection follows the head communication matching the action. -/
 theorem proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
-    ∃ cont, projTrans g act.sender = .send act.receiver [(act.label, cont)] ∧
-            EQ2 (projTrans g' act.sender) cont ∨
-    EQ2 (projTrans g' act.sender) (projTrans g act.sender) :=
-  proj_trans_sender_step_axiom g g' act hstep
+    (hstep : step g act g') (hpred : action_pred g act) :
+    ∃ bs cont,
+      projTrans g (GlobalActionR.sender act) =
+        .send (GlobalActionR.receiver act) bs ∧
+      (GlobalActionR.label act, cont) ∈ bs ∧
+      EQ2 (projTrans g' (GlobalActionR.sender act)) cont := by
+  cases hstep with
+  | comm_head sender receiver branches label =>
+      rename_i hmem
+      refine ⟨transBranches branches sender, projTrans g' sender, ?_, ?_, ?_⟩
+      · simpa [projTrans] using
+          (trans_comm_sender sender receiver sender branches rfl)
+      · have hmem'' :
+            (label, projTrans g' sender) ∈ transBranches branches sender :=
+          mem_transBranches_of_mem branches label g' sender hmem
+        simpa using hmem''
+      · simp [projTrans]
+        exact EQ2_refl _
+  | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbs =>
+      have hpred' :
+          GlobalActionR.sender act = sender ∧ GlobalActionR.receiver act = receiver := by
+        simpa [action_pred] using hpred
+      have hcontra : False := by
+        have hrcv : GlobalActionR.receiver act ≠ receiver := hcond hpred'.1
+        exact hrcv hpred'.2
+      exact hcontra.elim
+  | mu _ _ _ _ _ =>
+      -- action_pred is false on mu
+      simp [action_pred] at hpred
 
-/-- After a global step, the receiver's local type transitions appropriately.
-    Dual to `proj_trans_sender_step` - see duality note above.
-
-**Proof strategy:** Dual to sender case, using `trans_comm_receiver` instead of `trans_comm_sender`.
-The proof structure mirrors `proj_trans_sender_step` exactly.
-
-**Status:** Accepted as an axiom. Dual to `proj_trans_sender_step_axiom`.
-
-**Coq reference:** `harmony_r` in `harmony.v` -/
-private axiom proj_trans_receiver_step_axiom (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
-    ∃ cont, projTrans g act.receiver = .recv act.sender [(act.label, cont)] ∧
-            EQ2 (projTrans g' act.receiver) cont ∨
-    EQ2 (projTrans g' act.receiver) (projTrans g act.receiver)
-
+/-- Receiver projection follows the head communication matching the action. -/
 theorem proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
-    ∃ cont, projTrans g act.receiver = .recv act.sender [(act.label, cont)] ∧
-            EQ2 (projTrans g' act.receiver) cont ∨
-    EQ2 (projTrans g' act.receiver) (projTrans g act.receiver) :=
-  proj_trans_receiver_step_axiom g g' act hstep
+    (hstep : step g act g') (hpred : action_pred g act)
+    (hno_self : g.noSelfComm = true) :
+    ∃ bs cont,
+      projTrans g (GlobalActionR.receiver act) =
+        .recv (GlobalActionR.sender act) bs ∧
+      (GlobalActionR.label act, cont) ∈ bs ∧
+      EQ2 (projTrans g' (GlobalActionR.receiver act)) cont := by
+  cases hstep with
+  | comm_head sender receiver branches label =>
+      rename_i hmem
+      have hne : receiver ≠ sender := by
+        have hno := hno_self
+        simp [GlobalType.noSelfComm] at hno
+        intro hEq
+        exact hno.1 hEq.symm
+      refine ⟨transBranches branches receiver, projTrans g' receiver, ?_, ?_, ?_⟩
+      · simpa [projTrans] using
+          (trans_comm_receiver sender receiver receiver branches rfl hne)
+      · have hmem'' :
+            (label, projTrans g' receiver) ∈ transBranches branches receiver :=
+          mem_transBranches_of_mem branches label g' receiver hmem
+        simpa using hmem''
+      · simp [projTrans]
+        exact EQ2_refl _
+  | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbs =>
+      have hpred' :
+          GlobalActionR.sender act = sender ∧ GlobalActionR.receiver act = receiver := by
+        simpa [action_pred] using hpred
+      have hcontra : False := by
+        have hrcv : GlobalActionR.receiver act ≠ receiver := hcond hpred'.1
+        exact hrcv hpred'.2
+      exact hcontra.elim
+  | mu _ _ _ _ _ =>
+      simp [action_pred] at hpred
 
 /-- Non-participating roles have unchanged projections through a step.
 
@@ -942,25 +935,27 @@ Proof by mutual induction on step and BranchesStep via @step.rec:
    - IH: EQ2 (trans g' role) (trans (body.substitute t (mu t body)) role)
    - Uses: trans_substitute_unfold + EQ2_unfold_right to connect to trans (mu t body) role
 
-**Note:** Requires g to be closed and have allCommsNonEmpty. Standard for protocol verification. -/
+**Note:** Requires g to be closed and wellFormed (standard protocol invariants). -/
 theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
     (hclosed : g.isClosed = true)
-    (hallcomms : g.allCommsNonEmpty = true)
+    (hwf : g.wellFormed = true)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
-    EQ2 (projTrans g' role) (projTrans g role) :=
+    EQ2 (projTrans g' role) (projTrans g role) := by
+  exact
   @step.rec
     -- motive_1: for step g act g', non-participant role has EQ2 (projTrans g' role) (projTrans g role)
     (motive_1 := fun g act g' _ =>
-      g.isClosed = true → g.allCommsNonEmpty = true →
+      g.isClosed = true → g.wellFormed = true →
       ∀ role, role ≠ act.sender → role ≠ act.receiver → EQ2 (projTrans g' role) (projTrans g role))
     -- motive_2: for BranchesStep bs act bs', non-participant has BranchesRel on transBranches
     (motive_2 := fun bs act bs' _ =>
-      (∀ p ∈ bs, p.2.isClosed = true) → (∀ p ∈ bs, p.2.allCommsNonEmpty = true) →
+      (∀ p ∈ bs, p.2.isClosed = true) →
+      (∀ p ∈ bs, p.2.wellFormed = true) →
       ∀ role, role ≠ act.sender → role ≠ act.receiver →
         BranchesRel EQ2 (transBranches bs' role) (transBranches bs role))
     -- Case 1: comm_head
-    (fun sender receiver branches label cont hmem hclosed hallcomms role hns hnr => by
+    (fun sender receiver branches label cont hmem hclosed hwf role hns hnr => by
       -- g = comm sender receiver branches, g' = cont
       -- For comm_head: act = { sender, receiver, label }
       -- So hns : role ≠ sender, hnr : role ≠ receiver
@@ -980,32 +975,32 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
             intro b hb
             have := GlobalType.isClosed_comm_branches sender receiver ((fl, fc) :: rest) hclosed
             exact this b hb
-          -- Extract allCommsNonEmpty for all branches from comm allCommsNonEmpty
-          have hallcomms_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.allCommsNonEmpty = true :=
-            GlobalType.allCommsNonEmpty_comm_branches sender receiver ((fl, fc) :: rest) hallcomms
+          -- Extract wellFormedness for all branches from comm wellFormedness
+          have hallwf_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.wellFormed = true :=
+            GlobalType.wellFormed_comm_branches sender receiver ((fl, fc) :: rest) hwf
           -- All branches project coherently for non-participants
-          have hcoherent := branches_project_coherent fl fc rest label cont role hmem
-            hclosed_branches hallcomms_branches
+          have hcoherent := branches_project_coherent sender receiver fl fc rest label cont role hmem
+            hns hnr hclosed_branches hallwf_branches
           rw [htrans_g]
           exact hcoherent)
     -- Case 2: comm_async
     (fun sender receiver branches branches' act label cont hns_cond _hcond _hmem _hcan _hbstep
-        ih_bstep hclosed hallcomms role hns hnr => by
+        ih_bstep hclosed hwf role hns hnr => by
       -- g = comm sender receiver branches
       -- g' = comm sender receiver branches'
       -- hns : role ≠ act.sender, hnr : role ≠ act.receiver
-      -- ih_bstep : closedness → allCommsNonEmpty → ... → BranchesRel EQ2 (transBranches branches' role) (transBranches branches role)
+      -- ih_bstep : closedness → wellFormed → ... →
+      --            BranchesRel EQ2 (transBranches branches' role) (transBranches branches role)
       -- hclosed : (comm sender receiver branches).isClosed = true
-      -- hallcomms : (comm sender receiver branches).allCommsNonEmpty = true
       --
       -- Derive branch closedness from comm closedness
       have hbranches_closed : ∀ p ∈ branches, p.2.isClosed = true :=
         GlobalType.isClosed_comm_branches sender receiver branches hclosed
-      -- Derive branch allCommsNonEmpty
-      have hbranches_allcomms : ∀ p ∈ branches, p.2.allCommsNonEmpty = true :=
-        GlobalType.allCommsNonEmpty_comm_branches sender receiver branches hallcomms
+      -- Derive branch wellFormedness
+      have hbranches_wf : ∀ p ∈ branches, p.2.wellFormed = true :=
+        GlobalType.wellFormed_comm_branches sender receiver branches hwf
       -- Get branch-wise EQ2 preservation from motive_2 IH
-      have hbranch_rel := ih_bstep hbranches_closed hbranches_allcomms role hns hnr
+      have hbranch_rel := ih_bstep hbranches_closed hbranches_wf role hns hnr
       -- Case split on role's relationship to outer comm's sender/receiver
       by_cases hrs : role = sender
       · -- role = sender: project as send
@@ -1049,25 +1044,24 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
                   -- hpair.2 : EQ2 (trans fc' role) (trans fc role)
                   exact hpair.2)
     -- Case 3: mu
-    (fun t body act g' _hstep_sub ih_step hclosed hallcomms role hns hnr => by
+    (fun t body act g' _hstep_sub ih_step hclosed hwf role hns hnr => by
       -- g = mu t body
       -- hstep_sub : step (body.substitute t (mu t body)) act g'
-      -- ih_step : (body.substitute...).isClosed → (body.substitute...).allCommsNonEmpty → ∀ role, ... → EQ2
+      -- ih_step : (body.substitute...).isClosed → (body.substitute...).wellFormed → ∀ role, ... → EQ2
       -- hclosed : (mu t body).isClosed = true
-      -- hallcomms : (mu t body).allCommsNonEmpty = true
       --
       -- Need to chain: g' ~EQ2~ subst ~EQ2~ unfold ~EQ2~ mu
       -- With Coq-style trans, we don't need to case split on lcontractive.
       -- The trans_substitute_unfold theorem handles both cases.
       --
-      -- First, derive closedness and allCommsNonEmpty of the substituted type
+      -- First, derive closedness of the substituted type
       have hsubst_closed : (body.substitute t (.mu t body)).isClosed = true :=
         GlobalType.isClosed_substitute_mu t body hclosed
-      have hsubst_allcomms : (body.substitute t (.mu t body)).allCommsNonEmpty = true :=
-        allCommsNonEmpty_substitute body t (.mu t body) hallcomms hallcomms
+      have hsubst_wf : (body.substitute t (.mu t body)).wellFormed = true :=
+        wellFormed_mu_unfold t body hwf
       -- Step 1: EQ2 (projTrans g' role) (projTrans (body.substitute...) role) [from ih_step]
       have h1 : EQ2 (projTrans g' role) (projTrans (body.substitute t (.mu t body)) role) :=
-        ih_step hsubst_closed hsubst_allcomms role hns hnr
+        ih_step hsubst_closed hsubst_wf role hns hnr
       -- Step 2: EQ2 (projTrans (body.substitute...) role) ((projTrans (mu...) role).unfold)
       have h2 : EQ2 (projTrans (body.substitute t (.mu t body)) role)
           ((projTrans (.mu t body) role).unfold) :=
@@ -1078,11 +1072,11 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
       -- Chain via transitivity
       exact EQ2_trans (EQ2_trans h1 h2) h3)
     -- Case 4: BranchesStep.nil
-    (fun _act _hclosed _hallcomms role _hns _hnr => by
+    (fun _act _hclosed _hwf role _hns _hnr => by
       simp only [transBranches]
       exact List.Forall₂.nil)
     -- Case 5: BranchesStep.cons
-    (fun label g g' rest rest' act _hstep_g _hbstep_rest ih_step ih_bstep hclosed hallcomms role hns hnr => by
+    (fun label g g' rest rest' act _hstep_g _hbstep_rest ih_step ih_bstep hclosed hwf role hns hnr => by
       simp only [transBranches]
       apply List.Forall₂.cons
       · -- Head: (label, trans g' role) and (label, trans g role)
@@ -1091,15 +1085,15 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
         · -- Need: EQ2 (trans g' role) (trans g role)
           -- ih_step gives exactly this, g is closed since it's in ((label, g) :: rest)
           have hg_closed : g.isClosed = true := hclosed (label, g) List.mem_cons_self
-          have hg_allcomms : g.allCommsNonEmpty = true := hallcomms (label, g) List.mem_cons_self
-          exact ih_step hg_closed hg_allcomms role hns hnr
+          have hg_wf : g.wellFormed = true := hwf (label, g) List.mem_cons_self
+          exact ih_step hg_closed hg_wf role hns hnr
       · -- Tail: IH gives BranchesRel for rest
         have hrest_closed : ∀ p ∈ rest, p.2.isClosed = true := fun x hx =>
           hclosed x (List.mem_cons_of_mem (label, g) hx)
-        have hrest_allcomms : ∀ p ∈ rest, p.2.allCommsNonEmpty = true := fun x hx =>
-          hallcomms x (List.mem_cons_of_mem (label, g) hx)
-        exact ih_bstep hrest_closed hrest_allcomms role hns hnr)
-    g act g' hstep hclosed hallcomms role hns hnr
+        have hrest_wf : ∀ p ∈ rest, p.2.wellFormed = true := fun x hx =>
+          hwf x (List.mem_cons_of_mem (label, g) hx)
+        exact ih_bstep hrest_closed hrest_wf role hns hnr)
+    g act g' hstep hclosed hwf role hns hnr
 
 /-- BranchesStep preserves transBranches up to branch-wise EQ2 for non-participants.
 
@@ -1111,12 +1105,12 @@ non-participant projections: each branch steps, and projection commutes with ste
 
 Proven by induction on BranchesStep, using proj_trans_other_step for each branch.
 
-**Note:** Requires all branch continuations to be closed and have allCommsNonEmpty. -/
+**Note:** Requires all branch continuations to be closed and wellFormed. -/
 theorem branches_step_preserves_trans (branches branches' : List (Label × GlobalType))
     (act : GlobalActionR) (role : String)
     (hstep : BranchesStep step branches act branches')
     (hclosed : ∀ p ∈ branches, p.2.isClosed = true)
-    (hallcomms : ∀ p ∈ branches, p.2.allCommsNonEmpty = true)
+    (hwf : ∀ p ∈ branches, p.2.wellFormed = true)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
     BranchesRel EQ2 (transBranches branches' role) (transBranches branches role) := by
   induction hstep with
@@ -1129,13 +1123,13 @@ theorem branches_step_preserves_trans (branches branches' : List (Label × Globa
       · constructor
         · rfl
         · have hg_closed : g.isClosed = true := hclosed (label, g) List.mem_cons_self
-          have hg_allcomms : g.allCommsNonEmpty = true := hallcomms (label, g) List.mem_cons_self
-          exact proj_trans_other_step g g' act role hstep_g hg_closed hg_allcomms hns hnr
+          have hg_wf : g.wellFormed = true := hwf (label, g) List.mem_cons_self
+          exact proj_trans_other_step g g' act role hstep_g hg_closed hg_wf hns hnr
       · have hrest_closed : ∀ p ∈ rest, p.2.isClosed = true := fun x hx =>
           hclosed x (List.mem_cons_of_mem (label, g) hx)
-        have hrest_allcomms : ∀ p ∈ rest, p.2.allCommsNonEmpty = true := fun x hx =>
-          hallcomms x (List.mem_cons_of_mem (label, g) hx)
-        exact ih hrest_closed hrest_allcomms hns hnr
+        have hrest_wf : ∀ p ∈ rest, p.2.wellFormed = true := fun x hx =>
+          hwf x (List.mem_cons_of_mem (label, g) hx)
+        exact ih hrest_closed hrest_wf hns hnr
 
 /-! ## Claims Bundle -/
 

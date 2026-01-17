@@ -3,6 +3,8 @@ import Mathlib.Logic.Function.Iterate
 import Mathlib.Tactic
 import RumpsteakV2.Protocol.GlobalType
 
+set_option linter.unusedSimpArgs false
+
 /-! # RumpsteakV2.Protocol.LocalTypeDB
 
 De Bruijn indexed local types for clean substitution proofs.
@@ -209,9 +211,8 @@ theorem lift_subst_cancel (e : LocalTypeDB) (t : LocalTypeDB) :
       simp [LocalTypeDB.lift, LocalTypeDB.subst]
     -- var case
     · intro n t
-      have hne : n + 1 ≠ 0 := Nat.succ_ne_zero n
       have hgt : n + 1 > 0 := Nat.succ_pos n
-      simp [LocalTypeDB.lift, LocalTypeDB.subst, hne, hgt]
+      simp [LocalTypeDB.lift, LocalTypeDB.subst, hgt]
     -- send case
     · intro p bs hbs t
       simp [LocalTypeDB.lift, LocalTypeDB.subst, hbs t]

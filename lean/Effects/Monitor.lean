@@ -96,7 +96,7 @@ namespace MonitorState
 /-- Empty monitor state. -/
 def empty : MonitorState where
   G := []
-  D := []
+  D := Lean.RBMap.empty
   bufs := []
   Lin := LinCtx.empty
   supply := 0
@@ -783,7 +783,7 @@ def MonitorState.newSession (ms : MonitorState) (roles : RoleSet)
   let newEndpoints := roles.map fun r => ({ sid := sid, role := r }, localTypes r)
   let newEdges := RoleSet.allEdges sid roles
   { G := newEndpoints ++ ms.G
-    D := (newEdges.map fun e => (e, [])) ++ ms.D
+    D := initDEnv sid roles ++ ms.D
     bufs := (newEdges.map fun e => (e, [])) ++ ms.bufs
     Lin := (roles.map fun r => ({ sid := sid, role := r }, localTypes r)) ++ ms.Lin
     supply := sid + 1 }

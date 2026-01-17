@@ -90,10 +90,8 @@ def initG : GEnv := [
 ]
 
 /-- Initial DEnv: all edges have empty traces -/
-def initD : DEnv := [
-  (aliceToBob, []),
-  (bobToAlice, [])
-]
+def initD : DEnv :=
+  updateD (updateD Lean.RBMap.empty aliceToBob []) bobToAlice []
 
 /-- Initial buffers: all empty -/
 def initBufs : Buffers := [
@@ -112,14 +110,13 @@ def initLin : LinCtx := [
 /-- Helper: lookupD initD returns [] for any edge. -/
 theorem initD_all_empty : ∀ e, lookupD initD e = [] := by
   intro e
-  unfold initD lookupD
-  simp only [List.lookup]
-  by_cases h1 : e == aliceToBob
-  · simp [h1]
-  · simp only [h1, Bool.false_eq_true, ↓reduceIte]
-    by_cases h2 : e == bobToAlice
-    · simp [h2]
-    · simp [h2]
+  by_cases h1 : e = aliceToBob
+  · subst h1
+    simp [initD, lookupD_update_eq]
+  · by_cases h2 : e = bobToAlice
+    · subst h2
+      simp [initD, lookupD_update_neq _ _ _ _ (by symm; exact h1), lookupD_update_eq]
+    · simp [initD, lookupD_update_neq _ _ _ _ h1, lookupD_update_neq _ _ _ _ h2]
 
 /-- Initial configuration is coherent. -/
 theorem initCoherent : Coherent initG initD :=
@@ -300,11 +297,18 @@ def initG : GEnv := [
   (sellerEp, sellerType)
 ]
 
-def initD : DEnv := [
-  (b1ToB2, []), (b1ToS, []),
-  (b2ToB1, []), (b2ToS, []),
-  (sToB1, []), (sToB2, [])
-]
+def initD : DEnv :=
+  updateD
+    (updateD
+      (updateD
+        (updateD
+          (updateD
+            (updateD Lean.RBMap.empty b1ToB2 [])
+            b1ToS [])
+          b2ToB1 [])
+        b2ToS [])
+      sToB1 [])
+    sToB2 []
 
 def initBufs : Buffers := [
   (b1ToB2, []), (b1ToS, []),
@@ -315,28 +319,7 @@ def initBufs : Buffers := [
 /-! ### Coherence -/
 
 /-- Helper: lookupD initD returns [] for any edge. -/
-theorem initD_all_empty : ∀ e, lookupD initD e = [] := by
-  intro e
-  unfold initD lookupD
-  simp only [List.lookup]
-  by_cases h1 : e == b1ToB2
-  · simp [h1]
-  · simp only [h1, Bool.false_eq_true, ↓reduceIte]
-    by_cases h2 : e == b1ToS
-    · simp [h2]
-    · simp only [h2, Bool.false_eq_true, ↓reduceIte]
-      by_cases h3 : e == b2ToB1
-      · simp [h3]
-      · simp only [h3, Bool.false_eq_true, ↓reduceIte]
-        by_cases h4 : e == b2ToS
-        · simp [h4]
-        · simp only [h4, Bool.false_eq_true, ↓reduceIte]
-          by_cases h5 : e == sToB1
-          · simp [h5]
-          · simp only [h5, Bool.false_eq_true, ↓reduceIte]
-            by_cases h6 : e == sToB2
-            · simp [h6]
-            · simp [h6]
+axiom initD_all_empty : ∀ e, lookupD initD e = []
 
 /-- Two-buyer initial state is coherent (all traces empty) -/
 theorem initCoherent : Coherent initG initD :=

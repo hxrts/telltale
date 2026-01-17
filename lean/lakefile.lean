@@ -35,7 +35,7 @@ require plausible from git
 
 -- Paco provides parametrized coinduction for EQ2 proofs.
 require paco from git
-  "https://github.com/hxrts/paco-lean" @ "f496f07"
+  "https://github.com/hxrts/paco-lean" @ "v0.1.3"
 
 /-- V2 library containing the new protocol semantics and proofs. -/
 @[default_target]

@@ -151,13 +151,14 @@ theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
 
 /-- Non-participants have unchanged types (up to EQ2) after a step.
 
-**Note:** Requires g to be closed (standard for protocol verification). -/
+**Note:** Requires g to be closed and wellFormed (standard invariants). -/
 theorem other_type_preserved (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
     (hclosed : g.isClosed = true)
+    (hwf : g.wellFormed = true)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
     EQ2 (trans g' role) (trans g role) :=
-  proj_trans_other_step g g' act role hstep hclosed hns hnr
+  proj_trans_other_step g g' act role hstep hclosed hwf hns hnr
 
 /-! ## Claims Bundle -/
 

@@ -84,6 +84,12 @@ open scoped Classical
 
 noncomputable section
 
+/-! ## Compatibility Aliases -/
+
+/-- Backwards-compatible single-env pre-typing. -/
+abbrev HasTypeProcPre1 (S : SEnv) (G : GEnv) (P : Process) : Prop :=
+  HasTypeProcPre S ∅ G P
+
 /-! ## Helper Lemmas -/
 
 /-- StoreTyped is preserved when updating a non-channel variable. -/
@@ -110,66 +116,12 @@ theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : Store}
     exact hST y w U hy hU
 
 /-- BuffersTyped is preserved when enqueuing a well-typed value. -/
-theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
+theorem BuffersTyped_enqueue_old {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Edge} {v : Value} {T : ValType}
     (hBT : BuffersTyped G D bufs)
     (hv : HasTypeVal G v T) :
     BuffersTyped G (updateD D e (lookupD D e ++ [T])) (enqueueBuf bufs e v) := by
-  intro a
-  unfold BufferTyped
-  by_cases ha : a = e
-  · -- a = e: the edge we're enqueuing on
-    -- Get the original typing before substituting
-    have hOrig := hBT e
-    unfold BufferTyped at hOrig
-    obtain ⟨hLen, hTyping⟩ := hOrig
-    subst ha
-    -- The buffer becomes: lookupBuf bufs a ++ [v]
-    -- The trace becomes: lookupD D a ++ [T]
-    simp only [enqueueBuf, lookupBuf_update_eq, lookupD_update_eq]
-    -- New lengths are equal
-    have hNewLen : (lookupBuf bufs a ++ [v]).length = (lookupD D a ++ [T]).length := by
-      simp only [List.length_append, List.length_singleton]
-      omega
-    refine ⟨hNewLen, ?_⟩
-    intro i hi
-    -- Case split: is i < original length or i = original length?
-    by_cases hOld : i < (lookupBuf bufs a).length
-    · -- i < old length: use original typing
-      have hTrace : i < (lookupD D a).length := hLen ▸ hOld
-      have hBufGet : (lookupBuf bufs a ++ [v])[i] = (lookupBuf bufs a)[i] := by
-        simp only [List.getElem_append hOld]
-      have hTraceGet : (lookupD D a ++ [T])[i] = (lookupD D a)[i] := by
-        simp only [List.getElem_append hTrace]
-      simp only [hBufGet, hTraceGet]
-      convert hTyping i hOld using 2
-      · simp only [List.get_eq_getElem]
-      · simp only [List.get_eq_getElem]
-    · -- i >= old length: must be the newly added element
-      have hEq : i = (lookupBuf bufs a).length := by omega
-      have hTraceEq : i = (lookupD D a).length := hLen ▸ hEq
-      have hBufGet : (lookupBuf bufs a ++ [v])[i] = v := by
-        rw [hEq]
-        simp only [List.getElem_append_right (by omega), List.length_singleton,
-                   Nat.add_sub_cancel, List.getElem_singleton]
-      have hTraceGet : (lookupD D a ++ [T])[i] = T := by
-        rw [hTraceEq]
-        simp only [List.getElem_append_right (by omega), List.length_singleton,
-                   Nat.add_sub_cancel, List.getElem_singleton]
-      simp only [List.get_eq_getElem]
-      rw [hBufGet, hTraceGet]
-      exact hv
-  · -- a ≠ e: unaffected edge
-    have hOrig := hBT a
-    unfold BufferTyped at hOrig
-    obtain ⟨hLen, hTyping⟩ := hOrig
-    simp only [enqueueBuf]
-    have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
-      exact lookupBuf_update_neq _ _ _ _ (Ne.symm ha)
-    have hTraceEq : lookupD (updateD D e (lookupD D e ++ [T])) a = lookupD D a := by
-      exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
-    simp only [hBufEq, hTraceEq]
-    exact ⟨hLen, hTyping⟩
+  simpa using (BuffersTyped_enqueue (G := G) (D := D) (bufs := bufs) (e := e) (v := v) (T := T) hBT hv)
 
 /-! ## Preservation for Individual Steps -/
 
@@ -324,10 +276,10 @@ def BlockedRecv (C : Config) : Prop :=
 
 /-- Progress for send: send always steps (it just enqueues to buffer).
     Reference: `work/effects/008.lean:323-336` -/
-theorem progress_send {C : Config} {S : SEnv} {k x : Var}
+theorem progress_send {C : Config} {Ssh Sown : SEnv} {k x : Var}
     (hEq : C.proc = .send k x)
-    (hProc : HasTypeProcPre S C.G (.send k x))
-    (hStore : StoreTypedStrong C.G S C.store) :
+    (hProc : HasTypeProcPre Ssh Sown C.G (.send k x))
+    (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store) :
     ∃ C', Step C C' := by
   -- 1. Inversion: extract (e, q, T, L) from typing
   obtain ⟨e, q, T, L, hSk, hGe, hSx⟩ := inversion_send hProc
@@ -345,13 +297,13 @@ theorem progress_send {C : Config} {S : SEnv} {k x : Var}
 
 /-- Progress for recv: recv steps if buffer non-empty, otherwise blocked.
     Reference: `work/effects/008.lean:341-357` -/
-theorem progress_recv {C : Config} {S : SEnv} {k x : Var}
+theorem progress_recv {C : Config} {Ssh Sown : SEnv} {k x : Var}
     (hEq : C.proc = .recv k x)
-    (hProc : HasTypeProcPre S C.G (.recv k x))
-    (hStore : StoreTypedStrong C.G S C.store) :
+    (hProc : HasTypeProcPre Ssh Sown C.G (.recv k x))
+    (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store) :
     (∃ C', Step C C') ∨ BlockedRecv C := by
   -- 1. Inversion: extract (e, p, T, L) from typing
-  obtain ⟨e, p, T, L, hSk, hGe⟩ := inversion_recv hProc
+  obtain ⟨e, p, T, L, hSk, hGe, _hxNone⟩ := inversion_recv hProc
   -- 2. Bridge: get channel value vk from store
   obtain ⟨vk, hvk1, hvk2⟩ := store_lookup_of_senv_lookup hStore hSk
   -- 3. Inversion: channel value must be .chan e
@@ -373,10 +325,10 @@ theorem progress_recv {C : Config} {S : SEnv} {k x : Var}
 
 /-- Progress for select: select always steps (it just enqueues label to buffer).
     Reference: `work/effects/008.lean:362-376, 500-516` -/
-theorem progress_select {C : Config} {S : SEnv} {k : Var} {l : Label}
+theorem progress_select {C : Config} {Ssh Sown : SEnv} {k : Var} {l : Label}
     (hEq : C.proc = .select k l)
-    (hProc : HasTypeProcPre S C.G (.select k l))
-    (hStore : StoreTypedStrong C.G S C.store) :
+    (hProc : HasTypeProcPre Ssh Sown C.G (.select k l))
+    (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store) :
     ∃ C', Step C C' := by
   -- 1. Inversion: extract (e, q, bs, L) from typing
   obtain ⟨e, q, bs, L, hSk, hGe, hFind⟩ := inversion_select hProc
@@ -392,17 +344,24 @@ theorem progress_select {C : Config} {S : SEnv} {k : Var} {l : Label}
 
 /-- Progress for branch: branch steps if buffer non-empty, otherwise blocked.
     This requires ValidLabels to ensure the received label is valid. -/
-theorem progress_branch {C : Config} {S : SEnv} {k : Var} {procs : List (Label × Process)}
+private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
+    (h : xs.find? (fun b => b.1 == lbl) = some (lbl', v)) : lbl' = lbl := by
+  have hPred : (lbl' == lbl) := (List.find?_eq_some_iff_append (xs := xs)
+    (p := fun b => b.1 == lbl) (b := (lbl', v))).1 h |>.1
+  have hPred' : (lbl' == lbl) = true := by
+    simpa using hPred
+  exact (beq_iff_eq).1 hPred'
+
+theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (Label × Process)}
     (hEq : C.proc = .branch k procs)
-    (hProc : HasTypeProcPre S C.G (.branch k procs))
-    (hStore : StoreTypedStrong C.G S C.store)
-    (hValidLabels : ∀ (ep : Endpoint) bs l vs,
-      lookupG C.G ep = some (.branch ep.role bs) →
-      lookupBuf C.bufs ⟨ep.sid, ep.role, ep.role⟩ = (.string l) :: vs →
-      (bs.find? (fun b => b.1 == l)).isSome) :
+    (hProc : HasTypeProcPre Ssh Sown C.G (.branch k procs))
+    (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store)
+    (hBufs : BuffersTyped C.G C.D C.bufs)
+    (hHead : HeadCoherent C.G C.D)
+    (hValid : ValidLabels C.G C.D C.bufs) :
     (∃ C', Step C C') ∨ BlockedRecv C := by
   -- 1. Inversion: extract (e, p, bs) from typing
-  obtain ⟨e, p, bs, hSk, hGe, hLen, hLabels⟩ := inversion_branch hProc
+  obtain ⟨e, p, bs, hSk, hGe, hLen, hLabels, _hBodies⟩ := inversion_branch hProc
   -- 2. Bridge: get channel value vk from store
   obtain ⟨vk, hvk1, hvk2⟩ := store_lookup_of_senv_lookup hStore hSk
   -- 3. Inversion: channel value must be .chan e
@@ -416,13 +375,81 @@ theorem progress_branch {C : Config} {S : SEnv} {k : Var} {procs : List (Label �
     right
     exact ⟨k, procs, p, bs, e, hEq, hvk1, hGe, hBuf⟩
   | cons v vs =>
-    -- Non-empty buffer - need to handle string label
-    -- For now, we prove the step exists when buffer is non-empty
-    -- Full proof requires ValidLabels + HeadCoherent hypothesis
     left
-    -- The buffer head should be a string label
-    -- This is guaranteed by BufferTyping + HeadCoherent
-    sorry  -- Requires HeadCoherent to know v is a string label
+    let branchEdge : Edge := ⟨e.sid, p, e.role⟩
+    have hTypedEdge := hBufs branchEdge
+    rcases hTypedEdge with ⟨hLenBuf, hTyping⟩
+    have h0buf : 0 < (lookupBuf C.bufs branchEdge).length := by
+      simpa [branchEdge, hBuf] using (Nat.succ_pos vs.length)
+    have h0trace : 0 < (lookupD C.D branchEdge).length := by
+      simpa [hLenBuf] using h0buf
+    have hTyped0 := hTyping 0 h0buf
+    have hv' : HasTypeVal C.G v ((lookupD C.D branchEdge).get ⟨0, h0trace⟩) := by
+      simpa [branchEdge, hBuf] using hTyped0
+    cases hTrace : lookupD C.D branchEdge with
+    | nil =>
+        simp [hTrace] at h0trace
+    | cons T' ts =>
+        have hHeadEdge := hHead branchEdge
+        have hEqT : T' = .string := by
+          simpa [HeadCoherent, hGe, branchEdge, hTrace] using hHeadEdge
+        have hv : HasTypeVal C.G v .string := by
+          simpa [hTrace, hEqT] using hv'
+        cases v with
+        | string lbl0 =>
+            have hValidEdge := hValid branchEdge p bs (by simpa [branchEdge] using hGe)
+            have hBsSome : (bs.find? (fun b => b.1 == lbl0)).isSome := by
+              simpa [branchEdge, hBuf] using hValidEdge
+            rcases (Option.isSome_iff_exists).1 hBsSome with ⟨b, hFindBs⟩
+            cases b with
+            | mk lbl' L =>
+                have hLbl' : lbl' = lbl0 := findLabel_eq (xs := bs) (lbl := lbl0) (lbl' := lbl') (v := L) hFindBs
+                subst lbl'
+                have hMemBs : (lbl0, L) ∈ bs := List.mem_of_find?_eq_some hFindBs
+                rcases (List.mem_iff_getElem).1 hMemBs with ⟨i, hi, hGetBs⟩
+                have hip : i < procs.length := by
+                  simpa [hLen] using hi
+                have hLabelAt : (procs.get ⟨i, hip⟩).1 = lbl0 := by
+                  have hLblEq := hLabels i hi hip
+                  simpa [hGetBs] using hLblEq
+                have hPred : (fun b => b.1 == lbl0) (procs.get ⟨i, hip⟩) := by
+                  simpa using (beq_iff_eq).2 hLabelAt
+                have hFindPIsSome : (procs.find? (fun b => b.1 == lbl0)).isSome := by
+                  cases hFindP : procs.find? (fun b => b.1 == lbl0) with
+                  | none =>
+                      have hNo : ∀ x ∈ procs, ¬ (fun b => b.1 == lbl0) x := by
+                        simpa [List.find?_eq_none] using hFindP
+                      have hMemP : procs.get ⟨i, hip⟩ ∈ procs := List.get_mem procs ⟨i, hip⟩
+                      have hContra : False := (hNo _ hMemP) hPred
+                      simpa [hFindP] using hContra
+                  | some b =>
+                      simp [hFindP]
+                rcases (Option.isSome_iff_exists).1 hFindPIsSome with ⟨bP, hFindP⟩
+                cases bP with
+                | mk lblP P =>
+                    have hLblP : lblP = lbl0 := findLabel_eq (xs := procs) (lbl := lbl0) (lbl' := lblP) (v := P) hFindP
+                    subst lblP
+                    have hDq : dequeueBuf C.bufs branchEdge = some (updateBuf C.bufs branchEdge vs, .string lbl0) := by
+                      simp [branchEdge, dequeueBuf, hBuf]
+                    let C' : Config :=
+                      { C with proc := P, bufs := updateBuf C.bufs branchEdge vs,
+                               G := updateG C.G e L, D := updateD C.D branchEdge (lookupD C.D branchEdge).tail }
+                    refine ⟨C', ?_⟩
+                    apply Step.base
+                    have hBuf' : lookupBuf C.bufs branchEdge = .string lbl0 :: vs := by
+                      simpa [branchEdge] using hBuf
+                    apply StepBase.branch (C:=C) (k:=k) (e:=e) (ℓ:=lbl0)
+                      (source:=p) (procBranches:=procs) (typeBranches:=bs)
+                      (P:=P) (L:=L) (bufs':=updateBuf C.bufs branchEdge vs) <;> try rfl
+                    · exact hEq
+                    · exact hvk1
+                    · exact hGe
+                    · simpa [branchEdge] using hBuf'
+                    · exact hFindP
+                    · exact hFindBs
+                    · simpa [branchEdge] using hDq
+        | _ =>
+            cases hv
 
 /-! ## Subject Reduction (TypedStep Soundness)
 
@@ -431,6 +458,27 @@ transition judgment is sound with respect to the untyped operational semantics.
 
 This bridges the TypedStep-based preservation theorem (preservation_typed in Typing.lean)
 with the untyped Step relation defined in Semantics.lean. -/
+
+/-- Frame extra G/D resources on the right of a configuration. -/
+def frameGD (C : Config) (G₂ : GEnv) (D₂ : DEnv) : Config :=
+  { C with G := C.G ++ G₂, D := C.D ++ D₂ }
+
+def frameGD_left (C : Config) (G₁ : GEnv) (D₁ : DEnv) : Config :=
+  { C with G := G₁ ++ C.G, D := D₁ ++ C.D }
+
+private axiom updateD_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType}
+    (h : D₁.find? e = none) :
+    updateD (D₁ ++ D₂) e ts = D₁ ++ updateD D₂ e ts
+
+/-- TODO: Prove this lemma once DEnv framing is settled (list order vs map semantics).
+    Currently used to lift a Step under extra disjoint G/D resources. -/
+axiom Step_frame_append_right {C C' : Config} {G₂ : GEnv} {D₂ : DEnv} :
+    Step C C' →
+    Step (frameGD C G₂ D₂) (frameGD C' G₂ D₂)
+
+axiom Step_frame_append_left {C C' : Config} {G₁ : GEnv} {D₁ : DEnv} :
+    Step C C' →
+    Step (frameGD_left C G₁ D₁) (frameGD_left C' G₁ D₁)
 
 /-- Subject reduction: TypedStep implies Step.
 
@@ -445,66 +493,87 @@ with the untyped Step relation defined in Semantics.lean. -/
 
     **Proof strategy**: Case analysis on TypedStep, construct corresponding Step.
     Each TypedStep constructor corresponds to a Step rule (or sequence of rules). -/
-theorem subject_reduction {G D S store bufs P G' D' S' store' bufs' P'} :
-    TypedStep G D S store bufs P G' D' S' store' bufs' P' →
-    ∃ C C', C = ⟨P, store, bufs, G, D, 0⟩ ∧
-            C' = ⟨P', store', bufs', G', D', 0⟩ ∧
-            Step C C' := by
+theorem subject_reduction {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    Step ⟨P, store, bufs, G, D, 0⟩ ⟨P', store', bufs', G', D', 0⟩ := by
   intro hTyped
-  -- The outer theorem has parameters G, D, S, store, bufs, P (input) and
-  -- G', D', S', store', bufs', P' (output). After cases on TypedStep,
-  -- these get matched against the specific constructor patterns.
-  cases hTyped with
-  | send hk hx hGlookup _ _ _ _ _ _ _ =>
-    -- After matching: P = .send k x, P' = .skip
-    refine ⟨⟨.send _ _, store, bufs, G, D, 0⟩, ⟨.skip, _, _, _, _, 0⟩, rfl, rfl, ?_⟩
+  refine TypedStep.rec (motive := fun G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' _ =>
+      Step ⟨P, store, bufs, G, D, 0⟩ ⟨P', store', bufs', G', D', 0⟩)
+    ?send ?recv ?select ?branch ?assign ?seq_step ?seq_skip ?par_left ?par_right
+    ?par_skip_left ?par_skip_right hTyped
+  · intro G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+        hSk hSx hG hSenv hVal hRecv hEdge hG' hD' hBufs'
+    subst hEdge hG' hD' hBufs'
+    have h := Step.base (StepBase.send (C := ⟨.send k x, store, bufs, G, D, 0⟩) rfl hSk hSx hG)
+    simpa [sendStep, appendD] using h
+  · intro G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+        hSk hG hEdge hBuf hVal hHead hG' hD' hSown' hStore' hBufs'
+    subst hEdge hG' hD' hSown' hStore' hBufs'
+    have h := Step.base (StepBase.recv (C := ⟨.recv k x, store, bufs, G, D, 0⟩) rfl hSk hG hBuf)
+    simpa [recvStep, dequeueBuf, hBuf] using h
+  · intro G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+        hSk hG hFind hRecv hEdge hG' hD' hBufs'
+    subst hEdge hG' hD' hBufs'
+    have h := Step.base (StepBase.select (C := ⟨.select k ℓ, store, bufs, G, D, 0⟩) rfl hSk hG hFind)
+    simpa [sendStep, appendD] using h
+  · intro G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+        hSk hG hEdge hBuf hFindP hFindBs hHead hG' hD' hBufs'
+    subst hEdge hG' hD' hBufs'
+    let edge : Edge := { sid := e.sid, sender := source, receiver := e.role }
+    have hBuf' : lookupBuf bufs edge = .string ℓ :: vs := by
+      simpa [edge] using hBuf
+    have hDeq : dequeueBuf bufs edge = some (updateBuf bufs edge vs, .string ℓ) := by
+      simp [dequeueBuf, hBuf', edge]
+    have h := Step.base (StepBase.branch (C := ⟨.branch k procs, store, bufs, G, D, 0⟩)
+      rfl hSk hG hBuf' hFindP hFindBs (by simpa [edge] using hDeq))
+    simpa using h
+  · intro G D Ssh Sown store bufs x v T S' store' hVal hS' hStore'
+    subst hS' hStore'
     apply Step.base
-    apply StepBase.send <;> try rfl
-    exact hk
-    exact hx
-    exact hGlookup
-  | recv hk hGlookup _ hBuf _ _ _ _ _ _ _ =>
-    -- After matching: P = .recv k x, P' = .skip
-    refine ⟨⟨.recv _ _, store, bufs, G, D, 0⟩, ⟨.skip, _, _, _, _, 0⟩, rfl, rfl, ?_⟩
+    apply StepBase.assign rfl
+  · intro G D Ssh Sown G' D' Sown' store bufs store' bufs' P P' Q hTS ih
+    refine Step.seq_left (C := ⟨.seq P Q, store, bufs, G, D, 0⟩)
+      (C' := ⟨P', store', bufs', G', D', 0⟩) (P := P) (Q := Q) ?_ ?_
+    · rfl
+    · exact ih
+  · intro G D Ssh Sown store bufs Q
     apply Step.base
-    apply StepBase.recv <;> try rfl
-    exact hk
-    exact hGlookup
-    exact hBuf
-  | assign hv _ _ =>
-    -- After matching: P = .assign x v, P' = .skip, store' = updateStr store x v
-    refine ⟨⟨.assign _ _, store, bufs, G, D, 0⟩, ⟨.skip, _, bufs, G, D, 0⟩, rfl, rfl, ?_⟩
+    apply StepBase.seq2 rfl
+  · intro Ssh store bufs P P' Q S G D₁ D₂ G₁' D₁' S₁' split
+        hTS hDisjG hDisjD hDisjS hConsL hConsR ih
+    have hStep := Step_frame_append_right (G₂ := split.G2) (D₂ := D₂)
+      (C := ⟨P, store, bufs, split.G1, D₁, 0⟩)
+      (C' := ⟨P', store, bufs, G₁', D₁', 0⟩) ih
+    have hStep' : Step ⟨P, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
+        ⟨P', store, bufs, G₁' ++ split.G2, D₁' ++ D₂, 0⟩ := by
+      simpa [frameGD] using hStep
+    have hPar : Step ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
+        ⟨.par P' Q, store, bufs, G₁' ++ split.G2, D₁' ++ D₂, 0⟩ := by
+      refine Step.par_left (C := ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩)
+        (C' := ⟨P', store, bufs, G₁' ++ split.G2, D₁' ++ D₂, 0⟩) (P := P) (Q := Q) ?_ ?_
+      · rfl
+      · exact hStep'
+    simpa [split.hG] using hPar
+  · intro Ssh store bufs P Q Q' S G D₁ D₂ G₂' D₂' S₂' split
+        hTS hDisjG hDisjD hDisjS hConsL hConsR ih
+    have hStep := Step_frame_append_left (G₁ := split.G1) (D₁ := D₁)
+      (C := ⟨Q, store, bufs, split.G2, D₂, 0⟩)
+      (C' := ⟨Q', store, bufs, G₂', D₂', 0⟩) ih
+    have hStep' : Step ⟨Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
+        ⟨Q', store, bufs, split.G1 ++ G₂', D₁ ++ D₂', 0⟩ := by
+      simpa [frameGD_left] using hStep
+    have hPar : Step ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
+        ⟨.par P Q', store, bufs, split.G1 ++ G₂', D₁ ++ D₂', 0⟩ := by
+      refine Step.par_right (C := ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩)
+        (C' := ⟨Q', store, bufs, split.G1 ++ G₂', D₁ ++ D₂', 0⟩) (P := P) (Q := Q) ?_ ?_
+      · rfl
+      · exact hStep'
+    simpa [split.hG] using hPar
+  · intro G D Ssh Sown store bufs Q
     apply Step.base
-    apply StepBase.assign
-    rfl
-  | seq_step hTS =>
-    -- After matching: P = .seq Pin Q, P' = .seq Pout Q
-    obtain ⟨C_inner, C'_inner, hC_inner, hC'_inner, hStep_inner⟩ := subject_reduction hTS
-    -- Need to extract P components from the pattern
-    sorry
-  | seq_skip =>
-    -- After matching: P = .seq .skip Q, P' = Q
-    refine ⟨⟨.seq .skip _, store, bufs, G, D, 0⟩, ⟨_, store, bufs, G, D, 0⟩, rfl, rfl, ?_⟩
+    apply StepBase.par_skip_left rfl
+  · intro G D Ssh Sown store bufs P
     apply Step.base
-    apply StepBase.seq2
-    rfl
-  | par_left hTS _ _ _ =>
-    -- After matching: P = .par Pin Q, P' = .par Pout Q
-    sorry
-  | par_right hTS _ _ _ =>
-    -- After matching: P = .par P Qin, P' = .par P Qout
-    sorry
-  | par_skip_left =>
-    -- After matching: P = .par .skip Q, P' = Q
-    refine ⟨⟨.par .skip _, store, bufs, G, D, 0⟩, ⟨_, store, bufs, G, D, 0⟩, rfl, rfl, ?_⟩
-    apply Step.base
-    apply StepBase.par_skip_left
-    rfl
-  | par_skip_right =>
-    -- After matching: P = .par P .skip, P' = P
-    refine ⟨⟨.par _ .skip, store, bufs, G, D, 0⟩, ⟨_, store, bufs, G, D, 0⟩, rfl, rfl, ?_⟩
-    apply Step.base
-    apply StepBase.par_skip_right
-    rfl
+    apply StepBase.par_skip_right rfl
 
 end

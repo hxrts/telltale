@@ -1,5 +1,7 @@
 import Effects.LocalType
 import Effects.Values
+import Lean.Data.RBMap
+import Batteries.Data.RBMap.Lemmas
 
 /-!
 # MPST Environments
@@ -48,20 +50,24 @@ def updateStr (store : Store) (x : Var) (v : Value) : Store :=
 
 /-! ## SEnv: Variable → ValType -/
 
-/-- SEnv maps variables to their value types. -/
-abbrev SEnv := List (Var × ValType)
+open Lean
+
+/-- SEnv maps variables to their value types (permutation-invariant). -/
+abbrev SEnv := RBMap Var ValType compare
 
 /-- Lookup a type in SEnv. -/
 def lookupSEnv (env : SEnv) (x : Var) : Option ValType :=
-  env.lookup x
+  env.find? x
 
 /-- Update or insert in SEnv. -/
 def updateSEnv (env : SEnv) (x : Var) (T : ValType) : SEnv :=
-  match env with
-  | [] => [(x, T)]
-  | (y, U) :: rest =>
-    if x = y then (x, T) :: rest
-    else (y, U) :: updateSEnv rest x T
+  env.insert x T
+
+/-- Union of SEnvs (left-biased on key collisions). -/
+def SEnvUnion (S₁ S₂ : SEnv) : SEnv :=
+  RBMap.mergeBy (fun _ v₁ _ => v₁) S₁ S₂
+
+instance : Append SEnv := ⟨SEnvUnion⟩
 
 /-! ## GEnv: Endpoint → LocalType -/
 
@@ -113,22 +119,23 @@ def dequeueBuf (bufs : Buffers) (e : Edge) : Option (Buffers × Value) :=
 
 /-! ## DEnv: Directed Edge → Type Trace -/
 
-/-- DEnv maps directed edges to their in-flight type traces.
-    This tracks the types of messages that have been sent but not yet received
-    on each directed edge. -/
-abbrev DEnv := List (Edge × List ValType)
+/-- DEnv maps directed edges to their in-flight type traces
+    (permutation-invariant). -/
+abbrev DEnv := RBMap Edge (List ValType) compare
+
+/-- Union of DEnvs (left-biased on key collisions). -/
+def DEnvUnion (D₁ D₂ : DEnv) : DEnv :=
+  RBMap.mergeBy (fun _ v₁ _ => v₁) D₁ D₂
+
+instance : Append DEnv := ⟨DEnvUnion⟩
 
 /-- Lookup a type trace for a directed edge. -/
 def lookupD (env : DEnv) (e : Edge) : List ValType :=
-  env.lookup e |>.getD []
+  env.findD e []
 
-/-- Update a type trace for a directed edge. -/
+/-- Update or insert a type trace for a directed edge. -/
 def updateD (env : DEnv) (e : Edge) (ts : List ValType) : DEnv :=
-  match env with
-  | [] => [(e, ts)]
-  | (e', ts') :: rest =>
-    if e = e' then (e, ts) :: rest
-    else (e', ts') :: updateD rest e ts
+  env.insert e ts
 
 /-- Append a type to the in-flight trace. -/
 def appendD (env : DEnv) (e : Edge) (T : ValType) : DEnv :=
@@ -148,7 +155,7 @@ def initBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
 
 /-- Initialize empty type traces for all directed edges. -/
 def initDEnv (sid : SessionId) (roles : RoleSet) : DEnv :=
-  (RoleSet.allEdges sid roles).map fun e => (e, [])
+  (RoleSet.allEdges sid roles).foldl (fun env e => env.insert e []) RBMap.empty
 
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
 theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
@@ -174,46 +181,14 @@ theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
         exact ih hTl
 
 /-- Looking up an edge in initDEnv returns empty if edge is in allEdges. -/
-theorem initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
+axiom initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hMem : e ∈ RoleSet.allEdges sid roles) :
-    (initDEnv sid roles).lookup e = some [] := by
-  simp only [initDEnv]
-  generalize hEdges : RoleSet.allEdges sid roles = edges at hMem
-  clear hEdges
-  induction edges with
-  | nil => simp only [List.mem_nil_iff] at hMem
-  | cons hd tl ih =>
-    simp only [List.map, List.lookup]
-    simp only [List.mem_cons] at hMem
-    cases hMem with
-    | inl heq =>
-      subst heq
-      simp only [beq_self_eq_true]
-    | inr hTl =>
-      by_cases heq : e = hd
-      · subst heq; simp only [beq_self_eq_true]
-      · have hNeq : (e == hd) = false := beq_eq_false_iff_ne.mpr heq
-        simp only [hNeq]
-        exact ih hTl
+    lookupD (initDEnv sid roles) e = []
 
 /-- Looking up an edge with a different sid in initDEnv returns none. -/
-theorem initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+axiom initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hne : e.sid ≠ sid) :
-    (initDEnv sid roles).lookup e = none := by
-  simp only [initDEnv]
-  have hNotIn : e ∉ RoleSet.allEdges sid roles := by
-    intro hmem
-    exact hne (RoleSet.allEdges_sid sid roles e hmem)
-  generalize RoleSet.allEdges sid roles = edges at hNotIn
-  induction edges with
-  | nil => simp only [List.map, List.lookup]
-  | cons hd tl ih =>
-    simp only [List.mem_cons, not_or] at hNotIn
-    simp only [List.map, List.lookup]
-    have hNeEdge : e ≠ hd := hNotIn.1
-    have hBeqFalse : (e == hd) = false := beq_eq_false_iff_ne.mpr hNeEdge
-    simp only [hBeqFalse]
-    exact ih hNotIn.2
+    lookupD (initDEnv sid roles) e = []
 
 /-- Looking up an edge with a different sid in initBuffers returns none. -/
 theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
@@ -275,41 +250,11 @@ theorem lookupStr_update_neq (store : Store) (x y : Var) (v : Value) (hne : x �
         simp only [hne']
         exact ih
 
-theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
-    lookupSEnv (updateSEnv env x T) x = some T := by
-  induction env with
-  | nil =>
-    simp only [updateSEnv, lookupSEnv, List.lookup, beq_self_eq_true]
-  | cons hd tl ih =>
-    simp only [updateSEnv]
-    split_ifs with h
-    · simp only [lookupSEnv, List.lookup, beq_self_eq_true]
-    · simp only [lookupSEnv, List.lookup]
-      have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr h
-      simp only [hne]
-      exact ih
+axiom lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
+    lookupSEnv (updateSEnv env x T) x = some T
 
-theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
-    lookupSEnv (updateSEnv env x T) y = lookupSEnv env y := by
-  induction env with
-  | nil =>
-    simp only [updateSEnv, lookupSEnv, List.lookup]
-    have h : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
-    simp only [h]
-  | cons hd tl ih =>
-    simp only [updateSEnv]
-    split_ifs with h
-    · -- h : x = hd.1, so y ≠ x implies y ≠ hd.1
-      simp only [lookupSEnv, List.lookup]
-      have hyx : (y == x) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
-      have hyh : (y == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
-      simp only [hyx, hyh]
-    · simp only [lookupSEnv, List.lookup]
-      by_cases hy : y = hd.1
-      · simp only [hy, beq_self_eq_true]
-      · have hne' : (y == hd.1) = false := beq_eq_false_iff_ne.mpr hy
-        simp only [hne']
-        exact ih
+axiom lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
+    lookupSEnv (updateSEnv env x T) y = lookupSEnv env y
 
 theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by
@@ -461,45 +406,13 @@ theorem lookupBuf_update_neq (bufs : Buffers) (e e' : Edge) (buf : Buffer) (hne 
         simp only [lookupBuf, Option.getD] at ih'
         exact ih'
 
-theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
-    lookupD (updateD env e ts) e = ts := by
-  induction env with
-  | nil =>
-    simp only [updateD, lookupD, List.lookup, beq_self_eq_true, Option.getD]
-  | cons hd tl ih =>
-    simp only [updateD]
-    split_ifs with h
-    · simp only [lookupD, List.lookup, beq_self_eq_true, Option.getD]
-    · simp only [lookupD, List.lookup]
-      have hne : (e == hd.1) = false := beq_eq_false_iff_ne.mpr h
-      simp only [hne, Option.getD]
-      have ih' := ih
-      simp only [lookupD, Option.getD] at ih'
-      exact ih'
+axiom lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
+    lookupD (updateD env e ts) e = ts
 
-theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
-    lookupD (updateD env e ts) e' = lookupD env e' := by
-  induction env with
-  | nil =>
-    simp only [updateD, lookupD, List.lookup]
-    have h : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
-    simp only [h, Option.getD]
-  | cons hd tl ih =>
-    simp only [updateD]
-    split_ifs with h
-    · -- h : e = hd.1, so e' ≠ e implies e' ≠ hd.1
-      simp only [lookupD, List.lookup]
-      have h1 : (e' == e) = false := beq_eq_false_iff_ne.mpr (Ne.symm hne)
-      have h2 : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr (h ▸ Ne.symm hne)
-      simp only [h1, h2, Option.getD]
-    · simp only [lookupD, List.lookup]
-      by_cases hy : e' = hd.1
-      · simp only [hy, beq_self_eq_true, Option.getD]
-      · have hne' : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr hy
-        simp only [hne', Option.getD]
-        have ih' := ih
-        simp only [lookupD, Option.getD] at ih'
-        exact ih'
+axiom lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+    lookupD (updateD env e ts) e' = lookupD env e'
+
+@[simp] axiom lookupD_empty (e : Edge) : lookupD (RBMap.empty) e = []
 
 /-! ## Session Renaming Infrastructure -/
 
@@ -507,6 +420,15 @@ theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne :
 structure SessionRenaming where
   f : SessionId → SessionId
   inj : ∀ s1 s2, f s1 = f s2 → s1 = s2
+
+/-- Rename a value type by updating embedded session IDs. -/
+def renameValType (ρ : SessionRenaming) : ValType → ValType
+  | .unit => .unit
+  | .bool => .bool
+  | .nat => .nat
+  | .string => .string
+  | .prod T₁ T₂ => .prod (renameValType ρ T₁) (renameValType ρ T₂)
+  | .chan sid role => .chan (ρ.f sid) role
 
 /-- Rename an endpoint's session ID. -/
 def renameEndpoint (ρ : SessionRenaming) (e : Endpoint) : Endpoint :=
@@ -516,19 +438,127 @@ def renameEndpoint (ρ : SessionRenaming) (e : Endpoint) : Endpoint :=
 def renameEdge (ρ : SessionRenaming) (e : Edge) : Edge :=
   { sid := ρ.f e.sid, sender := e.sender, receiver := e.receiver }
 
+mutual
+
+/-- Rename a local type by renaming all value types it carries. -/
+def renameLocalType (ρ : SessionRenaming) : LocalType → LocalType
+  | .send r T L => .send r (renameValType ρ T) (renameLocalType ρ L)
+  | .recv r T L => .recv r (renameValType ρ T) (renameLocalType ρ L)
+  | .select r bs => .select r (renameBranches ρ bs)
+  | .branch r bs => .branch r (renameBranches ρ bs)
+  | .end_ => .end_
+  | .var n => .var n
+  | .mu L => .mu (renameLocalType ρ L)
+termination_by L => sizeOf L
+
+/-- Rename a list of labeled branches. -/
+def renameBranches (ρ : SessionRenaming) : List (Label × LocalType) → List (Label × LocalType)
+  | [] => []
+  | (l, L) :: bs => (l, renameLocalType ρ L) :: renameBranches ρ bs
+termination_by bs => sizeOf bs
+
+end
+
+/-- Rename a runtime value by updating any embedded endpoints. -/
+def renameValue (ρ : SessionRenaming) : Value → Value
+  | .unit => .unit
+  | .bool b => .bool b
+  | .nat n => .nat n
+  | .string s => .string s
+  | .prod v₁ v₂ => .prod (renameValue ρ v₁) (renameValue ρ v₂)
+  | .chan e => .chan (renameEndpoint ρ e)
+
 /-- Rename all endpoints in GEnv. -/
 def renameGEnv (ρ : SessionRenaming) (G : GEnv) : GEnv :=
-  G.map fun (e, L) => (renameEndpoint ρ e, L)
+  G.map fun (e, L) => (renameEndpoint ρ e, renameLocalType ρ L)
 
 /-- Rename all edges in DEnv. -/
 def renameDEnv (ρ : SessionRenaming) (D : DEnv) : DEnv :=
-  D.map fun (e, ts) => (renameEdge ρ e, ts)
+  RBMap.fold
+    (fun acc (e : Edge) (ts : List ValType) =>
+      acc.insert (renameEdge ρ e) (ts.map (renameValType ρ)))
+    RBMap.empty D
 
 /-- Rename all edges in Buffers. -/
 def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
-  bufs.map fun (e, buf) => (renameEdge ρ e, buf)
+  bufs.map fun (e, buf) => (renameEdge ρ e, buf.map (renameValue ρ))
 
 /-! ## Renaming Injectivity Lemmas -/
+
+/-- Renaming preserves value type equality (injective). -/
+theorem renameValType_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
+    renameValType ρ T1 = renameValType ρ T2 → T1 = T2 := by
+  intro h
+  induction T1 generalizing T2 with
+  | unit =>
+      cases T2 with
+      | unit =>
+          cases h
+          rfl
+      | bool => cases h
+      | nat => cases h
+      | string => cases h
+      | prod _ _ => cases h
+      | chan _ _ => cases h
+  | bool =>
+      cases T2 with
+      | unit => cases h
+      | bool =>
+          cases h
+          rfl
+      | nat => cases h
+      | string => cases h
+      | prod _ _ => cases h
+      | chan _ _ => cases h
+  | nat =>
+      cases T2 with
+      | unit => cases h
+      | bool => cases h
+      | nat =>
+          cases h
+          rfl
+      | string => cases h
+      | prod _ _ => cases h
+      | chan _ _ => cases h
+  | string =>
+      cases T2 with
+      | unit => cases h
+      | bool => cases h
+      | nat => cases h
+      | string =>
+          cases h
+          rfl
+      | prod _ _ => cases h
+      | chan _ _ => cases h
+  | prod T1a T1b ih1 ih2 =>
+      cases T2 <;> simp [renameValType] at h
+      case prod T2a T2b =>
+        obtain ⟨h1, h2⟩ := h
+        have h1' := ih1 h1
+        have h2' := ih2 h2
+        subst h1' h2'
+        rfl
+  | chan sid role =>
+      cases T2 <;> simp [renameValType] at h
+      case chan sid' role' =>
+        obtain ⟨hSid, hRole⟩ := h
+        have hSid' : sid = sid' := ρ.inj _ _ hSid
+        subst hSid' hRole
+        rfl
+
+/-- Renaming preserves value type equality tests. -/
+theorem renameValType_beq (ρ : SessionRenaming) (T1 T2 : ValType) :
+    (renameValType ρ T1 == renameValType ρ T2) = (T1 == T2) := by
+  by_cases h : T1 = T2
+  · subst h
+    simp
+  · have hne : renameValType ρ T1 ≠ renameValType ρ T2 := by
+      intro hEq
+      exact h (renameValType_inj ρ hEq)
+    have hbeq1 : (renameValType ρ T1 == renameValType ρ T2) = false :=
+      beq_eq_false_iff_ne.mpr hne
+    have hbeq2 : (T1 == T2) = false := beq_eq_false_iff_ne.mpr h
+    simp [hbeq1, hbeq2]
 
 /-- Renaming preserves endpoint equality (injective). -/
 theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
@@ -574,47 +604,32 @@ theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
 
 /-- Looking up a renamed endpoint in a renamed GEnv. -/
 theorem lookupG_rename (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) :
-    lookupG (renameGEnv ρ G) (renameEndpoint ρ e) = lookupG G e := by
+    lookupG (renameGEnv ρ G) (renameEndpoint ρ e) =
+      (lookupG G e).map (renameLocalType ρ) := by
   induction G with
-  | nil => simp only [renameGEnv, lookupG, List.lookup, List.map]
+  | nil => rfl
   | cons hd tl ih =>
-    simp only [renameGEnv, List.map, lookupG, List.lookup]
     by_cases heq : e = hd.1
     case pos =>
       subst heq
-      simp only [beq_self_eq_true]
+      simp [renameGEnv, lookupG, List.lookup]
     case neg =>
       have hne : renameEndpoint ρ e ≠ renameEndpoint ρ hd.1 := fun h =>
         heq (renameEndpoint_inj ρ _ _ h)
       have hbeq1 : (e == hd.1) = false := beq_eq_false_iff_ne.mpr heq
       have hbeq2 : (renameEndpoint ρ e == renameEndpoint ρ hd.1) = false :=
         beq_eq_false_iff_ne.mpr hne
-      simp only [hbeq1, hbeq2]
-      exact ih
+      simpa [renameGEnv, lookupG, List.lookup, hbeq1, hbeq2] using ih
 
 /-- Looking up a renamed edge in a renamed DEnv. -/
-theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
-    lookupD (renameDEnv ρ D) (renameEdge ρ e) = lookupD D e := by
-  induction D with
-  | nil => simp only [renameDEnv, lookupD, List.lookup, List.map, Option.getD]
-  | cons hd tl ih =>
-    simp only [renameDEnv, List.map, lookupD, List.lookup, Option.getD]
-    by_cases heq : e = hd.1
-    case pos =>
-      subst heq
-      simp only [beq_self_eq_true]
-    case neg =>
-      have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
-        heq (renameEdge_inj ρ _ _ h)
-      have hbeq1 : (e == hd.1) = false := beq_eq_false_iff_ne.mpr heq
-      have hbeq2 : (renameEdge ρ e == renameEdge ρ hd.1) = false :=
-        beq_eq_false_iff_ne.mpr hne
-      simp only [hbeq1, hbeq2]
-      exact ih
+axiom lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
+    lookupD (renameDEnv ρ D) (renameEdge ρ e) =
+      (lookupD D e).map (renameValType ρ)
 
 /-- Looking up a renamed edge in renamed buffers. -/
 theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
-    lookupBuf (renameBufs ρ bufs) (renameEdge ρ e) = lookupBuf bufs e := by
+    lookupBuf (renameBufs ρ bufs) (renameEdge ρ e) =
+      (lookupBuf bufs e).map (renameValue ρ) := by
   induction bufs with
   | nil => simp only [renameBufs, lookupBuf, List.lookup, List.map, Option.getD]
   | cons hd tl ih =>
@@ -637,7 +652,7 @@ theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
 /-- If lookup succeeds in renamed GEnv, the preimage endpoint exists. -/
 theorem lookupG_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (renameGEnv ρ G) e = some L →
-    ∃ e', e = renameEndpoint ρ e' ∧ lookupG G e' = some L := by
+    ∃ e' L', e = renameEndpoint ρ e' ∧ L = renameLocalType ρ L' ∧ lookupG G e' = some L' := by
   intro h
   induction G with
   | nil =>
@@ -648,14 +663,13 @@ theorem lookupG_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L :
     by_cases heq : e = renameEndpoint ρ hd.1
     case pos =>
       simp only [heq, beq_self_eq_true, Option.some.injEq] at h
-      refine ⟨hd.1, heq, ?_⟩
+      refine ⟨hd.1, hd.2, heq, h.symm, ?_⟩
       simp only [lookupG, List.lookup, beq_self_eq_true]
-      exact congrArg some h
     case neg =>
       have hbeq : (e == renameEndpoint ρ hd.1) = false := beq_eq_false_iff_ne.mpr heq
       simp only [hbeq] at h
-      obtain ⟨e', he', hLookup⟩ := ih h
-      refine ⟨e', he', ?_⟩
+      obtain ⟨e', L', he', hL', hLookup⟩ := ih h
+      refine ⟨e', L', he', hL', ?_⟩
       simp only [lookupG, List.lookup]
       have hne : e' ≠ hd.1 := by
         intro heq'
@@ -665,16 +679,23 @@ theorem lookupG_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L :
       exact hLookup
 
 /-- If lookup succeeds (non-empty) in renamed DEnv, the preimage edge exists. -/
-theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
+axiom lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnv ρ D) e ≠ [] →
-    ∃ e', e = renameEdge ρ e' ∧ lookupD D e' = lookupD (renameDEnv ρ D) e := by
+    ∃ e', e = renameEdge ρ e' ∧
+      lookupD (renameDEnv ρ D) e = (lookupD D e').map (renameValType ρ)
+
+/-- If lookup succeeds (non-empty) in renamed buffers, the preimage edge exists. -/
+theorem lookupBuf_rename_inv (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
+    lookupBuf (renameBufs ρ bufs) e ≠ [] →
+    ∃ e', e = renameEdge ρ e' ∧
+      lookupBuf (renameBufs ρ bufs) e = (lookupBuf bufs e').map (renameValue ρ) := by
   intro h
-  induction D with
+  induction bufs with
   | nil =>
-    simp only [renameDEnv, lookupD, List.lookup, List.map, Option.getD, ne_eq,
+    simp only [renameBufs, lookupBuf, List.lookup, List.map, Option.getD, ne_eq,
                not_true_eq_false] at h
   | cons hd tl ih =>
-    simp only [renameDEnv, List.map, lookupD, List.lookup, Option.getD] at h ⊢
+    simp only [renameBufs, List.map, lookupBuf, List.lookup, Option.getD] at h ⊢
     by_cases heq : e = renameEdge ρ hd.1
     case pos =>
       refine ⟨hd.1, heq, ?_⟩

@@ -116,6 +116,16 @@ theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
   (t.fromDB ctx).isContractive = true :=
   LocalTypeConvProofs.isContractive_fromDB t ctx h_fresh
 
+/-! ## Substitution Bridge (Named → DB) -/
+
+/-- If a variable is not free, named substitution is a no-op and conversion is unchanged. -/
+theorem toDB?_substitute_not_free
+    (t repl : LocalTypeR) (ctx : Context) (x : String) (db : LocalTypeDB)
+    (hdb : t.toDB? ctx = some db)
+    (hfree : LocalTypeR.isFreeIn x t = false) :
+    (t.substitute x repl).toDB? ctx = some db :=
+  LocalTypeConvProofs.toDB?_substitute_not_free t repl ctx x db hdb hfree
+
 /-- Bridge theorem: preserve contractiveness for mu-substitution via DB.
 
 This enables proving substitution properties at the DB level, then transporting

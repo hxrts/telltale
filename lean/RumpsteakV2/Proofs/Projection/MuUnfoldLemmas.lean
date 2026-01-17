@@ -72,6 +72,7 @@ theorem EQ2_mu_to_unfold (s : String) (body : LocalTypeR) :
 -/
 theorem EQ2_mu_crossed_unfold_left'
     {s t : String} {inner G : GlobalType} {role : String}
+    (hGclosed : G.isClosed = true)
     (_hL : (projTrans (inner.substitute t G) role).isGuarded s = true)
     (_hR_pre : (projTrans inner role).isGuarded s = true) :
     EQ2 ((projTrans (inner.substitute t G) role).substitute s
@@ -79,7 +80,7 @@ theorem EQ2_mu_crossed_unfold_left'
         (.mu s ((projTrans inner role).substitute t (projTrans G role))) := by
   -- proj_subst: trans (inner.substitute t G) role = (trans inner role).substitute t (trans G role)
   -- Use simp to rewrite all occurrences
-  simp only [proj_subst]
+  simp only [proj_subst _ _ _ _ hGclosed]
   -- Now goal is: EQ2 (X.substitute s (.mu s X)) (.mu s X)
   exact EQ2_mu_self_unfold s _
 
@@ -88,13 +89,14 @@ theorem EQ2_mu_crossed_unfold_left'
     Symmetric to `EQ2_mu_crossed_unfold_left'`. -/
 theorem EQ2_mu_crossed_unfold_right'
     {s t : String} {inner G : GlobalType} {role : String}
+    (hGclosed : G.isClosed = true)
     (_hL : (projTrans (inner.substitute t G) role).isGuarded s = true)
     (_hR_pre : (projTrans inner role).isGuarded s = true) :
     EQ2 (.mu s (projTrans (inner.substitute t G) role))
         (((projTrans inner role).substitute t (projTrans G role)).substitute s
           (.mu s ((projTrans inner role).substitute t (projTrans G role)))) := by
   -- Use simp to rewrite all occurrences
-  simp only [proj_subst]
+  simp only [proj_subst _ _ _ _ hGclosed]
   -- Now goal is: EQ2 (.mu s X) (X.substitute s (.mu s X))
   exact EQ2_mu_to_unfold s _
 
@@ -203,13 +205,14 @@ But `hL` claims `isGuarded s = true`, contradiction! -/
 theorem EQ2_mu_unguarded_to_end'
     {s t : String} {inner G : GlobalType} {role : String}
     (hst : s ≠ t)
+    (hGclosed : G.isClosed = true)
     (hL : (projTrans (inner.substitute t G) role).isGuarded s = true)
     (hR_pre : (projTrans inner role).isGuarded s = false) :
     EQ2 ((projTrans (inner.substitute t G) role).substitute s
            (.mu s (projTrans (inner.substitute t G) role)))
         .end := by
   -- By proj_subst: projTrans (inner.substitute t G) role = (projTrans inner role).substitute t (projTrans G role)
-  rw [proj_subst] at hL
+  rw [proj_subst inner t G role hGclosed] at hL
   -- Now hL says: ((projTrans inner role).substitute t (projTrans G role)).isGuarded s = true
   -- But since (projTrans inner role).isGuarded s = false and s ≠ t,
   -- by isGuarded_false_substitute_preserved, the substituted term also has isGuarded s = false.
@@ -244,10 +247,9 @@ theorem EQ2_mu_unguarded_to_end'
     variables). By `trans_isClosed_of_isClosed`, projections of closed global types are
     closed local types. Therefore, the unguardedness hypothesis never holds in practice.
 
-    Note: Requires `s ≠ t` hypothesis, which holds in Harmony.lean (non-shadowed branch). -/
+    Note: In Harmony.lean this lemma is used in the non-shadowed branch (s ≠ t). -/
 theorem EQ2_end_to_mu_unguarded'
     {s t : String} {inner G : GlobalType} {role : String}
-    (hst : s ≠ t)
     (hGclosed : G.isClosed = true)
     (hL_pre : (projTrans (inner.substitute t G) role).isGuarded s = false)
     (hR : (projTrans inner role).isGuarded s = true) :
@@ -256,7 +258,7 @@ theorem EQ2_end_to_mu_unguarded'
           (.mu s ((projTrans inner role).substitute t (projTrans G role)))) := by
   -- The hypothesis hL_pre is vacuously false for closed G.
   -- By proj_subst: projTrans (inner.substitute t G) role = (projTrans inner role).substitute t (projTrans G role)
-  rw [proj_subst] at hL_pre
+  rw [proj_subst inner t G role hGclosed] at hL_pre
   -- projTrans G role is closed (since G is closed)
   have hProjGclosed : (projTrans G role).isClosed = true :=
     RumpsteakV2.Protocol.Projection.Trans.trans_isClosed_of_isClosed G role hGclosed

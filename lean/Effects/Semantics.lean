@@ -133,22 +133,22 @@ inductive Step : Config → Config → Prop where
   | base {C C'} : StepBase C C' → Step C C'
 
   /-- Step in left of seq. -/
-  | seq_left {C P P' Q} :
+  | seq_left {C C' P Q} :
       C.proc = .seq P Q →
-      Step { C with proc := P } { C with proc := P' } →
-      Step C { C with proc := .seq P' Q }
+      Step { C with proc := P } C' →
+      Step C { C' with proc := .seq C'.proc Q }
 
   /-- Step in left of par. -/
-  | par_left {C P P' Q} :
+  | par_left {C C' P Q} :
       C.proc = .par P Q →
-      Step { C with proc := P } { C with proc := P' } →
-      Step C { C with proc := .par P' Q }
+      Step { C with proc := P } C' →
+      Step C { C' with proc := .par C'.proc Q }
 
   /-- Step in right of par. -/
-  | par_right {C P Q Q'} :
+  | par_right {C C' P Q} :
       C.proc = .par P Q →
-      Step { C with proc := Q } { C with proc := Q' } →
-      Step C { C with proc := .par P Q' }
+      Step { C with proc := Q } C' →
+      Step C { C' with proc := .par P C'.proc }
 
 /-! ## Step Properties -/
 

@@ -538,7 +538,7 @@ theorem IndependentActions.symm {act₁ act₂ : GlobalActionR}
 
 /-- The diamond property result is symmetric in act₁/act₂.
     This allows us to prove only one direction of asymmetric cases. -/
-theorem step_diamond_symm {g g₁ g₂ g₃ : GlobalType} {act₁ act₂ : GlobalActionR}
+theorem step_diamond_symm {g₁ g₂ g₃ : GlobalType} {act₁ act₂ : GlobalActionR}
     (h : step g₁ act₂ g₃ ∧ step g₂ act₁ g₃) :
     step g₂ act₁ g₃ ∧ step g₁ act₂ g₃ :=
   ⟨h.2, h.1⟩

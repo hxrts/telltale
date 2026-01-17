@@ -61,7 +61,7 @@ def freeVarsImmediate : Process → List Var
   | .seq P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
   | .par P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
   | .send k x => [k, x]
-  | .recv k x => [k]  -- x is bound
+  | .recv k _ => [k]  -- x is bound
   | .select k _ => [k]
   | .branch k _ => [k]  -- simplified: don't recurse into branch processes
   | .newSession _ _ P => P.freeVarsImmediate  -- f's range is bound
@@ -92,7 +92,7 @@ namespace Config
 
 /-- Initial configuration with just a process and empty environments. -/
 def init (P : Process) : Config :=
-  { proc := P, store := [], bufs := [], G := [], D := [], nextSid := 0 }
+  { proc := P, store := [], bufs := [], G := [], D := Lean.RBMap.empty, nextSid := 0 }
 
 /-- Initial configuration with type environments. -/
 def initWithEnv (P : Process) (G : GEnv) (D : DEnv) : Config :=

@@ -43,6 +43,7 @@ Adapted from binary session types where the split is: a = e, a = e.dual, a unrel
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
+set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
@@ -142,6 +143,29 @@ theorem Consume_cons (from_ : Role) (Lr : LocalType) (T : ValType) (ts : List Va
   cases hOne : consumeOne from_ T Lr with
   | none => rfl
   | some L' => rfl
+
+/-! ## Consume Renaming Lemmas -/
+
+/-- Renaming commutes with a single consume step. -/
+theorem consumeOne_rename (ρ : SessionRenaming) (from_ : Role) (T : ValType) (L : LocalType) :
+    consumeOne from_ (renameValType ρ T) (renameLocalType ρ L) =
+      (consumeOne from_ T L).map (renameLocalType ρ) := by
+  cases L <;> simp [consumeOne, renameLocalType, renameValType_beq]
+
+/-- Renaming commutes with Consume over a trace. -/
+theorem Consume_rename (ρ : SessionRenaming) (from_ : Role) (L : LocalType) (ts : List ValType) :
+    Consume from_ (renameLocalType ρ L) (ts.map (renameValType ρ)) =
+      (Consume from_ L ts).map (renameLocalType ρ) := by
+  induction ts generalizing L with
+  | nil =>
+    simp [Consume]
+  | cons t ts ih =>
+    simp [Consume]
+    cases h : consumeOne from_ t L with
+    | none =>
+        simp [consumeOne_rename, h]
+    | some L' =>
+        simp [consumeOne_rename, h, ih]
 
 /-- Corollary: If Consume succeeds on [T] for a recv type from the same sender, the types match. -/
 theorem Consume_single_recv_match {from_ : Role} {T T' : ValType} {L L' : LocalType}
@@ -250,7 +274,7 @@ These lemmas show that EdgeCoherent constrains trace structure:
 1. For non-recv/branch receiver types (send, select, etc.), trace must be empty
 2. For recv/branch with different sender, trace must be empty
 
-These are the creative shortcuts that resolve "different sender" sorries. -/
+These shortcuts resolve "different sender" sorries. -/
 
 /-- If receiver type is send (or other non-recv/branch), trace must be empty.
     This is because Consume for .send only succeeds on empty trace. -/
@@ -363,12 +387,14 @@ theorem trace_empty_when_branch_other_sender
       -- For branch, consumeOne checks if t is .string and r == from_
       cases t with
       | string =>
-        simp only [hNeq, Bool.false_and, Option.isSome] at hIsSome
-        exact Bool.noConfusion hIsSome
+        have hFalse : False := by
+          simpa [Consume, consumeOne, hNeq] using hIsSome
+        exact hFalse.elim
       | _ =>
         -- If head is not string, consumeOne returns none anyway
-        simp only [Option.isSome] at hIsSome
-        exact Bool.noConfusion hIsSome
+        have hFalse : False := by
+          simpa [Consume, consumeOne] using hIsSome
+        exact hFalse.elim
 
 /-! ## Head Coherent (Progress Refinement)
 
@@ -406,12 +432,39 @@ When the receiver is at a branch type and the buffer contains a string label,
 that label must be one of the valid branch options.
 
 Reference: `work/effects/008.lean:392-397` -/
-def ValidLabels (G : GEnv) (D : DEnv) (bufs : Buffers) : Prop :=
+def ValidLabels (G : GEnv) (_D : DEnv) (bufs : Buffers) : Prop :=
   ∀ (e : Edge) (source : Role) (bs : List (Label × LocalType)),
     lookupG G ⟨e.sid, e.receiver⟩ = some (.branch source bs) →
     match lookupBuf bufs e with
     | (.string l) :: _ => (bs.find? (fun b => b.1 == l)).isSome
     | _ => True
+
+/-! ## Receiver Readiness (Progress Support)
+
+SendReady encodes the additional invariant needed for progress/preservation with
+asynchronous buffers: after consuming the current trace on the edge, the receiver
+can accept the next message of type T from the sender. This is exactly the
+`hRecvReady` hypothesis required by `TypedStep.send`.
+-/
+
+/-- Receiver readiness for a send: after consuming the current trace on the edge,
+    the receiver can consume one more message of type T from the sender. -/
+def SendReady (G : GEnv) (D : DEnv) : Prop :=
+  ∀ e q T L,
+    lookupG G e = some (.send q T L) →
+    ∀ Lrecv, lookupG G { sid := e.sid, role := q } = some Lrecv →
+      ∃ L', Consume e.role Lrecv (lookupD D { sid := e.sid, sender := e.role, receiver := q }) = some L' ∧
+            (Consume e.role L' [T]).isSome
+
+/-- Receiver readiness for a select: after consuming the current trace on the edge,
+    the receiver can consume a label (encoded as .string) from the selector. -/
+def SelectReady (G : GEnv) (D : DEnv) : Prop :=
+  ∀ e q bs ℓ L,
+    lookupG G e = some (.select q bs) →
+    bs.find? (fun b => b.1 == ℓ) = some (ℓ, L) →
+    ∀ Lrecv, lookupG G { sid := e.sid, role := q } = some Lrecv →
+      ∃ L', Consume e.role Lrecv (lookupD D { sid := e.sid, sender := e.role, receiver := q }) = some L' ∧
+            (Consume e.role L' [.string]).isSome
 
 /-! ## Buffer Typing -/
 
@@ -528,6 +581,24 @@ def BufferTyped (G : GEnv) (D : DEnv) (bufs : Buffers) (e : Edge) : Prop :=
 def BuffersTyped (G : GEnv) (D : DEnv) (bufs : Buffers) : Prop :=
   ∀ e, BufferTyped G D bufs e
 
+namespace List
+
+@[simp] theorem get_map {α β} (f : α → β) (l : List α) (i : Nat) (hi : i < l.length) :
+    (l.map f).get ⟨i, by simpa [List.length_map] using hi⟩ = f (l.get ⟨i, hi⟩) := by
+  induction l generalizing i with
+  | nil =>
+      cases hi
+  | cons a tl ih =>
+      cases i with
+      | zero =>
+          simp
+      | succ i =>
+          have hi' : i < tl.length := by
+            simpa using hi
+          simp
+
+end List
+
 /-- If buffer has head v with type T, then trace has head T.
     Key lemma for deriving trace head in recv case.
     Proof strategy: BufferTyped gives buf[i] : trace[i] for all i.
@@ -539,10 +610,29 @@ theorem trace_head_from_buffer {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge}
     (hv : HasTypeVal G v T)
     (hTyped : BufferTyped G D bufs e) :
     (lookupD D e).head? = some T := by
-  -- The proof involves dependent type manipulations with List.get
-  -- that are tricky to work with. Use sorry for now.
-  -- Key insight: buf[0] : trace[0], buf[0]=v, v:T ⟹ trace[0]=T by HasTypeVal_unique
-  sorry
+  -- Unpack the buffer typing proof.
+  rcases hTyped with ⟨hLen, hTyping⟩
+  -- Buffer is non-empty at index 0.
+  have h0buf : 0 < (lookupBuf bufs e).length := by
+    simp [hBuf]
+  -- Trace is also non-empty by length equality.
+  have h0trace : 0 < (lookupD D e).length := by
+    simpa [hLen] using h0buf
+  -- Typing of the head element.
+  have hTyped0 := hTyping 0 h0buf
+  have hTyped0' : HasTypeVal G v ((lookupD D e).get ⟨0, h0trace⟩) := by
+    simpa [hBuf] using hTyped0
+  -- Split on the trace to extract its head and finish by uniqueness.
+  cases hTrace : lookupD D e with
+  | nil =>
+      -- Contradiction: trace must be non-empty.
+      simp [hTrace] at h0trace
+  | cons t ts =>
+      have hTypeTrace0 : HasTypeVal G v t := by
+        simpa [hTrace] using hTyped0'
+      have hEq : T = t := HasTypeVal_unique hv hTypeTrace0
+      -- head? is the first element of the trace.
+      simp [hEq]
 
 /-! ## Store Typing -/
 
@@ -664,8 +754,7 @@ theorem Coherent_send_preserved
             (Consume senderEp.role L' [T]).isSome) :
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
     Coherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
-  intro sendEdge
-  intro e  -- The edge we need to show coherence for
+  intro sendEdge e  -- The edge we need to show coherence for
 
   -- Case split: is e the send edge or not?
   by_cases heq : e = sendEdge
@@ -866,8 +955,7 @@ theorem Coherent_recv_preserved
     (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     Coherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
-  intro recvEdge
-  intro e  -- The edge we need to show coherence for
+  intro recvEdge e  -- The edge we need to show coherence for
 
   -- Case split: is e the recv edge or not?
   by_cases heq : e = recvEdge
@@ -1166,7 +1254,7 @@ theorem Coherent_select_preserved
     (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
     (hCoh : Coherent G D)
     (hG : lookupG G selectorEp = some (.select targetRole bs))
-    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (_hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
     -- CRITICAL: The target must be ready to accept the label
     (hTargetReady : ∀ Ltarget, lookupG G { sid := selectorEp.sid, role := targetRole } = some Ltarget →
       ∃ L', Consume selectorEp.role Ltarget (lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole }) = some L' ∧
@@ -1174,8 +1262,7 @@ theorem Coherent_select_preserved
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
     Coherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
   -- Similar structure to Coherent_send_preserved, with .string for labels
-  intro selectEdge
-  intro e
+  intro selectEdge e
   by_cases heq : e = selectEdge
   · -- Case 1: e = selectEdge
     subst heq
@@ -1307,13 +1394,12 @@ theorem Coherent_branch_preserved
     (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
     (hCoh : Coherent G D)
     (hG : lookupG G brancherEp = some (.branch senderRole bs))
-    (hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (_hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))
     (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
     Coherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
   -- Similar structure to Coherent_recv_preserved, adapted for branch/select
-  intro branchEdge
-  intro e
+  intro branchEdge e
   by_cases heq : e = branchEdge
   · -- Case 1: e = branchEdge
     subst heq
@@ -1472,8 +1558,7 @@ theorem HeadCoherent_send_preserved
             (Consume senderEp.role L' [T]).isSome) :
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
     HeadCoherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
-  intro sendEdge
-  intro e  -- The edge we check HeadCoherent for
+  intro sendEdge e  -- The edge we check HeadCoherent for
   simp only [HeadCoherent] at hHead ⊢
   -- Case split: is e the send edge or not?
   by_cases heq : e = sendEdge
@@ -1668,8 +1753,7 @@ theorem HeadCoherent_recv_preserved
     (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     HeadCoherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
-  intro recvEdge
-  intro e  -- The edge we check HeadCoherent for
+  intro recvEdge e  -- The edge we check HeadCoherent for
   simp only [HeadCoherent] at hHead ⊢
   -- Case split: is e the recv edge or not?
   by_cases heq : e = recvEdge
@@ -2383,7 +2467,7 @@ theorem BuffersTyped_branch_preserved
 /-! ## Initialization Lemma -/
 
 /-- Empty environments are coherent. -/
-theorem Coherent_empty : Coherent [] [] := by
+theorem Coherent_empty : Coherent [] Lean.RBMap.empty := by
   intro e Lsender Lrecv hGsender hGrecv
   -- lookupG [] _ = none for any endpoint
   unfold lookupG at hGsender
@@ -2416,8 +2500,10 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
     Coherent (renameGEnv ρ G) (renameDEnv ρ D) := by
   intro e Lsender Lrecv hGsender hGrecv
   -- If lookups succeed in renamed env, preimage endpoints exist
-  obtain ⟨senderEp', hsenderEq, hGsender'⟩ := lookupG_rename_inv ρ G _ _ hGsender
-  obtain ⟨recvEp', hrecvEq, hGrecv'⟩ := lookupG_rename_inv ρ G _ _ hGrecv
+  obtain ⟨senderEp', Lsender', hsenderEq, hLsenderEq, hGsender'⟩ :=
+    lookupG_rename_inv ρ G _ _ hGsender
+  obtain ⟨recvEp', Lrecv', hrecvEq, hLrecvEq, hGrecv'⟩ :=
+    lookupG_rename_inv ρ G _ _ hGrecv
   -- The sender/receiver roles in the renamed edge must match
   have hSenderRole : e.sender = senderEp'.role := by
     have h := congrArg Endpoint.role hsenderEq
@@ -2449,21 +2535,42 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
     -- Construct equality using Edge.eq_iff
     rw [Edge.eq_iff]
     exact ⟨h1, h2, h3⟩
-  -- The trace is the same (up to renaming)
-  have hTraceEq : lookupD (renameDEnv ρ D) e = lookupD D e' := by
-    rw [hEdgeEq, lookupD_rename]
+  -- The trace is the renamed original trace
+  have hTraceEq : lookupD (renameDEnv ρ D) e = (lookupD D e').map (renameValType ρ) := by
+    simpa [hEdgeEq] using (lookupD_rename (ρ:=ρ) (D:=D) (e:=e'))
   -- Apply original coherence at e'
-  have hCoh' := hCoh e' Lsender Lrecv
+  have hCoh' := hCoh e' Lsender' Lrecv'
   -- Need to show the endpoint conditions match
-  have hSenderEp : senderEp' = { sid := e'.sid, role := e'.sender : Endpoint } := by
-    simp only [e']
-  -- The remaining proof requires showing endpoint equalities and applying
-  -- the original coherence. Using sorry until tactic issues are resolved.
-  sorry
+  have hGsender'' : lookupG G { sid := e'.sid, role := e'.sender } = some Lsender' := by
+    simpa [e'] using hGsender'
+  have hGrecv'' : lookupG G { sid := e'.sid, role := e'.receiver } = some Lrecv' := by
+    have hSid : e'.sid = recvEp'.sid := by
+      -- e'.sid = senderEp'.sid and senderEp'.sid = recvEp'.sid
+      simpa [e'] using hSidEq
+    have hEpEq : { sid := e'.sid, role := e'.receiver : Endpoint } = recvEp' := by
+      cases recvEp' with
+      | mk sid role =>
+          simp [e', hSidEq]
+    simpa [hEpEq] using hGrecv'
+  have hConsumeOrig : (Consume e'.sender Lrecv' (lookupD D e')).isSome :=
+    hCoh' hGsender'' hGrecv''
+  have hConsumeRen :
+      (Consume e'.sender (renameLocalType ρ Lrecv') ((lookupD D e').map (renameValType ρ))).isSome := by
+    have hEq := Consume_rename (ρ:=ρ) (from_:=e'.sender) (L:=Lrecv') (ts:=lookupD D e')
+    cases hCons : Consume e'.sender Lrecv' (lookupD D e') with
+    | none =>
+        have hFalse : False := by
+          simpa [hCons] using hConsumeOrig
+        exact hFalse.elim
+    | some L' =>
+        simp [hEq, hCons]
+  -- sender role is preserved by renaming, and traces are renamed
+  simpa [e', hSenderRole, hLrecvEq, hTraceEq] using hConsumeRen
 
 /-- HasTypeVal is preserved under session renaming. -/
 theorem HasTypeVal_rename (ρ : SessionRenaming) (G : GEnv) (v : Value) (T : ValType) :
-    HasTypeVal G v T → HasTypeVal (renameGEnv ρ G) v T := by
+    HasTypeVal G v T →
+    HasTypeVal (renameGEnv ρ G) (renameValue ρ v) (renameValType ρ T) := by
   intro h
   induction h with
   | unit => exact HasTypeVal.unit
@@ -2472,12 +2579,11 @@ theorem HasTypeVal_rename (ρ : SessionRenaming) (G : GEnv) (v : Value) (T : Val
   | string s => exact HasTypeVal.string s
   | prod _ _ ih1 ih2 => exact HasTypeVal.prod ih1 ih2
   | @chan e L hLookup =>
-    -- Need to handle channel case - the endpoint gets renamed
-    -- But the value still contains the original endpoint...
-    -- This is subtle: the value .chan e references the original endpoint
-    -- In the renamed GEnv, that original endpoint is no longer present
-    -- Actually, this theorem may need adjustment - channel values need to be renamed too
-    sorry  -- Channel case requires careful treatment of value renaming
+    have hLookup' :
+        lookupG (renameGEnv ρ G) (renameEndpoint ρ e) = some (renameLocalType ρ L) := by
+      have hLookupRen := lookupG_rename (ρ:=ρ) (G:=G) (e:=e)
+      simpa [hLookup] using hLookupRen
+    exact HasTypeVal.chan hLookup'
 
 /-- BuffersTyped is preserved under session renaming. -/
 theorem BuffersTypedRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv) (bufs : Buffers)
@@ -2496,17 +2602,35 @@ theorem BuffersTypedRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv) (bufs 
     obtain ⟨hLen, hElem⟩ := hTyped'
     -- Rewrite lookups using simp to avoid dependent type issues
     simp only [lookupBuf_rename, lookupD_rename]
-    refine ⟨hLen, ?_⟩
+    have hLen' :
+        ((lookupBuf bufs e').map (renameValue ρ)).length =
+          ((lookupD D e').map (renameValType ρ)).length := by
+      simpa [List.length_map] using hLen
+    refine ⟨hLen', ?_⟩
     intro i hi
-    -- Need HasTypeVal_rename, which has a sorry for channel case
-    -- Use sorry here - this is a secondary proof that depends on
-    -- the channel renaming semantics
-    sorry
+    have hi' : i < (lookupBuf bufs e').length := by
+      simpa [List.length_map] using hi
+    have hElem' := hElem i hi'
+    have hRen := HasTypeVal_rename ρ G _ _ hElem'
+    simpa [lookupBuf_rename, lookupD_rename, List.length_map] using hRen
   case neg =>
     -- Edge not in image - both lookups return empty
     -- This case requires showing that lookups in renamed environments
     -- return [] for edges outside the renaming range
-    sorry
+    have hTraceEmpty : lookupD (renameDEnv ρ D) e = [] := by
+      by_contra hne
+      obtain ⟨e', he', _⟩ := lookupD_rename_inv ρ D e hne
+      exact h ⟨e', he'.symm⟩
+    have hBufEmpty : lookupBuf (renameBufs ρ bufs) e = [] := by
+      by_contra hne
+      obtain ⟨e', he', _⟩ := lookupBuf_rename_inv ρ bufs e hne
+      exact h ⟨e', he'.symm⟩
+    refine ⟨?_, ?_⟩
+    · simp [hBufEmpty, hTraceEmpty]
+    · intro i hi
+      have hi' : False := by
+        simpa [hBufEmpty] using hi
+      exact hi'.elim
 
 /-! ## Disjointness Infrastructure -/
 
@@ -2532,8 +2656,10 @@ theorem RenamedDisjoint (ρ1 ρ2 : SessionRenaming) (G1 G2 : GEnv)
   obtain ⟨e1, L1, hLookup1, hSid1⟩ := hS1
   obtain ⟨e2, L2, hLookup2, hSid2⟩ := hS2
   -- Get preimage endpoints
-  obtain ⟨e1', he1Eq, hLookup1'⟩ := lookupG_rename_inv ρ1 G1 e1 L1 hLookup1
-  obtain ⟨e2', he2Eq, hLookup2'⟩ := lookupG_rename_inv ρ2 G2 e2 L2 hLookup2
+  obtain ⟨e1', L1', he1Eq, hL1Eq, hLookup1'⟩ :=
+    lookupG_rename_inv ρ1 G1 e1 L1 hLookup1
+  obtain ⟨e2', L2', he2Eq, hL2Eq, hLookup2'⟩ :=
+    lookupG_rename_inv ρ2 G2 e2 L2 hLookup2
   -- e1.sid = ρ1.f e1'.sid and e2.sid = ρ2.f e2'.sid
   have hSid1' : e1.sid = ρ1.f e1'.sid := by rw [he1Eq]; simp only [renameEndpoint]
   have hSid2' : e2.sid = ρ2.f e2'.sid := by rw [he2Eq]; simp only [renameEndpoint]
@@ -2541,8 +2667,8 @@ theorem RenamedDisjoint (ρ1 ρ2 : SessionRenaming) (G1 G2 : GEnv)
   have hContra : ρ1.f e1'.sid = ρ2.f e2'.sid := by
     rw [← hSid1', ← hSid2', hSid1, hSid2]
   -- e1'.sid ∈ SessionsOf G1, e2'.sid ∈ SessionsOf G2
-  have hIn1 : e1'.sid ∈ SessionsOf G1 := ⟨e1', L1, hLookup1', rfl⟩
-  have hIn2 : e2'.sid ∈ SessionsOf G2 := ⟨e2', L2, hLookup2', rfl⟩
+  have hIn1 : e1'.sid ∈ SessionsOf G1 := ⟨e1', L1', hLookup1', rfl⟩
+  have hIn2 : e2'.sid ∈ SessionsOf G2 := ⟨e2', L2', hLookup2', rfl⟩
   exact hDisj _ hIn1 _ hIn2 hContra
 
 /-! ## Dual Relation for Local Types -/
@@ -2576,7 +2702,7 @@ theorem Dual_send_inv (L1 L2 : LocalType) (r : Role) (T : ValType) (L1' : LocalT
 theorem Dual_implies_Coherent_empty (L1 L2 : LocalType) (r1 r2 : Role)
     (sid : SessionId) (_hDual : Dual L1 L2) :
     let G : GEnv := [({ sid := sid, role := r1 }, L1), ({ sid := sid, role := r2 }, L2)]
-    let D : DEnv := []
+    let D : DEnv := Lean.RBMap.empty
     let e12 : Edge := { sid := sid, sender := r1, receiver := r2 }
     let e21 : Edge := { sid := sid, sender := r2, receiver := r1 }
     EdgeCoherent G D e12 ∧ EdgeCoherent G D e21 := by
@@ -2587,9 +2713,9 @@ theorem Dual_implies_Coherent_empty (L1 L2 : LocalType) (r1 r2 : Role)
   constructor
   · -- EdgeCoherent for e12 (r1 → r2)
     intro Lsender Lrecv hGsender hGrecv
-    simp only [lookupD, List.lookup, Option.getD, Consume, Option.isSome_some]
+    simp [lookupD_empty, Consume]
   · -- EdgeCoherent for e21 (r2 → r1)
     intro Lsender Lrecv hGsender hGrecv
-    simp only [lookupD, List.lookup, Option.getD, Consume, Option.isSome_some]
+    simp [lookupD_empty, Consume]
 
 end

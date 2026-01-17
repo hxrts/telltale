@@ -27,16 +27,16 @@ open RumpsteakV2.Protocol.CoTypes.EQ2
 
 /-! ## Determinism Theorems -/
 
-/-- Projection is deterministic up to EQ2 (assuming non-empty comm branches).
+/-- Projection is deterministic up to EQ2 (assuming well-formed global types).
 
 Uses CProject_implies_EQ2_trans twice and composes via EQ2 transitivity. -/
 theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTypeR}
     (hp1 : CProject g role e1) (hp2 : CProject g role e2)
-    (hne : g.allCommsNonEmpty = true) : EQ2 e1 e2 := by
+    (hwf : g.wellFormed = true) : EQ2 e1 e2 := by
   have h1 : EQ2 e1 (trans g role) :=
-    RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e1 hp1 hne
+    RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e1 hp1 hwf
   have h2 : EQ2 e2 (trans g role) :=
-    RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e2 hp2 hne
+    RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e2 hp2 hwf
   exact EQ2_trans h1 (EQ2_symm h2)
 
 /-- Helper: cons case for branches_proj_deterministic. -/
@@ -49,10 +49,10 @@ private theorem branches_proj_deterministic_cons
     (htail1 : BranchesProjRel CProject gbs' role lbs1')
     (hpair2 : gb.1 = lb2.1 ∧ CProject gb.2 role lb2.2)
     (htail2 : BranchesProjRel CProject gbs' role lbs2')
-    (hne : GlobalType.allCommsNonEmptyBranches (gb :: gbs') = true)
+    (hwf : ∀ gb' ∈ (gb :: gbs'), gb'.2.wellFormed = true)
     (branches_det : ∀ {lbs1 lbs2}, BranchesProjRel CProject gbs' role lbs1 →
       BranchesProjRel CProject gbs' role lbs2 →
-      GlobalType.allCommsNonEmptyBranches gbs' = true → BranchesRel EQ2 lbs1 lbs2) :
+      (∀ gb'' ∈ gbs', gb''.2.wellFormed = true) → BranchesRel EQ2 lbs1 lbs2) :
     BranchesRel EQ2 (lb1 :: lbs1') (lb2 :: lbs2') := by
   cases gb with
   | mk l gcont =>
@@ -62,21 +62,22 @@ private theorem branches_proj_deterministic_cons
           | mk l2 t2 =>
               rcases hpair1 with ⟨hlabel1, hcont1⟩
               rcases hpair2 with ⟨hlabel2, hcont2⟩
-              have hne' : gcont.allCommsNonEmpty = true ∧
-                  GlobalType.allCommsNonEmptyBranches gbs' = true := by
-                simpa [GlobalType.allCommsNonEmptyBranches] using hne
-              have hcont_eq : EQ2 t1 t2 := project_deterministic hcont1 hcont2 hne'.1
+              have hwf_head : gcont.wellFormed = true := hwf _ (by simp)
+              have hcont_eq : EQ2 t1 t2 := project_deterministic hcont1 hcont2 hwf_head
               have hlabel_eq : l1 = l2 := hlabel1.symm.trans hlabel2
-              have htail_eq := branches_det htail1 htail2 hne'.2
+              have hwf_tail : ∀ gb' ∈ gbs', gb'.2.wellFormed = true := by
+                intro gb' hmem
+                exact hwf gb' (by simp [hmem])
+              have htail_eq := branches_det htail1 htail2 hwf_tail
               cases hlabel_eq
               exact List.Forall₂.cons ⟨rfl, hcont_eq⟩ htail_eq
 
-/-- Determinism for branch-wise projection up to EQ2 (assuming non-empty comm branches). -/
+/-- Determinism for branch-wise projection up to EQ2 (assuming well-formed branches). -/
 theorem branches_proj_deterministic {gbs : List (Label × GlobalType)} {role : String}
     {lbs1 lbs2 : List (Label × LocalTypeR)}
     (h1 : BranchesProjRel CProject gbs role lbs1)
     (h2 : BranchesProjRel CProject gbs role lbs2)
-    (hne : GlobalType.allCommsNonEmptyBranches gbs = true) :
+    (hwf : ∀ gb ∈ gbs, gb.2.wellFormed = true) :
     BranchesRel EQ2 lbs1 lbs2 := by
   cases gbs with
   | nil =>
@@ -95,7 +96,7 @@ theorem branches_proj_deterministic {gbs : List (Label × GlobalType)} {role : S
                   cases h2 with
                   | cons hpair2 htail2 =>
                       exact branches_proj_deterministic_cons lb1 lbs1' lb2 lbs2' gb gbs'
-                        hpair1 htail1 hpair2 htail2 hne
-                        (fun h1 h2 hne' => branches_proj_deterministic h1 h2 hne')
+                        hpair1 htail1 hpair2 htail2 hwf
+                        (fun h1 h2 hwf' => branches_proj_deterministic h1 h2 hwf')
 
 end RumpsteakV2.Protocol.Projection.Projectb

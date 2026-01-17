@@ -408,10 +408,10 @@ theorem LocalTypeR.WellFormed_end : LocalTypeR.WellFormed .end :=
 
 /-! ## Lightweight Contractiveness and Partner Occurrence -/
 
-/-- Local contractiveness check mirroring global `lcontractive`. -/
+/-- Local contractiveness check for mu bodies (vars are non-contractive). -/
 def LocalTypeR.lcontractive : LocalTypeR → Bool
   | .end => true
-  | .var _ => true
+  | .var _ => false
   | .send _ _ => true
   | .recv _ _ => true
   | .mu _ body =>

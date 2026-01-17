@@ -195,13 +195,27 @@ mutual
             cases e' with
             | mu t'' body' =>
                 simp [CEmbedF] at hF
-                simp [CProjectF] at hP
-                rcases hF with ⟨ht1, _, hbody1⟩
-                rcases hP with ⟨ht2, _, hbody2⟩
+                rcases hF with ⟨ht1, hguard, hbody1⟩
                 subst ht1
-                subst ht2
-                have hbody := embed_project_roundtrip hbody1 hbody2
+                simp [CProjectF] at hP
+                rcases hP with ⟨hproj, hguard'⟩
+                rcases hguard' with ⟨_hguard, ht''⟩
+                subst ht''
+                have hbody := embed_project_roundtrip hbody1 hproj
                 simp [hbody]
+            | «end» =>
+                simp [CEmbedF] at hF
+                rcases hF with ⟨ht1, hguard, hbody1⟩
+                subst ht1
+                simp [CProjectF] at hP
+                rcases hP with ⟨candBody, hproj, hguard_false⟩
+                have hbody := embed_project_roundtrip hbody1 hproj
+                have : body.isGuarded t = false := by
+                  simpa [hbody] using hguard_false
+                have : False := by
+                  have h := this
+                  simp [hguard] at h
+                exact this.elim
             | _ => simp [CProjectF] at hP
         | _ => simp [CEmbedF] at hF
     | send receiver lbs =>
@@ -333,17 +347,20 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
   have hF := CEmbed_destruct hembed
   cases body with
   | «end» =>
-      cases gbody <;> simp [CEmbedF, LocalTypeR.lcontractive,
-        RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
+      cases gbody <;>
+        simp [CEmbedF, LocalTypeR.lcontractive,
+          RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
   | var t =>
-      cases gbody <;> simp [CEmbedF, LocalTypeR.lcontractive,
-        RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
+      cases gbody <;>
+        simp [CEmbedF, LocalTypeR.lcontractive] at hF hcontr ⊢
   | send receiver lbs =>
-      cases gbody <;> simp [CEmbedF, LocalTypeR.lcontractive,
-        RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
+      cases gbody <;>
+        simp [CEmbedF, LocalTypeR.lcontractive,
+          RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
   | recv sender lbs =>
-      cases gbody <;> simp [CEmbedF, LocalTypeR.lcontractive,
-        RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
+      cases gbody <;>
+        simp [CEmbedF, LocalTypeR.lcontractive,
+          RumpsteakV2.Protocol.Projection.Trans.lcontractive] at hF hcontr ⊢
   | mu t body' =>
       cases gbody with
       | mu t' gbody' =>
@@ -358,9 +375,30 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
 /-- When lcontractive body = true in the context of a mu, body.isGuarded t = true.
     This follows from the structure of lcontractive which requires send/recv/end at the top,
     all of which are guarded for any variable. -/
-private axiom lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
+private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
     (hcontr : LocalTypeR.lcontractive body = true) :
-    body.isGuarded t = true
+    body.isGuarded t = true := by
+  cases body with
+  | «end» =>
+      simp [LocalTypeR.isGuarded]
+  | var w =>
+      simp [LocalTypeR.lcontractive] at hcontr
+  | send p bs =>
+      simp [LocalTypeR.isGuarded]
+  | recv p bs =>
+      simp [LocalTypeR.isGuarded]
+  | mu s inner =>
+      cases inner with
+      | «end» =>
+          simp [LocalTypeR.lcontractive, LocalTypeR.isGuarded] at hcontr ⊢
+      | var w =>
+          simp [LocalTypeR.lcontractive] at hcontr
+      | send p bs =>
+          simp [LocalTypeR.lcontractive, LocalTypeR.isGuarded] at hcontr ⊢
+      | recv p bs =>
+          simp [LocalTypeR.lcontractive, LocalTypeR.isGuarded] at hcontr ⊢
+      | mu s' inner' =>
+          simp [LocalTypeR.lcontractive] at hcontr
 
 /-! ### Main Existence Theorems -/
 

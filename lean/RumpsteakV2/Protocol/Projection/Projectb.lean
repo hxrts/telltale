@@ -267,7 +267,7 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
     This mirrors Coq's `UnfProj` wrapper: we project on fully-unfolded
     global and local types. -/
 def CProjectF_unfold (R : ProjRel) : ProjRel := fun g role cand =>
-  CProjectF R (GlobalType.fullUnfold g) role (LocalTypeR.fullUnfold cand)
+  CProjectF R (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand)
 
 private theorem BranchesProjRel_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :

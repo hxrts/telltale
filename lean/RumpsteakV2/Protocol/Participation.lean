@@ -163,6 +163,82 @@ theorem not_part_of_all2_var (role : String) (t : String) : ¬ part_of_all2 role
   cases h with
   | intro _ hf => cases hf
 
+private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
+    sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
+  simp only [GlobalType.comm.sizeOf_spec]
+  have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
+  omega
+
+private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
+    (xs : List (α × β)) (x : α × β) (h : x ∈ xs) :
+    sizeOf x.2 < sizeOf xs := by
+  induction xs with
+  | nil => simp at h
+  | cons hd tl ih =>
+      cases h with
+      | head =>
+          simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]; omega
+      | tail _ hmem =>
+          have := ih hmem
+          simp only [sizeOf, List._sizeOf_1] at *
+          omega
+
+private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+    (gbs : List (Label × GlobalType)) (gb : Label × GlobalType) (h : gb ∈ gbs) :
+    sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver gbs) := by
+  have h1 := sizeOf_elem_snd_lt_list gbs gb h
+  have h2 := sizeOf_bs_lt_comm sender receiver gbs
+  omega
+
+/-! ## Induction principle for part_of_all2
+
+This mirrors the Coq `part_of_all2_ind2` lemma used in projection proofs.
+It gives a structural recursion on the global type, with explicit cases
+for direct participation, all-branches participation, and mu unfolding. -/
+
+theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
+    (h_comm_direct :
+      ∀ sender receiver branches, is_participant role sender receiver →
+        P (.comm sender receiver branches))
+    (h_comm_all :
+      ∀ sender receiver branches,
+        (∀ pair, pair ∈ branches → part_of_all2 role pair.2) →
+        (∀ pair, pair ∈ branches → part_of_all2 role pair.2 → P pair.2) →
+        P (.comm sender receiver branches))
+    (h_mu :
+      ∀ t body, part_of_all2 role body → P body → P (.mu t body)) :
+    ∀ g, part_of_all2 role g → P g := by
+  intro g h
+  match g with
+  | .end =>
+      exact (not_part_of_all2_end role h).elim
+  | .var t =>
+      exact (not_part_of_all2_var role t h).elim
+  | .mu t body =>
+      have hbody : part_of_all2 role body := part_of_all2_mu_inv h
+      have ih : P body := part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu body hbody
+      exact h_mu t body hbody ih
+  | .comm sender receiver branches =>
+      have hcases := part_of_all2_comm_inv (role := role) (sender := sender) (receiver := receiver)
+        (branches := branches) h
+      cases hcases with
+      | inl hpart =>
+          exact h_comm_direct sender receiver branches hpart
+      | inr hall =>
+          have ih :
+              ∀ pair, pair ∈ branches → part_of_all2 role pair.2 → P pair.2 := by
+            intro pair hmem hpoa
+            exact part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu pair.2 hpoa
+          exact h_comm_all sender receiver branches hall ih
+termination_by g
+decreasing_by
+  all_goals
+    simp_wf
+    all_goals
+      first
+      | simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1] at *
+      | (apply sizeOf_elem_snd_lt_comm; assumption)
+
 /-! ## Non-participation lemmas
 
 These lemmas capture what we can conclude when a role is NOT a participant. -/
@@ -216,6 +292,18 @@ mutual
     | (_, cont) :: rest =>
         participates role cont || participatesBranches role rest
 end
+
+/-! ## Boolean participation equivalence -/
+
+/-- `participates` is equivalent to `part_of2`. -/
+axiom part_of2_iff_participates (role : String) :
+    ∀ g, part_of2 role g ↔ participates role g = true
+
+/-- `participatesBranches` is equivalent to existence of a participating branch. -/
+axiom participatesBranches_iff_part_of2 (role : String) :
+    ∀ branches,
+      participatesBranches role branches = true ↔
+        ∃ pair, pair ∈ branches ∧ part_of2 role pair.2
 
 theorem participates_comm_iff {role sender receiver : String} {branches : List (Label × GlobalType)} :
     participates role (.comm sender receiver branches) =

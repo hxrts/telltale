@@ -77,7 +77,7 @@ Typed environments:
 - `Buffer`: List Value (message queue per edge)
 - `Buffers`: Edge → Buffer (all message queues)
 - `GEnv`: Endpoint → LocalType (current local types)
-- `DEnv`: Edge → List ValType (in-flight message types per edge)
+- `DEnv`: RBMap Edge (List ValType) compare (in-flight message types per edge)
 
 ### `Coherence.lean` ★
 The key MPST coherence proofs:
@@ -195,7 +195,7 @@ Instead of rendezvous send/recv, the network is explicit:
 
 The type-level traces in `DEnv` mirror the runtime buffers:
 * Runtime buffers: `Buffers : Edge → List Value`
-* Type-level traces: `DEnv : Edge → List ValType`
+* Type-level traces: `DEnv : RBMap Edge (List ValType) compare`
 
 This is what makes asynchronous fidelity provable: preservation updates both in lockstep.
 

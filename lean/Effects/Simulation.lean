@@ -125,20 +125,46 @@ def stepBaseDecide (C : Config) : Option Config :=
       | .skip => some { C with proc := P }  -- par P skip → P
       | _ => none  -- Would need recursive step
 
+/-- Coarse size measure for well-founded recursion on processes. -/
+private def procSize : Process → Nat
+  | .skip => 0
+  | .seq P Q => procSize P + procSize Q + 1
+  | .par P Q => procSize P + procSize Q + 1
+  | .send _ _ => 0
+  | .recv _ _ => 0
+  | .select _ _ => 0
+  | .branch _ _ => 1
+  | .newSession _ _ _ => 1
+  | .assign _ _ => 0
+
+private lemma procSize_lt_seq_left (P Q : Process) : procSize P < procSize (.seq P Q) := by
+  have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
+  have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
+  simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+
+private lemma procSize_lt_par_left (P Q : Process) : procSize P < procSize (.par P Q) := by
+  have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
+  have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
+  simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+
+private lemma procSize_lt_par_right (P Q : Process) : procSize Q < procSize (.par P Q) := by
+  have hpos : 0 < procSize P + 1 := Nat.succ_pos _
+  have h := Nat.lt_add_of_pos_left (n := procSize Q) hpos
+  simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
 
 /-- Attempt a full step with contextual closure.
 
 For seq and par, we recursively try to step the subprocesses.
 -/
-partial def stepDecide (C : Config) : Option Config :=
-  match C.proc with
+private def stepDecideAux (proc : Process) (C : Config) : Option Config :=
+  match proc with
   | .skip => none
 
   | .seq P Q =>
     if P = .skip then
       some { C with proc := Q }
     else
-      match stepDecide { C with proc := P } with
+      match stepDecideAux P { C with proc := P } with
       | some C' => some { C' with proc := .seq C'.proc Q }
       | none => none
 
@@ -149,15 +175,27 @@ partial def stepDecide (C : Config) : Option Config :=
       some { C with proc := P }
     else
       -- Try left first
-      match stepDecide { C with proc := P } with
+      match stepDecideAux P { C with proc := P } with
       | some C' => some { C' with proc := .par C'.proc Q }
       | none =>
         -- Try right
-        match stepDecide { C with proc := Q } with
+        match stepDecideAux Q { C with proc := Q } with
         | some C' => some { C' with proc := .par P C'.proc }
         | none => none
 
   | _ => stepBaseDecide C
+
+termination_by
+  procSize proc
+decreasing_by
+  all_goals
+    first
+      | simpa using procSize_lt_seq_left _ _
+      | simpa using procSize_lt_par_left _ _
+      | simpa using procSize_lt_par_right _ _
+
+def stepDecide (C : Config) : Option Config :=
+  stepDecideAux C.proc C
 
 /-! ## Multi-Step Execution -/
 
@@ -201,10 +239,286 @@ def isStuck (C : Config) : Bool :=
 
 /-! ## Simulation Properties -/
 
+/-- Extract the matched label from a `find?` with label predicate. -/
+private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
+    (h : xs.find? (fun b => b.1 == lbl) = some (lbl', v)) : lbl' = lbl := by
+  have hPred : (lbl' == lbl) := (List.find?_eq_some_iff_append (xs := xs)
+    (p := fun b => b.1 == lbl) (b := (lbl', v))).1 h |>.1
+  have hPred' : (lbl' == lbl) = true := by
+    simpa using hPred
+  exact (beq_iff_eq).1 hPred'
+
+/-- If stepBaseDecide returns some, then StepBase holds. -/
+theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
+    StepBase C C' := by
+  cases hProc : C.proc with
+  | skip =>
+      simp [stepBaseDecide, hProc] at h
+  | send k x =>
+      cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
+      case some v =>
+        cases v with
+        | chan e =>
+          cases hX : lookupStr C.store x <;> simp [stepBaseDecide, hProc, hK, hX] at h
+          case some v =>
+            cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hX, hG] at h
+            case some lt =>
+              cases lt with
+              | send target T L =>
+                have hC' : C' = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L := by
+                  simpa using h.symm
+                subst hC'
+                exact StepBase.send hProc hK hX hG
+              | _ =>
+                simp [stepBaseDecide, hProc, hK, hX, hG] at h
+        | _ =>
+          simp [stepBaseDecide, hProc, hK] at h
+  | recv k x =>
+      cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
+      case some v =>
+        cases v with
+        | chan e =>
+          cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hG] at h
+          case some lt =>
+            cases lt with
+            | recv source T L =>
+              cases hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
+                simp [stepBaseDecide, hProc, hK, hG, hBuf] at h
+              case cons v vs =>
+                have hC' :
+                    C' = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L := by
+                  simpa using h.symm
+                subst hC'
+                exact StepBase.recv hProc hK hG hBuf
+            | _ =>
+              simp [stepBaseDecide, hProc, hK, hG] at h
+        | _ =>
+          simp [stepBaseDecide, hProc, hK] at h
+  | select k ℓ =>
+      cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
+      case some v =>
+        cases v with
+        | chan e =>
+          cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hG] at h
+          case some lt =>
+            cases lt with
+            | select target branches =>
+              cases hFind : branches.find? (fun b => b.1 == ℓ) <;>
+                simp [stepBaseDecide, hProc, hK, hG, hFind] at h
+              case some pair =>
+                cases pair with
+                | mk lbl L =>
+                  have hLbl : lbl = ℓ := findLabel_eq (xs := branches) (v := L) hFind
+                  have hFind' :
+                      branches.find? (fun b => b.1 == ℓ) = some (ℓ, L) := by
+                    simpa [hLbl] using hFind
+                  have hC' :
+                      C' = sendStep C e { sid := e.sid, sender := e.role, receiver := target } (.string ℓ) .string L := by
+                    simpa using h.symm
+                  subst hC'
+                  exact StepBase.select hProc hK hG hFind'
+            | _ =>
+              simp [stepBaseDecide, hProc, hK, hG] at h
+        | _ =>
+          simp [stepBaseDecide, hProc, hK] at h
+  | branch k procBranches =>
+      cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
+      case some v =>
+        cases v with
+        | chan e =>
+          cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hG] at h
+          case some lt =>
+            cases lt with
+            | branch source typeBranches =>
+              cases hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
+                simp [stepBaseDecide, hProc, hK, hG, hBuf] at h
+              case cons v vs =>
+                cases v with
+                | string ℓ =>
+                  cases hFindP : procBranches.find? (fun b => b.1 == ℓ) <;>
+                    simp [stepBaseDecide, hProc, hK, hG, hBuf, hFindP] at h
+                  case some pairP =>
+                    cases pairP with
+                    | mk lblP P =>
+                      cases hFindT : typeBranches.find? (fun b => b.1 == ℓ) <;>
+                        simp [stepBaseDecide, hProc, hK, hG, hBuf, hFindP, hFindT] at h
+                      case some pairT =>
+                        cases pairT with
+                        | mk lblT L =>
+                          cases hDeq : dequeueBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
+                            simp [stepBaseDecide, hProc, hK, hG, hBuf, hFindP, hFindT, hDeq] at h
+                          case some pairDeq =>
+                            cases pairDeq with
+                            | mk bufs' ts =>
+                              have hLblP : lblP = ℓ := findLabel_eq (xs := procBranches) (v := P) hFindP
+                              have hLblT : lblT = ℓ := findLabel_eq (xs := typeBranches) (v := L) hFindT
+                              have hFindP' :
+                                  procBranches.find? (fun b => b.1 == ℓ) = some (ℓ, P) := by
+                                simpa [hLblP] using hFindP
+                              have hFindT' :
+                                  typeBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L) := by
+                                simpa [hLblT] using hFindT
+                              have hC' :
+                                  C' =
+                                    { C with
+                                      proc := P
+                                      bufs := bufs'
+                                      G := updateG C.G e L
+                                      D := updateD C.D { sid := e.sid, sender := source, receiver := e.role }
+                                        (lookupD C.D { sid := e.sid, sender := source, receiver := e.role }).tail } := by
+                                simpa using h.symm
+                              subst hC'
+                              exact StepBase.branch hProc hK hG hBuf hFindP' hFindT' hDeq
+                | _ =>
+                  simp [stepBaseDecide, hProc, hK, hG, hBuf] at h
+            | _ =>
+              simp [stepBaseDecide, hProc, hK, hG] at h
+        | _ =>
+          simp [stepBaseDecide, hProc, hK] at h
+  | newSession roles f P =>
+      have hC' : C' = { (newSessionStep C roles f) with proc := P } := by
+        simpa [stepBaseDecide, hProc] using h.symm
+      subst hC'
+      exact StepBase.newSession hProc
+  | assign x v =>
+      have hC' :
+          C' =
+            { C with
+              proc := .skip
+              store := updateStr C.store x v } := by
+        simpa [stepBaseDecide, hProc] using h.symm
+      subst hC'
+      exact StepBase.assign hProc
+  | seq P Q =>
+      cases hP : P <;> simp [stepBaseDecide, hProc, hP] at h
+      have hC' : C' = { C with proc := Q } := by
+        simpa [stepBaseDecide, hProc, hP] using h.symm
+      subst hC'
+      exact StepBase.seq2 (by simpa [hP] using hProc)
+  | par P Q =>
+      cases hP : P with
+      | skip =>
+          have hC' : C' = { C with proc := Q } := by
+            simpa [stepBaseDecide, hProc, hP] using h.symm
+          subst hC'
+          exact StepBase.par_skip_left (by simpa [hP] using hProc)
+      | _ =>
+          cases hQ : Q with
+          | skip =>
+              have hC' : C' = { C with proc := P } := by
+                simpa [stepBaseDecide, hProc, hP, hQ] using h.symm
+              subst hC'
+              exact StepBase.par_skip_right (by simpa [hQ] using hProc)
+          | _ =>
+              simp [stepBaseDecide, hProc, hP, hQ] at h
+
 /-- If stepDecide returns some, then Step holds (soundness). -/
 theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
     Step C C' := by
-  sorry  -- Proof requires case analysis on C.proc
+  classical
+  have wf := (measure (fun C : Config => procSize C.proc)).wf
+  refine (WellFounded.induction (C := fun C0 => ∀ C', stepDecide C0 = some C' → Step C0 C') wf (a := C) ?_) C' h
+  intro C ih C' hstep
+  cases hProc : C.proc with
+  | skip =>
+      have : False := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact this.elim
+  | seq P Q =>
+      by_cases hPskip : P = .skip
+      · subst hPskip
+        have hC' : C' = { C with proc := Q } := by
+          simpa [stepDecide, stepDecideAux, hProc] using hstep.symm
+        subst hC'
+        exact Step.base (StepBase.seq2 (by simpa using hProc))
+      · cases hsub : stepDecide { C with proc := P } with
+        | none =>
+            have hsub' : stepDecideAux P { C with proc := P } = none := by
+              simpa [stepDecide] using hsub
+            have : False := by
+              simpa [stepDecide, stepDecideAux, hProc, hPskip, hsub'] using hstep
+            exact this.elim
+        | some C0 =>
+            have hsub' : stepDecideAux P { C with proc := P } = some C0 := by
+              simpa [stepDecide] using hsub
+            have hC' : C' = { C0 with proc := .seq C0.proc Q } := by
+              simpa [stepDecide, stepDecideAux, hProc, hPskip, hsub'] using hstep.symm
+            subst hC'
+            have hlt : procSize ({ C with proc := P }.proc) < procSize C.proc := by
+              simpa [hProc] using procSize_lt_seq_left P Q
+            have hStepSub : Step { C with proc := P } C0 := by
+              exact ih _ hlt _ hsub
+            exact Step.seq_left hProc hStepSub
+  | par P Q =>
+      by_cases hPskip : P = .skip
+      · subst hPskip
+        have hC' : C' = { C with proc := Q } := by
+          simpa [stepDecide, stepDecideAux, hProc] using hstep.symm
+        subst hC'
+        exact Step.base (StepBase.par_skip_left (by simpa using hProc))
+      · by_cases hQskip : Q = .skip
+        · subst hQskip
+          have hC' : C' = { C with proc := P } := by
+            simpa [stepDecide, stepDecideAux, hProc, hPskip] using hstep.symm
+          subst hC'
+          exact Step.base (StepBase.par_skip_right (by simpa using hProc))
+        · cases hsub : stepDecide { C with proc := P } with
+          | some C0 =>
+              have hsub' : stepDecideAux P { C with proc := P } = some C0 := by
+                simpa [stepDecide] using hsub
+              have hC' : C' = { C0 with proc := .par C0.proc Q } := by
+                simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub'] using hstep.symm
+              subst hC'
+              have hlt : procSize ({ C with proc := P }.proc) < procSize C.proc := by
+                simpa [hProc] using procSize_lt_par_left P Q
+              have hStepSub : Step { C with proc := P } C0 := by
+                exact ih _ hlt _ hsub
+              exact Step.par_left hProc hStepSub
+          | none =>
+              have hsub' : stepDecideAux P { C with proc := P } = none := by
+                simpa [stepDecide] using hsub
+              cases hsubR : stepDecide { C with proc := Q } with
+              | some C0 =>
+                  have hsubR' : stepDecideAux Q { C with proc := Q } = some C0 := by
+                    simpa [stepDecide] using hsubR
+                  have hC' : C' = { C0 with proc := .par P C0.proc } := by
+                    simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR'] using hstep.symm
+                  subst hC'
+                  have hlt : procSize ({ C with proc := Q }.proc) < procSize C.proc := by
+                    simpa [hProc] using procSize_lt_par_right P Q
+                  have hStepSub : Step { C with proc := Q } C0 := by
+                    exact ih _ hlt _ hsubR
+                  exact Step.par_right hProc hStepSub
+              | none =>
+                  have hsubR' : stepDecideAux Q { C with proc := Q } = none := by
+                    simpa [stepDecide] using hsubR
+                  have : False := by
+                    simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR'] using hstep
+                  exact this.elim
+  | send k x =>
+      have hBase : stepBaseDecide C = some C' := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact Step.base (stepBaseDecide_sound hBase)
+  | recv k x =>
+      have hBase : stepBaseDecide C = some C' := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact Step.base (stepBaseDecide_sound hBase)
+  | select k ℓ =>
+      have hBase : stepBaseDecide C = some C' := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact Step.base (stepBaseDecide_sound hBase)
+  | branch k bs =>
+      have hBase : stepBaseDecide C = some C' := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact Step.base (stepBaseDecide_sound hBase)
+  | newSession roles f P =>
+      have hBase : stepBaseDecide C = some C' := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact Step.base (stepBaseDecide_sound hBase)
+  | assign x v =>
+      have hBase : stepBaseDecide C = some C' := by
+        simpa [stepDecide, stepDecideAux, hProc] using hstep
+      exact Step.base (stepBaseDecide_sound hBase)
 
 /-- If Step holds for decidable cases, stepDecide returns some (completeness for decidable subset). -/
 theorem stepDecide_complete_base {C C' : Config} (h : StepBase C C')

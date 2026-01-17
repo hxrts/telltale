@@ -107,7 +107,6 @@ decreasing_by
     first
     | exact sizeOf_snd_lt_sizeOf_cons hd tl
     | exact sizeOf_tl_lt_sizeOf_cons hd tl
-    | (simp [*]; omega)
 end
 
 /-! ## Key Lemma: UnfoldsToEnd implies no free variables -/

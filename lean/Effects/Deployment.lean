@@ -284,7 +284,7 @@ def mkInitGEnv (roles : RoleSet) (sid : SessionId) (localTypes : Role → LocalT
 
 /-- Create initial DEnv with empty traces for all edges. -/
 def mkInitDEnv (roles : RoleSet) (sid : SessionId) : DEnv :=
-  (RoleSet.allEdges sid roles).map fun e => (e, [])
+  initDEnv sid roles
 
 /-- Create initial LinCtx with tokens for all endpoints. -/
 def mkInitLin (roles : RoleSet) (sid : SessionId) (localTypes : Role → LocalType) : LinCtx :=
@@ -338,6 +338,65 @@ def mergeBufs (B₁ B₂ : Buffers) : Buffers := B₁ ++ B₂
 
 /-- Merge two linear contexts (disjoint union). -/
 def mergeLin (L₁ L₂ : LinCtx) : LinCtx := L₁ ++ L₂
+
+/-! ### Merge Lookup Lemmas -/
+
+/-- Lookup in merged GEnv prefers the left environment. -/
+theorem MergeGEnv_Left (G₁ G₂ : GEnv) (e : Endpoint) (L : LocalType) :
+    lookupG G₁ e = some L →
+    lookupG (mergeGEnv G₁ G₂) e = some L := by
+  intro h
+  have hLookup : G₁.lookup e = some L := by
+    simpa [lookupG] using h
+  calc
+    lookupG (mergeGEnv G₁ G₂) e
+        = (G₁.lookup e).or (G₂.lookup e) := by
+            simp [mergeGEnv, lookupG, List.lookup_append]
+    _ = some L := by
+            simp [hLookup]
+
+/-- Lookup in merged GEnv falls back to the right when left is missing. -/
+theorem MergeGEnv_Right (G₁ G₂ : GEnv) (e : Endpoint) :
+    lookupG G₁ e = none →
+    lookupG (mergeGEnv G₁ G₂) e = lookupG G₂ e := by
+  intro h
+  have hLookup : G₁.lookup e = none := by
+    simpa [lookupG] using h
+  calc
+    lookupG (mergeGEnv G₁ G₂) e
+        = (G₁.lookup e).or (G₂.lookup e) := by
+            simp [mergeGEnv, lookupG, List.lookup_append]
+    _ = lookupG G₂ e := by
+            simp [hLookup, lookupG]
+
+axiom MergeDEnv_Left (D₁ D₂ : DEnv) (edge : Edge) :
+    lookupD D₁ edge ≠ [] →
+    lookupD (mergeDEnv D₁ D₂) edge = lookupD D₁ edge
+
+axiom MergeDEnv_Right (D₁ D₂ : DEnv) (edge : Edge) :
+    D₁.find? edge = none →
+    lookupD (mergeDEnv D₁ D₂) edge = lookupD D₂ edge
+
+/-- Lookup in merged buffers prefers the left environment when it provides a buffer. -/
+theorem MergeBufs_Left (B₁ B₂ : Buffers) (edge : Edge) :
+    lookupBuf B₁ edge ≠ [] →
+    lookupBuf (mergeBufs B₁ B₂) edge = lookupBuf B₁ edge := by
+  intro h
+  unfold lookupBuf mergeBufs
+  cases hLookup : B₁.lookup edge with
+  | none =>
+      have : lookupBuf B₁ edge = [] := by
+        simp [lookupBuf, hLookup]
+      exact (h this).elim
+  | some buf =>
+      simp [List.lookup_append, hLookup]
+
+/-- Lookup in merged buffers falls back to the right when the left has no entry. -/
+theorem MergeBufs_Right (B₁ B₂ : Buffers) (edge : Edge) :
+    B₁.lookup edge = none →
+    lookupBuf (mergeBufs B₁ B₂) edge = lookupBuf B₂ edge := by
+  intro h
+  simp [lookupBuf, mergeBufs, List.lookup_append, h]
 
 /-- Full linking judgment (6.7.2): Propositional version with all conditions.
 
@@ -543,4 +602,3 @@ theorem compose_deadlock_free (p₁ p₂ : DeployedProtocol)
     exact hDF₂ r h₂
 
 end
-

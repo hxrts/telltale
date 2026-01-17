@@ -78,6 +78,17 @@ theorem reverse_ne_self (e : Edge) (h : e.sender ≠ e.receiver) : e.reverse ≠
 
 instance : Inhabited Edge := ⟨{ sid := 0, sender := "", receiver := "" }⟩
 
+instance : Ord Edge where
+  compare a b :=
+    match compare a.sid b.sid with
+    | .lt => .lt
+    | .gt => .gt
+    | .eq =>
+      match compare a.sender b.sender with
+      | .lt => .lt
+      | .gt => .gt
+      | .eq => compare a.receiver b.receiver
+
 end Edge
 
 /-- A role set is the collection of participants in a session. -/

@@ -19,7 +19,7 @@ The following definitions form the semantic interface for proofs:
 - `trans`
 - `lcontractive`
 - `projectb`
-- `CProject`
+- `CProject` (determinism up to EQ2 via ProjectProps)
 -/
 
 namespace RumpsteakV2.Protocol.Projection

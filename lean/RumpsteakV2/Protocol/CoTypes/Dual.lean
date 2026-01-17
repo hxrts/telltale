@@ -236,73 +236,90 @@ private theorem BranchesRel_DualRel_to_closure {bs cs : List (Label × LocalType
     BranchesRel (EQ2_closure DualRel) bs cs := by
   exact List.Forall₂.imp (fun _ _ hxy => ⟨hxy.1, Or.inl hxy.2⟩) h
 
+/-- Helper: send.send case for DualRel postfixpoint. -/
+private theorem DualRel_postfix_send_send {p q : String}
+    {bs cs : List (Label × LocalTypeR)}
+    (hp : p = q) (hbranches : BranchesRel EQ2 bs cs) :
+    EQ2F (EQ2_closure DualRel) (LocalTypeR.send p bs).dual (LocalTypeR.send q cs).dual := by
+  simp only [LocalTypeR.dual]
+  exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+
+/-- Helper: recv.recv case for DualRel postfixpoint. -/
+private theorem DualRel_postfix_recv_recv {p q : String}
+    {bs cs : List (Label × LocalTypeR)}
+    (hp : p = q) (hbranches : BranchesRel EQ2 bs cs) :
+    EQ2F (EQ2_closure DualRel) (LocalTypeR.recv p bs).dual (LocalTypeR.recv q cs).dual := by
+  simp only [LocalTypeR.dual]
+  exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+
+/-- Helper: mu.mu case for DualRel postfixpoint. -/
+private theorem DualRel_postfix_mu_mu {t s : String} {body body' : LocalTypeR}
+    (hleft : EQ2 (body.substitute t (LocalTypeR.mu t body)) (LocalTypeR.mu s body'))
+    (hright : EQ2 (LocalTypeR.mu t body) (body'.substitute s (LocalTypeR.mu s body'))) :
+    EQ2F (EQ2_closure DualRel) (LocalTypeR.mu t body).dual (LocalTypeR.mu s body').dual := by
+  simp only [LocalTypeR.dual]
+  constructor
+  · left
+    use body.substitute t (LocalTypeR.mu t body), LocalTypeR.mu s body'
+    refine ⟨hleft, ?_, rfl⟩
+    exact (LocalTypeR.dual_substitute body t (LocalTypeR.mu t body)).symm
+  · left
+    use LocalTypeR.mu t body, body'.substitute s (LocalTypeR.mu s body')
+    refine ⟨hright, rfl, ?_⟩
+    exact (LocalTypeR.dual_substitute body' s (LocalTypeR.mu s body')).symm
+
 /-- DualRel is a post-fixpoint of EQ2F up to EQ2 closure. -/
 private theorem DualRel_postfix_upto :
     ∀ a' b', DualRel a' b' → EQ2F (EQ2_closure DualRel) a' b' := by
-  intro a' b' ⟨a, b, hab, ha', hb'⟩
-  subst ha' hb'
+  intro a' b' ⟨a, b, hab, ha', hb'⟩; subst ha' hb'
   have hf : EQ2F EQ2 a b := EQ2.destruct hab
   cases a <;> cases b <;> simp only [EQ2F] at hf ⊢ <;> try exact hf
   case send.send p bs q cs =>
-    obtain ⟨hp, hbranches⟩ := hf
-    simp only [LocalTypeR.dual]
-    exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+    obtain ⟨hp, hbranches⟩ := hf; exact DualRel_postfix_send_send hp hbranches
   case recv.recv p bs q cs =>
-    obtain ⟨hp, hbranches⟩ := hf
-    simp only [LocalTypeR.dual]
-    exact ⟨hp, BranchesRel_DualRel_to_closure (BranchesRel_dualBranches hbranches)⟩
+    obtain ⟨hp, hbranches⟩ := hf; exact DualRel_postfix_recv_recv hp hbranches
   case mu.mu t body s body' =>
-    obtain ⟨hleft, hright⟩ := hf
-    simp only [LocalTypeR.dual]
-    constructor
-    · left
-      use body.substitute t (.mu t body), .mu s body'
-      refine ⟨hleft, ?_, rfl⟩
-      exact (LocalTypeR.dual_substitute body t (.mu t body)).symm
-    · left
-      use .mu t body, body'.substitute s (.mu s body')
-      refine ⟨hright, rfl, ?_⟩
-      exact (LocalTypeR.dual_substitute body' s (.mu s body')).symm
+    obtain ⟨hleft, hright⟩ := hf; exact DualRel_postfix_mu_mu hleft hright
   case mu.end t body =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use body.substitute t (.mu t body), .end
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+    use body.substitute t (LocalTypeR.mu t body), .end
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (LocalTypeR.mu t body)).symm, rfl⟩
   case mu.var t body v =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use body.substitute t (.mu t body), .var v
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+    use body.substitute t (LocalTypeR.mu t body), .var v
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (LocalTypeR.mu t body)).symm, rfl⟩
   case mu.send t body p bs =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use body.substitute t (.mu t body), .send p bs
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+    use body.substitute t (LocalTypeR.mu t body), .send p bs
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (LocalTypeR.mu t body)).symm, rfl⟩
   case mu.recv t body p bs =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use body.substitute t (.mu t body), .recv p bs
-    exact ⟨hf, (LocalTypeR.dual_substitute body t (.mu t body)).symm, rfl⟩
+    use body.substitute t (LocalTypeR.mu t body), .recv p bs
+    exact ⟨hf, (LocalTypeR.dual_substitute body t (LocalTypeR.mu t body)).symm, rfl⟩
   case end.mu s body' =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use .end, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+    use .end, body'.substitute s (LocalTypeR.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (LocalTypeR.mu s body')).symm⟩
   case var.mu v s body' =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use .var v, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+    use .var v, body'.substitute s (LocalTypeR.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (LocalTypeR.mu s body')).symm⟩
   case send.mu p bs s body' =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use .send p bs, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+    use .send p bs, body'.substitute s (LocalTypeR.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (LocalTypeR.mu s body')).symm⟩
   case recv.mu p bs s body' =>
-    simp only [LocalTypeR.dual]
+    simp [LocalTypeR.dual]
     left
-    use .recv p bs, body'.substitute s (.mu s body')
-    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (.mu s body')).symm⟩
+    use .recv p bs, body'.substitute s (LocalTypeR.mu s body')
+    exact ⟨hf, rfl, (LocalTypeR.dual_substitute body' s (LocalTypeR.mu s body')).symm⟩
 
 /-- Duality respects EQ2: if two types are EQ2-equivalent, their duals are too. -/
 theorem EQ2_dual {a b : LocalTypeR} (h : EQ2 a b) : EQ2 a.dual b.dual := by

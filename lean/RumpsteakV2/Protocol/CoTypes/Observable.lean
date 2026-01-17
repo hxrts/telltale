@@ -1,6 +1,8 @@
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
+set_option linter.dupNamespace false
+
 /-! # Observable Behavior Predicates
 
 This file defines membership predicates that capture observable behavior of local types
