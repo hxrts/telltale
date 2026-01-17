@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-01-17
+
 ### Added
 
-#### Lean Verification
-- Convert 6 projection axioms to theorems (`freeVars_substitute_subset`, `substitute_closed_when_only_var`, `allVarsBound_nil_implies_freeVars_nil`, `trans_muve_of_not_part_of2`, `CProject_muve_of_not_part_of2`, `part_of_all2_implies_part_of2`)
+#### Documentation
+- Aura protocol integration documents:
+  - `work/101/aura_refactoring_guide.md` - Clean design guide for Aura consensus with MPST
+  - `work/101/aura_mpst_benefits.md` - Benefits analysis of implementing Aura with MPST effect system
+  - `work/101/initialization_and_liveness.md` - Liveness solutions with privacy-preserving patterns
+- Compositional development guides:
+  - `work/compositional_development.md` - Protocol composition without transitive dependencies
+  - `work/effectful_composition.md` - Capability flow between protocols
 
 ### Changed
 
@@ -153,6 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - mdbook build errors by pinning old version
 
-[Unreleased]: https://github.com/hxrts/rumpsteak-aura/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/hxrts/rumpsteak-aura/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/hxrts/rumpsteak-aura/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/hxrts/rumpsteak-aura/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/hxrts/rumpsteak-aura/releases/tag/v0.7.0
