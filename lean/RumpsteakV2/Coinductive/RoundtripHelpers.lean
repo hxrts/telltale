@@ -5,6 +5,7 @@ import RumpsteakV2.Coinductive.Observable
 import RumpsteakV2.Coinductive.RegularityLemmas
 import RumpsteakV2.Coinductive.ToInductive
 import RumpsteakV2.Coinductive.ToCoindInjectivity
+import RumpsteakV2.Coinductive.WellFormed
 import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
@@ -92,6 +93,26 @@ lemma childRel_toCoind {t : LocalTypeR} {c : LocalTypeC}
         simp [i', castFin]
       simpa [hchild, hidx] using hcont
 
+/-! ## Reachability of `toCoind` subterms -/
+
+lemma reachable_toCoind {t : LocalTypeR} {c : LocalTypeC}
+    (h : c ∈ Reachable (toCoind t)) : ∃ u : LocalTypeR, c = toCoind u := by
+  induction h with
+  | refl =>
+      exact ⟨t, rfl⟩
+  | tail hprev hstep ih =>
+      rename_i b c
+      rcases ih with ⟨u, hu⟩
+      have hstep' : childRel (toCoind u) c := by
+        simpa [hu] using hstep
+      rcases childRel_toCoind hstep' with ⟨u', hu'⟩
+      exact ⟨u', hu'⟩
+
+lemma productive_toCoind (t : LocalTypeR) : ProductiveC (toCoind t) := by
+  intro c hc
+  rcases reachable_toCoind (t := t) hc with ⟨u, rfl⟩
+  exact observable_toCoind u
+
 /-! ## Size bounds for branch elements -/
 
 @[simp] lemma sizeOf_get_lt_sizeOf_branches {bs : List (Label × LocalTypeR)} (i : Fin bs.length) :
@@ -152,7 +173,7 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
       cases i
       refine ⟨body, ?_, ?_⟩
       · simpa [toCoind, children, mkMu] using hi.symm
-      · simpa using (sizeOf_body_lt_sizeOf_mu x body)
+      · exact sizeOf_body_lt_sizeOf_mu x body
   | send p bs =>
       rcases childRel_to_children h with ⟨i, hi⟩
       have hi' : children (mkSend p (toCoindBranches bs)) i = c := by
@@ -358,9 +379,9 @@ lemma freeVars_subset_namesIn {t : LocalTypeR} {all : Finset LocalTypeC}
 termination_by sizeOf t
 decreasing_by
   all_goals
-    first
-    | simpa [*] using (sizeOf_body_lt_sizeOf_mu x body)
-    | simpa [*] using (sizeOf_get_lt_sizeOf_send (p := p) (bs := bs) i)
-    | simpa [*] using (sizeOf_get_lt_sizeOf_recv (p := p) (bs := bs) i)
+    cases t <;> rename_i h <;> cases h;
+      first
+      | exact (sizeOf_body_lt_sizeOf_mu _ _)
+      | exact (sizeOf_get_lt_sizeOf_send (p := _) (bs := _) _)
 
 end RumpsteakV2.Coinductive

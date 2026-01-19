@@ -26,8 +26,8 @@ open Classical
 lemma childRel_to_children {t c : LocalTypeC} (h : childRel t c) :
     ∃ i : LocalTypeChild (head t), children t i = c := by
   rcases h with ⟨s, f, i, hdest, hchild⟩
-  have hhead : head t = s := by simpa [head, hdest]
-  refine ⟨cast (by simpa [hhead]) i, ?_⟩
+  have hhead : head t = s := by simp [head, hdest]
+  refine ⟨cast (by simp [hhead]) i, ?_⟩
   cases hhead; cases hdest
   simpa [children] using hchild
 

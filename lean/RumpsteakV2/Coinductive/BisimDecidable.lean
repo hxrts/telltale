@@ -1125,19 +1125,19 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
 /-
 Completeness (EQ2C ⇒ bisim = true) is intentionally omitted in the paco-first approach.
 The decidable checker remains sound (bisim_sound), and coinductive proofs should use
-the EQ2CE/EQ2C erasure lemmas directly (see RoundtripWIP.lean).
+the EQ2CE/EQ2C erasure lemmas directly (see Roundtrip.lean).
 -/
 
 /-! ## Connection to EQ2CE -/
 
 /-- Environment-aware bisimulation with resolution (local definition for this module).
-    This matches the definition in RoundtripWIP.lean. -/
+    This matches the definition in Roundtrip.lean. -/
 def EQ2CE_resolved'_local (a b : LocalTypeC) : Prop :=
   ∃ ρ, EnvResolvesL ρ ∧ EnvVarR ρ ∧ EQ2CE ρ a b
 
 /-
 The bridge from environment-aware EQ2CE to EQ2C is provided coinductively in
-RoundtripWIP.lean (paco-style). We avoid duplicating it here to keep this file
+Roundtrip.lean (paco-style). We avoid duplicating it here to keep this file
 focused on the sound decidable checker.
 -/
 

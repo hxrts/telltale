@@ -1,5 +1,6 @@
 import Mathlib
 import RumpsteakV2.Coinductive.LocalTypeC
+import RumpsteakV2.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
@@ -49,6 +50,18 @@ def Regular (t : LocalTypeC) : Prop :=
 
 /-- Alias for regularity, used as a bridge witness in conversions. -/
 def HasFiniteRep (t : LocalTypeC) : Prop := Regular t
+
+/-! ## Productivity (observability of all reachable nodes) -/
+
+/-- A coinductive type is productive if every reachable node is observable. -/
+def ProductiveC (t : LocalTypeC) : Prop :=
+  ∀ s, s ∈ Reachable t → ObservableC s
+
+lemma productive_of_reachable {t s : LocalTypeC}
+    (hprod : ProductiveC t) (hs : s ∈ Reachable t) : ProductiveC s := by
+  intro u hu
+  have : u ∈ Reachable t := hs.trans hu
+  exact hprod _ this
 
 /-! ## Closed Sets -/
 

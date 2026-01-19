@@ -40,7 +40,7 @@ private theorem toCoindBranches_regular_aux :
           subst h
           have hsz : sizeOf head.2 < sizeOf (head :: tail) := by
             have hhead : sizeOf head.2 < 1 + sizeOf head := by
-              cases head; simp only [Prod.snd, Prod.mk.sizeOf_spec]; omega
+              cases head; simp only [Prod.mk.sizeOf_spec]; omega
             simp only [List.cons.sizeOf_spec]; omega
           exact hrec head.2 hsz
       | inr h =>
@@ -68,12 +68,9 @@ theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
         exact toCoind_regular cont)
       apply regular_of_children
       intro i
-      have hchild : children (mkSend p (toCoindBranches bs)) i =
-          ((toCoindBranches bs).get (castFin (by simp) i)).2 := by
-        simpa using children_mkSend p (toCoindBranches bs) i
       have hmem : (toCoindBranches bs).get (castFin (by simp) i) ∈ toCoindBranches bs :=
         List.get_mem (l := toCoindBranches bs) (n := castFin (by simp) i)
-      simpa [hchild] using hreg _ hmem
+      simpa using hreg _ hmem
   | .recv p bs => by
       have hreg := toCoindBranches_regular_aux bs (fun cont hsz => by
         have hsz' : sizeOf cont < sizeOf (LocalTypeR.recv p bs) := by
@@ -81,12 +78,9 @@ theorem toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
         exact toCoind_regular cont)
       apply regular_of_children
       intro i
-      have hchild : children (mkRecv p (toCoindBranches bs)) i =
-          ((toCoindBranches bs).get (castFin (by simp) i)).2 := by
-        simpa using children_mkRecv p (toCoindBranches bs) i
       have hmem : (toCoindBranches bs).get (castFin (by simp) i) ∈ toCoindBranches bs :=
         List.get_mem (l := toCoindBranches bs) (n := castFin (by simp) i)
-      simpa [hchild] using hreg _ hmem
+      simpa using hreg _ hmem
 termination_by t => sizeOf t
 
 end RumpsteakV2.Coinductive

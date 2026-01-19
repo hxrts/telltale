@@ -83,6 +83,15 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 
 ---
 
+### Protocol/Participation.lean
+**Location:** `RumpsteakV2/Protocol/Participation.lean` (12KB)
+
+**Key Theorems:**
+- `part_of2_iff_participates` - Boolean participation ⇔ inductive participation
+- `participatesBranches_iff_part_of2` - Branch participation ⇔ ∃ participating branch
+
+---
+
 ## Projection System
 
 ### Protocol/Projection/Project.lean
@@ -269,7 +278,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ---
 
 ### Protocol/CoTypes/FullUnfold.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/FullUnfold.lean` (10KB)
+**Location:** `RumpsteakV2/Protocol/CoTypes/FullUnfold.lean` (11KB)
 
 **Key Definitions:**
 - `muHeight : LocalTypeR → Nat` - Count nested mu constructors
@@ -277,10 +286,11 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 - `fullUnfold : LocalTypeR → LocalTypeR` - Complete unfolding
 
 **Key Theorems:**
-- `fullUnfold_mu_subst` - Full unfold commutes with substitution
+- `fullUnfold_mu_subst` - Guarded mu: full unfold commutes with substitution
 - `muHeight_substitute_guarded` - Height preservation for guarded substitution
 - `EQ2_of_fullUnfold_eq` - Equality of full unfolds implies EQ2
-- `fullUnfold_eq_of_EQ2` - EQ2 implies equality of full unfolds
+- `fullUnfold_eq_of_EQ2` - EQ2 implies EQ2 of full unfolds
+- `EQ2_iff_fullUnfold_eq` - EQ2 ⇔ EQ2 of full unfolds
 
 ---
 
@@ -486,29 +496,31 @@ Well-formedness is preserved by global steps (type safety).
 ---
 
 ### Coinductive/Roundtrip.lean
-**Location:** `RumpsteakV2/Coinductive/Roundtrip.lean` (4KB)
+**Location:** `RumpsteakV2/Coinductive/Roundtrip.lean` (23KB)
 
 **Conversion Functions:**
 - `toInductive : LocalTypeC → LocalTypeR` - Convert coinductive to inductive
 - `toCoind : LocalTypeR → LocalTypeC` - Convert inductive to coinductive
 
-**Main Theorems (axiomatized, proven in RoundtripWIP):**
-- `toCoind_toInductive_eq2c` - Round-trip in EQ2C
-- `toCoind_toInductive` - Full round-trip equivalence
+**Main Theorems (axiomatized; erasure proofs in Roundtrip.lean):**
+- `toCoind_toInductive_eq2ce` - Round-trip in EQ2CE (axiom)
+
+**Key Lemmas (erasure + μ-paco bridge):**
+- `EQ2C_mu_paco_le_paco_of_productive` - Collapse μ-aware paco to EQ2C_paco under productivity
+- `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (requires productivity on both sides)
+- `toCoind_toInductive_eq2c_of_env_toCoind` - Round-trip for `toCoind` images (discharges productivity)
+- `envOf`, `nameOf` - Environment/name generation (definitions, no axioms)
 
 ---
 
 ### Coinductive/RoundtripWIP.lean
-**Location:** `RumpsteakV2/Coinductive/RoundtripWIP.lean` (13KB)
+**Location:** `RumpsteakV2/Coinductive/RoundtripWIP.lean` (0.2KB)
 
-**Work in Progress:**
-- Detailed proofs of roundtrip theorems
-- 1 termination sorry remains (decreasing_by)
-- Environment erasure proofs
+**Status:**
+- Deprecated wrapper (content consolidated into Roundtrip.lean)
 
-**Key Result:**
-- `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (termination sorry)
-- `toInductiveAux_eq2c` - All cases proven
+**Key Result (now in Roundtrip.lean):**
+- `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (μ-paco bridge; no sorry)
 
 ---
 
@@ -592,9 +604,10 @@ Well-formedness is preserved by global steps (type safety).
 
 #### **Coinductive/Inductive Bridge**
 1. `toInductive` / `toCoind` - Roundtrip.lean
-2. `toCoind_toInductive_eq2c` - Roundtrip.lean
-3. `EQ2CE_resolved'_implies_EQ2C` - RoundtripWIP.lean
+2. `toCoind_toInductive_eq2ce` - Roundtrip.lean (axiom)
+3. `EQ2CE_resolved'_implies_EQ2C` - Roundtrip.lean
 4. `BisimDecidable` - BisimDecidable.lean
+5. `EQ2C_mu_paco_le_paco_of_productive` - Roundtrip.lean (μ-paco collapse under productivity)
 
 ### By Dependency
 
@@ -632,38 +645,33 @@ EQ2.lean → EQ2Paco.lean      Bisim.lean
     ↓                         ↓
 LocalTypeC.lean → EQ2C.lean → BisimDecidable.lean
     ↓
-Roundtrip.lean → RoundtripWIP.lean
+Roundtrip.lean
 ```
 
 ---
 
 ## Axiom Inventory
 
-### Inductive Codebase (27 axioms)
+### Inductive Codebase (9 axioms)
 
 | File | Count | Key Axioms |
 |------|-------|------------|
-| Project.lean | 19 | Observable preservation, constructor compatibility, extraction, composition |
-| ProjSubst.lean | 3 | `proj_subst`, `isGuarded_substitute_preserved`, `isGuarded_substitute_unguarded` |
+| Project.lean | 3 | `EQ2_isGuarded_compat`, `CProject_isGuarded_trans`, `EQ2_CProjectTransRel_EQ2_compose` |
+| Projectb.lean | 2 | `projectb_trans`, `CProject_unguarded_trans` |
+| DBBridge.lean | 1 | `EQ2_subst_mu_comm_via_DB` |
 | EQ2.lean | 2 | `ReflRel_postfix`, `TransRel_postfix` |
 | Bisim.lean | 1 | `RelImage_of_Bisim_with_reflexivity` |
-| DBBridge.lean | 1 | `EQ2_subst_mu_comm_via_DB` |
-| EmbedProps.lean | 1 | `lcontractive_implies_isGuarded` |
 
-### Coinductive Codebase (7 axioms)
+### Coinductive Codebase (1 axiom)
 
-All in Roundtrip.lean (intentional stubs with proofs in RoundtripWIP.lean):
-- `nameOf`, `envOf` - name/environment generation
+All in Roundtrip.lean (intentional stub; proof in progress):
 - `toCoind_toInductive_eq2ce` - round-trip in EQ2CE
-- `toCoind_toInductive_eq2c_of_eq2ce/backedge/env` - EQ2C variants
-- `toCoind_toInductive` - main round-trip theorem
 
 ### Sorry Inventory
 
-**Inductive:** 0 sorries (all proven)
+**Inductive:** 0
 
-**Coinductive:** 1 executable sorry
-- RoundtripWIP.lean:180 - `decreasing_by` termination proof
+**Coinductive:** 0
 
 ---
 
@@ -695,7 +703,7 @@ All in Roundtrip.lean (intentional stubs with proofs in RoundtripWIP.lean):
 - **Safety properties?** → Read Determinism.lean and DeadlockFreedom.lean
 - **Mu-type unfolding?** → Read FullUnfold.lean and MuUnfoldLemmas.lean
 - **Substitution theory?** → Read SubstCommBarendregt.lean
-- **Round-trip conversions?** → Read Roundtrip.lean and RoundtripWIP.lean
+- **Round-trip conversions?** → Read Roundtrip.lean
 
 ---
 

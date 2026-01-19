@@ -46,7 +46,7 @@ mutual
     | .mu _ _, .var _, h => by cases (congrArg head h)
     | .mu x body, .mu y body', h => by
         have hdest := congrArg PFunctor.M.dest h
-        simp [toCoind, mkMu, -Sigma.mk.inj_iff] at hdest
+        simp [toCoind, mkMu] at hdest
         have hxhy := (Sigma.mk.inj_iff.mp hdest)
         have hx : x = y := by cases hxhy.1; rfl
         subst hx
@@ -140,6 +140,6 @@ lemma labels_get_eq {bs : List (Label × LocalTypeR)} (i : Fin (bs.map Prod.fst)
   | cons b bs ih =>
       cases i using Fin.cases with
       | zero => cases b with | mk label cont => simp [castFin]
-      | succ i => simp [castFin, ih i]
+      | succ i => simp [castFin]
 
 end RumpsteakV2.Coinductive

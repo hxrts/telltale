@@ -57,7 +57,7 @@ def maxLen (avoid : Finset String) : Nat :=
 lemma maxLen_insert {avoid : Finset String} {s : String} :
     maxLen (insert s avoid) = max (maxLen avoid) s.length := by
   classical
-  simp [maxLen, Finset.image_insert, Finset.sup_insert, max_comm, max_left_comm, max_assoc]
+  simp [maxLen, Finset.image_insert, Finset.sup_insert, max_comm]
 
 lemma length_le_maxLen {avoid : Finset String} {x : String} (hs : x ∈ avoid) :
     x.length ≤ maxLen avoid := by
@@ -116,7 +116,9 @@ noncomputable def toInductiveAux (root : LocalTypeC) (all visited : Finset Local
     | .mu x => x
     | _     => nameFor current all
   if h : current ∈ visited then
-    .var name
+    by
+      -- use `h` so the binder is not unused (also feeds termination)
+      simpa [h] using (.var name)
   else
     let visited' := Insert.insert current visited
     let body := match hdest : PFunctor.M.dest current with
