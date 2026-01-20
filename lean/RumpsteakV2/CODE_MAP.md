@@ -115,7 +115,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 - `branches_project_coherent` - Branches project coherently
 
 **Observable Preservation:**
-- Multiple axioms for observable property preservation (19 axioms total)
+- Observable preservation lemmas are proved directly in Project.lean (no axioms).
 
 ---
 
@@ -496,14 +496,14 @@ Well-formedness is preserved by global steps (type safety).
 ---
 
 ### Coinductive/Roundtrip.lean
-**Location:** `RumpsteakV2/Coinductive/Roundtrip.lean` (23KB)
+**Location:** `RumpsteakV2/Coinductive/Roundtrip.lean` (63KB, 1,214 lines)
 
 **Conversion Functions:**
 - `toInductive : LocalTypeC → LocalTypeR` - Convert coinductive to inductive
 - `toCoind : LocalTypeR → LocalTypeC` - Convert inductive to coinductive
 
-**Main Theorems (axiomatized; erasure proofs in Roundtrip.lean):**
-- `toCoind_toInductive_eq2ce` - Round-trip in EQ2CE (axiom)
+**Main Theorems (proved):**
+- `toCoind_toInductive_eq2ce` - Round-trip in EQ2CE
 
 **Key Lemmas (erasure + μ-paco bridge):**
 - `EQ2C_mu_paco_le_paco_of_productive` - Collapse μ-aware paco to EQ2C_paco under productivity
@@ -604,7 +604,7 @@ Well-formedness is preserved by global steps (type safety).
 
 #### **Coinductive/Inductive Bridge**
 1. `toInductive` / `toCoind` - Roundtrip.lean
-2. `toCoind_toInductive_eq2ce` - Roundtrip.lean (axiom)
+2. `toCoind_toInductive_eq2ce` - Roundtrip.lean
 3. `EQ2CE_resolved'_implies_EQ2C` - Roundtrip.lean
 4. `BisimDecidable` - BisimDecidable.lean
 5. `EQ2C_mu_paco_le_paco_of_productive` - Roundtrip.lean (μ-paco collapse under productivity)
@@ -652,20 +652,19 @@ Roundtrip.lean
 
 ## Axiom Inventory
 
-### Inductive Codebase (9 axioms)
+### Inductive Codebase (8 axioms)
 
 | File | Count | Key Axioms |
 |------|-------|------------|
-| Project.lean | 3 | `EQ2_isGuarded_compat`, `CProject_isGuarded_trans`, `EQ2_CProjectTransRel_EQ2_compose` |
+| Project.lean | 2 | `EQ2_isGuarded_compat`, `CProject_isGuarded_trans` |
 | Projectb.lean | 2 | `projectb_trans`, `CProject_unguarded_trans` |
 | DBBridge.lean | 1 | `EQ2_subst_mu_comm_via_DB` |
 | EQ2.lean | 2 | `ReflRel_postfix`, `TransRel_postfix` |
 | Bisim.lean | 1 | `RelImage_of_Bisim_with_reflexivity` |
 
-### Coinductive Codebase (1 axiom)
+### Coinductive Codebase (0 axioms)
 
-All in Roundtrip.lean (intentional stub; proof in progress):
-- `toCoind_toInductive_eq2ce` - round-trip in EQ2CE
+All coinductive axioms discharged.
 
 ### Sorry Inventory
 
@@ -678,7 +677,7 @@ All in Roundtrip.lean (intentional stub; proof in progress):
 ## File Size Reference
 
 **Largest Files (Top 10):**
-1. Project.lean - 229KB
+1. Project.lean - 324KB (~6,862 lines)
 2. Bisim.lean - 149KB
 3. LocalTypeR.lean - 74KB
 4. GlobalType.lean - 64KB
