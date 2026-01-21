@@ -1,4 +1,5 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.EQ2Props
 import RumpsteakV2.Protocol.CoTypes.Bisim
 import RumpsteakV2.Protocol.CoTypes.Quotient
 
@@ -18,6 +19,7 @@ The following definitions form the semantic interface for proofs:
 namespace RumpsteakV2.Protocol.CoTypes
 
 export RumpsteakV2.Protocol.CoTypes.EQ2 (EQ2)
+export RumpsteakV2.Protocol.CoTypes.EQ2Props (EQ2_trans_wf)
 export RumpsteakV2.Protocol.CoTypes.Bisim (
   EQ2_transfer_observable
   EQ2_iff_observable_correspond

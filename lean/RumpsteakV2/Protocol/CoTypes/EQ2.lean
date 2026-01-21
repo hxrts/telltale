@@ -20,6 +20,7 @@ The following definitions form the semantic interface for proofs:
 - `EQ2_symm`: symmetry of EQ2
 - `EQ2_trans`: transitivity of EQ2
 - `EQ2_equiv`: equivalence relation instance
+- `EQ2_trans_via_end` / `EQ2_trans_via_var`: constructor-based transitivity helpers
 - `EQ2_unfold_left`: left unfolding preserves EQ2
 - `EQ2_unfold_right`: right unfolding preserves EQ2
 - `EQ2_unfold`: bilateral unfolding preserves EQ2
@@ -266,9 +267,75 @@ private theorem EQ2_construct_mu (t : String) (body : LocalTypeR)
 
 /-- Coinductive relation for reflexivity: diagonal plus unfolding pairs. -/
 private def ReflRel : Rel := fun a b =>
-  a = b ∨
-  (∃ t body, a = body.substitute t (.mu t body) ∧ b = .mu t body) ∨
-  (∃ t body, a = .mu t body ∧ b = body.substitute t (.mu t body))
+  ∃ c n m, a = (LocalTypeR.unfold^[n]) c ∧ b = (LocalTypeR.unfold^[m]) c
+
+private def NonMu (a : LocalTypeR) : Prop := ∀ t body, a ≠ .mu t body
+
+private theorem nonmu_end : NonMu (.end : LocalTypeR) := by
+  intro t body h; cases h
+
+private theorem nonmu_var (v : String) : NonMu (.var v : LocalTypeR) := by
+  intro t body h; cases h
+
+private theorem nonmu_send (p : String) (bs : List (Label × LocalTypeR)) :
+    NonMu (.send p bs : LocalTypeR) := by
+  intro t body h; cases h
+
+private theorem nonmu_recv (p : String) (bs : List (Label × LocalTypeR)) :
+    NonMu (.recv p bs : LocalTypeR) := by
+  intro t body h; cases h
+
+private theorem unfold_iter_eq_of_nonmu (a : LocalTypeR) (h : NonMu a) :
+    ∀ n, (LocalTypeR.unfold^[n]) a = a := by
+  intro n
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+      have hfix : LocalTypeR.unfold a = a := LocalTypeR.unfold_non_mu a h
+      simp [Function.iterate_succ_apply', hfix, ih]
+
+private theorem ReflRel_unfold_left {a b : LocalTypeR} (h : ReflRel a b) :
+    ReflRel (LocalTypeR.unfold a) b := by
+  rcases h with ⟨c, n, m, ha, hb⟩
+  refine ⟨c, n + 1, m, ?_, hb⟩
+  simp [ha, Function.iterate_succ_apply']
+
+private theorem ReflRel_unfold_right {a b : LocalTypeR} (h : ReflRel a b) :
+    ReflRel a (LocalTypeR.unfold b) := by
+  rcases h with ⟨c, n, m, ha, hb⟩
+  refine ⟨c, n, m + 1, ha, ?_⟩
+  simp [hb, Function.iterate_succ_apply']
+
+private theorem ReflRel_eq_of_nonmu {a b : LocalTypeR} (ha : NonMu a) (hb : NonMu b)
+    (h : ReflRel a b) : a = b := by
+  rcases h with ⟨c, n, m, ha', hb'⟩
+  cases le_total n m with
+  | inl hnm =>
+      obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hnm
+      have hb'' : b = (LocalTypeR.unfold^[k]) ((LocalTypeR.unfold^[n]) c) := by
+        calc
+          b = (LocalTypeR.unfold^[m]) c := hb'
+          _ = (LocalTypeR.unfold^[k + n]) c := by simp [hk, Nat.add_comm]
+          _ = (LocalTypeR.unfold^[k]) ((LocalTypeR.unfold^[n]) c) := by
+                simpa using
+                  (Function.iterate_add_apply (f := LocalTypeR.unfold) k n c)
+      have hb''' : b = (LocalTypeR.unfold^[k]) a := by simpa [ha'] using hb''
+      have hfix : (LocalTypeR.unfold^[k]) a = a := unfold_iter_eq_of_nonmu a ha k
+      have hb'''' : b = a := by simpa [hfix] using hb'''
+      simpa using hb''''.symm
+  | inr hmn =>
+      obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le hmn
+      have ha'' : a = (LocalTypeR.unfold^[k]) ((LocalTypeR.unfold^[m]) c) := by
+        calc
+          a = (LocalTypeR.unfold^[n]) c := ha'
+          _ = (LocalTypeR.unfold^[k + m]) c := by simp [hk, Nat.add_comm]
+          _ = (LocalTypeR.unfold^[k]) ((LocalTypeR.unfold^[m]) c) := by
+                simpa using
+                  (Function.iterate_add_apply (f := LocalTypeR.unfold) k m c)
+      have ha''' : a = (LocalTypeR.unfold^[k]) b := by simpa [hb'] using ha''
+      have hfix : (LocalTypeR.unfold^[k]) b = b := unfold_iter_eq_of_nonmu b hb k
+      have ha'''' : a = b := by simpa [hfix] using ha'''
+      exact ha''''
 
 /-- ReflRel is a post-fixpoint of EQ2F.
 
@@ -288,7 +355,92 @@ The axiom is semantically sound because:
 Proving this constructively in Lean would require:
 - Coinduction up-to equivalence (parametrized coinduction)
 - Or a more sophisticated relation that captures transitive unfolding -/
-private axiom ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b
+private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := by
+  intro a b h
+  have hrefl : ∀ t, ReflRel t t := fun t => ⟨t, 0, 0, rfl, rfl⟩
+  cases a with
+  | «end» =>
+      cases b with
+      | «end» => simp [EQ2F]
+      | var v =>
+          have hEq := ReflRel_eq_of_nonmu nonmu_end (nonmu_var v) h
+          cases hEq
+      | send p bs =>
+          have hEq := ReflRel_eq_of_nonmu nonmu_end (nonmu_send p bs) h
+          cases hEq
+      | recv p bs =>
+          have hEq := ReflRel_eq_of_nonmu nonmu_end (nonmu_recv p bs) h
+          cases hEq
+      | mu t body =>
+          simpa [EQ2F] using (ReflRel_unfold_right h)
+  | var x =>
+      cases b with
+      | «end» =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_var x) nonmu_end h
+          cases hEq
+      | var y =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_var x) (nonmu_var y) h
+          cases hEq
+          simp [EQ2F]
+      | send p bs =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_var x) (nonmu_send p bs) h
+          cases hEq
+      | recv p bs =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_var x) (nonmu_recv p bs) h
+          cases hEq
+      | mu t body =>
+          simpa [EQ2F] using (ReflRel_unfold_right h)
+  | send p bs =>
+      cases b with
+      | «end» =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_send p bs) nonmu_end h
+          cases hEq
+      | var y =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_send p bs) (nonmu_var y) h
+          cases hEq
+      | send q cs =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_send p bs) (nonmu_send q cs) h
+          cases hEq
+          have hbr : BranchesRel ReflRel bs bs :=
+            BranchesRel_refl (R := ReflRel) hrefl bs
+          exact ⟨rfl, hbr⟩
+      | recv q cs =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_send p bs) (nonmu_recv q cs) h
+          cases hEq
+      | mu t body =>
+          simpa [EQ2F] using (ReflRel_unfold_right h)
+  | recv p bs =>
+      cases b with
+      | «end» =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_recv p bs) nonmu_end h
+          cases hEq
+      | var y =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_recv p bs) (nonmu_var y) h
+          cases hEq
+      | send q cs =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_recv p bs) (nonmu_send q cs) h
+          cases hEq
+      | recv q cs =>
+          have hEq := ReflRel_eq_of_nonmu (nonmu_recv p bs) (nonmu_recv q cs) h
+          cases hEq
+          have hbr : BranchesRel ReflRel bs bs :=
+            BranchesRel_refl (R := ReflRel) hrefl bs
+          exact ⟨rfl, hbr⟩
+      | mu t body =>
+          simpa [EQ2F] using (ReflRel_unfold_right h)
+  | mu t body =>
+      cases b with
+      | «end» =>
+          simpa [EQ2F] using (ReflRel_unfold_left h)
+      | var y =>
+          simpa [EQ2F] using (ReflRel_unfold_left h)
+      | send q cs =>
+          simpa [EQ2F] using (ReflRel_unfold_left h)
+      | recv q cs =>
+          simpa [EQ2F] using (ReflRel_unfold_left h)
+      | mu s body' =>
+          simp [EQ2F]
+          exact ⟨ReflRel_unfold_left h, ReflRel_unfold_right h⟩
 
 /-- EQ2 is reflexive.
 
@@ -297,7 +449,7 @@ plus unfolding pairs. The post-fixpoint property ReflRel_postfix encapsulates
 the coinductive reasoning required for the mu case. -/
 theorem EQ2_refl : ∀ t, EQ2 t t := by
   intro t
-  have hinR : ReflRel t t := Or.inl rfl
+  have hinR : ReflRel t t := ⟨t, 0, 0, rfl, rfl⟩
   exact EQ2_coind ReflRel_postfix t t hinR
 
 /-- Coinductive relation for symmetry: swap arguments of EQ2. -/
@@ -338,6 +490,13 @@ theorem EQ2_symm {a b : LocalTypeR} (h : EQ2 a b) : EQ2 b a := by
   have hinR : SymmRel b a := h
   exact EQ2_coind SymmRel_postfix b a hinR
 
+/-! ## Transitivity (axiom-based, pending Bisim detour)
+
+We keep an axiom-based transitivity proof here to avoid circular imports.
+The axiom is semantically sound and can be replaced by the Bisim detour in
+`Bisim.lean` once the import cycle is resolved.
+-/
+
 /-- Coinductive relation for transitivity: composition of EQ2 pairs. -/
 private def TransRel : Rel := fun a c => ∃ b, EQ2 a b ∧ EQ2 b c
 
@@ -351,26 +510,15 @@ proving this constructively requires "coinduction up-to" techniques because:
 3. For mu types, EQ2 involves unfolding, and the intermediate type b might unfold
    differently than a or c, requiring transitive chains of unfoldings
 
-The axiom is semantically sound because:
-- If a ≈ b and b ≈ c (observationally equal), then a ≈ c
-- Transitivity holds for observational equality on infinite trees
-- The intermediate witness b guides the proof but the result only relates a and c
-
 **ELIMINABLE**: This axiom can be replaced by the Bisim detour in Bisim.lean.
 See `EQ2_trans_via_Bisim` which proves transitivity using:
   1. EQ2 → Bisim (via EQ2.toBisim)
   2. Bisim.trans (fully proven)
   3. Bisim → EQ2 (via Bisim.toEQ2)
-
-The circular import (Bisim imports EQ2) prevents direct replacement here,
-but the axiom is provable given the Bisim infrastructure. -/
+-/
 private axiom TransRel_postfix : ∀ a c, TransRel a c → EQ2F TransRel a c
 
-/-- EQ2 is transitive.
-
-This proof uses coinduction on the relation TransRel which captures the
-composition of EQ2 pairs. The post-fixpoint property TransRel_postfix
-encapsulates the coinductive reasoning for transitivity. -/
+/-- EQ2 is transitive. -/
 theorem EQ2_trans {a b c : LocalTypeR} (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c := by
   have hinR : TransRel a c := ⟨b, hab, hbc⟩
   exact EQ2_coind TransRel_postfix a c hinR
@@ -378,5 +526,168 @@ theorem EQ2_trans {a b c : LocalTypeR} (hab : EQ2 a b) (hbc : EQ2 b c) : EQ2 a c
 /-- EQ2 is an equivalence relation. -/
 theorem EQ2_equiv : Equivalence EQ2 :=
   ⟨EQ2_refl, fun h => EQ2_symm h, fun h1 h2 => EQ2_trans h1 h2⟩
+
+/-! ## Transitivity via base constructors (end/var)
+
+These helper lemmas avoid full transitivity by coinduction on relations
+that fix the intermediate constructor. They are useful in places where
+the middle term is `.end` or `.var v`, which need not be well-formed. -/
+
+set_option linter.unnecessarySimpa false
+
+private def EndRel : Rel := fun a b => EQ2 a .end ∧ EQ2 .end b
+
+private theorem EndRel_postfix : ∀ a b, EndRel a b → EQ2F EndRel a b := by
+  intro a b h
+  rcases h with ⟨ha, hb⟩
+  cases a with
+  | «end» =>
+      cases b with
+      | «end» => simp [EQ2F]
+      | var v =>
+          have hbF : EQ2F EQ2 .end (.var v) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | send p bs =>
+          have hbF : EQ2F EQ2 .end (.send p bs) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | recv p bs =>
+          have hbF : EQ2F EQ2 .end (.recv p bs) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | mu t lbody =>
+          have hb' : EQ2 .end (lbody.substitute t (.mu t lbody)) := by
+            have hbF : EQ2F EQ2 .end (.mu t lbody) := EQ2.destruct hb
+            simpa [EQ2F] using hbF
+          have hrel : EndRel .end (lbody.substitute t (.mu t lbody)) :=
+            ⟨EQ2_refl .end, hb'⟩
+          simpa [EQ2F] using hrel
+  | var v =>
+      have haF : EQ2F EQ2 (.var v) .end := EQ2.destruct ha
+      simpa [EQ2F] using haF
+  | send p bs =>
+      have haF : EQ2F EQ2 (.send p bs) .end := EQ2.destruct ha
+      simpa [EQ2F] using haF
+  | recv p bs =>
+      have haF : EQ2F EQ2 (.recv p bs) .end := EQ2.destruct ha
+      simpa [EQ2F] using haF
+  | mu t lbody =>
+      have ha' : EQ2 (lbody.substitute t (.mu t lbody)) .end := by
+        have haF : EQ2F EQ2 (.mu t lbody) .end := EQ2.destruct ha
+        simpa [EQ2F] using haF
+      cases b with
+      | «end» =>
+          have hrel : EndRel (lbody.substitute t (.mu t lbody)) .end :=
+            ⟨ha', hb⟩
+          simpa [EQ2F] using hrel
+      | var v =>
+          have hrel : EndRel (lbody.substitute t (.mu t lbody)) (.var v) :=
+            ⟨ha', hb⟩
+          simpa [EQ2F] using hrel
+      | send p bs =>
+          have hrel : EndRel (lbody.substitute t (.mu t lbody)) (.send p bs) :=
+            ⟨ha', hb⟩
+          simpa [EQ2F] using hrel
+      | recv p bs =>
+          have hrel : EndRel (lbody.substitute t (.mu t lbody)) (.recv p bs) :=
+            ⟨ha', hb⟩
+          simpa [EQ2F] using hrel
+      | mu s lbody' =>
+          have hb' : EQ2 .end (lbody'.substitute s (.mu s lbody')) := by
+            have hbF : EQ2F EQ2 .end (.mu s lbody') := EQ2.destruct hb
+            simpa [EQ2F] using hbF
+          have hleft : EndRel (lbody.substitute t (.mu t lbody)) (.mu s lbody') :=
+            ⟨ha', hb⟩
+          have hright : EndRel (.mu t lbody) (lbody'.substitute s (.mu s lbody')) :=
+            ⟨ha, hb'⟩
+          simpa [EQ2F] using And.intro hleft hright
+
+theorem EQ2_trans_via_end {a b : LocalTypeR} (ha : EQ2 a .end) (hb : EQ2 .end b) : EQ2 a b := by
+  have hinR : EndRel a b := ⟨ha, hb⟩
+  exact EQ2_coind EndRel_postfix a b hinR
+
+private def VarRel (v : String) : Rel := fun a b => EQ2 a (.var v) ∧ EQ2 (.var v) b
+
+private theorem VarRel_postfix (v : String) :
+    ∀ a b, VarRel v a b → EQ2F (VarRel v) a b := by
+  intro a b h
+  rcases h with ⟨ha, hb⟩
+  cases a with
+  | «end» =>
+      have haF : EQ2F EQ2 .end (.var v) := EQ2.destruct ha
+      simpa [EQ2F] using haF
+  | var v' =>
+      cases b with
+      | «end» =>
+          have hbF : EQ2F EQ2 (.var v) .end := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | var w =>
+          have ha' : v' = v := by
+            have haF : EQ2F EQ2 (.var v') (.var v) := EQ2.destruct ha
+            simpa [EQ2F] using haF
+          have hb' : v = w := by
+            have hbF : EQ2F EQ2 (.var v) (.var w) := EQ2.destruct hb
+            simpa [EQ2F] using hbF
+          subst ha' hb'
+          simp [EQ2F]
+      | send p bs =>
+          have hbF : EQ2F EQ2 (.var v) (.send p bs) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | recv p bs =>
+          have hbF : EQ2F EQ2 (.var v) (.recv p bs) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | mu t lbody =>
+          have ha' : v' = v := by
+            have haF : EQ2F EQ2 (.var v') (.var v) := EQ2.destruct ha
+            simpa [EQ2F] using haF
+          subst ha'
+          have hb' : EQ2 (.var v') (lbody.substitute t (.mu t lbody)) := by
+            have hbF : EQ2F EQ2 (.var v') (.mu t lbody) := EQ2.destruct hb
+            simpa [EQ2F] using hbF
+          have hrel : VarRel v' (.var v') (lbody.substitute t (.mu t lbody)) :=
+            ⟨EQ2_refl (.var v'), hb'⟩
+          simpa [EQ2F] using hrel
+  | send p bs =>
+      have haF : EQ2F EQ2 (.send p bs) (.var v) := EQ2.destruct ha
+      simpa [EQ2F] using haF
+  | recv p bs =>
+      have haF : EQ2F EQ2 (.recv p bs) (.var v) := EQ2.destruct ha
+      simpa [EQ2F] using haF
+  | mu t lbody =>
+      have ha' : EQ2 (lbody.substitute t (.mu t lbody)) (.var v) := by
+        have haF : EQ2F EQ2 (.mu t lbody) (.var v) := EQ2.destruct ha
+        simpa [EQ2F] using haF
+      cases b with
+      | «end» =>
+          have hbF : EQ2F EQ2 (.var v) .end := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | var w =>
+          have hb' : v = w := by
+            have hbF : EQ2F EQ2 (.var v) (.var w) := EQ2.destruct hb
+            simpa [EQ2F] using hbF
+          subst hb'
+          have hrel : VarRel v (lbody.substitute t (.mu t lbody)) (.var v) :=
+            ⟨ha', EQ2_refl (.var v)⟩
+          simpa [EQ2F] using hrel
+      | send p bs =>
+          have hbF : EQ2F EQ2 (.var v) (.send p bs) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | recv p bs =>
+          have hbF : EQ2F EQ2 (.var v) (.recv p bs) := EQ2.destruct hb
+          simpa [EQ2F] using hbF
+      | mu s lbody' =>
+          have hb' : EQ2 (.var v) (lbody'.substitute s (.mu s lbody')) := by
+            have hbF : EQ2F EQ2 (.var v) (.mu s lbody') := EQ2.destruct hb
+            simpa [EQ2F] using hbF
+          have hleft : VarRel v (lbody.substitute t (.mu t lbody)) (.mu s lbody') :=
+            ⟨ha', hb⟩
+          have hright : VarRel v (.mu t lbody) (lbody'.substitute s (.mu s lbody')) :=
+            ⟨ha, hb'⟩
+          simpa [EQ2F] using And.intro hleft hright
+
+theorem EQ2_trans_via_var {a b : LocalTypeR} {v : String}
+    (ha : EQ2 a (.var v)) (hb : EQ2 (.var v) b) : EQ2 a b := by
+  have hinR : VarRel v a b := ⟨ha, hb⟩
+  exact EQ2_coind (VarRel_postfix v) a b hinR
+
+set_option linter.unnecessarySimpa true
 
 end RumpsteakV2.Protocol.CoTypes.EQ2

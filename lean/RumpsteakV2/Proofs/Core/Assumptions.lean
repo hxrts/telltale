@@ -4,7 +4,11 @@ Centralized axioms and assumptions for V2 proofs.
 
 This module is the only place where new axioms are introduced.
 -/
-
 namespace RumpsteakV2.Proofs.Core.Assumptions
+
+/-! ## Current Axioms
+
+(none)
+-/
 
 end RumpsteakV2.Proofs.Core.Assumptions

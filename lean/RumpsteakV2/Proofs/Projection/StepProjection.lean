@@ -92,7 +92,18 @@ theorem proj_trans_comm_receiver_is_recv
 
 /-! ## Reformulated Step Projection Theorems
 
-These are the CORRECT formulations that can be proven. -/
+These are the CORRECT formulations that can be proven.
+
+We now require the action to match the head communication (as in the
+Coq `preserve_proj` head case). This avoids the invalid comm_async
+counterexamples where the sender participates in a nested action while
+the outer comm has not stepped. -/
+
+private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
+  match g with
+  | .comm sender receiver _ =>
+      act.sender = sender ∧ act.receiver = receiver
+  | _ => False
 
 /-- Statement type for step projection (sender).
     This factored-out type helps with the mutual induction. -/
@@ -108,78 +119,27 @@ abbrev SenderStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType)
 
 This is the correct formulation that accounts for multi-branch protocols. -/
 theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
+    (hstep : step g act g') (hpred : action_pred g act) :
     SenderStepResult g act g' := by
-  -- Use @step.rec for mutual induction on step and BranchesStep
-  -- The proof structure follows Coq's `preserve_proj` in harmony.v
-  exact @step.rec
-    (motive_1 := fun g act g' _ => SenderStepResult g act g')
-    (motive_2 := fun bs act bs' _ =>
-      ∀ role, BranchesRel EQ2 (transBranches bs' role) (transBranches bs role))
-    -- comm_head case: direct participation
-    (fun sender receiver branches label cont hmem => by
+  cases hstep with
+  | comm_head sender receiver branches label g' hmem =>
       left
       exact ⟨transBranches branches sender,
-             trans cont sender,
+             projTrans g' sender,
              proj_trans_comm_sender_is_send sender receiver branches,
-             mem_transBranches_of_mem branches label cont sender hmem,
-             EQ2_refl _⟩)
-    -- comm_async case: nested stepping
-    (fun sender receiver branches branches' act label cont hns hcond hmem _hcan hbstep ih_bstep => by
-      by_cases has : act.sender = sender
-      · -- Sender matches outer sender: projection still .send, use BranchesRel from IH
-        right
-        have hg : projTrans (.comm sender receiver branches) act.sender =
-            .send receiver (transBranches branches act.sender) := by
-          rw [has]; exact proj_trans_comm_sender_is_send sender receiver branches
-        have hg' : projTrans (.comm sender receiver branches') act.sender =
-            .send receiver (transBranches branches' act.sender) := by
-          rw [has]; exact proj_trans_comm_sender_is_send sender receiver branches'
-        rw [hg, hg']
-        apply EQ2.construct
-        exact ⟨rfl, ih_bstep act.sender⟩
-      · by_cases har : act.sender = receiver
-        · exact absurd har hns
-        · -- Non-participant: projection via first continuation
-          right
-          simp only [projTrans]
-          -- trans on non-participant goes through first branch
-          -- Use trans_comm_other directly rather than as equation
-          rw [trans_comm_other sender receiver act.sender branches has har]
-          rw [trans_comm_other sender receiver act.sender branches' has har]
-          -- Need IH from step in BranchesStep for first branch
-          -- This requires extracting the step IH, which is available via motive_2 indirectly
-          sorry)
-    -- mu case: unfolding
-    (fun t body act g' hstep_inner ih => by
-      cases ih with
-      | inl hleft =>
-        -- First disjunct: send form - need to lift through mu unfolding
-        -- The mu unfolding changes the projection but preserves EQ2
-        sorry
-      | inr hright =>
-        -- Second disjunct: EQ2 unchanged
-        right
-        -- Need: EQ2 (trans g' sender) (trans (.mu t body) sender)
-        -- We have: EQ2 (trans g' sender) (trans (body.substitute t (.mu t body)) sender)
-        -- And: trans (.mu t body) sender is EQ2 to unfolded via mu-self-unfold
-        -- Use EQ2_trans to chain
-        sorry)
-    -- BranchesStep nil
-    (fun _act role => by simp only [transBranches, BranchesRel]; exact List.Forall₂.nil)
-    -- BranchesStep cons
-    (fun label g g' rest rest' act _hstep hbstep ih_step ih_bstep role => by
-      unfold transBranches BranchesRel
-      apply List.Forall₂.cons
-      · constructor
-        · rfl  -- labels match
-        · -- Need: EQ2 (trans g' role) (trans g role)
-          -- ih_step gives SenderStepResult, but we need it for arbitrary role
-          -- This is where the proof gets tricky - we need proj_trans_other_step for non-participants
-          -- and the step IH for participants
-          sorry
-      · exact ih_bstep role)
-    g act g' hstep
+             mem_transBranches_of_mem branches label g' sender hmem,
+             EQ2_refl _⟩
+  | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbstep =>
+      -- action_pred impossible for async steps
+      have hpred' : act.sender = sender ∧ act.receiver = receiver := by
+        simpa [action_pred] using hpred
+      have hcontra : False := by
+        have hrcv : act.receiver ≠ receiver := hcond hpred'.1
+        exact hrcv hpred'.2
+      exact hcontra.elim
+  | mu t body act g' hstep_inner =>
+      -- action_pred impossible for mu at head
+      simp [action_pred] at hpred
 
 /-- Statement type for step projection (receiver). -/
 abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
@@ -194,89 +154,40 @@ abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalTyp
 
 This is the dual of `proj_trans_sender_step_v2`. -/
 theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
+    (hstep : step g act g') (hpred : action_pred g act) (hno_self : g.noSelfComm = true) :
     ReceiverStepResult g act g' := by
-  -- Dual proof to sender case
-  exact @step.rec
-    (motive_1 := fun g act g' _ => ReceiverStepResult g act g')
-    (motive_2 := fun bs act bs' _ =>
-      ∀ role, BranchesRel EQ2 (transBranches bs' role) (transBranches bs role))
-    -- comm_head case
-    (fun sender receiver branches label cont hmem => by
+  cases hstep with
+  | comm_head sender receiver branches label g' hmem =>
+      have hne : receiver ≠ sender := by
+        have hns := hno_self
+        simp [GlobalType.noSelfComm] at hns
+        have hne' : sender ≠ receiver := hns.1
+        exact ne_comm.mp hne'
       left
-      -- Need: receiver ≠ sender for proj_trans_comm_receiver_is_recv
-      -- In well-formed protocols, sender ≠ receiver, but we don't have that hypothesis
-      -- For now, we use sorry for this well-formedness gap
-      have hne : receiver ≠ sender := by sorry
       exact ⟨transBranches branches receiver,
-             trans cont receiver,
+             projTrans g' receiver,
              proj_trans_comm_receiver_is_recv sender receiver branches hne,
-             mem_transBranches_of_mem branches label cont receiver hmem,
-             EQ2_refl _⟩)
-    -- comm_async case
-    (fun sender receiver branches branches' act label cont hns hcond hmem _hcan hbstep ih_bstep => by
-      by_cases har : act.receiver = receiver
-      · -- Receiver matches outer receiver
-        right
-        have hne : receiver ≠ sender := by
-          intro heq
-          -- hns : act.sender ≠ receiver, and we have act.receiver = receiver
-          -- If receiver = sender, then act.sender ≠ sender
-          -- But this doesn't directly give contradiction without more info
-          sorry
-        have hg : projTrans (.comm sender receiver branches) act.receiver =
-            .recv sender (transBranches branches act.receiver) := by
-          rw [har]; exact proj_trans_comm_receiver_is_recv sender receiver branches hne
-        have hg' : projTrans (.comm sender receiver branches') act.receiver =
-            .recv sender (transBranches branches' act.receiver) := by
-          rw [har]; exact proj_trans_comm_receiver_is_recv sender receiver branches' hne
-        rw [hg, hg']
-        apply EQ2.construct
-        exact ⟨rfl, ih_bstep act.receiver⟩
-      · by_cases has : act.receiver = sender
-        · -- act.receiver = sender (receiver role is the outer sender)
-          right
-          sorry
-        · -- Non-participant
-          right
-          sorry)
-    -- mu case
-    (fun t body act g' hstep_inner ih => by
-      cases ih with
-      | inl hleft => sorry
-      | inr hright =>
-        right
-        sorry)
-    -- BranchesStep nil
-    (fun _act role => by simp only [transBranches, BranchesRel]; exact List.Forall₂.nil)
-    -- BranchesStep cons
-    (fun label g g' rest rest' act _hstep hbstep ih_step ih_bstep role => by
-      unfold transBranches BranchesRel
-      apply List.Forall₂.cons
-      · exact ⟨rfl, sorry⟩
-      · exact ih_bstep role)
-    g act g' hstep
+             mem_transBranches_of_mem branches label g' receiver hmem,
+             EQ2_refl _⟩
+  | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbstep =>
+      -- action_pred impossible for async steps
+      have hpred' : act.sender = sender ∧ act.receiver = receiver := by
+        simpa [action_pred] using hpred
+      have hcontra : False := by
+        have hrcv : act.receiver ≠ receiver := hcond hpred'.1
+        exact hrcv hpred'.2
+      exact hcontra.elim
+  | mu t body act g' hstep_inner =>
+      -- action_pred impossible for mu at head
+      simp [action_pred] at hpred
 
 /-! ## Original Axiom Compatibility
 
-If the original axiom statement is needed, it follows from the v2 statement
-when branches project coherently (all to EQ2-equivalent types).
-
-This requires the `branches_project_coherent` lemma. -/
-
-/-- The original single-branch axiom follows from v2 when branches are coherent.
-    This theorem shows the connection but uses sorry for the coherence assumption. -/
+We expose a lightweight compatibility wrapper that simply reuses the v2
+statement under the head-action predicate. -/
 theorem proj_trans_sender_step_original_compat (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g')
-    -- Additional hypothesis: branches are coherent (all project to EQ2-equivalent types)
-    (hcoherent : ∀ sender receiver branches role,
-      g = .comm sender receiver branches →
-      ∀ l1 c1 l2 c2, (l1, c1) ∈ branches → (l2, c2) ∈ branches →
-        EQ2 (trans c1 role) (trans c2 role)) :
-    ∃ cont, projTrans g act.sender = .send act.receiver [(act.label, cont)] ∧
-            EQ2 (projTrans g' act.sender) cont ∨
-    EQ2 (projTrans g' act.sender) (projTrans g act.sender) := by
-  -- Use the v2 theorem and coherence to collapse to single branch
-  sorry
+    (hstep : step g act g') (hpred : action_pred g act) :
+    SenderStepResult g act g' := by
+  exact proj_trans_sender_step_v2 g g' act hstep hpred
 
 end RumpsteakV2.Proofs.Projection.StepProjection

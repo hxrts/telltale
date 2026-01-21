@@ -3,7 +3,6 @@ import RumpsteakV2.Semantics.Typing
 import RumpsteakV2.Semantics.EnvStep
 import RumpsteakV2.Proofs.Projection.Harmony
 import RumpsteakV2.Protocol.CoTypes.EQ2
-import RumpsteakV2.Proofs.Core.Assumptions
 
 /-! # RumpsteakV2.Proofs.Safety.SubjectReduction
 
@@ -30,6 +29,7 @@ namespace RumpsteakV2.Proofs.Safety.SubjectReduction
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Project
 open RumpsteakV2.Protocol.CoTypes.EQ2
 open RumpsteakV2.Protocol.CoTypes.Quotient
 open RumpsteakV2.Semantics.EnvStep
@@ -151,14 +151,15 @@ theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
 
 /-- Non-participants have unchanged types (up to EQ2) after a step.
 
-**Note:** Requires g to be closed and wellFormed (standard invariants). -/
+**Note:** Requires g to be closed/wellFormed and projectable. -/
 theorem other_type_preserved (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
     (hclosed : g.isClosed = true)
     (hwf : g.wellFormed = true)
-    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
-    EQ2 (trans g' role) (trans g role) :=
-  proj_trans_other_step g g' act role hstep hclosed hwf hns hnr
+    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver)
+    (hproj : ProjectableClosedWellFormed)
+    : EQ2 (trans g' role) (trans g role) :=
+  proj_trans_other_step g g' act role hstep hclosed hwf hns hnr hproj
 
 /-! ## Claims Bundle -/
 

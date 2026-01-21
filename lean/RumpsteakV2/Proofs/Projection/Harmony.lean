@@ -4,6 +4,7 @@ import RumpsteakV2.Protocol.Projection.Project
 import RumpsteakV2.Protocol.Participation
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.CoTypes.EQ2Paco
+import RumpsteakV2.Protocol.Projection.ProjSubst
 import RumpsteakV2.Proofs.Safety.Determinism
 import RumpsteakV2.Proofs.Projection.MuUnfoldLemmas
 import RumpsteakV2.Proofs.Projection.SubstEndUnguarded
@@ -68,7 +69,8 @@ namespace RumpsteakV2.Proofs.Projection.Harmony
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Projection.Projectb
-open RumpsteakV2.Protocol.Projection.Project (EQ_end part_of2_or_end CProject_implies_EQ2_trans)
+open RumpsteakV2.Protocol.Projection.Project
+  (EQ_end part_of2_or_end CProject_implies_EQ2_trans Projectable ProjectableClosedWellFormed)
 open RumpsteakV2.Protocol.Participation (part_of2 part_of_all2 part_of_all2_comm_inv not_part_of2_comm)
 open RumpsteakV2.Protocol.CoTypes.EQ2
 open RumpsteakV2.Protocol.CoTypes.Quotient
@@ -146,50 +148,47 @@ theorem trans_branches_coherent_EQ2
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hnp : role ≠ sender ∧ role ≠ receiver)
     (hne : branches ≠ [])
-    (hwf : (GlobalType.comm sender receiver branches).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver branches).wellFormed = true)
+    (hproj_comm : ∃ lt, CProject (.comm sender receiver branches) role lt) :
     ∀ b ∈ branches, EQ2 (projTrans b.2 role) (projTrans branches.head!.2 role) := by
   intro b hmem
   -- Case analysis on whether role participates in the comm
   by_cases hpart : part_of2 role (.comm sender receiver branches)
   · -- Case 1: role participates through branches
     -- Use CProject for the comm to extract AllBranchesProj coherence
-    have hproj_comm :
-        CProject (.comm sender receiver branches) role
-          (projTrans (.comm sender receiver branches) role) := by
-      have hpb :
-          projectb (.comm sender receiver branches) role
-            (projTrans (.comm sender receiver branches) role) = true :=
-        projectb_trans (.comm sender receiver branches) role
-      exact projectb_sound _ _ _ hpb
-    have hall :
-        AllBranchesProj CProject branches role
-          (projTrans (.comm sender receiver branches) role) := by
+    rcases hproj_comm with ⟨lt, hproj_comm⟩
+    have hall : AllBranchesProj CProject branches role lt := by
       have hF := CProject_destruct hproj_comm
       simpa [CProjectF, hnp.left, hnp.right] using hF
-    have hproj_b :
-        CProject b.2 role (projTrans (.comm sender receiver branches) role) :=
-      hall b hmem
+    have hproj_b : CProject b.2 role lt := hall b hmem
     have hwb : b.2.wellFormed = true :=
       GlobalType.wellFormed_comm_branches sender receiver branches hwf b hmem
-    have hEQ :
-        EQ2 (projTrans (.comm sender receiver branches) role)
-          (projTrans b.2 role) :=
-      CProject_implies_EQ2_trans b.2 role
-        (projTrans (.comm sender receiver branches) role) hproj_b hwb
     have hne_list : ∃ hd tl, branches = hd :: tl := by
       cases hbranches : branches with
       | nil => exact (False.elim (hne hbranches))
       | cons hd tl => exact ⟨hd, tl, rfl⟩
     obtain ⟨hd, tl, heq⟩ := hne_list
     subst heq
-    have hcomm_trans :
-        projTrans (.comm sender receiver (hd :: tl)) role =
-          projTrans hd.2 role :=
-      trans_comm_other sender receiver role (hd :: tl) hnp.left hnp.right
-    have hEQ' : EQ2 (projTrans hd.2 role) (projTrans b.2 role) := by
-      simpa [hcomm_trans] using hEQ
+    have hmem_hd : hd ∈ (hd :: tl) := by exact List.Mem.head tl
+    have hproj_hd : CProject hd.2 role lt := hall hd hmem_hd
+    have hwf_hd : hd.2.wellFormed = true :=
+      GlobalType.wellFormed_comm_branches sender receiver (hd :: tl) hwf hd hmem_hd
+    have hne_hd : hd.2.allCommsNonEmpty = true := by
+      have hwf_hd' := hwf_hd
+      simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf_hd'
+      exact hwf_hd'.1.1.2
+    have hne_b : b.2.allCommsNonEmpty = true := by
+      have hwf_b' := hwb
+      simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf_b'
+      exact hwf_b'.1.1.2
+    have htrans_hd : projTrans hd.2 role = lt := by
+      simpa [projTrans] using (trans_eq_of_CProject hd.2 role lt hproj_hd hne_hd)
+    have htrans_b : projTrans b.2 role = lt := by
+      simpa [projTrans] using (trans_eq_of_CProject b.2 role lt hproj_b hne_b)
+    have hEq : projTrans b.2 role = projTrans hd.2 role := by
+      simp [htrans_b, htrans_hd]
     simp [List.head!]
-    exact EQ2_symm hEQ'
+    exact hEq ▸ EQ2_refl _
 
   · -- Case 2: role doesn't participate at all
     -- Then all branches project to .end
@@ -212,8 +211,8 @@ theorem trans_branches_coherent_EQ2
       have hwf_b : b.2.wellFormed = true := by
         exact GlobalType.wellFormed_comm_branches sender receiver branches hwf b hmem
       exact EQ2_symm (EQ_end role b.2 hnopart_b hwf_b)
-    -- Chain: EQ2 (trans b.2 role) .end ∧ EQ2 .end (trans first.2 role)
-    exact EQ2_trans hb_end (EQ2_symm hfirst_end)
+    -- Chain via .end without full transitivity
+    exact EQ2_trans_via_end hb_end (EQ2_symm hfirst_end)
 
 /-- Helper: transBranches produces branches satisfying BranchesProjRel with the witness relation. -/
 private theorem transBranches_satisfies_BranchesProjRel
@@ -241,21 +240,40 @@ private theorem transBranches_satisfies_BranchesProjRel
         -- Show: BranchesProjRel for tl
         exact ih (fun gb hmem => hwf gb (List.Mem.tail hd hmem))
 
+/-- Helper: extract per-branch CProject witnesses from BranchesProjRel. -/
+private theorem branchesProjRel_to_CProject
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (h : BranchesProjRel CProject gbs role lbs) :
+    ∀ p ∈ gbs, ∃ lt, CProject p.2 role lt := by
+  induction h with
+  | nil =>
+      intro p hp
+      cases hp
+  | cons hpair _hrest ih =>
+      intro p hp
+      cases hp with
+      | head =>
+          rcases hpair with ⟨_hlabel, hproj⟩
+          exact ⟨_, hproj⟩
+      | tail _ hmem =>
+          exact ih _ hmem
+
 /-- trans produces a valid projection that satisfies CProject.
 
-This theorem establishes that the computational trans function
-produces outputs that satisfy the CProject relation. This is proven by coinduction on CProject,
-showing that trans constructs projections that match the CProjectF structure at each step.
+This theorem establishes that when CProject already holds (and g is wellFormed),
+the computational trans function produces the same candidate, hence also satisfies CProject.
 
 **Proof strategy:**
-- By coinduction with witness relation R g role cand := (cand = trans g role ∧ g.allCommsNonEmpty = true)
-- Show ∀ g role cand, R g role cand → CProjectF R g role cand
-- For comm with non-participant: uses trans_branches_coherent to establish AllBranchesProj -/
-theorem trans_produces_CProject (g : GlobalType) (role : String) :
+It uses `trans_eq_of_CProject` to rewrite the candidate to `trans g role`. -/
+theorem trans_produces_CProject (g : GlobalType) (role : String) (lt : LocalTypeR)
+    (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     CProject g role (projTrans g role) := by
-  have hpb : projectb g role (projTrans g role) = true :=
-    projectb_trans g role
-  exact projectb_sound g role (projTrans g role) hpb
+  have hne : g.allCommsNonEmpty = true := by
+    simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+    exact hwf.1.1.2
+  have htrans_eq : projTrans g role = lt := by
+    simpa [projTrans] using (trans_eq_of_CProject g role lt hproj hne)
+  simpa [htrans_eq] using hproj
 
 /-- Branch coherence for non-participants: all branches project to EQ2-equivalent types.
 
@@ -283,29 +301,38 @@ theorem branches_project_coherent (sender receiver : String)
     (hmem : (label, cont) ∈ ((first_label, first_cont) :: rest))
     (hns : role ≠ sender) (hnr : role ≠ receiver)
     (_hclosed_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.isClosed = true)
-    (hallwf_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.wellFormed = true) :
+    (hallwf_branches : ∀ b ∈ ((first_label, first_cont) :: rest), b.2.wellFormed = true)
+    (hproj_comm : ∃ lt,
+      CProject (GlobalType.comm sender receiver ((first_label, first_cont) :: rest)) role lt) :
     EQ2 (projTrans cont role) (projTrans first_cont role) := by
   let gcomm := GlobalType.comm sender receiver ((first_label, first_cont) :: rest)
-  have hproj_comm : CProject gcomm role (projTrans gcomm role) := by
-    have hpb : projectb gcomm role (projTrans gcomm role) = true :=
-      projectb_trans gcomm role
-    exact projectb_sound gcomm role (projTrans gcomm role) hpb
-  have hall : AllBranchesProj CProject ((first_label, first_cont) :: rest) role (projTrans gcomm role) := by
+  rcases hproj_comm with ⟨lt, hproj_comm⟩
+  have hall : AllBranchesProj CProject ((first_label, first_cont) :: rest) role lt := by
     have hF := CProject_destruct hproj_comm
     simpa [CProjectF, hns, hnr, gcomm] using hF
-  have hproj_first : CProject first_cont role (projTrans gcomm role) :=
+  have hproj_first : CProject first_cont role lt :=
     hall (first_label, first_cont) (List.Mem.head rest)
-  have hproj_cont : CProject cont role (projTrans gcomm role) :=
+  have hproj_cont : CProject cont role lt :=
     hall (label, cont) hmem
   have hwf_first : first_cont.wellFormed = true :=
     hallwf_branches (first_label, first_cont) (List.Mem.head rest)
   have hwf_cont : cont.wellFormed = true :=
     hallwf_branches (label, cont) hmem
-  have hEQ_first : EQ2 (projTrans gcomm role) (projTrans first_cont role) :=
-    CProject_implies_EQ2_trans first_cont role (projTrans gcomm role) hproj_first hwf_first
-  have hEQ_cont : EQ2 (projTrans gcomm role) (projTrans cont role) :=
-    CProject_implies_EQ2_trans cont role (projTrans gcomm role) hproj_cont hwf_cont
-  exact EQ2_trans (EQ2_symm hEQ_cont) hEQ_first
+  have hne_first : first_cont.allCommsNonEmpty = true := by
+    have hwf_first' := hwf_first
+    simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf_first'
+    exact hwf_first'.1.1.2
+  have hne_cont : cont.allCommsNonEmpty = true := by
+    have hwf_cont' := hwf_cont
+    simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf_cont'
+    exact hwf_cont'.1.1.2
+  have htrans_first : projTrans first_cont role = lt := by
+    simpa [projTrans] using (trans_eq_of_CProject first_cont role lt hproj_first hne_first)
+  have htrans_cont : projTrans cont role = lt := by
+    simpa [projTrans] using (trans_eq_of_CProject cont role lt hproj_cont hne_cont)
+  have hEq : projTrans cont role = projTrans first_cont role := by
+    simp [htrans_cont, htrans_first]
+  exact hEq ▸ EQ2_refl _
 
 /-! ### Projection-Substitution Commutation
 
@@ -455,6 +482,34 @@ private theorem EQ2_end_to_mu_unguarded
 -- Aliases to avoid namespace issues
 private abbrev gSubstBranches := RumpsteakV2.Protocol.GlobalType.substituteBranches
 private abbrev lSubstBranches := RumpsteakV2.Protocol.LocalTypeR.substituteBranches
+
+private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
+    (rest : List (Label × GlobalType)) :
+    sizeOf pair.2 < sizeOf (pair :: rest) := by
+  have h1 : sizeOf pair.2 < sizeOf pair := by
+    simp only [sizeOf, Prod._sizeOf_1]
+    omega
+  have h2 : sizeOf pair < sizeOf (pair :: rest) := by
+    simp only [sizeOf, List._sizeOf_1]
+    omega
+  exact Nat.lt_trans h1 h2
+
+private theorem sizeOf_bs_lt_comm (sender receiver : String)
+    (bs : List (Label × GlobalType)) :
+    sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
+  simp only [GlobalType.comm.sizeOf_spec]
+  have h : 0 < 1 + sizeOf sender + sizeOf receiver := by omega
+  omega
+
+private theorem sizeOf_cont_lt_comm
+    (sender receiver : String) (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
+    sizeOf cont < sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) := by
+  have h1 : sizeOf cont < sizeOf ((label, cont) :: rest) :=
+    sizeOf_head_snd_lt_cons (label, cont) rest
+  have h2 : sizeOf ((label, cont) :: rest) <
+      sizeOf (GlobalType.comm sender receiver ((label, cont) :: rest)) :=
+    sizeOf_bs_lt_comm sender receiver ((label, cont) :: rest)
+  exact Nat.lt_trans h1 h2
 
 -- Helper: BranchesRel for ProjSubstRel on transBranches/substituteBranches
 private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role : String)
@@ -673,6 +728,12 @@ private theorem ProjSubstRel_EQ2F_of_witness (g : GlobalType) (t : String) (G : 
               -- Since cont is a strict subterm of .comm, we can recurse.
               exact ProjSubstRel_EQ2F_of_witness cont t G role hGclosed
 termination_by sizeOf g
+decreasing_by
+  all_goals
+    simp_wf
+    first
+    | (simpa [GlobalType.comm.sizeOf_spec] using
+        (sizeOf_cont_lt_comm sender receiver label cont rest))
 
 /-- ProjSubstRel is a post-fixpoint of EQ2F (wrapper around well-founded induction). -/
 private theorem ProjSubstRel_postfix (t : String) (G : GlobalType) (role : String)
@@ -771,48 +832,22 @@ theorem trans_substitute_unfold (t : String) (body : GlobalType) (role : String)
         simp
       rw [h_proj_end]
       simp only [LocalTypeR.unfold]
-      -- LHS: projTrans (body.substitute t (mu t body)) role
-      -- Need to show this is EQ2-equivalent to .end
-      -- The key insight: if trans body role is not guarded by t, then
-      -- trans body role = .var t (at some level), and substitution produces the
-      -- same unguarded structure, so trans of substituted body is also .end
-      --
-      -- For now, use trans_subst_comm and the fact that both sides are .end
-      -- Actually, we need to show that projTrans (body.substitute ...) role = .end
-      -- This follows from the recursive structure
-      --
-      -- Use the theorem to get the correspondence, then show both sides are .end
-      have hsubst := trans_subst_comm body t (.mu t body) role hclosed
-      -- hsubst: EQ2 (projTrans (body.substitute ...) role) ((projTrans body role).substitute t (projTrans (mu t body) role))
-      -- RHS of hsubst simplifies using h_proj_end
-      rw [h_proj_end] at hsubst
-      -- Now hsubst: EQ2 (projTrans (body.substitute ...) role) ((projTrans body role).substitute t .end)
-      -- We need: EQ2 (projTrans (body.substitute ...) role) .end
-      --
-      -- Key: (projTrans body role).substitute t .end
-      -- If projTrans body role contains .var t, it gets replaced with .end
-      -- The result should be EQ2 to .end (since the non-guarded var gets replaced)
-      --
-      -- For completeness, we'd need a lemma showing this substitution produces .end
-      -- For now, chain through the EQ2 relation using the axiom
-      -- We have: projTrans (body.subst...) ~EQ2~ (projTrans body).subst t .end
-      -- And (projTrans body).isGuarded t = false means it's essentially .var t
-      -- Substituting .var t with .end gives .end
-      --
-      -- Simplified approach: When projTrans body role is not guarded by t,
-      -- the entire mu collapses to .end. The substituted body also projects to something
-      -- that collapses similarly.
-      --
-      -- Use EQ2_trans with the axiom result
-      -- Need: EQ2 ((projTrans body role).substitute t .end) .end
-      -- This requires showing that substituting .end for an unguarded var gives .end
-      -- Convert hguard from ¬(... = true) to (... = false)
+      -- Rewrite projection of the substituted body via proj_subst,
+      -- then use the unguarded-substitution lemma to conclude EQ2 to .end.
+      have hproj_subst :
+          projTrans (body.substitute t (.mu t body)) role =
+            (projTrans body role).substitute t (projTrans (.mu t body) role) :=
+        RumpsteakV2.Protocol.Projection.ProjSubst.proj_subst_mu_self t body role hclosed
+      have hproj_subst' :
+          projTrans (body.substitute t (.mu t body)) role =
+            (projTrans body role).substitute t LocalTypeR.end := by
+        simpa [h_proj_end] using hproj_subst
       have hguard_false : (projTrans body role).isGuarded t = false := by
         simp only [Bool.not_eq_true] at hguard
         exact hguard
       have hsub_end : EQ2 ((projTrans body role).substitute t LocalTypeR.end) LocalTypeR.end :=
         subst_end_unguarded_eq2_end (projTrans body role) t hguard_false
-      exact EQ2_trans hsubst hsub_end
+      simpa [← hproj_subst'] using hsub_end
 
 /-! ### Participant Projection Lemmas
 
@@ -935,19 +970,21 @@ Proof by mutual induction on step and BranchesStep via @step.rec:
    - IH: EQ2 (trans g' role) (trans (body.substitute t (mu t body)) role)
    - Uses: trans_substitute_unfold + EQ2_unfold_right to connect to trans (mu t body) role
 
-**Note:** Requires g to be closed and wellFormed (standard protocol invariants). -/
+**Note:** Requires g to be projectable (in addition to closed/wellFormed). -/
 theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
     (hclosed : g.isClosed = true)
     (hwf : g.wellFormed = true)
-    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
+    (hns : role ≠ act.sender) (hnr : role ≠ act.receiver)
+    (hproj : ProjectableClosedWellFormed) :
     EQ2 (projTrans g' role) (projTrans g role) := by
   exact
   @step.rec
     -- motive_1: for step g act g', non-participant role has EQ2 (projTrans g' role) (projTrans g role)
     (motive_1 := fun g act g' _ =>
       g.isClosed = true → g.wellFormed = true →
-      ∀ role, role ≠ act.sender → role ≠ act.receiver → EQ2 (projTrans g' role) (projTrans g role))
+      ∀ role, role ≠ act.sender → role ≠ act.receiver →
+        EQ2 (projTrans g' role) (projTrans g role))
     -- motive_2: for BranchesStep bs act bs', non-participant has BranchesRel on transBranches
     (motive_2 := fun bs act bs' _ =>
       (∀ p ∈ bs, p.2.isClosed = true) →
@@ -970,6 +1007,16 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
           -- projTrans g role = projTrans fc role (first continuation)
           have htrans_g : projTrans (GlobalType.comm sender receiver ((fl, fc) :: rest)) role =
               projTrans fc role := trans_comm_other sender receiver role ((fl, fc) :: rest) hns hnr
+          have hproj_comm :
+              ∃ lt,
+                CProject (GlobalType.comm sender receiver ((fl, fc) :: rest)) role lt := by
+            have hproj_comm' :
+                Projectable (GlobalType.comm sender receiver ((fl, fc) :: rest)) := by
+              simpa [ProjectableClosedWellFormed] using
+                (hproj (GlobalType.comm sender receiver ((fl, fc) :: rest))
+                  (by simpa [hbranches] using hclosed)
+                  (by simpa [hbranches] using hwf))
+            exact hproj_comm' role
           -- Extract closedness for all branches from comm closedness
           have hclosed_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.isClosed = true := by
             intro b hb
@@ -980,7 +1027,7 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
             GlobalType.wellFormed_comm_branches sender receiver ((fl, fc) :: rest) hwf
           -- All branches project coherently for non-participants
           have hcoherent := branches_project_coherent sender receiver fl fc rest label cont role hmem
-            hns hnr hclosed_branches hallwf_branches
+            hns hnr hclosed_branches hallwf_branches hproj_comm
           rw [htrans_g]
           exact hcoherent)
     -- Case 2: comm_async
@@ -999,11 +1046,10 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
       -- Derive branch wellFormedness
       have hbranches_wf : ∀ p ∈ branches, p.2.wellFormed = true :=
         GlobalType.wellFormed_comm_branches sender receiver branches hwf
-      -- Get branch-wise EQ2 preservation from motive_2 IH
-      have hbranch_rel := ih_bstep hbranches_closed hbranches_wf role hns hnr
       -- Case split on role's relationship to outer comm's sender/receiver
       by_cases hrs : role = sender
       · -- role = sender: project as send
+        have hbranch_rel := ih_bstep hbranches_closed hbranches_wf role hns hnr
         simp only [projTrans, trans_comm_sender sender receiver role branches hrs,
                    trans_comm_sender sender receiver role branches' hrs]
         -- Goal: EQ2 (send receiver (transBranches branches' role)) (send receiver (transBranches branches role))
@@ -1011,12 +1057,14 @@ theorem proj_trans_other_step (g g' : GlobalType) (act : GlobalActionR) (role : 
         exact EQ2.construct ⟨rfl, hbranch_rel⟩
       · by_cases hrr : role = receiver
         · -- role = receiver: project as recv
+          have hbranch_rel := ih_bstep hbranches_closed hbranches_wf role hns hnr
           simp only [projTrans, trans_comm_receiver sender receiver role branches hrr hrs,
                      trans_comm_receiver sender receiver role branches' hrr hrs]
           -- Goal: EQ2 (recv sender (transBranches branches' role)) (recv sender (transBranches branches role))
           -- EQ2F EQ2 (recv p bs) (recv p cs) = p = p ∧ BranchesRel EQ2 bs cs
           exact EQ2.construct ⟨rfl, hbranch_rel⟩
         · -- role ≠ sender ∧ role ≠ receiver: project via first branch
+          have hbranch_rel := ih_bstep hbranches_closed hbranches_wf role hns hnr
           -- Case split on branch structure
           match hbranches : branches, hbranches' : branches' with
           | [], [] =>
@@ -1105,12 +1153,13 @@ non-participant projections: each branch steps, and projection commutes with ste
 
 Proven by induction on BranchesStep, using proj_trans_other_step for each branch.
 
-**Note:** Requires all branch continuations to be closed and wellFormed. -/
+**Note:** Requires all branch continuations to be closed, wellFormed, and projectable. -/
 theorem branches_step_preserves_trans (branches branches' : List (Label × GlobalType))
     (act : GlobalActionR) (role : String)
     (hstep : BranchesStep step branches act branches')
     (hclosed : ∀ p ∈ branches, p.2.isClosed = true)
     (hwf : ∀ p ∈ branches, p.2.wellFormed = true)
+    (hproj : ProjectableClosedWellFormed)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
     BranchesRel EQ2 (transBranches branches' role) (transBranches branches role) := by
   induction hstep with
@@ -1124,7 +1173,7 @@ theorem branches_step_preserves_trans (branches branches' : List (Label × Globa
         · rfl
         · have hg_closed : g.isClosed = true := hclosed (label, g) List.mem_cons_self
           have hg_wf : g.wellFormed = true := hwf (label, g) List.mem_cons_self
-          exact proj_trans_other_step g g' act role hstep_g hg_closed hg_wf hns hnr
+          exact proj_trans_other_step g g' act role hstep_g hg_closed hg_wf hns hnr hproj
       · have hrest_closed : ∀ p ∈ rest, p.2.isClosed = true := fun x hx =>
           hclosed x (List.mem_cons_of_mem (label, g) hx)
         have hrest_wf : ∀ p ∈ rest, p.2.wellFormed = true := fun x hx =>

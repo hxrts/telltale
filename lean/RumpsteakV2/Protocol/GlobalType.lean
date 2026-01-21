@@ -1544,4 +1544,19 @@ def GlobalType.fullUnfoldIter (g : GlobalType) : GlobalType :=
   Nat.rec (motive := fun _ => GlobalType) g
     (fun _ acc => GlobalType.unfold acc) g.muHeight
 
+theorem GlobalType.muHeight_non_mu :
+    ∀ g : GlobalType, (∀ (t : String) (body : GlobalType), g ≠ .mu t body) →
+      g.muHeight = 0 := by
+  intro g h
+  cases g with
+  | mu t body =>
+      have : False := h t body rfl
+      exact this.elim
+  | _ =>
+      simp [GlobalType.muHeight]
+
+theorem GlobalType.fullUnfoldIter_muHeight_zero {g : GlobalType} (hmu : g.muHeight = 0) :
+    GlobalType.fullUnfoldIter g = g := by
+  simp [GlobalType.fullUnfoldIter, hmu]
+
 end RumpsteakV2.Protocol.GlobalType

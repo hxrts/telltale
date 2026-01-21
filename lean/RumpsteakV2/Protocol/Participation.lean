@@ -1,3 +1,4 @@
+import Mathlib.Logic.Function.Iterate
 import RumpsteakV2.Protocol.GlobalType
 
 /-! # RumpsteakV2.Protocol.Participation
@@ -175,10 +176,12 @@ private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
   induction xs with
   | nil => simp at h
   | cons hd tl ih =>
-      cases h with
-      | head =>
+      have hmem := (List.mem_cons).1 h
+      cases hmem with
+      | inl hEq =>
+          cases hEq
           simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]; omega
-      | tail _ hmem =>
+      | inr hmem =>
           have := ih hmem
           simp only [sizeOf, List._sizeOf_1] at *
           omega
@@ -230,14 +233,15 @@ theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
             intro pair hmem hpoa
             exact part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu pair.2 hpoa
           exact h_comm_all sender receiver branches hall ih
-termination_by g
+termination_by g _ => sizeOf g
 decreasing_by
   all_goals
     simp_wf
     all_goals
       first
-      | simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1] at *
-      | (apply sizeOf_elem_snd_lt_comm; assumption)
+      | (simpa [GlobalType.comm.sizeOf_spec] using
+          (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
+      | (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
 
 /-! ## Non-participation lemmas
 
@@ -264,6 +268,156 @@ theorem not_part_of2_mu {role t : String} {body : GlobalType}
   intro hbody
   apply h
   exact .intro _ (.mu _ _ hbody)
+
+/-! ## Participation and substitution/unfolding
+
+These lemmas show that participation is preserved under unfolding. They are
+useful for reasoning about `fullUnfoldIter` in projection proofs. -/
+
+private theorem mem_substituteBranches_iff
+    {branches : List (Label × GlobalType)} {t : String} {repl : GlobalType}
+    {label : Label} {cont' : GlobalType} :
+    (label, cont') ∈ GlobalType.substituteBranches branches t repl ↔
+      ∃ cont, cont' = cont.substitute t repl ∧ (label, cont) ∈ branches := by
+  induction branches with
+  | nil =>
+      simp [GlobalType.substituteBranches]
+  | cons head tail ih =>
+      cases head with
+      | mk hlabel hcont =>
+          constructor
+          · intro hmem
+            have hmem' :
+                (label, cont') = (hlabel, hcont.substitute t repl) ∨
+                  (label, cont') ∈ GlobalType.substituteBranches tail t repl := by
+              simpa [GlobalType.substituteBranches] using (List.mem_cons).1 hmem
+            cases hmem' with
+            | inl hEq =>
+                cases hEq
+                exact ⟨hcont, rfl, by simp⟩
+            | inr hmemTail =>
+                rcases (ih.mp hmemTail) with ⟨cont, hcont_eq, hmem''⟩
+                exact ⟨cont, hcont_eq, by simp [hmem'']⟩
+          · rintro ⟨cont, hcont_eq, hmem⟩
+            have hmem' :
+                (label, cont) = (hlabel, hcont) ∨ (label, cont) ∈ tail := by
+              simpa using (List.mem_cons).1 hmem
+            cases hmem' with
+            | inl hEq =>
+                cases hEq
+                -- head case
+                simp [GlobalType.substituteBranches, hcont_eq]
+            | inr hmemTail =>
+                have hmemSub :
+                    (label, cont') ∈ GlobalType.substituteBranches tail t repl :=
+                  ih.mpr ⟨cont, hcont_eq, hmemTail⟩
+                exact List.mem_cons_of_mem _ hmemSub
+
+theorem part_of2_substitute (role : String) :
+    ∀ g t repl, part_of2 role (g.substitute t repl) →
+      part_of2 role g ∨ part_of2 role repl := by
+  intro g t repl h
+  match g with
+  | .end =>
+      exact (not_part_of2_end role h).elim
+  | .var v =>
+      by_cases hvt : v = t
+      · right
+        simpa [GlobalType.substitute, hvt] using h
+      · exact (not_part_of2_var role v (by simpa [GlobalType.substitute, hvt] using h)).elim
+  | .comm sender receiver branches =>
+      have hcases := part_of2_comm_inv (role := role)
+        (sender := sender) (receiver := receiver) (branches := GlobalType.substituteBranches branches t repl) h
+      cases hcases with
+      | inl hpart =>
+          left
+          exact .intro _ (.comm_direct _ _ _ hpart)
+      | inr hbranch =>
+          rcases hbranch with ⟨label, cont', hmem, hcont'⟩
+          rcases (mem_substituteBranches_iff.mp hmem) with ⟨cont, hcont_eq, hmem'⟩
+          have hcont_subst : part_of2 role (cont.substitute t repl) := by
+            simpa [hcont_eq] using hcont'
+          have hih := part_of2_substitute role cont t repl hcont_subst
+          cases hih with
+          | inl hcont =>
+              left
+              exact .intro _ (.comm_branch _ _ label cont branches hmem' hcont)
+          | inr hrepl =>
+              right
+              exact hrepl
+  | .mu s body =>
+      by_cases hst : s = t
+      · left
+        simpa [GlobalType.substitute, hst] using h
+      · have hbody : part_of2 role (body.substitute t repl) := by
+          have hmu : part_of2 role (.mu s (body.substitute t repl)) := by
+            simpa [GlobalType.substitute, hst] using h
+          exact part_of2_mu_inv hmu
+        have hih := part_of2_substitute role body t repl hbody
+        cases hih with
+        | inl hbody_part =>
+            left
+            exact .intro _ (.mu _ _ hbody_part)
+        | inr hrepl =>
+            right
+            exact hrepl
+termination_by g _ _ _ => sizeOf g
+decreasing_by
+  all_goals
+    simp_wf
+    all_goals
+      first
+      | (simpa [GlobalType.comm.sizeOf_spec] using
+          (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
+      | (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
+
+theorem part_of2_unfold (role : String) (g : GlobalType) :
+    part_of2 role (GlobalType.unfold g) → part_of2 role g := by
+  cases g with
+  | «end» =>
+      intro h
+      simpa [GlobalType.unfold] using h
+  | var v =>
+      intro h
+      simpa [GlobalType.unfold] using h
+  | comm sender receiver branches =>
+      intro h
+      simpa [GlobalType.unfold] using h
+  | mu t body =>
+      intro h
+      have hsub : part_of2 role (body.substitute t (.mu t body)) := by
+        simpa [GlobalType.unfold] using h
+      have hcases := part_of2_substitute role body t (.mu t body) hsub
+      cases hcases with
+      | inl hbody =>
+          exact .intro _ (.mu _ _ hbody)
+      | inr hmu =>
+          exact hmu
+
+theorem part_of2_unfold_iter (role : String) (g : GlobalType) :
+    ∀ n, part_of2 role (Nat.rec g (fun _ acc => GlobalType.unfold acc) n) → part_of2 role g := by
+  intro n
+  induction n generalizing g with
+  | zero =>
+      intro h
+      simpa using h
+  | succ n ih =>
+      intro h
+      have h' : part_of2 role (GlobalType.unfold (Nat.rec g (fun _ acc => GlobalType.unfold acc) n)) := by
+        simpa using h
+      have h'' : part_of2 role (Nat.rec g (fun _ acc => GlobalType.unfold acc) n) :=
+        part_of2_unfold role (Nat.rec g (fun _ acc => GlobalType.unfold acc) n) h'
+      exact ih (g := g) h''
+
+theorem part_of2_fullUnfoldIter (role : String) (g : GlobalType) :
+    part_of2 role (GlobalType.fullUnfoldIter g) → part_of2 role g := by
+  simpa [GlobalType.fullUnfoldIter] using
+    (part_of2_unfold_iter role g g.muHeight)
+
+theorem not_part_of2_fullUnfoldIter (role : String) (g : GlobalType)
+    (h : ¬ part_of2 role g) : ¬ part_of2 role (GlobalType.fullUnfoldIter g) := by
+  intro hfull
+  exact h (part_of2_fullUnfoldIter role g hfull)
 
 /-! ## Classification: participant or non-participant
 
@@ -295,15 +449,103 @@ end
 
 /-! ## Boolean participation equivalence -/
 
-/-- `participates` is equivalent to `part_of2`. -/
-axiom part_of2_iff_participates (role : String) :
-    ∀ g, part_of2 role g ↔ participates role g = true
+mutual
+  /-- `participates` is equivalent to `part_of2`. -/
+  theorem part_of2_iff_participates (role : String) :
+      ∀ g, part_of2 role g ↔ participates role g = true := by
+    intro g
+    cases g with
+    | «end» =>
+        constructor
+        · intro h; exact (not_part_of2_end role h).elim
+        · intro h; simp [participates] at h
+    | var t =>
+        constructor
+        · intro h; exact (not_part_of2_var role t h).elim
+        · intro h; simp [participates] at h
+    | mu t body =>
+        constructor
+        · intro h
+          have hbody : part_of2 role body := part_of2_mu_inv (t := t) h
+          have ih := (part_of2_iff_participates role body).1 hbody
+          simpa [participates] using ih
+        · intro h
+          simp [participates] at h
+          have hbody : part_of2 role body :=
+            (part_of2_iff_participates role body).2 h
+          exact .intro _ (.mu _ _ hbody)
+    | comm sender receiver branches =>
+        constructor
+        · intro h
+          have hcases := part_of2_comm_inv (role := role) (sender := sender) (receiver := receiver)
+            (branches := branches) h
+          cases hcases with
+          | inl hpart =>
+              have hpart' : is_participant role sender receiver = true := by
+                simpa using hpart
+              simp [participates, hpart']  -- left disjunct
+          | inr hbranch =>
+              obtain ⟨label, cont, hmem, hcont⟩ := hbranch
+              have hbranches :
+                  participatesBranches role branches = true := by
+                have hexists : ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 :=
+                  ⟨(label, cont), hmem, hcont⟩
+                exact (participatesBranches_iff_part_of2 role branches).2 hexists
+              simp [participates, hbranches]
+        · intro h
+          simp [participates] at h
+          cases h with
+          | inl hpart =>
+              -- direct participation
+              exact .intro _ (.comm_direct _ _ _ hpart)
+          | inr hbranches =>
+              -- participation through a branch
+              have hexists :
+                  ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 :=
+                (participatesBranches_iff_part_of2 role branches).1 hbranches
+              obtain ⟨pair, hmem, hcont⟩ := hexists
+              exact .intro _ (.comm_branch _ _ pair.1 pair.2 _ hmem hcont)
 
-/-- `participatesBranches` is equivalent to existence of a participating branch. -/
-axiom participatesBranches_iff_part_of2 (role : String) :
-    ∀ branches,
-      participatesBranches role branches = true ↔
-        ∃ pair, pair ∈ branches ∧ part_of2 role pair.2
+  /-- `participatesBranches` is equivalent to existence of a participating branch. -/
+  theorem participatesBranches_iff_part_of2 (role : String) :
+      ∀ branches,
+        participatesBranches role branches = true ↔
+          ∃ pair, pair ∈ branches ∧ part_of2 role pair.2 := by
+    intro branches
+    cases branches with
+    | nil =>
+        simp [participatesBranches]
+    | cons hd tl =>
+        obtain ⟨label, cont⟩ := hd
+        constructor
+        · intro h
+          simp [participatesBranches, Bool.or_eq_true] at h
+          cases h with
+          | inl hcont =>
+              have hpo : part_of2 role cont :=
+                (part_of2_iff_participates role cont).2 hcont
+              exact ⟨(label, cont), by simp, hpo⟩
+          | inr hrest =>
+              have hrest' :=
+                (participatesBranches_iff_part_of2 role tl).1 hrest
+              obtain ⟨pair, hmem, hpo⟩ := hrest'
+              exact ⟨pair, by simp [hmem], hpo⟩
+        · intro h
+          obtain ⟨pair, hmem, hpo⟩ := h
+          simp [participatesBranches]  -- reduces to head/tail cases
+          have hmem' := (List.mem_cons).1 hmem
+          cases hmem' with
+          | inl hEq =>
+              cases hEq
+              have hcont : participates role cont = true :=
+                (part_of2_iff_participates role cont).1 hpo
+              exact Or.inl hcont
+          | inr hmemTail =>
+              have hrest :
+                  participatesBranches role tl = true :=
+                (participatesBranches_iff_part_of2 role tl).2 ⟨pair, hmemTail, hpo⟩
+              exact Or.inr hrest
+end
 
 theorem participates_comm_iff {role sender receiver : String} {branches : List (Label × GlobalType)} :
     participates role (.comm sender receiver branches) =

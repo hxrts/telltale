@@ -137,7 +137,7 @@ noncomputable def toInductiveAux (root : LocalTypeC) (all visited : Finset Local
             have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
             let body := toInductiveAux root all visited' child h_closed
               (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels.get i, body)
+            (labels[i], body)
           LocalTypeR.send p (List.ofFn f)
       | ⟨.recv p labels, k⟩ =>
           let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
@@ -146,7 +146,7 @@ noncomputable def toInductiveAux (root : LocalTypeC) (all visited : Finset Local
             have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
             let body := toInductiveAux root all visited' child h_closed
               (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels.get i, body)
+            (labels[i], body)
           LocalTypeR.recv p (List.ofFn f)
     -- Wrap in mu if needed
     match head current with

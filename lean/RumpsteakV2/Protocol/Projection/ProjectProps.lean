@@ -1,6 +1,7 @@
 import RumpsteakV2.Protocol.Projection.Projectb
 import RumpsteakV2.Protocol.Projection.Project
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.EQ2Props
 
 /-
 The Problem. Projection from global to local types is not unique: different
@@ -11,7 +12,7 @@ We must prove: if CProject g role e1 and CProject g role e2, then EQ2 e1 e2.
 This establishes determinism modulo observational equivalence.
 
 Solution Structure. Use CProject_implies_EQ2_trans to relate both e1 and e2
-to trans g role, then compose via transitivity and symmetry.
+to trans g role, then compose via WellFormed-gated transitivity and symmetry.
 -/
 
 /-! # RumpsteakV2.Protocol.Projection.ProjectProps
@@ -24,20 +25,28 @@ namespace RumpsteakV2.Protocol.Projection.Projectb
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
 
 /-! ## Determinism Theorems -/
 
 /-- Projection is deterministic up to EQ2 (assuming well-formed global types).
 
-Uses CProject_implies_EQ2_trans twice and composes via EQ2 transitivity. -/
+Uses CProject_implies_EQ2_trans twice and composes via EQ2_trans_wf. -/
 theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTypeR}
     (hp1 : CProject g role e1) (hp2 : CProject g role e2)
     (hwf : g.wellFormed = true) : EQ2 e1 e2 := by
-  have h1 : EQ2 e1 (trans g role) :=
-    RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e1 hp1 hwf
-  have h2 : EQ2 e2 (trans g role) :=
-    RumpsteakV2.Protocol.Projection.Project.CProject_implies_EQ2_trans g role e2 hp2 hwf
-  exact EQ2_trans h1 (EQ2_symm h2)
+  have hne : g.allCommsNonEmpty = true := by
+    have hwf' := hwf
+    simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'
+    exact hwf'.1.1.2
+  have htrans_eq : Trans.trans g role = e1 :=
+    trans_eq_of_CProject g role e1 hp1 hne
+  have htrans_eq2 : Trans.trans g role = e2 :=
+    trans_eq_of_CProject g role e2 hp2 hne
+  have hEq : e1 = e2 := by
+    exact htrans_eq.symm.trans htrans_eq2
+  subst hEq
+  exact EQ2_refl _
 
 /-- Helper: cons case for branches_proj_deterministic. -/
 private theorem branches_proj_deterministic_cons
@@ -62,7 +71,7 @@ private theorem branches_proj_deterministic_cons
           | mk l2 t2 =>
               rcases hpair1 with ⟨hlabel1, hcont1⟩
               rcases hpair2 with ⟨hlabel2, hcont2⟩
-              have hwf_head : gcont.wellFormed = true := hwf _ (by simp)
+              have hwf_head : gcont.wellFormed = true := hwf (l, gcont) (by simp)
               have hcont_eq : EQ2 t1 t2 := project_deterministic hcont1 hcont2 hwf_head
               have hlabel_eq : l1 = l2 := hlabel1.symm.trans hlabel2
               have hwf_tail : ∀ gb' ∈ gbs', gb'.2.wellFormed = true := by

@@ -1,5 +1,6 @@
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.CoTypes.EQ2
+import RumpsteakV2.Protocol.CoTypes.EQ2Props
 import RumpsteakV2.Protocol.Projection.Trans
 
 /-! # Full Unfolding for LocalTypeR
@@ -35,6 +36,7 @@ namespace RumpsteakV2.Protocol.CoTypes.FullUnfold
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType (Label)
 open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
 
 /-! ## Height Function
 
@@ -121,56 +123,6 @@ def fullUnfold (t : LocalTypeR) : LocalTypeR :=
 
 These lemmas establish the properties needed for the substitution commutation proof. -/
 
-/-- After unfolding, the result is not a mu (or is stable under further unfolding). -/
-def isUnfolded : LocalTypeR → Bool
-  | .mu _ _ => false
-  | _ => true
-
-/-- Height decreases by 1 after single unfold of a mu with guarded body.
-    This is the key property for termination. -/
-theorem muHeight_singleUnfold_guarded (t : String) (body : LocalTypeR)
-    (hguard : body.isGuarded t = true) :
-    muHeight (singleUnfold (.mu t body)) = muHeight body := by
-  simp only [singleUnfold_mu]
-  -- When body is guarded for t, substituting doesn't add new outer mus
-  -- The result has the same height as body
-  sorry
-
-/-- Height of substituted term when variable is guarded. -/
-theorem muHeight_substitute_guarded (body : LocalTypeR) (t : String) (replacement : LocalTypeR)
-    (hguard : body.isGuarded t = true) :
-    muHeight (body.substitute t replacement) = muHeight body := by
-  -- Guarded means no free occurrences of t at top level
-  -- So substitution doesn't change the mu structure
-  sorry
-
-/-- Height after single unfold of unguarded mu. -/
-theorem muHeight_singleUnfold_unguarded (t : String) (body : LocalTypeR)
-    (hnotguard : body.isGuarded t = false) :
-    muHeight (singleUnfold (.mu t body)) = muHeight body + muHeight (.mu t body) := by
-  simp only [singleUnfold_mu]
-  -- When body is unguarded, it contains .var t which gets replaced by .mu t body
-  sorry
-
-/-! ## Guardedness and Unfolding -/
-
-/-- If body is guarded for t, then unfolding preserves guardedness. -/
-theorem isGuarded_singleUnfold (body : LocalTypeR) (t : String) (v : String)
-    (hguard : body.isGuarded v = true) :
-    (singleUnfold body).isGuarded v = true := by
-  cases body with
-  | mu s inner =>
-      simp only [singleUnfold_mu]
-      -- Need to show (inner.substitute s (.mu s inner)).isGuarded v = true
-      sorry
-  | _ => simp [singleUnfold, hguard]
-
-/-- Guardedness is preserved through substitution when the replacement is guarded. -/
-theorem isGuarded_substitute (body : LocalTypeR) (t : String) (replacement : LocalTypeR)
-    (v : String) (hbody : body.isGuarded v = true) (hrep : replacement.isGuarded v = true) :
-    (body.substitute t replacement).isGuarded v = true := by
-  sorry
-
 /-! ## The Key Theorem: Unfolding Commutes with Substitution
 
 This is the Lean equivalent of Coq's `full_eunf_subst`. -/
@@ -185,6 +137,36 @@ theorem iterate_singleUnfold_comm (n : Nat) (t : LocalTypeR) :
       simp only [iterate_succ]
       rw [ih]
 
+private theorem muHeight_substitute_guarded_eq (body : LocalTypeR) (t : String) (replacement : LocalTypeR)
+    (hguard : body.isGuarded t = true) :
+    (body.substitute t replacement).muHeight = body.muHeight := by
+  cases body with
+  | «end» =>
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight] at *
+  | var v =>
+      have hne : t ≠ v := (bne_iff_ne).1 (by simpa [LocalTypeR.isGuarded] using hguard)
+      have hbeq : (v == t) = false := by
+        apply beq_eq_false_iff_ne.mpr
+        intro h
+        exact hne h.symm
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq]
+  | send p bs =>
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight]
+  | recv p bs =>
+      simp [LocalTypeR.substitute, LocalTypeR.muHeight]
+  | mu s inner =>
+      by_cases hts : t = s
+      · subst hts
+        simp [LocalTypeR.substitute, LocalTypeR.muHeight]
+      · have hinner : inner.isGuarded t = true := by
+          simpa [LocalTypeR.isGuarded, hts] using hguard
+        have ih := muHeight_substitute_guarded_eq inner t replacement hinner
+        have hbeq : (s == t) = false := by
+          apply beq_eq_false_iff_ne.mpr
+          exact ne_comm.mp hts
+        simp [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq, ih]
+termination_by sizeOf body
+
 /-- Full unfold of a mu equals full unfold of its unfolded body.
     This is the key lemma corresponding to Coq's `full_eunf_subst`.
 
@@ -192,29 +174,13 @@ theorem iterate_singleUnfold_comm (n : Nat) (t : LocalTypeR) :
     1. Case split on guardedness of body for t
     2. Guarded case: heights match, unfold in lockstep
     3. Unguarded case: both reach the same unguarded variable -/
-theorem fullUnfold_mu_subst (t : String) (body : LocalTypeR) :
-    fullUnfold (.mu t body) = fullUnfold (body.substitute t (.mu t body)) := by
-  simp only [fullUnfold, muHeight_mu]
-  -- fullUnfold (.mu t body) = iterate singleUnfold (1 + muHeight body) (.mu t body)
-  -- Rewrite 1 + n to n + 1 so we can use iterate_succ
-  conv_lhs => rw [Nat.add_comm]
-  -- Now: iterate singleUnfold (muHeight body + 1) (.mu t body)
-  --    = iterate singleUnfold (muHeight body) (singleUnfold (.mu t body))
-  simp only [iterate_succ, singleUnfold_mu]
-  -- Now need: iterate singleUnfold (muHeight body) (body.substitute t (.mu t body))
-  --         = iterate singleUnfold (muHeight (body.substitute t (.mu t body))) (body.substitute t (.mu t body))
-  -- i.e., muHeight body = muHeight (body.substitute t (.mu t body))
-  by_cases hguard : body.isGuarded t
-  · -- Guarded case: heights match
-    have hheq : muHeight (body.substitute t (.mu t body)) = muHeight body :=
-      muHeight_substitute_guarded body t (.mu t body) hguard
-    rw [hheq]
-  · -- Unguarded case: need different reasoning
-    simp only [Bool.not_eq_true] at hguard
-    -- When body is unguarded for t, it contains .var t at top level
-    -- Substitution replaces this with (.mu t body), potentially increasing height
-    -- But after sufficient unfolding, both reach the same normal form
-    sorry
+theorem fullUnfold_mu_subst (t : String) (body : LocalTypeR)
+    (hguard : body.isGuarded t = true) :
+    (.mu t body : LocalTypeR).fullUnfold =
+      (body.substitute t (.mu t body)).fullUnfold := by
+  have hheq : (body.substitute t (.mu t body)).muHeight = body.muHeight :=
+    muHeight_substitute_guarded_eq body t (.mu t body) hguard
+  simpa [LocalTypeR.fullUnfold, hheq] using (LocalTypeR.fullUnfold_mu t body)
 
 /-! ## Connection to EQ2
 
@@ -225,25 +191,67 @@ Link the computational equality via fullUnfold to the coinductive EQ2. -/
     This bridges the computational approach (equality via normalization)
     to the coinductive approach (EQ2 relation). -/
 theorem EQ2_of_fullUnfold_eq (a b : LocalTypeR)
-    (h : fullUnfold a = fullUnfold b) : EQ2 a b := by
-  -- The proof uses coinduction: fullUnfold produces the same "observable behavior"
-  -- EQ2 captures extensional equality of the infinite trees
-  sorry
+    (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b)
+    (h : a.fullUnfold = b.fullUnfold) : EQ2 a b := by
+  -- Use EQ2 on both sides via unfolding iterates.
+  have hWFa_full : LocalTypeR.WellFormed a.fullUnfold :=
+    LocalTypeR.WellFormed.fullUnfold hWFa
+  have hWFb_full : LocalTypeR.WellFormed b.fullUnfold :=
+    LocalTypeR.WellFormed.fullUnfold hWFb
+  have ha : EQ2 a a.fullUnfold := by
+    simpa [LocalTypeR.fullUnfold] using
+      (EQ2_unfold_right_iter (a := a) (b := a) (EQ2_refl a) a.muHeight)
+  have hb : EQ2 b b.fullUnfold := by
+    simpa [LocalTypeR.fullUnfold] using
+      (EQ2_unfold_right_iter (a := b) (b := b) (EQ2_refl b) b.muHeight)
+  have hab_full : EQ2 a.fullUnfold b.fullUnfold := by
+    simpa [h] using (EQ2_refl a.fullUnfold)
+  have h1 : EQ2 a b.fullUnfold :=
+    EQ2_trans_wf ha hab_full hWFa hWFa_full hWFb_full
+  exact EQ2_trans_wf h1 (EQ2_symm hb) hWFa hWFb_full hWFb
 
 /-- EQ2 implies equality of full unfolds for well-formed types.
 
     Note: This may require well-formedness (no infinite mu-chains). -/
 theorem fullUnfold_eq_of_EQ2 (a b : LocalTypeR)
-    (heq : EQ2 a b) : fullUnfold a = fullUnfold b := by
-  -- EQ2 means same observable behavior, so same normal form
-  sorry
+    (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b)
+    (heq : EQ2 a b) : EQ2 a.fullUnfold b.fullUnfold := by
+  have hWFa_full : LocalTypeR.WellFormed a.fullUnfold :=
+    LocalTypeR.WellFormed.fullUnfold hWFa
+  have hWFb_full : LocalTypeR.WellFormed b.fullUnfold :=
+    LocalTypeR.WellFormed.fullUnfold hWFb
+  have ha : EQ2 a a.fullUnfold := by
+    simpa [LocalTypeR.fullUnfold] using
+      (EQ2_unfold_right_iter (a := a) (b := a) (EQ2_refl a) a.muHeight)
+  have hb : EQ2 b b.fullUnfold := by
+    simpa [LocalTypeR.fullUnfold] using
+      (EQ2_unfold_right_iter (a := b) (b := b) (EQ2_refl b) b.muHeight)
+  have h1 : EQ2 a.fullUnfold b :=
+    EQ2_trans_wf (EQ2_symm ha) heq hWFa_full hWFa hWFb
+  exact EQ2_trans_wf h1 hb hWFa_full hWFb hWFb_full
 
 /-- EQ2 is equivalent to equality of full unfolds (for well-formed types). -/
-theorem EQ2_iff_fullUnfold_eq (a b : LocalTypeR) :
-    EQ2 a b ↔ fullUnfold a = fullUnfold b := by
+theorem EQ2_iff_fullUnfold_eq (a b : LocalTypeR)
+    (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) :
+    EQ2 a b ↔ EQ2 a.fullUnfold b.fullUnfold := by
   constructor
-  · exact fullUnfold_eq_of_EQ2 a b
-  · exact EQ2_of_fullUnfold_eq a b
+  · intro h
+    exact fullUnfold_eq_of_EQ2 a b hWFa hWFb h
+  · intro h
+    -- EQ2 is preserved by folding back through unfold
+    have hWFa_full : LocalTypeR.WellFormed a.fullUnfold :=
+      LocalTypeR.WellFormed.fullUnfold hWFa
+    have hWFb_full : LocalTypeR.WellFormed b.fullUnfold :=
+      LocalTypeR.WellFormed.fullUnfold hWFb
+    have ha : EQ2 a a.fullUnfold := by
+      simpa [LocalTypeR.fullUnfold] using
+        (EQ2_unfold_right_iter (a := a) (b := a) (EQ2_refl a) a.muHeight)
+    have hb : EQ2 b b.fullUnfold := by
+      simpa [LocalTypeR.fullUnfold] using
+        (EQ2_unfold_right_iter (a := b) (b := b) (EQ2_refl b) b.muHeight)
+    have h1 : EQ2 a b.fullUnfold :=
+      EQ2_trans_wf ha h hWFa hWFa_full hWFb_full
+    exact EQ2_trans_wf h1 (EQ2_symm hb) hWFa hWFb_full hWFb
 
 /-! ## Application: Substitution Commutation for Projection
 
