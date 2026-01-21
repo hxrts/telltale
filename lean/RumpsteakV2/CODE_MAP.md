@@ -1,6 +1,6 @@
 # RumpsteakV2 Code Map
 
-**Last Updated:** 2026-01-16
+**Last Updated:** 2026-01-21
 
 This document provides a comprehensive map of key proofs, lemmas, and definitions in the RumpsteakV2 formal verification codebase.
 
@@ -19,8 +19,8 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ## Overview
 
 **Codebase Statistics:**
-- Total files: 78 .lean files
-- Total size: ~900KB
+- Total files: 79 .lean files
+- Total size: ~1.4MB
 - Main modules: Protocol, Semantics, Proofs, Coinductive
 - Central result: Choreographic projection correctness and safety
 
@@ -95,7 +95,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ## Projection System
 
 ### Protocol/Projection/Project.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Project.lean` (229KB, largest file)
+**Location:** `RumpsteakV2/Protocol/Projection/Project.lean` (226KB, largest file)
 
 **Central Definitions:**
 - `CProjectF : (GlobalType → String → LocalTypeR → Prop) → GlobalType → String → LocalTypeR → Prop`
@@ -103,6 +103,11 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 
 - `CProject : GlobalType → String → LocalTypeR → Prop`
   - Main projection relation (greatest fixed point of CProjectF)
+
+- `Projectable : GlobalType → Prop`
+  - Global projectability (every role has a CProject witness)
+- `ProjectableClosedWellFormed : Prop`
+  - Projectability assumption for closed, well-formed globals (used in Harmony/SubjectReduction)
 
 **Key Theorems:**
 - `CProject_unfold` - Unfold CProject one step
@@ -209,14 +214,17 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ---
 
 ### Protocol/CoTypes/EQ2.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/EQ2.lean` (15KB)
+**Location:** `RumpsteakV2/Protocol/CoTypes/EQ2.lean` (706 lines)
 
 **Key Definition:**
 - `EQ2 : LocalTypeR → LocalTypeR → Prop` - Coinductive equality for local types
+- `ReflRel` - Unfold-closure relation used to prove reflexivity without axioms
 
 **Key Theorems:**
 - `EQ2_refl` - Reflexivity
 - `EQ2_symm` - Symmetry
+- `EQ2_trans_via_end` - Transitivity via `.end` without full trans
+- `EQ2_trans_via_var` - Transitivity via `.var v` without full trans
 - `EQ2_trans` - Transitivity
 - `EQ2_unfold_left` - Unfold left mu
 - `EQ2_unfold_right` - Unfold right mu
@@ -240,8 +248,16 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 
 ---
 
+### Protocol/CoTypes/EQ2Props.lean
+**Location:** `RumpsteakV2/Protocol/CoTypes/EQ2Props.lean` (24 lines)
+
+**Bisim-based EQ2 Properties:**
+- `EQ2_trans_wf` - Transitivity via Bisim (requires WellFormed hypotheses)
+
+---
+
 ### Protocol/CoTypes/Bisim.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/Bisim.lean` (149KB, largest in CoTypes)
+**Location:** `RumpsteakV2/Protocol/CoTypes/Bisim.lean` (156KB, largest in CoTypes)
 
 **Key Definition:**
 - `Bisim : LocalTypeR → LocalTypeR → Prop` - Bisimulation relation
@@ -252,6 +268,9 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 - `Bisim_trans` - Transitivity
 - `Bisim_implies_EQ2` - Bisimulation implies EQ2
 - `EQ2_implies_Bisim` - EQ2 implies bisimulation (for well-formed types)
+- `EQ2_send_not_UnfoldsToEnd/Var/CanRecv` - Incompatibility lemmas for send vs observables
+- `ObservableRel.toEQ2` - Build EQ2 from observables (requires WellFormed on both sides)
+- `EQ2_iff_observable_correspond` - EQ2 ↔ observable correspondence (WellFormed on both sides)
 
 **Bisimulation Up-To:**
 - `bisim_upto` - Up-to technique
@@ -335,7 +354,7 @@ This theorem states that global choreography steps correspond to local environme
 
 - `proj_trans_sender_step` - Sender projection step
 - `proj_trans_receiver_step` - Receiver projection step
-- `proj_trans_other_step` - Non-participant projection step
+- `proj_trans_other_step` - Non-participant projection step (requires `ProjectableClosedWellFormed`)
 
 - `trans_branches_coherent_EQ2` - Branches project coherently
   ```lean
@@ -526,6 +545,12 @@ Well-formedness is preserved by global steps (type safety).
 
 ## Supporting Lemmas
 
+### Proofs/Core/Assumptions.lean
+**Location:** `RumpsteakV2/Proofs/Core/Assumptions.lean` (1KB)
+
+**Key Axiom:**
+- `projectable_of_closed_wellFormed` - Closed & well-formed globals are projectable
+
 ### Protocol/CoTypes/Observable.lean
 **Location:** `RumpsteakV2/Protocol/CoTypes/Observable.lean` (11KB)
 
@@ -578,6 +603,10 @@ Well-formedness is preserved by global steps (type safety).
 3. `CProject_implies_EQ2_trans` - Project.lean → ProjectProps.lean
 4. `step_harmony` - Harmony.lean (uses all above)
 
+#### **Projectability Assumptions**
+1. `Projectable` - Project.lean (global projectability predicate)
+2. `projectable_of_closed_wellFormed` - Proofs/Core/Assumptions.lean (axiom)
+
 #### **Determinism Chain**
 1. `project_deterministic` - ProjectProps.lean
 2. `protocol_deterministic` - Determinism.lean
@@ -586,9 +615,10 @@ Well-formedness is preserved by global steps (type safety).
 #### **EQ2 Theory**
 1. `EQ2` definition - EQ2.lean
 2. `EQ2_paco_coind` - EQ2Paco.lean
-3. `Bisim_implies_EQ2` - Bisim.lean
-4. `EQ2_dual` - Dual.lean
-5. `EQ2_of_fullUnfold_eq` - FullUnfold.lean
+3. `EQ2_trans_wf` - EQ2Props.lean
+4. `Bisim_implies_EQ2` - Bisim.lean
+5. `EQ2_dual` - Dual.lean
+6. `EQ2_of_fullUnfold_eq` - FullUnfold.lean
 
 #### **Substitution Commutation**
 1. `trans_subst_comm` - Harmony.lean (main proof)
@@ -652,19 +682,20 @@ Roundtrip.lean
 
 ## Axiom Inventory
 
-### Inductive Codebase (8 axioms)
+### Inductive Codebase (1 axiom)
 
 | File | Count | Key Axioms |
 |------|-------|------------|
-| Project.lean | 2 | `EQ2_isGuarded_compat`, `CProject_isGuarded_trans` |
-| Projectb.lean | 2 | `projectb_trans`, `CProject_unguarded_trans` |
-| DBBridge.lean | 1 | `EQ2_subst_mu_comm_via_DB` |
-| EQ2.lean | 2 | `ReflRel_postfix`, `TransRel_postfix` |
-| Bisim.lean | 1 | `RelImage_of_Bisim_with_reflexivity` |
+| Project.lean | 0 | *(none)* |
+| Projectb.lean | 0 | *(none)* |
+| DBBridge.lean | 0 | *(none)* |
+| Proofs/Core/Assumptions.lean | 1 | `projectable_of_closed_wellFormed` |
 
-### Coinductive Codebase (0 axioms)
+### Coinductive Codebase (1 axiom)
 
-All coinductive axioms discharged.
+| File | Count | Key Axioms |
+|------|-------|------------|
+| EQ2.lean | 1 | `TransRel_postfix` |
 
 ### Sorry Inventory
 
@@ -677,11 +708,11 @@ All coinductive axioms discharged.
 ## File Size Reference
 
 **Largest Files (Top 10):**
-1. Project.lean - 324KB (~6,862 lines)
-2. Bisim.lean - 149KB
+1. Project.lean - 226KB (~4,899 lines)
+2. Bisim.lean - 157KB
 3. LocalTypeR.lean - 74KB
 4. GlobalType.lean - 64KB
-5. Harmony.lean - 60KB
+5. Harmony.lean - 60KB (~1,191 lines)
 6. SubstCommBarendregt.lean - 58KB
 7. BisimDecidable.lean - 51KB
 8. Determinism.lean - 40KB
