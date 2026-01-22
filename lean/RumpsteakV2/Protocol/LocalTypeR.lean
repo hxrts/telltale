@@ -693,10 +693,8 @@ mutual
           constructor
           · simp [LocalTypeR.freeVars]
           · exact h
-    | .send p bs => by
-        simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
-        exact freeVars_substituteBranches_subset_aux bs varName repl x hx
-    | .recv p bs => by
+    | .send _ bs | .recv _ bs => by
+        -- Send/recv cases share the same branch substitution behavior.
         simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
         exact freeVars_substituteBranches_subset_aux bs varName repl x hx
     | .mu t body => by
@@ -1218,9 +1216,8 @@ theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
         exact this.elim
       · have hbeq : (w == t) = false := beq_eq_false_iff_ne.mpr hw
         simp [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq]
-  | send p bs =>
-      simp [LocalTypeR.substitute, LocalTypeR.muHeight]
-  | recv p bs =>
+  | send _ _ | recv _ _ =>
+      -- Send/recv have identical muHeight behavior.
       simp [LocalTypeR.substitute, LocalTypeR.muHeight]
   | mu s body =>
       by_cases hs : s = t

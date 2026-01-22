@@ -71,6 +71,81 @@ inductive CanRecv : LocalTypeR → String → List (Label × LocalTypeR) → Pro
       CanRecv (body.substitute t (.mu t body)) partner branches →
       CanRecv (.mu t body) partner branches
 
+/-! ## Duality Lemmas -/
+
+/-- Unfolding to end is preserved by dual. -/
+theorem UnfoldsToEnd.dual {t : LocalTypeR} (h : UnfoldsToEnd t) : UnfoldsToEnd t.dual := by
+  -- Structural recursion; mu case uses dual_substitute.
+  induction h with
+  | base =>
+      simpa [LocalTypeR.dual] using (UnfoldsToEnd.base)
+  | @mu v body _ ih =>
+      have ih' : UnfoldsToEnd (body.dual.substitute v (LocalTypeR.mu v body).dual) := by
+        simpa [LocalTypeR.dual_substitute] using ih
+      simpa [LocalTypeR.dual] using (UnfoldsToEnd.mu (t := v) (body := body.dual) ih')
+
+/-- Unfolding to var is preserved by dual. -/
+theorem UnfoldsToVar.dual {t : LocalTypeR} {v : String} (h : UnfoldsToVar t v) :
+    UnfoldsToVar t.dual v := by
+  -- Structural recursion; mu case uses dual_substitute.
+  induction h with
+  | base =>
+      simpa [LocalTypeR.dual] using (UnfoldsToVar.base)
+  | @mu t body v' _ ih =>
+      have ih' : UnfoldsToVar (body.dual.substitute t (LocalTypeR.mu t body).dual) v' := by
+        simpa [LocalTypeR.dual_substitute] using ih
+      simpa [LocalTypeR.dual] using (UnfoldsToVar.mu (t := t) (body := body.dual) (v := v') ih')
+
+/-- Dual of CanSend is CanRecv. -/
+theorem CanSend.dual {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanSend t p bs) : CanRecv t.dual p (LocalTypeR.dualBranches bs) := by
+  -- Structural recursion; mu case uses dual_substitute.
+  induction h with
+  | base =>
+      simpa [LocalTypeR.dual] using (CanRecv.base)
+  | @mu t body p' bs' _ ih =>
+      have ih' : CanRecv (body.dual.substitute t (LocalTypeR.mu t body).dual) p'
+        (LocalTypeR.dualBranches bs') := by
+        simpa [LocalTypeR.dual_substitute] using ih
+      simpa [LocalTypeR.dual] using (CanRecv.mu (t := t) (body := body.dual) (partner := p')
+        (branches := LocalTypeR.dualBranches bs') ih')
+
+/-- Dual of CanRecv is CanSend. -/
+theorem CanRecv.dual {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecv t p bs) : CanSend t.dual p (LocalTypeR.dualBranches bs) := by
+  -- Structural recursion; mu case uses dual_substitute.
+  induction h with
+  | base =>
+      simpa [LocalTypeR.dual] using (CanSend.base)
+  | @mu t body p' bs' _ ih =>
+      have ih' : CanSend (body.dual.substitute t (LocalTypeR.mu t body).dual) p'
+        (LocalTypeR.dualBranches bs') := by
+        simpa [LocalTypeR.dual_substitute] using ih
+      simpa [LocalTypeR.dual] using (CanSend.mu (t := t) (body := body.dual) (partner := p')
+        (branches := LocalTypeR.dualBranches bs') ih')
+
+/-- Duality swaps CanSend and CanRecv. -/
+theorem CanSend.dual_iff_CanRecv {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)} :
+    CanSend t p bs ↔ CanRecv t.dual p (LocalTypeR.dualBranches bs) := by
+  -- Both directions are by dualizing twice.
+  constructor
+  · exact CanSend.dual
+  · intro h
+    have h' : CanSend t.dual.dual p (LocalTypeR.dualBranches (LocalTypeR.dualBranches bs)) :=
+      CanRecv.dual (t := t.dual) h
+    simpa [LocalTypeR.dual_dual, dualBranches_dualBranches] using h'
+
+/-- Duality swaps CanRecv and CanSend. -/
+theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)} :
+    CanRecv t p bs ↔ CanSend t.dual p (LocalTypeR.dualBranches bs) := by
+  -- Both directions are by dualizing twice.
+  constructor
+  · exact CanRecv.dual
+  · intro h
+    have h' : CanRecv t.dual.dual p (LocalTypeR.dualBranches (LocalTypeR.dualBranches bs)) :=
+      CanSend.dual (t := t.dual) h
+    simpa [LocalTypeR.dual_dual, dualBranches_dualBranches] using h'
+
 /-! ## One-Step Inversion Lemmas
 
 These lemmas expose the single-step structure of the membership predicates.
@@ -117,16 +192,31 @@ theorem CanRecv.cases {a : LocalTypeR} {partner : String} {branches : List (Labe
     (h : CanRecv a partner branches) :
     a = .recv partner branches ∨
       ∃ t body, a = .mu t body ∧ CanRecv (body.substitute t (.mu t body)) partner branches := by
-  cases h with
-  | base => exact Or.inl rfl
-  | mu h' => exact Or.inr ⟨_, _, rfl, h'⟩
+  -- Reduce recv to send on the dual type.
+  have hsend : CanSend a.dual partner (LocalTypeR.dualBranches branches) := CanRecv.dual h
+  rcases CanSend.cases hsend with hbase | ⟨t, body, hmu, hstep⟩
+  · left
+    -- Dualizing send gives recv on the original type.
+    have hbase' := congrArg LocalTypeR.dual hbase
+    simpa [LocalTypeR.dual, dualBranches_dualBranches, LocalTypeR.dual_dual] using hbase'
+  · right
+    refine ⟨t, body.dual, ?_, ?_⟩
+    · -- Dualizing the mu constructor keeps the binder.
+      have hmu' := congrArg LocalTypeR.dual hmu
+      simpa [LocalTypeR.dual, LocalTypeR.dual_dual] using hmu'
+    · -- Dualize the step and simplify.
+      have hrecv := CanSend.dual hstep
+      simpa [LocalTypeR.dual_substitute, LocalTypeR.dual, dualBranches_dualBranches] using hrecv
 
 theorem CanRecv.mu_inv {t : String} {body : LocalTypeR} {partner : String}
     {branches : List (Label × LocalTypeR)}
     (h : CanRecv (.mu t body) partner branches) :
     CanRecv (body.substitute t (.mu t body)) partner branches := by
-  cases h with
-  | mu h' => exact h'
+  -- Peel the mu case via CanRecv.cases.
+  rcases CanRecv.cases (a := .mu t body) h with hbase | ⟨t', body', hmu, hstep⟩
+  · cases hbase
+  · cases hmu
+    simpa using hstep
 
 /-! ## Observable Behavior Classification
 
@@ -173,7 +263,12 @@ theorem CanSend.send_refl (partner : String) (branches : List (Label × LocalTyp
 
 /-- CanRecv is reflexive for recv types. -/
 theorem CanRecv.recv_refl (partner : String) (branches : List (Label × LocalTypeR)) :
-    CanRecv (.recv partner branches) partner branches := CanRecv.base
+    CanRecv (.recv partner branches) partner branches := by
+  -- Obtain recv reflexivity by dualizing send reflexivity.
+  have hsend : CanSend (.send partner (LocalTypeR.dualBranches branches)) partner
+      (LocalTypeR.dualBranches branches) := CanSend.send_refl _ _
+  have hrecv := CanSend.dual hsend
+  simpa [LocalTypeR.dual, dualBranches_dualBranches] using hrecv
 
 /-- Non-mu types that are not end cannot unfold to end. -/
 theorem UnfoldsToEnd.not_var {v : String} : ¬UnfoldsToEnd (.var v) := nofun
@@ -211,9 +306,11 @@ theorem CanSend.not_end {a : LocalTypeR} {p : String} {bs : List (Label × Local
 /-- A type that can recv cannot unfold to end. -/
 theorem CanRecv.not_end {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
     (h : CanRecv a p bs) : ¬UnfoldsToEnd a := by
-  induction h with
-  | base => intro hend; cases hend
-  | @mu t body p' bs' _ ih => intro hend; cases hend with | @mu _ _ h => exact ih h
+  -- Reduce recv to send on the dual type.
+  intro hend
+  have hsend : CanSend a.dual p (LocalTypeR.dualBranches bs) := CanRecv.dual h
+  have hend_dual : UnfoldsToEnd a.dual := UnfoldsToEnd.dual hend
+  exact (CanSend.not_end hsend) hend_dual
 
 /-- A type that can send cannot unfold to a var. -/
 theorem CanSend.not_var {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
@@ -225,9 +322,11 @@ theorem CanSend.not_var {a : LocalTypeR} {p : String} {bs : List (Label × Local
 /-- A type that can recv cannot unfold to a var. -/
 theorem CanRecv.not_var {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
     (h : CanRecv a p bs) : ∀ v, ¬UnfoldsToVar a v := by
-  induction h with
-  | base => intro v hvar; cases hvar
-  | @mu t body p' bs' _ ih => intro v hvar; cases hvar with | @mu _ _ _ h => exact ih v h
+  -- Reduce recv to send on the dual type.
+  intro v hvar
+  have hsend : CanSend a.dual p (LocalTypeR.dualBranches bs) := CanRecv.dual h
+  have hvar_dual : UnfoldsToVar a.dual v := UnfoldsToVar.dual hvar
+  exact (CanSend.not_var hsend) v hvar_dual
 
 /-- A type that can send cannot recv. -/
 theorem CanSend.not_recv {a : LocalTypeR} {p q : String}
@@ -258,8 +357,14 @@ theorem CanSend.deterministic {a : LocalTypeR} {p q : String}
 theorem CanRecv.deterministic {a : LocalTypeR} {p q : String}
     {bs cs : List (Label × LocalTypeR)}
     (hp : CanRecv a p bs) (hq : CanRecv a q cs) : p = q ∧ bs = cs := by
-  induction hp with
-  | base => cases hq; exact ⟨rfl, rfl⟩
-  | @mu t body p' bs' _ ih => cases hq with | @mu _ _ _ _ h => exact ih h
+  -- Reduce recv determinism to send determinism on the dual type.
+  have hp' : CanSend a.dual p (LocalTypeR.dualBranches bs) := CanRecv.dual hp
+  have hq' : CanSend a.dual q (LocalTypeR.dualBranches cs) := CanRecv.dual hq
+  obtain ⟨hpq, hbs⟩ := CanSend.deterministic hp' hq'
+  have hbs' : bs = cs := by
+    -- dualBranches is involutive on both sides.
+    have hdual := congrArg LocalTypeR.dualBranches hbs
+    simpa [dualBranches_dualBranches] using hdual
+  exact ⟨hpq, hbs'⟩
 
 end RumpsteakV2.Protocol.CoTypes.Observable

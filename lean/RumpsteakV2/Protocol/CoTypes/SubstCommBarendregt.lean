@@ -50,6 +50,64 @@ mutual
     | (_, cont) :: rest => notBoundAt v cont && notBoundAtBranches v rest
 end
 
+/-! ## Duality Preservation for Barendregt Predicates -/
+
+mutual
+  /-- isFreeIn is invariant under duality. -/
+  theorem isFreeIn_dual (v : String) (t : LocalTypeR) :
+      isFreeIn v t.dual = isFreeIn v t := by
+    -- Structural recursion; send/recv share the branch case.
+    cases t with
+    | «end» => rfl
+    | var w => rfl
+    | send p bs =>
+        simp [LocalTypeR.dual, isFreeIn, isFreeInBranches_dual]
+    | recv p bs =>
+        simp [LocalTypeR.dual, isFreeIn, isFreeInBranches_dual]
+    | mu t body =>
+        by_cases hv : v == t
+        · simp [LocalTypeR.dual, isFreeIn, hv]
+        · simp [LocalTypeR.dual, isFreeIn, hv, isFreeIn_dual v body]
+
+  /-- isFreeInBranches is invariant under duality. -/
+  theorem isFreeInBranches_dual (v : String) (bs : List (Label × LocalTypeR)) :
+      isFreeInBranches v (LocalTypeR.dualBranches bs) = isFreeInBranches v bs := by
+    -- Recurse over branches, dualizing continuations.
+    cases bs with
+    | nil => rfl
+    | cons head tail =>
+        cases head with
+        | mk l t =>
+            simp [LocalTypeR.dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
+end
+
+mutual
+  /-- notBoundAt is invariant under duality. -/
+  theorem notBoundAt_dual (v : String) (t : LocalTypeR) :
+      notBoundAt v t.dual = notBoundAt v t := by
+    -- Structural recursion; send/recv share the branch case.
+    cases t with
+    | «end» => rfl
+    | var w => rfl
+    | send p bs =>
+        simp [LocalTypeR.dual, notBoundAt, notBoundAtBranches_dual]
+    | recv p bs =>
+        simp [LocalTypeR.dual, notBoundAt, notBoundAtBranches_dual]
+    | mu t body =>
+        simp [LocalTypeR.dual, notBoundAt, notBoundAt_dual v body]
+
+  /-- notBoundAtBranches is invariant under duality. -/
+  theorem notBoundAtBranches_dual (v : String) (bs : List (Label × LocalTypeR)) :
+      notBoundAtBranches v (LocalTypeR.dualBranches bs) = notBoundAtBranches v bs := by
+    -- Recurse over branches; dual does not affect binders.
+    cases bs with
+    | nil => rfl
+    | cons head tail =>
+        cases head with
+        | mk l t =>
+            simp [LocalTypeR.dualBranches, notBoundAtBranches, notBoundAt_dual, notBoundAtBranches_dual]
+end
+
 mutual
   /-- notBoundAt is preserved through substitution when repl also satisfies it. -/
   theorem notBoundAt_subst (v var : String) (a repl : LocalTypeR)
