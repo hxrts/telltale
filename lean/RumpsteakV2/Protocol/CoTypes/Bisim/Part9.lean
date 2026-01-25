@@ -4,6 +4,11 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## RelImage lift for Bisim branches (closed/fixed-point case) -/
 
 private theorem BranchesRelBisim_of_Bisim_with_relImage
@@ -32,7 +37,7 @@ private theorem BranchesRelBisim_of_Bisim_with_relImage
       · exact ih (fun lb hm => hfix_bs _ (List.Mem.tail _ hm))
                  (fun lc hm => hfix_cs _ (List.Mem.tail _ hm))
 
-private theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
+theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
     (hWFa : LocalTypeR.WellFormed a) (hWFrepl : LocalTypeR.WellFormed repl) :
     LocalTypeR.WellFormed (a.substitute var repl) := by
   have hclosed_env : ClosedUnder ((var, repl) :: ([] : Env)) a := by
@@ -51,7 +56,7 @@ private theorem WellFormed_substitute {a repl : LocalTypeR} (var : String)
     LocalTypeR.isContractive_substitute a var repl hWFa.contractive hWFrepl.contractive hWFrepl.closed
   exact ⟨hclosed, hcontr⟩
 
-private theorem WellFormed_mu_substitute {body repl : LocalTypeR} (x var : String)
+theorem WellFormed_mu_substitute {body repl : LocalTypeR} (x var : String)
     (hWFmu : LocalTypeR.WellFormed (.mu x body)) (hWFrepl : LocalTypeR.WellFormed repl) :
     LocalTypeR.WellFormed (.mu x (body.substitute var repl)) := by
   -- Extract properties from hWFmu

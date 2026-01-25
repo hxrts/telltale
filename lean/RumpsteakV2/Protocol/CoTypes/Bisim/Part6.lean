@@ -4,6 +4,11 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## Extraction from EQ2 when fullUnfold is non-mu
 
 These lemmas require only that the fully-unfolded form has no leading `mu`.
@@ -103,7 +108,7 @@ theorem EQ2.recv_right_implies_CanRecv_of_fullUnfold_nonmu {x : LocalTypeR} {p :
 
 /-! ## Observable Transfer via Unfold (no EQ2_trans) -/
 
-private theorem UnfoldsToEnd_transfer {a b : LocalTypeR} (ha : UnfoldsToEnd a) (h : EQ2 a b)
+theorem UnfoldsToEnd_transfer {a b : LocalTypeR} (ha : UnfoldsToEnd a) (h : EQ2 a b)
     (hWFb : LocalTypeR.WellFormed b) : UnfoldsToEnd b := by
   revert h
   refine UnfoldsToEnd.rec (motive := fun a _ => EQ2 a b → UnfoldsToEnd b) ?base ?mu ha

@@ -4,6 +4,11 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ### Phase 5: Unfold/Substitute Commutation
 
 The goal is to prove `unfold_substitute_EQ2`:

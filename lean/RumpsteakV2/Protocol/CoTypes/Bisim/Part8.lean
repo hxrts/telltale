@@ -4,6 +4,11 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## Phase 4: Congruence Framework
 
 This section provides the infrastructure for proving that Bisim (and hence EQ2)
