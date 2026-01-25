@@ -9,7 +9,7 @@ set_option linter.unnecessarySimpa false
 The Problem. Prove that projection commutes with substitution in global types:
 trans (g.substitute t G) role = (trans g role).substitute t (trans G role)
 
-This property is essential for eliminating mu-unfold axioms. When a recursive type μt.body
+This property is essential for eliminating mu-unfold obligations. When a recursive type μt.body
 is unfolded to body[t := μt.body], we must show that projecting the unfolded type is the
 same as unfolding the projected type. The difficulty is that the mu case requires careful
 guardedness analysis to ensure that the substitution preserves well-formedness.
@@ -19,13 +19,13 @@ Solution Structure. The Coq proof (indProj.v:173) proceeds by induction on g:
 2. Communication case (.comm) recurses on branch continuations
 3. Mu case (.mu s body) is the complex case requiring guardedness preservation
 
-This module axiomatizes the main theorem and provides specialized corollaries for
+This module proves the main theorem and provides specialized corollaries for
 the mu-self substitution case needed by Harmony.lean.
 -/
 
 /-! # Projection-Substitution Commutation
 
-This module provides the projection-substitution commutation axiom, following the Coq
+This module provides the projection-substitution commutation theorem, following the Coq
 proof in `indProj.v` (lemma `proj_subst`).
 
 ## Main Result
@@ -34,16 +34,16 @@ proof in `indProj.v` (lemma `proj_subst`).
 trans (g.substitute t G) role = (trans g role).substitute t (trans G role)
 ```
 
-This is the key lemma needed to eliminate the mu-unfold axioms in Harmony.lean.
+This is the key lemma needed to eliminate the mu-unfold assumptions in Harmony.lean.
 
 ## Status
 
-The main theorem is axiomatized. The Coq proof uses induction on g with:
+The main theorem is proven. The Coq proof uses induction on g with:
 - `.end`, `.var` cases: trivial
 - `.mu s body` case: requires guardedness analysis (the complex case)
 - `.comm` case: recursive on branch continuations
 
-The axiom is semantically sound - proven in Coq's `indProj.v:173`.
+The lemma is semantically sound - proven in Coq's `indProj.v:173`.
 
 ## References
 
@@ -118,56 +118,109 @@ private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
 These lemmas establish that guardedness is preserved through substitution,
 which is needed for the mu case of proj_subst. -/
 
+/-- Helper: mu case for guardedness preservation under substitution. -/
+private theorem isGuarded_substitute_preserved_mu
+    (s : String) (body : LocalTypeR)
+    (ih : ∀ t v repl, body.isGuarded v = true → repl.isGuarded v = true →
+      (body.substitute t repl).isGuarded v = true)
+    (t v : String) (repl : LocalTypeR)
+    (hbody : (LocalTypeR.mu s body).isGuarded v = true) (hrepl : repl.isGuarded v = true) :
+    ((LocalTypeR.mu s body).substitute t repl).isGuarded v = true := by
+  -- Split on whether v is the bound variable and whether s is substituted.
+  by_cases hvs : v = s
+  · subst hvs
+    by_cases hst : v = t
+    · subst hst; simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
+    · simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hst]
+  · have hbody' : body.isGuarded v = true := by
+      simpa [LocalTypeR.isGuarded, hvs] using hbody
+    by_cases hst : s = t
+    · subst hst
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hbody']
+    · have ih' := ih t v repl hbody' hrepl
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hst, ih']
+
+/-- Helper: var case for guardedness preservation under substitution. -/
+private theorem isGuarded_substitute_preserved_var
+    (w t v : String) (repl : LocalTypeR)
+    (hbody : (LocalTypeR.var w).isGuarded v = true) (hrepl : repl.isGuarded v = true) :
+    ((LocalTypeR.var w).substitute t repl).isGuarded v = true := by
+  -- Either the variable matches the substitution or it remains unchanged.
+  by_cases hwt : w = t
+  · subst hwt
+    simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hrepl
+  · have hvw : v ≠ w := (bne_iff_ne).1 (by simpa [LocalTypeR.isGuarded] using hbody)
+    have hvw' : (v != w) = true := (bne_iff_ne).2 hvw
+    simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hwt, hvw']
+
 /-- If body is guarded for v, and repl is guarded for v, then substitution preserves guardedness.
 
     **PROVABLE**: By induction on body. -/
 theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = true) (hrepl : repl.isGuarded v = true) :
     (body.substitute t repl).isGuarded v = true := by
-  let P1 : LocalTypeR → Prop :=
-    fun body =>
-      ∀ t v repl, body.isGuarded v = true → repl.isGuarded v = true →
-        (body.substitute t repl).isGuarded v = true
-  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True
+  -- Use the nested recursor for LocalTypeR to avoid unsupported induction.
+  let P1 : LocalTypeR → Prop := fun body =>
+    ∀ t v repl, body.isGuarded v = true → repl.isGuarded v = true →
+      (body.substitute t repl).isGuarded v = true
+  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True;
   let P3 : Label × LocalTypeR → Prop := fun _ => True
   have hrec : P1 body := by
     refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ body)
     · intro t v repl hbody hrepl
-      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
-    · intro p bs hbs t v repl hbody hrepl
-      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
-    · intro p bs hbs t v repl hbody hrepl
-      simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded] at hbody ⊢
+    · intro _ _ _ t v repl hbody hrepl
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded] at hbody ⊢
+    · intro _ _ _ t v repl hbody hrepl
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded] at hbody ⊢
     · intro s body ih t v repl hbody hrepl
-      by_cases hvs : v = s
-      · subst hvs
-        by_cases hst : v = t
-        · subst hst
-          simp [LocalTypeR.substitute, LocalTypeR.isGuarded]
-        · simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hst]
-      · have hbody' : body.isGuarded v = true := by
-          simpa [LocalTypeR.isGuarded, hvs] using hbody
-        by_cases hst : s = t
-        · subst hst
-          simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hbody']
-        · have ih' := ih t v repl hbody' hrepl
-          simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hst, ih']
+      exact isGuarded_substitute_preserved_mu s body ih t v repl hbody hrepl
     · intro w t v repl hbody hrepl
-      have hbody' : (v != w) = true := by
-        simpa [LocalTypeR.isGuarded] using hbody
-      have hvw : v ≠ w := (bne_iff_ne).1 hbody'
-      by_cases hwt : w = t
-      · subst hwt
-        simpa [LocalTypeR.substitute] using hrepl
-      · have hvw' : (v != w) = true := (bne_iff_ne).2 hvw
-        simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hwt, hvw']
+      exact isGuarded_substitute_preserved_var w t v repl hbody hrepl
     · exact True.intro
     · intro _ _ _ _
       exact True.intro
     · intro _ _ _
       exact True.intro
   exact hrec t v repl hbody hrepl
+
+/-- Helper: mu case for unguarded substitution. -/
+private theorem isGuarded_substitute_unguarded_mu
+    (s : String) (body : LocalTypeR)
+    (ih : ∀ t v repl, body.isGuarded v = false → t ≠ v →
+      (body.substitute t repl).isGuarded v = false)
+    (t v : String) (repl : LocalTypeR)
+    (hbody : (LocalTypeR.mu s body).isGuarded v = false) (hneq : t ≠ v) :
+    ((LocalTypeR.mu s body).substitute t repl).isGuarded v = false := by
+  -- Split on whether v is the bound variable and whether s is substituted.
+  by_cases hvs : v = s
+  · subst hvs
+    have : False := by simpa [LocalTypeR.isGuarded] using hbody
+    exact this.elim
+  · have hbody' : body.isGuarded v = false := by
+      simpa [LocalTypeR.isGuarded, hvs] using hbody
+    by_cases hst : s = t
+    · subst hst
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hbody']
+    · have ih' := ih t v repl hbody' hneq
+      simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hst, ih']
+
+/-- Helper: var case for unguarded substitution. -/
+private theorem isGuarded_substitute_unguarded_var
+    (w t v : String) (repl : LocalTypeR)
+    (hbody : (LocalTypeR.var w).isGuarded v = false) (hneq : t ≠ v) :
+    ((LocalTypeR.var w).substitute t repl).isGuarded v = false := by
+  -- The unguarded variable must be v itself.
+  have hvw : v = w := by
+    by_cases hvw : v = w
+    · exact hvw
+    · have hne : (v != w) = true := (bne_iff_ne).2 hvw
+      have : False := by simpa [LocalTypeR.isGuarded, hne] using hbody
+      exact this.elim
+  subst hvw
+  have hvneq : v ≠ t := Ne.symm hneq
+  simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvneq]
 
 /-- If body is NOT guarded for v (v appears unguarded), and t ≠ v, then substitution
     for t doesn't change guardedness for v.
@@ -176,57 +229,120 @@ theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl 
 theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = false) (hneq : t ≠ v) :
     (body.substitute t repl).isGuarded v = false := by
-  let P1 : LocalTypeR → Prop :=
-    fun body =>
-      ∀ t v repl, body.isGuarded v = false → t ≠ v →
-        (body.substitute t repl).isGuarded v = false
-  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True
-  let P3 : Label × LocalTypeR → Prop := fun _ => True
+  -- Use the nested recursor for LocalTypeR to avoid unsupported induction.
+  let P1 : LocalTypeR → Prop := fun body =>
+    ∀ t v repl, body.isGuarded v = false → t ≠ v →
+      (body.substitute t repl).isGuarded v = false
+  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True; let P3 : Label × LocalTypeR → Prop := fun _ => True
   have hrec : P1 body := by
     refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
-      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ body)
-    · intro t v repl hbody hneq
-      have : False := by
-        simpa [LocalTypeR.isGuarded] using hbody
-      exact this.elim
-    · intro p bs hbs t v repl hbody hneq
-      have : False := by
-        simpa [LocalTypeR.isGuarded] using hbody
-      exact this.elim
-    · intro p bs hbs t v repl hbody hneq
-      have : False := by
-        simpa [LocalTypeR.isGuarded] using hbody
-      exact this.elim
-    · intro s body ih t v repl hbody hneq
-      by_cases hvs : v = s
-      · subst hvs
-        have : False := by
-          simpa [LocalTypeR.isGuarded] using hbody
-        exact this.elim
-      · have hbody' : body.isGuarded v = false := by
-          simpa [LocalTypeR.isGuarded, hvs] using hbody
-        by_cases hst : s = t
-        · subst hst
-          simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hbody']
-        · have ih' := ih t v repl hbody' hneq
-          simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvs, hst, ih']
-    · intro w t v repl hbody hneq
-      have hvw : v = w := by
-        by_cases hvw : v = w
-        · exact hvw
-        · have hne : (v != w) = true := (bne_iff_ne).2 hvw
-          have : False := by
-            simpa [LocalTypeR.isGuarded, hne] using hbody
-          exact this.elim
-      subst hvw
-      have hvneq : v ≠ t := Ne.symm hneq
-      simp [LocalTypeR.substitute, LocalTypeR.isGuarded, hvneq]
-    · exact True.intro
-    · intro _ _ _ _
-      exact True.intro
-    · intro _ _ _
-      exact True.intro
+      (by intro t v repl hbody hneq; simpa [LocalTypeR.isGuarded] using hbody)
+      (by intro _ _ _ t v repl hbody hneq; simpa [LocalTypeR.isGuarded] using hbody)
+      (by intro _ _ _ t v repl hbody hneq; simpa [LocalTypeR.isGuarded] using hbody)
+      (by intro s body ih t v repl hbody hneq;
+        exact isGuarded_substitute_unguarded_mu s body ih t v repl hbody hneq)
+      (by intro w t v repl hbody hneq;
+        exact isGuarded_substitute_unguarded_var w t v repl hbody hneq)
+      (by exact True.intro) (by intro _ _ _ _; exact True.intro) (by intro _ _ _; exact True.intro) body)
   exact hrec t v repl hbody hneq
+mutual
+/-- Non-participant comm case for proj_subst. -/
+private theorem proj_subst_comm_other
+    (sender receiver role : String) (branches : List (Label × GlobalType))
+    (t : String) (G : GlobalType) (hclosed : G.isClosed = true)
+    (hs : role ≠ sender) (hr : role ≠ receiver) :
+    projTrans ((.comm sender receiver branches).substitute t G) role =
+      (projTrans (.comm sender receiver branches) role).substitute t (projTrans G role) := by
+  -- Split on branches and reuse the recursive hypothesis on the head.
+  cases branches with
+  | nil =>
+      simp [GlobalType.substitute, GlobalType.substituteBranches, projTrans,
+        Protocol.Projection.Trans.trans_comm_other sender receiver role [] hs hr]
+  | cons head tail =>
+      cases head with
+      | mk label cont =>
+          have hrec := proj_subst cont t G role hclosed
+          simp [GlobalType.substitute, GlobalType.substituteBranches, projTrans,
+            Protocol.Projection.Trans.trans_comm_other sender receiver role
+              ((label, cont.substitute t G) :: GlobalType.substituteBranches tail t G) hs hr,
+            Protocol.Projection.Trans.trans_comm_other sender receiver role
+              ((label, cont) :: tail) hs hr, hrec]
+
+/-- Commutative case split for proj_subst. -/
+private theorem proj_subst_comm
+    (sender receiver role : String) (branches : List (Label × GlobalType))
+    (t : String) (G : GlobalType) (hclosed : G.isClosed = true) :
+    projTrans ((.comm sender receiver branches).substitute t G) role =
+      (projTrans (.comm sender receiver branches) role).substitute t (projTrans G role) := by
+  -- Split by sender/receiver roles and reduce to branches.
+  by_cases hsender : role = sender
+  · simp [GlobalType.substitute, projTrans, projTransBranches,
+      Protocol.Projection.Trans.trans_comm_sender sender receiver role
+        (GlobalType.substituteBranches branches t G) hsender,
+      Protocol.Projection.Trans.trans_comm_sender sender receiver role branches hsender,
+      proj_subst_branches branches t G role hclosed]
+  · by_cases hreceiver : role = receiver
+    · have hs : role ≠ sender := hsender
+      simp [GlobalType.substitute, projTrans, projTransBranches,
+        Protocol.Projection.Trans.trans_comm_receiver sender receiver role
+          (GlobalType.substituteBranches branches t G) hreceiver hs,
+        Protocol.Projection.Trans.trans_comm_receiver sender receiver role branches hreceiver hs,
+        proj_subst_branches branches t G role hclosed]
+    · have hs : role ≠ sender := hsender
+      have hr : role ≠ receiver := hreceiver
+      simpa [projTrans] using proj_subst_comm_other sender receiver role branches t G hclosed hs hr
+
+/-- Mu case with shadowing (s = t) for proj_subst. -/
+private theorem proj_subst_mu_shadow
+    (s t : String) (body : GlobalType) (G : GlobalType) (role : String)
+    (hclosed : G.isClosed = true) (hst : s = t) :
+    projTrans ((.mu s body).substitute t G) role =
+      (projTrans (.mu s body) role).substitute t (projTrans G role) := by
+  -- Shadowing: substitution has no effect under mu binder.
+  subst hst
+  cases hguard : (projTrans body role).isGuarded s <;>
+    simp [GlobalType.substitute, projTrans, Protocol.Projection.Trans.trans,
+      LocalTypeR.substitute, hguard]
+
+/-- Mu case with distinct binder (s ≠ t) for proj_subst. -/
+private theorem proj_subst_mu_noshadow
+    (s t : String) (body : GlobalType) (G : GlobalType) (role : String)
+    (hclosed : G.isClosed = true) (hst : s ≠ t) :
+    projTrans ((.mu s body).substitute t G) role =
+      (projTrans (.mu s body) role).substitute t (projTrans G role) := by
+  -- No shadowing: use guardedness preservation through substitution.
+  have hrepl_closed : (projTrans G role).isClosed = true :=
+    Protocol.Projection.Trans.trans_isClosed_of_isClosed G role hclosed
+  have hrepl_guarded : (projTrans G role).isGuarded s = true :=
+    LocalTypeR.isGuarded_of_closed (projTrans G role) s (by simpa using hrepl_closed)
+  have hproj : projTrans (body.substitute t G) role =
+      (projTrans body role).substitute t (projTrans G role) :=
+    proj_subst body t G role hclosed
+  set e := projTrans body role; set repl := projTrans G role
+  have hproj' : projTrans (body.substitute t G) role = e.substitute t repl := by
+    simpa [e, repl] using hproj
+  cases hguard : e.isGuarded s with
+  | true =>
+      have hguard' : (e.substitute t repl).isGuarded s = true :=
+        isGuarded_substitute_preserved e t s repl hguard hrepl_guarded
+      simp [GlobalType.substitute, hst, projTrans, Protocol.Projection.Trans.trans,
+        LocalTypeR.substitute, hproj', e, repl, hguard, hguard']
+  | false =>
+      have hguard' : (e.substitute t repl).isGuarded s = false :=
+        isGuarded_substitute_unguarded e t s repl hguard (Ne.symm hst)
+      simp [GlobalType.substitute, hst, projTrans, Protocol.Projection.Trans.trans,
+        hproj', e, repl, hguard, hguard']
+
+/-- Mu case wrapper for proj_subst. -/
+private theorem proj_subst_mu
+    (s t : String) (body : GlobalType) (G : GlobalType) (role : String)
+    (hclosed : G.isClosed = true) :
+    projTrans ((.mu s body).substitute t G) role =
+      (projTrans (.mu s body) role).substitute t (projTrans G role) := by
+  -- Split on shadowing of the binder.
+  by_cases hst : s = t
+  · exact proj_subst_mu_shadow s t body G role hclosed hst
+  · exact proj_subst_mu_noshadow s t body G role hclosed hst
 
 /-! ## Main Axiom: Projection-Substitution Commutation -/
 
@@ -247,112 +363,54 @@ theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl 
    so that substitution cannot introduce unguarded occurrences of a mu binder.
 
    **PROVABLE**: By induction on g, with guardedness preservation in the mu case. -/
-mutual
-  /-- Projection commutes with global type substitution (closed replacement). -/
-  theorem proj_subst :
-      ∀ (g : GlobalType) (t : String) (G : GlobalType) (role : String),
-        G.isClosed = true →
-        projTrans (g.substitute t G) role =
-          (projTrans g role).substitute t (projTrans G role)
-    | .end, t, G, role, hclosed => by
-        simp [GlobalType.substitute, projTrans, Protocol.Projection.Trans.trans]
-    | .var v, t, G, role, hclosed => by
-        by_cases hvt : v = t
-        · subst hvt
-          simp [GlobalType.substitute, projTrans, Protocol.Projection.Trans.trans, LocalTypeR.substitute]
-        · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
-          simp [GlobalType.substitute, hvt', projTrans, Protocol.Projection.Trans.trans,
-            LocalTypeR.substitute]
-    | .comm sender receiver branches, t, G, role, hclosed => by
-        by_cases hsender : role = sender
-        · -- Sender case: projection is a send with projected branches.
-          simp [GlobalType.substitute, projTrans, projTransBranches,
-            Protocol.Projection.Trans.trans_comm_sender sender receiver role
-              (GlobalType.substituteBranches branches t G) hsender,
-            Protocol.Projection.Trans.trans_comm_sender sender receiver role branches hsender,
-            proj_subst_branches branches t G role hclosed]
-        · by_cases hreceiver : role = receiver
-          · -- Receiver case: projection is a recv with projected branches.
-            have hs : role ≠ sender := hsender
-            simp [GlobalType.substitute, projTrans, projTransBranches,
-              Protocol.Projection.Trans.trans_comm_receiver sender receiver role
-                (GlobalType.substituteBranches branches t G) hreceiver hs,
-              Protocol.Projection.Trans.trans_comm_receiver sender receiver role branches hreceiver hs,
-              proj_subst_branches branches t G role hclosed]
-          · -- Non-participant case: head projection on first branch.
-            have hs : role ≠ sender := hsender
-            have hr : role ≠ receiver := hreceiver
-            cases branches with
-            | nil =>
-                simp [GlobalType.substitute, GlobalType.substituteBranches, projTrans,
-                  Protocol.Projection.Trans.trans_comm_other sender receiver role [] hs hr]
-            | cons head tail =>
-                cases head with
-                | mk label cont =>
-                    have hrec := proj_subst cont t G role hclosed
-                    simp [GlobalType.substitute, GlobalType.substituteBranches, projTrans,
-                      Protocol.Projection.Trans.trans_comm_other sender receiver role
-                        ((label, cont.substitute t G) :: GlobalType.substituteBranches tail t G) hs hr,
-                      Protocol.Projection.Trans.trans_comm_other sender receiver role
-                        ((label, cont) :: tail) hs hr,
-                      hrec]
-    | .mu s body, t, G, role, hclosed => by
-        by_cases hst : s = t
-        · subst hst
-          cases hguard : (projTrans body role).isGuarded s <;>
-            simp [GlobalType.substitute, projTrans, Protocol.Projection.Trans.trans,
-              LocalTypeR.substitute, hguard]
-        · have hrepl_closed : (projTrans G role).isClosed = true :=
-            Protocol.Projection.Trans.trans_isClosed_of_isClosed G role hclosed
-          have hrepl_guarded : (projTrans G role).isGuarded s = true :=
-            LocalTypeR.isGuarded_of_closed (projTrans G role) s (by simpa using hrepl_closed)
-          have hproj : projTrans (body.substitute t G) role =
-              (projTrans body role).substitute t (projTrans G role) :=
-            proj_subst body t G role hclosed
-          set e := projTrans body role
-          set repl := projTrans G role
-          have hproj' : projTrans (body.substitute t G) role = e.substitute t repl := by
-            simpa [e, repl] using hproj
-          cases hguard : e.isGuarded s with
-          | true =>
-              have hguard' : (e.substitute t repl).isGuarded s = true :=
-                isGuarded_substitute_preserved e t s repl hguard hrepl_guarded
-              simp [GlobalType.substitute, hst, projTrans, Protocol.Projection.Trans.trans,
-                LocalTypeR.substitute, hproj', e, repl, hguard, hguard']
-          | false =>
-              have hguard' : (e.substitute t repl).isGuarded s = false :=
-                isGuarded_substitute_unguarded e t s repl hguard (Ne.symm hst)
-              simp [GlobalType.substitute, hst, projTrans, Protocol.Projection.Trans.trans,
-                hproj', e, repl, hguard, hguard']
-  termination_by
-    g => sizeOf g
-  decreasing_by
-    all_goals
-      first
-      | exact sizeOf_body_lt_mu _ _
-      | exact sizeOf_bs_lt_comm _ _ _
-      | exact sizeOf_cont_lt_comm _ _ _ _ _
+/-- Projection commutes with global type substitution (closed replacement). -/
+theorem proj_subst :
+    ∀ (g : GlobalType) (t : String) (G : GlobalType) (role : String),
+      G.isClosed = true →
+      projTrans (g.substitute t G) role =
+        (projTrans g role).substitute t (projTrans G role)
+  | .end, t, G, role, hclosed => by
+      simp [GlobalType.substitute, projTrans, Protocol.Projection.Trans.trans]
+  | .var v, t, G, role, hclosed => by
+      by_cases hvt : v = t
+      · subst hvt; simp [GlobalType.substitute, projTrans, Protocol.Projection.Trans.trans, LocalTypeR.substitute]
+      · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
+        simp [GlobalType.substitute, hvt', projTrans, Protocol.Projection.Trans.trans, LocalTypeR.substitute]
+  | .comm sender receiver branches, t, G, role, hclosed => by
+      -- Comm: delegate to the helper case split.
+      exact proj_subst_comm sender receiver role branches t G hclosed
+  | .mu s body, t, G, role, hclosed => by
+      -- Mu: split on shadowing vs non-shadowing binders.
+      exact proj_subst_mu s t body G role hclosed
+ termination_by
+   g => sizeOf g
+ decreasing_by
+   all_goals
+     first
+     | exact sizeOf_body_lt_mu _ _
+     | exact sizeOf_bs_lt_comm _ _ _
+     | exact sizeOf_cont_lt_comm _ _ _ _ _
 
-  /-- Branch-wise version of proj_subst for transBranches/substituteBranches. -/
-  theorem proj_subst_branches :
-      ∀ (bs : List (Label × GlobalType)) (t : String) (G : GlobalType) (role : String),
-        G.isClosed = true →
-        projTransBranches (GlobalType.substituteBranches bs t G) role =
-          LocalTypeR.substituteBranches (projTransBranches bs role) t (projTrans G role)
-    | [], t, G, role, hclosed => by
-        simp [GlobalType.substituteBranches, projTransBranches,
-          Protocol.Projection.Trans.transBranches]
-    | (label, cont) :: tail, t, G, role, hclosed => by
-        simp [GlobalType.substituteBranches, projTransBranches,
-          Protocol.Projection.Trans.transBranches,
-          proj_subst cont t G role hclosed, proj_subst_branches tail t G role hclosed]
-  termination_by
-    bs => sizeOf bs
-  decreasing_by
-    all_goals
-      first
-      | exact sizeOf_tail_lt_cons _ _
-      | exact sizeOf_cont_lt_cons _ _ _
+ /-- Branch-wise version of proj_subst for transBranches/substituteBranches. -/
+ theorem proj_subst_branches :
+     ∀ (bs : List (Label × GlobalType)) (t : String) (G : GlobalType) (role : String),
+       G.isClosed = true →
+       projTransBranches (GlobalType.substituteBranches bs t G) role =
+         LocalTypeR.substituteBranches (projTransBranches bs role) t (projTrans G role)
+   | [], t, G, role, hclosed => by
+       simp [GlobalType.substituteBranches, projTransBranches,
+         Protocol.Projection.Trans.transBranches]
+   | (label, cont) :: tail, t, G, role, hclosed => by
+       simp [GlobalType.substituteBranches, projTransBranches,
+         Protocol.Projection.Trans.transBranches,
+         proj_subst cont t G role hclosed, proj_subst_branches tail t G role hclosed]
+ termination_by
+   bs => sizeOf bs
+ decreasing_by
+   all_goals
+     first
+     | exact sizeOf_tail_lt_cons _ _
+     | exact sizeOf_cont_lt_cons _ _ _
 end
 
 /-! ## Corollaries -/
@@ -367,7 +425,7 @@ theorem proj_subst_EQ2 (g : GlobalType) (t : String) (G : GlobalType) (role : St
 
 /-- Specialized version: substituting mu into its body commutes with projection.
 
-    This is the key case for the Harmony axioms:
+    This is the key case for the Harmony lemmas:
     ```
     trans (body.substitute t (mu t body)) role = (trans body role).substitute t (mu t (trans body role))
     ```

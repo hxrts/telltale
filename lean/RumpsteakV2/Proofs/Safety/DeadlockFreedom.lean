@@ -78,19 +78,7 @@ def ConfigStepStar (_c _c' : Configuration) (_acts : List GlobalActionR) : Prop 
 
 /-! ## Progress Predicate: reachesComm
 
-This is a separate predicate from well-formedness that checks whether a type
-can reach a communication. It corresponds to Coq's `goodG` predicate.
-
-A type reaches a communication if:
-- It IS a communication, or
-- It's a recursion whose unfolding reaches a communication
-
-Types that DON'T reach a communication:
-- `end` (terminal, no communication)
-- `var t` (free variable, stuck)
-- `mu t .end` (loops forever on end)
-- `mu t (.var t)` (loops forever unfolding, but this is also non-productive)
--/
+This predicate checks whether a type can reach a communication (Coq `goodG`). -/
 
 /-- A global type reaches a communication if it can unfold to a comm constructor.
 

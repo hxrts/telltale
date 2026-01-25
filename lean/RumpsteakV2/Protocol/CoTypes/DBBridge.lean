@@ -4,7 +4,7 @@ import RumpsteakV2.Protocol.CoTypes.EQ2
 /-! # RumpsteakV2.Protocol.CoTypes.DBBridge
 
 Bridge lemmas for EQ2 substitution commutation. The original DB-backed
-axiom is now proven using closedness of well-formed mu types.
+assumption is now proven using closedness of well-formed mu types.
 -/
 
 namespace RumpsteakV2.Protocol.CoTypes

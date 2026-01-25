@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.Projection.Trans
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
+/- 
+The Problem. Show that projection interacts correctly with global stepping:
+when a global type steps, the sender/receiver projections either expose the
+corresponding branch continuation or remain EQ2-equivalent to the original.
+
+Solution Structure. Prove helper lemmas for branch membership and projection
+shape, define a head-action predicate, then prove sender/receiver step results
+by case analysis on the step constructor.
+-/
+
 /-! # Step Projection Theorems
 
 This module proves that projection commutes appropriately with global stepping.
@@ -14,9 +24,9 @@ This module proves that projection commutes appropriately with global stepping.
 
 - `proj_trans_receiver_step_v2`: Dual property for the receiver.
 
-## Note on Axiom Reformulation
+## Note on Reformulation
 
-The original axiom `proj_trans_sender_step_axiom` required:
+The original placeholder lemma for sender steps required:
 ```
 projTrans g act.sender = .send act.receiver [(act.label, cont)]
 ```
@@ -60,6 +70,7 @@ theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
     (label, trans cont role) ∈ transBranches branches role := by
+  -- Induct on the branch list and carry membership along.
   induction branches with
   | nil => cases hmem
   | cons hd tl ih =>
@@ -80,6 +91,7 @@ theorem proj_trans_comm_sender_is_send
     (sender receiver : String) (branches : List (Label × GlobalType)) :
     trans (.comm sender receiver branches) sender =
       .send receiver (transBranches branches sender) := by
+  -- This is the sender branch of trans_comm_sender.
   exact trans_comm_sender sender receiver sender branches rfl
 
 /-- For the comm_head case: if role = receiver, the projection is `.recv sender branches`. -/
@@ -88,6 +100,7 @@ theorem proj_trans_comm_receiver_is_recv
     (hne : receiver ≠ sender) :
     trans (.comm sender receiver branches) receiver =
       .recv sender (transBranches branches receiver) := by
+  -- This is the receiver branch of trans_comm_receiver.
   exact trans_comm_receiver sender receiver receiver branches rfl hne
 
 /-! ## Reformulated Step Projection Theorems
@@ -100,6 +113,7 @@ counterexamples where the sender participates in a nested action while
 the outer comm has not stepped. -/
 
 private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
+  -- Only comm heads match the sender/receiver predicate.
   match g with
   | .comm sender receiver _ =>
       act.sender = sender ∧ act.receiver = receiver
@@ -108,6 +122,7 @@ private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
 /-- Statement type for step projection (sender).
     This factored-out type helps with the mutual induction. -/
 abbrev SenderStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
+  -- Either the sender exposes the branch continuation, or stays EQ2-equivalent.
   (∃ bs cont, projTrans g act.sender = .send act.receiver bs ∧
               (act.label, cont) ∈ bs ∧
               EQ2 (projTrans g' act.sender) cont) ∨
@@ -118,31 +133,57 @@ abbrev SenderStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType)
     2. The new projection is EQ2 to the original projection.
 
 This is the correct formulation that accounts for multi-branch protocols. -/
+private theorem proj_trans_sender_step_v2_comm_head
+    (sender receiver : String) (branches : List (Label × GlobalType))
+    (label : Label) (g' : GlobalType) (hmem : (label, g') ∈ branches) :
+    SenderStepResult (.comm sender receiver branches)
+      { sender := sender, receiver := receiver, label := label } g' := by
+  -- Head comm: the sender exposes the chosen continuation.
+  left
+  exact ⟨transBranches branches sender,
+         projTrans g' sender,
+         proj_trans_comm_sender_is_send sender receiver branches,
+         mem_transBranches_of_mem branches label g' sender hmem,
+         EQ2_refl _⟩
+
+private theorem proj_trans_sender_step_v2_comm_async
+    (sender receiver : String) (branches branches' : List (Label × GlobalType))
+    (act : GlobalActionR)
+    (hcond : act.sender = sender → act.receiver ≠ receiver)
+    (hpred : action_pred (.comm sender receiver branches) act) :
+    SenderStepResult (.comm sender receiver branches) act (.comm sender receiver branches') := by
+  -- action_pred forbids async steps.
+  have hpred' : act.sender = sender ∧ act.receiver = receiver := by
+    simpa [action_pred] using hpred
+  have hcontra : False := by
+    have hrcv : act.receiver ≠ receiver := hcond hpred'.1
+    exact hrcv hpred'.2
+  exact hcontra.elim
+
+private theorem proj_trans_sender_step_v2_mu (t : String) (body : GlobalType)
+    (act : GlobalActionR) (g' : GlobalType)
+    (hstep_inner : step (body.substitute t (.mu t body)) act g')
+    (hpred : action_pred (.mu t body) act) :
+    SenderStepResult (.mu t body) act g' := by
+  -- action_pred is false at mu heads.
+  have : False := by simpa [action_pred] using hpred
+  exact this.elim
+
 theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     SenderStepResult g act g' := by
+  -- Split on the global step constructor.
   cases hstep with
   | comm_head sender receiver branches label g' hmem =>
-      left
-      exact ⟨transBranches branches sender,
-             projTrans g' sender,
-             proj_trans_comm_sender_is_send sender receiver branches,
-             mem_transBranches_of_mem branches label g' sender hmem,
-             EQ2_refl _⟩
-  | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbstep =>
-      -- action_pred impossible for async steps
-      have hpred' : act.sender = sender ∧ act.receiver = receiver := by
-        simpa [action_pred] using hpred
-      have hcontra : False := by
-        have hrcv : act.receiver ≠ receiver := hcond hpred'.1
-        exact hrcv hpred'.2
-      exact hcontra.elim
+      simpa using proj_trans_sender_step_v2_comm_head sender receiver branches label g' hmem
+  | comm_async sender receiver branches branches' act _label _cont _hns hcond _hmem _hcan _hbstep =>
+      exact proj_trans_sender_step_v2_comm_async sender receiver branches branches' act hcond hpred
   | mu t body act g' hstep_inner =>
-      -- action_pred impossible for mu at head
-      simp [action_pred] at hpred
+      exact proj_trans_sender_step_v2_mu t body act g' hstep_inner hpred
 
 /-- Statement type for step projection (receiver). -/
 abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
+  -- Either the receiver exposes the branch continuation, or stays EQ2-equivalent.
   (∃ bs cont, projTrans g act.receiver = .recv act.sender bs ∧
               (act.label, cont) ∈ bs ∧
               EQ2 (projTrans g' act.receiver) cont) ∨
@@ -153,33 +194,44 @@ abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalTyp
     2. The new projection is EQ2 to the original projection.
 
 This is the dual of `proj_trans_sender_step_v2`. -/
+private theorem proj_trans_receiver_step_comm_head
+    (sender receiver : String) (branches : List (Label × GlobalType)) (label : Label)
+    (g g' : GlobalType) (act : GlobalActionR) (hmem : (label, g') ∈ branches)
+    (hno_self : (.comm sender receiver branches).noSelfComm = true) :
+    ReceiverStepResult (.comm sender receiver branches) act g' := by
+  -- Use the comm-head shape lemma for the receiver projection.
+  have hne : receiver ≠ sender := by
+    have hns := hno_self
+    simp [GlobalType.noSelfComm] at hns
+    have hne' : sender ≠ receiver := hns.1
+    exact ne_comm.mp hne'
+  left
+  exact ⟨transBranches branches receiver,
+         projTrans g' receiver,
+         proj_trans_comm_receiver_is_recv sender receiver branches hne,
+         mem_transBranches_of_mem branches label g' receiver hmem,
+         EQ2_refl _⟩
+
+private theorem proj_trans_receiver_step_mu
+    (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType)
+    (hpred : action_pred (.mu t body) act) :
+    ReceiverStepResult (.mu t body) act g' := by
+  -- Mu at head cannot satisfy the action predicate.
+  simp [action_pred] at hpred
+  exact (False.elim hpred)
+
 theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) (hno_self : g.noSelfComm = true) :
     ReceiverStepResult g act g' := by
+  -- Split on the global step constructor.
   cases hstep with
   | comm_head sender receiver branches label g' hmem =>
-      have hne : receiver ≠ sender := by
-        have hns := hno_self
-        simp [GlobalType.noSelfComm] at hns
-        have hne' : sender ≠ receiver := hns.1
-        exact ne_comm.mp hne'
-      left
-      exact ⟨transBranches branches receiver,
-             projTrans g' receiver,
-             proj_trans_comm_receiver_is_recv sender receiver branches hne,
-             mem_transBranches_of_mem branches label g' receiver hmem,
-             EQ2_refl _⟩
+      exact proj_trans_receiver_step_comm_head sender receiver branches label g g' act hmem hno_self
   | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbstep =>
-      -- action_pred impossible for async steps
-      have hpred' : act.sender = sender ∧ act.receiver = receiver := by
-        simpa [action_pred] using hpred
-      have hcontra : False := by
-        have hrcv : act.receiver ≠ receiver := hcond hpred'.1
-        exact hrcv hpred'.2
-      exact hcontra.elim
+      -- Async steps contradict action_pred by definition.
+      exact (False.elim (hcond (by simpa [action_pred] using hpred)))
   | mu t body act g' hstep_inner =>
-      -- action_pred impossible for mu at head
-      simp [action_pred] at hpred
+      exact proj_trans_receiver_step_mu t body act g' hpred
 
 /-! ## Original Axiom Compatibility
 
@@ -188,6 +240,7 @@ statement under the head-action predicate. -/
 theorem proj_trans_sender_step_original_compat (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     SenderStepResult g act g' := by
+  -- Directly reuse the v2 formulation.
   exact proj_trans_sender_step_v2 g g' act hstep hpred
 
 end RumpsteakV2.Proofs.Projection.StepProjection

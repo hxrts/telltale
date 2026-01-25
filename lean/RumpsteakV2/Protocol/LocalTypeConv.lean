@@ -6,7 +6,7 @@ Conversions between named variables (LocalTypeR) and de Bruijn indices (LocalTyp
 
 ## Status
 
-**All LocalTypeConv axioms eliminated (11/11).**
+**All LocalTypeConv assumptions eliminated (11/11).**
 - Closedness + roundtrip lemmas are proved in `LocalTypeConvProofs.lean`.
 - Guardedness/contractiveness preservation is proved (with explicit context assumptions).
 - Substitution contractiveness bridge is derived from `LocalTypeR.isContractive_substitute`.

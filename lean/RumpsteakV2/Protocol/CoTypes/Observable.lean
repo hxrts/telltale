@@ -73,6 +73,10 @@ inductive CanRecv : LocalTypeR → String → List (Label × LocalTypeR) → Pro
 
 /-! ## Duality Lemmas -/
 
+/-- Definitional alias: recv-as-send on the dual type. -/
+abbrev CanRecvD (t : LocalTypeR) (p : String) (bs : List (Label × LocalTypeR)) : Prop :=
+  CanSend t.dual p (LocalTypeR.dualBranches bs)
+
 /-- Unfolding to end is preserved by dual. -/
 theorem UnfoldsToEnd.dual {t : LocalTypeR} (h : UnfoldsToEnd t) : UnfoldsToEnd t.dual := by
   -- Structural recursion; mu case uses dual_substitute.
@@ -145,6 +149,26 @@ theorem CanRecv.dual_iff_CanSend {t : LocalTypeR} {p : String} {bs : List (Label
     have h' : CanRecv t.dual.dual p (LocalTypeR.dualBranches (LocalTypeR.dualBranches bs)) :=
       CanSend.dual (t := t.dual) h
     simpa [LocalTypeR.dual_dual, dualBranches_dualBranches] using h'
+
+/-- CanRecvD is equivalent to CanRecv (by duality). -/
+@[simp]
+theorem CanRecvD_iff_CanRecv {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)} :
+    CanRecvD t p bs ↔ CanRecv t p bs := by
+  -- Flip CanRecv.dual_iff_CanSend to match the alias shape.
+  simpa [CanRecvD] using
+    (CanRecv.dual_iff_CanSend (t := t) (p := p) (bs := bs)).symm
+
+/-- Convenience: CanRecvD implies CanRecv. -/
+theorem CanRecvD.to_CanRecv {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecvD t p bs) : CanRecv t p bs := by
+  -- Use the equivalence lemma for conversion.
+  exact (CanRecvD_iff_CanRecv).1 h
+
+/-- Convenience: CanRecv implies CanRecvD. -/
+theorem CanRecv.to_CanRecvD {t : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+    (h : CanRecv t p bs) : CanRecvD t p bs := by
+  -- Use the equivalence lemma for conversion.
+  exact (CanRecvD_iff_CanRecv).2 h
 
 /-! ## One-Step Inversion Lemmas
 

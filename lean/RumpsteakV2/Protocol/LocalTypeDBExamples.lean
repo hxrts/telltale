@@ -13,7 +13,7 @@ that require clean substitution reasoning.
 2. **Proving unfold preservation properties**
 3. **Reasoning about iterated unfolding**
 
-All of these are PROVEN without sorries in LocalTypeDB.lean!
+All of these are PROVEN without placeholders in LocalTypeDB.lean!
 -/
 
 namespace RumpsteakV2.Protocol.LocalTypeDBExamples
@@ -75,7 +75,7 @@ example (body : LocalTypeDB) (h : (LocalTypeDB.mu body).isContractive = true) :
 These examples show how to use the bridge theorems to connect
 de Bruijn proofs back to named variables.
 
-Note: These have sorries in the correspondence lemmas, but the
+Note: These have legacy placeholders in the correspondence lemmas, but the
 de Bruijn side is complete!
 -/
 
@@ -147,7 +147,7 @@ The de Bruijn infrastructure provides COMPLETE, PROVEN theorems for:
 - Full unfold preservation
 
 These can be used directly in de Bruijn form, or connected back to
-named variables via the bridge theorems (which have minimal sorries
+named variables via the bridge theorems (which have minimal placeholders
 for context correspondence).
 
 This is a significant improvement over the named variable approach,

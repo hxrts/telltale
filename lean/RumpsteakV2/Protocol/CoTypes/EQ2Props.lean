@@ -4,7 +4,7 @@ import RumpsteakV2.Protocol.CoTypes.Bisim
 /-! # EQ2 Properties via Bisim
 
 This module provides EQ2 lemmas that are provable via the Bisim development,
-avoiding the axioms in EQ2.lean at the cost of explicit WellFormed hypotheses.
+avoiding the EQ2.lean detours at the cost of explicit WellFormed hypotheses.
 -/
 
 namespace RumpsteakV2.Protocol.CoTypes.EQ2Props

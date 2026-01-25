@@ -1,5 +1,4 @@
 import RumpsteakV2.Semantics.Typing
-import RumpsteakV2.Proofs.Core.Assumptions
 
 /-! # RumpsteakV2.Proofs.Safety.Progress
 

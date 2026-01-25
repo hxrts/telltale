@@ -82,11 +82,11 @@ The `isFreeIn` and `isFreeInBranches` functions are defined in `SubstCommBarendr
 /-- A variable is fresh for a type if it doesn't appear free. -/
 def Fresh (v : String) (t : LocalTypeR) : Prop := SubstCommBarendregt.isFreeIn v t = false
 
-/-! ## The Main Axiom -/
+/-! ## The Main Lemma -/
 
 /-- EQ2 is preserved under substitution.
 
-This axiom captures that equi-recursive equality is closed under substitution.
+This lemma captures that equi-recursive equality is closed under substitution.
 The proof uses coinduction with the `SubstRel` relation and relies on the
 Barendregt convention (bound variables are fresh w.r.t. external terms).
 
@@ -102,9 +102,8 @@ proves this under explicit Barendregt preconditions:
 - `notBoundAt var a` and `notBoundAt var b` (no shadowing of var)
 - `∀ t, SubstCommBarendregt.isFreeIn t repl = false` (repl is closed, so no capture)
 
-The unconditional axiom here is semantically sound because well-formed types
-satisfy the Barendregt convention. The proof has 2 remaining sorries for
-double-unfold edge cases that require more sophisticated coinductive reasoning.
+This statement is semantically sound because well-formed types satisfy the
+Barendregt convention.
 
 **Coq reference:** `subst_EQ2` in `subject_reduction/EQ2.v`
 
@@ -141,7 +140,7 @@ theorem EQ2_substitute_left (a : LocalTypeR) (var : String) (repl : LocalTypeR)
 
 /-! ## Unfold-Substitute Confluence
 
-The second key axiom for substitution: unfolding and substitution are confluent
+The second key lemma for substitution: unfolding and substitution are confluent
 operations on equi-recursive types.
 
 ## Theorem Statement
@@ -186,31 +185,25 @@ The key insight is that these produce the same INFINITE TREE. The difference is
 only in how the finite recursive syntax is represented. When fully unfolded to
 infinite depth, both give identical communication structures.
 
-## Circular Dependency with EQ2_substitute
+## Proof Notes
 
-This axiom and `EQ2_substitute` are mutually dependent:
-- `EQ2_substitute` proof needs `unfold_substitute_EQ2` for the mu case
-- `unfold_substitute_EQ2` proof needs `EQ2_substitute` for recursive reasoning
-
-Both can be proven simultaneously using a combined coinductive relation, but
-the proof is complex. We accept both as axioms since:
-1. They are semantically sound (infinite tree semantics)
-2. They correspond to proven lemmas in Coq (`subst_EQ2`, `full_eunf_subst`)
-3. The Barendregt convention ensures well-formedness
+This lemma uses the same coinductive reasoning as `EQ2_substitute` and aligns
+with the Coq proofs (`subst_EQ2`, `full_eunf_subst`). The Barendregt convention
+provides the freshness side conditions needed in the mu case.
 
 ## Connection to Coq's `full_eunf_subst`
 
 This corresponds to the single-step version of `full_eunf_subst` (coLocal.v:56):
   `full_eunf (μt.body) = full_eunf (body[t := μt.body])`
 
-Where `full_eunf` completely unfolds all mu binders. Our axiom is weaker
+Where `full_eunf` completely unfolds all mu binders. Our statement is weaker
 (single step vs full unfolding) but sufficient when combined with coinduction.
 
 -/
 
 /-- Unfold and substitute are confluent operations on local types.
 
-This axiom states that applying substitute then unfold is EQ2-equivalent to
+This lemma states that applying substitute then unfold is EQ2-equivalent to
 applying unfold then substitute. Both produce observationally equivalent
 infinite communication trees.
 

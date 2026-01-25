@@ -6,7 +6,7 @@ import RumpsteakV2.Protocol.CoTypes.EQ2
 
 /-! # Mu-Unfold Lemmas for Harmony
 
-This module proves the 4 mu-unfold axioms in Harmony.lean using the `proj_subst` lemma.
+This module proves the 4 mu-unfold lemmas in Harmony.lean using the `proj_subst` lemma.
 
 ## Main Results
 
@@ -22,7 +22,7 @@ The key insight is that `proj_subst` gives us:
 trans (inner.substitute t G) role = (trans inner role).substitute t (trans G role)
 ```
 
-This allows us to rewrite the LHS of the crossed-unfold axioms, and then apply
+This allows us to rewrite the LHS of the crossed-unfold lemmas, and then apply
 `EQ2_unfold_left`/`EQ2_unfold_right` which handle mu-unfolding via EQ2.
 -/
 
@@ -52,8 +52,9 @@ theorem EQ2_mu_self_unfold (s : String) (body : LocalTypeR) :
 
 /-- Symmetric version: mu is EQ2-equivalent to its unfolding. -/
 theorem EQ2_mu_to_unfold (s : String) (body : LocalTypeR) :
-    EQ2 (.mu s body) (body.substitute s (.mu s body)) :=
-  EQ2_symm (EQ2_mu_self_unfold s body)
+    EQ2 (.mu s body) (body.substitute s (.mu s body)) := by
+  -- Symmetry of EQ2 flips the direction of mu self-unfold.
+  exact EQ2_symm (EQ2_mu_self_unfold s body)
 
 /-! ## Crossed Unfold Lemmas -/
 
@@ -102,83 +103,93 @@ theorem EQ2_mu_crossed_unfold_right'
 
 /-! ## Guardedness Preservation Through Substitution
 
-The key insight for the mismatched guardedness cases is that guardedness
-is preserved in a specific way through substitution:
+Unguardedness is preserved when substituting a different variable `u ≠ v`.
+This rules out the mismatched guardedness cases in Harmony.lean for `s ≠ t`. -/
 
-1. If `v` is unguarded in `t`, and we substitute a *different* variable `u ≠ v`,
-   then `v` remains unguarded (the `.var v` is still there).
+/- Key lemma: Unguardedness is preserved when substituting a different variable.
 
-2. If `v` is guarded in `t`, substitution can only make `v` unguarded if the
-   replacement term has unguarded `v` and we replace at an unguarded position.
+   If `t.isGuarded v = false` (v appears unguarded) and `u ≠ v`,
+   then `(t.substitute u repl).isGuarded v = false`.
 
-This means the "mismatched guardedness" cases in Harmony.lean are actually
-impossible when `s ≠ t` (the non-shadowed mu case). -/
+   Proof: The `.var v` that caused unguardedness is unchanged by substituting `u`. -/
+/-- Unguardedness preservation: `.end` case is impossible. -/
+private theorem isGuarded_false_substitute_preserved_end (u v : String) (repl : LocalTypeR)
+    (hunguarded : LocalTypeR.end.isGuarded v = false) :
+    (LocalTypeR.end.substitute u repl).isGuarded v = false := by
+  -- isGuarded v .end = true, contradicting hunguarded.
+  simp only [LocalTypeR.isGuarded] at hunguarded
+  exact absurd hunguarded (by decide)
 
-/-- Key lemma: Unguardedness is preserved when substituting a different variable.
+/-- Unguardedness preservation: variable case. -/
+private theorem isGuarded_false_substitute_preserved_var (w u v : String) (repl : LocalTypeR)
+    (hneq : u ≠ v) (hunguarded : (LocalTypeR.var w).isGuarded v = false) :
+    ((LocalTypeR.var w).substitute u repl).isGuarded v = false := by
+  -- Unguardedness forces w = v, then substitution with u ≠ v leaves .var v.
+  simp only [LocalTypeR.isGuarded, bne_eq_false_iff_eq] at hunguarded
+  subst hunguarded
+  simp only [LocalTypeR.substitute]
+  split
+  · rename_i hvu
+    simp only [beq_iff_eq] at hvu
+    exact absurd hvu.symm hneq
+  · simp only [LocalTypeR.isGuarded, bne_self_eq_false]
 
-    If `t.isGuarded v = false` (v appears unguarded) and `u ≠ v`,
-    then `(t.substitute u repl).isGuarded v = false`.
+/-- Unguardedness preservation: `.send` case is impossible. -/
+private theorem isGuarded_false_substitute_preserved_send (p : String) (bs : List (Label × LocalTypeR))
+    (u v : String) (repl : LocalTypeR) (hunguarded : (LocalTypeR.send p bs).isGuarded v = false) :
+    ((LocalTypeR.send p bs).substitute u repl).isGuarded v = false := by
+  -- isGuarded v (.send p bs) = true, contradicts hunguarded.
+  simp only [LocalTypeR.isGuarded] at hunguarded
+  exact absurd hunguarded (by decide)
 
-    Proof: The `.var v` that caused unguardedness is unchanged by substituting `u`. -/
+/-- Unguardedness preservation: `.recv` case is impossible. -/
+private theorem isGuarded_false_substitute_preserved_recv (p : String) (bs : List (Label × LocalTypeR))
+    (u v : String) (repl : LocalTypeR) (hunguarded : (LocalTypeR.recv p bs).isGuarded v = false) :
+    ((LocalTypeR.recv p bs).substitute u repl).isGuarded v = false := by
+  -- isGuarded v (.recv p bs) = true, contradicts hunguarded.
+  simp only [LocalTypeR.isGuarded] at hunguarded
+  exact absurd hunguarded (by decide)
+
+/-- Unguardedness preservation: mu case uses the induction hypothesis. -/
+private theorem isGuarded_false_substitute_preserved_mu (s : String) (body : LocalTypeR)
+    (u v : String) (repl : LocalTypeR) (_hneq : u ≠ v)
+    (hunguarded : (LocalTypeR.mu s body).isGuarded v = false)
+    (ih : body.isGuarded v = false → (body.substitute u repl).isGuarded v = false) :
+    ((LocalTypeR.mu s body).substitute u repl).isGuarded v = false := by
+  -- Split on v == s, then on s == u to account for shadowing.
+  simp only [LocalTypeR.isGuarded] at hunguarded
+  split at hunguarded
+  · contradiction
+  · rename_i hvs
+    simp only [LocalTypeR.substitute]
+    split
+    · simp only [LocalTypeR.isGuarded, hvs]
+      exact hunguarded
+    · simp only [LocalTypeR.isGuarded, hvs]
+      exact ih hunguarded
+
+/-- Key lemma: Unguardedness is preserved when substituting a different variable. -/
 theorem isGuarded_false_substitute_preserved (t : LocalTypeR) (u v : String) (repl : LocalTypeR)
     (hneq : u ≠ v) (hunguarded : t.isGuarded v = false) :
     (t.substitute u repl).isGuarded v = false := by
-  cases t with
-  | «end» =>
-      -- isGuarded v .end = true, contradicts hunguarded
-      simp only [LocalTypeR.isGuarded] at hunguarded
-      -- hunguarded : true = false, contradiction
-      exact absurd hunguarded (by decide)
-  | var w =>
-      -- isGuarded v (.var w) = (v != w), so hunguarded means v = w
-      simp only [LocalTypeR.isGuarded] at hunguarded
-      -- hunguarded : (v != w) = false, which means v = w
-      simp only [bne_eq_false_iff_eq] at hunguarded
-      subst hunguarded
-      -- Now w = v, and we substitute u for v where u ≠ v
-      -- Goal: (.var v).substitute u repl).isGuarded v = false
-      simp only [LocalTypeR.substitute]
-      -- Now goal involves: if v == u then repl else .var v
-      -- Since v ≠ u, the condition v == u is false
-      split
-      · -- v == u case: impossible since hneq says u ≠ v
-        rename_i hvu
-        simp only [beq_iff_eq] at hvu
-        exact absurd hvu.symm hneq
-      · -- v != u case: result is .var v, so isGuarded v (.var v) = (v != v) = false
-        simp only [LocalTypeR.isGuarded, bne_self_eq_false]
-  | send p bs =>
-      -- isGuarded v (.send p bs) = true, contradicts hunguarded
-      simp only [LocalTypeR.isGuarded] at hunguarded
-      exact absurd hunguarded (by decide)
-  | recv p bs =>
-      -- isGuarded v (.recv p bs) = true, contradicts hunguarded
-      simp only [LocalTypeR.isGuarded] at hunguarded
-      exact absurd hunguarded (by decide)
-  | mu s body =>
-      -- isGuarded v (.mu s body) = if v == s then true else body.isGuarded v
-      simp only [LocalTypeR.isGuarded] at hunguarded
-      split at hunguarded
-      · -- v == s case: isGuarded = true, contradicts hunguarded
-        contradiction
-      · -- v != s case: body.isGuarded v = false
-        rename_i hvs
-        simp only [LocalTypeR.substitute]
-        split
-        · -- s == u: substitution shadowed, result is .mu s body unchanged
-          simp only [LocalTypeR.isGuarded, hvs]
-          exact hunguarded
-        · -- s != u: result is .mu s (body.substitute u repl)
-          simp only [LocalTypeR.isGuarded, hvs]
-          -- IH: body.substitute has isGuarded v = false
-          exact isGuarded_false_substitute_preserved body u v repl hneq hunguarded
+  -- Structural recursion on the local type (avoid `induction` on nested inductive).
+  refine (LocalTypeR.rec
+    (motive_1 := fun t => t.isGuarded v = false → (t.substitute u repl).isGuarded v = false)
+    (motive_2 := fun _ => True) (motive_3 := fun _ => True)
+    (by intro h; exact isGuarded_false_substitute_preserved_end u v repl h)
+    (by intro p bs _ h; exact isGuarded_false_substitute_preserved_send p bs u v repl h)
+    (by intro p bs _ h; exact isGuarded_false_substitute_preserved_recv p bs u v repl h)
+    (by intro s body ih h; exact isGuarded_false_substitute_preserved_mu s body u v repl hneq h ih)
+    (by intro w h; exact isGuarded_false_substitute_preserved_var w u v repl hneq h)
+    (by exact True.intro) (by intro _ _ _ _; exact True.intro) (by intro _ _ _; exact True.intro) t) hunguarded
 
 /-- Corollary: Unguardedness is preserved in the forward direction.
     (The reverse direction is more complex and not needed.) -/
 theorem isGuarded_substitute_forward (lt : LocalTypeR) (u v : String) (repl : LocalTypeR)
     (hneq : u ≠ v) (hunguarded : lt.isGuarded v = false) :
-    (lt.substitute u repl).isGuarded v = false :=
-  isGuarded_false_substitute_preserved lt u v repl hneq hunguarded
+    (lt.substitute u repl).isGuarded v = false := by
+  -- Reuse the preservation lemma directly.
+  exact isGuarded_false_substitute_preserved lt u v repl hneq hunguarded
 
 /-! ## Mismatched Guardedness Lemmas
 
@@ -194,14 +205,7 @@ So if `(projTrans inner role).isGuarded s = false` and `s ≠ t`, then by
 
 But `hL` claims `isGuarded s = true`, contradiction! -/
 
-/-- Mismatched guardedness: guarded mu unfold relates to end.
-
-    **PROVEN**: This case is vacuously true because the hypotheses are contradictory.
-
-    By `proj_subst`, both sides have the same isGuarded value when `s ≠ t`.
-    So if RHS is unguarded (`hR_pre`), LHS cannot be guarded (`hL`).
-
-    Note: Requires `s ≠ t` hypothesis, which holds in Harmony.lean (non-shadowed branch). -/
+/-- Mismatched guardedness: guarded mu unfold relates to end. -/
 theorem EQ2_mu_unguarded_to_end'
     {s t : String} {inner G : GlobalType} {role : String}
     (hst : s ≠ t)
@@ -224,30 +228,7 @@ theorem EQ2_mu_unguarded_to_end'
   rw [hcontra] at hL
   simp at hL
 
-/-- Mismatched guardedness: end relates to guarded mu unfold.
-
-    **Analysis from Coq reference (coLocal.v):**
-
-    In Coq, EQ2 is defined as `paco2 ((ApplyF full_eunf full_eunf) ∘ EQ2_gen)`, meaning
-    both sides are fully unfolded before comparison. The key lemma `eguarded_unfv` shows:
-    ```
-    eguarded n g = false → full_eunf g = EVar n
-    ```
-    So unguarded mu types unfold to `EVar n`, NOT `EEnd`. Since `EQ2_gen` has no case
-    matching `EEnd` with `EVar n`, Coq considers `.end` and unguarded mu to be **NOT**
-    EQ2-equivalent. Instead, Coq uses well-formedness predicates (`lInvPred`) to exclude
-    non-contractive types from the EQ2 domain entirely.
-
-    **Our approach:** Following Coq's strategy, we require the global type `G` to be closed.
-    For closed types, `isGuarded_of_closed` shows all variables are guarded, making the
-    hypothesis `hL_pre : isGuarded s = false` vacuously false. This makes the theorem
-    trivially true by contradiction.
-
-    **Why this works:** In real protocol verification, global types are closed (no free
-    variables). By `trans_isClosed_of_isClosed`, projections of closed global types are
-    closed local types. Therefore, the unguardedness hypothesis never holds in practice.
-
-    Note: In Harmony.lean this lemma is used in the non-shadowed branch (s ≠ t). -/
+/-- Mismatched guardedness: end relates to guarded mu unfold. -/
 theorem EQ2_end_to_mu_unguarded'
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)

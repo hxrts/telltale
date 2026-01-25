@@ -1,6 +1,6 @@
 # RumpsteakV2 Code Map
 
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-01-24
 
 This document provides a comprehensive map of key proofs, lemmas, and definitions in the RumpsteakV2 formal verification codebase.
 
@@ -23,6 +23,10 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 - Total size: ~1.4MB
 - Main modules: Protocol, Semantics, Proofs, Coinductive
 - Central result: Choreographic projection correctness and safety
+
+**Axiom Inventory (V2):**
+- Inductive projection path: 0 axioms (all discharged)
+- Coinductive EQ2 path: 0 axioms (EQ2 transitivity via Bisim detour)
 
 **Key Research Questions Addressed:**
 1. Does choreographic projection preserve semantics? (Harmony theorem)
@@ -94,38 +98,55 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 
 ## Projection System
 
-### Protocol/Projection/Project.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Project.lean` (226KB, largest file)
+### Protocol/Projection/Project.lean (re-export)
+**Location:** `RumpsteakV2/Protocol/Projection/Project.lean` (1.2KB)
 
-**Central Definitions:**
-- `CProjectF : (GlobalType → String → LocalTypeR → Prop) → GlobalType → String → LocalTypeR → Prop`
-  - One-step projection generator
+**Role:**
+- Re-exports the split Project modules under `Protocol/Projection/Project/`.
+- Provides a stable import path for downstream proofs.
 
-- `CProject : GlobalType → String → LocalTypeR → Prop`
-  - Main projection relation (greatest fixed point of CProjectF)
+### Protocol/Projection/Project/* (split modules)
+**Location:** `RumpsteakV2/Protocol/Projection/Project/` (20 files)
 
-- `Projectable : GlobalType → Prop`
-  - Global projectability (every role has a CProject witness)
-- `ProjectableClosedWellFormed : Prop`
-  - Projectability assumption for closed, well-formed globals (used in Harmony/SubjectReduction)
+**Central Definitions (split across modules):**
+- `CProjectF` / `CProject` - core projection relation (Project/ImplBase.lean)
+- `Projectable` / `ProjectableClosedWellFormed` - projectability predicates (Project/Core.lean)
+- `BranchesProjRel` / `AllBranchesProj` - branch-wise projection relations (Project/ImplBase.lean)
 
-**Key Theorems:**
-- `CProject_unfold` - Unfold CProject one step
-- `CProject_fold` - Fold CProjectF back to CProject
-- `CProject_coind` - Coinduction principle for CProject
-- `CProject_destruct` - Destruct CProject to CProjectF
+**File Size Table (split):**
 
-**Branch Projection:**
-- `BranchesProjRel` - Branch-wise projection relation
-- `branches_project_coherent` - Branches project coherently
+| File | Size | Purpose |
+|------|------|---------|
+| Core.lean | 4.0KB | Projectable, projectR? core API |
+| CProjectTransRel.lean | 0.9KB | CProject→EQ2 trans wrappers |
+| CProjectU.lean | 0.8KB | Unfold-insensitive projection interface |
+| Completeness.lean | 0.7KB | projectR? completeness |
+| Props.lean | 0.6KB | determinism/props re-export |
+| Impl.lean | 0.6KB | Impl re-export |
+| ImplBase.lean | 14.1KB | core CProject proofs |
+| ImplConstructors.lean | 20.7KB | constructor-specific trans lemmas |
+| ImplTransRelComp.lean | 28.8KB | postfix/comp proofs for trans relation |
+| ImplObservables.lean | 16.7KB | observable preservation |
+| ImplHeadPreservation.lean | 15.6KB | head preservation lemmas |
+| ImplCompleteness.lean | 14.9KB | completeness scaffolding |
+| ImplCompPostfix.lean | 42.4KB | comp postfix lemmas |
+| ImplExtraction.lean | 30.2KB | extraction / compose-through-mu |
+| ImplU.lean | 37.0KB | CProjectU proofs |
+| Muve.lean | 0.7KB | muve front-end |
+| MuveImpl.lean | 0.3KB | muve re-export |
+| MuveImplBase.lean | 24.8KB | muve base proofs |
+| MuveImplNonPart.lean | 18.5KB | non-participant muve |
+| MuveImplParticipant.lean | 19.5KB | participant muve |
 
-**Observable Preservation:**
-- Observable preservation lemmas are proved directly in Project.lean (no axioms).
+**Key Theorems (new locations):**
+- `CProject_unfold` / `CProject_fold` / `CProject_coind` / `CProject_destruct` → Project/ImplBase.lean
+- `branches_project_coherent` → Proofs/Projection/Harmony.lean (coherence via participation)
+- Observable preservation lemmas → Project/ImplObservables.lean
 
 ---
 
 ### Protocol/Projection/Projectb.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Projectb.lean` (40KB)
+**Location:** `RumpsteakV2/Protocol/Projection/Projectb.lean` (62.5KB)
 
 **Key Definitions:**
 - Alternative projection formulation using boolean guards
@@ -138,7 +159,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ---
 
 ### Protocol/Projection/Trans.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Trans.lean` (31KB)
+**Location:** `RumpsteakV2/Protocol/Projection/Trans.lean` (35.5KB)
 
 **Key Definition:**
 - `trans : GlobalType → String → LocalTypeR` - Direct projection function
@@ -180,7 +201,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ---
 
 ### Protocol/Projection/ProjectProps.lean
-**Location:** `RumpsteakV2/Protocol/Projection/ProjectProps.lean`
+**Location:** `RumpsteakV2/Protocol/Projection/ProjectProps.lean` (5.8KB)
 
 **Key Theorems:**
 - `project_deterministic` - Projection is deterministic up to EQ2
@@ -225,7 +246,6 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 - `EQ2_symm` - Symmetry
 - `EQ2_trans_via_end` - Transitivity via `.end` without full trans
 - `EQ2_trans_via_var` - Transitivity via `.var v` without full trans
-- `EQ2_trans` - Transitivity
 - `EQ2_unfold_left` - Unfold left mu
 - `EQ2_unfold_right` - Unfold right mu
 - `EQ2_send_head` - Send constructor equality
@@ -330,7 +350,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 ## Main Theorems
 
 ### Proofs/Projection/Harmony.lean
-**Location:** `RumpsteakV2/Proofs/Projection/Harmony.lean` (60KB)
+**Location:** `RumpsteakV2/Proofs/Projection/Harmony.lean` (81KB)
 
 **CENTRAL RESULT - Projection Harmony:**
 
@@ -354,7 +374,8 @@ This theorem states that global choreography steps correspond to local environme
 
 - `proj_trans_sender_step` - Sender projection step
 - `proj_trans_receiver_step` - Receiver projection step
-- `proj_trans_other_step` - Non-participant projection step (requires `ProjectableClosedWellFormed`)
+- `proj_trans_other_step` - Non-participant projection step (requires `ProjectableClosedWellFormed`;
+  mu case chains via `EQ2_trans_wf` with WellFormed witnesses)
 
 - `trans_branches_coherent_EQ2` - Branches project coherently
   ```lean
@@ -529,6 +550,7 @@ Well-formedness is preserved by global steps (type safety).
 - `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (requires productivity on both sides)
 - `toCoind_toInductive_eq2c_of_env_toCoind` - Round-trip for `toCoind` images (discharges productivity)
 - `envOf`, `nameOf` - Environment/name generation (definitions, no axioms)
+- `BranchesRelC_gupaco_clo`, `gupaco_clo_obs_of_rr` - gpaco_clo helper lemmas (guarded observable extraction)
 
 ---
 
@@ -546,10 +568,10 @@ Well-formedness is preserved by global steps (type safety).
 ## Supporting Lemmas
 
 ### Proofs/Core/Assumptions.lean
-**Location:** `RumpsteakV2/Proofs/Core/Assumptions.lean` (1KB)
+**Location:** `RumpsteakV2/Proofs/Core/Assumptions.lean` (0.3KB)
 
-**Key Axiom:**
-- `projectable_of_closed_wellFormed` - Closed & well-formed globals are projectable
+**Notes:**
+- No axioms currently live in this module (kept for centralized assumptions)
 
 ### Protocol/CoTypes/Observable.lean
 **Location:** `RumpsteakV2/Protocol/CoTypes/Observable.lean` (11KB)
@@ -605,7 +627,7 @@ Well-formedness is preserved by global steps (type safety).
 
 #### **Projectability Assumptions**
 1. `Projectable` - Project.lean (global projectability predicate)
-2. `projectable_of_closed_wellFormed` - Proofs/Core/Assumptions.lean (axiom)
+2. `ProjectableClosedWellFormed` - Project/Core.lean (assumption used by Harmony/SubjectReduction)
 
 #### **Determinism Chain**
 1. `project_deterministic` - ProjectProps.lean
@@ -682,20 +704,20 @@ Roundtrip.lean
 
 ## Axiom Inventory
 
-### Inductive Codebase (1 axiom)
+### Inductive Codebase (0 axioms)
 
 | File | Count | Key Axioms |
 |------|-------|------------|
 | Project.lean | 0 | *(none)* |
 | Projectb.lean | 0 | *(none)* |
 | DBBridge.lean | 0 | *(none)* |
-| Proofs/Core/Assumptions.lean | 1 | `projectable_of_closed_wellFormed` |
+| Proofs/Core/Assumptions.lean | 0 | *(none)* |
 
-### Coinductive Codebase (1 axiom)
+### Coinductive Codebase (0 axioms)
 
 | File | Count | Key Axioms |
 |------|-------|------------|
-| EQ2.lean | 1 | `TransRel_postfix` |
+| EQ2.lean | 0 | *(none)* |
 
 ### Sorry Inventory
 
@@ -712,7 +734,7 @@ Roundtrip.lean
 2. Bisim.lean - 157KB
 3. LocalTypeR.lean - 74KB
 4. GlobalType.lean - 64KB
-5. Harmony.lean - 60KB (~1,191 lines)
+5. Harmony.lean - 81KB (~1,618 lines)
 6. SubstCommBarendregt.lean - 58KB
 7. BisimDecidable.lean - 51KB
 8. Determinism.lean - 40KB

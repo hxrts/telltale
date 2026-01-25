@@ -49,9 +49,11 @@ open RumpsteakV2.Protocol.Projection.Project
 theorem EQ2_CProjectTransRel_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
-    (hrel : CProjectTransRel (.mu v body) c) :
+    (hrel : CProjectTransRel (.mu v body) c)
+    (hWFa : LocalTypeR.WellFormed a) (hWFc : LocalTypeR.WellFormed c) :
     EQ2F (EQ2_closure CProjectTransRelComp) a c := by
-  exact RumpsteakV2.Protocol.Projection.Project.EQ2_CProjectTransRel_compose_through_mu heq hrel
+  exact RumpsteakV2.Protocol.Projection.Project.EQ2_CProjectTransRel_compose_through_mu
+    heq hrel hWFa hWFc
 
 
 end RumpsteakV2.Protocol.Projection.ProjectPaco

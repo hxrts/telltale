@@ -4,6 +4,15 @@ import RumpsteakV2.Semantics.EnvStep
 import RumpsteakV2.Proofs.Projection.Harmony
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
+/- 
+The Problem. Show that typing is preserved by operational steps: when a
+well-typed configuration steps, its resulting configuration remains well-typed.
+
+Solution Structure. Define configurations and typing judgments, state the
+subject-reduction claims as a bundle, then prove preservation of typing and
+well-formedness, plus auxiliary EQ2 preservation facts for projections.
+-/
+
 /-! # RumpsteakV2.Proofs.Safety.SubjectReduction
 
 Subject reduction for V2.
@@ -40,12 +49,14 @@ open RumpsteakV2.Proofs.Projection.Harmony
 
 /-- A process is abstracted as having a local type. -/
 structure Process where
+  -- Each process is identified by a role and its local type.
   role : String
   localType : QLocalTypeR
   deriving Inhabited
 
 /-- A configuration consists of a global type and a list of processes. -/
 structure Configuration where
+  -- A configuration records the global type and its processes.
   globalType : GlobalType
   processes : List Process
   deriving Inhabited
@@ -58,6 +69,7 @@ stepping (Remark 10 in the paper). -/
 
 /-- A process is well-typed if its local type matches the projection of the global type. -/
 def Process.wellTyped (p : Process) (g : GlobalType) : Prop :=
+  -- Typing means the local type matches the projection of the global type.
   p.localType = QLocalTypeR.ofLocal (trans g p.role)
 
 /-- A configuration is well-typed relative to a fixed role set S if:
@@ -68,6 +80,7 @@ def Process.wellTyped (p : Process) (g : GlobalType) : Prop :=
 This follows the Coq definition of coherent:
   coherent l := ∃ g S, coherentG g ∧ l = map (proj g) S ∧ uniq S ∧ subset (roles g) S -/
 structure WellTypedConfig (c : Configuration) : Prop where
+  -- Bundle the typing and role-side invariants.
   /-- Each process is typed by the projection of the global type. -/
   processes_typed : ∀ p ∈ c.processes, p.wellTyped c.globalType
   /-- Global type roles are contained in process roles. -/
@@ -79,10 +92,12 @@ structure WellTypedConfig (c : Configuration) : Prop where
 
 /-- A configuration can step when the global type can step. -/
 def Configuration.canStep (c : Configuration) (act : GlobalActionR) : Prop :=
+  -- A configuration steps when its global type can step.
   RumpsteakV2.Protocol.GlobalType.canStep c.globalType act
 
 /-- Configuration stepping: update the global type and the affected processes. -/
 structure ConfigStep (c c' : Configuration) (act : GlobalActionR) : Prop where
+  -- Bundle the global step with updated process projections.
   /-- The global type steps. -/
   global_step : step c.globalType act c'.globalType
   /-- Process roles are preserved. -/
@@ -90,6 +105,16 @@ structure ConfigStep (c c' : Configuration) (act : GlobalActionR) : Prop where
   /-- Each process's new type matches the stepped projection. -/
   processes_stepped : ∀ p' ∈ c'.processes,
       p'.localType = QLocalTypeR.ofLocal (trans c'.globalType p'.role)
+
+/-! ## Claims -/
+
+/-- Claims bundle for subject reduction. -/
+structure Claims where
+  /-- Subject reduction preserves typing. -/
+  subject_reduction : ∀ c c' act, WellTypedConfig c → ConfigStep c c' act → WellTypedConfig c'
+  /-- Subject reduction preserves well-formedness. -/
+  wellformed_preserved : ∀ c c' act, WellTypedConfig c → ConfigStep c c' act →
+      WellFormedEnv (projEnv c'.globalType)
 
 /-! ## Subject Reduction -/
 
@@ -107,6 +132,7 @@ theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
     (hstep : ConfigStep c c' act) :
     WellTypedConfig c' where
   processes_typed := by
+    -- Each process type is updated by the step definition.
     intro p' hp'
     exact hstep.processes_stepped p' hp'
   roles_contained := by
@@ -117,6 +143,7 @@ theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
     rw [← hstep.roles_preserved]
     exact hcontained
   roles_unique := by
+    -- Role uniqueness is preserved by the role-preservation field.
     rw [← hstep.roles_preserved]
     exact htyped.roles_unique
 
@@ -127,6 +154,7 @@ theorem step_preserves_wellformed {c c' : Configuration} {act : GlobalActionR}
     (_htyped : WellTypedConfig c)
     (_hstep : ConfigStep c c' act) :
     WellFormedEnv (projEnv c'.globalType) := by
+  -- projEnv uses GlobalType.roles, which is always nodup.
   constructor
   rw [projEnv_dom]
   -- GlobalType.roles always produces Nodup lists
@@ -141,12 +169,14 @@ The sender performs a send action and its type evolves accordingly. -/
 theorem sender_type_after_step (g g' : GlobalType) (act : GlobalActionR)
     (_hstep : step g act g') :
     EQ2 (trans g' act.sender) (trans g' act.sender) :=
+  -- Reflexivity suffices since both sides are the same projection.
   EQ2_refl _
 
 /-- After a step, the receiver's local type is EQ2-equivalent to its projection. -/
 theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
     (_hstep : step g act g') :
     EQ2 (trans g' act.receiver) (trans g' act.receiver) :=
+  -- Reflexivity suffices since both sides are the same projection.
   EQ2_refl _
 
 /-- Non-participants have unchanged types (up to EQ2) after a step.
@@ -158,21 +188,13 @@ theorem other_type_preserved (g g' : GlobalType) (act : GlobalActionR) (role : S
     (hwf : g.wellFormed = true)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver)
     (hproj : ProjectableClosedWellFormed)
-    : EQ2 (trans g' role) (trans g role) :=
-  proj_trans_other_step g g' act role hstep hclosed hwf hns hnr hproj
-
-/-! ## Claims Bundle -/
-
-/-- Claims bundle for subject reduction. -/
-structure Claims where
-  /-- Subject reduction preserves typing. -/
-  subject_reduction : ∀ c c' act, WellTypedConfig c → ConfigStep c c' act → WellTypedConfig c'
-  /-- Subject reduction preserves well-formedness. -/
-  wellformed_preserved : ∀ c c' act, WellTypedConfig c → ConfigStep c c' act →
-      WellFormedEnv (projEnv c'.globalType)
+    : EQ2 (trans g' role) (trans g role) := by
+  -- Delegate to the projection harmony lemma for non-participants.
+  exact proj_trans_other_step g g' act role hstep hclosed hwf hns hnr hproj
 
 /-- Build the claims bundle from proven theorems. -/
 def claims : Claims where
+  -- Package the main theorems into the Claims structure.
   subject_reduction := fun _ _ _ h1 h2 => step_preserves_typing h1 h2
   wellformed_preserved := fun _ _ _ h1 h2 => step_preserves_wellformed h1 h2
 
