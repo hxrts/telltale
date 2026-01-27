@@ -3,6 +3,7 @@ import RumpsteakV2.Protocol.GlobalType.Part3
 set_option linter.dupNamespace false
 
 namespace RumpsteakV2.Protocol.GlobalType
+/-- Removing a duplicate from unguarded preserves isProductive. -/
 theorem isProductive_cons_dedup (g : GlobalType) (x : String) (unguarded : List String)
     (hprod : g.isProductive (x :: x :: unguarded) = true) :
     g.isProductive (x :: unguarded) = true := by
@@ -126,11 +127,11 @@ mutual
       (unguarded : List String)
       (hg : inner.isProductive (t :: varName :: unguarded) = true)
       (heq : (t == varName) = true) :
-      inner.isProductive (varName :: unguarded) = true := by
+      inner.isProductive (t :: unguarded) = true := by
     -- Shadowed binder: dedup the unguarded list.
     have heq' : t = varName := by simpa [beq_iff_eq] using heq
     subst heq'
-    exact isProductive_cons_dedup inner varName unguarded hg
+    exact isProductive_cons_dedup inner t unguarded hg
 
   /-- isProductive is preserved under substitution.
 

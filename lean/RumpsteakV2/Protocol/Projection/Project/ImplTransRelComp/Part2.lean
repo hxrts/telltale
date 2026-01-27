@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplTransRelComp.Part1
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 private theorem CProjectTransRel_postfix_comm_send_sender
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
@@ -232,10 +242,11 @@ private theorem CProjectTransRel_postfix_comm_cases
   | var v =>
       exact CProjectTransRel_postfix_comm_var (t := t) hproj hne htrans
 
+/-- Postfix property for CProjectTransRel with EQ2_closure of the composite relation. -/
 theorem CProjectTransRel_postfix :
     ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   intro lt t ⟨g, role, hproj, htrans, hwf⟩
-  -- Derive non-empty comms and the one-step CProjectF witness.
+  -- Proof strategy: reduce to CProjectF cases and dispatch by global constructor.
   have hne : g.allCommsNonEmpty = true := by
     have hwf' := hwf
     simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'

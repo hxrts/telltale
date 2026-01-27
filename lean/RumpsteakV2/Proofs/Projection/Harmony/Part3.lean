@@ -9,6 +9,17 @@ matches the top-level communication of `g`. Under this predicate,
 `comm_async` is impossible, so the projection transition is deterministic.
 -/
 
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.Projection.Trans
+  (trans_comm_sender trans_comm_receiver trans_comm_other trans_wellFormed_of_wellFormed)
+open RumpsteakV2.Protocol.Projection.Project (ProjectableClosedWellFormed)
+open RumpsteakV2.Protocol.Projection.Projectb (CProject)
+
+abbrev projTransBranches := RumpsteakV2.Protocol.Projection.Trans.transBranches
+
 private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
   -- Action matches the head comm of g, otherwise false.
   match g with
@@ -19,7 +30,7 @@ private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
 private theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
-    (label, projTrans cont role) ∈ transBranches branches role := by
+    (label, projTrans cont role) ∈ projTransBranches branches role := by
   induction branches with
   | nil => cases hmem
   | cons hd tl ih =>
@@ -27,10 +38,10 @@ private theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
       | mk label_hd cont_hd =>
         cases hmem with
         | head =>
-            simp [transBranches]
+            simp [projTransBranches, RumpsteakV2.Protocol.Projection.Trans.transBranches]
         | tail _ htl =>
             have ih' := ih htl
-            simp [transBranches, List.mem_cons, ih']
+            simp [projTransBranches, RumpsteakV2.Protocol.Projection.Trans.transBranches, List.mem_cons, ih']
 
 /-- Sender projection follows the head communication matching the action. -/
 private theorem proj_trans_sender_step_comm_head
@@ -42,13 +53,14 @@ private theorem proj_trans_sender_step_comm_head
       (label, cont) ∈ bs ∧
       EQ2 (projTrans g' sender) cont := by
   -- Head comm: sender projects to a send with matching branch.
-  refine ⟨transBranches branches sender, projTrans g' sender, ?_, ?_, ?_⟩
+  refine ⟨projTransBranches branches sender, projTrans g' sender, ?_, ?_, ?_⟩
   · simpa [projTrans] using (trans_comm_sender sender receiver sender branches rfl)
-  · have hmem' : (label, projTrans g' sender) ∈ transBranches branches sender :=
+  · have hmem' : (label, projTrans g' sender) ∈ projTransBranches branches sender :=
       mem_transBranches_of_mem branches label g' sender hmem
     simpa using hmem'
   · simp [projTrans, EQ2_refl]
 
+/-- Sender-side projection for head steps in the original harmony statement. -/
 theorem proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     ∃ bs cont,
@@ -88,13 +100,14 @@ private theorem proj_trans_receiver_step_comm_head
     have hno := hno_self
     simp [GlobalType.noSelfComm] at hno
     intro hEq; exact hno.1 hEq.symm
-  refine ⟨transBranches branches receiver, projTrans g' receiver, ?_, ?_, ?_⟩
+  refine ⟨projTransBranches branches receiver, projTrans g' receiver, ?_, ?_, ?_⟩
   · simpa [projTrans] using (trans_comm_receiver sender receiver receiver branches rfl hne)
-  · have hmem' : (label, projTrans g' receiver) ∈ transBranches branches receiver :=
+  · have hmem' : (label, projTrans g' receiver) ∈ projTransBranches branches receiver :=
       mem_transBranches_of_mem branches label g' receiver hmem
     simpa using hmem'
   · simp [projTrans, EQ2_refl]
 
+/-- Receiver-side projection for head steps in the original harmony statement. -/
 theorem proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act)
     (hno_self : g.noSelfComm = true) :
@@ -123,12 +136,9 @@ theorem proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
 
 /-- Helper: projectability yields a CProject witness. -/
 private theorem cproject_of_projectable (g : GlobalType) (role : String)
-    (hclosed : g.isClosed = true) (hwf : g.wellFormed = true)
-    (hproj : ProjectableClosedWellFormed) : ∃ lt, CProject g role lt := by
-  -- Use the projectability assumption specialized to g.
-  have hproj_g : Projectable g := by
-    simpa [ProjectableClosedWellFormed] using (hproj g hclosed hwf)
-  exact hproj_g role
+    (hproj : ProjectableClosedWellFormed g) : ∃ lt, CProject g role lt := by
+  -- Extract the projectability witness from the bundle.
+  exact hproj.2.2 role
 
 /-- Helper: comm_head case with nonempty branches. -/
 private theorem proj_trans_other_step_comm_head_nonempty
@@ -138,7 +148,7 @@ private theorem proj_trans_other_step_comm_head_nonempty
     (hclosed : (GlobalType.comm sender receiver ((fl, fc) :: rest)).isClosed = true)
     (hwf : (GlobalType.comm sender receiver ((fl, fc) :: rest)).wellFormed = true)
     (hns : role ≠ sender) (hnr : role ≠ receiver)
-    (hproj : ProjectableClosedWellFormed) :
+    (hproj : ProjectableClosedWellFormed (GlobalType.comm sender receiver ((fl, fc) :: rest))) :
     EQ2 (projTrans cont role)
       (projTrans (GlobalType.comm sender receiver ((fl, fc) :: rest)) role) := by
   -- Rewrite the comm projection to the first continuation.
@@ -147,7 +157,7 @@ private theorem proj_trans_other_step_comm_head_nonempty
     trans_comm_other sender receiver role ((fl, fc) :: rest) hns hnr
   -- Get a CProject witness and branch-side invariants.
   have hproj_comm : ∃ lt, CProject (GlobalType.comm sender receiver ((fl, fc) :: rest)) role lt :=
-    cproject_of_projectable _ role hclosed hwf hproj
+    cproject_of_projectable _ role hproj
   have hclosed_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.isClosed = true :=
     GlobalType.isClosed_comm_branches sender receiver ((fl, fc) :: rest) hclosed
   have hallwf_branches : ∀ b ∈ ((fl, fc) :: rest), b.2.wellFormed = true :=
@@ -159,14 +169,14 @@ private theorem proj_trans_other_step_comm_head_nonempty
   simpa [htrans_g] using hcoherent
 
 /-- Helper: comm_head case (handles empty branches by contradiction). -/
-private theorem proj_trans_other_step_comm_head
+theorem proj_trans_other_step_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches)
     (hclosed : (GlobalType.comm sender receiver branches).isClosed = true)
     (hwf : (GlobalType.comm sender receiver branches).wellFormed = true)
     (hns : role ≠ sender) (hnr : role ≠ receiver)
-    (hproj : ProjectableClosedWellFormed) :
+    (hproj : ProjectableClosedWellFormed (GlobalType.comm sender receiver branches)) :
     EQ2 (projTrans cont role)
       (projTrans (GlobalType.comm sender receiver branches) role) := by
   -- Split on branch structure to reach the nonempty helper.
@@ -181,18 +191,18 @@ private theorem proj_trans_other_step_comm_head
 /-- Helper: comm_async case when role is the sender. -/
 private theorem proj_trans_other_step_comm_async_sender
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (role : String)
-    (hbranch_rel : BranchesRel EQ2 (transBranches branches' role) (transBranches branches role))
+    (hbranch_rel : BranchesRel EQ2 (projTransBranches branches' role) (projTransBranches branches role))
     (hrs : role = sender) :
     EQ2 (projTrans (GlobalType.comm sender receiver branches') role)
         (projTrans (GlobalType.comm sender receiver branches) role) := by
   -- Rewrite both sides to sends and use EQ2.construct.
   have hsend' :
       projTrans (GlobalType.comm sender receiver branches') role =
-        .send receiver (transBranches branches' role) := by
+        .send receiver (projTransBranches branches' role) := by
     simpa [projTrans] using (trans_comm_sender sender receiver role branches' hrs)
   have hsend :
       projTrans (GlobalType.comm sender receiver branches) role =
-        .send receiver (transBranches branches role) := by
+        .send receiver (projTransBranches branches role) := by
     simpa [projTrans] using (trans_comm_sender sender receiver role branches hrs)
   rw [hsend', hsend]
   exact EQ2.construct ⟨rfl, hbranch_rel⟩
@@ -200,18 +210,18 @@ private theorem proj_trans_other_step_comm_async_sender
 /-- Helper: comm_async case when role is the receiver. -/
 private theorem proj_trans_other_step_comm_async_receiver
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (role : String)
-    (hbranch_rel : BranchesRel EQ2 (transBranches branches' role) (transBranches branches role))
+    (hbranch_rel : BranchesRel EQ2 (projTransBranches branches' role) (projTransBranches branches role))
     (hrr : role = receiver) (hrs : role ≠ sender) :
     EQ2 (projTrans (GlobalType.comm sender receiver branches') role)
         (projTrans (GlobalType.comm sender receiver branches) role) := by
   -- Rewrite both sides to recvs and use EQ2.construct.
   have hrecv' :
       projTrans (GlobalType.comm sender receiver branches') role =
-        .recv sender (transBranches branches' role) := by
+        .recv sender (projTransBranches branches' role) := by
     simpa [projTrans] using (trans_comm_receiver sender receiver role branches' hrr hrs)
   have hrecv :
       projTrans (GlobalType.comm sender receiver branches) role =
-        .recv sender (transBranches branches role) := by
+        .recv sender (projTransBranches branches role) := by
     simpa [projTrans] using (trans_comm_receiver sender receiver role branches hrr hrs)
   rw [hrecv', hrecv]
   exact EQ2.construct ⟨rfl, hbranch_rel⟩
@@ -221,8 +231,8 @@ private theorem proj_trans_other_step_comm_async_other_cons
     (sender receiver : String) (label label' : Label) (cont cont' : GlobalType)
     (rest rest' : List (Label × GlobalType)) (role : String)
     (hbranch_rel :
-      BranchesRel EQ2 (transBranches ((label', cont') :: rest') role)
-        (transBranches ((label, cont) :: rest) role))
+      BranchesRel EQ2 (projTransBranches ((label', cont') :: rest') role)
+        (projTransBranches ((label, cont) :: rest) role))
     (hrs : role ≠ sender) (hrr : role ≠ receiver) :
     EQ2 (projTrans (GlobalType.comm sender receiver ((label', cont') :: rest')) role)
         (projTrans (GlobalType.comm sender receiver ((label, cont) :: rest)) role) := by
@@ -230,9 +240,9 @@ private theorem proj_trans_other_step_comm_async_other_cons
   simp [projTrans, trans_comm_other, hrs, hrr]
   have hbranch_rel' :
       BranchesRel EQ2
-        ((label', projTrans cont' role) :: transBranches rest' role)
-        ((label, projTrans cont role) :: transBranches rest role) := by
-    simpa [transBranches] using hbranch_rel
+        ((label', projTrans cont' role) :: projTransBranches rest' role)
+        ((label, projTrans cont role) :: projTransBranches rest role) := by
+    simpa [projTransBranches, RumpsteakV2.Protocol.Projection.Trans.transBranches] using hbranch_rel
   cases hbranch_rel' with
   | cons hpair _ => exact hpair.2
 
@@ -240,7 +250,7 @@ private theorem proj_trans_other_step_comm_async_other
     (sender receiver : String) (branches branches' : List (Label × GlobalType))
     (act : GlobalActionR) (role : String)
     (hbstep : BranchesStep step branches act branches')
-    (hbranch_rel : BranchesRel EQ2 (transBranches branches' role) (transBranches branches role))
+    (hbranch_rel : BranchesRel EQ2 (projTransBranches branches' role) (projTransBranches branches role))
     (hrs : role ≠ sender) (hrr : role ≠ receiver) :
     EQ2 (projTrans (GlobalType.comm sender receiver branches') role)
         (projTrans (GlobalType.comm sender receiver branches) role) := by
@@ -252,21 +262,21 @@ private theorem proj_trans_other_step_comm_async_other
   | cons label cont cont' rest rest' _act _hstep _hbstep =>
       -- Reuse the cons/cons helper (labels are preserved by BranchesStep).
       have hbranch_rel' :
-          BranchesRel EQ2 (transBranches ((label, cont') :: rest') role)
-            (transBranches ((label, cont) :: rest) role) := by
+          BranchesRel EQ2 (projTransBranches ((label, cont') :: rest') role)
+            (projTransBranches ((label, cont) :: rest) role) := by
         simpa using hbranch_rel
       exact proj_trans_other_step_comm_async_other_cons
         sender receiver label label cont cont' rest rest' role hbranch_rel' hrs hrr
 
 /-- Helper: comm_async case (dispatches by role). -/
-private theorem proj_trans_other_step_comm_async
+theorem proj_trans_other_step_comm_async
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (act : GlobalActionR)
     (hbstep : BranchesStep step branches act branches')
     (ih_bstep :
       (∀ p ∈ branches, p.2.isClosed = true) →
       (∀ p ∈ branches, p.2.wellFormed = true) →
       ∀ role, role ≠ act.sender → role ≠ act.receiver →
-        BranchesRel EQ2 (transBranches branches' role) (transBranches branches role))
+        BranchesRel EQ2 (projTransBranches branches' role) (projTransBranches branches role))
     (hclosed : (GlobalType.comm sender receiver branches).isClosed = true)
     (hwf : (GlobalType.comm sender receiver branches).wellFormed = true)
     (role : String) (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
@@ -362,7 +372,7 @@ private lemma branch_wf_parts {b : Label × GlobalType} (h : b.2.wellFormed = tr
     b.2.allVarsBound = true ∧ b.2.allCommsNonEmpty = true ∧
       b.2.noSelfComm = true ∧ b.2.isProductive = true := by
   -- Split the wellFormed conjuncts for branch-level reuse.
-  simpa [GlobalType.wellFormed, Bool.and_eq_true] using h
+  simpa [GlobalType.wellFormed, Bool.and_eq_true, and_assoc] using h
 
 private lemma branches_wf_parts (branches : List (Label × GlobalType))
     (hbranches_wf : ∀ b ∈ branches, b.2.wellFormed = true) :
@@ -406,7 +416,10 @@ private lemma comm_sender_ne_receiver_of_wf {sender receiver : String} {branches
   have hnoself : (GlobalType.comm sender receiver branches).noSelfComm = true := by
     have hwf' := hwf_comm; simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'; exact hwf'.1.2
   by_cases h : sender = receiver
-  · subst h; have : False := by simp [GlobalType.noSelfComm] at hnoself; exact this.elim
+  · subst h
+    have : False := by
+      simpa [GlobalType.noSelfComm] using hnoself
+    exact this.elim
   · exact h
 
 private lemma comm_branches_nonempty_of_wf {sender receiver : String} {branches : List (Label × GlobalType)}
@@ -446,7 +459,11 @@ private theorem step_preserves_wf_comm_head
 
 private theorem step_preserves_wf_comm_async
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (act : GlobalActionR)
-    (_label : Label) (_cont : GlobalType) (_hns_cond : _) (_hcond : _) (_hmem : _) (_hcan : _)
+    (_label : Label) (_cont : GlobalType)
+    (_hns_cond : act.sender ≠ receiver)
+    (_hcond : act.sender = sender → act.receiver ≠ receiver)
+    (_hmem : (_label, _cont) ∈ branches)
+    (_hcan : canStep _cont act)
     (hbstep : BranchesStep step branches act branches')
     (ih_bstep : BranchWFMotive branches act branches' hbstep)
     (hwf_comm : (GlobalType.comm sender receiver branches).wellFormed = true) :
@@ -494,105 +511,11 @@ private theorem branches_wf_cons
         hwf_rest q (List.mem_cons_of_mem (label, g) hq)
       exact ih_bstep hwf_tail p hp'
 
-private theorem step_preserves_wellFormed (g g' : GlobalType) (act : GlobalActionR)
+theorem step_preserves_wellFormed (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hwf : g.wellFormed = true) : g'.wellFormed = true := by
   -- Recursor with constructor-specific helpers.
   refine @step.rec (motive_1 := StepWFMotive) (motive_2 := BranchWFMotive)
     step_preserves_wf_comm_head step_preserves_wf_comm_async step_preserves_wf_mu
     branches_wf_nil branches_wf_cons g act g' hstep hwf
-
-private theorem proj_trans_other_step_mu_chain
-    (t : String) (body : GlobalType) (role : String)
-    (hclosed : (GlobalType.mu t body).isClosed = true)
-    (hsubst_wf : (body.substitute t (.mu t body)).wellFormed = true)
-    (hwf : (GlobalType.mu t body).wellFormed = true) :
-    EQ2 (projTrans (body.substitute t (.mu t body)) role) (projTrans (.mu t body) role) := by
-  -- Unfold-substitute chain with well-formedness witnesses.
-  have h2 := trans_substitute_unfold t body role hclosed
-  have h3 := EQ2_symm (EQ2_unfold_right (EQ2_refl _))
-  have hWFb := trans_wellFormed_of_wellFormed _ _ hsubst_wf
-  have hWFc := trans_wellFormed_of_wellFormed _ _ hwf
-  have hWFunfold := LocalTypeR.WellFormed.unfold hWFc
-  exact EQ2_trans_wf h2 h3 hWFb hWFunfold hWFc
-
-/-- Helper: mu case for non-participants. -/
-private theorem proj_trans_other_step_mu
-    (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType)
-    (hstep_sub : step (body.substitute t (.mu t body)) act g')
-    (ih_step :
-      (body.substitute t (.mu t body)).isClosed = true →
-      (body.substitute t (.mu t body)).wellFormed = true →
-      ∀ role, role ≠ act.sender → role ≠ act.receiver →
-        EQ2 (projTrans g' role) (projTrans (body.substitute t (.mu t body)) role))
-    (hclosed : (GlobalType.mu t body).isClosed = true)
-    (hwf : (GlobalType.mu t body).wellFormed = true)
-    (role : String) (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
-    EQ2 (projTrans g' role) (projTrans (GlobalType.mu t body) role) := by
-  -- Chain IH with trans_substitute_unfold and the unfold lemma.
-  have hsubst_closed : (body.substitute t (.mu t body)).isClosed = true :=
-    GlobalType.isClosed_substitute_mu t body hclosed
-  have hsubst_wf : (body.substitute t (.mu t body)).wellFormed = true :=
-    wellFormed_mu_unfold t body hwf
-  have hWFg' : g'.wellFormed = true := step_preserves_wellFormed _ _ _ hstep_sub hsubst_wf
-  have h1 : EQ2 (projTrans g' role) (projTrans (body.substitute t (.mu t body)) role) :=
-    ih_step hsubst_closed hsubst_wf role hns hnr
-  have h23 := proj_trans_other_step_mu_chain t body role hclosed hsubst_wf hwf
-  have hWFa := trans_wellFormed_of_wellFormed g' role hWFg'
-  have hWFb := trans_wellFormed_of_wellFormed _ _ hsubst_wf
-  have hWFc := trans_wellFormed_of_wellFormed _ _ hwf
-  exact EQ2_trans_wf h1 h23 hWFa hWFb hWFc
-
-/-- Helper: BranchesStep.nil case. -/
-private theorem proj_trans_other_step_branches_nil (act : GlobalActionR) (role : String)
-    (_hns : role ≠ act.sender) (_hnr : role ≠ act.receiver) :
-    BranchesRel EQ2 (transBranches [] role) (transBranches [] role) := by
-  -- Empty branch lists are trivially related.
-  simp [transBranches, BranchesRel]
-
-private abbrev StepIH (g g' : GlobalType) (act : GlobalActionR) : Prop :=
-  -- Branch-step head hypothesis type.
-  g.isClosed = true → g.wellFormed = true →
-    ∀ role, role ≠ act.sender → role ≠ act.receiver →
-      EQ2 (projTrans g' role) (projTrans g role)
-
-private abbrev BranchIH (rest rest' : List (Label × GlobalType)) (act : GlobalActionR) : Prop :=
-  -- Branch-step tail hypothesis type.
-  (∀ p ∈ rest, p.2.isClosed = true) →
-    (∀ p ∈ rest, p.2.wellFormed = true) →
-      ∀ role, role ≠ act.sender → role ≠ act.receiver →
-        BranchesRel EQ2 (transBranches rest' role) (transBranches rest role)
-
-/-- Helper: BranchesStep.cons case. -/
-private theorem proj_trans_other_step_branches_cons
-    (label : Label) (g g' : GlobalType) (rest rest' : List (Label × GlobalType))
-    (act : GlobalActionR) (ih_step : StepIH g g' act) (ih_bstep : BranchIH rest rest' act)
-    (hclosed : ∀ p ∈ ((label, g) :: rest), p.2.isClosed = true)
-    (hwf : ∀ p ∈ ((label, g) :: rest), p.2.wellFormed = true)
-    (role : String) (hns : role ≠ act.sender) (hnr : role ≠ act.receiver) :
-    BranchesRel EQ2 (transBranches ((label, g') :: rest') role)
-      (transBranches ((label, g) :: rest) role) := by
-  -- Build the cons proof from the head IH and tail IH.
-  simp [transBranches]
-  refine List.Forall₂.cons ?head ?tail
-  · constructor
-    · rfl
-    · exact ih_step (hclosed (label, g) List.mem_cons_self)
-        (hwf (label, g) List.mem_cons_self) role hns hnr
-  · exact ih_bstep (fun p hp => hclosed p (List.mem_cons_of_mem (label, g) hp))
-      (fun p hp => hwf p (List.mem_cons_of_mem (label, g) hp)) role hns hnr
-
-/-- Motive for non-participant step preservation. -/
-private abbrev StepMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) (_ : step g act g') : Prop :=
-  g.isClosed = true → g.wellFormed = true →
-  ∀ role, role ≠ act.sender → role ≠ act.receiver →
-    EQ2 (projTrans g' role) (projTrans g role)
-
-/-- Motive for branch-wise non-participant preservation. -/
-private abbrev BranchMotive (bs : List (Label × GlobalType)) (act : GlobalActionR)
-    (bs' : List (Label × GlobalType)) (_ : BranchesStep step bs act bs') : Prop :=
-  (∀ p ∈ bs, p.2.isClosed = true) →
-  (∀ p ∈ bs, p.2.wellFormed = true) →
-  ∀ role, role ≠ act.sender → role ≠ act.receiver →
-    BranchesRel EQ2 (transBranches bs' role) (transBranches bs role)
 
 end RumpsteakV2.Proofs.Projection.Harmony

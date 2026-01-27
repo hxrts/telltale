@@ -4,6 +4,11 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## EQ2 to Bisim (Well-Formed Witness) -/
 
 theorem EQ2.toBisim_of_wellFormed {a b : LocalTypeR} (hWFa : LocalTypeR.WellFormed a)

@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplU.Part1
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 private theorem CProjectUEQ2Rel_postfix_mu_case
     {g role cand e0 : _} {t : String} {body : GlobalType}
     (hg : GlobalType.fullUnfoldIter g = .mu t body)
@@ -53,7 +63,10 @@ private theorem CProjectUEQ2Rel_postfix_comm_end_case
       by_cases hrs : role = sender
       · exact False.elim (by simpa [hrs] using hcore'')
       · by_cases hrr : role = receiver
-        · have hne : receiver ≠ sender := by intro h; exact hrs (hrr.trans h); exact False.elim (by simpa [hrr, hne] using hcore'')
+        · have hne : receiver ≠ sender := by
+            intro h
+            exact hrs (hrr.trans h)
+          exact False.elim (by simpa [hrr, hne] using hcore'')
         · have hcore_nonpart : (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧
               AllBranchesProj CProjectU gbs role e0.fullUnfold := by
             simpa [hrs, hrr, he0] using hcore''
@@ -330,6 +343,7 @@ private theorem CProjectUEQ2Rel_postfix
           (sender := sender) (receiver := receiver) (gbs := gbs)
           hg hcore heq_full heq hWF_full hWF hWFcand hWFcand_full)
 
+/-- CProjectU is stable under EQ2-equivalent candidates (with well-formedness). -/
 theorem CProjectU_EQ2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProjectU g role e0) (heq : EQ2 e0 e1)
     (hWF : LocalTypeR.WellFormed e0) (hWF' : LocalTypeR.WellFormed e1)

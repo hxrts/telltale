@@ -150,11 +150,11 @@ mutual
       (bound : List String)
       (hg : inner.allVarsBound (t :: varName :: bound) = true)
       (heq : (t == varName) = true) :
-      inner.allVarsBound (varName :: bound) = true := by
+      inner.allVarsBound (t :: bound) = true := by
     -- Shadowed binder: dedup the bound list.
     have heq' : t = varName := by simpa [beq_iff_eq] using heq
     subst heq'
-    exact allVarsBound_cons_dedup inner varName bound hg
+    exact allVarsBound_cons_dedup inner t bound hg
 
   private theorem allVarsBound_substitute_mu_noshadow (t : String) (inner : GlobalType)
       (varName : String) (repl : GlobalType) (bound : List String)
@@ -337,6 +337,4 @@ mutual
         exact ⟨isProductive_mono g ug1 ug2 hsub hprod.1,
                isProductiveBranches_mono rest ug1 ug2 hsub hprod.2⟩
 end
-
-/-- Removing a duplicate from unguarded preserves isProductive. -/
 end RumpsteakV2.Protocol.GlobalType

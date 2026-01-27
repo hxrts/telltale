@@ -1,3 +1,6 @@
+import RumpsteakV2.Protocol.Participation.Core
+import RumpsteakV2.Protocol.Participation.Extra
+
 /-! # RumpsteakV2.Protocol.Participation
 
 Participation predicates for projection proofs.
@@ -15,6 +18,3 @@ The following definitions form the semantic interface for proofs:
 - `part_of2_or_not`: classification lemma (participant or not)
 - `comp_dir`: direction of participation (sender, receiver, or none)
 -/
-
-import RumpsteakV2.Protocol.Participation.Core
-import RumpsteakV2.Protocol.Participation.Extra

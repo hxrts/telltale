@@ -16,22 +16,33 @@ structure GlobalActionR where
   label : Label
   deriving Repr, DecidableEq, Inhabited
 
-/-- Global enabledness: an action is available in the global type. -/
-inductive canStep : GlobalType → GlobalActionR → Prop where
-  | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
-      (label : Label) (cont : GlobalType) :
-      (label, cont) ∈ branches →
-      canStep (.comm sender receiver branches) { sender := sender, receiver := receiver, label := label }
-  | comm_async (sender receiver : String) (branches : List (Label × GlobalType))
-      (act : GlobalActionR) (label : Label) (cont : GlobalType) :
-      act.sender ≠ receiver →
-      (act.sender = sender → act.receiver ≠ receiver) →
-      (label, cont) ∈ branches →
-      canStep cont act →
-      canStep (.comm sender receiver branches) act
-  | mu (t : String) (body : GlobalType) (act : GlobalActionR) :
-      canStep (body.substitute t (.mu t body)) act →
-      canStep (.mu t body) act
+mutual
+  /-- Global enabledness: an action is available in the global type. -/
+  inductive canStep : GlobalType → GlobalActionR → Prop where
+    | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
+        (label : Label) (cont : GlobalType) :
+        (label, cont) ∈ branches →
+        canStep (.comm sender receiver branches) { sender := sender, receiver := receiver, label := label }
+    | comm_async (sender receiver : String) (branches : List (Label × GlobalType))
+        (act : GlobalActionR) (label : Label) (cont : GlobalType) :
+        act.sender ≠ receiver →
+        (act.sender = sender → act.receiver ≠ receiver) →
+        (label, cont) ∈ branches →
+        BranchesCanStep branches act →
+        canStep cont act →
+        canStep (.comm sender receiver branches) act
+    | mu (t : String) (body : GlobalType) (act : GlobalActionR) :
+        canStep (body.substitute t (.mu t body)) act →
+        canStep (.mu t body) act
+
+  /-- Branch-wise enabledness: every branch can step with act. -/
+  inductive BranchesCanStep : List (Label × GlobalType) → GlobalActionR → Prop where
+    | nil (act : GlobalActionR) : BranchesCanStep [] act
+    | cons (label : Label) (g : GlobalType) (rest : List (Label × GlobalType)) (act : GlobalActionR) :
+        canStep g act →
+        BranchesCanStep rest act →
+        BranchesCanStep ((label, g) :: rest) act
+end
 
 /-- Branch-wise step for async commutation. -/
 inductive BranchesStep (stepFn : GlobalType → GlobalActionR → GlobalType → Prop) :
@@ -60,6 +71,109 @@ inductive step : GlobalType → GlobalActionR → GlobalType → Prop where
   | mu (t : String) (body : GlobalType) (act : GlobalActionR) (g' : GlobalType) :
       step (body.substitute t (.mu t body)) act g' →
       step (.mu t body) act g'
+
+/-! ## canStep implies step
+
+This connects the enabledness predicate to the step relation. -/
+
+/-- If canStep g act holds via comm_head, then step g act cont for the continuation.
+
+This specialized lemma handles the synchronous case directly. -/
+theorem canStep_comm_head_implies_step (sender receiver : String)
+    (branches : List (Label × GlobalType)) (label : Label) (cont : GlobalType)
+    (hmem : (label, cont) ∈ branches) :
+    step (.comm sender receiver branches) { sender, receiver, label } cont :=
+  step.comm_head sender receiver branches label cont hmem
+
+/-- Predicate: canStep derivation is "synchronous" (no async commutation).
+
+This characterizes canStep derivations that arise from ReachesComm:
+only comm_head at the base, wrapped by mu unfoldings. -/
+inductive SyncCanStep : GlobalType → GlobalActionR → Prop where
+  | comm_head (sender receiver : String) (branches : List (Label × GlobalType))
+      (label : Label) (cont : GlobalType) :
+      (label, cont) ∈ branches →
+      SyncCanStep (.comm sender receiver branches) { sender, receiver, label }
+  | mu (t : String) (body : GlobalType) (act : GlobalActionR) :
+      SyncCanStep (body.substitute t (.mu t body)) act →
+      SyncCanStep (.mu t body) act
+
+/-- SyncCanStep implies canStep. -/
+theorem SyncCanStep.toCanStep {g : GlobalType} {act : GlobalActionR}
+    (h : SyncCanStep g act) : canStep g act := by
+  induction h with
+  | comm_head sender receiver branches label cont hmem =>
+      exact canStep.comm_head sender receiver branches label cont hmem
+  | mu t body act _ ih =>
+      exact canStep.mu t body act ih
+
+/-- SyncCanStep implies step (no async case needed).
+
+This is the specialized version for derivations from ReachesComm. -/
+theorem syncCanStep_implies_step (g : GlobalType) (act : GlobalActionR)
+    (hcan : SyncCanStep g act) :
+    ∃ g', step g act g' := by
+  induction hcan with
+  | comm_head sender receiver branches label cont hmem =>
+      -- Head case: step to the continuation directly.
+      exact ⟨cont, step.comm_head sender receiver branches label cont hmem⟩
+  | mu t body act _ ih =>
+      -- Mu case: step the unfolded body.
+      have ⟨g', hstep⟩ := ih
+      exact ⟨g', step.mu t body act g' hstep⟩
+
+/-! ## canStep implies step (mutual with BranchesCanStep) -/
+
+/-- If canStep g act, then there exists g' such that step g act g'. -/
+theorem canStep_implies_step (g : GlobalType) (act : GlobalActionR)
+    (hcan : canStep g act) :
+    ∃ g', step g act g' := by
+  refine (canStep.rec
+    (motive_1 := fun g act _ => ∃ g', step g act g')
+    (motive_2 := fun branches act _ => ∃ branches', BranchesStep step branches act branches')
+    ?comm_head ?comm_async ?mu ?nil ?cons hcan)
+  · intro sender receiver branches label cont hmem
+    exact ⟨cont, step.comm_head sender receiver branches label cont hmem⟩
+  · intro sender receiver branches act label cont hns hsr hmem _hbranches hcan_cont ih_branches _ih_cont
+    have ⟨branches', hbstep⟩ := ih_branches
+    exact ⟨.comm sender receiver branches',
+      step.comm_async sender receiver branches branches' act label cont hns hsr hmem hcan_cont hbstep⟩
+  · intro t body act _hcan_unf ih
+    have ⟨g', hstep⟩ := ih
+    exact ⟨g', step.mu t body act g' hstep⟩
+  · intro act
+    exact ⟨[], BranchesStep.nil act⟩
+  · intro label g rest act _hcan_head _hcan_rest ih_head ih_rest
+    have ⟨g', hstep⟩ := ih_head
+    have ⟨rest', hrest_step⟩ := ih_rest
+    exact ⟨(label, g') :: rest',
+      BranchesStep.cons label g g' rest rest' act hstep hrest_step⟩
+
+/-- If every branch can step with act, then branches can step in lockstep. -/
+theorem branchesCanStep_implies_branchesStep
+    (branches : List (Label × GlobalType)) (act : GlobalActionR)
+    (hcan : BranchesCanStep branches act) :
+    ∃ branches', BranchesStep step branches act branches' := by
+  refine (BranchesCanStep.rec
+    (motive_1 := fun g act _ => ∃ g', step g act g')
+    (motive_2 := fun branches act _ => ∃ branches', BranchesStep step branches act branches')
+    ?comm_head ?comm_async ?mu ?nil ?cons hcan)
+  · intro sender receiver branches label cont hmem
+    exact ⟨cont, step.comm_head sender receiver branches label cont hmem⟩
+  · intro sender receiver branches act label cont hns hsr hmem _hbranches hcan_cont ih_branches _ih_cont
+    have ⟨branches', hbstep⟩ := ih_branches
+    exact ⟨.comm sender receiver branches',
+      step.comm_async sender receiver branches branches' act label cont hns hsr hmem hcan_cont hbstep⟩
+  · intro t body act _hcan_unf ih
+    have ⟨g', hstep⟩ := ih
+    exact ⟨g', step.mu t body act g' hstep⟩
+  · intro act
+    exact ⟨[], BranchesStep.nil act⟩
+  · intro label g rest act _hcan_head _hcan_rest ih_head ih_rest
+    have ⟨g', hstep⟩ := ih_head
+    have ⟨rest', hrest_step⟩ := ih_rest
+    exact ⟨(label, g') :: rest',
+      BranchesStep.cons label g g' rest rest' act hstep hrest_step⟩
 
 /-! ## Helper lemmas for eraseDups membership
 
@@ -162,7 +276,7 @@ These lemmas show that substituting a mu-type for its variable doesn't add new r
 mutual
   private theorem substitute_roles_subset_comm (sender receiver : String)
       (branches : List (Label × GlobalType)) (t : String) (repl : GlobalType) :
-      ∀ p, p ∈ (GlobalType.comm sender receiver branches).substitute t repl).roles →
+      ∀ p, p ∈ ((GlobalType.comm sender receiver branches).substitute t repl).roles →
         p ∈ (GlobalType.comm sender receiver branches).roles ∨ p ∈ repl.roles := by
     -- Comm case: split into head roles and branch roles.
     intro p hp

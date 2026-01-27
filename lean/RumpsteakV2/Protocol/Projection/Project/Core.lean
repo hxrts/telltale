@@ -1,5 +1,6 @@
 import RumpsteakV2.Protocol.Projection.Projectb
 import RumpsteakV2.Protocol.Projection.Trans
+import RumpsteakV2.Protocol.Projection.Blind
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
 /-! # RumpsteakV2.Protocol.Projection.Project.Core
@@ -11,7 +12,8 @@ Core projection API and projectability predicates.
 The following definitions form the semantic interface for proofs:
 
 - `Projectable`: projectability predicate for globals
-- `ProjectableClosedWellFormed`: closed/wellFormed ⇒ projectable
+- `ProjectableClosedWellFormed`: closed/wellFormed + projectable bundle
+- `ProjectableClosedWellFormedBlind`: axiom-free version using blindness
 - `projectR?`: proof-carrying projection
 - `projectR?_some_implies_projectb`: inversion lemma for projectR?
 - `projectR?_sound`: soundness of projectR?
@@ -41,10 +43,33 @@ def Projectable (g : GlobalType) : Prop :=
   -- Require a projection witness for every role.
   ∀ role, ∃ lt, CProject g role lt
 
-/-- Global projectability assumption for closed, well-formed globals. -/
-def ProjectableClosedWellFormed : Prop :=
-  -- Closed + well-formed globals are assumed projectable.
-  ∀ g, g.isClosed = true → g.wellFormed = true → Projectable g
+/-- Closed + well-formed globals that are projectable. -/
+def ProjectableClosedWellFormed (g : GlobalType) : Prop :=
+  g.isClosed = true ∧ g.wellFormed = true ∧ Projectable g
+
+/-- Closed + well-formed + blind globals. This is the axiom-free version:
+    blindness ensures projectability without needing an axiom. -/
+def ProjectableClosedWellFormedBlind (g : GlobalType) : Prop :=
+  g.isClosed = true ∧ g.wellFormed = true ∧ Blind.isBlind g = true
+
+/-- ProjectableClosedWellFormedBlind implies ProjectableClosedWellFormed.
+    This uses the blindness theorem to derive projectability without axioms. -/
+theorem ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed
+    {g : GlobalType} (h : ProjectableClosedWellFormedBlind g) :
+    ProjectableClosedWellFormed g := by
+  obtain ⟨hclosed, hwf, hblind⟩ := h
+  refine ⟨hclosed, hwf, ?_⟩
+  -- Use the blindness theorem to derive Projectable
+  have hwfb : Blind.WellFormedBlind g = true := by
+    simp only [Blind.WellFormedBlind, Bool.and_eq_true]
+    exact ⟨⟨hclosed, hwf⟩, hblind⟩
+  exact Blind.projectable_of_wellFormedBlind g hwfb
+
+/-- Extract the Projectable component from ProjectableClosedWellFormedBlind. -/
+theorem Projectable_of_ProjectableClosedWellFormedBlind
+    {g : GlobalType} (h : ProjectableClosedWellFormedBlind g) :
+    Projectable g :=
+  (ProjectableClosedWellFormedBlind_implies_ProjectableClosedWellFormed h).2.2
 
 /-! ## Core Projection API -/
 

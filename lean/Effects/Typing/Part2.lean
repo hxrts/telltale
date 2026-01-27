@@ -1,5 +1,4 @@
-import Effects.Process
-import Effects.Coherence
+import Effects.Typing.Part1
 
 /-!
 # MPST Process Typing
@@ -522,10 +521,10 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
       TypedStep G D Ssh Sown store bufs (.seq .skip Q)
                 G D Sown store bufs Q
 
-  | par_left {Ssh store bufs P P' Q S G D₁ D₂ G₁' D₁' S₁'} (split : ParSplit S G) :
+  | par_left {Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'} (split : ParSplit S G) :
       -- Left process transitions with its resources
       TypedStep split.G1 D₁ Ssh split.S1 store bufs P
-                G₁' D₁' S₁' store bufs P' →
+                G₁' D₁' S₁' store' bufs' P' →
 
       -- Resources must be disjoint for parallel composition
       DisjointG split.G1 split.G2 →
@@ -536,12 +535,12 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
 
       -- Combined transition
       TypedStep G (D₁ ++ D₂) Ssh S store bufs (.par P Q)
-                (G₁' ++ split.G2) (D₁' ++ D₂) (S₁' ++ split.S2) store bufs (.par P' Q)
+                (G₁' ++ split.G2) (D₁' ++ D₂) (S₁' ++ split.S2) store' bufs' (.par P' Q)
 
-  | par_right {Ssh store bufs P Q Q' S G D₁ D₂ G₂' D₂' S₂'} (split : ParSplit S G) :
+  | par_right {Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'} (split : ParSplit S G) :
       -- Right process transitions with its resources
       TypedStep split.G2 D₂ Ssh split.S2 store bufs Q
-                G₂' D₂' S₂' store bufs Q' →
+                G₂' D₂' S₂' store' bufs' Q' →
 
       -- Resources must be disjoint
       DisjointG split.G1 split.G2 →
@@ -552,7 +551,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
 
       -- Combined transition
       TypedStep G (D₁ ++ D₂) Ssh S store bufs (.par P Q)
-                (split.G1 ++ G₂') (D₁ ++ D₂') (split.S1 ++ S₂') store bufs (.par P Q')
+                (split.G1 ++ G₂') (D₁ ++ D₂') (split.S1 ++ S₂') store' bufs' (.par P Q')
 
   | par_skip_left {G D Ssh Sown store bufs Q} :
       -- Skip elimination from parallel

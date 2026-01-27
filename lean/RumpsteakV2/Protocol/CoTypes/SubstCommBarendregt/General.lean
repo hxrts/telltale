@@ -1,6 +1,8 @@
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.Predicates
 
 namespace RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
 /-! ## General Substitution Commutation
 
 The key insight is that substitutions commute when:

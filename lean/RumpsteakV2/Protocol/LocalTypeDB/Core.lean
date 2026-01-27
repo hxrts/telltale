@@ -255,4 +255,4 @@ theorem liftBranches_substBranches_cancel_at_depth
   substBranches (liftBranches 1 (k + 1) bs) (k + 1) (t.lift 1 k) = bs := by
   exact liftBranches_substBranches_cancel_at_depth_any bs k (t.lift 1 k)
 
-end RumpsteakV2.Protocol.LocalTypeDB
+end RumpsteakV2.Protocol

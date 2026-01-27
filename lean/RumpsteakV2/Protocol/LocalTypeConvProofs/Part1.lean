@@ -160,7 +160,7 @@ private lemma cons_append_eq_cons (a : String) (pref suffix : NameOnlyContext) :
   show TypeContext.mk _ = TypeContext.mk _
   congr 1
 
-private lemma empty_append_eq (suffix : NameOnlyContext) :
+lemma empty_append_eq (suffix : NameOnlyContext) :
     (TypeContext.empty : NameOnlyContext) ++ suffix = suffix := by
   show TypeContext.mk _ = TypeContext.mk _
   congr 1

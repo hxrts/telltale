@@ -1,6 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Projectb.Part1
 
 namespace RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Participation
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## CProject Coinductive Relation
 
 CProject is defined as the greatest fixed point of CProjectF, which captures
@@ -288,6 +292,7 @@ theorem CProject_coind {R : ProjRel} (h : ∀ g role cand, R g role cand → CPr
   have hle : R ≤ CProjectF R := fun x y z hxyz => h x y z hxyz
   exact (CProject_coind' hle) g role cand hr
 
+/-- Coinduction principle for CProjectU: if R ⊆ CProjectF_unfold R, then R ⊆ CProjectU. -/
 theorem CProjectU_coind {R : ProjRel}
     (h : ∀ g role cand, R g role cand → CProjectF_unfold R g role cand) :
     ∀ g role cand, R g role cand → CProjectU g role cand := by
@@ -301,6 +306,7 @@ theorem CProject_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
   have hfix : CProjectF CProject = CProject := CProject_fixed
   exact Eq.mp (congrFun (congrFun (congrFun hfix.symm g) role) cand) h
 
+/-- Destruct CProjectU: if CProjectU holds, then CProjectF_unfold CProjectU holds. -/
 theorem CProjectU_destruct {g : GlobalType} {role : String} {cand : LocalTypeR}
     (h : CProjectU g role cand) : CProjectF_unfold CProjectU g role cand := by
   have hfix : CProjectF_unfold CProjectU = CProjectU := CProjectU_fixed
@@ -398,14 +404,17 @@ theorem projectb_end_var (role t : String) :
     projectb .end role (.var t) = false := by
   unfold projectb; rfl
 
+/-- Reflection: projectb for end with send candidate returns false. -/
 theorem projectb_end_send (role partner : String) (bs : List (Label × LocalTypeR)) :
     projectb .end role (.send partner bs) = false := by
   unfold projectb; rfl
 
+/-- Reflection: projectb for end with recv candidate returns false. -/
 theorem projectb_end_recv (role partner : String) (bs : List (Label × LocalTypeR)) :
     projectb .end role (.recv partner bs) = false := by
   unfold projectb; rfl
 
+/-- Reflection: projectb for end with mu candidate returns false. -/
 theorem projectb_end_mu (role t : String) (body : LocalTypeR) :
     projectb .end role (.mu t body) = false := by
   unfold projectb; rfl

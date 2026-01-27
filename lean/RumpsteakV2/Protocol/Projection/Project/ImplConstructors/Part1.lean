@@ -24,14 +24,14 @@ This breaks the circularity: CProjectTransRel_postfix needs to know that trans p
 the same constructor as CProject, but CProject_implies_EQ2_trans depends on CProjectTransRel_postfix. -/
 
 /-- Helper: extract projection of the first branch from AllBranchesProj. -/
-private theorem CProject_first_of_AllBranchesProj {first : Label × GlobalType}
+theorem CProject_first_of_AllBranchesProj {first : Label × GlobalType}
     {rest : List (Label × GlobalType)} {role : String} {lt : LocalTypeR}
     (hf : AllBranchesProj CProject (first :: rest) role lt) : CProject first.2 role lt := by
   -- The head branch is always a member of the list.
   exact hf first (by simp)
 
 /-- Helper: first branch inherits allCommsNonEmpty from a non-empty comm. -/
-private theorem allCommsNonEmpty_first_of_comm (sender receiver : String)
+theorem allCommsNonEmpty_first_of_comm (sender receiver : String)
     (first : Label × GlobalType) (rest : List (Label × GlobalType))
     (hne : (GlobalType.comm sender receiver (first :: rest)).allCommsNonEmpty = true) :
     first.2.allCommsNonEmpty = true := by
@@ -42,7 +42,7 @@ private theorem allCommsNonEmpty_first_of_comm (sender receiver : String)
   exact hne_branches first (by simp)
 
 /-- Helper: wellFormed implies allCommsNonEmpty. -/
-private theorem allCommsNonEmpty_of_wellFormed (g : GlobalType)
+theorem allCommsNonEmpty_of_wellFormed (g : GlobalType)
     (hwf : g.wellFormed = true) : g.allCommsNonEmpty = true := by
   -- Unpack wellFormed to reach allCommsNonEmpty.
   have hwf' := hwf
@@ -50,7 +50,7 @@ private theorem allCommsNonEmpty_of_wellFormed (g : GlobalType)
   exact hwf'.1.1.2
 
 /-- Helper: first branch inherits wellFormed from a non-empty comm. -/
-private theorem wellFormed_first_of_comm (sender receiver : String)
+theorem wellFormed_first_of_comm (sender receiver : String)
     (first : Label × GlobalType) (rest : List (Label × GlobalType))
     (hwf : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true) :
     first.2.wellFormed = true := by
@@ -91,6 +91,12 @@ private theorem sizeOf_snd_lt_comm_head (sender receiver : String)
 private theorem sizeOf_snd_lt_comm_head_mul (sender receiver : String)
     (first : Label × GlobalType) (rest : List (Label × GlobalType)) :
     sizeOf first.2 * 2 + 1 < sizeOf (GlobalType.comm sender receiver (first :: rest)) * 2 := by
+  have hlt := sizeOf_snd_lt_comm_head sender receiver first rest
+  omega
+
+theorem sizeOf_snd_lt_comm_head_mul3 (sender receiver : String)
+    (first : Label × GlobalType) (rest : List (Label × GlobalType)) :
+    sizeOf first.2 * 3 + 2 < sizeOf (GlobalType.comm sender receiver (first :: rest)) * 3 := by
   have hlt := sizeOf_snd_lt_comm_head sender receiver first rest
   omega
 
@@ -179,25 +185,36 @@ private theorem CProject_end_trans_end_comm_cons (g : GlobalType) (sender receiv
           allCommsNonEmpty_first_of_comm sender receiver first rest hne
         have ih := CProject_end_trans_end first.2 role hfirst hne_first
         exact CProject_end_trans_end_comm_other sender receiver role first rest hrs hrr ih
-termination_by (sizeOf g) * 2
+termination_by (sizeOf g) * 3
 decreasing_by
     all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul sender receiver first rest
+      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
 /-- Helper: comm case for end projection agreement. -/
 private theorem CProject_end_trans_end_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role : String)
       (h : CProject (.comm sender receiver gbs) role .end)
-      (hne : (.comm sender receiver gbs).allCommsNonEmpty = true) :
+      (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true) :
       trans (.comm sender receiver gbs) role = .end := by
     -- Split on the branch list; empty is impossible under allCommsNonEmpty.
-    cases gbs with
+    cases hgb : gbs with
     | nil =>
-        have : False := by simpa [GlobalType.allCommsNonEmpty] using hne
+        have hne' :
+            (gbs ≠ [] ∧ GlobalType.allCommsNonEmptyBranches gbs = true) := by
+          simpa [GlobalType.allCommsNonEmpty] using hne
+        have : False := hne'.1 (by simpa [hgb])
         exact this.elim
     | cons first rest =>
+        have h' : CProject (.comm sender receiver (first :: rest)) role .end := by
+          simpa [hgb] using h
+        have hne' : (GlobalType.comm sender receiver (first :: rest)).allCommsNonEmpty = true := by
+          simpa [hgb] using hne
         exact CProject_end_trans_end_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role h rfl hne
+          sender receiver first rest role h' rfl hne'
+termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
+decreasing_by
+    all_goals
+      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 
 /-- If CProject g role .end, then trans g role = .end.
       Proved by well-founded induction on g. -/
@@ -217,10 +234,10 @@ theorem CProject_end_trans_end (g : GlobalType) (role : String)
         simpa [hg] using
           (CProject_end_trans_end_comm sender receiver gbs role
             (by simpa [hg] using h) (by simpa [hg] using hne))
-termination_by (sizeOf g) * 2 + 1
+termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simpa using (Nat.lt_succ_self (sizeOf g * 2))
+      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 end
 
 /-! ### Var constructor agreement -/
@@ -303,25 +320,36 @@ private theorem CProject_var_trans_var_comm_cons (g : GlobalType) (sender receiv
           allCommsNonEmpty_first_of_comm sender receiver first rest hne
         have ih := CProject_var_trans_var first.2 role v hfirst hne_first
         exact CProject_var_trans_var_comm_other sender receiver role v first rest hrs hrr ih
-termination_by (sizeOf g) * 2
+termination_by (sizeOf g) * 3
 decreasing_by
     all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul sender receiver first rest
+      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
 /-- Helper: comm case for var projection agreement. -/
 private theorem CProject_var_trans_var_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role v : String)
       (h : CProject (.comm sender receiver gbs) role (.var v))
-      (hne : (.comm sender receiver gbs).allCommsNonEmpty = true) :
+      (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true) :
       trans (.comm sender receiver gbs) role = .var v := by
     -- Split on the branch list; empty is impossible under allCommsNonEmpty.
-    cases gbs with
+    cases hgb : gbs with
     | nil =>
-        have : False := by simpa [GlobalType.allCommsNonEmpty] using hne
+        have hne' :
+            (gbs ≠ [] ∧ GlobalType.allCommsNonEmptyBranches gbs = true) := by
+          simpa [GlobalType.allCommsNonEmpty] using hne
+        have : False := hne'.1 (by simpa [hgb])
         exact this.elim
     | cons first rest =>
+        have h' : CProject (.comm sender receiver (first :: rest)) role (.var v) := by
+          simpa [hgb] using h
+        have hne' : (GlobalType.comm sender receiver (first :: rest)).allCommsNonEmpty = true := by
+          simpa [hgb] using hne
         exact CProject_var_trans_var_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role v h rfl hne
+          sender receiver first rest role v h' rfl hne'
+termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
+decreasing_by
+    all_goals
+      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 
 /-- If CProject g role (.var v) and g has non-empty branches, then trans g role = .var v.
       Proved by well-founded induction on g.
@@ -341,10 +369,10 @@ theorem CProject_var_trans_var (g : GlobalType) (role : String) (v : String)
         simpa [hg] using
           (CProject_var_trans_var_comm sender receiver gbs role v
             (by simpa [hg] using h) (by simpa [hg] using hwf))
-termination_by (sizeOf g) * 2 + 1
+termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simpa using (Nat.lt_succ_self (sizeOf g * 2))
+      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 end
 
 /-! ### CProject-to-Trans structure extraction
@@ -354,7 +382,7 @@ the global type must have a corresponding structure. These lemmas extract that s
 and show trans produces the matching constructor. -/
 
 /-- Helper: `.end` cannot project to `.send`. -/
-private theorem CProject_send_implies_trans_send_end (role partner : String)
+theorem CProject_send_implies_trans_send_end (role partner : String)
     (lbs : List (Label × LocalTypeR))
     (hproj : CProject .end role (.send partner lbs)) :
     ∃ gbs', trans .end role = .send partner (transBranches gbs' role) ∧
@@ -366,7 +394,7 @@ private theorem CProject_send_implies_trans_send_end (role partner : String)
   exact this.elim
 
 /-- Helper: `.var` cannot project to `.send`. -/
-private theorem CProject_send_implies_trans_send_var (v role partner : String)
+theorem CProject_send_implies_trans_send_var (v role partner : String)
     (lbs : List (Label × LocalTypeR))
     (hproj : CProject (.var v) role (.send partner lbs)) :
     ∃ gbs', trans (.var v) role = .send partner (transBranches gbs' role) ∧
@@ -378,7 +406,7 @@ private theorem CProject_send_implies_trans_send_var (v role partner : String)
   exact this.elim
 
 /-- Helper: `.mu` cannot project to `.send`. -/
-private theorem CProject_send_implies_trans_send_mu (t : String) (body : GlobalType)
+theorem CProject_send_implies_trans_send_mu (t : String) (body : GlobalType)
     (role partner : String) (lbs : List (Label × LocalTypeR))
     (hproj : CProject (.mu t body) role (.send partner lbs)) :
     ∃ gbs', trans (.mu t body) role = .send partner (transBranches gbs' role) ∧

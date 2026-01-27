@@ -7,6 +7,7 @@ import RumpsteakV2.Coinductive.ToInductive
 import RumpsteakV2.Coinductive.ToCoindInjectivity
 import RumpsteakV2.Coinductive.WellFormed
 import RumpsteakV2.Protocol.LocalTypeR
+import RumpsteakV2.Protocol.Projection.Trans
 
 set_option linter.dupNamespace false
 
@@ -112,6 +113,12 @@ lemma productive_toCoind (t : LocalTypeR) : ProductiveC (toCoind t) := by
   intro c hc
   rcases reachable_toCoind (t := t) hc with ⟨u, rfl⟩
   exact observable_toCoind u
+
+/-- Projection via `trans` yields a productive `toCoind` image. -/
+lemma productive_toCoind_of_projTrans (g : GlobalType) (role : String) :
+    ProductiveC (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g role)) := by
+  -- Reduce to the generic toCoind productivity lemma.
+  exact productive_toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g role)
 
 /-! ## Size bounds for branch elements -/
 

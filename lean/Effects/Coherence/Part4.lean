@@ -1,4 +1,4 @@
-import Effects.Environments
+import Effects.Coherence.Part3
 
 /-!
 # MPST Coherence
@@ -580,8 +580,10 @@ theorem Coherent_recv_preserved
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
         exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (hCoh e)
 
-/-- Coherent is preserved when selecting (sending a label).
-    Select appends .string to trace, advances selector type.
-    Similar structure to Coherent_send_preserved. -/
+/-
+Coherent is preserved when selecting (sending a label).
+Select appends .string to trace, advances selector type.
+Similar structure to Coherent_send_preserved.
+-/
 
 end

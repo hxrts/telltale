@@ -1,4 +1,7 @@
 import Effects.Coherence
+import Effects.Monitor.Part1
+import Effects.Typing.Part1
+import Effects.Typing.Part3a
 
 /-!
 # MPST Verified Monitor
@@ -57,24 +60,22 @@ This is the key soundness theorem: if the monitor state is well-typed
 and we take a valid transition, the result is also well-typed. -/
 theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v : Value)
     (hStep : MonStep ms act v ms')
-    (hWT : WTMon ms) :
+    (hWTc : WTMonComplete ms) :
     WTMon ms' := by
+  -- Unpack the complete invariant for use in the per-action cases.
+  rcases hWTc with ⟨hWT, hComplete⟩
   cases hStep with
-  | send hG hLin hv =>
+  | send hG hRecvReady hLin hv =>
     -- Send case: enqueue value, advance sender type
     rename_i e target T L lin'  -- Bring implicit variables into scope
     constructor
     · -- Coherent: use Coherent_send_preserved
-      -- Requires hRecvReady hypothesis from coherence invariant
-      sorry  -- Coherent_send_preserved with receiver readiness from EdgeCoherent
+      have h := Coherent_send_preserved ms.G ms.D e target T L hWT.coherent hG hRecvReady
+      simp only [MonitorState.sendEdge] at h ⊢
+      exact h
     · -- HeadCoherent: send preserves head coherence
       -- The receiver's expected type doesn't change (only sender advances)
       -- Need hRecvReady: receiver can accept T after consuming current buffer
-      have hRecvReady : ∀ Lrecv, lookupG ms.G { sid := e.sid, role := target } = some Lrecv →
-          ∃ L', Consume e.role Lrecv (lookupD ms.D { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
-                (Consume e.role L' [T]).isSome := by
-        -- This follows from protocol well-formedness + EdgeCoherent
-        sorry  -- TODO: derive from protocol duality or add as WTMon invariant
       have h := HeadCoherent_send_preserved ms.G ms.D e target T L hWT.headCoherent hWT.coherent hG hRecvReady
       simp only [MonitorState.sendEdge]
       exact h
@@ -134,7 +135,8 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       -- Derive hTrace from BufferTyped using trace_head_from_buffer
       have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
       have hTrace := trace_head_from_buffer hBuf hv hTyped
-      have h := HeadCoherent_recv_preserved ms.G ms.D e source T L hWT.headCoherent hWT.coherent hG hTrace
+      have h := HeadCoherent_recv_preserved ms.G ms.D e source T L
+        hWT.headCoherent hWT.coherent hComplete hG hTrace
       simp only [MonitorState.recvEdge]
       exact h
     · -- ValidLabels: recv dequeues from buffer, preserves valid labels
@@ -185,17 +187,15 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       have heFresh := hWT.supply_fresh e _ hInOrig
       exact updateG_preserves_supply_fresh ms.G e L ms.supply hWT.supply_fresh_G heFresh
 
-  | select hG hFind hLin =>
+  | select hG hFind hRecvReady hLin =>
     -- Select case: like send but with label
     rename_i e target bs ℓ L lin'
     constructor
     · -- Coherent: use Coherent_select_preserved
-      sorry  -- Coherent_select_preserved with receiver readiness from EdgeCoherent
+      have h := Coherent_select_preserved ms.G ms.D e target bs ℓ L hWT.coherent hG hFind hRecvReady
+      simp only [MonitorState.sendEdge] at h ⊢
+      exact h
     · -- HeadCoherent: select preserves head coherence (appends to END)
-      have hRecvReady : ∀ Lrecv, lookupG ms.G { sid := e.sid, role := target } = some Lrecv →
-          ∃ L', Consume e.role Lrecv (lookupD ms.D { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
-                (Consume e.role L' [.string]).isSome := by
-        sorry  -- TODO: derive from protocol duality or add as WTMon invariant
       have h := HeadCoherent_select_preserved ms.G ms.D e target bs ℓ L hWT.headCoherent hWT.coherent hG hFind hRecvReady
       simp only [MonitorState.sendEdge]
       exact h
@@ -254,7 +254,8 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       have hv : HasTypeVal ms.G (.string ℓ) .string := HasTypeVal.string ℓ
       have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
       have hTrace := trace_head_from_buffer hBuf hv hTyped
-      have h := HeadCoherent_branch_preserved ms.G ms.D e source bs ℓ L hWT.headCoherent hWT.coherent hG hFind hTrace
+      have h := HeadCoherent_branch_preserved ms.G ms.D e source bs ℓ L
+        hWT.headCoherent hWT.coherent hComplete hG hFind hTrace
       simp only [MonitorState.recvEdge]
       exact h
     · -- ValidLabels: branch dequeues label from buffer, preserves valid labels
@@ -314,15 +315,43 @@ theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S 
   subst hEq
   exact consumeToken_not_mem ctx ctx' e S hPairwise h S' hMem
 
-/-- Tokens cannot be forged: only produceToken adds to context. -/
-theorem token_only_from_produce (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
-    (hNotIn : ¬LinCtx.contains ctx e)
-    (hIn : (e, S) ∈ ctx') :
-    ∃ ctx'' S', ctx' = LinCtx.produceToken ctx'' e S' := by
-  -- This theorem states a constructive property about how contexts grow
-  -- It's not directly provable without knowing how ctx' was constructed
-  -- The point is that if e wasn't in ctx and now (e, S) ∈ ctx', it must have been produced
-  sorry  -- Requires tracking context construction history
+/-! ## Buffer and DEnv Consistency Helpers -/
+
+/-- If a session is not in G, buffers have no entry for it. -/
+theorem BConsistent_lookup_none_of_notin_sessions
+    {G : GEnv} {B : Buffers} {e : Edge}
+    (hCons : BConsistent G B) (hNot : e.sid ∉ SessionsOf G) :
+    B.lookup e = none := by
+  by_contra hSome
+  cases hFind : B.lookup e with
+  | none => exact (hSome hFind)
+  | some buf =>
+      have hSid : e.sid ∈ SessionsOf G := hCons e buf hFind
+      exact (hNot hSid).elim
+
+/-- If a session is not in G, DEnv has no entry for it. -/
+theorem DEnv_find_none_of_notin_sessions
+    {G : GEnv} {D : DEnv} {e : Edge}
+    (hCons : DConsistent G D) (hNot : e.sid ∉ SessionsOf G) :
+    D.find? e = none := by
+  by_contra hSome
+  cases hFind : D.find? e with
+  | none => exact (hSome hFind)
+  | some ts =>
+      have hSid : e.sid ∈ SessionsOfD D := ⟨e, ts, hFind, rfl⟩
+      have hSidG : e.sid ∈ SessionsOf G := hCons hSid
+      exact (hNot hSidG).elim
+
+/-- BufferTyped is preserved when extending GEnv without changing existing lookups. -/
+theorem BufferTyped_weakenG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
+    BufferTyped G D bufs e →
+    (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
+    BufferTyped G' D bufs e := by
+  intro hBT hMono
+  rcases hBT with ⟨hLen, hTyping⟩
+  refine ⟨hLen, ?_⟩
+  intro i hi
+  exact HasTypeVal_mono G G' _ _ (hTyping i hi) hMono
 
 /-! ## Session Creation -/
 
@@ -394,18 +423,133 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
     (localTypes : Role → LocalType)
     (hWT : WTMon ms)
     (hNodup : roles.Nodup)  -- Roles must be distinct
+    (hConsD : DConsistent ms.G ms.D)
+    (hConsB : BConsistent ms.G ms.bufs)
     (hProj : True)  -- Placeholder: localTypes are valid projections
     : WTMon (ms.newSession roles localTypes) := by
   simp only [MonitorState.newSession]
+  have hSupplyNotIn : ms.supply ∉ SessionsOf ms.G := by
+    intro hIn
+    obtain ⟨e, L, hLookup, hSid⟩ := hIn
+    have hMem : (e, L) ∈ ms.G := lookupG_mem ms.G e L hLookup
+    have hFresh := hWT.supply_fresh_G e L hMem
+    have hFresh' : ms.supply < ms.supply := by
+      simpa [hSid] using hFresh
+    exact (Nat.lt_irrefl _ hFresh')
   constructor
   · -- coherent: Coherent (newEndpoints ++ ms.G) ((newEdges.map (·, [])) ++ ms.D)
-    sorry  -- Requires showing EdgeCoherent for all edges
+    intro e Lsender Lrecv hGsender hGrecv
+    by_cases hSid : e.sid = ms.supply
+    · -- New session edge: trace is empty, so Consume succeeds.
+      have hDnone : ms.D.find? e = none :=
+        DEnv_find_none_of_notin_sessions (G:=ms.G) (D:=ms.D) hConsD (by simpa [hSid] using hSupplyNotIn)
+      have hLookupD :
+          lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD (initDEnv ms.supply roles) e :=
+        lookupD_append_left_of_right_none (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hDnone
+      -- Show lookupD initDEnv = [] for this edge.
+      by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
+      · have hInit : lookupD (initDEnv ms.supply roles) e = [] :=
+          initDEnv_lookup_mem ms.supply roles e hMem
+        simpa [hLookupD, hInit, Consume] using (by rfl : (Consume e.sender Lrecv []).isSome)
+      · have hInitFind : (initDEnv ms.supply roles).find? e = none :=
+          initDEnv_find?_none_of_notin ms.supply roles e hMem
+        have hInit : lookupD (initDEnv ms.supply roles) e = [] := by
+          simp [lookupD, hInitFind]
+        simpa [hLookupD, hInit, Consume] using (by rfl : (Consume e.sender Lrecv []).isSome)
+    · -- Old session edge: environments unchanged for this sid.
+      have hSidNe : e.sid ≠ ms.supply := hSid
+      -- G lookups fall through to ms.G since new endpoints have different sid.
+      have hSenderNone :
+          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
+            { sid := e.sid, role := e.sender } = none :=
+        lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
+      have hRecvNone :
+          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
+            { sid := e.sid, role := e.receiver } = none :=
+        lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
+      have hGsender' : lookupG ms.G { sid := e.sid, role := e.sender } = some Lsender := by
+        simp [lookupG, List.lookup_append, hSenderNone] at hGsender
+        simpa using hGsender
+      have hGrecv' : lookupG ms.G { sid := e.sid, role := e.receiver } = some Lrecv := by
+        simp [lookupG, List.lookup_append, hRecvNone] at hGrecv
+        simpa using hGrecv
+      -- D lookup falls through to ms.D since initDEnv has no entry for other sids.
+      have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
+        intro hMem
+        exact hSidNe (RoleSet.allEdges_sid ms.supply roles e hMem)
+      have hFindNone : (initDEnv ms.supply roles).find? e = none :=
+        initDEnv_find?_none_of_notin ms.supply roles e hNotIn
+      have hLookupD :
+          lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD ms.D e :=
+        lookupD_append_right (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hFindNone
+      have hCohEdge := hWT.coherent e Lsender Lrecv hGsender' hGrecv'
+      simpa [hLookupD] using hCohEdge
   · -- headCoherent: HeadCoherent for combined G and D
     -- New edges have empty traces, so HeadCoherent trivially holds
-    sorry  -- HeadCoherent for newSession
+    intro e
+    simp only [HeadCoherent]
+    by_cases hSid : e.sid = ms.supply
+    · -- New session: trace is empty.
+      have hDnone : ms.D.find? e = none :=
+        DEnv_find_none_of_notin_sessions (G:=ms.G) (D:=ms.D) hConsD (by simpa [hSid] using hSupplyNotIn)
+      have hLookupD :
+          lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD (initDEnv ms.supply roles) e :=
+        lookupD_append_left_of_right_none (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hDnone
+      by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
+      · have hInit : lookupD (initDEnv ms.supply roles) e = [] :=
+          initDEnv_lookup_mem ms.supply roles e hMem
+        simp [hLookupD, hInit]
+      · have hInitFind : (initDEnv ms.supply roles).find? e = none :=
+          initDEnv_find?_none_of_notin ms.supply roles e hMem
+        have hInit : lookupD (initDEnv ms.supply roles) e = [] := by
+          simp [lookupD, hInitFind]
+        simp [hLookupD, hInit]
+    · -- Old session: fall back to ms.HeadCoherent.
+      have hSidNe : e.sid ≠ ms.supply := hSid
+      have hRecvNone :
+          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
+            { sid := e.sid, role := e.receiver } = none :=
+        lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
+      -- D lookup falls through to ms.D.
+      have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
+        intro hMem
+        exact hSidNe (RoleSet.allEdges_sid ms.supply roles e hMem)
+      have hFindNone : (initDEnv ms.supply roles).find? e = none :=
+        initDEnv_find?_none_of_notin ms.supply roles e hNotIn
+      have hLookupD :
+          lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD ms.D e :=
+        lookupD_append_right (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hFindNone
+      -- G lookup falls through to ms.G.
+      simp [lookupG, List.lookup_append, hRecvNone, hLookupD] at *
+      exact hWT.headCoherent e
   · -- validLabels: ValidLabels for combined G, D, bufs
     -- New edges have empty buffers, so ValidLabels trivially holds
-    sorry  -- ValidLabels for newSession
+    intro e source bs hLookup
+    by_cases hSid : e.sid = ms.supply
+    · -- New session: buffer is empty.
+      by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
+      · have hBufLookup := initBuffers_lookup_mem ms.supply roles e hMem
+        simp [lookupBuf, List.lookup_append, hBufLookup]
+      · have hBufNone : ms.bufs.lookup e = none :=
+          BConsistent_lookup_none_of_notin_sessions (G:=ms.G) (B:=ms.bufs) hConsB (by simpa [hSid] using hSupplyNotIn)
+        have hLeftNone : (RoleSet.allEdges ms.supply roles).map (fun e => (e, [])).lookup e = none := by
+          have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hMem
+          simpa [initBuffers] using hNone
+        simp [lookupBuf, List.lookup_append, hLeftNone, hBufNone]
+    · -- Old session: fall back to ms.validLabels.
+      have hSidNe : e.sid ≠ ms.supply := hSid
+      have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
+        intro hMem
+        exact hSidNe (RoleSet.allEdges_sid ms.supply roles e hMem)
+      have hBufNone : (RoleSet.allEdges ms.supply roles).map (fun e => (e, [])).lookup e = none := by
+        have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hNotIn
+        simpa [initBuffers] using hNone
+      have hRecvNone :
+          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
+            { sid := e.sid, role := e.receiver } = none :=
+        lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
+      simp [lookupG, lookupBuf, List.lookup_append, hBufNone, hRecvNone] at hLookup ⊢
+      exact hWT.validLabels e source bs hLookup
   · -- buffers_typed: BuffersTyped ... (newEdges.map (·, [])) ++ ms.bufs
     intro e
     simp only [BufferTyped, lookupBuf, lookupD, List.lookup_append]
@@ -414,22 +558,67 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
       by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
       · -- e is one of the new edges: buffer = [], trace = []
         have hBufLookup := initBuffers_lookup_mem ms.supply roles e hMem
-        have hDLookup := initDEnv_lookup_mem ms.supply roles e hMem
-        simp only [initBuffers, initDEnv] at hBufLookup hDLookup
-        simp only [hBufLookup, hDLookup, Option.getD_some]
-        exact ⟨rfl, fun i hi => absurd hi (Nat.not_lt_zero i)⟩
+        have hDnone : ms.D.find? e = none :=
+          DEnv_find_none_of_notin_sessions (G:=ms.G) (D:=ms.D) hConsD (by simpa [hSid] using hSupplyNotIn)
+        have hLookupD :
+            lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD (initDEnv ms.supply roles) e :=
+          lookupD_append_left_of_right_none (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hDnone
+        have hTrace : lookupD (initDEnv ms.supply roles) e = [] :=
+          initDEnv_lookup_mem ms.supply roles e hMem
+        simp [hLookupD, hTrace, hBufLookup, BufferTyped]
       · -- e is not in allEdges but has fresh sid
         -- This is an edge not created by this newSession (e.g., different roles)
         -- It shouldn't be in the old buffers either (fresh session ID)
         -- The lookup falls through to ms.bufs/ms.D, but since e.sid = ms.supply (fresh),
         -- by the supply invariant, e shouldn't be there either.
-        -- For now, we leave this as sorry - it requires a supply_fresh invariant on D/bufs
-        sorry
+        have hBufNone : ms.bufs.lookup e = none :=
+          BConsistent_lookup_none_of_notin_sessions (G:=ms.G) (B:=ms.bufs) hConsB (by simpa [hSid] using hSupplyNotIn)
+        have hDnone : ms.D.find? e = none :=
+          DEnv_find_none_of_notin_sessions (G:=ms.G) (D:=ms.D) hConsD (by simpa [hSid] using hSupplyNotIn)
+        have hLookupD :
+            lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD (initDEnv ms.supply roles) e :=
+          lookupD_append_left_of_right_none (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hDnone
+        have hInitFind : (initDEnv ms.supply roles).find? e = none :=
+          initDEnv_find?_none_of_notin ms.supply roles e hMem
+        have hTrace : lookupD (initDEnv ms.supply roles) e = [] := by
+          simp [lookupD, hInitFind]
+        simp [lookupBuf, List.lookup_append, hBufNone, hLookupD, hTrace, BufferTyped]
     · -- e.sid ≠ ms.supply: edge from old session
       -- The lookup in initBuffers/initDEnv returns none, so we fall through to ms.bufs/ms.D
       -- Need to show HasTypeVal extends from ms.G to newEndpoints ++ ms.G
       -- This requires careful handling of the lookup_append rewriting
-      sorry
+      have hSidNe : e.sid ≠ ms.supply := hSid
+      have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
+        intro hMem
+        exact hSidNe (RoleSet.allEdges_sid ms.supply roles e hMem)
+      have hBufNone : (RoleSet.allEdges ms.supply roles).map (fun e => (e, [])).lookup e = none := by
+        have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hNotIn
+        simpa [initBuffers] using hNone
+      have hFindNone : (initDEnv ms.supply roles).find? e = none :=
+        initDEnv_find?_none_of_notin ms.supply roles e hNotIn
+      have hLookupD :
+          lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD ms.D e :=
+        lookupD_append_right (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hFindNone
+      have hMono :
+          ∀ ep L, lookupG ms.G ep = some L →
+            lookupG ((roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) ++ ms.G) ep = some L := by
+          intro ep L hLookup
+          have hSid' : ep.sid ≠ ms.supply := by
+            -- If ep.sid = supply, then it would be in SessionsOf ms.G, contradicting freshness.
+            intro hEq
+            have hMem : (ep, L) ∈ ms.G := lookupG_mem ms.G ep L hLookup
+            have hFresh := hWT.supply_fresh_G ep L hMem
+            have hFresh' : ms.supply < ms.supply := by simpa [hEq] using hFresh
+            exact (Nat.lt_irrefl _ hFresh')
+          have hNone :
+              (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup ep = none :=
+            lookup_mapped_endpoints_sid_ne roles ms.supply localTypes ep (by simpa using hSid')
+          simp [lookupG, List.lookup_append, hNone, hLookup]
+      have hBT := hWT.buffers_typed e
+      -- Rewrite buffers and D to fall back to ms.{bufs,D}, then weaken G.
+      simp [lookupBuf, List.lookup_append, hBufNone, hLookupD] at hBT
+      exact BufferTyped_weakenG (G:=ms.G) (G':=(roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) ++ ms.G)
+        (D:=ms.D) (bufs:=ms.bufs) (e:=e) hBT hMono
   · -- lin_valid: for each (e, S) in combined Lin, lookupG G e = some S
     intro e S hMem
     simp only [List.mem_append, List.mem_map] at hMem

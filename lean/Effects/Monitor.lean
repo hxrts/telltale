@@ -1,3 +1,6 @@
+import Effects.Monitor.Part1
+import Effects.Monitor.Part2
+
 /-!
 # MPST Verified Monitor
 
@@ -38,6 +41,3 @@ Untrusted code interacts with the monitor by:
 
 This ensures untrusted code can only perform actions allowed by the protocol.
 -/
-
-import Effects.Monitor.Part1
-import Effects.Monitor.Part2

@@ -9,7 +9,7 @@ namespace RumpsteakV2.Proofs.Core.Assumptions
 
 /-! ## Current Assumptions
 
-No extra assumptions remain in the coinductive proof pipeline.
+No additional axioms are required at the moment.
 -/
 
 end RumpsteakV2.Proofs.Core.Assumptions

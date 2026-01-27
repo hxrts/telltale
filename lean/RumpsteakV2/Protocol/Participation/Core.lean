@@ -237,24 +237,36 @@ theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
     (h_comm_all : CommAll role P)
     (h_mu : ∀ t body, part_of_all2 role body → P body → P (.mu t body)) :
     ∀ g, part_of_all2 role g → P g := by
-  intro g h; cases g with  -- structural recursion on g
-  | end => exact (not_part_of_all2_end role h).elim
-  | var t => exact (not_part_of_all2_var role t h).elim
-  | mu t body =>
+  intro g h
+  match g with  -- structural recursion on g
+  | .end => exact (not_part_of_all2_end role h).elim
+  | .var t => exact (not_part_of_all2_var role t h).elim
+  | .mu t body =>
       have hbody : part_of_all2 role body := part_of_all2_mu_inv h
-      exact h_mu t body hbody (part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu body hbody)
-  | comm sender receiver branches =>
-      cases part_of_all2_comm_inv (role := role) (sender := sender)
-          (receiver := receiver) (branches := branches) h with
-      | inl hpart => exact h_comm_direct sender receiver branches hpart
+      have ih : P body :=
+        part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu body hbody
+      exact h_mu t body hbody ih
+  | .comm sender receiver branches =>
+      have hcases := part_of_all2_comm_inv (role := role) (sender := sender)
+        (receiver := receiver) (branches := branches) h
+      cases hcases with
+      | inl hpart =>
+          exact h_comm_direct sender receiver branches hpart
       | inr hall =>
-          exact h_comm_all sender receiver branches hall
-            (fun pair _ hpoa => part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu pair.2 hpoa)
+          have ih :
+              ∀ pair, pair ∈ branches → part_of_all2 role pair.2 → P pair.2 := by
+            intro pair hmem hpoa
+            exact part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu pair.2 hpoa
+          exact h_comm_all sender receiver branches hall ih
 termination_by g _ => sizeOf g
 decreasing_by
-  all_goals simp_wf; first | (simpa [GlobalType.comm.sizeOf_spec] using
-    (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
-  | (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
+  all_goals
+    simp_wf
+    try
+      (simpa [GlobalType.comm.sizeOf_spec] using
+        (sizeOf_elem_snd_lt_comm _ _ _ _ (by assumption)))
+    try
+      (simp only [sizeOf, GlobalType._sizeOf_1] at *; omega)
 
 /-! ## Non-participation lemmas
 

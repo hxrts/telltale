@@ -115,10 +115,9 @@ Operational semantics:
 
 ### `Preservation.lean`
 The main metatheory:
-- `preservation_send`: send step preserves typing
-- `preservation_recv`: recv step preserves typing
-- `preservation`: main subject reduction theorem
-- `progress`: progress theorem (terminates, steps, or blocked on recv)
+- `preservation`: TypedStep preserves WellFormed (wrapper)
+- `progress`: WellFormed processes can step or are blocked (wrapper)
+- `subject_reduction`: TypedStep implies Step (soundness)
 
 ## Proof Status
 
@@ -131,43 +130,32 @@ The main metatheory:
 - [x] Operational semantics
 - [x] Theorem statements
 
-### Proofs with `sorry` (TODO)
+### Axiomatized Proofs (TODO)
 
-The following proofs have detailed strategies documented but are incomplete:
+The following statements are currently assumed as axioms and should be discharged:
 
-#### Environment Lemmas
-- [ ] `lookupStr_update_eq/neq` - Store lookup/update
-- [ ] `lookupG_update_eq/neq` - GEnv lookup/update
-- [ ] `lookupBuf_update_eq/neq` - Buffer lookup/update
-- [ ] `lookupD_update_eq/neq` - DEnv lookup/update
+#### Coherence/Consistency
+- [ ] `sender_exists_of_receiver` (Coherence.Part2) – endpoint completeness assumption
+- [ ] `ValidLabels_*_preserved` (Coherence.Part8) – edge cases/protocol consistency
+- [ ] `initSession_coherent` (Coherence.Part8) – projection coherence placeholder
 
-#### Coherence Preservation
-- [ ] `Coherent_send_preserved` - 3-way edge case analysis
-- [ ] `Coherent_recv_preserved` - 3-way edge case analysis
-- [ ] `Coherent_empty` - Empty environments are coherent
-- [ ] `initSession_coherent` - Initialized sessions are coherent
-
-#### Typing Preservation
-- [ ] `StoreTyped_update_nonChan` - Store typing preserved
-- [ ] `BuffersTyped_enqueue` - Buffer typing after enqueue
-- [ ] `preservation_send` - Send step preservation
-- [ ] `preservation_recv` - Recv step preservation
-- [ ] `preservation` - Main theorem
-- [ ] `progress` - Progress theorem
+#### Deadlock Freedom
+- [ ] `subst_preserves_muDepth`
+- [ ] `reachesComm_body_implies_unfold_aux`
+- [ ] `deadlock_free`
 
 ## Key Theorems
 
 ### Subject Reduction (Preservation)
 ```lean
 theorem preservation
-    (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv)
-    (C C' : Config)
-    (hWT : WTConfigN n S G D C)
-    (hStep : Step C C') :
-    ∃ n' S' G' D', WTConfigN n' S' G' D' C'
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    WellFormed G D Ssh Sown store bufs P →
+    WellFormed G' D' Ssh Sown' store' bufs' P'
 ```
 
-If a well-typed configuration takes a step, the resulting configuration is also well-typed (under possibly updated environments).
+Typed steps preserve well-formedness, and TypedStep soundness links back to the untyped semantics.
 
 ### Coherence Preservation
 ```lean

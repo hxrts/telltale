@@ -7,6 +7,7 @@ set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
 namespace RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
 /-! ## Environments (abstraction point for closedness vs substitutions)
 
 We model an environment as a list of (name, type) bindings and define:

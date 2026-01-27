@@ -2,6 +2,7 @@ import Effects.Monitor
 import Effects.DeadlockFreedom
 import Effects.Spatial
 import Effects.Determinism
+import Effects.Typing.Part1
 
 /-!
 # MPST Deployed Protocol Bundle
@@ -186,8 +187,38 @@ structure DeployedProtocol where
   /-- Coherence certificate: G and D are coherent. -/
   coherence_cert : Coherent initGEnv initDEnv
 
+  /-- Head coherence certificate (progress refinement). -/
+  headCoherent_cert : HeadCoherent initGEnv initDEnv
+
+  /-- ValidLabels certificate for initial buffers. -/
+  validLabels_cert : ValidLabels initGEnv initDEnv initBufs
+
+  /-- Role completeness: all target roles exist in G. -/
+  roleComplete_cert : RoleComplete initGEnv
+
   /-- Buffers are typed according to D. -/
   buffers_typed_cert : BuffersTyped initGEnv initDEnv initBufs
+
+  /-- DEnv sessions are consistent with GEnv. -/
+  dConsistent_cert : DConsistent initGEnv initDEnv
+
+  /-- Buffers only mention sessions present in GEnv. -/
+  bConsistent_cert : BConsistent initGEnv initBufs
+
+  /-- Buffer domains match DEnv domains. -/
+  bufsDom_cert : BufsDom initBufs initDEnv
+
+  /-- Linear context entries match G. -/
+  lin_valid_cert : ∀ e S, (e, S) ∈ initLin → lookupG initGEnv e = some S
+
+  /-- Linear context has no duplicate endpoints. -/
+  lin_unique_cert : initLin.Pairwise (fun a b => a.1 ≠ b.1)
+
+  /-- Linear context endpoints are below supply. -/
+  supply_fresh_cert : ∀ e S, (e, S) ∈ initLin → e.sid < sessionId + 1
+
+  /-- GEnv endpoints are below supply. -/
+  supply_fresh_G_cert : ∀ e S, (e, S) ∈ initGEnv → e.sid < sessionId + 1
 
   /-- Interface for composition. -/
   interface : InterfaceType
@@ -220,21 +251,29 @@ theorem initMonitorState_wellTyped (p : DeployedProtocol) :
   constructor
   · exact p.coherence_cert
   · -- headCoherent: buffer heads match expected receive types
-    sorry  -- Requires HeadCoherent for initial state
+    exact p.headCoherent_cert
   · -- validLabels: branch labels in buffers are valid
-    sorry  -- Requires ValidLabels for initial state
+    exact p.validLabels_cert
   · exact p.buffers_typed_cert
   · -- lin_valid: tokens match G
     intro e S hIn
-    sorry  -- Proof requires showing initLin entries match initGEnv
+    exact p.lin_valid_cert e S hIn
   · -- lin_unique: no duplicate endpoints
-    sorry  -- Requires initLin has no duplicates
+    exact p.lin_unique_cert
   · -- supply_fresh: Lin endpoints below supply
     intro e S hIn
-    sorry  -- Requires initLin endpoints have sid < supply
+    simpa [DeployedProtocol.initMonitorState] using p.supply_fresh_cert e S hIn
   · -- supply_fresh_G: G endpoints below supply
     intro e S hIn
-    sorry  -- Requires initGEnv endpoints have sid < supply
+    simpa [DeployedProtocol.initMonitorState] using p.supply_fresh_G_cert e S hIn
+
+/-- The initial monitor state is well-typed and role-complete. -/
+theorem initMonitorState_wellTyped_complete (p : DeployedProtocol) :
+    WTMonComplete p.initMonitorState := by
+  -- Combine the existing WTMon proof with the role-complete certificate.
+  refine ⟨initMonitorState_wellTyped p, ?_⟩
+  -- Role completeness follows directly from the deployment bundle.
+  simpa [DeployedProtocol.initMonitorState] using p.roleComplete_cert
 
 /-- Get all endpoints for this protocol. -/
 def endpoints (p : DeployedProtocol) : List Endpoint :=
@@ -299,6 +338,95 @@ def mkDefaultInterface (roles : RoleSet) (sid : SessionId) (localTypes : Role �
   sessionIds := [sid]
   exports := roles.map fun r => ({ sid := sid, role := r }, localTypes r)
   imports := []
+
+/-! ## Initial Environment Certificates -/
+
+/-- mkInitGEnv lookup returns the local type for roles in the set. -/
+theorem mkInitGEnv_lookup (roles : RoleSet) (sid : SessionId)
+    (localTypes : Role → LocalType) (r : Role) (hMem : r ∈ roles) :
+    lookupG (mkInitGEnv roles sid localTypes) { sid := sid, role := r } =
+      some (localTypes r) := by
+  -- Induct on roles and unfold the list lookup.
+  induction roles with
+  | nil =>
+    cases hMem
+  | cons hd tl ih =>
+    simp [List.mem_cons] at hMem
+    cases hMem with
+    | inl hEq =>
+      subst hEq
+      simp [mkInitGEnv, lookupG, List.lookup]
+    | inr hMem =>
+      by_cases hEq : r = hd
+      · subst hEq
+        simp [mkInitGEnv, lookupG, List.lookup]
+      · have hNe : ({ sid := sid, role := r } : Endpoint) ≠ { sid := sid, role := hd } := by
+          intro hEqEp; cases hEqEp; exact hEq rfl
+        have hNe' : ({ sid := sid, role := r } : Endpoint) == { sid := sid, role := hd } = false :=
+          beq_eq_false_iff_ne.mpr hNe
+        simp [mkInitGEnv, lookupG, List.lookup, hNe', ih hMem]
+
+/-- Any role in the set witnesses the session in SessionsOf. -/
+theorem mkInitGEnv_sessionsOf_of_mem (roles : RoleSet) (sid : SessionId)
+    (localTypes : Role → LocalType) (r : Role) (hMem : r ∈ roles) :
+    sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) := by
+  -- Witness the endpoint for r and use the lookup lemma.
+  refine ⟨{ sid := sid, role := r }, localTypes r, ?_, rfl⟩
+  exact mkInitGEnv_lookup roles sid localTypes r hMem
+
+/-- A lookup in mkInitBufs implies the edge is from allEdges. -/
+theorem mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
+    (e : Edge) (buf : Buffer)
+    (h : (mkInitBufs roles sid).lookup e = some buf) :
+    e ∈ RoleSet.allEdges sid roles := by
+  -- A missing edge would force lookup to be none.
+  by_contra hNot
+  have hNone := initBuffers_lookup_none_of_notin sid roles e hNot
+  have hNone' : (mkInitBufs roles sid).lookup e = none := by
+    simpa [mkInitBufs, initBuffers] using hNone
+  exact Option.noConfusion (h.trans hNone'.symm)
+
+/-- Initial buffers mention only sessions present in the initial GEnv. -/
+theorem mkInit_bConsistent (roles : RoleSet) (sid : SessionId)
+    (localTypes : Role → LocalType) :
+    BConsistent (mkInitGEnv roles sid localTypes) (mkInitBufs roles sid) := by
+  -- A buffer entry comes from allEdges, so its sid appears in GEnv.
+  intro e buf hLookup
+  have hMem := mkInitBufs_lookup_mem roles sid e buf hLookup
+  have hSid : e.sid = sid := RoleSet.allEdges_sid sid roles e hMem
+  have hSender : e.sender ∈ roles := RoleSet.allEdges_sender_mem sid roles e hMem
+  have hSidIn : sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) :=
+    mkInitGEnv_sessionsOf_of_mem roles sid localTypes e.sender hSender
+  simpa [hSid] using hSidIn
+
+/-- Initial buffers and traces share the same edge domain. -/
+theorem mkInit_bufsDom (roles : RoleSet) (sid : SessionId) :
+    BufsDom (mkInitBufs roles sid) (mkInitDEnv roles sid) := by
+  -- Missing buffers are exactly the edges not in allEdges.
+  intro e hLookup
+  have hLookup' : (initBuffers sid roles).lookup e = none := by
+    simpa [mkInitBufs, initBuffers] using hLookup
+  have hNot := initBuffers_not_mem_of_lookup_none sid roles e hLookup'
+  have hNone := initDEnv_find?_none_of_notin sid roles e hNot
+  simpa [mkInitDEnv] using hNone
+
+/-- Initial DEnv sessions are consistent with the initial GEnv. -/
+theorem mkInit_dConsistent (roles : RoleSet) (sid : SessionId)
+    (localTypes : Role → LocalType) :
+    DConsistent (mkInitGEnv roles sid localTypes) (mkInitDEnv roles sid) := by
+  -- Any DEnv entry comes from allEdges and therefore has sid in GEnv.
+  intro s hs
+  obtain ⟨e, ts, hFind, hSid⟩ := hs
+  have hMem : e ∈ RoleSet.allEdges sid roles := by
+    by_contra hNot
+    have hNone := initDEnv_find?_none_of_notin sid roles e hNot
+    exact Option.noConfusion (hFind.trans hNone.symm)
+  have hSid' : e.sid = sid := RoleSet.allEdges_sid sid roles e hMem
+  have hSender : e.sender ∈ roles := RoleSet.allEdges_sender_mem sid roles e hMem
+  have hSidIn : sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) :=
+    mkInitGEnv_sessionsOf_of_mem roles sid localTypes e.sender hSender
+  have hEq : s = sid := hSid.symm.trans hSid'
+  simpa [hEq] using hSidIn
 
 /-! ## Linking Judgment (6.7.2)
 

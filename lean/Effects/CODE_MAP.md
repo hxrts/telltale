@@ -1,6 +1,6 @@
 # Effects Code Map
 
-**Last Updated:** 2026-01-16
+**Last Updated:** 2026-01-27
 
 This document provides a comprehensive map of the Effects directory - a formal verification library for asynchronous multiparty session types (MPST) with buffered communication in Lean 4.
 
@@ -21,7 +21,7 @@ This document provides a comprehensive map of the Effects directory - a formal v
 ## Overview
 
 **Directory Statistics:**
-- Total files: 18 .lean files + 1 README.md
+- Total files: 20 .lean files + 1 README.md
 - Total size: ~10,000 lines of Lean code
 - Largest file: Coherence.lean (2,724 lines)
 - Central innovation: Coherence invariant for async MPST
@@ -314,7 +314,7 @@ def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
 ---
 
 ### Typing.lean
-**Location:** `Effects/Typing.lean` (1,346 lines)
+**Location:** `Effects/Typing.lean` (re-export; split across Part1..Part7, with Part3a/Part3b)
 
 **Disjointness Predicates:**
 
@@ -698,6 +698,31 @@ def StoreTyped (G : GEnv) (S : SEnv) (store : Store) : Prop :=
         HasTypeVal G (store x) T
 ```
 
+**Split/Merge Lemmas (RBMap):**
+
+```lean
+-- Split/merge infrastructure for parallel composition
+theorem StoreTyped_split_left {G S₁ S₂ store} :
+    StoreTyped G (S₁ ++ S₂) store → StoreTyped G S₁ store
+
+theorem StoreTyped_split_right {G S₁ S₂ store} :
+    DisjointS S₁ S₂ → StoreTyped G (S₁ ++ S₂) store → StoreTyped G S₂ store
+
+theorem StoreTyped_merge {G₁ G₂ S₁ S₂ store} :
+    DisjointG G₁ G₂ → StoreTyped G₁ S₁ store → StoreTyped G₂ S₂ store →
+    StoreTyped (G₁ ++ G₂) (S₁ ++ S₂) store
+
+theorem BuffersTyped_merge {G₁ G₂ D₁ D₂ bufs} :
+    DisjointG G₁ G₂ → DisjointD D₁ D₂ →
+    BuffersTyped G₁ D₁ bufs → BuffersTyped G₂ D₂ bufs →
+    BuffersTyped (G₁ ++ G₂) (D₁ ++ D₂) bufs
+
+theorem Coherent_merge {G₁ G₂ D₁ D₂} :
+    Coherent G₁ D₁ → Coherent G₂ D₂ →
+    DisjointG G₁ G₂ → DConsistent G₁ D₁ → DConsistent G₂ D₂ →
+    Coherent (G₁ ++ G₂) (D₁ ++ D₂)
+```
+
 **Advanced Coherence Properties:**
 
 ```lean
@@ -749,17 +774,22 @@ def SelectReady (G : GEnv) (edge : Edge) : Prop :=
 ### Preservation.lean
 **Location:** `Effects/Preservation.lean` (533 lines)
 
-**Subject Reduction (Preservation):**
+**Typed Preservation + Soundness:**
 
 ```lean
 theorem preservation
-    (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C C' : Config)
-    (hWT : WTConfigN n S G D C)
-    (hStep : Step C C') :
-    ∃ n' S' G' D', WTConfigN n' S' G' D' C'
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    WellFormed G D Ssh Sown store bufs P →
+    WellFormed G' D' Ssh Sown' store' bufs' P'
+
+theorem subject_reduction {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    Step ⟨P, store, bufs, G, D, 0⟩ ⟨P', store', bufs', G', D', 0⟩
 ```
 
-**Meaning:** Well-typed configurations remain well-typed after taking a step.
+**Meaning:** TypedStep preserves WellFormed, and each typed step is a valid
+untyped step (soundness).
 
 **Key Helper Lemmas:**
 

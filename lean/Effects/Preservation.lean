@@ -17,8 +17,8 @@ The new preservation theorems are:
 - `subject_reduction` (this file) - TypedStep implies Step (soundness)
 
 The old theorems (`preservation_send`, `preservation_recv`, `preservation`, `progress`)
-remain below with their original sorries documenting the design issue. They are now
-deprecated in favor of the TypedStep-based approach.
+have been removed. The canonical results are the TypedStep-based theorems below,
+which align with the pre-update typing discipline.
 
 ## Proof Structure
 
@@ -41,39 +41,15 @@ The proof proceeds by case analysis on the step relation:
 
 ## Key Lemmas
 
-- `preservation_send`: Well-typedness preserved by send
-- `preservation_recv`: Well-typedness preserved by recv
-- `preservation`: Main theorem
+- `preservation` (this file): TypedStep preserves WellFormed (wrapper)
+- `progress` (this file): WellFormed processes can step or are blocked (wrapper)
+- `subject_reduction` (this file): TypedStep implies Step (soundness)
 
 ## Proof Techniques
 
-### Inversion on Typing
-
-The send/recv preservation proofs require inverting the process typing judgment
-to extract the concrete types involved. For example, if `proc = send k x` and
-we know `HasTypeProcN ... proc`, we can extract:
-- `lookupSEnv S k = some (chan sid role)` (channel variable)
-- `lookupSEnv S x = some T` (payload has the expected type)
-- `lookupG G e = some (send target T L)` (endpoint at send state)
-
-### Channel Aliasing
-
-A subtle issue arises when multiple variables might refer to the same endpoint.
-In a full development, `StoreNoAlias` would ensure each endpoint is held by
-exactly one variable (linearity). Without this, when we update G[e], we must
-consider whether other variables in S also reference e.
-
-For now, this aliasing case is marked `sorry` and would be resolved by adding
-a linearity invariant to WTConfigN.
-
-### HasTypeVal Stability
-
-HasTypeVal is stable under G updates for non-channel values (unit, bool, nat, string).
-For channel values, we need to track whether the channel is the one being updated:
-- If `e' = e` (the endpoint being updated): type changes to new type
-- If `e' ≠ e`: lookup unchanged, HasTypeVal preserved
-
-Use `lookupG_update_neq` to show the lookup is unchanged for unrelated endpoints.
+The TypedStep-based proofs avoid the old pre/post-update mismatch. All
+session evolution happens inside the transition judgment, so preservation
+and progress become direct structural proofs.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -121,138 +97,32 @@ theorem BuffersTyped_enqueue_old {G : GEnv} {D : DEnv} {bufs : Buffers}
     (hBT : BuffersTyped G D bufs)
     (hv : HasTypeVal G v T) :
     BuffersTyped G (updateD D e (lookupD D e ++ [T])) (enqueueBuf bufs e v) := by
-  simpa using (BuffersTyped_enqueue (G := G) (D := D) (bufs := bufs) (e := e) (v := v) (T := T) hBT hv)
-
-/-! ## Preservation for Individual Steps -/
-
-/-- Preservation for send step.
-
-    **Proof outline**:
-
-    1. Unpack WTConfigN into (hN, hStore, hBufs, hCoh, hProcTy)
-    2. Invert process typing: must be HasTypeProcN.send rule
-       This gives us T, L such that:
-       - `lookupSEnv S k = some (chan sid role)` for the endpoint
-       - `lookupSEnv S x = some T` for the payload type
-       - `lookupG G e = some (send target T L)` for the session type
-    3. Build WTConfigN for post-configuration:
-       - nextId: unchanged by send
-       - StoreTyped: Store unchanged; by_cases on each variable
-         - If y = k (channel): show e now has type L in G'
-         - If y ≠ k: use lookupG_update_neq for stability
-       - BuffersTyped: use `BuffersTyped_enqueue` with HasTypeVal for v
-       - Coherent: use `Coherent_send_preserved`
-       - Process typing: skip is well-typed
-
-    **NOTE**: There's a design tension in the typing rules:
-    - `HasTypeProcN.send` produces a judgment with post-update G (G[e] := L)
-    - This theorem assumes G has the send type at e (pre-update)
-    - Resolution options:
-      1. Change typing to use pre-update environments (standard approach)
-      2. Change preservation theorem to match current typing discipline
-      3. Use an auxiliary "expected type" function
-    This sorry marks the need to resolve this design issue. -/
-theorem preservation_send
-    (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C : Config)
-    (k x : Var) (e : Endpoint) (target : Role) (v : Value)
-    (hWT : WTConfigN n S G D C)
-    (hProc : C.proc = .send k x)
-    (hk : lookupStr C.store k = some (.chan e))
-    (hx : lookupStr C.store x = some v) :
-    ∃ T L,
-      lookupG G e = some (.send target T L) ∧
-      lookupSEnv S x = some T ∧
-      WTConfigN n S
-        (updateG G e L)
-        (updateD D { sid := e.sid, sender := e.role, receiver := target } (lookupD D { sid := e.sid, sender := e.role, receiver := target } ++ [T]))
-        (sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L) := by
-  sorry  -- Proof requires inversion on typing as outlined above
-
-/-- Preservation for recv step.
-
-    **Proof outline**:
-
-    1. Unpack WTConfigN into (hN, hStore, hBufs, hCoh, hProcTy)
-    2. Invert process typing: must be HasTypeProcN.recv rule
-       This gives us T, L such that:
-       - `lookupSEnv S k = some (chan sid role)` for the endpoint
-       - `lookupG G e = some (recv source T L)` for the session type
-    3. From BuffersTyped, get that v has type T (the head of the trace)
-    4. Build WTConfigN for post-configuration:
-       - nextId: unchanged by recv
-       - StoreTyped: Store updated with (x, v); use HasTypeVal from step 3
-       - BuffersTyped: buffer at edge dequeued, trace at edge tailed
-       - Coherent: use `Coherent_recv_preserved`
-       - Process typing: skip is well-typed
-
-    **NOTE**: Same design tension as preservation_send - the recv typing
-    rule uses post-update S and G, but this theorem assumes pre-update. -/
-theorem preservation_recv
-    (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C : Config)
-    (k x : Var) (e : Endpoint) (source : Role) (v : Value) (vs : List Value)
-    (hWT : WTConfigN n S G D C)
-    (hProc : C.proc = .recv k x)
-    (hk : lookupStr C.store k = some (.chan e))
-    (hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = v :: vs) :
-    ∃ T L,
-      lookupG G e = some (.recv source T L) ∧
-      WTConfigN n (updateSEnv S x T)
-        (updateG G e L)
-        (updateD D { sid := e.sid, sender := source, receiver := e.role } (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail)
-        (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L) := by
-  sorry  -- Proof requires inversion on typing as outlined above
+  -- Directly reuse the newer enqueue lemma.
+  simpa using
+    (BuffersTyped_enqueue (G := G) (D := D) (bufs := bufs) (e := e) (v := v) (T := T) hBT hv)
 
 /-! ## Main Preservation Theorem -/
 
-/-- Preservation: if C is well-typed and steps to C', then C' is well-typed.
-    This is the subject reduction theorem for MPST.
-
-    **Proof by induction on Step**:
-
-    **Base cases** (BaseStep):
-    - `seq2`: seq skip Q → Q
-      Invert seq typing to extract Q's typing; environments unchanged
-    - `par_skip_left/right`: par skip Q → Q, par P skip → P
-      Similar to seq2
-    - `assign`: assign x v → skip
-      Update S with type of v, store with v; use HasTypeVal
-    - `newSession`: Allocate fresh session ID
-      Use SupplyInv_newSession for freshness preservation
-      Extend G with new endpoints, D with empty traces
-    - `send`: Use `preservation_send` lemma
-    - `recv`: Use `preservation_recv` lemma
-
-    **Inductive cases** (context rules):
-    - `seq_left P P' Q`: P → P' implies seq P Q → seq P' Q
-      Apply IH to get (n', S', G', D', hWT') for P'
-      Rebuild seq typing with Q (note: Q's typing may need weakening)
-    - `par_left P P' Q`, `par_right P Q Q'`: Similar
-      For par, both branches may need separate session resources
-
-    **Key insight**: Each case either:
-    1. Doesn't touch protocol state (seq2, par_skip_*) → environments unchanged
-    2. Advances exactly one endpoint's type (send, recv) → use coherence lemmas
-    3. Creates fresh state (newSession) → extend environments consistently
-    4. Passes to subterm (context rules) → use induction hypothesis -/
+/-- Preservation: TypedStep preserves WellFormed. -/
 theorem preservation
-    (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv)
-    (C C' : Config)
-    (hWT : WTConfigN n S G D C)
-    (hStep : Step C C') :
-    ∃ n' S' G' D', WTConfigN n' S' G' D' C' := by
-  sorry  -- Full proof by case analysis on step as outlined above
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    WellFormed G D Ssh Sown store bufs P →
+    WellFormed G' D' Ssh Sown' store' bufs' P' := by
+  -- Delegate to the canonical proof in Typing.Part6.
+  exact preservation_typed
 
 /-! ## Progress Theorem -/
 
-/-- Progress: a well-typed configuration either terminates, can step, or is blocked on recv. -/
-theorem progress
-    (n : SessionId) (S : SEnv) (G : GEnv) (D : DEnv) (C : Config)
-    (hWT : WTConfigN n S G D C) :
-    Step.Terminates C ∨ (∃ C', Step C C') ∨
-    (∃ k x e source, C.proc = .recv k x ∧
-      lookupStr C.store k = some (.chan e) ∧
-      lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = []) := by
-  sorry  -- Full proof requires case analysis on process typing
+/-- Progress: a well-formed process can step or is blocked. -/
+theorem progress {G D Ssh Sown store bufs P} :
+    WellFormed G D Ssh Sown store bufs P →
+    (P = .skip) ∨
+      (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
+        G' D' Sown' store' bufs' P') ∨
+      BlockedProc store bufs P := by
+  -- Delegate to the canonical progress proof in Typing.Part7.
+  exact progress_typed
 
 /-! ## Progress Lemmas for Individual Process Forms
 
@@ -380,9 +250,9 @@ theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (
     have hTypedEdge := hBufs branchEdge
     rcases hTypedEdge with ⟨hLenBuf, hTyping⟩
     have h0buf : 0 < (lookupBuf C.bufs branchEdge).length := by
-      simpa [branchEdge, hBuf] using (Nat.succ_pos vs.length)
+      simp [branchEdge, hBuf]
     have h0trace : 0 < (lookupD C.D branchEdge).length := by
-      simpa [hLenBuf] using h0buf
+      exact (by simpa [hLenBuf] using h0buf)
     have hTyped0 := hTyping 0 h0buf
     have hv' : HasTypeVal C.G v ((lookupD C.D branchEdge).get ⟨0, h0trace⟩) := by
       simpa [branchEdge, hBuf] using hTyped0
@@ -420,10 +290,9 @@ theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (
                       have hNo : ∀ x ∈ procs, ¬ (fun b => b.1 == lbl0) x := by
                         simpa [List.find?_eq_none] using hFindP
                       have hMemP : procs.get ⟨i, hip⟩ ∈ procs := List.get_mem procs ⟨i, hip⟩
-                      have hContra : False := (hNo _ hMemP) hPred
-                      simpa [hFindP] using hContra
+                      exact ((hNo _ hMemP) hPred).elim
                   | some b =>
-                      simp [hFindP]
+                      simp
                 rcases (Option.isSome_iff_exists).1 hFindPIsSome with ⟨bP, hFindP⟩
                 cases bP with
                 | mk lblP P =>
@@ -539,33 +408,33 @@ theorem subject_reduction {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'
   · intro G D Ssh Sown store bufs Q
     apply Step.base
     apply StepBase.seq2 rfl
-  · intro Ssh store bufs P P' Q S G D₁ D₂ G₁' D₁' S₁' split
+  · intro Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁' split
         hTS hDisjG hDisjD hDisjS hConsL hConsR ih
     have hStep := Step_frame_append_right (G₂ := split.G2) (D₂ := D₂)
       (C := ⟨P, store, bufs, split.G1, D₁, 0⟩)
-      (C' := ⟨P', store, bufs, G₁', D₁', 0⟩) ih
+      (C' := ⟨P', store', bufs', G₁', D₁', 0⟩) ih
     have hStep' : Step ⟨P, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
-        ⟨P', store, bufs, G₁' ++ split.G2, D₁' ++ D₂, 0⟩ := by
+        ⟨P', store', bufs', G₁' ++ split.G2, D₁' ++ D₂, 0⟩ := by
       simpa [frameGD] using hStep
     have hPar : Step ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
-        ⟨.par P' Q, store, bufs, G₁' ++ split.G2, D₁' ++ D₂, 0⟩ := by
+        ⟨.par P' Q, store', bufs', G₁' ++ split.G2, D₁' ++ D₂, 0⟩ := by
       refine Step.par_left (C := ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩)
-        (C' := ⟨P', store, bufs, G₁' ++ split.G2, D₁' ++ D₂, 0⟩) (P := P) (Q := Q) ?_ ?_
+        (C' := ⟨P', store', bufs', G₁' ++ split.G2, D₁' ++ D₂, 0⟩) (P := P) (Q := Q) ?_ ?_
       · rfl
       · exact hStep'
     simpa [split.hG] using hPar
-  · intro Ssh store bufs P Q Q' S G D₁ D₂ G₂' D₂' S₂' split
+  · intro Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂' split
         hTS hDisjG hDisjD hDisjS hConsL hConsR ih
     have hStep := Step_frame_append_left (G₁ := split.G1) (D₁ := D₁)
       (C := ⟨Q, store, bufs, split.G2, D₂, 0⟩)
-      (C' := ⟨Q', store, bufs, G₂', D₂', 0⟩) ih
+      (C' := ⟨Q', store', bufs', G₂', D₂', 0⟩) ih
     have hStep' : Step ⟨Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
-        ⟨Q', store, bufs, split.G1 ++ G₂', D₁ ++ D₂', 0⟩ := by
+        ⟨Q', store', bufs', split.G1 ++ G₂', D₁ ++ D₂', 0⟩ := by
       simpa [frameGD_left] using hStep
     have hPar : Step ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩
-        ⟨.par P Q', store, bufs, split.G1 ++ G₂', D₁ ++ D₂', 0⟩ := by
+        ⟨.par P Q', store', bufs', split.G1 ++ G₂', D₁ ++ D₂', 0⟩ := by
       refine Step.par_right (C := ⟨.par P Q, store, bufs, split.G1 ++ split.G2, D₁ ++ D₂, 0⟩)
-        (C' := ⟨Q', store, bufs, split.G1 ++ G₂', D₁ ++ D₂', 0⟩) (P := P) (Q := Q) ?_ ?_
+        (C' := ⟨Q', store', bufs', split.G1 ++ G₂', D₁ ++ D₂', 0⟩) (P := P) (Q := Q) ?_ ?_
       · rfl
       · exact hStep'
     simpa [split.hG] using hPar

@@ -7,6 +7,7 @@ set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
 namespace RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
 /-! ## Full Unfolding (Coq-style `full_eunf`)
 
 Iterate mu-unfolding until reaching a non-mu form.

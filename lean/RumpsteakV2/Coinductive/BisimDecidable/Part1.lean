@@ -389,4 +389,4 @@ lemma obsKindOf_recv_iff {t : LocalTypeC} {p : String} {labels : List Label} :
     | .mu _ => simp [hh] at h
   · intro h; simp [h]
 
-end RumpsteakV2.Coinductive.BisimDecidable
+end RumpsteakV2.Coinductive

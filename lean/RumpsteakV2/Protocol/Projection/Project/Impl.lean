@@ -7,7 +7,4 @@ import RumpsteakV2.Protocol.Projection.Project.ImplObservables
 import RumpsteakV2.Protocol.Projection.Project.ImplExtraction
 import RumpsteakV2.Protocol.Projection.Project.ImplCompPostfix
 import RumpsteakV2.Protocol.Projection.Project.ImplCompleteness
-
-/-
-Barrel for the projection implementation pieces.
--/-
+/- Barrel for the projection implementation pieces. -/

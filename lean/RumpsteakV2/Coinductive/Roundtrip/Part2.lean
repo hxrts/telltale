@@ -1,4 +1,5 @@
 import RumpsteakV2.Coinductive.Roundtrip.Part1
+import RumpsteakV2.Coinductive.Roundtrip.GpacoCollapse
 
 set_option linter.dupNamespace false
 
@@ -149,6 +150,14 @@ theorem EQ2C_mu_paco_le_paco_of_productive {a b : LocalTypeC}
         exact go_recv hbr (by intro b hb; exact hb) (by intro c hc; exact hc)
       exact ObservableRelC.is_recv p bs cs ha_recv hb_recv (BranchesRelC_mono (fun _ _ hr => Or.inl hr) hbr')
 
+/-- gpaco-based collapse: if μ-paco steps are observable under GpacoRel, then μ-paco collapses. -/
+theorem EQ2C_mu_paco_le_paco_of_obs
+    (hrr : ∀ a b, EQ2C_mu_paco a b → ObservableRelC GpacoRel a b)
+    {a b : LocalTypeC} (h : EQ2C_mu_paco a b) :
+    EQ2C_paco a b := by
+  -- Delegate to the gpaco collapse lemma in GpacoCollapse.
+  exact mu_paco_le_paco_of_obs hrr h
+
 /-- EQ2CE_resolved' implies EQ2C, assuming productivity on both sides. -/
 theorem EQ2CE_resolved'_implies_EQ2C (a b : LocalTypeC) (h : EQ2CE_resolved' a b)
     (ha : ProductiveC a) (hb : ProductiveC b) :
@@ -177,6 +186,17 @@ theorem EQ2CE_to_EQ2C {ρ : EnvPair} {a b : LocalTypeC}
   -- Delegate to EQ2CE_to_EQ2C' which handles all cases
   EQ2CE_to_EQ2C' hce hEnvL hVarR ha hb
 
+/-! ## Sourced versions (toCoind) -/
+
+/-- Erasure for toCoind sources, discharging productivity. -/
+theorem EQ2CE_to_EQ2C'_toCoind {ρ : EnvPair}
+    {a b : RumpsteakV2.Protocol.LocalTypeR.LocalTypeR}
+    (hce : EQ2CE ρ (toCoind a) (toCoind b))
+    (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ) :
+    EQ2C (toCoind a) (toCoind b) := by
+  -- toCoind images are productive, so discharge hypotheses internally.
+  exact EQ2CE_to_EQ2C' hce hEnvL hVarR (productive_toCoind a) (productive_toCoind b)
+
 /-- The key lemma: EQ2CE_resolved implies EQ2C by coinduction.
     This uses EQ2CE_step_to_EQ2C_varR which handles mu cases via unfolding.
     Delegates to EQ2CE_to_EQ2C'. -/
@@ -197,4 +217,100 @@ theorem EQ2CE_to_EQ2C_paco {a b : LocalTypeC} (hR : EQ2CE_rel_paco a b)
   rw [← EQ2C_eq_paco_bot]
   exact EQ2CE_to_EQ2C' hce hResL hVarR ha hb
 
-end RumpsteakV2.Coinductive.Roundtrip
+/-! ## Sourced versions (toCoind) -/
+
+/-- Simplified erasure for toCoind sources. -/
+theorem EQ2CE_to_EQ2C_toCoind {ρ : EnvPair}
+    {a b : RumpsteakV2.Protocol.LocalTypeR.LocalTypeR}
+    (hce : EQ2CE ρ (toCoind a) (toCoind b))
+    (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ) :
+    EQ2C (toCoind a) (toCoind b) :=
+  EQ2CE_to_EQ2C'_toCoind hce hEnvL hVarR
+
+/-- Resolved erasure for toCoind sources, discharging productivity. -/
+theorem EQ2CE_resolved'_implies_EQ2C_toCoind
+    {a b : RumpsteakV2.Protocol.LocalTypeR.LocalTypeR}
+    (h : EQ2CE_resolved' (toCoind a) (toCoind b)) :
+    EQ2C (toCoind a) (toCoind b) :=
+  EQ2CE_resolved'_implies_EQ2C (toCoind a) (toCoind b) h
+    (productive_toCoind a) (productive_toCoind b)
+
+/-- Resolved erasure for toCoind sources (EnvPair version). -/
+theorem EQ2CE_resolved_to_EQ2C_toCoind
+    {ρ : EnvPair} {a b : RumpsteakV2.Protocol.LocalTypeR.LocalTypeR}
+    (h : EQ2CE_resolved ρ (toCoind a) (toCoind b)) :
+    EQ2C (toCoind a) (toCoind b) :=
+  EQ2CE_resolved_to_EQ2C ρ (toCoind a) (toCoind b) h
+    (productive_toCoind a) (productive_toCoind b)
+
+/-- Paco-style erasure for toCoind sources, discharging productivity. -/
+theorem EQ2CE_to_EQ2C_paco_toCoind
+    {a b : RumpsteakV2.Protocol.LocalTypeR.LocalTypeR}
+    (hR : EQ2CE_rel_paco (toCoind a) (toCoind b)) :
+    EQ2C_paco (toCoind a) (toCoind b) :=
+  EQ2CE_to_EQ2C_paco hR (productive_toCoind a) (productive_toCoind b)
+
+/-! ## Sourced versions (projTrans) -/
+
+/-- Erasure for projection sources, discharging productivity. -/
+theorem EQ2CE_to_EQ2C_projTrans {ρ : EnvPair}
+    {g₁ g₂ : RumpsteakV2.Protocol.GlobalType.GlobalType}
+    {role₁ role₂ : String}
+    (hce : EQ2CE ρ
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂)))
+    (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ) :
+    EQ2C (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+         (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂)) := by
+  -- Projection outputs are inductive, so toCoind images are productive.
+  have hprod₁ :
+      ProductiveC (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁)) :=
+    productive_toCoind_of_projTrans g₁ role₁
+  have hprod₂ :
+      ProductiveC (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂)) :=
+    productive_toCoind_of_projTrans g₂ role₂
+  -- Delegate to the general erasure lemma.
+  exact EQ2CE_to_EQ2C' hce hEnvL hVarR hprod₁ hprod₂
+
+/-- Resolved erasure for projTrans sources, discharging productivity. -/
+theorem EQ2CE_resolved'_implies_EQ2C_projTrans
+    {g₁ g₂ : RumpsteakV2.Protocol.GlobalType.GlobalType}
+    {role₁ role₂ : String}
+    (h : EQ2CE_resolved'
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂))) :
+    EQ2C (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+         (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂)) := by
+  -- Discharge productivity for both projections.
+  exact EQ2CE_resolved'_implies_EQ2C _ _ h
+    (productive_toCoind_of_projTrans g₁ role₁)
+    (productive_toCoind_of_projTrans g₂ role₂)
+
+/-- Resolved erasure for projTrans sources (EnvPair version). -/
+theorem EQ2CE_resolved_to_EQ2C_projTrans
+    {ρ : EnvPair} {g₁ g₂ : RumpsteakV2.Protocol.GlobalType.GlobalType}
+    {role₁ role₂ : String}
+    (h : EQ2CE_resolved ρ
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂))) :
+    EQ2C (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+         (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂)) := by
+  -- Discharge productivity for both projections.
+  exact EQ2CE_resolved_to_EQ2C ρ _ _ h
+    (productive_toCoind_of_projTrans g₁ role₁)
+    (productive_toCoind_of_projTrans g₂ role₂)
+
+/-- Paco-style erasure for projTrans sources, discharging productivity. -/
+theorem EQ2CE_to_EQ2C_paco_projTrans
+    {g₁ g₂ : RumpsteakV2.Protocol.GlobalType.GlobalType}
+    {role₁ role₂ : String}
+    (hR : EQ2CE_rel_paco
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+      (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂))) :
+    EQ2C_paco (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₁ role₁))
+              (toCoind (RumpsteakV2.Protocol.Projection.Trans.trans g₂ role₂)) :=
+  EQ2CE_to_EQ2C_paco hR
+    (productive_toCoind_of_projTrans g₁ role₁)
+    (productive_toCoind_of_projTrans g₂ role₂)
+
+end RumpsteakV2.Coinductive

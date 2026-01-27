@@ -26,24 +26,17 @@ These are sound because CProjectTransRelComp preserves observable behavior
 (modulo equi-recursive equivalence).
 -/
 
-private theorem CProjectTransRelComp_extend_right_noWF
+theorem CProjectTransRelComp_extend_right_noWF
     (h1 : CProjectTransRelComp a b) (h2 : EQ2 b c)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) (hWFc : LocalTypeR.WellFormed c) :
     CProjectTransRelComp a c := by
   exact CProjectTransRelComp_extend_right h1 h2 hWFa hWFb hWFc
 
-private theorem CProjectTransRelComp_extend_left_noWF
+theorem CProjectTransRelComp_extend_left_noWF
     (h1 : EQ2 a b) (h2 : CProjectTransRelComp b c)
     (hWFa : LocalTypeR.WellFormed a) (hWFb : LocalTypeR.WellFormed b) (hWFc : LocalTypeR.WellFormed c) :
     CProjectTransRelComp a c := by
   exact CProjectTransRelComp_extend_left h1 h2 hWFa hWFb hWFc
-
-private theorem wf_tail_of_cons
-    {lb : Label × LocalTypeR} {bs : List (Label × LocalTypeR)}
-    (hwf : ∀ lb' ∈ lb :: bs, LocalTypeR.WellFormed lb'.2) :
-    ∀ lb' ∈ bs, LocalTypeR.WellFormed lb'.2 := by
-  intro lb' hmem
-  exact hwf lb' (by simp [hmem])
 
 private theorem BranchesRel_trans_chain_head_noWF {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
@@ -77,7 +70,7 @@ private theorem BranchesRel_trans_chain_rev_head_noWF {R : Rel}
     | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
     | inr heq => exact Or.inr (EQ2_trans_wf h1.2 heq hWFa hWFb hWFc)
 
-private theorem BranchesRel_trans_chain_noWF {R : Rel}
+theorem BranchesRel_trans_chain_noWF {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {bs cs ds : List (Label × LocalTypeR)}
@@ -102,7 +95,7 @@ private theorem BranchesRel_trans_chain_noWF {R : Rel}
               · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
                   (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
 
-private theorem BranchesRel_trans_chain_rev_noWF {R : Rel}
+theorem BranchesRel_trans_chain_rev_noWF {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {bs cs ds : List (Label × LocalTypeR)}
@@ -175,7 +168,7 @@ private theorem CProjectTransRelComp_var_extract_both
   simpa [EQ2F] using hcomp
 
 /-- When var is CProjectTransRelComp-related to var, the variable names match. -/
-private theorem CProjectTransRelComp_var_extract
+theorem CProjectTransRelComp_var_extract
     {v1 v2 : String} (h : CProjectTransRelComp (.var v1) (.var v2))
     (hWFa : LocalTypeR.WellFormed (.var v1)) (hWFc : LocalTypeR.WellFormed (.var v2)) : v1 = v2 := by
   -- Split the composed relation into base/left/right/both cases.
@@ -258,8 +251,14 @@ private theorem CProjectTransRelComp_send_extract_right
       rcases CProjectTransRel_source_send (p := p1) (bs := bs1) (b := .mu t body) hrel with
         ⟨cs, hEq⟩
       cases hEq
-  | «end» | var _ | recv _ _ =>
-      have hrel_f := CProjectTransRel_postfix (.send p1 bs1) b hrel
+  | «end» =>
+      have hrel_f := CProjectTransRel_postfix (.send p1 bs1) .end (by simpa using hrel)
+      simpa [EQ2F] using hrel_f
+  | var v =>
+      have hrel_f := CProjectTransRel_postfix (.send p1 bs1) (.var v) (by simpa using hrel)
+      simpa [EQ2F] using hrel_f
+  | recv q cs =>
+      have hrel_f := CProjectTransRel_postfix (.send p1 bs1) (.recv q cs) (by simpa using hrel)
       simpa [EQ2F] using hrel_f
 
 /- Helper: both case for CProjectTransRelComp_send_extract. -/
@@ -275,7 +274,7 @@ private theorem CProjectTransRelComp_send_extract_both
       hWFa hWFc
   simpa [EQ2F] using hcomp
 
-private theorem CProjectTransRelComp_send_extract
+theorem CProjectTransRelComp_send_extract
     {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
     (h : CProjectTransRelComp (.send p1 bs1) (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1))
@@ -292,7 +291,7 @@ private theorem CProjectTransRelComp_send_extract
 
 /-- When recv is CProjectTransRelComp-related to recv, partners and branches match.
     Returns the partner equality and a BranchesRel for the continuation. -/
-private theorem recv_branches_wf (p : String) (bs : List (Label × LocalTypeR))
+theorem recv_branches_wf (p : String) (bs : List (Label × LocalTypeR))
     (hWF : LocalTypeR.WellFormed (.recv p bs)) :
     ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
   -- Extract per-branch well-formedness from recv well-formedness.

@@ -1,4 +1,4 @@
-import Effects.Environments
+import Effects.Coherence.Part2
 
 /-!
 # MPST Coherence
@@ -196,6 +196,16 @@ theorem BuffersTypedRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv) (bufs 
 /-- Sessions present in a GEnv. -/
 def SessionsOf (G : GEnv) : Set SessionId :=
   { s | ∃ e L, lookupG G e = some L ∧ e.sid = s }
+
+/-- Buffers are consistent with GEnv: every stored edge belongs to a session in G. -/
+def BConsistent (G : GEnv) (B : Buffers) : Prop :=
+  -- Any buffer entry witnesses that its session exists in G.
+  ∀ e buf, B.lookup e = some buf → e.sid ∈ SessionsOf G
+
+/-- Buffer domains cover DEnv domains: no trace exists without a buffer entry. -/
+def BufsDom (B : Buffers) (D : DEnv) : Prop :=
+  -- If a buffer key is missing, the DEnv has no key either.
+  ∀ e, B.lookup e = none → D.find? e = none
 
 /-- Two GEnvs are disjoint if they have no common sessions. -/
 def GEnvDisjoint (G1 G2 : GEnv) : Prop :=

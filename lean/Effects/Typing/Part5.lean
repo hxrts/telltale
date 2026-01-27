@@ -1,5 +1,4 @@
-import Effects.Process
-import Effects.Coherence
+import Effects.Typing.Part4
 
 /-!
 # MPST Process Typing
@@ -333,7 +332,7 @@ private theorem HasTypeProcPreOut_preserved_sub
           · simpa using (FootprintSubset_refl (W:=W₂))
           · simpa using (SEnvSubset_append_right (S₁:=∅) (S₂:=Δ₂))
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
       have hStore' : StoreTyped Gstore (SEnvAll Ssh (split.S1 ++ split.S2)) store := by
         simpa [split.hS] using hStore
       have hStoreL : StoreTyped Gstore (SEnvAll Ssh split.S1) store := by
@@ -369,7 +368,7 @@ private theorem HasTypeProcPreOut_preserved_sub
           · simpa [hW] using (FootprintSubset_append_left hSubW)
           · simpa [hΔ] using (SEnvSubset_append_left hSubΔ)
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
       have hStoreR : StoreTyped Gstore (SEnvAll Ssh split.S2) store := by
         intro x v T hStoreX hLookup
         have hLookupS : lookupSEnv (Ssh ++ split.S2) x = some T := by

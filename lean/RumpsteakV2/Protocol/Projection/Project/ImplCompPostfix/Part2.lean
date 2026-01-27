@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplCompPostfix.Part1
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 private theorem CProjectTransRelComp_postfix_prefix_send_send
     {p q : String} {bs cs : List (Label × LocalTypeR)} {b : LocalTypeR}
     (heq_ab : EQ2 (.send p bs) b) (hrel_bb' : CProjectTransRel b (.send q cs))
@@ -185,7 +195,7 @@ private theorem CProjectTransRelComp_postfix_prefix_mu
   | _ =>
       exact CProjectTransRelComp_postfix_prefix_mu_nonmu heq_ab hrel_bb' hWFa hWFc
 
-private theorem CProjectTransRelComp_postfix_prefix
+theorem CProjectTransRelComp_postfix_prefix
     {lt t b : LocalTypeR}
     (heq_ab : EQ2 lt b) (hrel_bb' : CProjectTransRel b t)
     (hWFa : LocalTypeR.WellFormed lt) (hWFc : LocalTypeR.WellFormed t) :

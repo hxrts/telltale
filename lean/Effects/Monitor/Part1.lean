@@ -132,6 +132,9 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
   /-- Send: enqueue value and advance sender's type. -/
   | send {ms e target T L v lin'} :
       lookupG ms.G e = some (.send target T L) →
+      (∀ Lrecv, lookupG ms.G { sid := e.sid, role := target } = some Lrecv →
+        ∃ L', Consume e.role Lrecv (lookupD ms.D { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
+              (Consume e.role L' [T]).isSome) →
       LinCtx.consumeToken ms.Lin e = some (lin', .send target T L) →
       HasTypeVal ms.G v T →
       MonStep ms (.send e target T) v
@@ -160,6 +163,9 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
   | select {ms e target bs ℓ L lin'} :
       lookupG ms.G e = some (.select target bs) →
       bs.find? (fun b => b.1 == ℓ) = some (ℓ, L) →
+      (∀ Lrecv, lookupG ms.G { sid := e.sid, role := target } = some Lrecv →
+        ∃ L', Consume e.role Lrecv (lookupD ms.D { sid := e.sid, sender := e.role, receiver := target }) = some L' ∧
+              (Consume e.role L' [.string]).isSome) →
       LinCtx.consumeToken ms.Lin e = some (lin', .select target bs) →
       MonStep ms (.select e target ℓ) (.string ℓ)
         { ms with
@@ -215,6 +221,24 @@ structure WTMon (ms : MonitorState) : Prop where
   supply_fresh : ∀ e S, (e, S) ∈ ms.Lin → e.sid < ms.supply
   /-- All endpoints in G have session ID below supply (freshness) -/
   supply_fresh_G : ∀ e S, (e, S) ∈ ms.G → e.sid < ms.supply
+
+/-! ## Complete Monitor Invariant -/
+
+/-- Complete monitor invariant: well-typedness plus role completeness. -/
+def WTMonComplete (ms : MonitorState) : Prop :=
+  -- Combine typing invariants with endpoint coverage.
+  WTMon ms ∧ RoleComplete ms.G
+
+/-- Extract the WTMon component. -/
+theorem WTMonComplete.toWTMon (ms : MonitorState) (h : WTMonComplete ms) : WTMon ms := by
+  -- Project the well-typedness half.
+  exact h.1
+
+/-- Extract the RoleComplete component. -/
+theorem WTMonComplete.toRoleComplete (ms : MonitorState) (h : WTMonComplete ms) :
+    RoleComplete ms.G := by
+  -- Project the role-completeness half.
+  exact h.2
 
 /-! ## Helper Lemmas for Linear Context -/
 

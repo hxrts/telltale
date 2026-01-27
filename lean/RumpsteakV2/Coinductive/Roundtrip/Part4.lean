@@ -3,75 +3,17 @@ import RumpsteakV2.Coinductive.Roundtrip.Part3
 set_option linter.dupNamespace false
 
 namespace RumpsteakV2.Coinductive
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+
+/-! ## Local instances -/
+
+/-- Local decidable equality for Finset operations on LocalTypeC. -/
+noncomputable local instance : DecidableEq LocalTypeC := by
+  -- Use classical choice to decide equality on LocalTypeC.
+  classical
+  infer_instance
 /-! ## Round-Trip Theorems (Axioms - proofs in progress) -/
-
-/-- Canonical round-trip: toCoind(toInductive(t)) is EQ2CE-equivalent to t. -/
-noncomputable def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
-    (current : LocalTypeC)
-    (h_closed : IsClosedSet all)
-    (h_visited : visited ⊆ all) (h_current : current ∈ all) : LocalTypeR :=
-  let visited' := Insert.insert current visited
-  match hdest : PFunctor.M.dest current with
-  | ⟨.end, _⟩   => LocalTypeR.end
-  | ⟨.var x, _⟩ => LocalTypeR.var x
-  | ⟨.mu x, k⟩  =>
-      let child := k ()
-      have hchild : childRel current child := ⟨.mu x, k, (), hdest, rfl⟩
-      have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-      toInductiveAux root all visited' child h_closed
-        (subset_insert_of_mem h_current h_visited) hchild_mem
-  | ⟨.send p labels, k⟩ =>
-      let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
-        let child := k i
-        have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
-        have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-        let body := toInductiveAux root all visited' child h_closed
-          (subset_insert_of_mem h_current h_visited) hchild_mem
-        (labels[i], body)
-      LocalTypeR.send p (List.ofFn f)
-  | ⟨.recv p labels, k⟩ =>
-      let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
-        let child := k i
-        have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
-        have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-        let body := toInductiveAux root all visited' child h_closed
-          (subset_insert_of_mem h_current h_visited) hchild_mem
-        (labels[i], body)
-      LocalTypeR.recv p (List.ofFn f)
-
-lemma toInductiveBody_eq_match (root : LocalTypeC) (all visited : Finset LocalTypeC)
-    (current : LocalTypeC)
-    (h_closed : IsClosedSet all)
-    (h_visited : visited ⊆ all) (h_current : current ∈ all) :
-    toInductiveBody root all visited current h_closed h_visited h_current =
-      (match hdest : PFunctor.M.dest current with
-      | ⟨.end, _⟩   => LocalTypeR.end
-      | ⟨.var x, _⟩ => LocalTypeR.var x
-      | ⟨.mu x, k⟩  =>
-          let child := k ()
-          have hchild : childRel current child := ⟨.mu x, k, (), hdest, rfl⟩
-          have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-          toInductiveAux root all (Insert.insert current visited) child h_closed
-            (subset_insert_of_mem h_current h_visited) hchild_mem
-      | ⟨.send p labels, k⟩ =>
-          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
-            let child := k i
-            have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
-            have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-            let body := toInductiveAux root all (Insert.insert current visited) child h_closed
-              (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels[i], body)
-          LocalTypeR.send p (List.ofFn f)
-      | ⟨.recv p labels, k⟩ =>
-          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
-            let child := k i
-            have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
-            have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-            let body := toInductiveAux root all (Insert.insert current visited) child h_closed
-              (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels[i], body)
-          LocalTypeR.recv p (List.ofFn f)) := by
-  rfl
 
 theorem toCoind_toInductive_eq2ce (t : LocalTypeC) (h : Regular t) :
     EQ2CE (envOf (Set.Finite.toFinset h) (Set.Finite.toFinset h))
@@ -594,6 +536,4 @@ theorem toCoind_toInductive_eq2ce (t : LocalTypeC) (h : Regular t) :
     · exact Or.inl rfl
   exact EQ2CE_coind hpost _ _ _ hR
 
-/-- Erase environment awareness given back-edge resolution.
-    Requires productivity of the RHS. -/
-end RumpsteakV2.Coinductive.Roundtrip
+end RumpsteakV2.Coinductive

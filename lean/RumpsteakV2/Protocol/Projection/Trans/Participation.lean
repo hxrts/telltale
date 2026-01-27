@@ -4,7 +4,6 @@ import RumpsteakV2.Protocol.Projection.Trans.Core
 namespace RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
-open RumpsteakV2.Protocol.Participation
 /-! ## First-Branch Participation
 
 The theorem `trans_isContractive_of_participant` with existential `participates` is FALSE.
@@ -23,7 +22,7 @@ mutual
     | .var _ => false
     | .mu _ body => participatesFirstBranch role body
     | .comm sender receiver branches =>
-        is_participant role sender receiver ||
+        Participation.is_participant role sender receiver ||
         match branches with
         | [] => false
         | (_, cont) :: _ => participatesFirstBranch role cont
@@ -34,20 +33,21 @@ mutual
     | (_, cont) :: _ => participatesFirstBranch role cont
 end
 
+/-- First-branch participation implies standard participation. -/
 theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String) :
-    participatesFirstBranch role g = true → participates role g = true := by
+    participatesFirstBranch role g = true → Participation.participates role g = true := by
   intro h
   match g with
   | .end => simpa [participatesFirstBranch] using h
   | .var _ => simpa [participatesFirstBranch] using h
   | .mu t body =>
       unfold participatesFirstBranch at h
-      unfold participates
+      unfold Participation.participates
       exact participatesFirstBranch_imp_participates body role h
   | .comm sender receiver branches =>
       unfold participatesFirstBranch at h
-      unfold participates
-      cases hpart : is_participant role sender receiver with
+      unfold Participation.participates
+      cases hpart : Participation.is_participant role sender receiver with
       | true =>
           simp [hpart]
       | false =>
@@ -56,7 +56,7 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
           | [] =>
               simp at h
           | (label, cont) :: rest =>
-              simp [participatesBranches, Bool.or_eq_true]
+              simp [Participation.participatesBranches, Bool.or_eq_true]
               exact Or.inl (participatesFirstBranch_imp_participates cont role h)
 
 mutual
@@ -68,10 +68,10 @@ mutual
     | .var _ => false
     | .mu _ body => participatesAllBranches role body
     | .comm sender receiver branches =>
-        is_participant role sender receiver &&
+        Participation.is_participant role sender receiver &&
         participatesAllBranchesList role branches ||
         -- OR: not direct participant but participates in first branch
-        (!(is_participant role sender receiver) &&
+        (!(Participation.is_participant role sender receiver) &&
          match branches with
          | [] => false
          | (_, cont) :: _ => participatesAllBranches role cont)
@@ -103,10 +103,10 @@ private theorem isGuarded_end (v : String) : (LocalTypeR.end).isGuarded v = true
 private theorem trans_isGuarded_of_participatesFirstBranch_comm_participant
     (sender receiver : String) (branches : List (Label × GlobalType))
     (v : String) (role : String)
-    (hpart : is_participant role sender receiver = true) :
+    (hpart : Participation.is_participant role sender receiver = true) :
     (trans (.comm sender receiver branches) role).isGuarded v = true := by
   -- Direct participant: sender or receiver.
-  unfold is_participant at hpart
+  unfold Participation.is_participant at hpart
   cases hrole_s : role == sender with
   | true =>
       have heq : role = sender := beq_iff_eq.mp hrole_s
@@ -122,6 +122,7 @@ private theorem trans_isGuarded_of_participatesFirstBranch_comm_participant
       rw [trans_comm_receiver sender receiver role branches heq hne]
       exact isGuarded_recv sender (transBranches branches role) v
 
+/-- If a role participates along the first-branch path, then its projection is guarded. -/
 theorem trans_isGuarded_of_participatesFirstBranch
     (g : GlobalType) (v : String) (role : String)
     (hpart : participatesFirstBranch role g = true) :
@@ -143,12 +144,12 @@ theorem trans_isGuarded_of_participatesFirstBranch
       · simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.isGuarded]
   | .comm sender receiver branches =>
       -- Comm case: direct participant or follow the first branch.
-      cases hpart_direct : is_participant role sender receiver with
+      cases hpart_direct : Participation.is_participant role sender receiver with
       | true =>
           exact trans_isGuarded_of_participatesFirstBranch_comm_participant sender receiver branches v role
             hpart_direct
       | false =>
-          unfold is_participant at hpart_direct
+          unfold Participation.is_participant at hpart_direct
           have hne_s : role ≠ sender := by
             intro heq
             rw [heq] at hpart_direct
@@ -165,14 +166,14 @@ theorem trans_isGuarded_of_participatesFirstBranch
               cases head with
               | mk label cont =>
                   have hcont' :
-                      is_participant role sender receiver = true ∨
+                      Participation.is_participant role sender receiver = true ∨
                         participatesFirstBranch role cont = true := by
                     simpa [participatesFirstBranch, Bool.or_eq_true] using hpart
                   have hcont : participatesFirstBranch role cont = true := by
                     cases hcont' with
                     | inl hleft =>
                         have hleft' : False := by
-                          simpa [is_participant, hpart_direct] using hleft
+                          simpa [Participation.is_participant, hpart_direct] using hleft
                         exact hleft'.elim
                     | inr hright =>
                         exact hright

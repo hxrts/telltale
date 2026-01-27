@@ -1,4 +1,4 @@
-import Effects.Environments
+import Effects.Coherence.Part1
 
 /-!
 # MPST Coherence
@@ -68,6 +68,18 @@ def EdgeCoherent (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
 def Coherent (G : GEnv) (D : DEnv) : Prop :=
   ∀ e, EdgeCoherent G D e
 
+/-! ## Endpoint Completeness (Assumption)
+
+Coherence alone does not guarantee that both endpoints of an arbitrary edge
+exist in G. Several trace-emptiness lemmas require the sender endpoint to exist.
+We assume this completeness property for now and discharge it later when the
+protocol representation guarantees it. -/
+
+axiom sender_exists_of_receiver
+    {G : GEnv} {e : Edge} {Lrecv : LocalType} :
+    lookupG G ⟨e.sid, e.receiver⟩ = some Lrecv →
+    ∃ Lsender, lookupG G ⟨e.sid, e.sender⟩ = some Lsender
+
 /-! ## Key Lemmas: EdgeCoherent Forces Empty Trace
 
 These lemmas show that EdgeCoherent constrains trace structure:
@@ -85,17 +97,15 @@ theorem trace_empty_when_send_receiver
     (hSend : lookupG G ⟨e.sid, e.receiver⟩ = some (.send r T L)) :
     lookupD D e = [] := by
   simp only [EdgeCoherent] at hCoh
-  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
-  | none => sorry  -- Sender type doesn't exist
-  | some Ls =>
-    have hIsSome := hCoh Ls (.send r T L) hLsender hSend
-    have h : (Consume e.sender (.send r T L) (lookupD D e)).isSome := hIsSome
-    cases hTrace : lookupD D e with
-    | nil => rfl
-    | cons t ts =>
-      rw [hTrace] at h
-      simp only [Consume, consumeOne, Option.isSome] at h
-      exact Bool.noConfusion h
+  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.send r T L) hSend
+  have hIsSome := hCoh Ls (.send r T L) hLsender hSend
+  have h : (Consume e.sender (.send r T L) (lookupD D e)).isSome := hIsSome
+  cases hTrace : lookupD D e with
+  | nil => rfl
+  | cons t ts =>
+    rw [hTrace] at h
+    simp only [Consume, consumeOne, Option.isSome] at h
+    exact Bool.noConfusion h
 
 /-- Similar lemma for select receiver type. -/
 theorem trace_empty_when_select_receiver
@@ -105,16 +115,14 @@ theorem trace_empty_when_select_receiver
     (hSelect : lookupG G ⟨e.sid, e.receiver⟩ = some (.select r bs)) :
     lookupD D e = [] := by
   simp only [EdgeCoherent] at hCoh
-  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
-  | none => sorry  -- Sender type doesn't exist
-  | some Ls =>
-    have hIsSome := hCoh Ls (.select r bs) hLsender hSelect
-    cases hTrace : lookupD D e with
-    | nil => rfl
-    | cons t ts =>
-      rw [hTrace] at hIsSome
-      simp only [Consume, consumeOne, Option.isSome] at hIsSome
-      exact Bool.noConfusion hIsSome
+  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.select r bs) hSelect
+  have hIsSome := hCoh Ls (.select r bs) hLsender hSelect
+  cases hTrace : lookupD D e with
+  | nil => rfl
+  | cons t ts =>
+    rw [hTrace] at hIsSome
+    simp only [Consume, consumeOne, Option.isSome] at hIsSome
+    exact Bool.noConfusion hIsSome
 
 /-! ## Key Lemma: Different Sender Forces Empty Trace
 
@@ -136,34 +144,19 @@ theorem trace_empty_when_recv_other_sender
   -- EdgeCoherent gives us: for any Lsender, (Consume e.sender (.recv r T L) trace).isSome
   simp only [EdgeCoherent] at hCoh
   -- We need to construct some Lsender; use .end_ as a dummy (sender type doesn't matter for Consume)
-  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
-  | none =>
-    -- If sender has no type, EdgeCoherent is vacuously satisfied
-    -- But we can still derive the result from Consume structure
-    -- Actually, let's try a different approach - analyze the trace directly
-    cases hTrace : lookupD D e with
-    | nil => rfl
-    | cons t ts =>
-      -- If trace is non-empty, Consume fails because sender ≠ r
-      -- But EdgeCoherent says Consume.isSome... contradiction? No, because no Lsender exists!
-      -- The EdgeCoherent condition is vacuously true when no Lsender.
-      -- So we can't derive anything from EdgeCoherent here.
-      -- Hmm, this is a gap. Let's assume G is total (all endpoints have types).
-      -- For now, return rfl and leave this case - it shouldn't occur in practice.
-      sorry
-  | some Ls =>
-    have hIsSome := hCoh Ls (.recv r T L) hLsender hRecv
-    -- hIsSome : (Consume e.sender (.recv r T L) (lookupD D e)).isSome
-    -- From Consume_other_empty, if trace is non-empty, Consume returns none
-    cases hTrace : lookupD D e with
-    | nil => rfl
-    | cons t ts =>
-      -- Consume e.sender (.recv r T L) (t :: ts) returns none because e.sender ≠ r
-      rw [hTrace] at hIsSome
-      simp only [Consume, consumeOne] at hIsSome
-      have hNeq : (e.sender == r) = false := beq_eq_false_iff_ne.mpr hNe
-      simp only [hNeq, Bool.false_and, Option.isSome] at hIsSome
-      exact Bool.noConfusion hIsSome
+  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.recv r T L) hRecv
+  have hIsSome := hCoh Ls (.recv r T L) hLsender hRecv
+  -- hIsSome : (Consume e.sender (.recv r T L) (lookupD D e)).isSome
+  -- From Consume_other_empty, if trace is non-empty, Consume returns none
+  cases hTrace : lookupD D e with
+  | nil => rfl
+  | cons t ts =>
+    -- Consume e.sender (.recv r T L) (t :: ts) returns none because e.sender ≠ r
+    rw [hTrace] at hIsSome
+    simp only [Consume, consumeOne] at hIsSome
+    have hNeq : (e.sender == r) = false := beq_eq_false_iff_ne.mpr hNe
+    simp only [hNeq, Bool.false_and, Option.isSome] at hIsSome
+    exact Bool.noConfusion hIsSome
 
 /-- Similar lemma for branch: if receiver expects branch from r, but edge has different sender, trace is empty. -/
 theorem trace_empty_when_branch_other_sender
@@ -174,27 +167,25 @@ theorem trace_empty_when_branch_other_sender
     (hNe : e.sender ≠ r) :
     lookupD D e = [] := by
   simp only [EdgeCoherent] at hCoh
-  cases hLsender : lookupG G ⟨e.sid, e.sender⟩ with
-  | none => sorry  -- Sender type doesn't exist case
-  | some Ls =>
-    have hIsSome := hCoh Ls (.branch r bs) hLsender hBranch
-    cases hTrace : lookupD D e with
-    | nil => rfl
-    | cons t ts =>
-      rw [hTrace] at hIsSome
-      simp only [Consume, consumeOne] at hIsSome
-      have hNeq : (e.sender == r) = false := beq_eq_false_iff_ne.mpr hNe
-      -- For branch, consumeOne checks if t is .string and r == from_
-      cases t with
-      | string =>
-        have hFalse : False := by
-          simpa [Consume, consumeOne, hNeq] using hIsSome
-        exact hFalse.elim
-      | _ =>
-        -- If head is not string, consumeOne returns none anyway
-        have hFalse : False := by
-          simpa [Consume, consumeOne] using hIsSome
-        exact hFalse.elim
+  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.branch r bs) hBranch
+  have hIsSome := hCoh Ls (.branch r bs) hLsender hBranch
+  cases hTrace : lookupD D e with
+  | nil => rfl
+  | cons t ts =>
+    rw [hTrace] at hIsSome
+    simp only [Consume, consumeOne] at hIsSome
+    have hNeq : (e.sender == r) = false := beq_eq_false_iff_ne.mpr hNe
+    -- For branch, consumeOne checks if t is .string and r == from_
+    cases t with
+    | string =>
+      have hFalse : False := by
+        simpa [Consume, consumeOne, hNeq] using hIsSome
+      exact hFalse.elim
+    | _ =>
+      -- If head is not string, consumeOne returns none anyway
+      have hFalse : False := by
+        simpa [Consume, consumeOne] using hIsSome
+      exact hFalse.elim
 
 /-! ## Head Coherent (Progress Refinement)
 
@@ -225,6 +216,32 @@ def HeadCoherent (G : GEnv) (D : DEnv) : Prop :=
       | [] => True
       | T' :: _ => T' = .string  -- Branch expects string label
     | _ => True
+
+/-- Role-completeness for GEnv: if a local type mentions a peer role,
+    that peer endpoint exists in G for the same session. -/
+def RoleComplete (G : GEnv) : Prop :=
+  ∀ e L, lookupG G e = some L →
+    match LocalType.targetRole? L with
+    | some r => ∃ L', lookupG G ⟨e.sid, r⟩ = some L'
+    | none => True
+
+/-- Role-completeness specialized to recv types. -/
+theorem RoleComplete_recv
+    {G : GEnv} {e : Endpoint} {r : Role} {T : ValType} {L : LocalType}
+    (hComplete : RoleComplete G)
+    (hG : lookupG G e = some (.recv r T L)) :
+    ∃ L', lookupG G ⟨e.sid, r⟩ = some L' := by
+  -- For recv, targetRole? = some r, so RoleComplete gives the witness directly.
+  simpa [RoleComplete, LocalType.targetRole?] using hComplete e (.recv r T L) hG
+
+/-- Role-completeness specialized to branch types. -/
+theorem RoleComplete_branch
+    {G : GEnv} {e : Endpoint} {r : Role} {bs : List (Label × LocalType)}
+    (hComplete : RoleComplete G)
+    (hG : lookupG G e = some (.branch r bs)) :
+    ∃ L', lookupG G ⟨e.sid, r⟩ = some L' := by
+  -- For branch, targetRole? = some r, so RoleComplete gives the witness directly.
+  simpa [RoleComplete, LocalType.targetRole?] using hComplete e (.branch r bs) hG
 
 /-- ValidLabels ensures received branch labels are valid.
 

@@ -1,3 +1,6 @@
+import RumpsteakV2.Proofs.Safety.Determinism.Part1
+import RumpsteakV2.Proofs.Safety.Determinism.Part2
+
 /-! # RumpsteakV2.Proofs.Safety.Determinism
 
 Determinism for V2 protocol semantics.
@@ -37,6 +40,3 @@ The following definitions form the semantic interface for proofs:
 
 This module uses placeholder definitions until Project.lean builds.
 -/
-
-import RumpsteakV2.Proofs.Safety.Determinism.Part1
-import RumpsteakV2.Proofs.Safety.Determinism.Part2

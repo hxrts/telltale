@@ -1,3 +1,6 @@
+import RumpsteakV2.Protocol.CoTypes.EQ2.Core
+import RumpsteakV2.Protocol.CoTypes.EQ2.TransBase
+
 /-! # RumpsteakV2.Protocol.CoTypes.EQ2
 
 Coinductive equality (EQ2) for local types.
@@ -17,6 +20,3 @@ The following definitions form the semantic interface for proofs:
 - `EQ2_unfold`: bilateral unfolding preserves EQ2
 - `EQ2_coind`: coinduction principle
 -/
-
-import RumpsteakV2.Protocol.CoTypes.EQ2.Core
-import RumpsteakV2.Protocol.CoTypes.EQ2.TransBase

@@ -1,3 +1,7 @@
+import RumpsteakV2.Coinductive.BisimDecidable.Part1
+import RumpsteakV2.Coinductive.BisimDecidable.Part2
+import RumpsteakV2.Coinductive.BisimDecidable.Part3
+
 /-!
 # Decidable Bisimulation for Regular Types
 
@@ -23,7 +27,3 @@ following the approach in the Coq reference implementation (subject_reduction/th
 - `bisim`: The decidable bisimulation check
 - `bisim_sound`: Soundness theorem
 -/
-
-import RumpsteakV2.Coinductive.BisimDecidable.Part1
-import RumpsteakV2.Coinductive.BisimDecidable.Part2
-import RumpsteakV2.Coinductive.BisimDecidable.Part3

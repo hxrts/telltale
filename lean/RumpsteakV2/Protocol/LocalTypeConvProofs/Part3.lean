@@ -9,6 +9,11 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 namespace RumpsteakV2.Protocol.LocalTypeConvProofs
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.LocalTypeDB
+open RumpsteakV2.Protocol.LocalTypeConv
+open RumpsteakV2.Protocol.NameOnlyContext
 /-! ## General roundtrip with adequate context -/
 
 theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)

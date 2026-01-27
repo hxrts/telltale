@@ -336,7 +336,7 @@ private theorem UnfoldPathVarBounded.unfold_iter_eq {n : ℕ} {v : String} {a : 
       simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using ih
 
 /-- Bounded send path yields a concrete unfold iteration. -/
-private theorem CanSendPathBounded.unfold_iter_eq {n : ℕ} {p : String}
+theorem CanSendPathBounded.unfold_iter_eq {n : ℕ} {p : String}
     {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
     CanSendPathBounded n p bs a → (LocalTypeR.unfold^[n] a = .send p bs) := by
   intro h
@@ -347,7 +347,7 @@ private theorem CanSendPathBounded.unfold_iter_eq {n : ℕ} {p : String}
 
 /-- Bounded recv path yields a concrete unfold iteration.
     Derived from `CanSendPathBounded.unfold_iter_eq` via duality. -/
-private theorem CanRecvPathBounded.unfold_iter_eq {n : ℕ} {p : String}
+theorem CanRecvPathBounded.unfold_iter_eq {n : ℕ} {p : String}
     {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
     CanRecvPathBounded n p bs a → (LocalTypeR.unfold^[n] a = .recv p bs) := by
   intro h

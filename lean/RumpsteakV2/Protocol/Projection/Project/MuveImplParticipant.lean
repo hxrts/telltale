@@ -137,7 +137,6 @@ private theorem CProject_not_muve_of_part_of2_aux_mu_end (t : String) (body : Gl
     isMuve .end = false := by
   rcases CProject_destruct hproj with ⟨candBody0, hbody_proj, hcase⟩
     -- The unguarded .end case contradicts the IH on the body.
-  dsimp [CProjectF] at hcase
   cases hcase with
   | inl hmu =>
       rcases hmu with ⟨_hguard, hEq⟩; cases hEq
@@ -148,8 +147,9 @@ private theorem CProject_not_muve_of_part_of2_aux_mu_end (t : String) (body : Gl
         simpa [GlobalType.allCommsNonEmpty] using hne
       have hmuve_false : isMuve candBody0 = false :=
         ih candBody0 hbody_proj hpart_body hne_body
-      exact Bool.noConfusion (by
-        simpa [isMuve_of_not_guarded candBody0 t hguard] using hmuve_false)
+      have hcontra : (true = false) := by
+        simpa [isMuve_of_not_guarded candBody0 t hguard] using hmuve_false
+      cases hcontra
 
 private theorem CProject_not_muve_of_part_of2_aux_mu (t : String) (body : GlobalType)
     (role : String) (lt : LocalTypeR)
@@ -179,8 +179,8 @@ private theorem CProject_not_muve_of_part_of2_aux_comm_nonpart
     (hpart : part_of2 role (.comm sender receiver branches))
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
     (hs : role ≠ sender) (hr : role ≠ receiver)
-    (ih : ∀ cont, CProject cont role lt → part_of2 role cont →
-      cont.allCommsNonEmpty = true → isMuve lt = false) :
+    (ih : ∀ pair, pair ∈ branches → CProject pair.2 role lt → part_of2 role pair.2 →
+      pair.2.allCommsNonEmpty = true → isMuve lt = false) :
     isMuve lt = false := by
   -- Non-participant: pick a participating branch and recurse.
   obtain ⟨label, cont, hmem, hpart_cont⟩ :=
@@ -190,7 +190,7 @@ private theorem CProject_not_muve_of_part_of2_aux_comm_nonpart
   have hne_branches : allCommsNonEmptyBranches branches = true := by
     exact allCommsNonEmptyBranches_of_comm (sender := sender) (receiver := receiver) hne
   have hne_cont : cont.allCommsNonEmpty = true := allCommsNonEmpty_of_mem hmem hne_branches
-  exact ih cont hcont_proj hpart_cont hne_cont
+  exact ih (label, cont) hmem hcont_proj hpart_cont hne_cont
 
 private theorem CProject_not_muve_of_part_of2_aux_comm_cons
     (sender receiver : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
@@ -198,21 +198,52 @@ private theorem CProject_not_muve_of_part_of2_aux_comm_cons
     (hproj : CProject (.comm sender receiver (first :: rest)) role lt)
     (hpart : part_of2 role (.comm sender receiver (first :: rest)))
     (hne : (GlobalType.comm sender receiver (first :: rest)).allCommsNonEmpty = true)
-    (ih : ∀ cont, CProject cont role lt → part_of2 role cont →
-      cont.allCommsNonEmpty = true → isMuve lt = false) :
+    (ih : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt → part_of2 role pair.2 →
+      pair.2.allCommsNonEmpty = true → isMuve lt = false) :
     isMuve lt = false := by
-  have hF := by  -- comm with non-empty branches: split by role position
-    simpa [CProjectF] using (CProject_destruct hproj)
   by_cases hs : role = sender
   · subst hs
-    simp only [↓reduceIte] at hF
-    cases lt <;> try rfl <;> exact False.elim hF
+    have hF := by
+      simpa [CProjectF] using (CProject_destruct hproj)
+    cases lt with
+    | send _ _ => rfl
+    | recv _ _ => rfl
+    | «end» =>
+        have hfalse : False := by
+          simpa [CProjectF] using hF
+        exact hfalse.elim
+    | var _ =>
+        have hfalse : False := by
+          simpa [CProjectF] using hF
+        exact hfalse.elim
+    | mu _ _ =>
+        have hfalse : False := by
+          simpa [CProjectF] using hF
+        exact hfalse.elim
   · by_cases hr : role = receiver
     · subst hr
-      simp only [if_neg hs] at hF
-      cases lt <;> try rfl <;> exact False.elim hF
-    · have hF' : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt := by
-        simpa [hs, hr] using hF
+      have hF := by
+        simpa [CProjectF, hs] using (CProject_destruct hproj)
+      cases lt with
+      | send _ _ => rfl
+      | recv _ _ => rfl
+      | «end» =>
+          have hfalse : False := by
+            simpa [CProjectF] using hF
+          exact hfalse.elim
+      | var _ =>
+          have hfalse : False := by
+            simpa [CProjectF] using hF
+          exact hfalse.elim
+      | mu _ _ =>
+          have hfalse : False := by
+            simpa [CProjectF] using hF
+          exact hfalse.elim
+    · have hF := by
+        simpa [CProjectF, hs, hr] using (CProject_destruct hproj)
+      have hF' : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt := by
+        intro pair hmem
+        exact hF pair hmem
       exact CProject_not_muve_of_part_of2_aux_comm_nonpart sender receiver (first :: rest)
         role lt hF' hpart hne hs hr ih
 
@@ -237,16 +268,20 @@ private theorem CProject_not_muve_of_part_of2_aux : (g : GlobalType) → (role :
       (simp only [GlobalType.allCommsNonEmpty, List.isEmpty_nil, Bool.and_eq_true, decide_eq_true_eq] at hne;
         exact Bool.noConfusion hne.1)
   | .comm sender receiver (first :: rest), role, lt, hproj, hpart, hne => by
-      have ih := fun cont hproj' hpart' hne' =>
-        CProject_not_muve_of_part_of2_aux cont role lt hproj' hpart' hne'
+      have ih :
+          ∀ pair : Label × GlobalType, pair ∈ first :: rest → CProject pair.2 role lt →
+            part_of2 role pair.2 → pair.2.allCommsNonEmpty = true → isMuve lt = false := by
+        intro pair hmem hproj' hpart' hne'
+        exact CProject_not_muve_of_part_of2_aux pair.2 role lt hproj' hpart' hne'
       exact CProject_not_muve_of_part_of2_aux_comm_cons sender receiver first rest role lt hproj hpart hne ih
 termination_by g _ _ _ _ _ => sizeOf g
 decreasing_by
-  all_goals (simp_wf; first
+  all_goals
+    simp_wf
+    subst_vars
+    first
     | (simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega)
-    | (have hmem_lt := sizeOf_mem_snd_lt (by assumption : (_ : Label × GlobalType) ∈ (_ :: _));
-       simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1] at hmem_lt ⊢;
-       omega))
+    | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_mem_snd_lt_comm hmem
 
 /-- Participant projections are NOT muve types.
 
@@ -369,15 +404,15 @@ private theorem CProject_part_of2_implies_part_of_all2_aux_comm_branch
     (hne_branches : allCommsNonEmptyBranches (first :: rest) = true)
     (hnsc_branches : noSelfCommBranches (first :: rest) = true)
     (hs : role ≠ sender) (hr : role ≠ receiver)
-    (ih : ∀ g, CProject g role lt → part_of2 role g →
-      g.allCommsNonEmpty = true → g.noSelfComm = true → part_of_all2 role g) :
+    (ih : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt → part_of2 role pair.2 →
+      pair.2.allCommsNonEmpty = true → pair.2.noSelfComm = true → part_of_all2 role pair.2) :
     part_of_all2 role pair.2 := by
   -- Each branch participates; otherwise we contradict AllBranchesProj.
   have hpair_proj : CProject pair.2 role lt := hF pair hmem
   by_cases hpart_pair : part_of2 role pair.2
   · have hne_pair : pair.2.allCommsNonEmpty = true := allCommsNonEmpty_of_mem hmem hne_branches
     have hnsc_pair : pair.2.noSelfComm = true := noSelfComm_of_mem hmem hnsc_branches
-    exact ih pair.2 hpair_proj hpart_pair hne_pair hnsc_pair
+    exact ih pair hmem hpair_proj hpart_pair hne_pair hnsc_pair
   · have hcontra : False :=
       CProject_part_of2_implies_part_of_all2_aux_comm_nonpart_contra
         sender receiver first rest role lt pair hmem hF hpart hne_branches hs hr hpart_pair
@@ -390,8 +425,8 @@ private theorem CProject_part_of2_implies_part_of_all2_aux_comm_cons
     (hpart : part_of2 role (.comm sender receiver (first :: rest)))
     (hne : (GlobalType.comm sender receiver (first :: rest)).allCommsNonEmpty = true)
     (hnsc : (GlobalType.comm sender receiver (first :: rest)).noSelfComm = true)
-    (ih : ∀ g, CProject g role lt → part_of2 role g →
-      g.allCommsNonEmpty = true → g.noSelfComm = true → part_of_all2 role g) :
+    (ih : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt → part_of2 role pair.2 →
+      pair.2.allCommsNonEmpty = true → pair.2.noSelfComm = true → part_of_all2 role pair.2) :
     part_of_all2 role (.comm sender receiver (first :: rest)) := by
   have hF := by simpa [CProjectF] using (CProject_destruct hproj)
   by_cases hs : role = sender
@@ -429,16 +464,18 @@ private theorem CProject_part_of2_implies_part_of_all2_aux : (g : GlobalType) �
   | .comm sender receiver (first :: rest), role, lt, hproj, hpart, hne, hnsc => by
       exact CProject_part_of2_implies_part_of_all2_aux_comm_cons sender receiver first rest role lt
         hproj hpart hne hnsc
-        (fun g hproj' hpart' hne' hnsc' =>
-          CProject_part_of2_implies_part_of_all2_aux g role lt hproj' hpart' hne' hnsc')
+        (fun pair hmem hproj' hpart' hne' hnsc' =>
+          CProject_part_of2_implies_part_of_all2_aux pair.2 role lt hproj' hpart' hne' hnsc')
 termination_by g _ _ _ _ _ _ => sizeOf g
 decreasing_by
-  all_goals (simp_wf; first
+  all_goals
+    simp_wf
+    subst_vars
+    first
     | (simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega)
-    | (have hmem_lt := sizeOf_mem_snd_lt (by assumption : (_ : Label × GlobalType) ∈ (_ :: _));
-       simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1] at hmem_lt ⊢;
-       omega))
+    | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_mem_snd_lt_comm hmem
 
+/-- CProject participation implies all-branch participation (under well-formedness). -/
 theorem CProject_part_of2_implies_part_of_all2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hpart : part_of2 role g)

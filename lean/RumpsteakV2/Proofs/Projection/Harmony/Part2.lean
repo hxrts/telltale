@@ -4,6 +4,10 @@ namespace RumpsteakV2.Proofs.Projection.Harmony
 /-! ## Substitution Commutation -/
 
 open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.Projection.Trans (trans_comm_sender trans_comm_receiver trans_comm_other)
 
 /-- Witness relation for trans_subst_comm: pairs arising from projection-substitution. -/
 private def ProjSubstRel (t : String) (G : GlobalType) (role : String) : Rel := fun a b =>
@@ -103,6 +107,7 @@ private theorem EQ2_end_to_mu_unguarded
 -- Aliases to avoid namespace issues
 private abbrev gSubstBranches := RumpsteakV2.Protocol.GlobalType.substituteBranches -- global branch subst
 private abbrev lSubstBranches := RumpsteakV2.Protocol.LocalTypeR.substituteBranches -- local branch subst
+private abbrev projTransBranches := RumpsteakV2.Protocol.Projection.Trans.transBranches
 
 private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
     (rest : List (Label × GlobalType)) :
@@ -138,25 +143,31 @@ private theorem sizeOf_cont_lt_comm
 private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role : String)
     (branches : List (Label × GlobalType)) :
     BranchesRel (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
-      (transBranches (gSubstBranches branches t G) role)
-      (lSubstBranches (transBranches branches role) t (projTrans G role)) := by
+      (projTransBranches (gSubstBranches branches t G) role)
+      (lSubstBranches (projTransBranches branches role) t (projTrans G role)) := by
   induction branches with
   | nil =>
-      unfold gSubstBranches lSubstBranches transBranches
-      simp only [RumpsteakV2.Protocol.GlobalType.substituteBranches,
-                 RumpsteakV2.Protocol.LocalTypeR.substituteBranches]
-      exact List.Forall₂.nil
+      simp [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
+        RumpsteakV2.Protocol.Projection.Trans.transBranches,
+        RumpsteakV2.Protocol.GlobalType.substituteBranches,
+        RumpsteakV2.Protocol.LocalTypeR.substituteBranches,
+        -RumpsteakV2.Protocol.LocalTypeR.substituteBranches_eq_map]
   | cons hd tl ih =>
       obtain ⟨label, cont⟩ := hd
-      unfold gSubstBranches lSubstBranches transBranches
-      simp only [RumpsteakV2.Protocol.GlobalType.substituteBranches,
-                 RumpsteakV2.Protocol.LocalTypeR.substituteBranches]
-      apply List.Forall₂.cons
-      · constructor
-        · rfl  -- labels match
-        · -- continuation: use ProjSubstRel witness
-          exact Or.inl ⟨cont, rfl, rfl⟩
-      · exact ih
+      simp [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
+        RumpsteakV2.Protocol.Projection.Trans.transBranches,
+        RumpsteakV2.Protocol.GlobalType.substituteBranches,
+        RumpsteakV2.Protocol.LocalTypeR.substituteBranches,
+        -RumpsteakV2.Protocol.LocalTypeR.substituteBranches_eq_map]
+      constructor
+      · -- head relation
+        exact Or.inl ⟨cont, rfl, rfl⟩
+      ·
+        simpa [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
+          RumpsteakV2.Protocol.Projection.Trans.transBranches,
+          RumpsteakV2.Protocol.GlobalType.substituteBranches,
+          RumpsteakV2.Protocol.LocalTypeR.substituteBranches,
+          -RumpsteakV2.Protocol.LocalTypeR.substituteBranches_eq_map] using ih
 
 /-- Helper: EQ2F for projection-substitution on `.end`. -/
 private theorem ProjSubstRel_EQ2F_end (t : String) (G : GlobalType) (role : String) :
@@ -295,11 +306,11 @@ private theorem ProjSubstRel_EQ2F_comm_sender
   -- Sender projection stays send; relate branches via transBranches_ProjSubstRel.
   have hLHS :
       projTrans (GlobalType.comm sender receiver (gSubstBranches branches t G)) role =
-        LocalTypeR.send receiver (transBranches (gSubstBranches branches t G) role) :=
+        LocalTypeR.send receiver (projTransBranches (gSubstBranches branches t G) role) :=
     trans_comm_sender sender receiver role (gSubstBranches branches t G) hrs
   have hRHS_proj :
       projTrans (GlobalType.comm sender receiver branches) role =
-        LocalTypeR.send receiver (transBranches branches role) :=
+        LocalTypeR.send receiver (projTransBranches branches role) :=
     trans_comm_sender sender receiver role branches hrs
   rw [hLHS, hRHS_proj]
   simp [LocalTypeR.substitute, EQ2F]
@@ -316,11 +327,11 @@ private theorem ProjSubstRel_EQ2F_comm_receiver
   -- Receiver projection stays recv; relate branches via transBranches_ProjSubstRel.
   have hLHS :
       projTrans (GlobalType.comm sender receiver (gSubstBranches branches t G)) role =
-        LocalTypeR.recv sender (transBranches (gSubstBranches branches t G) role) :=
+        LocalTypeR.recv sender (projTransBranches (gSubstBranches branches t G) role) :=
     trans_comm_receiver sender receiver role (gSubstBranches branches t G) hrr hrs
   have hRHS_proj :
       projTrans (GlobalType.comm sender receiver branches) role =
-        LocalTypeR.recv sender (transBranches branches role) :=
+        LocalTypeR.recv sender (projTransBranches branches role) :=
     trans_comm_receiver sender receiver role branches hrr hrs
   rw [hLHS, hRHS_proj]
   simp [LocalTypeR.substitute, EQ2F]
@@ -486,6 +497,7 @@ private theorem trans_substitute_unfold_unguarded
     subst_end_unguarded_eq2_end (projTrans body role) t hguard
   simpa [← hproj_subst'] using hsub_end
 
+/-- Projection commutes with a single mu-unfold (up to EQ2) for closed globals. -/
 theorem trans_substitute_unfold (t : String) (body : GlobalType) (role : String)
     (hclosed : (GlobalType.mu t body).isClosed = true) :
     EQ2 (projTrans (body.substitute t (GlobalType.mu t body)) role)

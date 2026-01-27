@@ -101,7 +101,7 @@ private theorem sizeOf_rest_lt_branch_cons (label : Label) (cont : GlobalType)
     sizeOf rest < sizeOf ((label, cont) :: rest) :=
   sizeOf_tail_lt_cons (label, cont) rest
 
-private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
+theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
   have hk : 0 < 1 + sizeOf t := by
     simp only [Nat.one_add]
@@ -127,7 +127,7 @@ private theorem sizeOf_elem_snd_lt_list {α β : Type _} [SizeOf α] [SizeOf β]
       | head => simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]; omega
       | tail _ hmem => have := ih hmem; simp only [sizeOf, List._sizeOf_1] at *; omega
 
-private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
+theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
     (gbs : List (Label × GlobalType)) (gb : Label × GlobalType) (h : gb ∈ gbs) :
     sizeOf gb.2 < sizeOf (GlobalType.comm sender receiver gbs) := by
   have h1 := sizeOf_elem_snd_lt_list gbs gb h
@@ -153,11 +153,15 @@ mutual
         | _ => false
     | .comm sender receiver branches, role, cand =>
         if role == sender then
-          match cand with | .send partner cands =>
-            if partner == receiver then projectbBranches branches role cands else false | _ => false
+          match cand with
+          | .send partner cands =>
+              if partner == receiver then projectbBranches branches role cands else false
+          | _ => false
         else if role == receiver then
-          match cand with | .recv partner cands =>
-            if partner == sender then projectbBranches branches role cands else false | _ => false
+          match cand with
+          | .recv partner cands =>
+              if partner == sender then projectbBranches branches role cands else false
+          | _ => false
         else
           projectbAllBranches branches role cand
   termination_by g _ _ => sizeOf g

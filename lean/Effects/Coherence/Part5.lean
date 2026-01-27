@@ -1,4 +1,4 @@
-import Effects.Environments
+import Effects.Coherence.Part3
 
 /-!
 # MPST Coherence

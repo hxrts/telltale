@@ -1,5 +1,6 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2
 import RumpsteakV2.Protocol.Projection.Project
+import RumpsteakV2.Protocol.Projection.Project.ImplExtraction
 
 /-
 The Problem. When composing projection relations through mu types, we need to

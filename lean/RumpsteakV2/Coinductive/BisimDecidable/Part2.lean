@@ -2,8 +2,16 @@ import RumpsteakV2.Coinductive.BisimDecidable.Part1
 
 set_option linter.dupNamespace false
 
+open Classical
+
 namespace RumpsteakV2.Coinductive
 /-! ## Decidable Bisimulation Definitions -/
+
+/-- Local decidable equality for visited membership. -/
+noncomputable local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
+  -- Use classical choice to decide equality on pairs.
+  classical
+  infer_instance
 
 /-- Helper: check if all pairs in a list satisfy bisim. -/
 def bisimAll (bisimFn : LocalTypeC × LocalTypeC → Bool)
@@ -366,4 +374,4 @@ lemma obsMatch_recv_bisimAll_to_BranchesRelC {n : Nat} {a b : LocalTypeC}
     rw [ha_child, hb_child]
     exact Or.inl ⟨fuel, visited_any, hvisited, hpair⟩
 
-end RumpsteakV2.Coinductive.BisimDecidable
+end RumpsteakV2.Coinductive

@@ -1,3 +1,6 @@
+import Effects.Deployment.Part1
+import Effects.Deployment.Part2
+
 /-!
 # MPST Deployed Protocol Bundle
 
@@ -28,6 +31,3 @@ Two deployed protocols can be composed if their interfaces are compatible:
 
 See Phase 12 for the full linking judgment.
 -/
-
-import Effects.Deployment.Part1
-import Effects.Deployment.Part2

@@ -1,6 +1,8 @@
 import RumpsteakV2.Proofs.Safety.Determinism.Part1
 
 namespace RumpsteakV2.Proofs.Safety.Determinism
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Semantics.Environment
 /-! ## Diamond Property for Independent Actions
 
 For independent actions (different sender-receiver pairs), we do have
@@ -208,6 +210,7 @@ private theorem uniqueBranchLabels_preserved_branches_cons
   · exact ⟨ih_step huniq.1, huniq_rest⟩
   · simpa [branchLabels] using congrArg (fun xs => lbl :: xs) hlabels_rest
 
+/-- Unique branch labels are preserved by a single step. -/
 theorem uniqueBranchLabels_preserved_by_step {g g' : GlobalType} {act : GlobalActionR}
     (huniq : g.uniqueBranchLabels = true)
     (hstep : step g act g') :
@@ -225,13 +228,19 @@ theorem uniqueBranchLabels_preserved_by_step {g g' : GlobalType} {act : GlobalAc
 /-- Every step corresponds to a canStep. -/
 theorem step_implies_canStep {g g' : GlobalType} {act : GlobalActionR}
     (h : step g act g') : canStep g act :=
-  match h with
-  | .comm_head sender receiver branches label cont hmem =>
-      canStep.comm_head sender receiver branches label cont hmem
-  | .comm_async sender receiver branches branches' act' label cont hns hcond hmem hcan _ =>
-      canStep.comm_async sender receiver branches act' label cont hns hcond hmem hcan
-  | .mu t body act' g'' hstep' =>
-      canStep.mu t body act' (step_implies_canStep hstep')
+  @step.rec
+    (motive_1 := fun g act _ _ => canStep g act)
+    (motive_2 := fun bs act _ _ => BranchesCanStep bs act)
+    (fun sender receiver branches label cont hmem =>
+      canStep.comm_head sender receiver branches label cont hmem)
+    (fun sender receiver branches branches' act label cont hns hcond hmem hcan hbs ih_branches =>
+      canStep.comm_async sender receiver branches act label cont hns hcond hmem ih_branches hcan)
+    (fun t body act g' hstep ih =>
+      canStep.mu t body act ih)
+    (fun act => BranchesCanStep.nil act)
+    (fun label g g' rest rest' act hstep hrest ih_head ih_rest =>
+      BranchesCanStep.cons label g rest act ih_head ih_rest)
+    (t := h)
 
 /-- Diamond property for global type step with independent actions.
     This is the core lemma: independent actions on global types commute.
@@ -424,6 +433,7 @@ private theorem diamond_branches_cons {act₂ : GlobalActionR}
       simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
       exact ⟨huniq_h₃, huniq_r₃⟩
 
+/-- Independent actions form a diamond under unique branch labels. -/
 theorem step_diamond_independent {g g₁ g₂ : GlobalType} {act₁ act₂ : GlobalActionR}
     (hind : IndependentActions act₁ act₂)
     (huniq : g.uniqueBranchLabels = true)

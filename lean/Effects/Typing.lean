@@ -1,3 +1,11 @@
+import Effects.Typing.Part1
+import Effects.Typing.Part2
+import Effects.Typing.Part3
+import Effects.Typing.Part4
+import Effects.Typing.Part5
+import Effects.Typing.Part6
+import Effects.Typing.Part7
+
 /-!
 # MPST Process Typing
 
@@ -23,11 +31,3 @@ This module defines the typing rules for MPST processes.
 - **Branch**: If `S[k] = chan (sid, r)` and `G[sid,r] = &p{ℓᵢ: Lᵢ}`,
               then `⊢ branch k [(ℓᵢ, Pᵢ)]` if each Pᵢ is typed under Lᵢ
 -/
-
-import Effects.Typing.Part1
-import Effects.Typing.Part2
-import Effects.Typing.Part3
-import Effects.Typing.Part4
-import Effects.Typing.Part5
-import Effects.Typing.Part6
-import Effects.Typing.Part7

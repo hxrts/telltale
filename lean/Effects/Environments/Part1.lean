@@ -157,6 +157,12 @@ def initBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
 def initDEnv (sid : SessionId) (roles : RoleSet) : DEnv :=
   (RoleSet.allEdges sid roles).foldl (fun env e => env.insert e []) RBMap.empty
 
+/-- Empty DEnv lookup via `find?` always returns none. -/
+@[simp] theorem DEnv_find?_empty (e : Edge) :
+    (RBMap.empty : DEnv).find? e = none := by
+  -- Unfold `find?` on the empty map.
+  rfl
+
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
 theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hMem : e ∈ RoleSet.allEdges sid roles) :
@@ -190,6 +196,20 @@ axiom initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hne : e.sid ≠ sid) :
     lookupD (initDEnv sid roles) e = []
 
+/-- If initBuffers returns none, the edge is not in the role edges. -/
+theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (h : (initBuffers sid roles).lookup e = none) :
+    e ∉ RoleSet.allEdges sid roles := by
+  -- Any edge in allEdges would be found with an empty buffer.
+  intro hMem
+  have hSome := initBuffers_lookup_mem sid roles e hMem
+  exact Option.noConfusion (hSome.symm.trans h)
+
+/-- initBuffers returns none for edges not in allEdges. -/
+axiom initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (hNot : e ∉ RoleSet.allEdges sid roles) :
+    (initBuffers sid roles).lookup e = none
+
 /-- Looking up an edge with a different sid in initBuffers returns none. -/
 theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hne : e.sid ≠ sid) :
@@ -211,6 +231,20 @@ theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     have hBeqFalse : (e == hd) = false := beq_eq_false_iff_ne.mpr hNeEdge
     simp only [hBeqFalse]
     exact ih hNotIn.2
+
+/-! ## initDEnv `find?` Helpers -/
+
+axiom foldl_insert_find?_eq (edges : List Edge) (e : Edge) (env : DEnv)
+    (hNot : e ∉ edges) :
+    (edges.foldl (fun env' e' => env'.insert e' []) env).find? e = env.find? e
+
+/-- initDEnv has no entry for edges outside allEdges. -/
+theorem initDEnv_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (hNot : e ∉ RoleSet.allEdges sid roles) :
+    (initDEnv sid roles).find? e = none := by
+  -- Reduce to the fold lemma with the empty map.
+  have hFold := foldl_insert_find?_eq (RoleSet.allEdges sid roles) e (RBMap.empty) hNot
+  simpa [initDEnv] using hFold
 
 /-! ## Environment Lemmas -/
 

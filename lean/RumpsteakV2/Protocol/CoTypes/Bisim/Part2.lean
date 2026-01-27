@@ -4,6 +4,9 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
 /-! ## Unfolding Shape Lemmas
 
 These lemmas connect the membership predicates with `fullUnfold`. They are used
@@ -316,7 +319,8 @@ theorem CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label ×
   have hfull := congrArg LocalTypeR.dual hfull_dual
   simpa [LocalTypeR.dual, LocalTypeR.dualBranches_involutive, LocalTypeR.dual_dual] using hfull
 
-private theorem WellFormed_branches_of_CanSend {a : LocalTypeR} {p : String}
+/-- CanSend implies all branches are well-formed under WellFormed a. -/
+theorem WellFormed_branches_of_CanSend {a : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : CanSend a p bs) (hWF : LocalTypeR.WellFormed a) :
     ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
   have hfull : a.fullUnfold = .send p bs := CanSend.fullUnfold_eq h hWF
@@ -325,7 +329,8 @@ private theorem WellFormed_branches_of_CanSend {a : LocalTypeR} {p : String}
     simpa [hfull] using hWFfull
   simpa using (LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWFsend)
 
-private theorem WellFormed_branches_of_CanRecv {a : LocalTypeR} {p : String}
+/-- CanRecv implies all branches are well-formed under WellFormed a. -/
+theorem WellFormed_branches_of_CanRecv {a : LocalTypeR} {p : String}
     {bs : List (Label × LocalTypeR)} (h : CanRecv a p bs) (hWF : LocalTypeR.WellFormed a) :
     ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
   -- Use duality to lift branch well-formedness from the send case.

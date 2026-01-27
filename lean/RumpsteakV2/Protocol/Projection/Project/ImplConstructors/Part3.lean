@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplConstructors.Part2
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 /-! ### Mu constructor agreement -/
 
 /-- Helper: `.end` cannot project to `.mu`. -/
@@ -58,7 +68,7 @@ private theorem CProject_mu_implies_trans_mu_mu (t : String) (gbody : GlobalType
 /-- Helper: sender role cannot project to `.mu`. -/
 private theorem CProject_mu_implies_trans_mu_comm_sender_contra
     (sender receiver role v : String) (gbs : List (Label × GlobalType)) (body : LocalTypeR)
-    (hproj : CProject (.comm sender receiver gbs) role (.mu v body))
+    (hproj : CProject (GlobalType.comm sender receiver gbs) role (.mu v body))
     (hrs : role = sender) : False := by
   -- CProjectF forbids .mu when the role is sender.
   have hf := CProject_destruct hproj
@@ -67,7 +77,7 @@ private theorem CProject_mu_implies_trans_mu_comm_sender_contra
 /-- Helper: receiver role cannot project to `.mu`. -/
 private theorem CProject_mu_implies_trans_mu_comm_receiver_contra
     (sender receiver role v : String) (gbs : List (Label × GlobalType)) (body : LocalTypeR)
-    (hproj : CProject (.comm sender receiver gbs) role (.mu v body))
+    (hproj : CProject (GlobalType.comm sender receiver gbs) role (.mu v body))
     (hrr : role = receiver) (hrs : role ≠ sender) : False := by
   -- CProjectF forbids .mu when the role is receiver.
   have hf := CProject_destruct hproj
@@ -80,13 +90,13 @@ private theorem CProject_mu_implies_trans_mu_comm_other
     (hrec :
       ∃ gbody, trans first.2 role = .mu v (trans gbody role) ∧
         body.isGuarded v = true ∧ CProject gbody role body ∧ gbody.allCommsNonEmpty = true) :
-    ∃ gbody, trans (.comm sender receiver (first :: rest)) role = .mu v (trans gbody role) ∧
+    ∃ gbody, trans (GlobalType.comm sender receiver (first :: rest)) role = .mu v (trans gbody role) ∧
       body.isGuarded v = true ∧ CProject gbody role body ∧ gbody.allCommsNonEmpty = true := by
   -- Non-participants use trans_comm_other to select the head branch.
   obtain ⟨gbody, htrans_mu, hguard, hbody_proj, hwf_body⟩ := hrec
   refine ⟨gbody, ?_, hguard, hbody_proj, hwf_body⟩
   have htrans :
-      trans (.comm sender receiver (first :: rest)) role = trans first.2 role := by
+      trans (GlobalType.comm sender receiver (first :: rest)) role = trans first.2 role := by
     simpa using trans_comm_other sender receiver role (first :: rest) hrs hrr
   simpa [htrans] using htrans_mu
 
@@ -116,25 +126,36 @@ private theorem CProject_mu_implies_trans_mu_comm_cons (g : GlobalType) (sender 
           allCommsNonEmpty_first_of_comm sender receiver first rest hne
         have hrec := CProject_mu_implies_trans_mu first.2 role v body hfirst hne_first
         exact CProject_mu_implies_trans_mu_comm_other sender receiver role v first rest body hrs hrr hrec
-termination_by (sizeOf g) * 2
+termination_by (sizeOf g) * 3
 decreasing_by
     all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul sender receiver first rest
+      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 /-- Helper: comm case for mu projection agreement. -/
 private theorem CProject_mu_implies_trans_mu_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role v : String) (body : LocalTypeR)
-      (hproj : CProject (.comm sender receiver gbs) role (.mu v body))
-      (hne : (.comm sender receiver gbs).allCommsNonEmpty = true) :
-      ∃ gbody, trans (.comm sender receiver gbs) role = .mu v (trans gbody role) ∧
+      (hproj : CProject (GlobalType.comm sender receiver gbs) role (.mu v body))
+      (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true) :
+      ∃ gbody, trans (GlobalType.comm sender receiver gbs) role = .mu v (trans gbody role) ∧
         body.isGuarded v = true ∧ CProject gbody role body ∧ gbody.allCommsNonEmpty = true := by
     -- Split on the branch list; empty is impossible under allCommsNonEmpty.
-    cases gbs with
+    cases hgb : gbs with
     | nil =>
-        have : False := by simpa [GlobalType.allCommsNonEmpty] using hne
+        have hne' :
+            (gbs ≠ [] ∧ GlobalType.allCommsNonEmptyBranches gbs = true) := by
+          simpa [GlobalType.allCommsNonEmpty] using hne
+        have : False := hne'.1 (by simpa [hgb])
         exact this.elim
     | cons first rest =>
-        exact CProject_mu_implies_trans_mu_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role v body hproj rfl hne
+        have hproj' : CProject (GlobalType.comm sender receiver (first :: rest)) role (.mu v body) := by
+          simpa [hgb] using hproj
+        have hne' : (GlobalType.comm sender receiver (first :: rest)).allCommsNonEmpty = true := by
+          simpa [hgb] using hne
+        exact CProject_mu_implies_trans_mu_comm_cons (GlobalType.comm sender receiver (first :: rest))
+          sender receiver first rest role v body hproj' rfl hne'
+termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
+decreasing_by
+    all_goals
+      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 /-- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
       Returns the global body and proof that trans produces `.mu v (trans gbody role)`. -/
 theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
@@ -155,10 +176,10 @@ theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
         simpa [hg] using
           (CProject_mu_implies_trans_mu_comm sender receiver gbs role v body
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
-termination_by (sizeOf g) * 2 + 1
+termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simpa using (Nat.lt_succ_self (sizeOf g * 2))
+      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 end
 
 

@@ -19,7 +19,7 @@ open RumpsteakV2.Protocol.Participation
 This is the Coq-style path: project on fully-unfolded global/local types.
 It avoids requiring exact constructor matching on the raw candidate. -/
 
-private def CProjectUEQ2Rel : ProjRel := fun g role cand =>
+def CProjectUEQ2Rel : ProjRel := fun g role cand =>
   ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0 ∧ LocalTypeR.WellFormed cand
 
 private theorem wf_tail_of_cons
@@ -30,7 +30,7 @@ private theorem wf_tail_of_cons
   intro lb' hmem
   exact hwf lb' (by simp [hmem])
 
-private theorem BranchesProjRel_lift_EQ2_U
+theorem BranchesProjRel_lift_EQ2_U
     {gbs : List (Label × GlobalType)} {role : String}
     {lbs0 lbs1 : List (Label × LocalTypeR)}
     (hproj : BranchesProjRel CProjectU gbs role lbs0)
@@ -122,7 +122,7 @@ private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : Local
   exact EQ2_fullUnfold_var (t := t) hWF
 
 
-private theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)}
+theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)}
     {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.send p bs) e → ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq -- Transfer observables through EQ2 and eliminate impossible cases.
@@ -159,7 +159,7 @@ private theorem EQ2_fullUnfold_send_wf {p : String} {bs : List (Label × LocalTy
   exact EQ2_fullUnfold_send (p := p) (bs := bs) hWF
 
 
-private theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)}
+theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)}
     {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.recv p bs) e → ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq -- Transfer observables through EQ2 and eliminate impossible cases.
@@ -195,7 +195,7 @@ private theorem EQ2_fullUnfold_recv_wf {p : String} {bs : List (Label × LocalTy
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   exact EQ2_fullUnfold_recv (p := p) (bs := bs) hWF
 
-private theorem EQ2_of_fullUnfold
+theorem EQ2_of_fullUnfold
     {e0 cand x : LocalTypeR}
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
@@ -209,7 +209,7 @@ private theorem EQ2_of_fullUnfold
     simpa [he0] using hWF_full
   exact EQ2_trans_wf (EQ2_symm heq_e0_x) heq hWF_x hWF hWFcand
 
-private theorem cand_fullUnfold_eq_end
+theorem cand_fullUnfold_eq_end
     {e0 cand : LocalTypeR}
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
@@ -220,7 +220,7 @@ private theorem cand_fullUnfold_eq_end
   have heq_end : EQ2 .end cand := EQ2_of_fullUnfold heq_full heq hWF_full hWF hWFcand he0
   exact EQ2_fullUnfold_end hWFcand heq_end
 
-private theorem EQ2_fullUnfold_to_fullUnfold
+theorem EQ2_fullUnfold_to_fullUnfold
     {e0 cand : LocalTypeR}
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold) (hWF : LocalTypeR.WellFormed e0)
@@ -247,7 +247,7 @@ private theorem AllBranchesProj_lift_EQ2_U
   have hproj' : CProjectU gb.2 role e0_full := hall gb hgb
   exact ⟨e0_full, hproj', heq_full_cand_full, hWF_full, hWFcand_full⟩
 
-private theorem CProjectUEQ2Rel_comm_nonpart
+theorem CProjectUEQ2Rel_comm_nonpart
     {gbs : List (Label × GlobalType)} {role : String}
     {e0_full cand_full : LocalTypeR}
     (heq_full_cand_full : EQ2 e0_full cand_full)
@@ -261,7 +261,7 @@ private theorem CProjectUEQ2Rel_comm_nonpart
   have hall' := AllBranchesProj_lift_EQ2_U heq_full_cand_full hWF_full hWFcand_full hall
   exact ⟨hpart_all, hall'⟩
 
-private theorem CProjectUEQ2Rel_postfix_end_case
+theorem CProjectUEQ2Rel_postfix_end_case
     {g role cand e0 : _}
     (hg : GlobalType.fullUnfoldIter g = .end)
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
@@ -288,7 +288,7 @@ private theorem CProjectUEQ2Rel_postfix_end_case
       have : False := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
       exact this.elim
 
-private theorem CProjectUEQ2Rel_postfix_var_case
+theorem CProjectUEQ2Rel_postfix_var_case
     {g role cand e0 : _} {v : String}
     (hg : GlobalType.fullUnfoldIter g = .var v)
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
@@ -317,7 +317,7 @@ private theorem CProjectUEQ2Rel_postfix_var_case
       have : False := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
       exact this.elim
 
-private theorem CProjectUEQ2Rel_postfix_mu_end_case
+theorem CProjectUEQ2Rel_postfix_mu_end_case
     {g role cand e0 : _} {t : String} {body : GlobalType}
     (hg : GlobalType.fullUnfoldIter g = .mu t body)
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))

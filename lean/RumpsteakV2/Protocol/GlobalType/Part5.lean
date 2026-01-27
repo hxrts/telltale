@@ -441,23 +441,6 @@ private theorem freeVars_substituteBranches_subset_head
       right
       exact hmem
 
-private theorem freeVars_substituteBranches_subset_tail
-    (head : Label × GlobalType) (tail : List (Label × GlobalType))
-    (t : String) (repl : GlobalType) (v : String)
-    (hv : v ∈ freeVarsOfBranches (substituteBranches tail t repl)) :
-    (v ∈ freeVarsOfBranches (head :: tail) ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
-  -- Tail case: recurse and reinsert into the full branch list.
-  have hsub := freeVars_substituteBranches_subset tail t repl v hv
-  cases hsub with
-  | inl hcase =>
-      left
-      have hmem : v ∈ freeVarsOfBranches (head :: tail) := by
-        simp [freeVarsOfBranches, List.mem_append, hcase.1]
-      exact ⟨hmem, hcase.2⟩
-  | inr hmem =>
-      right
-      exact hmem
-
 /-- Corollary for branches: free vars of substituted branches are bounded. -/
 theorem freeVars_substituteBranches_subset (branches : List (Label × GlobalType))
     (t : String) (repl : GlobalType) (v : String)
@@ -473,7 +456,16 @@ theorem freeVars_substituteBranches_subset (branches : List (Label × GlobalType
       | inl hv_head =>
           exact freeVars_substituteBranches_subset_head head tail t repl v hv_head
       | inr hv_tail =>
-          exact freeVars_substituteBranches_subset_tail head tail t repl v hv_tail
+          have hsub := freeVars_substituteBranches_subset tail t repl v hv_tail
+          cases hsub with
+          | inl hcase =>
+              left
+              have hmem : v ∈ freeVarsOfBranches (head :: tail) := by
+                simp [freeVarsOfBranches, List.mem_append, hcase.1]
+              exact ⟨hmem, hcase.2⟩
+          | inr hmem =>
+              right
+              exact hmem
 
 /-- Substitution preserves closedness when both repl is closed AND body has no free vars other than t.
 

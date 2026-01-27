@@ -15,12 +15,13 @@ open Paco
 open RumpsteakV2.Protocol.Participation
 
 /-- Local copy of BranchesRel_mono (since the original is private in EQ2.lean). -/
-private theorem BranchesRel_mono {R S : Rel}
+theorem BranchesRel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
   exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
 
+/-- Monotonicity of EQ2F over relations. -/
 theorem EQ2F_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {a b}, EQ2F R a b → EQ2F S a b := by
@@ -38,7 +39,7 @@ theorem EQ2F_mono {R S : Rel}
 
 /-! NOTE: EQ2 transitivity is used with explicit WellFormed witnesses. -/
 
-private theorem wf_tail_of_cons
+theorem wf_tail_of_cons
     {lb : Label × LocalTypeR} {bs : List (Label × LocalTypeR)}
     (hwf : ∀ lb' ∈ lb :: bs, LocalTypeR.WellFormed lb'.2) :
     ∀ lb' ∈ bs, LocalTypeR.WellFormed lb'.2 := by
@@ -63,7 +64,7 @@ private theorem BranchesRel_trans_chain_head {R : Rel}
     | inl hr => exact Or.inl (hextend _ _ _ hr h2.2 hWFa hWFb hWFc)
     | inr heq => exact Or.inr (EQ2_trans_wf heq h2.2 hWFa hWFb hWFc)
 
-private theorem BranchesRel_trans_chain_rev_head {R : Rel}
+theorem BranchesRel_trans_chain_rev_head {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : Label × LocalTypeR}
@@ -116,6 +117,7 @@ theorem BranchesRel_trans_chain {R : Rel}
 def CProjectTransRel : Rel := fun lt t =>
   ∃ g role, CProject g role lt ∧ t = Trans.trans g role ∧ g.wellFormed = true
 
+/-- CProject preserves well-formedness under well-formed globals. -/
 theorem CProject_wellFormed_of_wellFormed {g : GlobalType} {role : String} {lt : LocalTypeR}
     (hproj : CProject g role lt) (hwf : g.wellFormed = true) :
     LocalTypeR.WellFormed lt := by
@@ -127,11 +129,13 @@ theorem CProject_wellFormed_of_wellFormed {g : GlobalType} {role : String} {lt :
     RumpsteakV2.Protocol.Projection.Trans.trans_wellFormed_of_wellFormed g role hwf
   simpa [htrans] using hWFtrans
 
+/-- Left endpoint of CProjectTransRel is well-formed. -/
 theorem CProjectTransRel_wf_left {a b : LocalTypeR} (h : CProjectTransRel a b) :
     LocalTypeR.WellFormed a := by
   rcases h with ⟨g, role, hproj, _htrans, hwf⟩
   exact CProject_wellFormed_of_wellFormed (g := g) (role := role) (lt := a) hproj hwf
 
+/-- Right endpoint of CProjectTransRel is well-formed. -/
 theorem CProjectTransRel_wf_right {a b : LocalTypeR} (h : CProjectTransRel a b) :
     LocalTypeR.WellFormed b := by
   rcases h with ⟨g, role, _hproj, htrans, hwf⟩
@@ -158,6 +162,7 @@ def CProjectTransRelComp : Rel := fun a c =>
 def CProjectTransRelCompWF : Rel := fun a c =>
   CProjectTransRelComp a c ∧ LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed c
 
+/-- Lift a base CProjectTransRel witness into the well-formed composition wrapper. -/
 theorem CProjectTransRelCompWF_of_CProjectTransRel {a c : LocalTypeR}
     (h : CProjectTransRel a c) : CProjectTransRelCompWF a c := by
   -- Lift a base CProjectTransRel witness into the well-formed composition wrapper.
@@ -180,7 +185,7 @@ private theorem allCommsNonEmpty_of_mem_branch
 
 /- Helper: BranchesProjRel implies transBranches produces branch-wise related pairs.
     Requires wellFormedness of branch continuations to build CProjectTransRel witnesses. -/
-private theorem branchesProjRel_to_branchesRel_CProjectTransRel
+theorem branchesProjRel_to_branchesRel_CProjectTransRel
     (gbs : List (Label × GlobalType)) (role : String)
     (lbs : List (Label × LocalTypeR))
     (h : BranchesProjRel CProject gbs role lbs) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true) :
@@ -210,7 +215,7 @@ private theorem branchesProjRel_to_branchesRel_CProjectTransRel
                 exact ih hwf_tail
 
 
-private theorem CProjectTransRel_postfix_mu_closure
+theorem CProjectTransRel_postfix_mu_closure
     {v : String} {lbody t' : LocalTypeR}
     (hmu_rel : CProjectTransRel (LocalTypeR.mu v lbody) (LocalTypeR.mu v t')) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu v lbody) (LocalTypeR.mu v t') := by
@@ -228,7 +233,7 @@ private theorem CProjectTransRel_postfix_mu_closure
   · left; right; right; left
     exact ⟨LocalTypeR.mu v t', hmu_rel, heq_unfold_right⟩
 
-private theorem CProjectTransRel_postfix_end
+theorem CProjectTransRel_postfix_end
     {role : String} {t : LocalTypeR}
     (htrans : t = Trans.trans GlobalType.end role) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
@@ -236,7 +241,7 @@ private theorem CProjectTransRel_postfix_end
   subst htrans
   simp [Trans.trans, EQ2F]
 
-private theorem CProjectTransRel_postfix_var
+theorem CProjectTransRel_postfix_var
     {vt vlt : String} {role : String} {t : LocalTypeR}
     (hf : CProjectF CProject (GlobalType.var vt) role (LocalTypeR.var vlt))
     (htrans : t = Trans.trans (GlobalType.var vt) role) :
@@ -275,7 +280,7 @@ private theorem CProjectTransRel_postfix_mu_mu_guarded
   subst htrans
   simpa [htrans_mu] using CProjectTransRel_postfix_mu_closure hmu_rel
 
-private theorem CProjectTransRel_postfix_mu_mu
+theorem CProjectTransRel_postfix_mu_mu
     {muvar ltvar : String} {gbody : GlobalType} {lbody t : LocalTypeR} {role : String}
     (hproj : CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu ltvar lbody))
     (htrans : t = Trans.trans (GlobalType.mu muvar gbody) role)
@@ -294,7 +299,7 @@ private theorem CProjectTransRel_postfix_mu_mu
     have : False := by simpa using hend_eq
     exact this.elim
 
-private theorem CProjectTransRel_postfix_mu_end
+theorem CProjectTransRel_postfix_mu_end
     {muvar : String} {gbody : GlobalType} {t : LocalTypeR} {role : String}
     (_hproj : CProject (GlobalType.mu muvar gbody) role LocalTypeR.end)
     (htrans : t = Trans.trans (GlobalType.mu muvar gbody) role)

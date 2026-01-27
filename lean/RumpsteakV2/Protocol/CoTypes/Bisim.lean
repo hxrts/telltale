@@ -1,3 +1,14 @@
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part1
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part2
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part3
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part4
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part5
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part6
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part7
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part8
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part9
+import RumpsteakV2.Protocol.CoTypes.Bisim.Part10
+
 /-! # RumpsteakV2.Protocol.CoTypes.Bisim
 
 Bisimulation-style EQ2 formulation using membership predicates.
@@ -34,14 +45,3 @@ The following definitions form the semantic interface for proofs:
 - QpfTypes PR #49: https://github.com/alexkeizer/QpfTypes/pull/49
 - hxrts/QpfTypes fork: https://github.com/hxrts/QpfTypes (commit f9e16e9)
 -/
-
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part1
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part2
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part3
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part4
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part5
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part6
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part7
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part8
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part9
-import RumpsteakV2.Protocol.CoTypes.Bisim.Part10

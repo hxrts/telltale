@@ -3,6 +3,7 @@ import RumpsteakV2.Protocol.LocalTypeDB.Core
 set_option linter.unusedSimpArgs false
 
 namespace RumpsteakV2.Protocol
+open RumpsteakV2.Protocol.GlobalType
 /-! ## Closedness Preservation -/
 
 private theorem isClosedAt_lift_at (t : LocalTypeDB) (c k d : Nat) :
@@ -547,4 +548,4 @@ theorem isContractive_fullUnfold (t : LocalTypeDB) :
     isContractive_iter_unfold (k := t.muHeight) t h
 
 
-end RumpsteakV2.Protocol.LocalTypeDB
+end RumpsteakV2.Protocol

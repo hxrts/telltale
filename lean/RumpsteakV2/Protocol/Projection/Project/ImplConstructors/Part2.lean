@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplConstructors.Part1
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 /-! ### Send constructor agreement -/
 
 /- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
@@ -41,8 +51,11 @@ private theorem CProject_send_implies_trans_send_comm_receiver_contra
     (hproj : CProject (.comm sender receiver gbs) role (.send partner lbs))
     (hrr : role = receiver) (hrs : role ≠ sender) : False := by
   -- CProjectF forbids .send when the role is receiver.
+  have hne : receiver ≠ sender := by
+    intro h
+    exact hrs (hrr.trans h)
   have hf := CProject_destruct hproj
-  simpa [CProjectF, hrr, hrs] using hf
+  simpa [CProjectF, hrr, hne] using hf
 
 /-- Helper: non-participant comm case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm_other
@@ -69,7 +82,7 @@ mutual
 private theorem CProject_send_implies_trans_send_comm_cons (g : GlobalType) (sender receiver : String)
       (first : Label × GlobalType) (rest : List (Label × GlobalType)) (role partner : String)
       (lbs : List (Label × LocalTypeR)) (hproj : CProject g role (.send partner lbs))
-      (hg : g = (.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true) :
+      (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true) :
       ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .send partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧ (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
@@ -90,30 +103,40 @@ private theorem CProject_send_implies_trans_send_comm_cons (g : GlobalType) (sen
         have hrec := CProject_send_implies_trans_send first.2 role partner lbs hfirst hwf_first
         exact CProject_send_implies_trans_send_comm_other sender receiver role partner first rest lbs
           hrs hrr hrec
-termination_by (sizeOf g) * 2
+termination_by (sizeOf g) * 3
 decreasing_by
     all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul sender receiver first rest
+      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
 /-- Helper: comm case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List (Label × LocalTypeR))
       (hproj : CProject (.comm sender receiver gbs) role (.send partner lbs))
-      (hwf : (.comm sender receiver gbs).wellFormed = true) :
+      (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
       ∃ gbs', trans (.comm sender receiver gbs) role =
           .send partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
         (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
     -- Split on the branch list; empty is impossible under wellFormed.
-    cases gbs with
+    cases hgb : gbs with
     | nil =>
-        have hne : (.comm sender receiver []).allCommsNonEmpty = true :=
-          allCommsNonEmpty_of_wellFormed _ hwf
+        have hwf' : (GlobalType.comm sender receiver []).wellFormed = true := by
+          simpa [hgb] using hwf
+        have hne : (GlobalType.comm sender receiver []).allCommsNonEmpty = true :=
+          allCommsNonEmpty_of_wellFormed _ hwf'
         have : False := by simpa [GlobalType.allCommsNonEmpty] using hne
         exact this.elim
     | cons first rest =>
+        have hproj' : CProject (.comm sender receiver (first :: rest)) role (.send partner lbs) := by
+          simpa [hgb] using hproj
+        have hwf' : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true := by
+          simpa [hgb] using hwf
         exact CProject_send_implies_trans_send_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role partner lbs hproj rfl hwf
+          sender receiver first rest role partner lbs hproj' rfl hwf'
+termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
+decreasing_by
+    all_goals
+      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 /-- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
       (possibly through non-participant layers), and trans g role = .send partner (transBranches ...). -/
 theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
@@ -136,10 +159,10 @@ theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
         simpa [hg] using
           (CProject_send_implies_trans_send_comm sender receiver gbs role partner lbs
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
-termination_by (sizeOf g) * 2 + 1
+termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simpa using (Nat.lt_succ_self (sizeOf g * 2))
+      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 end
 
 /-- Helper: `.end` cannot project to `.recv`. -/
@@ -258,30 +281,40 @@ private theorem CProject_recv_implies_trans_recv_comm_cons (g : GlobalType) (sen
           CProject_recv_implies_trans_recv first.2 role partner lbs hfirst hwf_first
         exact CProject_recv_implies_trans_recv_comm_other sender receiver role partner first rest lbs
           hrs hrr hrec
-termination_by (sizeOf g) * 2
+termination_by (sizeOf g) * 3
 decreasing_by
     all_goals
-      simpa [hg] using sizeOf_snd_lt_comm_head_mul sender receiver first rest
+      simpa [hg] using sizeOf_snd_lt_comm_head_mul3 sender receiver first rest
 
 /-- Helper: comm case for recv projection agreement. -/
 private theorem CProject_recv_implies_trans_recv_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List (Label × LocalTypeR))
       (hproj : CProject (.comm sender receiver gbs) role (.recv partner lbs))
-      (hwf : (.comm sender receiver gbs).wellFormed = true) :
+      (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
       ∃ gbs', trans (.comm sender receiver gbs) role =
           .recv partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
         (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
     -- Split on the branch list; empty is impossible under wellFormed.
-    cases gbs with
+    cases hgb : gbs with
     | nil =>
-        have hne : (.comm sender receiver []).allCommsNonEmpty = true :=
-          allCommsNonEmpty_of_wellFormed _ hwf
+        have hwf' : (GlobalType.comm sender receiver []).wellFormed = true := by
+          simpa [hgb] using hwf
+        have hne : (GlobalType.comm sender receiver []).allCommsNonEmpty = true :=
+          allCommsNonEmpty_of_wellFormed _ hwf'
         have : False := by simpa [GlobalType.allCommsNonEmpty] using hne
         exact this.elim
     | cons first rest =>
+        have hproj' : CProject (.comm sender receiver (first :: rest)) role (.recv partner lbs) := by
+          simpa [hgb] using hproj
+        have hwf' : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true := by
+          simpa [hgb] using hwf
         exact CProject_recv_implies_trans_recv_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role partner lbs hproj rfl hwf
+          sender receiver first rest role partner lbs hproj' rfl hwf'
+termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
+decreasing_by
+    all_goals
+      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 /-- Symmetric version for recv. -/
 theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partner : String)
       (lbs : List (Label × LocalTypeR)) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true) :
@@ -296,10 +329,10 @@ theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partn
         simpa [hg] using
           (CProject_recv_implies_trans_recv_comm sender receiver gbs role partner lbs
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
-termination_by (sizeOf g) * 2 + 1
+termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simpa using (Nat.lt_succ_self (sizeOf g * 2))
+      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
 end
 
 /-- Helper: if CProject g role lt holds with lt.isGuarded v = true,

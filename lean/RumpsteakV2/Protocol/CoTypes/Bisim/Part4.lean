@@ -4,21 +4,26 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## Equivalence with EQ2
 
 The membership predicates in BisimF correspond to unfolding behavior in EQ2F.
 We prove Bisim ↔ EQ2, which enables deriving EQ2_trans from Bisim.trans. -/
 
-/-- Convert BranchesRelBisim R to BranchesRel R (same structure, just namespace difference). -/
-private theorem BranchesRelBisim_to_BranchesRel {R : Rel}
+/-- Convert BranchesRelBisim to BranchesRel (same structure, different namespace). -/
+theorem BranchesRelBisim_to_BranchesRel {R : Rel}
     {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
     BranchesRel R bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
 
-/-- Convert BranchesRel R to BranchesRelBisim R (same structure, just namespace difference). -/
-private theorem BranchesRel_to_BranchesRelBisim {R : Rel}
+/-- Convert BranchesRel to BranchesRelBisim (same structure, different namespace). -/
+theorem BranchesRel_to_BranchesRelBisim {R : Rel}
     {bs cs : List (Label × LocalTypeR)} (h : BranchesRel R bs cs) :
     BranchesRelBisim R bs cs := by
   induction h with

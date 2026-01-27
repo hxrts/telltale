@@ -45,12 +45,12 @@ private theorem EQ_end_closed (g : GlobalType) (role : String)
   rw [isClosed_eq_true_iff]
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
   rcases hwf with ⟨⟨⟨hbound, _hne⟩, _hnsc⟩, _hprod⟩
-  have hsub := trans_freeVars_subset g role
+  have hsub := trans_freeVars_subset role g
   have gclosed : g.freeVars = [] := allVarsBound_nil_implies_freeVars_nil g hbound
   simp only [List.eq_nil_iff_forall_not_mem]
   intro x hx
-  have hgx := hsub hx
-  simp [gclosed] at hgx
+  have hgx : x ∈ g.freeVars := hsub x hx
+  simpa [gclosed] using hgx
 
 private theorem EQ_end_coind (g : GlobalType) (role : String)
     (hmuve : isMuve (trans g role) = true)
@@ -60,6 +60,7 @@ private theorem EQ_end_coind (g : GlobalType) (role : String)
   have hinR : ClosedMuveRel .end (trans g role) := ⟨rfl, hmuve, hclosed⟩
   exact EQ2_coind ClosedMuveRel_postfix .end (trans g role) hinR
 
+/-- Non-participants project to a local type EQ2-equivalent to end. -/
 theorem EQ_end (role : String) (g : GlobalType)
     (hnotpart : ¬ part_of2 role g)
     (hwf : g.wellFormed = true) :
@@ -194,6 +195,7 @@ private theorem CProject_muve_of_not_part_of2_aux_comm_cons_data (sender receive
   have hbranches' : first.2.allCommsNonEmpty = true ∧ allCommsNonEmptyBranches rest = true := by
     simpa [GlobalType.allCommsNonEmptyBranches, Bool.and_eq_true] using hbranches
   exact ⟨hfirst_proj, hnotpart_first, hbranches'.1⟩
+/-- CProject for non-participants enforces a muve local type. -/
 theorem CProject_muve_of_not_part_of2_aux : (g : GlobalType) → (role : String) → (lt : LocalTypeR) →
     CProject g role lt → ¬ part_of2 role g → g.allCommsNonEmpty = true → isMuve lt = true
   | GlobalType.end, role, lt, hproj, _, _ =>

@@ -1,6 +1,9 @@
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.SubstRel
 
 namespace RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.GlobalType
 /-! ## Standard Case Analysis -/
 
 /-- Helper: lift BranchesRel through substitution. -/

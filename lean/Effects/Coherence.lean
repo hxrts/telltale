@@ -1,3 +1,13 @@
+import Effects.Coherence.Part1
+import Effects.Coherence.Part2
+import Effects.Coherence.Part3
+import Effects.Coherence.Part4
+import Effects.Coherence.Part5
+import Effects.Coherence.Part6
+import Effects.Coherence.Part7
+import Effects.Coherence.Part8
+import Effects.Coherence.Part9
+
 /-!
 # MPST Coherence
 
@@ -37,13 +47,3 @@ proceed by case analysis on which edge we're checking coherence for:
 This 3-way case split is the core proof technique for coherence preservation.
 Adapted from binary session types where the split is: a = e, a = e.dual, a unrelated.
 -/
-
-import Effects.Coherence.Part1
-import Effects.Coherence.Part2
-import Effects.Coherence.Part3
-import Effects.Coherence.Part4
-import Effects.Coherence.Part5
-import Effects.Coherence.Part6
-import Effects.Coherence.Part7
-import Effects.Coherence.Part8
-import Effects.Coherence.Part9

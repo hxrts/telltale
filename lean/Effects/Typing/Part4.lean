@@ -1,5 +1,4 @@
-import Effects.Process
-import Effects.Coherence
+import Effects.Typing.Part3
 
 /-!
 # MPST Process Typing
@@ -112,7 +111,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
   | seq_skip =>
       simp
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
       intro s hs
       have hs' : s ∈ SessionsOfD D₁' ∪ SessionsOfD D₂ :=
         SessionsOfD_append_subset (D₁:=D₁') (D₂:=D₂) hs
@@ -127,7 +126,7 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       | inr hright =>
           exact Or.inl (SessionsOfD_append_right (D₁:=D₁) hright)
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
       intro s hs
       have hs' : s ∈ SessionsOfD D₁ ∪ SessionsOfD D₂' :=
         SessionsOfD_append_subset (D₁:=D₁) (D₂:=D₂') hs

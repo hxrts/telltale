@@ -4,6 +4,11 @@ set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.CoTypes.Bisim
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.CoTypes.Observable
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## Observable Behavior Extraction from EQ2
 
 These lemmas extract observable behavior from EQ2 proofs. They are needed for EQ2.toBisim.
@@ -111,8 +116,8 @@ theorem EQ2.send_right_implies_CanSend_of_contractive {x : LocalTypeR} {p : Stri
       subst hp
       exact ⟨cs, hsend, hbr⟩
 
-/-- Flip BranchesRel with symmetric relation. -/
-private theorem BranchesRel_flip {as bs : List (Label × LocalTypeR)}
+/-- Flip the direction of a BranchesRel proof. -/
+theorem BranchesRel_flip {as bs : List (Label × LocalTypeR)}
     (h : BranchesRel EQ2 as bs) : BranchesRel EQ2 bs as := by
   induction h with
   | nil => exact List.Forall₂.nil
@@ -141,8 +146,8 @@ theorem BranchesRel_dual_eq2 {bs cs : List (Label × LocalTypeR)}
                         simpa [LocalTypeR.dual_involutive] using h'
                       exact List.Forall₂.cons ⟨hbc.1, hdu⟩ (ih htail)
 
-/-- Helper: turn a dualized CanSend result into a CanRecv result with matching branches. -/
-private theorem CanSend_dual_to_CanRecv {x : LocalTypeR} {p : String}
+/-- Dualize CanSend into CanRecv along matching branches. -/
+theorem CanSend_dual_to_CanRecv {x : LocalTypeR} {p : String}
     {bs cs : List (Label × LocalTypeR)}
     (hcan : CanSend x.dual p cs) (hbr : BranchesRel EQ2 (LocalTypeR.dualBranches bs) cs) :
     ∃ cs', CanRecv x p cs' ∧ BranchesRel EQ2 bs cs' := by

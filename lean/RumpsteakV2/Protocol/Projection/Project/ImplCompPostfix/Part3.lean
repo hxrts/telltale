@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplCompPostfix.Part2
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 private theorem CProjectTransRelComp_postfix_suffix_mu_mu
     {v v' : String} {body_lt body_t b : LocalTypeR}
     (hrel_ab : CProjectTransRel (.mu v body_lt) b) (heq_bc : EQ2 b (.mu v' body_t))
@@ -301,9 +311,11 @@ private theorem CProjectTransRelComp_postfix_suffix
   | mu v body_lt =>
       exact CProjectTransRelComp_postfix_suffix_mu (v := v) (body_lt := body_lt) hrel_ab heq_bc hWFa hWFc
 
+/-- Postfix property for the well-formed composite relation. -/
 theorem CProjectTransRelComp_postfix :
     ∀ lt t, CProjectTransRelCompWF lt t → EQ2F (EQ2_closure CProjectTransRelCompWF) lt t := by
   intro lt t hcompWF
+  -- Proof strategy: split on the four composition shapes (base/prefix/suffix/chain).
   rcases hcompWF with ⟨hcomp, hWFa, hWFc⟩
   rcases hcomp with hbase | ⟨b, heq_ab, hrel_bb'⟩ | ⟨b, hrel_ab, heq_bc⟩ | ⟨b, b', heq_ab, hrel_bb', heq_b'c⟩
   · -- Base case: CProjectTransRel lt t

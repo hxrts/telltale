@@ -65,99 +65,95 @@ private theorem embed_deterministic_var {t : String} {role : String} {g1 g2 : Gl
   | _ => simp [CEmbedF] at h1F
 
 mutual
-/-- Helper: determinism for mu case. -/
-private theorem embed_deterministic_mu {t : String} {body : LocalTypeR} {role : String}
-     {g1 g2 : GlobalType}
-     (h1F : CEmbedF CEmbed (.mu t body) role g1)
-     (h2F : CEmbedF CEmbed (.mu t body) role g2) : g1 = g2 := by
-   -- Mu: peel both sides and use IH on the bodies.
-   cases g1 with
-   | mu t1 gbody1 =>
-       cases g2 with
-       | mu t2 gbody2 =>
-           simp [CEmbedF] at h1F h2F
-           rcases h1F with ⟨ht1, _, hbody1⟩
-           rcases h2F with ⟨ht2, _, hbody2⟩
-           subst ht1 ht2
-           have hbody := embed_deterministic hbody1 hbody2
-           simp [hbody]
-       | _ => simp [CEmbedF] at h2F
-   | _ => simp [CEmbedF] at h1F
-
-/-- Helper: determinism for send case. -/
-private theorem embed_deterministic_send {receiver : String} {lbs : List (Label × LocalTypeR)}
-     {role : String} {g1 g2 : GlobalType}
-     (h1F : CEmbedF CEmbed (.send receiver lbs) role g1)
-     (h2F : CEmbedF CEmbed (.send receiver lbs) role g2) : g1 = g2 := by
-   -- Send: both sides must be comm with matching endpoints.
-   cases g1 with
-   | comm sender1 receiver1 gbs1 =>
-       cases g2 with
-       | comm sender2 receiver2 gbs2 =>
-           simp [CEmbedF] at h1F h2F
-           rcases h1F with ⟨hrole1, _, hrecv1, hbr1⟩
-           rcases h2F with ⟨hrole2, _, hrecv2, hbr2⟩
-           subst hrole1 hrole2 hrecv1 hrecv2
-           have hbs := branches_embed_deterministic hbr1 hbr2
-           simp [hbs]
-       | _ => simp [CEmbedF] at h2F
-   | _ => simp [CEmbedF] at h1F
-
-/-- Helper: determinism for recv case. -/
-private theorem embed_deterministic_recv {sender : String} {lbs : List (Label × LocalTypeR)}
-     {role : String} {g1 g2 : GlobalType}
-     (h1F : CEmbedF CEmbed (.recv sender lbs) role g1)
-     (h2F : CEmbedF CEmbed (.recv sender lbs) role g2) : g1 = g2 := by
-   -- Recv: both sides must be comm with matching endpoints.
-   cases g1 with
-   | comm sender1 receiver1 gbs1 =>
-       cases g2 with
-       | comm sender2 receiver2 gbs2 =>
-           simp [CEmbedF] at h1F h2F
-           rcases h1F with ⟨hrole1, _, hsend1, hbr1⟩
-           rcases h2F with ⟨hrole2, _, hsend2, hbr2⟩
-           subst hrole1 hrole2 hsend1 hsend2
-           have hbs := branches_embed_deterministic hbr1 hbr2
-           simp [hbs]
-       | _ => simp [CEmbedF] at h2F
-   | _ => simp [CEmbedF] at h1F
-
 /-- Determinism for embedding: a local type embeds into at most one global type. -/
 theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType}
      (h1 : CEmbed e role g1) (h2 : CEmbed e role g2) : g1 = g2 := by
-   -- Reduce to the one-step generators and dispatch on constructors.
-   have h1F := CEmbed_destruct h1; have h2F := CEmbed_destruct h2
-   cases e with
-   | «end» => exact embed_deterministic_end h1F h2F
-   | var t => exact embed_deterministic_var h1F h2F
-   | mu t body => exact embed_deterministic_mu h1F h2F
-   | send receiver lbs => exact embed_deterministic_send h1F h2F
-   | recv sender lbs => exact embed_deterministic_recv h1F h2F
+  -- Reduce to the one-step generators and dispatch on constructors.
+  have h1F := CEmbed_destruct h1; have h2F := CEmbed_destruct h2
+  cases e with
+  | «end» => exact embed_deterministic_end h1F h2F
+  | var t => exact embed_deterministic_var h1F h2F
+  | mu t body =>
+      cases g1 with
+      | mu t1 gbody1 =>
+          cases g2 with
+          | mu t2 gbody2 =>
+              simp [CEmbedF] at h1F h2F
+              rcases h1F with ⟨ht1, _, hbody1⟩
+              rcases h2F with ⟨ht2, _, hbody2⟩
+              subst ht1 ht2
+              have hbody := embed_deterministic hbody1 hbody2
+              simp [hbody]
+          | _ => simp [CEmbedF] at h2F
+      | _ => simp [CEmbedF] at h1F
+  | send receiver lbs =>
+      cases g1 with
+      | comm sender1 receiver1 gbs1 =>
+          cases g2 with
+          | comm sender2 receiver2 gbs2 =>
+              simp [CEmbedF] at h1F h2F
+              rcases h1F with ⟨hrole1, _, hrecv1, hbr1⟩
+              rcases h2F with ⟨hrole2, _, hrecv2, hbr2⟩
+              subst hrole1 hrole2 hrecv1 hrecv2
+              have hbs := branches_embed_deterministic hbr1 hbr2
+              simp [hbs]
+          | _ => simp [CEmbedF] at h2F
+      | _ => simp [CEmbedF] at h1F
+  | recv sender lbs =>
+      cases g1 with
+      | comm sender1 receiver1 gbs1 =>
+          cases g2 with
+          | comm sender2 receiver2 gbs2 =>
+              simp [CEmbedF] at h1F h2F
+              rcases h1F with ⟨hrole1, _, hsend1, hbr1⟩
+              rcases h2F with ⟨hrole2, _, hsend2, hbr2⟩
+              subst hrole1 hrole2 hsend1 hsend2
+              have hbs := branches_embed_deterministic hbr1 hbr2
+              simp [hbs]
+          | _ => simp [CEmbedF] at h2F
+      | _ => simp [CEmbedF] at h1F
+termination_by sizeOf e
+decreasing_by
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | exact sizeOf_body_lt_sizeOf_mu _ _
+    | exact sizeOf_branches_lt_sizeOf_send _ _
+    | exact sizeOf_branches_lt_sizeOf_recv _ _
 
 /-- Determinism for branch-wise embedding. -/
 theorem branches_embed_deterministic {lbs : List (Label × LocalTypeR)} {role : String}
      {gbs1 gbs2 : List (Label × GlobalType)}
      (h1 : BranchesEmbedRel CEmbed lbs role gbs1)
      (h2 : BranchesEmbedRel CEmbed lbs role gbs2) : gbs1 = gbs2 := by
-   -- Induct on gbs1/gbs2 with matching constructors.
-   cases gbs1 with
-   | nil => cases h1; cases gbs2 with | nil => rfl | cons _ _ => cases h2
-   | cons gb1 gbs1' =>
-       cases h1 with
-       | cons hpair htail =>
-           cases gbs2 with
-           | nil => cases h2
-           | cons gb2 gbs2' =>
-               cases h2 with
-               | cons hpair2 htail2 =>
-                   cases gb1 with
-                   | mk l1 g1 => cases gb2 with
-                     | mk l2 g2 =>
-                         rcases hpair with ⟨hlabel1, hcont1⟩; rcases hpair2 with ⟨hlabel2, hcont2⟩
-                         have hlabel : l1 = l2 := hlabel1.symm.trans hlabel2
-                         have hcont : g1 = g2 := embed_deterministic hcont1 hcont2; have htail_eq :=
-                           branches_embed_deterministic htail htail2
-                         cases hlabel; cases hcont; simp [htail_eq]
+  -- Induct on gbs1/gbs2 with matching constructors.
+  cases gbs1 with
+  | nil => cases h1; cases gbs2 with | nil => rfl | cons _ _ => cases h2
+  | cons gb1 gbs1' =>
+      cases h1 with
+      | cons hpair htail =>
+          cases gbs2 with
+          | nil => cases h2
+          | cons gb2 gbs2' =>
+              cases h2 with
+              | cons hpair2 htail2 =>
+                  cases gb1 with
+                  | mk l1 g1 => cases gb2 with
+                    | mk l2 g2 =>
+                        rcases hpair with ⟨hlabel1, hcont1⟩; rcases hpair2 with ⟨hlabel2, hcont2⟩
+                        have hlabel : l1 = l2 := hlabel1.symm.trans hlabel2
+                        have hcont : g1 = g2 := embed_deterministic hcont1 hcont2
+                        have htail_eq := branches_embed_deterministic htail htail2
+                        cases hlabel; cases hcont; simp [htail_eq]
+termination_by sizeOf lbs
+decreasing_by
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | exact sizeOf_cont_lt_sizeOf_branches _ _ _
+    | exact sizeOf_tail_lt_sizeOf_branches _ _
 end
 
 /-! ## Roundtrip Properties
@@ -191,79 +187,6 @@ private theorem embed_project_roundtrip_var {t : String} {role : String} {g : Gl
   | _ => simp [CEmbedF] at hF
 
 mutual
-/-- Helper: roundtrip for mu/mu case. -/
-private theorem embed_project_roundtrip_mu_mu
-    {t : String} {body : LocalTypeR} {role : String}
-    {t' t'' : String} {gbody : GlobalType} {body' : LocalTypeR}
-    (hF : CEmbedF CEmbed (.mu t body) role (.mu t' gbody))
-    (hP : CProjectF CProject (.mu t' gbody) role (.mu t'' body')) :
-    LocalTypeR.mu t body = LocalTypeR.mu t'' body' := by
-  -- Mu/mu: align binders and recurse on bodies.
-  simp [CEmbedF] at hF; rcases hF with ⟨ht1, hguard, hbody1⟩; subst ht1
-  simp [CProjectF] at hP; rcases hP with ⟨hproj, hguard'⟩
-  rcases hguard' with ⟨_hguard, ht''⟩; subst ht''
-  have hbody := embed_project_roundtrip hbody1 hproj; simp [hbody]
-
-/-- Helper: roundtrip for mu/end contradiction. -/
-private theorem embed_project_roundtrip_mu_end
-    {t : String} {body : LocalTypeR} {role : String} {t' : String} {gbody : GlobalType}
-    (hF : CEmbedF CEmbed (.mu t body) role (.mu t' gbody))
-    (hP : CProjectF CProject (.mu t' gbody) role .end) : False := by
-  -- Mu/end: guardedness mismatch is impossible.
-  simp [CEmbedF] at hF; rcases hF with ⟨ht1, hguard, hbody1⟩; subst ht1
-  simp [CProjectF] at hP; rcases hP with ⟨candBody, hproj, hguard_false⟩
-  have hbody := embed_project_roundtrip hbody1 hproj
-  have hfalse : body.isGuarded t = false := by simpa [hbody] using hguard_false
-  have : False := by have h := hfalse; simp [hguard] at h
-  exact this
-
-/-- Helper: roundtrip for mu case. -/
-private theorem embed_project_roundtrip_mu
-    {t : String} {body : LocalTypeR} {role : String} {g : GlobalType} {e' : LocalTypeR}
-    (hF : CEmbedF CEmbed (.mu t body) role g)
-    (hP : CProjectF CProject g role e') : LocalTypeR.mu t body = e' := by
-  -- Mu: split on global/local shapes.
-  cases g with
-  | mu t' gbody =>
-      cases e' with
-      | mu t'' body' => exact embed_project_roundtrip_mu_mu hF hP
-      | «end» => exact (embed_project_roundtrip_mu_end hF hP).elim
-      | _ => simp [CProjectF] at hP
-  | _ => simp [CEmbedF] at hF
-
-/-- Helper: roundtrip for send case. -/
-private theorem embed_project_roundtrip_send {receiver : String} {lbs : List (Label × LocalTypeR)}
-    {role : String} {g : GlobalType} {e' : LocalTypeR}
-    (hF : CEmbedF CEmbed (.send receiver lbs) role g)
-    (hP : CProjectF CProject g role e') : LocalTypeR.send receiver lbs = e' := by
-  -- Send: comm node with matching receiver and branches.
-  cases g with
-  | comm sender receiver' gbs =>
-      simp [CEmbedF] at hF; rcases hF with ⟨hrole, _, hrecv, hbr⟩; subst hrole
-      cases e' with
-      | send receiver'' lbs' =>
-          simp [CProjectF] at hP; rcases hP with ⟨hrecv', hpr⟩
-          subst hrecv hrecv'; have hbs := branches_embed_project_roundtrip hbr hpr; simp [hbs]
-      | _ => simp [CProjectF] at hP
-  | _ => simp [CEmbedF] at hF
-
-/-- Helper: roundtrip for recv case. -/
-private theorem embed_project_roundtrip_recv {sender : String} {lbs : List (Label × LocalTypeR)}
-    {role : String} {g : GlobalType} {e' : LocalTypeR}
-    (hF : CEmbedF CEmbed (.recv sender lbs) role g)
-    (hP : CProjectF CProject g role e') : LocalTypeR.recv sender lbs = e' := by
-  -- Recv: comm node with matching sender and branches.
-  cases g with
-  | comm sender' receiver gbs =>
-      simp [CEmbedF] at hF; rcases hF with ⟨hrole, hneq, hsend, hbr⟩; subst hrole hsend
-      have hneq' : role ≠ sender := by intro hrole'; exact hneq hrole'.symm
-      cases e' with
-      | recv sender'' lbs' =>
-          simp [CProjectF, hneq'] at hP; rcases hP with ⟨hsend', hpr⟩
-          subst hsend'; have hbs := branches_embed_project_roundtrip hbr hpr; simp [hbs]
-      | _ => simp [CProjectF, hneq'] at hP
-  | _ => simp [CEmbedF] at hF
-
 /-- Embed then project gives back the same local type. -/
 theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType} {e' : LocalTypeR}
     (he : CEmbed e role g) (hp : CProject g role e') : e = e' := by
@@ -272,9 +195,61 @@ theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType
   cases e with
   | «end» => exact embed_project_roundtrip_end hF hP
   | var t => exact embed_project_roundtrip_var hF hP
-  | mu t body => exact embed_project_roundtrip_mu hF hP
-  | send receiver lbs => exact embed_project_roundtrip_send hF hP
-  | recv sender lbs => exact embed_project_roundtrip_recv hF hP
+  | mu t body =>
+      cases g with
+      | mu t' gbody =>
+          cases e' with
+          | mu t'' body' =>
+              simp [CEmbedF] at hF; rcases hF with ⟨ht1, hguard, hbody1⟩; subst ht1
+              simp [CProjectF] at hP; rcases hP with ⟨hproj, hguard'⟩
+              rcases hguard' with ⟨_hguard, ht''⟩; subst ht''
+              have hbody := embed_project_roundtrip hbody1 hproj
+              simp [hbody]
+          | «end» =>
+              simp [CEmbedF] at hF; rcases hF with ⟨ht1, hguard, hbody1⟩; subst ht1
+              simp [CProjectF] at hP; rcases hP with ⟨candBody, hproj, hguard_false⟩
+              have hbody := embed_project_roundtrip hbody1 hproj
+              have hfalse : body.isGuarded t = false := by simpa [hbody] using hguard_false
+              have : False := by
+                have h := hfalse
+                simp [hguard] at h
+              exact this.elim
+          | _ => simp [CProjectF] at hP
+      | _ => simp [CEmbedF] at hF
+  | send receiver lbs =>
+      cases g with
+      | comm sender receiver' gbs =>
+          simp [CEmbedF] at hF; rcases hF with ⟨hrole, _, hrecv, hbr⟩; subst hrole
+          cases e' with
+          | send receiver'' lbs' =>
+              simp [CProjectF] at hP; rcases hP with ⟨hrecv', hpr⟩
+              subst hrecv hrecv'
+              have hbs := branches_embed_project_roundtrip hbr hpr
+              simp [hbs]
+          | _ => simp [CProjectF] at hP
+      | _ => simp [CEmbedF] at hF
+  | recv sender lbs =>
+      cases g with
+      | comm sender' receiver gbs =>
+          simp [CEmbedF] at hF; rcases hF with ⟨hrole, hneq, hsend, hbr⟩; subst hrole hsend
+          have hneq' : role ≠ sender := by intro hrole'; exact hneq hrole'.symm
+          cases e' with
+          | recv sender'' lbs' =>
+              simp [CProjectF, hneq'] at hP; rcases hP with ⟨hsend', hpr⟩
+              subst hsend'
+              have hbs := branches_embed_project_roundtrip hbr hpr
+              simp [hbs]
+          | _ => simp [CProjectF, hneq'] at hP
+      | _ => simp [CEmbedF] at hF
+termination_by sizeOf e
+decreasing_by
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | exact sizeOf_body_lt_sizeOf_mu _ _
+    | exact sizeOf_branches_lt_sizeOf_send _ _
+    | exact sizeOf_branches_lt_sizeOf_recv _ _
 
 /-- Embed/project roundtrip for branches. -/
 theorem branches_embed_project_roundtrip {lbs : List (Label × LocalTypeR)} {role : String}
@@ -300,9 +275,18 @@ theorem branches_embed_project_roundtrip {lbs : List (Label × LocalTypeR)} {rol
                         | mk l1 t1 => cases lb' with
                           | mk l2 t2 =>
                               have hlabel : l1 = l2 := by exact hpair.1.trans hpair2.1
-                              cases hlabel; have hcont_eq := embed_project_roundtrip hpair.2 hpair2.2;
-                                have htail_eq := branches_embed_project_roundtrip htail htail2
+                              cases hlabel
+                              have hcont_eq := embed_project_roundtrip hpair.2 hpair2.2
+                              have htail_eq := branches_embed_project_roundtrip htail htail2
                               cases hcont_eq; simp [htail_eq]
+termination_by sizeOf lbs
+decreasing_by
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | exact sizeOf_cont_lt_sizeOf_branches _ _ _
+    | exact sizeOf_tail_lt_sizeOf_branches _ _
 end
 
 /-- Project then embed gives back the same global type (follows from determinism). -/
@@ -415,70 +399,6 @@ private def derive_recv_branch_wf (sender : String) (lbs : List (Label × LocalT
    fun _ hmem partner hrecv => hwf' partner (LocalTypeR.hasRecvFrom_recv_branch hmem hrecv)⟩
 
 mutual
-/-- Helper: embed end case. -/
-private theorem localType_has_embed_end (role : String) : ∃ g, CEmbed .end role g := by
-  -- End embeds to end.
-  refine ⟨.end, ?_⟩; apply CEmbed_fold'; simp [CEmbedF]
-
-/-- Helper: embed var case. -/
-private theorem localType_has_embed_var (t : String) (role : String) : ∃ g, CEmbed (.var t) role g := by
-  -- Var embeds to matching var.
-  refine ⟨.var t, ?_⟩; apply CEmbed_fold'; simp [CEmbedF]
-
-/-- Helper: embed mu case when the body is contractive. -/
-private theorem localType_has_embed_mu_contr {t : String} {body : LocalTypeR} {role : String}
-    (hwf : ∀ partner, (LocalTypeR.mu t body).hasSendTo partner → role ≠ partner)
-    (hwf' : ∀ partner, (LocalTypeR.mu t body).hasRecvFrom partner → role ≠ partner)
-    (hcontr : LocalTypeR.lcontractive body = true) :
-    ∃ g, CEmbed (.mu t body) role g := by
-  -- Recurse on the body and wrap with mu.
-  have hwf_body : ∀ partner, body.hasSendTo partner → role ≠ partner := by
-    intro partner hsend; exact hwf partner (LocalTypeR.hasSendTo_mu hsend)
-  have hwf'_body : ∀ partner, body.hasRecvFrom partner → role ≠ partner := by
-    intro partner hrecv; exact hwf' partner (LocalTypeR.hasRecvFrom_mu hrecv)
-  have _hterm : sizeOf body < sizeOf (LocalTypeR.mu t body) :=
-    LocalTypeR.sizeOf_body_lt_sizeOf_mu t body
-  obtain ⟨gbody, hembed⟩ := localType_has_embed body role hwf_body hwf'_body
-  have hguard : body.isGuarded t = true := lcontractive_implies_isGuarded t body hcontr
-  refine ⟨.mu t gbody, ?_⟩; apply CEmbed_fold'; simp [CEmbedF]; exact ⟨hguard, hembed⟩
-
-/-- Helper: embed mu case when the body is not contractive. -/
-private theorem localType_has_embed_mu_noncontr {t : String} {body : LocalTypeR} {role : String}
-    (hwf : ∀ partner, (LocalTypeR.mu t body).hasSendTo partner → role ≠ partner)
-    (hcontr : LocalTypeR.lcontractive body = false) : False := by
-  -- Non-contractive mu violates the send-to-self constraint.
-  have hbad : (LocalTypeR.mu t body).hasSendTo role :=
-    LocalTypeR.hasSendTo_noncontractive (t := t) (body := body) (partner := role) hcontr
-  exact (hwf role hbad) rfl
-
-/-- Helper: embed send case. -/
-private theorem localType_has_embed_send {receiver : String} {lbs : List (Label × LocalTypeR)}
-    {role : String}
-    (hwf : ∀ partner, (LocalTypeR.send receiver lbs).hasSendTo partner → role ≠ partner)
-    (hwf' : ∀ partner, (LocalTypeR.send receiver lbs).hasRecvFrom partner → role ≠ partner) :
-    ∃ g, CEmbed (.send receiver lbs) role g := by
-  -- Send embeds to a comm with projected branches.
-  have hne : role ≠ receiver := hwf receiver LocalTypeR.hasSendTo_send
-  have ⟨hwf_branches, hwf'_branches⟩ := derive_send_branch_wf receiver lbs role hwf hwf'
-  have _hterm : sizeOf lbs < sizeOf (LocalTypeR.send receiver lbs) :=
-    LocalTypeR.sizeOf_branches_lt_sizeOf_send receiver lbs
-  obtain ⟨gbs, hembed⟩ := branches_have_embed lbs role hwf_branches hwf'_branches
-  refine ⟨.comm role receiver gbs, ?_⟩; apply CEmbed_fold'; simp [CEmbedF]; exact ⟨hne, hembed⟩
-
-/-- Helper: embed recv case. -/
-private theorem localType_has_embed_recv {sender : String} {lbs : List (Label × LocalTypeR)}
-    {role : String}
-    (hwf : ∀ partner, (LocalTypeR.recv sender lbs).hasSendTo partner → role ≠ partner)
-    (hwf' : ∀ partner, (LocalTypeR.recv sender lbs).hasRecvFrom partner → role ≠ partner) :
-    ∃ g, CEmbed (.recv sender lbs) role g := by
-  -- Recv embeds to a comm with projected branches.
-  have hne : sender ≠ role := by intro heq; apply hwf' sender LocalTypeR.hasRecvFrom_recv; exact heq.symm
-  have ⟨hwf_branches, hwf'_branches⟩ := derive_recv_branch_wf sender lbs role hwf hwf'
-  have _hterm : sizeOf lbs < sizeOf (LocalTypeR.recv sender lbs) :=
-    LocalTypeR.sizeOf_branches_lt_sizeOf_recv sender lbs
-  obtain ⟨gbs, hembed⟩ := branches_have_embed lbs role hwf_branches hwf'_branches
-  refine ⟨.comm sender role gbs, ?_⟩; apply CEmbed_fold'; simp [CEmbedF]; exact ⟨hne, hembed⟩
-
 /-- Any well-formed local type can be embedded into some global type.
 
     The well-formedness conditions ensure that:
@@ -491,40 +411,64 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
     (hwf : ∀ partner, e.hasSendTo partner → role ≠ partner)
     (hwf' : ∀ partner, e.hasRecvFrom partner → role ≠ partner) :
     ∃ g, CEmbed e role g := by
-  -- Dispatch by constructor and reuse helpers.
+  -- Dispatch by constructor and recurse on substructures.
   cases e with
-  | «end» => exact localType_has_embed_end role
-  | var t => exact localType_has_embed_var t role
+  | «end» =>
+      refine ⟨.end, ?_⟩
+      apply CEmbed_fold'
+      simp [CEmbedF]
+  | var t =>
+      refine ⟨.var t, ?_⟩
+      apply CEmbed_fold'
+      simp [CEmbedF]
   | mu t body =>
       cases hcontr : LocalTypeR.lcontractive body with
-      | true => exact localType_has_embed_mu_contr (t := t) (body := body) (role := role) hwf hwf' hcontr
-      | false => exact (localType_has_embed_mu_noncontr (t := t) (body := body) (role := role) hwf hcontr).elim
-  | send receiver lbs => exact localType_has_embed_send (receiver := receiver) (lbs := lbs) hwf hwf'
-  | recv sender lbs => exact localType_has_embed_recv (sender := sender) (lbs := lbs) hwf hwf'
+      | true =>
+          have hwf_body : ∀ partner, body.hasSendTo partner → role ≠ partner := by
+            intro partner hsend
+            exact hwf partner (LocalTypeR.hasSendTo_mu hsend)
+          have hwf'_body : ∀ partner, body.hasRecvFrom partner → role ≠ partner := by
+            intro partner hrecv
+            exact hwf' partner (LocalTypeR.hasRecvFrom_mu hrecv)
+          obtain ⟨gbody, hembed⟩ := localType_has_embed body role hwf_body hwf'_body
+          have hguard : body.isGuarded t = true := lcontractive_implies_isGuarded t body hcontr
+          refine ⟨.mu t gbody, ?_⟩
+          apply CEmbed_fold'
+          simp [CEmbedF]
+          exact ⟨hguard, hembed⟩
+      | false =>
+          have hbad : (LocalTypeR.mu t body).hasSendTo role :=
+            LocalTypeR.hasSendTo_noncontractive (t := t) (body := body) (partner := role) hcontr
+          have : False := (hwf role hbad) rfl
+          exact this.elim
+  | send receiver lbs =>
+      have hne : role ≠ receiver := hwf receiver LocalTypeR.hasSendTo_send
+      have ⟨hwf_branches, hwf'_branches⟩ := derive_send_branch_wf receiver lbs role hwf hwf'
+      obtain ⟨gbs, hembed⟩ := branches_have_embed lbs role hwf_branches hwf'_branches
+      refine ⟨.comm role receiver gbs, ?_⟩
+      apply CEmbed_fold'
+      simp [CEmbedF]
+      exact ⟨hne, hembed⟩
+  | recv sender lbs =>
+      have hne : sender ≠ role := by
+        intro heq
+        apply hwf' sender LocalTypeR.hasRecvFrom_recv
+        exact heq.symm
+      have ⟨hwf_branches, hwf'_branches⟩ := derive_recv_branch_wf sender lbs role hwf hwf'
+      obtain ⟨gbs, hembed⟩ := branches_have_embed lbs role hwf_branches hwf'_branches
+      refine ⟨.comm sender role gbs, ?_⟩
+      apply CEmbed_fold'
+      simp [CEmbedF]
+      exact ⟨hne, hembed⟩
 termination_by sizeOf e
-
-/-- Helper: cons case for branches_have_embed. -/
-private theorem branches_have_embed_cons {hd : Label × LocalTypeR} {tl : List (Label × LocalTypeR)}
-    {role : String}
-    (hwf : ∀ lb ∈ (hd :: tl), ∀ partner, lb.2.hasSendTo partner → role ≠ partner)
-    (hwf' : ∀ lb ∈ (hd :: tl), ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner) :
-    ∃ gbs, BranchesEmbedRel CEmbed (hd :: tl) role gbs := by
-  -- Split head/tail well-formedness and recurse.
-  have hwf_hd : ∀ partner, hd.2.hasSendTo partner → role ≠ partner :=
-    fun p h => hwf hd (List.Mem.head tl) p h
-  have hwf'_hd : ∀ partner, hd.2.hasRecvFrom partner → role ≠ partner :=
-    fun p h => hwf' hd (List.Mem.head tl) p h
-  have hwf_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasSendTo partner → role ≠ partner :=
-    fun lb hmem p h => hwf lb (List.Mem.tail hd hmem) p h
-  have hwf'_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner :=
-    fun lb hmem p h => hwf' lb (List.Mem.tail hd hmem) p h
-  have _hterm1 : sizeOf hd.2 < sizeOf (hd :: tl) :=
-    LocalTypeR.sizeOf_cont_lt_sizeOf_branches hd.1 hd.2 tl
-  have _hterm2 : sizeOf tl < sizeOf (hd :: tl) :=
-    LocalTypeR.sizeOf_tail_lt_sizeOf_branches hd tl
-  obtain ⟨gcont, hcont⟩ := localType_has_embed hd.2 role hwf_hd hwf'_hd
-  obtain ⟨gtl, htl⟩ := branches_have_embed tl role hwf_tl hwf'_tl
-  refine ⟨(hd.1, gcont) :: gtl, ?_⟩; exact List.Forall₂.cons ⟨rfl, hcont⟩ htl
+decreasing_by
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | exact sizeOf_body_lt_sizeOf_mu _ _
+    | exact sizeOf_branches_lt_sizeOf_send _ _
+    | exact sizeOf_branches_lt_sizeOf_recv _ _
 
 /-- Helper theorem for embedding branch lists. -/
 theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
@@ -534,8 +478,27 @@ theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
   -- Structural recursion on the branch list.
   cases lbs with
   | nil => exact ⟨[], List.Forall₂.nil⟩
-  | cons hd tl => exact branches_have_embed_cons (hd := hd) (tl := tl) hwf hwf'
+  | cons hd tl =>
+      have hwf_hd : ∀ partner, hd.2.hasSendTo partner → role ≠ partner :=
+        fun p h => hwf hd (List.Mem.head tl) p h
+      have hwf'_hd : ∀ partner, hd.2.hasRecvFrom partner → role ≠ partner :=
+        fun p h => hwf' hd (List.Mem.head tl) p h
+      have hwf_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasSendTo partner → role ≠ partner :=
+        fun lb hmem p h => hwf lb (List.Mem.tail hd hmem) p h
+      have hwf'_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner :=
+        fun lb hmem p h => hwf' lb (List.Mem.tail hd hmem) p h
+      obtain ⟨gcont, hcont⟩ := localType_has_embed hd.2 role hwf_hd hwf'_hd
+      obtain ⟨gtl, htl⟩ := branches_have_embed tl role hwf_tl hwf'_tl
+      refine ⟨(hd.1, gcont) :: gtl, ?_⟩
+      exact List.Forall₂.cons ⟨rfl, hcont⟩ htl
 termination_by sizeOf lbs
+decreasing_by
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | exact sizeOf_cont_lt_sizeOf_branches _ _ _
+    | exact sizeOf_tail_lt_sizeOf_branches _ _
 end
 
 /-! ### Participant Gating -/

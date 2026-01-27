@@ -89,6 +89,48 @@ instance : Ord Edge where
       | .gt => .gt
       | .eq => compare a.receiver b.receiver
 
+/-- Unfolding lemma for Edge.compare. -/
+theorem compare_def (a b : Edge) :
+    compare a b =
+      match compare a.sid b.sid with
+      | .lt => .lt
+      | .gt => .gt
+      | .eq =>
+        match compare a.sender b.sender with
+        | .lt => .lt
+        | .gt => .gt
+        | .eq => compare a.receiver b.receiver := by
+  -- compare is defined lexicographically on fields.
+  rfl
+
+/-- Edge comparison is exact: `.eq` iff the edges are equal. -/
+theorem compare_eq_iff_eq (e₁ e₂ : Edge) :
+    compare e₁ e₂ = .eq ↔ e₁ = e₂ := by
+  -- Unfold the lexicographic compare and reduce to component equalities.
+  cases e₁ with
+  | mk sid₁ s₁ r₁ =>
+    cases e₂ with
+    | mk sid₂ s₂ r₂ =>
+      constructor
+      · intro h
+        cases hSid : compare sid₁ sid₂ <;> simp [compare_def, hSid] at h
+        cases hSend : compare s₁ s₂ <;> simp [compare_def, hSid, hSend] at h
+        have hSidEq : sid₁ = sid₂ := (_root_.compare_eq_iff_eq (a:=sid₁) (b:=sid₂)).1 hSid
+        have hSendEq : s₁ = s₂ := (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₂)).1 hSend
+        have hRecvEq : r₁ = r₂ := by
+          simpa using h
+        cases hSidEq; cases hSendEq; cases hRecvEq; rfl
+      · intro h
+        -- Equal edges compare equal by reflexivity on each component.
+        cases h
+        have hSid : compare sid₁ sid₁ = .eq :=
+          (_root_.compare_eq_iff_eq (a:=sid₁) (b:=sid₁)).2 rfl
+        have hSend : compare s₁ s₁ = .eq :=
+          (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₁)).2 rfl
+        have hRecv : compare r₁ r₁ = .eq :=
+          (_root_.compare_eq_iff_eq (a:=r₁) (b:=r₁)).2 rfl
+        simp [compare_def, hSid, hSend, hRecv]
+
 end Edge
 
 /-- A role set is the collection of participants in a session. -/
@@ -115,6 +157,23 @@ theorem allEdges_sid (sid : SessionId) (rs : RoleSet) :
   · simp only [Option.some.injEq] at hite
     rw [← hite]
   · exact Option.noConfusion hite
+
+/-- Edges in allEdges have senders in the role set. -/
+theorem allEdges_sender_mem (sid : SessionId) (rs : RoleSet) :
+    ∀ e ∈ allEdges sid rs, e.sender ∈ rs := by
+  -- Unpack the flatMap/filterMap witness and rewrite the sender.
+  intro e he
+  simp only [allEdges, List.mem_flatMap, List.mem_filterMap] at he
+  obtain ⟨p, hp, q, hq, hite⟩ := he
+  by_cases hneq : p ≠ q
+  · have hEq : e = { sid := sid, sender := p, receiver := q } := by
+      have hEq' : { sid := sid, sender := p, receiver := q } = e := by
+        simpa [hneq] using hite
+      exact hEq'.symm
+    simpa [hEq] using hp
+  · have : False := by
+      simpa [hneq] using hite
+    exact this.elim
 
 /-- Get all endpoints for a session. -/
 def allEndpoints (sid : SessionId) (rs : RoleSet) : List Endpoint :=

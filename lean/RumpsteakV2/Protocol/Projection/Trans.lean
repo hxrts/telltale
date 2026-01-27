@@ -1,3 +1,7 @@
+import RumpsteakV2.Protocol.Projection.Trans.Core
+import RumpsteakV2.Protocol.Projection.Trans.Participation
+import RumpsteakV2.Protocol.Projection.Trans.Contractive
+
 /-! # RumpsteakV2.Protocol.Projection.Trans
 
 Candidate projection for V2 (Coq-style `trans`).
@@ -15,7 +19,3 @@ The following definitions form the semantic interface for proofs:
 - `trans_comm_receiver`: shape lemma for receiver projection
 - `trans_comm_other`: shape lemma for non-participant projection
 -/
-
-import RumpsteakV2.Protocol.Projection.Trans.Core
-import RumpsteakV2.Protocol.Projection.Trans.Participation
-import RumpsteakV2.Protocol.Projection.Trans.Contractive

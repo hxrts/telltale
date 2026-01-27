@@ -1,5 +1,6 @@
 import Effects.LocalType
 import Effects.Values
+import Effects.Environments.Part1
 import Lean.Data.RBMap
 import Batteries.Data.RBMap.Lemmas
 
@@ -23,6 +24,7 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
+open Lean
 
 noncomputable section
 

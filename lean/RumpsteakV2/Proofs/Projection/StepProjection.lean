@@ -169,10 +169,11 @@ private theorem proj_trans_sender_step_v2_mu (t : String) (body : GlobalType)
   have : False := by simpa [action_pred] using hpred
   exact this.elim
 
+/-- Sender-side step projection under the head-action predicate. -/
 theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) :
     SenderStepResult g act g' := by
-  -- Split on the global step constructor.
+  -- Proof strategy: case split on the step constructor and discharge the mu case via action_pred.
   cases hstep with
   | comm_head sender receiver branches label g' hmem =>
       simpa using proj_trans_sender_step_v2_comm_head sender receiver branches label g' hmem
@@ -196,9 +197,10 @@ abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalTyp
 This is the dual of `proj_trans_sender_step_v2`. -/
 private theorem proj_trans_receiver_step_comm_head
     (sender receiver : String) (branches : List (Label × GlobalType)) (label : Label)
-    (g g' : GlobalType) (act : GlobalActionR) (hmem : (label, g') ∈ branches)
-    (hno_self : (.comm sender receiver branches).noSelfComm = true) :
-    ReceiverStepResult (.comm sender receiver branches) act g' := by
+    (g' : GlobalType) (hmem : (label, g') ∈ branches)
+    (hno_self : (GlobalType.comm sender receiver branches).noSelfComm = true) :
+    ReceiverStepResult (.comm sender receiver branches)
+      { sender := sender, receiver := receiver, label := label } g' := by
   -- Use the comm-head shape lemma for the receiver projection.
   have hne : receiver ≠ sender := by
     have hns := hno_self
@@ -217,19 +219,23 @@ private theorem proj_trans_receiver_step_mu
     (hpred : action_pred (.mu t body) act) :
     ReceiverStepResult (.mu t body) act g' := by
   -- Mu at head cannot satisfy the action predicate.
-  simp [action_pred] at hpred
-  exact (False.elim hpred)
+  simpa [action_pred] using hpred
 
+/-- Receiver-side step projection under the head-action predicate. -/
 theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
     (hstep : step g act g') (hpred : action_pred g act) (hno_self : g.noSelfComm = true) :
     ReceiverStepResult g act g' := by
-  -- Split on the global step constructor.
+  -- Proof strategy: case split on the step constructor and use action_pred to rule out async/mu.
   cases hstep with
   | comm_head sender receiver branches label g' hmem =>
-      exact proj_trans_receiver_step_comm_head sender receiver branches label g g' act hmem hno_self
+      exact proj_trans_receiver_step_comm_head sender receiver branches label g' hmem hno_self
   | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbstep =>
       -- Async steps contradict action_pred by definition.
-      exact (False.elim (hcond (by simpa [action_pred] using hpred)))
+      have hpred' : act.sender = sender ∧ act.receiver = receiver := by
+        simpa [action_pred] using hpred
+      have hsender : act.sender = sender := hpred'.1
+      have hreceiver : act.receiver = receiver := hpred'.2
+      exact (hcond hsender hreceiver).elim
   | mu t body act g' hstep_inner =>
       exact proj_trans_receiver_step_mu t body act g' hpred
 

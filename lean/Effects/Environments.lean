@@ -1,3 +1,6 @@
+import Effects.Environments.Part1
+import Effects.Environments.Part2
+
 /-!
 # MPST Environments
 
@@ -12,6 +15,3 @@ This module defines the runtime environments for multiparty session types:
 The key difference from binary session types is that buffers and type traces
 are keyed by **directed edges** `(sid, from, to)` rather than endpoints.
 -/
-
-import Effects.Environments.Part1
-import Effects.Environments.Part2

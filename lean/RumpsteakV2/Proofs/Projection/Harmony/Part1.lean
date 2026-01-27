@@ -303,6 +303,7 @@ private theorem trans_branches_coherent_EQ2_nonpart
       have hb_end : EQ2 (projTrans b.2 role) .end := EQ2_symm (EQ_end role b.2 hnopart_b hwf_b)
       simpa [hbranches, List.head!] using (EQ2_trans_via_end hb_end (EQ2_symm hhd_end))
 
+/-- All branch projections are EQ2-coherent with the head branch for non-participants. -/
 theorem trans_branches_coherent_EQ2
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
     (hnp : role ≠ sender ∧ role ≠ receiver)

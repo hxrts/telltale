@@ -176,7 +176,7 @@ private theorem part_of_all2_implies_part_of2_aux_mu (role : String)
 private theorem part_of_all2_implies_part_of2_aux_comm (role : String)
     (sender receiver : String) (branches : List (Label × GlobalType))
     (h : part_of_all2 role (.comm sender receiver branches))
-    (hne : (.comm sender receiver branches).allCommsNonEmpty = true)
+    (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
     (ih : ∀ pair ∈ branches, part_of_all2 role pair.2 → part_of2 role pair.2) :
     part_of2 role (.comm sender receiver branches) := by
   -- Use the direct-participant or branch-participant case.
@@ -211,8 +211,11 @@ private theorem part_of_all2_implies_part_of2_aux (role : String) (g : GlobalTyp
       have ih := part_of_all2_implies_part_of2_aux role body hbody hne_body
       exact part_of_all2_implies_part_of2_aux_mu role t body ih
   | .comm sender receiver branches =>
-      have hne_branches : GlobalType.allCommsNonEmptyBranches branches = true :=
-        by simpa [GlobalType.allCommsNonEmpty] using hne
+      have hne_branches : GlobalType.allCommsNonEmptyBranches branches = true := by
+        have hne' :
+            (branches ≠ [] ∧ GlobalType.allCommsNonEmptyBranches branches = true) := by
+          simpa [GlobalType.allCommsNonEmpty] using hne
+        exact hne'.2
       have ih :
           ∀ pair ∈ branches, part_of_all2 role pair.2 → part_of2 role pair.2 := by
         intro pair hmem hpoa
@@ -228,6 +231,7 @@ decreasing_by
   · simpa using (sizeOf_elem_snd_lt_comm (sender := sender) (receiver := receiver)
       (branches := branches) (gb := pair) hmem)
 
+/-- Participation in all branches implies standard participation (under well-formedness). -/
 theorem part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
     (h : part_of_all2 role g)
     (hwf : g.wellFormed = true) : part_of2 role g := by

@@ -3,6 +3,11 @@ import RumpsteakV2.Coinductive.Roundtrip.Part2
 set_option linter.dupNamespace false
 
 namespace RumpsteakV2.Coinductive
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+noncomputable local instance : DecidableEq LocalTypeC := by
+  classical
+  infer_instance
 /-! ## Stub Definitions (Work in Progress)
 
 These definitions and theorems are incomplete. Full proofs are being developed
@@ -117,4 +122,74 @@ lemma envOf_resolves_of_backedge {all visited : Finset LocalTypeC}
   EnvResolves_of_left_varR (envOf_resolvesL_of_backedge (all := all) (visited := visited) hback)
     (envOf_varR all visited)
 
-end RumpsteakV2.Coinductive.Roundtrip
+/-! ## toInductive body helper -/
+
+/-- Canonical unfold body for toInductiveAux. -/
+noncomputable def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
+    (current : LocalTypeC)
+    (h_closed : IsClosedSet all)
+    (h_visited : visited ⊆ all) (h_current : current ∈ all) : LocalTypeR :=
+  let visited' := Insert.insert current visited
+  match hdest : PFunctor.M.dest current with
+  | ⟨.end, _⟩   => LocalTypeR.end
+  | ⟨.var x, _⟩ => LocalTypeR.var x
+  | ⟨.mu x, k⟩  =>
+      let child := k ()
+      have hchild : childRel current child := ⟨.mu x, k, (), hdest, rfl⟩
+      have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
+      toInductiveAux root all visited' child h_closed
+        (subset_insert_of_mem h_current h_visited) hchild_mem
+  | ⟨.send p labels, k⟩ =>
+      let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+        let child := k i
+        have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
+        have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
+        let body := toInductiveAux root all visited' child h_closed
+          (subset_insert_of_mem h_current h_visited) hchild_mem
+        (labels[i], body)
+      LocalTypeR.send p (List.ofFn f)
+  | ⟨.recv p labels, k⟩ =>
+      let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+        let child := k i
+        have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
+        have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
+        let body := toInductiveAux root all visited' child h_closed
+          (subset_insert_of_mem h_current h_visited) hchild_mem
+        (labels[i], body)
+      LocalTypeR.recv p (List.ofFn f)
+
+lemma toInductiveBody_eq_match (root : LocalTypeC) (all visited : Finset LocalTypeC)
+    (current : LocalTypeC)
+    (h_closed : IsClosedSet all)
+    (h_visited : visited ⊆ all) (h_current : current ∈ all) :
+    toInductiveBody root all visited current h_closed h_visited h_current =
+      (match hdest : PFunctor.M.dest current with
+      | ⟨.end, _⟩   => LocalTypeR.end
+      | ⟨.var x, _⟩ => LocalTypeR.var x
+      | ⟨.mu x, k⟩  =>
+          let child := k ()
+          have hchild : childRel current child := ⟨.mu x, k, (), hdest, rfl⟩
+          have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
+          toInductiveAux root all (Insert.insert current visited) child h_closed
+            (subset_insert_of_mem h_current h_visited) hchild_mem
+      | ⟨.send p labels, k⟩ =>
+          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+            let child := k i
+            have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
+            have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
+            let body := toInductiveAux root all (Insert.insert current visited) child h_closed
+              (subset_insert_of_mem h_current h_visited) hchild_mem
+            (labels[i], body)
+          LocalTypeR.send p (List.ofFn f)
+      | ⟨.recv p labels, k⟩ =>
+          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+            let child := k i
+            have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
+            have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
+            let body := toInductiveAux root all (Insert.insert current visited) child h_closed
+              (subset_insert_of_mem h_current h_visited) hchild_mem
+            (labels[i], body)
+          LocalTypeR.recv p (List.ofFn f)) := by
+  rfl
+
+end RumpsteakV2.Coinductive

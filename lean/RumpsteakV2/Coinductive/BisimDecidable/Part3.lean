@@ -2,8 +2,16 @@ import RumpsteakV2.Coinductive.BisimDecidable.Part2
 
 set_option linter.dupNamespace false
 
+open Classical
+
 namespace RumpsteakV2.Coinductive
 /-! ## Reachable Pairs -/
+
+/-- Local decidable equality for visited membership. -/
+noncomputable local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
+  -- Use classical choice to decide equality on pairs.
+  classical
+  infer_instance
 
 /-- The set of pairs reachable from (a, b) via child relation. -/
 def ReachablePairs (a b : LocalTypeC) : Set (LocalTypeC × LocalTypeC) :=
@@ -270,8 +278,10 @@ theorem bisim_sound {a b : LocalTypeC} {ha : Regular a} {hb : Regular b} {bound 
 /-! ## Maximum Unfolding Depth -/
 
 /-- Maximum mu-nesting depth for a regular type (upper bound on unfoldings needed). -/
-noncomputable def maxUnfoldDepth (t : LocalTypeC) : Nat :=
-  if hobs : ObservableC t then
+noncomputable def maxUnfoldDepth (t : LocalTypeC) : Nat := by
+  -- Use classical choice to decide observability for the bounded unfolding depth.
+  classical
+  exact if hobs : ObservableC t then
     Classical.choose (hasNonMuHead_fullUnfoldN_of_observable hobs)
   else
     0
@@ -392,4 +402,4 @@ Roundtrip.lean (paco-style). We avoid duplicating it here to keep this file
 focused on the sound decidable checker.
 -/
 
-end RumpsteakV2.Coinductive.BisimDecidable
+end RumpsteakV2.Coinductive

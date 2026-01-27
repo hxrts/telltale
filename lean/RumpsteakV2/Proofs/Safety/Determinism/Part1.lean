@@ -332,7 +332,8 @@ private theorem global_step_det_branches_cons
       subst hg hrest
       rfl
 
-theorem global_step_det {g g₁ g₂ : GlobalType} {act : GlobalActionR}
+/-- Global step determinism under unique branch labels. -/ theorem global_step_det
+    {g g₁ g₂ : GlobalType} {act : GlobalActionR}
     (huniq : g.uniqueBranchLabels = true)
     (h₁ : step g act g₁)
     (h₂ : step g act g₂) :
@@ -573,8 +574,7 @@ private theorem counter_c1_ne_c2 : counter_c1 ≠ counter_c2 := by
   have hxy : ("X" : String) = "Y" := by
     injection htype
   exact (by decide : ("X" : String) ≠ "Y") hxy
-
-theorem not_confluent_general :
+/-- A concrete counterexample: global confluence does not hold for all configurations. -/ theorem not_confluent_general :
     ¬∀ c c₁ c₂ act₁ act₂,
       ConfigStep c c₁ act₁ → ConfigStep c c₂ act₂ → act₁ ≠ act₂ →
       Confluent c c₁ c₂ := by

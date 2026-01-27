@@ -55,6 +55,7 @@ def isMuve : LocalTypeR → Bool
   | .send _ _ => false
   | .recv _ _ => false
 
+/-- If a local type is unguarded at some variable, it must be a muve type. -/
 theorem isMuve_of_not_guarded : ∀ lt v, lt.isGuarded v = false → isMuve lt = true
   | .end, _, _ => by simp [isMuve]
   | .var _, _, _ => by simp [isMuve]
@@ -205,6 +206,7 @@ private def freeVars_substituteBranches_subset_aux
 termination_by sizeOf branches
 end
 
+/-- Free variables after substitution come from the replacement or the original (minus varName). -/
 theorem freeVars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
     ∀ x, x ∈ (lt.substitute varName repl).freeVars →
          x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
@@ -315,6 +317,7 @@ private def allVarsBoundBranches_implies_freeVars_subset_aux
 termination_by sizeOf branches
 end
 
+/-- If all variables are bound with empty context, there are no free variables. -/
 theorem allVarsBound_nil_implies_freeVars_nil (g : GlobalType)
     (h : g.allVarsBound [] = true) :
     g.freeVars = [] := by
@@ -341,8 +344,14 @@ theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalType
       · simp [LocalTypeR.substitute, heq, isMuve, hlt]
       · simp [LocalTypeR.substitute, heq, isMuve]
         exact isMuve_substitute body varName repl hlt hrepl
-  | .send _ _ => simp [isMuve] at hlt; exact absurd hlt (by decide)
-  | .recv _ _ => simp [isMuve] at hlt; exact absurd hlt (by decide)
+  | .send _ _ =>
+      have : False := by
+        simpa [isMuve] using hlt
+      exact this.elim
+  | .recv _ _ =>
+      have : False := by
+        simpa [isMuve] using hlt
+      exact this.elim
 termination_by sizeOf lt
 
 /-! ### Structural Well-Formedness
@@ -405,70 +414,15 @@ private theorem trans_muve_of_not_part_of2_aux_base (g : GlobalType) (role : Str
 private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role (.mu t body))
     (hne : (GlobalType.mu t body).allCommsNonEmpty = true)
-    (hnsc : (GlobalType.mu t body).noSelfComm = true) :
+    (hnsc : (GlobalType.mu t body).noSelfComm = true)
+    (hbody : isMuve (Trans.trans body role) = true) :
     isMuve (Trans.trans (.mu t body) role) = true := by
   -- The mu case reduces to the body when the projection is guarded.
   rw [Trans.trans.eq_3]
   by_cases hguard : (Trans.trans body role).isGuarded t
   · simp only [hguard, ↓reduceIte, isMuve]
-    have hnotpart_body : ¬ part_of2 role body := by
-      intro hbody
-      exact hnotpart (part_of2.intro _ (part_ofF.mu t body hbody))
-    have hne_body : body.allCommsNonEmpty = true := by
-      simpa [GlobalType.allCommsNonEmpty] using hne
-    have hnsc_body : body.noSelfComm = true := by
-      simpa [GlobalType.noSelfComm] using hnsc
-    exact trans_muve_of_not_part_of2_aux body role hnotpart_body hne_body hnsc_body
+    exact hbody
   · simp only [hguard, Bool.false_eq_true, ↓reduceIte, isMuve]
-
-private theorem trans_muve_of_not_part_of2_aux_comm_nonpart (sender receiver : String)
-    (branches : List (Label × GlobalType)) (role : String)
-    (hnotpart : ¬ part_of2 role (GlobalType.comm sender receiver branches))
-    (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
-    (hnsc : (GlobalType.comm sender receiver branches).noSelfComm = true)
-    (hrole_sender : role == sender = false) (hrole_receiver : role == receiver = false) :
-    isMuve (Trans.trans (GlobalType.comm sender receiver branches) role) = true := by
-  -- Non-participants follow the first branch (or end on empty branches).
-  cases branches with
-  | nil =>
-      simp [Trans.trans, hrole_sender, hrole_receiver, isMuve]
-  | cons first rest =>
-      rw [Trans.trans.eq_5]
-      simp only [hrole_sender, Bool.false_eq_true, ↓reduceIte, hrole_receiver]
-      have hnotpart_cont : ¬ part_of2 role first.2 := by
-        intro hcont
-        have hmem : (first.1, first.2) ∈ first :: rest := by simp
-        exact hnotpart (part_of2.intro _ (part_ofF.comm_branch sender receiver
-          first.1 first.2 (first :: rest) hmem hcont))
-      have hne_cont : first.2.allCommsNonEmpty = true := by
-        simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
-          Bool.and_eq_true] at hne
-        exact hne.2.1
-      have hnsc_cont : first.2.noSelfComm = true := by
-        simp only [GlobalType.noSelfComm, GlobalType.noSelfCommBranches,
-          Bool.and_eq_true] at hnsc
-        exact hnsc.2.1
-      exact trans_muve_of_not_part_of2_aux first.2 role hnotpart_cont hne_cont hnsc_cont
-
-private theorem trans_muve_of_not_part_of2_aux_comm (sender receiver : String)
-    (branches : List (Label × GlobalType)) (role : String)
-    (hnotpart : ¬ part_of2 role (GlobalType.comm sender receiver branches))
-    (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
-    (hnsc : (GlobalType.comm sender receiver branches).noSelfComm = true) :
-    isMuve (Trans.trans (GlobalType.comm sender receiver branches) role) = true := by
-  -- Participants contradict the non-participation hypothesis; non-participants recurse.
-  by_cases hrole_sender : role == sender
-  · have hpart : part_of2 role (GlobalType.comm sender receiver branches) := by
-      apply part_of2.intro; apply part_ofF.comm_direct
-      simp [is_participant, hrole_sender]
-    exact (hnotpart hpart).elim
-  · by_cases hrole_receiver : role == receiver
-    · have hpart : part_of2 role (GlobalType.comm sender receiver branches) := by
-        apply part_of2.intro; apply part_ofF.comm_direct
-        simp [is_participant, hrole_sender, hrole_receiver]
-      exact (hnotpart hpart).elim
-    · exact trans_muve_of_not_part_of2_aux_comm_nonpart sender receiver branches role
-        hnotpart hne hnsc hrole_sender hrole_receiver
 
 private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g)
@@ -479,14 +433,63 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
   | .end => exact trans_muve_of_not_part_of2_aux_base .end role (Or.inl rfl)
   | .var t => exact trans_muve_of_not_part_of2_aux_base (.var t) role (Or.inr ⟨t, rfl⟩)
   | .mu t body =>
-      exact trans_muve_of_not_part_of2_aux_mu t body role hnotpart hne hnsc
+      have hnotpart_body : ¬ part_of2 role body := by
+        intro hbody
+        exact hnotpart (part_of2.intro _ (part_ofF.mu t body hbody))
+      have hne_body : body.allCommsNonEmpty = true := by
+        simpa [GlobalType.allCommsNonEmpty] using hne
+      have hnsc_body : body.noSelfComm = true := by
+        simpa [GlobalType.noSelfComm] using hnsc
+      have hbody : isMuve (Trans.trans body role) = true :=
+        trans_muve_of_not_part_of2_aux body role hnotpart_body hne_body hnsc_body
+      exact trans_muve_of_not_part_of2_aux_mu t body role hnotpart hne hnsc hbody
   | .comm sender receiver branches =>
-      exact trans_muve_of_not_part_of2_aux_comm sender receiver branches role hnotpart hne hnsc
+      -- Participants contradict the non-participation hypothesis; non-participants recurse.
+      cases hrole_sender : role == sender with
+      | true =>
+          have hpart : part_of2 role (GlobalType.comm sender receiver branches) := by
+            apply part_of2.intro; apply part_ofF.comm_direct
+            simp [is_participant, hrole_sender]
+          exact (hnotpart hpart).elim
+      | false =>
+          cases hrole_receiver : role == receiver with
+          | true =>
+              have hpart : part_of2 role (GlobalType.comm sender receiver branches) := by
+                apply part_of2.intro; apply part_ofF.comm_direct
+                simp [is_participant, hrole_sender, hrole_receiver]
+              exact (hnotpart hpart).elim
+          | false =>
+              cases branches with
+              | nil =>
+                  simp [Trans.trans, hrole_sender, hrole_receiver, isMuve]
+              | cons first rest =>
+                  rw [Trans.trans.eq_5]
+                  simp only [hrole_sender, Bool.false_eq_true, ↓reduceIte, hrole_receiver]
+                  have hnotpart_cont : ¬ part_of2 role first.2 := by
+                    intro hcont
+                    have hmem : (first.1, first.2) ∈ first :: rest := by simp
+                    exact hnotpart (part_of2.intro _ (part_ofF.comm_branch sender receiver
+                      first.1 first.2 (first :: rest) hmem hcont))
+                  have hne_cont : first.2.allCommsNonEmpty = true := by
+                    simp only [GlobalType.allCommsNonEmpty, GlobalType.allCommsNonEmptyBranches,
+                      Bool.and_eq_true] at hne
+                    exact hne.2.1
+                  have hnsc_cont : first.2.noSelfComm = true := by
+                    simp only [GlobalType.noSelfComm, GlobalType.noSelfCommBranches,
+                      Bool.and_eq_true] at hnsc
+                    exact hnsc.2.1
+                  exact trans_muve_of_not_part_of2_aux first.2 role hnotpart_cont hne_cont hnsc_cont
 termination_by sizeOf g
 decreasing_by
-  all_goals simp_wf; subst_vars
-  all_goals simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1, Label._sizeOf_1]; omega
+  all_goals
+    simp_wf
+    subst_vars
+    first
+    | omega
+    | exact sizeOf_body_lt_mu _ _
+    | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_pair_snd_lt_comm _ _ _ _
 
+/-- Non-participant projection yields a muve local type under well-formedness. -/
 theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g) (hwf : g.wellFormed = true) :
     isMuve (Trans.trans g role) = true := by

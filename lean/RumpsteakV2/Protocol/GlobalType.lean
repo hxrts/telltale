@@ -1,3 +1,9 @@
+import RumpsteakV2.Protocol.GlobalType.Part1
+import RumpsteakV2.Protocol.GlobalType.Part2
+import RumpsteakV2.Protocol.GlobalType.Part3
+import RumpsteakV2.Protocol.GlobalType.Part4
+import RumpsteakV2.Protocol.GlobalType.Part5
+
 /-! # RumpsteakV2.Protocol.GlobalType
 
 Global types for the V2 development.
@@ -18,9 +24,3 @@ The following definitions form the semantic interface for proofs:
 - `BranchesStep`: branch-wise step relation
 - `step`: global async step relation
 -/
-
-import RumpsteakV2.Protocol.GlobalType.Part1
-import RumpsteakV2.Protocol.GlobalType.Part2
-import RumpsteakV2.Protocol.GlobalType.Part3
-import RumpsteakV2.Protocol.GlobalType.Part4
-import RumpsteakV2.Protocol.GlobalType.Part5

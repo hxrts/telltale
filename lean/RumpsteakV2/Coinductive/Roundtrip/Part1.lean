@@ -299,4 +299,4 @@ theorem EQ2CE_resolved'_step_to_EQ2C {a b : LocalTypeC}
         exact EQ2CE_step.mu_right hb ⟨hEnvL', hVarR', hrel⟩
   exact EQ2CE_step_to_EQ2C_varR hR hResL hVarR hstep'
 
-end RumpsteakV2.Coinductive.Roundtrip
+end RumpsteakV2.Coinductive

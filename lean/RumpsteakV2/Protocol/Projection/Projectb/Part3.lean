@@ -1,6 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Projectb.Part2
 
 namespace RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Participation
+open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 /-! ## Soundness and Completeness
 
 These theorems establish the correspondence between the boolean checker `projectb`
@@ -339,7 +343,7 @@ theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)
 /-- Helper: BranchesProjRel CProject implies projectbBranches.
     The ih provides recursive evidence that for each branch global type,
     if CProject holds then projectb returns true. -/
-private theorem BranchesProjRel_to_projectbBranches
+theorem BranchesProjRel_to_projectbBranches
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
     (hrel : BranchesProjRel CProject gbs role lbs)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → projectb gb.2 role lb = true) :
@@ -359,7 +363,7 @@ private theorem BranchesProjRel_to_projectbBranches
 /-- Helper: AllBranchesProj CProject implies projectbAllBranches.
     The ih provides recursive evidence that for each branch global type,
     if CProject holds then projectb returns true. -/
-private theorem AllBranchesProj_to_projectbAllBranches
+theorem AllBranchesProj_to_projectbAllBranches
     (gbs : List (Label × GlobalType)) (role : String) (cand : LocalTypeR)
     (hall : AllBranchesProj CProject gbs role cand)
     (ih : ∀ gb ∈ gbs, CProject gb.2 role cand → projectb gb.2 role cand = true) :

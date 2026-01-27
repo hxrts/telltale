@@ -1,3 +1,8 @@
+import RumpsteakV2.Protocol.Projection.Projectb.Part1
+import RumpsteakV2.Protocol.Projection.Projectb.Part2
+import RumpsteakV2.Protocol.Projection.Projectb.Part3
+import RumpsteakV2.Protocol.Projection.Projectb.Part4
+
 /-! # RumpsteakV2.Protocol.Projection.Projectb
 
 Boolean checker for V2 projection (`projectb`).
@@ -19,8 +24,3 @@ The following definitions form the semantic interface for proofs:
 - `projectb_mu_mu`: reflection lemma for mu-mu
 - `projectb_comm_other`: reflection lemma for non-participant
 -/
-
-import RumpsteakV2.Protocol.Projection.Projectb.Part1
-import RumpsteakV2.Protocol.Projection.Projectb.Part2
-import RumpsteakV2.Protocol.Projection.Projectb.Part3
-import RumpsteakV2.Protocol.Projection.Projectb.Part4

@@ -1,57 +1,7 @@
-/-! # RumpsteakV2.Proofs.Projection.Harmony
-
-Harmony between global steps and environment steps.
-
-## Expose
-
-The following definitions form the semantic interface for proofs:
-
-- `Claims`: bundle of harmony properties
-- `step_harmony`: global step induces matching env step
-- `proj_trans_other_step`: non-participant projection unchanged after step
-
-## Technical Debt Summary (legacy placeholders removed; assumption-free in this file)
-
-**MAJOR PROGRESS**: `trans_branches_coherent` ELIMINATED!
-Coherence is now proven from first principles using participation structure, following Coq's proof strategy.
-
-**Mu-unfolding (from MuUnfoldLemmas.lean):**
-- `EQ2_mu_crossed_unfold_left`: **PROVEN** via proj_subst + EQ2_mu_self_unfold
-- `EQ2_mu_crossed_unfold_right`: **PROVEN** via proj_subst + EQ2_mu_to_unfold
-- `EQ2_mu_unguarded_to_end`: **PROVEN** (vacuously true - hypotheses contradict when s ≠ t)
-- `EQ2_end_to_mu_unguarded`: **PROVEN** (vacuously true for closed types)
-
-**Closedness theorems (PROVEN in GlobalType.lean):**
-- `GlobalType.isClosed_substitute_mu`: **PROVEN** - mu-unfolding preserves closedness
-- `GlobalType.isClosed_comm_branches`: **PROVEN** - closed comm has closed branches
-
-**Proven coinductive theorems:**
-- `subst_end_unguarded_eq2_end`: **PROVEN** in SubstEndUnguarded.lean via UnfoldsToEnd induction
-- `trans_subst_comm`: **PROVEN** using paco coinduction (requires closedness)
-- `EQ2_trans_wf`: **PROVEN** via Bisim (EQ2Props.lean); used with explicit well-formedness witnesses
-
-**Remaining Assumptions:** None (sender/receiver lemmas proven via head-action predicate)
-
-**COHERENCE PROOF COMPLETE (modulo helper lemmas):**
-- `trans_branches_coherent_EQ2`: **PROVEN** using participation structure
-  - Case 1 (non-participant): Uses `EQ_end` - all branches project to .end
-  - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction placeholders)
-- `trans_produces_CProject`: Bridges trans to CProject (uses coherence)
-- `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy placeholders)
-
-**Inherited from MuUnfoldLemmas.lean (via ProjSubst.lean):**
-4. `proj_subst`: Projection-substitution commutation (Coq indProj.v:173)
-
-**Key changes from Coq alignment:**
-- `trans` now checks `(trans body role).isGuarded t` instead of `lcontractive body`
-- This matches Coq's `eguarded` check on the projected type, not the global type
-- Non-contractive projections are replaced with `.end` by construction
-- The old `step_noncontr_impossible` assumption was removed (it was false for nested mu)
-- All theorems require closedness of global types (standard for protocol verification)
-
-**Next steps:** propagate the head-action predicate (`action_pred`) through callers
-if they need sender/receiver projections beyond the head-communication case.
--/
+import RumpsteakV2.Proofs.Projection.Harmony.Part1
+import RumpsteakV2.Proofs.Projection.Harmony.Part2
+import RumpsteakV2.Proofs.Projection.Harmony.Part3b
+import RumpsteakV2.Proofs.Projection.Harmony.Part4
 
 /-! ## Notes
 
@@ -143,7 +93,57 @@ After substituting `.end` for `v`:
 **PROVEN** in SubstEndUnguarded.lean via UnfoldsToEnd induction.
 -/
 
-import RumpsteakV2.Proofs.Projection.Harmony.Part1
-import RumpsteakV2.Proofs.Projection.Harmony.Part2
-import RumpsteakV2.Proofs.Projection.Harmony.Part3
-import RumpsteakV2.Proofs.Projection.Harmony.Part4
+/-! # RumpsteakV2.Proofs.Projection.Harmony
+
+Harmony between global steps and environment steps.
+
+## Expose
+
+The following definitions form the semantic interface for proofs:
+
+- `Claims`: bundle of harmony properties
+- `step_harmony`: global step induces matching env step
+- `proj_trans_other_step`: non-participant projection unchanged after step
+
+## Technical Debt Summary (legacy placeholders removed; assumption-free in this file)
+
+**MAJOR PROGRESS**: `trans_branches_coherent` ELIMINATED!
+Coherence is now proven from first principles using participation structure, following Coq's proof strategy.
+
+**Mu-unfolding (from MuUnfoldLemmas.lean):**
+- `EQ2_mu_crossed_unfold_left`: **PROVEN** via proj_subst + EQ2_mu_self_unfold
+- `EQ2_mu_crossed_unfold_right`: **PROVEN** via proj_subst + EQ2_mu_to_unfold
+- `EQ2_mu_unguarded_to_end`: **PROVEN** (vacuously true - hypotheses contradict when s ≠ t)
+- `EQ2_end_to_mu_unguarded`: **PROVEN** (vacuously true for closed types)
+
+**Closedness theorems (PROVEN in GlobalType.lean):**
+- `GlobalType.isClosed_substitute_mu`: **PROVEN** - mu-unfolding preserves closedness
+- `GlobalType.isClosed_comm_branches`: **PROVEN** - closed comm has closed branches
+
+**Proven coinductive theorems:**
+- `subst_end_unguarded_eq2_end`: **PROVEN** in SubstEndUnguarded.lean via UnfoldsToEnd induction
+- `trans_subst_comm`: **PROVEN** using paco coinduction (requires closedness)
+- `EQ2_trans_wf`: **PROVEN** via Bisim (EQ2Props.lean); used with explicit well-formedness witnesses
+
+**Remaining Assumptions:** None (sender/receiver lemmas proven via head-action predicate)
+
+**COHERENCE PROOF COMPLETE (modulo helper lemmas):**
+- `trans_branches_coherent_EQ2`: **PROVEN** using participation structure
+  - Case 1 (non-participant): Uses `EQ_end` - all branches project to .end
+  - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction placeholders)
+- `trans_produces_CProject`: Bridges trans to CProject (uses coherence)
+- `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy placeholders)
+
+**Inherited from MuUnfoldLemmas.lean (via ProjSubst.lean):**
+4. `proj_subst`: Projection-substitution commutation (Coq indProj.v:173)
+
+**Key changes from Coq alignment:**
+- `trans` now checks `(trans body role).isGuarded t` instead of `lcontractive body`
+- This matches Coq's `eguarded` check on the projected type, not the global type
+- Non-contractive projections are replaced with `.end` by construction
+- The old `step_noncontr_impossible` assumption was removed (it was false for nested mu)
+- All theorems require closedness of global types (standard for protocol verification)
+
+**Next steps:** propagate the head-action predicate (`action_pred`) through callers
+if they need sender/receiver projections beyond the head-communication case.
+-/

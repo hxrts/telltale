@@ -3,6 +3,16 @@ import RumpsteakV2.Protocol.Projection.Project.ImplExtraction.Part1
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project
+
+open RumpsteakV2.Protocol.GlobalType
+open RumpsteakV2.Protocol.LocalTypeR
+open RumpsteakV2.Protocol.Projection.Trans
+open RumpsteakV2.Protocol.Projection.Projectb
+open RumpsteakV2.Protocol.CoTypes.EQ2
+open RumpsteakV2.Protocol.CoTypes.EQ2Props
+open RumpsteakV2.Protocol.CoTypes.EQ2Paco
+open Paco
+open RumpsteakV2.Protocol.Participation
 private theorem CProjectTransRelComp_recv_extract_base
     {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
     (hbase : CProjectTransRel (.recv p1 bs1) (.recv p2 bs2)) :
@@ -66,8 +76,14 @@ private theorem CProjectTransRelComp_recv_extract_right
       rcases CProjectTransRel_source_recv (p := p1) (bs := bs1) (b := .mu t body) hrel with
         ⟨cs, hEq⟩
       cases hEq
-  | «end» | var _ | send _ _ =>
-      have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) b hrel
+  | «end» =>
+      have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) .end (by simpa using hrel)
+      simpa [EQ2F] using hrel_f
+  | var v =>
+      have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) (.var v) (by simpa using hrel)
+      simpa [EQ2F] using hrel_f
+  | send q cs =>
+      have hrel_f := CProjectTransRel_postfix (.recv p1 bs1) (.send q cs) (by simpa using hrel)
       simpa [EQ2F] using hrel_f
 
 /- Helper: both case for CProjectTransRelComp_recv_extract. -/
@@ -285,6 +301,7 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_recv
       simp only [EQ2F]
       exact CProjectTransRelComp_recv_not_send (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
+/-- Compose EQ2 on the left with CProjectTransRel through a mu head. -/
 theorem EQ2_CProjectTransRel_compose_through_mu
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))

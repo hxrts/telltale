@@ -26,7 +26,7 @@ private theorem lift_eq2_closure_compWF {a b : LocalTypeR}
   | inl hcomp => exact Or.inl ⟨hcomp, hWFa, hWFb⟩
   | inr heq => exact Or.inr heq
 
-private theorem BranchesRel_lift_compWF
+theorem BranchesRel_lift_compWF
     {bs cs : List (Label × LocalTypeR)}
     (h : BranchesRel (EQ2_closure CProjectTransRelComp) bs cs)
     (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
@@ -45,7 +45,7 @@ private theorem BranchesRel_lift_compWF
           (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
           (fun lb hm => hWFcs lb (List.Mem.tail _ hm))
 
-private theorem CProjectTransRelCompWF_extend_right {a b c : LocalTypeR}
+theorem CProjectTransRelCompWF_extend_right {a b c : LocalTypeR}
     (h1 : CProjectTransRelCompWF a b) (h2 : EQ2 b c)
     (hWFa : LocalTypeR.WellFormed a)
     (hWFb : LocalTypeR.WellFormed b)
@@ -53,7 +53,7 @@ private theorem CProjectTransRelCompWF_extend_right {a b c : LocalTypeR}
   -- Extend the underlying composition and reattach well-formedness.
   exact ⟨CProjectTransRelComp_extend_right h1.1 h2 hWFa hWFb hWFc, hWFa, hWFc⟩
 
-private theorem CProjectTransRelCompWF_extend_left {a b c : LocalTypeR}
+theorem CProjectTransRelCompWF_extend_left {a b c : LocalTypeR}
     (h1 : EQ2 a b) (h2 : CProjectTransRelCompWF b c)
     (hWFa : LocalTypeR.WellFormed a)
     (hWFb : LocalTypeR.WellFormed b)
@@ -144,7 +144,7 @@ private theorem EQ2F_lift_compWF {lt t : LocalTypeR}
     | exact EQ2F_lift_compWF_mu_left h hWFa hWFc
     | exact ⟨h.1, EQ2F_lift_compWF_send (h := h.2) hWFa hWFc⟩
     | exact ⟨h.1, EQ2F_lift_compWF_recv (h := h.2) hWFa hWFc⟩
-private theorem EQ2_CProjectTransRel_compose_through_mu_WF
+theorem EQ2_CProjectTransRel_compose_through_mu_WF
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (heq : EQ2 a (.mu v body))
     (hrel : CProjectTransRel (.mu v body) c)
@@ -172,7 +172,7 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_WF
           EQ2_unfold_right (EQ2_refl (.mu v body_c))⟩)))
   exact EQ2F_lift_compWF hcomp hWFa hWFc
 
-private theorem CProjectTransRel_EQ2_compose_through_mu_WF
+theorem CProjectTransRel_EQ2_compose_through_mu_WF
     {a c : LocalTypeR} {v : String} {body : LocalTypeR}
     (hrel : CProjectTransRel a (.mu v body))
     (heq : EQ2 (.mu v body) c)
@@ -201,7 +201,7 @@ This extends CProjectTransRel_postfix to handle the composition cases:
 
 The key insight: composition cases only arise in mu unfolding chains, where
 the EQ2F structure naturally decomposes into chains we can handle. -/
-private theorem CProjectTransRelComp_postfix_base
+theorem CProjectTransRelComp_postfix_base
     {lt t : LocalTypeR}
     (hbase : CProjectTransRel lt t)
     (hWFa : LocalTypeR.WellFormed lt) (hWFc : LocalTypeR.WellFormed t) :
@@ -210,7 +210,7 @@ private theorem CProjectTransRelComp_postfix_base
   have hbase_f := CProjectTransRel_postfix lt t hbase
   exact EQ2F_lift_compWF hbase_f hWFa hWFc
 
-private theorem CProjectTransRelComp_postfix_chain
+theorem CProjectTransRelComp_postfix_chain
     {a c b b' : LocalTypeR}
     (heq_ab : EQ2 a b) (hrel_bb' : CProjectTransRel b b') (heq_b'c : EQ2 b' c)
     (hWFa : LocalTypeR.WellFormed a) (hWFc : LocalTypeR.WellFormed c) :
@@ -218,7 +218,7 @@ private theorem CProjectTransRelComp_postfix_chain
   -- 3-hop chain: lift via the compose lemma into the WF closure.
   exact EQ2_CProjectTransRel_EQ2_compose_WF heq_ab hrel_bb' heq_b'c hWFa hWFc
 
-private theorem CProjectTransRelComp_postfix_prefix_mu_mu
+theorem CProjectTransRelComp_postfix_prefix_mu_mu
     {v v' : String} {body_lt body_t b : LocalTypeR}
     (heq_ab : EQ2 (.mu v body_lt) b) (hrel_bb' : CProjectTransRel b (.mu v' body_t))
     (hWFa : LocalTypeR.WellFormed (.mu v body_lt))
@@ -247,7 +247,7 @@ private theorem CProjectTransRelComp_postfix_prefix_mu_mu
         (EQ2_unfold_right (EQ2_refl (.mu v' body_t))) hWFa hWFc hWF_unfold_t
     exact Or.inl hcomp_right
 
-private theorem CProjectTransRelComp_postfix_prefix_mu_nonmu
+theorem CProjectTransRelComp_postfix_prefix_mu_nonmu
     {v : String} {body_lt t b : LocalTypeR}
     (heq_ab : EQ2 (.mu v body_lt) b) (hrel_bb' : CProjectTransRel b t)
     (hWFa : LocalTypeR.WellFormed (.mu v body_lt)) (hWFc : LocalTypeR.WellFormed t) :
@@ -269,7 +269,7 @@ private theorem CProjectTransRelComp_postfix_prefix_mu_nonmu
   | _ =>
       simpa [EQ2F] using (Or.inl hcomp_left)
 
-private theorem CProjectTransRelComp_postfix_prefix_nonmu_mu
+theorem CProjectTransRelComp_postfix_prefix_nonmu_mu
     {lt b : LocalTypeR} {v' : String} {body_t : LocalTypeR}
     (heq_ab : EQ2 lt b) (hrel_bb' : CProjectTransRel b (.mu v' body_t))
     (hWFa : LocalTypeR.WellFormed lt)
@@ -294,7 +294,7 @@ private theorem CProjectTransRelComp_postfix_prefix_nonmu_mu
   | _ =>
       simpa [EQ2F] using (Or.inl hcomp_right)
 
-private theorem CProjectTransRelComp_postfix_prefix_var_var
+theorem CProjectTransRelComp_postfix_prefix_var_var
     {x y : String} {b : LocalTypeR}
     (heq_ab : EQ2 (.var x) b) (hrel_bb' : CProjectTransRel b (.var y))
     (hWFa : LocalTypeR.WellFormed (.var x)) (hWFc : LocalTypeR.WellFormed (.var y)) :
