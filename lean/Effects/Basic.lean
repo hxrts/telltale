@@ -114,7 +114,7 @@ theorem compare_eq_iff_eq (e₁ e₂ : Edge) :
       constructor
       · intro h
         cases hSid : compare sid₁ sid₂ <;> simp [compare_def, hSid] at h
-        cases hSend : compare s₁ s₂ <;> simp [compare_def, hSid, hSend] at h
+        cases hSend : compare s₁ s₂ <;> simp [hSend] at h
         have hSidEq : sid₁ = sid₂ := (_root_.compare_eq_iff_eq (a:=sid₁) (b:=sid₂)).1 hSid
         have hSendEq : s₁ = s₂ := (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₂)).1 hSend
         have hRecvEq : r₁ = r₂ := by
@@ -129,7 +129,7 @@ theorem compare_eq_iff_eq (e₁ e₂ : Edge) :
           (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₁)).2 rfl
         have hRecv : compare r₁ r₁ = .eq :=
           (_root_.compare_eq_iff_eq (a:=r₁) (b:=r₁)).2 rfl
-        simp [compare_def, hSid, hSend, hRecv]
+        simp [compare_def]
 
 end Edge
 
@@ -172,7 +172,7 @@ theorem allEdges_sender_mem (sid : SessionId) (rs : RoleSet) :
       exact hEq'.symm
     simpa [hEq] using hp
   · have : False := by
-      simpa [hneq] using hite
+      simp [hneq] at hite
     exact this.elim
 
 /-- Get all endpoints for a session. -/

@@ -410,8 +410,7 @@ theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
   simp only [LinCtx.produceToken, List.pairwise_cons]
   constructor
   · -- Show e ≠ every element's first component in ctx
-    intro a haMem
-    intro heq
+    intro a haMem heq
     -- a ∈ ctx and e = a.1, so (e, a.2) = (a.1, a.2) = a ∈ ctx
     have haMem' : (e, a.2) ∈ ctx := by
       have : a = (a.1, a.2) := Prod.ext rfl rfl
@@ -434,7 +433,7 @@ theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Loc
     · simp only [Option.some.injEq, Prod.mk.injEq] at hConsume
       obtain ⟨rfl, rfl⟩ := hConsume
       simp only [beq_iff_eq] at heq
-      simp only [List.mem_cons, heq, true_and, true_or]
+      simp only [List.mem_cons, true_or]
     · cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume
