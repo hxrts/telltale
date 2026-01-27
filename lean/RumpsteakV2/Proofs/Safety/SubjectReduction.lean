@@ -181,16 +181,16 @@ theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
 
 /-- Non-participants have unchanged types (up to EQ2) after a step.
 
-**Note:** Requires g to be closed/wellFormed and projectable. -/
+**Note:** Requires g to be closed/wellFormed and blind. -/
 theorem other_type_preserved (g g' : GlobalType) (act : GlobalActionR) (role : String)
     (hstep : step g act g')
     (hclosed : g.isClosed = true)
     (hwf : g.wellFormed = true)
     (hns : role ≠ act.sender) (hnr : role ≠ act.receiver)
-    (hproj : ProjectableClosedWellFormed)
+    (hblind : RumpsteakV2.Protocol.Projection.Blind.isBlind g = true)
     : EQ2 (trans g' role) (trans g role) := by
   -- Delegate to the projection harmony lemma for non-participants.
-  exact proj_trans_other_step g g' act role hstep hclosed hwf hns hnr hproj
+  exact proj_trans_other_step g g' act role hstep hclosed hwf hns hnr hblind
 
 /-- Build the claims bundle from proven theorems. -/
 def claims : Claims where
