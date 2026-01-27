@@ -110,7 +110,7 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 
 **Central Definitions (split across modules):**
 - `CProjectF` / `CProject` - core projection relation (Project/ImplBase.lean)
-- `Projectable` / `ProjectableClosedWellFormed` - projectability predicates (Project/Core.lean)
+- `Projectable` / `ProjectableClosedWellFormed` - projectability predicates and bundle (Project/Core.lean)
 - `BranchesProjRel` / `AllBranchesProj` - branch-wise projection relations (Project/ImplBase.lean)
 
 **File Size Table (split):**
@@ -155,6 +155,28 @@ This document provides a comprehensive map of key proofs, lemmas, and definition
 **Key Theorems:**
 - `projectb_sound : CProject g role (projectb g role)` - Soundness
 - `projectb_trans : projectb g role ≈ trans g role` - Equivalence to trans
+
+---
+
+### Protocol/Projection/Blind.lean
+**Location:** `RumpsteakV2/Protocol/Projection/Blind.lean` (re-export; split into `Blind/Part1.lean` and `Blind/Part2.lean`)
+
+**Role:**
+- Defines syntactic blindness (`isBlind`) and the combined predicate `WellFormedBlind`.
+- Proves `projectable_of_wellFormedBlind` (axiom-free projectability from blindness).
+- Part2 contains substitution and branch-step helper lemmas.
+
+---
+
+### Protocol/Projection/Erasure.lean
+**Location:** `RumpsteakV2/Protocol/Projection/Erasure.lean` (re-export; split into `Erasure/Part1.lean`, `Erasure/Part2a.lean`, and `Erasure/Part2b.lean`)
+
+**Sizes:** Part1 (80 lines), Part2a (358 lines), Part2b (425 lines)
+
+**Role:**
+- Defines the erasure relation `Erases` and `Erasable` predicate.
+- Encodes send-branch identity and recv-branch union via label-set predicates.
+- Implements `merge`/`mergeAll` (Part2a) and proves `merge_sound`/`mergeAll_sound` (Part2b).
 
 ---
 
@@ -374,7 +396,7 @@ This theorem states that global choreography steps correspond to local environme
 
 - `proj_trans_sender_step` - Sender projection step
 - `proj_trans_receiver_step` - Receiver projection step
-- `proj_trans_other_step` - Non-participant projection step (requires `ProjectableClosedWellFormed`;
+- `proj_trans_other_step` - Non-participant projection step (requires `ProjectableClosedWellFormed g`;
   mu case chains via `EQ2_trans_wf` with WellFormed witnesses)
 
 - `trans_branches_coherent_EQ2` - Branches project coherently
@@ -538,6 +560,9 @@ Well-formedness is preserved by global steps (type safety).
 ### Coinductive/Roundtrip.lean
 **Location:** `RumpsteakV2/Coinductive/Roundtrip.lean` (63KB, 1,214 lines)
 
+**Supporting File:**
+- `RumpsteakV2/Coinductive/Roundtrip/GpacoCollapse.lean` - gpaco-based μ-paco collapse helpers
+
 **Conversion Functions:**
 - `toInductive : LocalTypeC → LocalTypeR` - Convert coinductive to inductive
 - `toCoind : LocalTypeR → LocalTypeC` - Convert inductive to coinductive
@@ -547,10 +572,16 @@ Well-formedness is preserved by global steps (type safety).
 
 **Key Lemmas (erasure + μ-paco bridge):**
 - `EQ2C_mu_paco_le_paco_of_productive` - Collapse μ-aware paco to EQ2C_paco under productivity
+- `EQ2C_mu_paco_le_paco_of_obs` - gpaco-based collapse from μ-paco to EQ2C_paco (observable hypothesis)
 - `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (requires productivity on both sides)
 - `toCoind_toInductive_eq2c_of_env_toCoind` - Round-trip for `toCoind` images (discharges productivity)
+- `toCoind_toInductive_eq2c_of_backedge_toCoind` - Round-trip for `toCoind` images with back-edge resolution (discharges productivity)
+- `EQ2CE_to_EQ2C'_toCoind` / `EQ2CE_to_EQ2C_toCoind` - Erasure for `toCoind` sources (no productivity)
+- `EQ2CE_resolved'_implies_EQ2C_toCoind` / `EQ2CE_resolved_to_EQ2C_toCoind` - Resolved erasure for `toCoind` sources
+- `EQ2CE_to_EQ2C_paco_toCoind` - Paco-style erasure for `toCoind` sources
 - `envOf`, `nameOf` - Environment/name generation (definitions, no axioms)
 - `BranchesRelC_gupaco_clo`, `gupaco_clo_obs_of_rr` - gpaco_clo helper lemmas (guarded observable extraction)
+- `GpacoRel`, `mu_paco_obs_to_gpaco`, `mu_paco_le_paco_of_obs` - gpaco collapse infrastructure (Roundtrip/GpacoCollapse.lean)
 
 ---
 
@@ -627,7 +658,7 @@ Well-formedness is preserved by global steps (type safety).
 
 #### **Projectability Assumptions**
 1. `Projectable` - Project.lean (global projectability predicate)
-2. `ProjectableClosedWellFormed` - Project/Core.lean (assumption used by Harmony/SubjectReduction)
+2. `ProjectableClosedWellFormed` - Project/Core.lean (bundle: closed + wellFormed + projectable; used by Harmony/SubjectReduction)
 
 #### **Determinism Chain**
 1. `project_deterministic` - ProjectProps.lean
