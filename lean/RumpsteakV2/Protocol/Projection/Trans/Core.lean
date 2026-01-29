@@ -124,14 +124,14 @@ private theorem sizeOf_cont_lt_comm_expanded (sender receiver : String)
     (label : Label) (cont : GlobalType) (tail : List (Label × GlobalType)) :
     sizeOf cont <
       1 + sizeOf sender + sizeOf receiver + (1 + (1 + sizeOf label + sizeOf cont) + sizeOf tail) := by
-  simp [GlobalType.comm.sizeOf_spec, sizeOf, List._sizeOf_1, Prod._sizeOf_1]
+  simp [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
   omega
 
 private theorem sizeOf_branches_lt_comm_expanded (sender receiver : String)
     (label : Label) (cont : GlobalType) (tail : List (Label × GlobalType)) :
     sizeOf ((label, cont) :: tail) <
       1 + sizeOf sender + sizeOf receiver + (1 + (1 + sizeOf label + sizeOf cont) + sizeOf tail) := by
-  simp [GlobalType.comm.sizeOf_spec, sizeOf, List._sizeOf_1, Prod._sizeOf_1]
+  simp [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
   omega
 
 private theorem sizeOf_cont_lt_cons (label : Label) (cont : GlobalType) (rest : List (Label × GlobalType)) :
@@ -265,7 +265,7 @@ mutual
     match g with
     | .end =>
         have : False := by
-          simpa [trans, LocalTypeR.freeVars, List.mem_nil_iff] using hx
+          simp [trans, LocalTypeR.freeVars] at hx
         exact this.elim
     | .var t =>
         simp only [trans, LocalTypeR.freeVars, GlobalType.freeVars] at hx ⊢
@@ -281,8 +281,7 @@ mutual
           exact ⟨hmem, hx.2⟩
         ·
           have : False := by
-            simpa [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.freeVars,
-              List.mem_nil_iff] using hx
+            simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.freeVars] at hx
           exact this.elim
     | .comm sender receiver branches =>
         cases hsender : role == sender with
@@ -291,9 +290,8 @@ mutual
             | nil =>
                 have : False := by
                   unfold trans at hx
-                  simpa [hsender, ↓reduceIte, transBranches, LocalTypeR.freeVars,
-                    LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap_nil,
-                    List.mem_nil_iff] using hx
+                  simp [hsender, ↓reduceIte, transBranches, LocalTypeR.freeVars,
+                    LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap_nil] at hx
                 exact this.elim
             | cons head tail =>
                 cases head with
@@ -309,9 +307,9 @@ mutual
                 | nil =>
                     have : False := by
                       unfold trans at hx
-                      simpa [hsender, Bool.false_eq_true, ↓reduceIte, hreceiver, transBranches,
+                      simp [hsender, Bool.false_eq_true, ↓reduceIte, hreceiver, transBranches,
                         LocalTypeR.freeVars, LocalTypeR.freeVarsOfBranches_eq_flatMap,
-                        List.flatMap_nil, List.mem_nil_iff] using hx
+                        List.flatMap_nil] at hx
                     exact this.elim
                 | cons head tail =>
                     cases head with
@@ -324,8 +322,8 @@ mutual
                 cases branches with
                 | nil =>
                     have : False := by
-                      simpa [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver,
-                        LocalTypeR.freeVars, List.mem_nil_iff] using hx
+                      simp [trans, hsender, Bool.false_eq_true, ↓reduceIte, hreceiver,
+                        LocalTypeR.freeVars] at hx
                     exact this.elim
                 | cons head tail =>
                     cases head with
@@ -339,7 +337,7 @@ mutual
   decreasing_by
     all_goals
       simp_wf
-      simp (config := { failIfUnchanged := false }) [*]
+      try (simp [*])
       first
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_branches_lt_comm_expanded _ _ _ _ _
@@ -356,7 +354,7 @@ mutual
     intro branches y hy
     match branches with
     | [] =>
-        simpa [transBranches, List.flatMap_nil, List.mem_nil_iff] using hy
+        simp [transBranches, List.flatMap_nil] at hy
     | (label, cont) :: tail =>
         simp only [transBranches, List.flatMap_cons, List.mem_append] at hy
         cases hy with
@@ -371,7 +369,6 @@ mutual
   decreasing_by
     all_goals
       simp_wf
-      simp (config := { failIfUnchanged := false }) [*]
       first
       | exact sizeOf_cont_lt_cons _ _ _
       | exact sizeOf_tail_lt_cons _ _

@@ -206,39 +206,30 @@ theorem typed_step_preserves_coherence {G D Ssh Sown store bufs P G' D' Sown' st
 private theorem updateSEnv_append_left_hit {S₁ S₂ : SEnv} {x : Var} {T : ValType}
     (hNone : lookupSEnv S₂ x = none) :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ := by
-  -- Compare lookups pointwise using extensionality.
-  apply SEnv_ext
-  intro y
-  by_cases hEq : y = x
-  · subst hEq
-    -- Updated key wins on both sides.
-    simp [lookupSEnv_update_eq, lookupSEnv_append_left]
-  · -- Non-updated key: updates are transparent.
-    have hUpd :
-        lookupSEnv (updateSEnv (S₁ ++ S₂) x T) y = lookupSEnv (S₁ ++ S₂) y := by
-      simpa using (lookupSEnv_update_neq (env:=S₁ ++ S₂) (x:=x) (y:=y) (T:=T) hEq)
-    cases hS₁ : lookupSEnv S₁ y <;>
-      simp [hUpd, hS₁, lookupSEnv_update_neq, hEq, lookupSEnv_append_left, lookupSEnv_append_right, hNone]
+  induction S₁ with
+  | nil =>
+      simp [updateSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y U =>
+          by_cases h : x = y
+          · subst h
+            simp [updateSEnv, List.append_assoc]
+          · simp [updateSEnv, h, ih, List.append_assoc]
 
 /-- Updating an appended SEnv always updates the left side. -/
 private theorem updateSEnv_append_left_any {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ := by
-  -- Compare lookups pointwise for all variables.
-  apply SEnv_ext
-  intro y
-  by_cases hEq : y = x
-  · -- Updated key wins on both sides.
-    subst hEq
-    simp [lookupSEnv_update_eq, lookupSEnv_append_left]
-  · -- Non-updated keys are unchanged by update.
-    have hUpd :
-        lookupSEnv (updateSEnv (S₁ ++ S₂) x T) y = lookupSEnv (S₁ ++ S₂) y := by
-      simpa using (lookupSEnv_update_neq (env:=S₁ ++ S₂) (x:=x) (y:=y) (T:=T) hEq)
-    have hUpd₁ :
-        lookupSEnv (updateSEnv S₁ x T) y = lookupSEnv S₁ y := by
-      simpa using (lookupSEnv_update_neq (env:=S₁) (x:=x) (y:=y) (T:=T) hEq)
-    cases hS₁ : lookupSEnv S₁ y <;>
-      simp [hUpd, hUpd₁, hS₁, lookupSEnv_append_left, lookupSEnv_append_right]
+  induction S₁ with
+  | nil =>
+      simp [updateSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y U =>
+          by_cases h : x = y
+          · subst h
+            simp [updateSEnv, List.append_assoc]
+          · simp [updateSEnv, h, ih, List.append_assoc]
 
 /-- If a disjoint update environment contains x, the right side cannot. -/
 private theorem lookupSEnv_none_of_disjoint_update

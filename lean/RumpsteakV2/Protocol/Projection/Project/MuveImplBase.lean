@@ -346,11 +346,11 @@ theorem isMuve_substitute (lt : LocalTypeR) (varName : String) (repl : LocalType
         exact isMuve_substitute body varName repl hlt hrepl
   | .send _ _ =>
       have : False := by
-        simpa [isMuve] using hlt
+        simp [isMuve] at hlt
       exact this.elim
   | .recv _ _ =>
       have : False := by
-        simpa [isMuve] using hlt
+        simp [isMuve] at hlt
       exact this.elim
 termination_by sizeOf lt
 
@@ -412,9 +412,9 @@ private theorem trans_muve_of_not_part_of2_aux_base (g : GlobalType) (role : Str
   | inr hVar => rcases hVar with ⟨t, rfl⟩; simp [Trans.trans, isMuve]
 
 private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalType) (role : String)
-    (hnotpart : ¬ part_of2 role (.mu t body))
-    (hne : (GlobalType.mu t body).allCommsNonEmpty = true)
-    (hnsc : (GlobalType.mu t body).noSelfComm = true)
+    (_hnotpart : ¬ part_of2 role (.mu t body))
+    (_hne : (GlobalType.mu t body).allCommsNonEmpty = true)
+    (_hnsc : (GlobalType.mu t body).noSelfComm = true)
     (hbody : isMuve (Trans.trans body role) = true) :
     isMuve (Trans.trans (.mu t body) role) = true := by
   -- The mu case reduces to the body when the projection is guarded.

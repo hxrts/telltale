@@ -447,8 +447,8 @@ termination_by g
 decreasing_by
   all_goals
     first
-    | (subst_vars; exact sizeOf_body_lt_mu _ _)
-    | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
+    | exact sizeOf_body_lt_mu _ _
+    | apply sizeOf_elem_snd_lt_comm; assumption
 
 end
 

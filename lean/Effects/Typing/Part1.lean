@@ -231,25 +231,68 @@ theorem lookupSEnv_append_assoc {S₁ S₂ S₃ : SEnv} {x : Var} :
             simpa [hRight'] using h23
           simpa [hLeft, hRight]
 
--- SEnv is extensional by function extensionality.
-theorem SEnv_ext {S₁ S₂ : SEnv} :
-  (∀ x, lookupSEnv S₁ x = lookupSEnv S₂ x) → S₁ = S₂ := by
-  intro h
-  funext x
-  exact h x
+theorem SEnv_append_assoc (S₁ S₂ S₃ : SEnv) :
+    (S₁ ++ S₂) ++ S₃ = S₁ ++ (S₂ ++ S₃) := by
+  simpa [List.append_assoc]
 
-/-- DEnv extensionality assumption for lookup-based equality. -/
+/-- DEnv extensionality (lookup-based) using canonical list representation. -/
 theorem DEnv_ext {D₁ D₂ : DEnv} :
   (∀ e, D₁.find? e = D₂.find? e) → D₁ = D₂ := by
   intro h
-  funext e
-  exact h e
-
-theorem SEnv_append_assoc (S₁ S₂ S₃ : SEnv) :
-    (S₁ ++ S₂) ++ S₃ = S₁ ++ (S₂ ++ S₃) := by
-  apply SEnv_ext
-  intro x
-  simpa using (lookupSEnv_append_assoc (S₁:=S₁) (S₂:=S₂) (S₃:=S₃) (x:=x))
+  cases D₁ with
+  | mk l₁ m₁ hm₁ hs₁ =>
+    cases D₂ with
+    | mk l₂ m₂ hm₂ hs₂ =>
+      have hlookup :
+          ∀ e, (l₁.lookup e).map (fun ts => ts.1) = (l₂.lookup e).map (fun ts => ts.1) := by
+        intro e
+        have h1 := DEnv_find?_eq_lookup (env := { list := l₁, map := m₁, map_eq := hm₁, sorted := hs₁ }) (e := e)
+        have h2 := DEnv_find?_eq_lookup (env := { list := l₂, map := m₂, map_eq := hm₂, sorted := hs₂ }) (e := e)
+        simpa [h1, h2] using (h e)
+      have hsub12 : l₁ ⊆ l₂ := by
+        intro p hp
+        have hlookup₁ : l₁.lookup p.1 = some p.2 :=
+          lookup_eq_some_of_mem_pairwise hs₁ hp
+        have hmap₂ : (l₂.lookup p.1).map (fun ts => ts.1) = some p.2.1 := by
+          simpa [hlookup₁] using hlookup p.1
+        cases hL2 : l₂.lookup p.1 with
+        | none =>
+            simp [hL2] at hmap₂
+            cases hmap₂
+        | some t2 =>
+            have ht2 : t2.1 = p.2.1 := by
+              simpa [hL2] using hmap₂
+            have ht2' : t2 = p.2 := by
+              apply Subtype.ext
+              exact ht2
+            have hmem : (p.1, t2) ∈ l₂ := lookup_mem hL2
+            simpa [ht2'] using hmem
+      have hsub21 : l₂ ⊆ l₁ := by
+        intro p hp
+        have hlookup₂ : l₂.lookup p.1 = some p.2 :=
+          lookup_eq_some_of_mem_pairwise hs₂ hp
+        have hmap₁ : (l₁.lookup p.1).map (fun ts => ts.1) = some p.2.1 := by
+          have := hlookup p.1
+          simpa [hlookup₂] using this.symm
+        cases hL1 : l₁.lookup p.1 with
+        | none =>
+            simp [hL1] at hmap₁
+            cases hmap₁
+        | some t1 =>
+            have ht1 : t1.1 = p.2.1 := by
+              simpa [hL1] using hmap₁
+            have ht1' : t1 = p.2 := by
+              apply Subtype.ext
+              exact ht1
+            have hmem : (p.1, t1) ∈ l₁ := lookup_mem hL1
+            simpa [ht1'] using hmem
+      have hl : l₁ = l₂ :=
+        list_eq_of_subset_pairwise hs₁ hs₂ hsub12 hsub21
+      have hm : m₁ = m₂ := by
+        simpa [hl, hm₁, hm₂]
+      cases hl
+      cases hm
+      simp
 
 theorem FootprintSubset_refl {W : Footprint} : FootprintSubset W W := by
   intro x hx; exact hx
@@ -458,29 +501,18 @@ def SEnvAll (Ssh Sown : SEnv) : SEnv :=
 theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
     (h : lookupSEnv Ssh x = none) :
     updateSEnv (Ssh ++ Sown) x T = Ssh ++ updateSEnv Sown x T := by
-  apply SEnv_ext
-  intro y
-  by_cases hEq : y = x
-  · subst hEq
-    have hLeft : lookupSEnv (updateSEnv (Ssh ++ Sown) x T) x = some T := by
-      simpa using (lookupSEnv_update_eq (env:=Ssh ++ Sown) (x:=x) (T:=T))
-    have hRight : lookupSEnv (Ssh ++ updateSEnv Sown x T) x = some T := by
-      have hRight' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=updateSEnv Sown x T) (x:=x) h
-      simpa [hRight'] using (lookupSEnv_update_eq (env:=Sown) (x:=x) (T:=T))
-    simpa [hLeft, hRight]
-  · have hLeft : lookupSEnv (updateSEnv (Ssh ++ Sown) x T) y = lookupSEnv (Ssh ++ Sown) y := by
-      simpa using (lookupSEnv_update_neq (env:=Ssh ++ Sown) (x:=x) (y:=y) (T:=T) hEq)
-    cases hS : lookupSEnv Ssh y with
-    | some Ty =>
-        have hL' := lookupSEnv_append_left (S₁:=Ssh) (S₂:=Sown) (x:=y) (T:=Ty) hS
-        have hR' := lookupSEnv_append_left (S₁:=Ssh) (S₂:=updateSEnv Sown x T) (x:=y) (T:=Ty) hS
-        simpa [hLeft, hL', hR']
-    | none =>
-        have hL' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown) (x:=y) hS
-        have hR' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=updateSEnv Sown x T) (x:=y) hS
-        have hUpd : lookupSEnv (updateSEnv Sown x T) y = lookupSEnv Sown y := by
-          simpa using (lookupSEnv_update_neq (env:=Sown) (x:=x) (y:=y) (T:=T) hEq)
-        simpa [hLeft, hL', hR', hUpd]
+  induction Ssh with
+  | nil =>
+      simp [updateSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y U =>
+          by_cases hxy : x = y
+          · subst hxy
+            simp [lookupSEnv] at h
+          · have htl : lookupSEnv tl x = none := by
+              simpa [lookupSEnv, hxy] using h
+            simp [updateSEnv, hxy, ih htl, List.append_assoc]
 
 theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G₁ e = none) :

@@ -116,13 +116,12 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
                     simp [GlobalType.substituteBranches, horiginal_branches] at hbranches
                     cases head' with
                     | mk label' cont' =>
-                        simp only [List.cons.injEq, Prod.mk.injEq] at hbranches
+                        simp only [Prod.mk.injEq] at hbranches
                         have hlabel : label' = label := hbranches.1.1.symm
                         have hcont : cont' = cont.substitute t repl := hbranches.1.2.symm
                         have hrest' : rest' = GlobalType.substituteBranches rest t repl := hbranches.2.symm
                         subst hlabel hcont hrest'
                         -- Need: rest'.all (fun p => decide (trans p.2 role = trans cont' role))
-                        simp only [List.all]
                         -- Original: rest.all (fun p => decide (trans p.2 role = trans cont role)) = true
                         have hrest_uniform : rest.all (fun p => decide (Trans.trans p.2 role = Trans.trans cont role)) = true := by
                           simpa [branchesUniformFor, horiginal_branches] using horiginal

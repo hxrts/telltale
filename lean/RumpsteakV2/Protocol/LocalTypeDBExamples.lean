@@ -117,14 +117,14 @@ def example_mu : LocalTypeDB :=
 example : example_mu.isContractive = true := by
   unfold example_mu
   simp [LocalTypeDB.isContractive, LocalTypeDB.isGuarded,
-        isContractiveBranches, Bool.and_eq_true]
+        isContractiveBranches]
 
 /-- Unfolding preserves contractiveness. -/
 example : example_mu.unfold.isContractive = true := by
   unfold example_mu
   apply isContractive_unfold
   simp [LocalTypeDB.isContractive, LocalTypeDB.isGuarded,
-        isContractiveBranches, Bool.and_eq_true]
+        isContractiveBranches]
 
 /-! ## Example 7: Nested Mus -/
 
@@ -136,7 +136,7 @@ def example_nested : LocalTypeDB :=
 example : example_nested.isContractive = true := by
   unfold example_nested
   simp [LocalTypeDB.isContractive, LocalTypeDB.isGuarded,
-        isContractiveBranches, Bool.and_eq_true]
+        isContractiveBranches]
 
 /-! ## Summary
 

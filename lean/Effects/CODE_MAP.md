@@ -166,16 +166,16 @@ structure Config where
 ## Type System
 
 ### Environments (Part1-Part2)
-**Location:** `Effects/Environments/Part1.lean` (548 lines), `Effects/Environments/Part2.lean` (527 lines)
+**Location:** `Effects/Environments/Part1.lean` (736 lines), `Effects/Environments/Part2.lean` (527 lines)
 
 Re-exported via `Effects/Environments.lean`.
 
 **Environment Types:**
 ```lean
 def Store : Type := List (Var * Value)
-def SEnv : Type := Var → Option ValType               -- extensional
+def SEnv : Type := List (Var * ValType)
 def GEnv : Type := List (Endpoint * LocalType)
-def DEnv : Type := Edge → Option (List ValType)       -- extensional
+structure DEnv                             -- RBMap-backed, canonical list representation
 def Buffers : Type := List (Edge * List Value)
 ```
 
@@ -208,7 +208,7 @@ def DisjointS (S1 S2 : SEnv) : Prop
 structure ParSplit  -- environment splitting for parallel composition
 def DConsistent (G : GEnv) (D : DEnv) : Prop
 ```
-Contains axioms: *(none)*.
+Contains axioms: *(none)*. `DEnv_ext` is proven via the canonical list representation.
 
 **Part2 -- Process Typing Judgment:**
 ```lean
@@ -595,8 +595,8 @@ Coherence preservation proofs split into three cases per edge:
 2. **Related edge** -- shares an endpoint with the updated edge
 3. **Unrelated edge** -- environments unchanged, coherence trivially preserved
 
-### 4. Extensional Environments
-`SEnv` and `DEnv` are function-backed, extensional maps; lookup-based reasoning avoids ordering dependencies in environment composition proofs.
+### 4. Canonicalized Environments
+`SEnv` is list-backed. `DEnv` is RBMap-backed with a canonical list representation; lookup-based reasoning avoids ordering dependencies in environment composition proofs.
 
 ### 5. Linear Capability Tokens
 Tokens are unforgeable capabilities tied to endpoints. Protocol steps consume and produce tokens, enforcing linear resource usage and preventing aliasing. The monitor validates token ownership before permitting any action.

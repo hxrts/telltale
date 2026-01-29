@@ -86,7 +86,8 @@ private theorem CProject_mu_implies_trans_mu_comm_receiver_contra
     (hrr : role = receiver) (hrs : role ≠ sender) : False := by
   -- CProjectF forbids .mu when the role is receiver.
   have hf := CProject_destruct hproj
-  simpa [CProjectF, hrr, hrs] using hf
+  have hns : receiver ≠ sender := by simpa [hrr] using hrs
+  simp [CProjectF, hrr, hns] at hf
 
 /-- Helper: non-participant comm case for mu projection agreement. -/
 private theorem CProject_mu_implies_trans_mu_comm_other
@@ -160,7 +161,7 @@ private theorem CProject_mu_implies_trans_mu_comm (sender receiver : String)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
     all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hgb, GlobalType.comm.sizeOf_spec]
 /-- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
       Returns the global body and proof that trans produces `.mu v (trans gbody role)`. -/
 theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
@@ -184,7 +185,7 @@ theorem CProject_mu_implies_trans_mu (g : GlobalType) (role : String)
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 

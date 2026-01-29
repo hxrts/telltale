@@ -1,5 +1,7 @@
 import Effects.LocalType
 import Effects.Values
+import Batteries.Data.RBMap
+import Batteries.Data.RBMap.Lemmas
 
 /-!
 # MPST Environments
@@ -21,6 +23,7 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
+open Lean
 
 noncomputable section
 
@@ -50,30 +53,27 @@ def updateStr (store : Store) (x : Var) (v : Value) : Store :=
 
 open Batteries
 
-/-- SEnv maps variables to their value types (extensional). -/
-abbrev SEnv := Var → Option ValType
+/-- SEnv maps variables to their value types (list-backed). -/
+abbrev SEnv := List (Var × ValType)
 
 /-- Lookup a type in SEnv. -/
 def lookupSEnv (env : SEnv) (x : Var) : Option ValType :=
-  env x
+  env.lookup x
 
 /-- Update or insert in SEnv. -/
 def updateSEnv (env : SEnv) (x : Var) (T : ValType) : SEnv :=
-  fun y => if y = x then some T else env y
-
-instance : EmptyCollection SEnv := ⟨fun _ => none⟩
+  match env with
+  | [] => [(x, T)]
+  | (y, U) :: rest =>
+    if x = y then (x, T) :: rest
+    else (y, U) :: updateSEnv rest x T
 
 @[simp] theorem lookupSEnv_empty (x : Var) : lookupSEnv (∅ : SEnv) x = none := by
   rfl
 
-/-- Union of SEnvs (left-biased on key collisions). -/
+/-- Union of SEnvs (list append, left-biased on lookup). -/
 def SEnvUnion (S₁ S₂ : SEnv) : SEnv :=
-  fun x =>
-    match S₁ x with
-    | some T => some T
-    | none => S₂ x
-
-instance : Append SEnv := ⟨SEnvUnion⟩
+  S₁ ++ S₂
 
 /-! ## GEnv: Endpoint → LocalType -/
 
@@ -124,47 +124,285 @@ def dequeueBuf (bufs : Buffers) (e : Edge) : Option (Buffers × Value) :=
   | v :: vs => some (updateBuf bufs e vs, v)
 
 /-! ## DEnv: Directed Edge → Type Trace -/
-
 /-! ## DEnv: Directed Edge → Type Trace -/
 
-/-- DEnv maps directed edges to their in-flight type traces (extensional). -/
-abbrev DEnv := Edge → Option (List ValType)
+/-- A trace stored in DEnv is always non-empty. -/
+abbrev Trace := { ts : List ValType // ts ≠ [] }
 
-/-- Lookup helper (dot notation). -/
+private def edgeCmpLT : (Edge × Trace) → (Edge × Trace) → Prop :=
+  RBNode.cmpLT (compare ·.1 ·.1)
+
+/-- DEnv maps directed edges to non-empty in-flight type traces (RBMap-backed).
+    Stored with a canonical list representation for extensional reasoning. -/
+structure DEnv where
+  list : List (Edge × Trace)
+  map : RBMap Edge Trace compare
+  map_eq : map = RBMap.ofList list compare
+  sorted : list.Pairwise edgeCmpLT
+
+instance : Coe DEnv (RBMap Edge Trace compare) := ⟨DEnv.map⟩
+
+def DEnv.ofMap (m : RBMap Edge Trace compare) : DEnv :=
+  { list := m.toList
+    map := RBMap.ofList m.toList compare
+    map_eq := rfl
+    sorted := by
+      simpa [edgeCmpLT] using (RBMap.toList_sorted (t := m)) }
+
+instance : EmptyCollection DEnv := ⟨DEnv.ofMap (∅ : RBMap Edge Trace compare)⟩
+
+/-- Lookup helper (dot notation), exposing lists (never empty). -/
 def DEnv.find? (env : DEnv) (e : Edge) : Option (List ValType) :=
-  env e
+  (env.map.find? e).map (fun ts => ts.1)
 
-instance : EmptyCollection DEnv := ⟨fun _ => none⟩
+lemma lookup_mem {l : List (Edge × Trace)} {e : Edge} {ts : Trace}
+    (h : l.lookup e = some ts) : (e, ts) ∈ l := by
+  induction l with
+  | nil =>
+      simp [List.lookup] at h
+  | cons hd tl ih =>
+      simp [List.lookup] at h
+      split at h
+      · simp [List.mem_cons, h]
+      · have : (e, ts) ∈ tl := ih h
+        exact List.mem_cons.mpr (Or.inr this)
+
+lemma lookup_eq_none_of_forall_ne {l : List (Edge × Trace)} {e : Edge}
+    (h : ∀ p ∈ l, p.1 ≠ e) : l.lookup e = none := by
+  induction l with
+  | nil => rfl
+  | cons hd tl ih =>
+      have hne : hd.1 ≠ e := h hd (List.mem_cons.mpr (Or.inl rfl))
+      have hne' : (e == hd.1) = false := by
+        exact beq_eq_false_iff_ne.mpr (Ne.symm hne)
+      simp [List.lookup, hne', ih (by
+        intro p hp
+        exact h p (List.mem_cons.mpr (Or.inr hp)))]
+
+theorem lookup_eq_some_of_mem_pairwise {l : List (Edge × Trace)} (h : l.Pairwise edgeCmpLT)
+    {p : Edge × Trace} (hp : p ∈ l) : l.lookup p.1 = some p.2 := by
+  induction l with
+  | nil => cases hp
+  | cons hd tl ih =>
+      simp only [List.mem_cons] at hp
+      simp only [List.pairwise_cons] at h
+      cases hp with
+      | inl hEq =>
+          subst hEq
+          simp [List.lookup]
+      | inr hMem =>
+          have hne : p.1 ≠ hd.1 := by
+            have hlt : edgeCmpLT hd p := h.1 _ hMem
+            -- edgeCmpLT implies key inequality
+            intro hEq
+            have hEq' : compare hd.1 p.1 = .eq :=
+              (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq.symm
+            have : (.eq : Ordering) = .lt := by
+              exact hEq'.symm.trans hlt
+            cases this
+          have hne' : (p.1 == hd.1) = false := by
+            exact beq_eq_false_iff_ne.mpr (Ne.symm hne)
+          simp [List.lookup, hne', ih h.2 hMem]
+
+private theorem find?_foldl_insert_of_pairwise
+    (l : List (Edge × Trace)) (m : RBMap Edge Trace compare)
+    (h : l.Pairwise edgeCmpLT) (k : Edge) :
+    (l.foldl (fun r p => r.insert p.1 p.2) m).find? k =
+      match l.lookup k with
+      | some v => some v
+      | none => m.find? k := by
+  induction l generalizing m with
+  | nil => simp
+  | cons hd tl ih =>
+      simp only [List.pairwise_cons] at h
+      by_cases hk : k = hd.1
+      · subst hk
+        -- No key in tl matches hd.1 (pairwise)
+        have hnone : tl.lookup hd.1 = none := by
+          apply lookup_eq_none_of_forall_ne
+          intro p hp
+          have hlt : edgeCmpLT hd p := h.1 _ hp
+          -- edgeCmpLT implies key inequality
+          intro hEq
+          have hEq' : compare hd.1 p.1 = .eq :=
+            (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq.symm
+          have : (.eq : Ordering) = .lt := by
+            exact hEq'.symm.trans hlt
+          cases this
+        have hfind : (m.insert hd.1 hd.2).find? hd.1 = some hd.2 := by
+          have hEq : compare hd.1 hd.1 = .eq := by
+            simpa using (Edge.compare_eq_iff_eq hd.1 hd.1).2 rfl
+          simpa using (RBMap.find?_insert_of_eq (t := m) (k := hd.1) (v := hd.2) (k' := hd.1) hEq)
+        simpa [List.lookup, hnone, hfind] using
+          (ih (m := m.insert hd.1 hd.2) (h := h.2) (k := hd.1))
+      · have hne : compare k hd.1 ≠ .eq := by
+          intro hEq
+          exact hk (Edge.compare_eq_iff_eq _ _ |>.1 hEq)
+        have hne' : (k == hd.1) = false := by
+          exact beq_eq_false_iff_ne.mpr hk
+        have hfind : (m.insert hd.1 hd.2).find? k = m.find? k := by
+          simpa using (RBMap.find?_insert_of_ne (t := m) (k := hd.1) (v := hd.2) (k' := k) hne)
+        simpa [List.lookup, hne', hfind] using
+          (ih (m := m.insert hd.1 hd.2) (h := h.2) (k := k))
+
+private theorem rbmap_find?_ofList_eq_lookup
+    (l : List (Edge × Trace)) (h : l.Pairwise edgeCmpLT) (k : Edge) :
+    (RBMap.ofList l compare).find? k = l.lookup k := by
+  have h' := find?_foldl_insert_of_pairwise (l := l) (m := (∅ : RBMap Edge Trace compare)) h k
+  simpa [RBMap.ofList] using h'
+
+theorem DEnv_find?_eq_lookup (env : DEnv) (e : Edge) :
+    env.find? e = (env.list.lookup e).map (fun ts => ts.1) := by
+  have h := rbmap_find?_ofList_eq_lookup (l := env.list) (h := env.sorted) (k := e)
+  simp [DEnv.find?, env.map_eq, h]
+
+theorem lookup_toList_eq_find? (m : RBMap Edge Trace compare) (e : Edge) :
+    m.toList.lookup e = m.find? e := by
+  cases h : m.find? e with
+  | none =>
+      by_contra hLookup
+      cases hLookup' : m.toList.lookup e with
+      | none =>
+          exact hLookup (by simpa [hLookup'])
+      | some v =>
+          have hMem : (e, v) ∈ m.toList := lookup_mem hLookup'
+          have hFind : m.find? e = some v :=
+            (RBMap.find?_some (t := m) (x := e) (v := v)).2 ⟨e, hMem, by simp⟩
+          cases h hFind
+  | some v =>
+      have hMem : (e, v) ∈ m.toList := by
+        have hSome := (RBMap.find?_some (t := m) (x := e) (v := v)).1 h
+        rcases hSome with ⟨y, hy, hEq⟩
+        have hy' : y = e := (Edge.compare_eq_iff_eq _ _).1 hEq
+        simpa [hy'] using hy
+      have hSorted : m.toList.Pairwise edgeCmpLT := by
+        simpa [edgeCmpLT] using (RBMap.toList_sorted (t := m))
+      have hLookup : m.toList.lookup e = some v :=
+        lookup_eq_some_of_mem_pairwise hSorted hMem
+      simpa [h] using hLookup
+
+@[simp] theorem DEnv_find?_ofMap (m : RBMap Edge Trace compare) (e : Edge) :
+    (DEnv.ofMap m).find? e = (m.find? e).map (fun ts => ts.1) := by
+  have hSorted : m.toList.Pairwise edgeCmpLT := by
+    simpa [edgeCmpLT] using (RBMap.toList_sorted (t := m))
+  have hLookup := rbmap_find?_ofList_eq_lookup (l := m.toList) (h := hSorted) (k := e)
+  have hToList := lookup_toList_eq_find? (m := m) (e := e)
+  simp [DEnv.find?, DEnv.ofMap, hLookup, hToList]
+
+private lemma edgeCmpLT_asymm {x y : Edge × Trace} (h : edgeCmpLT x y) : ¬ edgeCmpLT y x := by
+  have hgt : compare y.1 x.1 = .gt :=
+    (Std.OrientedCmp.gt_iff_lt).2 h
+  intro h'
+  have : (.gt : Ordering) = .lt := by
+    exact hgt.symm.trans h'
+  cases this
+
+theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
+    (h₁ : l₁.Pairwise edgeCmpLT) (h₂ : l₂.Pairwise edgeCmpLT)
+    (h₁₂ : l₁ ⊆ l₂) (h₂₁ : l₂ ⊆ l₁) : l₁ = l₂ := by
+  induction l₁ generalizing l₂ with
+  | nil =>
+      cases l₂ with
+      | nil => rfl
+      | cons b bs =>
+          have : b ∈ ([] : List (Edge × Trace)) := h₂₁ (List.mem_cons.mpr (Or.inl rfl))
+          cases this
+  | cons a l₁ ih =>
+      have ha : a ∈ l₂ := h₁₂ (List.mem_cons.mpr (Or.inl rfl))
+      cases l₂ with
+      | nil => cases ha
+      | cons b l₂ =>
+          have h₁' := h₁
+          have h₂' := h₂
+          simp only [List.pairwise_cons] at h₁' h₂'
+          -- a must be the head of l₂
+          have hab : a = b := by
+            cases ha with
+            | inl hEq => exact hEq
+            | inr haTail =>
+                have hb_lt_a : edgeCmpLT b a := h₂'.1 _ haTail
+                have hba : b ≠ a := by
+                  intro hEq
+                  subst hEq
+                  have hlt : edgeCmpLT a a := h₂'.1 _ haTail
+                  exact (edgeCmpLT_asymm hlt) hlt
+                have hb_mem_all : b ∈ a :: l₁ := h₂₁ (List.mem_cons.mpr (Or.inl rfl))
+                have hb_mem : b ∈ l₁ := by
+                  simpa [List.mem_cons, hba] using hb_mem_all
+                have ha_lt_b : edgeCmpLT a b := h₁'.1 _ hb_mem
+                exact (edgeCmpLT_asymm ha_lt_b) hb_lt_a
+          subst hab
+          -- tails are mutually subset
+          have h₁₂' : l₁ ⊆ l₂ := by
+            intro x hx
+            have hx' : x ∈ a :: l₂ := h₁₂ (List.mem_cons.mpr (Or.inr hx))
+            have hneq : x ≠ a := by
+              have hlt : edgeCmpLT a x := h₁'.1 _ hx
+              intro hEq
+              have hEq' : compare a.1 x.1 = .eq :=
+                (Edge.compare_eq_iff_eq a.1 x.1).2 (by simpa [hEq] using rfl)
+              have : (.eq : Ordering) = .lt := by
+                exact hEq'.symm.trans hlt
+              cases this
+            simpa [List.mem_cons, hneq] using hx'
+          have h₂₁' : l₂ ⊆ l₁ := by
+            intro x hx
+            have hx' : x ∈ a :: l₁ := h₂₁ (List.mem_cons.mpr (Or.inr hx))
+            have hneq : x ≠ a := by
+              have hlt : edgeCmpLT a x := h₂'.1 _ hx
+              intro hEq
+              have hEq' : compare a.1 x.1 = .eq :=
+                (Edge.compare_eq_iff_eq a.1 x.1).2 (by simpa [hEq] using rfl)
+              have : (.eq : Ordering) = .lt := by
+                exact hEq'.symm.trans hlt
+              cases this
+            simpa [List.mem_cons, hneq] using hx'
+          have htl : l₁ = l₂ := ih (h₁ := h₁'.2) (h₂ := h₂'.2) h₁₂' h₂₁'
+          simp [htl]
 
 /-- Union of DEnvs (left-biased on key collisions). -/
 def DEnvUnion (D₁ D₂ : DEnv) : DEnv :=
-  fun e =>
-    match D₁ e with
-    | some ts => some ts
-    | none => D₂ e
+  DEnv.ofMap <| D₂.map.fold (fun acc k v =>
+    match acc.find? k with
+    | some _ => acc
+    | none => acc.insert k v) D₁.map
 
 instance : Append DEnv := ⟨DEnvUnion⟩
 
 /-- Lookup a type trace for a directed edge. -/
 def lookupD (env : DEnv) (e : Edge) : List ValType :=
-  (env e).getD []
+  match env.find? e with
+  | some ts => ts.1
+  | none => []
 
-/-- Update or insert a type trace for a directed edge. -/
+/-- Update or insert a type trace for a directed edge.
+    Empty traces are erased to preserve non-emptiness invariants. -/
 def updateD (env : DEnv) (e : Edge) (ts : List ValType) : DEnv :=
-  fun e' => if e' = e then some ts else env e'
+  DEnv.ofMap <|
+    match ts with
+    | [] => env.map.erase e
+    | t :: ts' => env.map.insert e ⟨t :: ts', by simp⟩
 
 /-- Lookup after update on the same edge. -/
 theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     lookupD (updateD env e ts) e = ts := by
-  simp [lookupD, updateD]
+  cases ts with
+  | nil =>
+      simp [lookupD, updateD]
+  | cons t ts' =>
+      simp [lookupD, updateD]
 
 /-- Lookup after update on a different edge. -/
 theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
     lookupD (updateD env e ts) e' = lookupD env e' := by
-  simp [lookupD, updateD, hne]
+  cases ts with
+  | nil =>
+      simp [lookupD, updateD, hne]
+  | cons t ts' =>
+      simp [lookupD, updateD, hne]
 
 @[simp] theorem lookupD_empty (e : Edge) : lookupD (∅ : DEnv) e = [] := by
-  rfl
+  simp [lookupD]
 
 /-- Append a type to the in-flight trace. -/
 def appendD (env : DEnv) (e : Edge) (T : ValType) : DEnv :=
@@ -184,12 +422,12 @@ def initBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
 
 /-- Initialize empty type traces for all directed edges. -/
 def initDEnv (sid : SessionId) (roles : RoleSet) : DEnv :=
-  fun e => if e ∈ RoleSet.allEdges sid roles then some [] else none
+  ∅
 
 /-- Empty DEnv lookup via `find?` always returns none. -/
 @[simp] theorem DEnv_find?_empty (e : Edge) :
     (∅ : DEnv).find? e = none := by
-  rfl
+  simp [DEnv.find?]
 
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
 theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
@@ -218,16 +456,13 @@ theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
 theorem initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hMem : e ∈ RoleSet.allEdges sid roles) :
     lookupD (initDEnv sid roles) e = [] := by
-  simp [initDEnv, lookupD, _hMem]
+  simp [initDEnv, lookupD]
 
 /-- Looking up an edge with a different sid in initDEnv returns none. -/
 theorem initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     (_hne : e.sid ≠ sid) :
     lookupD (initDEnv sid roles) e = [] := by
-  have hNot : e ∉ RoleSet.allEdges sid roles := by
-    intro hmem
-    exact _hne (RoleSet.allEdges_sid sid roles e hmem)
-  simp [initDEnv, lookupD, hNot]
+  simp [initDEnv, lookupD]
 
 /-- If initBuffers returns none, the edge is not in the role edges. -/
 theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
@@ -281,7 +516,7 @@ theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
 theorem initDEnv_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hNot : e ∉ RoleSet.allEdges sid roles) :
     (initDEnv sid roles).find? e = none := by
-  simp [initDEnv, hNot]
+  simp [initDEnv, DEnv.find?]
 
 /-! ## Environment Lemmas -/
 
@@ -323,11 +558,27 @@ theorem lookupStr_update_neq (store : Store) (x y : Var) (v : Value) (hne : x �
 
 theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
     lookupSEnv (updateSEnv env x T) x = some T := by
-  simp [lookupSEnv, updateSEnv]
+  induction env with
+  | nil =>
+      simp [lookupSEnv, updateSEnv]
+  | cons hd tl ih =>
+      simp only [updateSEnv]
+      split_ifs with h
+      · simp [lookupSEnv, h, List.lookup]
+      · simp [lookupSEnv, List.lookup, beq_eq_false_iff_ne.mpr h] at *
+        exact ih
 
 theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
     lookupSEnv (updateSEnv env x T) y = lookupSEnv env y := by
-  simp [lookupSEnv, updateSEnv, hne]
+  induction env with
+  | nil =>
+      simp [lookupSEnv, updateSEnv, hne]
+  | cons hd tl ih =>
+      simp only [updateSEnv]
+      split_ifs with h
+      · simp [lookupSEnv, List.lookup, h, hne]
+      · simp [lookupSEnv, List.lookup, beq_eq_false_iff_ne.mpr h] at *
+        exact ih
 
 theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by

@@ -153,7 +153,7 @@ private theorem CProject_not_muve_of_part_of2_aux_mu_end (t : String) (body : Gl
       have hmuve_false : isMuve candBody0 = false :=
         ih candBody0 hbody_proj hpart_body hne_body
       have hcontra : (true = false) := by
-        simpa [isMuve_of_not_guarded candBody0 t hguard] using hmuve_false
+        simp [isMuve_of_not_guarded candBody0 t hguard] at hmuve_false
       cases hcontra
 
 private theorem CProject_not_muve_of_part_of2_aux_mu (t : String) (body : GlobalType)
@@ -172,7 +172,8 @@ private theorem CProject_not_muve_of_part_of2_aux_mu (t : String) (body : Global
       exact CProject_not_muve_of_part_of2_aux_mu_end t body role hproj hpart hne ih
   | var _ =>
       have : False := by
-        simpa [CProjectF] using (CProject_destruct hproj)
+        have hF := CProject_destruct hproj
+        simp [CProjectF] at hF
       exact this.elim
   | send _ _ => rfl
   | recv _ _ => rfl
@@ -208,44 +209,43 @@ private theorem CProject_not_muve_of_part_of2_aux_comm_cons
     isMuve lt = false := by
   by_cases hs : role = sender
   · subst hs
-    have hF := by
-      simpa [CProjectF] using (CProject_destruct hproj)
+    have hF := CProject_destruct hproj
     cases lt with
     | send _ _ => rfl
     | recv _ _ => rfl
     | «end» =>
         have hfalse : False := by
-          simpa [CProjectF] using hF
+          simp [CProjectF] at hF
         exact hfalse.elim
     | var _ =>
         have hfalse : False := by
-          simpa [CProjectF] using hF
+          simp [CProjectF] at hF
         exact hfalse.elim
     | mu _ _ =>
         have hfalse : False := by
-          simpa [CProjectF] using hF
+          simp [CProjectF] at hF
         exact hfalse.elim
   · by_cases hr : role = receiver
     · subst hr
-      have hF := by
-        simpa [CProjectF, hs] using (CProject_destruct hproj)
+      have hF := CProject_destruct hproj
+      simp [CProjectF, hs] at hF
       cases lt with
       | send _ _ => rfl
       | recv _ _ => rfl
       | «end» =>
           have hfalse : False := by
-            simpa [CProjectF] using hF
+            simp at hF
           exact hfalse.elim
       | var _ =>
           have hfalse : False := by
-            simpa [CProjectF] using hF
+            simp at hF
           exact hfalse.elim
       | mu _ _ =>
           have hfalse : False := by
-            simpa [CProjectF] using hF
+            simp at hF
           exact hfalse.elim
-    · have hF := by
-        simpa [CProjectF, hs, hr] using (CProject_destruct hproj)
+    · have hF := CProject_destruct hproj
+      simp [CProjectF, hs, hr] at hF
       have hF' : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt := by
         intro pair hmem
         exact hF pair hmem
@@ -283,7 +283,6 @@ termination_by g _ _ _ _ _ => sizeOf g
 decreasing_by
   all_goals
     simp_wf
-    subst_vars
     first
     | (simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega)
     | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_mem_snd_lt_comm hmem
@@ -397,7 +396,9 @@ private theorem CProject_part_of2_implies_part_of_all2_aux_mu (t : String) (body
   | «end» =>
       exact CProject_part_of2_implies_part_of_all2_aux_mu_end t body role hproj hpart hne hnsc ih
   | var _ | send _ _ | recv _ _ =>
-      have : False := by simpa [CProjectF] using (CProject_destruct hproj)
+      have : False := by
+        have hF := CProject_destruct hproj
+        simp [CProjectF] at hF
       exact this.elim
 
 private theorem CProject_part_of2_implies_part_of_all2_aux_comm_branch
@@ -433,7 +434,8 @@ private theorem CProject_part_of2_implies_part_of_all2_aux_comm_cons
     (ih : ∀ pair, pair ∈ first :: rest → CProject pair.2 role lt → part_of2 role pair.2 →
       pair.2.allCommsNonEmpty = true → pair.2.noSelfComm = true → part_of_all2 role pair.2) :
     part_of_all2 role (.comm sender receiver (first :: rest)) := by
-  have hF := by simpa [CProjectF] using (CProject_destruct hproj)
+  have hF := CProject_destruct hproj
+  simp [CProjectF] at hF
   by_cases hs : role = sender
   · exact part_of_all2.intro _ (part_of_allF.comm_direct sender receiver (first :: rest)
       (by simp [is_participant, hs]))
@@ -475,7 +477,6 @@ termination_by g _ _ _ _ _ _ => sizeOf g
 decreasing_by
   all_goals
     simp_wf
-    subst_vars
     first
     | (simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega)
     | simpa [GlobalType.comm.sizeOf_spec] using sizeOf_mem_snd_lt_comm hmem

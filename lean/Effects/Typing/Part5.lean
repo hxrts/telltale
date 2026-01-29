@@ -311,9 +311,7 @@ theorem HasTypeProcPre_frame_left {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {P :
         DisjointS_append_left (S₁:=S₁) (S₁':=S₁') (S₂:=S₂') hDisjS2 hDisjS'
       -- Rebuild par with framed components; coerce by lookup-extensionality.
       have hAssoc : (S₁ ++ S₁') ++ S₂' = S₁ ++ (S₁' ++ S₂') := by
-        apply SEnv_ext
-        intro x
-        simpa using (lookupSEnv_append_assoc (S₁:=S₁) (S₂:=S₁') (S₃:=S₂') (x:=x))
+        simpa [List.append_assoc]
       simpa [hAssoc] using HasTypeProcPre.par hDisjS' hP' hQ'
   | assign (Sown:=S₂) (G:=G₂) hSsh hv =>
       exact HasTypeProcPre.assign hSsh (HasTypeVal_frame_left hDisjG hv)
@@ -540,34 +538,21 @@ private theorem DisjointS_append_right
 
 /-- Appending the empty SEnv on the right is a no-op. -/
 private theorem SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
-  -- Prove extensionality by lookup.
-  apply SEnv_ext
-  intro x
-  cases hS : lookupSEnv S x with
-  | some T =>
-      have hLeft := lookupSEnv_append_left (S₁:=S) (S₂:=∅) (x:=x) (T:=T) hS
-      simpa [lookupSEnv_empty] using hLeft
-  | none =>
-      have hRight := lookupSEnv_append_right (S₁:=S) (S₂:=∅) (x:=x) hS
-      simpa [lookupSEnv_empty] using hRight
+  simpa using (List.append_nil S)
 
 /-- Updating an appended SEnv always updates the left side. -/
 private theorem updateSEnv_append_left_any {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ := by
-  -- Compare lookups pointwise for all variables.
-  apply SEnv_ext
-  intro y
-  by_cases hEq : y = x
-  · subst hEq
-    simp [lookupSEnv_update_eq, lookupSEnv_append_left]
-  · have hUpd :
-        lookupSEnv (updateSEnv (S₁ ++ S₂) x T) y = lookupSEnv (S₁ ++ S₂) y := by
-      simpa using (lookupSEnv_update_neq (env:=S₁ ++ S₂) (x:=x) (y:=y) (T:=T) hEq)
-    have hUpd₁ :
-        lookupSEnv (updateSEnv S₁ x T) y = lookupSEnv S₁ y := by
-      simpa using (lookupSEnv_update_neq (env:=S₁) (x:=x) (y:=y) (T:=T) hEq)
-    cases hS₁ : lookupSEnv S₁ y <;>
-      simp [hUpd, hUpd₁, hS₁, lookupSEnv_append_left, lookupSEnv_append_right]
+  induction S₁ with
+  | nil =>
+      simp [updateSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y U =>
+          by_cases h : x = y
+          · subst h
+            simp [updateSEnv, List.append_assoc]
+          · simp [updateSEnv, h, ih, List.append_assoc]
 
 /-- Shorthand for left-framing on pre-out typing. -/
 private abbrev FrameLeft (Ssh S₁ S₂ : SEnv) (G₁ G₂ : GEnv) (P : Process) : Prop :=

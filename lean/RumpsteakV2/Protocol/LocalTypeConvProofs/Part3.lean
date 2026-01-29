@@ -122,7 +122,6 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
       cases hdb
       simp [LocalTypeDB.isGuarded]
     · intro p bs hbs pref ctx i db hidx hdb
-      simp only [fromList_cons_toList] at hdb
       cases hdbs : LocalTypeR.branchesToDB? (pref ++ NameOnlyContext.cons x ctx) bs with
       | none =>
           simp [LocalTypeR.toDB?, hdbs] at hdb
@@ -140,7 +139,7 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           subst hdb
           simp [LocalTypeDB.isGuarded]
     · intro y body hbody pref ctx i db hidx hdb
-      simp only [fromList_cons_toList, fromList_toList, fromList_cons, fromList_append] at hdb
+      simp only [fromList_toList, fromList_cons] at hdb
       cases hbody_db : body.toDB? (cons y (pref ++ cons x ctx)) with
       | none =>
           simp [LocalTypeR.toDB?, hbody_db, Option.map] at hdb
@@ -157,9 +156,9 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
             exact hbody (pref := cons y pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
           have hguard'' : db'.isGuarded (i + pref.length + 1 + 1) = true := by
             have : i + (cons y pref).length + 1 = i + pref.length + 1 + 1 := by
-              simp [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm, cons_length]
+              simp [Nat.add_left_comm, Nat.add_comm, cons_length]
             simpa [this] using hguard'
-          simpa [LocalTypeDB.isGuarded, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using hguard''
+          simpa [LocalTypeDB.isGuarded, Nat.add_left_comm, Nat.add_comm] using hguard''
     · intro v pref ctx i db hidx hdb
       simp only [LocalTypeR.toDB?, fromList_cons_toList] at hdb
       cases hj : NameOnlyContext.indexOf (pref ++ NameOnlyContext.cons x ctx) v with
@@ -352,7 +351,7 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
           constructor
           · -- Show db'.isGuarded 0 = true
             have hidx : (NameOnlyContext.cons x ctx).indexOf x = some 0 := by
-              simp only [Context.indexOf, NameOnlyContext.indexOf_cons_eq]
+              simp only [NameOnlyContext.indexOf_cons_eq]
             exact isGuarded_toDB body (NameOnlyContext.cons x ctx) x 0 db' hguard hidx hbody_db
           · -- Show db'.isContractive = true using IH
             exact hbody (NameOnlyContext.cons x ctx) db' hbody_contr hbody_db

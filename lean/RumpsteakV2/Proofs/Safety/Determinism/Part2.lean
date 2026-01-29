@@ -238,12 +238,12 @@ theorem step_implies_canStep {g g' : GlobalType} {act : GlobalActionR}
     (motive_2 := fun bs act _ _ => BranchesCanStep bs act)
     (fun sender receiver branches label cont hmem =>
       canStep.comm_head sender receiver branches label cont hmem)
-    (fun sender receiver branches branches' act label cont hns hcond hmem hcan hbs ih_branches =>
+    (fun sender receiver branches _branches' act label cont hns hcond hmem hcan _hbs ih_branches =>
       canStep.comm_async sender receiver branches act label cont hns hcond hmem ih_branches hcan)
-    (fun t body act g' hstep ih =>
+    (fun t body act _g' _hstep ih =>
       canStep.mu t body act ih)
     (fun act => BranchesCanStep.nil act)
-    (fun label g g' rest rest' act hstep hrest ih_head ih_rest =>
+    (fun label g _g' rest _rest' act _hstep _hrest ih_head ih_rest =>
       BranchesCanStep.cons label g rest act ih_head ih_rest)
     (t := h)
 

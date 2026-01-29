@@ -61,9 +61,9 @@ lemma indexOf_cons (a : String) (ctx : Context) (v : String) :
       (if a == v then some 0 else Option.map Nat.succ (Context.indexOf ctx v)) := by
   by_cases h : a = v
   · subst h
-    simp only [beq_self_eq_true, ↓reduceIte, Context.indexOf, NameOnlyContext.indexOf_cons_eq]
+    simp [Context.indexOf, NameOnlyContext.indexOf_cons_eq]
   · have hne : (a == v) = false := beq_eq_false_iff_ne.mpr h
-    simp only [hne, ↓reduceIte, Context.indexOf]
+    simp only [hne, Context.indexOf]
     exact NameOnlyContext.indexOf_cons_ne ctx h
 
 lemma indexOf_eq_none_iff_not_mem (ctx : Context) (v : String) :
@@ -204,7 +204,7 @@ lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
           simp only [hctx, Option.map, Option.some.injEq] at hj
           -- hj : k + 1 = j, goal is indexOf ctx v = some (j - 0 - 1) = some (j - 1)
           -- Since k + 1 = j, we have k = j - 1
-          simp only [TypeContext.length_empty, Nat.add_zero, hctx]
+          simp only [TypeContext.length_empty]
           congr 1
           omega
   | h_cons a pref ih =>

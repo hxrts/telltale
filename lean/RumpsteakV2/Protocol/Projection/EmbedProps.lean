@@ -115,12 +115,10 @@ theorem embed_deterministic {e : LocalTypeR} {role : String} {g1 g2 : GlobalType
 termination_by sizeOf e
 decreasing_by
   all_goals
-    simp_wf
     subst_vars
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-    | exact sizeOf_branches_lt_sizeOf_recv _ _
 
 /-- Determinism for branch-wise embedding. -/
 theorem branches_embed_deterministic {lbs : List (Label × LocalTypeR)} {role : String}
@@ -149,7 +147,6 @@ theorem branches_embed_deterministic {lbs : List (Label × LocalTypeR)} {role : 
 termination_by sizeOf lbs
 decreasing_by
   all_goals
-    simp_wf
     subst_vars
     first
     | exact sizeOf_cont_lt_sizeOf_branches _ _ _
@@ -244,12 +241,10 @@ theorem embed_project_roundtrip {e : LocalTypeR} {role : String} {g : GlobalType
 termination_by sizeOf e
 decreasing_by
   all_goals
-    simp_wf
     subst_vars
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-    | exact sizeOf_branches_lt_sizeOf_recv _ _
 
 /-- Embed/project roundtrip for branches. -/
 theorem branches_embed_project_roundtrip {lbs : List (Label × LocalTypeR)} {role : String}
@@ -282,7 +277,6 @@ theorem branches_embed_project_roundtrip {lbs : List (Label × LocalTypeR)} {rol
 termination_by sizeOf lbs
 decreasing_by
   all_goals
-    simp_wf
     subst_vars
     first
     | exact sizeOf_cont_lt_sizeOf_branches _ _ _
@@ -463,12 +457,10 @@ theorem localType_has_embed (e : LocalTypeR) (role : String)
 termination_by sizeOf e
 decreasing_by
   all_goals
-    simp_wf
     subst_vars
     first
     | exact sizeOf_body_lt_sizeOf_mu _ _
     | exact sizeOf_branches_lt_sizeOf_send _ _
-    | exact sizeOf_branches_lt_sizeOf_recv _ _
 
 /-- Helper theorem for embedding branch lists. -/
 theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
@@ -494,7 +486,6 @@ theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
 termination_by sizeOf lbs
 decreasing_by
   all_goals
-    simp_wf
     subst_vars
     first
     | exact sizeOf_cont_lt_sizeOf_branches _ _ _

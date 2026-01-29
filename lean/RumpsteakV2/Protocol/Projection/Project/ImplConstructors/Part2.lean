@@ -141,7 +141,7 @@ private theorem CProject_send_implies_trans_send_comm (sender receiver : String)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
     all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hgb, GlobalType.comm.sizeOf_spec]
 /-- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
       (possibly through non-participant layers), and trans g role = .send partner (transBranches ...). -/
 theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
@@ -167,7 +167,7 @@ theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 /-- Helper: `.end` cannot project to `.recv`. -/
@@ -319,7 +319,7 @@ private theorem CProject_recv_implies_trans_recv_comm (sender receiver : String)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
     all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hgb, GlobalType.comm.sizeOf_spec]
 /-- Symmetric version for recv. -/
 theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partner : String)
       (lbs : List (Label × LocalTypeR)) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true) :
@@ -337,7 +337,7 @@ theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partn
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 /-- Helper: if CProject g role lt holds with lt.isGuarded v = true,

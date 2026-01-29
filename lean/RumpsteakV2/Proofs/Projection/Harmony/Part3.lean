@@ -412,7 +412,13 @@ private theorem comm_wellFormed_of_branches
   have hnoself : noSelfCommBranches branches = true := noSelfCommBranches_of_forall branches hnoself_br
   have hprod : isProductiveBranches branches [] = true := isProductiveBranches_of_forall branches [] hprod_br
   have hne' : branches.isEmpty = false := by
-    cases hbranches : branches <;> simp [hbranches] at hne <;> simp [hbranches]
+    cases hbranches : branches with
+    | nil =>
+        exfalso
+        apply hne
+        simp [hbranches]
+    | cons _ _ =>
+        simp
   simp [GlobalType.wellFormed, GlobalType.allVarsBound, GlobalType.allCommsNonEmpty,
     GlobalType.noSelfComm, GlobalType.isProductive, hvars, hallcomms, hnoself, hprod, hne', hneq]
 
@@ -424,7 +430,7 @@ private lemma comm_sender_ne_receiver_of_wf {sender receiver : String} {branches
   by_cases h : sender = receiver
   · subst h
     have : False := by
-      simpa [GlobalType.noSelfComm] using hnoself
+      simp [GlobalType.noSelfComm] at hnoself
     exact this.elim
   · exact h
 
@@ -493,7 +499,7 @@ private theorem step_preserves_wf_mu
     wellFormed_mu_unfold t body hwf_mu
   exact ih_step hsubst_wf
 
-private theorem branches_wf_nil (act : GlobalActionR)
+private theorem branches_wf_nil (_act : GlobalActionR)
     (_hwf_branches : ∀ p ∈ ([] : List (Label × GlobalType)), p.2.wellFormed = true) :
     ∀ p ∈ ([] : List (Label × GlobalType)), p.2.wellFormed = true := by
   intro p hp; cases hp

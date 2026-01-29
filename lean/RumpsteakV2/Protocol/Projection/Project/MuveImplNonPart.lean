@@ -55,7 +55,7 @@ private theorem EQ_end_closed (g : GlobalType) (role : String)
   simp only [List.eq_nil_iff_forall_not_mem]
   intro x hx
   have hgx : x ∈ g.freeVars := hsub x hx
-  simpa [gclosed] using hgx
+  simp [gclosed] at hgx
 
 private theorem EQ_end_coind (g : GlobalType) (role : String)
     (hmuve : isMuve (trans g role) = true)

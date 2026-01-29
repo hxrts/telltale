@@ -11,8 +11,7 @@ package rumpsteakLean
 
 -- Mathlib provides standard lemmas and automation for proofs.
 -- Pin to a mathlib tag that matches the Lean toolchain.
-require mathlib from git
-  "https://github.com/leanprover-community/mathlib4.git" @ "v4.26.0"
+require mathlib from "/Users/hxrts/projects/lean_common/mathlib4"
 
 -- Pin Mathlib's dependencies to the versions it was tested with
 -- (prevents Lake from resolving to newer incompatible versions)

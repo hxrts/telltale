@@ -154,7 +154,8 @@ private theorem proj_trans_sender_step_v2_comm_async
     SenderStepResult (.comm sender receiver branches) act (.comm sender receiver branches') := by
   -- action_pred forbids async steps.
   have hpred' : act.sender = sender ∧ act.receiver = receiver := by
-    simpa [action_pred] using hpred
+    simp [action_pred] at hpred
+    exact hpred
   have hcontra : False := by
     have hrcv : act.receiver ≠ receiver := hcond hpred'.1
     exact hrcv hpred'.2
@@ -162,11 +163,12 @@ private theorem proj_trans_sender_step_v2_comm_async
 
 private theorem proj_trans_sender_step_v2_mu (t : String) (body : GlobalType)
     (act : GlobalActionR) (g' : GlobalType)
-    (hstep_inner : step (body.substitute t (.mu t body)) act g')
+    (_hstep_inner : step (body.substitute t (.mu t body)) act g')
     (hpred : action_pred (.mu t body) act) :
     SenderStepResult (.mu t body) act g' := by
   -- action_pred is false at mu heads.
-  have : False := by simpa [action_pred] using hpred
+  have : False := by
+    simp [action_pred] at hpred
   exact this.elim
 
 /-- Sender-side step projection under the head-action predicate. -/
@@ -219,7 +221,7 @@ private theorem proj_trans_receiver_step_mu
     (hpred : action_pred (.mu t body) act) :
     ReceiverStepResult (.mu t body) act g' := by
   -- Mu at head cannot satisfy the action predicate.
-  simpa [action_pred] using hpred
+  simp [action_pred] at hpred
 
 /-- Receiver-side step projection under the head-action predicate. -/
 theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
@@ -232,7 +234,8 @@ theorem proj_trans_receiver_step_v2 (g g' : GlobalType) (act : GlobalActionR)
   | comm_async sender receiver branches branches' act label cont hns hcond hmem hcan hbstep =>
       -- Async steps contradict action_pred by definition.
       have hpred' : act.sender = sender ∧ act.receiver = receiver := by
-        simpa [action_pred] using hpred
+        simp [action_pred] at hpred
+        exact hpred
       have hsender : act.sender = sender := hpred'.1
       have hreceiver : act.receiver = receiver := hpred'.2
       exact (hcond hsender hreceiver).elim

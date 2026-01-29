@@ -88,7 +88,7 @@ theorem labelsSubset_of_labelsSubsetb {bs1 bs2 : List (Label × LocalTypeR)}
             cases hlookup2 : lookupBranch lbl bs2 with
             | none =>
                 have : False := by
-                  simpa [labelInb, hlookup2] using h'1
+                  simp [labelInb, hlookup2] at h'1
                 exact this.elim
             | some _ =>
                 simp [labelIn, hlookup2]
@@ -130,7 +130,7 @@ private theorem lookupBranch_appendMissing_of_not_in
                     lookupBranch lbl (appendMissing tail bs1) := by simp [happend]
                 _ = lookupBranch lbl tail := ih
                 _ = lookupBranch lbl ((l, t) :: tail) := by
-                  simpa [lookupBranch, hlt]
+                  simp [lookupBranch, hlt]
             ·
               have happend : appendMissing ((l, t) :: tail) bs1 = (l, t) :: appendMissing tail bs1 := by
                 simp [appendMissing, hIn]
@@ -140,7 +140,7 @@ private theorem lookupBranch_appendMissing_of_not_in
                 _ = lookupBranch lbl (appendMissing tail bs1) := by simp [lookupBranch, hlt]
                 _ = lookupBranch lbl tail := ih
                 _ = lookupBranch lbl ((l, t) :: tail) := by
-                  simpa [lookupBranch, hlt]
+                  simp [lookupBranch, hlt]
 
 /-! ## Merge Algorithm -/
 
@@ -159,23 +159,24 @@ private def lookupBranchEq (lbl : Label) :
 private lemma lookupBranchEq_none {lbl : Label} :
     ∀ bs, lookupBranchEq lbl bs = none → lookupBranch lbl bs = none
   | [] => by
-      intro h
-      simp [lookupBranchEq] at h
-      simpa [lookupBranch]
+      intro _
+      simp [lookupBranch]
   | (l, t) :: rest => by
       intro h
       by_cases hl : l = lbl
       ·
-        exact (False.elim (by
-          simpa [lookupBranchEq, lookupBranch, hl] using h))
+        have : False := by
+          simp [lookupBranchEq, lookupBranch, hl] at h
+        exact this.elim
       ·
         cases hrest : lookupBranchEq lbl rest with
         | none =>
             have hrest' := lookupBranchEq_none rest hrest
-            simp [lookupBranchEq, lookupBranch, hl, hrest, hrest']
+            simp [lookupBranch, hl, hrest']
         | some ht =>
-            exact (False.elim (by
-              simpa [lookupBranchEq, hl, hrest] using h))
+            have : False := by
+              simp [lookupBranchEq, hl, hrest] at h
+            exact this.elim
 
 mutual
   /-- Merge two local types, returning a common erasure if possible. -/
@@ -183,14 +184,14 @@ mutual
     | .end, .end => some .end
     | .var v, .var w => if v = w then some (.var v) else none
     | .mu v a, .mu w b =>
-        if h : v = w then
+        if _h : v = w then
           match merge a b with
           | some c => some (.mu v c)
           | none => none
         else
           none
     | .send p bs1, .send q bs2 =>
-        if h : p = q then
+        if _h : p = q then
           match mergeBranchesSend bs1 bs2 with
           | some bs =>
               if labelsSubsetb bs2 bs1 then some (.send p bs) else none
@@ -198,7 +199,7 @@ mutual
         else
           none
     | .recv p bs1, .recv q bs2 =>
-        if h : p = q then
+        if _h : p = q then
           match mergeBranchesRecv bs1 bs2 with
           | some bs => some (.recv p bs)
           | none => none
@@ -211,7 +212,6 @@ mutual
       first
       | exact Nat.add_lt_add (sizeOf_body_lt_sizeOf_mu _ _) (sizeOf_body_lt_sizeOf_mu _ _)
       | exact Nat.add_lt_add (sizeOf_branches_lt_sizeOf_send _ _) (sizeOf_branches_lt_sizeOf_send _ _)
-      | exact Nat.add_lt_add (sizeOf_branches_lt_sizeOf_recv _ _) (sizeOf_branches_lt_sizeOf_recv _ _)
   /-- Merge send branches using `merge` on continuations. -/
   def mergeBranchesSend : List (Label × LocalTypeR) → List (Label × LocalTypeR) →
       Option (List (Label × LocalTypeR))
@@ -219,7 +219,7 @@ mutual
     | (lbl, t1) :: rest, bs2 =>
         match lookupBranchEq lbl bs2 with
         | none => none
-        | some ⟨t2, hlookup⟩ =>
+        | some ⟨t2, _hlookup⟩ =>
             match merge t1 t2, mergeBranchesSend rest bs2 with
             | some t, some rest' => some ((lbl, t) :: rest')
             | _, _ => none
@@ -229,7 +229,7 @@ mutual
       first
       | exact Nat.add_lt_add_right (sizeOf_tail_lt_sizeOf_branches (head := (lbl, t1)) (tail := rest)) _
       | -- merge call on branch continuations
-        have hlookup' : lookupBranch lbl bs2 = some t2 := hlookup
+        have hlookup' : lookupBranch lbl bs2 = some t2 := _hlookup
         have hmem2 : t2 ∈ bs2.map Prod.snd := by
           refine List.mem_map.2 ?_
           exact ⟨(lbl, t2), mem_of_lookupBranch hlookup', rfl⟩
@@ -248,7 +248,7 @@ mutual
             match mergeBranchesRecv rest bs2 with
             | some rest' => some ((lbl, t1) :: rest')
             | none => none
-        | some ⟨t2, hlookup⟩ =>
+        | some ⟨t2, _hlookup⟩ =>
             match merge t1 t2, mergeBranchesRecv rest bs2 with
             | some t, some rest' => some ((lbl, t) :: rest')
             | _, _ => none
@@ -258,7 +258,7 @@ mutual
       first
       | exact Nat.add_lt_add_right (sizeOf_tail_lt_sizeOf_branches (head := (lbl, t1)) (tail := rest)) _
       | -- merge call on branch continuations
-        have hlookup' : lookupBranch lbl bs2 = some t2 := hlookup
+        have hlookup' : lookupBranch lbl bs2 = some t2 := _hlookup
         have hmem2 : t2 ∈ bs2.map Prod.snd := by
           refine List.mem_map.2 ?_
           exact ⟨(lbl, t2), mem_of_lookupBranch hlookup', rfl⟩
@@ -278,24 +278,24 @@ theorem mergeBranchesSend_eq_some {lbl : Label} {t1 : LocalTypeR}
       mergeBranchesSend rest bs2 = some rest' ∧
       bs = (lbl, t) :: rest' := by
   classical
-  cases hlookup : lookupBranchEq lbl bs2 with
+  cases hlookupEq : lookupBranchEq lbl bs2 with
   | none =>
-      simp [mergeBranchesSend, hlookup] at h
+      simp [mergeBranchesSend, hlookupEq] at h
   | some ht =>
       rcases ht with ⟨t2, hlookup⟩
       cases hmerge : merge t1 t2 with
       | none =>
-          simp [mergeBranchesSend, hlookup, hmerge] at h
+          simp [mergeBranchesSend, hlookupEq, hmerge] at h
       | some t =>
           cases hrest : mergeBranchesSend rest bs2 with
           | none =>
-              simp [mergeBranchesSend, hlookup, hmerge, hrest] at h
+              simp [mergeBranchesSend, hlookupEq, hmerge, hrest] at h
           | some rest' =>
-              simp [mergeBranchesSend, hlookup, hmerge, hrest] at h
+              simp [mergeBranchesSend, hlookupEq, hmerge, hrest] at h
               refine ⟨t2, t, rest', ?_, ?_, ?_, ?_⟩
-              · simpa [hlookup]
-              · simpa [hmerge]
-              · simpa [hrest]
+              · simp [hlookup]
+              · simp [hmerge]
+              · rfl
               · cases h; rfl
 
 theorem mergeBranchesRecv_eq_some {lbl : Label} {t1 : LocalTypeR}
@@ -309,34 +309,34 @@ theorem mergeBranchesRecv_eq_some {lbl : Label} {t1 : LocalTypeR}
         mergeBranchesRecv rest bs2 = some rest' ∧
         bs = (lbl, t) :: rest' := by
   classical
-  cases hlookup : lookupBranchEq lbl bs2 with
+  cases hlookupEq : lookupBranchEq lbl bs2 with
   | none =>
       cases hrest : mergeBranchesRecv rest bs2 with
       | none =>
-          simp [mergeBranchesRecv, hlookup, hrest] at h
+          simp [mergeBranchesRecv, hlookupEq, hrest] at h
       | some rest' =>
-          simp [mergeBranchesRecv, hlookup, hrest] at h
+          simp [mergeBranchesRecv, hlookupEq, hrest] at h
           left
           refine ⟨?_, rest', ?_, ?_⟩
-          · exact lookupBranchEq_none (lbl := lbl) bs2 hlookup
-          · simpa [hrest]
+          · exact lookupBranchEq_none (lbl := lbl) bs2 hlookupEq
+          · rfl
           · cases h; rfl
   | some ht =>
       rcases ht with ⟨t2, hlookup⟩
       cases hmerge : merge t1 t2 with
       | none =>
-          simp [mergeBranchesRecv, hlookup, hmerge] at h
+          simp [mergeBranchesRecv, hlookupEq, hmerge] at h
       | some t =>
           cases hrest : mergeBranchesRecv rest bs2 with
           | none =>
-              simp [mergeBranchesRecv, hlookup, hmerge, hrest] at h
+              simp [mergeBranchesRecv, hlookupEq, hmerge, hrest] at h
           | some rest' =>
-              simp [mergeBranchesRecv, hlookup, hmerge, hrest] at h
+              simp [mergeBranchesRecv, hlookupEq, hmerge, hrest] at h
               right
               refine ⟨t2, t, rest', ?_, ?_, ?_, ?_⟩
-              · simpa [hlookup]
-              · simpa [hmerge]
-              · simpa [hrest]
+              · simp [hlookup]
+              · simp [hmerge]
+              · rfl
               · cases h; rfl
 /-- Merge a list of local types (right fold). -/
 def mergeAll : List LocalTypeR → Option LocalTypeR

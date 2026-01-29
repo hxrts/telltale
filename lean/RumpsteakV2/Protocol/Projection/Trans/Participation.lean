@@ -43,8 +43,10 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
     participatesFirstBranch role g = true → Participation.participates role g = true := by
   intro h
   match g with
-  | .end => simpa [participatesFirstBranch] using h
-  | .var _ => simpa [participatesFirstBranch] using h
+  | .end =>
+      simp [participatesFirstBranch] at h
+  | .var _ =>
+      simp [participatesFirstBranch] at h
   | .mu t body =>
       unfold participatesFirstBranch at h
       unfold Participation.participates
@@ -54,15 +56,18 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
       unfold Participation.participates
       cases hpart : Participation.is_participant role sender receiver with
       | true =>
-          simp [hpart]
+          simp
       | false =>
-          simp [hpart] at h ⊢
           match hbranches : branches with
           | [] =>
-              simp at h
+              simp [hpart] at h
           | (label, cont) :: rest =>
-              simp [Participation.participatesBranches, Bool.or_eq_true]
-              exact Or.inl (participatesFirstBranch_imp_participates cont role h)
+              have hcont : participatesFirstBranch role cont = true := by
+                simp [hpart] at h
+                exact h
+              have hcont_part : Participation.participates role cont = true :=
+                participatesFirstBranch_imp_participates cont role hcont
+              simp [Participation.participatesBranches, hcont_part]
 
 mutual
   /-- Participation that continues through ALL branch continuations, not just first branch.
@@ -133,8 +138,10 @@ theorem trans_isGuarded_of_participatesFirstBranch
     (hpart : participatesFirstBranch role g = true) :
     (trans g role).isGuarded v = true := by
   match g with
-  | .end => simpa [participatesFirstBranch] using hpart
-  | .var _ => simpa [participatesFirstBranch] using hpart
+  | .end =>
+      simp [participatesFirstBranch] at hpart
+  | .var _ =>
+      simp [participatesFirstBranch] at hpart
   | .mu t body =>
       -- Mu case: follow the body and propagate guardedness.
       unfold participatesFirstBranch at hpart
@@ -173,12 +180,14 @@ theorem trans_isGuarded_of_participatesFirstBranch
                   have hcont' :
                       Participation.is_participant role sender receiver = true ∨
                         participatesFirstBranch role cont = true := by
-                    simpa [participatesFirstBranch, Bool.or_eq_true] using hpart
+                    have hpart' := hpart
+                    simp [participatesFirstBranch, Bool.or_eq_true] at hpart'
+                    exact hpart'
                   have hcont : participatesFirstBranch role cont = true := by
                     cases hcont' with
                     | inl hleft =>
                         have hleft' : False := by
-                          simpa [Participation.is_participant, hpart_direct] using hleft
+                          simp [Participation.is_participant, hpart_direct] at hleft
                         exact hleft'.elim
                     | inr hright =>
                         exact hright

@@ -1,8 +1,3 @@
-/-! # RumpsteakV2.Coinductive
-
-Hub module re-exporting coinductive session type infrastructure.
--/
-
 import RumpsteakV2.Coinductive.LocalTypeC
 import RumpsteakV2.Coinductive.Regularity
 import RumpsteakV2.Coinductive.Bridge

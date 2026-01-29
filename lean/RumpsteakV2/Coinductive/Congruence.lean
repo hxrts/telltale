@@ -23,7 +23,7 @@ namespace RumpsteakV2.Coinductive
 /-- toCoind is congruent: equal inputs produce equal outputs. -/
 lemma toCoind_congr {t u : RumpsteakV2.Protocol.LocalTypeR.LocalTypeR} (h : t = u) :
     toCoind t = toCoind u := by
-  simpa [h]
+  simp [h]
 
 /-- toInductive is congruent under bisimilarity.
     Since bisimilarity equals equality for M-types, this follows from reflexivity. -/

@@ -74,8 +74,10 @@ theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (ro
     participatesAllBranches role g = true → participatesFirstBranch role g = true := by
   intro h
   match g with
-  | .end => simpa [participatesAllBranches] using h
-  | .var _ => simpa [participatesAllBranches] using h
+  | .end =>
+      simp [participatesAllBranches] at h
+  | .var _ =>
+      simp [participatesAllBranches] at h
   | .mu _ body =>
       simpa [participatesAllBranches, participatesFirstBranch] using
         (participatesAllBranches_imp_participatesFirstBranch body role h)
@@ -92,7 +94,7 @@ theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (ro
       unfold participatesFirstBranch
       cases hpart : is_participant role sender receiver with
       | true =>
-          simp [hpart]
+          simp
       | false =>
           simp only [hpart, Bool.false_and, Bool.false_or] at h ⊢
           exact participatesAllBranches_imp_participatesFirstBranch cont role h
@@ -147,12 +149,12 @@ mutual
               intro heq
               have : is_participant role sender receiver = true := by
                 simp [is_participant, heq]
-              simpa [hpart_direct] using this
+              simp [hpart_direct] at this
             have hne_r : role ≠ receiver := by
               intro heq
               have : is_participant role sender receiver = true := by
                 simp [is_participant, heq, Bool.or_comm]
-              simpa [hpart_direct] using this
+              simp [hpart_direct] at this
             rw [trans_comm_other sender receiver role [] hne_s hne_r]
             simp [LocalTypeR.isContractive]
     | .comm sender receiver ((label, cont) :: rest) =>

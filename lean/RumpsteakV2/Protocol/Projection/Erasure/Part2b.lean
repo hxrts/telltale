@@ -32,15 +32,15 @@ private theorem mergeBranchesSend_sound
           refine ⟨?_, ?_, ?_, ?_⟩
           · intro lbl hIn
             have : False := by
-              simpa [labelIn, lookupBranch] using hIn
+              simp [labelIn, lookupBranch] at hIn
             exact this.elim
           · intro lbl hIn
             have : False := by
-              simpa [labelIn, lookupBranch] using hIn
+              simp [labelIn, lookupBranch] at hIn
             exact this.elim
           · intro lbl hIn
             have : False := by
-              simpa [labelIn, lookupBranch] using hIn
+              simp [labelIn, lookupBranch] at hIn
             exact this.elim
           · intro lbl t1 t2 t h1 _ _
             simp [lookupBranch] at h1
@@ -48,7 +48,7 @@ private theorem mergeBranchesSend_sound
           have hnone : mergeBranchesSend [] bs2 = none := by
             simp [mergeBranchesSend, hsubset]
           have : False := by
-            simpa [hnone] using h
+            simp [hnone] at h
           exact this.elim
   | cons head tail ih =>
       cases head with
@@ -190,7 +190,7 @@ private theorem mergeBranchesRecv_sound
               ·
                 simp [lookupBranch, hlt] at h1'
                 cases h1'
-                simp [lookupBranch, hlookup, hlt]
+                simp [lookupBranch, hlt]
               ·
                 have h1_tail : lookupBranch lbl tail = some t1' := by
                   simpa [lookupBranch, hlt] using h1'
@@ -294,7 +294,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
               exact Erases.end
           | var _ | mu _ _ | send _ _ | recv _ _ =>
               have : False := by
-                simpa [merge] using h
+                simp [merge] at h
               exact this.elim
       | var v =>
           cases b with
@@ -304,11 +304,11 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                 cases h
                 simpa [hv] using (Erases.var v)
               · have : False := by
-                  simpa [merge, hv] using h
+                  simp [merge, hv] at h
                 exact this.elim
           | «end» | mu _ _ | send _ _ | recv _ _ =>
               have : False := by
-                simpa [merge] using h
+                simp [merge] at h
               exact this.elim
       | mu v a' =>
           cases b with
@@ -318,7 +318,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                 cases h' : merge a' b' with
                 | none => simp [h'] at h
                 | some c' =>
-                    simp [h', hv] at h
+                    simp [h'] at h
                     cases h
                     have hlt : sizeOf a' + sizeOf b' < m := by
                       have h1 : sizeOf a' < sizeOf (LocalTypeR.mu v a') := sizeOf_body_lt_sizeOf_mu v a'
@@ -330,11 +330,11 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                     simpa [hv] using (Erases.mu v (hmerge _ _ _ hlt h'))
               ·
                 have : False := by
-                  simpa [merge, hv] using h
+                  simp [merge, hv] at h
                 exact this.elim
           | «end» | var _ | send _ _ | recv _ _ =>
               have : False := by
-                simpa [merge] using h
+                simp [merge] at h
               exact this.elim
       | send p bs =>
           cases b with
@@ -370,7 +370,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
               · simp [merge, hp] at h
           | «end» | var _ | mu _ _ | recv _ _ =>
               have : False := by
-                simpa [merge] using h
+                simp [merge] at h
               exact this.elim
       | recv p bs =>
           cases b with
@@ -400,7 +400,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
               · simp [merge, hp] at h
           | «end» | var _ | mu _ _ | send _ _ =>
               have : False := by
-                simpa [merge] using h
+                simp [merge] at h
               exact this.elim
 /-- mergeAll is sound w.r.t. ErasesAll. -/
 theorem mergeAll_sound {ts : List LocalTypeR} {t : LocalTypeR}

@@ -153,7 +153,8 @@ private theorem CProject_end_trans_end_comm_receiver_contra
     (hrr : role = receiver) (hrs : role ≠ sender) : False := by
   -- CProjectF forbids .end when the role is receiver.
   have hf := CProject_destruct h
-  simpa [CProjectF, hrr, hrs] using hf
+  have hns : receiver ≠ sender := by simpa [hrr] using hrs
+  simp [CProjectF, hrr, hns] at hf
 
 /-- Helper: non-participant comm case reduces to the head branch. -/
 private theorem CProject_end_trans_end_comm_other
@@ -219,7 +220,7 @@ private theorem CProject_end_trans_end_comm (sender receiver : String)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
     all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hgb, GlobalType.comm.sizeOf_spec]
 
 /-- If CProject g role .end, then trans g role = .end.
       Proved by well-founded induction on g. -/
@@ -242,7 +243,7 @@ theorem CProject_end_trans_end (g : GlobalType) (role : String)
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 /-! ### Var constructor agreement -/
@@ -287,7 +288,8 @@ private theorem CProject_var_trans_var_comm_receiver_contra
     (hrr : role = receiver) (hrs : role ≠ sender) : False := by
   -- CProjectF forbids .var when the role is receiver.
   have hf := CProject_destruct h
-  simpa [CProjectF, hrr, hrs] using hf
+  have hns : receiver ≠ sender := by simpa [hrr] using hrs
+  simp [CProjectF, hrr, hns] at hf
 
 /-- Helper: non-participant comm case reduces to the head branch. -/
 private theorem CProject_var_trans_var_comm_other
@@ -354,7 +356,7 @@ private theorem CProject_var_trans_var_comm (sender receiver : String)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
     all_goals
-      simp [hgb, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hgb, GlobalType.comm.sizeOf_spec]
 
 /-- If CProject g role (.var v) and g has non-empty branches, then trans g role = .var v.
       Proved by well-founded induction on g.
@@ -377,7 +379,7 @@ theorem CProject_var_trans_var (g : GlobalType) (role : String) (v : String)
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec, List._sizeOf_1, Prod._sizeOf_1]
+      simp [hg, GlobalType.comm.sizeOf_spec]
 end
 
 /-! ### CProject-to-Trans structure extraction
