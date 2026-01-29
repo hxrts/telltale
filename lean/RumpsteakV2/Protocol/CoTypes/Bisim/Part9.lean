@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part8
 
+/-! # Bisim Part 9: Substitution Compatibility (continued)
+
+Proves substitute_compatible_barendregt and EQ2_substitute_via_Bisim.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

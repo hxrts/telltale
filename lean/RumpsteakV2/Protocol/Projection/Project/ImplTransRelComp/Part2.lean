@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplTransRelComp.Part1
 
+/-! # ImplTransRelComp Part 2
+
+Comm-level postfix cases for CProjectTransRel.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

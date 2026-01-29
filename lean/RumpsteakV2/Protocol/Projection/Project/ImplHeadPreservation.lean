@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplTransRelComp
 
+/-! # Project ImplHeadPreservation
+
+Head constructor preservation for CProjectTransRel and 3-hop EQ2 composition.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

@@ -1,5 +1,11 @@
 import RumpsteakV2.Protocol.CoTypes.EQ2.Core
 
+/-! # EQ2 Transitivity via Base Constructors
+
+Transitivity helpers for EQ2 when the intermediate term is a base constructor
+(.end or .var v).
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unusedTactic false
 

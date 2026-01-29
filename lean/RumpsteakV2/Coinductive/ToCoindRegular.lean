@@ -6,7 +6,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. The toCoind function embeds inductive types into coinductive types.
 We need to prove that the result is always regular (has finitely many reachable
 states), which is necessary for round-tripping via toInductive.

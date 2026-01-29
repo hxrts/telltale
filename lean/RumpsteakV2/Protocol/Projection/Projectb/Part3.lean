@@ -5,6 +5,12 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Participation
 open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
+
+/-! # Projectb Part 3
+
+Soundness and completeness of `projectb` with respect to `CProject`.
+-/
+
 /-! ## Soundness and Completeness
 
 These theorems establish the correspondence between the boolean checker `projectb`

@@ -3,7 +3,7 @@ import RumpsteakV2.Coinductive.LocalTypeC
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 To build coinductive local types from other data, we need anamorphisms
 (unfolds). Mathlib's PFunctor.M provides a corecursor, however, the
 interface is low-level.

@@ -2,6 +2,11 @@ import RumpsteakV2.Protocol.GlobalType.Part1
 
 set_option linter.dupNamespace false
 
+/-! # GlobalType Part 2
+
+Actions, step semantics, wellFormed predicate, and canStep-implies-step theorems.
+-/
+
 namespace RumpsteakV2.Protocol.GlobalType
 /-! ## Actions and Step Semantics -/
 

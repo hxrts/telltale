@@ -1,5 +1,11 @@
 import RumpsteakV2.Proofs.Projection.Harmony.Part2
 
+/-! # Harmony Part 3
+
+Participant projection lemmas (sender/receiver step) and non-participant step helpers
+including well-formedness preservation.
+-/
+
 namespace RumpsteakV2.Proofs.Projection.Harmony
 /-! ### Participant Projection Lemmas
 

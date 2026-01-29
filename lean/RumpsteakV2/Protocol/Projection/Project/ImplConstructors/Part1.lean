@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplBase
 
+/-! # ImplConstructors Part 1
+
+Constructor agreement for end, var, and send/recv structural extraction.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

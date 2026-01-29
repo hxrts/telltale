@@ -3,7 +3,7 @@ import RumpsteakV2.Coinductive.LocalTypeC
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Coinductive local types (LocalTypeC) are infinite trees built
 from a polynomial functor. Unlike inductive types, we cannot pattern match
 on their structure directly. To reason about them, we need a notion of

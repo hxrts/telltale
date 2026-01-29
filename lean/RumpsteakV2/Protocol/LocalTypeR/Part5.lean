@@ -6,6 +6,11 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-! # LocalTypeR Part 5
+
+Well-formedness preservation (unfold, fullUnfold, branches) and unguarded variable theorem.
+-/
+
 namespace RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType
 /-! ## Well-formedness Preservation -/

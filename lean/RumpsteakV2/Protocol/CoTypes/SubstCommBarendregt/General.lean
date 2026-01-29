@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.Predicates
 
+/-! # General Substitution Commutation
+
+Proves `subst_subst_comm_general` and corollaries `subst_mu_comm`, `unfold_subst_eq_subst_unfold`.
+-/
+
 namespace RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType

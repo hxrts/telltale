@@ -1,5 +1,10 @@
 import RumpsteakV2.Proofs.Safety.Determinism.Part1
 
+/-! # Determinism Part 2
+
+Diamond property for independent actions and the determinism Claims bundle.
+-/
+
 namespace RumpsteakV2.Proofs.Safety.Determinism
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Semantics.Environment

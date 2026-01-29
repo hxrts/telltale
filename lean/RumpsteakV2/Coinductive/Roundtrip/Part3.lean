@@ -2,6 +2,11 @@ import RumpsteakV2.Coinductive.Roundtrip.Part2
 
 set_option linter.dupNamespace false
 
+/-! # Roundtrip Part 3
+
+Stub definitions (nameOf, envOf), environment containment helpers, and toInductiveBody.
+-/
+
 namespace RumpsteakV2.Coinductive
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR

@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part6
 
+/-! # Bisim Part 7: EQ2 to Bisim Conversion and Transitivity
+
+Converts EQ2 to Bisim under well-formedness and proves EQ2 transitivity via Bisim detour.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

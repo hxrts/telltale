@@ -1,5 +1,11 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part1
 
+/-! # Bisim Part 2: Unfolding Shape and Converse Lemmas
+
+Connects membership predicates with fullUnfold and proves fullUnfold reflects
+observable behavior for well-formed types.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

@@ -5,7 +5,7 @@ import RumpsteakV2.Protocol.Projection.Trans
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Given a global type and its stepping semantics, we need a way
 to represent the local view of each participant. The challenge is that global
 types step as a whole, but each role only sees its local session type.

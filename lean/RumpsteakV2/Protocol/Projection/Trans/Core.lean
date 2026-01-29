@@ -2,7 +2,7 @@ import RumpsteakV2.Protocol.GlobalType
 import RumpsteakV2.Protocol.LocalTypeR
 import RumpsteakV2.Protocol.Participation
 
-/-
+/-!
 The Problem. Define a candidate projection function `trans : GlobalType → String → LocalTypeR`
 that extracts a role's local view from a global choreography. The key challenge is handling
 recursive types (μt.body): we must project the body and then decide whether to keep the

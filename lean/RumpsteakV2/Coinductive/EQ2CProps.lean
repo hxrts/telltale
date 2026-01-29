@@ -4,7 +4,7 @@ import RumpsteakV2.Coinductive.WellFormed
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 EQ2C is defined as an existentially quantified bisimulation, but practical
 proofs need lemmas showing how EQ2C interacts with smart constructors and
 mu-unfolding.

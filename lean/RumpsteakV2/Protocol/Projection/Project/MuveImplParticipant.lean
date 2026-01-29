@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.MuveImplNonPart
 
+/-! # Project MuveImplParticipant
+
+Participant projection classification and part_of2_or_end theorem.
+-/
+
 namespace RumpsteakV2.Protocol.Projection.Project
 
 open RumpsteakV2.Protocol.GlobalType

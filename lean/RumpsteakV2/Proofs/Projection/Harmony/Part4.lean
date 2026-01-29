@@ -1,5 +1,10 @@
 import RumpsteakV2.Proofs.Projection.Harmony.Part3b
 
+/-! # Harmony Part 4
+
+Non-participant step preservation proof and Claims bundle.
+-/
+
 namespace RumpsteakV2.Proofs.Projection.Harmony
 /-! ### Non-participant Step Preservation
 

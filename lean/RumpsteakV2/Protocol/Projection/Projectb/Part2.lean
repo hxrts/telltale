@@ -5,6 +5,13 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Participation
 open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
+
+/-! # Projectb Part 2
+
+Coinductive CProject relation, constructor lemmas, and reflection lemmas connecting
+`projectb` to `CProject`.
+-/
+
 /-! ## CProject Coinductive Relation
 
 CProject is defined as the greatest fixed point of CProjectF, which captures

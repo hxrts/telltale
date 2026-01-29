@@ -6,6 +6,11 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-! # LocalTypeR Part 4
+
+Closed types and substitution, muHeight properties, guardedness and contractiveness preservation.
+-/
+
 namespace RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType
 /-! ## Closed Types and Substitution -/

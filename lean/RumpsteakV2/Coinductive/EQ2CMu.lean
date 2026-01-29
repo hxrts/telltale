@@ -8,6 +8,11 @@ import RumpsteakV2.Coinductive.BisimDecidable
 
 set_option linter.dupNamespace false
 
+/-! # EQ2CMu
+
+Mu-aware paco equality step and bounded unfolding helpers.
+-/
+
 namespace RumpsteakV2.Coinductive
 
 /-- One-step mu-aware generator: either take an observable step, or unfold μ on either side. -/

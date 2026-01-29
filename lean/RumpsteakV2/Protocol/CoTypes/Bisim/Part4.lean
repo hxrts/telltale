@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part3
 
+/-! # Bisim Part 4: Equivalence with EQ2
+
+Proves Bisim implies EQ2 and establishes EQ2 incompatibility lemmas.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

@@ -5,7 +5,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Given a regular coinductive type (one with finitely many reachable
 states), we want to construct an equivalent finite inductive type. This enables
 round-tripping between the two representations.

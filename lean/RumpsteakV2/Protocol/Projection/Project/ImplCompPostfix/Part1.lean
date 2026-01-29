@@ -1,6 +1,11 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplHeadPreservation
 import RumpsteakV2.Protocol.Projection.Project.ImplObservables
 
+/-! # ImplCompPostfix Part 1
+
+Well-formed closure lifting and base/chain/prefix postfix cases.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

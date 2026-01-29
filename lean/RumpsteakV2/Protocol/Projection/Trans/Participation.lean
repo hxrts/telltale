@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Trans.Core
 
+/-! # Trans Participation
+
+First-branch and all-branch participation predicates and guardedness of projection
+under participation.
+-/
 
 namespace RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.GlobalType

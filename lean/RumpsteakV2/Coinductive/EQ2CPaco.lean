@@ -4,7 +4,7 @@ import RumpsteakV2.Coinductive.EQ2C
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 EQ2C is defined via an existentially quantified bisimulation, which makes
 coinductive proofs awkward. The paco library provides a cleaner coinduction
 principle through parametrized greatest fixed points.

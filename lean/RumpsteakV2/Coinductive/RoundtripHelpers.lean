@@ -11,7 +11,7 @@ import RumpsteakV2.Protocol.Projection.Trans
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Round-trip correctness requires structural lemmas about toCoind:
 1. Children of toCoind images are themselves toCoind images
 2. Size bounds for recursive descent termination

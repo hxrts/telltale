@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplConstructors.Part1
 
+/-! # ImplConstructors Part 2
+
+Send and recv constructor agreement with matching branches.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

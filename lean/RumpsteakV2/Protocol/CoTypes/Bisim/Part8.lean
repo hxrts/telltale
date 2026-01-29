@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part7
 
+/-! # Bisim Part 8: Congruence Framework and Substitution Compatibility
+
+Proves duality is compatible and establishes substitution compatibility under Barendregt conditions.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

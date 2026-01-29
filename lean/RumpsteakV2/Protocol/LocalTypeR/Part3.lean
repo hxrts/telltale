@@ -6,6 +6,11 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-! # LocalTypeR Part 3
+
+Full unfolding, guardedness/contractiveness properties, and contractive types reaching observable form.
+-/
+
 namespace RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType
 /-! ## Full Unfolding (Coq-style `full_eunf`)

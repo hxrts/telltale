@@ -6,6 +6,11 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-! # LocalTypeR Part 2
+
+Environment application, active variables, closedness, and free-variable substitution properties.
+-/
+
 namespace RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.GlobalType
 /-! ## Environments (abstraction point for closedness vs substitutions)

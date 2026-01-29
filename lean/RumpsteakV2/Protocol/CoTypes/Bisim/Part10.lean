@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part9
 
+/-! # Bisim Part 10: Unfold/Substitute Commutation
+
+Proves unfold_substitute_EQ2_via_Bisim: unfolding and substituting commute up to EQ2.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

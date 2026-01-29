@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplObservables
 
+/-! # ImplExtraction Part 1
+
+Observable extraction: same-constructor CProjectTransRelComp structural equalities.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part4
 
+/-! # Bisim Part 5: Observable Behavior Extraction from EQ2
+
+Extracts observable behavior from EQ2 proofs under closedness/contractiveness.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

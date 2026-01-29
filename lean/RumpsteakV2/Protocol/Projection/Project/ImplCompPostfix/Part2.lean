@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplCompPostfix.Part1
 
+/-! # ImplCompPostfix Part 2
+
+Prefix postfix cases dispatching on left constructor.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

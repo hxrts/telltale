@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.MuveImplBase
 
+/-! # Project MuveImplNonPart
+
+Non-participant projection: EQ_end theorem and muve/closed properties.
+-/
+
 namespace RumpsteakV2.Protocol.Projection.Project
 
 open RumpsteakV2.Protocol.GlobalType

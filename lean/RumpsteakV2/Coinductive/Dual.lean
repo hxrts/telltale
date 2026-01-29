@@ -4,7 +4,7 @@ import RumpsteakV2.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Session type duality swaps send and recv. For coinductive types,
 we need a corecursive definition of duality and a proof that it's involutive
 (dual(dual(t)) = t).

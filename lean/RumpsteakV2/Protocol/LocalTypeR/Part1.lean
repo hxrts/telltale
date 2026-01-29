@@ -67,6 +67,8 @@ theorem freeVarsOfBranches_eq_flatMap (branches : List (Label × LocalTypeR)) :
       | mk label t =>
           simp [freeVarsOfBranches, ih, List.flatMap]
 
+/-! ## Size lemmas for termination proofs -/
+
 @[simp]
 lemma sizeOf_cont_lt_sizeOf_branches (label : Label) (cont : LocalTypeR)
     (tail : List (Label × LocalTypeR)) :

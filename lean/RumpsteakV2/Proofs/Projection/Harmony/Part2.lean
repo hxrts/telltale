@@ -1,5 +1,10 @@
 import RumpsteakV2.Proofs.Projection.Harmony.Part1
 
+/-! # Harmony Part 2
+
+Substitution commutation: projection commutes with substitution via paco coinduction.
+-/
+
 namespace RumpsteakV2.Proofs.Projection.Harmony
 /-! ## Substitution Commutation -/
 

@@ -10,6 +10,11 @@ import RumpsteakV2.Protocol.Projection.ProjSubst
 import RumpsteakV2.Proofs.Projection.SubstEndUnguarded
 import RumpsteakV2.Protocol.Participation
 
+/-! # Project ImplBase
+
+EQ2-based congruence proofs and completeness results connecting CProject with trans.
+-/
+
 set_option linter.unnecessarySimpa false
 
 /-

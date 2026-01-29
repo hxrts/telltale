@@ -8,7 +8,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. EQ2C bisimulation proofs require constructing bisimulation relations
 from head equality. When two coinductive types have matching heads, we need to
 show they are EQ2C-equivalent by building appropriate witness relations.

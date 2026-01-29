@@ -254,7 +254,7 @@ theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl 
     · intro _ _ _
       exact True.intro
   exact hrec t v repl hbody hneq
-/- ## Main Axiom: Projection-Substitution Commutation -/
+/-! ## Main Axiom: Projection-Substitution Commutation -/
 
 /- Projection commutes with global type substitution.
 
@@ -406,10 +406,5 @@ theorem proj_subst_mu_self_EQ2 (t : String) (body : GlobalType) (role : String)
         ((projTrans body role).substitute t (projTrans (.mu t body) role)) := by
   rw [proj_subst_mu_self t body role hclosed]
   exact EQ2_refl _
-
-/-! ## Guardedness Preservation
-
-These lemmas establish that guardedness is preserved through substitution,
-which is needed for the mu case of proj_subst. -/
 
 end RumpsteakV2.Protocol.Projection.ProjSubst

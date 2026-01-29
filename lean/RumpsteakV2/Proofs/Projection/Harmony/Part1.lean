@@ -10,7 +10,7 @@ import RumpsteakV2.Proofs.Safety.Determinism
 import RumpsteakV2.Proofs.Projection.MuUnfoldLemmas
 import RumpsteakV2.Proofs.Projection.SubstEndUnguarded
 
-/-
+/-!
 The Problem. Relate global protocol steps to environment steps in the operational
 semantics, showing that projection commutes with execution. The key difficulty is
 that projection distinguishes participants from non-participants, so step alignment

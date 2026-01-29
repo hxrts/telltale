@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.General
 
+/-! # SubstRel and Helper Lemmas
+
+Defines the `SubstRel` inductive relation for substitution congruence proofs.
+-/
+
 namespace RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.CoTypes.EQ2

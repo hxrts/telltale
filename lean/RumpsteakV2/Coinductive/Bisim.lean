@@ -3,7 +3,7 @@ import RumpsteakV2.Coinductive.LocalTypeC
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Coinductive types don't have structural equality in the same way
 as inductive types. Two coinductive trees are "the same" if they are bisimilar:
 they have the same head at every level, forever. We need a bisimulation relation

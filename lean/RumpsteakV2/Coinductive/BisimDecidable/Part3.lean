@@ -2,6 +2,11 @@ import RumpsteakV2.Coinductive.BisimDecidable.Part2
 
 set_option linter.dupNamespace false
 
+/-! # BisimDecidable Part 3
+
+Reachable pairs, termination measure, soundness, and completeness.
+-/
+
 open Classical
 
 namespace RumpsteakV2.Coinductive

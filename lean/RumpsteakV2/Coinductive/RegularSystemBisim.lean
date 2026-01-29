@@ -6,7 +6,7 @@ import RumpsteakV2.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. We defined RegularSystem to extract a finite coalgebra from a
 regular coinductive type. We need to prove that reconstructing from this
 system via SystemToCoind yields a bisimilar (hence equal) type.

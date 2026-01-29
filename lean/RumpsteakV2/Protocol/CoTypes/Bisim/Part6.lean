@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part5
 
+/-! # Bisim Part 6: EQ2 Extraction and Observable Transfer
+
+FullUnfold-based extraction lemmas and EQ2_transfer_observable theorem.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

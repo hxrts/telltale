@@ -1,7 +1,7 @@
 import Mathlib.Logic.Function.Iterate
 import RumpsteakV2.Protocol.GlobalType
 
-/-
+/-!
 The Problem. Define participation predicates that let projection proofs
 distinguish between participants (roles that appear on some communication path)
 and non-participants, and connect those predicates to branch-wise participation.

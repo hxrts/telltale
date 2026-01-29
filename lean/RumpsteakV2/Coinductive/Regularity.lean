@@ -4,7 +4,7 @@ import RumpsteakV2.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Coinductive types can represent infinite trees, but we often need
 finite representations (e.g., to convert back to inductive types). A coinductive
 type is "regular" if it has only finitely many distinct reachable subterms.

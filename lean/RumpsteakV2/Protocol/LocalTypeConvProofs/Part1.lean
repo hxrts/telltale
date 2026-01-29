@@ -4,15 +4,9 @@ import RumpsteakV2.Protocol.LocalTypeConvDefs
 
 set_option linter.mathlibStandardSet false
 
-/-! # RumpsteakV2.Protocol.LocalTypeConvProofs
+/-! # LocalTypeConvProofs Part 1
 
-Conversion Proofs: LocalTypeR ↔ LocalTypeDB Roundtrip.
-
-This module provides proven theorems for the conversion between named (LocalTypeR)
-and de Bruijn indexed (LocalTypeDB) representations of local types.
-
-This file uses the canonical definitions from `RumpsteakV2.Protocol.LocalTypeConv`,
-`LocalTypeR`, and `LocalTypeDB`.
+Basic helpers for indexOf, get?, string/nat injectivity, and generated context properties.
 -/
 
 open scoped BigOperators

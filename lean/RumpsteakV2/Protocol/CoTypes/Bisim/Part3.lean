@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.Bisim.Part2
 
+/-! # Bisim Part 3: Bisimulation Relation and Transitivity
+
+Defines BisimF functor and proves Bisim is an equivalence relation.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

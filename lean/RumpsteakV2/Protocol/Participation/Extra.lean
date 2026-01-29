@@ -1,5 +1,9 @@
 import RumpsteakV2.Protocol.Participation.Core
 
+/-! # Participation Extra
+
+Participation and substitution/unfolding lemmas, decidable `participates` function.
+-/
 
 namespace RumpsteakV2.Protocol.Participation
 open RumpsteakV2.Protocol.GlobalType

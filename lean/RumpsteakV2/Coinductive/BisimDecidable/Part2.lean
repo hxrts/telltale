@@ -2,6 +2,11 @@ import RumpsteakV2.Coinductive.BisimDecidable.Part1
 
 set_option linter.dupNamespace false
 
+/-! # BisimDecidable Part 2
+
+Decidable bisimulation definitions and helpers connecting `bisimAll` to `BranchesRelC`.
+-/
+
 open Classical
 
 namespace RumpsteakV2.Coinductive

@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplExtraction.Part1
 
+/-! # ImplExtraction Part 2
+
+Recv extraction and mu-intermediate composition for observable structure.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

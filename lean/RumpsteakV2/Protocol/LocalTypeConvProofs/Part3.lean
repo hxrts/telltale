@@ -8,6 +8,11 @@ set_option synthInstance.maxSize 128
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
+/-! # LocalTypeConvProofs Part 3
+
+General roundtrip with adequate context, and guardedness/contractiveness preservation across conversions.
+-/
+
 namespace RumpsteakV2.Protocol.LocalTypeConvProofs
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR

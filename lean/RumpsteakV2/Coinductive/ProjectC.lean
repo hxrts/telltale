@@ -7,7 +7,7 @@ import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Projection extracts a local type for a role from a global protocol.
 For coinductive types, projection must be defined as a greatest fixed point to
 handle infinite/recursive protocols correctly.

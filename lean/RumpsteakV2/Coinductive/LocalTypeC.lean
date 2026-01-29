@@ -3,7 +3,7 @@ import RumpsteakV2.Protocol.GlobalType
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Session types in Lean are naturally inductive, but some operations
 (like bisimulation and coinductive equivalence) require an infinite/coinductive
 representation. We need a coinductive local type that can represent potentially

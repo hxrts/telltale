@@ -19,7 +19,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. The key correctness property for the inductive-coinductive bridge
 is that round-tripping preserves equivalence: toCoind(toInductive(t)) ≅ t.
 This ensures we can convert freely between representations without losing

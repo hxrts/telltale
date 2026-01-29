@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplCompPostfix.Part2
 
+/-! # ImplCompPostfix Part 3
+
+Suffix postfix cases and final CProjectTransRelComp_postfix theorem.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

@@ -4,7 +4,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. We have two representations of local types: the inductive
 LocalTypeR (finite, pattern-matchable) and the coinductive LocalTypeC
 (potentially infinite, M-type). We need to embed inductive types into

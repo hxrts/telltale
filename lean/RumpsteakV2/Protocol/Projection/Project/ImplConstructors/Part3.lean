@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplConstructors.Part2
 
+/-! # ImplConstructors Part 3
+
+Mu constructor agreement.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

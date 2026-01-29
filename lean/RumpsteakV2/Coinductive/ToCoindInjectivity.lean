@@ -6,7 +6,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. The toCoind embedding from inductive to coinductive types should be
 injective: distinct inductive types should map to distinct coinductive types.
 This is essential for round-trip correctness.

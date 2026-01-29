@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Trans.Participation
 
+/-! # Trans Contractive
+
+Contractiveness preservation for projection: `trans_isContractive_of_participatesAllBranches`
+and `trans_wellFormed_of_wellFormed`.
+-/
 
 namespace RumpsteakV2.Protocol.Projection.Trans
 open RumpsteakV2.Protocol.GlobalType

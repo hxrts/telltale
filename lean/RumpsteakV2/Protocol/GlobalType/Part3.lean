@@ -2,13 +2,19 @@ import RumpsteakV2.Protocol.GlobalType.Part2
 
 set_option linter.dupNamespace false
 
+/-! # GlobalType Part 3
+
+Well-formedness preservation under mu-unfolding (allVarsBound, allCommsNonEmpty,
+noSelfComm, isProductive monotonicity).
+-/
+
 namespace RumpsteakV2.Protocol.GlobalType
 /-! ## Well-formedness Preservation under Mu-Unfolding
 
 These lemmas show that unfolding a mu-type preserves well-formedness.
 Key property: if `mu t body` is well-formed, then `body.substitute t (mu t body)` is well-formed. -/
 
--- Helper lemmas for allVarsBound
+/-! ## Helper lemmas for allVarsBound -/
 
 /-- If t is in (x :: xs) and t ≠ x, then t is in xs. -/
 theorem contains_cons_ne' {t x : String} {xs : List String}

@@ -3,7 +3,7 @@ import RumpsteakV2.Protocol.CoTypes.CoinductiveRel
 import RumpsteakV2.Protocol.Projection.Trans
 import RumpsteakV2.Protocol.Participation
 
-/-
+/-!
 The Problem. Define a coinductive projection relation CProject that captures when a global
 type g projects to a local type e for a given role. The challenge is twofold:
 1. Projection is inherently coinductive: recursive types unfold infinitely, so we need

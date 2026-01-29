@@ -2,6 +2,12 @@ import RumpsteakV2.Protocol.GlobalType.Part4
 
 set_option linter.dupNamespace false
 
+/-! # GlobalType Part 5
+
+Closedness predicates, free-variable subset lemmas, closedness preservation,
+and GlobalType unfolding definitions.
+-/
+
 namespace RumpsteakV2.Protocol.GlobalType
 /-! ## Closedness Predicate (Coq-style)
 

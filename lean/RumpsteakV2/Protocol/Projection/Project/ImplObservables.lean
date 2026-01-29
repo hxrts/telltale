@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplHeadPreservation
 
+/-! # Project ImplObservables
+
+Observable preservation: CProjectTransRelComp cannot relate types with incompatible heads.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

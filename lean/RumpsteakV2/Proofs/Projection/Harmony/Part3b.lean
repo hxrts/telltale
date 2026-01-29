@@ -1,6 +1,11 @@
 import RumpsteakV2.Proofs.Projection.Harmony.Part3
 import RumpsteakV2.Protocol.Projection.Blind
 
+/-! # Harmony Part 3b
+
+Mu/branch-specific helpers for non-participant step preservation.
+-/
+
 namespace RumpsteakV2.Proofs.Projection.Harmony
 /-! ### Non-participant mu/branch helpers
 

@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt.SubstRel
 
+/-! # SubstRel Standard Case Analysis and Main Theorem
+
+Proves `SubstRel_postfix_standard` and `EQ2_substitute_barendregt`.
+-/
+
 namespace RumpsteakV2.Protocol.CoTypes.SubstCommBarendregt
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.CoTypes.EQ2

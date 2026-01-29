@@ -2,6 +2,11 @@ import RumpsteakV2.Protocol.LocalTypeDB.Core
 
 set_option linter.unusedSimpArgs false
 
+/-! # LocalTypeDB Preservation
+
+Closedness and contractiveness preservation for lift, subst, unfold on de Bruijn local types.
+-/
+
 namespace RumpsteakV2.Protocol
 open RumpsteakV2.Protocol.GlobalType
 /-! ## Closedness Preservation -/

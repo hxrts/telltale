@@ -2,6 +2,11 @@ import RumpsteakV2.Coinductive.Roundtrip.Part4
 
 set_option linter.dupNamespace false
 
+/-! # Roundtrip Part 5
+
+Final round-trip statements and aliases.
+-/
+
 namespace RumpsteakV2.Coinductive
 open RumpsteakV2.Protocol.LocalTypeR
 theorem toCoind_toInductive_eq2c_of_eq2ce (t : LocalTypeC) (h : Regular t)

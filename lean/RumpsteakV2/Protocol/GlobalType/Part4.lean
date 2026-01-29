@@ -2,6 +2,11 @@ import RumpsteakV2.Protocol.GlobalType.Part3
 
 set_option linter.dupNamespace false
 
+/-! # GlobalType Part 4
+
+isProductive preservation under substitution and wellFormed_mu_unfold theorem.
+-/
+
 namespace RumpsteakV2.Protocol.GlobalType
 /-- Removing a duplicate from unguarded preserves isProductive. -/
 theorem isProductive_cons_dedup (g : GlobalType) (x : String) (unguarded : List String)

@@ -4,7 +4,7 @@ import RumpsteakV2.Semantics.EnvStep
 import RumpsteakV2.Proofs.Projection.Harmony
 import RumpsteakV2.Protocol.CoTypes.EQ2
 
-/- 
+/-!
 The Problem. Show that typing is preserved by operational steps: when a
 well-typed configuration steps, its resulting configuration remains well-typed.
 

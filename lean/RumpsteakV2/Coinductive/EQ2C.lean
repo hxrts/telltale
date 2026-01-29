@@ -4,7 +4,7 @@ import RumpsteakV2.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. Coinductive types can have different structural representations
 that are semantically equivalent. In particular, mu-unfolding should be silent:
 `mu x. T` should equal `T[x := mu x. T]`. We need an equi-recursive equality

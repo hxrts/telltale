@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplCompPostfix
 
+/-! # Project ImplCompleteness
+
+Completeness of the projection API: CProject implies projectR? returns some.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

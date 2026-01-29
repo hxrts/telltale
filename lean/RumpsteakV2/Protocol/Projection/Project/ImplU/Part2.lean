@@ -1,5 +1,10 @@
 import RumpsteakV2.Protocol.Projection.Project.ImplU.Part1
 
+/-! # ImplU Part 2
+
+CProjectU EQ2 closure: comm case postfix and final CProjectU_EQ2 theorem.
+-/
+
 set_option linter.unnecessarySimpa false
 
 namespace RumpsteakV2.Protocol.Projection.Project

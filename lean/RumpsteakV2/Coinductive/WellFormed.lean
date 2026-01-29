@@ -6,7 +6,7 @@ import RumpsteakV2.Protocol.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. WellFormedC (closed + observable) is the key property for working
 with coinductive types. We need preservation lemmas showing that:
 1. Smart constructors produce well-formed types

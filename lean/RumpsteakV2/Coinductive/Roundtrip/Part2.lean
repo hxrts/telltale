@@ -3,6 +3,11 @@ import RumpsteakV2.Coinductive.Roundtrip.GpacoCollapse
 
 set_option linter.dupNamespace false
 
+/-! # Roundtrip Part 2
+
+Mu-aware paco collapse under productivity and sourced erasure versions.
+-/
+
 namespace RumpsteakV2.Coinductive
 /-! ## μ-aware paco collapse (productivity assumption) -/
 

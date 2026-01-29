@@ -7,7 +7,7 @@ import RumpsteakV2.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-
+/-!
 The Problem. EQ2C relates coinductive types directly, but cannot handle finite
 syntax with explicit variable nodes that represent back-edges. When converting
 between inductive and coinductive representations, variables name cycles.

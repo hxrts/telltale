@@ -5,6 +5,12 @@ open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
 open RumpsteakV2.Protocol.Participation
 open RumpsteakV2.Protocol.CoTypes.CoinductiveRel
+
+/-! # Projectb Part 4
+
+`trans_eq_of_CProject` and full completeness of `projectb`.
+-/
+
 /-! ### trans Branch Helper -/
 
 /-- Helper: compute `transBranches` from a BranchesProjRel witness. -/

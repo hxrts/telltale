@@ -8,6 +8,11 @@ set_option synthInstance.maxSize 128
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
+/-! # LocalTypeConvProofs Part 2
+
+fromDB?/fromDB correctness, closedness preservation, toDB? for closed terms, and roundtrip proofs.
+-/
+
 namespace RumpsteakV2.Protocol.LocalTypeConvProofs
 open RumpsteakV2.Protocol.GlobalType
 open RumpsteakV2.Protocol.LocalTypeR
