@@ -160,6 +160,7 @@ Update inputs in `lean/choreo/`. Change `--role` in the Just recipes to validate
 2. **Recursion**: DSL implicit loops cannot be cross-validated against theory explicit µ-binders
 3. **Extensions**: Custom DSL extensions bypass formal verification
 4. **Payloads**: Type annotations on messages are not semantically verified
+5. **Coinductive round-trip**: The EQ2C round-trip proof currently assumes `ProductiveC` on the RHS; regularity alone does not imply productivity
 
 ## Future Work
 

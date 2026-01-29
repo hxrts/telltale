@@ -31,6 +31,161 @@ This global type projects to different local types. Alice gets `Bob!Int.Bob&{Sum
 
 The projection algorithm ensures the local types are compatible. If projection succeeds, the protocol is guaranteed to be deadlock-free. All participants will complete the protocol without communication errors.
 
+## Lean Signatures (Core Types)
+
+Rumpsteak-Aura’s formal core is specified in Lean. The core session types are:
+1) the **global protocol type** (`GlobalType`),
+2) the **recursive local type** (`LocalTypeR`), and
+3) the **coinductive local type** used in bisimulation proofs (`LocalTypeC`).
+
+Below are their exact Lean signatures, with namespaces preserved.
+
+**Global types and labels** (`lean/RumpsteakV2/Protocol/GlobalType.lean`):
+
+```lean
+namespace RumpsteakV2.Protocol.GlobalType
+
+inductive PayloadSort where
+  | unit : PayloadSort
+  | nat : PayloadSort
+  | bool : PayloadSort
+  | string : PayloadSort
+  | prod : PayloadSort → PayloadSort → PayloadSort
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+structure Label where
+  name : String
+  sort : PayloadSort := PayloadSort.unit
+  deriving Repr, DecidableEq, BEq, Inhabited
+
+inductive GlobalType where
+  | end : GlobalType
+  | comm : String → String → List (Label × GlobalType) → GlobalType
+  | mu : String → GlobalType → GlobalType
+  | var : String → GlobalType
+  deriving Repr, Inhabited
+
+end RumpsteakV2.Protocol.GlobalType
+```
+
+**Inductive local types** (`lean/RumpsteakV2/Protocol/LocalTypeR.lean`):
+
+```lean
+namespace RumpsteakV2.Protocol.LocalTypeR
+
+open RumpsteakV2.Protocol.GlobalType
+
+inductive LocalTypeR where
+  | end : LocalTypeR
+  | send : String → List (Label × LocalTypeR) → LocalTypeR
+  | recv : String → List (Label × LocalTypeR) → LocalTypeR
+  | mu : String → LocalTypeR → LocalTypeR
+  | var : String → LocalTypeR
+  deriving Repr, Inhabited
+
+end RumpsteakV2.Protocol.LocalTypeR
+```
+
+**Coinductive local types (M-types)** (`lean/RumpsteakV2/Coinductive/LocalTypeC.lean`):
+
+```lean
+namespace RumpsteakV2.Coinductive
+
+open RumpsteakV2.Protocol.GlobalType
+
+inductive LocalTypeHead where
+  | end  : LocalTypeHead
+  | var  : String → LocalTypeHead
+  | mu   : String → LocalTypeHead
+  | send : String → List Label → LocalTypeHead
+  | recv : String → List Label → LocalTypeHead
+  deriving Repr, DecidableEq
+
+def LocalTypeChild : LocalTypeHead → Type
+  | .end       => PEmpty
+  | .var _     => PEmpty
+  | .mu _      => Unit
+  | .send _ ls => Fin ls.length
+  | .recv _ ls => Fin ls.length
+
+def LocalTypeF : PFunctor := ⟨LocalTypeHead, LocalTypeChild⟩
+
+abbrev LocalTypeC := PFunctor.M LocalTypeF
+
+end RumpsteakV2.Coinductive
+```
+
+## Well-Formedness (Lean)
+
+Well-formedness is explicit in the Lean development.
+
+**Global types** are well-formed when all of the following hold:
+
+```lean
+def GlobalType.wellFormed (g : GlobalType) : Bool :=
+  g.allVarsBound && g.allCommsNonEmpty && g.noSelfComm && g.isProductive
+```
+
+Intuitively:
+- `allVarsBound`: recursion variables are bound
+- `allCommsNonEmpty`: communications have at least one branch
+- `noSelfComm`: no self-send
+- `isProductive`: recursion must pass through a communication
+
+**Local types** are well-formed when they are closed and contractive:
+
+```lean
+structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
+  closed : t.isClosed
+  contractive : t.isContractive = true
+```
+
+**Coinductive local types** are well-formed when they are closed and observable:
+
+```lean
+def ClosedC (t : LocalTypeC) : Prop :=
+  ∀ v, ¬ UnfoldsToVarC t v
+
+structure WellFormedC (t : LocalTypeC) : Prop where
+  closed : ClosedC t
+  observable : ObservableC t
+```
+
+## Progress Conditions (Lean)
+
+Progress is not derived from well-formedness alone. The V2 proofs separate
+structural well-formedness from a *progress predicate* that asserts a
+communication is reachable.
+
+The progress predicate is:
+
+```lean
+inductive ReachesComm : GlobalType → Prop where
+  | comm (sender receiver : String) (branches : List (Label × GlobalType)) :
+      branches ≠ [] → ReachesComm (.comm sender receiver branches)
+  | mu (t : String) (body : GlobalType) :
+      ReachesComm (body.substitute t (.mu t body)) →
+      ReachesComm (.mu t body)
+```
+
+The associated progress theorem uses this predicate together with
+well-formedness and well-typedness:
+
+```lean
+def CanProgress (c : Configuration) : Prop :=
+  ∃ c' act, ConfigStep c c' act
+
+theorem deadlock_free (c : Configuration)
+    (htyped : WellTypedConfig c)
+    (hwf : c.globalType.wellFormed = true)
+    (hcomm : ReachesComm c.globalType) :
+    CanProgress c
+```
+
+In other words: **well-formedness ensures validity of recursion and structure,
+while `ReachesComm` ensures actual progress is possible**. Both are required
+to justify progress.
+
 ## Choreographic Programming
 
 Choreographic programming takes the global types concept further. Instead of just types, you write actual program logic from a global perspective. The choreography describes computations and data flow between participants. Endpoint projection generates local implementations for each participant.

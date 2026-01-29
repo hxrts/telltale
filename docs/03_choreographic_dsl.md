@@ -1,14 +1,12 @@
 # Choreographic DSL
 
-## Current Status
-
-The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
-
 ## Overview
 
 The parser translates protocol specifications from a layout-sensitive, PureScript or Elm inspired DSL into the internal AST (`Choreography` + `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks.
 
 Empty blocks must use `{}`. The DSL does not use an explicit `end` keyword. A protocol ends when its block ends.
+
+The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
 
 ## DSL Syntax
 
