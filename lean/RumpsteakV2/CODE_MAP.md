@@ -1,810 +1,656 @@
-# RumpsteakV2 Code Map
+# CODE_MAP.md — RumpsteakV2 Lean Verification
 
-**Last Updated:** 2026-01-24
+**176 files | 40,470 lines | 0 axioms | 0 sorries — fully verified**
 
-This document provides a comprehensive map of key proofs, lemmas, and definitions in the RumpsteakV2 formal verification codebase.
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Core Protocol Types](#core-protocol-types)
-3. [Projection System](#projection-system)
-4. [Coinductive Types](#coinductive-types)
-5. [Main Theorems](#main-theorems)
-6. [Supporting Lemmas](#supporting-lemmas)
-7. [Cross-Reference Index](#cross-reference-index)
+Last updated: 2026-01-29
 
 ---
 
-## Overview
+## Table of Contents
 
-**Codebase Statistics:**
-- Total files: 79 .lean files
-- Total size: ~1.4MB
-- Main modules: Protocol, Semantics, Proofs, Coinductive
-- Central result: Choreographic projection correctness and safety
+1. [Overview](#1-overview)
+2. [Core Protocol Types](#2-core-protocol-types)
+3. [Projection System](#3-projection-system)
+4. [Coinductive Types](#4-coinductive-types)
+5. [Coinductive Module](#5-coinductive-module)
+6. [Main Theorems](#6-main-theorems)
+7. [Proof Strategies](#7-proof-strategies)
+8. [Axiom Inventory](#8-axiom-inventory)
+9. [Cross-Reference Index](#9-cross-reference-index)
+10. [File Size Reference](#10-file-size-reference)
+11. [Quick Navigation Guide](#11-quick-navigation-guide)
 
-**Axiom Inventory (V2):**
-- Inductive projection path: 0 axioms (all discharged)
-- Coinductive EQ2 path: 0 axioms (EQ2 transitivity via Bisim detour)
+---
+
+## 1. Overview
+
+RumpsteakV2 formally verifies choreographic projection and session-type safety properties in Lean 4. The development covers:
+
+- **Global and local session types** with de Bruijn indices and recursive binders
+- **Coinductive projection** via greatest fixed points, with a boolean checker and soundness proof
+- **Bisimulation and coinductive equality (EQ2)** for local types, including decidability for regular types
+- **Harmony**: global protocol steps correspond precisely to local environment steps
+- **Safety**: deadlock freedom, subject reduction, determinism, and progress
+- **Blindness**: axiom-free projectability via a syntactic uniformity predicate
+- **Coinductive round-trip**: bridging inductive `LocalTypeR` and coinductive `LocalTypeC` representations
 
 **Key Research Questions Addressed:**
+
 1. Does choreographic projection preserve semantics? (Harmony theorem)
 2. Are projected protocols deterministic? (Determinism proofs)
 3. Are projected protocols deadlock-free? (Safety proofs)
 4. Can we decide bisimulation for session types? (Decidability proofs)
 
----
+**Main modules:** Protocol, Semantics, Proofs, Coinductive
 
-## Core Protocol Types
-
-### Protocol/GlobalType.lean
-**Location:** `RumpsteakV2/Protocol/GlobalType.lean` (64KB)
-
-**Key Definitions:**
-- `GlobalType` - Global choreography types
-  - `.end` - Termination
-  - `.var` - Type variable
-  - `.mu` - Recursive type
-  - `.comm sender receiver branches` - Communication
-
-**Key Functions:**
-- `allCommsNonEmpty : GlobalType → Bool` - Check all communications have branches
-- `allCommsNonEmptyBranches : List (Label × GlobalType) → Bool` - Branch checking
-- `wellFormed : GlobalType → Bool` - Well-formedness predicate
-
-**Important Theorems:**
-- `allCommsNonEmpty_comm` - Characterization for comm constructor
-- `wellFormed_comm_branches` - Well-formedness for branches
+All results are axiom-free and sorry-free.
 
 ---
 
-### Protocol/LocalTypeR.lean
-**Location:** `RumpsteakV2/Protocol/LocalTypeR.lean` (74KB)
+## 2. Core Protocol Types
 
-**Key Definitions:**
-- `LocalTypeR` - Recursive local session types
-  - `.end` - Termination
-  - `.var v` - Type variable
-  - `.mu v body` - Recursive binding
-  - `.send partner branches` - Send action
-  - `.recv partner branches` - Receive action
+### GlobalType — `Protocol/GlobalType.lean` (re-export) + `GlobalType/Part1–5`
 
-**Key Functions:**
-- `substitute : LocalTypeR → String → LocalTypeR → LocalTypeR` - Variable substitution
-- `unfold : LocalTypeR → LocalTypeR` - One-step mu unfolding
-- `fullUnfold : LocalTypeR → LocalTypeR` - Complete unfolding
-- `isGuarded : LocalTypeR → String → Bool` - Guardedness check
-- `isContractive : LocalTypeR → Bool` - Contractiveness check
-- `freeVars : LocalTypeR → List String` - Free variable collection
-- `isClosed : LocalTypeR → Bool` - Closedness test
+The global session type inductive, representing choreographies with communication, branching, recursion, and end.
 
-**Key Lemmas:**
-- `dual_dual : ∀ t, t.dual.dual = t` - Duality is involution
-- `dual_substitute` - Duality commutes with substitution
-- `substitute_var_same` - Substitution identity
-- `substitute_var_diff` - Substitution variable mismatch
+| File | Contents |
+|------|----------|
+| `Part1` | `GlobalType` inductive definition, basic constructors |
+| `Part2` | `wellFormed` predicate |
+| `Part3` | `allCommsNonEmpty`, structural predicates |
+| `Part4` | `substitute`, `roles` |
+| `Part5` | `freeVars`, auxiliary lemmas (571 lines) |
 
----
+### LocalTypeR — `Protocol/LocalTypeR.lean` (re-export) + `LocalTypeR/Part1–5`
 
-### Protocol/Participation.lean
-**Location:** `RumpsteakV2/Protocol/Participation.lean` (12KB)
+The inductive local session type with recursive types, sends, receives, and branching.
 
-**Key Theorems:**
-- `part_of2_iff_participates` - Boolean participation ⇔ inductive participation
-- `participatesBranches_iff_part_of2` - Branch participation ⇔ ∃ participating branch
+| File | Contents |
+|------|----------|
+| `Part1` | `LocalTypeR` inductive, `substitute` (511 lines) |
+| `Part2` | `unfold`, `fullUnfold` |
+| `Part3` | `isGuarded`, `isContractive` |
+| `Part4` | `freeVars` |
+| `Part5` | `dual` |
 
----
+### Core — `Protocol/Core.lean`
 
-## Projection System
+`Role` and `Action` types shared across the development.
 
-### Protocol/Projection/Project.lean (re-export)
-**Location:** `RumpsteakV2/Protocol/Projection/Project.lean` (1.2KB)
+### Participation — `Protocol/Participation.lean` (re-export)
 
-**Role:**
-- Re-exports the split Project modules under `Protocol/Projection/Project/`.
-- Provides a stable import path for downstream proofs.
+| File | Contents |
+|------|----------|
+| `Participation/Core.lean` | `part_of2`, `part_of_all2`, `participates`, `part_of2_iff_participates`, `participatesBranches_iff_part_of2` |
+| `Participation/Extra.lean` | Additional participation lemmas |
 
-### Protocol/Projection/Project/* (split modules)
-**Location:** `RumpsteakV2/Protocol/Projection/Project/` (20 files)
+### Other Core Files
 
-**Central Definitions (split across modules):**
-- `CProjectF` / `CProject` - core projection relation (Project/ImplBase.lean)
-- `Projectable` / `ProjectableClosedWellFormed` - projectability predicates and bundle (Project/Core.lean)
-- `BranchesProjRel` / `AllBranchesProj` - branch-wise projection relations (Project/ImplBase.lean)
-
-**File Size Table (split):**
-
-| File | Size | Purpose |
-|------|------|---------|
-| Core.lean | 4.0KB | Projectable, projectR? core API |
-| CProjectTransRel.lean | 0.9KB | CProject→EQ2 trans wrappers |
-| CProjectU.lean | 0.8KB | Unfold-insensitive projection interface |
-| Completeness.lean | 0.7KB | projectR? completeness |
-| Props.lean | 0.6KB | determinism/props re-export |
-| Impl.lean | 0.6KB | Impl re-export |
-| ImplBase.lean | 14.1KB | core CProject proofs |
-| ImplConstructors.lean | 20.7KB | constructor-specific trans lemmas |
-| ImplTransRelComp.lean | 28.8KB | postfix/comp proofs for trans relation |
-| ImplObservables.lean | 16.7KB | observable preservation |
-| ImplHeadPreservation.lean | 15.6KB | head preservation lemmas |
-| ImplCompleteness.lean | 14.9KB | completeness scaffolding |
-| ImplCompPostfix.lean | 42.4KB | comp postfix lemmas |
-| ImplExtraction.lean | 30.2KB | extraction / compose-through-mu |
-| ImplU.lean | 37.0KB | CProjectU proofs |
-| Muve.lean | 0.7KB | muve front-end |
-| MuveImpl.lean | 0.3KB | muve re-export |
-| MuveImplBase.lean | 24.8KB | muve base proofs |
-| MuveImplNonPart.lean | 18.5KB | non-participant muve |
-| MuveImplParticipant.lean | 19.5KB | participant muve |
-
-**Key Theorems (new locations):**
-- `CProject_unfold` / `CProject_fold` / `CProject_coind` / `CProject_destruct` → Project/ImplBase.lean
-- `branches_project_coherent` → Proofs/Projection/Harmony.lean (coherence via participation)
-- Observable preservation lemmas → Project/ImplObservables.lean
+| File | Contents |
+|------|----------|
+| `Protocol/Semantics.lean` | Global type operational semantics |
+| `Protocol/Spatial.lean` | Spatial predicates on types |
+| `Protocol/TypeContext.lean` | Typing contexts (518 lines) |
+| `Protocol/LocalTypeConv*.lean` | Conversion lemmas between type representations |
+| `Protocol/LocalTypeDB/` | De Bruijn bridge, including `Preservation.lean` (551 lines) |
 
 ---
 
-### Protocol/Projection/Projectb.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Projectb.lean` (62.5KB)
+## 3. Projection System
 
-**Key Definitions:**
-- Alternative projection formulation using boolean guards
-- `projectb : GlobalType → String → LocalTypeR` - Computable projection
+### Trans — `Protocol/Projection/Trans/`
 
-**Key Theorems:**
-- `projectb_sound : CProject g role (projectb g role)` - Soundness
-- `projectb_trans : projectb g role ≈ trans g role` - Equivalence to trans
+Direct (functional) projection from global to local types.
 
----
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `trans` | `Trans/Core.lean` | Direct projection function |
+| `trans_comm_sender` | `Trans/Core.lean` | Sender case of projection |
+| `trans_comm_receiver` | `Trans/Core.lean` | Receiver case of projection |
+| `trans_comm_other` | `Trans/Core.lean` | Non-participant case |
+| `trans_closed_of_closed` | `Trans/` | Closedness preservation under projection |
 
-### Protocol/Projection/Blind.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Blind.lean` (re-export; split into `Blind/Part1.lean` and `Blind/Part2.lean`)
+### Projectb — `Protocol/Projection/Projectb/`
 
-**Role:**
-- Defines syntactic blindness (`isBlind`) and the combined predicate `WellFormedBlind`.
-- Proves `projectable_of_wellFormedBlind` (axiom-free projectability from blindness).
-- Part2 contains substitution and branch-step helper lemmas.
+Boolean projection checker and its soundness proof. `Projectb/Part4.lean` is 560 lines.
 
----
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `projectb` | `Projectb/` | Boolean projection checker |
+| `projectb_sound` | `Projectb/` | `CProject g role (projectb g role)` |
 
-### Protocol/Projection/Erasure.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Erasure.lean` (re-export; split into `Erasure/Part1.lean`, `Erasure/Part2a.lean`, and `Erasure/Part2b.lean`)
+### CProject / Project — `Protocol/Projection/Project/`
 
-**Sizes:** Part1 (80 lines), Part2a (358 lines), Part2b (425 lines)
+Coinductive projection relation defined as a greatest fixed point.
 
-**Role:**
-- Defines the erasure relation `Erases` and `Erasable` predicate.
-- Encodes send-branch identity and recv-branch union via label-set predicates.
-- Implements `merge`/`mergeAll` (Part2a) and proves `merge_sound`/`mergeAll_sound` (Part2b).
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `CProjectF` | `Project/ImplBase.lean` | Generator functor for coinductive projection |
+| `CProject` | `Project/ImplBase.lean` | Greatest fixed point: coinductive projection relation |
+| `CProject_unfold` | `Project/ImplBase.lean` | Unfold principle |
+| `CProject_fold` | `Project/ImplBase.lean` | Fold principle |
+| `CProject_coind` | `Project/ImplBase.lean` | Coinduction principle |
+| `CProject_destruct` | `Project/ImplBase.lean` | Destruction principle |
+| `CProject_implies_EQ2_trans` | `Project/` | Projection relates to `trans` via EQ2 |
+| `Projectable` | `Project/Core.lean` | Global projectability predicate |
+| `ProjectableClosedWellFormed` | `Project/Core.lean` | Bundle: closed + wellFormed + projectable |
+| `BranchesProjRel` | `Project/ImplBase.lean` | Branch-wise projection relation |
+| `AllBranchesProj` | `Project/ImplBase.lean` | All-branches projection |
 
----
+### ProjectProps — `Protocol/Projection/ProjectProps.lean`
 
-### Protocol/Projection/Trans.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Trans.lean` (35.5KB)
+| Definition | Description |
+|------------|-------------|
+| `project_deterministic` | Projection is deterministic up to EQ2 |
 
-**Key Definition:**
-- `trans : GlobalType → String → LocalTypeR` - Direct projection function
+### ProjSubst — `Protocol/Projection/ProjSubst.lean`
 
-**Key Lemmas:**
-- `trans_end` - Projection of end
-- `trans_comm_sender` - Projection for sender
-- `trans_comm_receiver` - Projection for receiver
-- `trans_comm_other` - Projection for non-participant
-- `lcontractive` - Trans produces contractive types
+Projection-substitution interaction lemmas.
 
-**Substitution:**
-- `trans_substitute_unfold` - Substitution unfolding for trans
+### Blind — `Protocol/Projection/Blind/`
 
----
+Blindness predicates that eliminate the projectability axiom entirely.
 
-### Protocol/Projection/Embed.lean
-**Location:** `RumpsteakV2/Protocol/Projection/Embed.lean` (9KB)
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `isBlind` | `Blind/Part1.lean` | Syntactic blindness predicate |
+| `branchesUniformFor` | `Blind/Part1.lean:45` | Uniform branches for non-participants |
+| `WellFormedBlind` | `Blind/Part1.lean:80` | Closed + wellFormed + blind |
+| `trans_uniform_for_nonparticipant` | `Blind/Part1.lean:287` | Core blindness property |
+| `projectb_trans_of_wellFormedBlind` | `Blind/Part1.lean:468` | Boolean projection agrees with trans under blindness |
+| `projectable_of_wellFormedBlind` | `Blind/Part1.lean:478` | **Eliminates projectability axiom** |
+| `isBlind_substitute` | `Blind/Part2.lean:72` | Blindness preserved by substitution |
+| `isBlindBranches_step` | `Blind/Part2.lean:173` | Blindness preserved by step |
 
-**Key Definitions:**
-- `CEmbedF` - One-step embedding generator
-- `CEmbed : LocalTypeR → String → GlobalType → Prop` - Embedding relation
+### Erasure — `Protocol/Projection/Erasure/`
 
-**Main Theorem:**
-- `CEmbed_implies_CProject` - Embedding implies projection (soundness)
-- `CEmbed_has_project` - Every embedding has a projection
+Erasure and deployment-related projection results.
 
----
+| File | Contents |
+|------|----------|
+| `Erasure/Part1.lean` | `Erases` relation, `Erasable` predicate |
+| `Erasure/Part2a.lean` | `merge`, `mergeAll` |
+| `Erasure/Part2b.lean` | `merge_sound`, `mergeAll_sound` |
 
-### Protocol/Projection/EmbedProps.lean
-**Location:** `RumpsteakV2/Protocol/Projection/EmbedProps.lean` (21KB)
+### Embed — `Protocol/Projection/Embed.lean`, `EmbedProps.lean`
 
-**Key Theorems:**
-- `embed_deterministic` - Embedding is unique up to equality
-- `branches_embed_deterministic` - Branch embedding determinism
-- `embed_project_roundtrip` - Embed then project is identity (up to EQ2)
-- `localType_has_embed` - Existence of embeddings for local types
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `CEmbedF` | `Embed.lean` | One-step embedding generator |
+| `CEmbed` | `Embed.lean` | Embedding relation |
+| `embed_project_roundtrip` | `EmbedProps.lean` | Embed-project round-trip property |
+| `embed_deterministic` | `EmbedProps.lean` | Embedding is unique up to equality |
 
----
-
-### Protocol/Projection/ProjectProps.lean
-**Location:** `RumpsteakV2/Protocol/Projection/ProjectProps.lean` (5.8KB)
-
-**Key Theorems:**
-- `project_deterministic` - Projection is deterministic up to EQ2
-- `branches_proj_deterministic` - Branch projection determinism
-
----
-
-## Coinductive Types
-
-### Protocol/CoTypes/CoinductiveRel.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/CoinductiveRel.lean`
-
-**Framework:**
-- `CoinductiveRel (F : Rel → Rel)` - Typeclass for coinductive relations
-- `gfp` - Greatest fixed point
-- `coind` - Coinduction principle
-- `unfold` - Unfolding lemma
-- `fold` - Folding lemma
+`EmbedProps.lean` is 519 lines.
 
 ---
 
-### Protocol/CoTypes/CoinductiveRelPaco.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/CoinductiveRelPaco.lean`
+## 4. Coinductive Types
 
-**PACO Framework:**
-- Parametric coinduction infrastructure
-- `paco` - PACO combinator
-- `paco_acc` - Accumulation lemma
-- `paco_mon` - Monotonicity
+### EQ2 — `Protocol/CoTypes/EQ2/`
 
----
+Coinductive equality on local types, defined as a greatest fixed point.
 
-### Protocol/CoTypes/EQ2.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/EQ2.lean` (706 lines)
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `EQ2` | `EQ2/Core.lean` | Coinductive equality (greatest fixed point) |
+| `ReflRel` | `EQ2/Core.lean` | Unfold-closure relation for axiom-free reflexivity |
+| `EQ2_refl` | `EQ2/Core.lean` | Reflexivity |
+| `EQ2_symm` | `EQ2/Core.lean` | Symmetry |
+| `EQ2_trans_via_end` | `EQ2/Core.lean` | Partial transitivity (end case) |
+| `EQ2_trans_via_var` | `EQ2/Core.lean` | Partial transitivity (var case) |
+| `EQ2_unfold_left` | `EQ2/Core.lean` | Left unfolding |
+| `EQ2_unfold_right` | `EQ2/Core.lean` | Right unfolding |
+| `EQ2_coind` | `EQ2/Core.lean` | Coinduction principle |
+| `EQ2_coind_upto` | `EQ2/Core.lean` | Up-to coinduction |
+| `EQ2_closure` | `EQ2/Core.lean` | Closure properties |
 
-**Key Definition:**
-- `EQ2 : LocalTypeR → LocalTypeR → Prop` - Coinductive equality for local types
-- `ReflRel` - Unfold-closure relation used to prove reflexivity without axioms
+### EQ2Paco — `Protocol/CoTypes/EQ2Paco.lean`
 
-**Key Theorems:**
-- `EQ2_refl` - Reflexivity
-- `EQ2_symm` - Symmetry
-- `EQ2_trans_via_end` - Transitivity via `.end` without full trans
-- `EQ2_trans_via_var` - Transitivity via `.var v` without full trans
-- `EQ2_unfold_left` - Unfold left mu
-- `EQ2_unfold_right` - Unfold right mu
-- `EQ2_send_head` - Send constructor equality
-- `EQ2_recv_head` - Receive constructor equality
+Parametric coinduction (paco) for EQ2.
 
-**Coinduction:**
-- `EQ2_coind` - Coinduction principle
-- `EQ2_coind_upto` - Coinduction up-to technique
-- `EQ2_closure` - Closure under EQ2
+| Definition | Description |
+|------------|-------------|
+| `EQ2_paco` | Parametric accumulation for EQ2 |
+| `EQ2_paco_coind` | Paco coinduction principle |
+| `EQ2_paco_unfold` | Paco unfolding |
 
----
+### EQ2Props — `Protocol/CoTypes/EQ2Props.lean`
 
-### Protocol/CoTypes/EQ2Paco.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/EQ2Paco.lean` (8KB)
+| Definition | Description |
+|------------|-------------|
+| `EQ2_trans_wf` | **Transitivity via Bisim detour** (requires WellFormed) |
 
-**PACO-based EQ2:**
-- `EQ2_paco` - PACO version of EQ2
-- `EQ2_paco_coind` - PACO coinduction
-- `EQ2_paco_unfold` - PACO unfolding
+### Bisim — `Protocol/CoTypes/Bisim/Part1–10` (10 files)
 
----
+Full bisimulation relation on local types.
 
-### Protocol/CoTypes/EQ2Props.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/EQ2Props.lean` (24 lines)
+| Definition | Description |
+|------------|-------------|
+| `Bisim` | Bisimulation relation |
+| `Bisim_refl` | Reflexivity |
+| `Bisim_symm` | Symmetry |
+| `Bisim_trans` | Transitivity |
+| `Bisim_implies_EQ2` | Bisim to EQ2 (WellFormed) |
+| `EQ2_implies_Bisim` | EQ2 to Bisim (WellFormed) |
 
-**Bisim-based EQ2 Properties:**
-- `EQ2_trans_wf` - Transitivity via Bisim (requires WellFormed hypotheses)
+### Observable — `Protocol/CoTypes/Observable.lean`
 
----
+| Definition | Description |
+|------------|-------------|
+| `UnfoldsToEnd` | Unfolds to end observable |
+| `UnfoldsToVar` | Unfolds to variable observable |
+| `CanSend` | Send capability observable |
+| `CanRecv` | Receive capability observable |
+| `ObservableRel.toEQ2` | Build EQ2 from observable agreement |
+| `EQ2_send_not_UnfoldsToEnd` | Incompatibility: send vs end |
+| `EQ2_send_not_UnfoldsToVar` | Incompatibility: send vs var |
+| `EQ2_send_not_CanRecv` | Incompatibility: send vs recv |
 
-### Protocol/CoTypes/Bisim.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/Bisim.lean` (156KB, largest in CoTypes)
+### Dual — `Protocol/CoTypes/Dual.lean`
 
-**Key Definition:**
-- `Bisim : LocalTypeR → LocalTypeR → Prop` - Bisimulation relation
+| Definition | Description |
+|------------|-------------|
+| `dual_involutive` | Duality is involution (`t.dual.dual = t`) |
+| `dual_isGuarded` | Duality preserves guardedness |
+| `dual_isContractive` | Duality preserves contractiveness |
+| `freeVars_dual` | Duality preserves free variables |
+| `EQ2_dual` | EQ2 respects duality |
 
-**Key Theorems:**
-- `Bisim_refl` - Reflexivity
-- `Bisim_symm` - Symmetry
-- `Bisim_trans` - Transitivity
-- `Bisim_implies_EQ2` - Bisimulation implies EQ2
-- `EQ2_implies_Bisim` - EQ2 implies bisimulation (for well-formed types)
-- `EQ2_send_not_UnfoldsToEnd/Var/CanRecv` - Incompatibility lemmas for send vs observables
-- `ObservableRel.toEQ2` - Build EQ2 from observables (requires WellFormed on both sides)
-- `EQ2_iff_observable_correspond` - EQ2 ↔ observable correspondence (WellFormed on both sides)
+### FullUnfold — `Protocol/CoTypes/FullUnfold.lean`
 
-**Bisimulation Up-To:**
-- `bisim_upto` - Up-to technique
-- `bisim_upto_eq` - Up-to equality
+| Definition | Description |
+|------------|-------------|
+| `fullUnfold` | Complete mu-unfolding |
+| `EQ2_iff_fullUnfold_eq` | EQ2 if and only if full unfolds are EQ2 |
+| `EQ2_of_fullUnfold_eq` | Equality of full unfolds implies EQ2 |
 
----
+### SubstCommBarendregt — `Protocol/CoTypes/SubstCommBarendregt/`
 
-### Protocol/CoTypes/Dual.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/Dual.lean` (13KB)
+Barendregt substitution commutation lemma for session types. `Main.lean` is 546 lines.
 
-**Key Theorems:**
-- `dual_involutive : t.dual.dual = t` - Duality involution
-- `dual_isGuarded` - Duality preserves guardedness
-- `dual_isContractive` - Duality preserves contractiveness
-- `freeVars_dual` - Duality preserves free variables
-- `EQ2_dual` - EQ2 respects duality
+### Other CoTypes Files
 
-**Observable Duality:**
-- `UnfoldsToEnd.dual` - Unfolding to end preserved by dual
-- `UnfoldsToVar.dual` - Unfolding to var preserved by dual
-- `CanSend.dual` - Dual of CanSend is CanRecv
-- `CanRecv.dual` - Dual of CanRecv is CanSend
-
----
-
-### Protocol/CoTypes/FullUnfold.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/FullUnfold.lean` (11KB)
-
-**Key Definitions:**
-- `muHeight : LocalTypeR → Nat` - Count nested mu constructors
-- `singleUnfold : LocalTypeR → LocalTypeR` - One unfold step
-- `fullUnfold : LocalTypeR → LocalTypeR` - Complete unfolding
-
-**Key Theorems:**
-- `fullUnfold_mu_subst` - Guarded mu: full unfold commutes with substitution
-- `muHeight_substitute_guarded` - Height preservation for guarded substitution
-- `EQ2_of_fullUnfold_eq` - Equality of full unfolds implies EQ2
-- `fullUnfold_eq_of_EQ2` - EQ2 implies EQ2 of full unfolds
-- `EQ2_iff_fullUnfold_eq` - EQ2 ⇔ EQ2 of full unfolds
+| File | Contents |
+|------|----------|
+| `CoinductiveRel.lean` | Generic coinductive relation infrastructure (`gfp`, `coind`, `unfold`, `fold`) |
+| `CoinductiveRelPaco.lean` | Paco for generic coinductive relations (`paco`, `paco_acc`, `paco_mon`) |
+| `Quotient.lean` | Quotient constructions on types |
+| `DBBridge.lean` | De Bruijn bridge utilities |
+| `Substitute.lean` | Substitution on coinductive types |
 
 ---
 
-### Protocol/CoTypes/SubstCommBarendregt.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/SubstCommBarendregt.lean` (58KB)
+## 5. Coinductive Module
 
-**Main Result:**
-- Barendregt's substitution commutation lemma for session types
-- Alpha-equivalence preservation through substitution
+### LocalTypeC — `Coinductive/LocalTypeC.lean`
 
-**Key Lemmas:**
-- Variable freshness conditions
-- Substitution composition
-- Alpha-conversion compatibility
+Coinductive local types via M-types (infinite trees).
+
+### EQ2C — `Coinductive/EQ2C.lean`
+
+Coinductive equality for `LocalTypeC`.
+
+| File | Contents |
+|------|----------|
+| `EQ2CEnv.lean` | EQ2C with environments |
+| `EQ2CMu.lean` | EQ2C under mu-binders |
+| `EQ2CPaco.lean` | Parametric coinduction for EQ2C |
+| `EQ2CProps.lean` | Properties of EQ2C |
+
+### BisimDecidable — `Coinductive/BisimDecidable/Part1–3`
+
+Decidable bisimulation for regular (finite-state) types.
+
+### Roundtrip — `Coinductive/Roundtrip/`
+
+Bridging inductive `LocalTypeR` and coinductive `LocalTypeC`. Five parts plus `GpacoCollapse`. `Roundtrip/Part4.lean` is 539 lines.
+
+| Definition | Location | Description |
+|------------|----------|-------------|
+| `toInductive` | `Roundtrip/` | `LocalTypeC` to `LocalTypeR` |
+| `toCoind` | `Roundtrip/` | `LocalTypeR` to `LocalTypeC` |
+| `toCoind_toInductive_eq2ce` | `Roundtrip/` | Round-trip theorem |
+| `EQ2C_mu_paco_le_paco_of_productive` | `Roundtrip/` | Mu-paco collapse under productivity |
+| `EQ2CE_resolved'_implies_EQ2C` | `Roundtrip/` | Environment erasure |
+| `productive_toCoind` | `Roundtrip/` | Productivity discharge for `toCoind` |
+| `reachable_toCoind` | `Roundtrip/` | Reachability discharge for `toCoind` |
+
+### Other Coinductive Files
+
+| File | Contents |
+|------|----------|
+| `Bridge.lean` | Inductive-coinductive bridge |
+| `ToInductive.lean` | Coinductive to inductive conversion |
+| `ToCoindRegular.lean` | Coinductive conversion for regular types |
+| `ToCoindInjectivity.lean` | Injectivity of coinductive conversion |
+| `Regularity.lean` | Regularity properties |
+| `RegularityLemmas.lean` | Supporting regularity lemmas |
+| `RegularSystemBisim.lean` | Bisimulation for regular systems |
+| `FiniteSystem.lean` | Finite-state system characterization |
+| `Coalgebra.lean` | Coalgebraic structure |
+| `Congruence.lean` | Congruence properties |
+| `Observable.lean` | Observable predicates for coinductive types |
+| `WellFormed.lean` | Well-formedness for coinductive types |
+| `BisimHelpers.lean` | Bisimulation helper lemmas |
+| `RoundtripHelpers.lean` | Round-trip helper lemmas |
+| `RoundtripWIP.lean` | Additional round-trip results |
+| `Dual.lean` | Duality for coinductive types |
+| `ProjectC.lean` | Projection for coinductive types |
 
 ---
 
-## Main Theorems
+## 6. Main Theorems
 
-### Proofs/Projection/Harmony.lean
-**Location:** `RumpsteakV2/Proofs/Projection/Harmony.lean` (81KB)
+### Harmony — `Proofs/Projection/Harmony.lean` (re-export) + `Harmony/Part1–4, Part3b`
 
-**CENTRAL RESULT - Projection Harmony:**
+The central correctness result: global protocol steps correspond to local environment steps.
 
-```lean
-theorem step_harmony {g : GlobalType} {env : ProjectedEnv} {g' : GlobalType}
-    (hstep : GlobalStep g action g')
-    (hproj : projEnv g env) :
-    ∃ env', EnvStep env action env' ∧ projEnv g' env'
+| Theorem | Location | Description |
+|---------|----------|-------------|
+| `step_harmony` | `Harmony/Part1.lean:206` | Global steps correspond to local env steps |
+| `trans_branches_coherent_EQ2` | `Harmony/Part1.lean:307` | Branch coherence under projection |
+| `trans_produces_CProject` | `Harmony/Part1.lean:372` | `trans` output satisfies `CProject` |
+| `branches_project_coherent` | `Harmony/Part1.lean:407` | Projected branches are coherent |
+| `trans_substitute_unfold` | `Harmony/Part2.lean:501` | Substitution-unfolding for projection |
+| `proj_trans_sender_step` | `Harmony/Part3.lean:64` | Sender case of harmony |
+| `proj_trans_receiver_step` | `Harmony/Part3.lean:111` | Receiver case of harmony |
+| `step_preserves_wellFormed` | `Harmony/Part3.lean:514` | Steps preserve well-formedness |
+| `proj_trans_other_step` | `Harmony/Part4.lean:52` | Non-participant case (uses `ProjectableClosedWellFormed`) |
+
+Supporting files:
+
+| File | Contents |
+|------|----------|
+| `MuUnfoldLemmas.lean` | `EQ2_mu_crossed_unfold_left`, `EQ2_mu_crossed_unfold_right` |
+| `StepProjection.lean` | Step-level projection lemmas |
+| `SubstEndUnguarded.lean` | `subst_end_unguarded_eq2_end` |
+
+### Determinism — `Proofs/Safety/Determinism.lean` (re-export) + `Determinism/Part1–2`
+
+| Theorem | Location | Description |
+|---------|----------|-------------|
+| `local_step_det` | `Determinism/Part1.lean` | Local step determinism |
+| `config_step_det` | `Determinism/Part1.lean:418` | Configuration step determinism |
+| `env_step_det` | `Determinism/Part1.lean` | Environment step determinism |
+| `diamond_independent` | `Determinism/Part2.lean:463` | Diamond property for independent steps |
+
+`Determinism/Part1.lean` is the largest file at 600 lines.
+
+### Deadlock Freedom — `Proofs/Safety/DeadlockFreedom.lean`
+
+| Theorem | Location | Description |
+|---------|----------|-------------|
+| `deadlock_free` | `DeadlockFreedom.lean:234` | WellFormed implies end or exists step |
+| `not_stuck` | `DeadlockFreedom.lean:247` | No stuck configurations |
+| `deadlock_free_trichotomy` | `DeadlockFreedom.lean:265` | Three-way classification of states |
+
+### Subject Reduction — `Proofs/Safety/SubjectReduction.lean`
+
+| Theorem | Location | Description |
+|---------|----------|-------------|
+| `step_preserves_typing` | `SubjectReduction.lean:130` | Typing preserved under reduction |
+| `step_preserves_wellformed` | `SubjectReduction.lean:153` | Well-formedness preserved under reduction |
+| `other_type_preserved` | `SubjectReduction.lean:185` | Non-participant types preserved (uses `ProjectableClosedWellFormed`) |
+
+### Progress — `Proofs/Safety/Progress.lean`
+
+Progress theorem for well-typed configurations.
+
+### Semantics — `Semantics/`
+
+| File | Contents |
+|------|----------|
+| `EnvStep.lean` | `ProjectedEnv`, `projEnv`, `EnvStep` -- environment step relation |
+| `Environment.lean` | Environment definitions |
+| `Typing.lean` | Typing judgments |
+
+### Axiom Assumptions — `Proofs/Core/Assumptions.lean`
+
+This file is **empty** -- no axioms are assumed.
+
+---
+
+## 7. Proof Strategies
+
+### Strategy 1: EQ2 Transitivity via Bisim Detour
+
+Direct coinductive proof of EQ2 transitivity is problematic because the coinductive hypothesis does not provide enough information to close the proof under unfolding. The solution (`EQ2_trans_wf` in `EQ2Props.lean`):
+
+```
+EQ2 a b  and  EQ2 b c
+  -> Bisim a b  and  Bisim b c     (via EQ2_implies_Bisim, requires WellFormed)
+  -> Bisim a c                      (via Bisim_trans)
+  -> EQ2 a c                        (via Bisim_implies_EQ2)
 ```
 
-This theorem states that global choreography steps correspond to local environment steps.
+This detour through the richer Bisim relation, which carries explicit simulation witnesses, makes transitivity provable. The WellFormed requirement is acceptable because all types arising from projection are well-formed.
 
-**Supporting Theorems:**
+**Key files:** `Protocol/CoTypes/EQ2Props.lean`, `Protocol/CoTypes/Bisim/Part1-10`
 
-- `trans_subst_comm` - Trans commutes with substitution (via paco coinduction)
-  ```lean
-  theorem trans_subst_comm (g : GlobalType) (t : String) (role : String) :
-      EQ2 (trans g role).substitute t (trans g role)
-          (trans (g.substitute t g) role)
-  ```
+### Strategy 2: Mu-Paco Collapse
 
-- `proj_trans_sender_step` - Sender projection step
-- `proj_trans_receiver_step` - Receiver projection step
-- `proj_trans_other_step` - Non-participant projection step (requires `ProjectableClosedWellFormed g`;
-  mu case chains via `EQ2_trans_wf` with WellFormed witnesses)
+The coinductive round-trip between `LocalTypeR` and `LocalTypeC` uses mu-aware parametric coinduction (mu-paco). Standard paco accumulates a set of "already proven" pairs; mu-paco additionally tracks recursive binder contexts. The collapse lemma:
 
-- `trans_branches_coherent_EQ2` - Branches project coherently
-  ```lean
-  theorem trans_branches_coherent_EQ2
-      (gbs : List (Label × GlobalType)) (role : String) :
-      ∀ l g, (l, g) ∈ gbs →
-        ∃ lbs, BranchesProjRel CProject gbs role lbs ∧
-               ∀ l' e, (l', e) ∈ lbs → l = l' → EQ2 (trans g role) e
-  ```
-
-- `trans_produces_CProject` - Trans produces valid CProject
-  ```lean
-  theorem trans_produces_CProject (g : GlobalType) (role : String) :
-      CProject g role (trans g role)
-  ```
-
-**Branch Helpers:**
-- `transBranches_satisfies_BranchesProjRel` - Trans branches satisfy projection relation
-
----
-
-### Proofs/Projection/MuUnfoldLemmas.lean
-**Location:** `RumpsteakV2/Proofs/Projection/MuUnfoldLemmas.lean` (12KB)
-
-**Key Mu-Unfolding Theorems:**
-
-- `EQ2_mu_crossed_unfold_left` - Left mu unfold crossing
-  ```lean
-  theorem EQ2_mu_crossed_unfold_left (t : String) (body e : LocalTypeR) :
-      EQ2 (.mu t body) e →
-      EQ2 (body.substitute t (.mu t body)) e
-  ```
-
-- `EQ2_mu_crossed_unfold_right` - Right mu unfold crossing
-  ```lean
-  theorem EQ2_mu_crossed_unfold_right (e : LocalTypeR) (t : String) (body : LocalTypeR) :
-      EQ2 e (.mu t body) →
-      EQ2 e (body.substitute t (.mu t body))
-  ```
-
-- `EQ2_mu_unguarded_to_end` - Unguarded mu to end
-- `EQ2_end_to_mu_unguarded` - End to unguarded mu
-
----
-
-### Proofs/Projection/SubstEndUnguarded.lean
-**Location:** `RumpsteakV2/Proofs/Projection/SubstEndUnguarded.lean` (8KB)
-
-**Key Theorem:**
-
-- `subst_end_unguarded_eq2_end` - Substitution of end in unguarded position
-  ```lean
-  theorem subst_end_unguarded_eq2_end (t : String) (body : LocalTypeR)
-      (hunguarded : body.isGuarded t = false)
-      (hbody_end : EQ2 body .end) :
-      EQ2 (body.substitute t .end) .end
-  ```
-
-Proven via coinductive `UnfoldsToEnd` relation.
-
----
-
-### Proofs/Safety/Determinism.lean
-**Location:** `RumpsteakV2/Proofs/Safety/Determinism.lean` (40KB)
-
-**Main Theorem:**
-```lean
-theorem protocol_deterministic (g : GlobalType) :
-    ∀ action₁ g₁ action₂ g₂,
-      GlobalStep g action₁ g₁ →
-      GlobalStep g action₂ g₂ →
-      action₁ = action₂ ∧ g₁ = g₂
+```
+EQ2C_mu_paco_le_paco_of_productive
 ```
 
-Protocol execution is deterministic - each global type can step to at most one successor.
+shows that mu-paco reduces to standard paco when the types involved are productive (every recursive path passes through a constructor). This bridges the inductive world (where recursion is structural) and the coinductive world (where recursion is guarded).
+
+**Key files:** `Coinductive/Roundtrip/`, `Coinductive/Roundtrip/GpacoCollapse.lean`
+
+### Strategy 3: Blindness for Axiom-Free Projectability
+
+Classical MPST theory assumes a projectability axiom: that every global type can be projected for every participant. The `isBlind` predicate provides a syntactic sufficient condition:
+
+- `branchesUniformFor`: all branches in a choice are identical for non-participants
+- `isBlind`: recursive check that all choices satisfy `branchesUniformFor` for non-senders
+
+The key theorem `projectable_of_wellFormedBlind` shows that closed + well-formed + blind global types are projectable without any axiom. Blindness is preserved by substitution (`isBlind_substitute`) and stepping (`isBlindBranches_step`).
+
+**Key files:** `Protocol/Projection/Blind/Part1.lean`, `Protocol/Projection/Blind/Part2.lean`
+
+### Strategy 4: CProject as Greatest Fixed Point
+
+Projection is defined coinductively rather than inductively to handle infinite (recursive) types:
+
+- `CProjectF` is the monotone generator functor
+- `CProject = gfp CProjectF` is the greatest fixed point
+- `CProject_coind`: to prove `CProject g r l`, supply a relation `R` with `R g r l` and show `R` is contained in `CProjectF R`
+- `CProject_destruct`: from `CProject g r l`, obtain `CProjectF CProject g r l`
+
+This enables proving projection properties by coinduction rather than requiring structural recursion on types.
+
+**Key files:** `Protocol/Projection/Project/ImplBase.lean`
+
+### Strategy 5: Harmony via Three Cases
+
+The `step_harmony` theorem decomposes into three cases matching the three roles in a communication:
+
+1. **Sender** (`proj_trans_sender_step`, `Harmony/Part3.lean:64`): The sender's local type takes a send step matching the global step.
+2. **Receiver** (`proj_trans_receiver_step`, `Harmony/Part3.lean:111`): The receiver's local type takes a receive step matching the global step.
+3. **Non-participant** (`proj_trans_other_step`, `Harmony/Part4.lean:52`): Any other role's local type is preserved (up to EQ2). This case chains through `EQ2_trans_wf` with `ProjectableClosedWellFormed` witnesses, using the blindness property to ensure the projection is unchanged.
+
+**Key files:** `Proofs/Projection/Harmony/Part1-4`, `Proofs/Projection/Harmony/Part3b`
 
 ---
 
-### Proofs/Safety/DeadlockFreedom.lean
-**Location:** `RumpsteakV2/Proofs/Safety/DeadlockFreedom.lean` (10KB)
+## 8. Axiom Inventory
 
-**Main Theorem:**
-```lean
-theorem deadlock_free (g : GlobalType) :
-    WellFormed g →
-    (g = .end ∨ ∃ action g', GlobalStep g action g')
+| Category | Count | Details |
+|----------|-------|---------|
+| Axioms | **0** | `Proofs/Core/Assumptions.lean` is empty |
+| Sorries | **0** | All proofs are complete |
+
+The development is entirely axiom-free and sorry-free. Projectability (traditionally an axiom in MPST theory) is discharged via the blindness predicate (`projectable_of_wellFormedBlind`).
+
+**Verification:** Both the inductive path (Protocol, Proofs) and coinductive path (Coinductive module) carry zero axioms and zero sorries.
+
+---
+
+## 9. Cross-Reference Index
+
+### By Concept
+
+| Concept | Defined In | Used By |
+|---------|-----------|---------|
+| `GlobalType` | `Protocol/GlobalType/Part1` | Projection, Harmony, Semantics |
+| `LocalTypeR` | `Protocol/LocalTypeR/Part1` | EQ2, Bisim, Projection, Safety |
+| `LocalTypeC` | `Coinductive/LocalTypeC` | Roundtrip, BisimDecidable, ProjectC |
+| `EQ2` | `Protocol/CoTypes/EQ2/Core` | EQ2Props, Bisim, Harmony, ProjectProps |
+| `EQ2_trans_wf` | `Protocol/CoTypes/EQ2Props` | Harmony/Part4 (non-participant case) |
+| `Bisim` | `Protocol/CoTypes/Bisim/Part1` | EQ2Props (transitivity detour) |
+| `CProject` | `Protocol/Projection/Project/ImplBase` | Harmony, ProjectProps, EmbedProps |
+| `trans` | `Protocol/Projection/Trans/Core` | Harmony, Blind, Projectb |
+| `isBlind` | `Protocol/Projection/Blind/Part1` | Harmony/Part4, Safety proofs |
+| `WellFormedBlind` | `Protocol/Projection/Blind/Part1` | Harmony entry point |
+| `wellFormed` | `Protocol/GlobalType/Part2` | Blind, Harmony, Safety |
+| `part_of2` | `Protocol/Participation/Core` | Projection, Harmony |
+| `EnvStep` | `Semantics/EnvStep` | Harmony, Safety |
+| `deadlock_free` | `Proofs/Safety/DeadlockFreedom` | Top-level safety result |
+| `step_harmony` | `Proofs/Projection/Harmony/Part1` | Top-level correctness result |
+| `config_step_det` | `Proofs/Safety/Determinism/Part1` | Top-level determinism result |
+| `step_preserves_typing` | `Proofs/Safety/SubjectReduction` | Top-level type safety result |
+
+### By Dependency Chain
+
+**Projection Stack:**
+```
+GlobalType
+    |
+    v
+Trans  ->  Projectb  ->  Project (CProject)
+    |           |              |
+    v           v              v
+ProjectProps  <-  Embed  <-  EmbedProps
+    |
+    v
+Harmony
 ```
 
-Well-formed protocols either terminate gracefully or can make progress.
-
----
-
-### Proofs/Safety/SubjectReduction.lean
-**Location:** `RumpsteakV2/Proofs/Safety/SubjectReduction.lean` (7KB)
-
-**Main Theorem:**
-```lean
-theorem subject_reduction (g g' : GlobalType) (action : Action) :
-    WellFormed g →
-    GlobalStep g action g' →
-    WellFormed g'
+**Safety Stack:**
+```
+Harmony
+    |
+    v
+SubjectReduction
+    |
+    v
+Determinism + DeadlockFreedom + Progress
 ```
 
-Well-formedness is preserved by global steps (type safety).
-
----
-
-## Coinductive Module
-
-### Coinductive/LocalTypeC.lean
-**Location:** `RumpsteakV2/Coinductive/LocalTypeC.lean` (5KB)
-
-**Key Definition:**
-- `LocalTypeC` - Coinductive local types via M-types (greatest fixed point of polynomial functor)
-
-**Smart Constructors:**
-- `mkEnd : LocalTypeC` - Coinductive end
-- `mkVar : String → LocalTypeC` - Coinductive variable
-- `mkMu : String → LocalTypeC → LocalTypeC` - Coinductive mu
-- `mkSend : String → List (Label × LocalTypeC) → LocalTypeC` - Coinductive send
-- `mkRecv : String → List (Label × LocalTypeC) → LocalTypeC` - Coinductive receive
-
-**Destructors:**
-- `destruct : LocalTypeC → LocalTypeCF LocalTypeC` - Coinductive destructor
-
----
-
-### Coinductive/EQ2C.lean
-**Location:** `RumpsteakV2/Coinductive/EQ2C.lean` (18KB)
-
-**Key Definition:**
-- `EQ2C : LocalTypeC → LocalTypeC → Prop` - Coinductive equality for coinductive types
-
-**Key Theorems:**
-- `EQ2C_refl` - Reflexivity
-- `EQ2C_symm` - Symmetry
-- `EQ2C_trans` - Transitivity
-- `EQ2C_unfold_left` - Unfold left mu
-- `EQ2C_unfold_right` - Unfold right mu
-
----
-
-### Coinductive/BisimDecidable.lean
-**Location:** `RumpsteakV2/Coinductive/BisimDecidable.lean` (51KB)
-
-**Main Result:**
-- Decidable bisimulation algorithm for regular session types
-- Soundness proof (completeness dropped in paco-first approach)
-
-**Key Definitions:**
-- `BisimRel = BisimRelCore ∨ EQ2C` - Combined bisimulation relation
-- `maxUnfoldDepth` - Bound for observable types
-
-**Key Theorems:**
-- `BisimRel_postfixpoint` - BisimRel is post-fixpoint
-- `EQ2C_postfixpoint` - EQ2C compatibility
-
----
-
-### Coinductive/Roundtrip.lean
-**Location:** `RumpsteakV2/Coinductive/Roundtrip.lean` (63KB, 1,214 lines)
-
-**Supporting File:**
-- `RumpsteakV2/Coinductive/Roundtrip/GpacoCollapse.lean` - gpaco-based μ-paco collapse helpers
-
-**Conversion Functions:**
-- `toInductive : LocalTypeC → LocalTypeR` - Convert coinductive to inductive
-- `toCoind : LocalTypeR → LocalTypeC` - Convert inductive to coinductive
-
-**Main Theorems (proved):**
-- `toCoind_toInductive_eq2ce` - Round-trip in EQ2CE
-
-**Key Lemmas (erasure + μ-paco bridge):**
-- `EQ2C_mu_paco_le_paco_of_productive` - Collapse μ-aware paco to EQ2C_paco under productivity
-- `EQ2C_mu_paco_le_paco_of_obs` - gpaco-based collapse from μ-paco to EQ2C_paco (observable hypothesis)
-- `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (requires productivity on both sides)
-- `toCoind_toInductive_eq2c_of_env_toCoind` - Round-trip for `toCoind` images (discharges productivity)
-- `toCoind_toInductive_eq2c_of_backedge_toCoind` - Round-trip for `toCoind` images with back-edge resolution (discharges productivity)
-- `EQ2CE_to_EQ2C'_toCoind` / `EQ2CE_to_EQ2C_toCoind` - Erasure for `toCoind` sources (no productivity)
-- `EQ2CE_resolved'_implies_EQ2C_toCoind` / `EQ2CE_resolved_to_EQ2C_toCoind` - Resolved erasure for `toCoind` sources
-- `EQ2CE_to_EQ2C_paco_toCoind` - Paco-style erasure for `toCoind` sources
-- `envOf`, `nameOf` - Environment/name generation (definitions, no axioms)
-- `BranchesRelC_gupaco_clo`, `gupaco_clo_obs_of_rr` - gpaco_clo helper lemmas (guarded observable extraction)
-- `GpacoRel`, `mu_paco_obs_to_gpaco`, `mu_paco_le_paco_of_obs` - gpaco collapse infrastructure (Roundtrip/GpacoCollapse.lean)
-
----
-
-### Coinductive/RoundtripWIP.lean
-**Location:** `RumpsteakV2/Coinductive/RoundtripWIP.lean` (0.2KB)
-
-**Status:**
-- Deprecated wrapper (content consolidated into Roundtrip.lean)
-
-**Key Result (now in Roundtrip.lean):**
-- `EQ2CE_resolved'_implies_EQ2C` - Environment erasure (μ-paco bridge; no sorry)
-
----
-
-## Supporting Lemmas
-
-### Proofs/Core/Assumptions.lean
-**Location:** `RumpsteakV2/Proofs/Core/Assumptions.lean` (0.3KB)
-
-**Notes:**
-- No axioms currently live in this module (kept for centralized assumptions)
-
-### Protocol/CoTypes/Observable.lean
-**Location:** `RumpsteakV2/Protocol/CoTypes/Observable.lean` (11KB)
-
-**Observable Predicates:**
-
-- `UnfoldsToEnd : LocalTypeR → Prop` - Type unfolds to end
-- `UnfoldsToVar : LocalTypeR → String → Prop` - Type unfolds to variable
-- `CanSend : LocalTypeR → String → List (Label × LocalTypeR) → Prop` - Type can send
-- `CanRecv : LocalTypeR → String → List (Label × LocalTypeR) → Prop` - Type can receive
-
-**Key Lemmas:**
-- `UnfoldsToEnd.mu` - Mu unfolding to end
-- `CanSend.mu` - Mu can send
-- `CanRecv.mu` - Mu can receive
-
----
-
-### Semantics/EnvStep.lean
-**Location:** `RumpsteakV2/Semantics/EnvStep.lean` (7KB)
-
-**Key Definitions:**
-
-- `ProjectedEnv` - Maps roles to local types
-  ```lean
-  def ProjectedEnv := Role → LocalTypeR
-  ```
-
-- `projEnv : GlobalType → ProjectedEnv → Prop` - Environment projection
-  ```lean
-  def projEnv (g : GlobalType) (env : ProjectedEnv) : Prop :=
-    ∀ role, CProject g role (env role)
-  ```
-
-- `EnvStep : ProjectedEnv → Action → ProjectedEnv → Prop` - Environment stepping
-  - Lifts local steps to environment transitions
-
-**Key Lemmas:**
-- `projEnv_deterministic` - Projected environments are unique up to EQ2
-- `envStep_role_match` - Step actions match role types
-
----
-
-## Cross-Reference Index
+**Coinductive Stack:**
+```
+CoinductiveRel  ->  CoinductiveRelPaco
+    |                       |
+    v                       v
+EQ2  ->  EQ2Paco           Bisim (Part1-10)
+    |                       |
+    v                       v
+EQ2Props  <-----------------+
+    |
+    v
+LocalTypeC  ->  EQ2C  ->  BisimDecidable
+    |
+    v
+Roundtrip (Part1-5 + GpacoCollapse)
+```
 
 ### By Topic
 
-#### **Projection Correctness**
-1. `trans_produces_CProject` - Trans.lean → Harmony.lean
-2. `projectb_sound` - Projectb.lean → Harmony.lean
-3. `CProject_implies_EQ2_trans` - Project.lean → ProjectProps.lean
-4. `step_harmony` - Harmony.lean (uses all above)
+**Projection Correctness:**
+1. `trans_produces_CProject` -- Trans output satisfies CProject (Harmony/Part1)
+2. `projectb_sound` -- Boolean checker is sound (Projectb)
+3. `CProject_implies_EQ2_trans` -- CProject relates to trans via EQ2 (Project)
+4. `step_harmony` -- Central harmony result (Harmony/Part1)
 
-#### **Projectability Assumptions**
-1. `Projectable` - Project.lean (global projectability predicate)
-2. `ProjectableClosedWellFormed` - Project/Core.lean (bundle: closed + wellFormed + projectable; used by Harmony/SubjectReduction)
+**Projectability:**
+1. `Projectable` -- Global projectability predicate (Project/Core)
+2. `ProjectableClosedWellFormed` -- Bundle used by Harmony and SubjectReduction (Project/Core)
+3. `projectable_of_wellFormedBlind` -- Axiom elimination (Blind/Part1)
 
-#### **Determinism Chain**
-1. `project_deterministic` - ProjectProps.lean
-2. `protocol_deterministic` - Determinism.lean
-3. `envStep_deterministic` - EnvStep.lean
+**Determinism Chain:**
+1. `project_deterministic` -- Projection determinism up to EQ2 (ProjectProps)
+2. `config_step_det` -- Configuration step determinism (Determinism/Part1)
+3. `diamond_independent` -- Diamond property (Determinism/Part2)
 
-#### **EQ2 Theory**
-1. `EQ2` definition - EQ2.lean
-2. `EQ2_paco_coind` - EQ2Paco.lean
-3. `EQ2_trans_wf` - EQ2Props.lean
-4. `Bisim_implies_EQ2` - Bisim.lean
-5. `EQ2_dual` - Dual.lean
-6. `EQ2_of_fullUnfold_eq` - FullUnfold.lean
+**EQ2 Theory:**
+1. `EQ2` definition (EQ2/Core)
+2. `EQ2_paco_coind` -- Paco coinduction (EQ2Paco)
+3. `EQ2_trans_wf` -- Transitivity via Bisim (EQ2Props)
+4. `Bisim_implies_EQ2` / `EQ2_implies_Bisim` -- Bidirectional bridge (Bisim)
+5. `EQ2_dual` -- Duality respect (Dual)
+6. `EQ2_iff_fullUnfold_eq` -- Full unfold characterization (FullUnfold)
 
-#### **Substitution Commutation**
-1. `trans_subst_comm` - Harmony.lean (main proof)
-2. `trans_substitute_unfold` - Trans.lean (helper)
-3. `dual_substitute` - LocalTypeR.lean
-4. Barendregt lemmas - SubstCommBarendregt.lean
+**Substitution:**
+1. `trans_substitute_unfold` -- Projection substitution (Harmony/Part2)
+2. Barendregt lemmas (SubstCommBarendregt)
+3. `isBlind_substitute` -- Blindness preserved (Blind/Part2)
 
-#### **Mu-Type Handling**
-1. `fullUnfold_mu_subst` - FullUnfold.lean
-2. `EQ2_mu_crossed_unfold_left/right` - MuUnfoldLemmas.lean
-3. `subst_end_unguarded_eq2_end` - SubstEndUnguarded.lean
-4. `isGuarded` preservation - Various files
+**Mu-Type Handling:**
+1. `fullUnfold` (FullUnfold)
+2. `EQ2_mu_crossed_unfold_left/right` (MuUnfoldLemmas)
+3. `subst_end_unguarded_eq2_end` (SubstEndUnguarded)
 
-#### **Coinductive/Inductive Bridge**
-1. `toInductive` / `toCoind` - Roundtrip.lean
-2. `toCoind_toInductive_eq2ce` - Roundtrip.lean
-3. `EQ2CE_resolved'_implies_EQ2C` - Roundtrip.lean
-4. `BisimDecidable` - BisimDecidable.lean
-5. `EQ2C_mu_paco_le_paco_of_productive` - Roundtrip.lean (μ-paco collapse under productivity)
-
-### By Dependency
-
-#### **Core Dependencies** (used everywhere)
-- `GlobalType` - GlobalType.lean
-- `LocalTypeR` - LocalTypeR.lean
-- `CProject` - Project.lean
-- `EQ2` - EQ2.lean
-
-#### **Projection Stack**
-```
-GlobalType.lean
-    ↓
-Trans.lean → Projectb.lean → Project.lean
-    ↓              ↓              ↓
-ProjectProps.lean ← Embed.lean ← EmbedProps.lean
-    ↓
-Harmony.lean
-```
-
-#### **Safety Stack**
-```
-Harmony.lean
-    ↓
-SubjectReduction.lean
-    ↓
-Determinism.lean + DeadlockFreedom.lean
-```
-
-#### **Coinductive Stack**
-```
-CoinductiveRel.lean → CoinductiveRelPaco.lean
-    ↓                         ↓
-EQ2.lean → EQ2Paco.lean      Bisim.lean
-    ↓                         ↓
-LocalTypeC.lean → EQ2C.lean → BisimDecidable.lean
-    ↓
-Roundtrip.lean
-```
+**Coinductive/Inductive Bridge:**
+1. `toInductive` / `toCoind` (Roundtrip)
+2. `toCoind_toInductive_eq2ce` -- Round-trip (Roundtrip)
+3. `EQ2C_mu_paco_le_paco_of_productive` -- Mu-paco collapse (Roundtrip)
+4. `EQ2CE_resolved'_implies_EQ2C` -- Environment erasure (Roundtrip)
+5. `BisimDecidable` (BisimDecidable/Part1-3)
 
 ---
 
-## Axiom Inventory
+## 10. File Size Reference
 
-### Inductive Codebase (0 axioms)
+Top 15 files by line count:
 
-| File | Count | Key Axioms |
-|------|-------|------------|
-| Project.lean | 0 | *(none)* |
-| Projectb.lean | 0 | *(none)* |
-| DBBridge.lean | 0 | *(none)* |
-| Proofs/Core/Assumptions.lean | 0 | *(none)* |
-
-### Coinductive Codebase (0 axioms)
-
-| File | Count | Key Axioms |
-|------|-------|------------|
-| EQ2.lean | 0 | *(none)* |
-
-### Sorry Inventory
-
-**Inductive:** 0
-
-**Coinductive:** 0
-
----
-
-## File Size Reference
-
-**Largest Files (Top 10):**
-1. Project.lean - 226KB (~4,899 lines)
-2. Bisim.lean - 157KB
-3. LocalTypeR.lean - 74KB
-4. GlobalType.lean - 64KB
-5. Harmony.lean - 81KB (~1,618 lines)
-6. SubstCommBarendregt.lean - 58KB
-7. BisimDecidable.lean - 51KB
-8. Determinism.lean - 40KB
-9. Projectb.lean - 40KB
-10. Trans.lean - 31KB
+| Rank | File | Lines |
+|------|------|-------|
+| 1 | `Proofs/Safety/Determinism/Part1.lean` | 600 |
+| 2 | `Protocol/GlobalType/Part5.lean` | 571 |
+| 3 | `Protocol/LocalTypeConvProofs/Part3.lean` | 571 |
+| 4 | `MuveImplBase.lean` | 561 |
+| 5 | `Protocol/Projection/Projectb/Part4.lean` | 560 |
+| 6 | `Protocol/LocalTypeDB/Preservation.lean` | 551 |
+| 7 | `Protocol/CoTypes/SubstCommBarendregt/Main.lean` | 546 |
+| 8 | `Coinductive/Roundtrip/Part4.lean` | 539 |
+| 9 | `MuveImplParticipant.lean` | 538 |
+| 10 | `Proofs/Projection/Harmony/Part3.lean` | 521 |
+| 11 | `Protocol/Projection/EmbedProps.lean` | 519 |
+| 12 | `Protocol/TypeContext.lean` | 518 |
+| 13 | `Proofs/Projection/Harmony/Part2.lean` | 514 |
+| 14 | `Protocol/LocalTypeR/Part1.lean` | 511 |
+| 15 | `Proofs/Safety/Determinism/Part2.lean` | 511 |
 
 ---
 
-## Quick Navigation Guide
+## 11. Quick Navigation Guide
 
-**Want to understand...**
-
-- **How projection works?** → Start with Trans.lean, then Project.lean
-- **Why projection is correct?** → Read Harmony.lean (step_harmony theorem)
-- **How EQ2 equality works?** → Start with EQ2.lean, then EQ2Paco.lean
-- **Bisimulation theory?** → Read Bisim.lean, then BisimDecidable.lean
-- **Coinductive types?** → Start with LocalTypeC.lean, then EQ2C.lean
-- **Safety properties?** → Read Determinism.lean and DeadlockFreedom.lean
-- **Mu-type unfolding?** → Read FullUnfold.lean and MuUnfoldLemmas.lean
-- **Substitution theory?** → Read SubstCommBarendregt.lean
-- **Round-trip conversions?** → Read Roundtrip.lean
-
----
-
-## Version History
-
-- 2026-01-16: Initial code map created
-- Future: Will be updated as proofs are completed
-
----
-
-## Contributing
-
-When adding new theorems or lemmas, please update this code map with:
-1. Theorem name and location
-2. Brief description
-3. Dependencies and cross-references
-4. Related theorems
-
-## License
-
-Same as RumpsteakV2 project.
+| Topic | Start Here |
+|-------|-----------|
+| Global types and their structure | `Protocol/GlobalType/Part1.lean` |
+| Local types and operations | `Protocol/LocalTypeR/Part1.lean` |
+| How projection works (functional) | `Protocol/Projection/Trans/Core.lean` |
+| How projection works (coinductive) | `Protocol/Projection/Project/ImplBase.lean` |
+| Boolean projection checker | `Protocol/Projection/Projectb/` |
+| Why no projectability axiom | `Protocol/Projection/Blind/Part1.lean` |
+| Coinductive equality | `Protocol/CoTypes/EQ2/Core.lean` |
+| EQ2 transitivity proof | `Protocol/CoTypes/EQ2Props.lean` |
+| Bisimulation theory | `Protocol/CoTypes/Bisim/Part1.lean` |
+| Observable predicates | `Protocol/CoTypes/Observable.lean` |
+| Duality | `Protocol/CoTypes/Dual.lean` |
+| Substitution commutation | `Protocol/CoTypes/SubstCommBarendregt/Main.lean` |
+| Coinductive types (M-types) | `Coinductive/LocalTypeC.lean` |
+| Inductive/coinductive bridge | `Coinductive/Roundtrip/` |
+| Decidable bisimulation | `Coinductive/BisimDecidable/Part1.lean` |
+| Harmony theorem | `Proofs/Projection/Harmony/Part1.lean` |
+| Deadlock freedom | `Proofs/Safety/DeadlockFreedom.lean` |
+| Subject reduction | `Proofs/Safety/SubjectReduction.lean` |
+| Determinism and diamond | `Proofs/Safety/Determinism/Part1.lean` |
+| Progress | `Proofs/Safety/Progress.lean` |
+| Axiom audit | `Proofs/Core/Assumptions.lean` (empty file) |
+| Operational semantics | `Semantics/EnvStep.lean` |
+| Mu-type unfolding | `Protocol/CoTypes/FullUnfold.lean` |
+| Participation predicates | `Protocol/Participation/Core.lean` |

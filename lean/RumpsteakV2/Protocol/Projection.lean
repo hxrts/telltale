@@ -20,6 +20,7 @@ The following definitions form the semantic interface for proofs:
 - `lcontractive`
 - `projectb`
 - `CProject` (determinism up to EQ2 via ProjectProps)
+- `projectR?` (proof-carrying projection with soundness/completeness)
 -/
 
 namespace RumpsteakV2.Protocol.Projection
@@ -29,6 +30,7 @@ export RumpsteakV2.Protocol.Projection.Projectb (projectb CProject project_deter
   branches_proj_deterministic)
 export RumpsteakV2.Protocol.Projection.Embed (CEmbed embed_deterministic branches_embed_deterministic
   embed_project_roundtrip branches_embed_project_roundtrip project_embed_roundtrip)
--- TODO (Phase C): export RumpsteakV2.Protocol.Projection.Project (projectR?)
+export RumpsteakV2.Protocol.Projection.Project (projectR? projectR?_sound projectR?_complete
+  projectR?_some_iff_CProject projectR?_some_implies_projectb)
 
 end RumpsteakV2.Protocol.Projection
