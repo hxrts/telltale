@@ -33,6 +33,7 @@ set_option autoImplicit false
 set_option linter.unnecessarySimpa false
 
 open scoped Classical
+open Batteries
 
 noncomputable section
 
@@ -60,7 +61,7 @@ def DisjointS (S₁ S₂ : SEnv) : Prop :=
   ∀ x T₁ T₂, lookupSEnv S₁ x = some T₁ → lookupSEnv S₂ x = some T₂ → False
 
 /-- Explicit split of S/G environments for parallel composition. -/
-structure ParSplit (S : SEnv) (G : GEnv) where
+structure ParSplit (S : SEnv) (G : GEnv) : Prop where
   S1 : SEnv
   S2 : SEnv
   G1 : GEnv
@@ -68,7 +69,9 @@ structure ParSplit (S : SEnv) (G : GEnv) where
   hS : S = S1 ++ S2
   hG : G = G1 ++ G2
 
-axiom ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G) : s₁ = s₂
+theorem ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G) : s₁ = s₂ := by
+  classical
+  exact Subsingleton.elim _ _
 
 
 /-- DEnv consistency with GEnv: all sessions in D appear in G. -/
@@ -97,8 +100,156 @@ def SEnvSubset (S₁ S₂ : SEnv) : Prop :=
 def SEnvDomSubset (S₁ S₂ : SEnv) : Prop :=
   ∀ ⦃x T⦄, lookupSEnv S₁ x = some T → ∃ T', lookupSEnv S₂ x = some T'
 
-axiom SEnv_append_assoc (S₁ S₂ S₃ : SEnv) :
-  (S₁ ++ S₂) ++ S₃ = S₁ ++ (S₂ ++ S₃)
+private instance : Std.TransCmp (α := Var) compare := inferInstance
+
+private def insertPairS (acc : SEnv) (p : Var × ValType) : SEnv :=
+  updateSEnv acc p.1 p.2
+
+private theorem lookupSEnv_foldl_insert_preserve
+    (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
+    (hlookup : lookupSEnv env x = some T)
+    (hSame : ∀ T', (x, T') ∈ L → T' = T) :
+    lookupSEnv (L.foldl insertPairS env) x = some T := by
+  induction L generalizing env with
+  | nil =>
+      simpa using hlookup
+  | cons p L ih =>
+      cases p with
+      | mk x' T' =>
+          have hSame' : ∀ T'', (x, T'') ∈ L → T'' = T := by
+            intro T'' hmem
+            exact hSame T'' (List.mem_cons_of_mem _ hmem)
+          by_cases hEq : x' = x
+          · cases hEq
+            have hT' : T' = T := hSame T' (by simp)
+            cases hT'
+            have hlookup' : lookupSEnv (updateSEnv env x T) x = some T := by
+              simpa using (lookupSEnv_update_eq (env:=env) (x:=x) (T:=T))
+            simpa [List.foldl, insertPairS] using
+              (ih (env := updateSEnv env x T) (hlookup := hlookup') (hSame := hSame'))
+          · have hlookup' : lookupSEnv (updateSEnv env x' T') x = some T := by
+              have h := lookupSEnv_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hEq
+              simpa [hlookup] using h
+            simpa [List.foldl, insertPairS] using
+              (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hSame := hSame'))
+
+private theorem lookupSEnv_foldl_insert_of_mem
+    (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
+    (hmem : (x, T) ∈ L)
+    (hSame : ∀ T', (x, T') ∈ L → T' = T) :
+    lookupSEnv (L.foldl insertPairS env) x = some T := by
+  induction L generalizing env with
+  | nil =>
+      cases hmem
+  | cons p L ih =>
+      cases p with
+      | mk x' T' =>
+          have hSame' : ∀ T'', (x, T'') ∈ L → T'' = T := by
+            intro T'' hmem'
+            exact hSame T'' (List.mem_cons_of_mem _ hmem')
+          cases hmem with
+          | head _ =>
+              have hlookup' : lookupSEnv (updateSEnv env x T) x = some T := by
+                simpa using (lookupSEnv_update_eq (env:=env) (x:=x) (T:=T))
+              simpa [List.foldl, insertPairS] using
+                (lookupSEnv_foldl_insert_preserve (L:=L) (env:=updateSEnv env x T)
+                  (x:=x) (T:=T) hlookup' hSame')
+          | tail _ htail =>
+              simpa [List.foldl, insertPairS] using
+                (ih (env := updateSEnv env x' T') (hmem := htail) (hSame := hSame'))
+
+private theorem lookupSEnv_foldl_insert_notin
+    (L : List (Var × ValType)) (env : SEnv) (x : Var) (v : Option ValType)
+    (hlookup : lookupSEnv env x = v)
+    (hNot : ∀ T, (x, T) ∈ L → False) :
+    lookupSEnv (L.foldl insertPairS env) x = v := by
+  induction L generalizing env with
+  | nil =>
+      simpa using hlookup
+  | cons p L ih =>
+      cases p with
+      | mk x' T' =>
+          have hNot' : ∀ T, (x, T) ∈ L → False := by
+            intro T hmem
+            exact hNot T (List.mem_cons_of_mem _ hmem)
+          have hneq : x' ≠ x := by
+            intro hEq
+            exact hNot T' (by simpa [hEq])
+          have hlookup' : lookupSEnv (updateSEnv env x' T') x = v := by
+            have h := lookupSEnv_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hneq
+            simpa [hlookup] using h
+          simpa [List.foldl, insertPairS] using
+            (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hNot := hNot'))
+
+private theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
+    lookupSEnv S₁ x = some T →
+    lookupSEnv (S₁ ++ S₂) x = some T := by
+  intro hlookup
+  simp [SEnvUnion, lookupSEnv, hlookup]
+
+private theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
+    lookupSEnv S₁ x = none →
+    lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x := by
+  intro hlookup
+  simp [SEnvUnion, lookupSEnv, hlookup]
+
+theorem lookupSEnv_append_assoc {S₁ S₂ S₃ : SEnv} {x : Var} :
+    lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv (S₁ ++ (S₂ ++ S₃)) x := by
+  cases h1 : lookupSEnv S₁ x with
+  | some T₁ =>
+      have h12 : lookupSEnv (S₁ ++ S₂) x = some T₁ :=
+        lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T₁) h1
+      have hLeft : lookupSEnv ((S₁ ++ S₂) ++ S₃) x = some T₁ :=
+        lookupSEnv_append_left (S₁:=S₁ ++ S₂) (S₂:=S₃) (x:=x) (T:=T₁) h12
+      have hRight : lookupSEnv (S₁ ++ (S₂ ++ S₃)) x = some T₁ :=
+        lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂ ++ S₃) (x:=x) (T:=T₁) h1
+      simpa [hLeft, hRight]
+  | none =>
+      have h12 : lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x :=
+        lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) h1
+      cases h2 : lookupSEnv S₂ x with
+      | some T₂ =>
+          have h12' : lookupSEnv (S₁ ++ S₂) x = some T₂ := by
+            simpa [h2] using h12
+          have hLeft : lookupSEnv ((S₁ ++ S₂) ++ S₃) x = some T₂ :=
+            lookupSEnv_append_left (S₁:=S₁ ++ S₂) (S₂:=S₃) (x:=x) (T:=T₂) h12'
+          have h23 : lookupSEnv (S₂ ++ S₃) x = some T₂ :=
+            lookupSEnv_append_left (S₁:=S₂) (S₂:=S₃) (x:=x) (T:=T₂) h2
+          have hRight : lookupSEnv (S₁ ++ (S₂ ++ S₃)) x = some T₂ := by
+            have hRight' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂ ++ S₃) (x:=x) h1
+            simpa [hRight'] using h23
+          simpa [hLeft, hRight]
+      | none =>
+          have h12' : lookupSEnv (S₁ ++ S₂) x = none := by
+            simpa [h2] using h12
+          have hLeft : lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv S₃ x :=
+            lookupSEnv_append_right (S₁:=S₁ ++ S₂) (S₂:=S₃) (x:=x) h12'
+          have h23 : lookupSEnv (S₂ ++ S₃) x = lookupSEnv S₃ x :=
+            lookupSEnv_append_right (S₁:=S₂) (S₂:=S₃) (x:=x) h2
+          have hRight : lookupSEnv (S₁ ++ (S₂ ++ S₃)) x = lookupSEnv S₃ x := by
+            have hRight' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂ ++ S₃) (x:=x) h1
+            simpa [hRight'] using h23
+          simpa [hLeft, hRight]
+
+-- SEnv is extensional by function extensionality.
+theorem SEnv_ext {S₁ S₂ : SEnv} :
+  (∀ x, lookupSEnv S₁ x = lookupSEnv S₂ x) → S₁ = S₂ := by
+  intro h
+  funext x
+  exact h x
+
+/-- DEnv extensionality assumption for lookup-based equality. -/
+theorem DEnv_ext {D₁ D₂ : DEnv} :
+  (∀ e, D₁.find? e = D₂.find? e) → D₁ = D₂ := by
+  intro h
+  funext e
+  exact h e
+
+theorem SEnv_append_assoc (S₁ S₂ S₃ : SEnv) :
+    (S₁ ++ S₂) ++ S₃ = S₁ ++ (S₂ ++ S₃) := by
+  apply SEnv_ext
+  intro x
+  simpa using (lookupSEnv_append_assoc (S₁:=S₁) (S₂:=S₂) (S₃:=S₃) (x:=x))
 
 theorem FootprintSubset_refl {W : Footprint} : FootprintSubset W W := by
   intro x hx; exact hx
@@ -136,19 +287,69 @@ theorem FootprintSubset_append_right_of_subset {W₁ W₂ W₂' : Footprint} :
   | inr hRight =>
       exact List.mem_append.mpr (Or.inr (hSub hRight))
 
-axiom SEnvSubset_append_left {S₁ S₁' S₂ : SEnv} :
-    SEnvSubset S₁' S₁ →
-    SEnvSubset (S₁' ++ S₂) (S₁ ++ S₂)
+theorem SEnvDomSubset_append_left_of_domsubset {S₁ S₁' S₂ : SEnv} :
+    SEnvDomSubset S₁' S₁ →
+    SEnvDomSubset (S₁' ++ S₂) (S₁ ++ S₂) := by
+  intro hSub x T hLookup
+  cases hLeft : lookupSEnv S₁' x with
+  | some T₁ =>
+      have hLeft' := lookupSEnv_append_left (S₁:=S₁') (S₂:=S₂) (x:=x) (T:=T₁) hLeft
+      have hEq : T₁ = T := by
+        have : some T₁ = some T := by simpa [hLeft'] using hLookup
+        exact Option.some.inj this
+      obtain ⟨T', hIn⟩ := hSub hLeft
+      exact ⟨T', by simpa [hEq] using lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T') hIn⟩
+  | none =>
+      have hRight := lookupSEnv_append_right (S₁:=S₁') (S₂:=S₂) (x:=x) hLeft
+      have hS2 : lookupSEnv S₂ x = some T := by
+        simpa [hRight] using hLookup
+      cases hS1 : lookupSEnv S₁ x with
+      | some T₁ =>
+          exact ⟨T₁, lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T₁) hS1⟩
+      | none =>
+          have hRight' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hS1
+          exact ⟨T, by simpa [hRight'] using hS2⟩
 
-axiom SEnvSubset_append_right {S₁ S₂ : SEnv} :
-    SEnvSubset S₂ (S₁ ++ S₂)
+theorem SEnvDomSubset_append_right_of_domsubset {S₁ S₂ S₂' : SEnv} :
+    SEnvDomSubset S₂' S₂ →
+    SEnvDomSubset (S₁ ++ S₂') (S₁ ++ S₂) := by
+  intro hSub x T hLookup
+  cases hLeft : lookupSEnv S₁ x with
+  | some T₁ =>
+      exact ⟨T₁, lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T₁) hLeft⟩
+  | none =>
+      have hRight := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂') (x:=x) hLeft
+      have hS2' : lookupSEnv S₂' x = some T := by
+        simpa [hRight] using hLookup
+      obtain ⟨T', hS2⟩ := hSub hS2'
+      have hRight' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
+      exact ⟨T', by simpa [hRight'] using hS2⟩
 
-axiom SEnvSubset_append_left_self {S₁ S₂ : SEnv} :
-    SEnvSubset S₁ (S₁ ++ S₂)
+theorem SEnvSubset_append_left_self {S₁ S₂ : SEnv} :
+    SEnvSubset S₁ (S₁ ++ S₂) := by
+  intro x T hLookup
+  exact lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T) hLookup
 
-axiom SEnvSubset_append_right_of_subset {S₁ S₂ S₂' : SEnv} :
+theorem SEnvSubset_append_right_of_subset {S₁ S₂ S₂' : SEnv} :
     SEnvSubset S₂' S₂ →
-    SEnvSubset (S₁ ++ S₂') (S₁ ++ S₂)
+    SEnvSubset (S₁ ++ S₂') (S₁ ++ S₂) := by
+  intro hSub x T hLookup
+  cases hLeft : lookupSEnv S₁ x with
+  | some T₁ =>
+      have hLeft' := lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂') (x:=x) (T:=T₁) hLeft
+      have hEq : T₁ = T := by
+        have : some T₁ = some T := by simpa [hLeft'] using hLookup
+        cases this
+        rfl
+      have hLeft'' := lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) (x:=x) (T:=T₁) hLeft
+      simpa [hEq] using hLeft''
+  | none =>
+      have hEq := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂') (x:=x) hLeft
+      have hS2' : lookupSEnv S₂' x = some T := by
+        simpa [hEq] using hLookup
+      have hS2 : lookupSEnv S₂ x = some T := hSub hS2'
+      have hEq' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
+      simpa [hEq'] using hS2
 
 theorem SEnvDomSubset_trans {S₁ S₂ S₃ : SEnv} :
     SEnvDomSubset S₁ S₂ →
@@ -183,30 +384,54 @@ theorem DisjointW_of_subset_right {W₁ W₂ W₂' : Footprint} :
   intro hSub hDisj x hx hW2
   exact hDisj hx (hSub hW2)
 
-axiom DisjointS_append_left {S₁ S₁' S₂ : SEnv} :
+theorem DisjointS_append_left {S₁ S₁' S₂ : SEnv} :
     DisjointS S₁ S₂ →
     DisjointS S₁' S₂ →
-    DisjointS (S₁ ++ S₁') S₂
+    DisjointS (S₁ ++ S₁') S₂ := by
+  intro hDisj hDisj' x T₁ T₂ hLookup hL2
+  cases hLeft : lookupSEnv S₁ x with
+  | some T₁' =>
+      have hLeft' := lookupSEnv_append_left (S₁:=S₁) (S₂:=S₁') (x:=x) (T:=T₁') hLeft
+      have hEq : T₁' = T₁ := by
+        have : some T₁' = some T₁ := by simpa [hLeft'] using hLookup
+        cases this
+        rfl
+      exact hDisj x T₁' T₂ hLeft (by simpa [hEq] using hL2)
+  | none =>
+      have hEq := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₁') (x:=x) hLeft
+      have hLookup' : lookupSEnv S₁' x = some T₁ := by
+        simpa [hEq] using hLookup
+      exact hDisj' x T₁ T₂ hLookup' hL2
 
-axiom DisjointS_of_subset_left {S₁ S₁' S₂ : SEnv} :
+theorem DisjointS_of_subset_left {S₁ S₁' S₂ : SEnv} :
     SEnvSubset S₁' S₁ →
     DisjointS S₁ S₂ →
-    DisjointS S₁' S₂
+    DisjointS S₁' S₂ := by
+  intro hSub hDisj x T₁ T₂ hL1 hL2
+  exact hDisj x T₁ T₂ (hSub hL1) hL2
 
-axiom DisjointS_of_domsubset_left {S₁ S₁' S₂ : SEnv} :
+theorem DisjointS_of_domsubset_left {S₁ S₁' S₂ : SEnv} :
     SEnvDomSubset S₁' S₁ →
     DisjointS S₁ S₂ →
-    DisjointS S₁' S₂
+    DisjointS S₁' S₂ := by
+  intro hSub hDisj x T₁ T₂ hL1 hL2
+  obtain ⟨T₁', hL1'⟩ := hSub hL1
+  exact hDisj x T₁' T₂ hL1' hL2
 
-axiom DisjointS_of_subset_right {S₁ S₂ S₂' : SEnv} :
+theorem DisjointS_of_subset_right {S₁ S₂ S₂' : SEnv} :
     SEnvSubset S₂' S₂ →
     DisjointS S₁ S₂ →
-    DisjointS S₁ S₂'
+    DisjointS S₁ S₂' := by
+  intro hSub hDisj x T₁ T₂ hL1 hL2
+  exact hDisj x T₁ T₂ hL1 (hSub hL2)
 
-axiom DisjointS_of_domsubset_right {S₁ S₂ S₂' : SEnv} :
+theorem DisjointS_of_domsubset_right {S₁ S₂ S₂' : SEnv} :
     SEnvDomSubset S₂' S₂ →
     DisjointS S₁ S₂ →
-    DisjointS S₁ S₂'
+    DisjointS S₁ S₂' := by
+  intro hSub hDisj x T₁ T₂ hL1 hL2
+  obtain ⟨T₂', hL2'⟩ := hSub hL2
+  exact hDisj x T₁ T₂' hL1 hL2'
 
 theorem DisjointS_symm {S₁ S₂ : SEnv} :
     DisjointS S₁ S₂ →
@@ -230,9 +455,32 @@ theorem lookupSEnv_none_of_disjoint_left {S₁ S₂ : SEnv} {x : Var} {T : ValTy
 def SEnvAll (Ssh Sown : SEnv) : SEnv :=
   Ssh ++ Sown
 
-axiom updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
+theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
     (h : lookupSEnv Ssh x = none) :
-    updateSEnv (Ssh ++ Sown) x T = Ssh ++ updateSEnv Sown x T
+    updateSEnv (Ssh ++ Sown) x T = Ssh ++ updateSEnv Sown x T := by
+  apply SEnv_ext
+  intro y
+  by_cases hEq : y = x
+  · subst hEq
+    have hLeft : lookupSEnv (updateSEnv (Ssh ++ Sown) x T) x = some T := by
+      simpa using (lookupSEnv_update_eq (env:=Ssh ++ Sown) (x:=x) (T:=T))
+    have hRight : lookupSEnv (Ssh ++ updateSEnv Sown x T) x = some T := by
+      have hRight' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=updateSEnv Sown x T) (x:=x) h
+      simpa [hRight'] using (lookupSEnv_update_eq (env:=Sown) (x:=x) (T:=T))
+    simpa [hLeft, hRight]
+  · have hLeft : lookupSEnv (updateSEnv (Ssh ++ Sown) x T) y = lookupSEnv (Ssh ++ Sown) y := by
+      simpa using (lookupSEnv_update_neq (env:=Ssh ++ Sown) (x:=x) (y:=y) (T:=T) hEq)
+    cases hS : lookupSEnv Ssh y with
+    | some Ty =>
+        have hL' := lookupSEnv_append_left (S₁:=Ssh) (S₂:=Sown) (x:=y) (T:=Ty) hS
+        have hR' := lookupSEnv_append_left (S₁:=Ssh) (S₂:=updateSEnv Sown x T) (x:=y) (T:=Ty) hS
+        simpa [hLeft, hL', hR']
+    | none =>
+        have hL' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown) (x:=y) hS
+        have hR' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=updateSEnv Sown x T) (x:=y) hS
+        have hUpd : lookupSEnv (updateSEnv Sown x T) y = lookupSEnv Sown y := by
+          simpa using (lookupSEnv_update_neq (env:=Sown) (x:=x) (y:=y) (T:=T) hEq)
+        simpa [hLeft, hL', hR', hUpd]
 
 theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G₁ e = none) :
@@ -257,6 +505,24 @@ theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
                 exact beq_eq_false_iff_ne.mpr hxe
               simpa [lookupG, List.lookup, hbeq] using h
             simp [updateG, hxe, ih h']
+
+/-- Updating a key that is already in the left GEnv only affects the left portion. -/
+theorem updateG_append_left_hit {G₁ G₂ : GEnv} {e : Endpoint} {L L' : LocalType}
+    (h : lookupG G₁ e = some L) :
+    updateG (G₁ ++ G₂) e L' = updateG G₁ e L' ++ G₂ := by
+  -- Find the matching endpoint in the left list and rebuild the append.
+  induction G₁ with
+  | nil =>
+      simp [lookupG] at h
+  | cons hd tl ih =>
+      cases hd with
+      | mk e' L'' =>
+          by_cases hEq : e = e'
+          · simp [updateG, hEq, lookupG, List.lookup, hEq, h]
+          · have h' : lookupG tl e = some L := by
+              simp [lookupG, List.lookup, hEq] at h
+              exact h
+            simp [updateG, hEq, ih h']
 
 /-- Process typing judgment.
     `HasTypeProcN n S G D P` means process P is well-typed under:

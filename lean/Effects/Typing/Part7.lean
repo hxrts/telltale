@@ -111,12 +111,14 @@ private lemma DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
 private lemma DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D := by
   rfl
 
-private axiom DEnv_append_empty_left (D : DEnv) : (∅ : DEnv) ++ D = D
+private lemma DEnv_append_empty_left (D : DEnv) : (∅ : DEnv) ++ D = D := by
+  rfl
 
 private lemma SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
   rfl
 
-private axiom SEnv_append_empty_left (S : SEnv) : (∅ : SEnv) ++ S = S
+private lemma SEnv_append_empty_left (S : SEnv) : (∅ : SEnv) ++ S = S := by
+  rfl
 
 private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
@@ -332,7 +334,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               HasTypeProcPreOut Ssh Sown G P (S₁' ++ split.S2) (G₁' ++ split.G2) W₁ Δ₁ := by
             have hFrame :=
               HasTypeProcPreOut_frame_right (S₁:=split.S1) (S₂:=split.S2) (G₁:=split.G1) (G₂:=split.G2)
-                (S₁':=S₁') (G₁':=G₁') (W:=W₁) (Δ:=Δ₁) hDisjS_symm hDisjG hP
+                (S₁':=S₁') (G₁':=G₁') (W:=W₁) (Δ:=Δ₁) hDisjS_symm (DisjointS_symm hDisjS_left) hDisjG hP
             simpa [split.hS, split.hG] using hFrame
           have hProgP :=
             progress_typed_aux hP_full hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
@@ -456,8 +458,10 @@ theorem progress_typed {G D Ssh Sown store bufs P} :
     BlockedProc store bufs P := by
   intro hWF
   unfold WellFormed at hWF
-  obtain ⟨hStore, hBufs, hCoh, hHead, hValid, hReady, hSelectReady, hDisjS, hCons, hPreOut⟩ := hWF
+  obtain ⟨hStore, hBufs, hCoh, hHead, hValid, hCompat, hDisjS, hCons, hPreOut⟩ := hWF
   obtain ⟨Sfin, Gfin, Wfin, Δfin, hOut⟩ := hPreOut
+  have hReady : SendReady G D := Compatible_to_SendReady hCompat
+  have hSelectReady : SelectReady G D := Compatible_to_SelectReady hCompat
   exact progress_typed_aux hOut hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
 
 /-  Subject reduction (soundness) theorem moved to Effects.Preservation

@@ -66,17 +66,23 @@ theorem satisfies_of_bool {topo : Topology} {req : SpatialReq}
 This is because `Consume from L [] = some L` for any L, so `.isSome` is true.
 -/
 theorem edgeCoherent_empty_trace (G : GEnv) (D : DEnv) (e : Edge)
-    (hTrace : lookupD D e = []) :
+    (hTrace : lookupD D e = [])
+    (hSender : ∀ Lrecv, lookupG G { sid := e.sid, role := e.receiver } = some Lrecv →
+      ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender) :
     EdgeCoherent G D e := by
-  unfold EdgeCoherent
-  simp only [hTrace, Consume, Option.isSome_some, implies_true]
+  intro Lrecv hGrecv
+  rcases hSender Lrecv hGrecv with ⟨Lsender, hGsender⟩
+  refine ⟨Lsender, hGsender, ?_⟩
+  simp [hTrace, Consume]
 
 /-- For a DEnv where all entries have empty traces, coherence holds. -/
 theorem coherent_all_empty (G : GEnv) (D : DEnv)
-    (hAll : ∀ e, lookupD D e = []) :
+    (hAll : ∀ e, lookupD D e = [])
+    (hSenders : ∀ e Lrecv, lookupG G { sid := e.sid, role := e.receiver } = some Lrecv →
+      ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender) :
     Coherent G D := by
   intro e
-  exact edgeCoherent_empty_trace G D e (hAll e)
+  exact edgeCoherent_empty_trace G D e (hAll e) (hSenders e)
 
 /-! ## BufferTyped for Empty Buffers -/
 

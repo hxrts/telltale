@@ -1,4 +1,5 @@
 import Effects.Coherence
+import Effects.Decidability
 import Effects.Monitor.Part1
 import Effects.Typing.Part1
 import Effects.Typing.Part3a
@@ -63,7 +64,7 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
     (hWTc : WTMonComplete ms) :
     WTMon ms' := by
   -- Unpack the complete invariant for use in the per-action cases.
-  rcases hWTc with ⟨hWT, hComplete⟩
+  rcases hWTc with ⟨hWT, _hComplete⟩
   cases hStep with
   | send hG hRecvReady hLin hv =>
     -- Send case: enqueue value, advance sender type
@@ -80,7 +81,10 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       simp only [MonitorState.sendEdge]
       exact h
     · -- ValidLabels: send preserves valid labels (no label changes)
-      have h := ValidLabels_send_preserved ms.G ms.D ms.bufs e target T L v hWT.validLabels hG
+      have h := ValidLabels_send_preserved (G:=ms.G) (D:=ms.D) (bufs:=ms.bufs)
+        (senderEp:=e) (receiverRole:=target) (T:=T) (L:=L) (v:=v)
+        (hValid:=hWT.validLabels) (hCoh:=hWT.coherent) (hBT:=hWT.buffers_typed)
+        (hG:=hG) (hRecvReady:=hRecvReady)
       simp only [MonitorState.sendEdge, enqueueBuf]
       exact h
     · -- BuffersTyped: enqueue preserves buffer typing
@@ -136,14 +140,12 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
       have hTrace := trace_head_from_buffer hBuf hv hTyped
       have h := HeadCoherent_recv_preserved ms.G ms.D e source T L
-        hWT.headCoherent hWT.coherent hComplete hG hTrace
+        hWT.headCoherent hWT.coherent hG hTrace
       simp only [MonitorState.recvEdge]
       exact h
     · -- ValidLabels: recv dequeues from buffer, preserves valid labels
-      -- Derive hTrace from BufferTyped using trace_head_from_buffer
-      have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
-      have hTrace := trace_head_from_buffer hBuf hv hTyped
-      have h := ValidLabels_recv_preserved ms.G ms.D ms.bufs e source T L hWT.validLabels hG hTrace
+      have h := ValidLabels_recv_preserved ms.G ms.D ms.bufs e source T L v vs
+        hWT.validLabels hWT.coherent hWT.buffers_typed hBuf hv hG
       -- h: ValidLabels G' D' (updateBuf bufs e (lookupBuf bufs e).tail)
       -- Goal: ValidLabels G' D' (updateBuf bufs e vs)
       -- From hBuf: lookupBuf bufs e = v :: vs, so (lookupBuf bufs e).tail = vs
@@ -200,7 +202,10 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       simp only [MonitorState.sendEdge]
       exact h
     · -- ValidLabels: select preserves valid labels (enqueues label at END)
-      have h := ValidLabels_select_preserved ms.G ms.D ms.bufs e target bs ℓ L hWT.validLabels hG hFind
+      have h := ValidLabels_select_preserved (G:=ms.G) (D:=ms.D) (bufs:=ms.bufs)
+        (selectorEp:=e) (targetRole:=target) (selectBranches:=bs) (ℓ:=ℓ) (L:=L)
+        (hValid:=hWT.validLabels) (hCoh:=hWT.coherent) (hBT:=hWT.buffers_typed)
+        (hG:=hG) (_hFind:=hFind) (hRecvReady:=hRecvReady)
       simp only [MonitorState.sendEdge, enqueueBuf]
       exact h
     · -- BuffersTyped: select enqueues label, preserves buffer typing
@@ -255,11 +260,12 @@ theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v :
       have hTyped := hWT.buffers_typed (MonitorState.recvEdge e source)
       have hTrace := trace_head_from_buffer hBuf hv hTyped
       have h := HeadCoherent_branch_preserved ms.G ms.D e source bs ℓ L
-        hWT.headCoherent hWT.coherent hComplete hG hFind hTrace
+        hWT.headCoherent hWT.coherent hG hFind hTrace
       simp only [MonitorState.recvEdge]
       exact h
     · -- ValidLabels: branch dequeues label from buffer, preserves valid labels
-      have h := ValidLabels_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs hWT.validLabels hG hFind hBuf
+      have h := ValidLabels_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs
+        hWT.validLabels hWT.coherent hWT.buffers_typed hG hFind hBuf
       simp only [MonitorState.recvEdge] at h ⊢
       exact h
     · -- BuffersTyped: branch dequeues label, preserves buffer typing
@@ -426,6 +432,13 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
     (hConsD : DConsistent ms.G ms.D)
     (hConsB : BConsistent ms.G ms.bufs)
     (hProj : True)  -- Placeholder: localTypes are valid projections
+    (hSenders :
+      ∀ e Lrecv,
+        lookupG (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r))
+          { sid := e.sid, role := e.receiver } = some Lrecv →
+        ∃ Lsender,
+          lookupG (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r))
+            { sid := e.sid, role := e.sender } = some Lsender)
     : WTMon (ms.newSession roles localTypes) := by
   simp only [MonitorState.newSession]
   have hSupplyNotIn : ms.supply ∉ SessionsOf ms.G := by
@@ -438,7 +451,7 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
     exact (Nat.lt_irrefl _ hFresh')
   constructor
   · -- coherent: Coherent (newEndpoints ++ ms.G) ((newEdges.map (·, [])) ++ ms.D)
-    intro e Lsender Lrecv hGsender hGrecv
+    intro e Lrecv hGrecv
     by_cases hSid : e.sid = ms.supply
     · -- New session edge: trace is empty, so Consume succeeds.
       have hDnone : ms.D.find? e = none :=
@@ -446,6 +459,25 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
       have hLookupD :
           lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD (initDEnv ms.supply roles) e :=
         lookupD_append_left_of_right_none (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hDnone
+      set recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+      have hRecvNone : lookupG ms.G recvEp = none := by
+        apply lookupG_none_of_not_session
+        simpa [hSid] using hSupplyNotIn
+      have hInvRecv := lookupG_append_inv (G₁:=roles.map fun r => (Endpoint.mk ms.supply r, localTypes r))
+        (G₂:=ms.G) (e:=recvEp) hGrecv
+      have hGrecvNew : lookupG (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) recvEp = some Lrecv := by
+        cases hInvRecv with
+        | inl hLeft => exact hLeft
+        | inr hRight =>
+            have : lookupG ms.G recvEp = some Lrecv := hRight.2
+            have : False := by simpa [hRecvNone] using this
+            exact this.elim
+      rcases hSenders e Lrecv hGrecvNew with ⟨Lsender, hGsenderNew⟩
+      have hGsenderMerged :
+          lookupG ((roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) ++ ms.G)
+            { sid := e.sid, role := e.sender } = some Lsender := by
+        exact lookupG_append_left hGsenderNew
+      refine ⟨Lsender, hGsenderMerged, ?_⟩
       -- Show lookupD initDEnv = [] for this edge.
       by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
       · have hInit : lookupD (initDEnv ms.supply roles) e = [] :=
@@ -458,21 +490,31 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
         simpa [hLookupD, hInit, Consume] using (by rfl : (Consume e.sender Lrecv []).isSome)
     · -- Old session edge: environments unchanged for this sid.
       have hSidNe : e.sid ≠ ms.supply := hSid
+      set senderEp : Endpoint := { sid := e.sid, role := e.sender }
+      set recvEp : Endpoint := { sid := e.sid, role := e.receiver }
       -- G lookups fall through to ms.G since new endpoints have different sid.
       have hSenderNone :
-          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
-            { sid := e.sid, role := e.sender } = none :=
+          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup senderEp = none :=
         lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
       have hRecvNone :
-          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
-            { sid := e.sid, role := e.receiver } = none :=
+          (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup recvEp = none :=
         lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
-      have hGsender' : lookupG ms.G { sid := e.sid, role := e.sender } = some Lsender := by
-        simp [lookupG, List.lookup_append, hSenderNone] at hGsender
-        simpa using hGsender
-      have hGrecv' : lookupG ms.G { sid := e.sid, role := e.receiver } = some Lrecv := by
-        simp [lookupG, List.lookup_append, hRecvNone] at hGrecv
-        simpa using hGrecv
+      have hInvRecv := lookupG_append_inv
+        (G₁:=roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) (G₂:=ms.G) (e:=recvEp) hGrecv
+      have hGrecv' : lookupG ms.G recvEp = some Lrecv := by
+        cases hInvRecv with
+        | inl hLeft =>
+            have : False := by simpa [hRecvNone] using hLeft
+            exact this.elim
+        | inr hRight => exact hRight.2
+      have hCohEdge := hWT.coherent e Lrecv hGrecv'
+      rcases hCohEdge with ⟨Lsender, hGsender', hConsume⟩
+      have hSenderEq := lookupG_append_right
+        (G₁:=roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) (G₂:=ms.G) (e:=senderEp) hSenderNone
+      have hGsenderMerged :
+          lookupG ((roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) ++ ms.G) senderEp =
+            some Lsender := by
+        simpa [hSenderEq] using hGsender'
       -- D lookup falls through to ms.D since initDEnv has no entry for other sids.
       have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
         intro hMem
@@ -482,8 +524,8 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
       have hLookupD :
           lookupD (initDEnv ms.supply roles ++ ms.D) e = lookupD ms.D e :=
         lookupD_append_right (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hFindNone
-      have hCohEdge := hWT.coherent e Lsender Lrecv hGsender' hGrecv'
-      simpa [hLookupD] using hCohEdge
+      refine ⟨Lsender, hGsenderMerged, ?_⟩
+      simpa [hLookupD] using hConsume
   · -- headCoherent: HeadCoherent for combined G and D
     -- New edges have empty traces, so HeadCoherent trivially holds
     intro e
@@ -498,12 +540,24 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
       by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
       · have hInit : lookupD (initDEnv ms.supply roles) e = [] :=
           initDEnv_lookup_mem ms.supply roles e hMem
-        simp [hLookupD, hInit]
+        cases hRecv :
+            lookupG (List.map (fun r => ({ sid := ms.supply, role := r }, localTypes r)) roles ++ ms.G)
+              { sid := e.sid, role := e.receiver } with
+        | none =>
+            simp [hLookupD, hInit, hRecv]
+        | some Lrecv =>
+            cases Lrecv <;> simp [hLookupD, hInit, hRecv]
       · have hInitFind : (initDEnv ms.supply roles).find? e = none :=
           initDEnv_find?_none_of_notin ms.supply roles e hMem
         have hInit : lookupD (initDEnv ms.supply roles) e = [] := by
           simp [lookupD, hInitFind]
-        simp [hLookupD, hInit]
+        cases hRecv :
+            lookupG (List.map (fun r => ({ sid := ms.supply, role := r }, localTypes r)) roles ++ ms.G)
+              { sid := e.sid, role := e.receiver } with
+        | none =>
+            simp [hLookupD, hInit, hRecv]
+        | some Lrecv =>
+            cases Lrecv <;> simp [hLookupD, hInit, hRecv]
     · -- Old session: fall back to ms.HeadCoherent.
       have hSidNe : e.sid ≠ ms.supply := hSid
       have hRecvNone :
@@ -529,30 +583,47 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
     · -- New session: buffer is empty.
       by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
       · have hBufLookup := initBuffers_lookup_mem ms.supply roles e hMem
-        simp [lookupBuf, List.lookup_append, hBufLookup]
+        have hBufLookup' :
+            List.lookup e ((RoleSet.allEdges ms.supply roles).map (fun e => (e, ([] : List Value)))) =
+              some ([] : List Value) := by
+          simpa [initBuffers] using hBufLookup
+        have hBuf :
+            lookupBuf (List.map (fun e => (e, ([] : List Value))) (RoleSet.allEdges ms.supply roles) ++ ms.bufs) e = [] := by
+          simp [lookupBuf, List.lookup_append, hBufLookup']
+        simp [hBuf]
       · have hBufNone : ms.bufs.lookup e = none :=
           BConsistent_lookup_none_of_notin_sessions (G:=ms.G) (B:=ms.bufs) hConsB (by simpa [hSid] using hSupplyNotIn)
-        have hLeftNone : (RoleSet.allEdges ms.supply roles).map (fun e => (e, [])).lookup e = none := by
+        have hLeftNone :
+            List.lookup e ((RoleSet.allEdges ms.supply roles).map (fun e => (e, ([] : List Value)))) = none := by
           have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hMem
           simpa [initBuffers] using hNone
-        simp [lookupBuf, List.lookup_append, hLeftNone, hBufNone]
+        have hBuf :
+            lookupBuf (List.map (fun e => (e, ([] : List Value))) (RoleSet.allEdges ms.supply roles) ++ ms.bufs) e = [] := by
+          simp [lookupBuf, List.lookup_append, hLeftNone, hBufNone]
+        simp [hBuf]
     · -- Old session: fall back to ms.validLabels.
       have hSidNe : e.sid ≠ ms.supply := hSid
       have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
         intro hMem
         exact hSidNe (RoleSet.allEdges_sid ms.supply roles e hMem)
-      have hBufNone : (RoleSet.allEdges ms.supply roles).map (fun e => (e, [])).lookup e = none := by
+      have hBufNone :
+          List.lookup e ((RoleSet.allEdges ms.supply roles).map (fun e => (e, ([] : List Value)))) = none := by
         have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hNotIn
         simpa [initBuffers] using hNone
       have hRecvNone :
           (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup
             { sid := e.sid, role := e.receiver } = none :=
         lookup_mapped_endpoints_sid_ne roles ms.supply localTypes _ (by simpa using hSidNe)
-      simp [lookupG, lookupBuf, List.lookup_append, hBufNone, hRecvNone] at hLookup ⊢
-      exact hWT.validLabels e source bs hLookup
+      have hLookup' : lookupG ms.G { sid := e.sid, role := e.receiver } = some (.branch source bs) := by
+        simpa [lookupG, List.lookup_append, hRecvNone] using hLookup
+      have hBufEq :
+          lookupBuf (List.map (fun e => (e, ([] : List Value))) (RoleSet.allEdges ms.supply roles) ++ ms.bufs) e =
+            lookupBuf ms.bufs e := by
+        simp [lookupBuf, List.lookup_append, hBufNone]
+      have hValidOld := hWT.validLabels e source bs hLookup'
+      simpa [hBufEq] using hValidOld
   · -- buffers_typed: BuffersTyped ... (newEdges.map (·, [])) ++ ms.bufs
     intro e
-    simp only [BufferTyped, lookupBuf, lookupD, List.lookup_append]
     by_cases hSid : e.sid = ms.supply
     · -- e.sid = ms.supply: edge belongs to new session
       by_cases hMem : e ∈ RoleSet.allEdges ms.supply roles
@@ -565,7 +636,16 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
           lookupD_append_left_of_right_none (D₁:=initDEnv ms.supply roles) (D₂:=ms.D) (e:=e) hDnone
         have hTrace : lookupD (initDEnv ms.supply roles) e = [] :=
           initDEnv_lookup_mem ms.supply roles e hMem
-        simp [hLookupD, hTrace, hBufLookup, BufferTyped]
+        have hBufLookup' :
+            List.lookup e ((RoleSet.allEdges ms.supply roles).map (fun e => (e, ([] : List Value)))) =
+              some ([] : List Value) := by
+          simpa [initBuffers] using hBufLookup
+        have hBuf :
+            lookupBuf (List.map (fun e => (e, ([] : List Value))) (RoleSet.allEdges ms.supply roles) ++ ms.bufs) e = [] := by
+          simp [lookupBuf, List.lookup_append, hBufLookup']
+        have hTrace' : lookupD (initDEnv ms.supply roles ++ ms.D) e = [] := by
+          simpa [hLookupD, hTrace]
+        exact bufferTyped_empty _ _ _ _ hBuf hTrace'
       · -- e is not in allEdges but has fresh sid
         -- This is an edge not created by this newSession (e.g., different roles)
         -- It shouldn't be in the old buffers either (fresh session ID)
@@ -582,7 +662,16 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
           initDEnv_find?_none_of_notin ms.supply roles e hMem
         have hTrace : lookupD (initDEnv ms.supply roles) e = [] := by
           simp [lookupD, hInitFind]
-        simp [lookupBuf, List.lookup_append, hBufNone, hLookupD, hTrace, BufferTyped]
+        have hLeftNone :
+            List.lookup e ((RoleSet.allEdges ms.supply roles).map (fun e => (e, ([] : List Value)))) = none := by
+          have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hMem
+          simpa [initBuffers] using hNone
+        have hBuf :
+            lookupBuf (List.map (fun e => (e, ([] : List Value))) (RoleSet.allEdges ms.supply roles) ++ ms.bufs) e = [] := by
+          simp [lookupBuf, List.lookup_append, hLeftNone, hBufNone]
+        have hTrace' : lookupD (initDEnv ms.supply roles ++ ms.D) e = [] := by
+          simpa [hLookupD, hTrace]
+        exact bufferTyped_empty _ _ _ _ hBuf hTrace'
     · -- e.sid ≠ ms.supply: edge from old session
       -- The lookup in initBuffers/initDEnv returns none, so we fall through to ms.bufs/ms.D
       -- Need to show HasTypeVal extends from ms.G to newEndpoints ++ ms.G
@@ -591,7 +680,8 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
       have hNotIn : e ∉ RoleSet.allEdges ms.supply roles := by
         intro hMem
         exact hSidNe (RoleSet.allEdges_sid ms.supply roles e hMem)
-      have hBufNone : (RoleSet.allEdges ms.supply roles).map (fun e => (e, [])).lookup e = none := by
+      have hBufNone :
+          List.lookup e ((RoleSet.allEdges ms.supply roles).map (fun e => (e, ([] : List Value)))) = none := by
         have hNone := initBuffers_lookup_none_of_notin ms.supply roles e hNotIn
         simpa [initBuffers] using hNone
       have hFindNone : (initDEnv ms.supply roles).find? e = none :=
@@ -613,12 +703,17 @@ theorem newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
           have hNone :
               (roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)).lookup ep = none :=
             lookup_mapped_endpoints_sid_ne roles ms.supply localTypes ep (by simpa using hSid')
-          simp [lookupG, List.lookup_append, hNone, hLookup]
+          have hLookup' : List.lookup ep ms.G = some L := by
+            simpa [lookupG] using hLookup
+          simp [lookupG, List.lookup_append, hNone, hLookup']
       have hBT := hWT.buffers_typed e
       -- Rewrite buffers and D to fall back to ms.{bufs,D}, then weaken G.
       simp [lookupBuf, List.lookup_append, hBufNone, hLookupD] at hBT
-      exact BufferTyped_weakenG (G:=ms.G) (G':=(roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) ++ ms.G)
-        (D:=ms.D) (bufs:=ms.bufs) (e:=e) hBT hMono
+      have hBT' :=
+        BufferTyped_weakenG (G:=ms.G) (G':=(roles.map fun r => (Endpoint.mk ms.supply r, localTypes r)) ++ ms.G)
+          (D:=ms.D) (bufs:=ms.bufs) (e:=e) hBT hMono
+      -- Rewrite buffers and traces back to combined environments.
+      simpa [BufferTyped, lookupBuf, List.lookup_append, hBufNone, hLookupD] using hBT'
   · -- lin_valid: for each (e, S) in combined Lin, lookupG G e = some S
     intro e S hMem
     simp only [List.mem_append, List.mem_map] at hMem

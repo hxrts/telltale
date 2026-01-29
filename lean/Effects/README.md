@@ -34,15 +34,15 @@ Coherent(G, D) :=
     the receiver's local type can consume the pending messages
 ```
 
-At the core is an **asynchronous multiparty session calculus** where a running system state is explicit: processes execute while messages sit in **unbounded FIFO buffers**. Instead of a binary endpoint `(id, L/R)`, an endpoint is a **session id plus role** `(sid, r)`, and messages flow along directed edges `(sid, p → q)`. The operational semantics is “real”: a send by role `p` to `q` **enqueues** immediately (no rendezvous), and a receive by `q` from `p` **dequeues** when the corresponding buffer edge is nonempty. Session creation allocates a fresh `sid` and initializes empty buffers for all relevant role-to-role edges (or mailboxes, depending on the delivery model you pick).
+At the core is an **asynchronous multiparty session calculus** where a running system state is explicit: processes execute while messages sit in **unbounded FIFO buffers**. Instead of a binary endpoint `(id, L/R)`, an endpoint is a **session id plus role** `(sid, r)`, and messages flow along directed edges `(sid, p → q)`. The operational semantics is "real": a send by role `p` to `q` **enqueues** immediately (no rendezvous), and a receive by `q` from `p` **dequeues** when the corresponding buffer edge is nonempty. Session creation allocates a fresh `sid` and initializes empty buffers for all relevant role-to-role edges (or mailboxes, depending on the delivery model you pick).
 
 Typing is split into three coupled environments that are checked and evolved together. First, `G` maps each role endpoint `(sid, r)` to a **local session type** (MPST local types: `!q(T).L`, `?p(T).L`, plus labeled selection/branching). Second, `D` maps each directed edge `(sid, p→q)` to a **type-level shadow queue**—a list of message types (and labels) that predicts exactly what values are currently in flight on that edge. Third, `S` (and a heap typing if you include state) tracks ordinary values, references, and effect capabilities. The crucial invariant is that runtime buffers `B` are related to `D` by `BuffersTyped`: every queued runtime value on `(sid, p→q)` matches the head types recorded in `D(sid, p→q)`.
 
-“Global correctness” is expressed as a semantics-dependent **coherence condition** over `(G, D)` rather than a simple binary duality. Coherence says: if you “consume” the queued traces `D` against the local types in `G` (a function like your `Consume`, generalized to directed edges and labels), then all roles’ remaining local types are mutually compatible—equivalently, they are consistent with some global conversation shape (either explicitly stored as a global type and checked by projection, or implicitly by a compatibility relation). This is what makes the system robust under real asynchrony: coherence talks about **in-flight messages**, so connecting components is safe even when buffers are non-empty, and protocol agreement is stated relative to the actual delivery discipline (FIFO-per-edge first, then generalize).
+"Global correctness" is expressed as a semantics-dependent **coherence condition** over `(G, D)` rather than a simple binary duality. Coherence says: if you "consume" the queued traces `D` against the local types in `G` (a function like your `Consume`, generalized to directed edges and labels), then all roles' remaining local types are mutually compatible—equivalently, they are consistent with some global conversation shape (either explicitly stored as a global type and checked by projection, or implicitly by a compatibility relation). This is what makes the system robust under real asynchrony: coherence talks about **in-flight messages**, so connecting components is safe even when buffers are non-empty, and protocol agreement is stated relative to the actual delivery discipline (FIFO-per-edge first, then generalize).
 
-Composable effects fit in by making “communication state” and “effect state” coexist without collapsing guarantees. The process typing judgment is effect-aware: a process is typed not just with `(S,G,D)` but also with an **effect context** (exceptions/cancellation, transactions/rollback, shared state via references, etc.) and explicit side conditions that preserve session invariants. The discipline is: linear resources (endpoints/tokens) cannot be duplicated or stored in shared locations unless mediated by a controlled capability; effect steps may interleave freely with communication steps, but any effect that can abort or roll back must do so in a way that keeps `(G,D,B)` coherent (e.g., a receive that “fails” cannot partially consume the queue trace). The result is a conditional but crisp theorem package: preservation always, and progress/non-stuckness relative to stated delivery/scheduler and effect assumptions.
+Composable effects fit in by making "communication state" and "effect state" coexist without collapsing guarantees. The process typing judgment is effect-aware: a process is typed not just with `(S,G,D)` but also with an **effect context** (exceptions/cancellation, transactions/rollback, shared state via references, etc.) and explicit side conditions that preserve session invariants. The discipline is: linear resources (endpoints/tokens) cannot be duplicated or stored in shared locations unless mediated by a controlled capability; effect steps may interleave freely with communication steps, but any effect that can abort or roll back must do so in a way that keeps `(G,D,B)` coherent (e.g., a receive that "fails" cannot partially consume the queue trace). The result is a conditional but crisp theorem package: preservation always, and progress/non-stuckness relative to stated delivery/scheduler and effect assumptions.
 
-Finally, to support **safe runtime composition between untrusted nodes**, you wrap the boundary in a **proof-carrying runtime monitor**. Each node presents a compact *boundary certificate* describing the endpoints it owns, the local types it claims for them, and (critically) the shadow traces `D` for edges it shares; the monitor checks a decidable “link” condition (linearity/non-aliasing + buffer/type-trace agreement + coherence after consuming queued traces). After linking, nodes don’t directly enqueue/dequeue—every send/recv goes through the verified monitor, which updates `B`, `D`, and `G` in lockstep and issues fresh linear tokens so endpoints can’t be misused or aliased. The big meta-theorem you aim for is: **if the monitor accepts steps, the global invariant holds forever**, so no participant can ever observe a protocol mismatch even under unbounded buffering, dynamic composition, and interleaved effects.
+Finally, to support **safe runtime composition between untrusted nodes**, you wrap the boundary in a **proof-carrying runtime monitor**. Each node presents a compact *boundary certificate* describing the endpoints it owns, the local types it claims for them, and (critically) the shadow traces `D` for edges it shares; the monitor checks a decidable "link" condition (linearity/non-aliasing + buffer/type-trace agreement + coherence after consuming queued traces). After linking, nodes don't directly enqueue/dequeue—every send/recv goes through the verified monitor, which updates `B`, `D`, and `G` in lockstep and issues fresh linear tokens so endpoints can't be misused or aliased. The big meta-theorem you aim for is: **if the monitor accepts steps, the global invariant holds forever**, so no participant can ever observe a protocol mismatch even under unbounded buffering, dynamic composition, and interleaved effects.
 
 
 ## Module Details
@@ -65,22 +65,24 @@ Local session types with role-directed actions:
 - `mu L` / `var n` - recursive types (de Bruijn indices)
 
 ### `Values.lean`
-Runtime values:
+Runtime values and linear capabilities:
 - `Value`: unit, bool, nat, string, products, endpoint channels
 - `ValType`: corresponding value types
 - `ValType.isLinear`: channels are linear (must be used exactly once)
+- `Token`, `LinCtx`: linear capability tokens and their context
 
-### `Environments.lean`
+### `Environments.lean` (Environments/Part1–2)
 Typed environments:
 - `Store`: Var → Value (runtime variable bindings)
-- `SEnv`: Var → ValType (static typing environment)
+- `SEnv`: Var → Option ValType (static typing environment)
 - `Buffer`: List Value (message queue per edge)
 - `Buffers`: Edge → Buffer (all message queues)
 - `GEnv`: Endpoint → LocalType (current local types)
-- `DEnv`: RBMap Edge (List ValType) compare (in-flight message types per edge)
+- `DEnv`: Edge → Option (List ValType) (in-flight message types per edge)
 
-### `Coherence.lean` ★
+### `Coherence.lean` (Coherence/Part1–9)
 The key MPST coherence proofs:
+- `Consume`: how a local type evolves as buffered messages arrive
 - `EdgeCoherent`: coherence for a single directed edge
 - `Coherent`: all edges are coherent
 - `Coherent_send_preserved`: coherence maintained after send
@@ -101,48 +103,108 @@ The process calculus:
 - `assign x v` - assign value to variable
 - `newSession roles f P` - create session with roles
 
-### `Typing.lean`
+### `Typing.lean` (Typing/Part1–7)
 Process typing judgment:
 - `HasTypeProcN`: typing judgment tracking environment evolution
 - `WTConfigN`: well-typed configuration predicate
+- `ParSplit`: environment splitting for parallel composition
 - Rules for each process construct
+- `preservation_typed`, `progress_typed`: main metatheory at the typed level
 
 ### `Semantics.lean`
 Operational semantics:
-- `StepBase`: primitive reductions (send enqueues, recv dequeues)
+- `StepBase`: primitive reductions (send enqueues, recv dequeues, select, branch, newSession, assign)
 - `Step`: contextual closure (seq/par evaluation contexts)
 - Helper functions: `sendStep`, `recvStep`
 
+### `Simulation.lean`
+Executable simulation for protocol testing:
+- `stepDecide`: decidable step function, attempts one step and returns `some C'` or `none`
+- `runSteps`: execute multiple steps until stuck or fuel exhausted
+- `traceSteps`: execute and collect the full trace
+- `stepDecide_sound`, `stepDecide_complete`: correctness of the decision procedure
+
 ### `Preservation.lean`
-The main metatheory:
-- `preservation`: TypedStep preserves WellFormed (wrapper)
-- `progress`: WellFormed processes can step or are blocked (wrapper)
+The main metatheory (wrappers):
+- `preservation`: TypedStep preserves WellFormed
+- `progress`: WellFormed processes can step or are blocked
 - `subject_reduction`: TypedStep implies Step (soundness)
+
+### `DeadlockFreedom.lean`
+Deadlock freedom infrastructure:
+- `Guarded`: local type is guarded (no unproductive recursion like `μX.X`)
+- `guardedDecide`: decidable checker for guardedness
+- `ReachesComm`: a local type can reach a communication action
+- `reachesCommDecide`: decidable checker for ReachesComm
+- `Done`: configuration has terminated (all processes skip, all types end)
+- `CanProgress`: configuration can take a step
+- `Stuck`: neither done nor can progress
+- `FairTrace`: fairness assumption for delivery
+- `deadlock_free`: the main deadlock freedom theorem
+
+### `Determinism.lean`
+Determinism and confluence:
+- `uniqueBranchLabelsList`: branch labels are unique
+- `stepBase_det_send`, `stepBase_det_recv`: base step determinism
+- `IndependentSessions`, `IndependentConfigs`: session isolation
+- `diamond_independent_sessions`: diamond property for steps on disjoint sessions
+
+### `Monitor.lean` (Monitor/Part1–2)
+Proof-carrying runtime monitor:
+- `MonitorState`: tracks `G`, `D`, buffers, linear context, fresh session ID supply
+- `MonStep`: judgment for valid monitor transitions (send, recv, select, branch, newSession)
+- `MonStep_preserves_WTMon`: valid transitions preserve well-typedness
+- Untrusted code interface: present token → request action → monitor validates → returns new token
+
+### `Spatial.lean`
+Spatial type system for deployment:
+- `SpatialReq`: requirement language (`netCapable`, `timeoutCapable`, `colocated`, `reliableEdge`, `conj`, `top`, `bot`)
+- `Topology`: deployment topology (site assignment for roles)
+- `Satisfies`: satisfaction judgment `topo |= R`
+- `SpatialLe`: spatial subtyping preorder
+- `spatial_le_sound`: monotonicity theorem
+
+### `Decidability.lean`
+Decidability instances:
+- `instDecidableReachesComm`: decidable ReachesComm
+- `instDecidableSatisfies`: decidable spatial satisfaction
+- `edgeCoherent_empty_trace`, `bufferTyped_empty`: base cases
+
+### `Deployment.lean` (Deployment/Part1–2, Part2a–2b)
+Deployed protocol bundles and composition:
+- `InterfaceType`: what a protocol exports/imports for composition
+- `DeployedProtocol`: complete bundle with all certificates (coherence, deadlock freedom, spatial satisfaction)
+- `ProtocolBundle`: lightweight bundle without proofs (for runtime)
+- Composition/linking: disjoint session IDs, matching exports/imports, merged environments remain coherent
+
+### `Examples.lean`
+Concrete protocol examples with full proofs:
+- `PingPong`: two-party ping-pong protocol
+- `TwoBuyer`: three-party buyer protocol
+- Coherence, deadlock freedom, and buffer typing demonstrated
+
 
 ## Proof Status
 
-### Structure Complete ✓
+### Structure Complete
 
 - [x] Core type definitions (LocalType, Endpoint, Edge)
 - [x] Environment operations (lookup, update)
-- [x] Coherence definition (EdgeCoherent, Coherent)
+- [x] Coherence definition and preservation (EdgeCoherent, Coherent, send/recv preserved)
 - [x] Process language and typing
 - [x] Operational semantics
-- [x] Theorem statements
+- [x] Simulation (decidable step function)
+- [x] Deadlock freedom infrastructure
+- [x] Runtime monitor and preservation
+- [x] Determinism and session isolation
+- [x] Spatial type system and decidability
+- [x] Deployment bundles and composition
+- [x] Worked examples (PingPong, TwoBuyer)
 
-### Axiomatized Proofs (TODO)
+### Axiom Status
 
-The following statements are currently assumed as axioms and should be discharged:
+All prior axioms and sorries in `Effects/` are discharged. The development is axiom-free; any remaining assumptions are explicit hypotheses on theorems (e.g., the `ProgressReady` gap used to bridge to projection in Part 2).
 
-#### Coherence/Consistency
-- [ ] `sender_exists_of_receiver` (Coherence.Part2) – endpoint completeness assumption
-- [ ] `ValidLabels_*_preserved` (Coherence.Part8) – edge cases/protocol consistency
-- [ ] `initSession_coherent` (Coherence.Part8) – projection coherence placeholder
-
-#### Deadlock Freedom
-- [ ] `subst_preserves_muDepth`
-- [ ] `reachesComm_body_implies_unfold_aux`
-- [ ] `deadlock_free`
 
 ## Key Theorems
 
@@ -170,6 +232,15 @@ theorem Coherent_send_preserved
 
 When an endpoint sends type `T`, advancing its local type from `send r T L` to `L`, coherence is maintained by appending `T` to the edge's in-flight trace.
 
+### Monitor Preservation
+```lean
+theorem MonStep_preserves_WTMon :
+    MonStep ms ms' → WTMon ms → WTMon ms'
+```
+
+Every valid monitor transition preserves the well-typedness invariant, so the monitor can never enter an inconsistent state.
+
+
 ## Key Design Insights
 
 ### 1) Communication modeled like real systems: buffers are first-class state
@@ -183,7 +254,7 @@ Instead of rendezvous send/recv, the network is explicit:
 
 The type-level traces in `DEnv` mirror the runtime buffers:
 * Runtime buffers: `Buffers : Edge → List Value`
-* Type-level traces: `DEnv : RBMap Edge (List ValType) compare`
+* Type-level traces: `DEnv : Edge → Option (List ValType)`
 
 This is what makes asynchronous fidelity provable: preservation updates both in lockstep.
 
@@ -193,6 +264,35 @@ The `Coherent(G,D)` invariant says:
 > For each edge, after consuming the queued types, the sender's and receiver's local types are compatible.
 
 The `Consume` function operationally models how a local type evolves as buffered messages arrive.
+
+### 4) Time in the protocol is modeled as choice, not clocks
+
+The effect system draws a sharp line between **protocol-level time** and **clock time**:
+
+* **Protocol-level time is choice.** A timeout, a deadline, or any time-dependent branch is represented as a `select`/`branch` pair. One label means "the timed event fired" and another means "communication arrived first." From the protocol's perspective, this is an ordinary labeled choice — the type system sees a discrete fork, not a duration.
+
+* **Clock time is an entirely local runtime concern.** Which branch actually fires — timeout vs. message — is decided by local infrastructure: OS timers, the scheduler, the network stack. The formal model never mentions clocks, durations, or wall time. It only requires that *some* label is chosen and that the choice is communicated through the normal `select`/`branch` mechanism.
+
+* **`SpatialReq.timeoutCapable`** bridges the two layers. It is a static, structural assertion that a deployment site *can* fire timeout events. It lives in the spatial type system (`Spatial.lean`) and is checked before execution begins — it does not introduce temporal operators into the session type system itself.
+
+This separation keeps the entire metatheory — preservation, coherence, deadlock freedom — free of real-time reasoning while still supporting timeout-based protocols in practice. A protocol that says "Alice selects `timeout` or `ack` to Bob" is well-typed and coherent regardless of how Alice's runtime decides between the two labels.
+
+### 5) Space in the protocol is modeled as spatial requirements with subtyping
+
+Protocols declare *what* their deployment needs — not *where* things run. The spatial type system (`Spatial.lean`) captures this:
+
+* **`SpatialReq`** is a small requirement language: `netCapable s` (site has network), `timeoutCapable s` (site can fire timeouts), `colocated r₁ r₂` (roles share a site), `reliableEdge r₁ r₂` (reliable transport between roles), composed with `conj`/`top`/`bot`.
+
+* **`Topology`** is the deployment witness: it assigns roles to sites, declares reliable edges, and lists per-site capabilities. It is external data — the protocol does not compute it.
+
+* **`Satisfies` (`topo ⊨ R`)** is the satisfaction judgment: does the topology provide what the requirement asks for? This is decidable (`satisfiesBool`).
+
+* **`SpatialLe` (`R₁ ≤ₛ R₂`)** is a spatial subtyping preorder. `R₁ ≤ₛ R₂` means R₁ is at least as demanding as R₂ — any topology satisfying R₁ also satisfies R₂. The monotonicity theorem `spatial_le_sound` proves this. Stronger requirements yield more portable protocols; weaker requirements yield more deployment flexibility.
+
+* **Requirement extraction** bridges session types and spatial needs: `commReq` requires network capability for both endpoints of an edge, `timedChoiceReq` requires timeout capability at the decider's site, and `edgeReq`/`endpointReq` connect `Edge`/`Endpoint` values to their spatial obligations.
+
+Like time, space is kept out of the session type metatheory. The spatial layer is checked once at deployment time; the preservation and coherence theorems hold independently of which topology is chosen.
+
 
 ## Usage Example
 

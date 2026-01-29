@@ -111,11 +111,13 @@ theorem EdgeCoherent_updateG_irrelevant (G : GEnv) (D : DEnv) (e : Edge)
     (hCoh : EdgeCoherent G D e) :
     EdgeCoherent (updateG G ep L) D e := by
   simp only [EdgeCoherent] at hCoh ⊢
-  intro Lsender Lrecv hGsender hGrecv
+  intro Lrecv hGrecv
   -- Use lookupG_update_neq since ep is different from both endpoints
-  rw [lookupG_update_neq _ _ _ _ hNeSender] at hGsender
-  rw [lookupG_update_neq _ _ _ _ hNeRecv] at hGrecv
-  exact hCoh Lsender Lrecv hGsender hGrecv
+  have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
+    simpa [lookupG_update_neq _ _ _ _ hNeRecv] using hGrecv
+  obtain ⟨Lsender, hGsender, hConsume⟩ := hCoh Lrecv hGrecv'
+  refine ⟨Lsender, ?_, hConsume⟩
+  simpa [lookupG_update_neq _ _ _ _ hNeSender] using hGsender
 
 /-- Updating D at edge e' ≠ e doesn't affect EdgeCoherent at e.
     Reference: `work/effects/004.lean` EdgeCoherent_updateD_irrelevant -/
@@ -125,10 +127,10 @@ theorem EdgeCoherent_updateD_irrelevant (G : GEnv) (D : DEnv) (e e' : Edge)
     (hCoh : EdgeCoherent G D e) :
     EdgeCoherent G (updateD D e' ts) e := by
   simp only [EdgeCoherent] at hCoh ⊢
-  intro Lsender Lrecv hGsender hGrecv
+  intro Lrecv hGrecv
   -- Use lookupD_update_neq since e' ≠ e
   simp only [lookupD_update_neq _ _ _ _ hNe]
-  exact hCoh Lsender Lrecv hGsender hGrecv
+  exact hCoh Lrecv hGrecv
 
 
 end

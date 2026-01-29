@@ -1,4 +1,5 @@
 import Mathlib
+import Init.Data.Order.Ord
 
 /-!
 # MPST Basic Definitions
@@ -79,29 +80,28 @@ theorem reverse_ne_self (e : Edge) (h : e.sender ≠ e.receiver) : e.reverse ≠
 instance : Inhabited Edge := ⟨{ sid := 0, sender := "", receiver := "" }⟩
 
 instance : Ord Edge where
-  compare a b :=
-    match compare a.sid b.sid with
-    | .lt => .lt
-    | .gt => .gt
-    | .eq =>
-      match compare a.sender b.sender with
-      | .lt => .lt
-      | .gt => .gt
-      | .eq => compare a.receiver b.receiver
+  compare :=
+    compareLex (compareOn (fun e : Edge => e.sid))
+      (compareLex (compareOn (fun e : Edge => e.sender))
+        (compareOn (fun e : Edge => e.receiver)))
 
 /-- Unfolding lemma for Edge.compare. -/
 theorem compare_def (a b : Edge) :
     compare a b =
-      match compare a.sid b.sid with
-      | .lt => .lt
-      | .gt => .gt
-      | .eq =>
-        match compare a.sender b.sender with
-        | .lt => .lt
-        | .gt => .gt
-        | .eq => compare a.receiver b.receiver := by
-  -- compare is defined lexicographically on fields.
+      compareLex (compareOn (fun e : Edge => e.sid))
+        (compareLex (compareOn (fun e : Edge => e.sender))
+          (compareOn (fun e : Edge => e.receiver))) a b := by
+  -- compare is defined lexicographically via compareLex.
   rfl
+
+/-- Edge comparison is transitive via lexicographic compare on fields. -/
+instance : Std.TransOrd Edge := by
+  -- Reduce to transitivity of compareLex on field comparators.
+  simpa [compare_def] using
+    (inferInstanceAs (Std.TransCmp
+      (compareLex (compareOn (fun e : Edge => e.sid))
+        (compareLex (compareOn (fun e : Edge => e.sender))
+          (compareOn (fun e : Edge => e.receiver))))))
 
 /-- Edge comparison is exact: `.eq` iff the edges are equal. -/
 theorem compare_eq_iff_eq (e₁ e₂ : Edge) :
@@ -113,23 +113,24 @@ theorem compare_eq_iff_eq (e₁ e₂ : Edge) :
     | mk sid₂ s₂ r₂ =>
       constructor
       · intro h
-        cases hSid : compare sid₁ sid₂ <;> simp [compare_def, hSid] at h
-        cases hSend : compare s₁ s₂ <;> simp [hSend] at h
-        have hSidEq : sid₁ = sid₂ := (_root_.compare_eq_iff_eq (a:=sid₁) (b:=sid₂)).1 hSid
-        have hSendEq : s₁ = s₂ := (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₂)).1 hSend
-        have hRecvEq : r₁ = r₂ := by
-          simpa using h
+        have h' :
+            compare sid₁ sid₂ = .eq ∧
+              compare s₁ s₂ = .eq ∧ compare r₁ r₂ = .eq := by
+          -- compareLex_eq_eq peels the lexicographic comparator.
+          have h' := h
+          simp only [compare_def, compareLex_eq_eq] at h'
+          simpa [compareOn] using h'
+        have hSidEq : sid₁ = sid₂ :=
+          (_root_.compare_eq_iff_eq (a:=sid₁) (b:=sid₂)).1 h'.1
+        have hSendEq : s₁ = s₂ :=
+          (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₂)).1 h'.2.1
+        have hRecvEq : r₁ = r₂ :=
+          (_root_.compare_eq_iff_eq (a:=r₁) (b:=r₂)).1 h'.2.2
         cases hSidEq; cases hSendEq; cases hRecvEq; rfl
       · intro h
         -- Equal edges compare equal by reflexivity on each component.
         cases h
-        have hSid : compare sid₁ sid₁ = .eq :=
-          (_root_.compare_eq_iff_eq (a:=sid₁) (b:=sid₁)).2 rfl
-        have hSend : compare s₁ s₁ = .eq :=
-          (_root_.compare_eq_iff_eq (a:=s₁) (b:=s₁)).2 rfl
-        have hRecv : compare r₁ r₁ = .eq :=
-          (_root_.compare_eq_iff_eq (a:=r₁) (b:=r₁)).2 rfl
-        simp [compare_def]
+        simp
 
 end Edge
 

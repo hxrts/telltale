@@ -162,13 +162,17 @@ theorem RoleComplete_mergeGEnv (G₁ G₂ : GEnv)
             simpa [RoleComplete, hTarget] using hC₂ e L hRight.2
           rcases hComp with ⟨L', hL'⟩
           exact MergeGEnv_some_of_right G₁ G₂ ⟨e.sid, r⟩ hL'
-axiom MergeDEnv_Left (D₁ D₂ : DEnv) (edge : Edge) :
+theorem MergeDEnv_Left (D₁ D₂ : DEnv) (edge : Edge) :
     lookupD D₁ edge ≠ [] →
-    lookupD (mergeDEnv D₁ D₂) edge = lookupD D₁ edge
+    lookupD (mergeDEnv D₁ D₂) edge = lookupD D₁ edge := by
+  intro h
+  simpa [mergeDEnv] using (lookupD_append_left (D₁:=D₁) (D₂:=D₂) (e:=edge) h)
 
-axiom MergeDEnv_Right (D₁ D₂ : DEnv) (edge : Edge) :
+theorem MergeDEnv_Right (D₁ D₂ : DEnv) (edge : Edge) :
     D₁.find? edge = none →
-    lookupD (mergeDEnv D₁ D₂) edge = lookupD D₂ edge
+    lookupD (mergeDEnv D₁ D₂) edge = lookupD D₂ edge := by
+  intro h
+  simpa [mergeDEnv] using (lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=edge) h)
 
 /-- Lookup in merged buffers prefers the left environment when it provides a buffer. -/
 theorem MergeBufs_Left (B₁ B₂ : Buffers) (edge : Edge) :

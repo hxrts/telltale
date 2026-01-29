@@ -286,7 +286,6 @@ theorem HeadCoherent_recv_preserved
     (L : LocalType)
     (hHead : HeadCoherent G D)
     (hCoh : Coherent G D)
-    (hComplete : RoleComplete G)
     (hG : lookupG G receiverEp = some (.recv senderRole Trecv L))
     (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? =
       some Trecv) :
@@ -321,10 +320,6 @@ theorem HeadCoherent_recv_preserved
           simp [List.tail_cons]
           -- Use coherence on the self-edge to get Consume success on the full trace.
           have hEdgeCoh : EdgeCoherent G D recvEdge := hCoh recvEdge
-          have hSenderLookup :
-              lookupG G ⟨recvEdge.sid, recvEdge.sender⟩ = some (.recv receiverEp.role Trecv L) := by
-            -- Sender endpoint equals receiverEp after subst.
-            simpa [recvEdge] using hG
           have hRecvLookup' :
               lookupG G ⟨recvEdge.sid, recvEdge.receiver⟩ = some (.recv receiverEp.role Trecv L) := by
             -- Receiver endpoint equals receiverEp after subst.
@@ -332,7 +327,8 @@ theorem HeadCoherent_recv_preserved
           have hConsumeRaw :
               (Consume receiverEp.role (.recv receiverEp.role Trecv L) (t :: ts)).isSome := by
             -- Rewrite sender role and trace using recvEdge and hTraceVal.
-            simpa [recvEdge, hTraceVal] using (hEdgeCoh _ _ hSenderLookup hRecvLookup')
+            obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.recv receiverEp.role Trecv L) hRecvLookup'
+            simpa [recvEdge, hTraceVal] using hConsume
           have hConsume :
               (Consume receiverEp.role (.recv receiverEp.role Trecv L) (Trecv :: ts)).isSome := by
             -- Rewrite the head using hHeadEq.
@@ -398,15 +394,12 @@ theorem HeadCoherent_recv_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hSender : ∃ Ls, lookupG G ⟨receiverEp.sid, senderRole⟩ = some Ls :=
-              RoleComplete_recv hComplete hG
-            rcases hSender with ⟨Ls, hSenderLookup⟩
             have hEdgeCoh : EdgeCoherent G D recvEdge := hCoh recvEdge
             have hG' : lookupG G receiverEp = some (.recv senderRole t L) := by
               simpa [hHeadEq] using hG
             have hConsumeFull :
                 (Consume senderRole (.recv senderRole t L) (t :: t' :: ts')).isSome := by
-              have hConsume := hEdgeCoh Ls (.recv senderRole t L) hSenderLookup hG'
+              obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.recv senderRole t L) hG'
               simpa [hTraceVal] using hConsume
             have hConsumeTail :
                 (Consume senderRole L (t' :: ts')).isSome := by
@@ -423,15 +416,12 @@ theorem HeadCoherent_recv_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hSender : ∃ Ls, lookupG G ⟨receiverEp.sid, senderRole⟩ = some Ls :=
-              RoleComplete_recv hComplete hG
-            rcases hSender with ⟨Ls, hSenderLookup⟩
             have hEdgeCoh : EdgeCoherent G D recvEdge := hCoh recvEdge
             have hG' : lookupG G receiverEp = some (.recv senderRole t L) := by
               simpa [hHeadEq] using hG
             have hConsumeFull :
                 (Consume senderRole (.recv senderRole t L) (t :: t' :: ts')).isSome := by
-              have hConsume := hEdgeCoh Ls (.recv senderRole t L) hSenderLookup hG'
+              obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.recv senderRole t L) hG'
               simpa [hTraceVal] using hConsume
             have hConsumeTail :
                 (Consume senderRole L (t' :: ts')).isSome := by

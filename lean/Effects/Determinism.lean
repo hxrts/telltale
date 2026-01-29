@@ -279,12 +279,12 @@ theorem not_confluent_general :
   intro h
   -- Counterexample: Two terminated configs with different nextSid
   -- Since skip can't step, Steps from a skip config only reaches itself
-  let C₁ : Config := { proc := .skip, store := [], bufs := [], G := [], D := Lean.RBMap.empty, nextSid := 0 }
-  let C₂ : Config := { proc := .skip, store := [], bufs := [], G := [], D := Lean.RBMap.empty, nextSid := 1 }
+  let C₁ : Config := { proc := .skip, store := [], bufs := [], G := [], D := (∅ : DEnv), nextSid := 0 }
+  let C₂ : Config := { proc := .skip, store := [], bufs := [], G := [], D := (∅ : DEnv), nextSid := 1 }
   -- C₁ ≠ C₂ because nextSid differs
   have hne : C₁ ≠ C₂ := by simp [C₁, C₂]
   -- We need some C that can step (to satisfy the premises)
-  let C : Config := { proc := .assign "x" .unit, store := [], bufs := [], G := [], D := Lean.RBMap.empty, nextSid := 0 }
+  let C : Config := { proc := .assign "x" .unit, store := [], bufs := [], G := [], D := (∅ : DEnv), nextSid := 0 }
   have hStep : ∃ C', Step C C' :=
     ⟨{ C with proc := .skip, store := [("x", .unit)] }, Step.base (StepBase.assign rfl)⟩
   -- Apply h to get a reconvergence

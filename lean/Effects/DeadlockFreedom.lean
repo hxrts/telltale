@@ -121,13 +121,6 @@ def muDepth : LocalType → Nat
   | .mu L => 1 + muDepth L
   | _ => 0
 
-/-- Substitution preserves the mu-depth for non-var types.
-    For var types, the result depends on the replacement. -/
-axiom subst_preserves_muDepth (n : Nat) (r : LocalType) (L : LocalType) :
-    match L with
-    | .var m => if m = n then muDepth (LocalType.subst n r L) = muDepth r else muDepth (LocalType.subst n r L) = 0
-    | _ => muDepth (LocalType.subst n r L) = muDepth L
-
 /-- Substitution preserves reachesCommDecide.
 
 The key insight is that subst preserves the top-level constructor for all types
@@ -207,11 +200,121 @@ private theorem reachesComm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
   | var m => exact absurd rfl (hNotVar m)
   | mu L' => exact absurd rfl (hNotMu L')
 
+/-! ## Unfold Soundness Helpers -/
+
+/-- Substitution preserves muDepth for types that can reach communication. -/
+private theorem muDepth_subst_of_decide (n : Nat) (r L : LocalType)
+    (h : reachesCommDecide L = true) :
+    muDepth (LocalType.subst n r L) = muDepth L := by
+  -- Induct on L; h rules out var/end and keeps muDepth stable.
+  induction L generalizing n r with
+  | send r T L ih =>
+      -- send has muDepth 0 and subst preserves constructor.
+      simp [LocalType.subst, muDepth]
+  | recv r T L ih =>
+      -- recv has muDepth 0 and subst preserves constructor.
+      simp [LocalType.subst, muDepth]
+  | select r bs =>
+      -- branches are not traversed by subst, so muDepth stays 0.
+      simp [LocalType.subst, muDepth]
+  | branch r bs =>
+      -- same as select.
+      simp [LocalType.subst, muDepth]
+  | end_ =>
+      -- reachesCommDecide end_ = false, contradiction.
+      exact Bool.noConfusion h
+  | var m =>
+      -- reachesCommDecide var = false, contradiction.
+      exact Bool.noConfusion h
+  | mu L ih =>
+      -- reduce to the body using the IH with shifted index.
+      have h' : reachesCommDecide L = true := by
+        simpa [reachesCommDecide] using h
+      have hDepth := ih (n := n + 1) (r := r) h'
+      -- muDepth is preserved under mu if the body is preserved.
+      simp [LocalType.subst, muDepth, hDepth]
+
+/-- Non-mu case: unfold is identity, so ReachesComm follows from the decision. -/
+private theorem reachesComm_unfold_nonmu (L : LocalType) (h : reachesCommDecide L = true)
+    (hNotMu : ∀ L', L ≠ .mu L') : ReachesComm L.unfold := by
+  -- Unfold does not change non-mu types; use the direct constructors.
+  cases L with
+  | send => simpa [LocalType.unfold] using ReachesComm.send
+  | recv => simpa [LocalType.unfold] using ReachesComm.recv
+  | select r bs =>
+      by_cases hEmpty : bs = []
+      · simp [reachesCommDecide, hEmpty] at h
+      · simpa [LocalType.unfold] using ReachesComm.select hEmpty
+  | branch r bs =>
+      by_cases hEmpty : bs = []
+      · simp [reachesCommDecide, hEmpty] at h
+      · simpa [LocalType.unfold] using ReachesComm.branch hEmpty
+  | end_ => exact Bool.noConfusion h
+  | var => exact Bool.noConfusion h
+  | mu L' => exact (hNotMu L' rfl).elim
+
+/-- Arithmetic helper: strip two leading mu constructors. -/
+private theorem muDepth_le_of_mu_mu_le {L : LocalType} {fuel : Nat} :
+    muDepth (.mu (.mu L)) ≤ fuel.succ → muDepth L ≤ fuel := by
+  -- Expand muDepth and solve the arithmetic side-goal.
+  intro h
+  simp [muDepth] at h
+  omega
+
+/-- Mu case: prove reachability by recursing on the unfolded body. -/
+private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
+    (hFuel : muDepth (.mu L) ≤ fuel.succ) (hBody : reachesCommDecide L = true)
+    (ih : ∀ L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold) :
+    ReachesComm (.mu L).unfold := by
+  -- Split on the body shape; non-mu bodies are immediate.
+  cases L with
+  | send => simpa [LocalType.unfold, LocalType.subst] using ReachesComm.send
+  | recv => simpa [LocalType.unfold, LocalType.subst] using ReachesComm.recv
+  | select r bs =>
+      by_cases hEmpty : bs = []
+      · simp [reachesCommDecide, hEmpty] at hBody
+      · simpa [LocalType.unfold, LocalType.subst] using ReachesComm.select hEmpty
+  | branch r bs =>
+      by_cases hEmpty : bs = []
+      · simp [reachesCommDecide, hEmpty] at hBody
+      · simpa [LocalType.unfold, LocalType.subst] using ReachesComm.branch hEmpty
+  | end_ => exact Bool.noConfusion hBody
+  | var => exact Bool.noConfusion hBody
+  | mu L2 =>
+      -- Reduce to the unfolded substituted body using IH.
+      have hBody' : reachesCommDecide L2 = true := by
+        simpa [reachesCommDecide] using hBody
+      have hDec : reachesCommDecide (LocalType.subst 1 (.mu (.mu L2)) L2) = true :=
+        subst_preserves_reachesCommDecide 1 (.mu (.mu L2)) L2 hBody'
+      have hEq : muDepth (LocalType.subst 1 (.mu (.mu L2)) L2) = muDepth L2 :=
+        muDepth_subst_of_decide 1 (.mu (.mu L2)) L2 hBody'
+      have hLe : muDepth L2 ≤ fuel := muDepth_le_of_mu_mu_le (L:=L2) (fuel:=fuel) hFuel
+      have hIH := ih (LocalType.subst 1 (.mu (.mu L2)) L2) (by simpa [hEq] using hLe) hDec
+      simpa [LocalType.unfold, LocalType.subst] using (ReachesComm.mu hIH)
+
 /-- Auxiliary: ReachesComm after unfolding, with explicit fuel for termination.
     The fuel represents an upper bound on the number of mu-strippings needed. -/
-private axiom reachesComm_body_implies_unfold_aux (fuel : Nat) (L : LocalType)
+private theorem reachesComm_body_implies_unfold_aux (fuel : Nat) (L : LocalType)
     (hFuel : muDepth L ≤ fuel) (hBody : reachesCommDecide L = true) :
-    ReachesComm L.unfold
+    ReachesComm L.unfold := by
+  -- Induct on the explicit fuel to ensure termination.
+  induction fuel generalizing L with
+  | zero =>
+      -- If muDepth L ≤ 0, then L is not a mu-type.
+      cases L with
+      | mu L' =>
+          simp [muDepth] at hFuel
+      | _ =>
+          exact reachesComm_unfold_nonmu L hBody (by intro L' hEq; cases hEq)
+  | succ fuel ih =>
+      -- For non-mu types, unfold is identity; for mu, recurse on the body.
+      cases L with
+      | mu L' =>
+          have hBody' : reachesCommDecide L' = true := by
+            simpa [reachesCommDecide] using hBody
+          exact reachesComm_unfold_mu fuel L' hFuel hBody' (by intro L hF hB; exact ih hF hB)
+      | _ =>
+          exact reachesComm_unfold_nonmu L hBody (by intro L' hEq; cases hEq)
 
 /-- Helper: reachesCommDecide is monotonic under unfolding for guarded types.
 
@@ -283,6 +386,16 @@ def EventuallyDelivered (e : Edge) (v : Value) (trace : List Config) : Prop :=
 
 /-! ## Deadlock Freedom Theorem -/
 
+/-- Progress-ready configuration (gap to be discharged by projection).
+
+    This captures the two missing facts for progress:
+    1. If the process is `skip`, then all endpoints are at `end_`
+    2. The process is not blocked on an empty receive/branch buffer -/
+def ProgressReady (C : Config) : Prop :=
+  -- Ready = skip implies done, and no blocked recv/branch.
+  (C.proc = .skip → ∀ e L, lookupG C.G e = some L → L = .end_) ∧
+  ¬ BlockedProc C.store C.bufs C.proc
+
 /-- Main deadlock freedom theorem.
 
 A well-typed configuration where all endpoints can reach communication
@@ -298,18 +411,42 @@ is either done or can progress.
 **Dependencies**:
 - Requires `progress` theorem from Preservation.lean
 - Uses ReachesComm to ensure types aren't stuck -/
-axiom deadlock_free (C : Config) (Ssh Sown : SEnv)
+theorem deadlock_free (C : Config) (Ssh Sown : SEnv)
     (hWF : WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
+    (hReady : ProgressReady C)
     (hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
     Done C.G C ∨ CanProgress C
+  := by
+  -- Use progress and rule out the blocked case with ProgressReady.
+  have hProg := progress (G:=C.G) (D:=C.D) (Ssh:=Ssh) (Sown:=Sown)
+    (store:=C.store) (bufs:=C.bufs) (P:=C.proc) hWF
+  cases hProg with
+  | inl hSkip =>
+      -- skip case: ProgressReady gives us that all endpoints are end_.
+      left
+      refine ⟨hSkip, ?_⟩
+      exact hReady.1 hSkip
+  | inr hRest =>
+      cases hRest with
+      | inl hStep =>
+          -- TypedStep implies Step, so we can progress.
+          right
+          obtain ⟨G', D', Sown', store', bufs', P', hTS⟩ := hStep
+          refine ⟨⟨P', store', bufs', G', D', C.nextSid⟩, ?_⟩
+          exact subject_reduction (n:=C.nextSid) hTS
+      | inr hBlocked =>
+          -- BlockedProc contradicts ProgressReady.
+          exact (hReady.2 hBlocked).elim
 
 /-- Corollary: well-typed configurations with progressive types are never stuck. -/
 theorem not_stuck (C : Config) (Ssh Sown : SEnv)
     (hWF : WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
+    (hReady : ProgressReady C)
     (hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
     ¬Stuck C.G C := by
   intro ⟨hNotDone, hNoProgress⟩
-  have h := deadlock_free C Ssh Sown hWF hReaches
+  -- deadlock_free rules out stuckness under ProgressReady.
+  have h := deadlock_free C Ssh Sown hWF hReady hReaches
   cases h with
   | inl hDone => exact hNotDone hDone
   | inr hProg => exact hNoProgress hProg

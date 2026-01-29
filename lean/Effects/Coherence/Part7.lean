@@ -222,7 +222,6 @@ theorem HeadCoherent_branch_preserved
     (bs : List (String × LocalType)) (ℓ : String) (L : LocalType)
     (hHead : HeadCoherent G D)
     (hCoh : Coherent G D)
-    (hComplete : RoleComplete G)
     (hG : lookupG G brancherEp = some (.branch senderRole bs))
     (_hFind : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L))  -- Not needed for head coherence.
     (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
@@ -241,7 +240,9 @@ theorem HeadCoherent_branch_preserved
       have hEdgeCoh : EdgeCoherent G D branchEdge := hCoh branchEdge
       have hConsume :
           (Consume brancherEp.role (.branch brancherEp.role bs) (lookupD D branchEdge)).isSome :=
-        hEdgeCoh _ _ hG hG
+        by
+          obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.branch brancherEp.role bs) hG
+          exact hConsume
       cases hTraceVal : lookupD D branchEdge with
       | nil =>
           -- Empty trace contradicts head? = some .string.
@@ -287,13 +288,10 @@ theorem HeadCoherent_branch_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hSender : ∃ Ls, lookupG G ⟨brancherEp.sid, senderRole⟩ = some Ls :=
-              RoleComplete_branch hComplete hG
-            rcases hSender with ⟨Ls, hSenderLookup⟩
             have hEdgeCoh : EdgeCoherent G D branchEdge := hCoh branchEdge
             have hConsume :
                 (Consume senderRole (.branch senderRole bs) (.string :: t' :: ts')).isSome := by
-              have hConsume := hEdgeCoh Ls (.branch senderRole bs) hSenderLookup hG
+              obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.branch senderRole bs) hG
               simpa [hTraceVal] using hConsume
             rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hEq⟩
             exact (Consume_branch_nonempty_false
@@ -303,13 +301,10 @@ theorem HeadCoherent_branch_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hSender : ∃ Ls, lookupG G ⟨brancherEp.sid, senderRole⟩ = some Ls :=
-              RoleComplete_branch hComplete hG
-            rcases hSender with ⟨Ls, hSenderLookup⟩
             have hEdgeCoh : EdgeCoherent G D branchEdge := hCoh branchEdge
             have hConsume :
                 (Consume senderRole (.branch senderRole bs) (.string :: t' :: ts')).isSome := by
-              have hConsume := hEdgeCoh Ls (.branch senderRole bs) hSenderLookup hG
+              obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.branch senderRole bs) hG
               simpa [hTraceVal] using hConsume
             rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hEq⟩
             exact (Consume_branch_nonempty_false

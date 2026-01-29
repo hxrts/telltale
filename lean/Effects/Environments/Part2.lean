@@ -1,8 +1,6 @@
 import Effects.LocalType
 import Effects.Values
 import Effects.Environments.Part1
-import Lean.Data.RBMap
-import Batteries.Data.RBMap.Lemmas
 
 /-!
 # MPST Environments
@@ -24,9 +22,8 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
-open Lean
-
 noncomputable section
+
 
 /-! ## Session Renaming Infrastructure -/
 
@@ -86,12 +83,28 @@ def renameValue (ρ : SessionRenaming) : Value → Value
 def renameGEnv (ρ : SessionRenaming) (G : GEnv) : GEnv :=
   G.map fun (e, L) => (renameEndpoint ρ e, renameLocalType ρ L)
 
+/-- Choose a preimage edge under renaming (if it exists). -/
+noncomputable def preimageEdge (ρ : SessionRenaming) (e : Edge) : Option Edge :=
+  if h : ∃ e', renameEdge ρ e' = e then
+    some (Classical.choose h)
+  else
+    none
+
+theorem preimageEdge_spec {ρ : SessionRenaming} {e e' : Edge} :
+    preimageEdge ρ e = some e' → renameEdge ρ e' = e := by
+  intro h
+  by_cases hpre : ∃ e'', renameEdge ρ e'' = e
+  · simp [preimageEdge, hpre] at h
+    cases h
+    exact Classical.choose_spec hpre
+  · simp [preimageEdge, hpre] at h
+
 /-- Rename all edges in DEnv. -/
 def renameDEnv (ρ : SessionRenaming) (D : DEnv) : DEnv :=
-  RBMap.fold
-    (fun acc (e : Edge) (ts : List ValType) =>
-      acc.insert (renameEdge ρ e) (ts.map (renameValType ρ)))
-    RBMap.empty D
+  fun e =>
+    match preimageEdge ρ e with
+    | some e' => (D.find? e').map (List.map (renameValType ρ))
+    | none => none
 
 /-- Rename all edges in Buffers. -/
 def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
@@ -214,6 +227,15 @@ theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
   subst hsid' hsender hrecv
   rfl
 
+theorem preimageEdge_rename (ρ : SessionRenaming) (e : Edge) :
+    preimageEdge ρ (renameEdge ρ e) = some e := by
+  classical
+  have hpre : ∃ e', renameEdge ρ e' = renameEdge ρ e := ⟨e, rfl⟩
+  have hEq : Classical.choose hpre = e := by
+    apply renameEdge_inj ρ
+    simpa using (Classical.choose_spec hpre)
+  simp [preimageEdge, hpre, hEq]
+
 /-! ## Renaming Lookup Lemmas -/
 
 /-- Looking up a renamed endpoint in a renamed GEnv. -/
@@ -236,9 +258,16 @@ theorem lookupG_rename (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) :
       simpa [renameGEnv, lookupG, List.lookup, hbeq1, hbeq2] using ih
 
 /-- Looking up a renamed edge in a renamed DEnv. -/
-axiom lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
+theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnv ρ D) (renameEdge ρ e) =
-      (lookupD D e).map (renameValType ρ)
+      (lookupD D e).map (renameValType ρ) := by
+  classical
+  have hpre : preimageEdge ρ (renameEdge ρ e) = some e := preimageEdge_rename ρ e
+  cases hfind : D.find? e with
+  | none =>
+      simp [renameDEnv, lookupD, hpre, hfind]
+  | some ts =>
+      simp [renameDEnv, lookupD, hpre, hfind]
 
 /-- Looking up a renamed edge in renamed buffers. -/
 theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
@@ -293,10 +322,21 @@ theorem lookupG_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L :
       exact hLookup
 
 /-- If lookup succeeds (non-empty) in renamed DEnv, the preimage edge exists. -/
-axiom lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
+theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnv ρ D) e ≠ [] →
     ∃ e', e = renameEdge ρ e' ∧
-      lookupD (renameDEnv ρ D) e = (lookupD D e').map (renameValType ρ)
+      lookupD (renameDEnv ρ D) e = (lookupD D e').map (renameValType ρ) := by
+  intro h
+  cases hpre : preimageEdge ρ e with
+  | none =>
+      have hlookup : lookupD (renameDEnv ρ D) e = [] := by
+        simp [renameDEnv, lookupD, hpre]
+      exact (h hlookup).elim
+  | some e' =>
+      have heq : e = renameEdge ρ e' := by
+        exact (preimageEdge_spec (ρ:=ρ) (e:=e) (e':=e') (by simpa [hpre])).symm
+      refine ⟨e', heq, ?_⟩
+      simpa [heq] using (lookupD_rename (ρ:=ρ) (D:=D) (e:=e'))
 
 /-- If lookup succeeds (non-empty) in renamed buffers, the preimage edge exists. -/
 theorem lookupBuf_rename_inv (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :

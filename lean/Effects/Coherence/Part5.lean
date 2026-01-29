@@ -67,15 +67,19 @@ theorem Coherent_select_preserved
   · -- Case 1: e = selectEdge
     subst heq
     simp only [EdgeCoherent]
-    intro Lsender Lrecv hGsender hGrecv
+    intro Lrecv hGrecv
     have hSenderLookup : lookupG (updateG G selectorEp L) { sid := selectorEp.sid, role := selectorEp.role } = some L := by
       convert lookupG_update_eq G selectorEp L
+    refine ⟨L, hSenderLookup, ?_⟩
     by_cases hTargetIsSender : targetRole = selectorEp.role
     · -- Self-select: target = selector
       subst hTargetIsSender
-      rw [hSenderLookup] at hGsender hGrecv
-      simp only [Option.some.injEq] at hGsender hGrecv
-      subst hGsender hGrecv
+      have hRecvLookup : lookupG (updateG G selectorEp L) { sid := selectorEp.sid, role := selectorEp.role } = some L := by
+        simpa using hSenderLookup
+      have hEq : Lrecv = L := by
+        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
+        exact Option.some.inj this
+      subst hEq
       simp only [lookupD_update_eq]
       -- hTargetReady with SELECT type is unsatisfiable (Consume on SELECT fails)
       obtain ⟨L', hL', hL'T⟩ := hTargetReady (.select selectorEp.role bs) hG
@@ -96,12 +100,10 @@ theorem Coherent_select_preserved
         intro h
         have : selectorEp.role = targetRole := congrArg Endpoint.role h
         exact hTargetIsSender this.symm
-      rw [hSenderLookup] at hGsender
-      rw [lookupG_update_neq _ _ _ _ hTargetNeq] at hGrecv
-      simp only [Option.some.injEq] at hGsender
-      subst hGsender
+      have hGrecv' : lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv := by
+        simpa [lookupG_update_neq _ _ _ _ hTargetNeq] using hGrecv
       simp only [lookupD_update_eq]
-      obtain ⟨L', hL', hL'T⟩ := hTargetReady Lrecv hGrecv
+      obtain ⟨L', hL', hL'T⟩ := hTargetReady Lrecv hGrecv'
       rw [Consume_append _ _ _ _ hL']
       exact hL'T
   · -- Case 2: e ≠ selectEdge - use irrelevance lemmas
@@ -115,25 +117,23 @@ theorem Coherent_select_preserved
         have hSid2 : e.sid = selectorEp.sid := congrArg Endpoint.sid hRecvMatch
         have hRole2 : e.receiver = selectorEp.role := congrArg Endpoint.role hRecvMatch
         simp only [EdgeCoherent]
-        intro Lsender Lrecv hGsender hGrecv
+        intro Lrecv hGrecv
         have hLookupS : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.sender } = some L := by
           conv => lhs; rw [hSid1, hRole1]
           exact lookupG_update_eq G selectorEp L
         have hLookupR : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G selectorEp L
-        rw [hLookupS] at hGsender
-        rw [hLookupR] at hGrecv
-        simp only [Option.some.injEq] at hGsender hGrecv
-        subst hGsender hGrecv
+        have hEq : Lrecv = L := by
+          have : some Lrecv = some L := by simpa [hLookupR] using hGrecv
+          exact Option.some.inj this
+        subst hEq
+        refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         have hOrigCoh := hCoh e
-        simp only [EdgeCoherent] at hOrigCoh
-        have hOrigSenderG : lookupG G { sid := e.sid, role := e.sender } = some (.select targetRole bs) := by
-          conv => lhs; rw [hSid1, hRole1]; exact hG
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
-        have hOrig := hOrigCoh (.select targetRole bs) (.select targetRole bs) hOrigSenderG hOrigRecvG
+        have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
         cases hTrace : lookupD D e with
         | nil =>
           rw [hRole1]
@@ -146,35 +146,39 @@ theorem Coherent_select_preserved
         have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
         simp only [EdgeCoherent]
-        intro Lsender Lrecv hGsender hGrecv
-        rw [lookupG_update_neq _ _ _ _ hRecvNoMatch] at hGrecv
+        intro Lrecv hGrecv
+        have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
+          simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
         have hOrigCoh := hCoh e
-        simp only [EdgeCoherent] at hOrigCoh
+        have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         have hSid : e.sid = selectorEp.sid := congrArg Endpoint.sid hSenderMatch
         have hRole : e.sender = selectorEp.role := congrArg Endpoint.role hSenderMatch
-        have hOrigSender : lookupG G { sid := e.sid, role := e.sender } = some (.select targetRole bs) := by
-          conv => lhs; rw [hSid, hRole]; exact hG
-        exact hOrigCoh (.select targetRole bs) Lrecv hOrigSender hGrecv
+        have hSenderLookup : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.sender } = some L := by
+          conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G selectorEp L
+        refine ⟨L, hSenderLookup, hConsume⟩
     · -- Sender endpoint ≠ selectorEp
       have hSenderNoMatch : selectorEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = selectorEp
       · -- Receiver = selectorEp, sender ≠ selectorEp
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
         simp only [EdgeCoherent]
-        intro Lsender Lrecv hGsender hGrecv
-        rw [lookupG_update_neq _ _ _ _ hSenderNoMatch] at hGsender
+        intro Lrecv hGrecv
         have hSid : e.sid = selectorEp.sid := congrArg Endpoint.sid hRecvMatch
         have hRole : e.receiver = selectorEp.role := congrArg Endpoint.role hRecvMatch
         have hRecvLookup : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G selectorEp L
-        rw [hRecvLookup] at hGrecv
-        simp only [Option.some.injEq] at hGrecv
-        subst hGrecv
+        have hEq : Lrecv = L := by
+          have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
+          exact Option.some.inj this
+        subst hEq
         have hOrigCoh := hCoh e
-        simp only [EdgeCoherent] at hOrigCoh
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
           conv => lhs; rw [hSid, hRole]; exact hG
-        have hOrig := hOrigCoh Lsender (.select targetRole bs) hGsender hOrigRecv
+        have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecv
+        rcases EdgeCoherent_sender_of_receiver hOrigCoh hOrigRecv with ⟨Lsender, hGsender⟩
+        have hGsender' : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.sender } = some Lsender := by
+          simpa [lookupG_update_neq _ _ _ _ hSenderNoMatch] using hGsender
+        refine ⟨Lsender, hGsender', ?_⟩
         cases hTrace : lookupD D e with
         | nil => simp only [Consume, Option.isSome]
         | cons t ts =>
@@ -204,18 +208,21 @@ theorem Coherent_branch_preserved
   · -- Case 1: e = branchEdge
     subst heq
     simp only [EdgeCoherent]
-    intro Lsender Lrecv hGsender hGrecv
+    intro Lrecv hGrecv
     have hRecvLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := brancherEp.role } = some L := by
       convert lookupG_update_eq G brancherEp L
     by_cases hSenderIsRecv : senderRole = brancherEp.role
     · -- Self-branch: sender = receiver
       subst hSenderIsRecv
-      rw [hRecvLookup] at hGsender hGrecv
-      simp only [Option.some.injEq] at hGsender hGrecv
-      subst hGsender hGrecv
+      have hEq : Lrecv = L := by
+        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
+        exact Option.some.inj this
+      subst hEq
+      have hSenderLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := brancherEp.role } = some L := by
+        simpa using hRecvLookup
+      refine ⟨L, hSenderLookup, ?_⟩
       simp only [lookupD_update_eq]
       have hOrigCoh := hCoh branchEdge
-      simp only [EdgeCoherent] at hOrigCoh
       cases hTraceVal : lookupD D branchEdge with
       | nil =>
         rw [hTraceVal] at hTrace
@@ -228,7 +235,7 @@ theorem Coherent_branch_preserved
         -- Original coherence with branch type
         -- consumeOne doesn't handle branch, so this case is vacuously handled
         -- by showing original coherence required empty trace or contradiction
-        have hOrig := hOrigCoh (.branch brancherEp.role bs) (.branch brancherEp.role bs) hG hG
+        have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hG
         rw [hTraceVal] at hOrig
         simp only [Consume, consumeOne, Option.isSome] at hOrig
         exact Bool.noConfusion hOrig
@@ -237,13 +244,16 @@ theorem Coherent_branch_preserved
         intro h
         have : brancherEp.role = senderRole := congrArg Endpoint.role h
         exact hSenderIsRecv this.symm
-      rw [hRecvLookup] at hGrecv
-      rw [lookupG_update_neq _ _ _ _ hSenderNeq] at hGsender
-      simp only [Option.some.injEq] at hGrecv
-      subst hGrecv
+      have hEq : Lrecv = L := by
+        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
+        exact Option.some.inj this
+      subst hEq
       simp only [lookupD_update_eq]
       have hOrigCoh := hCoh branchEdge
-      simp only [EdgeCoherent] at hOrigCoh
+      rcases EdgeCoherent_sender_of_receiver hOrigCoh hG with ⟨Lsender, hGsender⟩
+      have hSenderLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := senderRole } = some Lsender := by
+        simpa [lookupG_update_neq _ _ _ _ hSenderNeq] using hGsender
+      refine ⟨Lsender, hSenderLookup, ?_⟩
       cases hTraceVal : lookupD D branchEdge with
       | nil =>
         rw [hTraceVal] at hTrace
@@ -253,7 +263,7 @@ theorem Coherent_branch_preserved
         rw [hTraceVal] at hTrace
         simp only [List.head?, Option.some.injEq] at hTrace
         subst hTrace
-        have hOrig := hOrigCoh Lsender (.branch senderRole bs) hGsender hG
+        have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hG
         rw [hTraceVal] at hOrig
         simp only [Consume, consumeOne, Option.isSome] at hOrig
         -- consumeOne on branch type returns none, so Consume fails on non-empty trace
@@ -269,25 +279,23 @@ theorem Coherent_branch_preserved
         have hSid2 : e.sid = brancherEp.sid := congrArg Endpoint.sid hRecvMatch
         have hRole2 : e.receiver = brancherEp.role := congrArg Endpoint.role hRecvMatch
         simp only [EdgeCoherent]
-        intro Lsender Lrecv hGsender hGrecv
+        intro Lrecv hGrecv
         have hLookupS : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.sender } = some L := by
           conv => lhs; rw [hSid1, hRole1]
           exact lookupG_update_eq G brancherEp L
         have hLookupR : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G brancherEp L
-        rw [hLookupS] at hGsender
-        rw [hLookupR] at hGrecv
-        simp only [Option.some.injEq] at hGsender hGrecv
-        subst hGsender hGrecv
+        have hEq : Lrecv = L := by
+          have : some Lrecv = some L := by simpa [hLookupR] using hGrecv
+          exact Option.some.inj this
+        subst hEq
+        refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         have hOrigCoh := hCoh e
-        simp only [EdgeCoherent] at hOrigCoh
-        have hOrigSenderG : lookupG G { sid := e.sid, role := e.sender } = some (.branch senderRole bs) := by
-          conv => lhs; rw [hSid1, hRole1]; exact hG
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
-        have hOrig := hOrigCoh (.branch senderRole bs) (.branch senderRole bs) hOrigSenderG hOrigRecvG
+        have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
         cases hTraceE : lookupD D e with
         | nil =>
           rw [hRole1]
@@ -300,35 +308,39 @@ theorem Coherent_branch_preserved
         have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
         simp only [EdgeCoherent]
-        intro Lsender Lrecv hGsender hGrecv
-        rw [lookupG_update_neq _ _ _ _ hRecvNoMatch] at hGrecv
+        intro Lrecv hGrecv
+        have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
+          simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
         have hOrigCoh := hCoh e
-        simp only [EdgeCoherent] at hOrigCoh
+        have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         have hSid : e.sid = brancherEp.sid := congrArg Endpoint.sid hSenderMatch
         have hRole : e.sender = brancherEp.role := congrArg Endpoint.role hSenderMatch
-        have hOrigSender : lookupG G { sid := e.sid, role := e.sender } = some (.branch senderRole bs) := by
-          conv => lhs; rw [hSid, hRole]; exact hG
-        exact hOrigCoh (.branch senderRole bs) Lrecv hOrigSender hGrecv
+        have hSenderLookup : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.sender } = some L := by
+          conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G brancherEp L
+        refine ⟨L, hSenderLookup, hConsume⟩
     · -- Sender endpoint ≠ brancherEp
       have hSenderNoMatch : brancherEp ≠ { sid := e.sid, role := e.sender } := fun h => hSenderMatch h.symm
       by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = brancherEp
       · -- Receiver = brancherEp, sender ≠ brancherEp
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
         simp only [EdgeCoherent]
-        intro Lsender Lrecv hGsender hGrecv
-        rw [lookupG_update_neq _ _ _ _ hSenderNoMatch] at hGsender
+        intro Lrecv hGrecv
         have hSid : e.sid = brancherEp.sid := congrArg Endpoint.sid hRecvMatch
         have hRole : e.receiver = brancherEp.role := congrArg Endpoint.role hRecvMatch
         have hRecvLookup : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G brancherEp L
-        rw [hRecvLookup] at hGrecv
-        simp only [Option.some.injEq] at hGrecv
-        subst hGrecv
+        have hEq : Lrecv = L := by
+          have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
+          exact Option.some.inj this
+        subst hEq
         have hOrigCoh := hCoh e
-        simp only [EdgeCoherent] at hOrigCoh
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
           conv => lhs; rw [hSid, hRole]; exact hG
-        have hOrig := hOrigCoh Lsender (.branch senderRole bs) hGsender hOrigRecv
+        have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecv
+        rcases EdgeCoherent_sender_of_receiver hOrigCoh hOrigRecv with ⟨Lsender, hGsender⟩
+        have hGsender' : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.sender } = some Lsender := by
+          simpa [lookupG_update_neq _ _ _ _ hSenderNoMatch] using hGsender
+        refine ⟨Lsender, hGsender', ?_⟩
         cases hTraceE : lookupD D e with
         | nil => simp only [Consume, Option.isSome]
         | cons t ts =>

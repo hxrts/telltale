@@ -96,7 +96,7 @@ namespace MonitorState
 /-- Empty monitor state. -/
 def empty : MonitorState where
   G := []
-  D := Lean.RBMap.empty
+  D := (∅ : DEnv)
   bufs := []
   Lin := LinCtx.empty
   supply := 0

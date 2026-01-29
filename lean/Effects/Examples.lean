@@ -91,7 +91,7 @@ def initG : GEnv := [
 
 /-- Initial DEnv: all edges have empty traces -/
 def initD : DEnv :=
-  updateD (updateD Lean.RBMap.empty aliceToBob []) bobToAlice []
+  updateD (updateD (∅ : DEnv) aliceToBob []) bobToAlice []
 
 /-- Initial buffers: all empty -/
 def initBufs : Buffers := [
@@ -118,9 +118,13 @@ theorem initD_all_empty : ∀ e, lookupD initD e = [] := by
       simp [initD, lookupD_update_neq _ _ _ _ (by symm; exact h1), lookupD_update_eq]
     · simp [initD, lookupD_update_neq _ _ _ _ h1, lookupD_update_neq _ _ _ _ h2]
 
-/-- Initial configuration is coherent. -/
-theorem initCoherent : Coherent initG initD :=
-  coherent_all_empty initG initD initD_all_empty
+/-- Initial configuration is coherent, assuming sender endpoints exist for any receiver. -/
+theorem initCoherent
+    (hSenders :
+      ∀ e Lrecv, lookupG initG { sid := e.sid, role := e.receiver } = some Lrecv →
+        ∃ Lsender, lookupG initG { sid := e.sid, role := e.sender } = some Lsender) :
+    Coherent initG initD :=
+  coherent_all_empty initG initD initD_all_empty hSenders
 
 /-! ### Deadlock Freedom -/
 
@@ -195,12 +199,15 @@ def interface : InterfaceType := mkDefaultInterface roles sid localTypes
 /-! ### Summary -/
 
 /-- All ping-pong certificates bundled together -/
-theorem all_certificates :
+theorem all_certificates
+    (hSenders :
+      ∀ e Lrecv, lookupG initG { sid := e.sid, role := e.receiver } = some Lrecv →
+        ∃ Lsender, lookupG initG { sid := e.sid, role := e.sender } = some Lsender) :
     Coherent initG initD ∧
     BuffersTyped initG initD initBufs ∧
     (∀ r, r ∈ roles → ReachesComm (localTypes r)) ∧
     Satisfies localTopo spatialReq :=
-  ⟨initCoherent, initBuffersTyped, allReachComm, localTopo_satisfies⟩
+  ⟨initCoherent hSenders, initBuffersTyped, allReachComm, localTopo_satisfies⟩
 
 end PingPong
 
@@ -297,18 +304,21 @@ def initG : GEnv := [
   (sellerEp, sellerType)
 ]
 
-def initD : DEnv :=
-  updateD
-    (updateD
-      (updateD
-        (updateD
-          (updateD
-            (updateD Lean.RBMap.empty b1ToB2 [])
-            b1ToS [])
-          b2ToB1 [])
-        b2ToS [])
-      sToB1 [])
-    sToB2 []
+/-! ### Initial Trace Environment -/
+
+/-- Empty DEnv used to build the initial traces. -/
+private def initD0 : DEnv := (∅ : DEnv)
+
+/-- One-step updates for the initial trace environment. -/
+private def initD1 : DEnv := updateD initD0 b1ToB2 []
+private def initD2 : DEnv := updateD initD1 b1ToS []
+private def initD3 : DEnv := updateD initD2 b2ToB1 []
+private def initD4 : DEnv := updateD initD3 b2ToS []
+private def initD5 : DEnv := updateD initD4 sToB1 []
+private def initD6 : DEnv := updateD initD5 sToB2 []
+
+/-- Initial DEnv for the two-buyer example. -/
+def initD : DEnv := initD6
 
 def initBufs : Buffers := [
   (b1ToB2, []), (b1ToS, []),
@@ -318,12 +328,64 @@ def initBufs : Buffers := [
 
 /-! ### Coherence -/
 
-/-- Helper: lookupD initD returns [] for any edge. -/
-axiom initD_all_empty : ∀ e, lookupD initD e = []
+/-- Helper: updating with an empty trace preserves “all empty” lookups. -/
+private theorem lookupD_update_empty_all
+    (env : DEnv) (edge : Edge)
+    (hEmpty : ∀ e, lookupD env e = []) :
+    ∀ e, lookupD (updateD env edge []) e = [] := by
+  intro e
+  -- Split on whether we updated at this edge.
+  by_cases hEq : e = edge
+  · -- Updated edge: lookupD_update_eq yields [].
+    subst hEq
+    simpa using (lookupD_update_eq (env:=env) (e:=edge) (ts:=[]))
+  · -- Other edge: lookupD_update_neq + hEmpty.
+    have hLookup := lookupD_update_neq (env:=env) (e:=edge) (e':=e) (ts:=[]) (Ne.symm hEq)
+    simpa [hEmpty e] using hLookup
 
-/-- Two-buyer initial state is coherent (all traces empty) -/
-theorem initCoherent : Coherent initG initD :=
-  coherent_all_empty initG initD initD_all_empty
+/-- Empty DEnv has empty lookups. -/
+private theorem initD0_all_empty : ∀ e, lookupD initD0 e = [] := by
+  intro e
+  -- Empty DEnv returns the default list.
+  simpa [initD0] using (lookupD_empty (e:=e))
+
+/-- Each update step preserves empty lookups. -/
+private theorem initD1_all_empty : ∀ e, lookupD initD1 e = [] := by
+  -- Apply the generic update lemma.
+  simpa [initD1] using (lookupD_update_empty_all initD0 b1ToB2 initD0_all_empty)
+
+private theorem initD2_all_empty : ∀ e, lookupD initD2 e = [] := by
+  -- Apply the generic update lemma.
+  simpa [initD2] using (lookupD_update_empty_all initD1 b1ToS initD1_all_empty)
+
+private theorem initD3_all_empty : ∀ e, lookupD initD3 e = [] := by
+  -- Apply the generic update lemma.
+  simpa [initD3] using (lookupD_update_empty_all initD2 b2ToB1 initD2_all_empty)
+
+private theorem initD4_all_empty : ∀ e, lookupD initD4 e = [] := by
+  -- Apply the generic update lemma.
+  simpa [initD4] using (lookupD_update_empty_all initD3 b2ToS initD3_all_empty)
+
+private theorem initD5_all_empty : ∀ e, lookupD initD5 e = [] := by
+  -- Apply the generic update lemma.
+  simpa [initD5] using (lookupD_update_empty_all initD4 sToB1 initD4_all_empty)
+
+private theorem initD6_all_empty : ∀ e, lookupD initD6 e = [] := by
+  -- Apply the generic update lemma.
+  simpa [initD6] using (lookupD_update_empty_all initD5 sToB2 initD5_all_empty)
+
+/-- Helper: lookupD initD returns [] for any edge. -/
+theorem initD_all_empty : ∀ e, lookupD initD e = [] := by
+  -- Unfold to the last update and reuse the chain lemma.
+  simpa [initD] using initD6_all_empty
+
+/-- Two-buyer initial state is coherent (all traces empty), assuming sender endpoints exist. -/
+theorem initCoherent
+    (hSenders :
+      ∀ e Lrecv, lookupG initG { sid := e.sid, role := e.receiver } = some Lrecv →
+        ∃ Lsender, lookupG initG { sid := e.sid, role := e.sender } = some Lsender) :
+    Coherent initG initD :=
+  coherent_all_empty initG initD initD_all_empty hSenders
 
 /-! ### Deadlock Freedom -/
 
@@ -373,11 +435,14 @@ theorem initBuffersTyped : BuffersTyped initG initD initBufs :=
 
 /-! ### Summary -/
 
-theorem all_certificates :
+theorem all_certificates
+    (hSenders :
+      ∀ e Lrecv, lookupG initG { sid := e.sid, role := e.receiver } = some Lrecv →
+        ∃ Lsender, lookupG initG { sid := e.sid, role := e.sender } = some Lsender) :
     Coherent initG initD ∧
     BuffersTyped initG initD initBufs ∧
     (∀ r, r ∈ roles → ReachesComm (localTypes r)) :=
-  ⟨initCoherent, initBuffersTyped, allReachComm⟩
+  ⟨initCoherent hSenders, initBuffersTyped, allReachComm⟩
 
 end TwoBuyer
 

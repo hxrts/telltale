@@ -92,7 +92,7 @@ namespace Config
 
 /-- Initial configuration with just a process and empty environments. -/
 def init (P : Process) : Config :=
-  { proc := P, store := [], bufs := [], G := [], D := Lean.RBMap.empty, nextSid := 0 }
+  { proc := P, store := [], bufs := [], G := [], D := (∅ : DEnv), nextSid := 0 }
 
 /-- Initial configuration with type environments. -/
 def initWithEnv (P : Process) (G : GEnv) (D : DEnv) : Config :=

@@ -32,8 +32,56 @@ set_option autoImplicit false
 set_option linter.unnecessarySimpa false
 
 open scoped Classical
+open Batteries
 
 noncomputable section
+
+/-! ### Global Compatibility (Coinductive) -/
+
+/-- GStep: projection of TypedStep to G/D (for compatibility closure). -/
+def GStep (G : GEnv) (D : DEnv) (G' : GEnv) (D' : DEnv) : Prop :=
+  -- Existential projection of a TypedStep on G/D.
+  ∃ Ssh Sown store bufs P Sown' store' bufs' P',
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'
+
+/-! ## Compatibility (coinductive closure) -/
+
+/-- Compatibility: readiness now + closure under GStep. -/
+coinductive Compatible (G : GEnv) (D : DEnv) : Prop where
+  | mk :
+      -- Compatibility exposes immediate readiness and step closure.
+      SendReady G D →
+      SelectReady G D →
+      (∀ {G' D'}, GStep G D G' D' → Compatible G' D') →
+      Compatible G D
+
+/-- Extract SendReady from Compatible. -/
+theorem Compatible_to_SendReady {G : GEnv} {D : DEnv} :
+    Compatible G D → SendReady G D := by
+  -- Compatibility carries SendReady as a field.
+  intro h
+  cases h with
+  | mk hSend _ _ => exact hSend
+
+/-- Extract SelectReady from Compatible. -/
+theorem Compatible_to_SelectReady {G : GEnv} {D : DEnv} :
+    Compatible G D → SelectReady G D := by
+  -- Compatibility carries SelectReady as a field.
+  intro h
+  cases h with
+  | mk _ hSelect _ => exact hSelect
+
+/-- Compatibility is preserved by any TypedStep. -/
+theorem Compatible_preserved
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    Compatible G D →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    Compatible G' D' := by
+  -- Use the step-closure field with the projected GStep witness.
+  intro hCompat hTS
+  cases hCompat with
+  | mk _ _ hClosed =>
+      exact hClosed ⟨Ssh, Sown, store, bufs, P, Sown', store', bufs', P', hTS⟩
 
 /-! ### WellFormed Predicate -/
 
@@ -43,8 +91,9 @@ noncomputable section
     is well-formed if:
     1. Store is typed by S and G
     2. Buffers are typed by D
-    3. G and D are coherent
-    4. Process P has pre-update style typing
+    3. G and D are coherent (including head/label refinements)
+    4. G and D are globally compatible (coinductive readiness)
+    5. Process P has pre-update style typing
 
     This predicate is preserved by TypedStep transitions. -/
 def WellFormed (G : GEnv) (D : DEnv) (Ssh Sown : SEnv)
@@ -54,8 +103,7 @@ def WellFormed (G : GEnv) (D : DEnv) (Ssh Sown : SEnv)
   Coherent G D ∧
   HeadCoherent G D ∧
   ValidLabels G D bufs ∧
-  SendReady G D ∧
-  SelectReady G D ∧
+  Compatible G D ∧
   DisjointS Ssh Sown ∧
   DConsistent G D ∧
   ∃ S' G' W Δ, HasTypeProcPreOut Ssh Sown G P S' G' W Δ
@@ -111,131 +159,424 @@ theorem lookupG_none_of_not_session {G : GEnv} {e : Endpoint} :
       have hSid : e.sid ∈ SessionsOf G := ⟨e, L, hLookup, rfl⟩
       exact (hNot hSid).elim
 
-axiom DisjointD_lookup_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
+theorem DisjointD_lookup_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     DisjointD D₁ D₂ →
     D₁.find? e = some ts →
-    D₂.find? e = none
+    D₂.find? e = none := by
+  intro hDisj hFind
+  by_contra hSome
+  cases hFind2 : D₂.find? e with
+  | none => exact (hSome hFind2)
+  | some ts2 =>
+      have hSid1 : e.sid ∈ SessionsOfD D₁ := by
+        exact ⟨e, ts, hFind, rfl⟩
+      have hSid2 : e.sid ∈ SessionsOfD D₂ := by
+        exact ⟨e, ts2, hFind2, rfl⟩
+      have hInter : e.sid ∈ SessionsOfD D₁ ∩ SessionsOfD D₂ := by
+        exact ⟨hSid1, hSid2⟩
+      have hEmpty : SessionsOfD D₁ ∩ SessionsOfD D₂ = ∅ := hDisj
+      have : e.sid ∈ (∅ : Set SessionId) := by
+        simpa [hEmpty] using hInter
+      exact this.elim
 
-axiom DisjointD_lookup_right {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
+theorem DisjointD_lookup_right {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     DisjointD D₁ D₂ →
     D₂.find? e = some ts →
-    D₁.find? e = none
+    D₁.find? e = none := by
+  intro hDisj hFind
+  have hDisj' : DisjointD D₂ D₁ := by
+    simpa [DisjointD, Set.inter_comm] using hDisj
+  exact DisjointD_lookup_left (D₁:=D₂) (D₂:=D₁) hDisj' hFind
 
-axiom SessionsOfD_append_subset {D₁ D₂ : DEnv} :
-    SessionsOfD (D₁ ++ D₂) ⊆ SessionsOfD D₁ ∪ SessionsOfD D₂
+private def insertPairD (acc : DEnv) (p : Edge × List ValType) : DEnv :=
+  updateD acc p.1 p.2
 
-axiom SessionsOfD_append_left {D₁ D₂ : DEnv} :
-    SessionsOfD D₁ ⊆ SessionsOfD (D₁ ++ D₂)
+private def insertPairS (acc : SEnv) (p : Var × ValType) : SEnv :=
+  updateSEnv acc p.1 p.2
 
-axiom SessionsOfD_append_right {D₁ D₂ : DEnv} :
-    SessionsOfD D₂ ⊆ SessionsOfD (D₁ ++ D₂)
+private theorem findD_foldl_insert_preserve
+    (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
+    (hfind : env.find? e = some ts)
+    (hSame : ∀ ts', (e, ts') ∈ L → ts' = ts) :
+    (L.foldl insertPairD env).find? e = some ts := by
+  induction L generalizing env with
+  | nil =>
+      simpa using hfind
+  | cons p L ih =>
+      cases p with
+      | mk e' ts' =>
+          have hSame' : ∀ ts'', (e, ts'') ∈ L → ts'' = ts := by
+            intro ts'' hmem
+            exact hSame ts'' (List.mem_cons_of_mem _ hmem)
+          by_cases hEq : e' = e
+          · cases hEq
+            have hts' : ts' = ts := hSame ts' (by simp)
+            cases hts'
+            have hfind' : (updateD env e ts).find? e = some ts := by
+              simp [updateD, DEnv.find?]
+            simpa [List.foldl, insertPairD] using
+              (ih (env := updateD env e ts) (hfind := hfind') (hSame := hSame'))
+          · have hfind' : (updateD env e' ts').find? e = some ts := by
+              have h' : (updateD env e' ts').find? e = env.find? e := by
+                simp [updateD, DEnv.find?, hEq]
+              simpa [hfind] using h'
+            simpa [List.foldl, insertPairD] using
+              (ih (env := updateD env e' ts') (hfind := hfind') (hSame := hSame'))
 
-axiom SessionsOfD_updateD_subset {D : DEnv} {e : Edge} {ts : List ValType} :
-    SessionsOfD (updateD D e ts) ⊆ SessionsOfD D ∪ {e.sid}
+private theorem findD_foldl_insert_of_mem
+    (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
+    (hmem : (e, ts) ∈ L)
+    (hSame : ∀ ts', (e, ts') ∈ L → ts' = ts) :
+    (L.foldl insertPairD env).find? e = some ts := by
+  induction L generalizing env with
+  | nil =>
+      cases hmem
+  | cons p L ih =>
+      cases p with
+      | mk e' ts' =>
+          have hSame' : ∀ ts'', (e, ts'') ∈ L → ts'' = ts := by
+            intro ts'' hmem'
+            exact hSame ts'' (List.mem_cons_of_mem _ hmem')
+          cases hmem with
+          | head _ =>
+              have hfind' : (updateD env e ts).find? e = some ts := by
+                simp [updateD, DEnv.find?]
+              simpa [List.foldl, insertPairD] using
+                (findD_foldl_insert_preserve (L:=L) (env:=updateD env e ts)
+                  (e:=e) (ts:=ts) hfind' hSame')
+          | tail _ htail =>
+              simpa [List.foldl, insertPairD] using
+                (ih (env := updateD env e' ts') (hmem := htail) (hSame := hSame'))
 
-axiom lookupD_entry_of_nonempty {D : DEnv} {e : Edge} :
+private theorem findD_foldl_insert_notin
+    (L : List (Edge × List ValType)) (env : DEnv) (e : Edge)
+    (hNot : ∀ ts, (e, ts) ∈ L → False) :
+    (L.foldl insertPairD env).find? e = env.find? e := by
+  induction L generalizing env with
+  | nil =>
+      rfl
+  | cons p L ih =>
+      cases p with
+      | mk e' ts' =>
+          have hNot' : ∀ ts, (e, ts) ∈ L → False := by
+            intro ts hmem
+            exact hNot ts (List.mem_cons_of_mem _ hmem)
+          have hneq : e' ≠ e := by
+            intro hEq
+            exact hNot ts' (by simpa [hEq])
+          have hfind :
+              (updateD env e' ts').find? e = env.find? e := by
+            simp [updateD, DEnv.find?, hneq]
+          simpa [List.foldl, insertPairD, hfind] using
+            (ih (env := updateD env e' ts') (hNot := hNot'))
+
+private theorem lookupD_foldl_insert_preserve'
+    (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
+    (hlookup : lookupD env e = ts)
+    (hSame : ∀ ts', (e, ts') ∈ L → ts' = ts) :
+    lookupD (L.foldl insertPairD env) e = ts := by
+  induction L generalizing env with
+  | nil =>
+      simpa using hlookup
+  | cons p L ih =>
+      cases p with
+      | mk e' ts' =>
+          have hSame' : ∀ ts'', (e, ts'') ∈ L → ts'' = ts := by
+            intro ts'' hmem
+            exact hSame ts'' (List.mem_cons_of_mem _ hmem)
+          by_cases hEq : e' = e
+          · cases hEq
+            have hts' : ts' = ts := hSame ts' (by simp)
+            cases hts'
+            have hlookup' : lookupD (updateD env e ts) e = ts := by
+              simpa using (lookupD_update_eq (env:=env) (e:=e) (ts:=ts))
+            simpa [List.foldl, insertPairD] using
+              (ih (env := updateD env e ts) (hlookup := hlookup') (hSame := hSame'))
+          · have hlookup' : lookupD (updateD env e' ts') e = ts := by
+              have h := lookupD_update_neq (env:=env) (e:=e') (e':=e) (ts:=ts') hEq
+              simpa [hlookup] using h
+            simpa [List.foldl, insertPairD] using
+              (ih (env := updateD env e' ts') (hlookup := hlookup') (hSame := hSame'))
+
+private theorem lookupD_foldl_insert_of_mem
+    (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
+    (hmem : (e, ts) ∈ L)
+    (hSame : ∀ ts', (e, ts') ∈ L → ts' = ts) :
+    lookupD (L.foldl insertPairD env) e = ts := by
+  induction L generalizing env with
+  | nil =>
+      cases hmem
+  | cons p L ih =>
+      cases p with
+      | mk e' ts' =>
+          have hSame' : ∀ ts'', (e, ts'') ∈ L → ts'' = ts := by
+            intro ts'' hmem'
+            exact hSame ts'' (List.mem_cons_of_mem _ hmem')
+          cases hmem with
+          | head _ =>
+              have hlookup' : lookupD (updateD env e ts) e = ts := by
+                simpa using (lookupD_update_eq (env:=env) (e:=e) (ts:=ts))
+              simpa [List.foldl, insertPairD] using
+                (lookupD_foldl_insert_preserve' (L:=L) (env:=updateD env e ts)
+                  (e:=e) (ts:=ts) hlookup' hSame')
+          | tail _ htail =>
+              simpa [List.foldl, insertPairD] using
+                (ih (env := updateD env e' ts') (hmem := htail) (hSame := hSame'))
+
+private theorem lookupD_foldl_insert_notin
+    (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
+    (hlookup : lookupD env e = ts)
+    (hNot : ∀ ts, (e, ts) ∈ L → False) :
+    lookupD (L.foldl insertPairD env) e = ts := by
+  apply lookupD_foldl_insert_preserve' (L:=L) (env:=env) (e:=e) (ts:=ts) hlookup
+  intro ts' hmem
+  exact (hNot ts' hmem).elim
+
+private theorem lookupSEnv_foldl_insert_preserve
+    (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
+    (hlookup : lookupSEnv env x = some T)
+    (hSame : ∀ T', (x, T') ∈ L → T' = T) :
+    lookupSEnv (L.foldl insertPairS env) x = some T := by
+  induction L generalizing env with
+  | nil =>
+      simpa using hlookup
+  | cons p L ih =>
+      cases p with
+      | mk x' T' =>
+          have hSame' : ∀ T'', (x, T'') ∈ L → T'' = T := by
+            intro T'' hmem
+            exact hSame T'' (List.mem_cons_of_mem _ hmem)
+          by_cases hEq : x' = x
+          · cases hEq
+            have hT' : T' = T := hSame T' (by simp)
+            cases hT'
+            have hlookup' : lookupSEnv (updateSEnv env x T) x = some T := by
+              simpa using (lookupSEnv_update_eq (env:=env) (x:=x) (T:=T))
+            simpa [List.foldl, insertPairS] using
+              (ih (env := updateSEnv env x T) (hlookup := hlookup') (hSame := hSame'))
+          · have hlookup' : lookupSEnv (updateSEnv env x' T') x = some T := by
+              have h := lookupSEnv_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hEq
+              simpa [hlookup] using h
+            simpa [List.foldl, insertPairS] using
+              (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hSame := hSame'))
+
+private theorem lookupSEnv_foldl_insert_of_mem
+    (L : List (Var × ValType)) (env : SEnv) (x : Var) (T : ValType)
+    (hmem : (x, T) ∈ L)
+    (hSame : ∀ T', (x, T') ∈ L → T' = T) :
+    lookupSEnv (L.foldl insertPairS env) x = some T := by
+  induction L generalizing env with
+  | nil =>
+      cases hmem
+  | cons p L ih =>
+      cases p with
+      | mk x' T' =>
+          have hSame' : ∀ T'', (x, T'') ∈ L → T'' = T := by
+            intro T'' hmem'
+            exact hSame T'' (List.mem_cons_of_mem _ hmem')
+          cases hmem with
+          | head _ =>
+              have hlookup' : lookupSEnv (updateSEnv env x T) x = some T := by
+                simpa using (lookupSEnv_update_eq (env:=env) (x:=x) (T:=T))
+              simpa [List.foldl, insertPairS] using
+                (lookupSEnv_foldl_insert_preserve (L:=L) (env:=updateSEnv env x T)
+                  (x:=x) (T:=T) hlookup' hSame')
+          | tail _ htail =>
+              simpa [List.foldl, insertPairS] using
+                (ih (env := updateSEnv env x' T') (hmem := htail) (hSame := hSame'))
+
+private theorem lookupSEnv_foldl_insert_notin
+    (L : List (Var × ValType)) (env : SEnv) (x : Var) (v : Option ValType)
+    (hlookup : lookupSEnv env x = v)
+    (hNot : ∀ T, (x, T) ∈ L → False) :
+    lookupSEnv (L.foldl insertPairS env) x = v := by
+  induction L generalizing env with
+  | nil =>
+      simpa using hlookup
+  | cons p L ih =>
+      cases p with
+      | mk x' T' =>
+          have hNot' : ∀ T, (x, T) ∈ L → False := by
+            intro T hmem
+            exact hNot T (List.mem_cons_of_mem _ hmem)
+          have hneq : x' ≠ x := by
+            intro hEq
+            exact hNot T' (by simpa [hEq])
+          have hlookup' : lookupSEnv (updateSEnv env x' T') x = v := by
+            have h := lookupSEnv_update_neq (env:=env) (x:=x') (y:=x) (T:=T') hneq
+            simpa [hlookup] using h
+          simpa [List.foldl, insertPairS] using
+            (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hNot := hNot'))
+
+theorem findD_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
+    D₁.find? e = some ts →
+    (D₁ ++ D₂).find? e = some ts := by
+  intro hfind
+  simp [DEnvUnion, DEnv.find?, hfind]
+
+theorem findD_append_right {D₁ D₂ : DEnv} {e : Edge} :
+    D₁.find? e = none →
+    (D₁ ++ D₂).find? e = D₂.find? e := by
+  intro hfind
+  simp [DEnvUnion, DEnv.find?, hfind]
+
+theorem SessionsOfD_append_left {D₁ D₂ : DEnv} :
+    SessionsOfD D₁ ⊆ SessionsOfD (D₁ ++ D₂) := by
+  intro s hs
+  rcases hs with ⟨e, ts, hFind, hSid⟩
+  exact ⟨e, ts, findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hFind, hSid⟩
+
+theorem SessionsOfD_append_right {D₁ D₂ : DEnv} :
+    SessionsOfD D₂ ⊆ SessionsOfD (D₁ ++ D₂) := by
+  intro s hs
+  rcases hs with ⟨e, ts, hFind, hSid⟩
+  cases hLeft : D₁.find? e with
+  | some ts₁ =>
+      exact ⟨e, ts₁, findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts₁) hLeft, hSid⟩
+  | none =>
+      have hFind' := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hLeft
+      exact ⟨e, ts, by simpa [hFind'] using hFind, hSid⟩
+
+theorem SessionsOfD_append_subset {D₁ D₂ : DEnv} :
+    SessionsOfD (D₁ ++ D₂) ⊆ SessionsOfD D₁ ∪ SessionsOfD D₂ := by
+  intro s hs
+  rcases hs with ⟨e, ts, hFind, hSid⟩
+  cases hLeft : D₁.find? e with
+  | some ts₁ =>
+      have hIn : s ∈ SessionsOfD D₁ := ⟨e, ts₁, hLeft, hSid⟩
+      exact Or.inl hIn
+  | none =>
+      have hRight := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hLeft
+      have hFind' : D₂.find? e = some ts := by
+        simpa [hRight] using hFind
+      have hIn : s ∈ SessionsOfD D₂ := ⟨e, ts, hFind', hSid⟩
+      exact Or.inr hIn
+
+theorem SessionsOfD_updateD_subset {D : DEnv} {e : Edge} {ts : List ValType} :
+    SessionsOfD (updateD D e ts) ⊆ SessionsOfD D ∪ {e.sid} := by
+  intro s hs
+  rcases hs with ⟨e', ts', hFind, hSid⟩
+  by_cases hEq : e' = e
+  · subst hEq
+    right
+    simpa [hSid]
+  · left
+    have hFind' : D.find? e' = some ts' := by
+      have h' : (updateD D e ts).find? e' = D.find? e' := by
+        simp [updateD, DEnv.find?, hEq]
+      simpa [h'] using hFind
+    exact ⟨e', ts', hFind', hSid⟩
+
+theorem lookupD_entry_of_nonempty {D : DEnv} {e : Edge} :
     lookupD D e ≠ [] →
-    ∃ ts, D.find? e = some ts
+    ∃ ts, D.find? e = some ts := by
+  intro hne
+  cases hFind : D.find? e with
+  | none =>
+      have hlookup : lookupD D e = [] := by
+        simp [lookupD, hFind]
+      exact (hne hlookup).elim
+  | some ts =>
+      exact ⟨ts, by simpa [hFind]⟩
 
 /-- Lookup in appended GEnv prefers the left. -/
 theorem lookupG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
     lookupG G₁ e = some L →
     lookupG (G₁ ++ G₂) e = some L := by
-  intro h
-  have hLookup : G₁.lookup e = some L := by
-    simpa [lookupG] using h
-  calc
-    lookupG (G₁ ++ G₂) e = (G₁.lookup e).or (G₂.lookup e) := by
-      simp [lookupG, List.lookup_append]
-    _ = some L := by
-      simp [hLookup]
+  intro hLookup
+  induction G₁ with
+  | nil =>
+      simp [lookupG] at hLookup
+  | cons hd tl ih =>
+      cases hEq : (e == hd.1) with
+      | true =>
+          have hL : hd.2 = L := by
+            simpa [lookupG, List.lookup, hEq] using hLookup
+          simp [lookupG, List.lookup, hEq, hL]
+      | false =>
+          have hLookup' : lookupG tl e = some L := by
+            simpa [lookupG, List.lookup, hEq] using hLookup
+          have ih' := ih hLookup'
+          simpa [lookupG, List.lookup, hEq] using ih'
 
 /-- Lookup in appended GEnv falls back to the right when left is missing. -/
 theorem lookupG_append_right {G₁ G₂ : GEnv} {e : Endpoint} :
     lookupG G₁ e = none →
     lookupG (G₁ ++ G₂) e = lookupG G₂ e := by
-  intro h
-  have hLookup : G₁.lookup e = none := by
-    simpa [lookupG] using h
-  calc
-    lookupG (G₁ ++ G₂) e = (G₁.lookup e).or (G₂.lookup e) := by
-      simp [lookupG, List.lookup_append]
-    _ = lookupG G₂ e := by
-      simp [hLookup, lookupG]
+  intro hLookup
+  induction G₁ with
+  | nil =>
+      simp [lookupG] at hLookup ⊢
+  | cons hd tl ih =>
+      cases hEq : (e == hd.1) with
+      | true =>
+          have : False := by
+            simpa [lookupG, List.lookup, hEq] using hLookup
+          exact this.elim
+      | false =>
+          have hLookup' : lookupG tl e = none := by
+            simpa [lookupG, List.lookup, hEq] using hLookup
+          have ih' := ih hLookup'
+          simpa [lookupG, List.lookup, hEq] using ih'
 
 /-- Invert lookup in an appended GEnv. -/
 theorem lookupG_append_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
     lookupG (G₁ ++ G₂) e = some L →
     lookupG G₁ e = some L ∨ (lookupG G₁ e = none ∧ lookupG G₂ e = some L) := by
-  intro h
-  have hLookup : (G₁.lookup e).or (G₂.lookup e) = some L := by
-    simpa [lookupG, List.lookup_append] using h
-  cases hLeft : G₁.lookup e with
+  intro hLookup
+  cases hLeft : lookupG G₁ e with
+  | some L₁ =>
+      left
+      have hLeft' := lookupG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L₁) hLeft
+      have hEq : L₁ = L := by
+        have : some L₁ = some L := by simpa [hLeft'] using hLookup
+        cases this
+        rfl
+      simpa [hEq] using hLeft
   | none =>
       right
-      have hRight : G₂.lookup e = some L := by
-        simpa [hLeft] using hLookup
-      exact ⟨by simpa [lookupG] using hLeft, by simpa [lookupG] using hRight⟩
-  | some L1 =>
-      have hEq : L1 = L := by
-        simpa [hLeft] using hLookup
-      left
-      simpa [lookupG, hEq] using hLeft
+      have hRight := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      have hLookup' : lookupG G₂ e = some L := by
+        simpa [hRight] using hLookup
+      exact ⟨by simpa [hLeft], hLookup'⟩
 
 theorem SessionsOf_append_right_subset {G₁ G₂ : GEnv} :
     SessionsOf G₂ ⊆ SessionsOf (G₁ ++ G₂) := by
-  intro s hMem
-  rcases hMem with ⟨e, L, hLookup, hSid⟩
-  by_cases hNone : lookupG G₁ e = none
-  · have hEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
-    exact ⟨e, L, by simpa [hEq] using hLookup, hSid⟩
-  · cases hSome : lookupG G₁ e with
-    | none => exact (hNone hSome).elim
-    | some L₁ =>
-        have hLeft : lookupG (G₁ ++ G₂) e = some L₁ :=
-          lookupG_append_left (G₁:=G₁) (G₂:=G₂) hSome
-        exact ⟨e, L₁, hLeft, hSid⟩
+  intro s hs
+  rcases hs with ⟨e, L, hLookup, hSid⟩
+  cases hLeft : lookupG G₁ e with
+  | some L₁ =>
+      exact ⟨e, L₁, lookupG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L₁) hLeft, hSid⟩
+  | none =>
+      have hRight := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      exact ⟨e, L, by simpa [hRight] using hLookup, hSid⟩
 
 /-- Sessions in an appended GEnv are contained in the union of sessions. -/
 theorem SessionsOf_append_subset {G₁ G₂ : GEnv} :
     SessionsOf (G₁ ++ G₂) ⊆ SessionsOf G₁ ∪ SessionsOf G₂ := by
   intro s hs
   rcases hs with ⟨e, L, hLookup, hSid⟩
-  have hLookup' : (G₁.lookup e).or (G₂.lookup e) = some L := by
-    simpa [lookupG, List.lookup_append] using hLookup
-  cases hLeft : G₁.lookup e with
+  cases hLeft : lookupG G₁ e with
+  | some L₁ =>
+      exact Or.inl ⟨e, L₁, hLeft, hSid⟩
   | none =>
-      have hRight : G₂.lookup e = some L := by
-        simpa [hLeft] using hLookup'
-      right
-      exact ⟨e, L, by simpa [lookupG] using hRight, hSid⟩
-  | some L1 =>
-      have hEq : L1 = L := by
-        simpa [hLeft] using hLookup'
-      left
-      exact ⟨e, L1, by simpa [lookupG] using hLeft, by simpa [hEq] using hSid⟩
+      have hRight := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      have hLookup' : lookupG G₂ e = some L := by
+        simpa [hRight] using hLookup
+      exact Or.inr ⟨e, L, hLookup', hSid⟩
 
 /-- Left sessions embed into appended GEnv sessions. -/
 theorem SessionsOf_append_left {G₁ G₂ : GEnv} :
     SessionsOf G₁ ⊆ SessionsOf (G₁ ++ G₂) := by
   intro s hs
   rcases hs with ⟨e, L, hLookup, hSid⟩
-  exact ⟨e, L, lookupG_append_left hLookup, hSid⟩
+  exact ⟨e, L, lookupG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLookup, hSid⟩
 
 /-- Right sessions embed into appended GEnv sessions. -/
 theorem SessionsOf_append_right {G₁ G₂ : GEnv} :
     SessionsOf G₂ ⊆ SessionsOf (G₁ ++ G₂) := by
   intro s hs
-  by_cases hIn1 : s ∈ SessionsOf G₁
-  · exact SessionsOf_append_left (G₂:=G₂) hIn1
-  · rcases hs with ⟨e, L, hLookup, hSid⟩
-    have hNone : lookupG G₁ e = none := by
-      apply lookupG_none_of_not_session
-      intro hMem
-      exact hIn1 (by simpa [hSid] using hMem)
-    have hLookup' : lookupG (G₁ ++ G₂) e = some L := by
-      simpa [lookupG_append_right hNone] using hLookup
-    exact ⟨e, L, hLookup', hSid⟩
+  exact SessionsOf_append_right_subset (G₁:=G₁) (G₂:=G₂) hs
 
 /-- Disjointness is preserved when the left sessions shrink. -/
 theorem DisjointG_of_subset_left {G₁ G₁' G₂ : GEnv} :
@@ -243,95 +584,150 @@ theorem DisjointG_of_subset_left {G₁ G₁' G₂ : GEnv} :
     DisjointG G₁ G₂ →
     DisjointG G₁' G₂ := by
   intro hSub hDisj
-  -- show SessionsOf G₁' ∩ SessionsOf G₂ = ∅
-  ext s; constructor
-  · intro hMem
-    have hLeft : s ∈ SessionsOf G₁ := hSub hMem.1
-    have hRight : s ∈ SessionsOf G₂ := hMem.2
-    have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hLeft, hRight⟩
-    have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
-    have hContra : s ∈ (∅ : Set SessionId) := by
-      simpa [hEmpty] using hInter
-    exact hContra.elim
-  · intro hMem
-    exact hMem.elim
+  have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := by
+    simpa [DisjointG, GEnvDisjoint] using hDisj
+  apply Set.eq_empty_iff_forall_notMem.2
+  intro s hs
+  have hs' : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := by
+    exact ⟨hSub hs.1, hs.2⟩
+  have : s ∈ (∅ : Set SessionId) := by
+    simpa [hEmpty] using hs'
+  exact this.elim
 
 /-- DisjointG is symmetric. -/
 theorem DisjointG_symm {G₁ G₂ : GEnv} :
     DisjointG G₁ G₂ →
     DisjointG G₂ G₁ := by
   intro hDisj
-  unfold DisjointG at *
-  unfold GEnvDisjoint at hDisj
-  unfold GEnvDisjoint
-  simpa [Set.inter_comm] using hDisj
+  simpa [DisjointG, GEnvDisjoint, Set.inter_comm] using hDisj
 
 theorem DisjointG_append_left {G₁ G₁' G₂ : GEnv} :
     DisjointG G₁ G₂ →
     DisjointG G₁' G₂ →
     DisjointG (G₁ ++ G₁') G₂ := by
-  intro hDisj1 hDisj2
-  unfold DisjointG at *
-  unfold GEnvDisjoint at *
-  ext s; constructor
-  · intro hMem
-    rcases hMem with ⟨hInLeft, hInRight⟩
-    rcases hInLeft with ⟨e, L, hLookup, hSid⟩
-    have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₁') (e:=e) (L:=L) hLookup
-    cases hInv with
-    | inl hLeft =>
-        have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := by
-          exact ⟨⟨e, L, hLeft, hSid⟩, hInRight⟩
-        have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj1
-        have hContra : s ∈ (∅ : Set SessionId) := by
-          simpa [hEmpty] using hInter
-        exact hContra.elim
-    | inr hRight =>
-        rcases hRight with ⟨_, hLookupR⟩
-        have hInter : s ∈ SessionsOf G₁' ∩ SessionsOf G₂ := by
-          exact ⟨⟨e, L, hLookupR, hSid⟩, hInRight⟩
-        have hEmpty : SessionsOf G₁' ∩ SessionsOf G₂ = ∅ := hDisj2
-        have hContra : s ∈ (∅ : Set SessionId) := by
-          simpa [hEmpty] using hInter
-        exact hContra.elim
-  · intro hMem
-    exact hMem.elim
+  intro hDisj hDisj'
+  apply Set.eq_empty_iff_forall_notMem.2
+  intro s hs
+  have hSub := SessionsOf_append_subset (G₁:=G₁) (G₂:=G₁') hs.1
+  cases hSub with
+  | inl hIn1 =>
+      have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := by
+        simpa [DisjointG, GEnvDisjoint] using hDisj
+      have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn1, hs.2⟩
+      have : s ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+      exact this.elim
+  | inr hIn2 =>
+      have hEmpty : SessionsOf G₁' ∩ SessionsOf G₂ = ∅ := by
+        simpa [DisjointG, GEnvDisjoint] using hDisj'
+      have hInter : s ∈ SessionsOf G₁' ∩ SessionsOf G₂ := ⟨hIn2, hs.2⟩
+      have : s ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+      exact this.elim
 
-axiom lookupD_append_left {D₁ D₂ : DEnv} {e : Edge} :
+theorem lookupD_append_left {D₁ D₂ : DEnv} {e : Edge} :
     lookupD D₁ e ≠ [] →
-    lookupD (D₁ ++ D₂) e = lookupD D₁ e
+    lookupD (D₁ ++ D₂) e = lookupD D₁ e := by
+  intro hne
+  cases hfind : D₁.find? e with
+  | none =>
+      have hlookup : lookupD D₁ e = [] := by
+        simp [lookupD, hfind]
+      exact (hne hlookup).elim
+  | some ts =>
+      have hleft :=
+        findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hfind
+      have hlookup : lookupD D₁ e = ts := by
+        simp [lookupD, hfind]
+      have hlookup' : lookupD (D₁ ++ D₂) e = ts := by
+        simp [lookupD, hleft]
+      simpa [hlookup] using hlookup'
 
-axiom lookupD_append_right {D₁ D₂ : DEnv} {e : Edge} :
+theorem lookupD_append_right {D₁ D₂ : DEnv} {e : Edge} :
     D₁.find? e = none →
-    lookupD (D₁ ++ D₂) e = lookupD D₂ e
+    lookupD (D₁ ++ D₂) e = lookupD D₂ e := by
+  intro hfind
+  have h := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hfind
+  simp [lookupD, h]
 
-axiom lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
+theorem lookupD_append_left_of_right_none {D₁ D₂ : DEnv} {e : Edge} :
     D₂.find? e = none →
-    lookupD (D₁ ++ D₂) e = lookupD D₁ e
+    lookupD (D₁ ++ D₂) e = lookupD D₁ e := by
+  intro hRight
+  cases hfind : D₁.find? e with
+  | none =>
+      have h := findD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hfind
+      have hlookup : lookupD D₁ e = [] := by
+        simp [lookupD, hfind]
+      have hlookup' : lookupD (D₁ ++ D₂) e = [] := by
+        simp [lookupD, h, hRight]
+      simpa [hlookup] using hlookup'
+  | some ts =>
+      have hleft :=
+        findD_append_left (D₁:=D₁) (D₂:=D₂) (e:=e) (ts:=ts) hfind
+      have hlookup : lookupD D₁ e = ts := by
+        simp [lookupD, hfind]
+      have hlookup' : lookupD (D₁ ++ D₂) e = ts := by
+        simp [lookupD, hleft]
+      simpa [hlookup] using hlookup'
 
-axiom lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
+theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     lookupSEnv S₁ x = some T →
-    lookupSEnv (S₁ ++ S₂) x = some T
+    lookupSEnv (S₁ ++ S₂) x = some T := by
+  intro hlookup
+  simp [SEnvUnion, lookupSEnv, hlookup]
 
-/-- Lookup in appended SEnv falls back to the right when left is missing. -/
-axiom lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
+theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
     lookupSEnv S₁ x = none →
-    lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x
+    lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x := by
+  intro hlookup
+  simp [SEnvUnion, lookupSEnv, hlookup]
 
-/-- Domain subset: left part embeds into append. -/
-axiom SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
-    SEnvDomSubset S₁ (S₁ ++ S₂)
+theorem SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
+    SEnvDomSubset S₁ (S₁ ++ S₂) := by
+  intro x T hLookup
+  exact ⟨T, lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) hLookup⟩
 
-/-- Domain subset: right part embeds into append. -/
-axiom SEnvDomSubset_append_right {S₁ S₂ : SEnv} :
-    SEnvDomSubset S₂ (S₁ ++ S₂)
+theorem SEnvDomSubset_append_right {S₁ S₂ : SEnv} :
+    SEnvDomSubset S₂ (S₁ ++ S₂) := by
+  intro x T hLookup
+  cases hLeft : lookupSEnv S₁ x with
+  | some T₁ =>
+      exact ⟨T₁, lookupSEnv_append_left (S₁:=S₁) (S₂:=S₂) hLeft⟩
+  | none =>
+      have hEq := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hLeft
+      exact ⟨T, by simpa [hEq] using hLookup⟩
 
-axiom lookupSEnv_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType} :
+theorem lookupSEnv_all_frame_left {Ssh S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     DisjointS S₁ S₂ →
     lookupSEnv (Ssh ++ S₂) x = some T →
-    lookupSEnv (Ssh ++ (S₁ ++ S₂)) x = some T
+    lookupSEnv (Ssh ++ (S₁ ++ S₂)) x = some T := by
+  intro hDisj hLookup
+  cases hSsh : lookupSEnv Ssh x with
+  | some Tsh =>
+      have hLeft := lookupSEnv_append_left (S₁:=Ssh) (S₂:=S₂) hSsh
+      have hEq : Tsh = T := by
+        have : some Tsh = some T := by simpa [hLeft] using hLookup
+        cases this
+        rfl
+      have hLeft' := lookupSEnv_append_left (S₁:=Ssh) (S₂:=S₁ ++ S₂) hSsh
+      simpa [hEq] using hLeft'
+  | none =>
+      have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=S₂) (x:=x) hSsh
+      have hS2 : lookupSEnv S₂ x = some T := by
+        simpa [hEq] using hLookup
+      have hS1 : lookupSEnv S₁ x = none := by
+        by_cases hS1 : lookupSEnv S₁ x = none
+        · exact hS1
+        · cases hS1' : lookupSEnv S₁ x with
+          | none => exact (hS1 hS1').elim
+          | some T₁ =>
+              have hContra := hDisj x T₁ T hS1' hS2
+              exact hContra.elim
+      have hEq' := lookupSEnv_append_right (S₁:=S₁) (S₂:=S₂) (x:=x) hS1
+      have hIn : lookupSEnv (S₁ ++ S₂) x = some T := by
+        simpa [hEq'] using hS2
+      have hEq'' := lookupSEnv_append_right (S₁:=Ssh) (S₂:=S₁ ++ S₂) (x:=x) hSsh
+      simpa [hEq''] using hIn
 
-/-- Pre-out typing never shrinks the owned variable environment (by domain). -/
 theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sown' G' W Δ →
     SEnvDomSubset Sown Sown' := by
@@ -420,18 +816,35 @@ theorem StoreTyped_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : Store}
 /-- Coherence splits to the left portion of G/D. -/
 theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     Coherent (G₁ ++ G₂) (D₁ ++ D₂) →
+    DisjointG G₁ G₂ →
     Coherent G₁ D₁ := by
-  intro hCoh e Lsender Lrecv hGsender hGrecv
-  have hGsender' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender :=
-    lookupG_append_left hGsender
-  have hGrecv' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv :=
-    lookupG_append_left hGrecv
+  intro hCoh hDisj e Lrecv hGrecv
+  let senderEp : Endpoint := { sid := e.sid, role := e.sender }
+  let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hGrecv' : lookupG (G₁ ++ G₂) recvEp = some Lrecv := lookupG_append_left hGrecv
+  have hCoh' := hCoh e Lrecv hGrecv'
+  rcases hCoh' with ⟨Lsender, hGsenderMerged, hConsume⟩
+  -- sender must live in G₁ because sessions are disjoint and receiver is in G₁
+  have hSid : e.sid ∈ SessionsOf G₁ := ⟨recvEp, Lrecv, hGrecv, rfl⟩
+  have hNot : e.sid ∉ SessionsOf G₂ := by
+    intro hIn2
+    have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid, hIn2⟩
+    have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
+    have : e.sid ∈ (∅ : Set SessionId) := by
+      simpa [hEmpty] using hInter
+    exact this.elim
+  have hG2none_sender : lookupG G₂ senderEp = none := lookupG_none_of_not_session hNot
+  have hGsender : lookupG G₁ senderEp = some Lsender := by
+    cases lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) hGsenderMerged with
+    | inl hLeft => exact hLeft
+    | inr hRight =>
+        have hRight' : lookupG G₂ senderEp = some Lsender := hRight.2
+        have : False := by simpa [hG2none_sender] using hRight'
+        exact this.elim
   by_cases hTrace : lookupD D₁ e = []
-  · -- Empty trace: Consume is trivially some
+  · refine ⟨Lsender, hGsender, ?_⟩
     simp [hTrace, Consume]
-  · -- Non-empty trace: use coherence of the merged env
-    have hTrace' : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
+  · have hTrace' : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
       lookupD_append_left (e := e) hTrace
-    have hCoh' := hCoh e Lsender Lrecv hGsender' hGrecv'
-    simpa [hTrace'] using hCoh'
-
+    refine ⟨Lsender, hGsender, ?_⟩
+    simpa [hTrace'] using hConsume

@@ -1,4 +1,6 @@
 import Effects.Coherence.Part2
+import Effects.Coherence.Part4
+import Effects.Coherence.Part5
 
 /-!
 # MPST Coherence
@@ -54,59 +56,219 @@ noncomputable section
 /-- ValidLabels is preserved when sending.
     Send appends a value to the buffer, but ValidLabels checks branch labels
     which are only relevant when receiver has branch type.
-    The main case (buffer head unchanged when appending) works.
-    Edge cases (empty buffer, self-send, type changes) are currently axiomatized. -/
-axiom ValidLabels_send_preserved
+    Self-send and branch-receiver cases are ruled out by `hRecvReady`. -/
+theorem ValidLabels_send_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType) (v : Value)
     (hValid : ValidLabels G D bufs)
-    (_hG : lookupG G senderEp = some (.send receiverRole T L)) :
+    (hCoh : Coherent G D)
+    (hBT : BuffersTyped G D bufs)
+    (hG : lookupG G senderEp = some (.send receiverRole T L))
+    (hRecvReady : ∀ Lrecv, lookupG G { sid := senderEp.sid, role := receiverRole } = some Lrecv →
+      ∃ L', Consume senderEp.role Lrecv (lookupD D { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }) = some L' ∧
+            (Consume senderEp.role L' [T]).isSome) :
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
     ValidLabels (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T]))
-               (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v]))
-
-/-- ValidLabels is preserved when receiving.
-    Recv removes head from buffer. If the head was checked by ValidLabels,
-    the remaining buffer still satisfies the property for the continuation type.
-    The main case (buffer tail preservation) requires protocol consistency. -/
-axiom ValidLabels_recv_preserved
-    (G : GEnv) (D : DEnv) (bufs : Buffers)
-    (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
-    (hValid : ValidLabels G D bufs)
-    (hG : lookupG G receiverEp = some (.recv senderRole T L))
-    (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
-    let recvEdge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
-    ValidLabels (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
-               (updateBuf bufs recvEdge (lookupBuf bufs recvEdge).tail)
+               (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) := by
+  intro sendEdge e source bs hBranch
+  let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  by_cases hRecvEq : recvEp = senderEp
+  · -- Receiver is the updated endpoint: original type is .send, so buffers must be empty.
+    have hNoSelf : receiverRole ≠ senderEp.role := by
+      intro hEq
+      subst hEq
+      obtain ⟨L', hConsume, hConsumeT⟩ := hRecvReady (.send senderEp.role T L) hG
+      cases hTrace : lookupD D { sid := senderEp.sid, sender := senderEp.role, receiver := senderEp.role } with
+      | nil =>
+          rw [hTrace] at hConsume
+          simp only [Consume] at hConsume
+          have hL' : L' = .send senderEp.role T L := Option.some.inj hConsume.symm
+          rw [hL'] at hConsumeT
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeT
+          exact Bool.noConfusion hConsumeT
+      | cons t ts =>
+          rw [hTrace] at hConsume
+          simp only [Consume, consumeOne] at hConsume
+          exact Option.noConfusion hConsume
+    have hSend : lookupG G recvEp = some (.send receiverRole T L) := by
+      simpa [hRecvEq] using hG
+    have hTraceEmpty : lookupD D e = [] :=
+      trace_empty_when_send_receiver (hCoh e) hSend
+    have hBufEmpty : lookupBuf bufs e = [] := by
+      rcases hBT e with ⟨hLen, _⟩
+      cases hBuf : lookupBuf bufs e with
+      | nil => rfl
+      | cons v' vs =>
+          have hLen' : Nat.succ vs.length = 0 := by
+            simpa [hTraceEmpty, hBuf] using hLen
+          exact (False.elim (Nat.succ_ne_zero _ hLen'))
+    have hNe : e ≠ sendEdge := by
+      intro hEq
+      subst hEq
+      have hRecvRole : receiverRole = senderEp.role := by
+        have h' := congrArg Endpoint.role hRecvEq
+        simpa [recvEp] using h'
+      exact hNoSelf hRecvRole
+    have hBufEq :
+        lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e =
+          lookupBuf bufs e := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+    have hBuf' :
+        lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e = [] := by
+      simpa [hBufEq, hBufEmpty]
+    simp [hBuf']
+  · -- Receiver endpoint unchanged: use original ValidLabels and buffer update facts.
+    have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
+      have hBranch' := hBranch
+      rw [lookupG_update_neq G senderEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      exact hBranch'
+    by_cases hEdge : e = sendEdge
+    · -- If receiver is branch at sendEdge, hRecvReady is inconsistent.
+      subst hEdge
+      obtain ⟨L', hConsume, hConsumeT⟩ := hRecvReady (.branch source bs) hBranchOld
+      cases hTrace : lookupD D sendEdge with
+      | nil =>
+          rw [hTrace] at hConsume
+          simp only [Consume] at hConsume
+          have hL' : L' = .branch source bs := Option.some.inj hConsume.symm
+          rw [hL'] at hConsumeT
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeT
+          exact (False.elim (Bool.noConfusion hConsumeT))
+      | cons t ts =>
+          rw [hTrace] at hConsume
+          simp only [Consume, consumeOne] at hConsume
+          exact (False.elim (Option.noConfusion hConsume))
+    · -- Edge unaffected: buffer unchanged, use old ValidLabels.
+      have hBufEq :
+          lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e =
+            lookupBuf bufs e := by
+        exact lookupBuf_update_neq _ _ _ _ (Ne.symm hEdge)
+      have hValidOld := hValid e source bs hBranchOld
+      simpa [hBufEq] using hValidOld
 
 /-- ValidLabels is preserved when selecting (sending a label).
-    Select appends label to buffer END, so HEAD unchanged. -/
-axiom ValidLabels_select_preserved
+    Select appends label to buffer END, so HEAD unchanged.
+    Self-select and branch-receiver cases are ruled out by `hRecvReady`. -/
+theorem ValidLabels_select_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
     (selectorEp : Endpoint) (targetRole : Role)
     (selectBranches : List (String × LocalType)) (ℓ : String) (L : LocalType)
     (hValid : ValidLabels G D bufs)
+    (hCoh : Coherent G D)
+    (hBT : BuffersTyped G D bufs)
     (hG : lookupG G selectorEp = some (.select targetRole selectBranches))
-    (hFind : selectBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L)) :
+    (_hFind : selectBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (hRecvReady : ∀ Lrecv, lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv →
+      ∃ L', Consume selectorEp.role Lrecv (lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole }) = some L' ∧
+            (Consume selectorEp.role L' [.string]).isSome) :
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
     ValidLabels (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string]))
-               (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ]))
-
-/-- ValidLabels is preserved when branching (receiving a label).
-    Branch removes label from buffer HEAD. -/
-axiom ValidLabels_branch_preserved
-    (G : GEnv) (D : DEnv) (bufs : Buffers)
-    (brancherEp : Endpoint) (senderRole : Role)
-    (branchOptions : List (String × LocalType)) (ℓ : String) (L : LocalType) (vs : List Value)
-    (hValid : ValidLabels G D bufs)
-    (hG : lookupG G brancherEp = some (.branch senderRole branchOptions))
-    (hFind : branchOptions.find? (fun b => b.1 == ℓ) = some (ℓ, L))
-    (hBufEq : lookupBuf bufs { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role } = .string ℓ :: vs) :
-    let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
-    ValidLabels (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail)
-               (updateBuf bufs branchEdge vs)
+               (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) := by
+  intro selectEdge e source bs hBranch
+  let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  by_cases hRecvEq : recvEp = selectorEp
+  · -- Receiver is the updated endpoint: original type is .select, so buffers must be empty.
+    have hNoSelf : targetRole ≠ selectorEp.role := by
+      intro hEq
+      subst hEq
+      obtain ⟨L', hConsume, hConsumeT⟩ := hRecvReady (.select selectorEp.role selectBranches) hG
+      cases hTrace : lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := selectorEp.role } with
+      | nil =>
+          rw [hTrace] at hConsume
+          simp only [Consume] at hConsume
+          have hL' : L' = .select selectorEp.role selectBranches := Option.some.inj hConsume.symm
+          rw [hL'] at hConsumeT
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeT
+          exact Bool.noConfusion hConsumeT
+      | cons t ts =>
+          rw [hTrace] at hConsume
+          simp only [Consume, consumeOne] at hConsume
+          exact Option.noConfusion hConsume
+    have hSelect : lookupG G recvEp = some (.select targetRole selectBranches) := by
+      simpa [hRecvEq] using hG
+    have hTraceEmpty : lookupD D e = [] :=
+      trace_empty_when_select_receiver (hCoh e) hSelect
+    have hBufEmpty : lookupBuf bufs e = [] := by
+      rcases hBT e with ⟨hLen, _⟩
+      cases hBuf : lookupBuf bufs e with
+      | nil => rfl
+      | cons v' vs =>
+          have hLen' : Nat.succ vs.length = 0 := by
+            simpa [hTraceEmpty, hBuf] using hLen
+          exact (False.elim (Nat.succ_ne_zero _ hLen'))
+    have hNe : e ≠ selectEdge := by
+      intro hEq
+      subst hEq
+      have hRecvRole : targetRole = selectorEp.role := by
+        have h' := congrArg Endpoint.role hRecvEq
+        simpa [recvEp] using h'
+      exact hNoSelf hRecvRole
+    have hBufEq :
+        lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e =
+          lookupBuf bufs e := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+    have hBuf' :
+        lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e = [] := by
+      simpa [hBufEq, hBufEmpty]
+    simp [hBuf']
+  · -- Receiver endpoint unchanged: use original ValidLabels and buffer update facts.
+    have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
+      have hBranch' := hBranch
+      rw [lookupG_update_neq G selectorEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      exact hBranch'
+    by_cases hEdge : e = selectEdge
+    · -- If receiver is branch at selectEdge, hRecvReady is inconsistent.
+      subst hEdge
+      obtain ⟨L', hConsume, hConsumeT⟩ := hRecvReady (.branch source bs) hBranchOld
+      cases hTrace : lookupD D selectEdge with
+      | nil =>
+          rw [hTrace] at hConsume
+          simp only [Consume] at hConsume
+          have hL' : L' = .branch source bs := Option.some.inj hConsume.symm
+          rw [hL'] at hConsumeT
+          simp only [Consume, consumeOne, Option.isSome] at hConsumeT
+          exact (False.elim (Bool.noConfusion hConsumeT))
+      | cons t ts =>
+          rw [hTrace] at hConsume
+          simp only [Consume, consumeOne] at hConsume
+          exact (False.elim (Option.noConfusion hConsume))
+    · -- Edge unaffected: buffer unchanged, use old ValidLabels.
+      have hBufEq :
+          lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e =
+            lookupBuf bufs e := by
+        exact lookupBuf_update_neq _ _ _ _ (Ne.symm hEdge)
+      have hValidOld := hValid e source bs hBranchOld
+      simpa [hBufEq] using hValidOld
 
 /-! ## Buffer Typing Preservation Helpers -/
+
+private theorem trace_empty_when_branch_receiver
+    {G : GEnv} {D : DEnv} {e : Edge}
+    {r : Role} {bs : List (String × LocalType)}
+    (hCoh : EdgeCoherent G D e)
+    (hBranch : lookupG G ⟨e.sid, e.receiver⟩ = some (.branch r bs)) :
+    lookupD D e = [] := by
+  simp only [EdgeCoherent] at hCoh
+  obtain ⟨Ls, _hLsender, hIsSome⟩ := hCoh (.branch r bs) hBranch
+  cases hTrace : lookupD D e with
+  | nil => rfl
+  | cons t ts =>
+      rw [hTrace] at hIsSome
+      simp only [Consume, consumeOne] at hIsSome
+      exact Bool.noConfusion hIsSome
+
+private theorem buffer_empty_of_typed_trace_empty
+    {G : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge}
+    (hBT : BuffersTyped G D bufs)
+    (hTrace : lookupD D e = []) :
+    lookupBuf bufs e = [] := by
+  rcases hBT e with ⟨hLen, _⟩
+  cases hBuf : lookupBuf bufs e with
+  | nil => rfl
+  | cons v vs =>
+      have hLen' : Nat.succ vs.length = 0 := by
+        simpa [hTrace, hBuf] using hLen
+      exact (False.elim (Nat.succ_ne_zero _ hLen'))
 
 private theorem HasTypeVal_updateG_weaken {G : GEnv} {ep : Endpoint} {Lnew : LocalType}
     {v : Value} {T : ValType} :
@@ -359,16 +521,105 @@ theorem BuffersTyped_branch_preserved
     BuffersTyped_updateG_weaken (e:=brancherEp) (L:=L) hBT'
   exact hBT''
 
+/-! ## ValidLabels Preservation (recv/branch) -/
+
+theorem ValidLabels_recv_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
+    (v : Value) (vs : List Value)
+    (hValid : ValidLabels G D bufs)
+    (hCoh : Coherent G D)
+    (hBT : BuffersTyped G D bufs)
+    (hBuf : lookupBuf bufs { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role } = v :: vs)
+    (hv : HasTypeVal G v T)
+    (hG : lookupG G receiverEp = some (.recv senderRole T L)) :
+    let recvEdge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
+    ValidLabels (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
+               (updateBuf bufs recvEdge vs) := by
+  intro recvEdge e source bs hBranch
+  let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hTypedEdge := hBT recvEdge
+  have hTrace : (lookupD D recvEdge).head? = some T :=
+    trace_head_from_buffer hBuf hv hTypedEdge
+  have hCoh' := Coherent_recv_preserved G D receiverEp senderRole T L hCoh hG hTrace
+  have hBT' :=
+    BuffersTyped_recv_preserved G D bufs receiverEp senderRole T L v vs hBT hBuf hv hG
+  by_cases hRecvEq : recvEp = receiverEp
+  · -- Receiver is the updated endpoint; if L is branch, traces must be empty.
+    have hTraceEmpty : lookupD (updateD D recvEdge (lookupD D recvEdge).tail) e = [] :=
+      trace_empty_when_branch_receiver (hCoh' e) hBranch
+    have hBufEmpty : lookupBuf (updateBuf bufs recvEdge vs) e = [] :=
+      buffer_empty_of_typed_trace_empty hBT' hTraceEmpty
+    simp [hBufEmpty]
+  · -- Receiver endpoint unchanged: use original ValidLabels.
+    have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
+      have hBranch' := hBranch
+      rw [lookupG_update_neq G receiverEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      exact hBranch'
+    have hNe : e ≠ recvEdge := by
+      intro hEq
+      apply hRecvEq
+      subst hEq
+      rfl
+    have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) e = lookupBuf bufs e := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+    have hValidOld := hValid e source bs hBranchOld
+    simpa [hBufEq] using hValidOld
+
+theorem ValidLabels_branch_preserved
+    (G : GEnv) (D : DEnv) (bufs : Buffers)
+    (brancherEp : Endpoint) (senderRole : Role)
+    (branchOptions : List (String × LocalType)) (ℓ : String) (L : LocalType) (vs : List Value)
+    (hValid : ValidLabels G D bufs)
+    (hCoh : Coherent G D)
+    (hBT : BuffersTyped G D bufs)
+    (hG : lookupG G brancherEp = some (.branch senderRole branchOptions))
+    (hFind : branchOptions.find? (fun b => b.1 == ℓ) = some (ℓ, L))
+    (hBufEq : lookupBuf bufs { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role } = .string ℓ :: vs) :
+    let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
+    ValidLabels (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail)
+               (updateBuf bufs branchEdge vs) := by
+  intro branchEdge e source bs hBranch
+  let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hv : HasTypeVal G (.string ℓ) .string := HasTypeVal.string ℓ
+  have hTypedEdge := hBT branchEdge
+  have hTrace : (lookupD D branchEdge).head? = some .string :=
+    trace_head_from_buffer hBufEq hv hTypedEdge
+  have hCoh' := Coherent_branch_preserved G D brancherEp senderRole branchOptions ℓ L hCoh hG hFind hTrace
+  have hBT' :=
+    BuffersTyped_branch_preserved G D bufs brancherEp senderRole branchOptions ℓ L vs hBT hBufEq hG hFind
+  by_cases hRecvEq : recvEp = brancherEp
+  · -- Receiver is the updated endpoint; if L is branch, traces must be empty.
+    have hTraceEmpty : lookupD (updateD D branchEdge (lookupD D branchEdge).tail) e = [] :=
+      trace_empty_when_branch_receiver (hCoh' e) hBranch
+    have hBufEmpty : lookupBuf (updateBuf bufs branchEdge vs) e = [] :=
+      buffer_empty_of_typed_trace_empty hBT' hTraceEmpty
+    simp [hBufEmpty]
+  · -- Receiver endpoint unchanged: use original ValidLabels.
+    have hBranchOld : lookupG G recvEp = some (.branch source bs) := by
+      have hBranch' := hBranch
+      rw [lookupG_update_neq G brancherEp recvEp L (Ne.symm hRecvEq)] at hBranch'
+      exact hBranch'
+    have hNe : e ≠ branchEdge := by
+      intro hEq
+      apply hRecvEq
+      subst hEq
+      rfl
+    have hBufEq' : lookupBuf (updateBuf bufs branchEdge vs) e = lookupBuf bufs e := by
+      exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
+    have hValidOld := hValid e source bs hBranchOld
+    simpa [hBufEq'] using hValidOld
+
 /-! ## Initialization Lemma -/
 
 /-- Empty environments are coherent. -/
-theorem Coherent_empty : Coherent [] Lean.RBMap.empty := by
-  intro e Lsender Lrecv hGsender hGrecv
+theorem Coherent_empty : Coherent [] (∅ : DEnv) := by
+  intro e Lrecv hGrecv
   -- lookupG [] _ = none for any endpoint
-  unfold lookupG at hGsender
-  simp only [List.lookup] at hGsender
-  -- hGsender : none = some Lsender is a contradiction
-  exact (Option.some_ne_none Lsender hGsender.symm).elim
+  unfold lookupG at hGrecv
+  simp only [List.lookup] at hGrecv
+  -- hGrecv : none = some Lrecv is a contradiction
+  exact (Option.some_ne_none Lrecv hGrecv.symm).elim
 
 /-- Initialize coherent environments for a new session with local types. -/
 def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType) :
@@ -379,10 +630,31 @@ def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → Local
   (G, D, bufs)
 
 /-- Initialized session environments are coherent (when types are projections). -/
-axiom initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType)
-    (hProj : True)  -- Placeholder for "localTypes are valid projections"
+theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType)
+    (_hProj : True)  -- Placeholder for "localTypes are valid projections"
+    (hSenders :
+      ∀ e Lrecv,
+        lookupG (roles.map fun r => ({ sid := sid, role := r }, localTypes r))
+          { sid := e.sid, role := e.receiver } = some Lrecv →
+        ∃ Lsender,
+          lookupG (roles.map fun r => ({ sid := sid, role := r }, localTypes r))
+            { sid := e.sid, role := e.sender } = some Lsender)
     : let (G, D, _) := initSession sid roles localTypes
-      Coherent G D
+      Coherent G D := by
+  -- Buffers/traces are initialized empty for all edges, so Consume always succeeds.
+  simp [initSession, Coherent, EdgeCoherent]
+  intro e Lrecv hGrecv
+  rcases hSenders e Lrecv hGrecv with ⟨Lsender, hGsender⟩
+  refine ⟨Lsender, hGsender, ?_⟩
+  -- All traces are empty in initDEnv.
+  have hTrace : lookupD (initDEnv sid roles) e = [] := by
+    by_cases hMem : e ∈ RoleSet.allEdges sid roles
+    · exact initDEnv_lookup_mem sid roles e hMem
+    · have hFind : (initDEnv sid roles).find? e = none :=
+        initDEnv_find?_none_of_notin sid roles e hMem
+      simp [lookupD, hFind]
+  -- Consume with empty trace always succeeds.
+  simp [hTrace, Consume]
 
 
 end

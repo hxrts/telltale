@@ -1,7 +1,5 @@
 import Effects.LocalType
 import Effects.Values
-import Lean.Data.RBMap
-import Batteries.Data.RBMap.Lemmas
 
 /-!
 # MPST Environments
@@ -50,22 +48,30 @@ def updateStr (store : Store) (x : Var) (v : Value) : Store :=
 
 /-! ## SEnv: Variable → ValType -/
 
-open Lean
+open Batteries
 
-/-- SEnv maps variables to their value types (permutation-invariant). -/
-abbrev SEnv := RBMap Var ValType compare
+/-- SEnv maps variables to their value types (extensional). -/
+abbrev SEnv := Var → Option ValType
 
 /-- Lookup a type in SEnv. -/
 def lookupSEnv (env : SEnv) (x : Var) : Option ValType :=
-  env.find? x
+  env x
 
 /-- Update or insert in SEnv. -/
 def updateSEnv (env : SEnv) (x : Var) (T : ValType) : SEnv :=
-  env.insert x T
+  fun y => if y = x then some T else env y
+
+instance : EmptyCollection SEnv := ⟨fun _ => none⟩
+
+@[simp] theorem lookupSEnv_empty (x : Var) : lookupSEnv (∅ : SEnv) x = none := by
+  rfl
 
 /-- Union of SEnvs (left-biased on key collisions). -/
 def SEnvUnion (S₁ S₂ : SEnv) : SEnv :=
-  RBMap.mergeBy (fun _ v₁ _ => v₁) S₁ S₂
+  fun x =>
+    match S₁ x with
+    | some T => some T
+    | none => S₂ x
 
 instance : Append SEnv := ⟨SEnvUnion⟩
 
@@ -119,23 +125,46 @@ def dequeueBuf (bufs : Buffers) (e : Edge) : Option (Buffers × Value) :=
 
 /-! ## DEnv: Directed Edge → Type Trace -/
 
-/-- DEnv maps directed edges to their in-flight type traces
-    (permutation-invariant). -/
-abbrev DEnv := RBMap Edge (List ValType) compare
+/-! ## DEnv: Directed Edge → Type Trace -/
+
+/-- DEnv maps directed edges to their in-flight type traces (extensional). -/
+abbrev DEnv := Edge → Option (List ValType)
+
+/-- Lookup helper (dot notation). -/
+def DEnv.find? (env : DEnv) (e : Edge) : Option (List ValType) :=
+  env e
+
+instance : EmptyCollection DEnv := ⟨fun _ => none⟩
 
 /-- Union of DEnvs (left-biased on key collisions). -/
 def DEnvUnion (D₁ D₂ : DEnv) : DEnv :=
-  RBMap.mergeBy (fun _ v₁ _ => v₁) D₁ D₂
+  fun e =>
+    match D₁ e with
+    | some ts => some ts
+    | none => D₂ e
 
 instance : Append DEnv := ⟨DEnvUnion⟩
 
 /-- Lookup a type trace for a directed edge. -/
 def lookupD (env : DEnv) (e : Edge) : List ValType :=
-  env.findD e []
+  (env e).getD []
 
 /-- Update or insert a type trace for a directed edge. -/
 def updateD (env : DEnv) (e : Edge) (ts : List ValType) : DEnv :=
-  env.insert e ts
+  fun e' => if e' = e then some ts else env e'
+
+/-- Lookup after update on the same edge. -/
+theorem lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
+    lookupD (updateD env e ts) e = ts := by
+  simp [lookupD, updateD]
+
+/-- Lookup after update on a different edge. -/
+theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+    lookupD (updateD env e ts) e' = lookupD env e' := by
+  simp [lookupD, updateD, hne]
+
+@[simp] theorem lookupD_empty (e : Edge) : lookupD (∅ : DEnv) e = [] := by
+  rfl
 
 /-- Append a type to the in-flight trace. -/
 def appendD (env : DEnv) (e : Edge) (T : ValType) : DEnv :=
@@ -155,12 +184,11 @@ def initBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
 
 /-- Initialize empty type traces for all directed edges. -/
 def initDEnv (sid : SessionId) (roles : RoleSet) : DEnv :=
-  (RoleSet.allEdges sid roles).foldl (fun env e => env.insert e []) RBMap.empty
+  fun e => if e ∈ RoleSet.allEdges sid roles then some [] else none
 
 /-- Empty DEnv lookup via `find?` always returns none. -/
 @[simp] theorem DEnv_find?_empty (e : Edge) :
-    (RBMap.empty : DEnv).find? e = none := by
-  -- Unfold `find?` on the empty map.
+    (∅ : DEnv).find? e = none := by
   rfl
 
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
@@ -187,14 +215,19 @@ theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
         exact ih hTl
 
 /-- Looking up an edge in initDEnv returns empty if edge is in allEdges. -/
-axiom initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
-    (hMem : e ∈ RoleSet.allEdges sid roles) :
-    lookupD (initDEnv sid roles) e = []
+theorem initDEnv_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (_hMem : e ∈ RoleSet.allEdges sid roles) :
+    lookupD (initDEnv sid roles) e = [] := by
+  simp [initDEnv, lookupD, _hMem]
 
 /-- Looking up an edge with a different sid in initDEnv returns none. -/
-axiom initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
-    (hne : e.sid ≠ sid) :
-    lookupD (initDEnv sid roles) e = []
+theorem initDEnv_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
+    (_hne : e.sid ≠ sid) :
+    lookupD (initDEnv sid roles) e = [] := by
+  have hNot : e ∉ RoleSet.allEdges sid roles := by
+    intro hmem
+    exact _hne (RoleSet.allEdges_sid sid roles e hmem)
+  simp [initDEnv, lookupD, hNot]
 
 /-- If initBuffers returns none, the edge is not in the role edges. -/
 theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
@@ -206,9 +239,21 @@ theorem initBuffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) (
   exact Option.noConfusion (hSome.symm.trans h)
 
 /-- initBuffers returns none for edges not in allEdges. -/
-axiom initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
+theorem initBuffers_lookup_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hNot : e ∉ RoleSet.allEdges sid roles) :
-    (initBuffers sid roles).lookup e = none
+    (initBuffers sid roles).lookup e = none := by
+  simp only [initBuffers]
+  generalize hEdges : RoleSet.allEdges sid roles = edges at hNot
+  clear hEdges
+  induction edges with
+  | nil =>
+      simp
+  | cons hd tl ih =>
+      simp only [List.mem_cons, not_or] at hNot
+      simp only [List.map, List.lookup]
+      have hne : (e == hd) = false := beq_eq_false_iff_ne.mpr hNot.1
+      simp only [hne]
+      exact ih hNot.2
 
 /-- Looking up an edge with a different sid in initBuffers returns none. -/
 theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
@@ -232,19 +277,11 @@ theorem initBuffers_lookup_none (sid : SessionId) (roles : RoleSet) (e : Edge)
     simp only [hBeqFalse]
     exact ih hNotIn.2
 
-/-! ## initDEnv `find?` Helpers -/
-
-axiom foldl_insert_find?_eq (edges : List Edge) (e : Edge) (env : DEnv)
-    (hNot : e ∉ edges) :
-    (edges.foldl (fun env' e' => env'.insert e' []) env).find? e = env.find? e
-
 /-- initDEnv has no entry for edges outside allEdges. -/
 theorem initDEnv_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Edge)
     (hNot : e ∉ RoleSet.allEdges sid roles) :
     (initDEnv sid roles).find? e = none := by
-  -- Reduce to the fold lemma with the empty map.
-  have hFold := foldl_insert_find?_eq (RoleSet.allEdges sid roles) e (RBMap.empty) hNot
-  simpa [initDEnv] using hFold
+  simp [initDEnv, hNot]
 
 /-! ## Environment Lemmas -/
 
@@ -284,11 +321,13 @@ theorem lookupStr_update_neq (store : Store) (x y : Var) (v : Value) (hne : x �
         simp only [hne']
         exact ih
 
-axiom lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
-    lookupSEnv (updateSEnv env x T) x = some T
+theorem lookupSEnv_update_eq (env : SEnv) (x : Var) (T : ValType) :
+    lookupSEnv (updateSEnv env x T) x = some T := by
+  simp [lookupSEnv, updateSEnv]
 
-axiom lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
-    lookupSEnv (updateSEnv env x T) y = lookupSEnv env y
+theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x ≠ y) :
+    lookupSEnv (updateSEnv env x T) y = lookupSEnv env y := by
+  simp [lookupSEnv, updateSEnv, hne]
 
 theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by
@@ -440,13 +479,7 @@ theorem lookupBuf_update_neq (bufs : Buffers) (e e' : Edge) (buf : Buffer) (hne 
         simp only [lookupBuf, Option.getD] at ih'
         exact ih'
 
-axiom lookupD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
-    lookupD (updateD env e ts) e = ts
-
-axiom lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
-    lookupD (updateD env e ts) e' = lookupD env e'
-
-@[simp] axiom lookupD_empty (e : Edge) : lookupD (RBMap.empty) e = []
+-- lookupD lemmas are defined above near DEnv.
 
 
 end

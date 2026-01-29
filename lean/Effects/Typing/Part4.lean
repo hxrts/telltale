@@ -145,11 +145,24 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
   | par_skip_right =>
       simp
 
-axiom lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
+theorem lookupD_none_of_disjointG {G₁ G₂ : GEnv} {D₂ : DEnv} {e : Edge} :
     DisjointG G₁ G₂ →
     DConsistent G₂ D₂ →
     e.sid ∈ SessionsOf G₁ →
-    D₂.find? e = none
+    D₂.find? e = none := by
+  intro hDisj hCons hIn1
+  by_contra hSome
+  cases hFind : D₂.find? e with
+  | none =>
+      exact (hSome hFind)
+  | some ts =>
+      have hSid : e.sid ∈ SessionsOfD D₂ := ⟨e, ts, hFind, rfl⟩
+      have hSid2 : e.sid ∈ SessionsOf G₂ := hCons hSid
+      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn1, hSid2⟩
+      have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
+      have : e.sid ∈ (∅ : Set SessionId) := by
+        simpa [hEmpty] using hInter
+      exact this.elim
 
 /-- Coherence splits to the right portion of G/D when sessions are disjoint. -/
 theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
@@ -157,9 +170,9 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     DisjointG G₁ G₂ →
     DConsistent G₁ D₁ →
     Coherent G₂ D₂ := by
-  intro hCoh hDisj hCons e Lsender Lrecv hGsender hGrecv
+  intro hCoh hDisj hCons e Lrecv hGrecv
   -- endpoints are in G₂; ensure G₁ has none for this session
-  have hSid : e.sid ∈ SessionsOf G₂ := ⟨{ sid := e.sid, role := e.sender }, Lsender, hGsender, rfl⟩
+  have hSid : e.sid ∈ SessionsOf G₂ := ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hGrecv, rfl⟩
   have hG1none_sender : lookupG G₁ { sid := e.sid, role := e.sender } = none := by
     apply lookupG_none_of_not_session
     intro hIn
@@ -176,8 +189,6 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     have hContra : e.sid ∈ (∅ : Set SessionId) := by
       simpa [hEmpty] using hInter
     exact hContra.elim
-  have hGsender' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender := by
-    simpa [lookupG_append_right hG1none_sender] using hGsender
   have hGrecv' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv := by
     simpa [lookupG_append_right hG1none_recv] using hGrecv
   -- D₁ has no entries for this session
@@ -190,8 +201,13 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) hDisjSym hCons hSid
   have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
     lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
-  have hCohEdge := hCoh e Lsender Lrecv hGsender' hGrecv'
-  simpa [hTraceEq] using hCohEdge
+  have hCohEdge := hCoh e Lrecv hGrecv'
+  rcases hCohEdge with ⟨Lsender, hGsenderMerged, hConsume⟩
+  have hSenderEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none_sender
+  have hGsenderG2 : lookupG G₂ { sid := e.sid, role := e.sender } = some Lsender := by
+    simpa [hSenderEq] using hGsenderMerged
+  refine ⟨Lsender, hGsenderG2, ?_⟩
+  simpa [hTraceEq] using hConsume
 
 /-- HasTypeVal weakening: values typed in empty environment are typed in any environment. -/
 theorem HasTypeVal_weaken {v : Value} {T : ValType} {G : GEnv} :

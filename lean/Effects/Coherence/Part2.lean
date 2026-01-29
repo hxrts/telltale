@@ -57,28 +57,36 @@ def EdgeCoherent (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
   let senderEp := { sid := e.sid, role := e.sender : Endpoint }
   let receiverEp := { sid := e.sid, role := e.receiver : Endpoint }
   let trace := lookupD D e
-  ∀ Lsender Lrecv,
-    lookupG G senderEp = some Lsender →
+  ∀ Lrecv,
     lookupG G receiverEp = some Lrecv →
-    -- After consuming what sender has sent (tracked in D[sender,receiver])
-    -- from receiver's perspective, receiver can handle it
-    (Consume e.sender Lrecv trace).isSome
+    ∃ Lsender,
+      lookupG G senderEp = some Lsender ∧
+      -- After consuming what sender has sent (tracked in D[sender,receiver])
+      -- from receiver's perspective, receiver can handle it
+      (Consume e.sender Lrecv trace).isSome
 
 /-- Full coherence: edge-coherent for all edges in all sessions. -/
 def Coherent (G : GEnv) (D : DEnv) : Prop :=
   ∀ e, EdgeCoherent G D e
 
-/-! ## Endpoint Completeness (Assumption)
+/-! ### Small Helpers -/
 
-Coherence alone does not guarantee that both endpoints of an arbitrary edge
-exist in G. Several trace-emptiness lemmas require the sender endpoint to exist.
-We assume this completeness property for now and discharge it later when the
-protocol representation guarantees it. -/
+/-- Extract the consume condition from `EdgeCoherent` given a receiver lookup. -/
+theorem EdgeCoherent_consume_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+    (hCoh : EdgeCoherent G D e)
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
+    (Consume e.sender Lrecv (lookupD D e)).isSome := by
+  rcases hCoh Lrecv hGrecv with ⟨_, _, hConsume⟩
+  exact hConsume
 
-axiom sender_exists_of_receiver
-    {G : GEnv} {e : Edge} {Lrecv : LocalType} :
-    lookupG G ⟨e.sid, e.receiver⟩ = some Lrecv →
-    ∃ Lsender, lookupG G ⟨e.sid, e.sender⟩ = some Lsender
+/-- Extract the sender lookup guaranteed by `EdgeCoherent` given a receiver lookup. -/
+theorem EdgeCoherent_sender_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+    (hCoh : EdgeCoherent G D e)
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
+    ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender := by
+  rcases hCoh Lrecv hGrecv with ⟨Lsender, hGsender, _⟩
+  exact ⟨Lsender, hGsender⟩
+
 
 /-! ## Key Lemmas: EdgeCoherent Forces Empty Trace
 
@@ -97,8 +105,7 @@ theorem trace_empty_when_send_receiver
     (hSend : lookupG G ⟨e.sid, e.receiver⟩ = some (.send r T L)) :
     lookupD D e = [] := by
   simp only [EdgeCoherent] at hCoh
-  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.send r T L) hSend
-  have hIsSome := hCoh Ls (.send r T L) hLsender hSend
+  obtain ⟨Ls, hLsender, hIsSome⟩ := hCoh (.send r T L) hSend
   have h : (Consume e.sender (.send r T L) (lookupD D e)).isSome := hIsSome
   cases hTrace : lookupD D e with
   | nil => rfl
@@ -115,8 +122,7 @@ theorem trace_empty_when_select_receiver
     (hSelect : lookupG G ⟨e.sid, e.receiver⟩ = some (.select r bs)) :
     lookupD D e = [] := by
   simp only [EdgeCoherent] at hCoh
-  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.select r bs) hSelect
-  have hIsSome := hCoh Ls (.select r bs) hLsender hSelect
+  obtain ⟨Ls, hLsender, hIsSome⟩ := hCoh (.select r bs) hSelect
   cases hTrace : lookupD D e with
   | nil => rfl
   | cons t ts =>
@@ -141,11 +147,9 @@ theorem trace_empty_when_recv_other_sender
     (hRecv : lookupG G ⟨e.sid, e.receiver⟩ = some (.recv r T L))
     (hNe : e.sender ≠ r) :
     lookupD D e = [] := by
-  -- EdgeCoherent gives us: for any Lsender, (Consume e.sender (.recv r T L) trace).isSome
+  -- EdgeCoherent gives us a sender witness and that (Consume e.sender (.recv r T L) trace).isSome.
   simp only [EdgeCoherent] at hCoh
-  -- We need to construct some Lsender; use .end_ as a dummy (sender type doesn't matter for Consume)
-  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.recv r T L) hRecv
-  have hIsSome := hCoh Ls (.recv r T L) hLsender hRecv
+  obtain ⟨Ls, hLsender, hIsSome⟩ := hCoh (.recv r T L) hRecv
   -- hIsSome : (Consume e.sender (.recv r T L) (lookupD D e)).isSome
   -- From Consume_other_empty, if trace is non-empty, Consume returns none
   cases hTrace : lookupD D e with
@@ -167,8 +171,7 @@ theorem trace_empty_when_branch_other_sender
     (hNe : e.sender ≠ r) :
     lookupD D e = [] := by
   simp only [EdgeCoherent] at hCoh
-  obtain ⟨Ls, hLsender⟩ := sender_exists_of_receiver (G:=G) (e:=e) (Lrecv:=.branch r bs) hBranch
-  have hIsSome := hCoh Ls (.branch r bs) hLsender hBranch
+  obtain ⟨Ls, hLsender, hIsSome⟩ := hCoh (.branch r bs) hBranch
   cases hTrace : lookupD D e with
   | nil => rfl
   | cons t ts =>
