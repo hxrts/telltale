@@ -44,6 +44,7 @@
           gawk
           gnused
           elan
+          python3
         ];
 
         buildInputs =
