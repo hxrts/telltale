@@ -16,6 +16,8 @@ The following definitions form the semantic interface for proofs:
 - `projEnv`
 - `EnvStep`
 - `WellFormedEnv`
+- `MsgQueue`
+- `Channel`
 - `EnvConfig`
 - `EnvAction`
 - `EnvConfigStep`

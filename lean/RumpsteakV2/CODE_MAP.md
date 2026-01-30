@@ -1,6 +1,6 @@
 # CODE_MAP.md — RumpsteakV2 Lean Verification
 
-**176 files | 40,470 lines | 0 axioms | 0 sorries — fully verified**
+**175 files | 40,834 lines | 0 axioms | 0 sorries — fully verified**
 
 Last updated: 2026-01-29
 
@@ -334,7 +334,6 @@ Bridging inductive `LocalTypeR` and coinductive `LocalTypeC`. Five parts plus `G
 | `WellFormed.lean` | Well-formedness for coinductive types |
 | `BisimHelpers.lean` | Bisimulation helper lemmas |
 | `RoundtripHelpers.lean` | Round-trip helper lemmas |
-| `RoundtripWIP.lean` | Additional round-trip results |
 | `Dual.lean` | Duality for coinductive types |
 | `ProjectC.lean` | Projection for coinductive types |
 

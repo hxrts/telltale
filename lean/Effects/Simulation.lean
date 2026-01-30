@@ -65,12 +65,12 @@ def stepBaseDecide (C : Config) : Option Config :=
     | some (.chan e) =>
       -- Get source role from type
       match lookupG C.G e with
-      | some (.recv source T L) =>
-        match lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
-        | v :: _ =>
-          some (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L)
-        | [] => none  -- Buffer empty, blocked
-      | _ => none
+      | some (.recv source _ L) =>
+          match lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } with
+          | v :: _ =>
+            some (recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L)
+          | [] => none  -- Buffer empty, blocked
+        | _ => none
     | _ => none
 
   | .select k ℓ =>
@@ -140,12 +140,12 @@ private def procSize : Process → Nat
 private lemma procSize_lt_seq_left (P Q : Process) : procSize P < procSize (.seq P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
-  simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+  simp [procSize, Nat.add_assoc]
 
 private lemma procSize_lt_par_left (P Q : Process) : procSize P < procSize (.par P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
-  simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+  simp [procSize, Nat.add_assoc]
 
 private lemma procSize_lt_par_right (P Q : Process) : procSize Q < procSize (.par P Q) := by
   have hpos : 0 < procSize P + 1 := Nat.succ_pos _
@@ -259,9 +259,9 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
       case some v =>
         cases v with
         | chan e =>
-          cases hX : lookupStr C.store x <;> simp [stepBaseDecide, hProc, hK, hX] at h
+          cases hX : lookupStr C.store x <;> simp [hX] at h
           case some v =>
-            cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hX, hG] at h
+            cases hG : lookupG C.G e <;> simp [hG] at h
             case some lt =>
               cases lt with
               | send target T L =>
@@ -270,20 +270,20 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                 subst hC'
                 exact StepBase.send hProc hK hX hG
               | _ =>
-                simp [stepBaseDecide, hProc, hK, hX, hG] at h
+                simp at h
         | _ =>
-          simp [stepBaseDecide, hProc, hK] at h
+          simp at h
   | recv k x =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
         cases v with
         | chan e =>
-          cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hG] at h
+          cases hG : lookupG C.G e <;> simp [hG] at h
           case some lt =>
             cases lt with
             | recv source T L =>
               cases hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
-                simp [stepBaseDecide, hProc, hK, hG, hBuf] at h
+                simp [hBuf] at h
               case cons v vs =>
                 have hC' :
                     C' = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L := by
@@ -291,20 +291,20 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                 subst hC'
                 exact StepBase.recv hProc hK hG hBuf
             | _ =>
-              simp [stepBaseDecide, hProc, hK, hG] at h
+              simp at h
         | _ =>
-          simp [stepBaseDecide, hProc, hK] at h
+          simp at h
   | select k ℓ =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
         cases v with
         | chan e =>
-          cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hG] at h
+          cases hG : lookupG C.G e <;> simp [hG] at h
           case some lt =>
             cases lt with
             | select target branches =>
               cases hFind : branches.find? (fun b => b.1 == ℓ) <;>
-                simp [stepBaseDecide, hProc, hK, hG, hFind] at h
+                simp [hFind] at h
               case some pair =>
                 cases pair with
                 | mk lbl L =>
@@ -318,35 +318,35 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                   subst hC'
                   exact StepBase.select hProc hK hG hFind'
             | _ =>
-              simp [stepBaseDecide, hProc, hK, hG] at h
+              simp at h
         | _ =>
-          simp [stepBaseDecide, hProc, hK] at h
+          simp at h
   | branch k procBranches =>
       cases hK : lookupStr C.store k <;> simp [stepBaseDecide, hProc, hK] at h
       case some v =>
         cases v with
         | chan e =>
-          cases hG : lookupG C.G e <;> simp [stepBaseDecide, hProc, hK, hG] at h
+          cases hG : lookupG C.G e <;> simp [hG] at h
           case some lt =>
             cases lt with
             | branch source typeBranches =>
               cases hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
-                simp [stepBaseDecide, hProc, hK, hG, hBuf] at h
+                simp [hBuf] at h
               case cons v vs =>
                 cases v with
                 | string ℓ =>
                   cases hFindP : procBranches.find? (fun b => b.1 == ℓ) <;>
-                    simp [stepBaseDecide, hProc, hK, hG, hBuf, hFindP] at h
+                    simp [hFindP] at h
                   case some pairP =>
                     cases pairP with
                     | mk lblP P =>
                       cases hFindT : typeBranches.find? (fun b => b.1 == ℓ) <;>
-                        simp [stepBaseDecide, hProc, hK, hG, hBuf, hFindP, hFindT] at h
+                        simp [hFindT] at h
                       case some pairT =>
                         cases pairT with
                         | mk lblT L =>
                           cases hDeq : dequeueBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } <;>
-                            simp [stepBaseDecide, hProc, hK, hG, hBuf, hFindP, hFindT, hDeq] at h
+                            simp [hDeq] at h
                           case some pairDeq =>
                             cases pairDeq with
                             | mk bufs' ts =>
@@ -370,11 +370,11 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
                               subst hC'
                               exact StepBase.branch hProc hK hG hBuf hFindP' hFindT' hDeq
                 | _ =>
-                  simp [stepBaseDecide, hProc, hK, hG, hBuf] at h
+                  simp at h
             | _ =>
-              simp [stepBaseDecide, hProc, hK, hG] at h
+              simp at h
         | _ =>
-          simp [stepBaseDecide, hProc, hK] at h
+          simp at h
   | newSession roles f P =>
       have hC' : C' = { (newSessionStep C roles f) with proc := P } := by
         simpa [stepBaseDecide, hProc] using h.symm
@@ -422,7 +422,9 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
   cases hProc : C.proc with
   | skip =>
       have : False := by
-        simpa [stepDecide, stepDecideAux, hProc] using hstep
+        have hnone : stepDecide C = none := by
+          simp [stepDecide, stepDecideAux, hProc]
+        cases hstep.symm.trans hnone
       exact this.elim
   | seq P Q =>
       by_cases hPskip : P = .skip
@@ -436,7 +438,9 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
             have hsub' : stepDecideAux P { C with proc := P } = none := by
               simpa [stepDecide] using hsub
             have : False := by
-              simpa [stepDecide, stepDecideAux, hProc, hPskip, hsub'] using hstep
+              have hnone : stepDecide C = none := by
+                simp [stepDecide, stepDecideAux, hProc, hPskip, hsub']
+              cases hstep.symm.trans hnone
             exact this.elim
         | some C0 =>
             have hsub' : stepDecideAux P { C with proc := P } = some C0 := by
@@ -493,7 +497,9 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
                   have hsubR' : stepDecideAux Q { C with proc := Q } = none := by
                     simpa [stepDecide] using hsubR
                   have : False := by
-                    simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR'] using hstep
+                    have hnone : stepDecide C = none := by
+                      simp [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR']
+                    cases hstep.symm.trans hnone
                   exact this.elim
   | send k x =>
       have hBase : stepBaseDecide C = some C' := by
@@ -521,8 +527,8 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
       exact Step.base (stepBaseDecide_sound hBase)
 
 /-- If Step holds for decidable cases, stepDecide returns some (completeness for decidable subset). -/
-theorem stepDecide_complete_base {C C' : Config} (h : StepBase C C')
-    (hDec : stepBaseDecide C = some C') :
+theorem stepDecide_complete_base {C C' : Config} (_ : StepBase C C')
+    (_ : stepBaseDecide C = some C') :
     True := by
   trivial
 

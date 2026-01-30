@@ -103,9 +103,6 @@ macro_rules (kind := vec_notation)
   | `(![$x])            => `(Vec.append1 Vec.nil $x)
   | `(![$xs,*, $x])     => `(Vec.append1 ![$xs,*] $x)
 
-#check TypeVec
-#check MvFunctor
-
 def ITreeTypeVec (n : Nat) := PFin2 n → Type u
 
 def ITreeTypeVec.Arrow {n : Nat} (α β : ITreeTypeVec.{u} n) : Type u := ∀ i : PFin2.{u} n, α i → β i
@@ -271,13 +268,3 @@ def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
   simp [unbox_Prj, box_Prj]) (by
   exact?)
 
-#check P_Prj
-
-#check box_Prj
-#check unbox_Prj
-#check instMvQPF_Prj
-
-#print P_Prj
-#print box_Prj
-#print unbox_Prj
-#print instMvQPF_Prj

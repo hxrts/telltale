@@ -24,10 +24,10 @@ This document provides a comprehensive map of the Effects directory -- a formal 
 
 **Directory Statistics:**
 - Total files: 43 .lean files
-- Total size: 19,953 lines of Lean code
+- Total size: 17,019 lines of Lean code
 - Axioms: 0
 - Sorries: 0
-- Largest file: Typing/Part6.lean (3,486 lines)
+- Largest file: Typing/Part6.lean (2,128 lines)
 
 **Key Research Contributions:**
 1. **Async buffered communication** as first-class with explicit FIFO buffers
@@ -198,7 +198,7 @@ def renameEndpoint / renameEdge / renameGEnv / renameDEnv / renameBufs
 ---
 
 ### Typing (Part1-Part7)
-**Location:** Re-exported via `Effects/Typing.lean`. Split across Part1 (649 lines), Part2 (567 lines), Part3a (934 lines), Part3b, Part4 (474 lines), Part5 (1,265 lines), Part6 (3,486 lines), Part7 (475 lines).
+**Location:** Re-exported via `Effects/Typing.lean`. Split across Part1 (649 lines), Part2 (567 lines), Part3a (934 lines), Part3b, Part4 (474 lines), Part5 (1,265 lines), Part6 (2,128 lines), Part7 (475 lines).
 
 **Part1 -- Disjointness and Splitting:**
 ```lean
@@ -233,7 +233,7 @@ Inversion lemmas for each process construct.
 **Part5 -- Frame Lemmas:**
 `HasTypeProcPreOut` frame properties (proved; no axioms).
 
-**Part6 -- Preservation Sub-Lemmas (3,486 lines):**
+**Part6 -- Preservation Sub-Lemmas (2,128 lines):**
 The largest file. Contains `Compatible` and preservation sub-lemmas for each step kind.
 
 **Part7 -- Coherence-Typing Integration:**

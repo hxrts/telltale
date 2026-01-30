@@ -417,6 +417,45 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
           have htl : l₁ = l₂ := ih (h₁ := h₁'.2) (h₂ := h₂'.2) h₁₂' h₂₁'
           simp [htl]
 
+/-- Two DEnvs with identical find? are equal. -/
+theorem DEnv_eq_of_find?_eq {D₁ D₂ : DEnv}
+    (h : ∀ e, D₁.find? e = D₂.find? e) : D₁ = D₂ := by
+  have hlist : D₁.list = D₂.list := by
+    apply list_eq_of_subset_pairwise (h₁:=D₁.sorted) (h₂:=D₂.sorted)
+    · intro p hp
+      have hlookup : D₁.list.lookup p.1 = some p.2 :=
+        lookup_eq_some_of_mem_pairwise (h:=D₁.sorted) hp
+      have hfind : D₁.find? p.1 = some p.2 := by
+        have hEq := DEnv_find?_eq_lookup (env:=D₁) (e:=p.1)
+        simpa [hEq] using hlookup
+      have hfind' : D₂.find? p.1 = some p.2 := by
+        simpa [h p.1] using hfind
+      have hlookup' : D₂.list.lookup p.1 = some p.2 := by
+        have hEq := DEnv_find?_eq_lookup (env:=D₂) (e:=p.1)
+        simpa [hEq] using hfind'
+      exact lookup_mem hlookup'
+    · intro p hp
+      have hlookup : D₂.list.lookup p.1 = some p.2 :=
+        lookup_eq_some_of_mem_pairwise (h:=D₂.sorted) hp
+      have hfind : D₂.find? p.1 = some p.2 := by
+        have hEq := DEnv_find?_eq_lookup (env:=D₂) (e:=p.1)
+        simpa [hEq] using hlookup
+      have hfind' : D₁.find? p.1 = some p.2 := by
+        have hEq := h p.1
+        simpa [hEq] using hfind
+      have hlookup' : D₁.list.lookup p.1 = some p.2 := by
+        have hEq := DEnv_find?_eq_lookup (env:=D₁) (e:=p.1)
+        simpa [hEq] using hfind'
+      exact lookup_mem hlookup'
+  cases D₁ with
+  | mk l₁ m₁ h₁ s₁ =>
+      cases D₂ with
+      | mk l₂ m₂ h₂ s₂ =>
+          cases hlist
+          have hmap : m₁ = m₂ := by rw [h₁, h₂]
+          cases hmap
+          rfl
+
 /-- Union of DEnvs (left-biased on key collisions). -/
 def DEnvUnion (D₁ D₂ : DEnv) : DEnv :=
   DEnv.ofMap <|
@@ -517,6 +556,71 @@ def initDEnv (_sid : SessionId) (_roles : RoleSet) : DEnv :=
 @[simp] theorem DEnv_find?_empty (e : Edge) :
     (∅ : DEnv).find? e = none := by
   simp [DEnv.find?, DEnv_map_find?_empty]
+
+theorem DEnvUnion_empty_right (D : DEnv) : DEnvUnion D (∅ : DEnv) = D := by
+  apply DEnv_eq_of_find?_eq
+  intro e
+  simp only [DEnvUnion, DEnv_find?_ofMap]
+  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  have : (∅ : DEnv).map.toList = [] := rfl
+  rw [this, List.foldl_nil]
+  simp [DEnv.find?]
+
+theorem DEnvUnion_empty_left (D : DEnv) : DEnvUnion (∅ : DEnv) D = D := by
+  apply DEnv_eq_of_find?_eq
+  intro e
+  -- (DEnvUnion ∅ D).find? e = D.find? e
+  -- DEnvUnion folds D.map into (∅).map with conditional insert.
+  -- Starting from empty, every key is new, so all inserts happen.
+  -- The result has the same find? as D.map.
+  simp only [DEnvUnion, DEnv_find?_ofMap]
+  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  -- Goal: (DEnv.ofMap (D.map.toList.foldl f (∅).map)).find? e = D.find? e
+  -- where f is the conditional insert.
+  -- Suffices to show the foldl equals rbmapOfList D.map.toList
+  suffices hFold :
+    D.map.toList.foldl (fun acc (p : Edge × Trace) =>
+      match acc.find? p.1 with
+      | some _ => acc
+      | none => acc.insert p.1 p.2) (∅ : DEnv).map =
+    rbmapOfList D.map.toList by
+    rw [hFold]
+    exact rbmapOfList_toList_find? D.map e
+  -- Since we start from empty, acc.find? is always none for unseen keys.
+  -- With unique keys (from sorted), every key is unseen.
+  have hSorted : D.map.toList.Pairwise edgeCmpLT := by
+    simpa [edgeCmpLT] using RBMap.toList_sorted (t := D.map)
+  unfold rbmapOfList
+  generalize D.map.toList = pairs at hSorted
+  suffices h : ∀ (acc : RBMap Edge Trace compare) (ps : List (Edge × Trace)),
+    ps.Pairwise edgeCmpLT →
+    (∀ p ∈ ps, acc.find? p.1 = none) →
+    ps.foldl (fun acc (p : Edge × Trace) =>
+      match acc.find? p.1 with
+      | some _ => acc
+      | none => acc.insert p.1 p.2) acc =
+    ps.foldl (fun r (p : Edge × Trace) => r.insert p.1 p.2) acc from
+    h _ pairs hSorted (fun p _ => rbmap_find?_empty p.1)
+  intro acc ps hPW
+  induction ps generalizing acc with
+  | nil => intro _; rfl
+  | cons p ps ih =>
+    intro hNone
+    simp only [List.foldl_cons]
+    have hNoneP := hNone p (by simp)
+    rw [hNoneP]
+    have hPW' := (List.pairwise_cons.1 hPW)
+    refine ih (acc := acc.insert p.1 p.2) hPW'.2 ?_
+    intro q hq
+    have hNoneQ := hNone q (List.mem_cons_of_mem p hq)
+    have hLT := hPW'.1 q hq
+    have hCmpLT := edgeCmpLT_eq_lt hLT
+    have hNe : compare q.1 p.1 ≠ .eq := by
+      intro heq
+      have := Std.OrientedCmp.eq_swap (cmp := compare) (a := q.1) (b := p.1)
+      simp [heq, hCmpLT] at this
+    have := RBMap.find?_insert_of_ne (t := acc) (k := p.1) (v := p.2) (k' := q.1) hNe
+    simpa [this] using hNoneQ
 
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
 theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)

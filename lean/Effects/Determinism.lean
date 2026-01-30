@@ -40,7 +40,7 @@ This ensures that a given label uniquely determines the continuation.
 /-- Check if all branch labels in a list are unique. -/
 def uniqueBranchLabelsList : List (Label × LocalType) → Bool
   | [] => true
-  | (lbl, cont) :: rest =>
+  | (lbl, _) :: rest =>
       !(rest.map Prod.fst).contains lbl &&
       uniqueBranchLabelsList rest
 
@@ -105,12 +105,12 @@ same edge with the same value), the result is unique.
 -/
 theorem stepBase_det_send {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role}
     {T : ValType} {L : LocalType}
-    (hProc : C.proc = .send k x)
-    (hk : lookupStr C.store k = some (.chan e))
-    (hx : lookupStr C.store x = some v)
-    (hG : lookupG C.G e = some (.send target T L))
-    (h₁ : StepBase C C₁)
-    (h₂ : StepBase C C₂)
+    (_hProc : C.proc = .send k x)
+    (_hk : lookupStr C.store k = some (.chan e))
+    (_hx : lookupStr C.store x = some v)
+    (_hG : lookupG C.G e = some (.send target T L))
+    (_h₁ : StepBase C C₁)
+    (_h₂ : StepBase C C₂)
     (hC₁ : C₁ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L)
     (hC₂ : C₂ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L) :
     C₁ = C₂ := by
@@ -120,10 +120,10 @@ theorem stepBase_det_send {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v :
 theorem stepBase_det_recv {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {source : Role}
     {T : ValType} {L : LocalType}
     {v : Value} {vs : List Value}
-    (hProc : C.proc = .recv k x)
-    (hk : lookupStr C.store k = some (.chan e))
-    (hG : lookupG C.G e = some (.recv source T L))
-    (hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = v :: vs)
+    (_hProc : C.proc = .recv k x)
+    (_hk : lookupStr C.store k = some (.chan e))
+    (_hG : lookupG C.G e = some (.recv source T L))
+    (_hBuf : lookupBuf C.bufs { sid := e.sid, sender := source, receiver := e.role } = v :: vs)
     (h₁ : C₁ = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L)
     (h₂ : C₂ = recvStep C e { sid := e.sid, sender := source, receiver := e.role } x v L) :
     C₁ = C₂ := by
@@ -165,7 +165,7 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
     (hStep₁ : StepBase C C₁)
     (hStep₂ : StepBase C C₂)
     (hInd : IndependentConfigs C C) :
-    C₁ = C₂ ∨ ∃ C₃, ∃ (hStep₁' : StepBase C₁ C₃) (hStep₂' : StepBase C₂ C₃), True := by
+    C₁ = C₂ ∨ ∃ C₃, ∃ (_ : StepBase C₁ C₃) (_ : StepBase C₂ C₃), True := by
   cases hStep₁ with
   | send hProc hk _ =>
     -- Communication step: IndependentConfigs C C = (s ≠ s) = False
@@ -247,7 +247,7 @@ For local types, step determinism follows from unique branch labels.
 If a local type with unique branch labels steps to two results
 under the same action context, the results are equal.
 -/
-theorem localType_step_det {L₁ L₂ : LocalType} {r : Role} {lbl : Label}
+theorem localType_step_det {L₁ L₂ : LocalType} {_r : Role} {lbl : Label}
     {bs : List (Label × LocalType)}
     (huniq : uniqueBranchLabelsList bs = true)
     (hmem₁ : (lbl, L₁) ∈ bs)

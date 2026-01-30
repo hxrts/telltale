@@ -130,9 +130,9 @@ theorem lookup_mapped_endpoints_sid_ne (roles : RoleSet) (sid : SessionId)
     have hNeqEndpoint : (e == Endpoint.mk sid r) = false := by
       rw [beq_eq_false_iff_ne]
       intro heq
-      have : e.sid = sid := by simp only [heq, Endpoint.sid]
+      have : e.sid = sid := by simp [heq]
       exact hNeq this
-    simp only [hNeqEndpoint, cond_false]
+    simp only [hNeqEndpoint]
     exact ih
 
 /-- Lookup in mapped endpoints finds the entry if role is in list. -/
@@ -156,7 +156,7 @@ theorem lookup_mapped_endpoints_mem (roles : RoleSet) (sid : SessionId)
         intro heq'
         simp only [Endpoint.mk.injEq] at heq'
         exact heq heq'.2.symm
-      simp only [hNeqEndpoint, cond_false]
+      simp only [hNeqEndpoint]
       simp only [List.mem_cons] at hMem
       cases hMem with
       | inl h => exact absurd h.symm heq

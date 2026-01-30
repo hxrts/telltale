@@ -105,57 +105,11 @@ private lemma DisjointD_left_empty (D : DEnv) : DisjointD (∅ : DEnv) D := by
 private lemma DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
   simp [DConsistent, SessionsOfD_empty]
 
-private theorem DEnv_eq_of_find?_eq {D₁ D₂ : DEnv}
-    (h : ∀ e, D₁.find? e = D₂.find? e) : D₁ = D₂ := by
-  -- Show list equality via find?/lookup equivalence and pairwise uniqueness.
-  have hlist : D₁.list = D₂.list := by
-    apply list_eq_of_subset_pairwise (h₁:=D₁.sorted) (h₂:=D₂.sorted)
-    · intro p hp
-      have hlookup : D₁.list.lookup p.1 = some p.2 :=
-        lookup_eq_some_of_mem_pairwise (h:=D₁.sorted) hp
-      have hfind : D₁.find? p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₁) (e:=p.1)
-        simpa [hEq] using hlookup
-      have hfind' : D₂.find? p.1 = some p.2 := by
-        simpa [h p.1] using hfind
-      have hlookup' : D₂.list.lookup p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₂) (e:=p.1)
-        simpa [hEq] using hfind'
-      exact lookup_mem hlookup'
-    · intro p hp
-      have hlookup : D₂.list.lookup p.1 = some p.2 :=
-        lookup_eq_some_of_mem_pairwise (h:=D₂.sorted) hp
-      have hfind : D₂.find? p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₂) (e:=p.1)
-        simpa [hEq] using hlookup
-      have hfind' : D₁.find? p.1 = some p.2 := by
-        have hEq := h p.1
-        simpa [hEq] using hfind
-      have hlookup' : D₁.list.lookup p.1 = some p.2 := by
-        have hEq := DEnv_find?_eq_lookup (env:=D₁) (e:=p.1)
-        simpa [hEq] using hfind'
-      exact lookup_mem hlookup'
-  -- Lists equal => maps equal via map_eq; proof fields are Prop.
-  cases D₁ with
-  | mk l₁ m₁ h₁ s₁ =>
-      cases D₂ with
-      | mk l₂ m₂ h₂ s₂ =>
-          have hmap : m₁ = m₂ := by
-            simpa [h₁, h₂, hlist]
-          cases hlist
-          cases hmap
-          rfl
+private theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D :=
+  DEnvUnion_empty_right D
 
-private theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D := by
-  apply DEnv_eq_of_find?_eq
-  intro e
-  -- Fold over an empty map does nothing.
-  simp [DEnvUnion, RBMap.foldl_eq_foldl_toList, DEnv.find?, DEnv_find?_ofMap]
-
-private theorem DEnv_append_empty_left (D : DEnv) : (∅ : DEnv) ++ D = D := by
-  apply DEnv_eq_of_find?_eq
-  intro e
-  simp [DEnvUnion, RBMap.foldl_eq_foldl_toList, DEnv.find?, DEnv_find?_ofMap]
+private theorem DEnv_append_empty_left (D : DEnv) : (∅ : DEnv) ++ D = D :=
+  DEnvUnion_empty_left D
 
 private lemma SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
   simpa using (List.append_nil S)

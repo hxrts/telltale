@@ -40,7 +40,7 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
   have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hIn2⟩
   have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
   have : s ∈ (∅ : Set SessionId) := by
-    simpa [hEmpty] using hInter
+    simp [hEmpty] at hInter
   exact this.elim
 
 /-- If a session is not in G, buffers have no entries for it. -/
