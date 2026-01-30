@@ -28,12 +28,12 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::ast::{
+use telltale_choreography::ast::{
     choreography_to_global, local_to_local_r, local_types_equivalent, Choreography, ConversionError,
 };
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
-use rumpsteak_aura_choreography::compiler::projection::project;
-use rumpsteak_theory::projection::project as theory_project;
+use telltale_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::compiler::projection::project;
+use telltale_theory::projection::project as theory_project;
 
 /// Parse a DSL choreography string.
 fn parse_choreography(input: &str) -> Choreography {
@@ -44,7 +44,7 @@ fn parse_choreography(input: &str) -> Choreography {
 fn find_role<'a>(
     choreography: &'a Choreography,
     name: &str,
-) -> Option<&'a rumpsteak_aura_choreography::ast::Role> {
+) -> Option<&'a telltale_choreography::ast::Role> {
     choreography.roles.iter().find(|r| *r.name() == name)
 }
 

@@ -1,6 +1,6 @@
 # Background
 
-This document provides an introduction to the theory behind Rumpsteak-Aura. It covers multiparty session types, choreographic programming, and algebraic effects. Understanding these concepts helps explain how the system achieves type-safe distributed programming.
+This document provides an introduction to the theory behind Telltale. It covers multiparty session types, choreographic programming, and algebraic effects. Understanding these concepts helps explain how the system achieves type-safe distributed programming.
 
 ## Session Types
 
@@ -33,17 +33,17 @@ The projection algorithm ensures the local types are compatible. If projection s
 
 ## Lean Signatures (Core Types)
 
-Rumpsteak-Aura’s formal core is specified in Lean. The core session types are:
+Telltale’s formal core is specified in Lean. The core session types are:
 1) the **global protocol type** (`GlobalType`),
 2) the **recursive local type** (`LocalTypeR`), and
 3) the **coinductive local type** used in bisimulation proofs (`LocalTypeC`).
 
 Below are their exact Lean signatures, with namespaces preserved.
 
-**Global types and labels** (`lean/RumpsteakV2/Protocol/GlobalType.lean`):
+**Global types and labels** (`lean/TelltaleV2/Protocol/GlobalType.lean`):
 
 ```lean
-namespace RumpsteakV2.Protocol.GlobalType
+namespace TelltaleV2.Protocol.GlobalType
 
 inductive PayloadSort where
   | unit : PayloadSort
@@ -65,15 +65,15 @@ inductive GlobalType where
   | var : String → GlobalType
   deriving Repr, Inhabited
 
-end RumpsteakV2.Protocol.GlobalType
+end TelltaleV2.Protocol.GlobalType
 ```
 
-**Inductive local types** (`lean/RumpsteakV2/Protocol/LocalTypeR.lean`):
+**Inductive local types** (`lean/TelltaleV2/Protocol/LocalTypeR.lean`):
 
 ```lean
-namespace RumpsteakV2.Protocol.LocalTypeR
+namespace TelltaleV2.Protocol.LocalTypeR
 
-open RumpsteakV2.Protocol.GlobalType
+open TelltaleV2.Protocol.GlobalType
 
 inductive LocalTypeR where
   | end : LocalTypeR
@@ -83,15 +83,15 @@ inductive LocalTypeR where
   | var : String → LocalTypeR
   deriving Repr, Inhabited
 
-end RumpsteakV2.Protocol.LocalTypeR
+end TelltaleV2.Protocol.LocalTypeR
 ```
 
-**Coinductive local types (M-types)** (`lean/RumpsteakV2/Coinductive/LocalTypeC.lean`):
+**Coinductive local types (M-types)** (`lean/TelltaleV2/Coinductive/LocalTypeC.lean`):
 
 ```lean
-namespace RumpsteakV2.Coinductive
+namespace TelltaleV2.Coinductive
 
-open RumpsteakV2.Protocol.GlobalType
+open TelltaleV2.Protocol.GlobalType
 
 inductive LocalTypeHead where
   | end  : LocalTypeHead
@@ -112,7 +112,7 @@ def LocalTypeF : PFunctor := ⟨LocalTypeHead, LocalTypeChild⟩
 
 abbrev LocalTypeC := PFunctor.M LocalTypeF
 
-end RumpsteakV2.Coinductive
+end TelltaleV2.Coinductive
 ```
 
 ## Well-Formedness (Lean)
@@ -209,7 +209,7 @@ A good place to start learning more about choreographic programming is [Introduc
 
 Algebraic effects separate what a program does from how it does it. The effect algebra defines a set of abstract operations that a program can perform. Handlers provide concrete implementations of these operations. This separation allows the same program to run with different implementations.
 
-In Rumpsteak-Aura, communication operations are effects. Sending and receiving messages are abstract operations. Different handlers implement these operations differently. An in-memory handler passes messages through local channels. A network handler sends messages over TCP or WebSocket connections.
+In Telltale, communication operations are effects. Sending and receiving messages are abstract operations. Different handlers implement these operations differently. An in-memory handler passes messages through local channels. A network handler sends messages over TCP or WebSocket connections.
 
 ```rust
 let program = Program::new()
@@ -224,9 +224,9 @@ interpret(&mut network_handler, &mut endpoint, program).await;
 
 The program specifies what messages to send and receive. The handler determines how this happens. This design enables testing with local handlers and deployment with network handlers. The protocol logic remains unchanged.
 
-## Integration in Rumpsteak-Aura
+## Integration in Telltale
 
-Rumpsteak-Aura combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system ensures protocol safety through MPST. Effect handlers provide flexible execution strategies. The choreography macro parses protocol definitions, generates role and message types automatically, and creates session types for each participant through projection.
+Telltale combines these concepts into a practical system. Choreographies define distributed protocols globally. The type system ensures protocol safety through MPST. Effect handlers provide flexible execution strategies. The choreography macro parses protocol definitions, generates role and message types automatically, and creates session types for each participant through projection.
 
 The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection. The same choreography works across different deployment scenarios. Content addressing assigns cryptographic identities to all protocol artifacts, enabling memoization and structural sharing.
 

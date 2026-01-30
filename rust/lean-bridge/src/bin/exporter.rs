@@ -16,8 +16,8 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 
-use rumpsteak_aura_choreography::ast::{LocalType, Protocol};
-use rumpsteak_aura_choreography::compiler::{parse_choreography_str, project};
+use telltale_choreography::ast::{LocalType, Protocol};
+use telltale_choreography::compiler::{parse_choreography_str, project};
 
 #[derive(Serialize)]
 struct SimpleAction {

@@ -9,7 +9,7 @@
 //! - Code generation with enhanced features
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::{LocalType, Role},
     compiler::{
         codegen::{

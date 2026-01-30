@@ -10,7 +10,7 @@
 // - Complex protocol scenarios
 
 use futures::executor;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     interpret, LabelId, Metrics, NoOpHandler, Program, RecordingHandler, Retry, RoleId, RoleName,
     Trace,
 };

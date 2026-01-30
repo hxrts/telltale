@@ -1,17 +1,17 @@
 [package]
-name = "rumpsteak-transport"
+name = "telltale-transport"
 version = "0.9.1"
 edition = "2021"
-authors = ["Rumpsteak Contributors"]
+authors = ["Telltale Contributors"]
 license = "MIT OR Apache-2.0"
-description = "Production transport implementations for Rumpsteak session types"
-repository = "https://github.com/hxrts/rumpsteak-aura"
+description = "Production transport implementations for Telltale session types"
+repository = "https://github.com/hxrts/telltale"
 keywords = ["session-types", "tcp", "transport", "async", "networking"]
 categories = ["asynchronous", "network-programming"]
 readme = "README.md"
 
 [dependencies]
-rumpsteak-aura-choreography = { version = "0.9.1", path = "../choreography" }
+telltale-choreography = { version = "0.9.1", path = "../choreography" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt-multi-thread"] }
 thiserror = "1"

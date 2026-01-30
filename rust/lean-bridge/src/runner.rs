@@ -1,12 +1,12 @@
 //! Lean Runner - Invokes the Lean verification binary.
 //!
 //! This module provides the [`LeanRunner`] struct which wraps invocation of
-//! the Lean `rumpsteak_runner` binary for validating choreography projections.
+//! the Lean `telltale_runner` binary for validating choreography projections.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_lean_bridge::runner::LeanRunner;
+//! use telltale_lean_bridge::runner::LeanRunner;
 //! use serde_json::json;
 //!
 //! let runner = LeanRunner::new()?;
@@ -80,7 +80,7 @@ pub struct LeanValidationResult {
 
 /// Runner for invoking the Lean verification binary.
 ///
-/// The runner manages invocation of the `rumpsteak_runner` Lean executable,
+/// The runner manages invocation of the `telltale_runner` Lean executable,
 /// handling temporary file creation for JSON exchange and parsing results.
 pub struct LeanRunner {
     binary_path: PathBuf,
@@ -88,7 +88,7 @@ pub struct LeanRunner {
 
 impl LeanRunner {
     /// Default path to the Lean binary (relative to workspace root).
-    pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/rumpsteak_runner";
+    pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/telltale_runner";
 
     /// Get the workspace root path by walking up from the manifest directory.
     fn find_workspace_root() -> Option<PathBuf> {

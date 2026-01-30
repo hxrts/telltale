@@ -86,7 +86,7 @@ fn session_type(mut input: ItemType) -> TokenStream {
     let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak_aura::Role),
+        parse_quote!('__r, __R: ::telltale::Role),
     );
     augment_type(&mut input.ty, &exclude);
     input.into_token_stream()
@@ -99,7 +99,7 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
 
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak_aura::Role),
+        parse_quote!('__r, __R: ::telltale::Role),
     );
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
@@ -119,15 +119,15 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
 
     let mut output = TokenStream::new();
     output.extend(quote! {
-        impl #impl_generics ::rumpsteak_aura::FromState<'__r> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::telltale::FromState<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
 
-            fn from_state(state: ::rumpsteak_aura::State<'__r, Self::Role>) -> Self {
-                Self { #field_ident: ::rumpsteak_aura::FromState::from_state(state) }
+            fn from_state(state: ::telltale::State<'__r, Self::Role>) -> Self {
+                Self { #field_ident: ::telltale::FromState::from_state(state) }
             }
         }
 
-        impl #impl_generics ::rumpsteak_aura::IntoSession<'__r> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::telltale::IntoSession<'__r> for #ident #ty_generics #where_clause {
             type Session = #field_ty;
 
             fn into_session(self) -> Self::Session {
@@ -152,14 +152,14 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, '__r, __R: ::rumpsteak_aura::Role + '__r),
+        parse_quote!('__q, '__r, __R: ::telltale::Role + '__r),
     );
     let (impl_generics, _, _) = generics.split_for_impl();
 
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, __R: ::rumpsteak_aura::Role),
+        parse_quote!('__q, __R: ::telltale::Role),
     );
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -192,7 +192,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     let mut output = TokenStream::new();
     for (label, ty) in labels.iter().zip(&tys) {
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak_aura::Choice<'__r, #label> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::telltale::Choice<'__r, #label> for #ident #ty_generics #where_clause {
                 type Session = #ty;
             }
         });
@@ -200,29 +200,29 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
 
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak_aura::Role),
+        parse_quote!('__r, __R: ::telltale::Role),
     );
     let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
 
     let mut generics = input.generics.clone();
     generics.make_where_clause().predicates.push(parse_quote! {
-        __R::Message: #(::rumpsteak_aura::Message<#labels> +)*
+        __R::Message: #(::telltale::Message<#labels> +)*
     });
 
     let (_, _, where_clause) = generics.split_for_impl();
     output.extend(quote! {
-        impl #impl_generics ::rumpsteak_aura::Choices<'__r> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::telltale::Choices<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
 
             fn downcast(
-                state: ::rumpsteak_aura::State<'__r, Self::Role>,
+                state: ::telltale::State<'__r, Self::Role>,
                 message: <Self::Role as Role>::Message,
             ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
-                #(let message = match ::rumpsteak_aura::Message::downcast(message) {
+                #(let message = match ::telltale::Message::downcast(message) {
                     Ok(label) => {
                         return Ok(Self::#idents(
                             label,
-                            ::rumpsteak_aura::FromState::from_state(state)
+                            ::telltale::FromState::from_state(state)
                         ));
                     }
                     Err(message) => message

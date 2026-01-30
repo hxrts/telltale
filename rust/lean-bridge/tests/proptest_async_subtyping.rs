@@ -12,11 +12,11 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_theory::{
+use telltale_theory::{
     async_subtype, orphan_free, siso_decompose, siso_decompose_with_fuel, InputTree, OutputTree,
     SisoSegment, UnfoldSteps,
 };
-use rumpsteak_types::{Label, LocalTypeR, PayloadSort};
+use telltale_types::{Label, LocalTypeR, PayloadSort};
 
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [

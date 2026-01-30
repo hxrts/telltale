@@ -6,7 +6,7 @@
 // work correctly when compiled to WASM.
 #![cfg(target_arch = "wasm32")]
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     interpret, Effect, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
 };
 use serde::{Deserialize, Serialize};

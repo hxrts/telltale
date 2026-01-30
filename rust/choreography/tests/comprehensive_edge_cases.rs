@@ -10,7 +10,7 @@
 //! - Range syntax edge cases
 //! - Cross-feature integration scenarios
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::*,
     compiler::{parser::parse_choreography_str, projection::project},
 };

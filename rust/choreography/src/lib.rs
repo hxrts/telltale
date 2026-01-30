@@ -1,6 +1,6 @@
-//! Choreographic Programming for Rumpsteak
+//! Choreographic Programming for Telltale
 //!
-//! This crate provides a choreographic programming layer on top of Rumpsteak's
+//! This crate provides a choreographic programming layer on top of Telltale's
 //! session types, enabling global protocol specification with automatic projection.
 //!
 //! The choreographic approach allows you to write distributed protocols from a
@@ -48,7 +48,7 @@ pub use effects::{
     ProgramMessage, RoleId,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
-pub use effects::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
+pub use effects::{TelltaleEndpoint, TelltaleHandler, SimpleChannel};
 pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
@@ -74,8 +74,8 @@ pub use simulation::{
     StepInput, StepOutput, SystemClock,
 };
 
-// Re-export macros from rumpsteak-macros
-pub use rumpsteak_aura_macros::choreography;
+// Re-export macros from telltale-macros
+pub use telltale_macros::choreography;
 
 // High-level API functions for extension-aware compilation
 

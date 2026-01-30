@@ -4,7 +4,7 @@
 //! including global protocols, local (projected) types, roles, and messages.
 //!
 //! Core types (GlobalType, LocalTypeR, Label, PayloadSort) are re-exported from
-//! `rumpsteak-types` for Lean correspondence. Extended types (LocalType, Protocol)
+//! `telltale-types` for Lean correspondence. Extended types (LocalType, Protocol)
 //! are defined here for DSL-specific features.
 
 /// Typed protocol annotations
@@ -19,10 +19,10 @@ pub mod execution_hints;
 /// Conversion utilities between DSL types and theory types
 pub mod convert;
 
-/// Global types for multiparty session type protocols (extended, uses rumpsteak-types)
+/// Global types for multiparty session type protocols (extended, uses telltale-types)
 pub mod global_type;
 
-/// Local types resulting from projection (extended, uses rumpsteak-types)
+/// Local types resulting from projection (extended, uses telltale-types)
 pub mod local_type;
 
 /// Message type definitions
@@ -40,8 +40,8 @@ pub mod role;
 /// Validation errors and utilities
 pub mod validation;
 
-// Re-export core types from rumpsteak-types for Lean correspondence
-pub use rumpsteak_types::{
+// Re-export core types from telltale-types for Lean correspondence
+pub use telltale_types::{
     Action, GlobalType as GlobalTypeCore, Label, LocalAction, LocalTypeR, PayloadSort,
 };
 

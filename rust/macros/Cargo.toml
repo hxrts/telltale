@@ -1,11 +1,11 @@
 [package]
-name = "rumpsteak-aura-macros"
+name = "telltale-macros"
 version = "0.9.1"
 authors = ["Sam Hart"]
 edition = "2021"
-description = "Procedural macros for Rumpsteak session types (Aura flavored)."
+description = "Procedural macros for Telltale session types (Aura flavored)."
 readme = "../../README.md"
-repository = "https://github.com/aura-project/rumpsteak-aura"
+repository = "https://github.com/hxrts/telltale"
 license = "MIT"
 keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]

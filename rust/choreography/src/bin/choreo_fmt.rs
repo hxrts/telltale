@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, Read};
 
 use anyhow::{bail, Context, Result};
-use rumpsteak_aura_choreography::format_choreography_str;
+use telltale_choreography::format_choreography_str;
 
 fn main() -> Result<()> {
     let mut write = false;

@@ -1,12 +1,12 @@
 [package]
-name = "rumpsteak-aura"
+name = "telltale"
 version = "0.9.1"
 authors = ["Zak Cutner <me@zakcutner.uk>", "Sam Hart <sam@hxrts.com>"]
 edition = "2021"
 rust-version = "1.75"
 description = "Session types for multi-party asynchronous communication."
 readme = "README.md"
-repository = "https://github.com/aura-project/rumpsteak-aura"
+repository = "https://github.com/hxrts/telltale"
 license = "MIT"
 keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]
@@ -23,9 +23,9 @@ futures = { workspace = true }
 time = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
-rumpsteak-aura-macros = { path = "rust/macros", version = "0.9.1" }
-rumpsteak-types = { path = "rust/types", version = "0.9.1" }
-rumpsteak-theory = { path = "rust/theory", version = "0.9.1", optional = true }
+telltale-macros = { path = "rust/macros", version = "0.9.1" }
+telltale-types = { path = "rust/types", version = "0.9.1" }
+telltale-theory = { path = "rust/theory", version = "0.9.1", optional = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -61,7 +61,7 @@ proptest = { workspace = true }
 anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
 # For examples
-rumpsteak-theory = { path = "rust/theory", version = "0.9.1" }
+telltale-theory = { path = "rust/theory", version = "0.9.1" }
 serde_json = { workspace = true }
 
 [features]
@@ -74,11 +74,11 @@ test-utils = ["rand"]
 wasm = ["getrandom/js"]
 
 # Session type theory algorithms (projection, merge, duality, etc.)
-theory = ["rumpsteak-theory"]
+theory = ["telltale-theory"]
 
 # Granular theory features (require theory feature)
-theory-async-subtyping = ["theory", "rumpsteak-theory/async-subtyping"]
-theory-bounded = ["theory", "rumpsteak-theory/bounded"]
+theory-async-subtyping = ["theory", "telltale-theory/async-subtyping"]
+theory-bounded = ["theory", "telltale-theory/bounded"]
 
 # All optional features
 full = [

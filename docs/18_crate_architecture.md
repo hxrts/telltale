@@ -7,24 +7,24 @@ This document describes the crate architecture introduced in v0.7.0. The structu
 ```mermaid
 graph TB
     subgraph Foundation
-        types["rumpsteak-types<br/>Core type definitions"]
+        types["telltale-types<br/>Core type definitions"]
     end
 
     subgraph Theory
-        theory["rumpsteak-theory<br/>Algorithms: projection, merge, subtyping"]
+        theory["telltale-theory<br/>Algorithms: projection, merge, subtyping"]
     end
 
     subgraph Verification
-        lean["rumpsteak-lean-bridge<br/>Lean interop & validation"]
+        lean["telltale-lean-bridge<br/>Lean interop & validation"]
     end
 
     subgraph Application
-        choreo["rumpsteak-aura-choreography<br/>DSL, parsing & code generation"]
-        macros["rumpsteak-aura-macros<br/>Proc macros"]
+        choreo["telltale-choreography<br/>DSL, parsing & code generation"]
+        macros["telltale-macros<br/>Proc macros"]
     end
 
     subgraph Facade
-        main["rumpsteak-aura<br/>Main crate, re-exports"]
+        main["telltale<br/>Main crate, re-exports"]
     end
 
     types --> theory
@@ -40,11 +40,11 @@ graph TB
     lean --> main
 ```
 
-This diagram shows the dependency relationships between crates. Arrows indicate dependency direction. The `rumpsteak-types` crate serves as the foundation for all other crates.
+This diagram shows the dependency relationships between crates. Arrows indicate dependency direction. The `telltale-types` crate serves as the foundation for all other crates.
 
 ## Crate Descriptions
 
-### rumpsteak-types
+### telltale-types
 
 This crate is located in `rust/types/`. It contains all core type definitions that match Lean exactly. It has no dependencies on other workspace crates.
 
@@ -57,7 +57,7 @@ The crate also provides content addressing infrastructure. The `ContentId` type 
 - `dag-cbor` — Enables DAG-CBOR serialization for IPLD/IPFS compatibility. Adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
 
 ```rust
-use rumpsteak_types::{GlobalType, LocalTypeR, Label, PayloadSort};
+use telltale_types::{GlobalType, LocalTypeR, Label, PayloadSort};
 
 let g = GlobalType::comm(
     "Client",
@@ -70,7 +70,7 @@ let lt = LocalTypeR::send("Server", Label::new("request"), LocalTypeR::End);
 
 The first expression creates a global type matching Lean's `GlobalType.comm "Client" "Server" [...]` constructor. The second creates a local type matching Lean's `LocalTypeR.send "Server" [...]` constructor.
 
-### rumpsteak-theory
+### telltale-theory
 
 This crate is located in `rust/theory/`. It implements pure algorithms for session type operations. The crate performs no IO or parsing.
 
@@ -81,8 +81,8 @@ The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async
 The `content_id` module provides content addressing for all types. Projection results are memoized by content ID for performance. See [Content Addressing](05_content_addressing.md) for details.
 
 ```rust
-use rumpsteak_theory::{project, merge, sync_subtype, async_subtype};
-use rumpsteak_types::GlobalType;
+use telltale_theory::{project, merge, sync_subtype, async_subtype};
+use telltale_types::GlobalType;
 
 let global = GlobalType::comm("A", "B", vec![...]);
 let local_a = project(&global, "A")?;
@@ -93,7 +93,7 @@ assert!(sync_subtype(&local_a, &local_a_expected));
 
 The `project` function computes the local type for a given role. The `sync_subtype` function checks synchronous subtyping between local types.
 
-### rumpsteak-lean-bridge
+### telltale-lean-bridge
 
 This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](15_lean_rust_bridge.md) for detailed documentation.
 
@@ -109,22 +109,22 @@ lean-bridge import --input protocol.json
 
 These commands generate samples, validate round-trips, and import JSON respectively.
 
-### rumpsteak-aura-choreography
+### telltale-choreography
 
-This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `rumpsteak-types` and `rumpsteak-theory`.
+This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `telltale-types` and `telltale-theory`.
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation. The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
 The `topology/` directory provides deployment configuration. See [Topology](08_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](09_resource_heap.md) for nullifier-based consumption tracking.
 
-### rumpsteak-aura
+### telltale
 
 This crate is located in `rust/src/`. It is the main facade crate that re-exports from all other crates.
 
-The crate supports several feature flags. The `theory` feature includes `rumpsteak-theory` algorithms. The `full` feature enables all optional features. See [Getting Started](01_getting_started.md) for the complete feature flag reference.
+The crate supports several feature flags. The `theory` feature includes `telltale-theory` algorithms. The `full` feature enables all optional features. See [Getting Started](01_getting_started.md) for the complete feature flag reference.
 
 ```rust
-use rumpsteak_aura::prelude::*;
+use telltale::prelude::*;
 ```
 
 The prelude provides access to types, theory algorithms, and other commonly used items.
@@ -134,14 +134,14 @@ The prelude provides access to types, theory algorithms, and other commonly used
 ```
 DSL Text                 Choreography AST               GlobalType
 -----------► Parser -------------------► Lower -------------------►
- "A -> B"                    (DSL)                    (rumpsteak-types)
+ "A -> B"                    (DSL)                    (telltale-types)
 
                                 |
                                 | project()
                                 v
 
                             LocalTypeR
-                         (rumpsteak-types)
+                         (telltale-types)
                                 |
                 +---------------+---------------+
                 |                               |

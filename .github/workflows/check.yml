@@ -50,12 +50,12 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --package rumpsteak-aura-choreography --target wasm32-unknown-unknown --features wasm
+          args: --package telltale-choreography --target wasm32-unknown-unknown --features wasm
       - name: Check WASM compilation (core)
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --package rumpsteak-aura --target wasm32-unknown-unknown --features wasm
+          args: --package telltale --target wasm32-unknown-unknown --features wasm
       - name: Build WASM example
         run: |
           cd examples/wasm-ping-pong
@@ -93,7 +93,7 @@ jobs:
             exit 1
           fi
 
-  # Lean verification disabled - rumpsteak_runner target removed in V2 refactor
+  # Lean verification disabled - telltale_runner target removed in V2 refactor
   # TODO: Re-enable once V2 runner is implemented
   # lean:
   #   name: Lean Verification
@@ -108,12 +108,12 @@ jobs:
   #     - name: Build Lean binary
   #       run: nix develop --command bash -c "cd lean && lake build"
   #     - name: Run Lean verification (sample)
-  #       run: nix develop --command just rumpsteak-lean-check
+  #       run: nix develop --command just telltale-lean-check
   #     - name: Run Lean verification (extended)
-  #       run: nix develop --command just rumpsteak-lean-check-extended
+  #       run: nix develop --command just telltale-lean-check-extended
   #     - name: Run Lean verification (negative test)
-  #       run: nix develop --command just rumpsteak-lean-check-failing
+  #       run: nix develop --command just telltale-lean-check-failing
   #     - name: Run Lean-validated Rust tests
   #       run: |
-  #         nix develop --command cargo test -p rumpsteak-lean-bridge --all-targets
+  #         nix develop --command cargo test -p telltale-lean-bridge --all-targets
   #         echo "✓ All Lean-validated Rust tests passed"

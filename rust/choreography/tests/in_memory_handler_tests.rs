@@ -9,10 +9,10 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::effects::{
+use telltale_choreography::effects::{
     handlers::in_memory::InMemoryHandler, ChoreoHandler, LabelId, RoleId,
 };
-use rumpsteak_aura_choreography::RoleName;
+use telltale_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

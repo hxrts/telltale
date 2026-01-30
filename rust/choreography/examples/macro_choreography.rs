@@ -15,13 +15,13 @@
 // - Static analysis of choreographic programs
 
 use futures::executor;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     interpret, ChoreoResult, InterpretResult, LabelId, Metrics, NoOpHandler, Program,
     RecordingHandler, RoleId, RoleName,
 };
 use serde::{Deserialize, Serialize};
 
-// NOTE: The choreography! macro generates Rumpsteak session types
+// NOTE: The choreography! macro generates Telltale session types
 // For this example, we'll demonstrate the algebraic effect API directly
 // without using the macro, showing how to build choreographic programs programmatically
 
@@ -140,7 +140,7 @@ async fn run_program<H>(
     name: &str,
 ) -> ChoreoResult<InterpretResult<ProtocolMessage>>
 where
-    H: rumpsteak_aura_choreography::ChoreoHandler<Role = Role>,
+    H: telltale_choreography::ChoreoHandler<Role = Role>,
 {
     println!("  {name}: Executing protocol");
     interpret(handler, endpoint, program).await

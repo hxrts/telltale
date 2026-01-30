@@ -16,11 +16,11 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_theory::semantics::{
+use telltale_theory::semantics::{
     can_step, consume_with_proof, good_g, local_can_step, local_step, reduces, reduces_star, step,
     GlobalAction, LocalAction,
 };
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [

@@ -20,7 +20,7 @@ that determines whether a deployment topology satisfies a protocol's spatial nee
 - `SpatialLe` - Spatial subtyping preorder `R₁ ≤ R₂`
 - `spatial_le_sound` - Monotonicity theorem
 
-Ported from RumpsteakV2.Protocol.Spatial.
+Ported from Telltale.Protocol.Spatial.
 -/
 
 set_option linter.mathlibStandardSet false

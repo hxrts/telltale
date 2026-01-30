@@ -9,14 +9,14 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::effects::{
+use telltale_choreography::effects::{
     algebra::{InterpreterState, Program},
     handlers::in_memory::InMemoryHandler,
     interpreter::{interpret, testing::MockHandler},
     middleware::Trace,
     ChoreoHandler, LabelId, RoleId,
 };
-use rumpsteak_aura_choreography::RoleName;
+use telltale_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -117,7 +117,7 @@ async fn test_interpreter_simple_send_program() {
 
 #[tokio::test]
 async fn test_interpreter_send_recv_sequence() {
-    use rumpsteak_aura_choreography::effects::interpreter::testing::{MockOperation, MockResponse};
+    use telltale_choreography::effects::interpreter::testing::{MockOperation, MockResponse};
 
     let mut handler = MockHandler::new(TestRole::Alice);
 
@@ -167,7 +167,7 @@ async fn test_interpreter_send_recv_sequence() {
 
 #[tokio::test]
 async fn test_interpreter_choose_offer_sequence() {
-    use rumpsteak_aura_choreography::effects::interpreter::testing::{MockOperation, MockResponse};
+    use telltale_choreography::effects::interpreter::testing::{MockOperation, MockResponse};
 
     let mut handler = MockHandler::new(TestRole::Bob);
 
@@ -200,7 +200,7 @@ async fn test_interpreter_choose_offer_sequence() {
 
 #[tokio::test]
 async fn test_interpreter_recv_error_becomes_failed_state() {
-    use rumpsteak_aura_choreography::effects::algebra::InterpretResult;
+    use telltale_choreography::effects::algebra::InterpretResult;
 
     let mut handler = MockHandler::new(TestRole::Alice);
     // Don't add a response - recv will fail
@@ -223,7 +223,7 @@ async fn test_interpreter_recv_error_becomes_failed_state() {
 
 #[tokio::test]
 async fn test_interpreter_offer_error_becomes_failed_state() {
-    use rumpsteak_aura_choreography::effects::algebra::InterpretResult;
+    use telltale_choreography::effects::algebra::InterpretResult;
 
     let mut handler = MockHandler::new(TestRole::Bob);
     // Don't add a response - offer will fail
@@ -604,7 +604,7 @@ fn test_program_has_parallel() {
 
 #[tokio::test]
 async fn test_interpreter_multi_step_protocol() {
-    use rumpsteak_aura_choreography::effects::interpreter::testing::MockResponse;
+    use telltale_choreography::effects::interpreter::testing::MockResponse;
 
     let mut handler = MockHandler::new(TestRole::Alice);
 

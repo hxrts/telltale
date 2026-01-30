@@ -1,6 +1,6 @@
 //! Configuration for TCP transport.
 
-use rumpsteak_aura_choreography::QueueCapacity;
+use telltale_choreography::QueueCapacity;
 use std::collections::HashMap;
 use std::time::Duration;
 

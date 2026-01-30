@@ -17,8 +17,8 @@
 //! ```
 
 use clap::{Parser, Subcommand};
-use rumpsteak_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;

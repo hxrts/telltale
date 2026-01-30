@@ -7,13 +7,13 @@
 //!
 //! # Correspondence with Lean
 //!
-//! The core `LocalTypeR` is re-exported from `rumpsteak-types` and mirrors
-//! `lean/Rumpsteak/Protocol/LocalTypeR.lean`.
+//! The core `LocalTypeR` is re-exported from `telltale-types` and mirrors
+//! `lean/Telltale/Protocol/LocalTypeR.lean`.
 //!
 //! The extended `LocalType` adds constructs for code generation (loops, timeouts, etc.).
 
-// Re-export LocalTypeR from rumpsteak-types
-pub use rumpsteak_types::LocalTypeR;
+// Re-export LocalTypeR from telltale-types
+pub use telltale_types::LocalTypeR;
 
 use super::{MessageType, Role};
 use proc_macro2::Ident;
@@ -132,7 +132,7 @@ impl LocalType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_types::{Label, PayloadSort};
+    use telltale_types::{Label, PayloadSort};
 
     #[test]
     fn test_simple_local_type() {

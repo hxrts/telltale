@@ -36,19 +36,19 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
     }
 
     let mut output = quote! {
-        impl #impl_generics ::rumpsteak_aura::Role for #ident #ty_generics #where_clause {
+        impl #impl_generics ::telltale::Role for #ident #ty_generics #where_clause {
             type Message = #message;
 
             fn seal(&mut self) {
                 #(
-                    ::rumpsteak_aura::Sealable::seal(&mut self.#field_idents);
+                    ::telltale::Sealable::seal(&mut self.#field_idents);
                 )*
             }
 
             fn is_sealed(&self) -> bool {
                 // Return true if any route is sealed
                 #(
-                    if ::rumpsteak_aura::Sealable::is_sealed(&self.#field_idents) {
+                    if ::telltale::Sealable::is_sealed(&self.#field_idents) {
                         return true;
                     }
                 )*
@@ -67,7 +67,7 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
         };
 
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak_aura::Route<#route> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::telltale::Route<#route> for #ident #ty_generics #where_clause {
                 type Route = #field_ty;
 
                 fn route(&mut self) -> &mut Self::Route {

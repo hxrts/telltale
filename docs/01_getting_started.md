@@ -2,41 +2,41 @@
 
 ## Installation
 
-Add Rumpsteak-Aura to your project dependencies.
+Add Telltale to your project dependencies.
 
 ```toml
 [dependencies]
-rumpsteak-aura = "*"
-rumpsteak-aura-choreography = "*"
+telltale = "*"
+telltale-choreography = "*"
 ```
 
 This adds the main facade crate and the choreographic programming layer.
 
 ### Understanding the Crates
 
-Rumpsteak-Aura is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence. The `rumpsteak-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `rumpsteak-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
+Telltale is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence. The `telltale-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
 
-The `rumpsteak-aura-choreography` crate is the choreographic programming layer providing the DSL parser, effect handlers, and code generation. The `rumpsteak-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
+The `telltale-choreography` crate is the choreographic programming layer providing the DSL parser, effect handlers, and code generation. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
 
-The `rumpsteak-aura` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `rumpsteak-aura` and `rumpsteak-aura-choreography` for session types and the high-level DSL.
+The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-choreography` for session types and the high-level DSL.
 
 ### Feature Flags
 
 The workspace provides granular feature flags to control dependencies and functionality.
 
-#### Root Crate (`rumpsteak-aura`)
+#### Root Crate (`telltale`)
 
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `serialize` | no | Serialization support for session types |
 | `test-utils` | no | Testing utilities (random generation) |
 | `wasm` | no | WebAssembly support |
-| `theory` | no | Session type algorithms via `rumpsteak-theory` |
+| `theory` | no | Session type algorithms via `telltale-theory` |
 | `theory-async-subtyping` | no | POPL 2021 asynchronous subtyping algorithm |
 | `theory-bounded` | no | Bounded recursion strategies |
 | `full` | no | Enable all optional features |
 
-#### Theory Crate (`rumpsteak-theory`)
+#### Theory Crate (`telltale-theory`)
 
 | Feature | Default | Description |
 |---------|---------|-------------|
@@ -50,14 +50,14 @@ The workspace provides granular feature flags to control dependencies and functi
 | `semantics` | **yes** | Async step semantics from ECOOP 2025 |
 | `coherence` | **yes** | Coherence predicates |
 
-#### Choreography Crate (`rumpsteak-aura-choreography`)
+#### Choreography Crate (`telltale-choreography`)
 
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `test-utils` | no | Testing utilities (random, fault injection) |
 | `wasm` | no | WebAssembly support |
 
-#### Lean Bridge Crate (`rumpsteak-lean-bridge`)
+#### Lean Bridge Crate (`telltale-lean-bridge`)
 
 | Feature | Default | Description |
 |---------|---------|-------------|
@@ -70,7 +70,7 @@ The workspace provides granular feature flags to control dependencies and functi
 
 ```toml
 # Just the core runtime, no algorithms
-rumpsteak-aura = { version = "*", default-features = false }
+telltale = { version = "*", default-features = false }
 ```
 
 This keeps the dependency surface small while enabling the core runtime.
@@ -79,7 +79,7 @@ This keeps the dependency surface small while enabling the core runtime.
 
 ```toml
 # Everything enabled
-rumpsteak-aura = { version = "*", features = ["full"] }
+telltale = { version = "*", features = ["full"] }
 ```
 
 This enables all optional features for the facade crate.
@@ -87,7 +87,7 @@ This enables all optional features for the facade crate.
 For WASM support, enable the wasm feature on the choreography crate.
 
 ```toml
-rumpsteak-aura-choreography = { version = "*", features = ["wasm"] }
+telltale-choreography = { version = "*", features = ["wasm"] }
 ```
 
 This enables compilation to WebAssembly targets.
@@ -99,7 +99,7 @@ This example shows a simple ping-pong protocol between two roles.
 Define the choreography using the `choreography!` macro.
 
 ```rust
-use rumpsteak_aura_choreography::choreography;
+use telltale_choreography::choreography;
 
 choreography!(r#"
 protocol PingPong =
@@ -114,7 +114,7 @@ The macro automatically generates role types, message types, and session types. 
 Run the protocol using the effect system.
 
 ```rust
-use rumpsteak_aura_choreography::{InMemoryHandler, Program, interpret};
+use telltale_choreography::{InMemoryHandler, Program, interpret};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -139,7 +139,7 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The `InMemoryHandler` provides local message passing for testing. See [Using Rumpsteak Handlers](07_rumpsteak_handler.md) for production handlers.
+The `InMemoryHandler` provides local message passing for testing. See [Using Telltale Handlers](07_telltale_handler.md) for production handlers.
 
 ## Core Concepts
 
@@ -159,9 +159,9 @@ Messages are data exchanged between roles. They must implement `Serialize` and `
 
 Handlers interpret choreographic effects into actual communication. Different handlers provide different transports.
 
-The `InMemoryHandler` provides local testing. The `RumpsteakHandler` provides channel-based communication. WebSocket handlers provide network communication.
+The `InMemoryHandler` provides local testing. The `TelltaleHandler` provides channel-based communication. WebSocket handlers provide network communication.
 
-The `RumpsteakHandler` supports two patterns. You can register built-in `SimpleChannel` pairs.
+The `TelltaleHandler` supports two patterns. You can register built-in `SimpleChannel` pairs.
 
 ```rust
 let (client_ch, server_ch) = SimpleChannel::pair();
@@ -174,9 +174,9 @@ Both endpoints now communicate through the channel pair.
 Alternatively, you can wrap your own sink and stream transports.
 
 ```rust
-use rumpsteak_aura_choreography::effects::RumpsteakSession;
+use telltale_choreography::effects::TelltaleSession;
 
-let ws_session = RumpsteakSession::from_sink_stream(websocket_writer, websocket_reader);
+let ws_session = TelltaleSession::from_sink_stream(websocket_writer, websocket_reader);
 client_endpoint.register_session(Role::Server, ws_session);
 ```
 

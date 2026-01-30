@@ -6,7 +6,7 @@
 use crate::runner::LeanRunner;
 
 /// Path to the Lean runner binary (relative to workspace root).
-pub const LEAN_BINARY_PATH: &str = "lean/.lake/build/bin/rumpsteak_runner";
+pub const LEAN_BINARY_PATH: &str = "lean/.lake/build/bin/telltale_runner";
 
 /// Skip message displayed when Lean binary is unavailable.
 pub const LEAN_SKIP_MESSAGE: &str =

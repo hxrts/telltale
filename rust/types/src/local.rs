@@ -7,7 +7,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! The core `LocalTypeR` enum mirrors `lean/Rumpsteak/Protocol/LocalTypeR.lean`:
+//! The core `LocalTypeR` enum mirrors `lean/Telltale/Protocol/LocalTypeR.lean`:
 //! - `LocalTypeR::End` ↔ Lean's `LocalTypeR.end`
 //! - `LocalTypeR::Send` ↔ Lean's `LocalTypeR.send`
 //! - `LocalTypeR::Recv` ↔ Lean's `LocalTypeR.recv`
@@ -26,7 +26,7 @@ use std::collections::HashSet;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// // Simple send: !B{msg.end}
 /// let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);

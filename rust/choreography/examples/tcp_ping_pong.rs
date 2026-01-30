@@ -1,4 +1,4 @@
-//! TCP Transport Example for Rumpsteak
+//! TCP Transport Example for Telltale
 //!
 //! This example demonstrates how to implement the `Transport` trait over TCP
 //! for real network communication between session-typed roles.
@@ -36,7 +36,7 @@
 //! - N bytes: message payload
 
 use async_trait::async_trait;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     topology::{Transport, TransportError, TransportResult},
     RoleName,
 };

@@ -23,8 +23,8 @@
 //! results by content ID:
 //!
 //! ```
-//! use rumpsteak_theory::projection::MemoizedProjector;
-//! use rumpsteak_types::{GlobalType, Label};
+//! use telltale_theory::projection::MemoizedProjector;
+//! use telltale_types::{GlobalType, Label};
 //!
 //! let mut projector = MemoizedProjector::new();
 //! let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
@@ -44,8 +44,8 @@
 
 use crate::limits::{CacheEntries, DEFAULT_PROJECTOR_CACHE_ENTRIES};
 use crate::merge::{merge_all, MergeError};
-use rumpsteak_types::content_store::{CacheMetrics, KeyedContentStore};
-use rumpsteak_types::{GlobalType, LocalTypeR};
+use telltale_types::content_store::{CacheMetrics, KeyedContentStore};
+use telltale_types::{GlobalType, LocalTypeR};
 use thiserror::Error;
 
 /// Errors that can occur during projection
@@ -83,8 +83,8 @@ pub type ProjectionResult = Result<LocalTypeR, ProjectionError>;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::project;
-/// use rumpsteak_types::{GlobalType, LocalTypeR, Label};
+/// use telltale_theory::project;
+/// use telltale_types::{GlobalType, LocalTypeR, Label};
 ///
 /// // A -> B: msg. end
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
@@ -216,8 +216,8 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::projection::MemoizedProjector;
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::projection::MemoizedProjector;
+/// use telltale_types::{GlobalType, Label};
 ///
 /// let mut projector = MemoizedProjector::new();
 ///
@@ -342,7 +342,7 @@ impl MemoizedProjector {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     #[test]
     fn test_project_end() {

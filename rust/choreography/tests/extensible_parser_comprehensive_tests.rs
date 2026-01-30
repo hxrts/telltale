@@ -7,7 +7,7 @@
 //! - Backwards compatibility
 //! - Error handling and edge cases
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::*,
     compiler::{extension_parser::*, grammar::*, parser::parse_choreography_str, ProjectionError},
     extensions::*,

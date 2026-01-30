@@ -13,19 +13,19 @@
 //!
 //! ```bash
 //! # Regenerate all golden files
-//! cargo run -p rumpsteak-lean-bridge --bin golden -- regenerate
+//! cargo run -p telltale-lean-bridge --bin golden -- regenerate
 //!
 //! # Check for drift (CI)
-//! cargo run -p rumpsteak-lean-bridge --bin golden -- check
+//! cargo run -p telltale-lean-bridge --bin golden -- check
 //!
 //! # Add a new test case
-//! cargo run -p rumpsteak-lean-bridge --bin golden -- add my_protocol '{"kind":"comm",...}'
+//! cargo run -p telltale-lean-bridge --bin golden -- add my_protocol '{"kind":"comm",...}'
 //! ```
 
 use clap::{Parser, Subcommand};
-use rumpsteak_lean_bridge::equivalence::EquivalenceChecker;
-use rumpsteak_lean_bridge::import::json_to_global;
-use rumpsteak_lean_bridge::runner::LeanRunner;
+use telltale_lean_bridge::equivalence::EquivalenceChecker;
+use telltale_lean_bridge::import::json_to_global;
+use telltale_lean_bridge::runner::LeanRunner;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -138,7 +138,7 @@ fn cmd_check(golden_dir: &PathBuf) -> anyhow::Result<()> {
         for item in &drifted {
             println!("  - {}", item);
         }
-        println!("\nRun 'cargo run -p rumpsteak-lean-bridge --bin golden -- regenerate' to update");
+        println!("\nRun 'cargo run -p telltale-lean-bridge --bin golden -- regenerate' to update");
         std::process::exit(1);
     }
 }
@@ -213,7 +213,7 @@ fn require_lean() -> anyhow::Result<()> {
         eprintln!("Error: Lean runner not available");
         eprintln!();
         eprintln!("Build the Lean runner first:");
-        eprintln!("  cd lean && lake build rumpsteak_runner");
+        eprintln!("  cd lean && lake build telltale_runner");
         eprintln!();
         eprintln!("Or with Nix:");
         eprintln!("  nix develop --command bash -c \"cd lean && lake build\"");

@@ -16,7 +16,7 @@
 //! - `?p{lᵢ.Sᵢ} <: ?p{l'ⱼ.T'ⱼ}` if `{lᵢ} ⊆ {l'ⱼ}` and `Sᵢ <: T'ᵢ` for matching labels
 //! - `μt.S <: μt.T` if `S <: T` (under assumption `t <: t`)
 
-use rumpsteak_types::LocalTypeR;
+use telltale_types::LocalTypeR;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -62,8 +62,8 @@ pub enum SyncSubtypeError {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::sync_subtype;
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::sync_subtype;
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// // end <: end
 /// assert!(sync_subtype(&LocalTypeR::End, &LocalTypeR::End).is_ok());
@@ -241,7 +241,7 @@ fn sync_subtype_with_assumptions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     #[test]
     fn test_end_subtype() {

@@ -1,10 +1,10 @@
-# rumpsteak-transport
+# telltale-transport
 
-Production transport implementations for the Rumpsteak session types library.
+Production transport implementations for the Telltale session types library.
 
 ## Overview
 
-This crate provides production-ready transport implementations that implement the `Transport` trait from `rumpsteak-aura-choreography`. It enables session-typed protocols to communicate over TCP between separate processes or machines.
+This crate provides production-ready transport implementations that implement the `Transport` trait from `telltale-choreography`. It enables session-typed protocols to communicate over TCP between separate processes or machines.
 
 ## Features
 
@@ -23,8 +23,8 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rumpsteak-transport = "*"
-rumpsteak-aura-choreography = "*"
+telltale-transport = "*"
+telltale-choreography = "*"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -33,8 +33,8 @@ tokio = { version = "1", features = ["full"] }
 ### Direct Configuration
 
 ```rust
-use rumpsteak_transport::{TcpTransport, TcpTransportConfig, Message, Transport};
-use rumpsteak_aura_choreography::RoleName;
+use telltale_transport::{TcpTransport, TcpTransportConfig, Message, Transport};
+use telltale_choreography::RoleName;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,14 +67,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 The `EnvResolver` discovers endpoints from environment variables:
 
 ```rust
-use rumpsteak_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
-use rumpsteak_aura_choreography::{TransportFactory, RoleName};
+use telltale_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
+use telltale_choreography::{TransportFactory, RoleName};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set environment variables:
-    //   RUMPSTEAK_ALICE_ENDPOINT=127.0.0.1:8080
-    //   RUMPSTEAK_BOB_ENDPOINT=127.0.0.1:8081
+    //   TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
+    //   TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
 
     let resolver = EnvResolver::with_default_prefix();
     let config = TcpTransportConfig::default();
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Custom Environment Prefix
 
 ```rust
-use rumpsteak_transport::EnvResolver;
+use telltale_transport::EnvResolver;
 
 // Use custom prefix: MYAPP_ALICE_ENDPOINT, MYAPP_BOB_ENDPOINT, etc.
 let resolver = EnvResolver::new("MYAPP")?;
@@ -99,7 +99,7 @@ let resolver = EnvResolver::new("MYAPP")?;
 ### Legacy Configuration from Environment
 
 ```rust
-use rumpsteak_transport::TcpTransportConfig;
+use telltale_transport::TcpTransportConfig;
 
 // Reads from environment variables:
 // - ROLE: Role name
@@ -112,7 +112,7 @@ let config = TcpTransportConfig::from_env()?;
 ### Custom Retry Configuration
 
 ```rust
-use rumpsteak_transport::{TcpTransportConfig, RetryConfig};
+use telltale_transport::{TcpTransportConfig, RetryConfig};
 use std::time::Duration;
 
 let retry = RetryConfig {
@@ -134,7 +134,7 @@ The transport supports both IPv4 and IPv6 addresses. Use bracket notation for IP
 ### IPv6 Configuration
 
 ```rust
-use rumpsteak_transport::TcpTransportConfig;
+use telltale_transport::TcpTransportConfig;
 
 // IPv6 loopback
 let config = TcpTransportConfig::new("Server", "[::1]:8080")
@@ -151,7 +151,7 @@ let production = TcpTransportConfig::new("Server", "[2001:db8::1]:8080")
 ### Mixed IPv4/IPv6 Peers
 
 ```rust
-use rumpsteak_transport::TcpTransportConfig;
+use telltale_transport::TcpTransportConfig;
 
 // Gateway connecting IPv4 and IPv6 peers
 let config = TcpTransportConfig::new("Gateway", "0.0.0.0:8080")
@@ -163,13 +163,13 @@ let config = TcpTransportConfig::new("Gateway", "0.0.0.0:8080")
 
 ```bash
 # IPv6 loopback
-export RUMPSTEAK_ALICE_ENDPOINT=[::1]:8080
+export TELLTALE_ALICE_ENDPOINT=[::1]:8080
 
 # Full IPv6 address
-export RUMPSTEAK_BOB_ENDPOINT=[2001:db8::1]:8081
+export TELLTALE_BOB_ENDPOINT=[2001:db8::1]:8081
 
 # Dual-stack binding
-export RUMPSTEAK_SERVER_ENDPOINT=[::]:3000
+export TELLTALE_SERVER_ENDPOINT=[::]:3000
 ```
 
 ## Multi-Process Deployment
@@ -178,22 +178,22 @@ For production deployments where each role runs in a separate process:
 
 ```bash
 # Terminal 1: Run Alice
-export RUMPSTEAK_ALICE_ENDPOINT=127.0.0.1:8080
-export RUMPSTEAK_BOB_ENDPOINT=127.0.0.1:8081
+export TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
+export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
 cargo run --bin my_protocol -- --role Alice
 
 # Terminal 2: Run Bob
-export RUMPSTEAK_ALICE_ENDPOINT=127.0.0.1:8080
-export RUMPSTEAK_BOB_ENDPOINT=127.0.0.1:8081
+export TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
+export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
 cargo run --bin my_protocol -- --role Bob
 ```
 
 ## Message Type
 
-Messages use the `Message` type from `rumpsteak-aura-choreography` which validates size limits:
+Messages use the `Message` type from `telltale-choreography` which validates size limits:
 
 ```rust
-use rumpsteak_transport::Message;
+use telltale_transport::Message;
 
 // Create a message (validates size)
 let msg = Message::new(b"Hello".to_vec())?;

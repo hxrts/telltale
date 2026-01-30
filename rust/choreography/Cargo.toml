@@ -1,12 +1,12 @@
 [package]
-name = "rumpsteak-aura-choreography"
+name = "telltale-choreography"
 version = "0.9.1"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
-description = "Choreographic programming for Rumpsteak - effect-based distributed protocols"
+description = "Choreographic programming for Telltale - effect-based distributed protocols"
 readme = "../../README.md"
-repository = "https://github.com/aura-project/rumpsteak-aura"
+repository = "https://github.com/hxrts/telltale"
 license = "MIT OR Apache-2.0"
 keywords = ["choreography", "session", "types", "effects"]
 categories = ["asynchronous", "concurrency"]
@@ -15,10 +15,10 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [dependencies]
-rumpsteak-aura = { path = "../..", version = "0.9.1" }
-rumpsteak-aura-macros = { path = "../macros", version = "0.9.1" }
-rumpsteak-types = { path = "../types", version = "0.9.1" }
-rumpsteak-theory = { path = "../theory", version = "0.9.1" }
+telltale = { path = "../..", version = "0.9.1" }
+telltale-macros = { path = "../macros", version = "0.9.1" }
+telltale-types = { path = "../types", version = "0.9.1" }
+telltale-theory = { path = "../theory", version = "0.9.1" }
 futures = { workspace = true }
 async-trait = { workspace = true }
 async-recursion = { workspace = true }
@@ -72,7 +72,7 @@ name = "choreography_bench"
 harness = false
 
 [[bench]]
-name = "rumpsteak_handler_bench"
+name = "telltale_handler_bench"
 harness = false
 
 [[bin]]

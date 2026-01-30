@@ -14,8 +14,8 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::topology::{TopologyBuilder, TopologyHandler, TopologyMode};
-use rumpsteak_aura_choreography::{Namespace, RoleName, TopologyEndpoint};
+use telltale_choreography::topology::{TopologyBuilder, TopologyHandler, TopologyMode};
+use telltale_choreography::{Namespace, RoleName, TopologyEndpoint};
 
 fn main() {
     println!("╔════════════════════════════════════════════════════════════╗");
@@ -200,10 +200,10 @@ fn demonstrate_role_validation() {
 // ```rust
 // pub mod topology {
 //     use super::*;
-//     use rumpsteak_aura_choreography::topology::{
+//     use telltale_choreography::topology::{
 //         Location, Topology, TopologyBuilder, TopologyHandler, TopologyMode,
 //     };
-//     use rumpsteak_aura_choreography::{Namespace, RoleName, TopologyEndpoint};
+//     use telltale_choreography::{Namespace, RoleName, TopologyEndpoint};
 //
 //     pub fn handler(role: Role) -> TopologyHandler {
 //         TopologyHandler::local(role.role_name())

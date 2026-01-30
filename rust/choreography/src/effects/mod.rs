@@ -29,7 +29,7 @@ pub use registry::{ExtensibleHandler, ExtensionRegistry};
 
 // Re-export handler implementations for convenience
 pub use handlers::{InMemoryHandler, RecordedEvent, RecordingHandler};
-pub use handlers::{RumpsteakEndpoint, RumpsteakHandler, RumpsteakSession, SimpleChannel};
+pub use handlers::{TelltaleEndpoint, TelltaleHandler, TelltaleSession, SimpleChannel};
 
 // Re-export middleware for convenience
 pub use middleware::{Metrics, Retry, Trace};

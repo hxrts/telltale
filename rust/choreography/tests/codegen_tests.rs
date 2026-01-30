@@ -7,14 +7,14 @@
 #![allow(clippy::expect_used)]
 
 use quote::format_ident;
-use rumpsteak_aura_choreography::ast::{
+use telltale_choreography::ast::{
     annotation::Annotations, Choreography, LocalType, MessageType, Protocol, Role, RoleParam,
 };
-use rumpsteak_aura_choreography::compiler::codegen::{
+use telltale_choreography::compiler::codegen::{
     generate_choreography_code, generate_dynamic_role_support, generate_role_implementations,
     generate_session_type, generate_topology_integration, InlineTopology,
 };
-use rumpsteak_aura_choreography::topology::Topology;
+use telltale_choreography::topology::Topology;
 use std::collections::HashMap;
 
 // Helper to create simple roles

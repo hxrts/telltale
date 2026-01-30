@@ -6,7 +6,7 @@
 // This example demonstrates the enhanced error reporting in the choreography parser.
 // Run with: cargo run --example error_demo
 
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::compiler::parser::parse_choreography_str;
 
 fn main() {
     println!("=== Choreography Parser Error Message Demo ===\n");

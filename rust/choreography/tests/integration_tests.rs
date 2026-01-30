@@ -8,7 +8,7 @@
 //! - Complex multi-feature protocols
 //! - End-to-end compilation and generation
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::{LocalType, Role},
     compiler::{
         codegen::{generate_choreography_code_with_dynamic_roles, generate_dynamic_role_support},

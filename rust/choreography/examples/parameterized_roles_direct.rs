@@ -3,7 +3,7 @@
 
 //! Direct test of parameterized roles parsing without using the proc macro
 
-use rumpsteak_aura_choreography::compiler::{parse_dsl, project};
+use telltale_choreography::compiler::{parse_dsl, project};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dsl = r"

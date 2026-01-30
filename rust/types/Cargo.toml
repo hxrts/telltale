@@ -1,12 +1,12 @@
 [package]
-name = "rumpsteak-types"
+name = "telltale-types"
 version = "0.9.1"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
-description = "Core session types for Rumpsteak - matching Lean definitions"
+description = "Core session types for Telltale - matching Lean definitions"
 readme = "../../README.md"
-repository = "https://github.com/aura-project/rumpsteak-aura"
+repository = "https://github.com/hxrts/telltale"
 license = "MIT OR Apache-2.0"
 keywords = ["session", "types", "mpst", "protocol"]
 categories = ["data-structures"]

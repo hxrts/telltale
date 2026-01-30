@@ -15,11 +15,11 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_theory::coherence::{
+use telltale_theory::coherence::{
     action_pred, check_coherent, good_g, linear_pred, projectable, size_pred,
 };
-use rumpsteak_theory::well_formedness::unique_labels;
-use rumpsteak_types::{GlobalType, Label};
+use telltale_theory::well_formedness::unique_labels;
+use telltale_types::{GlobalType, Label};
 
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [

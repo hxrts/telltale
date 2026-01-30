@@ -1,4 +1,4 @@
-//! Lean Verification Bridge for Rumpsteak Session Types
+//! Lean Verification Bridge for Telltale Session Types
 //!
 //! This crate provides bidirectional conversion between Rust session types
 //! and Lean-compatible JSON format, enabling formal verification of
@@ -38,8 +38,8 @@
 //! # Example
 //!
 //! ```
-//! use rumpsteak_types::{GlobalType, Label};
-//! use rumpsteak_lean_bridge::export::global_to_json;
+//! use telltale_types::{GlobalType, Label};
+//! use telltale_lean_bridge::export::global_to_json;
 //!
 //! let g = GlobalType::comm(
 //!     "Client",

@@ -23,7 +23,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/DeBruijn.lean`.
+//! This module corresponds to `lean/Telltale/Protocol/DeBruijn.lean`.
 
 use crate::{GlobalType, Label, LocalTypeR};
 use serde::{Deserialize, Serialize};
@@ -37,7 +37,7 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{GlobalType, Label, de_bruijn::GlobalTypeDB};
+/// use telltale_types::{GlobalType, Label, de_bruijn::GlobalTypeDB};
 ///
 /// // These two types are α-equivalent
 /// let g1 = GlobalType::mu("x", GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")));
@@ -146,7 +146,7 @@ impl From<&GlobalType> for GlobalTypeDB {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{LocalTypeR, Label, de_bruijn::LocalTypeRDB};
+/// use telltale_types::{LocalTypeR, Label, de_bruijn::LocalTypeRDB};
 ///
 /// // These two types are α-equivalent
 /// let t1 = LocalTypeR::mu("x", LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("x")));

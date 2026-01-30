@@ -2,7 +2,7 @@
 
 ## Overview
 
-Rumpsteak's choreographic programming system compiles to WebAssembly. The core library and effect handlers work in browser environments.
+Telltale's choreographic programming system compiles to WebAssembly. The core library and effect handlers work in browser environments.
 
 WASM support enables choreographic protocols in web applications, browser-based distributed systems, and serverless edge computing.
 
@@ -10,7 +10,7 @@ WASM support enables choreographic protocols in web applications, browser-based 
 
 The following features compile and run in WASM:
 
-Core session types and choreography system work fully. The InMemoryHandler provides local message passing for testing protocols. RumpsteakHandler now compiles for WASM and can be used with custom network transports (WebSocket, fetch API, etc.). All middleware (Trace, Metrics, Retry, FaultInjection) functions correctly. Effect system and interpreter execute normally. Timeouts use wasm-timer for cross-platform support.
+Core session types and choreography system work fully. The InMemoryHandler provides local message passing for testing protocols. TelltaleHandler now compiles for WASM and can be used with custom network transports (WebSocket, fetch API, etc.). All middleware (Trace, Metrics, Retry, FaultInjection) functions correctly. Effect system and interpreter execute normally. Timeouts use wasm-timer for cross-platform support.
 
 ## What Does Not Work in WASM
 
@@ -24,7 +24,7 @@ Add the wasm feature to your dependencies:
 
 ```toml
 [dependencies]
-rumpsteak-aura-choreography = { version = "0.7", features = ["wasm"] }
+telltale-choreography = { version = "0.7", features = ["wasm"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 ```
@@ -43,7 +43,7 @@ The wasm-ping-pong example demonstrates a complete browser protocol:
 
 ```rust
 use wasm_bindgen::prelude::*;
-use rumpsteak_aura_choreography::{InMemoryHandler, Program, interpret};
+use telltale_choreography::{InMemoryHandler, Program, interpret};
 
 #[wasm_bindgen]
 pub async fn run_protocol(message: String) -> Result<String, JsValue> {
@@ -77,19 +77,19 @@ python3 -m http.server 8000
 
 Open http://localhost:8000 in a browser to run the protocol.
 
-## Using RumpsteakHandler in WASM
+## Using TelltaleHandler in WASM
 
-RumpsteakHandler now compiles for WASM. To use it with real network transport:
+TelltaleHandler now compiles for WASM. To use it with real network transport:
 
 ```rust
 use wasm_bindgen::prelude::*;
-use rumpsteak_aura_choreography::{RumpsteakHandler, RumpsteakEndpoint, SimpleChannel};
+use telltale_choreography::{TelltaleHandler, TelltaleEndpoint, SimpleChannel};
 
 #[wasm_bindgen]
 pub async fn run_distributed_protocol() -> Result<(), JsValue> {
     // Create endpoints
-    let mut alice_ep = RumpsteakEndpoint::new(Role::Alice);
-    let mut bob_ep = RumpsteakEndpoint::new(Role::Bob);
+    let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
+    let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
     
     // Option 1: use SimpleChannel (works natively and in WASM)
     let (alice_ch, bob_ch) = SimpleChannel::pair();
@@ -97,11 +97,11 @@ pub async fn run_distributed_protocol() -> Result<(), JsValue> {
     bob_ep.register_channel(Role::Alice, bob_ch);
 
     // Option 2: wrap browser transports directly
-    // let ws_session = RumpsteakSession::from_sink_stream(ws_writer, ws_reader);
+    // let ws_session = TelltaleSession::from_sink_stream(ws_writer, ws_reader);
     // alice_ep.register_session(Role::Bob, ws_session);
     
     // Create handler
-    let mut handler = RumpsteakHandler::new();
+    let mut handler = TelltaleHandler::new();
     
     // Use with choreography operations
     handler.send(&mut alice_ep, Role::Bob, &message).await?;
@@ -155,7 +155,7 @@ impl WebSocketHandler {
 ```
 
 With the Phase 3 handler you can skip the custom `ChoreoHandler`. Wrap this
-`WebSocketHandler` with `RumpsteakSession::from_sink_stream` and register it on
+`WebSocketHandler` with `TelltaleSession::from_sink_stream` and register it on
 the endpoint instead.
 
 For HTTP-based protocols, use the fetch API:
@@ -179,7 +179,7 @@ The pattern is the same: implement ChoreoHandler using browser APIs for your tra
 The runtime module provides platform-specific functions:
 
 ```rust
-use rumpsteak_aura_choreography::runtime::{spawn, spawn_local};
+use telltale_choreography::runtime::{spawn, spawn_local};
 
 spawn(async { /* task */ });  // Works on native and WASM
 ```

@@ -4,7 +4,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! Corresponds to the `Label` structure in `lean/Rumpsteak/Protocol/GlobalType.lean`.
+//! Corresponds to the `Label` structure in `lean/Telltale/Protocol/GlobalType.lean`.
 
 use crate::PayloadSort;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{Label, PayloadSort};
+/// use telltale_types::{Label, PayloadSort};
 ///
 /// // Simple label with unit payload
 /// let hello = Label::new("hello");

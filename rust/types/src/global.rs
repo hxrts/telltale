@@ -8,7 +8,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module mirrors the definitions in `lean/Rumpsteak/Protocol/GlobalType.lean`:
+//! This module mirrors the definitions in `lean/Telltale/Protocol/GlobalType.lean`:
 //! - `PayloadSort` ↔ Lean's `PayloadSort`
 //! - `GlobalType` ↔ Lean's `GlobalType`
 
@@ -24,7 +24,7 @@ use std::collections::HashSet;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::PayloadSort;
+/// use telltale_types::PayloadSort;
 ///
 /// let unit = PayloadSort::Unit;
 /// assert!(unit.is_simple());
@@ -90,7 +90,7 @@ impl std::fmt::Display for PayloadSort {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_types::{GlobalType, Label};
 ///
 /// // Simple protocol: A -> B: hello. end
 /// let g = GlobalType::send("A", "B", Label::new("hello"), GlobalType::End);

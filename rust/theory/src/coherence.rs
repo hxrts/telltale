@@ -8,7 +8,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module mirrors `lean/Rumpsteak/Protocol/Coherence.lean`:
+//! This module mirrors `lean/Telltale/Protocol/Coherence.lean`:
 //! - `CoherentG` ↔ Lean's `coherentG` structure
 //! - `projectable` ↔ Lean's `projectable` definition
 //! - `check_coherent` bundles all predicates
@@ -17,7 +17,7 @@ use crate::merge::can_merge;
 use crate::projection::MemoizedProjector;
 use crate::semantics::{can_step, step, GlobalAction};
 use crate::well_formedness::unique_labels;
-use rumpsteak_types::GlobalType;
+use telltale_types::GlobalType;
 use std::collections::HashSet;
 
 /// Coherence bundle for global types.
@@ -62,8 +62,8 @@ impl CoherentG {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::check_coherent;
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::check_coherent;
+/// use telltale_types::{GlobalType, Label};
 ///
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 /// let bundle = check_coherent(&g);
@@ -135,8 +135,8 @@ fn action_pred_rec(g: &GlobalType) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::projectable;
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::projectable;
+/// use telltale_types::{GlobalType, Label};
 ///
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 /// assert!(projectable(&g));
@@ -289,7 +289,7 @@ fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut HashSet<GlobalType>) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     #[test]
     fn test_coherent_simple() {

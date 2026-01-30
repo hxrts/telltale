@@ -13,7 +13,7 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/Resource.lean`:
+//! This module corresponds to `lean/Telltale/Protocol/Resource.lean`:
 //! - `ResourceId` ↔ Lean's `ResourceId`
 //! - `Resource` ↔ Lean's `Resource`
 //! - `HeapError` ↔ Lean's `HeapError`

@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_aura_choreography::runtime::TestAdapter;
+//! use telltale_choreography::runtime::TestAdapter;
 //!
 //! // Define role and label types
 //! #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

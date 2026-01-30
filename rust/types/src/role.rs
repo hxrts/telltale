@@ -11,7 +11,7 @@ use std::collections::HashSet;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::Role;
+/// use telltale_types::Role;
 ///
 /// let client = Role::new("Client");
 /// let server = Role::indexed("Worker", 0);

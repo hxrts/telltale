@@ -3,7 +3,7 @@
 
 //! Debug parameterized roles parsing
 
-use rumpsteak_aura_choreography::compiler::parse_dsl;
+use telltale_choreography::compiler::parse_dsl;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dsl = r"

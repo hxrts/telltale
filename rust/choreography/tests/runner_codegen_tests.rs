@@ -4,8 +4,8 @@
 //! are generated correctly from choreographic specifications.
 
 use quote::format_ident;
-use rumpsteak_aura_choreography::ast::{LocalType, MessageType, Role};
-use rumpsteak_aura_choreography::compiler::runner::{
+use telltale_choreography::ast::{LocalType, MessageType, Role};
+use telltale_choreography::compiler::runner::{
     generate_all_runners, generate_execute_as, generate_output_types, generate_runner_fn,
 };
 
@@ -445,7 +445,7 @@ fn test_branch_label_excludes_message_type_names_simple() {
 /// (via merge_labeled_local_types in merge_choice_continuations) for choice projections.
 #[test]
 fn test_merge_rejects_different_receives_without_labels() {
-    use rumpsteak_aura_choreography::compiler::projection::merge_local_types;
+    use telltale_choreography::compiler::projection::merge_local_types;
 
     let sender = make_role("Sender");
     let commit_msg = make_message("CommitCeremony");
@@ -493,7 +493,7 @@ fn test_merge_rejects_different_receives_without_labels() {
 /// attempts to merge receives with different messages without label information.
 #[test]
 fn test_merge_fix_prevents_branch_label_pollution() {
-    use rumpsteak_aura_choreography::compiler::projection::merge_local_types;
+    use telltale_choreography::compiler::projection::merge_local_types;
 
     let sender = make_role("Sender");
     let commit_msg = make_message("CommitCeremony");

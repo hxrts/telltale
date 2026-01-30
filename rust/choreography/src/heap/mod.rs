@@ -15,13 +15,13 @@
 //! ## Lean Correspondence
 //!
 //! This module corresponds to the Lean formalization:
-//! - `lean/Rumpsteak/Protocol/Resource.lean` - Resource types
-//! - `lean/Rumpsteak/Protocol/Heap.lean` - Heap operations
+//! - `lean/Telltale/Protocol/Resource.lean` - Resource types
+//! - `lean/Telltale/Protocol/Heap.lean` - Heap operations
 //!
 //! ## Example
 //!
 //! ```rust
-//! use rumpsteak_aura_choreography::heap::{Heap, Resource};
+//! use telltale_choreography::heap::{Heap, Resource};
 //!
 //! // Create a new heap
 //! let heap = Heap::new();

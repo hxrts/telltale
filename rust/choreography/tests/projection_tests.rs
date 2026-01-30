@@ -7,11 +7,11 @@
 #![allow(clippy::expect_used)]
 
 use quote::format_ident;
-use rumpsteak_aura_choreography::ast::{
+use telltale_choreography::ast::{
     annotation::Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role,
     RoleParam,
 };
-use rumpsteak_aura_choreography::compiler::projection::{project, ProjectionError};
+use telltale_choreography::compiler::projection::{project, ProjectionError};
 use std::collections::HashMap;
 
 // Helper to create simple roles

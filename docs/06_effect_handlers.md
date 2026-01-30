@@ -63,7 +63,7 @@ The InMemoryHandler is located in `rust/choreography/src/effects/handlers/in_mem
 Basic usage creates a handler for a single role.
 
 ```rust
-use rumpsteak_aura_choreography::InMemoryHandler;
+use telltale_choreography::InMemoryHandler;
 
 let mut handler = InMemoryHandler::new(Role::Alice);
 ```
@@ -82,13 +82,13 @@ let bob = InMemoryHandler::with_channels(Role::Bob, channels.clone(), choice_cha
 
 The shared channels enable communication between handlers in the same process.
 
-### RumpsteakHandler
+### TelltaleHandler
 
-The RumpsteakHandler is located in `rust/choreography/src/effects/handlers/rumpsteak.rs`. It provides production-ready session-typed channels. The implementation uses the core Rumpsteak library for type-safe communication.
+The TelltaleHandler is located in `rust/choreography/src/effects/handlers/telltale.rs`. It provides production-ready session-typed channels. The implementation uses the core Telltale library for type-safe communication.
 
 This handler enforces session types at runtime. It provides strong guarantees about protocol compliance.
 
-See [Using Rumpsteak Handlers](07_rumpsteak_handler.md) for complete documentation.
+See [Using Telltale Handlers](07_telltale_handler.md) for complete documentation.
 
 ### RecordingHandler
 
@@ -97,7 +97,7 @@ The RecordingHandler is located in `rust/choreography/src/effects/handlers/recor
 Basic usage creates a recording handler.
 
 ```rust
-use rumpsteak_aura_choreography::RecordingHandler;
+use telltale_choreography::RecordingHandler;
 
 let mut handler = RecordingHandler::new(Role::Alice);
 // ... execute protocol ...
@@ -128,7 +128,7 @@ The Trace middleware is located in `rust/choreography/src/effects/middleware/mod
 Usage example shows wrapping a handler.
 
 ```rust
-use rumpsteak_aura_choreography::middleware::Trace;
+use telltale_choreography::middleware::Trace;
 
 let base_handler = InMemoryHandler::new(role);
 let mut handler = Trace::new(base_handler, "Alice".to_string());
@@ -143,7 +143,7 @@ The Metrics middleware is located in `rust/choreography/src/effects/middleware/m
 Usage example shows metrics collection.
 
 ```rust
-use rumpsteak_aura_choreography::middleware::Metrics;
+use telltale_choreography::middleware::Metrics;
 
 let base_handler = InMemoryHandler::new(role);
 let mut handler = Metrics::new(base_handler);
@@ -160,7 +160,7 @@ The Retry middleware is located in `rust/choreography/src/effects/middleware/ret
 Usage example configures retry behavior.
 
 ```rust
-use rumpsteak_aura_choreography::middleware::Retry;
+use telltale_choreography::middleware::Retry;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
@@ -176,7 +176,7 @@ The FaultInjection middleware is located in `rust/choreography/src/effects/middl
 Usage example configures fault injection.
 
 ```rust
-use rumpsteak_aura_choreography::middleware::FaultInjection;
+use telltale_choreography::middleware::FaultInjection;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
@@ -243,7 +243,7 @@ The handler manages connection state and serialization. The endpoint type holds 
 
 Use InMemoryHandler for local testing and simple protocols.
 
-Use RumpsteakHandler for production deployments with session type guarantees.
+Use TelltaleHandler for production deployments with session type guarantees.
 
 Use RecordingHandler for test verification and debugging.
 
@@ -253,7 +253,7 @@ Use middleware to add logging, metrics, retries, or fault injection. Middleware 
 
 ## WASM Considerations
 
-InMemoryHandler and RumpsteakHandler both work in WASM environments. They use futures channels for communication.
+InMemoryHandler and TelltaleHandler both work in WASM environments. They use futures channels for communication.
 
 For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](13_wasm_guide.md) for details.
 
@@ -295,7 +295,7 @@ pub trait ChoreographicAdapter: Sized {
 The `TestAdapter` implements `ChoreographicAdapter` for testing protocols with role families.
 
 ```rust
-use rumpsteak_aura_choreography::runtime::test_adapter::TestAdapter;
+use telltale_choreography::runtime::test_adapter::TestAdapter;
 
 // Create adapter with configured role family
 let witnesses: Vec<Role> = (0..5).map(Role::Witness).collect();
@@ -342,7 +342,7 @@ The `@min_responses(N)` annotation generates threshold checking. The collect ope
 Execution hints are extracted from annotations and passed separately to code generation. This keeps the `LocalType` pure for Lean verification while enabling runtime optimizations.
 
 ```rust
-use rumpsteak_aura_choreography::ast::{ExecutionHints, ChoreographyWithHints};
+use telltale_choreography::ast::{ExecutionHints, ChoreographyWithHints};
 
 // Extract hints from a parsed choreography
 let with_hints = ChoreographyWithHints::from_choreography(choreography);
@@ -361,7 +361,7 @@ Default behavior without hints is sequential execution with all responses requir
 Role family constraints can be validated against topology configuration.
 
 ```rust
-use rumpsteak_aura_choreography::topology::Topology;
+use telltale_choreography::topology::Topology;
 
 let config = r#"
     topology Prod for Protocol {

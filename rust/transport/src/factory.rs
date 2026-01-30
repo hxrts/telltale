@@ -3,7 +3,7 @@
 use crate::config::TcpTransportConfig;
 use crate::TcpTransport;
 use async_trait::async_trait;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     EndpointResolver, RoleName, Transport, TransportError, TransportFactory,
 };
 use std::sync::Arc;
@@ -16,8 +16,8 @@ use std::sync::Arc;
 /// # Example
 ///
 /// ```rust,no_run
-/// use rumpsteak_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
-/// use rumpsteak_aura_choreography::{TransportFactory, RoleName};
+/// use telltale_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
+/// use telltale_choreography::{TransportFactory, RoleName};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create factory with environment-based discovery
@@ -97,8 +97,8 @@ impl<R: EndpointResolver + 'static> TransportFactory for TcpTransportFactory<R> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_aura_choreography::StaticResolver;
-    use rumpsteak_aura_choreography::topology::Endpoint;
+    use telltale_choreography::StaticResolver;
+    use telltale_choreography::topology::Endpoint;
 
     #[tokio::test]
     async fn test_factory_creates_transport() {

@@ -11,8 +11,8 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
-use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
 /// Deterministic seed for property-based tests.
 /// Using a fixed seed ensures all proptest runs are reproducible.

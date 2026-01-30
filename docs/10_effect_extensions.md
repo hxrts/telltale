@@ -240,7 +240,7 @@ Boxed roles must match the choreography's role type `R: RoleId`. Role types must
 This example shows proper projection implementation.
 
 ```rust
-use rumpsteak_aura_choreography::effects::*;
+use telltale_choreography::effects::*;
 use std::any::{Any, TypeId};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

@@ -58,8 +58,8 @@ impl CacheMetrics {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::content_store::ContentStore;
-/// use rumpsteak_types::{GlobalType, LocalTypeR, Label};
+/// use telltale_types::content_store::ContentStore;
+/// use telltale_types::{GlobalType, LocalTypeR, Label};
 ///
 /// let mut store: ContentStore<GlobalType, LocalTypeR> = ContentStore::new();
 ///
@@ -228,8 +228,8 @@ impl<K: Contentable, V: Clone, H: Hasher + Eq + StdHash> Clone for ContentStore<
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::content_store::KeyedContentStore;
-/// use rumpsteak_types::{GlobalType, LocalTypeR, Label};
+/// use telltale_types::content_store::KeyedContentStore;
+/// use telltale_types::{GlobalType, LocalTypeR, Label};
 ///
 /// let mut store: KeyedContentStore<GlobalType, String, LocalTypeR> = KeyedContentStore::new();
 ///

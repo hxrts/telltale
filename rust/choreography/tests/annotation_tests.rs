@@ -7,10 +7,10 @@
 // the choreography compilation pipeline.
 
 use proc_macro2::{Ident, Span};
-use rumpsteak_aura_choreography::ast::{
+use telltale_choreography::ast::{
     Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, ProtocolAnnotation, Role,
 };
-use rumpsteak_aura_choreography::compiler::{
+use telltale_choreography::compiler::{
     generate_choreography_code_with_namespacing, parse_choreography_str,
 };
 use std::collections::HashMap;

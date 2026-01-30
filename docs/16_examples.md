@@ -32,7 +32,7 @@ The `ring_choice.rs` example shows ring topology with choice points. Roles make 
 
 The `wasm-ping-pong` example runs in browsers. It shows browser‑based ping‑pong protocol. See examples/wasm-ping-pong/README.md for details.
 
-`RumpsteakEndpoint` supports two patterns. Use `register_channel` for `SimpleChannel`. Use `register_session` for custom transports. Call `RumpsteakSession::from_sink_stream` for WebSockets or other transports.
+`TelltaleEndpoint` supports two patterns. Use `register_channel` for `SimpleChannel`. Use `register_session` for custom transports. Call `TelltaleSession::from_sink_stream` for WebSockets or other transports.
 
 ## Common Patterns
 
@@ -173,7 +173,7 @@ async fn test_protocol() {
 
 InMemoryHandler provides fast deterministic testing.
 
-### Integration Test with RumpsteakHandler
+### Integration Test with TelltaleHandler
 
 Test actual session‑typed communication.
 
@@ -182,10 +182,10 @@ Test actual session‑typed communication.
 async fn test_session_types() {
     let (alice_ch, bob_ch) = SimpleChannel::pair();
 
-    let mut alice_ep = RumpsteakEndpoint::new(Role::Alice);
+    let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
     alice_ep.register_channel(Role::Bob, alice_ch);
 
-    let mut bob_ep = RumpsteakEndpoint::new(Role::Bob);
+    let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
     bob_ep.register_channel(Role::Alice, bob_ch);
 
     // Run protocol with both endpoints

@@ -61,7 +61,7 @@ pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
     let endpoint_type = generate_endpoint_type(protocol_name);
 
     quote! {
-        use rumpsteak_aura_choreography::{
+        use telltale_choreography::{
             ChoreoHandler, Result, Program, Effect, LabelId, RoleId, RoleName,
             interpret, InterpretResult, ProgramMessage
         };
@@ -122,7 +122,7 @@ fn generate_endpoint_type(protocol_name: &proc_macro2::Ident) -> TokenStream {
             // Protocol-specific endpoint state
         }
 
-        impl rumpsteak::effects::Endpoint for #ep_name {}
+        impl telltale::effects::Endpoint for #ep_name {}
     }
 }
 
@@ -324,7 +324,7 @@ fn generate_program_builder(protocol: &Protocol, role: &Role) -> TokenStream {
     let program_effects = generate_program_effects(protocol, role);
 
     quote! {
-        use rumpsteak_aura_choreography::{Program, Effect};
+        use telltale_choreography::{Program, Effect};
 
         Program::new()
             #program_effects

@@ -9,8 +9,8 @@
 //! This provides end-to-end verification that the guardedness enforcement
 //! proven necessary in Lean actually prevents deadlock-prone protocols.
 
-use rumpsteak_theory::{project, validate_global, validate_local, ValidationError};
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_theory::{project, validate_global, validate_local, ValidationError};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 // ============================================================================
 // Test 1: Direct Unguarded Recursion (μt. t)

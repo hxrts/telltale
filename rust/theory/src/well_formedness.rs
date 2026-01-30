@@ -24,7 +24,7 @@
 //! - `unique_labels` ↔ Lean's `uniqLabels` inductive
 //! - `branches_unique` ↔ Lean's `BranchesUniq`
 
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 use thiserror::Error;
 
 /// Errors during well-formedness validation
@@ -66,8 +66,8 @@ pub type ValidationResult = Result<(), ValidationError>;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::validate_global;
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::validate_global;
+/// use telltale_types::{GlobalType, Label};
 ///
 /// // Well-formed protocol
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
@@ -140,8 +140,8 @@ fn find_self_comm(g: &GlobalType) -> Option<String> {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::unique_labels;
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::unique_labels;
+/// use telltale_types::{GlobalType, Label};
 ///
 /// // Unique labels
 /// let g = GlobalType::comm("A", "B", vec![
@@ -259,8 +259,8 @@ fn find_duplicate_label_local(lt: &LocalTypeR) -> Option<String> {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::validate_local;
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::validate_local;
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// // Well-formed local type
 /// let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
@@ -315,7 +315,7 @@ pub fn is_well_formed_local(lt: &LocalTypeR) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     #[test]
     fn test_validate_global_simple() {

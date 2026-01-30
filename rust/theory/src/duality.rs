@@ -11,7 +11,7 @@
 //! - `dual(μt.T) = μt.dual(T)`
 //! - `dual(t) = t`
 
-use rumpsteak_types::LocalTypeR;
+use telltale_types::LocalTypeR;
 
 /// Compute the dual of a local type.
 ///
@@ -21,8 +21,8 @@ use rumpsteak_types::LocalTypeR;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::dual;
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::dual;
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
 /// let recv = dual(&send);
@@ -40,8 +40,8 @@ pub fn dual(lt: &LocalTypeR) -> LocalTypeR {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::{dual, is_dual};
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::{dual, is_dual};
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
 /// let recv = LocalTypeR::recv("B", Label::new("msg"), LocalTypeR::End);
@@ -56,7 +56,7 @@ pub fn is_dual(t1: &LocalTypeR, t2: &LocalTypeR) -> bool {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     #[test]
     fn test_dual_end() {

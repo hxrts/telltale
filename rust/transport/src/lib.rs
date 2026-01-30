@@ -1,7 +1,7 @@
-//! Production Transport for Rumpsteak Session Types
+//! Production Transport for Telltale Session Types
 //!
 //! This crate provides production-ready transport implementations for
-//! the Rumpsteak session types library.
+//! the Telltale session types library.
 //!
 //! ## Features
 //!
@@ -17,8 +17,8 @@
 //! ## Example
 //!
 //! ```no_run
-//! use rumpsteak_transport::{TcpTransport, TcpTransportConfig, EnvResolver, TcpTransportFactory};
-//! use rumpsteak_aura_choreography::{RoleName, Transport, TransportFactory};
+//! use telltale_transport::{TcpTransport, TcpTransportConfig, EnvResolver, TcpTransportFactory};
+//! use telltale_choreography::{RoleName, Transport, TransportFactory};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,8 +32,8 @@
 //!
 //!     // Option 2: Factory with environment-based discovery
 //!     // Set environment variables:
-//!     //   RUMPSTEAK_ALICE_ENDPOINT=127.0.0.1:8080
-//!     //   RUMPSTEAK_BOB_ENDPOINT=127.0.0.1:8081
+//!     //   TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
+//!     //   TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
 //!     let resolver = EnvResolver::with_default_prefix();
 //!     let factory = TcpTransportFactory::with_resolver(resolver);
 //!     let transport = factory.create(&RoleName::from_static("Alice")).await?;
@@ -47,7 +47,7 @@
 //! The transport fully supports IPv6 addresses. Use bracket notation for IPv6:
 //!
 //! ```no_run
-//! use rumpsteak_transport::TcpTransportConfig;
+//! use telltale_transport::TcpTransportConfig;
 //!
 //! // IPv6 loopback
 //! let config = TcpTransportConfig::new("Server", "[::1]:8080")
@@ -65,8 +65,8 @@
 //! Environment variables also support IPv6:
 //!
 //! ```bash
-//! export RUMPSTEAK_ALICE_ENDPOINT=[::1]:8080
-//! export RUMPSTEAK_BOB_ENDPOINT=[2001:db8::1]:8081
+//! export TELLTALE_ALICE_ENDPOINT=[::1]:8080
+//! export TELLTALE_BOB_ENDPOINT=[2001:db8::1]:8081
 //! ```
 //!
 //! ## Message Framing
@@ -107,7 +107,7 @@ pub use resolver::{EnvResolver, EnvResolverConfigError};
 pub use transport::{TcpTransport, TransportState};
 
 // Re-export core traits and types for convenience
-pub use rumpsteak_aura_choreography::topology::{
+pub use telltale_choreography::topology::{
     Message, Transport, TransportError, TransportFactory, TransportResult,
 };
-pub use rumpsteak_aura_choreography::{EndpointResolver, RoleName, StaticResolver};
+pub use telltale_choreography::{EndpointResolver, RoleName, StaticResolver};

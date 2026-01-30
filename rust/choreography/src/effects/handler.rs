@@ -14,7 +14,7 @@
 //! # Example
 //!
 //! ```text
-//! use rumpsteak_aura_choreography::{ChoreoHandler, LabelId};
+//! use telltale_choreography::{ChoreoHandler, LabelId};
 //!
 //! #[async_trait]
 //! impl ChoreoHandler for MyHandler {
@@ -99,7 +99,7 @@ impl MessageTag {
 
 /// Session endpoint trait
 ///
-/// Represents the runtime-specific connection state (e.g., Rumpsteak channel bundle).
+/// Represents the runtime-specific connection state (e.g., Telltale channel bundle).
 /// The generated code will be generic over the endpoint type.
 pub trait Endpoint: Send {}
 impl<T: Send> Endpoint for T {}

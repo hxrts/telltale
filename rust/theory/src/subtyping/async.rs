@@ -13,7 +13,7 @@
 //! be decomposed into alternating input and output phases.
 
 use crate::limits::{UnfoldSteps, DEFAULT_SISO_UNFOLD_STEPS};
-use rumpsteak_types::{Label, LocalTypeR};
+use telltale_types::{Label, LocalTypeR};
 use thiserror::Error;
 
 /// Errors during asynchronous subtyping
@@ -91,8 +91,8 @@ pub struct SisoSegment {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::siso_decompose;
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::siso_decompose;
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// // Simple send then receive
 /// let t = LocalTypeR::send(
@@ -308,8 +308,8 @@ fn find_input_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::async_subtype;
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::async_subtype;
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// let t1 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
 /// let t2 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
@@ -344,8 +344,8 @@ pub fn async_subtype(sub: &LocalTypeR, sup: &LocalTypeR) -> Result<(), AsyncSubt
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::orphan_free;
-/// use rumpsteak_types::LocalTypeR;
+/// use telltale_theory::orphan_free;
+/// use telltale_types::LocalTypeR;
 ///
 /// // End is always orphan-free
 /// assert!(orphan_free(&LocalTypeR::End));

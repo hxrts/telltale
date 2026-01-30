@@ -1,16 +1,16 @@
 //! Global Types for Multiparty Session Type Protocols
 //!
-//! This module re-exports the core global types from `rumpsteak-types`.
+//! This module re-exports the core global types from `telltale-types`.
 //! These types describe protocols from a bird's-eye view.
 //!
 //! Based on: "A Very Gentle Introduction to Multiparty Session Types" (Yoshida & Gheri)
 //!
 //! # Lean Correspondence
 //!
-//! These types mirror the definitions in `lean/Rumpsteak/Protocol/GlobalType.lean`.
+//! These types mirror the definitions in `lean/Telltale/Protocol/GlobalType.lean`.
 
-// Re-export all core types from rumpsteak-types
-pub use rumpsteak_types::{GlobalType, Label, PayloadSort};
+// Re-export all core types from telltale-types
+pub use telltale_types::{GlobalType, Label, PayloadSort};
 
 #[cfg(test)]
 mod tests {

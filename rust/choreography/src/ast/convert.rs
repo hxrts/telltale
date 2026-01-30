@@ -2,7 +2,7 @@
 //!
 //! This module provides bidirectional conversion between choreography DSL types
 //! (Protocol, LocalType) and the formal theory types (GlobalType, LocalTypeR)
-//! from `rumpsteak-types`.
+//! from `telltale-types`.
 //!
 //! ## Supported Conversions
 //!
@@ -19,7 +19,7 @@
 //! - `LocalChoice`: DSL-only feature for local decisions
 
 use super::{Branch, Choreography, LocalType, MessageType, Protocol};
-use rumpsteak_types::{GlobalType as GlobalTypeCore, Label, LocalTypeR, PayloadSort};
+use telltale_types::{GlobalType as GlobalTypeCore, Label, LocalTypeR, PayloadSort};
 use thiserror::Error;
 
 /// Errors that can occur during conversion.

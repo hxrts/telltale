@@ -11,7 +11,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use quote::format_ident;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::{Annotations, Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol, Role},
     compiler::{codegen::generate_session_type, projection::project},
     effects::{interpret, LabelId, NoOpHandler, Program, RoleId},

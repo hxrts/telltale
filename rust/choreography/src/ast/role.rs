@@ -88,7 +88,7 @@ pub enum RangeExpr {
 ///
 /// ```text
 /// use quote::format_ident;
-/// use rumpsteak_aura_choreography::{Role, RoleParam};
+/// use telltale_choreography::{Role, RoleParam};
 ///
 /// // Simple role
 /// let client = Role::new(format_ident!("Client")).unwrap();

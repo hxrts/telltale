@@ -1,5 +1,5 @@
 {
-  description = "Rumpsteak Aura - Session types for asynchronous communication";
+  description = "Telltale - Session types for asynchronous communication";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -62,7 +62,7 @@
           inherit nativeBuildInputs buildInputs;
 
           shellHook = ''
-            echo "Rumpsteak Aura development environment"
+            echo "Telltale development environment"
             echo "Rust: $(rustc --version)"
             echo "Lean: $(elan show 2>/dev/null | head -1 || echo 'run: elan default leanprover/lean4:v4.25.0')"
             echo "WASM: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
@@ -70,7 +70,7 @@
         };
 
         packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "rumpsteak-aura";
+          pname = "telltale";
           version = "0.1.1-aura";
 
           src = ./.;
@@ -83,7 +83,7 @@
 
           meta = with pkgs.lib; {
             description = "Session types for asynchronous communication between multiple parties - Aura fork for threshold cryptography choreographies";
-            homepage = "https://github.com/aura-project/rumpsteak-aura";
+            homepage = "https://github.com/hxrts/telltale";
             license = with licenses; [
               mit
               asl20

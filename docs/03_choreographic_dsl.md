@@ -311,7 +311,7 @@ Unlike `timed_choice`, this annotation does **not** change the session type. It 
 #### 11) String-based Protocol Definition
 
 ```rust
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::compiler::parser::parse_choreography_str;
 
 let protocol = r#"
 protocol PingPong =
@@ -364,7 +364,7 @@ The parser builds the AST for projection, validation, and code generation.
 `parse_choreography_str` parses a DSL string into a `Choreography` AST.
 
 ```rust
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::compiler::parser::parse_choreography_str;
 
 let choreo = parse_choreography_str(r#"
 protocol Example =
@@ -379,7 +379,7 @@ This example parses a DSL string into a `Choreography`. It uses `parse_choreogra
 
 ```rust
 use std::path::Path;
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_file;
+use telltale_choreography::compiler::parser::parse_choreography_file;
 
 let choreo = parse_choreography_file(Path::new("protocol.choreo"))?;
 ```
@@ -542,7 +542,7 @@ This example uses adjacent `branch` blocks. Each branch defines a parallel sub p
 ### With Projection
 
 ```rust
-use rumpsteak_aura_choreography::compiler::{parser, projection};
+use telltale_choreography::compiler::{parser, projection};
 
 let choreo = parser::parse_choreography_str(input)?;
 
@@ -557,7 +557,7 @@ This projects the global protocol to a local type for each role. The result can 
 ### With Code Generation
 
 ```rust
-use rumpsteak_aura_choreography::compiler::{parser, projection, codegen};
+use telltale_choreography::compiler::{parser, projection, codegen};
 
 let choreo = parser::parse_choreography_str(input)?;
 let mut local_types = Vec::new();
@@ -581,7 +581,7 @@ This generates Rust code for the choreography. The generated code includes sessi
 Run parser tests with:
 
 ```bash
-cargo test --package rumpsteak-aura-choreography parser
+cargo test --package telltale-choreography parser
 ```
 
 This runs the parser test suite for the choreography crate. It exercises grammar and layout handling.

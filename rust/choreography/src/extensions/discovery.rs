@@ -17,7 +17,7 @@ pub struct ExtensionMetadata {
     pub description: String,
     pub author: String,
     pub dependencies: Vec<String>,
-    pub required_rumpsteak_version: Option<String>,
+    pub required_telltale_version: Option<String>,
     pub priority: Option<u32>,
     /// Documentation fields
     pub overview: Option<String>,
@@ -211,12 +211,12 @@ impl ExtensionDiscovery {
         // Check version compatibility
         for ext_name in &resolved {
             if let Some(package) = self.discovered_extensions.get(ext_name) {
-                if let Some(required_version) = &package.metadata.required_rumpsteak_version {
+                if let Some(required_version) = &package.metadata.required_telltale_version {
                     // In a real implementation, we'd check against actual version
                     if required_version != "0.5.0" {
                         return Err(ParseError::IncompatibleExtensions {
                             details: format!(
-                                "Extension '{}' requires rumpsteak-aura version '{}', but current version is '0.5.0'. Please update the extension or rumpsteak-aura to compatible versions.",
+                                "Extension '{}' requires telltale version '{}', but current version is '0.5.0'. Please update the extension or telltale to compatible versions.",
                                 ext_name, required_version
                             ),
                         });
@@ -280,9 +280,9 @@ impl ExtensionDiscovery {
                 name: "timeout".to_string(),
                 version: "0.5.0".to_string(),
                 description: "Timeout support for choreographic protocols".to_string(),
-                author: "Rumpsteak Aura Team".to_string(),
+                author: "Telltale Team".to_string(),
                 dependencies: vec![],
-                required_rumpsteak_version: Some("0.5.0".to_string()),
+                required_telltale_version: Some("0.5.0".to_string()),
                 priority: Some(100),
                 overview: Some("Adds timeout semantics to choreographic protocols".to_string()),
                 syntax_guide: Some("Use `timeout(duration) { ... }` syntax".to_string()),
@@ -302,7 +302,7 @@ impl ExtensionDiscovery {
                 description: "Aura-style annotations for capability tracking".to_string(),
                 author: "Aura Project".to_string(),
                 dependencies: vec![],
-                required_rumpsteak_version: Some("0.5.0".to_string()),
+                required_telltale_version: Some("0.5.0".to_string()),
                 priority: Some(110),
                 overview: Some(
                     "Adds Aura-specific annotations for capabilities and flow control".to_string(),
@@ -331,7 +331,7 @@ impl ExtensionDiscovery {
         Self::new()
     }
 
-    /// Helper to register built-in rumpsteak extensions
+    /// Helper to register built-in telltale extensions
     pub fn with_builtin_only() -> Result<ExtensionRegistry, ParseError> {
         let mut discovery = Self::new();
 
@@ -340,9 +340,9 @@ impl ExtensionDiscovery {
                 name: "timeout".to_string(),
                 version: "0.5.0".to_string(),
                 description: "Timeout support for choreographic protocols".to_string(),
-                author: "Rumpsteak Aura Team".to_string(),
+                author: "Telltale Team".to_string(),
                 dependencies: vec![],
-                required_rumpsteak_version: Some("0.5.0".to_string()),
+                required_telltale_version: Some("0.5.0".to_string()),
                 priority: Some(100),
                 overview: Some("Adds timeout semantics to choreographic protocols".to_string()),
                 syntax_guide: Some("Use `timeout(duration) { ... }` syntax".to_string()),
@@ -541,7 +541,7 @@ mod tests {
             description: "Test extension".to_string(),
             author: "Test Author".to_string(),
             dependencies: vec![],
-            required_rumpsteak_version: Some("0.5.0".to_string()),
+            required_telltale_version: Some("0.5.0".to_string()),
             priority: Some(100),
             overview: None,
             syntax_guide: None,
@@ -565,7 +565,7 @@ mod tests {
             description: "Base extension".to_string(),
             author: "Test".to_string(),
             dependencies: vec![],
-            required_rumpsteak_version: Some("0.5.0".to_string()),
+            required_telltale_version: Some("0.5.0".to_string()),
             priority: Some(100),
             overview: None,
             syntax_guide: None,
@@ -586,7 +586,7 @@ mod tests {
             description: "Dependent extension".to_string(),
             author: "Test".to_string(),
             dependencies: vec!["base".to_string()],
-            required_rumpsteak_version: Some("0.5.0".to_string()),
+            required_telltale_version: Some("0.5.0".to_string()),
             priority: Some(100),
             overview: None,
             syntax_guide: None,

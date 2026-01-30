@@ -1,4 +1,4 @@
-//! DSL Extension System for Rumpsteak-Aura
+//! DSL Extension System for Telltale
 //!
 //! This module provides a clean, composable system for extending choreographic DSL syntax.
 //! Extensions can add new grammar rules, custom statement parsers, and protocol behaviors

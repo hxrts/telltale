@@ -1,10 +1,10 @@
 //! Environment variable based endpoint resolver.
 
 use async_trait::async_trait;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     EndpointResolver, ResolutionFailureReason, ResolverError, RoleName,
 };
-use rumpsteak_aura_choreography::topology::Endpoint;
+use telltale_choreography::topology::Endpoint;
 use thiserror::Error;
 
 /// Error configuring the environment resolver.
@@ -27,16 +27,16 @@ pub enum EnvResolverConfigError {
 ///
 /// # Example
 ///
-/// With the default prefix "RUMPSTEAK":
+/// With the default prefix "TELLTALE":
 ///
 /// ```bash
-/// export RUMPSTEAK_ALICE_ENDPOINT=127.0.0.1:8080
-/// export RUMPSTEAK_BOB_ENDPOINT=127.0.0.1:8081
+/// export TELLTALE_ALICE_ENDPOINT=127.0.0.1:8080
+/// export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
 /// ```
 ///
 /// ```rust,no_run
-/// use rumpsteak_transport::EnvResolver;
-/// use rumpsteak_aura_choreography::{EndpointResolver, RoleName};
+/// use telltale_transport::EnvResolver;
+/// use telltale_choreography::{EndpointResolver, RoleName};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let resolver = EnvResolver::with_default_prefix();
@@ -73,11 +73,11 @@ impl EnvResolver {
         Ok(Self { prefix })
     }
 
-    /// Create a resolver with the default prefix "RUMPSTEAK".
+    /// Create a resolver with the default prefix "TELLTALE".
     #[must_use]
     pub fn with_default_prefix() -> Self {
         Self {
-            prefix: "RUMPSTEAK".to_string(),
+            prefix: "TELLTALE".to_string(),
         }
     }
 
@@ -155,28 +155,28 @@ mod tests {
     #[test]
     fn test_env_resolver_with_default_prefix() {
         let resolver = EnvResolver::with_default_prefix();
-        assert_eq!(resolver.prefix(), "RUMPSTEAK");
+        assert_eq!(resolver.prefix(), "TELLTALE");
     }
 
     #[test]
     fn test_env_var_name() {
         let resolver = EnvResolver::with_default_prefix();
         let role = RoleName::from_static("Alice");
-        assert_eq!(resolver.env_var_name(&role), "RUMPSTEAK_ALICE_ENDPOINT");
+        assert_eq!(resolver.env_var_name(&role), "TELLTALE_ALICE_ENDPOINT");
     }
 
     #[test]
     fn test_env_var_name_with_underscore() {
         let resolver = EnvResolver::with_default_prefix();
         let role = RoleName::new("my_role").unwrap();
-        assert_eq!(resolver.env_var_name(&role), "RUMPSTEAK_MY_ROLE_ENDPOINT");
+        assert_eq!(resolver.env_var_name(&role), "TELLTALE_MY_ROLE_ENDPOINT");
     }
 
     #[test]
     fn test_env_var_name_lowercase() {
         let resolver = EnvResolver::with_default_prefix();
         let role = RoleName::new("alice").unwrap();
-        assert_eq!(resolver.env_var_name(&role), "RUMPSTEAK_ALICE_ENDPOINT");
+        assert_eq!(resolver.env_var_name(&role), "TELLTALE_ALICE_ENDPOINT");
     }
 
     #[tokio::test]

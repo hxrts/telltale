@@ -1,7 +1,7 @@
-//! Procedural macros for Rumpsteak session types.
+//! Procedural macros for Telltale session types.
 //!
 //! This crate provides derive macros and attribute macros for defining
-//! session-typed protocols in Rumpsteak. It includes:
+//! session-typed protocols in Telltale. It includes:
 //!
 //! - `#[derive(Message)]` - Derive message trait implementations
 //! - `#[derive(Role)]` - Derive role trait implementations with routing

@@ -4,11 +4,11 @@
 //! across session type operations (projection, duality, merge).
 
 use proptest::prelude::*;
-use rumpsteak_theory::{
+use telltale_theory::{
     check_coherent, dual, merge, project, projectable, validate_global, validate_local,
     well_formedness::unique_labels_local,
 };
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 // ============================================================================
 // Helpers

@@ -1,11 +1,11 @@
 [package]
-name = "rumpsteak-lean-bridge"
+name = "telltale-lean-bridge"
 version = "0.9.1"
 authors = ["Sam Hart <sam@hxrts.com>"]
 edition = "2021"
-description = "Lean verification bridge for Rumpsteak session types"
+description = "Lean verification bridge for Telltale session types"
 readme = "../../README.md"
-repository = "https://github.com/aura-project/rumpsteak-aura"
+repository = "https://github.com/hxrts/telltale"
 license = "MIT"
 keywords = ["session-types", "verification", "lean", "multiparty"]
 categories = ["development-tools", "concurrency"]
@@ -28,24 +28,24 @@ required-features = ["golden"]
 [features]
 default = ["runner"]
 cli = ["clap"]
-runner = ["rumpsteak-theory"]  # Enable LeanRunner and EquivalenceChecker
-exporter = ["rumpsteak-aura-choreography", "anyhow"]  # Enable choreography exporter
+runner = ["telltale-theory"]  # Enable LeanRunner and EquivalenceChecker
+exporter = ["telltale-choreography", "anyhow"]  # Enable choreography exporter
 golden = ["clap", "anyhow", "runner"]  # Enable golden file management CLI
 
 [dependencies]
-rumpsteak-types = { path = "../types", version = "0.9.1" }
-rumpsteak-theory = { path = "../theory", version = "0.9.1", optional = true }
+telltale-types = { path = "../types", version = "0.9.1" }
+telltale-theory = { path = "../theory", version = "0.9.1", optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4.4", features = ["derive"], optional = true }
 tempfile = { workspace = true }
 anyhow = { workspace = true, optional = true }
-rumpsteak-aura-choreography = { path = "../choreography", version = "0.9.1", optional = true }
+telltale-choreography = { path = "../choreography", version = "0.9.1", optional = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
-rumpsteak-theory = { path = "../theory", version = "0.9.1" }
-rumpsteak-aura-choreography = { path = "../choreography", version = "0.9.1" }
+telltale-theory = { path = "../theory", version = "0.9.1" }
+telltale-choreography = { path = "../choreography", version = "0.9.1" }
 tempfile = { workspace = true }
 serde_json = { workspace = true }

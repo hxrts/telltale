@@ -3,13 +3,13 @@
 //! These tests compare Rust projection outputs against live Lean computations.
 //! They require the Lean binary to be built and available.
 //!
-//! Run these tests with: `cargo test -p rumpsteak-lean-bridge live_equivalence`
+//! Run these tests with: `cargo test -p telltale-lean-bridge live_equivalence`
 //!
 //! ## Prerequisites
 //!
 //! Build the Lean runner:
 //! ```bash
-//! cd lean && lake build rumpsteak_runner
+//! cd lean && lake build telltale_runner
 //! ```
 //!
 //! ## When to Use
@@ -24,9 +24,9 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_lean_bridge::equivalence::EquivalenceChecker;
-use rumpsteak_lean_bridge::runner::LeanRunner;
-use rumpsteak_types::{GlobalType, Label};
+use telltale_lean_bridge::equivalence::EquivalenceChecker;
+use telltale_lean_bridge::runner::LeanRunner;
+use telltale_types::{GlobalType, Label};
 use std::path::PathBuf;
 
 /// Deterministic seed for property-based tests.
@@ -46,7 +46,7 @@ fn golden_dir() -> PathBuf {
 fn try_get_lean_checker() -> Option<EquivalenceChecker> {
     if !LeanRunner::is_available() {
         println!("Lean runner not available, skipping test");
-        println!("Build with: cd lean && lake build rumpsteak_runner");
+        println!("Build with: cd lean && lake build telltale_runner");
         return None;
     }
 
@@ -59,7 +59,7 @@ fn try_get_lean_checker() -> Option<EquivalenceChecker> {
         .is_err()
     {
         println!("Lean runner not responding correctly (may need rebuild)");
-        println!("Rebuild with: cd lean && lake build rumpsteak_runner");
+        println!("Rebuild with: cd lean && lake build telltale_runner");
         return None;
     }
 
@@ -306,7 +306,7 @@ fn proptest_live_projection_equivalence() {
 // ============================================================================
 
 #[test]
-#[ignore] // Run manually: cargo test -p rumpsteak-lean-bridge generate_golden -- --ignored
+#[ignore] // Run manually: cargo test -p telltale-lean-bridge generate_golden -- --ignored
 fn generate_golden_ping_pong() {
     let Some(checker) = try_get_lean_checker() else {
         panic!("Lean runner required for golden file generation");
@@ -331,7 +331,7 @@ fn generate_golden_ping_pong() {
 }
 
 #[test]
-#[ignore] // Run manually: cargo test -p rumpsteak-lean-bridge generate_golden -- --ignored
+#[ignore] // Run manually: cargo test -p telltale-lean-bridge generate_golden -- --ignored
 fn generate_golden_choice() {
     let Some(checker) = try_get_lean_checker() else {
         panic!("Lean runner required for golden file generation");

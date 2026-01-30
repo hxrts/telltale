@@ -13,8 +13,8 @@
 //! # Example
 //!
 //! ```
-//! use rumpsteak_types::{LocalTypeR, Label};
-//! use rumpsteak_theory::{bound_recursion, BoundingStrategy, FuelSteps};
+//! use telltale_types::{LocalTypeR, Label};
+//! use telltale_theory::{bound_recursion, BoundingStrategy, FuelSteps};
 //!
 //! // Create a recursive ping-pong protocol
 //! let lt = LocalTypeR::mu(
@@ -31,7 +31,7 @@
 //! ```
 
 use crate::limits::{FuelSteps, YieldAfterSteps};
-use rumpsteak_types::LocalTypeR;
+use telltale_types::LocalTypeR;
 use std::collections::HashSet;
 
 /// Strategy for bounding recursive types.
@@ -330,7 +330,7 @@ fn unfold_bounded_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     fn ping_pong_recursive() -> LocalTypeR {
         LocalTypeR::mu(

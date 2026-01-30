@@ -8,11 +8,11 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_aura_choreography::effects::{ChoreographyError, LabelId, RoleId};
-use rumpsteak_aura_choreography::identifiers::RoleName;
-use rumpsteak_aura_choreography::runtime::adapter::ChoreographicAdapter;
-use rumpsteak_aura_choreography::runtime::test_adapter::TestAdapter;
-use rumpsteak_aura_choreography::topology::{RoleFamilyConstraint, Topology};
+use telltale_choreography::effects::{ChoreographyError, LabelId, RoleId};
+use telltale_choreography::identifiers::RoleName;
+use telltale_choreography::runtime::adapter::ChoreographicAdapter;
+use telltale_choreography::runtime::test_adapter::TestAdapter;
+use telltale_choreography::topology::{RoleFamilyConstraint, Topology};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================

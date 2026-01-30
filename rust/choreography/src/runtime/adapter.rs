@@ -15,7 +15,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_aura_choreography::runtime::ChoreographicAdapter;
+//! use telltale_choreography::runtime::ChoreographicAdapter;
 //!
 //! struct MyAdapter { /* ... */ }
 //!

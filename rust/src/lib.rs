@@ -1,4 +1,4 @@
-//! Core Rumpsteak library for session-typed communication.
+//! Core Telltale library for session-typed communication.
 //!
 //! This crate provides session types (Send, Receive, Select, Branch, End) and
 //! channel abstractions for safe multiparty communication.
@@ -36,14 +36,14 @@
 pub mod channel;
 
 // Re-export core types (always available)
-pub use rumpsteak_types as types;
-pub use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+pub use telltale_types as types;
+pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
 // Re-export optional crates
 #[cfg(feature = "theory")]
-pub use rumpsteak_theory as theory;
+pub use telltale_theory as theory;
 
-pub use rumpsteak_aura_macros::{session, Message, Role, Roles};
+pub use telltale_macros::{session, Message, Role, Roles};
 
 /// Prelude module for convenient imports.
 pub mod prelude {
@@ -52,7 +52,7 @@ pub mod prelude {
         Branch, Choice, Choices, End, FromState, IntoSession, Message, Receive, ReceiveError, Role,
         Route, Select, Send, Session, SessionError,
     };
-    pub use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+    pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 }
 
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};

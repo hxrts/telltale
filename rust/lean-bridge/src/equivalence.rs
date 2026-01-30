@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_lean_bridge::equivalence::{EquivalenceChecker, GoldenDir};
+//! use telltale_lean_bridge::equivalence::{EquivalenceChecker, GoldenDir};
 //!
 //! // Fast golden file testing
 //! let checker = EquivalenceChecker::with_golden_dir("golden/projection");
@@ -35,8 +35,8 @@
 use crate::export::{global_to_json, local_to_json};
 use crate::import::ImportError;
 use crate::runner::{LeanRunner, LeanRunnerError};
-use rumpsteak_theory::projection::{project, ProjectionError};
-use rumpsteak_types::GlobalType;
+use telltale_theory::projection::{project, ProjectionError};
+use telltale_types::GlobalType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

@@ -13,7 +13,7 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/Location.lean`:
+//! This module corresponds to `lean/Telltale/Protocol/Location.lean`:
 //! - `Location` ↔ Lean's `Location`
 //! - `TopologyConstraint` ↔ Lean's `TopologyConstraint`
 //! - `Topology` ↔ Lean's `Topology`

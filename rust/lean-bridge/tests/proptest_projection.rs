@@ -17,9 +17,9 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_lean_bridge::{global_to_json, local_to_json, LeanRunner};
-use rumpsteak_theory::projection::{project, project_all};
-use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_lean_bridge::{global_to_json, local_to_json, LeanRunner};
+use telltale_theory::projection::{project, project_all};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 use serde_json::{json, Value};
 
 /// Deterministic seed for property-based tests.

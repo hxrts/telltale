@@ -20,7 +20,7 @@ to a unique next configuration. This is crucial for:
 - `IndependentActions`: predicate for actions on disjoint sessions
 - `diamond_independent`: diamond property for independent actions
 
-Ported from RumpsteakV2.Proofs.Safety.Determinism.
+Ported from Telltale.Proofs.Safety.Determinism.
 -/
 
 set_option linter.mathlibStandardSet false

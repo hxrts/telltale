@@ -15,7 +15,7 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/Heap.lean`:
+//! This module corresponds to `lean/Telltale/Protocol/Heap.lean`:
 //! - `Heap` ↔ Lean's `Heap`
 //! - `alloc` ↔ Lean's `Heap.alloc`
 //! - `consume` ↔ Lean's `Heap.consume`

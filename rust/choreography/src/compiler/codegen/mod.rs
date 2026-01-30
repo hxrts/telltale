@@ -1,4 +1,4 @@
-//! Code generation from projected local types to Rumpsteak session types.
+//! Code generation from projected local types to Telltale session types.
 //!
 //! This module generates Rust code from choreographies including:
 //! - Session type definitions
@@ -27,7 +27,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use std::collections::HashMap;
 
-/// Generate Rumpsteak session type definitions from a local type
+/// Generate Telltale session type definitions from a local type
 #[must_use]
 pub fn generate_session_type(
     role: &Role,
@@ -220,7 +220,7 @@ fn generate_choice_enum(branches: &[(Ident, LocalType)], _is_select: bool) -> To
     }
 }
 
-/// Generate complete Rumpsteak code from a choreography
+/// Generate complete Telltale code from a choreography
 #[must_use]
 pub fn generate_choreography_code(
     name: &str,
@@ -292,8 +292,8 @@ fn generate_extension_code(
         #(#extension_impls)*
 
         // Extension registry setup
-        pub fn create_extension_registry() -> ::rumpsteak_aura_choreography::extensions::ExtensionRegistry {
-            let mut registry = ::rumpsteak_aura_choreography::extensions::ExtensionRegistry::new();
+        pub fn create_extension_registry() -> ::telltale_choreography::extensions::ExtensionRegistry {
+            let mut registry = ::telltale_choreography::extensions::ExtensionRegistry::new();
 
             // In a real implementation, this would register runtime extension handlers
             // For now, we just return the empty registry
@@ -525,7 +525,7 @@ pub fn generate_choreography_code_with_namespacing(
     }
 }
 
-/// Generate complete Rumpsteak code from a choreography with annotation support
+/// Generate complete Telltale code from a choreography with annotation support
 #[must_use]
 pub fn generate_choreography_code_with_annotations(
     name: &str,

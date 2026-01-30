@@ -7,8 +7,8 @@
 fn test_effect_traits_compile() {
     // Just verify the module structure compiles
     // The crate name in tests is the library name with underscores
-    use rumpsteak_aura_choreography::effects::{LabelId, RoleId};
-    use rumpsteak_aura_choreography::RoleName;
+    use telltale_choreography::effects::{LabelId, RoleId};
+    use telltale_choreography::RoleName;
 
     // Basic role enum
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

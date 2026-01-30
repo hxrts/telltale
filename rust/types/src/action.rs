@@ -1,7 +1,7 @@
 //! Actions in Session Types
 //!
 //! Actions represent the basic communication primitives in session types.
-//! These correspond to the Lean definitions in `lean/Rumpsteak/Protocol/Core.lean`.
+//! These correspond to the Lean definitions in `lean/Telltale/Protocol/Core.lean`.
 
 use crate::Label;
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ impl std::fmt::Display for Action {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{LocalAction, Action, Label};
+/// use telltale_types::{LocalAction, Action, Label};
 ///
 /// // Send "hello" to role B
 /// let action = LocalAction::new(Action::Send, "B", Label::new("hello"));

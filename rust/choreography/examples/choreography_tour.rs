@@ -3,7 +3,7 @@
 
 //! End-to-End Choreography Tour
 //!
-//! This example provides a comprehensive tour of rumpsteak-aura's choreographic
+//! This example provides a comprehensive tour of telltale's choreographic
 //! programming features, demonstrating the complete flow from DSL to local types:
 //!
 //! 1. Module namespace support - organize protocols in modules
@@ -13,12 +13,12 @@
 //! 5. Cross-feature integration - combining all features
 //! 6. **Projection** - DSL → Parse → Project to local session types
 
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
-use rumpsteak_aura_choreography::compiler::projection::project;
+use telltale_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::compiler::projection::project;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║       Rumpsteak Aura - End-to-End Choreography Tour        ║");
+    println!("║       Telltale - End-to-End Choreography Tour        ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
 

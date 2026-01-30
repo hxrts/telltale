@@ -24,7 +24,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_aura_choreography::tracing::{TracingAdapter, ProtocolSpan};
+//! use telltale_choreography::tracing::{TracingAdapter, ProtocolSpan};
 //!
 //! // Wrap an adapter with tracing
 //! let traced = TracingAdapter::new(my_adapter, "MyProtocol", Role::Client);

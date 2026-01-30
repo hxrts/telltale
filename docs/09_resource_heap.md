@@ -122,7 +122,7 @@ Once a resource is consumed, subsequent consumption attempts fail. This provides
 The heap state can be converted to a Merkle tree for verification.
 
 ```rust
-use rumpsteak_aura_choreography::{HeapCommitment, MerkleTree};
+use telltale_choreography::{HeapCommitment, MerkleTree};
 
 let tree = MerkleTree::from_heap(&heap);
 let root = tree.root;
@@ -235,7 +235,7 @@ Errors provide context for debugging heap operations.
 ## Usage Example
 
 ```rust
-use rumpsteak_aura_choreography::{Heap, HeapMessage, MerkleTree, Resource};
+use telltale_choreography::{Heap, HeapMessage, MerkleTree, Resource};
 
 // Create empty heap
 let heap = Heap::new();

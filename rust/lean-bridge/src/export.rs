@@ -3,7 +3,7 @@
 //! This module provides functions to convert GlobalType and LocalTypeR
 //! into JSON format that matches the Lean type definitions.
 
-use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 use serde_json::{json, Value};
 
 /// Convert a GlobalType to Lean-compatible JSON.
@@ -20,8 +20,8 @@ use serde_json::{json, Value};
 /// # Example
 ///
 /// ```
-/// use rumpsteak_types::{GlobalType, Label};
-/// use rumpsteak_lean_bridge::export::global_to_json;
+/// use telltale_types::{GlobalType, Label};
+/// use telltale_lean_bridge::export::global_to_json;
 ///
 /// let g = GlobalType::End;
 /// let json = global_to_json(&g);
@@ -86,8 +86,8 @@ pub fn global_to_json(g: &GlobalType) -> Value {
 /// # Example
 ///
 /// ```
-/// use rumpsteak_types::{LocalTypeR, Label};
-/// use rumpsteak_lean_bridge::export::local_to_json;
+/// use telltale_types::{LocalTypeR, Label};
+/// use telltale_lean_bridge::export::local_to_json;
 ///
 /// let lt = LocalTypeR::End;
 /// let json = local_to_json(&lt);

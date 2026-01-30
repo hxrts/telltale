@@ -6,7 +6,7 @@
 use crate::export::{global_to_json, local_to_json};
 use crate::import::{json_to_global, json_to_local, ImportError};
 use crate::runner::LeanRunner;
-use rumpsteak_types::{GlobalType, LocalTypeR};
+use telltale_types::{GlobalType, LocalTypeR};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -274,14 +274,14 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
 }
 
 /// Check if two Labels are equal.
-fn labels_equal(l1: &rumpsteak_types::Label, l2: &rumpsteak_types::Label) -> bool {
+fn labels_equal(l1: &telltale_types::Label, l2: &telltale_types::Label) -> bool {
     l1.name == l2.name && l1.sort == l2.sort
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumpsteak_types::Label;
+    use telltale_types::Label;
 
     #[test]
     fn test_global_roundtrip_valid() {

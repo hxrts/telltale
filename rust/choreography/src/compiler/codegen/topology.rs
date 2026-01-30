@@ -49,10 +49,10 @@ pub fn generate_topology_integration(
         /// Topology integration for the #protocol_name_str protocol
         pub mod topology {
             use super::*;
-            use ::rumpsteak_aura_choreography::topology::{
+            use ::telltale_choreography::topology::{
                 Location, Topology, TopologyBuilder, TopologyHandler, TopologyMode,
             };
-            use ::rumpsteak_aura_choreography::{
+            use ::telltale_choreography::{
                 Datacenter, Namespace, Region, RoleName, TopologyEndpoint,
             };
 

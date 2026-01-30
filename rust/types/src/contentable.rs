@@ -18,7 +18,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/Serialize.lean`.
+//! This module corresponds to `lean/Telltale/Protocol/Serialize.lean`.
 //! The `toCbor`/`fromCbor` methods in Lean map to `to_cbor_bytes`/`from_cbor_bytes` here.
 
 use crate::content_id::{ContentId, Hasher, Sha256Hasher};
@@ -40,8 +40,8 @@ use serde::{de::DeserializeOwned, Serialize};
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{GlobalType, Label};
-/// use rumpsteak_types::contentable::Contentable;
+/// use telltale_types::{GlobalType, Label};
+/// use telltale_types::contentable::Contentable;
 ///
 /// // α-equivalent types produce the same bytes
 /// let g1 = GlobalType::mu("x", GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x")));

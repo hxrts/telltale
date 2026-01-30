@@ -140,7 +140,7 @@ impl DiagnosticCode {
     #[must_use]
     pub fn doc_url(&self) -> String {
         format!(
-            "https://rumpsteak.dev/errors/{}",
+            "https://telltale.dev/errors/{}",
             self.code().to_lowercase()
         )
     }

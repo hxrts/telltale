@@ -100,7 +100,7 @@ pub fn generate_runner_fn_with_hints(
                     index: u32,
                 ) -> Result<#output_type, A::Error>
                 where
-                    A::Error: From<::rumpsteak_aura_choreography::ChoreographyError>
+                    A::Error: From<::telltale_choreography::ChoreographyError>
             },
             quote! {
                 let _ctx = ProtocolContext::for_role(#protocol_str, #role_variant);
@@ -114,7 +114,7 @@ pub fn generate_runner_fn_with_hints(
                     adapter: &mut A,
                 ) -> Result<#output_type, A::Error>
                 where
-                    A::Error: From<::rumpsteak_aura_choreography::ChoreographyError>
+                    A::Error: From<::telltale_choreography::ChoreographyError>
             },
             quote! {
                 let _ctx = ProtocolContext::for_role(#protocol_str, #role_variant);
@@ -212,7 +212,7 @@ fn generate_runner_body_with_hints(
                                 // Parallel broadcast to all #family_name instances
                                 let roles = adapter.resolve_family(#family_name)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -235,7 +235,7 @@ fn generate_runner_body_with_hints(
                                 // Broadcast to all #family_name instances
                                 let roles = adapter.resolve_family(#family_name)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -254,7 +254,7 @@ fn generate_runner_body_with_hints(
                                 // Parallel broadcast to #family_name range
                                 let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -277,7 +277,7 @@ fn generate_runner_body_with_hints(
                                 // Broadcast to #family_name range
                                 let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -329,7 +329,7 @@ fn generate_runner_body_with_hints(
                                     // Parallel collect from all #family_name instances (min: #min)
                                     let roles = adapter.resolve_family(#family_name)?;
                                     if roles.is_empty() {
-                                        return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                             #family_name.to_string()
                                         ).into());
                                     }
@@ -346,7 +346,7 @@ fn generate_runner_body_with_hints(
                                             }
                                         }
                                         if collected.len() < #min as usize {
-                                            return Err(::rumpsteak_aura_choreography::ChoreographyError::InsufficientResponses {
+                                            return Err(::telltale_choreography::ChoreographyError::InsufficientResponses {
                                                 expected: #min as usize,
                                                 received: collected.len(),
                                             }.into());
@@ -361,7 +361,7 @@ fn generate_runner_body_with_hints(
                                     // Parallel collect from all #family_name instances
                                     let roles = adapter.resolve_family(#family_name)?;
                                     if roles.is_empty() {
-                                        return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                        return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                             #family_name.to_string()
                                         ).into());
                                     }
@@ -382,7 +382,7 @@ fn generate_runner_body_with_hints(
                                 // Collect from all #family_name instances
                                 let roles = adapter.resolve_family(#family_name)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -400,7 +400,7 @@ fn generate_runner_body_with_hints(
                                 // Parallel collect from #family_name range
                                 let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -420,7 +420,7 @@ fn generate_runner_body_with_hints(
                                 // Collect from #family_name range
                                 let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
                                 if roles.is_empty() {
-                                    return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                    return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                         #family_name.to_string()
                                     ).into());
                                 }
@@ -477,7 +477,7 @@ pub(crate) fn generate_runner_body(
                             // Broadcast to all #family_name instances
                             let roles = adapter.resolve_family(#family_name)?;
                             if roles.is_empty() {
-                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                     #family_name.to_string()
                                 ).into());
                             }
@@ -494,7 +494,7 @@ pub(crate) fn generate_runner_body(
                             // Broadcast to #family_name range
                             let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
                             if roles.is_empty() {
-                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                     #family_name.to_string()
                                 ).into());
                             }
@@ -535,7 +535,7 @@ pub(crate) fn generate_runner_body(
                             // Collect from all #family_name instances
                             let roles = adapter.resolve_family(#family_name)?;
                             if roles.is_empty() {
-                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                     #family_name.to_string()
                                 ).into());
                             }
@@ -551,7 +551,7 @@ pub(crate) fn generate_runner_body(
                             // Collect from #family_name range
                             let roles = adapter.resolve_range(#family_name, #start_expr, #end_expr)?;
                             if roles.is_empty() {
-                                return Err(::rumpsteak_aura_choreography::ChoreographyError::EmptyRoleFamily(
+                                return Err(::telltale_choreography::ChoreographyError::EmptyRoleFamily(
                                     #family_name.to_string()
                                 ).into());
                             }
@@ -678,7 +678,7 @@ pub(crate) fn generate_runner_body(
                     // RoleDecides directly, bypassing the normal parse/desugar path.
                     let role_str = role.name().to_string();
                     quote! {
-                        return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                        return Err(::telltale_choreography::ChoreographyError::ExecutionError(
                             format!(
                                 "role-decided loops are not supported directly in generated runners. \
                                  The parser should desugar 'loop decide by {}' to a choice+rec pattern. \
@@ -727,7 +727,7 @@ pub(crate) fn generate_runner_body(
                 }
                 None => {
                     quote! {
-                        return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                        return Err(::telltale_choreography::ChoreographyError::ExecutionError(
                             "unbounded loops are not supported in generated runners. \
                              Use a bounded loop condition like: \
                              'loop decide by Role' (desugars to choice), \
@@ -778,7 +778,7 @@ pub(crate) fn generate_runner_body(
                 quote! {
                     // Recursive variable (unbound) - this indicates a code generator bug
                     // The variable should have been bound by a Mu construct
-                    return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                    return Err(::telltale_choreography::ChoreographyError::ExecutionError(
                         format!(
                             "unbound recursive variable '{}'; this indicates a code generator bug",
                             #label_str
@@ -805,7 +805,7 @@ pub(crate) fn generate_runner_body(
                 match timeout_result {
                     Ok(inner_result) => inner_result?,
                     Err(_elapsed) => {
-                        return Err(::rumpsteak_aura_choreography::ChoreographyError::Timeout(
+                        return Err(::telltale_choreography::ChoreographyError::Timeout(
                             std::time::Duration::from_millis(#timeout_ms),
                         )
                         .into());
@@ -874,7 +874,7 @@ pub(crate) fn generate_role_id(role: &Role) -> TokenStream {
                 // This should be handled at the Send/Receive level, not here
                 // If we reach here, it's a context where wildcards aren't supported
                 quote! {{
-                    return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                    return Err(::telltale_choreography::ChoreographyError::ExecutionError(
                         "wildcard roles in this context should use resolve_family() instead".to_string()
                     ).into());
                 }}
@@ -883,7 +883,7 @@ pub(crate) fn generate_role_id(role: &Role) -> TokenStream {
                 // This should be handled at the Send/Receive level, not here
                 // If we reach here, it's a context where ranges aren't supported
                 quote! {{
-                    return Err(::rumpsteak_aura_choreography::ChoreographyError::ExecutionError(
+                    return Err(::telltale_choreography::ChoreographyError::ExecutionError(
                         "range roles in this context should use resolve_range() instead".to_string()
                     ).into());
                 }}
@@ -944,7 +944,7 @@ pub fn generate_execute_as(
             adapter: &mut A,
         ) -> Result<(), A::Error>
         where
-            A::Error: From<::rumpsteak_aura_choreography::ChoreographyError>
+            A::Error: From<::telltale_choreography::ChoreographyError>
         {
             match role {
                 #(#match_arms)*
@@ -1021,7 +1021,7 @@ pub fn generate_all_runners(
         #[allow(dead_code, unused_imports, unused_variables)]
         pub mod runners {
             use super::*;
-            use ::rumpsteak_aura_choreography::{ChoreographicAdapter, LabelId, ProtocolContext};
+            use ::telltale_choreography::{ChoreographicAdapter, LabelId, ProtocolContext};
 
             #output_types
 
@@ -1065,7 +1065,7 @@ fn generate_branch_label_enum(labels: &BTreeSet<String>) -> TokenStream {
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub enum BranchLabel {}
 
-            impl ::rumpsteak_aura_choreography::LabelId for BranchLabel {
+            impl ::telltale_choreography::LabelId for BranchLabel {
                 fn as_str(&self) -> &'static str {
                     match *self {}
                 }
@@ -1098,7 +1098,7 @@ fn generate_branch_label_enum(labels: &BTreeSet<String>) -> TokenStream {
             #(#variants),*
         }
 
-        impl ::rumpsteak_aura_choreography::LabelId for BranchLabel {
+        impl ::telltale_choreography::LabelId for BranchLabel {
             fn as_str(&self) -> &'static str {
                 match self {
                     #(#as_str_arms),*
@@ -1135,11 +1135,11 @@ fn generate_runtime_role_enum(roles: &[Role]) -> TokenStream {
             let role_str = role.name().to_string();
             if role.index().is_some() || role.param().is_some() {
                 quote! {
-                    Role::#name(_) => ::rumpsteak_aura_choreography::RoleName::from_static(#role_str)
+                    Role::#name(_) => ::telltale_choreography::RoleName::from_static(#role_str)
                 }
             } else {
                 quote! {
-                    Role::#name => ::rumpsteak_aura_choreography::RoleName::from_static(#role_str)
+                    Role::#name => ::telltale_choreography::RoleName::from_static(#role_str)
                 }
             }
         })
@@ -1164,10 +1164,10 @@ fn generate_runtime_role_enum(roles: &[Role]) -> TokenStream {
             #(#role_variants),*
         }
 
-        impl ::rumpsteak_aura_choreography::RoleId for Role {
+        impl ::telltale_choreography::RoleId for Role {
             type Label = BranchLabel;
 
-            fn role_name(&self) -> ::rumpsteak_aura_choreography::RoleName {
+            fn role_name(&self) -> ::telltale_choreography::RoleName {
                 match self {
                     #(#role_name_arms),*
                 }

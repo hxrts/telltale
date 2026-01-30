@@ -29,7 +29,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This implementation corresponds to `lean/Rumpsteak/Protocol/ProjectionR.lean`:
+//! This implementation corresponds to `lean/Telltale/Protocol/ProjectionR.lean`:
 //! - `merge_send_branches` ↔ Lean's `LocalTypeR.mergeSendSorted`
 //! - `merge_recv_branches` ↔ Lean's `LocalTypeR.mergeRecvSorted`
 //!
@@ -95,7 +95,7 @@ pub type MergeResult = Result<LocalTypeR, MergeError>;
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::{merge, can_merge, LocalTypeR, Label};
+/// use telltale_types::{merge, can_merge, LocalTypeR, Label};
 ///
 /// // Merging identical send types succeeds
 /// let t1 = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);

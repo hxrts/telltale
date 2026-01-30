@@ -3,7 +3,7 @@
 
 //! Complete test demonstrating parameterized roles functionality
 
-use rumpsteak_aura_choreography::compiler::{parse_dsl, project};
+use telltale_choreography::compiler::{parse_dsl, project};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Parameterized Roles Test Suite ===\n");

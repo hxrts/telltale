@@ -1,13 +1,13 @@
 import Lake
 open Lake DSL
 
-/-! # RumpsteakV2 Lean Package
+/-! # Telltale Lean Package
 
-Lake build definition for the RumpsteakV2 verification library.
-V1 (Rumpsteak) is intentionally excluded from build targets.
+Lake build definition for the Telltale verification library.
+V1 (legacy) is intentionally excluded from build targets.
 -/
 
-package rumpsteakLean
+package telltale
 
 -- Mathlib provides standard lemmas and automation for proofs.
 -- Pin to a mathlib tag that matches the Lean toolchain.
@@ -19,8 +19,8 @@ require paco from git
 
 /-- V2 library containing the new protocol semantics and proofs. -/
 @[default_target]
-lean_lib RumpsteakV2 where
-  globs := #[`RumpsteakV2.*]
+lean_lib Telltale where
+  globs := #[`Telltale.*]
 
 /-- Session types with async effects - formalized preservation proofs. -/
 lean_lib Effects where

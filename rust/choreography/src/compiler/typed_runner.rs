@@ -306,7 +306,7 @@ pub fn generate_typed_runner(
             ) -> std::result::Result<#result_type, ChoreographyError> {
                 let ctx = ProtocolContext::indexed(
                     #protocol_str,
-                    ::rumpsteak_aura_choreography::RoleName::from_static(#role_str),
+                    ::telltale_choreography::RoleName::from_static(#role_str),
                     index,
                 );
                 Self::run_impl(adapter, &ctx, params).await
@@ -322,7 +322,7 @@ pub fn generate_typed_runner(
             ) -> std::result::Result<#result_type, ChoreographyError> {
                 let ctx = ProtocolContext::new(
                     #protocol_str,
-                    ::rumpsteak_aura_choreography::RoleName::from_static(#role_str),
+                    ::telltale_choreography::RoleName::from_static(#role_str),
                 );
                 Self::run_impl(adapter, &ctx, params).await
             }

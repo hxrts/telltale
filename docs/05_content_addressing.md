@@ -11,8 +11,8 @@ The content addressing system provides three capabilities. It computes determini
 The `ContentId` type wraps a cryptographic hash of a value's canonical form.
 
 ```rust
-use rumpsteak_types::{ContentId, Sha256Hasher, GlobalType, Label};
-use rumpsteak_types::contentable::Contentable;
+use telltale_types::{ContentId, Sha256Hasher, GlobalType, Label};
+use telltale_types::contentable::Contentable;
 
 let g = GlobalType::comm("A", "B", vec![(Label::new("msg"), GlobalType::End)]);
 let bytes = g.to_bytes()?;
@@ -62,8 +62,8 @@ Two serialization formats are available for content addressing.
 JSON serialization is enabled by default. It produces human-readable output suitable for debugging and interoperability.
 
 ```rust
-use rumpsteak_types::{GlobalType, Label};
-use rumpsteak_types::contentable::Contentable;
+use telltale_types::{GlobalType, Label};
+use telltale_types::contentable::Contentable;
 
 let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
@@ -85,14 +85,14 @@ Enable the feature in `Cargo.toml`:
 
 ```toml
 [dependencies]
-rumpsteak-types = { version = "0.7", features = ["dag-cbor"] }
+telltale-types = { version = "0.7", features = ["dag-cbor"] }
 ```
 
 DAG-CBOR methods become available on the `Contentable` trait:
 
 ```rust
-use rumpsteak_types::{GlobalType, Label};
-use rumpsteak_types::contentable::Contentable;
+use telltale_types::{GlobalType, Label};
+use telltale_types::contentable::Contentable;
 
 let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
@@ -154,8 +154,8 @@ Content IDs enable efficient memoization of expensive operations. A projection c
 
 ```rust
 use std::collections::HashMap;
-use rumpsteak_types::ContentId;
-use rumpsteak_theory::project;
+use telltale_types::ContentId;
+use telltale_theory::project;
 
 let mut cache: HashMap<(ContentId<_>, String), LocalTypeR> = HashMap::new();
 let cid = global.content_id_sha256()?;
@@ -176,8 +176,8 @@ This pattern enables caching projection results by content ID.
 The `ContentStore` provides deduplication for protocol artifacts.
 
 ```rust
-use rumpsteak_types::ContentStore;
-use rumpsteak_types::{GlobalType, Label};
+use telltale_types::ContentStore;
+use telltale_types::{GlobalType, Label};
 
 let mut store = ContentStore::new();
 let global = GlobalType::comm("A", "B", vec![(Label::new("ping"), GlobalType::End)]);
@@ -221,8 +221,8 @@ Alpha equivalence holds when de Bruijn conversion produces identical results for
 ## Usage Example
 
 ```rust
-use rumpsteak_types::{contentable::Contentable, ContentStore, GlobalType, Label};
-use rumpsteak_theory::project;
+use telltale_types::{contentable::Contentable, ContentStore, GlobalType, Label};
+use telltale_theory::project;
 
 // Create a protocol
 let ping_pong = GlobalType::comm(

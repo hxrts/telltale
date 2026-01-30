@@ -1,6 +1,6 @@
 # Lean Verification
 
-Rumpsteak uses Lean 4 to formally verify the correctness of choreographic projection. This chapter describes what properties are proven, what remains axiomatized, and how verification integrates with the Rust implementation.
+Telltale uses Lean 4 to formally verify the correctness of choreographic projection. This chapter describes what properties are proven, what remains axiomatized, and how verification integrates with the Rust implementation.
 
 ## Verification Strategy
 
@@ -8,7 +8,7 @@ The project employs a defense-in-depth approach with three layers. Core session 
 
 ## What is Formally Proven
 
-The following properties have complete proofs in `lean/Rumpsteak/Proofs/`:
+The following properties have complete proofs in `lean/Telltale/Proofs/`:
 
 ### Merge Operator Properties
 
@@ -73,11 +73,11 @@ def isSubtype (sub sup : LocalType) : Bool :=
 
 The Lean codebase is organized into focused modules:
 
-- **Rumpsteak.Choreography**: Decodes choreographies from JSON, validates roles and actions with `hasUniqueRoles` and `hasValidActions`
-- **Rumpsteak.Projection**: Builds per-role `LocalType` traces from global types
-- **Rumpsteak.Program**: Maps exported effects to `LocalAction` values as a homomorphism from JSON to the projection domain
-- **Rumpsteak.Subtyping**: Defines order checks with `DecidableEq`
-- **Rumpsteak.Runner**: Applies membership, order, and label invariants per branch
+- **Telltale.Choreography**: Decodes choreographies from JSON, validates roles and actions with `hasUniqueRoles` and `hasValidActions`
+- **Telltale.Projection**: Builds per-role `LocalType` traces from global types
+- **Telltale.Program**: Maps exported effects to `LocalAction` values as a homomorphism from JSON to the projection domain
+- **Telltale.Subtyping**: Defines order checks with `DecidableEq`
+- **Telltale.Runner**: Applies membership, order, and label invariants per branch
 
 ## Features Without Lean Formalization
 
@@ -117,7 +117,7 @@ The `continue` keyword provides explicit back-references that align with the the
 Use the Nix shell to ensure Rust, Lean, and Lake versions match:
 
 ```bash
-nix develop --command just rumpsteak-lean-check
+nix develop --command just telltale-lean-check
 ```
 
 This exports the sample choreography for Chef, SousChef, and Baker from `lean/choreo/lean-sample.choreo`, builds the Lean runner, and validates each role. Logs are written to `lean/artifacts/runner-<role>.{log,json}`.
@@ -125,7 +125,7 @@ This exports the sample choreography for Chef, SousChef, and Baker from `lean/ch
 ### Extended Scenario
 
 ```bash
-nix develop --command just rumpsteak-lean-check-extended
+nix develop --command just telltale-lean-check-extended
 ```
 
 Validates `lean/choreo/lean-extended.choreo` with two course cycles before dessert options.
@@ -133,7 +133,7 @@ Validates `lean/choreo/lean-extended.choreo` with two course cycles before desse
 ### Negative Testing
 
 ```bash
-nix develop --command just rumpsteak-lean-check-failing
+nix develop --command just telltale-lean-check-failing
 ```
 
 Exports `lean/choreo/lean-failing.choreo` with a corrupted label. The runner exits non-zero, confirming error detection works.

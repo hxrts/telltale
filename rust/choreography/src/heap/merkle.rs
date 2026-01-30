@@ -11,7 +11,7 @@
 //!
 //! ## Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/Merkle.lean`:
+//! This module corresponds to `lean/Telltale/Protocol/Merkle.lean`:
 //! - `MerkleTree` ↔ Lean's `MerkleTree`
 //! - `MerkleProof` ↔ Lean's `MerkleProof`
 //! - `merkle_root` ↔ Lean's `merkleRoot`

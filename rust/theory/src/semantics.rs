@@ -14,14 +14,14 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module mirrors `lean/Rumpsteak/Protocol/GlobalType.lean`:
+//! This module mirrors `lean/Telltale/Protocol/GlobalType.lean`:
 //! - `GlobalAction` ↔ Lean's `GlobalActionR`
 //! - `LocalAction` ↔ Lean's `LocalActionR`
 //! - `can_step` ↔ Lean's `canStep` inductive
 //! - `step` ↔ Lean's `step` inductive
 //! - `ConsumeResult` ↔ Lean's `ConsumeResult` inductive
 
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 use std::collections::HashSet;
 
 /// Direction of a local action (send or receive).
@@ -125,8 +125,8 @@ impl LocalAction {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::semantics::{can_step, GlobalAction};
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::semantics::{can_step, GlobalAction};
+/// use telltale_types::{GlobalType, Label};
 ///
 /// // A -> B: msg. end
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
@@ -199,8 +199,8 @@ fn can_step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> bool {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::semantics::{step, GlobalAction};
-/// use rumpsteak_types::{GlobalType, Label};
+/// use telltale_theory::semantics::{step, GlobalAction};
+/// use telltale_types::{GlobalType, Label};
 ///
 /// // A -> B: msg. end  --[A,B,msg]--> end
 /// let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
@@ -286,8 +286,8 @@ fn step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> Option<GlobalTy
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_theory::semantics::{local_can_step, LocalAction};
-/// use rumpsteak_types::{LocalTypeR, Label};
+/// use telltale_theory::semantics::{local_can_step, LocalAction};
+/// use telltale_types::{LocalTypeR, Label};
 ///
 /// // !B{msg.end}
 /// let lt = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);

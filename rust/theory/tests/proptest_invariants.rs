@@ -6,10 +6,10 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use rumpsteak_theory::{
+use telltale_theory::{
     async_subtype, check_coherent, merge, project, sync_subtype, validate_global, validate_local,
 };
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Deterministic seed for reproducibility
 const SEED: [u8; 32] = [
@@ -808,7 +808,7 @@ fn prop_generated_local_types_are_guarded() {
 
 #[test]
 fn prop_step_deterministic() {
-    use rumpsteak_theory::semantics::{can_step, step, GlobalAction};
+    use telltale_theory::semantics::{can_step, step, GlobalAction};
 
     let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let act = GlobalAction::new("A", "B", Label::new("msg"));
@@ -828,7 +828,7 @@ fn prop_step_deterministic() {
 
 #[test]
 fn prop_enabled_implies_step_exists() {
-    use rumpsteak_theory::semantics::{can_step, step, GlobalAction};
+    use telltale_theory::semantics::{can_step, step, GlobalAction};
 
     let mut runner = TestRunner::new_with_rng(
         Config {

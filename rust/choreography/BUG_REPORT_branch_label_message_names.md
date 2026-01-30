@@ -1,7 +1,7 @@
 # Bug Report: Message Type Names in BranchLabel Enum
 
 **Status:** ✅ FIXED
-**Version:** rumpsteak-aura v0.8.1, rumpsteak-aura-choreography v0.8.1
+**Version:** telltale v0.8.1, telltale-choreography v0.8.1
 **Severity:** High - Causes compilation errors in generated code (WAS causing - now fixed)
 **Location:** `rust/choreography/src/compiler/projection.rs` (fixed)
 

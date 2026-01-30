@@ -9,7 +9,7 @@
 //! - Runtime role binding and validation
 //! - Overflow protection and security constraints
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::{
         Annotations, Choreography, LocalType, MessageType, Protocol, RangeExpr, Role, RoleIndex,
         RoleParam, RoleRange, RoleValidationError, MAX_RANGE_SIZE, MAX_ROLE_COUNT, MAX_ROLE_INDEX,
@@ -178,7 +178,7 @@ fn test_dynamic_role_projection() {
 
 #[test]
 fn test_role_bounds_checker() {
-    use rumpsteak_aura_choreography::ast::role::RoleBoundsChecker;
+    use telltale_choreography::ast::role::RoleBoundsChecker;
 
     let checker = RoleBoundsChecker::default();
 

@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use rumpsteak_aura_choreography::testing::*;
+//! use telltale_choreography::testing::*;
 //!
 //! let result = ProtocolTest::builder("AuraConsensus")
 //!     .bind_role("Coordinator", coordinator_adapter)

@@ -1,6 +1,6 @@
 # Lean-Rust Bridge
 
-The `rumpsteak-lean-bridge` crate connects Rust implementations to Lean verification. It provides JSON serialization, test infrastructure, and the `LeanRunner` for invoking the Lean binary.
+The `telltale-lean-bridge` crate connects Rust implementations to Lean verification. It provides JSON serialization, test infrastructure, and the `LeanRunner` for invoking the Lean binary.
 
 ## Two Projection Implementations
 
@@ -123,7 +123,7 @@ Randomized testing with deterministic seeds covers simple protocols, choice prot
 
 Location: `rust/lean-bridge/tests/proptest_async_subtyping.rs`
 
-These tests validate the SISO decomposition and asynchronous subtyping algorithms from `rumpsteak-theory`. The test suite uses fixed seeds for full reproducibility.
+These tests validate the SISO decomposition and asynchronous subtyping algorithms from `telltale-theory`. The test suite uses fixed seeds for full reproducibility.
 
 ```rust
 // Example: Input tree contravariance property
@@ -150,8 +150,8 @@ Direct validation against the Lean runner covers ping-pong protocols, three-part
 The GitHub Actions workflow ensures Lean verification runs on every push.
 
 1. Build Lean binary: `cd lean && lake build`
-2. Run Lean verification scripts: `just rumpsteak-lean-check*`
-3. Run Lean-validated Rust tests: `cargo test -p rumpsteak-lean-bridge`
+2. Run Lean verification scripts: `just telltale-lean-check*`
+3. Run Lean-validated Rust tests: `cargo test -p telltale-lean-bridge`
 
 The test `test_lean_binary_available_for_ci` explicitly requires the Lean binary and fails if missing. This makes Lean verification mandatory in CI rather than silently skipped.
 
@@ -173,19 +173,19 @@ These commands build the Lean binary required for cross-validation tests.
 
 ```bash
 # Full test suite
-cargo test -p rumpsteak-lean-bridge
+cargo test -p telltale-lean-bridge
 
 # Cross-validation only
-cargo test -p rumpsteak-lean-bridge --test projection_equivalence_tests
+cargo test -p telltale-lean-bridge --test projection_equivalence_tests
 
 # Projection property tests only
-cargo test -p rumpsteak-lean-bridge --test proptest_projection
+cargo test -p telltale-lean-bridge --test proptest_projection
 
 # Async subtyping property tests only
-cargo test -p rumpsteak-lean-bridge --test proptest_async_subtyping
+cargo test -p telltale-lean-bridge --test proptest_async_subtyping
 
 # Integration tests only
-cargo test -p rumpsteak-lean-bridge --test lean_integration_tests
+cargo test -p telltale-lean-bridge --test lean_integration_tests
 ```
 
 These commands run specific test suites for focused debugging.
@@ -195,8 +195,8 @@ These commands run specific test suites for focused debugging.
 ### Export and Import
 
 ```rust
-use rumpsteak_lean_bridge::{global_to_json, local_to_json, json_to_global, json_to_local};
-use rumpsteak_types::{GlobalType, LocalTypeR, Label};
+use telltale_lean_bridge::{global_to_json, local_to_json, json_to_global, json_to_local};
+use telltale_types::{GlobalType, LocalTypeR, Label};
 
 let g = GlobalType::comm(
     "Client",
@@ -213,7 +213,7 @@ This example shows the round-trip export and import of a global type through JSO
 ### LeanRunner
 
 ```rust
-use rumpsteak_lean_bridge::LeanRunner;
+use telltale_lean_bridge::LeanRunner;
 
 // Check availability
 if LeanRunner::is_available() {
@@ -231,7 +231,7 @@ The `LeanRunner` invokes the Lean binary for validation. Use `is_available()` to
 ### Validator
 
 ```rust
-use rumpsteak_lean_bridge::Validator;
+use telltale_lean_bridge::Validator;
 
 let validator = Validator::new();
 let result = validator.validate_projection_with_lean(&choreo, &program)?;
@@ -243,7 +243,7 @@ The `Validator` provides a higher-level API for comparing Rust and Lean projecti
 ## CLI Tool
 
 ```bash
-cargo build -p rumpsteak-lean-bridge --features cli --release
+cargo build -p telltale-lean-bridge --features cli --release
 ```
 
 This command builds the CLI with the `cli` feature enabled.
@@ -271,14 +271,14 @@ The Rust merge implementation matches the Lean formalization in `ProjectionR.lea
 
 Send merge follows `mergeSendSorted` where branches must have identical label sets. A non-participant cannot choose based on an unseen choice. Receive merge follows `mergeRecvSorted` where branches union their label sets. A non-participant can handle any incoming message.
 
-The `rumpsteak-theory` crate implements these in `merge.rs`. Tests validate correspondence between Rust and Lean results.
+The `telltale-theory` crate implements these in `merge.rs`. Tests validate correspondence between Rust and Lean results.
 
 ## Error Handling
 
 ### Import Errors
 
 ```rust
-use rumpsteak_lean_bridge::ImportError;
+use telltale_lean_bridge::ImportError;
 
 match json_to_global(&json) {
     Ok(g) => println!("Parsed: {:?}", g),
@@ -293,7 +293,7 @@ Import errors distinguish between unknown type kinds, missing required fields, a
 ### Validation Results
 
 ```rust
-use rumpsteak_lean_bridge::ValidationResult;
+use telltale_lean_bridge::ValidationResult;
 
 match validator.compare_local(&rust, &lean) {
     ValidationResult::Match => println!("Types match"),

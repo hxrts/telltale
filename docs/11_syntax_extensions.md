@@ -1,10 +1,10 @@
-# Syntax Extensions in Rumpsteak-Aura
+# Syntax Extensions in Telltale
 
-This guide covers the complete syntax extension system in rumpsteak-aura, which allows 3rd party projects to inherit ALL features automatically while adding their own custom extensions.
+This guide covers the complete syntax extension system in telltale, which allows 3rd party projects to inherit ALL features automatically while adding their own custom extensions.
 
 ## Overview
 
-The rumpsteak-aura extension system provides a clean way for 3rd party projects to extend choreographic DSL syntax while automatically inheriting all core features.
+The telltale extension system provides a clean way for 3rd party projects to extend choreographic DSL syntax while automatically inheriting all core features.
 
 Core capabilities include full feature inheritance (choice constructs, loops, branch parallel, parameterized roles, protocol composition, error handling), automatic extension discovery and registration, cached grammar composition with 387x performance improvements, priority-based conflict resolution between extensions, and a preprocessing approach for simplicity and maintainability.
 
@@ -17,7 +17,7 @@ graph TD
     A["**3rd Party Project**<br/>Inherits all features"]
     B["**Extension Registry**<br/>Grammar + Parsers"]
     C["**Grammar Composer**<br/>Dynamic composition"]
-    D["**Rumpsteak-Aura Parser**<br/>Standard grammar + Features"]
+    D["**Telltale Parser**<br/>Standard grammar + Features"]
     E["**Validated AST**"]
     
     A --> B
@@ -30,8 +30,8 @@ Key benefits include clean separation between extension and base parsing, cached
 
 ## Complete Integration Example
 
-The `external-demo` project demonstrates the proper way for 3rd party projects to integrate with rumpsteak-aura. It uses a two-crate architecture:
-- `external-demo` - Regular crate that re-exports ALL rumpsteak-aura functionality 
+The `external-demo` project demonstrates the proper way for 3rd party projects to integrate with telltale. It uses a two-crate architecture:
+- `external-demo` - Regular crate that re-exports ALL telltale functionality 
 - `external-demo-macros` - Proc-macro crate providing full-featured choreography! macro
 
 Here's the complete implementation:
@@ -43,9 +43,9 @@ Two-crate architecture for maximum compatibility:
 `external-demo/Cargo.toml` (Regular crate):
 ```toml
 [dependencies]
-# Re-export all rumpsteak-aura functionality  
-rumpsteak-aura = { path = ".." }
-rumpsteak-aura-choreography = { path = "../choreography" }
+# Re-export all telltale functionality  
+telltale = { path = ".." }
+telltale-choreography = { path = "../choreography" }
 # Import custom proc macros
 external-demo-macros = { path = "../external-demo-macros" }
 ```
@@ -58,7 +58,7 @@ This dependency set re-exports the core crates and the custom macro crate. It ke
 proc-macro = true
 
 [dependencies]
-rumpsteak-aura-choreography = { path = "../choreography" }
+telltale-choreography = { path = "../choreography" }
 proc-macro2 = "1.0"  
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
@@ -70,9 +70,9 @@ This declares a proc-macro crate that depends on the choreography crate. It also
 
 ```rust
 // external-demo/src/lib.rs
-// Re-export ALL rumpsteak-aura functionality so 3rd parties get everything
-pub use rumpsteak_aura::*;
-pub use rumpsteak_aura_choreography::*;
+// Re-export ALL telltale functionality so 3rd parties get everything
+pub use telltale::*;
+pub use telltale_choreography::*;
 
 // Import our custom proc macros from the separate proc-macro crate
 pub use external_demo_macros::*;
@@ -80,17 +80,17 @@ pub use external_demo_macros::*;
 // Extension definitions for Aura  
 pub mod aura_extensions;
 
-/// Full-featured choreography! macro with ALL rumpsteak-aura features
+/// Full-featured choreography! macro with ALL telltale features
 pub use external_demo_macros::choreography;
 ```
 
-This re-exports the base APIs and the custom macro entry point. It ensures downstream crates see the same surface as rumpsteak-aura.
+This re-exports the base APIs and the custom macro entry point. It ensures downstream crates see the same surface as telltale.
 
 ### 3. Extension Definition
 
 ```rust
 // external-demo/src/aura_extensions.rs
-use rumpsteak_aura_choreography::extensions::*;
+use telltale_choreography::extensions::*;
 
 #[derive(Debug)]
 pub struct AuraGrammarExtension;
@@ -126,12 +126,12 @@ This defines a grammar extension and registers it in the extension registry. The
 
 ```rust
 // external-demo-macros/src/choreography.rs
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::Choreography,
     compiler::parser::parse_choreography_str,
 };
 
-/// Full-featured choreography macro that inherits ALL rumpsteak-aura features
+/// Full-featured choreography macro that inherits ALL telltale features
 pub fn choreography_impl(input: TokenStream) -> Result<TokenStream, syn::Error> {
     let input_str = input.to_string();
     let registry = ExtensionRegistry::new(); // Empty registry for stable generation
@@ -223,7 +223,7 @@ The `GrammarComposer` provides high-performance grammar composition with caching
 ### Basic Usage
 
 ```rust
-use rumpsteak_aura_choreography::{GrammarComposer, GrammarExtension};
+use telltale_choreography::{GrammarComposer, GrammarExtension};
 
 let mut composer = GrammarComposer::new();
 composer.register_extension(MyExtension);
@@ -274,7 +274,7 @@ Performance benefits include 387x speedup for repeated compositions through cach
 The `ExtensionParser` handles extension-aware parsing with optimizations:
 
 ```rust
-use rumpsteak_aura_choreography::*;
+use telltale_choreography::*;
 
 // Create extension parser
 let mut parser = ExtensionParser::new();
@@ -319,7 +319,7 @@ This example shows a custom parse pass that augments the base parser. It runs ex
 
 ## Feature Inheritance Demonstration
 
-The system ensures 3rd party projects automatically inherit ALL rumpsteak-aura features:
+The system ensures 3rd party projects automatically inherit ALL telltale features:
 
 ### Choice Constructs
 
@@ -365,14 +365,14 @@ This example shows an infinite loop in a protocol. It uses the same syntax as th
 
 ### Protocol Composition
 
-All advanced rumpsteak-aura features work automatically in 3rd party projects without any additional integration work.
+All advanced telltale features work automatically in 3rd party projects without any additional integration work.
 
 ## Extension Discovery System
 
 The discovery system automatically finds and registers extensions:
 
 ```rust
-use rumpsteak_aura_choreography::extensions::discovery::*;
+use telltale_choreography::extensions::discovery::*;
 
 // Automatic discovery
 let discovery = ExtensionDiscovery::new();
@@ -534,7 +534,7 @@ This example shows a legacy custom macro. It now expects a string literal input 
 
 After (extension system with full feature inheritance):
 ```rust
-// Standard rumpsteak-aura with extensions
+// Standard telltale with extensions
 choreography!(r#"
 protocol MyProtocol =
   roles A, B
@@ -582,7 +582,7 @@ This snippet inspects the composed grammar and extension stats. It helps diagnos
 
 ## Complete Example: external-demo
 
-The `external-demo` project provides a complete working example of 3rd party integration using the two-crate pattern. It demonstrates full feature inheritance where all rumpsteak-aura features work automatically. The integration uses a simple preprocessing approach. Roles are extracted from the choreography at compile time. Extension data converts to effect system calls. The implementation leverages cached grammar composition for performance.
+The `external-demo` project provides a complete working example of 3rd party integration using the two-crate pattern. It demonstrates full feature inheritance where all telltale features work automatically. The integration uses a simple preprocessing approach. Roles are extracted from the choreography at compile time. Extension data converts to effect system calls. The implementation leverages cached grammar composition for performance.
 
 To see the complete implementation:
 ```bash
@@ -592,7 +592,7 @@ cargo run --example simple_ping_pong  # Run example
 cargo run --example threshold_ceremony  # Advanced features
 ```
 
-This demonstrates how 3rd party projects can integrate with rumpsteak-aura while inheriting ALL features automatically and adding their own domain-specific extensions.
+This demonstrates how 3rd party projects can integrate with telltale while inheriting ALL features automatically and adding their own domain-specific extensions.
 
 ## Advanced Topics
 
@@ -628,4 +628,4 @@ impl ProtocolExtension for MyProtocol {
 }
 ```
 
-The extension system provides a complete foundation for building domain-specific choreographic languages while maintaining full compatibility with rumpsteak-aura's features.
+The extension system provides a complete foundation for building domain-specific choreographic languages while maintaining full compatibility with telltale's features.

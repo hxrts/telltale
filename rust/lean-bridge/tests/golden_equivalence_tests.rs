@@ -3,7 +3,7 @@
 //! These tests compare Rust projection outputs against pre-computed Lean outputs
 //! stored as golden files. This enables fast CI without requiring the Lean runtime.
 //!
-//! Golden files are generated from Lean using `cargo run -p rumpsteak-lean-bridge --bin golden`
+//! Golden files are generated from Lean using `cargo run -p telltale-lean-bridge --bin golden`
 //! and should be regenerated when the Lean specification changes.
 //!
 //! ## Directory Structure
@@ -22,8 +22,8 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_lean_bridge::equivalence::EquivalenceChecker;
-use rumpsteak_lean_bridge::import::json_to_global;
+use telltale_lean_bridge::equivalence::EquivalenceChecker;
+use telltale_lean_bridge::import::json_to_global;
 use std::path::PathBuf;
 
 /// Get the path to the golden files directory.
@@ -32,7 +32,7 @@ fn golden_dir() -> PathBuf {
 }
 
 /// Load a GlobalType from a golden input file.
-fn load_input(test_name: &str) -> rumpsteak_types::GlobalType {
+fn load_input(test_name: &str) -> telltale_types::GlobalType {
     let path = golden_dir()
         .join("projection")
         .join(test_name)

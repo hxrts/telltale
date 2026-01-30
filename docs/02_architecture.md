@@ -2,7 +2,7 @@
 
 ## Overview
 
-Rumpsteak implements choreographic programming for Rust. The system compiles global protocol specifications into local session types for each participant.
+Telltale implements choreographic programming for Rust. The system compiles global protocol specifications into local session types for each participant.
 
 The architecture has four main layers:
 
@@ -36,7 +36,7 @@ graph TB
     end
 
     subgraph Layer4["Layer 4: Runtime Execution"]
-        Handler["Effect Handler<br/>(InMemory / Rumpsteak)"]
+        Handler["Effect Handler<br/>(InMemory / Telltale)"]
         Transport["Transport Layer<br/>(Channels / Network)"]
         Exec["Running Protocol"]
     end
@@ -311,38 +311,38 @@ Add new code generation backends to target different session type libraries. The
 
 ## Workspace Organization
 
-Rumpsteak-Aura is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory. The crate structure mirrors the Lean formalization.
+Telltale is organized as a Cargo workspace with multiple crates. All Rust code is located in the `rust/` directory. The crate structure mirrors the Lean formalization.
 
 ```
-rumpsteak-aura/
+telltale/
 ├── rust/                   All Rust crates
-│   ├── src/                Facade crate (rumpsteak-aura)
-│   ├── types/              Core types (rumpsteak-types)
+│   ├── src/                Facade crate (telltale)
+│   ├── types/              Core types (telltale-types)
 │   │   └── src/
 │   │       ├── global.rs   GlobalType (matches Lean)
 │   │       ├── local.rs    LocalTypeR (matches Lean)
 │   │       ├── label.rs    Label, PayloadSort
 │   │       └── action.rs   Action, LocalAction
-│   ├── theory/             Session type algorithms (rumpsteak-theory)
+│   ├── theory/             Session type algorithms (telltale-theory)
 │   │   └── src/
 │   │       ├── projection.rs   Global to local projection
 │   │       ├── merge.rs        Branch merging
 │   │       ├── subtyping/      Sync and async subtyping
 │   │       ├── duality.rs      Dual type computation
 │   │       └── bounded.rs      Bounded recursion
-│   ├── choreography/       DSL and effects (rumpsteak-aura-choreography)
+│   ├── choreography/       DSL and effects (telltale-choreography)
 │   │   └── src/
 │   │       ├── ast/        Extended AST definitions
 │   │       ├── compiler/   Parser, projection, codegen
 │   │       ├── effects/    Effect handlers and middleware
 │   │       └── runtime/    Platform abstraction
-│   ├── lean-bridge/        Lean validation (rumpsteak-lean-bridge)
+│   ├── lean-bridge/        Lean validation (telltale-lean-bridge)
 │   │   └── src/
 │   │       ├── export.rs   Rust to JSON export
 │   │       ├── import.rs   JSON to Rust import
 │   │       └── runner.rs   Lean binary invocation
-│   ├── transport/          Transport abstractions (rumpsteak-transport)
-│   └── macros/             Procedural macros (rumpsteak-aura-macros)
+│   ├── transport/          Transport abstractions (telltale-transport)
+│   └── macros/             Procedural macros (telltale-macros)
 ├── lean/                   Lean 4 verification code
 ├── examples/               Example protocols
 └── docs/                   Documentation
@@ -352,8 +352,8 @@ This tree outlines the workspace layout and crate locations. It helps map each c
 
 ### Crate Responsibilities
 
-The `rumpsteak-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `rumpsteak-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `rumpsteak-types`.
+The `telltale-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `telltale-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `telltale-types`.
 
-The `rumpsteak-aura-choreography` crate is the choreographic programming layer including the DSL parser, effect handlers, code generation, and runtime support. The `rumpsteak-lean-bridge` crate provides Lean integration through JSON export and import with a runner for invoking the verification binary.
+The `telltale-choreography` crate is the choreographic programming layer including the DSL parser, effect handlers, code generation, and runtime support. The `telltale-lean-bridge` crate provides Lean integration through JSON export and import with a runner for invoking the verification binary.
 
-The `rumpsteak-aura` crate is the main facade that re-exports types from other crates with feature flags. Most users import from this crate.
+The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users import from this crate.

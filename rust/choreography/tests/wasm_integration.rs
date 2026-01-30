@@ -6,7 +6,7 @@
 // including message exchange, timeouts, and error handling.
 #![cfg(target_arch = "wasm32")]
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     interpret, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
 };
 use serde::{Deserialize, Serialize};

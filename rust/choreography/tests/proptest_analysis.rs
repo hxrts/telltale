@@ -12,8 +12,8 @@
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use quote::{format_ident, quote};
-use rumpsteak_aura_choreography::ast::{Annotations, Choreography, MessageType, Protocol, Role};
-use rumpsteak_aura_choreography::compiler::analysis::analyze;
+use telltale_choreography::ast::{Annotations, Choreography, MessageType, Protocol, Role};
+use telltale_choreography::compiler::analysis::analyze;
 use std::collections::HashMap;
 
 // Reuse strategies from projection tests
@@ -259,7 +259,7 @@ proptest! {
 
         let unused_roles: Vec<_> = result.warnings.iter()
             .filter_map(|w| {
-                if let rumpsteak_aura_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) = w {
+                if let telltale_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) = w {
                     Some(r)
                 } else {
                     None
@@ -471,7 +471,7 @@ mod unit_tests {
 
         // Charlie should be warned as unused
         let has_unused_warning = result.warnings.iter().any(|w| {
-            matches!(w, rumpsteak_aura_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) if *r == charlie)
+            matches!(w, telltale_choreography::compiler::analysis::AnalysisWarning::UnusedRole(r) if *r == charlie)
         });
 
         assert!(has_unused_warning, "Unused role should generate warning");

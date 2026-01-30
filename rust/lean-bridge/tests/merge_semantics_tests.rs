@@ -1,7 +1,7 @@
 //! Tests validating merge semantics correspondence between Rust and Lean.
 //!
 //! These tests verify that the Rust merge implementation matches the behavior
-//! defined in `lean/Rumpsteak/Protocol/ProjectionR.lean`:
+//! defined in `lean/Telltale/Protocol/ProjectionR.lean`:
 //!
 //! - `merge_send_branches` ↔ Lean's `LocalTypeR.mergeSendSorted`
 //! - `merge_recv_branches` ↔ Lean's `LocalTypeR.mergeRecvSorted`
@@ -13,9 +13,9 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use rumpsteak_lean_bridge::{json_to_local, local_to_json, LeanRunner};
-use rumpsteak_theory::{can_merge, merge, project};
-use rumpsteak_types::{GlobalType, Label, LocalTypeR};
+use telltale_lean_bridge::{json_to_local, local_to_json, LeanRunner};
+use telltale_theory::{can_merge, merge, project};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 use serde_json::json;
 
 /// Helper macro to skip tests when Lean binary is unavailable.

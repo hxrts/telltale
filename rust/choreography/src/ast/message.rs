@@ -11,7 +11,7 @@ use proc_macro2::{Ident, TokenStream};
 ///
 /// ```ignore
 /// use quote::{format_ident, quote};
-/// use rumpsteak_aura_choreography::MessageType;
+/// use telltale_choreography::MessageType;
 ///
 /// // Simple message without payload
 /// let ping = MessageType {

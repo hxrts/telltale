@@ -6,11 +6,11 @@
 //! - Collecting responses from a threshold of signers
 //! - Topology-based role constraint validation
 
-use rumpsteak_aura_choreography::effects::{LabelId, RoleId};
-use rumpsteak_aura_choreography::identifiers::RoleName;
-use rumpsteak_aura_choreography::runtime::adapter::ChoreographicAdapter;
-use rumpsteak_aura_choreography::runtime::test_adapter::TestAdapter;
-use rumpsteak_aura_choreography::topology::Topology;
+use telltale_choreography::effects::{LabelId, RoleId};
+use telltale_choreography::identifiers::RoleName;
+use telltale_choreography::runtime::adapter::ChoreographicAdapter;
+use telltale_choreography::runtime::test_adapter::TestAdapter;
+use telltale_choreography::topology::Topology;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================

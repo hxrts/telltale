@@ -1215,130 +1215,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
-name = "rumpsteak-aura"
-version = "0.9.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64",
- "bincode",
- "criterion",
- "futures",
- "getrandom 0.2.16",
- "hex",
- "num-complex",
- "proc-macro2",
- "proptest",
- "quote",
- "rand 0.8.5",
- "rumpsteak-aura-macros",
- "rumpsteak-theory",
- "rumpsteak-types",
- "serde",
- "serde_json",
- "syn 2.0.110",
- "tempfile",
- "thiserror",
- "time",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-timer",
-]
-
-[[package]]
-name = "rumpsteak-aura-choreography"
-version = "0.9.1"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "base64",
- "bincode",
- "criterion",
- "futures",
- "getrandom 0.2.16",
- "hex",
- "parking_lot 0.12.5",
- "pest",
- "pest_derive",
- "proc-macro2",
- "proptest",
- "quote",
- "rand 0.8.5",
- "rumpsteak-aura",
- "rumpsteak-aura-macros",
- "rumpsteak-theory",
- "rumpsteak-types",
- "serde",
- "sha2",
- "syn 2.0.110",
- "tempfile",
- "thiserror",
- "time",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
- "wasm-timer",
-]
-
-[[package]]
-name = "rumpsteak-aura-macros"
-version = "0.9.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.110",
-]
-
-[[package]]
-name = "rumpsteak-lean-bridge"
-version = "0.9.1"
-dependencies = [
- "anyhow",
- "clap 4.5.53",
- "proptest",
- "rumpsteak-aura-choreography",
- "rumpsteak-theory",
- "rumpsteak-types",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "rumpsteak-theory"
-version = "0.9.1"
-dependencies = [
- "assert_matches",
- "proptest",
- "rumpsteak-types",
- "thiserror",
-]
-
-[[package]]
-name = "rumpsteak-types"
-version = "0.9.1"
-dependencies = [
- "assert_matches",
- "proptest",
- "serde",
- "serde_ipld_dagcbor",
- "serde_json",
- "sha2",
- "thiserror",
-]
-
-[[package]]
 name = "rustix"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1557,6 +1433,130 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "telltale"
+version = "0.9.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "bincode",
+ "criterion",
+ "futures",
+ "getrandom 0.2.16",
+ "hex",
+ "num-complex",
+ "proc-macro2",
+ "proptest",
+ "quote",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "syn 2.0.110",
+ "telltale-macros",
+ "telltale-theory",
+ "telltale-types",
+ "tempfile",
+ "thiserror",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-timer",
+]
+
+[[package]]
+name = "telltale-choreography"
+version = "0.9.1"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "async-trait",
+ "base64",
+ "bincode",
+ "criterion",
+ "futures",
+ "getrandom 0.2.16",
+ "hex",
+ "parking_lot 0.12.5",
+ "pest",
+ "pest_derive",
+ "proc-macro2",
+ "proptest",
+ "quote",
+ "rand 0.8.5",
+ "serde",
+ "sha2",
+ "syn 2.0.110",
+ "telltale",
+ "telltale-macros",
+ "telltale-theory",
+ "telltale-types",
+ "tempfile",
+ "thiserror",
+ "time",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "wasm-timer",
+]
+
+[[package]]
+name = "telltale-lean-bridge"
+version = "0.9.1"
+dependencies = [
+ "anyhow",
+ "clap 4.5.53",
+ "proptest",
+ "serde",
+ "serde_json",
+ "telltale-choreography",
+ "telltale-theory",
+ "telltale-types",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "telltale-macros"
+version = "0.9.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.110",
+]
+
+[[package]]
+name = "telltale-theory"
+version = "0.9.1"
+dependencies = [
+ "assert_matches",
+ "proptest",
+ "telltale-types",
+ "thiserror",
+]
+
+[[package]]
+name = "telltale-types"
+version = "0.9.1"
+dependencies = [
+ "assert_matches",
+ "proptest",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]

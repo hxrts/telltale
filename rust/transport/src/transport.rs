@@ -3,8 +3,8 @@
 use crate::config::TcpTransportConfig;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
-use rumpsteak_aura_choreography::topology::{Message, TransportError, TransportResult};
-use rumpsteak_aura_choreography::{MessageLenBytes, QueueCapacity, RoleName, Transport};
+use telltale_choreography::topology::{Message, TransportError, TransportResult};
+use telltale_choreography::{MessageLenBytes, QueueCapacity, RoleName, Transport};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

@@ -10,10 +10,10 @@
 //!
 //! | Rust Type | Lean Definition |
 //! |-----------|-----------------|
-//! | `GlobalType` | `lean/Rumpsteak/Protocol/GlobalType.lean` |
-//! | `LocalTypeR` | `lean/Rumpsteak/Protocol/LocalTypeR.lean` |
-//! | `PayloadSort` | `lean/Rumpsteak/Protocol/GlobalType.lean` |
-//! | `Label` | `lean/Rumpsteak/Protocol/GlobalType.lean` |
+//! | `GlobalType` | `lean/Telltale/Protocol/GlobalType.lean` |
+//! | `LocalTypeR` | `lean/Telltale/Protocol/LocalTypeR.lean` |
+//! | `PayloadSort` | `lean/Telltale/Protocol/GlobalType.lean` |
+//! | `Label` | `lean/Telltale/Protocol/GlobalType.lean` |
 //!
 //! # References
 //!

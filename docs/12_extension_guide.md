@@ -1,19 +1,19 @@
 # Composition Tutorial
 
-This tutorial integrates rumpsteak-aura into your project. It demonstrates composing domain-specific choreographies with extensions.
+This tutorial integrates telltale into your project. It demonstrates composing domain-specific choreographies with extensions.
 
 ## Prerequisites
 
-You need Rust 1.75 or later. Basic understanding of choreographic programming is required. See [Getting Started](01_getting_started.md) for fundamentals. Familiarity with effect handlers helps. See [Using Rumpsteak Handlers](07_rumpsteak_handler.md) for handler concepts.
+You need Rust 1.75 or later. Basic understanding of choreographic programming is required. See [Getting Started](01_getting_started.md) for fundamentals. Familiarity with effect handlers helps. See [Using Telltale Handlers](07_telltale_handler.md) for handler concepts.
 
 ## Step 1: Add Dependencies
 
-Add rumpsteak-aura to your `Cargo.toml`.
+Add telltale to your `Cargo.toml`.
 
 ```toml
 [dependencies]
-rumpsteak-aura = "0.7"
-rumpsteak-aura-choreography = "0.7"
+telltale = "0.7"
+telltale-choreography = "0.7"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -53,7 +53,7 @@ Roles represent participants. Messages are the data exchanged. Roles must implem
 Define extensions for domain needs.
 
 ```rust
-use rumpsteak_aura_choreography::effects::*;
+use telltale_choreography::effects::*;
 use std::any::{Any, TypeId};
 
 #[derive(Clone, Debug)]
@@ -141,7 +141,7 @@ The `LogEvent` extension appears in all role projections. An empty vector makes 
 Build a handler with extension support.
 
 ```rust
-use rumpsteak_aura_choreography::effects::*;
+use telltale_choreography::effects::*;
 use async_trait::async_trait;
 
 pub struct DomainHandler {
@@ -274,7 +274,7 @@ The handler implements both `ExtensibleHandler` and `ChoreoHandler`. Extension h
 Create a choreography using the effect algebra.
 
 ```rust
-use rumpsteak_aura_choreography::effects::*;
+use telltale_choreography::effects::*;
 
 pub fn auth_protocol() -> Program<Role, String> {
     Program::new()
@@ -313,7 +313,7 @@ The program combines extensions and communication. Logging appears before and af
 Combine the components and execute.
 
 ```rust
-use rumpsteak_aura_choreography::effects::*;
+use telltale_choreography::effects::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -478,4 +478,4 @@ Integration tests verify protocol execution. Unit tests check extension registra
 
 ## Next Steps
 
-Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](10_effect_extensions.md). Explore advanced examples in `rust/choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Rumpsteak Handlers](07_rumpsteak_handler.md).
+Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](10_effect_extensions.md). Explore advanced examples in `rust/choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Telltale Handlers](07_telltale_handler.md).

@@ -3,7 +3,7 @@
 //! This module provides functions to parse JSON (from Lean output)
 //! back into GlobalType and LocalTypeR.
 
-use rumpsteak_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -34,12 +34,12 @@ pub enum ImportError {
 /// # Example
 ///
 /// ```
-/// use rumpsteak_lean_bridge::import::json_to_global;
+/// use telltale_lean_bridge::import::json_to_global;
 /// use serde_json::json;
 ///
 /// let json = json!({ "kind": "end" });
 /// let g = json_to_global(&json).unwrap();
-/// assert!(matches!(g, rumpsteak_types::GlobalType::End));
+/// assert!(matches!(g, telltale_types::GlobalType::End));
 /// ```
 pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
     let kind = json
@@ -121,12 +121,12 @@ pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
 /// # Example
 ///
 /// ```
-/// use rumpsteak_lean_bridge::import::json_to_local;
+/// use telltale_lean_bridge::import::json_to_local;
 /// use serde_json::json;
 ///
 /// let json = json!({ "kind": "end" });
 /// let lt = json_to_local(&json).unwrap();
-/// assert!(matches!(lt, rumpsteak_types::LocalTypeR::End));
+/// assert!(matches!(lt, telltale_types::LocalTypeR::End));
 /// ```
 pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
     let kind = json

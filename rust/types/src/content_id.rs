@@ -10,7 +10,7 @@
 //!
 //! # Lean Correspondence
 //!
-//! This module corresponds to `lean/Rumpsteak/Protocol/ContentId.lean`.
+//! This module corresponds to `lean/Telltale/Protocol/ContentId.lean`.
 
 use sha2::Digest;
 use std::fmt;
@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 /// # Example
 ///
 /// ```
-/// use rumpsteak_types::content_id::{Hasher, Sha256Hasher};
+/// use telltale_types::content_id::{Hasher, Sha256Hasher};
 ///
 /// let data = b"hello world";
 /// let hash = Sha256Hasher::digest(data);
@@ -87,7 +87,7 @@ impl Hasher for Sha256Hasher {
 /// # Examples
 ///
 /// ```
-/// use rumpsteak_types::content_id::{ContentId, Sha256Hasher};
+/// use telltale_types::content_id::{ContentId, Sha256Hasher};
 ///
 /// let cid: ContentId<Sha256Hasher> = ContentId::from_bytes(b"test data");
 /// assert_eq!(cid.as_bytes().len(), 32);

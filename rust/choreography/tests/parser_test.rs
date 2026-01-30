@@ -3,7 +3,7 @@
 
 // Comprehensive tests for the choreographic DSL parser
 
-use rumpsteak_aura_choreography::compiler::parser::{parse_choreography_str, ParseError};
+use telltale_choreography::compiler::parser::{parse_choreography_str, ParseError};
 
 #[test]
 fn test_parse_simple_protocol() {
@@ -65,7 +65,7 @@ protocol Broadcast = {
     assert_eq!(choreo.roles.len(), 3);
 
     // Check that the protocol is a Broadcast with correct to_all field
-    use rumpsteak_aura_choreography::ast::Protocol;
+    use telltale_choreography::ast::Protocol;
     match &choreo.protocol {
         Protocol::Broadcast {
             from,
@@ -288,7 +288,7 @@ protocol Recursive = {
     let result = parse_choreography_str(input);
     assert!(result.is_ok());
 
-    use rumpsteak_aura_choreography::ast::Protocol;
+    use telltale_choreography::ast::Protocol;
 
     let choreo = result.unwrap();
     // Verify the rec body contains a continue
@@ -578,7 +578,7 @@ protocol Sequence = {
 
 #[test]
 fn test_integration_with_projection() {
-    use rumpsteak_aura_choreography::compiler::projection;
+    use telltale_choreography::compiler::projection;
 
     let input = r"
 protocol TwoParty = {
@@ -851,7 +851,7 @@ protocol UndefinedCall = {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        rumpsteak_aura_choreography::compiler::parser::ParseError::UndefinedProtocol { .. }
+        telltale_choreography::compiler::parser::ParseError::UndefinedProtocol { .. }
     ));
 
     let err_msg = err.to_string();
@@ -880,7 +880,7 @@ where {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        rumpsteak_aura_choreography::compiler::parser::ParseError::DuplicateProtocol { .. }
+        telltale_choreography::compiler::parser::ParseError::DuplicateProtocol { .. }
     ));
 
     let err_msg = err.to_string();

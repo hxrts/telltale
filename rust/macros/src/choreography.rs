@@ -39,7 +39,7 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 
     // Generate use statements for the necessary imports
     let imports = quote! {
-        use ::rumpsteak_aura::{channel, Message as MessageTrait, Role as RoleTrait, Roles as RolesTrait};
+        use ::telltale::{channel, Message as MessageTrait, Role as RoleTrait, Roles as RolesTrait};
         use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
     };
 
@@ -55,14 +55,14 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
 /// Parse choreography from DSL string
 ///
 /// Note: DSL string parsing with full support for parameterized roles is now available
-/// in the `rumpsteak-choreography` crate. The macro in that crate (`rumpsteak_aura_choreography::choreography!`)
+/// in the `telltale-choreography` crate. The macro in that crate (`telltale_choreography::choreography!`)
 /// provides complete integration. This stub remains for backwards compatibility.
 fn choreography_from_dsl_string(dsl: String) -> proc_macro2::TokenStream {
     drop(dsl); // Explicitly consume parameter
     quote! {
         compile_error!(
-            "DSL string parsing with parameterized roles support is available through the rumpsteak_aura_choreography crate.\n\
-             Use: rumpsteak_aura_choreography::choreography! instead of rumpsteak_macros::choreography!\n\
+            "DSL string parsing with parameterized roles support is available through the telltale_choreography crate.\n\
+             Use: telltale_choreography::choreography! instead of telltale_macros::choreography!\n\
              \n\
              Or use the explicit macro syntax without string literals for basic protocols."
         );
@@ -255,7 +255,7 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
         };
 
         role_structs.push(quote! {
-            #[derive(::rumpsteak_aura::Role)]
+            #[derive(::telltale::Role)]
             #[message(Label)]
             #[allow(dead_code)]
             pub struct #role(#route Channel);
@@ -263,12 +263,12 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
     }
 
     quote! {
-        type Channel = ::rumpsteak_aura::channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+        type Channel = ::telltale::channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
         #(#role_structs)*
 
         /// Roles tuple for protocol setup
-        #[derive(::rumpsteak_aura::Roles)]
+        #[derive(::telltale::Roles)]
         #[allow(dead_code)]
         pub struct Roles(#(#role_names),*);
     }
@@ -314,7 +314,7 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
         #(#message_structs)*
 
         /// Message enum for the protocol
-        #[derive(::rumpsteak_aura::Message)]
+        #[derive(::telltale::Message)]
         #[allow(dead_code)]
         pub enum Label {
             #(#message_names(#message_names)),*
@@ -333,7 +333,7 @@ fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
 
         let session_type_name = quote::format_ident!("{}Session", role_name);
         types.extend(quote! {
-            #[::rumpsteak_aura::session]
+            #[::telltale::session]
             pub type #session_type_name = #session_type;
         });
     }
@@ -343,7 +343,7 @@ fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
 
 /// Project the protocol to a specific role's session type
 fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStream {
-    let mut type_expr = quote! { ::rumpsteak_aura::End };
+    let mut type_expr = quote! { ::telltale::End };
 
     // Process interactions in reverse order to build the type
     for interaction in protocol.interactions.iter().rev() {
@@ -354,12 +354,12 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                 if from == &role.name {
                     // This role sends
                     type_expr = quote! {
-                        ::rumpsteak_aura::Send<#to, #message, #type_expr>
+                        ::telltale::Send<#to, #message, #type_expr>
                     };
                 } else if to == &role.name {
                     // This role receives
                     type_expr = quote! {
-                        ::rumpsteak_aura::Receive<#from, #message, #type_expr>
+                        ::telltale::Receive<#from, #message, #type_expr>
                     };
                 }
                 // Otherwise, this role doesn't participate
@@ -381,11 +381,11 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                                 Interaction::Send { from, to, message, .. } => {
                                     if from == &role.name {
                                         branch_type = quote! {
-                                            ::rumpsteak_aura::Send<#to, #message, #branch_type>
+                                            ::telltale::Send<#to, #message, #branch_type>
                                         };
                                     } else if to == &role.name {
                                         branch_type = quote! {
-                                            ::rumpsteak_aura::Receive<#from, #message, #branch_type>
+                                            ::telltale::Receive<#from, #message, #branch_type>
                                         };
                                     }
                                 }
@@ -394,7 +394,7 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                                 }
                             }
                         }
-                        quote! { ::rumpsteak_aura::Choose<#label, #branch_type> }
+                        quote! { ::telltale::Choose<#label, #branch_type> }
                     }).collect();
 
                     // Combine branches into a choice type (sum type)
@@ -404,7 +404,7 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                             .fold(None, |acc, branch| match acc {
                                 None => Some(branch),
                                 Some(prev) => {
-                                    Some(quote! { ::rumpsteak_aura::Branch<#prev, #branch> })
+                                    Some(quote! { ::telltale::Branch<#prev, #branch> })
                                 }
                             })
                             .unwrap();
@@ -421,11 +421,11 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                                 Interaction::Send { from, to, message, .. } => {
                                     if from == &role.name {
                                         branch_type = quote! {
-                                            ::rumpsteak_aura::Send<#to, #message, #branch_type>
+                                            ::telltale::Send<#to, #message, #branch_type>
                                         };
                                     } else if to == &role.name {
                                         branch_type = quote! {
-                                            ::rumpsteak_aura::Receive<#from, #message, #branch_type>
+                                            ::telltale::Receive<#from, #message, #branch_type>
                                         };
                                     }
                                 }
@@ -439,7 +439,7 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
 
                     if !branch_types.is_empty() {
                         type_expr = quote! {
-                            ::rumpsteak_aura::Offer<#choosing_role, { #(#branch_types),* }>
+                            ::telltale::Offer<#choosing_role, { #(#branch_types),* }>
                         };
                     }
                 }

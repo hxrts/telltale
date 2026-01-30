@@ -11,8 +11,8 @@
 #![allow(clippy::expect_used)]
 
 use parking_lot::Mutex;
-use rumpsteak_aura_choreography::effects::LabelId;
-use rumpsteak_aura_choreography::simulation::{
+use telltale_choreography::effects::LabelId;
+use telltale_choreography::simulation::{
     clock::{Clock, MockClock, Rng, SeededRng},
     envelope::ProtocolEnvelope,
     observer::{NullObserver, ProtocolEvent, ProtocolObserver, RecordingObserver},
@@ -21,7 +21,7 @@ use rumpsteak_aura_choreography::simulation::{
     },
     transport::{FaultyTransport, InMemoryTransport, SimulatedTransport, TransportError},
 };
-use rumpsteak_aura_choreography::RoleName;
+use telltale_choreography::RoleName;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -1417,7 +1417,7 @@ fn test_recording_observer_recvs_filter() {
 
 #[test]
 fn test_recording_observer_errors_filter() {
-    use rumpsteak_aura_choreography::effects::ChoreographyError;
+    use telltale_choreography::effects::ChoreographyError;
 
     let mut observer = RecordingObserver::new();
 

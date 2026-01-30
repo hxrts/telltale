@@ -424,7 +424,7 @@ pub fn generate_session_type(
 ) -> Result<TokenStream, ProjectionError>
 ```
 
-Generates Rumpsteak session type for a specific role.
+Generates Telltale session type for a specific role.
 Projects the choreography to a local type and converts to Rust type definitions.
 
 ### generate_choreography_code
@@ -837,13 +837,13 @@ pub fn with_channels(
 The new constructor creates an isolated handler.
 With_channels shares channels between handlers for coordinated testing.
 
-### RumpsteakHandler
+### TelltaleHandler
 
 ```rust
-pub struct RumpsteakHandler<R: RoleId>
+pub struct TelltaleHandler<R: RoleId>
 ```
 
-Handler for Rumpsteak session-typed channels.
+Handler for Telltale session-typed channels.
 Provides unified abstraction over bidirectional channels and dynamic sessions.
 
 Constructor:
@@ -852,13 +852,13 @@ Constructor:
 pub fn new() -> Self
 ```
 
-Requires RumpsteakEndpoint for connection management.
-See [Using Rumpsteak Handlers](07_rumpsteak_handler.md) for complete usage.
+Requires TelltaleEndpoint for connection management.
+See [Using Telltale Handlers](07_telltale_handler.md) for complete usage.
 
-### RumpsteakEndpoint
+### TelltaleEndpoint
 
 ```rust
-pub struct RumpsteakEndpoint<R: RoleId>
+pub struct TelltaleEndpoint<R: RoleId>
 ```
 
 Endpoint managing per-peer channels and sessions.
@@ -880,7 +880,7 @@ pub async fn send(&mut self, msg: Vec<u8>) -> Result<(), String>
 pub async fn recv(&mut self) -> Result<Vec<u8>, String>
 ```
 
-These methods create a channel pair and move raw bytes. They are used by the Rumpsteak handler implementation.
+These methods create a channel pair and move raw bytes. They are used by the Telltale handler implementation.
 
 ### RecordingHandler
 

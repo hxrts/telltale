@@ -110,7 +110,7 @@ The `min` specifies the minimum number of instances required. The `max` specifie
 Role constraints are available through the `Topology` struct.
 
 ```rust
-use rumpsteak_aura_choreography::topology::{Topology, RoleFamilyConstraint};
+use telltale_choreography::topology::{Topology, RoleFamilyConstraint};
 
 // Access constraint for a family
 let constraint = topology.get_family_constraint("Witness");
@@ -224,7 +224,7 @@ This creates an in-memory handler with implicit local topology.
 Simple deployments specify peer addresses directly.
 
 ```rust
-use rumpsteak_aura_choreography::{RoleName, TopologyEndpoint};
+use telltale_choreography::{RoleName, TopologyEndpoint};
 
 let topology = Topology::builder()
     .local_role(RoleName::from_static("Alice"))
@@ -244,7 +244,7 @@ This builds a topology in code and binds it to a generated protocol handler.
 Production deployments use explicit topology objects.
 
 ```rust
-use rumpsteak_aura_choreography::{Region, RoleName, TopologyEndpoint};
+use telltale_choreography::{Region, RoleName, TopologyEndpoint};
 
 let topology = Topology::builder()
     .remote_role(
@@ -303,7 +303,7 @@ This loads a topology file and binds it to a generated handler.
 You can also parse a topology from a string.
 
 ```rust
-use rumpsteak_aura_choreography::topology::parse_topology;
+use telltale_choreography::topology::parse_topology;
 
 let parsed = parse_topology(r#"
 topology Dev for PingPong {
@@ -322,7 +322,7 @@ This parses the DSL into a `ParsedTopology`. The `topology` field contains the `
 The topology determines which transport to use for each role pair.
 
 ```rust
-use rumpsteak_aura_choreography::{RoleName, TopologyError};
+use telltale_choreography::{RoleName, TopologyError};
 
 fn select_transport(
     topo: &Topology,
@@ -346,7 +346,7 @@ The handler automatically routes messages through appropriate transports.
 Topologies are validated against choreography roles.
 
 ```rust
-use rumpsteak_aura_choreography::RoleName;
+use telltale_choreography::RoleName;
 
 let choreo = parse_choreography_str(dsl)?;
 let topo = parse_topology(topo_dsl)?;
@@ -390,7 +390,7 @@ The `InMemoryHandler::new()` API remains valid. Choreographies without explicit 
 ## Usage Example
 
 ```rust
-use rumpsteak_aura_choreography::{choreography, RoleName, Topology, TopologyEndpoint};
+use telltale_choreography::{choreography, RoleName, Topology, TopologyEndpoint};
 
 choreography!(r#"
 protocol Auction =

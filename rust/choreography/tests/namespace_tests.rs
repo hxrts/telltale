@@ -5,7 +5,7 @@
 ///
 /// This module tests the namespace functionality added to support multiple
 /// choreographies in the same crate without type conflicts.
-use rumpsteak_aura_choreography::compiler::{
+use telltale_choreography::compiler::{
     generate_choreography_code_with_namespacing, parse_choreography_str, project,
 };
 

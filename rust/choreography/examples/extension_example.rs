@@ -3,7 +3,7 @@
 //! This example shows how to create and use extensions to the choreographic DSL,
 //! including custom grammar rules, parsers, and protocol behaviors.
 
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::LocalType, compiler::projection::ProjectionError, CodegenContext, ExtensionParserBuilder,
     ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext, ParseError,
     ProjectionContext, ProtocolExtension, Role, StatementParser,
@@ -11,7 +11,7 @@ use rumpsteak_aura_choreography::{
 use std::any::{Any, TypeId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Rumpsteak-Aura DSL Extension System Demo");
+    println!("Telltale DSL Extension System Demo");
 
     // Demo 1: Register timeout extension
     demo_timeout_extension()?;
@@ -31,7 +31,7 @@ fn demo_timeout_extension() -> Result<(), Box<dyn std::error::Error>> {
 
     // Register the built-in timeout extension
     let mut registry = ExtensionRegistry::new();
-    rumpsteak_aura_choreography::extensions::timeout::register_timeout_extension(&mut registry);
+    telltale_choreography::extensions::timeout::register_timeout_extension(&mut registry);
 
     println!("Timeout extension registered");
     println!(
