@@ -85,20 +85,26 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
   -- Sender lookup after renaming.
   let senderEp' : Endpoint := { sid := e'.sid, role := e'.sender }
   have hSenderEq : { sid := e.sid, role := e.sender } = renameEndpoint ρ senderEp' := by
-    simp [senderEp', renameEndpoint, hSid]
+    simp [senderEp', renameEndpoint, e', hSid]
   have hLookupRen := lookupG_rename (ρ:=ρ) (G:=G) (e:=senderEp')
   have hSenderLookup :
       lookupG (renameGEnv ρ G) { sid := e.sid, role := e.sender } =
         some (renameLocalType ρ Lsender') := by
-    simpa [hSenderEq, hGsender'] using hLookupRen
+    have hLookupRen' :
+        lookupG (renameGEnv ρ G) { sid := e.sid, role := e.sender } =
+          (lookupG G senderEp').map (renameLocalType ρ) := by
+      simpa [hSenderEq] using hLookupRen
+    simpa [hGsender', senderEp'] using hLookupRen'
   -- Rename preservation for Consume.
   have hConsumeRen :
       (Consume e.sender (renameLocalType ρ Lrecv') ((lookupD D e').map (renameValType ρ))).isSome := by
-    have hEq := Consume_rename (ρ:=ρ) (from_:=e'.sender) (L:=Lrecv') (ts:=lookupD D e')
-    cases hCons : Consume e'.sender Lrecv' (lookupD D e') with
+    have hEq := Consume_rename (ρ:=ρ) (from_:=e.sender) (L:=Lrecv') (ts:=lookupD D e')
+    cases hCons : Consume e.sender Lrecv' (lookupD D e') with
     | none =>
+        have hConsTrue : (Consume e.sender Lrecv' (lookupD D e')).isSome = true := by
+          simpa using hConsumeOrig
         have hFalse : False := by
-          simpa [hCons] using hConsumeOrig
+          simpa [hCons] using hConsTrue
         exact hFalse.elim
     | some L' =>
         simp [hEq, hCons]
@@ -270,12 +276,28 @@ theorem Dual_implies_Coherent_empty (L1 L2 : LocalType) (r1 r2 : Role)
     simp [htrace, Consume]
   · -- EdgeCoherent for e21 (r2 → r1)
     intro Lrecv hGrecv
-    refine ⟨L2, ?_, ?_⟩
-    · -- sender lookup
-      simp [lookupG]
-    have htrace :
-        lookupD (∅ : DEnv) { sid := sid, sender := r2, receiver := r1 } = [] := by
-      simpa using (lookupD_empty (e:={ sid := sid, sender := r2, receiver := r1 }))
-    simp [htrace, Consume]
+    by_cases h : r2 = r1
+    · subst h
+      refine ⟨L1, ?_, ?_⟩
+      · simp [lookupG]
+      have htrace :
+          lookupD (∅ : DEnv) { sid := sid, sender := r2, receiver := r2 } = [] := by
+        simpa using (lookupD_empty (e:={ sid := sid, sender := r2, receiver := r2 }))
+      simp [htrace, Consume]
+    · refine ⟨L2, ?_, ?_⟩
+      ·
+        have hne : ({ sid := sid, role := r2 } : Endpoint) ≠ { sid := sid, role := r1 } := by
+          intro hEq
+          have : r2 = r1 := by
+            have := congrArg Endpoint.role hEq
+            simpa using this
+          exact h this
+        have hbeq : ({ sid := sid, role := r2 } == ({ sid := sid, role := r1 } : Endpoint)) = false :=
+          beq_eq_false_iff_ne.mpr hne
+        simp [lookupG, List.lookup, hbeq]
+      have htrace :
+          lookupD (∅ : DEnv) { sid := sid, sender := r2, receiver := r1 } = [] := by
+        simpa using (lookupD_empty (e:={ sid := sid, sender := r2, receiver := r1 }))
+      simp [htrace, Consume]
 
 end

@@ -109,9 +109,9 @@ theorem Coherent_send_preserved
       have hRecvLookup : lookupG (updateG G senderEp L) { sid := senderEp.sid, role := senderEp.role } = some L := by
         simpa using hSenderLookup
       have hEq : Lrecv = L := by
-        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-        exact Option.some.inj this
-      subst hEq
+        have : some L = some Lrecv := by
+          simpa [hRecvLookup, sendEdge] using hGrecv
+        exact (Option.some.inj this).symm
       simp only [lookupD_update_eq]
       -- Use hRecvReady - in self-send case, receiver's original type is the sender's type
       -- Note: hRecvReady with a SEND original type is actually unsatisfiable!
@@ -144,7 +144,7 @@ theorem Coherent_send_preserved
           exact h'
         exact hRecvIsSender this.symm
       have hGrecv' : lookupG G { sid := senderEp.sid, role := receiverRole } = some Lrecv := by
-        simpa [lookupG_update_neq _ _ _ _ hRecvNeq] using hGrecv
+        simpa [lookupG_update_neq _ _ _ _ hRecvNeq, sendEdge] using hGrecv
       simp only [lookupD_update_eq]
       -- Use hRecvReady with receiver's original type
       obtain ⟨L', hL', hL'T⟩ := hRecvReady Lrecv hGrecv'
@@ -174,9 +174,9 @@ theorem Coherent_send_preserved
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G senderEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hLookupR] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hLookupR] using hGrecv
+          exact (Option.some.inj this).symm
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         -- Need to show Consume e.sender L (lookupD D e) is some
@@ -235,9 +235,9 @@ theorem Coherent_send_preserved
         have hRecvLookup : lookupG (updateG G senderEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G senderEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hRecvLookup] using hGrecv
+          exact (Option.some.inj this).symm
         -- Original coherence: receiver had SEND type, so Consume only works on empty trace
         have hOrigCoh := hCoh e
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.send receiverRole T L) := by
@@ -310,9 +310,9 @@ theorem Coherent_recv_preserved
       subst hSenderIsRecv
       -- Receiver lookup gives L
       have hEq : Lrecv = L := by
-        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-        exact Option.some.inj this
-      subst hEq
+        have : some L = some Lrecv := by
+          simpa [hRecvLookup, recvEdge] using hGrecv
+        exact (Option.some.inj this).symm
       have hSenderLookup : lookupG (updateG G receiverEp L) { sid := receiverEp.sid, role := receiverEp.role } = some L := by
         simpa using hRecvLookup
       refine ⟨L, hSenderLookup, ?_⟩
@@ -347,16 +347,16 @@ theorem Coherent_recv_preserved
         simp only [hBeqRole, hBeqType, Bool.and_self, ite_true] at hOrig
         -- Now we need: Consume recvEdge.sender L rest is some
         simp only [List.tail_cons]
-        exact hOrig
+        simpa [hEq] using hOrig
     · -- Normal case: sender ≠ receiver
       have hSenderNeq : receiverEp ≠ { sid := receiverEp.sid, role := senderRole } := by
         intro h
         have : receiverEp.role = senderRole := congrArg Endpoint.role h
         exact hSenderIsRecv this.symm
       have hEq : Lrecv = L := by
-        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-        exact Option.some.inj this
-      subst hEq
+        have : some L = some Lrecv := by
+          simpa [hRecvLookup, recvEdge] using hGrecv
+        exact (Option.some.inj this).symm
       simp only [lookupD_update_eq]
       -- Original coherence
       have hOrigCoh := hCoh recvEdge
@@ -383,7 +383,7 @@ theorem Coherent_recv_preserved
         have hBeqType : (t == t) = true := beq_self_eq_true _
         simp only [hBeqRole, hBeqType, Bool.and_self, ite_true] at hOrig
         simp only [List.tail_cons]
-        exact hOrig
+        simpa [hEq] using hOrig
   · -- Case 2: e ≠ recvEdge - use irrelevance lemmas
     have hNeSymm : recvEdge ≠ e := Ne.symm heq
     -- Check if receiverEp is involved in edge e's endpoints
@@ -404,9 +404,9 @@ theorem Coherent_recv_preserved
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G receiverEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hLookupR] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hLookupR] using hGrecv
+          exact (Option.some.inj this).symm
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         -- Original coherence at e with receiver's original type .recv
@@ -488,9 +488,9 @@ theorem Coherent_recv_preserved
         have hRecvLookup : lookupG (updateG G receiverEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G receiverEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hRecvLookup] using hGrecv
+          exact (Option.some.inj this).symm
         -- Original coherence: receiver had .recv type
         have hOrigCoh := hCoh e
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.recv senderRole T L) := by

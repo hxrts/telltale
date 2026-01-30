@@ -385,6 +385,8 @@ Supporting files:
 | `not_stuck` | `DeadlockFreedom.lean:247` | No stuck configurations |
 | `deadlock_free_trichotomy` | `DeadlockFreedom.lean:265` | Three-way classification of states |
 
+Progress is treated as a conditional property (`ReachesComm`) inside this file.
+
 ### Subject Reduction — `Proofs/Safety/SubjectReduction.lean`
 
 | Theorem | Location | Description |
@@ -392,10 +394,6 @@ Supporting files:
 | `step_preserves_typing` | `SubjectReduction.lean:130` | Typing preserved under reduction |
 | `step_preserves_wellformed` | `SubjectReduction.lean:153` | Well-formedness preserved under reduction |
 | `other_type_preserved` | `SubjectReduction.lean:185` | Non-participant types preserved (uses `ProjectableClosedWellFormed`) |
-
-### Progress — `Proofs/Safety/Progress.lean`
-
-Progress theorem for well-typed configurations.
 
 ### Semantics — `Semantics/`
 
@@ -649,7 +647,6 @@ Top 15 files by line count:
 | Deadlock freedom | `Proofs/Safety/DeadlockFreedom.lean` |
 | Subject reduction | `Proofs/Safety/SubjectReduction.lean` |
 | Determinism and diamond | `Proofs/Safety/Determinism/Part1.lean` |
-| Progress | `Proofs/Safety/Progress.lean` |
 | Axiom audit | `Proofs/Core/Assumptions.lean` (empty file) |
 | Operational semantics | `Semantics/EnvStep.lean` |
 | Mu-type unfolding | `Protocol/CoTypes/FullUnfold.lean` |

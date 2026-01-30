@@ -30,6 +30,7 @@ set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 set_option linter.unnecessarySimpa false
+set_option maxHeartbeats 5000000
 
 open scoped Classical
 

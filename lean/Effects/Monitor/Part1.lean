@@ -432,8 +432,10 @@ theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Loc
     split_ifs at hConsume with heq
     · simp only [Option.some.injEq, Prod.mk.injEq] at hConsume
       obtain ⟨rfl, rfl⟩ := hConsume
-      simp only [beq_iff_eq] at heq
-      simp only [List.mem_cons, true_or]
+      have heq' : e = hd.1 := by
+        simpa [beq_iff_eq] using heq
+      subst heq'
+      simp [List.mem_cons]
     · cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume

@@ -23,11 +23,15 @@ open RumpsteakV2.Protocol.Participation
 /- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
     (possibly through non-participant layers), and trans g role = .send partner (transBranches ...).
 
-    This follows from CProjectF: only comm with role=sender produces .send.
+    This follows from CProjectF: only comm with role=sender produces .send. -/
 
-    TODO: The proof requires careful handling of CProjectF reduction with nested if-then-else
-    and match expressions. The key insight is that AllBranchesProj in non-participant cases
-    requires wellFormedness to rule out empty branches. -/
+-- Reduce the non-participant comm case of CProjectF to AllBranchesProj.
+private theorem CProjectF_comm_other_iff
+    (sender receiver role : String) (gbs : List (Label × GlobalType)) (cand : LocalTypeR)
+    (hrs : role ≠ sender) (hrr : role ≠ receiver) :
+    CProjectF CProject (.comm sender receiver gbs) role cand ↔
+      AllBranchesProj CProject gbs role cand := by
+  simp [CProjectF, hrs, hrr]
 /-- Helper: sender case for send projection agreement (comm/cons). -/
 private theorem CProject_send_implies_trans_send_comm_cons_sender
     (sender receiver : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
@@ -100,7 +104,8 @@ private theorem CProject_send_implies_trans_send_comm_cons (g : GlobalType) (sen
       · exact (CProject_send_implies_trans_send_comm_receiver_contra sender receiver role partner
           (first :: rest) lbs hproj hrr hrs).elim
       · have hf' : AllBranchesProj CProject (first :: rest) role (.send partner lbs) := by
-          simpa [CProjectF, hrs, hrr] using (CProject_destruct hproj)
+          exact (CProjectF_comm_other_iff sender receiver role (first :: rest)
+            (.send partner lbs) hrs hrr).1 (CProject_destruct hproj)
         have hfirst : CProject first.2 role (.send partner lbs) :=
           CProject_first_of_AllBranchesProj hf'
         have hwf_first : first.2.wellFormed = true :=
@@ -277,7 +282,8 @@ private theorem CProject_recv_implies_trans_recv_comm_cons (g : GlobalType) (sen
       · exact CProject_recv_implies_trans_recv_comm_cons_receiver sender receiver first rest role
           partner lbs (CProject_destruct hproj) hrs hrr hwf
       · have hf' : AllBranchesProj CProject (first :: rest) role (.recv partner lbs) := by
-          simpa [CProjectF, hrs, hrr] using (CProject_destruct hproj)
+          exact (CProjectF_comm_other_iff sender receiver role (first :: rest)
+            (.recv partner lbs) hrs hrr).1 (CProject_destruct hproj)
         have hfirst : CProject first.2 role (.recv partner lbs) :=
           CProject_first_of_AllBranchesProj hf'
         have hwf_first : first.2.wellFormed = true := by

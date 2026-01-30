@@ -633,7 +633,7 @@ def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → Local
 theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType)
     (_hProj : True)  -- Placeholder for "localTypes are valid projections"
     (hSenders :
-      ∀ e Lrecv,
+      ∀ (e : Edge) (Lrecv : LocalType),
         lookupG (roles.map fun r => ({ sid := sid, role := r }, localTypes r))
           { sid := e.sid, role := e.receiver } = some Lrecv →
         ∃ Lsender,
@@ -645,7 +645,8 @@ theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : R
   simp [initSession, Coherent, EdgeCoherent]
   intro e Lrecv hGrecv
   rcases hSenders e Lrecv hGrecv with ⟨Lsender, hGsender⟩
-  refine ⟨Lsender, hGsender, ?_⟩
+  refine ⟨?_, ?_⟩
+  · exact ⟨Lsender, hGsender⟩
   -- All traces are empty in initDEnv.
   have hTrace : lookupD (initDEnv sid roles) e = [] := by
     by_cases hMem : e ∈ RoleSet.allEdges sid roles

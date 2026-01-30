@@ -47,8 +47,8 @@ def GStep (G : GEnv) (D : DEnv) (G' : GEnv) (D' : DEnv) : Prop :=
 /-! ## Compatibility (coinductive closure) -/
 
 /-- Compatibility: readiness now + closure under GStep. -/
-coinductive Compatible (G : GEnv) (D : DEnv) : Prop where
-  | mk :
+coinductive Compatible : GEnv → DEnv → Prop where
+  | mk {G : GEnv} {D : DEnv} :
       -- Compatibility exposes immediate readiness and step closure.
       SendReady G D →
       SelectReady G D →
@@ -194,6 +194,24 @@ private def insertPairD (acc : DEnv) (p : Edge × List ValType) : DEnv :=
 private def insertPairS (acc : SEnv) (p : Var × ValType) : SEnv :=
   updateSEnv acc p.1 p.2
 
+private theorem findD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
+    (updateD env e ts).find? e = some ts := by
+  have hEq : compare e e = .eq := by
+    simp
+  simpa [updateD] using
+    (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := ts) (k' := e) hEq)
+
+private theorem findD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+    (updateD env e ts).find? e' = env.find? e' := by
+  have hne' : compare e' e ≠ .eq := by
+    intro hEq
+    exact hne (by symm; exact (Edge.compare_eq_iff_eq e' e).1 hEq)
+  have h' : (env.map.insert e ts).find? e' = env.map.find? e' := by
+    simpa using (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne')
+  have h'' : (updateD env e ts).find? e' = env.map.find? e' := by
+    simpa [updateD] using h'
+  simpa [DEnv.find?] using h''
+
 private theorem findD_foldl_insert_preserve
     (L : List (Edge × List ValType)) (env : DEnv) (e : Edge) (ts : List ValType)
     (hfind : env.find? e = some ts)
@@ -212,13 +230,13 @@ private theorem findD_foldl_insert_preserve
           · cases hEq
             have hts' : ts' = ts := hSame ts' (by simp)
             cases hts'
-            have hfind' : (updateD env e ts).find? e = some ts := by
-              simp [updateD, DEnv.find?]
+            have hfind' : (updateD env e ts).find? e = some ts :=
+              findD_update_eq env e ts
             simpa [List.foldl, insertPairD] using
               (ih (env := updateD env e ts) (hfind := hfind') (hSame := hSame'))
           · have hfind' : (updateD env e' ts').find? e = some ts := by
-              have h' : (updateD env e' ts').find? e = env.find? e := by
-                simp [updateD, DEnv.find?, hEq]
+              have h' : (updateD env e' ts').find? e = env.find? e :=
+                findD_update_neq env e' e ts' hEq
               simpa [hfind] using h'
             simpa [List.foldl, insertPairD] using
               (ih (env := updateD env e' ts') (hfind := hfind') (hSame := hSame'))
@@ -239,8 +257,8 @@ private theorem findD_foldl_insert_of_mem
             exact hSame ts'' (List.mem_cons_of_mem _ hmem')
           cases hmem with
           | head _ =>
-              have hfind' : (updateD env e ts).find? e = some ts := by
-                simp [updateD, DEnv.find?]
+              have hfind' : (updateD env e ts).find? e = some ts :=
+                findD_update_eq env e ts
               simpa [List.foldl, insertPairD] using
                 (findD_foldl_insert_preserve (L:=L) (env:=updateD env e ts)
                   (e:=e) (ts:=ts) hfind' hSame')
@@ -266,7 +284,7 @@ private theorem findD_foldl_insert_notin
             exact hNot ts' (by simpa [hEq])
           have hfind :
               (updateD env e' ts').find? e = env.find? e := by
-            simp [updateD, DEnv.find?, hneq]
+            exact findD_update_neq env e' e ts' hneq
           simpa [List.foldl, insertPairD, hfind] using
             (ih (env := updateD env e' ts') (hNot := hNot'))
 
@@ -408,17 +426,114 @@ private theorem lookupSEnv_foldl_insert_notin
           simpa [List.foldl, insertPairS] using
             (ih (env := updateSEnv env x' T') (hlookup := hlookup') (hNot := hNot'))
 
+private def insertIfMissing (acc : RBMap Edge Trace compare) (k : Edge) (v : Trace) :
+    RBMap Edge Trace compare :=
+  match acc.find? k with
+  | some _ => acc
+  | none => acc.insert k v
+
+private theorem rbmap_foldl_preserve
+    (L : List (Edge × Trace)) (acc : RBMap Edge Trace compare) (e : Edge) (ts : Trace)
+    (hfind : acc.find? e = some ts) :
+    (L.foldl (fun acc p => insertIfMissing acc p.1 p.2) acc).find? e = some ts := by
+  induction L generalizing acc with
+  | nil =>
+      simpa [hfind]
+  | cons hd tl ih =>
+      cases hd with
+      | mk k v =>
+          cases hacc : acc.find? k with
+          | some _ =>
+              simpa [List.foldl, insertIfMissing, hacc] using (ih (acc := acc) hfind)
+          | none =>
+              have hkne : k ≠ e := by
+                intro hEq
+                subst hEq
+                simpa [hfind] using hacc
+              have hne : compare e k ≠ .eq := by
+                intro hEq
+                exact hkne (by symm; exact (Edge.compare_eq_iff_eq e k).1 hEq)
+              have hacc' : (acc.insert k v).find? e = acc.find? e := by
+                simpa using (RBMap.find?_insert_of_ne (t := acc) (k := k) (v := v) (k' := e) hne)
+              have hfind' : (acc.insert k v).find? e = some ts := by
+                simpa [hfind] using hacc'
+              simpa [List.foldl, insertIfMissing, hacc] using
+                (ih (acc := acc.insert k v) hfind')
+
+private theorem rbmap_foldl_none
+    (L : List (Edge × Trace)) (acc : RBMap Edge Trace compare) (e : Edge)
+    (hfind : acc.find? e = none) :
+    (L.foldl (fun acc p => insertIfMissing acc p.1 p.2) acc).find? e = L.lookup e := by
+  induction L generalizing acc with
+  | nil =>
+      simpa [List.lookup, hfind]
+  | cons hd tl ih =>
+      cases hd with
+      | mk k v =>
+          by_cases hEq : e = k
+          · subst hEq
+            have hEq' : compare e e = .eq := by
+              simp
+            have hfind' : (acc.insert e v).find? e = some v := by
+              simpa using (RBMap.find?_insert_of_eq (t := acc) (k := e) (v := v) (k' := e) hEq')
+            have hpreserve :
+                (tl.foldl (fun acc p => insertIfMissing acc p.1 p.2) (acc.insert e v)).find? e =
+                  some v :=
+              rbmap_foldl_preserve (L := tl) (acc := acc.insert e v) (e := e) (ts := v) hfind'
+            simpa [List.lookup, beq_self_eq_true, insertIfMissing, hfind] using hpreserve
+          · have hbeq : (e == k) = false := beq_eq_false_iff_ne.mpr hEq
+            cases hacc : acc.find? k with
+            | some _ =>
+                have ih' := ih (acc := acc) hfind
+                simpa [List.foldl, insertIfMissing, hacc, List.lookup, hbeq] using ih'
+            | none =>
+                have hne : compare e k ≠ .eq := by
+                  intro hEq'
+                  exact hEq ((Edge.compare_eq_iff_eq e k).1 hEq')
+                have hacc' : (acc.insert k v).find? e = acc.find? e := by
+                  simpa using (RBMap.find?_insert_of_ne (t := acc) (k := k) (v := v) (k' := e) hne)
+                have hfind' : (acc.insert k v).find? e = none := by
+                  simpa [hfind] using hacc'
+                have ih' := ih (acc := acc.insert k v) hfind'
+                simpa [List.foldl, insertIfMissing, hacc, List.lookup, hbeq] using ih'
+
 theorem findD_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
     D₁.find? e = some ts →
     (D₁ ++ D₂).find? e = some ts := by
   intro hfind
-  simp [DEnvUnion, DEnv.find?, hfind]
+  have hfind_map : D₁.map.find? e = some ts := by
+    simpa [DEnv.find?] using hfind
+  have hfold_list :
+      (D₂.map.toList.foldl (fun acc p => insertIfMissing acc p.1 p.2) D₁.map).find? e = some ts :=
+    rbmap_foldl_preserve (L := D₂.map.toList) (acc := D₁.map) (e := e) (ts := ts) hfind_map
+  have hfold :
+      (RBMap.foldl (fun acc k v => insertIfMissing acc k v) D₁.map D₂.map).find? e = some ts := by
+    simpa [RBMap.foldl_eq_foldl_toList] using hfold_list
+  change (DEnvUnion D₁ D₂).find? e = some ts
+  simpa [DEnvUnion, insertIfMissing] using hfold
 
 theorem findD_append_right {D₁ D₂ : DEnv} {e : Edge} :
     D₁.find? e = none →
     (D₁ ++ D₂).find? e = D₂.find? e := by
   intro hfind
-  simp [DEnvUnion, DEnv.find?, hfind]
+  have hfind_map : D₁.map.find? e = none := by
+    simpa [DEnv.find?] using hfind
+  have hfold_list :
+      (D₂.map.toList.foldl (fun acc p => insertIfMissing acc p.1 p.2) D₁.map).find? e =
+        D₂.map.toList.lookup e :=
+    rbmap_foldl_none (L := D₂.map.toList) (acc := D₁.map) (e := e) hfind_map
+  have hfold :
+      (RBMap.foldl (fun acc k v => insertIfMissing acc k v) D₁.map D₂.map).find? e =
+        D₂.map.toList.lookup e := by
+    simpa [RBMap.foldl_eq_foldl_toList] using hfold_list
+  have hlookup : D₂.map.toList.lookup e = D₂.map.find? e :=
+    lookup_toList_eq_find? (m := D₂.map) (e := e)
+  have hfold' :
+      (RBMap.foldl (fun acc k v => insertIfMissing acc k v) D₁.map D₂.map).find? e =
+        D₂.map.find? e := by
+    simpa [hlookup] using hfold
+  change (DEnvUnion D₁ D₂).find? e = D₂.map.find? e
+  simpa [DEnvUnion, insertIfMissing] using hfold'
 
 theorem SessionsOfD_append_left {D₁ D₂ : DEnv} :
     SessionsOfD D₁ ⊆ SessionsOfD (D₁ ++ D₂) := by
@@ -462,8 +577,8 @@ theorem SessionsOfD_updateD_subset {D : DEnv} {e : Edge} {ts : List ValType} :
     simpa [hSid]
   · left
     have hFind' : D.find? e' = some ts' := by
-      have h' : (updateD D e ts).find? e' = D.find? e' := by
-        simp [updateD, DEnv.find?, hEq]
+      have h' : (updateD D e ts).find? e' = D.find? e' :=
+        findD_update_neq D e e' ts (Ne.symm hEq)
       simpa [h'] using hFind
     exact ⟨e', ts', hFind', hSid⟩
 
@@ -673,13 +788,40 @@ theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType} :
     lookupSEnv S₁ x = some T →
     lookupSEnv (S₁ ++ S₂) x = some T := by
   intro hlookup
-  simp [SEnvUnion, lookupSEnv, hlookup]
+  induction S₁ with
+  | nil =>
+      cases hlookup
+  | cons hd tl ih =>
+      by_cases hEq : x == hd.1
+      · have hT : T = hd.2 := by
+          have : some hd.2 = some T := by
+            simpa [lookupSEnv, List.lookup, hEq] using hlookup
+          exact Option.some.inj this.symm
+        subst hT
+        simp [lookupSEnv, List.lookup, hEq]
+      · have hTail : lookupSEnv tl x = some T := by
+          simpa [lookupSEnv, List.lookup, hEq] using hlookup
+        have hTail' := ih hTail
+        simpa [lookupSEnv, List.lookup, hEq] using hTail'
 
 theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
     lookupSEnv S₁ x = none →
     lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x := by
   intro hlookup
-  simp [SEnvUnion, lookupSEnv, hlookup]
+  induction S₁ with
+  | nil =>
+      simp [lookupSEnv]
+  | cons hd tl ih =>
+      by_cases hEq : x == hd.1
+      · have : lookupSEnv (hd :: tl) x = some hd.2 := by
+          simp [lookupSEnv, List.lookup, hEq]
+        have hContra : (none : Option ValType) = some hd.2 := by
+          simpa [hlookup] using this
+        cases hContra
+      · have hTail : lookupSEnv tl x = none := by
+          simpa [lookupSEnv, List.lookup, hEq] using hlookup
+        have hTail' := ih hTail
+        simpa [lookupSEnv, List.lookup, hEq] using hTail'
 
 theorem SEnvDomSubset_append_left {S₁ S₂ : SEnv} :
     SEnvDomSubset S₁ (S₁ ++ S₂) := by

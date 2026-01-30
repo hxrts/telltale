@@ -77,8 +77,9 @@ theorem edgeCoherent_empty_trace (G : GEnv) (D : DEnv) (e : Edge)
 
 /-- For a DEnv where all entries have empty traces, coherence holds. -/
 theorem coherent_all_empty (G : GEnv) (D : DEnv)
-    (hAll : ∀ e, lookupD D e = [])
-    (hSenders : ∀ e Lrecv, lookupG G { sid := e.sid, role := e.receiver } = some Lrecv →
+    (hAll : ∀ e : Edge, lookupD D e = [])
+    (hSenders : ∀ e : Edge, ∀ Lrecv : LocalType,
+      lookupG G { sid := e.sid, role := e.receiver } = some Lrecv →
       ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender) :
     Coherent G D := by
   intro e

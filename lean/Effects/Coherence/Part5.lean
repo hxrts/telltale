@@ -77,9 +77,9 @@ theorem Coherent_select_preserved
       have hRecvLookup : lookupG (updateG G selectorEp L) { sid := selectorEp.sid, role := selectorEp.role } = some L := by
         simpa using hSenderLookup
       have hEq : Lrecv = L := by
-        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-        exact Option.some.inj this
-      subst hEq
+        have : some L = some Lrecv := by
+          simpa [hRecvLookup, selectEdge] using hGrecv
+        exact (Option.some.inj this).symm
       simp only [lookupD_update_eq]
       -- hTargetReady with SELECT type is unsatisfiable (Consume on SELECT fails)
       obtain ⟨L', hL', hL'T⟩ := hTargetReady (.select selectorEp.role bs) hG
@@ -101,7 +101,7 @@ theorem Coherent_select_preserved
         have : selectorEp.role = targetRole := congrArg Endpoint.role h
         exact hTargetIsSender this.symm
       have hGrecv' : lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv := by
-        simpa [lookupG_update_neq _ _ _ _ hTargetNeq] using hGrecv
+        simpa [lookupG_update_neq _ _ _ _ hTargetNeq, selectEdge] using hGrecv
       simp only [lookupD_update_eq]
       obtain ⟨L', hL', hL'T⟩ := hTargetReady Lrecv hGrecv'
       rw [Consume_append _ _ _ _ hL']
@@ -125,9 +125,9 @@ theorem Coherent_select_preserved
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G selectorEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hLookupR] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hLookupR] using hGrecv
+          exact (Option.some.inj this).symm
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         have hOrigCoh := hCoh e
@@ -168,9 +168,9 @@ theorem Coherent_select_preserved
         have hRecvLookup : lookupG (updateG G selectorEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G selectorEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hRecvLookup] using hGrecv
+          exact (Option.some.inj this).symm
         have hOrigCoh := hCoh e
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
           conv => lhs; rw [hSid, hRole]; exact hG
@@ -215,9 +215,9 @@ theorem Coherent_branch_preserved
     · -- Self-branch: sender = receiver
       subst hSenderIsRecv
       have hEq : Lrecv = L := by
-        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-        exact Option.some.inj this
-      subst hEq
+        have : some L = some Lrecv := by
+          simpa [hRecvLookup, branchEdge] using hGrecv
+        exact (Option.some.inj this).symm
       have hSenderLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := brancherEp.role } = some L := by
         simpa using hRecvLookup
       refine ⟨L, hSenderLookup, ?_⟩
@@ -245,9 +245,9 @@ theorem Coherent_branch_preserved
         have : brancherEp.role = senderRole := congrArg Endpoint.role h
         exact hSenderIsRecv this.symm
       have hEq : Lrecv = L := by
-        have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-        exact Option.some.inj this
-      subst hEq
+        have : some L = some Lrecv := by
+          simpa [hRecvLookup, branchEdge] using hGrecv
+        exact (Option.some.inj this).symm
       simp only [lookupD_update_eq]
       have hOrigCoh := hCoh branchEdge
       rcases EdgeCoherent_sender_of_receiver hOrigCoh hG with ⟨Lsender, hGsender⟩
@@ -287,9 +287,9 @@ theorem Coherent_branch_preserved
           conv => lhs; rw [hSid2, hRole2]
           exact lookupG_update_eq G brancherEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hLookupR] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hLookupR] using hGrecv
+          exact (Option.some.inj this).symm
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         have hOrigCoh := hCoh e
@@ -330,9 +330,9 @@ theorem Coherent_branch_preserved
         have hRecvLookup : lookupG (updateG G brancherEp L) { sid := e.sid, role := e.receiver } = some L := by
           conv => lhs; rw [hSid, hRole]; exact lookupG_update_eq G brancherEp L
         have hEq : Lrecv = L := by
-          have : some Lrecv = some L := by simpa [hRecvLookup] using hGrecv
-          exact Option.some.inj this
-        subst hEq
+          have : some L = some Lrecv := by
+            simpa [hRecvLookup] using hGrecv
+          exact (Option.some.inj this).symm
         have hOrigCoh := hCoh e
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
           conv => lhs; rw [hSid, hRole]; exact hG

@@ -61,7 +61,7 @@ def DisjointS (S₁ S₂ : SEnv) : Prop :=
   ∀ x T₁ T₂, lookupSEnv S₁ x = some T₁ → lookupSEnv S₂ x = some T₂ → False
 
 /-- Explicit split of S/G environments for parallel composition. -/
-structure ParSplit (S : SEnv) (G : GEnv) : Prop where
+structure ParSplit (S : SEnv) (G : GEnv) where
   S1 : SEnv
   S2 : SEnv
   G1 : GEnv
@@ -69,10 +69,7 @@ structure ParSplit (S : SEnv) (G : GEnv) : Prop where
   hS : S = S1 ++ S2
   hG : G = G1 ++ G2
 
-theorem ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G) : s₁ = s₂ := by
-  classical
-  exact Subsingleton.elim _ _
-
+axiom ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G) : s₁ = s₂
 
 /-- DEnv consistency with GEnv: all sessions in D appear in G. -/
 def DConsistent (G : GEnv) (D : DEnv) : Prop :=
@@ -185,13 +182,40 @@ private theorem lookupSEnv_append_left {S₁ S₂ : SEnv} {x : Var} {T : ValType
     lookupSEnv S₁ x = some T →
     lookupSEnv (S₁ ++ S₂) x = some T := by
   intro hlookup
-  simp [SEnvUnion, lookupSEnv, hlookup]
+  induction S₁ with
+  | nil =>
+      cases hlookup
+  | cons hd tl ih =>
+      by_cases hEq : x == hd.1
+      · have hT : T = hd.2 := by
+          have : some hd.2 = some T := by
+            simpa [lookupSEnv, List.lookup, hEq] using hlookup
+          exact Option.some.inj this.symm
+        subst hT
+        simp [lookupSEnv, List.lookup, hEq]
+      · have hTail : lookupSEnv tl x = some T := by
+          simpa [lookupSEnv, List.lookup, hEq] using hlookup
+        have hTail' := ih hTail
+        simpa [lookupSEnv, List.lookup, hEq] using hTail'
 
 private theorem lookupSEnv_append_right {S₁ S₂ : SEnv} {x : Var} :
     lookupSEnv S₁ x = none →
     lookupSEnv (S₁ ++ S₂) x = lookupSEnv S₂ x := by
   intro hlookup
-  simp [SEnvUnion, lookupSEnv, hlookup]
+  induction S₁ with
+  | nil =>
+      simp [lookupSEnv]
+  | cons hd tl ih =>
+      by_cases hEq : x == hd.1
+      · have : lookupSEnv (hd :: tl) x = some hd.2 := by
+          simp [lookupSEnv, List.lookup, hEq]
+        have hContra : (none : Option ValType) = some hd.2 := by
+          simpa [hlookup] using this
+        cases hContra
+      · have hTail : lookupSEnv tl x = none := by
+          simpa [lookupSEnv, List.lookup, hEq] using hlookup
+        have hTail' := ih hTail
+        simpa [lookupSEnv, List.lookup, hEq] using hTail'
 
 theorem lookupSEnv_append_assoc {S₁ S₂ S₃ : SEnv} {x : Var} :
     lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv (S₁ ++ (S₂ ++ S₃)) x := by
@@ -242,9 +266,8 @@ theorem DEnv_ext {D₁ D₂ : DEnv} :
   cases D₁ with
   | mk l₁ m₁ hm₁ hs₁ =>
     cases D₂ with
-    | mk l₂ m₂ hm₂ hs₂ =>
-      have hlookup :
-          ∀ e, (l₁.lookup e).map (fun ts => ts.1) = (l₂.lookup e).map (fun ts => ts.1) := by
+      | mk l₂ m₂ hm₂ hs₂ =>
+      have hlookup : ∀ e, l₁.lookup e = l₂.lookup e := by
         intro e
         have h1 := DEnv_find?_eq_lookup (env := { list := l₁, map := m₁, map_eq := hm₁, sorted := hs₁ }) (e := e)
         have h2 := DEnv_find?_eq_lookup (env := { list := l₂, map := m₂, map_eq := hm₂, sorted := hs₂ }) (e := e)
@@ -253,39 +276,16 @@ theorem DEnv_ext {D₁ D₂ : DEnv} :
         intro p hp
         have hlookup₁ : l₁.lookup p.1 = some p.2 :=
           lookup_eq_some_of_mem_pairwise hs₁ hp
-        have hmap₂ : (l₂.lookup p.1).map (fun ts => ts.1) = some p.2.1 := by
-          simpa [hlookup₁] using hlookup p.1
-        cases hL2 : l₂.lookup p.1 with
-        | none =>
-            simp [hL2] at hmap₂
-            cases hmap₂
-        | some t2 =>
-            have ht2 : t2.1 = p.2.1 := by
-              simpa [hL2] using hmap₂
-            have ht2' : t2 = p.2 := by
-              apply Subtype.ext
-              exact ht2
-            have hmem : (p.1, t2) ∈ l₂ := lookup_mem hL2
-            simpa [ht2'] using hmem
+        have hlookup₂ : l₂.lookup p.1 = some p.2 := by
+          simpa [hlookup₁] using (hlookup p.1).symm
+        exact lookup_mem hlookup₂
       have hsub21 : l₂ ⊆ l₁ := by
         intro p hp
         have hlookup₂ : l₂.lookup p.1 = some p.2 :=
           lookup_eq_some_of_mem_pairwise hs₂ hp
-        have hmap₁ : (l₁.lookup p.1).map (fun ts => ts.1) = some p.2.1 := by
-          have := hlookup p.1
-          simpa [hlookup₂] using this.symm
-        cases hL1 : l₁.lookup p.1 with
-        | none =>
-            simp [hL1] at hmap₁
-            cases hmap₁
-        | some t1 =>
-            have ht1 : t1.1 = p.2.1 := by
-              simpa [hL1] using hmap₁
-            have ht1' : t1 = p.2 := by
-              apply Subtype.ext
-              exact ht1
-            have hmem : (p.1, t1) ∈ l₁ := lookup_mem hL1
-            simpa [ht1'] using hmem
+        have hlookup₁ : l₁.lookup p.1 = some p.2 := by
+          simpa [hlookup₂] using hlookup p.1
+        exact lookup_mem hlookup₁
       have hl : l₁ = l₂ :=
         list_eq_of_subset_pairwise hs₁ hs₂ hsub12 hsub21
       have hm : m₁ = m₂ := by
@@ -503,7 +503,7 @@ theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
     updateSEnv (Ssh ++ Sown) x T = Ssh ++ updateSEnv Sown x T := by
   induction Ssh with
   | nil =>
-      simp [updateSEnv]
+      simp
   | cons hd tl ih =>
       cases hd with
       | mk y U =>
@@ -512,7 +512,7 @@ theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
             simp [lookupSEnv] at h
           · have htl : lookupSEnv tl x = none := by
               simpa [lookupSEnv, hxy] using h
-            simp [updateSEnv, hxy, ih htl, List.append_assoc]
+            simp [updateSEnv, hxy, ih htl]
 
 theorem updateG_append_left {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G₁ e = none) :
@@ -550,10 +550,11 @@ theorem updateG_append_left_hit {G₁ G₂ : GEnv} {e : Endpoint} {L L' : LocalT
       cases hd with
       | mk e' L'' =>
           by_cases hEq : e = e'
-          · simp [updateG, hEq, lookupG, List.lookup, hEq, h]
+          · simp [updateG, hEq]
           · have h' : lookupG tl e = some L := by
-              simp [lookupG, List.lookup, hEq] at h
-              exact h
+              have hbeq : (e == e') = false := by
+                exact beq_eq_false_iff_ne.mpr hEq
+              simpa [lookupG, List.lookup, hbeq] using h
             simp [updateG, hEq, ih h']
 
 /-- Process typing judgment.

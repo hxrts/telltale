@@ -44,7 +44,7 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
   exact this.elim
 
 /-- If a session is not in G, buffers have no entries for it. -/
-private theorem BConsistent_lookup_none_of_notin_sessions
+private theorem BConsistent_lookup_none_of_notin_sessions_local
     {G : GEnv} {B : Buffers} {e : Edge}
     (hCons : BConsistent G B) (hNot : e.sid ∉ SessionsOf G) :
     B.lookup e = none := by
@@ -57,7 +57,7 @@ private theorem BConsistent_lookup_none_of_notin_sessions
       exact (hNot hSid)
 
 /-- If a session is not in G, DEnv has no entry for it. -/
-private theorem DEnv_find_none_of_notin_sessions
+private theorem DEnv_find_none_of_notin_sessions_local
     {G : GEnv} {D : DEnv} {e : Edge}
     (hCons : DConsistent G D) (hNot : e.sid ∉ SessionsOf G) :
     D.find? e = none := by
@@ -202,7 +202,7 @@ private theorem lookupD_merge_left_of_notin_right
     lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e := by
   -- Exclude the right entry via DConsistent, then use left-biased lookup.
   have hNone : D₂.find? e = none :=
-    DEnv_find_none_of_notin_sessions (G:=G₂) (D:=D₂) hCons₂ hNot
+    DEnv_find_none_of_notin_sessions_local (G:=G₂) (D:=D₂) hCons₂ hNot
   exact lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
 
 /-- Merged DEnv follows the right when the session is absent on the left. -/
@@ -212,7 +212,7 @@ private theorem lookupD_merge_right_of_notin_left
     lookupD (mergeDEnv D₁ D₂) e = lookupD D₂ e := by
   -- Exclude the left entry via DConsistent, then use right-biased lookup.
   have hNone : D₁.find? e = none :=
-    DEnv_find_none_of_notin_sessions (G:=G₁) (D:=D₁) hCons₁ hNot
+    DEnv_find_none_of_notin_sessions_local (G:=G₁) (D:=D₁) hCons₁ hNot
   exact lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hNone
 
 /-- Merged buffers follow the left when the session is absent on the right. -/
@@ -222,7 +222,7 @@ private theorem lookupBuf_merge_left_of_notin_right
     lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₁ e := by
   -- Exclude the right buffer entry, then simplify lookup on append.
   have hNone : B₂.lookup e = none :=
-    BConsistent_lookup_none_of_notin_sessions (G:=G₂) (B:=B₂) hCons₂ hNot
+    BConsistent_lookup_none_of_notin_sessions_local (G:=G₂) (B:=B₂) hCons₂ hNot
   simp [lookupBuf, mergeBufs, List.lookup_append, hNone]
 
 /-- Merged buffers follow the right when the session is absent on the left. -/
@@ -232,7 +232,7 @@ private theorem lookupBuf_merge_right_of_notin_left
     lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₂ e := by
   -- Exclude the left buffer entry, then simplify lookup on append.
   have hNone : B₁.lookup e = none :=
-    BConsistent_lookup_none_of_notin_sessions (G:=G₁) (B:=B₁) hCons₁ hNot
+    BConsistent_lookup_none_of_notin_sessions_local (G:=G₁) (B:=B₁) hCons₁ hNot
   simp [lookupBuf, mergeBufs, List.lookup_append, hNone]
 
 /-- Full linking judgment (6.7.2): Propositional version with all conditions.

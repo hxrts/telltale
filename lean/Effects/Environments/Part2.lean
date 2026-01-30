@@ -99,12 +99,55 @@ theorem preimageEdge_spec {ρ : SessionRenaming} {e e' : Edge} :
     exact Classical.choose_spec hpre
   · simp [preimageEdge, hpre] at h
 
-/-- Rename all edges in DEnv. -/
+/-- Renaming preserves edge equality (injective). -/
+theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
+    renameEdge ρ e1 = renameEdge ρ e2 → e1 = e2 := by
+  intro h
+  have hsid : ρ.f e1.sid = ρ.f e2.sid := by
+    have := congrArg Edge.sid h
+    simp only [renameEdge] at this
+    exact this
+  have hsender : e1.sender = e2.sender := by
+    have := congrArg Edge.sender h
+    simp only [renameEdge] at this
+    exact this
+  have hrecv : e1.receiver = e2.receiver := by
+    have := congrArg Edge.receiver h
+    simp only [renameEdge] at this
+    exact this
+  have hsid' : e1.sid = e2.sid := ρ.inj _ _ hsid
+  cases e1; cases e2
+  simp only at hsid' hsender hrecv
+  subst hsid' hsender hrecv
+  rfl
+
 def renameDEnv (ρ : SessionRenaming) (D : DEnv) : DEnv :=
-  fun e =>
-    match preimageEdge ρ e with
-    | some e' => (D.find? e').map (List.map (renameValType ρ))
-    | none => none
+  D.list.foldl
+    (fun acc p => updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+    (∅ : DEnv)
+
+private lemma lookupD_foldl_update_neq (ρ : SessionRenaming) :
+    ∀ (l : List (Edge × Trace)) (acc : DEnv) (edge : Edge),
+      (∀ p ∈ l, renameEdge ρ p.1 ≠ edge) →
+      lookupD
+          (l.foldl
+            (fun acc p => updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+            acc)
+          edge = lookupD acc edge := by
+  intro l acc edge hne
+  induction l generalizing acc with
+  | nil => rfl
+  | cons hd tl ih =>
+      have hne_hd : renameEdge ρ hd.1 ≠ edge := hne hd (List.mem_cons.mpr (Or.inl rfl))
+      have hne_tl : ∀ p ∈ tl, renameEdge ρ p.1 ≠ edge := by
+        intro p hp
+        exact hne p (List.mem_cons.mpr (Or.inr hp))
+      have hupd : lookupD (updateD acc (renameEdge ρ hd.1)
+        (hd.2.map (renameValType ρ))) edge = lookupD acc edge :=
+        lookupD_update_neq (env := acc) (e := renameEdge ρ hd.1) (e' := edge)
+          (ts := hd.2.map (renameValType ρ)) (hne := hne_hd)
+      simpa [List.foldl, hupd] using (ih (acc := updateD acc (renameEdge ρ hd.1)
+        (hd.2.map (renameValType ρ))) hne_tl)
 
 /-- Rename all edges in Buffers. -/
 def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
@@ -205,28 +248,6 @@ theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
   subst hsid' hrole
   rfl
 
-/-- Renaming preserves edge equality (injective). -/
-theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
-    renameEdge ρ e1 = renameEdge ρ e2 → e1 = e2 := by
-  intro h
-  have hsid : ρ.f e1.sid = ρ.f e2.sid := by
-    have := congrArg Edge.sid h
-    simp only [renameEdge] at this
-    exact this
-  have hsender : e1.sender = e2.sender := by
-    have := congrArg Edge.sender h
-    simp only [renameEdge] at this
-    exact this
-  have hrecv : e1.receiver = e2.receiver := by
-    have := congrArg Edge.receiver h
-    simp only [renameEdge] at this
-    exact this
-  have hsid' : e1.sid = e2.sid := ρ.inj _ _ hsid
-  cases e1; cases e2
-  simp only at hsid' hsender hrecv
-  subst hsid' hsender hrecv
-  rfl
-
 theorem preimageEdge_rename (ρ : SessionRenaming) (e : Edge) :
     preimageEdge ρ (renameEdge ρ e) = some e := by
   classical
@@ -237,6 +258,17 @@ theorem preimageEdge_rename (ρ : SessionRenaming) (e : Edge) :
   simp [preimageEdge, hpre, hEq]
 
 /-! ## Renaming Lookup Lemmas -/
+
+private lemma lookupD_eq_list_lookup (D : DEnv) (e : Edge) :
+    lookupD D e = match D.list.lookup e with
+      | some ts => ts
+      | none => [] := by
+  have hfind := DEnv_find?_eq_lookup (env := D) (e := e)
+  cases h : D.list.lookup e with
+  | none =>
+      simp [lookupD, hfind, h]
+  | some ts =>
+      simp [lookupD, hfind, h]
 
 /-- Looking up a renamed endpoint in a renamed GEnv. -/
 theorem lookupG_rename (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) :
@@ -261,13 +293,90 @@ theorem lookupG_rename (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) :
 theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnv ρ D) (renameEdge ρ e) =
       (lookupD D e).map (renameValType ρ) := by
-  classical
-  have hpre : preimageEdge ρ (renameEdge ρ e) = some e := preimageEdge_rename ρ e
-  cases hfind : D.find? e with
-  | none =>
-      simp [renameDEnv, lookupD, hpre, hfind]
-  | some ts =>
-      simp [renameDEnv, lookupD, hpre, hfind]
+  have hfold :
+      lookupD (renameDEnv ρ D) (renameEdge ρ e) =
+        match D.list.lookup e with
+        | some ts => ts.map (renameValType ρ)
+        | none => [] := by
+    cases D with
+    | mk l m map_eq sorted =>
+        have hfold' :
+            ∀ (l : List (Edge × Trace)) (sorted : l.Pairwise edgeCmpLT) (acc : DEnv) (e : Edge),
+              lookupD
+                  (l.foldl
+                    (fun acc p =>
+                      updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+                    acc)
+                  (renameEdge ρ e) =
+                match l.lookup e with
+                | some ts => ts.map (renameValType ρ)
+                | none => lookupD acc (renameEdge ρ e) := by
+          intro l sorted acc e
+          revert sorted
+          induction l generalizing acc with
+          | nil =>
+              intro sorted
+              simp [List.lookup]
+          | cons hd tl ih =>
+              intro sorted
+              have hpair := (List.pairwise_cons.1 sorted)
+              have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
+              have htl : tl.Pairwise edgeCmpLT := hpair.2
+              by_cases hEq : e = hd.1
+              case pos =>
+                subst hEq
+                have hne : ∀ p ∈ tl, renameEdge ρ p.1 ≠ renameEdge ρ hd.1 := by
+                  intro p hp hEq'
+                  have hEq0 : p.1 = hd.1 := renameEdge_inj ρ _ _ hEq'
+                  have hlt : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt (hhd p hp)
+                  have hEqCmp : compare hd.1 p.1 = .eq :=
+                    (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq0.symm
+                  have : Ordering.lt = Ordering.eq := by
+                    exact hlt.symm.trans hEqCmp
+                  cases this
+                have htail :
+                    lookupD
+                        (tl.foldl
+                          (fun acc p =>
+                            updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+                          (updateD acc (renameEdge ρ hd.1)
+                            (hd.2.map (renameValType ρ))))
+                        (renameEdge ρ hd.1) =
+                      lookupD (updateD acc (renameEdge ρ hd.1)
+                        (hd.2.map (renameValType ρ))) (renameEdge ρ hd.1) := by
+                  simpa using
+                    (lookupD_foldl_update_neq (ρ := ρ) (l := tl)
+                      (acc := updateD acc (renameEdge ρ hd.1)
+                        (hd.2.map (renameValType ρ)))
+                      (edge := renameEdge ρ hd.1) hne)
+                have hupd :
+                    lookupD (updateD acc (renameEdge ρ hd.1)
+                      (hd.2.map (renameValType ρ))) (renameEdge ρ hd.1) =
+                      hd.2.map (renameValType ρ) := by
+                  simpa using
+                    (lookupD_update_eq (env := acc) (e := renameEdge ρ hd.1)
+                      (ts := hd.2.map (renameValType ρ)))
+                simp [List.lookup, htail, hupd]
+              case neg =>
+                have hne : renameEdge ρ hd.1 ≠ renameEdge ρ e := by
+                  intro hEq'
+                  exact hEq (renameEdge_inj ρ _ _ hEq').symm
+                have hupd :
+                    lookupD (updateD acc (renameEdge ρ hd.1)
+                      (hd.2.map (renameValType ρ))) (renameEdge ρ e) =
+                      lookupD acc (renameEdge ρ e) := by
+                  simpa using
+                    (lookupD_update_neq (env := acc) (e := renameEdge ρ hd.1)
+                      (e' := renameEdge ρ e) (ts := hd.2.map (renameValType ρ)) (hne := hne))
+                have hrec := ih (acc := updateD acc (renameEdge ρ hd.1)
+                  (hd.2.map (renameValType ρ))) (sorted := htl)
+                have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
+                simp [List.lookup, hbeq, hrec, hupd]
+        have hfold'' := hfold' (l := l) (sorted := sorted) (acc := (∅ : DEnv)) (e := e)
+        simpa [renameDEnv] using hfold''
+  have hlookup := lookupD_eq_list_lookup (D := D) (e := e)
+  cases h : D.list.lookup e <;>
+    simp [hfold, hlookup, h]
 
 /-- Looking up a renamed edge in renamed buffers. -/
 theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
@@ -329,12 +438,26 @@ theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
   intro h
   cases hpre : preimageEdge ρ e with
   | none =>
-      have hlookup : lookupD (renameDEnv ρ D) e = [] := by
-        simp [renameDEnv, lookupD, hpre]
-      exact (h hlookup).elim
+      have hno : ∀ p ∈ D.list, renameEdge ρ p.1 ≠ e := by
+        intro p hp hEq
+        have hex : ∃ e', renameEdge ρ e' = e := ⟨p.1, hEq⟩
+        have hsome : preimageEdge ρ e = some (Classical.choose hex) := by
+          simp [preimageEdge, hex]
+        have : (none : Option Edge) = some (Classical.choose hex) := by
+          rw [hpre] at hsome
+          exact hsome
+        cases this
+      have hlookup :
+          lookupD (renameDEnv ρ D) e = lookupD (∅ : DEnv) e := by
+        simpa [renameDEnv] using
+          (lookupD_foldl_update_neq (ρ := ρ) (l := D.list) (acc := (∅ : DEnv))
+            (edge := e) hno)
+      have hlookup' : lookupD (∅ : DEnv) e = [] := by
+        simp [lookupD_empty]
+      exact (h (by simp [hlookup, hlookup'])).elim
   | some e' =>
       have heq : e = renameEdge ρ e' := by
-        exact (preimageEdge_spec (ρ:=ρ) (e:=e) (e':=e') (by simpa [hpre])).symm
+        exact (preimageEdge_spec (ρ:=ρ) (e:=e) (e':=e') (by simp [hpre])).symm
       refine ⟨e', heq, ?_⟩
       simpa [heq] using (lookupD_rename (ρ:=ρ) (D:=D) (e:=e'))
 
