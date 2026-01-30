@@ -1,6 +1,6 @@
 # Effects Code Map
 
-**Last Updated:** 2026-01-29
+**Last Updated:** 2026-01-30
 
 This document provides a comprehensive map of the Effects directory -- a formal verification library for asynchronous multiparty session types (MPST) with buffered communication in Lean 4.
 
@@ -24,8 +24,8 @@ This document provides a comprehensive map of the Effects directory -- a formal 
 
 **Directory Statistics:**
 - Total files: 43 .lean files
-- Total size: 17,019 lines of Lean code
-- Axioms: 0
+- Total size: 17,083 lines of Lean code
+- Axioms: 35 (see [Axiom Inventory](#axiom-inventory))
 - Sorries: 0
 - Largest file: Typing/Part6.lean (2,128 lines)
 
@@ -50,7 +50,7 @@ Layer 1: Foundation        -> Basic, LocalType, Values, Environments, Process
 ## Foundational Types
 
 ### Basic.lean
-**Location:** `Effects/Basic.lean` (114 lines)
+**Location:** `Effects/Basic.lean` (185 lines)
 
 Core abstractions for multiparty communication:
 
@@ -166,7 +166,7 @@ structure Config where
 ## Type System
 
 ### Environments (Part1-Part2)
-**Location:** `Effects/Environments/Part1.lean` (736 lines), `Effects/Environments/Part2.lean` (527 lines)
+**Location:** `Effects/Environments/Part1.lean` (938 lines), `Effects/Environments/Part2.lean` (493 lines)
 
 Re-exported via `Effects/Environments.lean`.
 
@@ -198,7 +198,7 @@ def renameEndpoint / renameEdge / renameGEnv / renameDEnv / renameBufs
 ---
 
 ### Typing (Part1-Part7)
-**Location:** Re-exported via `Effects/Typing.lean`. Split across Part1 (649 lines), Part2 (567 lines), Part3a (934 lines), Part3b, Part4 (474 lines), Part5 (1,265 lines), Part6 (2,128 lines), Part7 (475 lines).
+**Location:** Re-exported via `Effects/Typing.lean`. Split across Part1 (651 lines), Part2 (567 lines), Part3a (992 lines), Part3b, Part4 (478 lines), Part5 (1,632 lines), Part6 (2,128 lines), Part7 (472 lines). Part1 contains 1 axiom (`ParSplit.unique`); Part5 contains 2 axioms; Part6 contains 1 axiom (`DisjointS_preserved_TypedStep_right`).
 
 **Part1 -- Disjointness and Splitting:**
 ```lean
@@ -208,7 +208,7 @@ def DisjointS (S1 S2 : SEnv) : Prop
 structure ParSplit  -- environment splitting for parallel composition
 def DConsistent (G : GEnv) (D : DEnv) : Prop
 ```
-Contains axioms: *(none)*. `DEnv_ext` is proven via the canonical list representation.
+Contains 1 axiom: `ParSplit.unique`. `DEnv_ext` is proven via the canonical list representation.
 
 **Part2 -- Process Typing Judgment:**
 ```lean
@@ -236,8 +236,8 @@ Inversion lemmas for each process construct.
 **Part6 -- Preservation Sub-Lemmas (2,128 lines):**
 The largest file. Contains `Compatible` and preservation sub-lemmas for each step kind.
 
-**Part7 -- Coherence-Typing Integration:**
-Bridges coherence and typing judgments.
+**Part7 -- Progress Helpers:**
+DEnv union lemmas (`DEnvUnion_empty_right/left`) and environment append properties used by preservation and progress proofs.
 
 ---
 
@@ -264,7 +264,7 @@ inductive HasTypeVal : GEnv -> Value -> ValType -> Prop
 **Part3 -- Typing Variants:**
 `StoreTypedStrong`, `EdgeCoherent_updateG/D_irrelevant`.
 
-**Part4 -- Send/Recv Coherence Preservation (589 lines):**
+**Part4 -- Send/Recv Coherence Preservation (601 lines):**
 ```lean
 theorem Coherent_send_preserved  -- Coherence/Part4.lean:81
 theorem Coherent_recv_preserved  -- Coherence/Part4.lean:285
@@ -276,12 +276,12 @@ theorem Coherent_select_preserved  -- Coherence/Part5.lean:52
 theorem Coherent_branch_preserved  -- Coherence/Part5.lean:192
 ```
 
-**Part6 -- Additional Helper Lemmas (517 lines)**
+**Part6 -- Additional Helper Lemmas (507 lines)**
 
 **Part7 -- HeadCoherent Preservation:**
 `HeadCoherent_select/branch_preserved`.
 
-**Part8 -- Initialization and ValidLabels (652 lines):**
+**Part8 -- Initialization and ValidLabels (661 lines):**
 ```lean
 theorem Coherent_empty           -- Coherence/Part8.lean:617
 theorem initSession_coherent     -- Coherence/Part8.lean:634
@@ -333,25 +333,14 @@ inductive Step : Config -> Config -> Prop
 ## Main Theorems
 
 ### Preservation.lean
-**Location:** `Effects/Preservation.lean` (1,065 lines)
+**Location:** `Effects/Preservation.lean` (192 lines)
+
+Contains 6 axioms stating the main safety theorems. These are the top-level claims whose proofs depend on the sub-lemmas in Typing/Part5-Part7 and Coherence/Part4-Part8.
 
 ```lean
-theorem preservation             -- line 107
-    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
-    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' ->
-    WellFormed G D Ssh Sown store bufs P ->
-    WellFormed G' D' Ssh Sown' store' bufs' P'
-
-theorem progress                 -- line 118
-    {n S G D C} :
-    WellFormed ... -> Done C \/ CanProgress C
-
-theorem subject_reduction        -- line 982
-    -- TypedStep soundness: typed steps correspond to untyped steps
-
-theorem Step_frame_append_left   -- line 922
-theorem Step_frame_append_right  -- line 946
-    -- frame lemmas under disjointness
+axiom preservation_typed         -- line 107
+axiom progress_send/recv/select/branch  -- lines 154-175
+axiom subject_reduction          -- line 187
 ```
 
 ---
@@ -370,7 +359,7 @@ theorem session_isolation        -- steps on one session don't affect others
 ---
 
 ### DeadlockFreedom.lean
-**Location:** `Effects/DeadlockFreedom.lean` (578 lines)
+**Location:** `Effects/DeadlockFreedom.lean` (490 lines)
 
 ```lean
 inductive Guarded : LocalType -> Prop       -- no unproductive recursion
@@ -392,7 +381,7 @@ theorem disjoint_sessions_commute
 ## Runtime & Monitoring
 
 ### Monitor (Part1-Part2)
-**Location:** `Effects/Monitor/Part1.lean` (475 lines), `Effects/Monitor/Part2.lean` (777 lines). Re-exported via `Effects/Monitor.lean`.
+**Location:** `Effects/Monitor/Part1.lean` (477 lines), `Effects/Monitor/Part2.lean` (187 lines). Re-exported via `Effects/Monitor.lean`.
 
 **Part1 -- Definitions:**
 ```lean
@@ -415,18 +404,17 @@ structure WTMonComplete (ms : MonitorState) : Prop
 ```
 Token management lemmas.
 
-**Part2 -- Preservation:**
+**Part2 -- Preservation (187 lines):**
+Contains 2 axioms and proven helper lemmas (token consumption, buffer/DEnv consistency, session creation).
 ```lean
-theorem MonStep_preserves_WTMon      -- line 62
-    MonStep ms ms' -> WTMon ms -> WTMon ms'
-
-theorem newSession_preserves_WTMon   -- line 428
+axiom MonStep_preserves_WTMon        -- line 62
+axiom newSession_preserves_WTMon     -- line 184
 ```
 
 ---
 
 ### Deployment (Part1, Part2a, Part2b)
-**Location:** `Effects/Deployment/Part1.lean` (454 lines), `Effects/Deployment/Part2.lean` (re-export), `Effects/Deployment/Part2a.lean`, `Effects/Deployment/Part2b.lean`. Re-exported via `Effects/Deployment.lean`.
+**Location:** `Effects/Deployment/Part1.lean` (391 lines), `Effects/Deployment/Part2.lean` (re-export), `Effects/Deployment/Part2a.lean`, `Effects/Deployment/Part2b.lean`. Re-exported via `Effects/Deployment.lean`.
 
 **Part1 -- Core Definitions:**
 ```lean
@@ -462,7 +450,7 @@ theorem spatial_le_sound        -- monotonicity: R1 <= R2 -> (topo |= R1 -> topo
 ## Supporting Infrastructure
 
 ### Simulation.lean
-**Location:** `Effects/Simulation.lean` (534 lines)
+**Location:** `Effects/Simulation.lean` (540 lines)
 
 ```lean
 def stepBaseDecide (C : Config) : Option Config
@@ -497,9 +485,21 @@ DecidableEq instances for Edge, Endpoint, Role, LocalType. Decidable `ReachesCom
 
 ## Axiom Inventory
 
-0 axioms, 0 sorries.
+35 axioms, 0 sorries. Axioms represent theorem statements whose proofs are planned but not yet mechanized.
 
-*(Axiom inventory is empty.)*
+| File | Count | Axioms |
+|------|-------|--------|
+| Preservation.lean | 6 | `preservation_typed`, `progress_send`, `progress_recv`, `progress_select`, `progress_branch`, `subject_reduction` |
+| DeadlockFreedom.lean | 7 | `muDepth_subst_of_decide`, `reachesComm_unfold_mu`, `reachesComm_body_implies_unfold_aux`, `reachesComm_body_implies_unfold`, `reachesCommDecide_sound`, `deadlock_free`, `not_stuck` |
+| Deployment/Part1.lean | 6 | `mkInitGEnv_lookup`, `mkInitGEnv_sessionsOf_of_mem`, `mkInitBufs_lookup_mem`, `mkInit_bConsistent`, `mkInit_bufsDom`, `mkInit_dConsistent` |
+| Deployment/Part2b.lean | 9 | `mergeBufs_typed`, `mergeLin_valid`, `mergeLin_unique`, `link_preserves_WTMon_full`, `link_preserves_WTMon`, `link_preserves_WTMon_complete`, `link_preserves_WTMon_complete_full`, `disjoint_sessions_independent`, `compose_deadlock_free` |
+| Monitor/Part2.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
+| Typing/Part1.lean | 1 | `ParSplit.unique` |
+| Typing/Part5.lean | 2 | `SessionsOf_subset_of_HasTypeProcPreOut`, `updateSEnv_append_left_any` |
+| Typing/Part6.lean | 1 | `DisjointS_preserved_TypedStep_right` |
+| Examples.lean | 1 | `examples_stub` |
+
+**Note:** The 4 axioms in Typing (Part1/Part5/Part6) support frame lemmas. The 6 in Preservation are top-level safety claims. The 9 in Deployment/Part2b cover composition metatheory. The `examples_stub` axiom is a placeholder.
 
 ---
 
@@ -524,17 +524,17 @@ DecidableEq instances for Edge, Endpoint, Role, LocalType. Decidable `ReachesCom
 7. `CoherentRenaming` -> Coherence/Part9.lean
 
 **Safety Properties:**
-1. `preservation` -> Preservation.lean:107
-2. `progress` -> Preservation.lean:118
-3. `subject_reduction` -> Preservation.lean:982
+1. `preservation_typed` -> Preservation.lean:107 (axiom)
+2. `progress_send/recv/select/branch` -> Preservation.lean:154-175 (axioms)
+3. `subject_reduction` -> Preservation.lean:187 (axiom)
 4. `stepBase_det` / `diamond_independent` -> Determinism.lean
-5. `deadlock_free` / `not_stuck` -> DeadlockFreedom.lean
-6. `session_isolation` -> DeadlockFreedom.lean:453
+5. `deadlock_free` / `not_stuck` -> DeadlockFreedom.lean (axioms)
+6. `session_isolation` -> DeadlockFreedom.lean
 
 **Runtime Infrastructure:**
 1. `MonStep` monitor transitions -> Monitor/Part1.lean
 2. `MonStep_preserves_WTMon` -> Monitor/Part2.lean:62
-3. `newSession_preserves_WTMon` -> Monitor/Part2.lean:428
+3. `newSession_preserves_WTMon` -> Monitor/Part2.lean:184
 4. `stepDecide` executable simulation -> Simulation.lean
 5. `DeployedProtocol` / `ProtocolBundle` -> Deployment/Part1.lean
 6. `spatial_le_sound` -> Spatial.lean

@@ -141,12 +141,12 @@ theorem ITreeMvPFunctor.map_eq {n : Nat} {P : ITreeMvPFunctor.{u} n} {α β : IT
 
 @[simp]
 theorem ITreeMvPFunctor.map_id {n : Nat} {P : ITreeMvPFunctor.{u} n} {α : ITreeTypeVec n} (x : P.Obj α) : ITreeMvPFunctor.map ITreeTypeVec.id x = x := by
-  exact?
+  exact rfl
 
 @[simp]
 theorem ITreeMvPFunctor.map_comp {n : Nat} {P : ITreeMvPFunctor.{u} n} {α β γ : ITreeTypeVec n} (f : α ⟹ β) (g : β ⟹ γ) (x : P.Obj α) :
     ITreeMvPFunctor.map g (ITreeMvPFunctor.map f x) = ITreeMvPFunctor.map (g ⊚ f) x := by
-      exact?
+      exact rfl
 
 class ITreeMvQPF {n : Nat} (F : ITreeTypeVec n → Type u) extends ITreeMvFunctor F where
   P : ITreeMvPFunctor.{u} n
@@ -200,9 +200,6 @@ inductive HeadT : Type 1
   | ret
   | tau
   | vis (Ans : Type)
-
-#print ITreeMvPFunctor
-#print PFin2
 
 def PFin2.elim0 {C : PFin2 0 → Sort u} : ∀ i : PFin2 0, C i := fun i => by cases i
 
@@ -266,5 +263,5 @@ def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
   congr) (by
   -- The identity function is its own inverse.
   simp [unbox_Prj, box_Prj]) (by
-  exact?)
+  exact fun α β f a => rfl)
 

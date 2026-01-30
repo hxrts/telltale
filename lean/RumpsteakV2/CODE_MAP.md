@@ -1,8 +1,8 @@
 # CODE_MAP.md — RumpsteakV2 Lean Verification
 
-**175 files | 40,834 lines | 0 axioms | 0 sorries — fully verified**
+**174 files | 40,815 lines | 0 axioms | 0 sorries — fully verified**
 
-Last updated: 2026-01-29
+Last updated: 2026-01-30
 
 ---
 
@@ -92,7 +92,8 @@ The inductive local session type with recursive types, sends, receives, and bran
 | `Protocol/Spatial.lean` | Spatial predicates on types |
 | `Protocol/TypeContext.lean` | Typing contexts (518 lines) |
 | `Protocol/LocalTypeConv*.lean` | Conversion lemmas between type representations |
-| `Protocol/LocalTypeDB/` | De Bruijn bridge, including `Preservation.lean` (551 lines) |
+| `Protocol/LocalTypeDB/` | De Bruijn bridge, including `Preservation.lean` (556 lines) |
+| `Protocol/ObservableClosed.lean` | MvQPF infrastructure for observable behavior of closed recursive types |
 
 ---
 
@@ -112,7 +113,7 @@ Direct (functional) projection from global to local types.
 
 ### Projectb — `Protocol/Projection/Projectb/`
 
-Boolean projection checker and its soundness proof. `Projectb/Part4.lean` is 560 lines.
+Boolean projection checker and its soundness proof. `Projectb/Part4.lean` is 566 lines.
 
 | Definition | Location | Description |
 |------------|----------|-------------|
@@ -181,7 +182,7 @@ Erasure and deployment-related projection results.
 | `embed_project_roundtrip` | `EmbedProps.lean` | Embed-project round-trip property |
 | `embed_deterministic` | `EmbedProps.lean` | Embedding is unique up to equality |
 
-`EmbedProps.lean` is 519 lines.
+`EmbedProps.lean` is 510 lines.
 
 ---
 
@@ -606,20 +607,20 @@ Top 15 files by line count:
 | Rank | File | Lines |
 |------|------|-------|
 | 1 | `Proofs/Safety/Determinism/Part1.lean` | 600 |
-| 2 | `Protocol/GlobalType/Part5.lean` | 571 |
-| 3 | `Protocol/LocalTypeConvProofs/Part3.lean` | 571 |
-| 4 | `MuveImplBase.lean` | 561 |
-| 5 | `Protocol/Projection/Projectb/Part4.lean` | 560 |
-| 6 | `Protocol/LocalTypeDB/Preservation.lean` | 551 |
-| 7 | `Protocol/CoTypes/SubstCommBarendregt/Main.lean` | 546 |
-| 8 | `Coinductive/Roundtrip/Part4.lean` | 539 |
-| 9 | `MuveImplParticipant.lean` | 538 |
-| 10 | `Proofs/Projection/Harmony/Part3.lean` | 521 |
-| 11 | `Protocol/Projection/EmbedProps.lean` | 519 |
+| 2 | `Protocol/GlobalType/Part5.lean` | 577 |
+| 3 | `Protocol/LocalTypeConvProofs/Part3.lean` | 575 |
+| 4 | `Protocol/Projection/Projectb/Part4.lean` | 566 |
+| 5 | `Protocol/Projection/Project/MuveImplBase.lean` | 561 |
+| 6 | `Protocol/LocalTypeDB/Preservation.lean` | 556 |
+| 7 | `Protocol/CoTypes/SubstCommBarendregt/Main.lean` | 551 |
+| 8 | `Coinductive/Roundtrip/Part4.lean` | 544 |
+| 9 | `Protocol/Projection/Project/MuveImplParticipant.lean` | 544 |
+| 10 | `Proofs/Projection/Harmony/Part3.lean` | 533 |
+| 11 | `Proofs/Projection/Harmony/Part2.lean` | 519 |
 | 12 | `Protocol/TypeContext.lean` | 518 |
-| 13 | `Proofs/Projection/Harmony/Part2.lean` | 514 |
-| 14 | `Protocol/LocalTypeR/Part1.lean` | 511 |
-| 15 | `Proofs/Safety/Determinism/Part2.lean` | 511 |
+| 13 | `Proofs/Safety/Determinism/Part2.lean` | 516 |
+| 14 | `Protocol/LocalTypeR/Part1.lean` | 513 |
+| 15 | `Protocol/Projection/EmbedProps.lean` | 510 |
 
 ---
 
