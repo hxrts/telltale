@@ -1,15 +1,15 @@
 #![allow(clippy::type_complexity)]
 
-//! External Demo - Full Rumpsteak-Aura Integration
+//! External Demo - Full Telltale-Aura Integration
 //!
-//! This crate demonstrates how external projects integrate with rumpsteak-aura
+//! This crate demonstrates how external projects integrate with telltale
 //! and the choreography DSL. It serves as a reference implementation for
 //! third-party crates that want to use the MPST library.
 //!
 //! # Architecture
 //!
 //! ```text
-//! external-demo/              ← Regular crate (re-exports rumpsteak-aura)
+//! external-demo/              ← Regular crate (re-exports telltale)
 //! external-demo-macros/       ← Proc-macro crate (custom macros)
 //! ```
 //!
@@ -34,14 +34,14 @@ pub use external_demo_macros::choreography;
 
 // Prelude module for convenient imports
 pub mod prelude {
-    // Core session types and macros from rumpsteak-aura
-    pub use rumpsteak_aura::{
+    // Core session types and macros from telltale
+    pub use telltale::{
         channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
         Select, Send,
     };
 
     // Choreography types
-    pub use rumpsteak_aura_choreography::{
+    pub use telltale_choreography::{
         ast::{Choreography, LocalType, MessageType, Protocol, Role as ChoreographyRole},
         compiler::{parser::parse_choreography_str_with_extensions, GrammarComposer},
         extensions::{ExtensionRegistry, ProtocolExtension},
@@ -64,16 +64,16 @@ pub use aura_extensions::{create_aura_extension_registry, register_aura_extensio
 // Re-export specific types to avoid ambiguity
 // Users should use prelude::* or import from these explicitly
 
-/// Core rumpsteak-aura types for session type programming
+/// Core telltale types for session type programming
 pub mod session {
-    pub use rumpsteak_aura::{
+    pub use telltale::{
         channel, session, try_session, Branch, End, Message, Receive, Role, Roles, Select, Send,
     };
 }
 
 /// Choreography DSL types and tools
 pub mod choreography_dsl {
-    pub use rumpsteak_aura_choreography::{
+    pub use telltale_choreography::{
         ast, compiler, extensions, runtime, simulation, testing, tracing,
     };
 }
@@ -82,8 +82,8 @@ pub mod choreography_dsl {
 ///
 /// This function configures the extension registry with Aura-specific
 /// grammar extensions and statement parsers.
-pub fn init_aura_extensions() -> rumpsteak_aura_choreography::extensions::ExtensionRegistry {
-    let mut registry = rumpsteak_aura_choreography::extensions::ExtensionRegistry::new();
+pub fn init_aura_extensions() -> telltale_choreography::extensions::ExtensionRegistry {
+    let mut registry = telltale_choreography::extensions::ExtensionRegistry::new();
     aura_extensions::register_aura_extensions(&mut registry);
     registry
 }

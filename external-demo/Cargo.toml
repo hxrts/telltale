@@ -3,14 +3,14 @@ name = "external-demo"
 version = "0.6.0"
 edition = "2021"
 
-# This is an external project - exclude from rumpsteak-aura workspace
+# This is an external project - exclude from telltale workspace
 [workspace]
 
 [dependencies]
-# Re-export all rumpsteak-aura functionality
-rumpsteak-aura = { path = ".." }
-rumpsteak-aura-choreography = { path = "../rust/choreography" }
-rumpsteak-aura-macros = { path = "../rust/macros" }
+# Re-export all telltale functionality
+telltale = { path = ".." }
+telltale-choreography = { path = "../rust/choreography" }
+telltale-macros = { path = "../rust/macros" }
 
 # Import our proc macros from the separate crate
 external-demo-macros = { path = "../external-demo-macros" }

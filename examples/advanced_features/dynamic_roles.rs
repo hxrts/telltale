@@ -4,11 +4,11 @@
 //! 1. DSL parsing of protocols with wildcards and ranges
 //! 2. Runtime resolution of role families using TestAdapter
 
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
-use rumpsteak_aura_choreography::effects::{LabelId, RoleId};
-use rumpsteak_aura_choreography::identifiers::RoleName;
-use rumpsteak_aura_choreography::runtime::adapter::ChoreographicAdapter;
-use rumpsteak_aura_choreography::runtime::test_adapter::TestAdapter;
+use telltale_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::effects::{LabelId, RoleId};
+use telltale_choreography::identifiers::RoleName;
+use telltale_choreography::runtime::adapter::ChoreographicAdapter;
+use telltale_choreography::runtime::test_adapter::TestAdapter;
 
 const THRESHOLD_SIGNATURE: &str = r#"
 module threshold_crypto exposing (ThresholdSignature)
@@ -150,7 +150,10 @@ fn main() {
     let threshold = adapter
         .resolve_range("Signer", 0, 3)
         .expect("resolve_range");
-    println!("  resolve_range(\"Signer\", 0, 3) -> {} roles", threshold.len());
+    println!(
+        "  resolve_range(\"Signer\", 0, 3) -> {} roles",
+        threshold.len()
+    );
 
     // Get family size
     let size = adapter.family_size("Signer").expect("family_size");

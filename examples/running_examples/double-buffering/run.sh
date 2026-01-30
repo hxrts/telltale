@@ -1,6 +1,6 @@
 #!/bin/sh
 
-GENERATE="$(which rumpsteak-generate || echo "../../../target/debug/rumpsteak-generate")"
+GENERATE="$(which telltale-generate || echo "../../../target/debug/telltale-generate")"
 SUBTYPE="$(which subtype || echo "../../../target/debug/subtype")"
 
 failwith() {
@@ -25,7 +25,7 @@ checkdots() {
 }
 
 dot2rs() {
-	$GENERATE --name DB k_optimised.dot s.dot t.dot > db_opt.rs || failwith "Can not generate .rs file (rumpsteak-generate error)."
+	$GENERATE --name DB k_optimised.dot s.dot t.dot > db_opt.rs || failwith "Can not generate .rs file (telltale-generate error)."
 }
 
 checksubtype() {

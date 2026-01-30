@@ -34,7 +34,7 @@ use futures::{
     executor, try_join,
 };
 #[allow(unused_imports)]
-use rumpsteak_aura::{
+use telltale::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
     Select, Send,
 };

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Rust Style Guide Conformance Checker for Rumpsteak-Aura
+# Rust Style Guide Conformance Checker for Telltale-Aura
 # Based on work/style_guide_rust.md
 #
 # Usage:

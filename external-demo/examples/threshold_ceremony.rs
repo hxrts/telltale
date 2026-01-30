@@ -1,14 +1,14 @@
 //! Threshold Signing Ceremony Choreography
 //!
 //! This example demonstrates a complete threshold signing ceremony using the
-//! DSL parsing with basic rumpsteak-aura features and extension points
+//! DSL parsing with basic telltale features and extension points
 //! for future Aura-specific enhancements.
 
-use rumpsteak_aura::*;
-use futures::channel::mpsc::{UnboundedSender, UnboundedReceiver};
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str_with_extensions;
-use rumpsteak_aura_choreography::extensions::ExtensionRegistry;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use serde::{Deserialize, Serialize};
+use telltale::*;
+use telltale_choreography::compiler::parser::parse_choreography_str_with_extensions;
+use telltale_choreography::extensions::ExtensionRegistry;
 
 // Type definitions for the generated code
 #[allow(dead_code)]
@@ -196,10 +196,7 @@ mod tests {
             ceremony_id: "ceremony_final".to_string(),
             aggregated_signature: vec![0xFF; 64], // 64-byte signature
             success: true,
-            participating_ids: vec![
-                "signer_1".to_string(),
-                "signer_2".to_string(),
-            ],
+            participating_ids: vec!["signer_1".to_string(), "signer_2".to_string()],
             completion_timestamp: 1640995200,
         };
 

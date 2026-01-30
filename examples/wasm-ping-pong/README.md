@@ -1,6 +1,6 @@
 # WASM Ping-Pong Example
 
-A minimal example demonstrating Rumpsteak's choreographic programming in WebAssembly.
+A minimal example demonstrating Telltale's choreographic programming in WebAssembly.
 
 ## Overview
 
@@ -8,7 +8,7 @@ This example implements a simple two-party protocol where:
 - Alice sends a "Ping" message to Bob
 - Bob receives the Ping and responds with a "Pong" message
 
-The protocol uses Rumpsteak's choreographic effect system with the `InMemoryHandler` for communication.
+The protocol uses Telltale's choreographic effect system with the `InMemoryHandler` for communication.
 
 ## Quick Start
 
@@ -59,10 +59,10 @@ Create an `index.html` file to test in the browser:
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Rumpsteak WASM Ping-Pong</title>
+    <title>Telltale WASM Ping-Pong</title>
 </head>
 <body>
-    <h1>Rumpsteak WASM Example</h1>
+    <h1>Telltale WASM Example</h1>
     <button id="run">Run Ping-Pong Protocol</button>
     <pre id="output"></pre>
     

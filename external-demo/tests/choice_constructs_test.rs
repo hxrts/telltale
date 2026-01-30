@@ -3,7 +3,7 @@
 //! This test checks whether the advanced parser (`parse_and_generate_with_extensions`)
 //! can properly handle choice constructs.
 
-use rumpsteak_aura_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
+use telltale_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
 
 // Test the specific syntax requested by the user
 #[test]
@@ -95,13 +95,13 @@ fn test_choice_construct_error_handling() {
     let registry = ExtensionRegistry::new();
     let result = parse_and_generate_with_extensions(invalid_choreography, &registry);
 
-        match result {
-            Ok(_) => {
+    match result {
+        Ok(_) => {
             println!("Note: Invalid branch syntax was accepted");
-            }
-            Err(e) => {
-                println!("✓ Invalid syntax correctly rejected: {}", e);
-            }
+        }
+        Err(e) => {
+            println!("✓ Invalid syntax correctly rejected: {}", e);
+        }
     }
 
     println!("✓ Choice construct syntax appears to be recognized by the parser");

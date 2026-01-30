@@ -1,4 +1,4 @@
-//! Client-server logging example using rumpsteak session types.
+//! Client-server logging example using telltale session types.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
@@ -43,7 +43,7 @@
 use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use ::futures::{executor, try_join};
 #[allow(unused_imports)]
-use ::rumpsteak_aura::{
+use ::telltale::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
     Select, Send,
 };

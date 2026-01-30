@@ -1,5 +1,5 @@
 # clippy.toml
-# Rust Style Guide conformance settings for Rumpsteak-Aura
+# Rust Style Guide conformance settings for Telltale-Aura
 # See work/style_guide_rust.md for rationale
 
 # Limit function cognitive complexity (style guide: keep functions small)

@@ -1,14 +1,14 @@
 //! Demonstration of correct choice construct syntax for external-demo
-//! 
+//!
 //! This test shows the working syntax for choice constructs and provides
 //! a corrected version of the user's original request.
 
-use rumpsteak_aura_choreography::{parse_and_generate_with_extensions, extensions::ExtensionRegistry};
+use telltale_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
 
 #[test]
 fn demo_correct_choice_syntax() {
     println!("=== Choice Constructs ARE Supported! ===\n");
-    
+
     // The user's original request (DOESN'T WORK):
     let original_request = r#"
 protocol TestChoice = {
@@ -36,21 +36,21 @@ protocol TestChoice = {
     }
 }
 "#;
-    
+
     println!("❌ ORIGINAL SYNTAX (doesn't work):");
     println!("{}", original_request);
-    
+
     println!("✅ CORRECTED SYNTAX (works!):");
     println!("{}", corrected_syntax);
-    
+
     let registry = ExtensionRegistry::new();
-    
+
     // Test original (should fail)
     match parse_and_generate_with_extensions(original_request, &registry) {
         Ok(_) => println!("Unexpected: Original syntax worked"),
         Err(_) => println!("✓ Confirmed: Original syntax fails as expected"),
     }
-    
+
     // Test corrected (should work)
     match parse_and_generate_with_extensions(corrected_syntax, &registry) {
         Ok(_) => println!("✅ SUCCESS: Corrected syntax works perfectly!"),
@@ -59,7 +59,7 @@ protocol TestChoice = {
             panic!("This should work!");
         }
     }
-    
+
     println!("\n=== Key Differences ===");
     println!("1. Use 'choice at Role' (or 'case choose Role of')");
     println!("2. Each branch uses 'label ->' with a block");

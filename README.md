@@ -1,53 +1,10 @@
-# Telltale ♨️
+# Telltale
 
-Rust-based choreographic programming DSL for projecting session typed protocols.
+Telltale is a framework for choreographic programming with multiparty session types. Protocols are written from a global viewpoint and automatically projected to local types for each participant. Session types guarantee the absence of deadlocks and communication errors at compile time.
 
-Where did the grotesque name come from? The session type system is forked from Zak Cutner's [Telltale](https://github.com/zakcutner/telltale) library. This is an experiment in projecting session types from a global viewpoint. I've added a choreographic programming DSL which generates session typed code into an effect API.
-
-[![Crate](https://img.shields.io/crates/v/telltale)](https://crates.io/crates/telltale)
-[![Docs](https://docs.rs/telltale/badge.svg)](https://docs.rs/telltale)
-[![License](https://img.shields.io/crates/l/telltale)](LICENSE)
-
-`telltale` is a Rust framework for safely and efficiently implementing
-message-passing asynchronous programs. It uses multiparty session types to statically guarantee the absence of communication errors such as deadlocks and asynchronous subtyping to allow optimizing communications.
-
-Multiparty session types (MPST) verify the safety of message-passing protocols, as described in [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
-Asynchronous subtyping, introduced for MPST in [Precise Subtyping for
-Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf),
-verifies the reordering of messages to create more optimized implementations than are usually possible with MPST.
-
-[Mechanised Subject Reduction for Multiparty Asynchronous Session Types](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.31) (ECOOP 2025) presents a mechanized Coq proof addressing flaws in the original MPST formulation by Honda et al. The authors identify that the original subject reduction theorem does not hold under asynchronous semantics due to out-of-order message delivery, and introduce a restricted theory with an additional *unstuckness* property that restores subject reduction. Their mechanization ([github.com/Tirore96/subject_reduction](https://github.com/Tirore96/subject_reduction)) includes a decidable coinductive equality for session types and a corrected projection theorem.
-
-## Features
-
-- Deadlock-free communication with session types.
-- Integrates with `async`/`await` code.
-- Supports any number of participants.
-- Choreographic programming with DSL parser and automatic projection.
-- Effect handler system with multiple implementations (in-memory, distributed).
-- TelltaleHandler with session state tracking.
-- Middleware support (tracing, retry, metrics, fault injection).
-- WebAssembly support for browser-based protocols.
-- Formal verification of choreographic projection using Lean 4.
-
-## Usage
-
-For core session types:
-
-```toml
-[dependencies]
-telltale = "*"
-```
-
-For choreographic programming:
-```toml
-[dependencies]
-telltale-choreography = "*"
-```
+The Rust implementation provides a DSL, compiler, effect handler system, and transport abstraction. A parallel Lean 4 formalization verifies projection correctness, proves safety properties (subject reduction, deadlock freedom, determinism), and models an Iris-backed session-type VM with resource algebras and separation logic.
 
 ## Example
-
-Define a protocol using the choreographic DSL:
 
 ```rust
 use telltale_choreography::choreography;
@@ -61,84 +18,67 @@ choreography! {
 }
 ```
 
-Run the protocol with the effect handler system:
+The macro generates role types, message types, and session types. Protocol logic is decoupled from transport through effect handlers. `InMemoryHandler` runs protocols in tests. `TelltaleHandler` connects to real transports (WebSockets, QUIC, or custom sink/stream pairs).
 
 ```rust
-use telltale_choreography::{InMemoryHandler, Program, interpret};
-use serde::{Serialize, Deserialize};
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum Role {
-    Alice,
-    Bob,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-enum Message {
-    Ping,
-    Pong,
-}
-
-let mut handler = InMemoryHandler::new(Role::Alice);
 let program = Program::new()
     .send(Role::Bob, Message::Ping)
     .recv::<Message>(Role::Bob)
     .end();
 
-let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The choreography macro generates role types, message types, and session types automatically. The effect handler system decouples protocol logic from transport. Use `InMemoryHandler` for testing or `TelltaleHandler` for production. `TelltaleHandler` now accepts either the built-in `SimpleChannel` pairs via `register_channel` or any custom sink/stream transport via `TelltaleSession::from_sink_stream` + `register_session`, so you can drop in WebSockets, QUIC streams, or other runtimes without writing a new handler. See `docs/` for guides.
+## Rust Crates
 
-## Workspace Structure
+All Rust source lives in `rust/`.
 
-This project is organized as a Cargo workspace. All Rust crates are in the `rust/` directory:
+**`telltale`** is the facade crate with session type primitives (`Send`, `Receive`, `Select`, `Branch`, `End`) and async channel abstractions.
 
-#### `rust/src/` - Core Session Types (`telltale`)
+**`telltale-types`** defines `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort` with content addressing. These definitions match the Lean formalization exactly.
 
-The facade library providing core session type primitives (`Send`, `Receive`, `Select`, `Branch`, `End`), async channels, and role definitions. Re-exports types from other crates.
+**`telltale-theory`** implements projection, merge, duality, sync/async subtyping, and bounded recursion.
 
-#### `rust/types/` - Type Definitions (`telltale-types`)
+**`telltale-choreography`** contains the DSL parser, compiler, effect handlers, middleware (tracing, retry, metrics, fault injection), simulation infrastructure, topology configuration, and WebAssembly support.
 
-Core type definitions matching Lean exactly: `GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`. Includes content addressing infrastructure.
+**`telltale-macros`** provides the `choreography!` macro and derive macros for roles and messages.
 
-#### `rust/theory/` - Session Type Algorithms (`telltale-theory`)
+**`telltale-lean-bridge`** converts between Rust session types and Lean-compatible JSON. The `exporter` feature serializes choreography ASTs for the Lean verification pipeline.
 
-Pure algorithms for session type operations: projection, merge, duality, synchronous/asynchronous subtyping, and bounded recursion strategies.
+## Lean Formalization
 
-#### `rust/choreography/` - Choreographic Programming (`telltale-choreography`)
+The `lean/` directory contains six libraries organized by concern.
 
-Choreographic programming layer with DSL parser, automatic projection, and code generation. Includes a transport-agnostic effect handler system (`InMemoryHandler` for testing, `TelltaleHandler` for production), middleware support (tracing, retry, metrics, fault injection), and WebAssembly support.
+**SessionTypes** defines the inductive global and local type structures.
 
-#### `rust/macros/` - Procedural Macros (`telltale-macros`)
+**SessionCoTypes** develops coinductive equality, bisimulation, duality, and the inductive/coinductive roundtrip bridge.
 
-Procedural macros including `choreography!` for inline protocol definitions.
+**Choreography** implements projection from global to local types and proves harmony (the projection correctness theorem).
 
-#### `rust/lean-bridge/` - Lean Verification Bridge (`telltale-lean-bridge`)
+**Semantics** defines operational rules, typing judgments, and metatheory including determinism, deadlock freedom, and subject reduction.
 
-Bidirectional conversion between Rust session types and Lean-compatible JSON. The `exporter` feature adds a CLI tool that exports choreography ASTs to JSON for Lean 4 verification.
+**Protocol** models async buffered multiparty sessions with coherence, preservation, monitors, deployment, and spatial reasoning. This library carries 35 axioms and 0 sorries.
 
-#### `examples/` - Protocol Examples
+**Runtime** is the session-type bytecode VM verified with Iris separation logic. It covers resource algebras, cancelable invariants, a cooperative scheduler, WP rules for each instruction, and an adequacy theorem connecting the VM to observable traces. Iris primitives are axiomatized as shims that retire as the upstream iris-lean library matures.
 
-Examples demonstrating Telltale usage. Includes `wasm-ping-pong/` for browser-based protocols.
+The verification pipeline runs with `just telltale-lean-check` (requires Nix).
 
-## WebAssembly Support
+## WebAssembly
 
-Supports compilation to WebAssembly, allowing the core session types and choreography system to run in browser environments. Both the effect handlers and platform-agnostic runtime abstraction work in WASM, enabling you to implement custom network transports using `ChoreoHandler` with WebSockets, WebRTC, or other browser APIs. The `examples/wasm-ping-pong/` directory contains a working example.
+The core session types and choreography system compile to WebAssembly. Effect handlers and the platform abstraction layer work in browser environments. See `examples/wasm-ping-pong/` for a working example.
 
-To get started, run `cd examples/wasm-ping-pong && ./build.sh` (or `wasm-pack build --target web`).
+```bash
+cd examples/wasm-ping-pong && wasm-pack build --target web
+```
 
-## Formal Verification
+## Building
 
-Choreographic projection correctness is verified using Lean. The verification pipeline validates:
-
-- **Projection correctness**: Local types accurately represent each role's view of the global protocol
-- **Duality**: Send/receive pairs are properly matched between communicating roles
-- **Subtyping invariants**: Asynchronous message reordering preserves causal dependencies
-- **Effect conformance**: Generated effect programs match their projected session types
-
-The `lean/` directory contains Lean proof modules, and `lean-bridge` (with the `exporter` feature) serializes Rust choreography ASTs to JSON for verification. Run the full pipeline with `just telltale-lean-check` (requires Nix). See `docs/14_lean_verification.md` for details.
+```bash
+cargo build --workspace --all-targets --all-features   # build
+cargo test --workspace --all-targets --all-features     # test
+cargo clippy --workspace --all-targets --all-features -- -D warnings  # lint
+cd lean && lake build                                   # lean (requires nix develop)
+```
 
 ## License
 

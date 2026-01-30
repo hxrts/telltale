@@ -3,7 +3,7 @@
 //! Annotation syntax was removed from the DSL, so this example now focuses on
 //! basic protocol flows using the new syntax.
 
-use rumpsteak_aura_choreography_macros::choreography;
+use telltale_choreography_macros::choreography;
 
 choreography! {
     protocol CostAwareProtocol = {

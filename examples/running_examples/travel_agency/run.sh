@@ -2,7 +2,7 @@
 
 set -x
 
-GENERATE="$(which rumpsteak-generate || if [ -e "../../../target/debug/rumpsteak-generate" ]; then echo "../../../target/debug/rumpsteak-generate"; else echo "../../../target/release/rumpsteak-generate"; fi)"
+GENERATE="$(which telltale-generate || if [ -e "../../../target/debug/telltale-generate" ]; then echo "../../../target/debug/telltale-generate"; else echo "../../../target/release/telltale-generate"; fi)"
 
 SCR2DOT="../../../../scr2dot/_build/default/scr2dot.exe"
 MPST_UNROLL="../../../../mpst_unroll/target/debug/mpst_unroll"
@@ -36,7 +36,7 @@ checkdots() {
 dot2rs() {
 	DOT="$(echo ${ENDPOINTS}.dot | sed s/\ /.dot\ /g)"
 
-	$GENERATE --name $PROTO $DOT > ${FILE}.rs || failwith "Can not generate .rs file (rumpsteak-generate error)."
+	$GENERATE --name $PROTO $DOT > ${FILE}.rs || failwith "Can not generate .rs file (telltale-generate error)."
 }
 
 checkrs() {

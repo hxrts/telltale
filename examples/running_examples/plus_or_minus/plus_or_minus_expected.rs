@@ -1,10 +1,11 @@
-use ::futures::{
+use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join
+    executor, try_join,
 };
 #[allow(unused_imports)]
-use ::rumpsteak_aura::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, try_session
+use telltale::{
+    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
+    Select, Send,
 };
 
 use std::error::Error;

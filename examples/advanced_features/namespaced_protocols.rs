@@ -3,7 +3,7 @@
 //! This example parses multiple protocols with different module namespaces
 //! and shows their qualified names.
 
-use rumpsteak_aura_choreography::compiler::parser::parse_choreography_str;
+use telltale_choreography::compiler::parser::parse_choreography_str;
 
 const THRESHOLD_SIGNATURE: &str = r#"
 module threshold_ceremony exposing (ThresholdSignature)

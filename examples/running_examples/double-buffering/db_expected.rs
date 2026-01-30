@@ -1,6 +1,6 @@
-use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 #[allow(unused_imports)]
-use ::rumpsteak_aura::{
+use telltale::{
     channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send,
 };
 

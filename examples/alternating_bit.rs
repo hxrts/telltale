@@ -1,4 +1,4 @@
-//! Alternating bit protocol example using rumpsteak session types.
+//! Alternating bit protocol example using telltale session types.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
@@ -7,7 +7,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor, try_join,
 };
-use rumpsteak_aura::{
+use telltale::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Role, Roles, Send,
 };
 use std::{error::Error, result};

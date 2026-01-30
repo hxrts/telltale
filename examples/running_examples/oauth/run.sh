@@ -1,6 +1,6 @@
 #!/bin/sh
 
-GENERATE="$(which rumpsteak-generate || if [ -e "../../../target/debug/rumpsteak-generate" ]; then echo "../../../target/debug/rumpsteak-generate"; fi || echo "../../../target/release/rumpsteak-generate")"
+GENERATE="$(which telltale-generate || if [ -e "../../../target/debug/telltale-generate" ]; then echo "../../../target/debug/telltale-generate"; fi || echo "../../../target/release/telltale-generate")"
 
 failwith() {
 	echo [FAIL] $1 1>&2
@@ -20,7 +20,7 @@ checkdots() {
 }
 
 dot2rs() {
-	$GENERATE --name Proto C.dot S.dot A.dot > oauth.rs || failwith "Can not generate .rs file (rumpsteak-generate error)."
+	$GENERATE --name Proto C.dot S.dot A.dot > oauth.rs || failwith "Can not generate .rs file (telltale-generate error)."
 }
 
 checkrs() {

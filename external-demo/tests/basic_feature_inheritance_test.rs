@@ -1,13 +1,13 @@
-//! Test suite verifying that external-demo inherits basic rumpsteak-aura features
+//! Test suite verifying that external-demo inherits basic telltale features
 //!
 //! This test validates the core requirement: 3rd party projects should be able to
-//! import rumpsteak-aura, get basic features, and use choreography! syntax.
+//! import telltale, get basic features, and use choreography! syntax.
 
 use external_demo::choreography;
 use external_demo::prelude::*;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use rumpsteak_aura::channel;
 use serde::{Deserialize, Serialize};
+use telltale::channel;
 
 // Common type definitions needed for generated code
 #[allow(dead_code)]
@@ -33,7 +33,7 @@ pub struct ImportRequest;
 pub struct BasicFeatures;
 
 #[allow(dead_code)]
-#[derive(rumpsteak_aura::Message)]
+#[derive(telltale::Message)]
 enum Label {
     Message(Message),
     Request(Request),
@@ -45,7 +45,7 @@ enum Label {
 
 #[test]
 fn test_basic_choreography_inheritance() {
-    // Test that basic choreography syntax works exactly like rumpsteak-aura
+    // Test that basic choreography syntax works exactly like telltale
     choreography! {
         protocol BasicExample = {
             roles Alice, Bob
@@ -84,15 +84,15 @@ fn test_another_two_party_protocol() {
 #[test]
 fn test_core_requirement_fulfilled() {
     // This test embodies the core requirement:
-    // "3rd party developers can import rumpsteak-aura, get all features,
+    // "3rd party developers can import telltale, get all features,
     //  and use choreography! macro syntax"
 
-    // 1. Import rumpsteak-aura (✓ - via external_demo re-export)
+    // 1. Import telltale (✓ - via external_demo re-export)
     // 2. Get basic features (✓ - basic syntax works above)
     // 3. Use choreography! macro syntax (✓ - direct DSL syntax works)
 
-    use rumpsteak_aura_choreography::compiler::{ExtensionParser, GrammarComposer};
-    use rumpsteak_aura_choreography::extensions::ExtensionRegistry;
+    use telltale_choreography::compiler::{ExtensionParser, GrammarComposer};
+    use telltale_choreography::extensions::ExtensionRegistry;
 
     // Verify extension system integration
     let _registry = ExtensionRegistry::new();
@@ -102,11 +102,11 @@ fn test_core_requirement_fulfilled() {
     // Verify choreography macro works with basic syntax
     choreography! {
         protocol RequirementValidation = {
-            roles ThirdParty, RumpsteakAura
+            roles ThirdParty, TelltaleAura
 
             // This validates that 3rd parties get basic functionality
-            ThirdParty -> RumpsteakAura : ImportRequest
-            RumpsteakAura -> ThirdParty : BasicFeatures
+            ThirdParty -> TelltaleAura : ImportRequest
+            TelltaleAura -> ThirdParty : BasicFeatures
         }
     }
 

@@ -1,10 +1,10 @@
 // WASM example: Simple ping-pong protocol
 //
-// Demonstrates how to use Rumpsteak choreographic programming in WASM.
+// Demonstrates how to use Telltale choreographic programming in WASM.
 // This is a minimal two-party protocol where Alice sends a ping and Bob responds with a pong.
 
 use wasm_bindgen::prelude::*;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     InMemoryHandler, Program, interpret, RoleId, LabelId, RoleName,
 };
 use serde::{Serialize, Deserialize};
@@ -71,30 +71,30 @@ pub enum Message {
 #[wasm_bindgen]
 pub async fn run_alice(message: String) -> Result<String, JsValue> {
     tracing::info!("Alice: Starting ping-pong protocol");
-    
+
     // Create shared channels for communication
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));
-    
+
     // Create handler for Alice
     let mut handler = InMemoryHandler::with_channels(
         Role::Alice,
         channels.clone(),
         choice_channels.clone(),
     );
-    
+
     // Define Alice's protocol: send ping to Bob
     let program = Program::new()
         .send(Role::Bob, Message::Ping(message.clone()))
         .recv::<Message>(Role::Bob)
         .end();
-    
+
     // Execute protocol
     let mut endpoint = ();
     let result = interpret(&mut handler, &mut endpoint, program)
         .await
         .map_err(|e| JsValue::from_str(&format!("Protocol error: {:?}", e)))?;
-    
+
     // Extract received message
     if let Some(Message::Pong(response)) = result.received_values.first() {
         Ok(response.clone())
@@ -107,30 +107,30 @@ pub async fn run_alice(message: String) -> Result<String, JsValue> {
 #[wasm_bindgen]
 pub async fn run_bob() -> Result<String, JsValue> {
     tracing::info!("Bob: Starting ping-pong protocol");
-    
+
     // Create shared channels for communication
     let channels = Arc::new(Mutex::new(HashMap::new()));
     let choice_channels = Arc::new(Mutex::new(HashMap::new()));
-    
+
     // Create handler for Bob
     let mut handler = InMemoryHandler::with_channels(
         Role::Bob,
         channels.clone(),
         choice_channels.clone(),
     );
-    
+
     // Define Bob's protocol: receive ping from Alice, respond with pong
     let program = Program::new()
         .recv::<Message>(Role::Alice)
         .send(Role::Alice, Message::Pong("Hello from Bob!".to_string()))
         .end();
-    
+
     // Execute protocol
     let mut endpoint = ();
     let result = interpret(&mut handler, &mut endpoint, program)
         .await
         .map_err(|e| JsValue::from_str(&format!("Protocol error: {:?}", e)))?;
-    
+
     // Extract received message
     if let Some(Message::Ping(ping_msg)) = result.received_values.first() {
         Ok(ping_msg.clone())
@@ -143,83 +143,82 @@ pub async fn run_bob() -> Result<String, JsValue> {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-    
+
     wasm_bindgen_test_configure!(run_in_browser);
-    
+
     #[wasm_bindgen_test]
     fn test_role_creation() {
         init();
-        
+
         // Test role enum creation
         let alice = Role::Alice;
         let bob = Role::Bob;
-        
+
         // Roles can be compared
         assert_ne!(alice, bob);
         assert_eq!(alice, Role::Alice);
     }
-    
+
     #[wasm_bindgen_test]
     fn test_message_serialization() {
         init();
-        
+
         // Test that messages can be created
         let ping = Message::Ping("test".to_string());
         let pong = Message::Pong("response".to_string());
-        
+
         // Verify message enum variants work
         match ping {
             Message::Ping(s) => assert_eq!(s, "test"),
             _ => panic!("Expected Ping variant"),
         }
-        
+
         match pong {
             Message::Pong(s) => assert_eq!(s, "response"),
             _ => panic!("Expected Pong variant"),
         }
     }
-    
+
     #[wasm_bindgen_test]
     fn test_handler_creation() {
         init();
-        
+
         // Test that handlers can be created with shared channels
         let channels = Arc::new(Mutex::new(HashMap::new()));
         let choice_channels = Arc::new(Mutex::new(HashMap::new()));
-        
+
         let alice = InMemoryHandler::with_channels(
             Role::Alice,
             channels.clone(),
             choice_channels.clone(),
         );
-        
+
         let bob = InMemoryHandler::with_channels(
             Role::Bob,
             channels.clone(),
             choice_channels.clone(),
         );
-        
+
         // Test passes if handlers can be created without panicking
         drop(alice);
         drop(bob);
     }
-    
+
     #[wasm_bindgen_test]
     async fn test_program_creation() {
         init();
-        
+
         // Test that effect programs can be created
         let _alice_program = Program::new()
             .send(Role::Bob, Message::Ping("test".to_string()))
             .recv::<Message>(Role::Bob)
             .end();
-        
+
         let _bob_program = Program::new()
             .recv::<Message>(Role::Alice)
             .send(Role::Alice, Message::Pong("response".to_string()))
             .end();
-        
+
         // Test passes if programs compile and can be created
     }
 }
-

@@ -7,7 +7,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use rumpsteak_aura::Message;
+use telltale::Message;
 
 // ============================================================================
 // Single Message Type Tests

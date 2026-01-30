@@ -8,7 +8,7 @@ The project employs a defense-in-depth approach with three layers. Core session 
 
 ## What is Formally Proven
 
-The following properties have complete proofs in `lean/Telltale/Proofs/`:
+The following properties have complete proofs in the `Semantics` and `Choreography` libraries:
 
 ### Merge Operator Properties
 
@@ -73,11 +73,12 @@ def isSubtype (sub sup : LocalType) : Bool :=
 
 The Lean codebase is organized into focused modules:
 
-- **Telltale.Choreography**: Decodes choreographies from JSON, validates roles and actions with `hasUniqueRoles` and `hasValidActions`
-- **Telltale.Projection**: Builds per-role `LocalType` traces from global types
-- **Telltale.Program**: Maps exported effects to `LocalAction` values as a homomorphism from JSON to the projection domain
-- **Telltale.Subtyping**: Defines order checks with `DecidableEq`
-- **Telltale.Runner**: Applies membership, order, and label invariants per branch
+- **SessionTypes**: Inductive session type definitions (global types, local types, participation)
+- **SessionCoTypes**: Coinductive equality, bisimulation, duality, and observables
+- **Choreography**: Projection from global to local types, harmony proofs, blindness, erasure
+- **Semantics**: Operational semantics, typing, determinism, deadlock freedom, subject reduction
+- **Protocol**: Async buffered MPST with coherence, preservation, monitoring, deployment
+- **Runtime**: VM definition, Iris separation logic backend, resource algebras, WP rules
 
 ## Features Without Lean Formalization
 

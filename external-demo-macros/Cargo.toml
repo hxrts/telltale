@@ -3,7 +3,7 @@ name = "external-demo-macros"
 version = "0.6.0"
 edition = "2021"
 
-# This is an external project - exclude from rumpsteak-aura workspace
+# This is an external project - exclude from telltale workspace
 [workspace]
 
 [lib]
@@ -17,7 +17,7 @@ proc-macro = []
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }
-rumpsteak-aura-choreography = { path = "../rust/choreography" }
+telltale-choreography = { path = "../rust/choreography" }
 
 # Async trait support for generated code
 async-trait = "0.1"

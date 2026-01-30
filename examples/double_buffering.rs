@@ -8,7 +8,7 @@ use futures::{
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
-use rumpsteak_aura::{
+use telltale::{
     channel::{Bidirectional, Nil},
     session, try_session, End, Message, Receive, Role, Roles, Send,
 };

@@ -576,7 +576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
-name = "rumpsteak-aura"
+name = "telltale"
 version = "0.7.0"
 dependencies = [
  "anyhow",
@@ -588,8 +588,8 @@ dependencies = [
  "hex",
  "proc-macro2",
  "quote",
- "rumpsteak-aura-macros",
- "rumpsteak-types",
+ "telltale-macros",
+ "telltale-types",
  "serde",
  "syn",
  "thiserror",
@@ -603,7 +603,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-aura-choreography"
+name = "telltale-choreography"
 version = "0.7.0"
 dependencies = [
  "anyhow",
@@ -620,10 +620,10 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rumpsteak-aura",
- "rumpsteak-aura-macros",
- "rumpsteak-theory",
- "rumpsteak-types",
+ "telltale",
+ "telltale-macros",
+ "telltale-theory",
+ "telltale-types",
  "serde",
  "sha2",
  "syn",
@@ -639,7 +639,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-aura-macros"
+name = "telltale-macros"
 version = "0.7.0"
 dependencies = [
  "proc-macro2",
@@ -648,15 +648,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-theory"
+name = "telltale-theory"
 version = "0.7.0"
 dependencies = [
- "rumpsteak-types",
+ "telltale-types",
  "thiserror",
 ]
 
 [[package]]
-name = "rumpsteak-types"
+name = "telltale-types"
 version = "0.7.0"
 dependencies = [
  "serde",
@@ -1137,8 +1137,8 @@ dependencies = [
  "console_error_panic_hook",
  "futures",
  "getrandom 0.2.16",
- "rumpsteak-aura",
- "rumpsteak-aura-choreography",
+ "telltale",
+ "telltale-choreography",
  "serde",
  "tracing",
  "tracing-wasm",

@@ -9,7 +9,7 @@
 #![allow(clippy::unwrap_used)]
 
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use rumpsteak_aura::{
+use telltale::{
     channel::{Bidirectional, Nil},
     Message, Role, Roles, Route, Sealable,
 };

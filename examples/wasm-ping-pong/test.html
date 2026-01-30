@@ -1,85 +1,92 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>WASM Ping-Pong Test</title>
-    <style>
-        body {
-            font-family: monospace;
-            padding: 20px;
-            background: #1e1e1e;
-            color: #d4d4d4;
-        }
-        #output {
-            background: #252526;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
-            white-space: pre-wrap;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        button {
-            background: #0e639c;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover {
-            background: #1177bb;
-        }
-        .success {
-            color: #4ec9b0;
-        }
-        .error {
-            color: #f48771;
-        }
-    </style>
-</head>
-<body>
-    <h1>Rumpsteak WASM Ping-Pong Example</h1>
-    <p>This demonstrates Rumpsteak choreographic programming compiled to WebAssembly.</p>
-    
-    <button onclick="runPingPong()">Run Ping-Pong Protocol</button>
-    
-    <div id="output"></div>
-
-    <script type="module">
-        import init, { init as wasmInit, run_alice, run_bob } from './pkg/wasm_ping_pong.js';
-
-        window.runPingPong = async function() {
-            const output = document.getElementById('output');
-            output.innerHTML = 'Initializing WASM module...\n';
-            
-            try {
-                // Initialize the WASM module
-                await init();
-                wasmInit();
-                output.innerHTML += '<span class="success">WASM module initialized successfully</span>\n\n';
-                
-                output.innerHTML += 'Starting ping-pong protocol...\n';
-                
-                // Run Alice's side
-                output.innerHTML += 'Alice: Sending ping...\n';
-                const aliceResult = await run_alice('Hello from Alice!');
-                output.innerHTML += `<span class="success">Alice received: ${aliceResult}</span>\n`;
-                
-                // Run Bob's side
-                output.innerHTML += '\nBob: Waiting for ping...\n';
-                const bobResult = await run_bob('Hello from Bob!');
-                output.innerHTML += `<span class="success">Bob sent: ${bobResult}</span>\n`;
-                
-                output.innerHTML += '\n<span class="success">Protocol completed successfully!</span>\n';
-                
-            } catch (error) {
-                output.innerHTML += `\n<span class="error">Error: ${error}</span>\n`;
-                console.error('Error running ping-pong:', error);
+    <head>
+        <meta charset="utf-8" />
+        <title>WASM Ping-Pong Test</title>
+        <style>
+            body {
+                font-family: monospace;
+                padding: 20px;
+                background: #1e1e1e;
+                color: #d4d4d4;
             }
-        };
-    </script>
-</body>
-</html>
+            #output {
+                background: #252526;
+                padding: 15px;
+                border-radius: 5px;
+                margin-top: 20px;
+                white-space: pre-wrap;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            button {
+                background: #0e639c;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            button:hover {
+                background: #1177bb;
+            }
+            .success {
+                color: #4ec9b0;
+            }
+            .error {
+                color: #f48771;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Telltale WASM Ping-Pong Example</h1>
+        <p>
+            This demonstrates Telltale choreographic programming compiled to
+            WebAssembly.
+        </p>
 
+        <button onclick="runPingPong()">Run Ping-Pong Protocol</button>
+
+        <div id="output"></div>
+
+        <script type="module">
+            import init, {
+                init as wasmInit,
+                run_alice,
+                run_bob,
+            } from "./pkg/wasm_ping_pong.js";
+
+            window.runPingPong = async function () {
+                const output = document.getElementById("output");
+                output.innerHTML = "Initializing WASM module...\n";
+
+                try {
+                    // Initialize the WASM module
+                    await init();
+                    wasmInit();
+                    output.innerHTML +=
+                        '<span class="success">WASM module initialized successfully</span>\n\n';
+
+                    output.innerHTML += "Starting ping-pong protocol...\n";
+
+                    // Run Alice's side
+                    output.innerHTML += "Alice: Sending ping...\n";
+                    const aliceResult = await run_alice("Hello from Alice!");
+                    output.innerHTML += `<span class="success">Alice received: ${aliceResult}</span>\n`;
+
+                    // Run Bob's side
+                    output.innerHTML += "\nBob: Waiting for ping...\n";
+                    const bobResult = await run_bob("Hello from Bob!");
+                    output.innerHTML += `<span class="success">Bob sent: ${bobResult}</span>\n`;
+
+                    output.innerHTML +=
+                        '\n<span class="success">Protocol completed successfully!</span>\n';
+                } catch (error) {
+                    output.innerHTML += `\n<span class="error">Error: ${error}</span>\n`;
+                    console.error("Error running ping-pong:", error);
+                }
+            };
+        </script>
+    </body>
+</html>

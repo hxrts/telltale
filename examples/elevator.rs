@@ -9,7 +9,7 @@ use futures::{
     FutureExt,
 };
 use rand::Rng;
-use rumpsteak_aura::{
+use telltale::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
     Select, Send,
 };

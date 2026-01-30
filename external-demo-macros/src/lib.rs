@@ -2,16 +2,16 @@
 //!
 //! This crate provides additional proc macros for the external demo,
 //! demonstrating how 3rd party projects can create their own macros
-//! while still using rumpsteak-aura's choreography! macro for protocols.
+//! while still using telltale's choreography! macro for protocols.
 
 use proc_macro::TokenStream;
 
-mod effect_handlers;
 mod choreography;
+mod effect_handlers;
 
-/// Full-featured choreography! macro with ALL rumpsteak-aura features
+/// Full-featured choreography! macro with ALL telltale features
 ///
-/// This macro provides access to ALL rumpsteak-aura features including:
+/// This macro provides access to ALL telltale features including:
 /// - Module declarations: `module my_protocol exposing (MyProtocol)`
 /// - Parameterized roles: `Worker[N]`, `Signer[*]`
 /// - Choice constructs: `choice at Role { ... }`
@@ -74,7 +74,7 @@ pub fn choreography(input: TokenStream) -> TokenStream {
 ///         },
 ///     },
 ///     real: {
-///         struct_name: RealRandomHandler, 
+///         struct_name: RealRandomHandler,
 ///         methods: {
 ///             random_bytes(len: usize) -> Vec<u8> => {
 ///                 let mut bytes = vec![0u8; len];

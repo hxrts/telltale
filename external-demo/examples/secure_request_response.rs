@@ -4,9 +4,9 @@
 //! including capability guards, flow costs, and journal facts.
 
 use external_demo::choreography;
-use rumpsteak_aura::*;
-use futures::channel::mpsc::{UnboundedSender, UnboundedReceiver};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use serde::{Deserialize, Serialize};
+use telltale::*;
 
 // Type definitions for the generated code
 #[allow(dead_code)]
@@ -45,7 +45,7 @@ pub enum ResponseStatus {
     InvalidRequest,
 }
 
-// Define the secure choreography with basic rumpsteak-aura syntax and namespace
+// Define the secure choreography with basic telltale syntax and namespace
 choreography! {
     protocol SecureProtocol = {
         roles Client, Server
@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("- Basic choreography! macro usage with external-demo");
     println!("- Secure message type definitions");
     println!("- Extension points for Aura-specific features");
-    println!("- Integration with rumpsteak-aura infrastructure");
+    println!("- Integration with telltale infrastructure");
 
     println!("\n=== Protocol Flow ===");
     println!("1. Client sends SecureRequest to Server");

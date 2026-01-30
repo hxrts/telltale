@@ -136,7 +136,7 @@ dependencies = [
  "async-trait",
  "proc-macro2",
  "quote",
- "rumpsteak-aura-choreography",
+ "telltale-choreography",
  "syn",
 ]
 
@@ -507,7 +507,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-aura"
+name = "telltale"
 version = "0.8.2"
 dependencies = [
  "anyhow",
@@ -519,8 +519,8 @@ dependencies = [
  "hex",
  "proc-macro2",
  "quote",
- "rumpsteak-aura-macros",
- "rumpsteak-types",
+ "telltale-macros",
+ "telltale-types",
  "serde",
  "syn",
  "thiserror",
@@ -534,7 +534,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-aura-choreography"
+name = "telltale-choreography"
 version = "0.8.2"
 dependencies = [
  "anyhow",
@@ -550,10 +550,10 @@ dependencies = [
  "pest_derive",
  "proc-macro2",
  "quote",
- "rumpsteak-aura",
- "rumpsteak-aura-macros",
- "rumpsteak-theory",
- "rumpsteak-types",
+ "telltale",
+ "telltale-macros",
+ "telltale-theory",
+ "telltale-types",
  "serde",
  "sha2",
  "syn",
@@ -569,7 +569,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-aura-macros"
+name = "telltale-macros"
 version = "0.8.2"
 dependencies = [
  "proc-macro2",
@@ -578,15 +578,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "rumpsteak-theory"
+name = "telltale-theory"
 version = "0.8.2"
 dependencies = [
- "rumpsteak-types",
+ "telltale-types",
  "thiserror",
 ]
 
 [[package]]
-name = "rumpsteak-types"
+name = "telltale-types"
 version = "0.8.2"
 dependencies = [
  "serde",

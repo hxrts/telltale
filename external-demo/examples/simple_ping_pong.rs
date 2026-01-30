@@ -1,17 +1,17 @@
 //! Simple Ping-Pong Choreography Example with Extension System
 //!
-//! This example demonstrates how external-demo inherits ALL rumpsteak-aura features
+//! This example demonstrates how external-demo inherits ALL telltale features
 //! automatically through the extension system, including:
 //! - Basic choreographic syntax
 //! - Extension support for custom Aura annotations
 
 use external_demo::choreography;
-use rumpsteak_aura::*;
-use futures::channel::mpsc::{UnboundedSender, UnboundedReceiver};
-use rumpsteak_aura_choreography::{
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use serde::{Deserialize, Serialize};
+use telltale::*;
+use telltale_choreography::{
     compiler::parser::parse_choreography_str_with_extensions, extensions::ExtensionRegistry,
 };
-use serde::{Deserialize, Serialize};
 
 // Type definitions for the generated code
 #[allow(dead_code)]
@@ -50,7 +50,7 @@ choreography! {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== External-Demo Extension System Demo ===\n");
 
-    // Demonstrate that external-demo inherits ALL rumpsteak-aura features
+    // Demonstrate that external-demo inherits ALL telltale features
     demo_feature_inheritance()?;
 
     // Show extension system integration
@@ -63,10 +63,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Demonstrate that external-demo inherits all rumpsteak-aura features
+/// Demonstrate that external-demo inherits all telltale features
 fn demo_feature_inheritance() -> Result<(), Box<dyn std::error::Error>> {
     println!("Demo 1: Feature Inheritance");
-    println!("external-demo automatically inherits ALL rumpsteak-aura features:");
+    println!("external-demo automatically inherits ALL telltale features:");
 
     // Test basic choreography
     let basic_choreography = r#"
@@ -78,10 +78,9 @@ fn demo_feature_inheritance() -> Result<(), Box<dyn std::error::Error>> {
         }
 "#;
 
-    // Parse using inherited rumpsteak features
+    // Parse using inherited telltale features
     let registry = ExtensionRegistry::new();
-    let (choreography, _) =
-        parse_choreography_str_with_extensions(basic_choreography, &registry)?;
+    let (choreography, _) = parse_choreography_str_with_extensions(basic_choreography, &registry)?;
 
     println!(
         "   Role definitions: {:?}",
@@ -105,7 +104,7 @@ fn demo_extension_integration() -> Result<(), Box<dyn std::error::Error>> {
     println!("   external-demo has full access to extension system");
     println!("   Can register custom extensions");
     println!("   Can use discovery system");
-    println!("   Maintains compatibility with rumpsteak-aura");
+    println!("   Maintains compatibility with telltale");
 
     Ok(())
 }

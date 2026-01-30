@@ -1,10 +1,11 @@
-use ::futures::{
+use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join
+    executor, try_join,
 };
 #[allow(unused_imports)]
-use ::rumpsteak_aura::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, try_session
+use telltale::{
+    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
+    Select, Send,
 };
 
 use std::error::Error;
@@ -78,7 +79,8 @@ struct Date(i32);
 struct QuitSeller(i32);
 
 #[session]
-type ThreeBuyersA = Send<S, Request, Receive<S, QuoteAlice, Send<B, ParticipationBob, Branch<B, ThreeBuyersA3>>>>;
+type ThreeBuyersA =
+    Send<S, Request, Receive<S, QuoteAlice, Send<B, ParticipationBob, Branch<B, ThreeBuyersA3>>>>;
 
 #[session]
 enum ThreeBuyersA3 {
@@ -96,7 +98,8 @@ enum ThreeBuyersB2 {
 }
 
 #[session]
-type ThreeBuyersS = Receive<A, Request, Send<A, QuoteAlice, Send<B, QuoteBob, Branch<B, ThreeBuyersS3>>>>;
+type ThreeBuyersS =
+    Receive<A, Request, Send<A, QuoteAlice, Send<B, QuoteBob, Branch<B, ThreeBuyersS3>>>>;
 
 #[session]
 enum ThreeBuyersS3 {

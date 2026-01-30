@@ -1,6 +1,6 @@
 # Justfile
-
 # Max parallel threads for Lake/Lean builds
+
 lean_threads := "3"
 
 # Default task
@@ -17,11 +17,10 @@ ci-dry-run:
     just wasm-check
     # Golden file equivalence tests (fast, no Lean required)
     just test-golden
-    # Lean runner disabled - rumpsteak_runner target removed in V2 refactor
     # TODO: Re-enable once V2 runner is implemented
-    # just rumpsteak-lean-check
-    # just rumpsteak-lean-check-extended
-    # just rumpsteak-lean-check-failing
+    # just telltale-lean-check
+    # just telltale-lean-check-extended
+    # just telltale-lean-check-failing
 
 # Rust style guide lint check (comprehensive)
 lint:
@@ -33,8 +32,8 @@ lint-quick:
 
 # Check WASM compilation for choreography and core crates
 wasm-check:
-    cargo check --package rumpsteak-aura-choreography --target wasm32-unknown-unknown --features wasm
-    cargo check --package rumpsteak-aura --target wasm32-unknown-unknown --features wasm
+    cargo check --package telltale-choreography --target wasm32-unknown-unknown --features wasm
+    cargo check --package telltale --target wasm32-unknown-unknown --features wasm
 
 # Build WASM example with wasm-pack
 wasm-build:
@@ -46,10 +45,10 @@ wasm-test:
 
 # Format choreography DSL files (prints to stdout unless --write is used)
 choreo-fmt *FILES:
-    cargo run -p rumpsteak-aura-choreography --bin choreo-fmt -- {{FILES}}
+    cargo run -p telltale-choreography --bin choreo-fmt -- {{ FILES }}
 
 choreo-fmt-write *FILES:
-    cargo run -p rumpsteak-aura-choreography --bin choreo-fmt -- --write {{FILES}}
+    cargo run -p telltale-choreography --bin choreo-fmt -- --write {{ FILES }}
 
 # Install git hooks for pre-commit checks
 install-hooks:
@@ -138,62 +137,62 @@ lean-init:
     set -euo pipefail
     if [ ! -f lean/lakefile.lean ]; then
         echo "Initializing Lean project..."
-        cd lean && lake init rumpsteak_lean math
+        cd lean && lake init telltale_lean math
         echo "Lean project initialized!"
     else
         echo "Lean project already initialized"
     fi
 
-rumpsteak-lean-check: lean-init
+telltale-lean-check: lean-init
     # Export rust choreography data, build the Lean runner, and verify three roles with logs
     mkdir -p lean/artifacts
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-sample.choreo --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-sample.choreo --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-sample.choreo --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
-    LEAN_NUM_THREADS={{lean_threads}} lake --dir lean build rumpsteak_runner
-    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-chef.json --log lean/artifacts/runner-chef.log --json-log lean/artifacts/runner-chef.json
-    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-sous.json --log lean/artifacts/runner-sous.log --json-log lean/artifacts/runner-sous.json
-    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-baker.json --log lean/artifacts/runner-baker.log --json-log lean/artifacts/runner-baker.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-sample.choreo --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-sample.choreo --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-sample.choreo --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
+    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_runner
+    ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-chef.json --log lean/artifacts/runner-chef.log --json-log lean/artifacts/runner-chef.json
+    ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-sous.json --log lean/artifacts/runner-sous.log --json-log lean/artifacts/runner-sous.json
+    ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-baker.json --log lean/artifacts/runner-baker.log --json-log lean/artifacts/runner-baker.json
 
-rumpsteak-lean-check-extended: lean-init
+telltale-lean-check-extended: lean-init
     # Extended scenario with looped service and dessert fan-out
     mkdir -p lean/artifacts
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-extended.choreo --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-extended.choreo --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-extended.choreo --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
-    LEAN_NUM_THREADS={{lean_threads}} lake --dir lean build rumpsteak_runner
-    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
-    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
-    ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-baker.json --log lean/artifacts/runner-extended-baker.log --json-log lean/artifacts/runner-extended-baker.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-extended.choreo --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-extended.choreo --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-extended.choreo --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
+    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_runner
+    ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
+    ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
+    ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-baker.json --log lean/artifacts/runner-extended-baker.log --json-log lean/artifacts/runner-extended-baker.json
 
 # Regenerate golden files from Lean (requires Lean build)
 regenerate-golden: lean-init
-    LEAN_NUM_THREADS={{lean_threads}} lake --dir lean build rumpsteak_runner
-    cargo run -p rumpsteak-lean-bridge --bin golden --features golden -- regenerate
+    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_runner
+    cargo run -p telltale-lean-bridge --bin golden --features golden -- regenerate
 
 # Check for golden file drift (fails if golden files are outdated)
 check-golden-drift: lean-init
-    LEAN_NUM_THREADS={{lean_threads}} lake --dir lean build rumpsteak_runner
-    cargo run -p rumpsteak-lean-bridge --bin golden --features golden -- check
+    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_runner
+    cargo run -p telltale-lean-bridge --bin golden --features golden -- check
 
 # List all golden test cases
 list-golden:
-    cargo run -p rumpsteak-lean-bridge --bin golden --features golden -- list
+    cargo run -p telltale-lean-bridge --bin golden --features golden -- list
 
 # Run golden file equivalence tests (fast, no Lean required)
 test-golden:
-    cargo test -p rumpsteak-lean-bridge --test golden_equivalence_tests
+    cargo test -p telltale-lean-bridge --test golden_equivalence_tests
 
 # Run live Lean equivalence tests (requires Lean build)
 test-live-equivalence: lean-init
-    LEAN_NUM_THREADS={{lean_threads}} lake --dir lean build rumpsteak_runner
-    cargo test -p rumpsteak-lean-bridge --test live_equivalence_tests
+    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_runner
+    cargo test -p telltale-lean-bridge --test live_equivalence_tests
 
 # Intentional failure fixture: labels mismatch.
-rumpsteak-lean-check-failing: lean-init
+telltale-lean-check-failing: lean-init
     mkdir -p lean/artifacts
-    cargo run -p rumpsteak-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-failing.choreo --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
+    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input lean/choreo/lean-failing.choreo --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
     # Corrupt the exported program to introduce a label mismatch
     perl -0pi -e 's/"label": "Pong"/"label": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
-    LEAN_NUM_THREADS={{lean_threads}} lake --dir lean build rumpsteak_runner
-    ! ./lean/.lake/build/bin/rumpsteak_runner --choreography lean/artifacts/lean-failing-choreography.json --program lean/artifacts/lean-failing-program-chef.json --log lean/artifacts/runner-failing-chef.log --json-log lean/artifacts/runner-failing-chef.json
+    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_runner
+    ! ./lean/.lake/build/bin/telltale_runner --choreography lean/artifacts/lean-failing-choreography.json --program lean/artifacts/lean-failing-program-chef.json --log lean/artifacts/runner-failing-chef.log --json-log lean/artifacts/runner-failing-chef.json

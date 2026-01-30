@@ -1,4 +1,4 @@
-//! Fast Fourier Transform example using rumpsteak session types.
+//! Fast Fourier Transform example using telltale session types.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
@@ -8,7 +8,7 @@ use futures::{
     executor, try_join,
 };
 use num_complex::{Complex, Complex32};
-use rumpsteak_aura::{
+use telltale::{
     channel::{Bidirectional, Nil},
     session, try_session, End, Message, Receive, Role, Roles, Route, Send,
 };

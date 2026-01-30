@@ -8,10 +8,10 @@
 //!
 //! Run with: cargo run --example bounded_recursion
 
-use rumpsteak_theory::{
+use telltale_theory::{
     bound_recursion, unfold_bounded, BoundingStrategy, FuelSteps, YieldAfterSteps,
 };
-use rumpsteak_types::{Label, LocalTypeR};
+use telltale_types::{Label, LocalTypeR};
 
 fn main() {
     println!("=== Bounded Recursion Example ===\n");

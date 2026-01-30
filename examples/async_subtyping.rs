@@ -11,10 +11,10 @@
 //!
 //! Run with: cargo run --example async_subtyping
 
-use rumpsteak_theory::{
+use telltale_theory::{
     async_subtype, orphan_free, siso_decompose, sync_subtype, InputTree, OutputTree,
 };
-use rumpsteak_types::{Label, LocalTypeR};
+use telltale_types::{Label, LocalTypeR};
 
 #[allow(clippy::too_many_lines)]
 fn main() {

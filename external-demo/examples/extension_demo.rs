@@ -1,4 +1,4 @@
-//! Comprehensive demonstration of the rumpsteak-aura extension system
+//! Comprehensive demonstration of the telltale extension system
 //!
 //! This example shows how to:
 //! - Create custom extensions with the external-demo integration
@@ -10,7 +10,7 @@
 use external_demo::choreography;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use proc_macro2::TokenStream;
-use rumpsteak_aura::*;
+use telltale::*;
 
 // Type definitions for the generated code
 #[allow(dead_code)]
@@ -43,7 +43,7 @@ pub struct ResultMessage;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CancelMessage;
-use rumpsteak_aura_choreography::{
+use telltale_choreography::{
     ast::{LocalType, Role},
     extensions::{
         discovery::{ExtensionDiscovery, ExtensionMetadata},
@@ -85,7 +85,7 @@ fn demo_basic_extensions() -> Result<(), Box<dyn std::error::Error>> {
         protocol BasicDemo = {
             roles Alice, Bob
 
-            // Standard rumpsteak syntax
+            // Standard telltale syntax
             Alice -> Bob : HelloMsg
         }
     }
@@ -113,7 +113,7 @@ fn demo_extension_discovery() -> Result<(), Box<dyn std::error::Error>> {
             description: "Logging support for protocols".to_string(),
             author: "Demo Team".to_string(),
             dependencies: vec![],
-            required_rumpsteak_version: Some("0.5.0".to_string()),
+            required_telltale_version: Some("0.5.0".to_string()),
             priority: Some(100),
             overview: Some("Adds logging capabilities to choreographies".to_string()),
             syntax_guide: Some(
@@ -132,7 +132,7 @@ fn demo_extension_discovery() -> Result<(), Box<dyn std::error::Error>> {
             description: "Monitoring support with logging dependency".to_string(),
             author: "Demo Team".to_string(),
             dependencies: vec!["logging".to_string()],
-            required_rumpsteak_version: Some("0.5.0".to_string()),
+            required_telltale_version: Some("0.5.0".to_string()),
             priority: Some(120),
             overview: Some("Provides runtime monitoring of choreography execution".to_string()),
             syntax_guide: Some(
@@ -227,8 +227,8 @@ fn demo_performance_optimization() -> Result<(), Box<dyn std::error::Error>> {
 fn demo_third_party_integration() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nDemo 5: 3rd Party Integration Pattern");
 
-    // This demonstrates how external-demo inherits ALL rumpsteak features
-    println!("   external-demo crate inherits ALL rumpsteak features:");
+    // This demonstrates how external-demo inherits ALL telltale features
+    println!("   external-demo crate inherits ALL telltale features:");
     println!("    - Basic role declarations and messaging");
     println!("    - Clean choreography! macro syntax");
     println!("    - Protocol composition capabilities");
@@ -240,7 +240,7 @@ fn demo_third_party_integration() -> Result<(), Box<dyn std::error::Error>> {
         protocol ThirdPartyDemo = {
             roles Worker, Coordinator
 
-            // All rumpsteak features work automatically
+            // All telltale features work automatically
             Coordinator -> Worker : TaskMessage
             Worker -> Coordinator : ResultMessage
             Coordinator -> Worker : CancelMessage
@@ -249,7 +249,7 @@ fn demo_third_party_integration() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("   3rd party choreography executed successfully with macro");
     println!("   Features demonstrated:");
-    println!("    - Full compatibility with rumpsteak-aura");
+    println!("    - Full compatibility with telltale");
     println!("    - Seamless integration pattern");
     println!("    - Complete feature inheritance");
 
@@ -380,21 +380,21 @@ impl ProtocolExtension for DemoProtocolExtension {
     fn validate(
         &self,
         _roles: &[Role],
-    ) -> Result<(), rumpsteak_aura_choreography::extensions::ExtensionValidationError> {
+    ) -> Result<(), telltale_choreography::extensions::ExtensionValidationError> {
         Ok(())
     }
 
     fn project(
         &self,
         _role: &Role,
-        _context: &rumpsteak_aura_choreography::extensions::ProjectionContext,
-    ) -> Result<LocalType, rumpsteak_aura_choreography::compiler::projection::ProjectionError> {
+        _context: &telltale_choreography::extensions::ProjectionContext,
+    ) -> Result<LocalType, telltale_choreography::compiler::projection::ProjectionError> {
         Ok(LocalType::End)
     }
 
     fn generate_code(
         &self,
-        _context: &rumpsteak_aura_choreography::extensions::CodegenContext,
+        _context: &telltale_choreography::extensions::CodegenContext,
     ) -> TokenStream {
         use quote::quote;
         quote! {
