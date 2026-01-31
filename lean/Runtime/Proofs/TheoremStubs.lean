@@ -1,4 +1,4 @@
-import Runtime.Monitor.UnifiedMonitor
+import Runtime.Monitor.Monitor
 import Runtime.Transport.Transport
 import Runtime.Scheduler.Scheduler
 import Runtime.ProgramLogic.GhostState

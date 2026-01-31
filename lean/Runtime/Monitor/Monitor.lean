@@ -69,7 +69,8 @@ def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
 def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (m : SessionMonitor γ) : Prop :=
   -- Well-typed instructions are accepted by the monitor.
-  ∀ i sk L L', WellTypedInstr i sk L L' → monitorAllows m i = true
+  ∀ (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType),
+    WellTypedInstr i sk L L' → monitorAllows m i = true
 
 def unified_monitor_preserves {γ : Type u} (m : SessionMonitor γ) : Prop :=
   -- Monitor steps preserve protocol session ids when present.

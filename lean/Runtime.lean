@@ -16,7 +16,7 @@ import Runtime.ProgramLogic.SessionWP
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
-import Runtime.Monitor.UnifiedMonitor
+import Runtime.Monitor.Monitor
 import Runtime.Monitor.DomainComposition
 
 /- 

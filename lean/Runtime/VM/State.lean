@@ -2,7 +2,7 @@ import Std
 import Runtime.VM.Core
 import Runtime.VM.Config
 import Runtime.VM.Program
-import Runtime.Monitor.UnifiedMonitor
+import Runtime.Monitor.Monitor
 import Runtime.Resources.Arena
 import Runtime.Resources.ResourceModel
 

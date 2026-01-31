@@ -451,7 +451,7 @@ Axiom shims for Iris primitives. Each retires when the corresponding upstream PR
 | File | Lines | Description |
 |------|-------|-------------|
 | Adequacy/Adequacy.lean | 27 | Adequacy theorem |
-| Monitor/UnifiedMonitor.lean | 31 | Unified monitoring |
+| Monitor/Monitor.lean | 31 | Unified monitoring |
 | Monitor/DomainComposition.lean | 26 | Domain composition for monitors |
 
 ---
