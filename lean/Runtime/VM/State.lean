@@ -119,11 +119,14 @@ structure ExecResult (γ : Type u) where
 
 /-! ## Scheduler state -/
 
+abbrev SchedQueue := List CoroutineId -- FIFO queue of runnable coroutines.
+abbrev BlockedSet (γ : Type u) := List (CoroutineId × BlockReason γ) -- Blocked map stub.
+
 structure SchedState (γ : Type u) where
   -- Scheduler policy and bookkeeping queues.
   policy : SchedPolicy
-  readyQueue : List CoroutineId
-  blockedSet : List (CoroutineId × BlockReason γ)
+  readyQueue : SchedQueue
+  blockedSet : BlockedSet γ
   timeslice : Nat
   stepCount : Nat
 
