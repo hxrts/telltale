@@ -1,4 +1,4 @@
-import Runtime.ProgramLogic.SessionWP
+import Runtime.VM.Core
 import Runtime.Compat.Inv
 
 /-!
@@ -30,24 +30,29 @@ set_option autoImplicit false
 
 universe u
 
-inductive SessionKind where
+inductive SessionKind (γ : Type u) where
   -- The source kind of a monitored session action.
   | protocol (sid : SessionId)
-  | guard (chainId : Nat) (layer : Namespace)
-  | handler (hsid : Nat)
-  | ghost (gsid : Nat)
+  | guard (chainId : GuardChainId) (layer : γ)
+  | handler (hsid : HandlerId)
+  | ghost (gsid : GhostSessionId)
 
 inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectModel ε] :
-    Instr γ ε → SessionKind → LocalType → LocalType → Prop where
-  | wt_step (i : Instr γ ε) (sk : SessionKind) (L L' : LocalType) :
+    Instr γ ε → SessionKind γ → LocalType → LocalType → Prop where
+  | wt_step (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType) :
       -- Placeholder typing judgment for unified monitor.
       WellTypedInstr i sk L L'
 
-structure SessionMonitor where
+structure SessionMonitor (γ : Type u) where
   -- Monitor transition per session kind.
-  step : SessionKind → Option SessionKind
+  step : SessionKind γ → Option (SessionKind γ)
 
-def monitor_sound (_m : SessionMonitor) : Prop :=
+def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (_m : SessionMonitor γ) (_i : Instr γ ε) : Bool :=
+  -- Placeholder: monitor accepts all instructions.
+  true
+
+def monitor_sound {γ : Type u} (_m : SessionMonitor γ) : Prop :=
   -- Placeholder: monitor soundness invariant.
   True
 def unified_monitor_preserves : Prop :=
@@ -68,11 +73,7 @@ inductive FStep where
   | step (f : Failure)
   deriving Repr
 
-def Recoverable {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (_st : VMState ι γ π ε) (_sid : SessionId) : Prop :=
+def Recoverable {σ : Type} (_st : σ) (_sid : SessionId) : Prop :=
   -- Placeholder: recovery predicate.
   True
 

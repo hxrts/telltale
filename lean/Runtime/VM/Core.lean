@@ -63,5 +63,4 @@ inductive Instr (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
   | yield
   | halt
 
-abbrev CodeImage (γ ε : Type u) [GuardLayer γ] [EffectModel ε] := Array (Instr γ ε)
 abbrev RegFile := Array Value

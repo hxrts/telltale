@@ -1,4 +1,5 @@
 import Runtime.VM.LanguageInstance
+import Runtime.VM.Program
 import Runtime.VM.Violation
 import Runtime.ProgramLogic.SessionWP
 import Runtime.Compat.WP
@@ -76,9 +77,8 @@ def no_phantom_events {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
   -- Placeholder for trace soundness.
   True
-def compile_refines {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
-  -- Placeholder compilation refinement.
+def compile_refines {γ ε : Type} [GuardLayer γ] [EffectModel ε]
+    (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)
+    (_chain : GuardChain γ) : Prop :=
+  -- Placeholder: compiled bytecode refines the source process.
   True

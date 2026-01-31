@@ -1,6 +1,8 @@
 import Std
 import Runtime.VM.Core
 import Runtime.VM.Config
+import Runtime.VM.Program
+import Runtime.Monitor.UnifiedMonitor
 import Runtime.Resources.Arena
 
 /-
@@ -115,6 +117,16 @@ structure ExecResult (γ : Type u) where
   event : Option StepEvent
   deriving Repr
 
+/-! ## Scheduler state -/
+
+structure SchedState (γ : Type u) where
+  -- Scheduler policy and bookkeeping queues.
+  policy : SchedPolicy
+  readyQueue : List CoroutineId
+  blockedSet : List (CoroutineId × BlockReason γ)
+  timeslice : Nat
+  stepCount : Nat
+
 /-! ## VM state -/
 
 structure VMState (ι γ π ε : Type u) [IdentityModel ι] [GuardLayer γ]
@@ -123,8 +135,8 @@ structure VMState (ι γ π ε : Type u) [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] where
   -- Configuration and programs.
   config : VMConfig ι γ π ε
-  code : CodeImage γ ε
-  programs : Array (CodeImage γ ε)
+  code : Program γ ε
+  programs : Array (Program γ ε)
   coroutines : Array (CoroutineState γ ε)
   buffers : List (Edge × List Value)
   persistent : PersistenceModel.PState π
@@ -133,8 +145,8 @@ structure VMState (ι γ π ε : Type u) [IdentityModel ι] [GuardLayer γ]
   arena : Arena
   sessions : SessionStore
   guardResources : List (γ × GuardLayer.Resource γ)
-  sched : Unit
-  monitor : Unit
+  sched : SchedState γ
+  monitor : SessionMonitor γ
   obsTrace : List StepEvent
   mask : Unit
   ghostSessions : Unit
@@ -148,5 +160,5 @@ def WFVMState {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
     (st : VMState ι γ π ε) : Prop :=
   -- Check PC bounds and session ids against the next counter.
   (∀ i (h : i < st.coroutines.size),
-    (st.coroutines[i]'h).pc < st.code.size) ∧
+    (st.coroutines[i]'h).pc < st.code.code.size) ∧
   (∀ s ∈ st.sessions, s.fst < st.nextSessionId)

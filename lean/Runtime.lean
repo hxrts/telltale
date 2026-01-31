@@ -3,6 +3,7 @@ import Runtime.VM.TypeClasses
 import Runtime.VM.SchedulerTypes
 import Runtime.VM.Violation
 import Runtime.VM.Config
+import Runtime.VM.Program
 import Runtime.VM.Definition
 import Runtime.VM.LanguageInstance
 import Runtime.Resources.SessionRA
