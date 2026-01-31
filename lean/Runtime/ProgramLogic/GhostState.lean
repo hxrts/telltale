@@ -57,24 +57,32 @@ structure FlowPolicy where
   allowed : GhostKnowledgeFact → Role → Bool
 
 def KnowledgeReachable (_k : GhostKnowledgeFact) : Prop :=
-  -- Placeholder reachability predicate for knowledge flow.
+  -- Reachability predicate for knowledge flow (placeholder relation).
   True
+
+def knowledge_disjoint (ks1 ks2 : List (Endpoint × GhostKnowledgeFact)) : Prop :=
+  -- Disjointness of knowledge sets by element exclusion.
+  ∀ x, x ∈ ks1 → x ∈ ks2 → False
 
 def knowledge_separation : Prop :=
-  -- Placeholder: disjoint knowledge resources do not alias.
-  True
+  -- Disjoint knowledge resources can be combined without aliasing.
+  ∀ γ ks1 ks2, knowledge_disjoint ks1 ks2 →
+    iProp.entails (iProp.sep (knowledge_set_owns γ ks1) (knowledge_set_owns γ ks2))
+      (knowledge_set_owns γ (ks1 ++ ks2))
 
 def send_transfers_knowledge : Prop :=
-  -- Placeholder: send establishes sender-knowledge and receiver-knowledge.
-  True
+  -- Sending creates receiver knowledge in addition to sender knowledge.
+  ∀ γ sender receiver fact,
+    iProp.entails (knows γ sender fact)
+      (iProp.sep (knows γ sender fact) (knows γ receiver fact))
 
-def non_leakage (_pol : FlowPolicy) : Prop :=
-  -- Placeholder: no flow chain implies no knowledge gain.
-  True
+def non_leakage (pol : FlowPolicy) : Prop :=
+  -- Disallowed flows cannot become reachable.
+  ∀ k r, pol.allowed k r = false → ¬ KnowledgeReachable k
 
 def check_enforces_policy : Prop :=
-  -- Placeholder: check enforces the knowledge flow policy.
-  True
+  -- Successful checks imply the flow is permitted.
+  ∀ pol k r, pol.allowed k r = true → KnowledgeReachable k
 
 /-! ## Progress RA -/
 
@@ -87,12 +95,20 @@ def progress_token_own (γ : GhostName) (sid : SessionId) (e : Endpoint) (n : Na
 def session_progress_supply (_γ : GhostName) (_sid : SessionId) : iProp :=
   -- Placeholder: session-wide supply of progress tokens.
   iProp.emp
-def progress_token_sound (_sid : SessionId) : Prop :=
-  -- Placeholder: progress token implies eventual advancement.
-  True
-def progress_aware_starvation_free (_sid : SessionId) : Prop :=
-  -- Placeholder: scheduling serves token holders.
-  True
+def progress_token_sound : Prop :=
+  -- Progress tokens represent positive budget for advancement.
+  ∀ γ sid e n, iProp.entails (progress_token_own γ sid e n)
+    (iProp.pure (n > 0))
+
+def session_type_mints_tokens : Prop :=
+  -- Active sessions can mint progress tokens.
+  ∀ γ sid, iProp.entails (session_progress_supply γ sid)
+    (iProp.exist (fun e => progress_token_own γ sid e 1))
+
+def progress_aware_starvation_free : Prop :=
+  -- Token ownership implies access to the session supply.
+  ∀ γ sid e n, iProp.entails (progress_token_own γ sid e n)
+    (session_progress_supply γ sid)
 
 /-! ## Finalization tokens -/
 

@@ -1,5 +1,4 @@
 import Runtime.VM.TypeClasses
-import Runtime.Compat.RA
 
 /-
 The Problem. The runtime needs a lightweight resource model for V1 that

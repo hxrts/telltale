@@ -212,15 +212,29 @@ def schedule_confluence {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (_st : VMState ι γ π ε ν) : Prop :=
-  -- Placeholder for schedule confluence.
-  True
+    (st : VMState ι γ π ε ν) : Prop :=
+  -- Scheduling is deterministic for a given state.
+  ∀ st1 st2, schedule st = some st1 → schedule st = some st2 → st1 = st2
 
 /-- Placeholder: cooperative execution refines concurrent. -/
 def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (_st : VMState ι γ π ε ν) : Prop :=
-  -- Placeholder for refinement.
-  True
+    (st : VMState ι γ π ε ν) : Prop :=
+  -- Cooperative scheduling coincides with round-robin selection.
+  st.sched.policy = .cooperative →
+    schedule st = schedule { st with sched := { st.sched with policy := .roundRobin } }
+
+def starvation_free {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : Prop :=
+  -- Progress-aware scheduling selects token holders when runnable.
+  st.sched.policy = .progressAware →
+    ∀ cid, cid ∈ st.sched.readyQueue →
+      match st.coroutines[cid]? with
+      | none => True
+      | some c => c.progressTokens.isEmpty = false →
+          ∃ st', schedule st = some (cid, st')

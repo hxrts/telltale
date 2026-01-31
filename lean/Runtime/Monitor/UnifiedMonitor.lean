@@ -42,6 +42,12 @@ inductive SessionKind (γ : Type u) where
   | handler (hsid : HandlerId)
   | ghost (gsid : GhostSessionId)
 
+def SessionKind.sid? {γ : Type u} : SessionKind γ → Option SessionId :=
+  -- Extract a protocol session id when present.
+  fun
+  | .protocol sid => some sid
+  | _ => none
+
 inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectModel ε] :
     Instr γ ε → SessionKind γ → LocalType → LocalType → Prop where
   | wt_step (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType) :
@@ -60,12 +66,17 @@ def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
   -- Placeholder: monitor accepts all instructions.
   true
 
-def monitor_sound {γ : Type u} (_m : SessionMonitor γ) : Prop :=
-  -- Placeholder: monitor soundness invariant.
-  True
-def unified_monitor_preserves : Prop :=
-  -- Placeholder: monitor preserves typing across steps.
-  True
-def cross_kind_interop : Prop :=
-  -- Placeholder: cross-kind interop property.
-  True
+def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (m : SessionMonitor γ) : Prop :=
+  -- Well-typed instructions are accepted by the monitor.
+  ∀ i sk L L', WellTypedInstr i sk L L' → monitorAllows m i = true
+
+def unified_monitor_preserves {γ : Type u} (m : SessionMonitor γ) : Prop :=
+  -- Monitor steps preserve protocol session ids when present.
+  ∀ sk sk', m.step sk = some sk' → SessionKind.sid? sk' = SessionKind.sid? sk
+
+def cross_kind_interop {γ : Type u} (m : SessionMonitor γ) : Prop :=
+  -- Distinct session kinds step independently of protocol ids.
+  ∀ sk1 sk2, sk1 ≠ sk2 →
+    SessionKind.sid? sk1 = none ∨ SessionKind.sid? sk2 = none ∨ SessionKind.sid? sk1 ≠ SessionKind.sid? sk2 →
+    (m.step sk1).isSome → (m.step sk2).isSome

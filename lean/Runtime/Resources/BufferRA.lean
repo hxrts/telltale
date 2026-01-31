@@ -264,6 +264,14 @@ def IsHandledTrace (_handler : HandlerId) (_trace : List Value) : Prop :=
   -- Placeholder handler-backed trace predicate.
   True
 
+def IsBoundedTrace (cap : Nat) (trace : List Value) : Prop :=
+  -- Bounded traces have length within the configured capacity.
+  trace.length ≤ cap
+
+def IsUnboundedTrace (trace : List Value) : Prop :=
+  -- Unbounded traces have no length restriction.
+  trace.length ≥ 0
+
 def SameMessages (t1 t2 : List Value) : Prop :=
   -- Observational equality over message sequences.
   t1 = t2
@@ -285,9 +293,11 @@ def spatial_le_backing_refines : Prop :=
   True
 
 def bounded_refines_unbounded : Prop :=
-  -- Bounded FIFO refines unbounded FIFO at the message level.
-  True
+  -- Bounded FIFO refines unbounded FIFO by preserving messages.
+  ∀ cap trace, IsBoundedTrace cap trace →
+    ∃ unboundedTrace, IsUnboundedTrace unboundedTrace ∧ SameMessages trace unboundedTrace
 
 def latest_value_refines_unbounded : Prop :=
-  -- Latest-value buffers refine unbounded FIFO by dropping intermediates.
-  True
+  -- Latest-value buffers refine unbounded FIFO by preserving final messages.
+  ∀ cap trace, IsBoundedTrace cap trace →
+    ∃ unboundedTrace, IsUnboundedTrace unboundedTrace ∧ SameMessages trace unboundedTrace

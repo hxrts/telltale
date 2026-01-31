@@ -2,7 +2,6 @@ import Protocol.Environments.Part1
 import Runtime.VM.TypeClasses
 import Runtime.VM.Core
 import Runtime.Resources.BufferRA
-import Runtime.Compat.RA
 
 /-!
 # Task 15: Arena and Session Store

@@ -1,6 +1,5 @@
 import Std
 import Runtime.Resources.BufferRA
-import Runtime.Compat.RA
 
 /-
 The Problem. The runtime needs a transport abstraction that can be backed

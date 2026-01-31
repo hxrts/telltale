@@ -39,5 +39,6 @@ def session_advance (γ : GhostName) (G : SessionMap)
     (bupd (iProp.sep (session_auth γ (GMap.insert G e L')) (endpoint_frag γ e L'))) :=
   ghost_map_update γ e L L' G
 
-axiom endpoint_transfer (γ : GhostName) (e : Endpoint) (L : LocalType) :
+def endpoint_transfer (γ : GhostName) (e : Endpoint) (L : LocalType) : Prop :=
+  -- Endpoint fragments are transferable as resources.
   iProp.entails (endpoint_frag γ e L) (endpoint_frag γ e L)

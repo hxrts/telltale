@@ -99,5 +99,7 @@ def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)
     (_chain : GuardChain γ) : Prop :=
-  -- Placeholder: compiled bytecode refines the source process.
-  True
+  -- Compiler preserves role-local types and entry points.
+  let prog := compile (γ:=γ) (ε:=ε) _p _roles _types _chain
+  prog.entryPoints = _roles.map (fun r => (r, 0)) ∧
+  prog.localTypes = programLocalTypes _roles _types

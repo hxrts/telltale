@@ -36,9 +36,10 @@ universe u
 
 variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
 
-def wp_send : iProp :=
-  -- WP rule derived from the generic pair rule.
-  wp_pair (sendPair (γ:=γ) (ε:=ε))
+def wp_send (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+    (e : Endpoint) (L : LocalType) : iProp :=
+  -- Send requires the session invariant and endpoint ownership.
+  iProp.sep (session_inv γn sid ct) (endpoint_frag γn e L)
 
 def wp_recv : iProp :=
   -- WP rule derived from the generic pair rule.
@@ -56,9 +57,9 @@ def wp_open : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (openPair (γ:=γ) (ε:=ε))
 
-def wp_close : iProp :=
-  -- WP rule derived from the generic pair rule.
-  wp_pair (closePair (γ:=γ) (ε:=ε))
+def wp_close (γn : GhostName) (sid : SessionId) (ct : CancelToken) : iProp :=
+  -- Close requires the cancel token and the session invariant.
+  iProp.sep (session_inv γn sid ct) (cancel_token_own ct)
 
 def wp_acquire (layer : γ) : iProp :=
   -- Acquire WP: parameterized by the guard layer.

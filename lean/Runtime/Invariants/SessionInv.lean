@@ -161,8 +161,10 @@ def open_coherent {ι : Type} [IdentityModel ι]
     (_spatialReq : SpatialReq)
     (_assignment : Role → IdentityModel.ParticipantId ι)
     (_siteChoice : IdentityModel.ParticipantId ι → IdentityModel.SiteId ι) : Prop :=
-  -- Placeholder coherence statement for session open.
-  True
+  -- Session creation is coherent when the spatial constraint is satisfiable.
+  ∃ hSiteChoice,
+    canCreate _spatialReq _roles _assignment _siteChoice hSiteChoice ∧
+    (∀ r, r ∈ _roles → _types r ≠ LocalType.end_)
 
 def migrate_preserves_spatial {ι : Type} [IdentityModel ι]
     (_spatialReq : SpatialReq)
@@ -171,9 +173,11 @@ def migrate_preserves_spatial {ι : Type} [IdentityModel ι]
   -- Placeholder spatial preservation under migration.
   True
 
-def leave_preserves_coherent (_sid : SessionId) (_role : Role) : Prop :=
-  -- Placeholder coherence preservation for leave.
-  True
+def leave_preserves_coherent (sid : SessionId) (role : Role) : Prop :=
+  -- Leaving preserves coherence for the remaining endpoints.
+  ∀ G D,
+    iProp.entails (session_coherent sid G D)
+      (session_coherent sid (GMap.delete G { sid := sid, role := role }) D)
 
 def close_empty (_sid : SessionId) : Prop :=
   -- Placeholder: closing implies empty buffers/endpoints.
@@ -185,6 +189,7 @@ def close_makes_inaccessible {ι γ π ε ν : Type} [IdentityModel ι] [GuardLa
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (_st : VMState ι γ π ε ν) (_sid : SessionId) : Prop :=
-  -- Placeholder: closed sessions are inaccessible to instructions.
-  True
+    (st : VMState ι γ π ε ν) (sid : SessionId) : Prop :=
+  -- Closed sessions expose no buffers or traces.
+  ∀ stSess, (sid, stSess) ∈ st.sessions → stSess.phase = .closed →
+    stSess.buffers = [] ∧ stSess.traces = (∅ : DEnv)
