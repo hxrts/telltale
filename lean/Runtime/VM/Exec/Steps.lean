@@ -49,16 +49,22 @@ private def stepRecv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   | some (.chan ep) =>
       if owns coro ep then
         let edge := edgeOf ep
-        match bufDequeue st.buffers edge with
+        let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
+        match consumeProgressToken coro.progressTokens token with
         | none =>
-            let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
-            blockPack st coro (.recvWait edge token)
-        | some (v, bufs') =>
-            match setReg coro.regs dst v with
-            | none => faultPack st coro .outOfRegisters "bad dst reg"
-            | some regs' =>
-                let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                continuePack st' { coro with regs := regs' } (some (.recv edge "" v))
+            faultPack st coro (.noProgressToken edge) "missing progress token"
+        | some tokens' =>
+            match bufDequeue st.buffers edge with
+            | none =>
+                let coro' := { coro with progressTokens := tokens' }
+                blockPack st coro' (.recvWait edge token)
+            | some (v, bufs') =>
+                match setReg coro.regs dst v with
+                | none => faultPack st coro .outOfRegisters "bad dst reg"
+                | some regs' =>
+                    let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
+                    let coro' := { coro with regs := regs', progressTokens := tokens' }
+                    continuePack st' coro' (some (.recv edge "" v))
       else
         faultPack st coro (.channelClosed ep) "endpoint not owned"
   | some v =>
@@ -144,6 +150,15 @@ private def writeEndpoints (regs : RegFile) (sid : SessionId)
         | some acc' => go rest acc'
   go pairs regs
 
+private def handlerBound (handlers : List (Edge × HandlerId)) (edge : Edge) : Bool :=
+  -- Check whether a handler binding exists for the edge.
+  handlers.any (fun h => decide (h.fst = edge))
+
+private def handlersCoverRoles (sid : SessionId) (roles : List Role)
+    (handlers : List (Edge × HandlerId)) : Bool :=
+  -- Ensure every role's self-edge is bound to some handler.
+  roles.all (fun r => handlerBound handlers { sid := sid, sender := r, receiver := r })
+
 private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -160,27 +175,30 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
       let roles := triples.map (fun p => p.1)
       let dstRegs := triples.map (fun p => p.2.2)
       let pairs := List.zip roles dstRegs
-      match writeEndpoints coro.regs sid pairs with
-      | none => faultPack st coro .outOfRegisters "bad dst reg"
-      | some regs' =>
-          let endpoints := roles.map (fun r => { sid := sid, role := r })
-          let localTypes' := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
-          let sess : SessionState :=
-            -- V1 binds session scope to the session id.
-            { scope := { id := sid }
-            , sid := sid
-            , roles := roles
-            , endpoints := endpoints
-            , localTypes := localTypes'
-            , traces := initDEnv sid roles
-            , buffers := []
-            , handlers := handlers
-            , epoch := 0
-            , phase := .active }
-          let coro' := advancePc ({ coro with regs := regs', status := .ready, ownedEndpoints := endpoints ++ coro.ownedEndpoints })
-          let st' :=
-            { st with nextSessionId := st.nextSessionId + 1, sessions := (sid, sess) :: st.sessions }
-          pack coro' st' (mkRes .continue (some (.open sid)))
+      if !handlersCoverRoles sid roles handlers then
+        faultPack st coro (.specFault "handler bindings incomplete") "handler bindings incomplete"
+      else
+        match writeEndpoints coro.regs sid pairs with
+        | none => faultPack st coro .outOfRegisters "bad dst reg"
+        | some regs' =>
+            let endpoints := roles.map (fun r => { sid := sid, role := r })
+            let localTypes' := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
+            let sess : SessionState :=
+              -- V1 binds session scope to the session id.
+              { scope := { id := sid }
+              , sid := sid
+              , roles := roles
+              , endpoints := endpoints
+              , localTypes := localTypes'
+              , traces := initDEnv sid roles
+              , buffers := []
+              , handlers := handlers
+              , epoch := 0
+              , phase := .active }
+            let coro' := advancePc ({ coro with regs := regs', status := .ready, ownedEndpoints := endpoints ++ coro.ownedEndpoints })
+            let st' :=
+              { st with nextSessionId := st.nextSessionId + 1, sessions := (sid, sess) :: st.sessions }
+            pack coro' st' (mkRes .continue (some (.open sid)))
 
 private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -250,9 +268,13 @@ private def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
     (action : EffectModel.EffectAction ε) : StepPack ι γ π ε ν :=
-  -- Execute an effect action on the effect context.
-  let ctx' := EffectModel.exec action coro.effectCtx
-  continuePack st { coro with effectCtx := ctx' } none
+  -- Execute an effect action via the bound handler (placeholder response model).
+  match SessionStore.defaultHandler st.sessions with
+  | none =>
+      faultPack st coro (.invokeFault "no handler bound") "no handler bound"
+  | some _handlerId =>
+      let ctx' := EffectModel.exec action coro.effectCtx
+      continuePack st { coro with effectCtx := ctx' } none
 
 private def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

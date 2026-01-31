@@ -1,7 +1,16 @@
 import Runtime.VM.LanguageInstance
 import Runtime.Invariants.SessionInv
+import Runtime.ProgramLogic.WPPair
 import Runtime.Compat.Inv
 import Runtime.Compat.WP
+
+/- 
+The Problem. Provide uniform WP rules for VM instructions without repeating
+the same invariant open/close structure across each proof.
+
+Solution Structure. Delegate each WP rule to the generic `wp_pair`
+combinator and expose the derived rules as the public API.
+-/
 
 /-!
 # Task 19: Session WP Rules
@@ -23,24 +32,90 @@ Dependencies: Task 12, Task 16, Shim.Invariants + Shim.WeakestPre.
 set_option autoImplicit false
 noncomputable section
 
-def wp_send : iProp := iProp.emp
-def wp_recv : iProp := iProp.emp
-def wp_offer : iProp := iProp.emp
-def wp_choose : iProp := iProp.emp
-def wp_open : iProp := iProp.emp
-def wp_close : iProp := iProp.emp
-def wp_acquire : iProp := iProp.emp
-def wp_release : iProp := iProp.emp
-def wp_invoke : iProp := iProp.emp
-def wp_fork : iProp := iProp.emp
-def wp_join : iProp := iProp.emp
-def wp_abort : iProp := iProp.emp
-def wp_transfer : iProp := iProp.emp
-def wp_tag : iProp := iProp.emp
-def wp_check : iProp := iProp.emp
-def wp_loadImm : iProp := iProp.emp
-def wp_mov : iProp := iProp.emp
-def wp_jmp : iProp := iProp.emp
-def wp_spawn : iProp := iProp.emp
-def wp_yield : iProp := iProp.emp
-def wp_halt : iProp := iProp.emp
+universe u
+
+variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+
+def wp_send : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (sendPair (γ:=γ) (ε:=ε))
+
+def wp_recv : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (recvPair (γ:=γ) (ε:=ε))
+
+def wp_offer : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (offerPair (γ:=γ) (ε:=ε))
+
+def wp_choose : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (choosePair (γ:=γ) (ε:=ε))
+
+def wp_open : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (openPair (γ:=γ) (ε:=ε))
+
+def wp_close : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (closePair (γ:=γ) (ε:=ε))
+
+def wp_acquire : iProp :=
+  -- Acquire WP: abstract over the guard layer.
+  iProp.exist (fun layer => wp_pair (acquirePair (γ:=γ) (ε:=ε) layer))
+
+def wp_release : iProp :=
+  -- Release WP: abstract over the guard layer.
+  iProp.exist (fun layer => wp_pair (releasePair (γ:=γ) (ε:=ε) layer))
+
+def wp_invoke : iProp :=
+  -- Invoke WP: abstract over effect actions.
+  iProp.exist (fun action => wp_pair (invokePair (γ:=γ) (ε:=ε) action))
+
+def wp_fork : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (forkPair (γ:=γ) (ε:=ε))
+
+def wp_join : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (joinPair (γ:=γ) (ε:=ε))
+
+def wp_abort : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (abortPair (γ:=γ) (ε:=ε))
+
+def wp_transfer : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (transferPair (γ:=γ) (ε:=ε))
+
+def wp_tag : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (tagPair (γ:=γ) (ε:=ε))
+
+def wp_check : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (checkPair (γ:=γ) (ε:=ε))
+
+def wp_loadImm : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (loadImmPair (γ:=γ) (ε:=ε))
+
+def wp_mov : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (movPair (γ:=γ) (ε:=ε))
+
+def wp_jmp : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (jmpPair (γ:=γ) (ε:=ε))
+
+def wp_spawn : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (spawnPair (γ:=γ) (ε:=ε))
+
+def wp_yield : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (yieldPair (γ:=γ) (ε:=ε))
+
+def wp_halt : iProp :=
+  -- WP rule derived from the generic pair rule.
+  wp_pair (haltPair (γ:=γ) (ε:=ε))

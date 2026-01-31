@@ -56,3 +56,13 @@ structure VMConfig (ι γ π ε ν : Type u)
   -- Speculation toggle and bound (§17).
   speculationEnabled : Bool
   maxSpeculationDepth : Nat := 16
+
+def deterministic_finalization_ok {ι γ π ε ν : Type u}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (_cfg : VMConfig ι γ π ε ν) : Prop :=
+  -- Placeholder: deterministic handlers, agreed time, no nondet reads, persistence commutes.
+  True

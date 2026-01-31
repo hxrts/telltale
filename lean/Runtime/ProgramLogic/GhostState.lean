@@ -3,6 +3,14 @@ import Runtime.Compat.RA
 import Runtime.Compat.Inv
 import Runtime.Compat.SavedProp
 
+/- 
+The Problem. Capture ghost resources for knowledge, progress, and transfer
+so that session proofs can reason about ownership and movement of state.
+
+Solution Structure. Define lightweight RA predicates and placeholder
+theorems for knowledge flow, progress, ghost sessions, and bundles.
+-/
+
 /-!
 # Tasks 20A–20C: Knowledge, Progress, Ghost Sessions, Resource Bundles
 
@@ -33,10 +41,11 @@ def sepList (ps : List iProp) : iProp :=
 
 /-! ## Knowledge RA -/
 
-abbrev GhostKnowledgeFact := String
-abbrev KnowledgeRA := GMap (Endpoint × GhostKnowledgeFact) Unit
+abbrev GhostKnowledgeFact := String -- Atom representing a knowledge fact.
+abbrev KnowledgeRA := GMap (Endpoint × GhostKnowledgeFact) Unit -- Ghost map for facts.
 
 def knows (γ : GhostName) (e : Endpoint) (k : GhostKnowledgeFact) : iProp :=
+  -- Ownership of a single knowledge fact for an endpoint.
   ghost_map_elem γ (e, k) ()
 
 def knowledge_set_owns (γ : GhostName) (ks : List (Endpoint × GhostKnowledgeFact)) : iProp :=
@@ -44,9 +53,11 @@ def knowledge_set_owns (γ : GhostName) (ks : List (Endpoint × GhostKnowledgeFa
   sepList (ks.map (fun p => knows γ p.1 p.2))
 
 structure FlowPolicy where
+  -- Flow policy decides if a fact may flow to a role.
   allowed : GhostKnowledgeFact → Role → Bool
 
 def KnowledgeReachable (_k : GhostKnowledgeFact) : Prop :=
+  -- Placeholder reachability predicate for knowledge flow.
   True
 
 def knowledge_separation : Prop :=
@@ -67,15 +78,21 @@ def check_enforces_policy : Prop :=
 
 /-! ## Progress RA -/
 
-abbrev ProgressRA := GMap (SessionId × Endpoint) Nat
+abbrev ProgressRA := GMap (SessionId × Endpoint) Nat -- Token counts per endpoint.
 
 def progress_token_own (γ : GhostName) (sid : SessionId) (e : Endpoint) (n : Nat) : iProp :=
+  -- Ownership of n progress tokens for a session endpoint.
   ghost_map_elem γ (sid, e) n
 
 def session_progress_supply (_γ : GhostName) (_sid : SessionId) : iProp :=
+  -- Placeholder: session-wide supply of progress tokens.
   iProp.emp
-def progress_token_sound (_sid : SessionId) : Prop := True
-def progress_aware_starvation_free (_sid : SessionId) : Prop := True
+def progress_token_sound (_sid : SessionId) : Prop :=
+  -- Placeholder: progress token implies eventual advancement.
+  True
+def progress_aware_starvation_free (_sid : SessionId) : Prop :=
+  -- Placeholder: scheduling serves token holders.
+  True
 
 /-! ## Finalization tokens -/
 
@@ -92,7 +109,7 @@ structure FinalizationToken where
   mode : FinalizationMode
   deriving Repr
 
-abbrev FinalizationRA := GMap ScopeId FinalizationMode
+abbrev FinalizationRA := GMap ScopeId FinalizationMode -- Finalization mode per scope.
 
 def finalization_auth (γ : GhostName) (M : FinalizationRA) : iProp :=
   -- Authoritative finalization map for scopes.
@@ -113,15 +130,24 @@ structure GhostSession where
   state : LocalType
   deriving Repr
 
-abbrev GhostSessionStore := List GhostSession
+abbrev GhostSessionStore := List GhostSession -- Store of ghost sessions.
 
 def ghost_session_inv (_sid : SessionId) : iProp :=
+  -- Placeholder: invariant for a ghost session.
   iProp.emp
 
-def ghost_session_progress (_sid : SessionId) : Prop := True
-def join_sound (_sid : SessionId) : Prop := True
-def abort_safe (_sid : SessionId) : Prop := True
-def spec_bounded (_sid : SessionId) : Prop := True
+def ghost_session_progress (_sid : SessionId) : Prop :=
+  -- Placeholder: ghost session liveness.
+  True
+def join_sound (_sid : SessionId) : Prop :=
+  -- Placeholder: join preserves correctness.
+  True
+def abort_safe (_sid : SessionId) : Prop :=
+  -- Placeholder: abort restores pre-speculation state.
+  True
+def spec_bounded (_sid : SessionId) : Prop :=
+  -- Placeholder: speculation depth is bounded.
+  True
 
 /-! ## Resource bundles -/
 
@@ -159,6 +185,16 @@ def transfer_bundle {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
   -- Transfer preserves ownership of the same bundle.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
+
+def bundle_complete {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (_b : ResourceBundle γ ε) : Prop :=
+  -- Placeholder: bundle contains all required transfer resources.
+  True
+
+def transfer_bundle_preserves {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
+  -- Placeholder: bundle transfer preserves invariants.
+  transfer_bundle γn b
 
 def WellTypedTransfer {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (b : ResourceBundle γ ε) : Prop :=

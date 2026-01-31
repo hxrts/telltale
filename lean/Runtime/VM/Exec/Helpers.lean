@@ -110,6 +110,11 @@ def owns {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
   -- Check endpoint ownership for linear use.
   c.ownedEndpoints.any (fun e => e == ep)
 
+def consumeProgressToken (tokens : List ProgressToken) (tok : ProgressToken) :
+    Option (List ProgressToken) :=
+  -- Remove a progress token if it is available.
+  if tokens.contains tok then some (tokens.erase tok) else none
+
 def valTypeOf (v : Value) : ValType :=
   -- Recover a value type for diagnostics only.
   match v with

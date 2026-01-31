@@ -29,12 +29,20 @@ structure ProgressToken where
   -- Token ties a session to an endpoint for liveness reasoning.
   sid : SessionId
   endpoint : Endpoint
-  deriving Repr
+  deriving Repr, DecidableEq
 
 structure SpeculationState where
   -- Minimal speculation metadata (placeholder for section 17).
   ghostSid : GhostSessionId
   depth : Nat
+  deriving Repr
+
+structure HandlerSession where
+  -- Internal session between a coroutine and its effect handler.
+  sid : SessionId
+  performer : Endpoint
+  handler : Endpoint
+  sessionType : LocalType
   deriving Repr
 
 inductive BlockReason (γ : Type u) where

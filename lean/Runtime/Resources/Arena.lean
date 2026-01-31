@@ -110,6 +110,10 @@ def SessionState.lookupBuffer (st : SessionState) (edge : Edge) : Buffer :=
   -- Lookup a buffer in this session's buffer slice.
   lookupBuf st.buffers edge
 
+def SessionState.lookupHandler (st : SessionState) (edge : Edge) : Option HandlerId :=
+  -- Lookup the handler bound to a given edge.
+  st.handlers.lookup edge
+
 def SessionStore.lookupType (store : SessionStore) (e : Endpoint) : Option LocalType :=
   -- Find the matching session and then its local type.
   match store with
@@ -139,6 +143,25 @@ def SessionStore.lookupBuffer (store : SessionStore) (edge : Edge) : Buffer :=
         st.lookupBuffer edge
       else
         SessionStore.lookupBuffer rest edge
+
+def SessionStore.lookupHandler (store : SessionStore) (edge : Edge) : Option HandlerId :=
+  -- Find the matching session and then its handler binding.
+  match store with
+  | [] => none
+  | (sid, st) :: rest =>
+      if _h : sid = edge.sid then
+        st.lookupHandler edge
+      else
+        SessionStore.lookupHandler rest edge
+
+def SessionStore.defaultHandler (store : SessionStore) : Option HandlerId :=
+  -- Pick any handler id from the active session store.
+  match store with
+  | [] => none
+  | (_, st) :: rest =>
+      match st.handlers with
+      | [] => SessionStore.defaultHandler rest
+      | (_, h) :: _ => some h
 
 def SessionStore.toGEnv (store : SessionStore) : GEnv :=
   -- Flatten per-session local types into a single GEnv.

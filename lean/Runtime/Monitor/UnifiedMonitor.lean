@@ -47,6 +47,9 @@ inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectModel ε] :
   | wt_step (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType) :
       -- Placeholder typing judgment for unified monitor.
       WellTypedInstr i sk L L'
+  | wt_invoke (action : EffectModel.EffectAction ε) (hsid : HandlerId) :
+      -- Handler session typing for invoke steps.
+      WellTypedInstr (.invoke action) (.handler hsid) (EffectModel.handlerType action) .end_
 
 structure SessionMonitor (γ : Type u) where
   -- Monitor transition per session kind.

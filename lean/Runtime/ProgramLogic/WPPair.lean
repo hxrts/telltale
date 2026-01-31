@@ -1,0 +1,131 @@
+import Runtime.VM.Core
+import Runtime.Compat.Inv
+import Runtime.Compat.WP
+
+/- 
+The Problem. Many instruction WP rules share the same acquire/interact/release
+shape, but the proofs are duplicated across each concrete instruction.
+
+Solution Structure. Introduce an `InstrPair` abstraction and a generic
+`wp_pair` rule that concrete WP rules can reuse.
+-/
+
+set_option autoImplicit false
+noncomputable section
+
+universe u
+
+/-! ## Instruction pairs -/
+
+structure InstrPair (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+  -- Common shape for acquire/interact/release reasoning.
+  instr : Instr γ ε
+  openCtx : iProp
+  interact : iProp
+  closeCtx : iProp
+  pre : iProp
+  post : iProp
+
+def mkPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (instr : Instr γ ε) : InstrPair γ ε :=
+  -- Build a placeholder instruction pair for refactoring.
+  { instr := instr
+  , openCtx := iProp.emp
+  , interact := iProp.emp
+  , closeCtx := iProp.emp
+  , pre := iProp.emp
+  , post := iProp.emp }
+
+def wp_pair {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (_p : InstrPair γ ε) : iProp :=
+  -- Generic WP rule for instruction pairs (placeholder).
+  iProp.emp
+
+/-! ## Concrete pair instances -/
+
+def sendPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `send`.
+  mkPair (.send 0 0)
+
+def recvPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `recv`.
+  mkPair (.recv 0 0)
+
+def offerPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `offer`.
+  mkPair (.offer 0 "")
+
+def choosePair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `choose`.
+  mkPair (.choose 0 [])
+
+def openPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `open`.
+  mkPair (.open [] [] [] [])
+
+def closePair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `close`.
+  mkPair (.close 0)
+
+def acquirePair {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (layer : γ) : InstrPair γ ε :=
+  -- Pair wrapper for `acquire`.
+  mkPair (.acquire layer 0)
+
+def releasePair {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (layer : γ) : InstrPair γ ε :=
+  -- Pair wrapper for `release`.
+  mkPair (.release layer 0)
+
+def invokePair {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (action : EffectModel.EffectAction ε) : InstrPair γ ε :=
+  -- Pair wrapper for `invoke`.
+  mkPair (.invoke action)
+
+def transferPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `transfer`.
+  mkPair (.transfer 0 0 0)
+
+def tagPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `tag`.
+  mkPair (.tag 0 0)
+
+def checkPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `check`.
+  mkPair (.check 0 0 0)
+
+def forkPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `fork`.
+  mkPair (.fork 0)
+
+def joinPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `join`.
+  mkPair .join
+
+def abortPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `abort`.
+  mkPair .abort
+
+def loadImmPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `loadImm`.
+  mkPair (.loadImm 0 .unit)
+
+def movPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `mov`.
+  mkPair (.mov 0 0)
+
+def jmpPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `jmp`.
+  mkPair (.jmp 0)
+
+def spawnPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `spawn`.
+  mkPair (.spawn 0 [])
+
+def yieldPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `yield`.
+  mkPair .yield
+
+def haltPair {γ ε : Type u} [GuardLayer γ] [EffectModel ε] : InstrPair γ ε :=
+  -- Pair wrapper for `halt`.
+  mkPair .halt
