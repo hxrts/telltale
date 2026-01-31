@@ -33,10 +33,12 @@ structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
 
 /-! ## VM configuration -/
 
-structure VMConfig (ι γ π ε : Type u)
+structure VMConfig (ι γ π ε ν : Type u)
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] where
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] where
   -- Buffering policy per edge.
   bufferConfig : Edge → BufferConfig
   -- Scheduling policy.

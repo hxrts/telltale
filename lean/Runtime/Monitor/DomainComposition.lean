@@ -33,6 +33,47 @@ instance : EffectModel Unit where
   post := fun _ _ => iProp.emp
   handlerType := fun _ => LocalType.end_
 
+instance : VerificationModel Unit where
+  -- Unit verification model: trivial cryptography.
+  Hash := Unit
+  hash := fun _ => ()
+  hashTagged := fun _ _ => ()
+  decEqH := by infer_instance
+  SigningKey := Unit
+  VerifyKey := Unit
+  Signature := Unit
+  sign := fun _ _ => ()
+  verifySignature := fun _ _ _ => true
+  CommitmentKey := Unit
+  Commitment := Unit
+  CommitmentProof := Unit
+  Nonce := Unit
+  NullifierKey := Unit
+  Nullifier := Unit
+  commit := fun _ _ _ => ()
+  nullify := fun _ _ => ()
+  verifyCommitment := fun _ _ _ => true
+  decEqC := by infer_instance
+  decEqN := by infer_instance
+
+instance : AuthTree Unit where
+  -- Unit authenticated tree: all proofs validate.
+  Root := Unit
+  Leaf := Unit
+  Path := Unit
+  verifyPath := fun _ _ _ => true
+
+instance : AccumulatedSet Unit where
+  -- Unit accumulated set: membership is vacuous.
+  Key := Unit
+  State := Unit
+  ProofMember := Unit
+  ProofNonMember := Unit
+  keyOfHash := fun _ => ()
+  insert := fun st _ => st
+  verifyMember := fun _ _ _ => true
+  verifyNonMember := fun _ _ _ => true
+
 /-! ## Composed instances -/
 
 instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
@@ -87,6 +128,11 @@ class PersistenceEffectBridge (π : Type u) (ε : Type u) [PersistenceModel π] 
 class IdentityPersistenceBridge (ι : Type u) (π : Type u) [IdentityModel ι] [PersistenceModel π] where
   -- Map identities into persistent state.
   bridge : IdentityModel.ParticipantId ι → PersistenceModel.PState π
+
+class IdentityVerificationBridge (ι : Type u) (ν : Type u)
+    [IdentityModel ι] [VerificationModel ν] where
+  -- Map identities into verification keys.
+  bridge : IdentityModel.ParticipantId ι → VerificationModel.VerifyKey ν
 
 /-! ## Composition claims -/
 

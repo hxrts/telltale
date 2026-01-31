@@ -1,3 +1,4 @@
+import Protocol.Environments.Part1
 import Runtime.VM.Exec.Helpers
 
 /-
@@ -14,12 +15,12 @@ universe u
 
 /-! ## Instruction semantics -/
 
-private def stepSend {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (chan val : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (chan val : Reg) : StepPack ι γ π ε ν :=
   -- Send a value on a owned endpoint and append to buffers.
   match readReg coro.regs chan, readReg coro.regs val with
   | some (.chan ep), some v =>
@@ -37,12 +38,12 @@ private def stepSend {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none, _ =>
       faultPack st coro .outOfRegisters "missing send channel"
 
-private def stepRecv {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepRecv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (chan dst : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (chan dst : Reg) : StepPack ι γ π ε ν :=
   -- Receive a value or block if none is available.
   match readReg coro.regs chan with
   | some (.chan ep) =>
@@ -65,12 +66,12 @@ private def stepRecv {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none =>
       faultPack st coro .outOfRegisters "missing recv channel"
 
-private def stepOffer {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepOffer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (chan : Reg) (lbl : Label) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (chan : Reg) (lbl : Label) : StepPack ι γ π ε ν :=
   -- Offer a label by enqueuing it on the buffer.
   match readReg coro.regs chan with
   | some (.chan ep) =>
@@ -87,12 +88,12 @@ private def stepOffer {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none =>
       faultPack st coro .outOfRegisters "missing offer channel"
 
-private def stepChoose {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepChoose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (chan : Reg) (table : List (Label × PC)) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (chan : Reg) (table : List (Label × PC)) : StepPack ι γ π ε ν :=
   -- Consume a label and jump to the selected branch.
   match readReg coro.regs chan with
   | some (.chan ep) =>
@@ -143,14 +144,14 @@ private def writeEndpoints (regs : RegFile) (sid : SessionId)
         | some acc' => go rest acc'
   go pairs regs
 
-private def stepOpen {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
     (localTypes : List (Role × LocalType))
     (handlers : List (Edge × HandlerId))
-    (dsts : List (Role × Reg)) : StepPack ι γ π ε :=
+    (dsts : List (Role × Reg)) : StepPack ι γ π ε ν :=
   -- Create a new session and install endpoints in registers.
   match zipOpenArgs localTypes dsts with
   | none => faultPack st coro (.closeFault "open arity mismatch") "open arity mismatch"
@@ -164,25 +165,36 @@ private def stepOpen {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
       | some regs' =>
           let endpoints := roles.map (fun r => { sid := sid, role := r })
           let localTypes' := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
-          let _ := handlers -- placeholder until handler-backed sessions land
           let sess : SessionState :=
-            { endpoints := endpoints, localTypes := localTypes', buffers := [], phase := .active }
+            -- V1 binds session scope to the session id.
+            { scope := { id := sid }
+            , sid := sid
+            , roles := roles
+            , endpoints := endpoints
+            , localTypes := localTypes'
+            , traces := initDEnv sid roles
+            , buffers := []
+            , handlers := handlers
+            , epoch := 0
+            , phase := .active }
           let coro' := advancePc ({ coro with regs := regs', status := .ready, ownedEndpoints := endpoints ++ coro.ownedEndpoints })
           let st' :=
             { st with nextSessionId := st.nextSessionId + 1, sessions := (sid, sess) :: st.sessions }
           pack coro' st' (mkRes .continue (some (.open sid)))
 
-private def stepClose {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (session : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (session : Reg) : StepPack ι γ π ε ν :=
   -- Close a session endpoint and clear its buffers.
   match readReg coro.regs session with
   | some (.chan ep) =>
       if owns coro ep then
-        let updatePhase (s : SessionState) : SessionState := { s with phase := .closed, buffers := [] }
+        let updatePhase (s : SessionState) : SessionState :=
+          -- Closing clears buffers and traces while marking the phase.
+          { s with phase := .closed, buffers := [], traces := (∅ : DEnv) }
         let rec closeSess (ss : SessionStore) : SessionStore :=
           match ss with
           | [] => []
@@ -202,12 +214,12 @@ private def stepClose {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none =>
       faultPack st coro .outOfRegisters "missing close operand"
 
-private def stepAcquire {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (layer : γ) (dst : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (layer : γ) (dst : Reg) : StepPack ι γ π ε ν :=
   -- Acquire a guard-layer resource and return evidence.
   let res? : Option (GuardLayer.Resource γ) :=
     match st.guardResources with
@@ -223,31 +235,31 @@ private def stepAcquire {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ
           | none => faultPack st coro .outOfRegisters "bad dst reg"
           | some regs' => continuePack st { coro with regs := regs' } none
 
-private def stepRelease {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (_layer : γ) (_evidence : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (_layer : γ) (_evidence : Reg) : StepPack ι γ π ε ν :=
   -- Release a guard-layer resource (placeholder).
   continuePack st coro none
 
-private def stepInvoke {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (action : EffectModel.EffectAction ε) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (action : EffectModel.EffectAction ε) : StepPack ι γ π ε ν :=
   -- Execute an effect action on the effect context.
   let ctx' := EffectModel.exec action coro.effectCtx
   continuePack st { coro with effectCtx := ctx' } none
 
-private def stepFork {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (sidReg : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (sidReg : Reg) : StepPack ι γ π ε ν :=
   -- Enter speculation mode for a ghost session id.
   match readReg coro.regs sidReg with
   | some (.nat gsid) =>
@@ -258,30 +270,30 @@ private def stepFork {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none =>
       faultPack st coro .outOfRegisters "missing fork operand"
 
-private def stepJoin {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepJoin {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Join speculation: clear ghost state.
   let coro' := advancePc { coro with specState := none }
   pack coro' st (mkRes .joined none)
 
-private def stepAbort {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepAbort {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Abort speculation: clear ghost state.
   let coro' := advancePc { coro with specState := none }
   pack coro' st (mkRes .aborted none)
 
-private def stepTransfer {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (endpoint targetCoro _bundle : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (endpoint targetCoro _bundle : Reg) : StepPack ι γ π ε ν :=
   -- Transfer an owned endpoint to another coroutine.
   match readReg coro.regs endpoint, readReg coro.regs targetCoro with
   | some (.chan ep), some (.nat tid) =>
@@ -308,12 +320,12 @@ private def stepTransfer {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer �
   | none, _ =>
       faultPack st coro .outOfRegisters "missing transfer endpoint"
 
-private def stepTag {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepTag {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (fact dst : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (fact dst : Reg) : StepPack ι γ π ε ν :=
   -- Record a knowledge fact and return success.
   match readReg coro.regs fact with
   | some (.string s) =>
@@ -327,12 +339,12 @@ private def stepTag {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none =>
       faultPack st coro .outOfRegisters "missing fact"
 
-private def stepCheck {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (knowledge _target dst : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (knowledge _target dst : Reg) : StepPack ι γ π ε ν :=
   -- Check whether a fact is in the knowledge set.
   match readReg coro.regs knowledge with
   | some (.string s) =>
@@ -345,12 +357,12 @@ private def stepCheck {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   | none =>
       faultPack st coro .outOfRegisters "missing knowledge"
 
-private def stepSpawn {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepSpawn {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (target : PC) (args : List Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (target : PC) (args : List Reg) : StepPack ι γ π ε ν :=
   -- Spawn a new coroutine with copied arguments.
   let newId := st.nextCoroId
   let initRegs : RegFile := Array.mk (List.replicate coro.regs.size Value.unit)
@@ -376,23 +388,23 @@ private def stepSpawn {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
   let coro' := advancePc { coro with status := .ready }
   pack coro' st' (mkRes (.spawned newId) none)
 
-private def stepLoadImm {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepLoadImm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (dst : Reg) (v : Value) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (dst : Reg) (v : Value) : StepPack ι γ π ε ν :=
   -- Load an immediate value into a register.
   match setReg coro.regs dst v with
   | some regs' => continuePack st { coro with regs := regs' } none
   | none => faultPack st coro .outOfRegisters "out of registers"
 
-private def stepMov {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepMov {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (dst src : Reg) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (dst src : Reg) : StepPack ι γ π ε ν :=
   -- Move a value between registers.
   match readReg coro.regs src with
   | none => faultPack st coro .outOfRegisters "bad src reg"
@@ -401,32 +413,32 @@ private def stepMov {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
       | none => faultPack st coro .outOfRegisters "bad dst reg"
       | some regs' => continuePack st { coro with regs := regs' } none
 
-private def stepJmp {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepJmp {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (target : PC) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (target : PC) : StepPack ι γ π ε ν :=
   -- Jump to a new program counter.
   let coro' := { coro with pc := target, status := .ready }
   pack coro' st (mkRes .continue none)
 
-private def stepYield {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+private def stepYield {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Yield to scheduler by blocking the coroutine.
   let coro' := advancePc { coro with status := .blocked .spawnWait }
   pack coro' st (mkRes .yielded none)
 
 /-- Dispatch to per-instruction semantics. -/
-def stepInstr {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def stepInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (i : Instr γ ε) : StepPack ι γ π ε :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (i : Instr γ ε) : StepPack ι γ π ε ν :=
   -- Call the appropriate per-instruction helper.
   match i with
   | .send chan val => stepSend st coro chan val

@@ -149,3 +149,67 @@ class EffectModel (ε : Type u) where
   post : EffectAction → EffectCtx → iProp
   /-- Session type associated with an effect handler. -/
   handlerType : EffectAction → LocalType
+
+/-! ## Cryptography and authenticated structures -/
+
+abbrev Data := Value
+
+inductive HashTag where
+  -- Domain-separated hash contexts for resources and proofs.
+  | merkleNode
+  | smtLeaf
+  | smtEmpty
+  | traceEvent
+  | contentId
+  | resourceKind
+  | commitment
+  | nullifier
+  deriving Repr, DecidableEq
+
+class VerificationModel (ν : Type u) where
+  -- Hashing for content identification.
+  Hash : Type
+  hash : Data → Hash
+  hashTagged : HashTag → Data → Hash
+  decEqH : DecidableEq Hash
+  -- Signing for message authentication.
+  SigningKey : Type
+  VerifyKey : Type
+  Signature : Type
+  sign : SigningKey → Data → Signature
+  verifySignature : VerifyKey → Data → Signature → Bool
+  -- Commitments and nullifiers for resources.
+  CommitmentKey : Type
+  Commitment : Type
+  CommitmentProof : Type
+  Nonce : Type
+  NullifierKey : Type
+  Nullifier : Type
+  commit : CommitmentKey → Data → Nonce → Commitment
+  nullify : Data → NullifierKey → Nullifier
+  verifyCommitment : Commitment → CommitmentProof → Data → Bool
+  decEqC : DecidableEq Commitment
+  decEqN : DecidableEq Nullifier
+
+class AuthTree (ν : Type u) [VerificationModel ν] where
+  -- Authenticated tree interface for structured data.
+  Root : Type
+  Leaf : Type
+  Path : Type
+  verifyPath : Root → Leaf → Path → Bool
+
+class AccumulatedSet (ν : Type u) [VerificationModel ν] where
+  -- Accumulated set interface with member/non-member proofs.
+  Key : Type
+  State : Type
+  ProofMember : Type
+  ProofNonMember : Type
+  keyOfHash : VerificationModel.Hash ν → Key
+  insert : State → Key → State
+  verifyMember : State → Key → ProofMember → Bool
+  verifyNonMember : State → Key → ProofNonMember → Bool
+
+structure ScopeId where
+  -- Scope identifier for local resource views.
+  id : Nat
+  deriving Repr, DecidableEq

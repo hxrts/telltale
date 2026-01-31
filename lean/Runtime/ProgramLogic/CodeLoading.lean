@@ -20,10 +20,11 @@ Dependencies: Task 11, Task 16, Shim.Invariants + Shim.WeakestPre.
 
 set_option autoImplicit false
 
-structure LoadResult where
-  -- Result flag and human-readable message.
-  ok : Bool
-  msg : String
+inductive LoadResult (ν : Type) [VerificationModel ν] where
+  -- Hash-identified image load result.
+  | ok (imageId : VerificationModel.Hash ν)
+  | verificationFailed (reason : String)
+  | resourceExhausted
   deriving Repr
 
 def code_signature_check {γ ε : Type} [GuardLayer γ] [EffectModel ε]
@@ -31,36 +32,50 @@ def code_signature_check {γ ε : Type} [GuardLayer γ] [EffectModel ε]
   -- Placeholder for signature verification.
   true
 
-def loadTrusted {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def loadTrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (img : CodeImage γ ε) : VMState ι γ π ε × LoadResult :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (img : CodeImage γ ε) :
+    VMState ι γ π ε ν × LoadResult ν :=
   -- Trusted images replace the current program directly.
   let programs' := st.programs.push img.program
-  ({ st with code := img.program, programs := programs' }, { ok := true, msg := "trusted" })
+  ({ st with code := img.program, programs := programs' },
+    -- Placeholder hash until code-image hashing is defined.
+    .ok (VerificationModel.hash (ν:=ν) (.unit)))
 
-def loadUntrusted {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def loadUntrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (img : CodeImage γ ε) : VMState ι γ π ε × LoadResult :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (img : CodeImage γ ε) :
+    VMState ι γ π ε ν × LoadResult ν :=
   -- Untrusted images require signature verification.
   if code_signature_check img then
     let programs' := st.programs.push img.program
-    ({ st with code := img.program, programs := programs' }, { ok := true, msg := "untrusted ok" })
+    ({ st with code := img.program, programs := programs' },
+      -- Placeholder hash until code-image hashing is defined.
+      .ok (VerificationModel.hash (ν:=ν) (.unit)))
   else
-    (st, { ok := false, msg := "signature failed" })
+    (st, .verificationFailed "signature failed")
 
-def SafeUpdate {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def SafeUpdate {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] : Prop :=
   -- Placeholder: safe update relation.
   True
-def hotSwap_preserves_coherent {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def hotSwap_preserves_coherent {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] : Prop :=
   -- Placeholder: hot-swap preserves coherence.
   True

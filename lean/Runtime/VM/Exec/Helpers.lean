@@ -15,13 +15,15 @@ universe u
 
 /-! ## Helper bundles -/
 
-structure StepPack (ι γ π ε : Type u)
+structure StepPack (ι γ π ε ν : Type u)
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] where
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] where
   -- Bundle updated coroutine/state/result from a single step.
   coro : CoroutineState γ ε
-  st : VMState ι γ π ε
+  st : VMState ι γ π ε ν
   res : ExecResult γ
 
 /-! ## Buffer helpers -/
@@ -72,12 +74,14 @@ def updateSessBuffers (store : SessionStore) (sid : SessionId)
       else
         (sid', s) :: updateSessBuffers rest sid bufs
 
-def appendEvent {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def appendEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε)
-    (ev : Option StepEvent) : VMState ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν)
+    (ev : Option StepEvent) : VMState ι γ π ε ν :=
   -- Record an event in the observable trace.
   match ev with
   | none => st
@@ -123,59 +127,71 @@ def mkRes {γ : Type u} (status : ExecStatus γ)
   -- Build an execution result.
   { status := status, event := event }
 
-def pack {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def pack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (coro : CoroutineState γ ε) (st : VMState ι γ π ε)
-    (res : ExecResult γ) : StepPack ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (coro : CoroutineState γ ε) (st : VMState ι γ π ε ν)
+    (res : ExecResult γ) : StepPack ι γ π ε ν :=
   -- Bundle the updated coroutine, state, and result.
   { coro := coro, st := st, res := res }
 
-def faultPack {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def faultPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (err : Fault γ) (msg : String) : StepPack ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (err : Fault γ) (msg : String) : StepPack ι γ π ε ν :=
   -- Mark the coroutine as faulted and emit a fault event.
   let coro' := { coro with status := .faulted err }
   pack coro' st (mkRes (.faulted err) (some (.fault msg)))
 
-def blockPack {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def blockPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (reason : BlockReason γ) : StepPack ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (reason : BlockReason γ) : StepPack ι γ π ε ν :=
   -- Mark the coroutine as blocked without producing an event.
   let coro' := { coro with status := .blocked reason }
   pack coro' st (mkRes (.blocked reason) none)
 
-def continuePack {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def continuePack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε)
-    (ev : Option StepEvent) : StepPack ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (ev : Option StepEvent) : StepPack ι γ π ε ν :=
   -- Mark the coroutine ready and continue.
   let coro' := advancePc { coro with status := .ready }
   pack coro' st (mkRes .continue ev)
 
-def haltPack {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coro : CoroutineState γ ε) : StepPack ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Mark the coroutine as done.
   let coro' := advancePc { coro with status := .done }
   pack coro' st (mkRes .halted none)
 
-def chargeCost {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def chargeCost {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (cfg : VMConfig ι γ π ε) (coro : CoroutineState γ ε)
+    [IdentityVerificationBridge ι ν]
+    (cfg : VMConfig ι γ π ε ν) (coro : CoroutineState γ ε)
     (i : Instr γ ε) : Option (CoroutineState γ ε) :=
   -- Deduct instruction cost from the budget when possible.
   let cost := cfg.costModel.stepCost i
@@ -186,12 +202,14 @@ def chargeCost {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-! ## Coroutine updates -/
 
-def updateCoro {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def updateCoro {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) (coroId : CoroutineId)
-    (coro : CoroutineState γ ε) : VMState ι γ π ε :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coroId : CoroutineId)
+    (coro : CoroutineState γ ε) : VMState ι γ π ε ν :=
   -- Update the coroutine array at the given index.
   if h : coroId < st.coroutines.size then
     { st with coroutines := st.coroutines.set (i := coroId) (v := coro) (h := h) }

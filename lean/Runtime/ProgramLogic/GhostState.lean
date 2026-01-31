@@ -22,6 +22,8 @@ Dependencies: Task 13, Compat.RA + Compat.Inv + Compat.SavedProp.
 set_option autoImplicit false
 noncomputable section
 
+universe u
+
 /-! ## Knowledge RA -/
 
 abbrev GhostKnowledgeFact := String
@@ -69,21 +71,66 @@ def spec_bounded (_sid : SessionId) : Prop := True
 
 /-! ## Resource bundles -/
 
-structure ResourceBundle where
-  endpoints : List Endpoint
-  deriving Repr
+/-- Separate conjunction over a list of propositions. -/
+def sepList (ps : List iProp) : iProp :=
+  -- Fold with separation and the empty resource.
+  ps.foldl iProp.sep iProp.emp
 
-def bundle_owns (_γ : GhostName) (_b : ResourceBundle) : iProp :=
+/-- Guard-layer ownership predicate (placeholder). -/
+def guard_layer_owns {γ : Type u} [GuardLayer γ] (_layer : γ)
+    (_res : GuardLayer.Resource γ) : iProp :=
+  -- V1 uses a stubbed guard resource ownership.
   iProp.emp
 
-def transfer_bundle (_b : ResourceBundle) : Prop := True
-def WellTypedTransfer (_b : ResourceBundle) : Prop := True
-def transfer_continuation_typed (_b : ResourceBundle) : Prop := True
-def transfer_source_loses (_b : ResourceBundle) : Prop := True
+/-- Effect-context ownership predicate (placeholder). -/
+def effect_ctx_owns {ε : Type u} [EffectModel ε] (_ctx : EffectModel.EffectCtx ε) : iProp :=
+  -- V1 treats effect context ownership as opaque.
+  iProp.emp
 
-structure ResourceTree where
-  root : ResourceBundle
-  children : List ResourceTree
-  deriving Repr
+structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+  endpoint : Endpoint -- Endpoint being transferred.
+  localType : LocalType -- Current local type at the endpoint.
+  guardState : List (γ × GuardLayer.Resource γ) -- Guard resources for the endpoint.
+  effectSlice : EffectModel.EffectCtx ε -- Effect context slice.
+  progressTokens : List (SessionId × Endpoint × Nat) -- Liveness tokens.
+  knowledge : List (Endpoint × GhostKnowledgeFact) -- Knowledge facts.
 
-def higher_order_transfer_preserves (_t : ResourceTree) : Prop := True
+def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (γn : GhostName) (b : ResourceBundle γ ε) : iProp :=
+  -- Bundle ownership is the separating conjunction of all components.
+  let guardOwns := sepList (b.guardState.map (fun p => guard_layer_owns p.1 p.2))
+  let progressOwns :=
+    sepList (b.progressTokens.map (fun p => progress_token_own γn p.1 p.2.1 p.2.2))
+  let knowledgeOwns := sepList (b.knowledge.map (fun p => knows γn p.1 p.2))
+  iProp.sep (endpoint_frag γn b.endpoint b.localType)
+    (iProp.sep guardOwns (iProp.sep (effect_ctx_owns b.effectSlice)
+      (iProp.sep progressOwns knowledgeOwns)))
+
+def transfer_bundle {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
+  -- Transfer preserves ownership of the same bundle.
+  iProp.entails (bundle_owns γn b) (bundle_owns γn b)
+
+def WellTypedTransfer {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (b : ResourceBundle γ ε) : Prop :=
+  -- Placeholder: non-empty endpoint transfer check.
+  b.localType ≠ LocalType.end_
+
+def transfer_continuation_typed {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (b : ResourceBundle γ ε) : Prop :=
+  -- Placeholder: continuation exists if transfer is well-typed.
+  WellTypedTransfer b
+
+def transfer_source_loses {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
+  -- Placeholder: source loses ownership implies re-establishing bundle ownership elsewhere.
+  iProp.entails (bundle_owns γn b) (bundle_owns γn b)
+
+structure ResourceTree (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+  root : ResourceBundle γ ε -- Root bundle for the tree.
+  children : List (ResourceTree γ ε) -- Nested bundle transfers.
+
+def higher_order_transfer_preserves {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (_t : ResourceTree γ ε) : Prop :=
+  -- Placeholder: higher-order transfer preserves ownership.
+  True

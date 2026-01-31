@@ -4,6 +4,7 @@ import Runtime.VM.Config
 import Runtime.VM.Program
 import Runtime.Monitor.UnifiedMonitor
 import Runtime.Resources.Arena
+import Runtime.Resources.ResourceModel
 
 /-
 The Problem. Specify the runtime state and execution outcomes for the
@@ -132,12 +133,14 @@ structure SchedState (γ : Type u) where
 
 /-! ## VM state -/
 
-structure VMState (ι γ π ε : Type u) [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] where
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] where
   -- Configuration and programs.
-  config : VMConfig ι γ π ε
+  config : VMConfig ι γ π ε ν
   code : Program γ ε
   programs : Array (Program γ ε)
   coroutines : Array (CoroutineState γ ε)
@@ -147,6 +150,7 @@ structure VMState (ι γ π ε : Type u) [IdentityModel ι] [GuardLayer γ]
   nextSessionId : SessionId
   arena : Arena
   sessions : SessionStore
+  resourceStates : List (ScopeId × ResourceState ν) -- Scoped resource views.
   guardResources : List (γ × GuardLayer.Resource γ)
   sched : SchedState γ
   monitor : SessionMonitor γ
@@ -156,11 +160,13 @@ structure VMState (ι γ π ε : Type u) [IdentityModel ι] [GuardLayer γ]
   progressSupply : Unit
 
 /-- Well-formedness: coroutine PCs are in range and sessions are bounded. -/
-def WFVMState {ι γ π ε : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε]
+def WFVMState {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    (st : VMState ι γ π ε) : Prop :=
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : Prop :=
   -- Check PC bounds and session ids against the next counter.
   (∀ i (h : i < st.coroutines.size),
     (st.coroutines[i]'h).pc < st.code.code.size) ∧
