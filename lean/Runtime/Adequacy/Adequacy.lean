@@ -35,24 +35,43 @@ Dependencies: Task 12, Task 19, Shim.WeakestPre.
 set_option autoImplicit false
 noncomputable section
 
-inductive ObsEvent where
+inductive ObsEvent (ε : Type) [EffectModel ε] where
   -- Observable events emitted by VM execution.
-  | send (edge : Edge) (label : Label)
-  | recv (edge : Edge) (label : Label)
-  | open (sid : SessionId)
-  | close (sid : SessionId)
-  | fail (msg : String)
-  | recover (sid : SessionId)
+  | sent (edge : Edge) (val : Value) (seqNo : Nat)
+  | received (edge : Edge) (val : Value) (seqNo : Nat)
+  | offered (edge : Edge) (label : Label)
+  | chose (edge : Edge) (label : Label)
+  | acquired (layer : Namespace) (endpoint : Endpoint)
+  | released (layer : Namespace) (endpoint : Endpoint)
+  | invoked (endpoint : Endpoint) (action : EffectModel.EffectAction ε)
+  | opened (sid : SessionId) (roles : RoleSet)
+  | closed (sid : SessionId)
+  | epochAdvanced (sid : SessionId) (epoch : Nat)
+  | transferred (endpoint : Endpoint) (fromCoro toCoro : Nat)
+  | forked (sid : SessionId) (ghostSid : GhostSessionId)
+  | joined (sid : SessionId)
+  | aborted (sid : SessionId)
+  | tagged (endpoint : Endpoint) (fact : KnowledgeFact)
+  | checked (endpoint : Endpoint) (target : Role) (permitted : Bool)
   deriving Repr
 
 -- Trace of observable events.
-abbrev ObsTrace := List ObsEvent -- Linearized execution trace.
+abbrev ObsTrace (ε : Type) [EffectModel ε] := List (Nat × ObsEvent ε)
 
 
-def CausallyConsistent (_trace : ObsTrace) : Prop :=
+def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε) :=
+  -- Project internal step events to observable events.
+  match ev with
+  | .send edge _ v => some (.sent edge v 0)
+  | .recv edge _ v => some (.received edge v 0)
+  | .open sid => some (.opened sid [])
+  | .close sid => some (.closed sid)
+  | .fault _ => none
+
+def CausallyConsistent {ε : Type} [EffectModel ε] (_trace : ObsTrace ε) : Prop :=
   -- Placeholder for causal consistency of traces.
   True
-def FIFOConsistent (_trace : ObsTrace) : Prop :=
+def FIFOConsistent {ε : Type} [EffectModel ε] (_trace : ObsTrace ε) : Prop :=
   -- Placeholder for FIFO consistency of traces.
   True
 

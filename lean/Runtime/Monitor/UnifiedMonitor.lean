@@ -1,11 +1,21 @@
 import Runtime.VM.Core
 import Runtime.Compat.Inv
 
-/-!
-# Task 23: Unified Monitor and Failure Model
+/-
+The Problem. The runtime needs a unified monitor that tracks session
+kinds uniformly, allowing typing and invariants to be checked at a
+single interface.
 
-Monitor consistency across session kinds and crash safety
-from iris_runtime_2.md §§9, 14.
+Solution Structure. Define a lightweight monitor interface parametric
+over session kinds. Failure semantics live in a separate module to avoid
+cyclic dependencies on VM state.
+-/
+
+/-!
+# Task 23: Unified Monitor
+
+Monitor consistency across session kinds
+from iris_runtime_2.md §14.
 
 ## Definitions
 
@@ -16,12 +26,7 @@ from iris_runtime_2.md §§9, 14.
 - `monitor_sound`, `unified_monitor_preserves`
 - `cross_kind_interop`
 
-### Failure Model
-- `Failure`, `FStep` — failure-aware step relation
-- `Recoverable` — recovery predicate
-- `crash_nonparticipant_preserves`
-- `participant_failover`
-- `crash_close_safe`
+Failure model definitions live in `Runtime.Failure.Failure`.
 
 Dependencies: Task 19, Shim.Invariants.
 -/
@@ -60,29 +65,4 @@ def unified_monitor_preserves : Prop :=
   True
 def cross_kind_interop : Prop :=
   -- Placeholder: cross-kind interop property.
-  True
-
-inductive Failure where
-  -- Failure cases for sessions.
-  | crash (sid : SessionId)
-  | timeout (sid : SessionId)
-  deriving Repr
-
-inductive FStep where
-  -- Failure-aware step relation (placeholder).
-  | step (f : Failure)
-  deriving Repr
-
-def Recoverable {σ : Type} (_st : σ) (_sid : SessionId) : Prop :=
-  -- Placeholder: recovery predicate.
-  True
-
-def crash_nonparticipant_preserves : Prop :=
-  -- Placeholder: non-participant crash preserves correctness.
-  True
-def participant_failover : Prop :=
-  -- Placeholder: participant failover property.
-  True
-def crash_close_safe : Prop :=
-  -- Placeholder: crash-close safety.
   True

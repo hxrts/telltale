@@ -61,22 +61,25 @@ def knowledge_inv_all (_γ : GhostName) (_sid : SessionId) (_G : SessionMap) : i
 
 /-! ## Cancelable session invariant -/
 
+def session_inv_body (γ : GhostName) (sid : SessionId) : iProp :=
+  -- Session invariant body with coherence, buffers, and progress.
+  iProp.exist fun G =>
+    iProp.exist fun D =>
+      iProp.exist fun bufs =>
+        iProp.sep (session_coherent sid G D)
+          (iProp.sep (buffers_typed sid G D bufs)
+            (iProp.sep (session_auth γ G)
+              (iProp.sep (head_coherent sid G D)
+                (iProp.sep (session_progress_supply γ sid)
+                  (knowledge_inv_all γ sid G)))))
+
 def sessionNs (sid : SessionId) : Namespace :=
   -- Namespace for a session invariant.
   Namespace.append_nat Namespace.root sid
 
 def session_inv (_γ : GhostName) (sid : SessionId) (ct : CancelToken) : iProp :=
   -- Session invariant ties coherence, buffers, progress, and knowledge.
-  cinv (sessionNs sid) ct (
-    iProp.exist fun G =>
-      iProp.exist fun D =>
-        iProp.exist fun bufs =>
-          iProp.sep (session_coherent sid G D)
-            (iProp.sep (buffers_typed sid G D bufs)
-              (iProp.sep (session_auth _γ G)
-                (iProp.sep (head_coherent sid G D)
-                  (iProp.sep (session_progress_supply _γ sid)
-                    (knowledge_inv_all _γ sid G))))))
+  cinv (sessionNs sid) ct (session_inv_body _γ sid)
 
 def session_ns_disjoint (sid₁ sid₂ : SessionId)
     (hNs : sessionNs sid₁ ≠ sessionNs sid₂) :
@@ -85,37 +88,38 @@ def session_ns_disjoint (sid₁ sid₂ : SessionId)
   namespace_disjoint (sessionNs sid₁) (sessionNs sid₂) hNs
 
 def session_inv_alloc (γ : GhostName) (sid : SessionId) (E : Mask) :
-  iProp.entails (iProp.later iProp.emp)
+  iProp.entails (iProp.later (session_inv_body γ sid))
     (fupd E E (iProp.exist fun ct => iProp.sep (session_inv γ sid ct) (cancel_token_own ct))) :=
   -- Allocate a fresh cancelable invariant for a session.
-  cinv_alloc (sessionNs sid) E iProp.emp
+  cinv_alloc (sessionNs sid) E (session_inv_body γ sid)
 
 def session_inv_open (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E : Mask)
     (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
   iProp.entails (session_inv γ sid ct)
     (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid)))
-      (iProp.sep (iProp.later iProp.emp)
-        (iProp.wand (iProp.later iProp.emp)
+      (iProp.sep (iProp.later (session_inv_body γ sid))
+        (iProp.wand (iProp.later (session_inv_body γ sid))
           (fupd (Mask.diff E (namespace_to_mask (sessionNs sid))) E iProp.emp)))) :=
   -- Open the session invariant under mask difference.
-  cinv_acc (sessionNs sid) E ct iProp.emp hSub
+  cinv_acc (sessionNs sid) E ct (session_inv_body γ sid) hSub
 
 def session_inv_close (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E : Mask)
     (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
   iProp.entails (iProp.sep (session_inv γ sid ct) (cancel_token_own ct))
-    (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid))) (iProp.later iProp.emp)) :=
+    (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid)))
+      (iProp.later (session_inv_body γ sid))) :=
   -- Cancel the session invariant with the cancel token.
-  cinv_cancel (sessionNs sid) E ct iProp.emp hSub
+  cinv_cancel (sessionNs sid) E ct (session_inv_body γ sid) hSub
 
 /-! ## Conservation invariants -/
 
-def conservation_inv (γ : GhostName) (_sid : SessionId)
+def conservation_inv (_γ : GhostName) (_sid : SessionId)
     {M : Type} [AddCommMonoid M]
     (_proj : Endpoint → M) (_total : M) : iProp :=
   -- Placeholder conservation invariant over endpoints.
   iProp.emp
 
-def conservation_inv_preserved (γ : GhostName) (_sid : SessionId)
+def conservation_inv_preserved (_γ : GhostName) (_sid : SessionId)
     {M : Type} [AddCommMonoid M]
     (_proj : Endpoint → M) (_total : M) : Prop :=
   -- Placeholder preservation statement for conservation invariants.
@@ -130,7 +134,6 @@ structure Participation (ι : Type) [IdentityModel ι] where
   role : Role
   endpoint : Endpoint
   site : IdentityModel.SiteId ι
-  deriving Repr
 
 inductive LifecycleEvent (ι : Type) [IdentityModel ι]
     (γ ε : Type) [GuardLayer γ] [EffectModel ε] where
@@ -149,8 +152,7 @@ inductive LifecycleEvent (ι : Type) [IdentityModel ι]
       (fromSite toSite : IdentityModel.SiteId ι)
   | epochAdvance (sid : SessionId) (newEpoch : Nat)
   | transfer (sid : SessionId) (endpoint : Endpoint)
-      (from to : Nat) (bundle : ResourceBundle γ ε)
-  deriving Repr
+      (fromCoro toCoro : Nat) (bundle : ResourceBundle γ ε)
 
 /-! ## Lifecycle correctness stubs -/
 
@@ -165,7 +167,7 @@ def open_coherent {ι : Type} [IdentityModel ι]
 def migrate_preserves_spatial {ι : Type} [IdentityModel ι]
     (_spatialReq : SpatialReq)
     (_assignment : Role → IdentityModel.ParticipantId ι)
-    (_siteChoice siteChoice' : IdentityModel.ParticipantId ι → IdentityModel.SiteId ι) : Prop :=
+    (_siteChoice _siteChoice' : IdentityModel.ParticipantId ι → IdentityModel.SiteId ι) : Prop :=
   -- Placeholder spatial preservation under migration.
   True
 
