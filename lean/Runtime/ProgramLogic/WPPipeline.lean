@@ -16,12 +16,10 @@ universe u
 
 variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
 
-def wp_send_pipeline : iProp :=
+def wp_send_pipeline (layer : γ) (action : EffectModel.EffectAction ε) : iProp :=
   -- Placeholder: acquire + invoke + send via chained wp_pair rules.
-  iProp.exist (fun layer =>
-    iProp.exist (fun action =>
-      iProp.sep
-        (wp_pair (acquirePair (γ:=γ) (ε:=ε) layer))
-        (iProp.sep
-          (wp_pair (invokePair (γ:=γ) (ε:=ε) action))
-          (wp_pair (sendPair (γ:=γ) (ε:=ε))))))
+  iProp.sep
+    (wp_pair (acquirePair (γ:=γ) (ε:=ε) layer))
+    (iProp.sep
+      (wp_pair (invokePair (γ:=γ) (ε:=ε) action))
+      (wp_pair (sendPair (γ:=γ) (ε:=ε))))

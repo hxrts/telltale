@@ -41,7 +41,6 @@ inductive Failure (ι : Type u) [IdentityModel ι] where
   | heal (edges : List Edge)
   | corrupt (edge : Edge) (seqNo : Nat)
   | timeout (edge : Edge) (deadline : Nat)
-  deriving Repr
 
 def ParticipantLost {ι : Type u} [IdentityModel ι]
     (crashed : List (IdentityModel.SiteId ι))
@@ -135,7 +134,7 @@ def FStarDrain {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (_st st' : VMState ι γ π ε ν) : Prop :=
+    (_st _st' : VMState ι γ π ε ν) : Prop :=
   -- Placeholder: closure under failure-aware steps.
   True
 

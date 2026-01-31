@@ -15,16 +15,14 @@ universe u
 
 /-! ## Scheduler helpers -/
 
-private def runnable {γ ε ν : Type u} [GuardLayer γ] [EffectModel ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+private def runnable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (c : CoroutineState γ ε) : Bool :=
   -- Ready and speculating coroutines are runnable.
   match c.status with
   | .ready | .speculating => true
   | _ => false
 
-private def hasProgressToken {γ ε ν : Type u} [GuardLayer γ] [EffectModel ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+private def hasProgressToken {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (c : CoroutineState γ ε) : Bool :=
   -- A coroutine is progress-aware if it holds tokens.
   !c.progressTokens.isEmpty
@@ -137,7 +135,7 @@ private def pickRunnable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
   | .cooperative => pickRoundRobin st
   | .workStealing _ => pickRoundRobin st
 
-private def dropBlocked {γ : Type} (blocked : BlockedSet γ) (cid : CoroutineId) :
+private def dropBlocked {γ : Type u} (blocked : BlockedSet γ) (cid : CoroutineId) :
     BlockedSet γ :=
   -- Remove any stale blocked entry for the coroutine.
   blocked.filter (fun p => decide (p.fst ≠ cid))
@@ -146,7 +144,7 @@ private def enqueueCoro (queue : SchedQueue) (cid : CoroutineId) : SchedQueue :=
   -- Enqueue a coroutine at the back.
   queue ++ [cid]
 
-private def updateAfterStep {γ : Type} (sched : SchedState γ) (cid : CoroutineId)
+private def updateAfterStep {γ : Type u} (sched : SchedState γ) (cid : CoroutineId)
     (status : ExecStatus γ) : SchedState γ :=
   -- Update queues and blocked set based on step status.
   let blocked' := dropBlocked sched.blockedSet cid

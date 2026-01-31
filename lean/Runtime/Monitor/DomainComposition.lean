@@ -18,6 +18,8 @@ universe u
 
 def combineNs (n₁ n₂ : Namespace) : Namespace :=
   -- Deterministic namespace combination for product guards.
+  let _ := n₁ -- Placeholder: use component namespaces in V2 tagging.
+  let _ := n₂ -- Placeholder: use component namespaces in V2 tagging.
   Namespace.append (Namespace.append Namespace.root "guard") "pair"
 
 instance : GuardLayer Unit where
@@ -103,8 +105,18 @@ instance instIdentityModelSum (ι₁ ι₂ : Type u)
     -- Reliability is preserved within each component.
     (IdentityModel.reliableEdges (ι:=ι₁)).map (fun p => (Sum.inl p.1, Sum.inl p.2)) ++
     (IdentityModel.reliableEdges (ι:=ι₂)).map (fun p => (Sum.inr p.1, Sum.inr p.2))
-  decEqP := by infer_instance
-  decEqS := by infer_instance
+  decEqP := by
+    -- Use identity-model decidable equality to build the sum instance.
+    classical
+    let _ : DecidableEq (IdentityModel.ParticipantId ι₁) := IdentityModel.decEqP (ι:=ι₁)
+    let _ : DecidableEq (IdentityModel.ParticipantId ι₂) := IdentityModel.decEqP (ι:=ι₂)
+    exact instDecidableEqSum
+  decEqS := by
+    -- Use identity-model decidable equality to build the sum instance.
+    classical
+    let _ : DecidableEq (IdentityModel.SiteId ι₁) := IdentityModel.decEqS (ι:=ι₁)
+    let _ : DecidableEq (IdentityModel.SiteId ι₂) := IdentityModel.decEqS (ι:=ι₂)
+    exact instDecidableEqSum
 
 instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
     EffectModel (Sum ε₁ ε₂) where

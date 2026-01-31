@@ -60,17 +60,17 @@ def wp_close : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (closePair (γ:=γ) (ε:=ε))
 
-def wp_acquire : iProp :=
-  -- Acquire WP: abstract over the guard layer.
-  iProp.exist (fun layer => wp_pair (acquirePair (γ:=γ) (ε:=ε) layer))
+def wp_acquire (layer : γ) : iProp :=
+  -- Acquire WP: parameterized by the guard layer.
+  wp_pair (acquirePair (γ:=γ) (ε:=ε) layer)
 
-def wp_release : iProp :=
-  -- Release WP: abstract over the guard layer.
-  iProp.exist (fun layer => wp_pair (releasePair (γ:=γ) (ε:=ε) layer))
+def wp_release (layer : γ) : iProp :=
+  -- Release WP: parameterized by the guard layer.
+  wp_pair (releasePair (γ:=γ) (ε:=ε) layer)
 
-def wp_invoke : iProp :=
-  -- Invoke WP: abstract over effect actions.
-  iProp.exist (fun action => wp_pair (invokePair (γ:=γ) (ε:=ε) action))
+def wp_invoke (action : EffectModel.EffectAction ε) : iProp :=
+  -- Invoke WP: parameterized by the effect action.
+  wp_pair (invokePair (γ:=γ) (ε:=ε) action)
 
 def wp_fork : iProp :=
   -- WP rule derived from the generic pair rule.

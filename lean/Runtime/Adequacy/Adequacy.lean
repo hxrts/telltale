@@ -53,7 +53,6 @@ inductive ObsEvent (ε : Type) [EffectModel ε] where
   | aborted (sid : SessionId)
   | tagged (endpoint : Endpoint) (fact : KnowledgeFact)
   | checked (endpoint : Endpoint) (target : Role) (permitted : Bool)
-  deriving Repr
 
 -- Trace of observable events.
 abbrev ObsTrace (ε : Type) [EffectModel ε] := List (Nat × ObsEvent ε)

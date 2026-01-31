@@ -35,7 +35,6 @@ inductive LoadResult (ν : Type) [VerificationModel ν] where
   | ok (imageId : VerificationModel.Hash ν)
   | verificationFailed (reason : String)
   | resourceExhausted
-  deriving Repr
 
 def code_signature_check {γ ε : Type} [GuardLayer γ] [EffectModel ε]
     (_img : UntrustedImage γ ε) : Bool :=
@@ -94,6 +93,6 @@ def hotSwap_preserves_coherent {ι γ π ε ν : Type} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (_current new_ : LocalType) (_buffered : List ValType) : Prop :=
+    (_current _new : LocalType) (_buffered : List ValType) : Prop :=
   -- Placeholder: hot-swap preserves coherence under SafeUpdate.
   True
