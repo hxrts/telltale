@@ -5,7 +5,7 @@ import Runtime.Shim.ResourceAlgebra
 
 Axiom shims for saved propositions and ghost variables.
 Retires when: iris_2.md Tasks 9E–9F land.
-Unblocks: Tasks 16, 20.
+Unblocks: Tasks 16, 20C.
 -/
 
 set_option autoImplicit false

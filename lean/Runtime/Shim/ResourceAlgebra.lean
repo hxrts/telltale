@@ -3,7 +3,7 @@
 
 Axiom shims for resource algebra primitives.
 Retires when: iris.md Tasks 1+3+8, iris_2.md Task 9D land.
-Unblocks: Tasks 13, 14, 15, 18, 20, 24.
+Unblocks: Tasks 13, 14, 15, 18, 20A, 20B, 20C, 24.
 -/
 
 set_option autoImplicit false

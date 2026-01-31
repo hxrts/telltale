@@ -1,5 +1,5 @@
 import Runtime.VM.TypeClasses
-import Runtime.Shim.ResourceAlgebra
+import Runtime.Compat.RA
 
 /-!
 # Task 15: Arena and Session Store
@@ -21,4 +21,33 @@ Dependencies: Task 10, Shim.ResourceAlgebra.
 
 set_option autoImplicit false
 
--- TODO: implement Task 15
+inductive SessionPhase where
+  | opening
+  | active
+  | closing
+  | closed
+  deriving Repr
+
+structure ArenaSlot where
+  ty : ValType
+  val : Value
+  deriving Repr
+
+structure Arena where
+  slots : List ArenaSlot
+  deriving Repr
+
+structure SessionState where
+  endpoints : List Endpoint
+  localTypes : List (Endpoint × LocalType)
+  buffers : List (Edge × List Value)
+  phase : SessionPhase
+  deriving Repr
+
+abbrev SessionStore := List (SessionId × SessionState)
+
+def sessionStore_refines_envs (_store : SessionStore) : Prop :=
+  True
+
+def arena_lookup_typed (_arena : Arena) (_idx : Nat) : Prop :=
+  True

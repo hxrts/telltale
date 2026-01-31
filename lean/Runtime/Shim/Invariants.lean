@@ -5,7 +5,7 @@ import Runtime.Shim.ResourceAlgebra
 
 Axiom shims for masks, fancy update modality, invariants, and cancelable invariants.
 Retires when: iris.md Tasks 2–6 land.
-Unblocks: Tasks 16, 19, 21, 23.
+Unblocks: Tasks 16, 19, 20B, 20C, 21, 23.
 -/
 
 set_option autoImplicit false

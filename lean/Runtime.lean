@@ -1,8 +1,4 @@
-import Runtime.Shim.ResourceAlgebra
-import Runtime.Shim.Invariants
-import Runtime.Shim.WeakestPre
-import Runtime.Shim.SavedProp
-import Runtime.Shim.GenHeap
+import Runtime.Compat
 import Runtime.VM.TypeClasses
 import Runtime.VM.Definition
 import Runtime.VM.LanguageInstance
