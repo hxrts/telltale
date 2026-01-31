@@ -1,5 +1,8 @@
 import Runtime.Compat
 import Runtime.VM.TypeClasses
+import Runtime.VM.SchedulerTypes
+import Runtime.VM.Violation
+import Runtime.VM.Config
 import Runtime.VM.Definition
 import Runtime.VM.LanguageInstance
 import Runtime.Resources.SessionRA
@@ -14,6 +17,14 @@ import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
 import Runtime.Monitor.UnifiedMonitor
 import Runtime.Monitor.DomainComposition
+
+/- 
+The Problem. Provide a single entry point that re-exports the runtime spec
+and its proof layers for downstream modules and documentation.
+
+Solution Structure. Import the VM spec, resources, program logic, and
+monitor/adequacy modules in one place.
+-/
 
 /-! # Runtime
 

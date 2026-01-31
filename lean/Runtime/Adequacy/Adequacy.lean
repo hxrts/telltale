@@ -1,6 +1,15 @@
 import Runtime.VM.LanguageInstance
+import Runtime.VM.Violation
 import Runtime.ProgramLogic.SessionWP
 import Runtime.Compat.WP
+
+/- 
+The Problem. Define observable traces and adequacy statements that connect
+the VM execution to protocol-level correctness claims.
+
+Solution Structure. Provide trace/event types and placeholder adequacy
+statements that will be refined by later proofs.
+-/
 
 /-!
 # Task 22: Observable Trace Infrastructure and VM Adequacy
@@ -26,6 +35,7 @@ set_option autoImplicit false
 noncomputable section
 
 inductive ObsEvent where
+  -- Observable events emitted by VM execution.
   | send (edge : Edge) (label : Label)
   | recv (edge : Edge) (label : Label)
   | open (sid : SessionId)
@@ -34,24 +44,41 @@ inductive ObsEvent where
   | recover (sid : SessionId)
   deriving Repr
 
-abbrev ObsTrace := List ObsEvent
+-- Trace of observable events.
+abbrev ObsTrace := List ObsEvent -- Linearized execution trace.
 
-inductive Violation where
-  | safety (msg : String)
-  | liveness (msg : String)
-  deriving Repr
 
-structure ViolationPolicy where
-  allow : Violation → Bool
+def CausallyConsistent (_trace : ObsTrace) : Prop :=
+  -- Placeholder for causal consistency of traces.
+  True
+def FIFOConsistent (_trace : ObsTrace) : Prop :=
+  -- Placeholder for FIFO consistency of traces.
+  True
 
-def CausallyConsistent (_trace : ObsTrace) : Prop := True
-def FIFOConsistent (_trace : ObsTrace) : Prop := True
-
-def session_state_interp {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
-    (st : VMState ι π ε) : iProp :=
+def session_state_interp {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    (st : VMState ι γ π ε) : iProp :=
+  -- Interpret the concrete VM state as logical resources.
   iProp.sep (iProp.pure (WFVMState st))
     (iProp.pure (sessionStore_refines_envs st.sessions))
 
-def vm_adequacy {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] : Prop := True
-def no_phantom_events {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] : Prop := True
-def compile_refines {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] : Prop := True
+def vm_adequacy {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+  -- Placeholder adequacy statement.
+  True
+def no_phantom_events {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+  -- Placeholder for trace soundness.
+  True
+def compile_refines {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+  -- Placeholder compilation refinement.
+  True

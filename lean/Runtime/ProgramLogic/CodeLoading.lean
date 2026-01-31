@@ -21,22 +21,44 @@ Dependencies: Task 11, Task 16, Shim.Invariants + Shim.WeakestPre.
 set_option autoImplicit false
 
 structure LoadResult where
+  -- Result flag and human-readable message.
   ok : Bool
   msg : String
   deriving Repr
 
-def code_signature_check {ε : Type} [EffectModel ε] (_img : CodeImage ε) : Bool := true
+def code_signature_check {γ ε : Type} [GuardLayer γ] [EffectModel ε]
+    (_img : CodeImage γ ε) : Bool :=
+  -- Placeholder for signature verification.
+  true
 
-def loadTrusted {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
-    (st : VMState ι π ε) (img : CodeImage ε) : VMState ι π ε × LoadResult :=
+def loadTrusted {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    (st : VMState ι γ π ε) (img : CodeImage γ ε) : VMState ι γ π ε × LoadResult :=
+  -- Trusted images replace the current program directly.
   ({ st with code := img }, { ok := true, msg := "trusted" })
 
-def loadUntrusted {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
-    (st : VMState ι π ε) (img : CodeImage ε) : VMState ι π ε × LoadResult :=
+def loadUntrusted {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    (st : VMState ι γ π ε) (img : CodeImage γ ε) : VMState ι γ π ε × LoadResult :=
+  -- Untrusted images require signature verification.
   if code_signature_check img then
     ({ st with code := img }, { ok := true, msg := "untrusted ok" })
   else
     (st, { ok := false, msg := "signature failed" })
 
-def SafeUpdate {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] : Prop := True
-def hotSwap_preserves_coherent {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] : Prop := True
+def SafeUpdate {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+  -- Placeholder: safe update relation.
+  True
+def hotSwap_preserves_coherent {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] : Prop :=
+  -- Placeholder: hot-swap preserves coherence.
+  True

@@ -19,30 +19,34 @@ Dependencies: Task 11, Shim.WeakestPre.
 
 set_option autoImplicit false
 
-universe u
-
-inductive SessionVM (ι π ε : Type u) : Type u where
+inductive SessionVM (ι γ π ε : Type) : Type where
+  -- Tag type for the VM language instance.
   | mk
 
 def SessionVM.to_val (e : Expr) : Option Expr :=
+  -- A halted expression is treated as a value.
   if e.halted then some e else none
 
 def SessionVM.of_val (v : Expr) : Expr :=
+  -- Wrap a value as a halted expression.
   { v with halted := true }
 
-instance instLanguageSessionVM {ι π ε : Type u}
-    [IdentityModel ι] [PersistenceModel π] [EffectModel ε] :
-    Iris.Language (SessionVM ι π ε) where
+instance instLanguageSessionVM {ι γ π ε : Type}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] :
+    Iris.Language (SessionVM ι γ π ε) where
   expr := Expr
   val := Expr
-  state := VMState ι π ε
+  state := VMState ι γ π ε
   of_val := SessionVM.of_val
   to_val := SessionVM.to_val
   prim_step := fun e σ =>
+    -- Do not step halted expressions.
     if e.halted then [] else
       let (σ', res) := execInstr σ e.cid
       match res.status with
-      | .blocked => []
+      | .blocked _ => []
       | _ =>
           let halted' :=
             match σ'.coroutines[e.cid]? with
@@ -50,20 +54,32 @@ instance instLanguageSessionVM {ι π ε : Type u}
             | none => true
           [({ cid := e.cid, halted := halted' }, σ', [])]
 
-theorem to_of_val {ι π ε : Type u}
-    [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
+/-- `to_val` after `of_val` yields the halted expression. -/
+theorem to_of_val {ι γ π ε : Type}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     (v : Expr) :
     SessionVM.to_val (SessionVM.of_val v) = some { v with halted := true } := by
+  -- The wrapper forces `halted = true`.
   simp [SessionVM.to_val, SessionVM.of_val]
 
-theorem of_to_val {ι π ε : Type u}
-    [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
+/-- `of_val` simply flips the `halted` flag. -/
+theorem of_to_val {ι γ π ε : Type}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     (e : Expr) :
     SessionVM.of_val e = { e with halted := true } := by
+  -- Definition is by record update.
   rfl
 
-theorem val_head_stuck {ι π ε : Type u}
-    [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
-    (v : Expr) (σ : VMState ι π ε) :
-    Iris.Language.prim_step (Λ:=SessionVM ι π ε) (SessionVM.of_val v) σ = [] := by
+/-- Values are head-stuck in the VM language. -/
+theorem val_head_stuck {ι γ π ε : Type}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    (v : Expr) (σ : VMState ι γ π ε) :
+    Iris.Language.prim_step (Λ:=SessionVM ι γ π ε) (SessionVM.of_val v) σ = [] := by
+  -- A halted expression produces no steps.
   simp [Iris.Language.prim_step, instLanguageSessionVM, SessionVM.of_val]

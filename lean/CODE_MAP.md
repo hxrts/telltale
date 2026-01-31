@@ -400,7 +400,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 ## Runtime
 
 **Root Module:** `Runtime.lean`
-**Description:** VM definition, Iris separation logic backend, resource algebras, session invariants, WP rules, and adequacy. Scaffolded per `work/iris_3.md` — shims populated, task stubs expanding incrementally.
+**Description:** VM definition, Iris separation logic backend, resource algebras, session invariants, WP rules, and adequacy. Scaffolded, shims populated, task stubs expanding incrementally.
 
 ### Iris Separation Logic Shims
 

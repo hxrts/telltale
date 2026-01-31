@@ -1,30 +1,23 @@
 import Runtime.VM.TypeClasses
 import Runtime.Compat.RA
 
-/-!
-# Task 24: Domain Model Composition
+/- 
+The Problem. The VM needs to compose multiple domain models while keeping a
+small, uniform core interface (for guards, effects, persistence, identity).
 
-Coproduct/product instances and bridge classes for composable domain models
-from iris_runtime_2.md §20.
-
-## Definitions
-
-- Unit instances (`EffectModel Unit`, `GuardLayer Unit`)
-- `EffectModel (ε₁ ⊕ ε₂)` — effect coproduct
-- `GuardLayer (γ₁ × γ₂)` — guard product
-- Bridge classes: `IdentityGuardBridge`, `EffectGuardBridge`,
-  `PersistenceEffectBridge`, `IdentityPersistenceBridge`
-- `effect_composition_safe`
-- `composed_frame_rule`
-- `protocol_federation`
-
-Dependencies: Task 10, Shim.ResourceAlgebra.
+Solution Structure. Provide unit and product/sum instances plus bridge
+classes that capture cross-model compatibility obligations.
 -/
 
 set_option autoImplicit false
 noncomputable section
 
+universe u
+
+/-! ## Unit instances -/
+
 instance : GuardLayer Unit where
+  -- Unit guard layer: trivial namespace and resource.
   layerNs := fun _ => Namespace.root
   Resource := Unit
   Evidence := Unit
@@ -32,6 +25,7 @@ instance : GuardLayer Unit where
   close := fun _ _ => ()
 
 instance : EffectModel Unit where
+  -- Unit effect model: no-op effects with empty specs.
   EffectAction := Unit
   EffectCtx := Unit
   exec := fun _ _ => ()
@@ -39,8 +33,11 @@ instance : EffectModel Unit where
   post := fun _ _ => iProp.emp
   handlerType := fun _ => LocalType.end_
 
-instance instEffectModelSum (ε₁ ε₂ : Type) [EffectModel ε₁] [EffectModel ε₂] :
+/-! ## Composed instances -/
+
+instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
     EffectModel (Sum ε₁ ε₂) where
+  -- Sum effects dispatch to the corresponding component model.
   EffectAction := Sum (EffectModel.EffectAction ε₁) (EffectModel.EffectAction ε₂)
   EffectCtx := EffectModel.EffectCtx ε₁ × EffectModel.EffectCtx ε₂
   exec := fun a ctx =>
@@ -60,8 +57,9 @@ instance instEffectModelSum (ε₁ ε₂ : Type) [EffectModel ε₁] [EffectMode
     | Sum.inl a1 => EffectModel.handlerType a1
     | Sum.inr a2 => EffectModel.handlerType a2
 
-instance instGuardLayerProd (γ₁ γ₂ : Type) [GuardLayer γ₁] [GuardLayer γ₂] :
+instance instGuardLayerProd (γ₁ γ₂ : Type u) [GuardLayer γ₁] [GuardLayer γ₂] :
     GuardLayer (γ₁ × γ₂) where
+  -- Product layer uses the left component's namespace.
   layerNs := fun g => GuardLayer.layerNs g.1
   Resource := GuardLayer.Resource γ₁ × GuardLayer.Resource γ₂
   Evidence := GuardLayer.Evidence γ₁ × GuardLayer.Evidence γ₂
@@ -72,18 +70,32 @@ instance instGuardLayerProd (γ₁ γ₂ : Type) [GuardLayer γ₁] [GuardLayer 
   close := fun r e =>
     (GuardLayer.close r.1 e.1, GuardLayer.close r.2 e.2)
 
-structure IdentityGuardBridge (ι : Type) (γ : Type) [IdentityModel ι] [GuardLayer γ] where
+/-! ## Bridge classes -/
+
+class IdentityGuardBridge (ι : Type u) (γ : Type u) [IdentityModel ι] [GuardLayer γ] where
+  -- Map identities into guard resources.
   bridge : IdentityModel.ParticipantId ι → GuardLayer.Resource γ
 
-structure EffectGuardBridge (ε : Type) (γ : Type) [EffectModel ε] [GuardLayer γ] where
+class EffectGuardBridge (ε : Type u) (γ : Type u) [EffectModel ε] [GuardLayer γ] where
+  -- Map effect actions into guard resources.
   bridge : EffectModel.EffectAction ε → GuardLayer.Resource γ
 
-structure PersistenceEffectBridge (π : Type) (ε : Type) [PersistenceModel π] [EffectModel ε] where
+class PersistenceEffectBridge (π : Type u) (ε : Type u) [PersistenceModel π] [EffectModel ε] where
+  -- Map effects into persistence deltas.
   bridge : EffectModel.EffectAction ε → PersistenceModel.Delta π
 
-structure IdentityPersistenceBridge (ι : Type) (π : Type) [IdentityModel ι] [PersistenceModel π] where
+class IdentityPersistenceBridge (ι : Type u) (π : Type u) [IdentityModel ι] [PersistenceModel π] where
+  -- Map identities into persistent state.
   bridge : IdentityModel.ParticipantId ι → PersistenceModel.PState π
 
-def effect_composition_safe : Prop := True
-def composed_frame_rule : Prop := True
-def protocol_federation : Prop := True
+/-! ## Composition claims -/
+
+def effect_composition_safe : Prop :=
+  -- Placeholder: composition safety statement for effects.
+  True
+def composed_frame_rule : Prop :=
+  -- Placeholder: frame rule for composed models.
+  True
+def protocol_federation : Prop :=
+  -- Placeholder: federation correctness statement.
+  True

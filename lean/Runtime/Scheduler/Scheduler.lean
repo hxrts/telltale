@@ -1,40 +1,34 @@
 import Runtime.VM.Definition
-import Runtime.Compat.WP
+import Runtime.VM.SchedulerTypes
 
-/-!
-# Task 17: Cooperative Scheduler
+/-
+The Problem. The runtime needs a scheduler model that can be referenced by the
+VM without pulling in proof-level dependencies.
 
-Cooperative coroutine scheduler from iris_runtime_2.md §4.
-
-## Definitions
-
-- `SchedPolicy` — round-robin, priority, work-stealing
-- `schedule` — select next runnable coroutine
-- `schedStep` — scheduler + VM step composed
-- `schedule_confluence` — diamond property
-- `cooperative_refines_concurrent`
-- `CoroutinePool` — ready/blocked/halted partition
-
-Dependencies: Task 11, Shim.WeakestPre.
+Solution Structure. Define a minimal pool view and step function that can be
+refined later by scheduler correctness theorems.
 -/
 
 set_option autoImplicit false
 
-inductive SchedPolicy where
-  | roundRobin
-  | priority
-  | workStealing
-  deriving Repr
+/-! ## Scheduler state -/
 
 structure CoroutinePool where
+  -- Partition coroutines by status.
   ready : List CoroutineId
   blocked : List CoroutineId
   halted : List CoroutineId
   deriving Repr
 
-def schedule {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] :
-    VMState ι π ε → Option (CoroutineId × VMState ι π ε) :=
+/-! ## Scheduler step -/
+
+def schedule {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] :
+    VMState ι γ π ε → Option (CoroutineId × VMState ι γ π ε) :=
   fun st =>
+    -- Pick the first runnable coroutine in array order.
     let rec go (i : Nat) : Option CoroutineId :=
       if h : i < st.coroutines.size then
         let c := st.coroutines[i]'h
@@ -47,17 +41,31 @@ def schedule {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectM
     | none => none
     | some cid => some (cid, st)
 
-def schedStep {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε] :
-    VMState ι π ε → Option (VMState ι π ε) :=
+def schedStep {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] :
+    VMState ι γ π ε → Option (VMState ι γ π ε) :=
   fun st =>
+    -- Execute a single scheduled coroutine step.
     match schedule st with
     | none => none
     | some (cid, st') =>
         let (st'', _) := execInstr st' cid
         some st''
 
-def schedule_confluence {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
-    (_st : VMState ι π ε) : Prop := True
+def schedule_confluence {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    (_st : VMState ι γ π ε) : Prop :=
+  -- Placeholder: scheduler choices are confluent.
+  True
 
-def cooperative_refines_concurrent {ι π ε : Type} [IdentityModel ι] [PersistenceModel π] [EffectModel ε]
-    (_st : VMState ι π ε) : Prop := True
+def cooperative_refines_concurrent {ι γ π ε : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    (_st : VMState ι γ π ε) : Prop :=
+  -- Placeholder: cooperative execution refines concurrent.
+  True
