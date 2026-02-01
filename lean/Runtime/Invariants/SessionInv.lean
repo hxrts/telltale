@@ -56,13 +56,13 @@ def head_coherent (sid : SessionId) (G : SessionMap) (D : DEnv) : iProp :=
   -- Head coherence matches the full consume condition in V1.
   session_coherent sid G D
 
-def knowledge_fact (sid : SessionId) (e : Endpoint) : GhostKnowledgeFact :=
+def knowledge_fact (sid : SessionId) (e : Endpoint) : KnowledgeFact :=
   -- Stable per-endpoint fact tag for knowledge ownership.
-  toString sid ++ ":" ++ e.role
+  { endpoint := e, fact := toString sid ++ ":" ++ e.role }
 
 def knowledge_inv (γ : GhostName) (sid : SessionId) (e : Endpoint) : iProp :=
   -- Endpoint-specific knowledge invariant.
-  knows γ e (knowledge_fact sid e)
+  knows γ (knowledge_fact sid e)
 
 def knowledge_inv_all (γ : GhostName) (sid : SessionId) (G : SessionMap) : iProp :=
   -- Conjunction of knowledge invariants over the session map.

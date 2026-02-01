@@ -69,6 +69,9 @@ instance : VerificationModel Unit where
   verifyCommitment := fun _ _ _ => true
   decEqC := by infer_instance
   decEqN := by infer_instance
+  defaultCommitmentKey := ()
+  defaultNullifierKey := ()
+  defaultNonce := ()
 
 instance : AuthTree Unit where
   -- Unit authenticated tree: all proofs validate.
@@ -211,6 +214,10 @@ instance instPersistenceModelProd (π₁ π₂ : Type u)
     | some s1, some s2 => some (s1, s2)
     | _, _ => none
   empty := (PersistenceModel.empty, PersistenceModel.empty)
+  openDelta := fun sid =>
+    (PersistenceModel.openDelta sid, PersistenceModel.openDelta sid)
+  closeDelta := fun sid =>
+    (PersistenceModel.closeDelta sid, PersistenceModel.closeDelta sid)
 
 /-! ## Bridge classes -/
 

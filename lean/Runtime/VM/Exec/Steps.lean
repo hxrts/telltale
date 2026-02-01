@@ -1,4 +1,5 @@
 import Protocol.Environments.Part1
+import Runtime.Resources.ResourceModel
 import Runtime.VM.Exec.Helpers
 
 /-
@@ -14,6 +15,13 @@ set_option autoImplicit false
 universe u
 
 /-! ## Instruction semantics -/
+
+private def primaryEndpoint {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (coro : CoroutineState γ ε) : Endpoint :=
+  -- Choose a representative endpoint for observability.
+  match coro.ownedEndpoints with
+  | e :: _ => e
+  | [] => { sid := 0, role := "" }
 
 private def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -39,7 +47,10 @@ private def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
                 match SessionStore.lookupHandler st.sessions edge with
                 | none =>
                     faultPack st coro (.specFault "no handler bound") "no handler bound"
-                | some _ =>
+                | some h =>
+                    if st.config.handlerSpecOk h = false then
+                      faultPack st coro (.specFault "handler spec failed") "handler spec failed"
+                    else
                     -- Sign the payload with the role's signing key.
                     let signed := signValue (st.config.roleSigningKey ep.role) v
                     let cfg := st.config.bufferConfig edge
@@ -95,7 +106,10 @@ private def stepRecv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
               match SessionStore.lookupHandler st.sessions edge with
               | none =>
                   faultPack st coro (.specFault "no handler bound") "no handler bound"
-              | some _ =>
+              | some h =>
+                  if st.config.handlerSpecOk h = false then
+                    faultPack st coro (.specFault "handler spec failed") "handler spec failed"
+                  else
                   match consumeProgressToken coro.progressTokens token with
                   | none =>
                       faultPack st coro (.noProgressToken edge) "missing progress token"
@@ -163,7 +177,10 @@ private def stepOffer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
                   match SessionStore.lookupHandler st.sessions edge with
                   | none =>
                       faultPack st coro (.specFault "no handler bound") "no handler bound"
-                  | some _ =>
+                  | some h =>
+                      if st.config.handlerSpecOk h = false then
+                        faultPack st coro (.specFault "handler spec failed") "handler spec failed"
+                      else
                       let cfg := st.config.bufferConfig edge
                       let (res, bufs') := bufEnqueue cfg st.buffers edge signed
                       match res with
@@ -213,7 +230,10 @@ private def stepChoose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
               match SessionStore.lookupHandler st.sessions edge with
               | none =>
                   faultPack st coro (.specFault "no handler bound") "no handler bound"
-              | some _ =>
+              | some h =>
+                  if st.config.handlerSpecOk h = false then
+                    faultPack st coro (.specFault "handler spec failed") "handler spec failed"
+                  else
                   match bufDequeue st.buffers edge with
                   | some (sv, bufs') =>
                       -- Verify the signature before consuming the label.
@@ -324,7 +344,6 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
         | some regs' =>
             let scope := { id := sid }
             let payload := Value.prod (.nat sid) (.string (String.intercalate "," roles))
-            let commitKey := commitmentKeyOfPayload (ν:=ν) payload
             let endpoints := roles.map (fun r => { sid := sid, role := r })
             let localTypes' := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
             let edges := allEdges sid roles
@@ -342,14 +361,34 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
               , epoch := 0
               , phase := .active }
             let coro' := advancePc ({ coro with regs := regs', status := .ready, ownedEndpoints := endpoints ++ coro.ownedEndpoints })
-            let resources' := updateResourceStates st.resourceStates scope
-              (fun rs => { rs with commitments := AccumulatedSet.insert rs.commitments commitKey })
-            let st' :=
-              { st with nextSessionId := st.nextSessionId + 1
-                      , sessions := (sid, sess) :: st.sessions
-                      , resourceStates := resources'
-                      , buffers := bufs' }
-            pack coro' st' (mkRes .continue (some (.obs (.opened sid roles))))
+            let res : Resource ν :=
+              { logic := VerificationModel.hashTagged .resourceKind payload
+              , label := VerificationModel.hashTagged .contentId payload
+              , quantity := 1
+              , value := payload
+              , nonce := VerificationModel.defaultNonce
+              , ckey := VerificationModel.defaultCommitmentKey
+              , nullifierKey := VerificationModel.defaultNullifierKey
+              , isEphemeral := false }
+            let tx : Transaction ν :=
+              { created := [res]
+              , consumed := []
+              , deltaProof := ()
+              , logicProofs := []
+              , complianceProofs := [st.config.complianceProof res]
+              , authorizedImbalance := true }
+            match applyTransactionAtScope st.resourceStates scope tx with
+            | none =>
+                faultPack st coro (.specFault "resource transaction failed") "resource transaction failed"
+            | some resources' =>
+                let persist' := PersistenceModel.apply st.persistent (PersistenceModel.openDelta sid)
+                let st' :=
+                  { st with nextSessionId := st.nextSessionId + 1
+                          , sessions := (sid, sess) :: st.sessions
+                          , resourceStates := resources'
+                          , buffers := bufs'
+                          , persistent := persist' }
+                pack coro' st' (mkRes .continue (some (.obs (.opened sid roles))))
 
 private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -361,16 +400,20 @@ private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
   match readReg coro.regs session with
   | some (.chan ep) =>
       if owns coro ep then
+        let rec findEpoch (ss : SessionStore ν) : Nat :=
+          match ss with
+          | [] => 0
+          | (sid, s) :: rest => if sid = ep.sid then s.epoch else findEpoch rest
+        let epoch' := findEpoch st.sessions + 1
         let updatePhase (s : SessionState ν) : SessionState ν :=
           -- Closing clears buffers and traces while marking the phase.
-          { s with phase := .closed, buffers := [], traces := (∅ : DEnv) }
+          { s with phase := .closed, buffers := [], traces := (∅ : DEnv), epoch := epoch' }
         let rec findRoles (ss : SessionStore ν) : RoleSet :=
           match ss with
           | [] => []
           | (sid, s) :: rest => if sid = ep.sid then s.roles else findRoles rest
         let roles := findRoles st.sessions
         let payload := Value.prod (.nat ep.sid) (.string (String.intercalate "," roles))
-        let nullKey := nullifierKeyOfPayload (ν:=ν) payload
         let rec closeSess (ss : SessionStore ν) : SessionStore ν :=
           match ss with
           | [] => []
@@ -379,12 +422,34 @@ private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
                 (sid, updatePhase s) :: rest
               else
                 (sid, s) :: closeSess rest
-        let resources' := updateResourceStates st.resourceStates { id := ep.sid }
-          (fun rs => { rs with nullifiers := AccumulatedSet.insert rs.nullifiers nullKey })
-        let st' := { st with sessions := closeSess st.sessions, resourceStates := resources' }
-        let owned' := coro.ownedEndpoints.filter (fun e => decide (e ≠ ep))
-        let coro' := advancePc { coro with status := .ready, ownedEndpoints := owned' }
-        pack coro' st' (mkRes .continue (some (.obs (.closed ep.sid))))
+        let res : Resource ν :=
+          { logic := VerificationModel.hashTagged .resourceKind payload
+          , label := VerificationModel.hashTagged .contentId payload
+          , quantity := 1
+          , value := payload
+          , nonce := VerificationModel.defaultNonce
+          , ckey := VerificationModel.defaultCommitmentKey
+          , nullifierKey := VerificationModel.defaultNullifierKey
+          , isEphemeral := false }
+        let tx : Transaction ν :=
+          { created := []
+          , consumed := [res]
+          , deltaProof := ()
+          , logicProofs := []
+          , complianceProofs := [st.config.complianceProof res]
+          , authorizedImbalance := true }
+        match applyTransactionAtScope st.resourceStates { id := ep.sid } tx with
+        | none =>
+            faultPack st coro (.closeFault "resource transaction failed") "resource transaction failed"
+        | some resources' =>
+            let persist' := PersistenceModel.apply st.persistent (PersistenceModel.closeDelta ep.sid)
+            let st' := { st with sessions := closeSess st.sessions
+                                , resourceStates := resources'
+                                , persistent := persist' }
+            let st'' := appendEvent st' (some (StepEvent.obs (.epochAdvanced ep.sid epoch')))
+            let owned' := coro.ownedEndpoints.filter (fun e => decide (e ≠ ep))
+            let coro' := advancePc { coro with status := .ready, ownedEndpoints := owned' }
+            pack coro' st'' (mkRes .continue (some (.obs (.closed ep.sid))))
       else
         faultPack st coro (.closeFault "endpoint not owned") "endpoint not owned"
   | some v =>
@@ -412,7 +477,7 @@ private def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
             match setReg coro.regs dst encoded with
             | none => faultPack st coro .outOfRegisters "bad dst reg"
             | some regs' =>
-                let ev := StepEvent.obs (.acquired (GuardLayer.layerNs layer))
+                let ev := StepEvent.obs (.acquired (GuardLayer.layerNs layer) (primaryEndpoint coro))
                 continuePack st { coro with regs := regs' } (some ev)
 
 private def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -436,7 +501,7 @@ private def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
             | some _ =>
                 let rs' := guardResourceUpdate st.guardResources _layer (fun r => GuardLayer.close r evd)
                 let st' := { st with guardResources := rs' }
-                let ev := StepEvent.obs (.released (GuardLayer.layerNs _layer))
+                let ev := StepEvent.obs (.released (GuardLayer.layerNs _layer) (primaryEndpoint coro))
                 continuePack st' coro (some ev)
 
 private def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -454,7 +519,7 @@ private def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
       let delta := PersistenceEffectBridge.bridge (π:=π) (ε:=ε) action
       let persist' := PersistenceModel.apply st.persistent delta
       let st' := { st with persistent := persist' }
-      let ev := StepEvent.obs (.invoked handlerId)
+      let ev := StepEvent.obs (.invoked (primaryEndpoint coro) action)
       continuePack st' { coro with effectCtx := ctx' } (some ev)
 
 private def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -467,7 +532,7 @@ private def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   match readReg coro.regs sidReg with
   | some (.nat gsid) =>
       let coro' := advancePc { coro with specState := some { ghostSid := gsid, depth := 0 } }
-      pack coro' st (mkRes (.forked gsid) none)
+      pack coro' st (mkRes (.forked gsid) (some (.obs (.forked gsid gsid))))
   | some v =>
       faultPack st coro (.typeViolation .nat (valTypeOf v)) "bad fork operand"
   | none =>
@@ -479,8 +544,12 @@ private def stepJoin {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Join speculation: clear ghost state.
+  let sid :=
+    match coro.specState with
+    | some s => s.ghostSid
+    | none => 0
   let coro' := advancePc { coro with specState := none }
-  pack coro' st (mkRes .joined none)
+  pack coro' st (mkRes .joined (some (.obs (.joined sid))))
 
 private def stepAbort {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -488,8 +557,12 @@ private def stepAbort {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
   -- Abort speculation: clear ghost state.
+  let sid :=
+    match coro.specState with
+    | some s => s.ghostSid
+    | none => 0
   let coro' := advancePc { coro with specState := none }
-  pack coro' st (mkRes .aborted none)
+  pack coro' st (mkRes .aborted (some (.obs (.aborted sid))))
 
 private def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

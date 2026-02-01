@@ -1,4 +1,4 @@
-import Runtime.VM.LanguageInstance
+import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Invariants.SessionInv
 import Runtime.ProgramLogic.WPPair
 import Runtime.Compat.Inv

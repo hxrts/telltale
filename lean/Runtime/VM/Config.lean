@@ -1,6 +1,7 @@
 import Runtime.VM.TypeClasses
 import Runtime.VM.Core
 import Runtime.VM.Knowledge
+import Runtime.Resources.ResourceModel
 import Runtime.VM.SchedulerTypes
 import Runtime.VM.Violation
 import Runtime.Monitor.DomainComposition
@@ -48,6 +49,10 @@ structure VMConfig (ι γ π ε ν : Type u)
   violationPolicy : ViolationPolicy
   -- Knowledge flow policy (§16).
   flowPolicy : FlowPolicy
+  -- Handler transport-spec check hook (§8/§15).
+  handlerSpecOk : HandlerId → Bool
+  -- Compliance proof supplier for resource transactions (§22).
+  complianceProof : Resource ν → ComplianceProof ν
   -- Resource bounds.
   maxCoroutines : Nat
   maxSessions : Nat

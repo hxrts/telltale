@@ -1,4 +1,5 @@
 import Runtime.Resources.SessionRA
+import Runtime.VM.Knowledge
 import Runtime.Compat.RA
 import Runtime.Compat.Inv
 import Runtime.Compat.SavedProp
@@ -41,26 +42,21 @@ def sepList (ps : List iProp) : iProp :=
 
 /-! ## Knowledge RA -/
 
-abbrev GhostKnowledgeFact := String -- Atom representing a knowledge fact.
-abbrev KnowledgeRA := GMap (Endpoint × GhostKnowledgeFact) Unit -- Ghost map for facts.
+abbrev KnowledgeRA := GMap KnowledgeFact Unit -- Ghost map for facts.
 
-def knows (γ : GhostName) (e : Endpoint) (k : GhostKnowledgeFact) : iProp :=
-  -- Ownership of a single knowledge fact for an endpoint.
-  ghost_map_elem γ (e, k) ()
+def knows (γ : GhostName) (k : KnowledgeFact) : iProp :=
+  -- Ownership of a single knowledge fact.
+  ghost_map_elem γ k ()
 
-def knowledge_set_owns (γ : GhostName) (ks : List (Endpoint × GhostKnowledgeFact)) : iProp :=
+def knowledge_set_owns (γ : GhostName) (ks : List KnowledgeFact) : iProp :=
   -- Ownership of a list of knowledge facts.
-  sepList (ks.map (fun p => knows γ p.1 p.2))
+  sepList (ks.map (fun k => knows γ k))
 
-structure FlowPolicy where
-  -- Flow policy decides if a fact may flow to a role.
-  allowed : GhostKnowledgeFact → Role → Bool
-
-def KnowledgeReachable (_k : GhostKnowledgeFact) : Prop :=
+def KnowledgeReachable (_k : KnowledgeFact) : Prop :=
   -- Reachability predicate for knowledge flow (placeholder relation).
   True
 
-def knowledge_disjoint (ks1 ks2 : List (Endpoint × GhostKnowledgeFact)) : Prop :=
+def knowledge_disjoint (ks1 ks2 : List KnowledgeFact) : Prop :=
   -- Disjointness of knowledge sets by element exclusion.
   ∀ x, x ∈ ks1 → x ∈ ks2 → False
 
@@ -73,8 +69,10 @@ def knowledge_separation : Prop :=
 def send_transfers_knowledge : Prop :=
   -- Sending creates receiver knowledge in addition to sender knowledge.
   ∀ γ sender receiver fact,
-    iProp.entails (knows γ sender fact)
-      (iProp.sep (knows γ sender fact) (knows γ receiver fact))
+    let kSender : KnowledgeFact := { endpoint := sender, fact := fact }
+    let kReceiver : KnowledgeFact := { endpoint := receiver, fact := fact }
+    iProp.entails (knows γ kSender)
+      (iProp.sep (knows γ kSender) (knows γ kReceiver))
 
 def non_leakage (pol : FlowPolicy) : Prop :=
   -- Disallowed flows cannot become reachable.
@@ -191,7 +189,7 @@ structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
   guardState : List (γ × GuardLayer.Resource γ) -- Guard resources for the endpoint.
   effectSlice : EffectModel.EffectCtx ε -- Effect context slice.
   progressTokens : List (SessionId × Endpoint × Nat) -- Liveness tokens.
-  knowledge : List (Endpoint × GhostKnowledgeFact) -- Knowledge facts.
+  knowledge : List KnowledgeFact -- Knowledge facts.
 
 def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : iProp :=

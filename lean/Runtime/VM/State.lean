@@ -96,15 +96,15 @@ structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
 
 /-! ## Execution results and events -/
 
-inductive ObsEvent where
+inductive ObsEvent (ε : Type u) [EffectModel ε] where
   -- Observable events emitted by VM execution.
   | sent (edge : Edge) (val : Value) (seqNo : Nat)
   | received (edge : Edge) (val : Value) (seqNo : Nat)
   | offered (edge : Edge) (label : Label)
   | chose (edge : Edge) (label : Label)
-  | acquired (layer : Namespace)
-  | released (layer : Namespace)
-  | invoked (handler : HandlerId)
+  | acquired (layer : Namespace) (endpoint : Endpoint)
+  | released (layer : Namespace) (endpoint : Endpoint)
+  | invoked (endpoint : Endpoint) (action : EffectModel.EffectAction ε)
   | opened (sid : SessionId) (roles : RoleSet)
   | closed (sid : SessionId)
   | epochAdvanced (sid : SessionId) (epoch : Nat)
@@ -115,9 +115,9 @@ inductive ObsEvent where
   | tagged (fact : KnowledgeFact)
   | checked (target : Role) (permitted : Bool)
 
-inductive StepEvent where
+inductive StepEvent (ε : Type u) [EffectModel ε] where
   -- Step events are either observable or internal.
-  | obs (ev : ObsEvent)
+  | obs (ev : ObsEvent ε)
   | internal
 
 inductive ExecStatus (γ : Type u) where
@@ -135,10 +135,10 @@ inductive ExecStatus (γ : Type u) where
   | aborted
   deriving Repr
 
-structure ExecResult (γ : Type u) where
+structure ExecResult (γ ε : Type u) [EffectModel ε] where
   -- Execution result with optional observable event.
   status : ExecStatus γ
-  event : Option StepEvent
+  event : Option (StepEvent ε)
 
 /-! ## Scheduler state -/
 
@@ -176,7 +176,7 @@ structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
   guardResources : List (γ × GuardLayer.Resource γ)
   sched : SchedState γ
   monitor : SessionMonitor γ
-  obsTrace : List StepEvent
+  obsTrace : List (StepEvent ε)
   crashedSites : List (IdentityModel.SiteId ι)
   partitionedEdges : List Edge
   mask : Unit

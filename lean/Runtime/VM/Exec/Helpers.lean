@@ -24,7 +24,7 @@ structure StepPack (ι γ π ε ν : Type u)
   -- Bundle updated coroutine/state/result from a single step.
   coro : CoroutineState γ ε
   st : VMState ι γ π ε ν
-  res : ExecResult γ
+  res : ExecResult γ ε
 
 /-! ## Buffer helpers -/
 
@@ -202,6 +202,19 @@ def defaultResourceState {ν : Type u} [VerificationModel ν] [AccumulatedSet ν
   , commitments := AccumulatedSet.empty
   , nullifiers := AccumulatedSet.empty }
 
+/-! ## Persistence helpers -/
+
+def reconstructSession {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (sid : SessionId) :
+    Option (PersistenceModel.SessionState π) :=
+  -- Reconstruct a session from persistent state.
+  PersistenceModel.derive st.persistent sid
+
 def updateResourceStates {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (states : List (ScopeId × ResourceState ν)) (scope : ScopeId)
     (f : ResourceState ν → ResourceState ν) : List (ScopeId × ResourceState ν) :=
@@ -213,6 +226,25 @@ def updateResourceStates {ν : Type u} [VerificationModel ν] [AccumulatedSet ν
         (sid, f st) :: rest
       else
         (sid, st) :: updateResourceStates rest scope f
+
+def applyTransactionAtScope {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (states : List (ScopeId × ResourceState ν)) (scope : ScopeId)
+    (tx : Transaction ν) : Option (List (ScopeId × ResourceState ν)) :=
+  -- Apply a transaction to a scope, inserting default state if needed.
+  match states with
+  | [] =>
+      match applyTransaction tx (defaultResourceState scope) with
+      | some st' => some [(scope, st')]
+      | none => none
+  | (sid, st) :: rest =>
+      if sid = scope then
+        match applyTransaction tx st with
+        | some st' => some ((sid, st') :: rest)
+        | none => none
+      else
+        match applyTransactionAtScope rest scope tx with
+        | some rest' => some ((sid, st) :: rest')
+        | none => none
 
 def updateSessBuffers {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) (sid : SessionId)
@@ -233,7 +265,7 @@ def appendEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν)
-    (ev : Option StepEvent) : VMState ι γ π ε ν :=
+    (ev : Option (StepEvent ε)) : VMState ι γ π ε ν :=
   -- Record an event in the observable trace.
   match ev with
   | none => st
@@ -280,8 +312,8 @@ def valTypeOf (v : Value) : ValType :=
 
 /-! ## Result helpers -/
 
-def mkRes {γ : Type u} (status : ExecStatus γ)
-    (event : Option StepEvent) : ExecResult γ :=
+def mkRes {γ ε : Type u} [EffectModel ε] (status : ExecStatus γ)
+    (event : Option (StepEvent ε)) : ExecResult γ ε :=
   -- Build an execution result.
   { status := status, event := event }
 
@@ -292,7 +324,7 @@ def pack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (coro : CoroutineState γ ε) (st : VMState ι γ π ε ν)
-    (res : ExecResult γ) : StepPack ι γ π ε ν :=
+    (res : ExecResult γ ε) : StepPack ι γ π ε ν :=
   -- Bundle the updated coroutine, state, and result.
   { coro := coro, st := st, res := res }
 
@@ -328,7 +360,7 @@ def continuePack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
-    (ev : Option StepEvent) : StepPack ι γ π ε ν :=
+    (ev : Option (StepEvent ε)) : StepPack ι γ π ε ν :=
   -- Mark the coroutine ready and continue.
   let coro' := advancePc { coro with status := .ready }
   pack coro' st (mkRes .continue ev)

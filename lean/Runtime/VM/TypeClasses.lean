@@ -146,6 +146,10 @@ class PersistenceModel (π : Type u) where
   derive : PState → SessionId → Option SessionState
   /-- Empty persistent state. -/
   empty : PState
+  /-- Delta emitted on session open. -/
+  openDelta : SessionId → Delta
+  /-- Delta emitted on session close. -/
+  closeDelta : SessionId → Delta
 
 -- Effect interface with Iris pre/postconditions.
 class EffectModel (ε : Type u) where
@@ -201,6 +205,10 @@ class VerificationModel (ν : Type u) where
   verifyCommitment : Commitment → CommitmentProof → Data → Bool
   decEqC : DecidableEq Commitment
   decEqN : DecidableEq Nullifier
+  -- Default keys and nonce for V1 scaffolding.
+  defaultCommitmentKey : CommitmentKey
+  defaultNullifierKey : NullifierKey
+  defaultNonce : Nonce
 
 /-! ## Signed message wrapper -/
 

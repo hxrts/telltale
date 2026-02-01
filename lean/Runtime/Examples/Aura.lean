@@ -65,6 +65,8 @@ instance : PersistenceModel AuraJournal where
   apply := fun _ _ => ()
   derive := fun _ _ => some ()
   empty := ()
+  openDelta := fun _ => ()
+  closeDelta := fun _ => ()
 
 /-! ## Bridge instances -/
 
@@ -117,6 +119,8 @@ def auraConfig :
   , schedPolicy := .roundRobin
   , violationPolicy := { allow := fun _ => false }
   , flowPolicy := auraFlowPolicy
+  , handlerSpecOk := fun _ => true
+  , complianceProof := fun _ => ((), ())
   , maxCoroutines := 128
   , maxSessions := 64
   , guardChain := auraGuardChain

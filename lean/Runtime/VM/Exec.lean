@@ -20,7 +20,7 @@ private def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (coroId : CoroutineId) (pack' : StepPack ι γ π ε ν) :
-    VMState ι γ π ε ν × ExecResult γ :=
+    VMState ι γ π ε ν × ExecResult γ ε :=
   -- Update the coroutine and append any observable event.
   let st' := updateCoro pack'.st coroId pack'.coro
   (appendEvent st' pack'.res.event, pack'.res)
@@ -30,7 +30,7 @@ private def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε)
-    (instr : Instr γ ε) : VMState ι γ π ε ν × ExecResult γ :=
+    (instr : Instr γ ε) : VMState ι γ π ε ν × ExecResult γ ε :=
   -- Enforce monitor typing and cost budget before execution.
   if monitorAllows st.monitor instr then
     match chargeCost st.config coro instr with
@@ -49,7 +49,7 @@ private def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε) :
-    VMState ι γ π ε ν × ExecResult γ :=
+    VMState ι γ π ε ν × ExecResult γ ε :=
   -- Handle coroutine status and fetch the next instruction.
   match coro.status with
   | .done => (st, mkRes .halted none)
@@ -70,7 +70,7 @@ def execInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coroId : CoroutineId) :
-    VMState ι γ π ε ν × ExecResult γ :=
+    VMState ι γ π ε ν × ExecResult γ ε :=
   -- Guard against missing coroutine and delegate to the core stepper.
   match st.coroutines[coroId]? with
   | none =>

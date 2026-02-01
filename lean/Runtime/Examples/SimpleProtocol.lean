@@ -73,6 +73,8 @@ instance : PersistenceModel TestPersist where
   apply := fun _ _ => ()
   derive := fun _ _ => some ()
   empty := ()
+  openDelta := fun _ => ()
+  closeDelta := fun _ => ()
 
 instance : EffectModel TestEffect where
   -- Empty effect model avoids noncomputable iProp constants.
@@ -106,6 +108,9 @@ instance : VerificationModel TestVerify where
   verifyCommitment := fun _ _ _ => true
   decEqC := by infer_instance
   decEqN := by infer_instance
+  defaultCommitmentKey := ()
+  defaultNullifierKey := ()
+  defaultNonce := ()
 
 instance : AuthTree TestVerify where
   -- Trivial authenticated tree interface for tests.
@@ -174,6 +179,8 @@ def testConfig : VMConfig TestIdentity TestGuard TestPersist TestEffect TestVeri
   , schedPolicy := .roundRobin
   , violationPolicy := { allow := fun _ => false }
   , flowPolicy := testFlowPolicy
+  , handlerSpecOk := fun _ => true
+  , complianceProof := fun _ => ((), ())
   , maxCoroutines := 8
   , maxSessions := 4
   , guardChain := testGuardChain

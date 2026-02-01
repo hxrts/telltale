@@ -78,8 +78,8 @@ def Resource.kind {ν : Type u} [VerificationModel ν]
 /-- Resource delta contribution (placeholder). -/
 def Resource.delta {ν : Type u} [VerificationModel ν]
     (_r : Resource ν) : Delta :=
-  -- V1 uses a stubbed delta accounting.
-  0
+  -- V1 uses quantity-only delta accounting.
+  Int.ofNat _r.quantity
 
 /-- Map a commitment payload into an accumulated-set key. -/
 def commitmentKey {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
@@ -124,9 +124,11 @@ structure Transaction (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] w
 
 /-- Delta balance predicate for a transaction (stub). -/
 def txBalanced {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
-    (_tx : Transaction ν) : Prop :=
-  -- V1 leaves balance checking abstract.
-  True
+    (tx : Transaction ν) : Prop :=
+  -- V1 balances by total quantity across all kinds.
+  let created := tx.created.foldl (fun acc r => acc + r.delta) 0
+  let consumed := tx.consumed.foldl (fun acc r => acc + r.delta) 0
+  created - consumed = 0
 
 /-- Transaction validity for a given resource state (V1). -/
 def Transaction.valid {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
