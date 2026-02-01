@@ -18,8 +18,7 @@ universe u
 
 /-! ## Control-flow semantics -/
 
-private def copyArgs {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
-    (src : RegFile) (size : Nat) (args : List Reg) : RegFile :=
+private def copyArgs (src : RegFile) (size : Nat) (args : List Reg) : RegFile :=
   -- Copy argument registers into a fresh register file.
   let initRegs : RegFile := Array.mk (List.replicate size Value.unit)
   let rec go (idx : Nat) (regs : RegFile) (xs : List Reg) : RegFile :=
