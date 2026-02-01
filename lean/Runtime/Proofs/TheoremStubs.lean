@@ -62,24 +62,28 @@ def handler_is_session : Prop :=
 
 def handler_progress : Prop :=
   -- Handler traces satisfy their declared transport specs.
-  ∀ (ν : Type) [VerificationModel ν] handler (trace : TransportTrace ν)
+  ∀ (ν : Type) [VerificationModel ν] handler (handlers : List (Edge × HandlerId))
+    (trace : TransportTrace ν)
     (hSpec : HandlerSatisfiesTransportSpec ν handler),
-    IsHandlerTrace (ν:=ν) handler trace →
+    IsHandlerTrace (ν:=ν) handler handlers trace →
     SpecSatisfied hSpec.spec trace
 
 def handler_transport_refines : Prop :=
   -- Handler-backed traces refine some transport spec.
-  ∀ (ν : Type) [VerificationModel ν] handler (trace : TransportTrace ν)
+  ∀ (ν : Type) [VerificationModel ν] handler (handlers : List (Edge × HandlerId))
+    (trace : TransportTrace ν)
     (_hSpec : HandlerSatisfiesTransportSpec ν handler),
-    IsHandlerTrace (ν:=ν) handler trace →
+    IsHandlerTrace (ν:=ν) handler handlers trace →
     ∃ spec, SpecSatisfied spec trace
 
 def effect_polymorphic_safety : Prop :=
   -- Any two spec-satisfying handlers respect their own specs.
-  ∀ (ν : Type) [VerificationModel ν] h1 h2 (trace : TransportTrace ν)
+  ∀ (ν : Type) [VerificationModel ν] h1 h2 (handlers : List (Edge × HandlerId))
+    (trace : TransportTrace ν)
     (hSpec1 : HandlerSatisfiesTransportSpec ν h1)
     (hSpec2 : HandlerSatisfiesTransportSpec ν h2),
-    IsHandlerTrace (ν:=ν) h1 trace → IsHandlerTrace (ν:=ν) h2 trace →
+    IsHandlerTrace (ν:=ν) h1 handlers trace →
+    IsHandlerTrace (ν:=ν) h2 handlers trace →
     SpecSatisfied hSpec1.spec trace ∧ SpecSatisfied hSpec2.spec trace
 
 /-! ## Progress Tokens and Scheduling -/

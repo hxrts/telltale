@@ -29,6 +29,13 @@ instance : GuardLayer Unit where
   Evidence := Unit
   open_ := fun _ => some ()
   close := fun _ _ => ()
+  encodeEvidence := fun _ => Value.unit
+  decodeEvidence := fun v =>
+    -- Only unit values decode as unit evidence.
+    match v with
+    | .unit => some ()
+    | _ => none
+  decEq := by infer_instance
 
 instance : EffectModel Unit where
   -- Unit effect model: no-op effects with empty specs.
@@ -175,6 +182,21 @@ instance instGuardLayerProd (γ₁ γ₂ : Type u) [GuardLayer γ₁] [GuardLaye
     | _, _ => none
   close := fun r e =>
     (GuardLayer.close r.1 e.1, GuardLayer.close r.2 e.2)
+  encodeEvidence := fun e =>
+    -- Encode pair evidence as a value product.
+    Value.prod (GuardLayer.encodeEvidence e.1) (GuardLayer.encodeEvidence e.2)
+  decodeEvidence := fun v =>
+    -- Decode a value product into pair evidence.
+    match v with
+    | .prod v1 v2 =>
+        match GuardLayer.decodeEvidence v1, GuardLayer.decodeEvidence v2 with
+        | some e1, some e2 => some (e1, e2)
+        | _, _ => none
+    | _ => none
+  decEq := by
+    -- Use product equality derived from component layers.
+    classical
+    infer_instance
 
 instance instPersistenceModelProd (π₁ π₂ : Type u)
     [PersistenceModel π₁] [PersistenceModel π₂] : PersistenceModel (π₁ × π₂) where

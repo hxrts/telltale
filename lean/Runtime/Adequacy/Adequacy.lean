@@ -35,27 +35,8 @@ Dependencies: Task 12, Task 19, Shim.WeakestPre.
 set_option autoImplicit false
 noncomputable section
 
-inductive ObsEvent (ε : Type) [EffectModel ε] where
-  -- Observable events emitted by VM execution.
-  | sent (edge : Edge) (val : Value) (seqNo : Nat)
-  | received (edge : Edge) (val : Value) (seqNo : Nat)
-  | offered (edge : Edge) (label : Label)
-  | chose (edge : Edge) (label : Label)
-  | acquired (layer : Namespace)
-  | released (layer : Namespace)
-  | invoked (handler : HandlerId)
-  | opened (sid : SessionId) (roles : RoleSet)
-  | closed (sid : SessionId)
-  | epochAdvanced (sid : SessionId) (epoch : Nat)
-  | transferred (endpoint : Endpoint) (fromCoro toCoro : Nat)
-  | forked (sid : SessionId) (ghostSid : GhostSessionId)
-  | joined (sid : SessionId)
-  | aborted (sid : SessionId)
-  | tagged (fact : KnowledgeFact)
-  | checked (target : Role) (permitted : Bool)
-
 -- Trace of observable events.
-abbrev ObsTrace (ε : Type) [EffectModel ε] := List (Nat × ObsEvent ε)
+abbrev ObsTrace := List (Nat × ObsEvent)
 
 private def listGet? {α : Type} : List α → Nat → Option α
   -- Total list lookup by index.
@@ -64,66 +45,56 @@ private def listGet? {α : Type} : List α → Nat → Option α
   | _ :: xs, n + 1 => listGet? xs n
 
 
-def observeAt {ε : Type} [EffectModel ε]
-    (idx : Nat) (ev : StepEvent) : Option (ObsEvent ε) :=
+def obsWithSeqNo (idx : Nat) (ev : ObsEvent) : ObsEvent :=
+  -- Replace seqNo fields with the current index.
+  match ev with
+  | .sent edge val _ => .sent edge val idx
+  | .received edge val _ => .received edge val idx
+  | _ => ev
+
+def observeAt (idx : Nat) (ev : StepEvent) : Option ObsEvent :=
   -- Project internal events to observable events with seqNo = index.
   match ev with
-  | .send edge _ v => some (.sent edge v idx)
-  | .recv edge _ v => some (.received edge v idx)
-  | .offer edge lbl => some (.offered edge lbl)
-  | .choose edge lbl => some (.chose edge lbl)
-  | .acquire layer => some (.acquired layer)
-  | .release layer => some (.released layer)
-  | .invoke handler => some (.invoked handler)
-  | .transfer ep fromCoro toCoro => some (.transferred ep fromCoro toCoro)
-  | .tag fact => some (.tagged fact)
-  | .check target ok => some (.checked target ok)
-  | .open sid => some (.opened sid [])
-  | .close sid => some (.closed sid)
-  | .fault _ => none
+  | .obs e => some (obsWithSeqNo idx e)
+  | .internal => none
 
-def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε) :=
+def observe (ev : StepEvent) : Option ObsEvent :=
   -- Index-free projection defaults seqNo to 0 for V1 convenience.
-  observeAt (ε:=ε) 0 ev
+  observeAt 0 ev
 
-def obsTraceOf {ε : Type} [EffectModel ε]
-    (trace : List StepEvent) : ObsTrace ε :=
+def obsTraceOf (trace : List StepEvent) : ObsTrace :=
   -- Enumerate events and keep the observable subset with indices.
-  let rec go (idx : Nat) (evs : List StepEvent) : ObsTrace ε :=
+  let rec go (idx : Nat) (evs : List StepEvent) : ObsTrace :=
     match evs with
     | [] => []
     | ev :: rest =>
         let tail := go (idx + 1) rest
-        match observeAt (ε:=ε) idx ev with
+        match observeAt idx ev with
         | none => tail
         | some obs => (idx, obs) :: tail
   go 0 trace
 
-def SentAt {ε : Type} [EffectModel ε]
-    (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
+def SentAt (trace : ObsTrace) (idx : Nat) (e : Edge) (v : Value) : Prop :=
   -- Event at idx is a send of v on e (seqNo ignored).
   ∃ n seq, listGet? trace idx = some (n, ObsEvent.sent e v seq)
 
-def RecvAt {ε : Type} [EffectModel ε]
-    (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
+def RecvAt (trace : ObsTrace) (idx : Nat) (e : Edge) (v : Value) : Prop :=
   -- Event at idx is a receive of v on e (seqNo ignored).
   ∃ n seq, listGet? trace idx = some (n, ObsEvent.received e v seq)
 
-def SendBeforeObs {ε : Type} [EffectModel ε]
-    (trace : ObsTrace ε) (e : Edge) (v1 v2 : Value) : Prop :=
+def SendBeforeObs (trace : ObsTrace) (e : Edge) (v1 v2 : Value) : Prop :=
   -- Send ordering derived from trace indices.
   ∃ i j, i < j ∧ SentAt trace i e v1 ∧ SentAt trace j e v2
 
-def RecvBeforeObs {ε : Type} [EffectModel ε]
-    (trace : ObsTrace ε) (e : Edge) (v1 v2 : Value) : Prop :=
+def RecvBeforeObs (trace : ObsTrace) (e : Edge) (v1 v2 : Value) : Prop :=
   -- Receive ordering derived from trace indices.
   ∃ i j, i < j ∧ RecvAt trace i e v1 ∧ RecvAt trace j e v2
 
-def CausallyConsistent {ε : Type} [EffectModel ε] (trace : ObsTrace ε) : Prop :=
+def CausallyConsistent (trace : ObsTrace) : Prop :=
   -- Every receive is preceded by a matching send.
   ∀ j e v, RecvAt trace j e v → ∃ i, i < j ∧ SentAt trace i e v
 
-def FIFOConsistent {ε : Type} [EffectModel ε] (trace : ObsTrace ε) : Prop :=
+def FIFOConsistent (trace : ObsTrace) : Prop :=
   -- Receive order respects send order for each edge.
   ∀ e v1 v2, SendBeforeObs trace e v1 v2 → RecvBeforeObs trace e v1 v2
 
@@ -142,7 +113,7 @@ def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
   -- V1 adequacy: observable traces are causally and FIFO consistent.
   ∀ (st : VMState ι γ π ε ν), WFVMState st →
-    let obs := obsTraceOf (ε:=ε) st.obsTrace
+    let obs := obsTraceOf st.obsTrace
     CausallyConsistent obs ∧ FIFOConsistent obs
 def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -150,8 +121,8 @@ def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
   -- Every observed event comes from some step event at that index.
   ∀ (st : VMState ι γ π ε ν) idx ev,
-    (idx, ev) ∈ obsTraceOf (ε:=ε) st.obsTrace →
-      ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = some ev
+    (idx, ev) ∈ obsTraceOf st.obsTrace →
+      ∃ stepEv ∈ st.obsTrace, observeAt idx stepEv = some ev
 def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)

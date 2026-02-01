@@ -1,6 +1,7 @@
 import Std
 import Runtime.VM.Core
 import Runtime.VM.Config
+import Runtime.VM.Knowledge
 import Runtime.VM.Program
 import Runtime.Monitor.Monitor
 import Runtime.Resources.Arena
@@ -22,8 +23,6 @@ universe u
 
 abbrev NamespaceRef := String -- Opaque namespace name for guard faults.
 
-abbrev KnowledgeFact := String -- Atom for knowledge tracking.
-abbrev KnowledgeSet := List KnowledgeFact -- Snapshot of learned facts.
 
 structure ProgressToken where
   -- Token ties a session to an endpoint for liveness reasoning.
@@ -97,21 +96,29 @@ structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
 
 /-! ## Execution results and events -/
 
+inductive ObsEvent where
+  -- Observable events emitted by VM execution.
+  | sent (edge : Edge) (val : Value) (seqNo : Nat)
+  | received (edge : Edge) (val : Value) (seqNo : Nat)
+  | offered (edge : Edge) (label : Label)
+  | chose (edge : Edge) (label : Label)
+  | acquired (layer : Namespace)
+  | released (layer : Namespace)
+  | invoked (handler : HandlerId)
+  | opened (sid : SessionId) (roles : RoleSet)
+  | closed (sid : SessionId)
+  | epochAdvanced (sid : SessionId) (epoch : Nat)
+  | transferred (endpoint : Endpoint) (fromCoro toCoro : Nat)
+  | forked (sid : SessionId) (ghostSid : GhostSessionId)
+  | joined (sid : SessionId)
+  | aborted (sid : SessionId)
+  | tagged (fact : KnowledgeFact)
+  | checked (target : Role) (permitted : Bool)
+
 inductive StepEvent where
-  -- Step events used by the VM trace (placeholder; refined in Task 11).
-  | send (edge : Edge) (label : Label) (val : Value)
-  | recv (edge : Edge) (label : Label) (val : Value)
-  | offer (edge : Edge) (label : Label)
-  | choose (edge : Edge) (label : Label)
-  | acquire (layer : Namespace)
-  | release (layer : Namespace)
-  | invoke (handler : HandlerId)
-  | transfer (endpoint : Endpoint) (fromCoro toCoro : Nat)
-  | tag (fact : KnowledgeFact)
-  | check (target : Role) (permitted : Bool)
-  | open (sid : SessionId)
-  | close (sid : SessionId)
-  | fault (msg : String)
+  -- Step events are either observable or internal.
+  | obs (ev : ObsEvent)
+  | internal
 
 inductive ExecStatus (γ : Type u) where
   -- Result status of a single instruction step.

@@ -54,6 +54,16 @@ instance : GuardLayer TestGuard where
   Evidence := Unit
   open_ := fun _ => some ()
   close := fun _ _ => ()
+  encodeEvidence := fun _ => Value.unit
+  decodeEvidence := fun v =>
+    -- Only unit values decode as unit evidence.
+    match v with
+    | .unit => some ()
+    | _ => none
+  decEq := by
+    -- Empty type has decidable equality.
+    intro a
+    cases a
 
 instance : PersistenceModel TestPersist where
   -- Unit persistence model with no-op updates.
@@ -154,11 +164,16 @@ def testBufferConfig : BufferConfig :=
   -- Default FIFO buffers with blocking backpressure.
   { mode := .fifo, initialCapacity := 16, policy := .block }
 
+def testFlowPolicy : FlowPolicy :=
+  -- Allow all knowledge flows in tests.
+  { allowed := fun _ _ => true }
+
 def testConfig : VMConfig TestIdentity TestGuard TestPersist TestEffect TestVerify :=
   -- Minimal VM config for the example program.
   { bufferConfig := fun _ => testBufferConfig
   , schedPolicy := .roundRobin
   , violationPolicy := { allow := fun _ => false }
+  , flowPolicy := testFlowPolicy
   , maxCoroutines := 8
   , maxSessions := 4
   , guardChain := testGuardChain
@@ -190,8 +205,10 @@ def exampleLocalTypes : List (Role × LocalType) :=
   [("Alice", aliceType), ("Bob", bobType)]
 
 def exampleHandlers (sid : SessionId) : List (Edge × HandlerId) :=
-  -- Bind self-edges to a single handler id for V1.
+  -- Bind all session edges to a single handler id for V1.
   [({ sid := sid, sender := "Alice", receiver := "Alice" }, 0),
+    ({ sid := sid, sender := "Alice", receiver := "Bob" }, 0),
+    ({ sid := sid, sender := "Bob", receiver := "Alice" }, 0),
     ({ sid := sid, sender := "Bob", receiver := "Bob" }, 0)]
 
 def exampleDsts : List (Role × Reg) :=

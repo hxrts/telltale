@@ -36,15 +36,28 @@ private def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
                 -- Crashed endpoints fail fast.
                 faultPack st coro (.specFault "edge crashed") "edge crashed"
               else
-                -- Sign the payload with the role's signing key.
-                let signed := signValue (st.config.roleSigningKey ep.role) v
-                let bufs' := bufEnqueue st.buffers edge signed
-                let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
-                let trace := SessionStore.lookupTrace sessions1 edge
-                let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [T])
-                let sessions3 := SessionStore.updateType sessions2 ep L'
-                let st' := { st with buffers := bufs', sessions := sessions3 }
-                continuePack st' coro (some (.send edge "" v))
+                match SessionStore.lookupHandler st.sessions edge with
+                | none =>
+                    faultPack st coro (.specFault "no handler bound") "no handler bound"
+                | some _ =>
+                    -- Sign the payload with the role's signing key.
+                    let signed := signValue (st.config.roleSigningKey ep.role) v
+                    let cfg := st.config.bufferConfig edge
+                    let (res, bufs') := bufEnqueue cfg st.buffers edge signed
+                    match res with
+                    | .ok =>
+                        let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                        let trace := SessionStore.lookupTrace sessions1 edge
+                        let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [T])
+                        let sessions3 := SessionStore.updateType sessions2 ep L'
+                        let st' := { st with buffers := bufs', sessions := sessions3 }
+                        continuePack st' coro (some (.obs (.sent edge v 0)))
+                    | .blocked =>
+                        blockPack st coro (.sendWait edge)
+                    | .dropped =>
+                        faultPack st coro (.flowViolation "buffer drop") "buffer drop"
+                    | .error =>
+                        faultPack st coro (.flowViolation "buffer overflow") "buffer overflow"
             else
               faultPack st coro (.typeViolation T (valTypeOf v)) "bad send payload"
         | _ =>
@@ -79,34 +92,38 @@ private def stepRecv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
               -- Crashed endpoints fail fast.
               faultPack st coro (.specFault "edge crashed") "edge crashed"
             else
-              match consumeProgressToken coro.progressTokens token with
+              match SessionStore.lookupHandler st.sessions edge with
               | none =>
-                  faultPack st coro (.noProgressToken edge) "missing progress token"
-              | some tokens' =>
-                  match bufDequeue st.buffers edge with
+                  faultPack st coro (.specFault "no handler bound") "no handler bound"
+              | some _ =>
+                  match consumeProgressToken coro.progressTokens token with
                   | none =>
-                      let coro' := { coro with progressTokens := tokens' }
-                      blockPack st coro' (.recvWait edge token)
-                  | some (sv, bufs') =>
-                      -- Verify the signature against the sender role.
-                      let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
-                      if verifySignedValue vk sv then
-                        if decide (valTypeOf sv.payload = T) then
-                          match setReg coro.regs dst sv.payload with
-                          | none => faultPack st coro .outOfRegisters "bad dst reg"
-                          | some regs' =>
-                              let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
-                              let trace := SessionStore.lookupTrace sessions1 edge
-                              let trace' := match trace with | [] => [] | _ :: ts => ts
-                              let sessions2 := SessionStore.updateTrace sessions1 edge trace'
-                              let sessions3 := SessionStore.updateType sessions2 ep L'
-                              let st' := { st with buffers := bufs', sessions := sessions3 }
-                              let coro' := { coro with regs := regs', progressTokens := tokens' }
-                              continuePack st' coro' (some (.recv edge "" sv.payload))
-                        else
-                          faultPack st coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
-                      else
-                        faultPack st coro (.invalidSignature edge) "invalid signature"
+                      faultPack st coro (.noProgressToken edge) "missing progress token"
+                  | some tokens' =>
+                      match bufDequeue st.buffers edge with
+                      | none =>
+                          let coro' := { coro with progressTokens := tokens' }
+                          blockPack st coro' (.recvWait edge token)
+                      | some (sv, bufs') =>
+                          -- Verify the signature against the sender role.
+                          let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
+                          if verifySignedValue vk sv then
+                            if decide (valTypeOf sv.payload = T) then
+                              match setReg coro.regs dst sv.payload with
+                              | none => faultPack st coro .outOfRegisters "bad dst reg"
+                              | some regs' =>
+                                  let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                                  let trace := SessionStore.lookupTrace sessions1 edge
+                                  let trace' := match trace with | [] => [] | _ :: ts => ts
+                                  let sessions2 := SessionStore.updateTrace sessions1 edge trace'
+                                  let sessions3 := SessionStore.updateType sessions2 ep L'
+                                  let st' := { st with buffers := bufs', sessions := sessions3 }
+                                  let coro' := { coro with regs := regs', progressTokens := tokens' }
+                                  continuePack st' coro' (some (.obs (.received edge sv.payload 0)))
+                            else
+                              faultPack st coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
+                          else
+                            faultPack st coro (.invalidSignature edge) "invalid signature"
         | _ =>
             faultPack st coro (.specFault "recv not permitted") "recv not permitted"
       else
@@ -143,13 +160,26 @@ private def stepOffer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
                   let v := Value.string lbl
                   -- Sign the label payload before enqueue.
                   let signed := signValue (st.config.roleSigningKey ep.role) v
-                  let bufs' := bufEnqueue st.buffers edge signed
-                  let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
-                  let trace := SessionStore.lookupTrace sessions1 edge
-                  let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [.string])
-                  let sessions3 := SessionStore.updateType sessions2 ep L'
-                  let st' := { st with buffers := bufs', sessions := sessions3 }
-                  continuePack st' coro (some (.offer edge lbl))
+                  match SessionStore.lookupHandler st.sessions edge with
+                  | none =>
+                      faultPack st coro (.specFault "no handler bound") "no handler bound"
+                  | some _ =>
+                      let cfg := st.config.bufferConfig edge
+                      let (res, bufs') := bufEnqueue cfg st.buffers edge signed
+                      match res with
+                      | .ok =>
+                          let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                          let trace := SessionStore.lookupTrace sessions1 edge
+                          let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [.string])
+                          let sessions3 := SessionStore.updateType sessions2 ep L'
+                          let st' := { st with buffers := bufs', sessions := sessions3 }
+                          continuePack st' coro (some (.obs (.offered edge lbl)))
+                      | .blocked =>
+                          blockPack st coro (.sendWait edge)
+                      | .dropped =>
+                          faultPack st coro (.flowViolation "buffer drop") "buffer drop"
+                      | .error =>
+                          faultPack st coro (.flowViolation "buffer overflow") "buffer overflow"
         | _ =>
             faultPack st coro (.specFault "offer not permitted") "offer not permitted"
       else
@@ -180,38 +210,42 @@ private def stepChoose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
               -- Crashed endpoints fail fast.
               faultPack st coro (.specFault "edge crashed") "edge crashed"
             else
-              match bufDequeue st.buffers edge with
-              | some (sv, bufs') =>
-                  -- Verify the signature before consuming the label.
-                  let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
-                  if verifySignedValue vk sv then
-                    match sv.payload with
-                    | .string lbl =>
-                        match table.find? (fun b => b.fst == lbl) with
-                        | some (_, target) =>
-                            match choices.find? (fun b => b.fst == lbl) with
+              match SessionStore.lookupHandler st.sessions edge with
+              | none =>
+                  faultPack st coro (.specFault "no handler bound") "no handler bound"
+              | some _ =>
+                  match bufDequeue st.buffers edge with
+                  | some (sv, bufs') =>
+                      -- Verify the signature before consuming the label.
+                      let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
+                      if verifySignedValue vk sv then
+                        match sv.payload with
+                        | .string lbl =>
+                            match table.find? (fun b => b.fst == lbl) with
+                            | some (_, target) =>
+                                match choices.find? (fun b => b.fst == lbl) with
+                                | none =>
+                                    let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
+                                    faultPack st' coro (.unknownLabel lbl) "unknown label"
+                                | some (_, L') =>
+                                    let coro' := { coro with pc := target, status := .ready }
+                                    let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                                    let trace := SessionStore.lookupTrace sessions1 edge
+                                    let trace' := match trace with | [] => [] | _ :: ts => ts
+                                    let sessions2 := SessionStore.updateTrace sessions1 edge trace'
+                                    let sessions3 := SessionStore.updateType sessions2 ep L'
+                                    let st' := { st with buffers := bufs', sessions := sessions3 }
+                                    pack coro' st' (mkRes .continue (some (.obs (.chose edge lbl))))
                             | none =>
                                 let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
                                 faultPack st' coro (.unknownLabel lbl) "unknown label"
-                            | some (_, L') =>
-                                let coro' := { coro with pc := target, status := .ready }
-                                let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
-                                let trace := SessionStore.lookupTrace sessions1 edge
-                                let trace' := match trace with | [] => [] | _ :: ts => ts
-                                let sessions2 := SessionStore.updateTrace sessions1 edge trace'
-                                let sessions3 := SessionStore.updateType sessions2 ep L'
-                                let st' := { st with buffers := bufs', sessions := sessions3 }
-                                pack coro' st' (mkRes .continue (some (.choose edge lbl)))
-                        | none =>
+                        | _ =>
                             let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                            faultPack st' coro (.unknownLabel lbl) "unknown label"
-                    | _ =>
-                        let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                        faultPack st' coro (.typeViolation .string (valTypeOf sv.payload)) "bad label payload"
-                  else
-                    faultPack st coro (.invalidSignature edge) "invalid signature"
-              | none =>
-                  blockPack st coro (.recvWait edge token)
+                            faultPack st' coro (.typeViolation .string (valTypeOf sv.payload)) "bad label payload"
+                      else
+                        faultPack st coro (.invalidSignature edge) "invalid signature"
+                  | none =>
+                      blockPack st coro (.recvWait edge token)
         | _ =>
             faultPack st coro (.specFault "choose not permitted") "choose not permitted"
       else
@@ -255,6 +289,17 @@ private def handlersCoverRoles (sid : SessionId) (roles : List Role)
   -- Ensure every role's self-edge is bound to some handler.
   roles.all (fun r => handlerBound handlers { sid := sid, sender := r, receiver := r })
 
+private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
+  -- Enumerate all directed edges between roles for a session.
+  roles.foldl
+    (fun acc r1 => acc ++ roles.map (fun r2 => { sid := sid, sender := r1, receiver := r2 }))
+    []
+
+private def handlersCoverEdges (sid : SessionId) (roles : List Role)
+    (handlers : List (Edge × HandlerId)) : Bool :=
+  -- Ensure every session edge is bound to some handler.
+  (allEdges sid roles).all (fun e => handlerBound handlers e)
+
 private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -271,7 +316,7 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
       let roles := triples.map (fun p => p.1)
       let dstRegs := triples.map (fun p => p.2.2)
       let pairs := List.zip roles dstRegs
-      if !handlersCoverRoles sid roles handlers then
+      if !handlersCoverEdges sid roles handlers then
         faultPack st coro (.specFault "handler bindings incomplete") "handler bindings incomplete"
       else
         match writeEndpoints coro.regs sid pairs with
@@ -282,6 +327,8 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
             let commitKey := commitmentKeyOfPayload (ν:=ν) payload
             let endpoints := roles.map (fun r => { sid := sid, role := r })
             let localTypes' := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
+            let edges := allEdges sid roles
+            let bufs' := signedBuffersEnsure st.buffers edges
             let sess : SessionState ν :=
               -- V1 binds session scope to the session id.
               { scope := scope
@@ -290,7 +337,7 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
               , endpoints := endpoints
               , localTypes := localTypes'
               , traces := initDEnv sid roles
-              , buffers := []
+              , buffers := buffersFor bufs' sid
               , handlers := handlers
               , epoch := 0
               , phase := .active }
@@ -300,8 +347,9 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
             let st' :=
               { st with nextSessionId := st.nextSessionId + 1
                       , sessions := (sid, sess) :: st.sessions
-                      , resourceStates := resources' }
-            pack coro' st' (mkRes .continue (some (.open sid)))
+                      , resourceStates := resources'
+                      , buffers := bufs' }
+            pack coro' st' (mkRes .continue (some (.obs (.opened sid roles))))
 
 private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -336,7 +384,7 @@ private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
         let st' := { st with sessions := closeSess st.sessions, resourceStates := resources' }
         let owned' := coro.ownedEndpoints.filter (fun e => decide (e ≠ ep))
         let coro' := advancePc { coro with status := .ready, ownedEndpoints := owned' }
-        pack coro' st' (mkRes .continue (some (.close ep.sid)))
+        pack coro' st' (mkRes .continue (some (.obs (.closed ep.sid))))
       else
         faultPack st coro (.closeFault "endpoint not owned") "endpoint not owned"
   | some v =>
@@ -351,21 +399,21 @@ private def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
     (layer : γ) (dst : Reg) : StepPack ι γ π ε ν :=
   -- Acquire a guard-layer resource and return evidence.
-  let res? : Option (GuardLayer.Resource γ) :=
-    match st.guardResources with
-    | [] => none
-    | (_, r) :: _ => some r
-  match res? with
-  | none => faultPack st coro (.acquireFault "guard-layer" "unknown layer") "unknown layer"
-  | some r =>
-      match GuardLayer.open_ r with
-      | none => blockPack st coro (.acquireDenied layer)
-      | some _ev =>
-          match setReg coro.regs dst .unit with
-          | none => faultPack st coro .outOfRegisters "bad dst reg"
-          | some regs' =>
-              let ev := StepEvent.acquire (GuardLayer.layerNs layer)
-              continuePack st { coro with regs := regs' } (some ev)
+  if st.config.guardChain.active layer = false then
+    faultPack st coro (.acquireFault "guard-layer" "inactive layer") "inactive layer"
+  else
+    match guardResourceLookup st.guardResources layer with
+    | none => faultPack st coro (.acquireFault "guard-layer" "unknown layer") "unknown layer"
+    | some r =>
+        match GuardLayer.open_ r with
+        | none => blockPack st coro (.acquireDenied layer)
+        | some ev =>
+            let encoded := GuardLayer.encodeEvidence ev
+            match setReg coro.regs dst encoded with
+            | none => faultPack st coro .outOfRegisters "bad dst reg"
+            | some regs' =>
+                let ev := StepEvent.obs (.acquired (GuardLayer.layerNs layer))
+                continuePack st { coro with regs := regs' } (some ev)
 
 private def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -374,8 +422,22 @@ private def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
     (_layer : γ) (_evidence : Reg) : StepPack ι γ π ε ν :=
   -- Release a guard-layer resource and record the layer.
-  let ev := StepEvent.release (GuardLayer.layerNs _layer)
-  continuePack st coro (some ev)
+  if st.config.guardChain.active _layer = false then
+    faultPack st coro (.acquireFault "guard-layer" "inactive layer") "inactive layer"
+  else
+    match readReg coro.regs _evidence with
+    | none => faultPack st coro .outOfRegisters "missing evidence"
+    | some v =>
+        match GuardLayer.decodeEvidence v with
+        | none => faultPack st coro (.acquireFault "guard-layer" "bad evidence") "bad evidence"
+        | some evd =>
+            match guardResourceLookup st.guardResources _layer with
+            | none => faultPack st coro (.acquireFault "guard-layer" "unknown layer") "unknown layer"
+            | some _ =>
+                let rs' := guardResourceUpdate st.guardResources _layer (fun r => GuardLayer.close r evd)
+                let st' := { st with guardResources := rs' }
+                let ev := StepEvent.obs (.released (GuardLayer.layerNs _layer))
+                continuePack st' coro (some ev)
 
 private def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -389,8 +451,11 @@ private def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
       faultPack st coro (.invokeFault "no handler bound") "no handler bound"
   | some handlerId =>
       let ctx' := EffectModel.exec action coro.effectCtx
-      let ev := StepEvent.invoke handlerId
-      continuePack st { coro with effectCtx := ctx' } (some ev)
+      let delta := PersistenceEffectBridge.bridge (π:=π) (ε:=ε) action
+      let persist' := PersistenceModel.apply st.persistent delta
+      let st' := { st with persistent := persist' }
+      let ev := StepEvent.obs (.invoked handlerId)
+      continuePack st' { coro with effectCtx := ctx' } (some ev)
 
 private def stepFork {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -437,16 +502,25 @@ private def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
   | some (.chan ep), some (.nat tid) =>
       if owns coro ep then
         let owned' := coro.ownedEndpoints.filter (fun e => decide (e ≠ ep))
+        let movedTokens := coro.progressTokens.filter (fun t => decide (t.endpoint = ep))
+        let keptTokens := coro.progressTokens.filter (fun t => decide (t.endpoint ≠ ep))
+        let movedFacts := coro.knowledgeSet.filter (fun k => decide (k.endpoint = ep))
+        let keptFacts := coro.knowledgeSet.filter (fun k => decide (k.endpoint ≠ ep))
         let coros' :=
           if h : tid < st.coroutines.size then
             let cT := st.coroutines[tid]'h
-            let cT' := { cT with ownedEndpoints := ep :: cT.ownedEndpoints }
+            let cT' :=
+              { cT with ownedEndpoints := ep :: cT.ownedEndpoints
+                       , progressTokens := movedTokens ++ cT.progressTokens
+                       , knowledgeSet := movedFacts ++ cT.knowledgeSet }
             st.coroutines.set (i := tid) (v := cT') (h := h)
           else
             st.coroutines
         let st' := { st with coroutines := coros' }
-        let coro' := advancePc { coro with ownedEndpoints := owned' }
-        pack coro' st' (mkRes (.transferred ep tid) (some (.transfer ep coro.id tid)))
+        let coro' := advancePc { coro with ownedEndpoints := owned'
+                                          , progressTokens := keptTokens
+                                          , knowledgeSet := keptFacts }
+        pack coro' st' (mkRes (.transferred ep tid) (some (.obs (.transferred ep coro.id tid))))
       else
         faultPack st coro (.transferFault "endpoint not owned") "endpoint not owned"
   | some (.chan _), none =>
@@ -466,15 +540,16 @@ private def stepTag {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (fact dst : Reg) : StepPack ι γ π ε ν :=
   -- Record a knowledge fact and return success.
   match readReg coro.regs fact with
-  | some (.string s) =>
+  | some (.prod (.chan ep) (.string s)) =>
       match setReg coro.regs dst (.bool true) with
       | none => faultPack st coro .outOfRegisters "bad dst reg"
       | some regs' =>
-          let know' := s :: coro.knowledgeSet
-          let ev := StepEvent.tag s
+          let fact' := { endpoint := ep, fact := s }
+          let know' := fact' :: coro.knowledgeSet
+          let ev := StepEvent.obs (.tagged fact')
           continuePack st { coro with regs := regs', knowledgeSet := know' } (some ev)
   | some v =>
-      faultPack st coro (.typeViolation .string (valTypeOf v)) "bad fact"
+      faultPack st coro (.typeViolation (.prod (.chan 0 "") .string) (valTypeOf v)) "bad fact"
   | none =>
       faultPack st coro .outOfRegisters "missing fact"
 
@@ -486,19 +561,21 @@ private def stepCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
     (knowledge target dst : Reg) : StepPack ι γ π ε ν :=
   -- Check whether a fact is in the knowledge set.
   match readReg coro.regs knowledge with
-  | some (.string s) =>
-      let ok := coro.knowledgeSet.any (fun k => k == s)
+  | some (.prod (.chan ep) (.string s)) =>
+      let fact := { endpoint := ep, fact := s }
+      let permitted := st.config.flowPolicy.allowed fact
       let tgtRole : Role :=
         match readReg coro.regs target with
         | some (.string r) => r
         | _ => ""
+      let ok := permitted tgtRole && coro.knowledgeSet.any (fun k => k == fact)
       match setReg coro.regs dst (.bool ok) with
       | none => faultPack st coro .outOfRegisters "bad dst reg"
       | some regs' =>
-          let ev := StepEvent.check tgtRole ok
+          let ev := StepEvent.obs (.checked tgtRole ok)
           continuePack st { coro with regs := regs' } (some ev)
   | some v =>
-      faultPack st coro (.typeViolation .string (valTypeOf v)) "bad knowledge"
+      faultPack st coro (.typeViolation (.prod (.chan 0 "") .string) (valTypeOf v)) "bad knowledge"
   | none =>
       faultPack st coro .outOfRegisters "missing knowledge"
 

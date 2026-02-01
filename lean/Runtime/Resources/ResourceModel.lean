@@ -139,3 +139,16 @@ def Transaction.valid {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     AccumulatedSet.verifyNonMember st.nullifiers (nullifierKey r) p.2 = true) ∧
   (∀ r ∈ tx.created, ∃ p ∈ tx.complianceProofs,
     AccumulatedSet.verifyNonMember st.commitments (commitmentKey r) p.2 = true)
+
+noncomputable def applyTransaction {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (tx : Transaction ν) (st : ResourceState ν) : Option (ResourceState ν) :=
+  -- Apply a valid transaction by updating commitments and nullifiers.
+  by
+    classical
+    by_cases h : Transaction.valid tx st
+    · let commit' :=
+        tx.created.foldl (fun acc r => AccumulatedSet.insert acc (commitmentKey r)) st.commitments
+      let nullify' :=
+        tx.consumed.foldl (fun acc r => AccumulatedSet.insert acc (nullifierKey r)) st.nullifiers
+      exact some { st with commitments := commit', nullifiers := nullify' }
+    · exact none

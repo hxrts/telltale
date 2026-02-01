@@ -75,18 +75,6 @@ def edgeCrashed {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     | none => false
   senderCrashed || receiverCrashed
 
-def bufEnqueue {ν : Type u} [VerificationModel ν]
-    (bufs : SignedBuffers ν) (edge : Edge)
-    (v : SignedValue ν) : SignedBuffers ν :=
-  -- Add a signed value to the edge buffer, creating it if missing.
-  match bufs with
-  | [] => [(edge, [v])]
-  | (e, vs) :: rest =>
-      if _h : e = edge then
-        (e, vs ++ [v]) :: rest
-      else
-        (e, vs) :: bufEnqueue rest edge v
-
 def bufDequeue {ν : Type u} [VerificationModel ν]
     (bufs : SignedBuffers ν) (edge : Edge) :
     Option (SignedValue ν × SignedBuffers ν) :=
@@ -108,6 +96,102 @@ def buffersFor {ν : Type u} [VerificationModel ν]
     SignedBuffers ν :=
   -- Project signed buffers for a given session id.
   bufs.filter (fun p => decide (p.fst.sid = sid))
+
+/-! ## Signed buffer helpers -/
+
+inductive SignedEnqueueResult where
+  -- Outcomes for signed-buffer enqueue operations.
+  | ok
+  | blocked
+  | dropped
+  | error
+  deriving Repr, DecidableEq
+
+def signedBufferLookup {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edge : Edge) : SignedBuffer ν :=
+  -- Lookup a signed buffer by edge (default empty).
+  match bufs with
+  | [] => []
+  | (e, vs) :: rest => if decide (e = edge) then vs else signedBufferLookup rest edge
+
+def signedBufferFind? {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edge : Edge) : Option (SignedBuffer ν) :=
+  -- Lookup a signed buffer by edge (option form).
+  match bufs with
+  | [] => none
+  | (e, vs) :: rest => if decide (e = edge) then some vs else signedBufferFind? rest edge
+
+def signedBufferSet {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edge : Edge) (trace : SignedBuffer ν) :
+    SignedBuffers ν :=
+  -- Replace or insert the signed buffer for an edge.
+  match bufs with
+  | [] => [(edge, trace)]
+  | (e, vs) :: rest =>
+      if decide (e = edge) then
+        (e, trace) :: rest
+      else
+        (e, vs) :: signedBufferSet rest edge trace
+
+def signedBufferEnsure {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edge : Edge) : SignedBuffers ν :=
+  -- Ensure an empty buffer entry exists for the edge.
+  match signedBufferFind? bufs edge with
+  | some _ => bufs
+  | none => (edge, []) :: bufs
+
+def signedBuffersEnsure {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edges : List Edge) : SignedBuffers ν :=
+  -- Ensure empty entries for a list of edges.
+  edges.foldl (fun acc e => signedBufferEnsure acc e) bufs
+
+def bufferEffectiveCapacity (cfg : BufferConfig) : Nat :=
+  -- V1 treats resize as "preallocated to max".
+  match cfg.policy with
+  | .resize maxCap => maxCap
+  | _ => BufferConfig.capacity cfg
+
+def bufEnqueue {ν : Type u} [VerificationModel ν]
+    (cfg : BufferConfig) (bufs : SignedBuffers ν) (edge : Edge)
+    (v : SignedValue ν) : SignedEnqueueResult × SignedBuffers ν :=
+  -- Enqueue a signed value with backpressure policy.
+  match cfg.mode with
+  | .latestValue =>
+      (SignedEnqueueResult.ok, signedBufferSet bufs edge [v])
+  | .fifo =>
+      let trace := signedBufferLookup bufs edge
+      let cap := bufferEffectiveCapacity cfg
+      if trace.length < cap then
+        (SignedEnqueueResult.ok, signedBufferSet bufs edge (trace ++ [v]))
+      else
+        match cfg.policy with
+        | .block => (SignedEnqueueResult.blocked, bufs)
+        | .drop => (SignedEnqueueResult.dropped, bufs)
+        | .error => (SignedEnqueueResult.error, bufs)
+        | .resize _ => (SignedEnqueueResult.blocked, bufs)
+
+/-! ## Guard resource helpers -/
+
+def guardResourceLookup {γ : Type u} [GuardLayer γ]
+    (rs : List (γ × GuardLayer.Resource γ)) (layer : γ) :
+    Option (GuardLayer.Resource γ) :=
+  -- Lookup a guard-layer resource by layer tag.
+  match rs with
+  | [] => none
+  | (g, r) :: rest => if decide (g = layer) then some r else guardResourceLookup rest layer
+
+def guardResourceUpdate {γ : Type u} [GuardLayer γ]
+    (rs : List (γ × GuardLayer.Resource γ)) (layer : γ)
+    (f : GuardLayer.Resource γ → GuardLayer.Resource γ) :
+    List (γ × GuardLayer.Resource γ) :=
+  -- Update a guard-layer resource by layer tag.
+  match rs with
+  | [] => []
+  | (g, r) :: rest =>
+      if decide (g = layer) then
+        (g, f r) :: rest
+      else
+        (g, r) :: guardResourceUpdate rest layer f
 
 /-! ## Resource-state helpers -/
 
@@ -153,6 +237,7 @@ def appendEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   -- Record an event in the observable trace.
   match ev with
   | none => st
+  | some StepEvent.internal => st
   | some e => { st with obsTrace := st.obsTrace ++ [e] }
 
 /-! ## Register helpers -/
@@ -221,7 +306,8 @@ def faultPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (err : Fault γ) (msg : String) : StepPack ι γ π ε ν :=
   -- Mark the coroutine as faulted and emit a fault event.
   let coro' := { coro with status := .faulted err }
-  pack coro' st (mkRes (.faulted err) (some (.fault msg)))
+  let _ := msg
+  pack coro' st (mkRes (.faulted err) (some StepEvent.internal))
 
 def blockPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]

@@ -53,13 +53,13 @@ private def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   -- Handle coroutine status and fetch the next instruction.
   match coro.status with
   | .done => (st, mkRes .halted none)
-  | .faulted err => (st, mkRes (.faulted err) (some (.fault "faulted coroutine")))
+  | .faulted err => (st, mkRes (.faulted err) (some StepEvent.internal))
   | _ =>
       match st.code.code[coro.pc]? with
       | none =>
           let coro' := { coro with status := .faulted (.closeFault "pc out of range") }
           let st' := updateCoro st coroId coro'
-          (st', mkRes (.faulted (.closeFault "pc out of range")) (some (.fault "pc out of range")))
+          (st', mkRes (.faulted (.closeFault "pc out of range")) (some StepEvent.internal))
       | some instr => execWithInstr st coroId coro instr
 
 /-! ## Main stepper -/
@@ -74,5 +74,5 @@ def execInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   -- Guard against missing coroutine and delegate to the core stepper.
   match st.coroutines[coroId]? with
   | none =>
-      (st, mkRes (.faulted (.closeFault "unknown coroutine")) (some (.fault "unknown coroutine")))
+      (st, mkRes (.faulted (.closeFault "unknown coroutine")) (some StepEvent.internal))
   | some coro => execAtPC st coroId coro

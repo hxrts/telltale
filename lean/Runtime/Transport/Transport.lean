@@ -136,16 +136,25 @@ def traceOfBuffers {ν : Type u} [VerificationModel ν]
   -- Interpret each buffer entry as a send event.
   bufs.flatMap (fun p => p.snd.map (fun sv => TransportEvent.sent p.fst sv))
 
+def handlerEdges (handlers : List (Edge × HandlerId)) (handler : HandlerId) : List Edge :=
+  -- Collect edges bound to a specific handler.
+  handlers.foldl
+    (fun acc p => if decide (p.snd = handler) then acc ++ [p.fst] else acc)
+    []
+
 def handlerTraceOf {ν : Type u} [VerificationModel ν]
-    (_handler : HandlerId) (bufs : SignedBuffers ν) : TransportTrace ν :=
-  -- Handler-backed traces are derived from self-edge buffers in V1.
-  let selfBufs := bufs.filter (fun p => decide (p.fst.sender = p.fst.receiver))
-  traceOfBuffers selfBufs
+    (handler : HandlerId) (handlers : List (Edge × HandlerId))
+    (bufs : SignedBuffers ν) : TransportTrace ν :=
+  -- Handler-backed traces are derived from the handler's bound edges.
+  let edges := handlerEdges handlers handler
+  let bufs' := bufs.filter (fun p => edges.contains p.fst)
+  traceOfBuffers bufs'
 
 def IsHandlerTrace {ν : Type u} [VerificationModel ν]
-    (handler : HandlerId) (trace : TransportTrace ν) : Prop :=
-  -- Handler traces are those induced by the handler's buffer-backed edges.
-  ∃ bufs, trace = handlerTraceOf (ν:=ν) handler bufs
+    (handler : HandlerId) (handlers : List (Edge × HandlerId))
+    (trace : TransportTrace ν) : Prop :=
+  -- Handler traces are those induced by the handler's bound edges.
+  ∃ bufs, trace = handlerTraceOf (ν:=ν) handler handlers bufs
 
 def SpecSatisfied {ν : Type u} [VerificationModel ν]
     (spec : TransportSpec ν) (trace : TransportTrace ν) : Prop :=
@@ -156,7 +165,7 @@ class HandlerSatisfiesTransportSpec (ν : Type u) [VerificationModel ν]
     (handler : HandlerId) where
   -- Handler-level proof of the transport spec.
   spec : TransportSpec ν
-  proof : ∀ trace, IsHandlerTrace handler trace → SpecSatisfied spec trace
+  proof : ∀ handlers trace, IsHandlerTrace handler handlers trace → SpecSatisfied spec trace
 
 /-! ## Serialization -/
 

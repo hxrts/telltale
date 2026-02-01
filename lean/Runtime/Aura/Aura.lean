@@ -102,6 +102,10 @@ def auraCostModel : CostModel AuraGuard AuraEffect :=
   , hMinCost := by intro _ _; exact Nat.le_refl 1
   , hMinPos := by exact Nat.le_refl 1 }
 
+def auraFlowPolicy : FlowPolicy :=
+  -- V1 allows all knowledge flows.
+  { allowed := fun _ _ => true }
+
 def auraBufferConfig : BufferConfig :=
   -- Default FIFO buffers with blocking backpressure.
   { mode := .fifo, initialCapacity := 16, policy := .block }
@@ -112,6 +116,7 @@ def auraConfig :
   { bufferConfig := fun _ => auraBufferConfig
   , schedPolicy := .roundRobin
   , violationPolicy := { allow := fun _ => false }
+  , flowPolicy := auraFlowPolicy
   , maxCoroutines := 128
   , maxSessions := 64
   , guardChain := auraGuardChain

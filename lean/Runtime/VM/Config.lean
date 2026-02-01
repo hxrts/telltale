@@ -1,5 +1,6 @@
 import Runtime.VM.TypeClasses
 import Runtime.VM.Core
+import Runtime.VM.Knowledge
 import Runtime.VM.SchedulerTypes
 import Runtime.VM.Violation
 import Runtime.Monitor.DomainComposition
@@ -45,6 +46,8 @@ structure VMConfig (ι γ π ε ν : Type u)
   schedPolicy : SchedPolicy
   -- Violation handling policy.
   violationPolicy : ViolationPolicy
+  -- Knowledge flow policy (§16).
+  flowPolicy : FlowPolicy
   -- Resource bounds.
   maxCoroutines : Nat
   maxSessions : Nat

@@ -57,6 +57,16 @@ class GuardLayer (γ : Type u) where
   open_ : Resource → Option Evidence
   /-- Close the layer: update the resource after commit. -/
   close : Resource → Evidence → Resource
+  /-- Encode evidence for register storage. -/
+  encodeEvidence : Evidence → Value
+  /-- Decode evidence from a register value. -/
+  decodeEvidence : Value → Option Evidence
+  /-- Decidable equality on layer tags. -/
+  decEq : DecidableEq γ
+
+instance (γ : Type u) [GuardLayer γ] : DecidableEq γ :=
+  -- Use the guard layer's decidable equality.
+  GuardLayer.decEq
 
 /-! ## Identity utilities -/
 
