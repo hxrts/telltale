@@ -5,7 +5,7 @@ import Runtime.VM.Violation
 import Runtime.VM.Config
 import Runtime.VM.Program
 import Runtime.VM.Definition
-import Runtime.VM.LanguageInstance
+import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Resources.SessionRA
 import Runtime.Resources.BufferRA
 import Runtime.Resources.Arena

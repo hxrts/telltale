@@ -119,7 +119,8 @@ def auraConfig :
   , schedPolicy := .roundRobin
   , violationPolicy := { allow := fun _ => false }
   , flowPolicy := auraFlowPolicy
-  , handlerSpecOk := fun _ => true
+  , spatialOk := fun _ => true
+  , transportOk := fun _ _ => true
   , complianceProof := fun _ => ((), ())
   , maxCoroutines := 128
   , maxSessions := 64

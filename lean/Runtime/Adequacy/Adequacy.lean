@@ -35,6 +35,8 @@ Dependencies: Task 12, Task 19, Shim.WeakestPre.
 set_option autoImplicit false
 noncomputable section
 
+universe u
+
 -- Trace of observable events.
 abbrev ObsTrace (ε : Type u) [EffectModel ε] := List (Nat × ObsEvent ε)
 
@@ -123,7 +125,7 @@ def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
   -- V1 adequacy: observable traces are causally and FIFO consistent.
   ∀ (st : VMState ι γ π ε ν), WFVMState st →
-    let obs := obsTraceOf (ε:=ε) st.obsTrace
+    let obs := obsTraceOf (ε:=ε) st.obsTrace;
     CausallyConsistent obs ∧ FIFOConsistent obs
 def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

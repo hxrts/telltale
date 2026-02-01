@@ -179,7 +179,8 @@ def testConfig : VMConfig TestIdentity TestGuard TestPersist TestEffect TestVeri
   , schedPolicy := .roundRobin
   , violationPolicy := { allow := fun _ => false }
   , flowPolicy := testFlowPolicy
-  , handlerSpecOk := fun _ => true
+  , spatialOk := fun _ => true
+  , transportOk := fun _ _ => true
   , complianceProof := fun _ => ((), ())
   , maxCoroutines := 8
   , maxSessions := 4

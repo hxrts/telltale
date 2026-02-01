@@ -130,27 +130,50 @@ def txBalanced {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
   let consumed := tx.consumed.foldl (fun acc r => acc + r.delta) 0
   created - consumed = 0
 
+def txBalancedB {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (tx : Transaction ν) : Bool :=
+  -- Boolean version of delta balance.
+  let created := tx.created.foldl (fun acc r => acc + r.delta) 0
+  let consumed := tx.consumed.foldl (fun acc r => acc + r.delta) 0
+  (created - consumed == 0)
+
+def complianceCoversConsumed {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (st : ResourceState ν) (tx : Transaction ν) : Bool :=
+  -- Every consumed resource has a witness proof in the compliance list.
+  tx.consumed.all (fun r =>
+    tx.complianceProofs.any (fun p =>
+      AccumulatedSet.verifyMember st.commitments (commitmentKey r) p.1 &&
+      AccumulatedSet.verifyNonMember st.nullifiers (nullifierKey r) p.2))
+
+def complianceCoversCreated {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (st : ResourceState ν) (tx : Transaction ν) : Bool :=
+  -- Every created resource is shown fresh in the commitment set.
+  tx.created.all (fun r =>
+    tx.complianceProofs.any (fun p =>
+      AccumulatedSet.verifyNonMember st.commitments (commitmentKey r) p.2))
+
+def Transaction.validB {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (tx : Transaction ν) (st : ResourceState ν) : Bool :=
+  -- V1 validity: balance + membership/non-membership proofs.
+  let balanced := txBalancedB tx
+  let balanceOk := tx.authorizedImbalance || balanced
+  balanceOk &&
+    complianceCoversConsumed st tx &&
+    complianceCoversCreated st tx
+
 /-- Transaction validity for a given resource state (V1). -/
 def Transaction.valid {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) (st : ResourceState ν) : Prop :=
-  -- Membership and non-membership are delegated to the accumulated-set interface.
-  txBalanced tx ∧
-  (tx.authorizedImbalance ∨ txBalanced tx) ∧
-  (∀ r ∈ tx.consumed, ∃ p ∈ tx.complianceProofs,
-    AccumulatedSet.verifyMember st.commitments (commitmentKey r) p.1 = true ∧
-    AccumulatedSet.verifyNonMember st.nullifiers (nullifierKey r) p.2 = true) ∧
-  (∀ r ∈ tx.created, ∃ p ∈ tx.complianceProofs,
-    AccumulatedSet.verifyNonMember st.commitments (commitmentKey r) p.2 = true)
+  Transaction.validB tx st = true
 
-noncomputable def applyTransaction {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+def applyTransaction {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) (st : ResourceState ν) : Option (ResourceState ν) :=
   -- Apply a valid transaction by updating commitments and nullifiers.
-  by
-    classical
-    by_cases h : Transaction.valid tx st
-    · let commit' :=
-        tx.created.foldl (fun acc r => AccumulatedSet.insert acc (commitmentKey r)) st.commitments
-      let nullify' :=
-        tx.consumed.foldl (fun acc r => AccumulatedSet.insert acc (nullifierKey r)) st.nullifiers
-      exact some { st with commitments := commit', nullifiers := nullify' }
-    · exact none
+  if Transaction.validB tx st then
+    let commit' :=
+      tx.created.foldl (fun acc r => AccumulatedSet.insert acc (commitmentKey r)) st.commitments
+    let nullify' :=
+      tx.consumed.foldl (fun acc r => AccumulatedSet.insert acc (nullifierKey r)) st.nullifiers
+    some { st with commitments := commit', nullifiers := nullify' }
+  else
+    none

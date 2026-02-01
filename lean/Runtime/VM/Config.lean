@@ -49,8 +49,10 @@ structure VMConfig (ι γ π ε ν : Type u)
   violationPolicy : ViolationPolicy
   -- Knowledge flow policy (§16).
   flowPolicy : FlowPolicy
-  -- Handler transport-spec check hook (§8/§15).
-  handlerSpecOk : HandlerId → Bool
+  -- Spatial requirement hook for session creation (§2).
+  spatialOk : RoleSet → Bool
+  -- Handler transport-spec check hook over current buffers (§8/§15).
+  transportOk : HandlerId → SignedBuffers ν → Bool
   -- Compliance proof supplier for resource transactions (§22).
   complianceProof : Resource ν → ComplianceProof ν
   -- Resource bounds.
