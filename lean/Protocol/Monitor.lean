@@ -1,5 +1,5 @@
-import Protocol.Monitor.Part1
-import Protocol.Monitor.Part2
+import Protocol.Monitor.Core
+import Protocol.Monitor.Preservation
 
 /-!
 # MPST Verified Monitor

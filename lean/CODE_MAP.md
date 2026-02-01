@@ -57,21 +57,21 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 
 | File | Lines | Description |
 |------|-------|-------------|
-| GlobalType/Part1.lean | 329 | Global type definitions and operations |
-| GlobalType/Part2.lean | 357 | Global type substitution |
-| GlobalType/Part3.lean | 346 | Global stepping semantics |
-| GlobalType/Part4.lean | 294 | Well-formedness and properties |
-| GlobalType/Part5.lean | 577 | Observable behavior and duality |
+| GlobalType/Core.lean | 329 | Global type definitions and operations |
+| GlobalType/Semantics.lean | 357 | Global type substitution |
+| GlobalType/WellFormedLemmas.lean | 346 | Global stepping semantics |
+| GlobalType/ProductivityLemmas.lean | 294 | Well-formedness and properties |
+| GlobalType/Closedness.lean | 577 | Observable behavior and duality |
 
 ### Local Types (Recursive)
 
 | File | Lines | Description |
 |------|-------|-------------|
-| LocalTypeR/Part1.lean | 513 | Recursive local type definitions |
-| LocalTypeR/Part2.lean | 354 | Well-formedness and operations |
-| LocalTypeR/Part3.lean | 249 | Observable predicates |
-| LocalTypeR/Part4.lean | 398 | Substitution and operations |
-| LocalTypeR/Part5.lean | 274 | Duality and properties |
+| LocalTypeR/Core.lean | 513 | Recursive local type definitions |
+| LocalTypeR/Environments.lean | 354 | Well-formedness and operations |
+| LocalTypeR/Unfolding.lean | 249 | Observable predicates |
+| LocalTypeR/Substitution.lean | 398 | Substitution and operations |
+| LocalTypeR/WellFormedness.lean | 274 | Duality and properties |
 
 ### Local Types (De Bruijn)
 
@@ -87,9 +87,9 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 |------|-------|-------------|
 | LocalTypeConv.lean | 187 | Named ↔ de Bruijn conversions |
 | LocalTypeConvDefs.lean | 210 | Conversion definition predicates |
-| LocalTypeConvProofs/Part1.lean | 433 | Soundness of named → de Bruijn |
-| LocalTypeConvProofs/Part2.lean | 404 | Completeness of named → de Bruijn |
-| LocalTypeConvProofs/Part3.lean | 575 | Substitution equivalence under conversion |
+| LocalTypeConvProofs/Helpers.lean | 433 | Soundness of named → de Bruijn |
+| LocalTypeConvProofs/ClosedRoundtrip.lean | 404 | Completeness of named → de Bruijn |
+| LocalTypeConvProofs/Roundtrip.lean | 575 | Substitution equivalence under conversion |
 | LocalTypeRDBBridge.lean | 47 | Bridge between LocalTypeR and LocalTypeDB |
 
 ### Supporting Modules
@@ -129,16 +129,16 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Bisim/Part1.lean | 360 | Definition and basic properties |
-| Bisim/Part2.lean | 356 | Preservation and respects relations |
-| Bisim/Part3.lean | 337 | Transitivity and composition |
-| Bisim/Part4.lean | 476 | Duality and observable predicates |
-| Bisim/Part5.lean | 220 | Symmetry and equivalence |
-| Bisim/Part6.lean | 464 | Mu-unfold preservation |
-| Bisim/Part7.lean | 156 | Transitive closure |
-| Bisim/Part8.lean | 367 | Substitution and duality |
-| Bisim/Part9.lean | 491 | Bisimulation as equivalence for EQ2 |
-| Bisim/Part10.lean | 219 | Auxiliary lemmas |
+| Bisim/Core.lean | 360 | Definition and basic properties |
+| Bisim/UnfoldingLemmas.lean | 356 | Preservation and respects relations |
+| Bisim/Bisimulation.lean | 337 | Transitivity and composition |
+| Bisim/EQ2Equivalence.lean | 476 | Duality and observable predicates |
+| Bisim/ObservableFromEQ2.lean | 220 | Symmetry and equivalence |
+| Bisim/EQ2Extraction.lean | 464 | Mu-unfold preservation |
+| Bisim/EQ2ToBisim.lean | 156 | Transitive closure |
+| Bisim/Congruence.lean | 367 | Substitution and duality |
+| Bisim/Substitution.lean | 491 | Bisimulation as equivalence for EQ2 |
+| Bisim/UnfoldSubstitute.lean | 219 | Auxiliary lemmas |
 
 ### Substitution Theory
 
@@ -167,9 +167,9 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Coinductive/BisimDecidable/Part1.lean | 392 | Decidability framework and fuel-based computation |
-| Coinductive/BisimDecidable/Part2.lean | 382 | Decision procedure implementation |
-| Coinductive/BisimDecidable/Part3.lean | 410 | Correctness proofs |
+| Coinductive/BisimDecidable/Core.lean | 392 | Decidability framework and fuel-based computation |
+| Coinductive/BisimDecidable/BisimAux.lean | 382 | Decision procedure implementation |
+| Coinductive/BisimDecidable/Correctness.lean | 410 | Correctness proofs |
 
 ### Roundtrip Bridge (Inductive ↔ Coinductive)
 
@@ -179,11 +179,11 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Coinductive/Regularity.lean | 101 | Regularity constraints |
 | Coinductive/ToInductive.lean | 172 | Coinductive → inductive conversion |
 | Coinductive/WellFormed.lean | 125 | Well-formedness conditions |
-| Coinductive/Roundtrip/Part1.lean | 302 | Inductive → coinductive correctness |
-| Coinductive/Roundtrip/Part2.lean | 321 | Coinductive → inductive conversion |
-| Coinductive/Roundtrip/Part3.lean | 200 | Roundtrip composition |
-| Coinductive/Roundtrip/Part4.lean | 544 | Completeness and characterization |
-| Coinductive/Roundtrip/Part5.lean | 86 | Final auxiliary lemmas |
+| Coinductive/Roundtrip/Core.lean | 302 | Inductive → coinductive correctness |
+| Coinductive/Roundtrip/PacoCollapse.lean | 321 | Coinductive → inductive conversion |
+| Coinductive/Roundtrip/EnvDefs.lean | 200 | Roundtrip composition |
+| Coinductive/Roundtrip/RoundtripTheorem.lean | 544 | Completeness and characterization |
+| Coinductive/Roundtrip/RoundtripCorollaries.lean | 86 | Final auxiliary lemmas |
 | Coinductive/RoundtripHelpers.lean | 394 | Helper lemmas |
 | Coinductive/ToCoindInjectivity.lean | 145 | Injectivity of toCoind conversion |
 | Coinductive/ToCoindRegular.lean | 86 | Regularity preservation for toCoind |
@@ -226,10 +226,10 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Projection/Projectb/Part1.lean | 205 | Boolean projection definition |
-| Projection/Projectb/Part2.lean | 465 | Branch handling |
-| Projection/Projectb/Part3.lean | 387 | Correctness lemmas |
-| Projection/Projectb/Part4.lean | 566 | Mu-type handling |
+| Projection/Projectb/Checker.lean | 205 | Boolean projection definition |
+| Projection/Projectb/Coinductive.lean | 465 | Branch handling |
+| Projection/Projectb/Soundness.lean | 387 | Correctness lemmas |
+| Projection/Projectb/Completeness.lean | 566 | Mu-type handling |
 
 ### Proof-Carrying Projection API
 
@@ -240,28 +240,28 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Projection/Project/MuveImplParticipant.lean | 544 | Participant mu-unfolding elimination |
 | Projection/Project/MuveImplNonPart.lean | 429 | Non-participant mu-unfolding elimination |
 | Projection/Project/ImplBase.lean | 431 | Base projection implementation |
-| Projection/Project/ImplConstructors/Part1.lean | 427 | End, var, mu cases |
-| Projection/Project/ImplConstructors/Part2.lean | 366 | Send/recv cases |
-| Projection/Project/ImplConstructors/Part3.lean | 192 | Branching cases |
+| Projection/Project/ImplConstructors/Base.lean | 427 | End, var, mu cases |
+| Projection/Project/ImplConstructors/SendRecv.lean | 366 | Send/recv cases |
+| Projection/Project/ImplConstructors/Mu.lean | 192 | Branching cases |
 | Projection/Project/ImplCompleteness.lean | 314 | Completeness proof |
 | Projection/Project/ImplObservables.lean | 362 | Observable properties preservation |
 | Projection/Project/ImplHeadPreservation.lean | 463 | Head shape preservation |
-| Projection/Project/ImplExtraction/Part1.lean | 306 | Observable extraction |
-| Projection/Project/ImplExtraction/Part2.lean | 330 | Payload and branch extraction |
-| Projection/Project/ImplTransRelComp/Part1.lean | 331 | Transition relation base cases |
-| Projection/Project/ImplTransRelComp/Part2.lean | 354 | Transition relation properties |
-| Projection/Project/ImplCompPostfix/Part1.lean | 321 | Observable postfix computation |
-| Projection/Project/ImplCompPostfix/Part2.lean | 219 | Observable list postfix |
-| Projection/Project/ImplCompPostfix/Part3.lean | 356 | Postfix properties |
-| Projection/Project/ImplU/Part1.lean | 355 | Unfolding base cases |
-| Projection/Project/ImplU/Part2.lean | 363 | Unfolding lemmas and composition |
+| Projection/Project/ImplExtraction/ObservableExtraction.lean | 306 | Observable extraction |
+| Projection/Project/ImplExtraction/RecvExtraction.lean | 330 | Payload and branch extraction |
+| Projection/Project/ImplTransRelComp/Core.lean | 331 | Transition relation base cases |
+| Projection/Project/ImplTransRelComp/CommCases.lean | 354 | Transition relation properties |
+| Projection/Project/ImplCompPostfix/WellFormedClosure.lean | 321 | Observable postfix computation |
+| Projection/Project/ImplCompPostfix/PrefixCases.lean | 219 | Observable list postfix |
+| Projection/Project/ImplCompPostfix/SuffixCases.lean | 356 | Postfix properties |
+| Projection/Project/ImplU/EQ2Closure.lean | 355 | Unfolding base cases |
+| Projection/Project/ImplU/CommCases.lean | 363 | Unfolding lemmas and composition |
 
 ### Blindness Predicate
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Projection/Blind/Part1.lean | 492 | Definition and basic properties |
-| Projection/Blind/Part2.lean | 187 | Preservation and composition |
+| Projection/Blind/Core.lean | 492 | Definition and basic properties |
+| Projection/Blind/Preservation.lean | 187 | Preservation and composition |
 
 ### Harmony (Projection Correctness)
 
@@ -271,11 +271,11 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Harmony/MuUnfoldLemmas.lean | 257 | Mu-unfolding auxiliary lemmas |
 | Harmony/StepProjection.lean | 255 | Projection preserves stepping semantics |
 | Harmony/SubstEndUnguarded.lean | 239 | Substitution with guardedness constraints |
-| Harmony/Part1.lean | 423 | Main structure |
-| Harmony/Part2.lean | 519 | Communication handling |
-| Harmony/Part3.lean | 533 | Branching |
-| Harmony/Part4.lean | 126 | Recursion |
-| Harmony/Part5.lean | 147 | Final properties |
+| Harmony/StepHarmony.lean | 423 | Main structure |
+| Harmony/Substitution.lean | 519 | Communication handling |
+| Harmony/ParticipantSteps.lean | 533 | Branching |
+| Harmony/NonParticipantHelpers.lean | 126 | Recursion |
+| Harmony/NonParticipantSteps.lean | 147 | Final properties |
 
 ### Supporting Modules
 
@@ -286,9 +286,9 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Projection/ComposeProof.lean | 60 | Composition of projection lemmas |
 | Projection/Embed.lean | 233 | Coinductive embedding relation |
 | Projection/EmbedProps.lean | 510 | Embedding properties |
-| Projection/Erasure/Part1.lean | 80 | Erasure definition |
-| Projection/Erasure/Part2.lean | 358 | Erasure lemmas |
-| Projection/Erasure/Part3.lean | 425 | Erasure correctness |
+| Projection/Erasure/Core.lean | 80 | Erasure definition |
+| Projection/Erasure/Merge.lean | 358 | Erasure lemmas |
+| Projection/Erasure/MergeSoundness.lean | 425 | Erasure correctness |
 | Assumptions.lean | 15 | Centralized assumptions |
 
 ---
@@ -303,8 +303,8 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Environment.lean | 299 | Environment configuration (message queues, timeouts, actions) |
 | EnvStep.lean | 191 | Environment-step relation |
 | Typing.lean | 23 | Typing judgment interface |
-| Determinism/Part1.lean | 600 | Determinism proof part 1 |
-| Determinism/Part2.lean | 516 | Determinism proof part 2 |
+| Determinism/Core.lean | 600 | Determinism proof part 1 |
+| Determinism/Diamond.lean | 516 | Determinism proof part 2 |
 | DeadlockFreedom.lean | 293 | Deadlock freedom with fairness |
 | SubjectReduction.lean | 201 | Subject reduction for well-typed processes |
 
@@ -328,8 +328,8 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Environments/Part1.lean | 938 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init |
-| Environments/Part2.lean | 493 | Session renaming with injectivity/commutativity |
+| Environments/Core.lean | 938 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init |
+| Environments/Renaming.lean | 493 | Session renaming with injectivity/commutativity |
 
 ### Coherence (9 parts)
 
@@ -337,28 +337,28 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Coherence/Part1.lean | 253 | `Consume`, `EdgeCoherent`, `Coherent`, `HasTypeVal` |
-| Coherence/Part2.lean | 458 | `BufferTyped`, `StoreTyped` |
-| Coherence/Part3.lean | 136 | `StoreTypedStrong`, irrelevance lemmas |
-| Coherence/Part4.lean | 601 | `Coherent_send_preserved`, `Coherent_recv_preserved` |
-| Coherence/Part5.lean | 356 | `Coherent_select_preserved`, `Coherent_branch_preserved` |
-| Coherence/Part6.lean | 507 | Helper lemmas |
-| Coherence/Part7.lean | 376 | `HeadCoherent_select/branch_preserved` |
-| Coherence/Part8.lean | 661 | `Coherent_empty`, `initSession_coherent`, ValidLabels |
-| Coherence/Part9.lean | 303 | `CoherentRenaming`, `Dual_implies_Coherent_empty` |
+| Coherence/Consume.lean | 253 | `Consume`, `EdgeCoherent`, `Coherent`, `HasTypeVal` |
+| Coherence/EdgeCoherence.lean | 458 | `BufferTyped`, `StoreTyped` |
+| Coherence/StoreTyping.lean | 136 | `StoreTypedStrong`, irrelevance lemmas |
+| Coherence/Preservation.lean | 601 | `Coherent_send_preserved`, `Coherent_recv_preserved` |
+| Coherence/SelectPreservation.lean | 356 | `Coherent_select_preserved`, `Coherent_branch_preserved` |
+| Coherence/HeadPreservationSend.lean | 507 | Helper lemmas |
+| Coherence/HeadPreservationSelect.lean | 376 | `HeadCoherent_select/branch_preserved` |
+| Coherence/ValidLabels.lean | 661 | `Coherent_empty`, `initSession_coherent`, ValidLabels |
+| Coherence/Renaming.lean | 303 | `CoherentRenaming`, `Dual_implies_Coherent_empty` |
 
 ### Typing (8 parts)
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Typing/Part1.lean | 651 | Disjointness, splitting (`ParSplit`), `DConsistent` — 1 axiom |
-| Typing/Part2.lean | 567 | `HasTypeProcN` judgment |
-| Typing/Part3.lean | 992 | SEnv append/lookup lemmas |
-| Typing/Part4.lean | 327 | Additional environment lemmas |
-| Typing/Part5.lean | 478 | `WTConfigN` well-typed configuration |
-| Typing/Part6.lean | 1,633 | Frame lemmas — 2 axioms |
-| Typing/Part7.lean | 2,128 | Preservation sub-lemmas (`Compatible`) — 1 axiom |
-| Typing/Part8.lean | 472 | DEnv union and environment append properties |
+| Typing/Core.lean | 651 | Disjointness, splitting (`ParSplit`), `DConsistent` — 1 axiom |
+| Typing/Judgments.lean | 567 | `HasTypeProcN` judgment |
+| Typing/Compatibility.lean | 992 | SEnv append/lookup lemmas |
+| Typing/MergeLemmas.lean | 327 | Additional environment lemmas |
+| Typing/StepLemmas.lean | 478 | `WTConfigN` well-typed configuration |
+| Typing/Framing.lean | 1,633 | Frame lemmas — 2 axioms |
+| Typing/Preservation.lean | 2,128 | Preservation sub-lemmas (`Compatible`) — 1 axiom |
+| Typing/Progress.lean | 472 | DEnv union and environment append properties |
 
 ### Operational Semantics
 
@@ -378,16 +378,16 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Monitor/Part1.lean | 477 | `ProtoAction`, `MonitorState`, `MonStep`, `WTMon` |
-| Monitor/Part2.lean | 187 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` — 2 axioms |
+| Monitor/Core.lean | 477 | `ProtoAction`, `MonitorState`, `MonStep`, `WTMon` |
+| Monitor/Preservation.lean | 187 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` — 2 axioms |
 
 ### Deployment Composition
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Deployment/Part1.lean | 391 | `InterfaceType`, `DeployedProtocol`, `ProtocolBundle` — 6 axioms |
-| Deployment/Part2.lean | 296 | `MergeDEnv`, disjoint sessions |
-| Deployment/Part3.lean | 78 | Composition metatheory — 9 axioms |
+| Deployment/Interface.lean | 391 | `InterfaceType`, `DeployedProtocol`, `ProtocolBundle` — 6 axioms |
+| Deployment/Merge.lean | 296 | `MergeDEnv`, disjoint sessions |
+| Deployment/Linking.lean | 78 | Composition metatheory — 9 axioms |
 
 ### Supporting Modules
 
@@ -543,12 +543,12 @@ telltale (package)
 |------|-------|--------|
 | Preservation.lean | 6 | `preservation_typed`, `progress_send`, `progress_recv`, `progress_select`, `progress_branch`, `subject_reduction` |
 | DeadlockFreedom.lean | 7 | `muDepth_subst_of_decide`, `reachesComm_unfold_mu`, `reachesComm_body_implies_unfold_aux`, `reachesComm_body_implies_unfold`, `reachesCommDecide_sound`, `deadlock_free`, `not_stuck` |
-| Deployment/Part1.lean | 6 | `mkInitGEnv_lookup`, `mkInitGEnv_sessionsOf_of_mem`, `mkInitBufs_lookup_mem`, `mkInit_bConsistent`, `mkInit_bufsDom`, `mkInit_dConsistent` |
-| Deployment/Part3.lean | 9 | `mergeBufs_typed`, `mergeLin_valid`, `mergeLin_unique`, `link_preserves_WTMon_full`, `link_preserves_WTMon`, `link_preserves_WTMon_complete`, `link_preserves_WTMon_complete_full`, `disjoint_sessions_independent`, `compose_deadlock_free` |
-| Monitor/Part2.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
-| Typing/Part1.lean | 1 | `ParSplit.unique` |
-| Typing/Part6.lean | 2 | `SessionsOf_subset_of_HasTypeProcPreOut`, `updateSEnv_append_left_any` |
-| Typing/Part7.lean | 1 | `DisjointS_preserved_TypedStep_right` |
+| Deployment/Interface.lean | 6 | `mkInitGEnv_lookup`, `mkInitGEnv_sessionsOf_of_mem`, `mkInitBufs_lookup_mem`, `mkInit_bConsistent`, `mkInit_bufsDom`, `mkInit_dConsistent` |
+| Deployment/Linking.lean | 9 | `mergeBufs_typed`, `mergeLin_valid`, `mergeLin_unique`, `link_preserves_WTMon_full`, `link_preserves_WTMon`, `link_preserves_WTMon_complete`, `link_preserves_WTMon_complete_full`, `disjoint_sessions_independent`, `compose_deadlock_free` |
+| Monitor/Preservation.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
+| Typing/Core.lean | 1 | `ParSplit.unique` |
+| Typing/Framing.lean | 2 | `SessionsOf_subset_of_HasTypeProcPreOut`, `updateSEnv_append_left_any` |
+| Typing/Preservation.lean | 1 | `DisjointS_preserved_TypedStep_right` |
 
 ### Runtime Library (~108 shim axioms)
 
@@ -592,21 +592,21 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 
 **Want to understand...**
 
-- **Session type definitions?** → SessionTypes/GlobalType/Part1.lean, LocalTypeR/Part1.lean
+- **Session type definitions?** → SessionTypes/GlobalType/Core.lean, LocalTypeR/Core.lean
 - **De Bruijn indices?** → SessionTypes/LocalTypeDB/Core.lean
 - **Coinductive equality (EQ2)?** → SessionCoTypes/EQ2/Core.lean
-- **Bisimulation?** → SessionCoTypes/Bisim/Part1.lean
+- **Bisimulation?** → SessionCoTypes/Bisim/Core.lean
 - **Inductive ↔ coinductive bridge?** → SessionCoTypes/Coinductive/Roundtrip/
 - **Projection algorithm?** → Choreography/Projection/Project/Core.lean, ImplBase.lean
-- **Projection correctness (harmony)?** → Choreography/Harmony.lean, Harmony/Part1-5.lean
+- **Projection correctness (harmony)?** → Choreography/Harmony.lean, Harmony/StepHarmony.lean, Harmony/Substitution.lean, Harmony/ParticipantSteps.lean, Harmony/NonParticipantHelpers.lean, Harmony/NonParticipantSteps.lean
 - **Operational semantics?** → Semantics/Environment.lean, Protocol/Semantics.lean
-- **Coherence invariant?** → Protocol/Coherence/Part1.lean
-- **Coherence preservation?** → Protocol/Coherence/Part4.lean (send/recv), Part5.lean (select/branch)
-- **Type system?** → Protocol/Typing/Part2.lean (`HasTypeProcN`), Part5.lean (`WTConfigN`)
+- **Coherence invariant?** → Protocol/Coherence/Consume.lean
+- **Coherence preservation?** → Protocol/Coherence/Preservation.lean (send/recv), Protocol/Coherence/SelectPreservation.lean (select/branch)
+- **Type system?** → Protocol/Typing/Judgments.lean (`HasTypeProcN`, `WTConfigN`)
 - **Type safety?** → Protocol/Preservation.lean
 - **Deadlock freedom?** → Protocol/DeadlockFreedom.lean
-- **Runtime monitoring?** → Protocol/Monitor/Part1.lean
-- **Deployment composition?** → Protocol/Deployment/Part1-3.lean
+- **Runtime monitoring?** → Protocol/Monitor/Core.lean
+- **Deployment composition?** → Protocol/Deployment/Interface.lean, Protocol/Deployment/Merge.lean, Protocol/Deployment/Linking.lean
 - **Iris separation logic shims?** → Runtime/Shim/ResourceAlgebra.lean
 - **Weakest preconditions?** → Runtime/Shim/WeakestPre.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)

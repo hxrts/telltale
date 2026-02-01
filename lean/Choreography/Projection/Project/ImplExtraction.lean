@@ -1,7 +1,7 @@
-import Choreography.Projection.Project.ImplExtraction.Part1
-import Choreography.Projection.Project.ImplExtraction.Part2
+import Choreography.Projection.Project.ImplExtraction.ObservableExtraction
+import Choreography.Projection.Project.ImplExtraction.RecvExtraction
 
 /-! # Project ImplExtraction
 
-Barrel for observable extraction lemmas (Parts 1-2).
+Barrel for observable extraction lemmas (ObservableExtraction/RecvExtraction).
 -/

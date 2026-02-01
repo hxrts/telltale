@@ -1,7 +1,7 @@
-import Choreography.Projection.Project.ImplTransRelComp.Part1
-import Choreography.Projection.Project.ImplTransRelComp.Part2
+import Choreography.Projection.Project.ImplTransRelComp.Core
+import Choreography.Projection.Project.ImplTransRelComp.CommCases
 
 /-! # Project ImplTransRelComp
 
-Barrel for CProjectTransRel composition lemmas (Parts 1-2).
+Barrel for CProjectTransRel composition lemmas (Core/CommCases).
 -/

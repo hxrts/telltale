@@ -1,7 +1,7 @@
-import Choreography.Projection.Projectb.Part1
-import Choreography.Projection.Projectb.Part2
-import Choreography.Projection.Projectb.Part3
-import Choreography.Projection.Projectb.Part4
+import Choreography.Projection.Projectb.Checker
+import Choreography.Projection.Projectb.Coinductive
+import Choreography.Projection.Projectb.Soundness
+import Choreography.Projection.Projectb.Completeness
 
 /-! # Choreography.Projection.Projectb
 

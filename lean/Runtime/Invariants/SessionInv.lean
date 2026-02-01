@@ -1,5 +1,5 @@
-import Protocol.Environments.Part1
-import Protocol.Coherence.Part1
+import Protocol.Environments.Core
+import Protocol.Coherence.Consume
 import Runtime.Resources.SessionRA
 import Runtime.ProgramLogic.GhostState
 import Runtime.VM.State

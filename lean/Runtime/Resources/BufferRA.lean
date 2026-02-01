@@ -1,5 +1,5 @@
 import Std
-import Protocol.Environments.Part1
+import Protocol.Environments.Core
 import Runtime.VM.Core
 import Runtime.VM.TypeClasses
 import Runtime.Compat.RA

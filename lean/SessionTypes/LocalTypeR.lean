@@ -1,8 +1,8 @@
-import SessionTypes.LocalTypeR.Part1
-import SessionTypes.LocalTypeR.Part2
-import SessionTypes.LocalTypeR.Part3
-import SessionTypes.LocalTypeR.Part4
-import SessionTypes.LocalTypeR.Part5
+import SessionTypes.LocalTypeR.Core
+import SessionTypes.LocalTypeR.Environments
+import SessionTypes.LocalTypeR.Unfolding
+import SessionTypes.LocalTypeR.Substitution
+import SessionTypes.LocalTypeR.WellFormedness
 
 /-! # SessionTypes.LocalTypeR
 

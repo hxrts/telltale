@@ -1,8 +1,8 @@
-import Choreography.Harmony.Part1
-import Choreography.Harmony.Part2
-import Choreography.Harmony.Part3
-import Choreography.Harmony.Part4
-import Choreography.Harmony.Part5
+import Choreography.Harmony.StepHarmony
+import Choreography.Harmony.Substitution
+import Choreography.Harmony.ParticipantSteps
+import Choreography.Harmony.NonParticipantHelpers
+import Choreography.Harmony.NonParticipantSteps
 
 /-! ## Notes
 

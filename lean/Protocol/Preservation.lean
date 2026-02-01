@@ -116,7 +116,7 @@ theorem preservation
     (hTS : TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P') →
     LocalTypeR.WellFormed G D Ssh Sown store bufs P →
     LocalTypeR.WellFormed G' D' Ssh Sown' store' bufs' P' := by
-  -- Delegate to the canonical proof in Typing.Part6.
+  -- Delegate to the canonical proof in Typing.Framing.
   exact preservation_typed
 
 /-! ## Progress Theorem -/
@@ -128,7 +128,7 @@ theorem progress {G D Ssh Sown store bufs P} :
       (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
         G' D' Sown' store' bufs' P') ∨
       BlockedProc store bufs P := by
-  -- Delegate to the canonical progress proof in Typing.Part7.
+  -- Delegate to the canonical progress proof in Typing.Preservation.
   exact progress_typed
 
 /-! ## Progress Lemmas for Individual Process Forms

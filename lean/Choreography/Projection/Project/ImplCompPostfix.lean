@@ -1,8 +1,8 @@
-import Choreography.Projection.Project.ImplCompPostfix.Part1
-import Choreography.Projection.Project.ImplCompPostfix.Part2
-import Choreography.Projection.Project.ImplCompPostfix.Part3
+import Choreography.Projection.Project.ImplCompPostfix.WellFormedClosure
+import Choreography.Projection.Project.ImplCompPostfix.PrefixCases
+import Choreography.Projection.Project.ImplCompPostfix.SuffixCases
 
 /-! # Project ImplCompPostfix
 
-Barrel for CProjectTransRelComp postfix lemmas (Parts 1-3).
+Barrel for CProjectTransRelComp postfix lemmas (WellFormedClosure/PrefixCases/SuffixCases).
 -/

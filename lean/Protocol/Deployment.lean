@@ -1,6 +1,6 @@
-import Protocol.Deployment.Part1
-import Protocol.Deployment.Part2
-import Protocol.Deployment.Part3
+import Protocol.Deployment.Interface
+import Protocol.Deployment.Merge
+import Protocol.Deployment.Linking
 
 /-!
 # MPST Deployed Protocol Bundle

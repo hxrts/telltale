@@ -1,13 +1,13 @@
-import SessionCoTypes.Bisim.Part1
-import SessionCoTypes.Bisim.Part2
-import SessionCoTypes.Bisim.Part3
-import SessionCoTypes.Bisim.Part4
-import SessionCoTypes.Bisim.Part5
-import SessionCoTypes.Bisim.Part6
-import SessionCoTypes.Bisim.Part7
-import SessionCoTypes.Bisim.Part8
-import SessionCoTypes.Bisim.Part9
-import SessionCoTypes.Bisim.Part10
+import SessionCoTypes.Bisim.Core
+import SessionCoTypes.Bisim.UnfoldingLemmas
+import SessionCoTypes.Bisim.Bisimulation
+import SessionCoTypes.Bisim.EQ2Equivalence
+import SessionCoTypes.Bisim.ObservableFromEQ2
+import SessionCoTypes.Bisim.EQ2Extraction
+import SessionCoTypes.Bisim.EQ2ToBisim
+import SessionCoTypes.Bisim.Congruence
+import SessionCoTypes.Bisim.Substitution
+import SessionCoTypes.Bisim.UnfoldSubstitute
 
 /-! # SessionCoTypes.Bisim
 

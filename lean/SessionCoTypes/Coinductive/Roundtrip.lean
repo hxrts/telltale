@@ -1,5 +1,5 @@
-import SessionCoTypes.Coinductive.Roundtrip.Part1
-import SessionCoTypes.Coinductive.Roundtrip.Part2
-import SessionCoTypes.Coinductive.Roundtrip.Part3
-import SessionCoTypes.Coinductive.Roundtrip.Part4
-import SessionCoTypes.Coinductive.Roundtrip.Part5
+import SessionCoTypes.Coinductive.Roundtrip.Core
+import SessionCoTypes.Coinductive.Roundtrip.PacoCollapse
+import SessionCoTypes.Coinductive.Roundtrip.EnvDefs
+import SessionCoTypes.Coinductive.Roundtrip.RoundtripTheorem
+import SessionCoTypes.Coinductive.Roundtrip.RoundtripCorollaries

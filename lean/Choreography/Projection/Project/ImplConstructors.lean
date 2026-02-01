@@ -1,8 +1,8 @@
-import Choreography.Projection.Project.ImplConstructors.Part1
-import Choreography.Projection.Project.ImplConstructors.Part2
-import Choreography.Projection.Project.ImplConstructors.Part3
+import Choreography.Projection.Project.ImplConstructors.Base
+import Choreography.Projection.Project.ImplConstructors.SendRecv
+import Choreography.Projection.Project.ImplConstructors.Mu
 
 /-! # Project ImplConstructors
 
-Barrel for constructor agreement lemmas (Parts 1-3).
+Barrel for constructor agreement lemmas (Base/SendRecv/Mu).
 -/

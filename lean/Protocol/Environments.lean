@@ -1,5 +1,5 @@
-import Protocol.Environments.Part1
-import Protocol.Environments.Part2
+import Protocol.Environments.Core
+import Protocol.Environments.Renaming
 
 /-!
 # MPST Environments

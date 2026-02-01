@@ -1,12 +1,12 @@
-import Protocol.Coherence.Part1
-import Protocol.Coherence.Part2
-import Protocol.Coherence.Part3
-import Protocol.Coherence.Part4
-import Protocol.Coherence.Part5
-import Protocol.Coherence.Part6
-import Protocol.Coherence.Part7
-import Protocol.Coherence.Part8
-import Protocol.Coherence.Part9
+import Protocol.Coherence.Consume
+import Protocol.Coherence.EdgeCoherence
+import Protocol.Coherence.StoreTyping
+import Protocol.Coherence.Preservation
+import Protocol.Coherence.SelectPreservation
+import Protocol.Coherence.HeadPreservationSend
+import Protocol.Coherence.HeadPreservationSelect
+import Protocol.Coherence.ValidLabels
+import Protocol.Coherence.Renaming
 
 /-!
 # MPST Coherence

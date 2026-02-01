@@ -1,11 +1,11 @@
-import Protocol.Typing.Part1
-import Protocol.Typing.Part2
-import Protocol.Typing.Part3
-import Protocol.Typing.Part4
-import Protocol.Typing.Part5
-import Protocol.Typing.Part6
-import Protocol.Typing.Part7
-import Protocol.Typing.Part8
+import Protocol.Typing.Core
+import Protocol.Typing.Judgments
+import Protocol.Typing.Compatibility
+import Protocol.Typing.MergeLemmas
+import Protocol.Typing.StepLemmas
+import Protocol.Typing.Framing
+import Protocol.Typing.Preservation
+import Protocol.Typing.Progress
 
 /-!
 # MPST Process Typing

@@ -1,6 +1,6 @@
-import SessionCoTypes.Coinductive.BisimDecidable.Part1
-import SessionCoTypes.Coinductive.BisimDecidable.Part2
-import SessionCoTypes.Coinductive.BisimDecidable.Part3
+import SessionCoTypes.Coinductive.BisimDecidable.Core
+import SessionCoTypes.Coinductive.BisimDecidable.BisimAux
+import SessionCoTypes.Coinductive.BisimDecidable.Correctness
 
 /-!
 # Decidable Bisimulation for Regular Types

@@ -1,6 +1,6 @@
 import SessionCoTypes.Coinductive.EQ2C
 import SessionCoTypes.Coinductive.EQ2CMu
-import SessionCoTypes.Coinductive.Roundtrip.Part1
+import SessionCoTypes.Coinductive.Roundtrip.Core
 
 /-!
 The Problem. The round-trip proof currently uses ProductiveC to turn

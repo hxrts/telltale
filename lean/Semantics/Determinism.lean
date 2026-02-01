@@ -1,5 +1,5 @@
-import Semantics.Determinism.Part1
-import Semantics.Determinism.Part2
+import Semantics.Determinism.Core
+import Semantics.Determinism.Diamond
 
 /-! # Semantics.Determinism
 

@@ -1,6 +1,6 @@
-import SessionTypes.LocalTypeConvProofs.Part1
-import SessionTypes.LocalTypeConvProofs.Part2
-import SessionTypes.LocalTypeConvProofs.Part3
+import SessionTypes.LocalTypeConvProofs.Helpers
+import SessionTypes.LocalTypeConvProofs.ClosedRoundtrip
+import SessionTypes.LocalTypeConvProofs.Roundtrip
 
 /-! # SessionTypes.LocalTypeConvProofs
 

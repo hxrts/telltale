@@ -1,4 +1,4 @@
-import Protocol.Coherence.Part1
+import Protocol.Coherence.Consume
 import Protocol.DeadlockFreedom
 import Runtime.VM.Definition
 import Runtime.Invariants.SessionInv

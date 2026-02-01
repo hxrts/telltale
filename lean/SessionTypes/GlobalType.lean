@@ -1,8 +1,8 @@
-import SessionTypes.GlobalType.Part1
-import SessionTypes.GlobalType.Part2
-import SessionTypes.GlobalType.Part3
-import SessionTypes.GlobalType.Part4
-import SessionTypes.GlobalType.Part5
+import SessionTypes.GlobalType.Core
+import SessionTypes.GlobalType.Semantics
+import SessionTypes.GlobalType.WellFormedLemmas
+import SessionTypes.GlobalType.ProductivityLemmas
+import SessionTypes.GlobalType.Closedness
 
 /-! # SessionTypes.GlobalType
 

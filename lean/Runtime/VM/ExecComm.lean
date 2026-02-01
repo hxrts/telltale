@@ -1,4 +1,4 @@
-import Protocol.Environments.Part1
+import Protocol.Environments.Core
 import Runtime.Resources.ResourceModel
 import Runtime.VM.ExecHelpers
 

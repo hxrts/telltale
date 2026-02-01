@@ -1,4 +1,4 @@
-import Protocol.Environments.Part1
+import Protocol.Environments.Core
 import Runtime.VM.TypeClasses
 import Runtime.VM.Core
 import Runtime.Resources.BufferRA

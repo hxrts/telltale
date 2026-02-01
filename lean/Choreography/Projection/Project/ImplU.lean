@@ -1,7 +1,7 @@
-import Choreography.Projection.Project.ImplU.Part1
-import Choreography.Projection.Project.ImplU.Part2
+import Choreography.Projection.Project.ImplU.EQ2Closure
+import Choreography.Projection.Project.ImplU.CommCases
 
 /-! # Project ImplU
 
-Barrel for unfolding-insensitive projection EQ2 closure (Parts 1-2).
+Barrel for unfolding-insensitive projection EQ2 closure (EQ2Closure/CommCases).
 -/
