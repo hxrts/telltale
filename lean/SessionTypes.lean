@@ -6,8 +6,9 @@ import SessionTypes.LocalTypeConv
 import SessionTypes.LocalTypeRDBBridge
 import SessionTypes.Participation
 import SessionTypes.TypeContext
-import SessionTypes.Spatial
+
 import SessionTypes.ObservableClosed
+import SessionTypes.LocalTypeDBExamples
 
 /-! # SessionTypes
 

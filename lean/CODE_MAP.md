@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-01-31
+**Last Updated:** 2026-02-01
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -28,13 +28,13 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 
 | Library | Files | Lines | Focus |
 |---------|-------|-------|-------|
-| SessionTypes | 31 | ~8,054 | Global/local type definitions, de Bruijn, participation |
-| SessionCoTypes | 60 | ~10,357 | Coinductive EQ2, bisimulation, duality, roundtrip bridge |
-| Choreography | 54 | ~8,783 | Projection, harmony, blindness, embedding, erasure |
-| Semantics | 8 | ~2,177 | Operational semantics, determinism, deadlock freedom |
-| Protocol | 51 | ~12,409 | Async buffered MPST, coherence, preservation, monitoring |
-| Runtime | 19 | ~601 | VM scaffold, Iris separation logic shims, resource algebras |
-| **Total** | **223** | **~42,381** | |
+| SessionTypes | 29 | ~8,177 | Global/local type definitions, de Bruijn, participation |
+| SessionCoTypes | 62 | ~14,045 | Coinductive EQ2, bisimulation, duality, roundtrip bridge |
+| Choreography | 68 | ~15,879 | Projection, harmony, blindness, embedding, erasure |
+| Semantics | 8 | ~2,165 | Operational semantics, determinism, deadlock freedom |
+| Protocol | 41 | ~17,046 | Async buffered MPST, coherence, preservation, monitoring |
+| Runtime | 53 | ~6,945 | VM, Iris separation logic shims, resource algebras, session invariants |
+| **Total** | **261** | **~64,257** | |
 
 **Architectural Layers:**
 ```
@@ -43,7 +43,7 @@ Layer 5: Protocol         → Async MPST, coherence, typing, preservation, monit
 Layer 4: Semantics        → Operational semantics, typing judgments, determinism, deadlock freedom
 Layer 3: Choreography     → Projection, harmony, blindness, embedding, erasure
 Layer 2: SessionCoTypes   → Coinductive EQ2, bisimulation, duality, roundtrip bridge
-Layer 1: SessionTypes     → Global/local types, de Bruijn, participation, spatial
+Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 ```
 
 ---
@@ -100,7 +100,6 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation, spat
 | Participation/Core.lean | 297 | Participant classification in global protocols |
 | Participation/Extra.lean | 410 | Extended participation properties |
 | TypeContext.lean | 518 | Unified parametric context infrastructure |
-| Spatial.lean | 323 | Spatial type system with topology satisfaction |
 | ObservableClosed.lean | 267 | Termination for observable behavior of closed types |
 
 ---
@@ -186,6 +185,10 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation, spat
 | Coinductive/Roundtrip/Part4.lean | 544 | Completeness and characterization |
 | Coinductive/Roundtrip/Part5.lean | 86 | Final auxiliary lemmas |
 | Coinductive/RoundtripHelpers.lean | 394 | Helper lemmas |
+| Coinductive/ToCoindInjectivity.lean | 145 | Injectivity of toCoind conversion |
+| Coinductive/ToCoindRegular.lean | 86 | Regularity preservation for toCoind |
+| Coinductive/RegularityLemmas.lean | 81 | Auxiliary regularity lemmas |
+| Coinductive/Roundtrip/GpacoCollapse.lean | 111 | Paco collapse for roundtrip proofs |
 
 ### Supporting Modules
 
@@ -393,7 +396,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Spatial.lean | 364 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound` |
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
-| Examples.lean | 19 | Protocol examples — 1 axiom |
+| Examples.lean | 19 | Protocol examples (stubbed) |
 
 ---
 
@@ -408,51 +411,107 @@ Axiom shims for Iris primitives. Each retires when the corresponding upstream PR
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Shim/ResourceAlgebra.lean | 130 | `iProp`, `GhostName`, sep logic connectives, `own`, `bupd`, `Auth`, `GMap`, `ghost_map_*`, `big_sepL/M` |
-| Shim/Invariants.lean | 78 | `Mask`, `Namespace`, `fupd`, `inv`, `cinv`, `CancelToken` |
-| Shim/WeakestPre.lean | 103 | `Language`/`EctxLanguage` classes, `wp`, `state_interp`, WP rules, `MultiStep`, `wp_adequacy` |
-| Shim/SavedProp.lean | 33 | `saved_prop_own/alloc/agree/persistent`, `ghost_var` operations |
-| Shim/GenHeap.lean | 35 | `HeapLookup/Insert`, `pointsto`, `gen_heap_alloc/valid/update` |
+| Shim/ResourceAlgebra.lean | 129 | `iProp`, `GhostName`, sep logic connectives, `own`, `bupd`, `Auth`, `GMap`, `ghost_map_*`, `big_sepL/M` |
+| Shim/Invariants.lean | 77 | `Mask`, `Namespace`, `fupd`, `inv`, `cinv`, `CancelToken` |
+| Shim/WeakestPre.lean | 108 | `Language`/`EctxLanguage` classes, `wp`, `state_interp`, WP rules, `MultiStep`, `wp_adequacy` |
+| Shim/SavedProp.lean | 32 | `saved_prop_own/alloc/agree/persistent`, `ghost_var` operations |
+| Shim/GenHeap.lean | 36 | `HeapLookup/Insert`, `pointsto`, `gen_heap_alloc/valid/update` |
 
-### VM Definition (Tasks 10–12)
+### Compat Layer
 
-| File | Lines | Description |
-|------|-------|-------------|
-| VM/TypeClasses.lean | 19 | Type class definitions for VM |
-| VM/Definition.lean | 25 | VM machine definition |
-| VM/LanguageInstance.lean | 22 | Iris `Language` instance |
-
-### Session Resources (Tasks 13–15)
+Swap modules that re-export shim definitions. When upstream Iris lands, these swap to real implementations.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Resources/SessionRA.lean | 20 | Session resource algebra |
-| Resources/BufferRA.lean | 21 | Message buffer resource algebra |
-| Resources/Arena.lean | 24 | Memory arena management |
+| Compat.lean | 13 | Single import point for all Iris compat modules |
+| Compat/RA.lean | 10 | Resource algebra compat |
+| Compat/Inv.lean | 10 | Invariant compat |
+| Compat/WP.lean | 10 | Weakest precondition compat |
+| Compat/SavedProp.lean | 10 | Saved proposition compat |
+| Compat/GenHeap.lean | 10 | Generalized heap compat |
 
-### Invariants and Scheduling (Tasks 16–18)
-
-| File | Lines | Description |
-|------|-------|-------------|
-| Invariants/SessionInv.lean | 25 | Session invariant properties |
-| Scheduler/Scheduler.lean | 23 | Process scheduler |
-| Transport/Transport.lean | 23 | Abstract transport layer |
-
-### Program Logic (Tasks 19–21)
+### VM Core
 
 | File | Lines | Description |
 |------|-------|-------------|
-| ProgramLogic/SessionWP.lean | 25 | Session-level WP rules |
-| ProgramLogic/GhostState.lean | 24 | Ghost state management |
-| ProgramLogic/CodeLoading.lean | 23 | Code loading infrastructure |
+| VM/TypeClasses.lean | 247 | Identity, guard, persistence, effect, verification model typeclasses |
+| VM/Core.lean | 66 | Register file, instruction set, coroutine |
+| VM/Config.lean | 74 | VMConfig, VMState, ResourcePool |
+| VM/State.lean | 207 | Full machine state, session table, buffer management |
+| VM/Program.lean | 108 | Program representation and code segments |
+| VM/Definition.lean | 14 | Re-export wrapper for VM.State and VM.Exec |
+| VM/Knowledge.lean | 30 | Knowledge base and fact management |
+| VM/Violation.lean | 29 | Violation policy and fault types |
+| VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
 
-### Adequacy and Monitoring (Tasks 22–24)
+### VM Execution
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Adequacy/Adequacy.lean | 27 | Adequacy theorem |
-| Monitor/Monitor.lean | 31 | Unified monitoring |
-| Monitor/DomainComposition.lean | 26 | Domain composition for monitors |
+| VM/Exec.lean | 89 | Top-level step function dispatch |
+| VM/ExecHelpers.lean | 421 | Register operations, buffer lookup, shared helpers |
+| VM/ExecComm.lean | 449 | Send/recv/select/branch execution |
+| VM/ExecSession.lean | 304 | Session open/close/fork/join |
+| VM/ExecOwnership.lean | 157 | Ownership transfer and capability operations |
+| VM/ExecControl.lean | 103 | Control flow (jump, call, return, halt) |
+| VM/ExecGuardEffect.lean | 111 | Guard chain evaluation and effect dispatch |
+| VM/ExecSpeculation.lean | 66 | Speculative execution (fork/join/abort) |
+| VM/ExecSteps.lean | 54 | Multi-step execution wrapper |
+
+### Resources
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Resources/ResourceModel.lean | 179 | Resource model interface and profiles |
+| Resources/SessionRA.lean | 44 | Session resource algebra |
+| Resources/BufferRA.lean | 317 | Message buffer resource algebra with auth/frag |
+| Resources/Arena.lean | 260 | Memory arena with pointsto and allocation |
+| Resources/ProfilesV1.lean | 42 | V1 resource profile definitions |
+
+### Program Logic
+
+| File | Lines | Description |
+|------|-------|-------------|
+| ProgramLogic/LanguageInstance.lean | 93 | Iris `Language`/`EctxLanguage` instances |
+| ProgramLogic/SessionWP.lean | 122 | Session-level WP rules |
+| ProgramLogic/GhostState.lean | 242 | Ghost state management (session maps, buffer maps) |
+| ProgramLogic/CodeLoading.lean | 99 | Code loading and program verification |
+| ProgramLogic/ProofInterfaces.lean | 91 | Proof interface typeclasses |
+| ProgramLogic/WPPair.lean | 131 | WP pairing for send/recv duality |
+| ProgramLogic/WPPipeline.lean | 25 | WP pipeline composition |
+| ProgramLogic/FinalizationWP.lean | 39 | Finalization and cleanup WP rules |
+
+### Invariants, Scheduling, Transport
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Invariants/SessionInv.lean | 215 | Session invariant: coherence, buffers, endpoint state |
+| Scheduler/Scheduler.lean | 240 | Process scheduler with fairness and priority |
+| Transport/Transport.lean | 232 | Abstract transport layer with handler specs |
+| Cost/Credits.lean | 56 | Cost credit resource algebra |
+
+### Domain Composition and Monitoring
+
+| File | Lines | Description |
+|------|-------|-------------|
+| VM/DomainComposition.lean | 326 | Domain-specific composition and guard chain |
+| Monitor/Monitor.lean | 123 | Unified session monitor |
+| Failure/Failure.lean | 235 | Failure modes and recovery |
+
+### Adequacy and Proofs
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Adequacy/Adequacy.lean | 145 | Adequacy theorem connecting WP to execution |
+| Proofs/TheoremStubs.lean | 199 | Top-level theorem statements |
+
+### Examples and Tests
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Examples/SimpleProtocol.lean | 301 | Simple two-party protocol example |
+| Examples/Aura.lean | 133 | Aura instantiation example |
+| Tests/Main.lean | 54 | Runtime test harness |
 
 ---
 
@@ -478,7 +537,7 @@ telltale (package)
 
 ## Axiom Inventory
 
-### Protocol Library (35 axioms)
+### Protocol Library (34 axioms)
 
 | File | Count | Axioms |
 |------|-------|--------|
@@ -490,7 +549,6 @@ telltale (package)
 | Typing/Part1.lean | 1 | `ParSplit.unique` |
 | Typing/Part6.lean | 2 | `SessionsOf_subset_of_HasTypeProcPreOut`, `updateSEnv_append_left_any` |
 | Typing/Part7.lean | 1 | `DisjointS_preserved_TypedStep_right` |
-| Examples.lean | 1 | `examples_stub` |
 
 ### Runtime Library (~108 shim axioms)
 

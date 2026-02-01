@@ -100,7 +100,7 @@ theorem HeadCoherent_send_preserved
   by_cases heq : e = sendEdge
   · -- Case 1: e = sendEdge - type and trace both change
     subst heq
-    -- Self-send case is unusual; handle with sorry
+    -- Self-send case: receiver = sender, handled by subst and lookup lemmas.
     by_cases hRecvIsSender : receiverRole = senderEp.role
     · -- Self-send: receiver = sender, type at senderEp changes to L
       subst hRecvIsSender
@@ -297,7 +297,7 @@ theorem HeadCoherent_recv_preserved
   by_cases heq : e = recvEdge
   · -- Case 1: e = recvEdge - type and trace both change
     subst heq
-    -- Self-recv case is unusual; handle with sorry
+    -- Self-recv case: sender = receiver, handled by subst and lookup lemmas.
     by_cases hSenderIsRecv : senderRole = receiverEp.role
     · -- Self-recv: senderRole = receiverEp.role, sender/receiver endpoints coincide.
       subst hSenderIsRecv

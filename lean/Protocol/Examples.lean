@@ -15,5 +15,5 @@ open scoped Classical
 
 noncomputable section
 
--- Placeholder example to keep the module non-empty.
-axiom examples_stub : True
+-- Placeholder to keep the module non-empty while examples are refactored.
+theorem examples_stub : True := trivial
