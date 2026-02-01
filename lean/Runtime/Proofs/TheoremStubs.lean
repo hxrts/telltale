@@ -62,34 +62,37 @@ def handler_is_session : Prop :=
 
 def handler_progress : Prop :=
   -- Handler traces satisfy their declared transport specs.
-  ∀ handler trace, HandlerSatisfiesTransportSpec handler →
-    IsHandlerTrace handler trace →
-    SpecSatisfied (HandlerSatisfiesTransportSpec.spec handler) trace
+  ∀ (ν : Type) [VerificationModel ν] handler (trace : TransportTrace ν)
+    (hSpec : HandlerSatisfiesTransportSpec ν handler),
+    IsHandlerTrace (ν:=ν) handler trace →
+    SpecSatisfied hSpec.spec trace
 
 def handler_transport_refines : Prop :=
   -- Handler-backed traces refine some transport spec.
-  ∀ handler trace, HandlerSatisfiesTransportSpec handler →
-    IsHandlerTrace handler trace →
+  ∀ (ν : Type) [VerificationModel ν] handler (trace : TransportTrace ν)
+    (_hSpec : HandlerSatisfiesTransportSpec ν handler),
+    IsHandlerTrace (ν:=ν) handler trace →
     ∃ spec, SpecSatisfied spec trace
 
 def effect_polymorphic_safety : Prop :=
   -- Any two spec-satisfying handlers respect their own specs.
-  ∀ h1 h2 trace, HandlerSatisfiesTransportSpec h1 → HandlerSatisfiesTransportSpec h2 →
-    IsHandlerTrace h1 trace → IsHandlerTrace h2 trace →
-    SpecSatisfied (HandlerSatisfiesTransportSpec.spec h1) trace ∧
-    SpecSatisfied (HandlerSatisfiesTransportSpec.spec h2) trace
+  ∀ (ν : Type) [VerificationModel ν] h1 h2 (trace : TransportTrace ν)
+    (hSpec1 : HandlerSatisfiesTransportSpec ν h1)
+    (hSpec2 : HandlerSatisfiesTransportSpec ν h2),
+    IsHandlerTrace (ν:=ν) h1 trace → IsHandlerTrace (ν:=ν) h2 trace →
+    SpecSatisfied hSpec1.spec trace ∧ SpecSatisfied hSpec2.spec trace
 
 /-! ## Progress Tokens and Scheduling -/
 
-def session_type_mints_tokens : Prop :=
+def session_type_mints_tokens_stub : Prop :=
   -- Session progress supply yields minted tokens.
-  Runtime.ProgramLogic.GhostState.session_type_mints_tokens
+  session_type_mints_tokens
 
 def recv_consumes_token : Prop :=
   -- Placeholder: recv requires and consumes a progress token.
   True
 
-def starvation_free : Prop :=
+def starvation_free_stub : Prop :=
   -- Progress-aware scheduling property lifted from the scheduler.
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
@@ -97,7 +100,7 @@ def starvation_free : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : VMState ι γ π ε ν, Runtime.Scheduler.Scheduler.starvation_free st
+    ∀ st : VMState ι γ π ε ν, starvation_free st
 
 /-! ## Cost Metering -/
 

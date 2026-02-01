@@ -50,6 +50,7 @@ instance : VerificationModel Unit where
   Signature := Unit
   sign := fun _ _ => ()
   verifySignature := fun _ _ _ => true
+  verifyKeyOf := fun _ => ()
   CommitmentKey := Unit
   Commitment := Unit
   CommitmentProof := Unit

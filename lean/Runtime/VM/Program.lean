@@ -49,10 +49,13 @@ structure CodeImage (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
   wfBlind : Prop
   projectionCorrect : Prop
 
-structure UntrustedImage (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure UntrustedImage (γ ε ν : Type u) [GuardLayer γ] [EffectModel ε]
+    [VerificationModel ν] where
   -- Unverified image pending projection/typing checks.
   program : Program γ ε
   globalType : GlobalType
+  signer : VerificationModel.VerifyKey ν
+  signature : VerificationModel.Signature ν
 
 /-! ## Compilation scaffold -/
 

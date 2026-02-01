@@ -61,6 +61,7 @@ inductive Fault (γ : Type u) where
   | typeViolation (expected actual : ValType)
   | unknownLabel (label : Label)
   | channelClosed (endpoint : Endpoint)
+  | invalidSignature (edge : Edge)
   | acquireFault (layer : NamespaceRef) (msg : String)
   | invokeFault (msg : String)
   | transferFault (msg : String)
@@ -100,10 +101,17 @@ inductive StepEvent where
   -- Step events used by the VM trace (placeholder; refined in Task 11).
   | send (edge : Edge) (label : Label) (val : Value)
   | recv (edge : Edge) (label : Label) (val : Value)
+  | offer (edge : Edge) (label : Label)
+  | choose (edge : Edge) (label : Label)
+  | acquire (layer : Namespace)
+  | release (layer : Namespace)
+  | invoke (handler : HandlerId)
+  | transfer (endpoint : Endpoint) (fromCoro toCoro : Nat)
+  | tag (fact : KnowledgeFact)
+  | check (target : Role) (permitted : Bool)
   | open (sid : SessionId)
   | close (sid : SessionId)
   | fault (msg : String)
-  deriving Repr
 
 inductive ExecStatus (γ : Type u) where
   -- Result status of a single instruction step.
@@ -124,7 +132,6 @@ structure ExecResult (γ : Type u) where
   -- Execution result with optional observable event.
   status : ExecStatus γ
   event : Option StepEvent
-  deriving Repr
 
 /-! ## Scheduler state -/
 
@@ -152,17 +159,19 @@ structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
   code : Program γ ε
   programs : Array (Program γ ε)
   coroutines : Array (CoroutineState γ ε)
-  buffers : List (Edge × List Value)
+  buffers : SignedBuffers ν
   persistent : PersistenceModel.PState π
   nextCoroId : CoroutineId
   nextSessionId : SessionId
   arena : Arena
-  sessions : SessionStore
+  sessions : SessionStore ν
   resourceStates : List (ScopeId × ResourceState ν) -- Scoped resource views.
   guardResources : List (γ × GuardLayer.Resource γ)
   sched : SchedState γ
   monitor : SessionMonitor γ
   obsTrace : List StepEvent
+  crashedSites : List (IdentityModel.SiteId ι)
+  partitionedEdges : List Edge
   mask : Unit
   ghostSessions : Unit
   progressSupply : Unit

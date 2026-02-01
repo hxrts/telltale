@@ -28,13 +28,24 @@ structure StepPack (ι γ π ε ν : Type u)
 
 /-! ## Buffer helpers -/
 
+def signValue {ν : Type u} [VerificationModel ν]
+    (sk : VerificationModel.SigningKey ν) (v : Value) : SignedValue ν :=
+  -- Create a signed payload using the verification model.
+  { payload := v, signature := VerificationModel.sign sk v }
+
+def verifySignedValue {ν : Type u} [VerificationModel ν]
+    (vk : VerificationModel.VerifyKey ν) (sv : SignedValue ν) : Bool :=
+  -- Check the signature against the payload.
+  VerificationModel.verifySignature vk sv.payload sv.signature
+
 def edgeOf (ep : Endpoint) : Edge :=
   -- Build a self-edge for single-endpoint buffering.
   { sid := ep.sid, sender := ep.role, receiver := ep.role }
 
-def bufEnqueue (bufs : List (Edge × List Value)) (edge : Edge)
-    (v : Value) : List (Edge × List Value) :=
-  -- Add a value to the edge buffer, creating it if missing.
+def bufEnqueue {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edge : Edge)
+    (v : SignedValue ν) : SignedBuffers ν :=
+  -- Add a signed value to the edge buffer, creating it if missing.
   match bufs with
   | [] => [(edge, [v])]
   | (e, vs) :: rest =>
@@ -43,9 +54,10 @@ def bufEnqueue (bufs : List (Edge × List Value)) (edge : Edge)
       else
         (e, vs) :: bufEnqueue rest edge v
 
-def bufDequeue (bufs : List (Edge × List Value)) (edge : Edge) :
-    Option (Value × List (Edge × List Value)) :=
-  -- Remove the oldest value for the edge, if any.
+def bufDequeue {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (edge : Edge) :
+    Option (SignedValue ν × SignedBuffers ν) :=
+  -- Remove the oldest signed value for the edge, if any.
   match bufs with
   | [] => none
   | (e, vs) :: rest =>
@@ -58,14 +70,16 @@ def bufDequeue (bufs : List (Edge × List Value)) (edge : Edge) :
         | none => none
         | some (v, rest') => some (v, (e, vs) :: rest')
 
-def buffersFor (bufs : List (Edge × List Value)) (sid : SessionId) :
-    List (Edge × List Value) :=
-  -- Project buffers for a given session id.
+def buffersFor {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) (sid : SessionId) :
+    SignedBuffers ν :=
+  -- Project signed buffers for a given session id.
   bufs.filter (fun p => decide (p.fst.sid = sid))
 
-def updateSessBuffers (store : SessionStore) (sid : SessionId)
-    (bufs : List (Edge × List Value)) : SessionStore :=
-  -- Refresh the buffers for a specific session.
+def updateSessBuffers {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (sid : SessionId)
+    (bufs : SignedBuffers ν) : SessionStore ν :=
+  -- Refresh the signed buffers for a specific session.
   match store with
   | [] => []
   | (sid', s) :: rest =>

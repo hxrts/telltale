@@ -51,6 +51,8 @@ structure VMConfig (ι γ π ε ν : Type u)
   -- Guard chain configuration.
   guardChain : GuardChain γ
   guardChainWf : GuardChain.wf guardChain
+  -- Per-role signing key (V1 uses transparent keys).
+  roleSigningKey : Role → VerificationModel.SigningKey ν
   -- Cost metering policy (§21).
   costModel : CostModel γ ε
   -- Speculation toggle and bound (§17).

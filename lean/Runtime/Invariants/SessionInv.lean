@@ -1,4 +1,5 @@
 import Protocol.Environments.Part1
+import Protocol.Coherence.Part1
 import Runtime.Resources.SessionRA
 import Runtime.ProgramLogic.GhostState
 import Runtime.VM.State
@@ -38,26 +39,34 @@ noncomputable section
 
 /-! ## Session coherence stubs -/
 
-def session_coherent (_sid : SessionId) (_G : SessionMap) (_D : DEnv) : iProp :=
-  -- Placeholder coherence predicate for per-session environments.
-  iProp.emp
+def session_coherent (sid : SessionId) (G : SessionMap) (D : DEnv) : iProp :=
+  -- Coherence: every endpoint can consume its own pending trace.
+  iProp.pure
+    (∀ e L, GMap.lookup G e = some L →
+      Consume e.role L (lookupD D { sid := sid, sender := e.role, receiver := e.role }) ≠ none)
 
-def buffers_typed (_sid : SessionId) (_G : SessionMap) (_D : DEnv)
-    (_bufs : Buffers) : iProp :=
-  -- Placeholder buffer-typing predicate.
-  iProp.emp
+def buffers_typed (_sid : SessionId) (G : SessionMap) (_D : DEnv)
+    (bufs : Buffers) : iProp :=
+  -- Buffer values correspond to known receiver endpoints.
+  iProp.pure
+    (∀ edge v, v ∈ lookupBuf bufs edge →
+      ∃ L, GMap.lookup G { sid := edge.sid, role := edge.receiver } = some L)
 
-def head_coherent (_sid : SessionId) (_G : SessionMap) (_D : DEnv) : iProp :=
-  -- Placeholder for trace head coherence.
-  iProp.emp
+def head_coherent (sid : SessionId) (G : SessionMap) (D : DEnv) : iProp :=
+  -- Head coherence matches the full consume condition in V1.
+  session_coherent sid G D
 
-def knowledge_inv (_γ : GhostName) (_sid : SessionId) (_e : Endpoint) : iProp :=
-  -- Placeholder per-endpoint knowledge invariant.
-  iProp.emp
+def knowledge_fact (sid : SessionId) (e : Endpoint) : GhostKnowledgeFact :=
+  -- Stable per-endpoint fact tag for knowledge ownership.
+  toString sid ++ ":" ++ e.role
 
-def knowledge_inv_all (_γ : GhostName) (_sid : SessionId) (_G : SessionMap) : iProp :=
-  -- Placeholder for a big-separation conjunction of knowledge invariants.
-  iProp.emp
+def knowledge_inv (γ : GhostName) (sid : SessionId) (e : Endpoint) : iProp :=
+  -- Endpoint-specific knowledge invariant.
+  knows γ e (knowledge_fact sid e)
+
+def knowledge_inv_all (γ : GhostName) (sid : SessionId) (G : SessionMap) : iProp :=
+  -- Conjunction of knowledge invariants over the session map.
+  big_sepM (fun e _ => knowledge_inv γ sid e) G
 
 /-! ## Cancelable session invariant -/
 

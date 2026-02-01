@@ -178,6 +178,7 @@ class VerificationModel (ν : Type u) where
   Signature : Type
   sign : SigningKey → Data → Signature
   verifySignature : VerifyKey → Data → Signature → Bool
+  verifyKeyOf : SigningKey → VerifyKey
   -- Commitments and nullifiers for resources.
   CommitmentKey : Type
   Commitment : Type
@@ -190,6 +191,21 @@ class VerificationModel (ν : Type u) where
   verifyCommitment : Commitment → CommitmentProof → Data → Bool
   decEqC : DecidableEq Commitment
   decEqN : DecidableEq Nullifier
+
+/-! ## Signed message wrapper -/
+
+structure SignedValue (ν : Type u) [VerificationModel ν] where
+  -- Payload paired with its authentication tag.
+  payload : Value
+  signature : VerificationModel.Signature ν
+
+abbrev SignedBuffer (ν : Type u) [VerificationModel ν] :=
+  -- Buffer of signed payloads per edge.
+  List (SignedValue ν)
+
+abbrev SignedBuffers (ν : Type u) [VerificationModel ν] :=
+  -- Edge-indexed signed buffers.
+  List (Edge × SignedBuffer ν)
 
 class AuthTree (ν : Type u) [VerificationModel ν] where
   -- Authenticated tree interface for structured data.

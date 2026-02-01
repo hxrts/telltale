@@ -82,7 +82,7 @@ def non_leakage (pol : FlowPolicy) : Prop :=
 
 def check_enforces_policy : Prop :=
   -- Successful checks imply the flow is permitted.
-  ∀ pol k r, pol.allowed k r = true → KnowledgeReachable k
+  ∀ (pol : FlowPolicy) k r, pol.allowed k r = true → KnowledgeReachable k
 
 /-! ## Progress RA -/
 

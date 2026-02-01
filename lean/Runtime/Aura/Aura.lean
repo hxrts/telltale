@@ -118,5 +118,6 @@ def auraConfig :
   , guardChainWf := by
       -- Empty guard chain is trivially well-formed.
       simp [GuardChain.wf, GuardChain.namespaces, auraGuardChain]
+  , roleSigningKey := fun _ => ()
   , costModel := auraCostModel
   , speculationEnabled := false }

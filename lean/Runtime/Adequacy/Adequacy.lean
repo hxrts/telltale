@@ -41,9 +41,9 @@ inductive ObsEvent (ε : Type) [EffectModel ε] where
   | received (edge : Edge) (val : Value) (seqNo : Nat)
   | offered (edge : Edge) (label : Label)
   | chose (edge : Edge) (label : Label)
-  | acquired (layer : Namespace) (endpoint : Endpoint)
-  | released (layer : Namespace) (endpoint : Endpoint)
-  | invoked (endpoint : Endpoint) (action : EffectModel.EffectAction ε)
+  | acquired (layer : Namespace)
+  | released (layer : Namespace)
+  | invoked (handler : HandlerId)
   | opened (sid : SessionId) (roles : RoleSet)
   | closed (sid : SessionId)
   | epochAdvanced (sid : SessionId) (epoch : Nat)
@@ -51,11 +51,17 @@ inductive ObsEvent (ε : Type) [EffectModel ε] where
   | forked (sid : SessionId) (ghostSid : GhostSessionId)
   | joined (sid : SessionId)
   | aborted (sid : SessionId)
-  | tagged (endpoint : Endpoint) (fact : KnowledgeFact)
-  | checked (endpoint : Endpoint) (target : Role) (permitted : Bool)
+  | tagged (fact : KnowledgeFact)
+  | checked (target : Role) (permitted : Bool)
 
 -- Trace of observable events.
 abbrev ObsTrace (ε : Type) [EffectModel ε] := List (Nat × ObsEvent ε)
+
+private def listGet? {α : Type} : List α → Nat → Option α
+  -- Total list lookup by index.
+  | [], _ => none
+  | x :: _, 0 => some x
+  | _ :: xs, n + 1 => listGet? xs n
 
 
 def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε) :=
@@ -63,16 +69,45 @@ def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε)
   match ev with
   | .send edge _ v => some (.sent edge v 0)
   | .recv edge _ v => some (.received edge v 0)
+  | .offer edge lbl => some (.offered edge lbl)
+  | .choose edge lbl => some (.chose edge lbl)
+  | .acquire layer => some (.acquired layer)
+  | .release layer => some (.released layer)
+  | .invoke handler => some (.invoked handler)
+  | .transfer ep fromCoro toCoro => some (.transferred ep fromCoro toCoro)
+  | .tag fact => some (.tagged fact)
+  | .check target ok => some (.checked target ok)
   | .open sid => some (.opened sid [])
   | .close sid => some (.closed sid)
   | .fault _ => none
 
-def CausallyConsistent {ε : Type} [EffectModel ε] (_trace : ObsTrace ε) : Prop :=
-  -- Placeholder for causal consistency of traces.
-  True
-def FIFOConsistent {ε : Type} [EffectModel ε] (_trace : ObsTrace ε) : Prop :=
-  -- Placeholder for FIFO consistency of traces.
-  True
+def SentAt {ε : Type} [EffectModel ε]
+    (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
+  -- Event at idx is a send of v on e (seqNo ignored).
+  ∃ n seq, listGet? trace idx = some (n, ObsEvent.sent e v seq)
+
+def RecvAt {ε : Type} [EffectModel ε]
+    (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
+  -- Event at idx is a receive of v on e (seqNo ignored).
+  ∃ n seq, listGet? trace idx = some (n, ObsEvent.received e v seq)
+
+def SendBeforeObs {ε : Type} [EffectModel ε]
+    (trace : ObsTrace ε) (e : Edge) (v1 v2 : Value) : Prop :=
+  -- Send ordering derived from trace indices.
+  ∃ i j, i < j ∧ SentAt trace i e v1 ∧ SentAt trace j e v2
+
+def RecvBeforeObs {ε : Type} [EffectModel ε]
+    (trace : ObsTrace ε) (e : Edge) (v1 v2 : Value) : Prop :=
+  -- Receive ordering derived from trace indices.
+  ∃ i j, i < j ∧ RecvAt trace i e v1 ∧ RecvAt trace j e v2
+
+def CausallyConsistent {ε : Type} [EffectModel ε] (trace : ObsTrace ε) : Prop :=
+  -- Every receive is preceded by a matching send.
+  ∀ j e v, RecvAt trace j e v → ∃ i, i < j ∧ SentAt trace i e v
+
+def FIFOConsistent {ε : Type} [EffectModel ε] (trace : ObsTrace ε) : Prop :=
+  -- Receive order respects send order for each edge.
+  ∀ e v1 v2, SendBeforeObs trace e v1 v2 → RecvBeforeObs trace e v1 v2
 
 def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

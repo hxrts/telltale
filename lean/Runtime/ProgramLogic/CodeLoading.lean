@@ -36,15 +36,16 @@ inductive LoadResult (ν : Type) [VerificationModel ν] where
   | verificationFailed (reason : String)
   | resourceExhausted
 
-def code_signature_check {γ ε : Type} [GuardLayer γ] [EffectModel ε]
-    (_img : UntrustedImage γ ε) : Bool :=
-  -- Placeholder for signature verification on untrusted images.
-  true
-
 def code_image_id {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
     [VerificationModel ν] (img : Program γ ε) : VerificationModel.Hash ν :=
   -- V1 content id uses a transparent hash of program metadata.
   VerificationModel.hash (ν:=ν) (.string img.metadata.name)
+
+def code_signature_check {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
+    [VerificationModel ν] (img : UntrustedImage γ ε ν) : Bool :=
+  -- Verify the image signature against its content id.
+  let payload : Data := .string img.program.metadata.name
+  VerificationModel.verifySignature img.signer payload img.signature
 
 def loadTrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
@@ -66,7 +67,7 @@ def loadUntrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (img : UntrustedImage γ ε) :
+    (st : VMState ι γ π ε ν) (img : UntrustedImage γ ε ν) :
     VMState ι γ π ε ν × LoadResult ν :=
   -- Untrusted images require signature verification.
   if code_signature_check img then

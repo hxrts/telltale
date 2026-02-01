@@ -23,6 +23,8 @@ Dependencies: Task 10, Shim.ResourceAlgebra.
 
 set_option autoImplicit false
 
+universe u
+
 inductive SessionPhase where
   | opening
   | active
@@ -80,7 +82,7 @@ def Arena.free (a : Arena) (addr : Addr) : Arena :=
   else
     a
 
-structure SessionState where
+structure SessionState (ν : Type u) [VerificationModel ν] where
   -- Scope for resource commitments and nullifiers.
   scope : ScopeId -- Local resource scope.
   sid : SessionId -- Session identifier.
@@ -88,32 +90,48 @@ structure SessionState where
   endpoints : List Endpoint -- Allocated endpoints.
   localTypes : List (Endpoint × LocalType) -- Endpoint types (GEnv slice).
   traces : DEnv -- In-flight type traces (DEnv slice).
-  buffers : Buffers -- In-memory buffers (protocol Buffers).
+  buffers : SignedBuffers ν -- In-memory signed buffers.
   handlers : List (Edge × HandlerId) -- Handler bindings per edge.
   epoch : Nat -- Epoch tag for rotation.
   phase : SessionPhase -- Lifecycle status.
 
-abbrev SessionStore := List (SessionId × SessionState)
+abbrev SessionStore (ν : Type u) [VerificationModel ν] :=
+  List (SessionId × SessionState ν)
 
 /-! ## Session environment projections -/
 
-def SessionState.lookupType (st : SessionState) (e : Endpoint) : Option LocalType :=
+def SessionState.lookupType {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (e : Endpoint) : Option LocalType :=
   -- Lookup a local type in this session's endpoint map.
   st.localTypes.lookup e
 
-def SessionState.lookupTrace (st : SessionState) (edge : Edge) : List ValType :=
+def SessionState.lookupTrace {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (edge : Edge) : List ValType :=
   -- Lookup a type trace in this session's DEnv slice.
   lookupD st.traces edge
 
-def SessionState.lookupBuffer (st : SessionState) (edge : Edge) : Buffer :=
-  -- Lookup a buffer in this session's buffer slice.
-  lookupBuf st.buffers edge
+def SignedBuffer.payloads {ν : Type u} [VerificationModel ν]
+    (buf : SignedBuffer ν) : Buffer :=
+  -- Strip signatures to recover payload buffers.
+  buf.map (fun sv => sv.payload)
 
-def SessionState.lookupHandler (st : SessionState) (edge : Edge) : Option HandlerId :=
+def SignedBuffers.payloads {ν : Type u} [VerificationModel ν]
+    (bufs : SignedBuffers ν) : Buffers :=
+  -- Strip signatures across all edge buffers.
+  bufs.map (fun p => (p.fst, SignedBuffer.payloads p.snd))
+
+def SessionState.lookupBuffer {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (edge : Edge) : Buffer :=
+  -- Lookup a buffer and project to payloads.
+  lookupBuf (SignedBuffers.payloads st.buffers) edge
+
+def SessionState.lookupHandler {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (edge : Edge) : Option HandlerId :=
   -- Lookup the handler bound to a given edge.
   st.handlers.lookup edge
 
-def SessionStore.lookupType (store : SessionStore) (e : Endpoint) : Option LocalType :=
+def SessionStore.lookupType {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (e : Endpoint) : Option LocalType :=
   -- Find the matching session and then its local type.
   match store with
   | [] => none
@@ -123,7 +141,8 @@ def SessionStore.lookupType (store : SessionStore) (e : Endpoint) : Option Local
       else
         SessionStore.lookupType rest e
 
-def SessionStore.lookupTrace (store : SessionStore) (edge : Edge) : List ValType :=
+def SessionStore.lookupTrace {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (edge : Edge) : List ValType :=
   -- Find the matching session and then its trace.
   match store with
   | [] => []
@@ -133,7 +152,8 @@ def SessionStore.lookupTrace (store : SessionStore) (edge : Edge) : List ValType
       else
         SessionStore.lookupTrace rest edge
 
-def SessionStore.lookupBuffer (store : SessionStore) (edge : Edge) : Buffer :=
+def SessionStore.lookupBuffer {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (edge : Edge) : Buffer :=
   -- Find the matching session and then its buffer.
   match store with
   | [] => []
@@ -143,7 +163,8 @@ def SessionStore.lookupBuffer (store : SessionStore) (edge : Edge) : Buffer :=
       else
         SessionStore.lookupBuffer rest edge
 
-def SessionStore.lookupHandler (store : SessionStore) (edge : Edge) : Option HandlerId :=
+def SessionStore.lookupHandler {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (edge : Edge) : Option HandlerId :=
   -- Find the matching session and then its handler binding.
   match store with
   | [] => none
@@ -153,7 +174,8 @@ def SessionStore.lookupHandler (store : SessionStore) (edge : Edge) : Option Han
       else
         SessionStore.lookupHandler rest edge
 
-def SessionStore.defaultHandler (store : SessionStore) : Option HandlerId :=
+def SessionStore.defaultHandler {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) : Option HandlerId :=
   -- Pick any handler id from the active session store.
   match store with
   | [] => none
@@ -162,19 +184,23 @@ def SessionStore.defaultHandler (store : SessionStore) : Option HandlerId :=
       | [] => SessionStore.defaultHandler rest
       | (_, h) :: _ => some h
 
-def SessionStore.toGEnv (store : SessionStore) : GEnv :=
+def SessionStore.toGEnv {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) : GEnv :=
   -- Flatten per-session local types into a single GEnv.
   store.foldl (fun acc p => acc ++ p.snd.localTypes) []
 
-def SessionStore.toDEnv (store : SessionStore) : DEnv :=
+def SessionStore.toDEnv {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) : DEnv :=
   -- Union per-session DEnv slices (left-biased on conflicts).
   store.foldl (fun acc p => acc ++ p.snd.traces) (∅ : DEnv)
 
-def SessionStore.toBuffers (store : SessionStore) : Buffers :=
-  -- Flatten per-session buffers into a single Buffers list.
-  store.foldl (fun acc p => acc ++ p.snd.buffers) []
+def SessionStore.toBuffers {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) : Buffers :=
+  -- Flatten and project signed buffers into payload buffers.
+  store.foldl (fun acc p => acc ++ SignedBuffers.payloads p.snd.buffers) []
 
-def sessionStore_refines_envs (store : SessionStore) : Prop :=
+def sessionStore_refines_envs {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) : Prop :=
   -- Store lookups agree with the corresponding environment projections.
   let G := store.toGEnv
   let D := store.toDEnv
