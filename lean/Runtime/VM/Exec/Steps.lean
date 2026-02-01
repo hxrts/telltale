@@ -25,12 +25,30 @@ private def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   match readReg coro.regs chan, readReg coro.regs val with
   | some (.chan ep), some v =>
       if owns coro ep then
-        let edge := edgeOf ep
-        -- Sign the payload with the role's signing key.
-        let signed := signValue (st.config.roleSigningKey ep.role) v
-        let bufs' := bufEnqueue st.buffers edge signed
-        let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-        continuePack st' coro (some (.send edge "" v))
+        match SessionStore.lookupType st.sessions ep with
+        | some (.send r T L') =>
+            if decide (valTypeOf v = T) then
+              let edge := edgeTo ep r
+              if edgePartitioned st edge then
+                -- Partitioned edges block sends in V1.
+                blockPack st coro (.sendWait edge)
+              else if edgeCrashed st edge then
+                -- Crashed endpoints fail fast.
+                faultPack st coro (.specFault "edge crashed") "edge crashed"
+              else
+                -- Sign the payload with the role's signing key.
+                let signed := signValue (st.config.roleSigningKey ep.role) v
+                let bufs' := bufEnqueue st.buffers edge signed
+                let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                let trace := SessionStore.lookupTrace sessions1 edge
+                let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [T])
+                let sessions3 := SessionStore.updateType sessions2 ep L'
+                let st' := { st with buffers := bufs', sessions := sessions3 }
+                continuePack st' coro (some (.send edge "" v))
+            else
+              faultPack st coro (.typeViolation T (valTypeOf v)) "bad send payload"
+        | _ =>
+            faultPack st coro (.specFault "send not permitted") "send not permitted"
       else
         faultPack st coro (.channelClosed ep) "endpoint not owned"
   | some (.chan _), none =>
@@ -50,28 +68,47 @@ private def stepRecv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   match readReg coro.regs chan with
   | some (.chan ep) =>
       if owns coro ep then
-        let edge := edgeOf ep
-        let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
-        match consumeProgressToken coro.progressTokens token with
-        | none =>
-            faultPack st coro (.noProgressToken edge) "missing progress token"
-        | some tokens' =>
-            match bufDequeue st.buffers edge with
-            | none =>
-                let coro' := { coro with progressTokens := tokens' }
-                blockPack st coro' (.recvWait edge token)
-            | some (sv, bufs') =>
-                -- Verify the signature against the sender role.
-                let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
-                if verifySignedValue vk sv then
-                  match setReg coro.regs dst sv.payload with
-                  | none => faultPack st coro .outOfRegisters "bad dst reg"
-                  | some regs' =>
-                      let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                      let coro' := { coro with regs := regs', progressTokens := tokens' }
-                      continuePack st' coro' (some (.recv edge "" sv.payload))
-                else
-                  faultPack st coro (.invalidSignature edge) "invalid signature"
+        match SessionStore.lookupType st.sessions ep with
+        | some (.recv r T L') =>
+            let edge := edgeFrom r ep
+            let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
+            if edgePartitioned st edge then
+              -- Partitioned edges block receives in V1.
+              blockPack st coro (.recvWait edge token)
+            else if edgeCrashed st edge then
+              -- Crashed endpoints fail fast.
+              faultPack st coro (.specFault "edge crashed") "edge crashed"
+            else
+              match consumeProgressToken coro.progressTokens token with
+              | none =>
+                  faultPack st coro (.noProgressToken edge) "missing progress token"
+              | some tokens' =>
+                  match bufDequeue st.buffers edge with
+                  | none =>
+                      let coro' := { coro with progressTokens := tokens' }
+                      blockPack st coro' (.recvWait edge token)
+                  | some (sv, bufs') =>
+                      -- Verify the signature against the sender role.
+                      let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
+                      if verifySignedValue vk sv then
+                        if decide (valTypeOf sv.payload = T) then
+                          match setReg coro.regs dst sv.payload with
+                          | none => faultPack st coro .outOfRegisters "bad dst reg"
+                          | some regs' =>
+                              let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                              let trace := SessionStore.lookupTrace sessions1 edge
+                              let trace' := match trace with | [] => [] | _ :: ts => ts
+                              let sessions2 := SessionStore.updateTrace sessions1 edge trace'
+                              let sessions3 := SessionStore.updateType sessions2 ep L'
+                              let st' := { st with buffers := bufs', sessions := sessions3 }
+                              let coro' := { coro with regs := regs', progressTokens := tokens' }
+                              continuePack st' coro' (some (.recv edge "" sv.payload))
+                        else
+                          faultPack st coro (.typeViolation T (valTypeOf sv.payload)) "bad recv payload"
+                      else
+                        faultPack st coro (.invalidSignature edge) "invalid signature"
+        | _ =>
+            faultPack st coro (.specFault "recv not permitted") "recv not permitted"
       else
         faultPack st coro (.channelClosed ep) "endpoint not owned"
   | some v =>
@@ -89,13 +126,32 @@ private def stepOffer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
   match readReg coro.regs chan with
   | some (.chan ep) =>
       if owns coro ep then
-        let edge := edgeOf ep
-        let v := Value.string lbl
-        -- Sign the label payload before enqueue.
-        let signed := signValue (st.config.roleSigningKey ep.role) v
-        let bufs' := bufEnqueue st.buffers edge signed
-        let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-        continuePack st' coro (some (.offer edge lbl))
+        match SessionStore.lookupType st.sessions ep with
+        | some (.select r choices) =>
+            match choices.find? (fun p => p.fst == lbl) with
+            | none =>
+                faultPack st coro (.unknownLabel lbl) "unknown label"
+            | some (_, L') =>
+                let edge := edgeTo ep r
+                if edgePartitioned st edge then
+                  -- Partitioned edges block offers in V1.
+                  blockPack st coro (.sendWait edge)
+                else if edgeCrashed st edge then
+                  -- Crashed endpoints fail fast.
+                  faultPack st coro (.specFault "edge crashed") "edge crashed"
+                else
+                  let v := Value.string lbl
+                  -- Sign the label payload before enqueue.
+                  let signed := signValue (st.config.roleSigningKey ep.role) v
+                  let bufs' := bufEnqueue st.buffers edge signed
+                  let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                  let trace := SessionStore.lookupTrace sessions1 edge
+                  let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [.string])
+                  let sessions3 := SessionStore.updateType sessions2 ep L'
+                  let st' := { st with buffers := bufs', sessions := sessions3 }
+                  continuePack st' coro (some (.offer edge lbl))
+        | _ =>
+            faultPack st coro (.specFault "offer not permitted") "offer not permitted"
       else
         faultPack st coro (.channelClosed ep) "endpoint not owned"
   | some v =>
@@ -113,30 +169,51 @@ private def stepChoose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
   match readReg coro.regs chan with
   | some (.chan ep) =>
       if owns coro ep then
-        let edge := edgeOf ep
-        match bufDequeue st.buffers edge with
-        | some (sv, bufs') =>
-            -- Verify the signature before consuming the label.
-            let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
-            if verifySignedValue vk sv then
-              match sv.payload with
-              | .string lbl =>
-                  match table.find? (fun b => b.fst == lbl) with
-                  | some (_, target) =>
-                      let coro' := { coro with pc := target, status := .ready }
-                      let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                      pack coro' st' (mkRes .continue (some (.choose edge lbl)))
-                  | none =>
-                      let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                      faultPack st' coro (.unknownLabel lbl) "unknown label"
-              | _ =>
-                  let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
-                  faultPack st' coro (.typeViolation .string (valTypeOf sv.payload)) "bad label payload"
-            else
-              faultPack st coro (.invalidSignature edge) "invalid signature"
-        | none =>
+        match SessionStore.lookupType st.sessions ep with
+        | some (.branch r choices) =>
+            let edge := edgeFrom r ep
             let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
-            blockPack st coro (.recvWait edge token)
+            if edgePartitioned st edge then
+              -- Partitioned edges block chooses in V1.
+              blockPack st coro (.recvWait edge token)
+            else if edgeCrashed st edge then
+              -- Crashed endpoints fail fast.
+              faultPack st coro (.specFault "edge crashed") "edge crashed"
+            else
+              match bufDequeue st.buffers edge with
+              | some (sv, bufs') =>
+                  -- Verify the signature before consuming the label.
+                  let vk := VerificationModel.verifyKeyOf (st.config.roleSigningKey edge.sender)
+                  if verifySignedValue vk sv then
+                    match sv.payload with
+                    | .string lbl =>
+                        match table.find? (fun b => b.fst == lbl) with
+                        | some (_, target) =>
+                            match choices.find? (fun b => b.fst == lbl) with
+                            | none =>
+                                let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
+                                faultPack st' coro (.unknownLabel lbl) "unknown label"
+                            | some (_, L') =>
+                                let coro' := { coro with pc := target, status := .ready }
+                                let sessions1 := updateSessBuffers st.sessions ep.sid bufs'
+                                let trace := SessionStore.lookupTrace sessions1 edge
+                                let trace' := match trace with | [] => [] | _ :: ts => ts
+                                let sessions2 := SessionStore.updateTrace sessions1 edge trace'
+                                let sessions3 := SessionStore.updateType sessions2 ep L'
+                                let st' := { st with buffers := bufs', sessions := sessions3 }
+                                pack coro' st' (mkRes .continue (some (.choose edge lbl)))
+                        | none =>
+                            let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
+                            faultPack st' coro (.unknownLabel lbl) "unknown label"
+                    | _ =>
+                        let st' := { st with buffers := bufs', sessions := updateSessBuffers st.sessions ep.sid bufs' }
+                        faultPack st' coro (.typeViolation .string (valTypeOf sv.payload)) "bad label payload"
+                  else
+                    faultPack st coro (.invalidSignature edge) "invalid signature"
+              | none =>
+                  blockPack st coro (.recvWait edge token)
+        | _ =>
+            faultPack st coro (.specFault "choose not permitted") "choose not permitted"
       else
         faultPack st coro (.channelClosed ep) "endpoint not owned"
   | some v =>
@@ -200,11 +277,14 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
         match writeEndpoints coro.regs sid pairs with
         | none => faultPack st coro .outOfRegisters "bad dst reg"
         | some regs' =>
+            let scope := { id := sid }
+            let payload := Value.prod (.nat sid) (.string (String.intercalate "," roles))
+            let commitKey := commitmentKeyOfPayload (ν:=ν) payload
             let endpoints := roles.map (fun r => { sid := sid, role := r })
             let localTypes' := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
             let sess : SessionState ν :=
               -- V1 binds session scope to the session id.
-              { scope := { id := sid }
+              { scope := scope
               , sid := sid
               , roles := roles
               , endpoints := endpoints
@@ -215,8 +295,12 @@ private def stepOpen {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
               , epoch := 0
               , phase := .active }
             let coro' := advancePc ({ coro with regs := regs', status := .ready, ownedEndpoints := endpoints ++ coro.ownedEndpoints })
+            let resources' := updateResourceStates st.resourceStates scope
+              (fun rs => { rs with commitments := AccumulatedSet.insert rs.commitments commitKey })
             let st' :=
-              { st with nextSessionId := st.nextSessionId + 1, sessions := (sid, sess) :: st.sessions }
+              { st with nextSessionId := st.nextSessionId + 1
+                      , sessions := (sid, sess) :: st.sessions
+                      , resourceStates := resources' }
             pack coro' st' (mkRes .continue (some (.open sid)))
 
 private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -232,6 +316,13 @@ private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
         let updatePhase (s : SessionState ν) : SessionState ν :=
           -- Closing clears buffers and traces while marking the phase.
           { s with phase := .closed, buffers := [], traces := (∅ : DEnv) }
+        let rec findRoles (ss : SessionStore ν) : RoleSet :=
+          match ss with
+          | [] => []
+          | (sid, s) :: rest => if sid = ep.sid then s.roles else findRoles rest
+        let roles := findRoles st.sessions
+        let payload := Value.prod (.nat ep.sid) (.string (String.intercalate "," roles))
+        let nullKey := nullifierKeyOfPayload (ν:=ν) payload
         let rec closeSess (ss : SessionStore ν) : SessionStore ν :=
           match ss with
           | [] => []
@@ -240,7 +331,9 @@ private def stepClose {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
                 (sid, updatePhase s) :: rest
               else
                 (sid, s) :: closeSess rest
-        let st' := { st with sessions := closeSess st.sessions }
+        let resources' := updateResourceStates st.resourceStates { id := ep.sid }
+          (fun rs => { rs with nullifiers := AccumulatedSet.insert rs.nullifiers nullKey })
+        let st' := { st with sessions := closeSess st.sessions, resourceStates := resources' }
         let owned' := coro.ownedEndpoints.filter (fun e => decide (e ≠ ep))
         let coro' := advancePc { coro with status := .ready, ownedEndpoints := owned' }
         pack coro' st' (mkRes .continue (some (.close ep.sid)))

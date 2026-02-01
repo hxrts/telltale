@@ -65,14 +65,35 @@ def programLocalTypes (roles : RoleSet) (types : Role → LocalType) :
   -- Preserve role order in the role set.
   roles.map (fun r => (r, types r))
 
+def regOf (v : Var) : Reg :=
+  -- V1 register mapping: deterministic by variable name length.
+  v.length
+
+def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (p : Process) : List (Instr γ ε) :=
+  -- Compile a single process into a flat instruction list.
+  match p with
+  | .skip => []
+  | .assign x v => [Instr.loadImm (regOf x) v]
+  | .send k x => [Instr.send (regOf k) (regOf x)]
+  | .recv k x => [Instr.recv (regOf k) (regOf x)]
+  | .select k lbl => [Instr.offer (regOf k) lbl]
+  | .branch k branches =>
+      let table := branches.map (fun b => (b.1, 0))
+      [Instr.choose (regOf k) table]
+  | .seq p₁ p₂ => compileBlock p₁ ++ compileBlock p₂
+  | .par p₁ p₂ => compileBlock p₁ ++ compileBlock p₂
+  | .newSession _ _ p' => compileBlock p'
+
 /-- Compile a process into a program (stub). -/
 def compile {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (p : Process) (roles : RoleSet) (types : Role → LocalType)
     (chain : GuardChain γ) : Program γ ε :=
-  -- Placeholder compiler: emit empty code with trivial metadata.
+  -- V1 compiler: emit a single-process bytecode block and halt.
   let _ := p
   let _ := chain
-  { code := #[],
+  let code := (compileBlock (γ:=γ) (ε:=ε) p) ++ [Instr.halt]
+  { code := code.toArray,
     entryPoints := roles.map (fun r => (r, 0)),
     localTypes := programLocalTypes roles types,
     handlerTypes := [],

@@ -44,8 +44,18 @@ structure Resource (ν : Type u) [VerificationModel ν] where
 
 /-- Serialize a resource for hashing/commitment (placeholder). -/
 def resourcePayload {ν : Type u} [VerificationModel ν] (_r : Resource ν) : Data :=
-  -- Replace with a real encoding when Value serialization is fixed.
-  Value.unit
+  -- Encode quantity/value/ephemeral flag in a deterministic V1 payload.
+  Value.prod (Value.prod (.nat _r.quantity) _r.value) (.bool _r.isEphemeral)
+
+def commitmentKeyOfPayload {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (payload : Data) : AccumulatedSet.Key ν :=
+  -- Derive a commitment-set key from a payload hash.
+  AccumulatedSet.keyOfHash (VerificationModel.hashTagged .commitment payload)
+
+def nullifierKeyOfPayload {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (payload : Data) : AccumulatedSet.Key ν :=
+  -- Derive a nullifier-set key from a payload hash.
+  AccumulatedSet.keyOfHash (VerificationModel.hashTagged .nullifier payload)
 
 /-- Commitment for a resource. -/
 def Resource.commitment {ν : Type u} [VerificationModel ν]

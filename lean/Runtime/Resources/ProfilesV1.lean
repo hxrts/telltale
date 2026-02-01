@@ -35,6 +35,7 @@ instance instAccumulatedSetV1 (ν : Type u) [VerificationModel ν] : Accumulated
   State := List (VerificationModel.Hash ν)
   ProofMember := Unit
   ProofNonMember := Unit
+  empty := []
   keyOfHash := fun h => h
   insert := fun st k => if decide (k ∈ st) then st else k :: st
   verifyMember := fun st k _ => decide (k ∈ st)

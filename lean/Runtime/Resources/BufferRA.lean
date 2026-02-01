@@ -248,56 +248,70 @@ def BoundedBuffer.drainEpoch (buf : BoundedBuffer) (newEpoch : Nat) : BoundedBuf
 
 abbrev BufferRA := GMap Edge BoundedBuffer -- Ghost map for edge buffers.
 
-def IsSharedTrace (_trace : List Value) : Prop :=
-  -- Placeholder shared-memory trace predicate.
+def tracePayloads {ν : Type} [VerificationModel ν]
+    (trace : SignedBuffer ν) : Buffer :=
+  -- Project a signed trace to its payload sequence.
+  trace.map (fun sv => sv.payload)
+
+def IsSharedTrace {ν : Type} [VerificationModel ν]
+    (trace : SignedBuffer ν) : Prop :=
+  -- Shared traces preserve unique payload order in V1.
+  List.Nodup (tracePayloads trace)
+
+def IsReliableTrace {ν : Type} [VerificationModel ν]
+    (trace : SignedBuffer ν) : Prop :=
+  -- Reliable traces preserve unique payload order in V1.
+  List.Nodup (tracePayloads trace)
+
+def IsUnreliableTrace {ν : Type} [VerificationModel ν]
+    (_trace : SignedBuffer ν) : Prop :=
+  -- Unreliable traces place no additional ordering constraints in V1.
   True
 
-def IsReliableTrace (_trace : List Value) : Prop :=
-  -- Placeholder reliable transport trace predicate.
-  True
+def IsHandledTrace {ν : Type} [VerificationModel ν]
+    (_handler : HandlerId) (trace : SignedBuffer ν) : Prop :=
+  -- Handler-backed traces are reliable in V1.
+  IsReliableTrace trace
 
-def IsUnreliableTrace (_trace : List Value) : Prop :=
-  -- Placeholder unreliable transport trace predicate.
-  True
-
-def IsHandledTrace (_handler : HandlerId) (_trace : List Value) : Prop :=
-  -- Placeholder handler-backed trace predicate.
-  True
-
-def IsBoundedTrace (cap : Nat) (trace : List Value) : Prop :=
+def IsBoundedTrace {ν : Type} [VerificationModel ν]
+    (cap : Nat) (trace : SignedBuffer ν) : Prop :=
   -- Bounded traces have length within the configured capacity.
   trace.length ≤ cap
 
-def IsUnboundedTrace (trace : List Value) : Prop :=
+def IsUnboundedTrace {ν : Type} [VerificationModel ν]
+    (trace : SignedBuffer ν) : Prop :=
   -- Unbounded traces have no length restriction.
   trace.length ≥ 0
 
-def SameMessages (t1 t2 : List Value) : Prop :=
-  -- Observational equality over message sequences.
-  t1 = t2
+def SameMessages {ν : Type} [VerificationModel ν]
+    (t1 t2 : SignedBuffer ν) : Prop :=
+  -- Observational equality over payload sequences.
+  tracePayloads t1 = tracePayloads t2
 
-def shared_refines_reliable : Prop :=
+def shared_refines_reliable {ν : Type} [VerificationModel ν] : Prop :=
   -- Shared backing refines reliable backing.
-  ∀ trace, IsSharedTrace trace → IsReliableTrace trace
+  ∀ trace, IsSharedTrace (ν:=ν) trace → IsReliableTrace trace
 
-def reliable_refines_unreliable : Prop :=
+def reliable_refines_unreliable {ν : Type} [VerificationModel ν] : Prop :=
   -- Reliable backing refines unreliable backing.
-  ∀ trace, IsReliableTrace trace → IsUnreliableTrace trace
+  ∀ trace, IsReliableTrace (ν:=ν) trace → IsUnreliableTrace trace
 
-def handled_refines_any : Prop :=
+def handled_refines_any {ν : Type} [VerificationModel ν] : Prop :=
   -- Handler-backed traces refine any backing satisfying the transport spec.
-  ∀ handler trace, IsHandledTrace handler trace → ∃ backingTrace, SameMessages trace backingTrace
+  ∀ handler trace,
+    IsHandledTrace (ν:=ν) handler trace →
+      ∃ backingTrace, SameMessages trace backingTrace
 
-def spatial_le_backing_refines : Prop :=
+def spatial_le_backing_refines {ν : Type} [VerificationModel ν] : Prop :=
   -- Spatial subtyping lifts to buffer backing refinement.
-  True
+  ∀ trace, IsSharedTrace (ν:=ν) trace → IsUnreliableTrace trace
 
-def bounded_refines_unbounded : Prop :=
+def bounded_refines_unbounded {ν : Type} [VerificationModel ν] : Prop :=
   -- Bounded FIFO refines unbounded FIFO by preserving messages.
-  ∀ cap trace, IsBoundedTrace cap trace →
+  ∀ cap trace, IsBoundedTrace (ν:=ν) cap trace →
     ∃ unboundedTrace, IsUnboundedTrace unboundedTrace ∧ SameMessages trace unboundedTrace
 
-def latest_value_refines_unbounded : Prop :=
+def latest_value_refines_unbounded {ν : Type} [VerificationModel ν] : Prop :=
   -- Latest-value buffers refine unbounded FIFO by preserving final messages.
-  ∀ cap trace, IsBoundedTrace cap trace →
+  ∀ cap trace, IsBoundedTrace (ν:=ν) cap trace →
     ∃ unboundedTrace, IsUnboundedTrace unboundedTrace ∧ SameMessages trace unboundedTrace

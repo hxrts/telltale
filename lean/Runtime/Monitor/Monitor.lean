@@ -50,12 +50,52 @@ def SessionKind.sid? {γ : Type u} : SessionKind γ → Option SessionId :=
 
 inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectModel ε] :
     Instr γ ε → SessionKind γ → LocalType → LocalType → Prop where
-  | wt_step (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType) :
-      -- Placeholder typing judgment for unified monitor.
-      WellTypedInstr i sk L L'
+  | wt_send (sid : SessionId) (chan val : Reg) (r : Role)
+      (T : ValType) (L' : LocalType) :
+      -- Sending advances a send type to its continuation.
+      WellTypedInstr (.send chan val) (.protocol sid) (.send r T L') L'
+  | wt_recv (sid : SessionId) (chan dst : Reg) (r : Role)
+      (T : ValType) (L' : LocalType) :
+      -- Receiving advances a recv type to its continuation.
+      WellTypedInstr (.recv chan dst) (.protocol sid) (.recv r T L') L'
+  | wt_offer (sid : SessionId) (chan : Reg) (r : Role)
+      (choices : List (Label × LocalType)) (lbl : Label) (L' : LocalType) :
+      -- Offer advances along the selected branch.
+      (lbl, L') ∈ choices →
+      WellTypedInstr (.offer chan lbl) (.protocol sid) (.select r choices) L'
+  | wt_choose (sid : SessionId) (chan : Reg) (r : Role)
+      (choices : List (Label × LocalType)) (table : List (Label × PC)) :
+      -- Choose is well-typed when table labels are covered by branches.
+      (∀ lbl pc, (lbl, pc) ∈ table → ∃ L', (lbl, L') ∈ choices) →
+      WellTypedInstr (.choose chan table) (.protocol sid) (.branch r choices) (.branch r choices)
+  | wt_acquire (chainId : GuardChainId) (layer : γ) (dst : Reg) (L : LocalType) :
+      -- Guard acquisition preserves the guard-session local type in V1.
+      WellTypedInstr (.acquire layer dst) (.guard chainId layer) L L
+  | wt_release (chainId : GuardChainId) (layer : γ) (ev : Reg) (L : LocalType) :
+      -- Guard release preserves the guard-session local type in V1.
+      WellTypedInstr (.release layer ev) (.guard chainId layer) L L
   | wt_invoke (action : EffectModel.EffectAction ε) (hsid : HandlerId) :
       -- Handler session typing for invoke steps.
       WellTypedInstr (.invoke action) (.handler hsid) (EffectModel.handlerType action) .end_
+  | wt_open (sid : SessionId) (roles : RoleSet) (types : List (Role × LocalType))
+      (handlers : List (Edge × HandlerId)) (dsts : List (Role × Reg)) :
+      -- Opening is well-typed at the boundary of a fresh session.
+      WellTypedInstr (.open roles types handlers dsts) (.protocol sid) .end_ .end_
+  | wt_close (sid : SessionId) (session : Reg) :
+      -- Closing is well-typed at end.
+      WellTypedInstr (.close session) (.protocol sid) .end_ .end_
+  | wt_fork (gsid : GhostSessionId) (sidReg : Reg) (L : LocalType) :
+      -- Fork preserves the ghost-session type in V1.
+      WellTypedInstr (.fork sidReg) (.ghost gsid) L L
+  | wt_join (gsid : GhostSessionId) (L : LocalType) :
+      -- Join preserves the ghost-session type in V1.
+      WellTypedInstr .join (.ghost gsid) L L
+  | wt_abort (gsid : GhostSessionId) (L : LocalType) :
+      -- Abort preserves the ghost-session type in V1.
+      WellTypedInstr .abort (.ghost gsid) L L
+  | wt_noop (i : Instr γ ε) (sk : SessionKind γ) (L : LocalType) :
+      -- Non-session instructions preserve local types.
+      WellTypedInstr i sk L L
 
 structure SessionMonitor (γ : Type u) where
   -- Monitor transition per session kind.
@@ -63,7 +103,7 @@ structure SessionMonitor (γ : Type u) where
 
 def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (_m : SessionMonitor γ) (_i : Instr γ ε) : Bool :=
-  -- Placeholder: monitor accepts all instructions.
+  -- V1 monitor is permissive; typing checks happen in execution.
   true
 
 def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectModel ε]

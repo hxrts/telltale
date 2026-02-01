@@ -42,6 +42,39 @@ def edgeOf (ep : Endpoint) : Edge :=
   -- Build a self-edge for single-endpoint buffering.
   { sid := ep.sid, sender := ep.role, receiver := ep.role }
 
+def edgeTo (ep : Endpoint) (target : Role) : Edge :=
+  -- Build a directed edge from this endpoint to a target role.
+  { sid := ep.sid, sender := ep.role, receiver := target }
+
+def edgeFrom (sender : Role) (ep : Endpoint) : Edge :=
+  -- Build a directed edge to this endpoint from a sender.
+  { sid := ep.sid, sender := sender, receiver := ep.role }
+
+def edgePartitioned {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (edge : Edge) : Bool :=
+  -- An edge is partitioned when it appears in the VM state.
+  st.partitionedEdges.any (fun e => decide (e = edge))
+
+def edgeCrashed {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (edge : Edge) : Bool :=
+  -- An edge is crashed if either endpoint maps to a crashed site.
+  let _ : DecidableEq (IdentityModel.SiteId ι) := IdentityModel.decEqS (ι:=ι)
+  let senderCrashed :=
+    match IdentityModel.siteOf (ι:=ι) edge.sender with
+    | some sid => decide (sid ∈ st.crashedSites)
+    | none => false
+  let receiverCrashed :=
+    match IdentityModel.siteOf (ι:=ι) edge.receiver with
+    | some sid => decide (sid ∈ st.crashedSites)
+    | none => false
+  senderCrashed || receiverCrashed
+
 def bufEnqueue {ν : Type u} [VerificationModel ν]
     (bufs : SignedBuffers ν) (edge : Edge)
     (v : SignedValue ν) : SignedBuffers ν :=
@@ -75,6 +108,27 @@ def buffersFor {ν : Type u} [VerificationModel ν]
     SignedBuffers ν :=
   -- Project signed buffers for a given session id.
   bufs.filter (fun p => decide (p.fst.sid = sid))
+
+/-! ## Resource-state helpers -/
+
+def defaultResourceState {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (scope : ScopeId) : ResourceState ν :=
+  -- Empty resource state for a new scope.
+  { scope := scope
+  , commitments := AccumulatedSet.empty
+  , nullifiers := AccumulatedSet.empty }
+
+def updateResourceStates {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
+    (states : List (ScopeId × ResourceState ν)) (scope : ScopeId)
+    (f : ResourceState ν → ResourceState ν) : List (ScopeId × ResourceState ν) :=
+  -- Update or insert the resource state for a scope.
+  match states with
+  | [] => [(scope, f (defaultResourceState scope))]
+  | (sid, st) :: rest =>
+      if sid = scope then
+        (sid, f st) :: rest
+      else
+        (sid, st) :: updateResourceStates rest scope f
 
 def updateSessBuffers {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) (sid : SessionId)

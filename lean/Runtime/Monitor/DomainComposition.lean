@@ -76,6 +76,7 @@ instance : AccumulatedSet Unit where
   State := Unit
   ProofMember := Unit
   ProofNonMember := Unit
+  empty := ()
   keyOfHash := fun _ => ()
   insert := fun st _ => st
   verifyMember := fun _ _ _ => true

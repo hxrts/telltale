@@ -95,5 +95,5 @@ def hotSwap_preserves_coherent {ι γ π ε ν : Type} [IdentityModel ι] [Guard
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (_current _new : LocalType) (_buffered : List ValType) : Prop :=
-  -- Placeholder: hot-swap preserves coherence under SafeUpdate.
-  True
+  -- V1: hot-swap preserves coherence exactly when SafeUpdate holds.
+  SafeUpdate (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) _current _new _buffered

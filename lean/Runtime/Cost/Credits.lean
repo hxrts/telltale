@@ -21,15 +21,15 @@ def cost_credit_own (γ : GhostName) (n : CostCredit) : iProp :=
   own γ n
 
 def cost_credit_auth (γ : GhostName) (n : CostCredit) : iProp :=
-  -- Authoritative credit counter (placeholder).
+  -- Authoritative credit counter for the total budget.
   own γ n
 
 def cost_credit_split (_n m k : CostCredit) : Prop :=
-  -- Placeholder: split credits into two parts.
+  -- Split credits into two parts.
   m + k = _n
 
 def cost_credit_consume (_n cost : CostCredit) : Prop :=
-  -- Placeholder: consuming cost from a credit budget is valid.
+  -- Consuming cost from a credit budget is valid.
   cost ≤ _n
 
 /-! ## Configuration checks -/
@@ -41,8 +41,9 @@ def cost_model_ok {ι γ π ε ν : Type}
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (cfg : VMConfig ι γ π ε ν) : Prop :=
-  -- Placeholder: configuration respects minimal cost assumptions.
-  cfg.costModel.minCost ≥ 1
+  -- Configuration respects minimum cost assumptions.
+  (cfg.costModel.minCost ≥ 1) ∧
+    (∀ i, i ≠ .halt → cfg.costModel.stepCost i ≥ cfg.costModel.minCost)
 
 def step_cost {ι γ π ε ν : Type}
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]

@@ -42,3 +42,16 @@ lean_lib Protocol where
 @[default_target]
 lean_lib Runtime where
   globs := #[`Runtime.*]
+
+/-- Linker args to silence macOS deployment target warnings for test executables. -/
+def macosLinkArgs : Array String :=
+  -- Match the toolchain's minimum macOS version for system libraries.
+  if System.Platform.isOSX then
+    #["-mmacosx-version-min=15.0"]
+  else
+    #[]
+
+/-- Executable runtime tests for the VM example. -/
+lean_exe runtime_tests where
+  root := `Runtime.Tests.Main
+  moreLinkArgs := macosLinkArgs

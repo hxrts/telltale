@@ -64,11 +64,12 @@ private def listGet? {α : Type} : List α → Nat → Option α
   | _ :: xs, n + 1 => listGet? xs n
 
 
-def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε) :=
-  -- Project internal step events to observable events.
+def observeAt {ε : Type} [EffectModel ε]
+    (idx : Nat) (ev : StepEvent) : Option (ObsEvent ε) :=
+  -- Project internal events to observable events with seqNo = index.
   match ev with
-  | .send edge _ v => some (.sent edge v 0)
-  | .recv edge _ v => some (.received edge v 0)
+  | .send edge _ v => some (.sent edge v idx)
+  | .recv edge _ v => some (.received edge v idx)
   | .offer edge lbl => some (.offered edge lbl)
   | .choose edge lbl => some (.chose edge lbl)
   | .acquire layer => some (.acquired layer)
@@ -80,6 +81,23 @@ def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε)
   | .open sid => some (.opened sid [])
   | .close sid => some (.closed sid)
   | .fault _ => none
+
+def observe {ε : Type} [EffectModel ε] (ev : StepEvent) : Option (ObsEvent ε) :=
+  -- Index-free projection defaults seqNo to 0 for V1 convenience.
+  observeAt (ε:=ε) 0 ev
+
+def obsTraceOf {ε : Type} [EffectModel ε]
+    (trace : List StepEvent) : ObsTrace ε :=
+  -- Enumerate events and keep the observable subset with indices.
+  let rec go (idx : Nat) (evs : List StepEvent) : ObsTrace ε :=
+    match evs with
+    | [] => []
+    | ev :: rest =>
+        let tail := go (idx + 1) rest
+        match observeAt (ε:=ε) idx ev with
+        | none => tail
+        | some obs => (idx, obs) :: tail
+  go 0 trace
 
 def SentAt {ε : Type} [EffectModel ε]
     (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
@@ -122,14 +140,18 @@ def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
-  -- Placeholder adequacy statement.
-  True
+  -- V1 adequacy: observable traces are causally and FIFO consistent.
+  ∀ (st : VMState ι γ π ε ν), WFVMState st →
+    let obs := obsTraceOf (ε:=ε) st.obsTrace
+    CausallyConsistent obs ∧ FIFOConsistent obs
 def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
-  -- Placeholder for trace soundness.
-  True
+  -- Every observed event comes from some step event at that index.
+  ∀ (st : VMState ι γ π ε ν) idx ev,
+    (idx, ev) ∈ obsTraceOf (ε:=ε) st.obsTrace →
+      ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = some ev
 def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)

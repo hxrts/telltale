@@ -220,6 +220,7 @@ class AccumulatedSet (ν : Type u) [VerificationModel ν] where
   State : Type
   ProofMember : Type
   ProofNonMember : Type
+  empty : State
   keyOfHash : VerificationModel.Hash ν → Key
   insert : State → Key → State
   verifyMember : State → Key → ProofMember → Bool

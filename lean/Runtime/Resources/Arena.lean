@@ -110,6 +110,16 @@ def SessionState.lookupTrace {ν : Type u} [VerificationModel ν]
   -- Lookup a type trace in this session's DEnv slice.
   lookupD st.traces edge
 
+def SessionState.updateType {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (e : Endpoint) (L : LocalType) : SessionState ν :=
+  -- Update the local type map for an endpoint.
+  { st with localTypes := updateG st.localTypes e L }
+
+def SessionState.updateTrace {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (edge : Edge) (ts : List ValType) : SessionState ν :=
+  -- Update the type trace for an edge.
+  { st with traces := updateD st.traces edge ts }
+
 def SignedBuffer.payloads {ν : Type u} [VerificationModel ν]
     (buf : SignedBuffer ν) : Buffer :=
   -- Strip signatures to recover payload buffers.
@@ -173,6 +183,28 @@ def SessionStore.lookupHandler {ν : Type u} [VerificationModel ν]
         st.lookupHandler edge
       else
         SessionStore.lookupHandler rest edge
+
+def SessionStore.updateType {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (e : Endpoint) (L : LocalType) : SessionStore ν :=
+  -- Update the local type for the endpoint in its session.
+  match store with
+  | [] => []
+  | (sid, st) :: rest =>
+      if sid = e.sid then
+        (sid, st.updateType e L) :: rest
+      else
+        (sid, st) :: SessionStore.updateType rest e L
+
+def SessionStore.updateTrace {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (edge : Edge) (ts : List ValType) : SessionStore ν :=
+  -- Update the trace for the edge in its session.
+  match store with
+  | [] => []
+  | (sid, st) :: rest =>
+      if sid = edge.sid then
+        (sid, st.updateTrace edge ts) :: rest
+      else
+        (sid, st) :: SessionStore.updateTrace rest edge ts
 
 def SessionStore.defaultHandler {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) : Option HandlerId :=
