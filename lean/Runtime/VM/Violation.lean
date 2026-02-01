@@ -1,11 +1,16 @@
 import Std
 
-/-
-The Problem. The runtime needs a spec-level notion of violations and a
-policy hook for how they are handled (log, drop, abort).
+/-!
+# Violations and Policy
 
-Solution Structure. Provide minimal data types for violations and policies
-so both the VM config and adequacy layer can reference them.
+`Violation` and `ViolationPolicy`, spec-level types for safety and liveness
+violations. A `Violation` is either a safety violation (should never occur in
+well-typed runs) or a liveness violation (progress failure). The `ViolationPolicy`
+in `VMConfig` decides whether to allow or reject each violation, letting the
+deployment choose between strict abort-on-violation and lenient logging modes.
+
+Referenced by both `Config.lean` (stores the policy) and the adequacy layer
+(uses violations in correctness statements).
 -/
 
 set_option autoImplicit false

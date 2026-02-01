@@ -1,5 +1,5 @@
 import Runtime.VM.Config
-import Runtime.Monitor.DomainComposition
+import Runtime.VM.DomainComposition
 import Runtime.Resources.BufferRA
 
 /-
@@ -127,7 +127,7 @@ def auraConfig :
   , guardChain := auraGuardChain
   , guardChainWf := by
       -- Empty guard chain is trivially well-formed.
-      simp [GuardChain.wf, GuardChain.namespaces, auraGuardChain]
+      simp [GuardChain.wf, GuardChain.layerIds, auraGuardChain]
   , roleSigningKey := fun _ => ()
   , costModel := auraCostModel
   , speculationEnabled := false }

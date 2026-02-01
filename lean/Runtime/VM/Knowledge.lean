@@ -1,12 +1,16 @@
 import Runtime.VM.Core
 
-/-
-The Problem. The VM needs a shared definition of knowledge facts and
-flow policies that can be referenced by both config and execution
-without creating import cycles.
+/-!
+# Knowledge Facts and Flow Policy
 
-Solution Structure. Define endpoint-bound knowledge facts, knowledge
-sets, and a simple flow policy predicate in a dedicated module.
+Definitions for the epistemic separation logic layer (`runtime.md` §16). A
+`KnowledgeFact` binds a string payload to a specific endpoint, representing
+information that a coroutine has learned through protocol interaction. A
+`FlowPolicy` decides which facts may propagate to which roles.
+
+This module is deliberately small and import-cycle-free so that both `Config.lean`
+(which stores the flow policy) and the `Exec*.lean` files (which read/write knowledge
+sets) can depend on it.
 -/
 
 set_option autoImplicit false

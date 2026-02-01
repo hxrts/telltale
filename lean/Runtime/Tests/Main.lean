@@ -1,6 +1,6 @@
 import Runtime.Examples.SimpleProtocol
 import Runtime.VM.Exec
-import Runtime.VM.Exec.Helpers
+import Runtime.VM.ExecHelpers
 
 /-
 The Problem. Provide an executable Lean test that runs the example VM

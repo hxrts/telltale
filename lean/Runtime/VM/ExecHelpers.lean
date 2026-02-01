@@ -1,12 +1,25 @@
 import Std
 import Runtime.VM.State
 
-/-
-The Problem. Instruction semantics need reusable helper functions for
-buffers, registers, and result packaging.
+/-!
+# Execution Helpers
 
-Solution Structure. Provide small helpers for buffer updates, register
-access, and result construction used by per-instruction steps.
+Shared utility functions used by all per-instruction step functions. Organized into:
+
+- **Buffer helpers**: signed-value enqueue/dequeue, edge lookup, buffer-config capacity,
+  latest-value and FIFO modes with backpressure policy.
+- **Guard resource helpers**: lookup and update guard-layer resources by layer tag.
+- **Resource state helpers**: default state construction, scoped transaction application,
+  session buffer refresh.
+- **Persistence helpers**: session reconstruction from persistent state.
+- **Register helpers**: safe read/write, PC advancement, endpoint ownership check,
+  progress token consumption, value type recovery.
+- **Result helpers**: `StepPack` construction for continue/fault/block/halt outcomes,
+  cost charging.
+- **Coroutine updates**: write-back of modified coroutine state into the VM state array.
+
+Every `Exec*.lean` file imports this module. The helpers are intentionally small and
+pure so that the per-instruction semantics files stay focused on control flow.
 -/
 
 set_option autoImplicit false

@@ -1,12 +1,23 @@
-import Runtime.VM.Exec.Helpers
-import Runtime.VM.Exec.Steps
+import Runtime.VM.ExecHelpers
+import Runtime.VM.ExecSteps
 
-/-
-The Problem. Provide the VM's single-instruction stepper used by the
-scheduler and language instance.
+/-!
+# Main Instruction Stepper
 
-Solution Structure. Factor per-case helpers and assemble the main stepper
-from monitor checks, cost charging, and instruction dispatch.
+`execInstr`, the top-level entry point for executing one instruction on a coroutine.
+The execution pipeline is:
+
+1. Look up the coroutine by id (fault if missing).
+2. Check coroutine status (skip if done/faulted).
+3. Fetch the instruction at the current PC (fault if out of range).
+4. Run the session monitor type check (fault if rejected).
+5. Charge the instruction's cost against the coroutine's budget (fault if insufficient).
+6. Dispatch to the per-instruction step function via `stepInstr`.
+7. Write back the updated coroutine and append any observable event to the trace.
+
+The scheduler calls `execInstr` in a loop. Each call produces an updated `VMState`
+and an `ExecResult` indicating whether the coroutine continued, yielded, blocked,
+halted, faulted, or triggered a structural change (spawn, transfer, fork, join, abort).
 -/
 
 set_option autoImplicit false

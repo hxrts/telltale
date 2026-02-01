@@ -4,15 +4,20 @@ import Runtime.VM.Knowledge
 import Runtime.Resources.ResourceModel
 import Runtime.VM.SchedulerTypes
 import Runtime.VM.Violation
-import Runtime.Monitor.DomainComposition
+import Runtime.VM.DomainComposition
 import Runtime.Resources.BufferRA
 
-/-
-The Problem. The VM needs a configuration record that ties together domain
-interfaces, scheduling, buffering, and policy hooks while staying parametric.
+/-!
+# VM Configuration
 
-Solution Structure. Define a small `CostModel` and a `VMConfig` structure
-that references spec-level types only (no proof imports).
+`CostModel` and `VMConfig`, the static configuration that parameterizes a VM instance.
+`VMConfig` bundles buffer policies, scheduling policy, violation handling, knowledge flow
+policy, spatial requirement hooks, handler transport-spec checks, guard chain configuration,
+signing keys, cost metering, and speculation settings. All five domain interfaces
+(`ι`, `γ`, `π`, `ε`, `ν`) plus their bridge classes appear as typeclass constraints.
+
+This file imports only spec-level types (no proof modules). The `VMConfig` record is
+threaded through `VMState` and read by every instruction stepper.
 -/
 
 set_option autoImplicit false
@@ -22,7 +27,7 @@ universe u
 /-! ## Cost model -/
 
 structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
-  -- Cost per instruction; used for budgeting and bounds.
+  -- Cost per instruction, used for budgeting and bounds.
   stepCost : Instr γ ε → Nat
   -- Minimum cost for any non-halt instruction.
   minCost : Nat
@@ -41,31 +46,20 @@ structure VMConfig (ι γ π ε ν : Type u)
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] where
-  -- Buffering policy per edge.
+  -- VM configuration fields for policies and hooks.
   bufferConfig : Edge → BufferConfig
-  -- Scheduling policy.
   schedPolicy : SchedPolicy
-  -- Violation handling policy.
   violationPolicy : ViolationPolicy
-  -- Knowledge flow policy (§16).
   flowPolicy : FlowPolicy
-  -- Spatial requirement hook for session creation (§2).
   spatialOk : RoleSet → Bool
-  -- Handler transport-spec check hook over current buffers (§8/§15).
   transportOk : HandlerId → SignedBuffers ν → Bool
-  -- Compliance proof supplier for resource transactions (§22).
   complianceProof : Resource ν → ComplianceProof ν
-  -- Resource bounds.
   maxCoroutines : Nat
   maxSessions : Nat
-  -- Guard chain configuration.
   guardChain : GuardChain γ
   guardChainWf : GuardChain.wf guardChain
-  -- Per-role signing key (V1 uses transparent keys).
   roleSigningKey : Role → VerificationModel.SigningKey ν
-  -- Cost metering policy (§21).
   costModel : CostModel γ ε
-  -- Speculation toggle and bound (§17).
   speculationEnabled : Bool
   maxSpeculationDepth : Nat := 16
 

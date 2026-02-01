@@ -4,24 +4,29 @@ import Protocol.LocalType
 import Protocol.Values
 import Protocol.Spatial
 import SessionTypes.GlobalType
-import Runtime.Compat.Inv
-import Runtime.Compat.RA
 
 set_option autoImplicit false
 
 universe u
 
-/-
-The Problem. The runtime must be parametric over identity, guard, persistence,
-and effect models while staying independent of any particular domain.
+/-!
+# Domain Model Interfaces
 
-Solution Structure. Define lean typeclasses and small helper defs that expose
-just enough structure to wire the VM and keep later proofs modular.
+The five parametric interfaces that the VM is built on: `IdentityModel`, `GuardLayer`,
+`PersistenceModel`, `EffectModel`, and `VerificationModel`. Each is a typeclass that a
+concrete domain (e.g. Aura) instantiates. This file also defines the authenticated data
+structure interfaces (`AuthTree`, `AccumulatedSet`) and the `ScopeId` type used for
+scoped resource views.
+
+Everything here is pure specification with no proof imports. The rest of `Runtime/VM/`
+and `Runtime/Resources/` depend on these definitions. Domain-specific instances belong
+in `Runtime/Aura/` or equivalent modules, not here.
 -/
 
 /-! ## Shared protocol types -/
 
 abbrev GlobalType := SessionTypes.GlobalType.GlobalType
+abbrev LayerId := String
 
 /-! ## Domain model interfaces -/
 
@@ -47,8 +52,8 @@ class IdentityModel (ι : Type u) where
 
 -- Guard layer interface for invariant-protected resources.
 class GuardLayer (γ : Type u) where
-  /-- Namespace for this layer's invariant. -/
-  layerNs : γ → Namespace
+  /-- Runtime identifier for this guard layer. -/
+  layerId : γ → LayerId
   /-- Resource this layer protects. -/
   Resource : Type
   /-- Evidence produced on successful evaluation. -/
@@ -114,15 +119,13 @@ structure GuardChain (γ : Type u) [GuardLayer γ] where
   /-- Active predicate for hot-swappable layers. -/
   active : γ → Bool
 
-def GuardChain.namespaces {γ : Type u} [GuardLayer γ] (chain : GuardChain γ) : List Namespace :=
-  -- Extract namespaces in order for disjointness checks.
-  chain.layers.map GuardLayer.layerNs
+def GuardChain.layerIds {γ : Type u} [GuardLayer γ] (chain : GuardChain γ) : List LayerId :=
+  -- Extract layer identifiers in order for disjointness checks.
+  chain.layers.map GuardLayer.layerId
 
 def GuardChain.wf {γ : Type u} [GuardLayer γ] (chain : GuardChain γ) : Prop :=
-  -- Pairwise namespace disjointness ensures safe invariant stacking.
-  List.Pairwise
-    (fun n₁ n₂ => Mask.disjoint (namespace_to_mask n₁) (namespace_to_mask n₂))
-    (GuardChain.namespaces chain)
+  -- Layer identifiers are unique in the chain.
+  List.Nodup (GuardChain.layerIds chain)
 
 inductive GuardCommand where
   -- Commands emitted by guard evaluation.
@@ -158,9 +161,6 @@ class EffectModel (ε : Type u) where
   EffectCtx : Type
   /-- Execute an action in the effect context. -/
   exec : EffectAction → EffectCtx → EffectCtx
-  /-- Pre- and post-conditions for effects. -/
-  pre : EffectAction → EffectCtx → iProp
-  post : EffectAction → EffectCtx → iProp
   /-- Session type associated with an effect handler. -/
   handlerType : EffectAction → LocalType
 
@@ -181,19 +181,17 @@ inductive HashTag where
   deriving Repr, DecidableEq
 
 class VerificationModel (ν : Type u) where
-  -- Hashing for content identification.
+  -- Cryptographic primitives and V1 defaults.
   Hash : Type
   hash : Data → Hash
   hashTagged : HashTag → Data → Hash
   decEqH : DecidableEq Hash
-  -- Signing for message authentication.
   SigningKey : Type
   VerifyKey : Type
   Signature : Type
   sign : SigningKey → Data → Signature
   verifySignature : VerifyKey → Data → Signature → Bool
   verifyKeyOf : SigningKey → VerifyKey
-  -- Commitments and nullifiers for resources.
   CommitmentKey : Type
   Commitment : Type
   CommitmentProof : Type
@@ -205,7 +203,6 @@ class VerificationModel (ν : Type u) where
   verifyCommitment : Commitment → CommitmentProof → Data → Bool
   decEqC : DecidableEq Commitment
   decEqN : DecidableEq Nullifier
-  -- Default keys and nonce for V1 scaffolding.
   defaultCommitmentKey : CommitmentKey
   defaultNullifierKey : NullifierKey
   defaultNonce : Nonce

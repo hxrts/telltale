@@ -2,12 +2,20 @@ import Runtime.VM.Core
 import Runtime.VM.TypeClasses
 import Protocol.Process
 
-/-
-The Problem. The VM needs a program image format and a compiler stub that
-connects high-level processes to bytecode programs.
+/-!
+# Program Images and Compilation
 
-Solution Structure. Define program metadata, program images, and a minimal
-`compile` placeholder plus refinement statement.
+`Program`, `CodeImage`, and `UntrustedImage`, the program representation that the
+VM loads and executes. A `Program` is bytecode plus per-role entry points, local types,
+handler types, and source metadata. A `CodeImage` bundles a program with its global type
+and well-formedness/projection-correctness evidence (currently `Prop` stubs). An
+`UntrustedImage` is an unverified program pending signature and typing checks, used by
+the code loading pipeline (`runtime.md` §10).
+
+The `compile` function is a V1 stub that translates a `Process` (from `Protocol.Process`)
+into a flat bytecode block. It maps variables to registers by name length and emits a
+single basic block followed by `halt`. A real compiler would produce optimized bytecode
+with proper register allocation and branch targets.
 -/
 
 set_option autoImplicit false

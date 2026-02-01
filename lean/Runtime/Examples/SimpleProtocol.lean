@@ -1,6 +1,6 @@
 import Runtime.VM.Program
 import Runtime.VM.Exec
-import Runtime.VM.Exec.Helpers
+import Runtime.VM.ExecHelpers
 import Runtime.VM.Config
 import Runtime.Resources.BufferRA
 import Runtime.Monitor.Monitor
@@ -48,8 +48,8 @@ instance : IdentityModel TestIdentity where
   decEqS := by infer_instance
 
 instance : GuardLayer TestGuard where
-  -- Empty guard layer avoids noncomputable namespaces.
-  layerNs := fun g => nomatch g
+  -- Empty guard layer avoids noncomputable identifiers.
+  layerId := fun g => nomatch g
   Resource := Unit
   Evidence := Unit
   open_ := fun _ => some ()
@@ -81,8 +81,6 @@ instance : EffectModel TestEffect where
   EffectAction := Empty
   EffectCtx := Unit
   exec := fun a _ => nomatch a
-  pre := fun a _ => nomatch a
-  post := fun a _ => nomatch a
   handlerType := fun a => nomatch a
 
 instance : VerificationModel TestVerify where
@@ -187,7 +185,7 @@ def testConfig : VMConfig TestIdentity TestGuard TestPersist TestEffect TestVeri
   , guardChain := testGuardChain
   , guardChainWf := by
       -- Empty guard chain is trivially well-formed.
-      simp [GuardChain.wf, GuardChain.namespaces, testGuardChain]
+      simp [GuardChain.wf, GuardChain.layerIds, testGuardChain]
   , roleSigningKey := fun _ => ()
   , costModel := testCostModel
   , speculationEnabled := false }

@@ -1,30 +1,40 @@
 import Runtime.VM.TypeClasses
-import Runtime.Compat.RA
 
-/- 
-The Problem. The VM needs to compose multiple domain models while keeping a
-small, uniform core interface (for guards, effects, persistence, identity).
+/-!
+# Domain Model Composition
 
-Solution Structure. Provide unit and product/sum instances plus bridge
-classes that capture cross-model compatibility obligations.
+Unit, sum, and product instances for all five domain interfaces, plus the bridge
+classes that connect them. This is the Lean counterpart of `runtime.md` §20.
+
+**Unit instances** (`GuardLayer Unit`, `EffectModel Unit`, `VerificationModel Unit`,
+`AuthTree Unit`, `AccumulatedSet Unit`) provide trivial no-op implementations used
+as identity elements in composition and as defaults for testing.
+
+**Sum/product instances** let independent domain models be combined. Sum instances
+dispatch on the chosen side. Product instances run both components. This enables
+protocol federation: a VM configured with `EffectModel (ε₁ ⊕ ε₂)` can execute
+effects from either domain without either domain knowing about the other.
+
+**Bridge classes** (`IdentityGuardBridge`, `EffectGuardBridge`, `PersistenceEffectBridge`,
+`IdentityPersistenceBridge`, `IdentityVerificationBridge`) capture the cross-model
+obligations that domain instantiations must satisfy. Bridge composition instances
+automatically lift bridges over sums so that composed domains inherit their
+component bridges.
 -/
 
 set_option autoImplicit false
-noncomputable section
 
 universe u
 
 /-! ## Unit instances -/
 
-def combineNs (n₁ n₂ : Namespace) : Namespace :=
-  -- Deterministic namespace combination for product guards.
-  let _ := n₁ -- Placeholder: use component namespaces in V2 tagging.
-  let _ := n₂ -- Placeholder: use component namespaces in V2 tagging.
-  Namespace.append (Namespace.append Namespace.root "guard") "pair"
+def combineLayerId (id₁ id₂ : LayerId) : LayerId :=
+  -- Deterministic layer identifier combination for product guards.
+  id₁ ++ "::" ++ id₂
 
 instance : GuardLayer Unit where
-  -- Unit guard layer: trivial namespace and resource.
-  layerNs := fun _ => Namespace.root
+  -- Unit guard layer: trivial id and resource.
+  layerId := fun _ => "unit"
   Resource := Unit
   Evidence := Unit
   open_ := fun _ => some ()
@@ -38,12 +48,10 @@ instance : GuardLayer Unit where
   decEq := by infer_instance
 
 instance : EffectModel Unit where
-  -- Unit effect model: no-op effects with empty specs.
+  -- Unit effect model: no-op effects.
   EffectAction := Unit
   EffectCtx := Unit
   exec := fun _ _ => ()
-  pre := fun _ _ => iProp.emp
-  post := fun _ _ => iProp.emp
   handlerType := fun _ => LocalType.end_
 
 instance : VerificationModel Unit where
@@ -94,41 +102,70 @@ instance : AccumulatedSet Unit where
 
 /-! ## Composed instances -/
 
+private def sumSites (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    (Sum (IdentityModel.ParticipantId ι₁) (IdentityModel.ParticipantId ι₂) → List (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂))) :=
+  -- Lift sites into the sum identity model.
+  fun
+    | Sum.inl p => (IdentityModel.sites (ι:=ι₁) p).map Sum.inl
+    | Sum.inr p => (IdentityModel.sites (ι:=ι₂) p).map Sum.inr
+
+private def sumSiteName (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂) → Site) :=
+  -- Lift site names into the sum identity model.
+  fun
+    | Sum.inl s => IdentityModel.siteName (ι:=ι₁) s
+    | Sum.inr s => IdentityModel.siteName (ι:=ι₂) s
+
+private def sumSiteOf (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    Site → Option (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂)) :=
+  -- Prefer the left model when both interpret a site name.
+  fun site =>
+    match IdentityModel.siteOf (ι:=ι₁) site with
+    | some s => some (Sum.inl s)
+    | none => (IdentityModel.siteOf (ι:=ι₂) site).map Sum.inr
+
+private def sumSiteCapabilities (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂) → SiteCapabilities) :=
+  -- Lift site capabilities into the sum identity model.
+  fun
+    | Sum.inl s => IdentityModel.siteCapabilities (ι:=ι₁) s
+    | Sum.inr s => IdentityModel.siteCapabilities (ι:=ι₂) s
+
+private def sumReliableEdges (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    List (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂) ×
+          Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂)) :=
+  -- Lift reliable edges into the sum identity model.
+  (IdentityModel.reliableEdges (ι:=ι₁)).map (fun p => (Sum.inl p.1, Sum.inl p.2)) ++
+  (IdentityModel.reliableEdges (ι:=ι₂)).map (fun p => (Sum.inr p.1, Sum.inr p.2))
+
+private def sumDecEqP (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    DecidableEq (Sum (IdentityModel.ParticipantId ι₁) (IdentityModel.ParticipantId ι₂)) := by
+  -- Build decidable equality for summed participants.
+  classical
+  let _ : DecidableEq (IdentityModel.ParticipantId ι₁) := IdentityModel.decEqP (ι:=ι₁)
+  let _ : DecidableEq (IdentityModel.ParticipantId ι₂) := IdentityModel.decEqP (ι:=ι₂)
+  exact instDecidableEqSum
+
+private def sumDecEqS (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
+    DecidableEq (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂)) := by
+  -- Build decidable equality for summed sites.
+  classical
+  let _ : DecidableEq (IdentityModel.SiteId ι₁) := IdentityModel.decEqS (ι:=ι₁)
+  let _ : DecidableEq (IdentityModel.SiteId ι₂) := IdentityModel.decEqS (ι:=ι₂)
+  exact instDecidableEqSum
+
 instance instIdentityModelSum (ι₁ ι₂ : Type u)
     [IdentityModel ι₁] [IdentityModel ι₂] : IdentityModel (Sum ι₁ ι₂) where
   -- Sum identity model: dispatch on the chosen side.
   ParticipantId := Sum (IdentityModel.ParticipantId ι₁) (IdentityModel.ParticipantId ι₂)
   SiteId := Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂)
-  sites := fun
-    | Sum.inl p => (IdentityModel.sites (ι:=ι₁) p).map Sum.inl
-    | Sum.inr p => (IdentityModel.sites (ι:=ι₂) p).map Sum.inr
-  siteName := fun
-    | Sum.inl s => IdentityModel.siteName (ι:=ι₁) s
-    | Sum.inr s => IdentityModel.siteName (ι:=ι₂) s
-  siteOf := fun site =>
-    -- Prefer the left model when both could interpret a site name.
-    match IdentityModel.siteOf (ι:=ι₁) site with
-    | some s => some (Sum.inl s)
-    | none => (IdentityModel.siteOf (ι:=ι₂) site).map Sum.inr
-  siteCapabilities := fun
-    | Sum.inl s => IdentityModel.siteCapabilities (ι:=ι₁) s
-    | Sum.inr s => IdentityModel.siteCapabilities (ι:=ι₂) s
-  reliableEdges :=
-    -- Reliability is preserved within each component.
-    (IdentityModel.reliableEdges (ι:=ι₁)).map (fun p => (Sum.inl p.1, Sum.inl p.2)) ++
-    (IdentityModel.reliableEdges (ι:=ι₂)).map (fun p => (Sum.inr p.1, Sum.inr p.2))
-  decEqP := by
-    -- Use identity-model decidable equality to build the sum instance.
-    classical
-    let _ : DecidableEq (IdentityModel.ParticipantId ι₁) := IdentityModel.decEqP (ι:=ι₁)
-    let _ : DecidableEq (IdentityModel.ParticipantId ι₂) := IdentityModel.decEqP (ι:=ι₂)
-    exact instDecidableEqSum
-  decEqS := by
-    -- Use identity-model decidable equality to build the sum instance.
-    classical
-    let _ : DecidableEq (IdentityModel.SiteId ι₁) := IdentityModel.decEqS (ι:=ι₁)
-    let _ : DecidableEq (IdentityModel.SiteId ι₂) := IdentityModel.decEqS (ι:=ι₂)
-    exact instDecidableEqSum
+  sites := sumSites ι₁ ι₂
+  siteName := sumSiteName ι₁ ι₂
+  siteOf := sumSiteOf ι₁ ι₂
+  siteCapabilities := sumSiteCapabilities ι₁ ι₂
+  reliableEdges := sumReliableEdges ι₁ ι₂
+  decEqP := sumDecEqP ι₁ ι₂
+  decEqS := sumDecEqS ι₁ ι₂
 
 instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
     EffectModel (Sum ε₁ ε₂) where
@@ -139,14 +176,6 @@ instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectMo
     match a, ctx with
     | Sum.inl a1, (c1, c2) => (EffectModel.exec a1 c1, c2)
     | Sum.inr a2, (c1, c2) => (c1, EffectModel.exec a2 c2)
-  pre := fun a ctx =>
-    match a, ctx with
-    | Sum.inl a1, (c1, _) => EffectModel.pre a1 c1
-    | Sum.inr a2, (_, c2) => EffectModel.pre a2 c2
-  post := fun a ctx =>
-    match a, ctx with
-    | Sum.inl a1, (c1, _) => EffectModel.post a1 c1
-    | Sum.inr a2, (_, c2) => EffectModel.post a2 c2
   handlerType := fun a =>
     match a with
     | Sum.inl a1 => EffectModel.handlerType a1
@@ -154,20 +183,12 @@ instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectMo
 
 instance instEffectModelProd (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
     EffectModel (ε₁ × ε₂) where
-  -- Product effects run both components and separate pre/post conditions.
+  -- Product effects run both components.
   EffectAction := EffectModel.EffectAction ε₁ × EffectModel.EffectAction ε₂
   EffectCtx := EffectModel.EffectCtx ε₁ × EffectModel.EffectCtx ε₂
   exec := fun a ctx =>
     match a, ctx with
     | (a1, a2), (c1, c2) => (EffectModel.exec a1 c1, EffectModel.exec a2 c2)
-  pre := fun a ctx =>
-    match a, ctx with
-    | (a1, a2), (c1, c2) =>
-        iProp.sep (EffectModel.pre a1 c1) (EffectModel.pre a2 c2)
-  post := fun a ctx =>
-    match a, ctx with
-    | (a1, a2), (c1, c2) =>
-        iProp.sep (EffectModel.post a1 c1) (EffectModel.post a2 c2)
   handlerType := fun a =>
     -- Placeholder: product handler type is abstracted away for now.
     match a with
@@ -175,8 +196,8 @@ instance instEffectModelProd (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectM
 
 instance instGuardLayerProd (γ₁ γ₂ : Type u) [GuardLayer γ₁] [GuardLayer γ₂] :
     GuardLayer (γ₁ × γ₂) where
-  -- Product layer combines namespaces to keep layers disjoint.
-  layerNs := fun g => combineNs (GuardLayer.layerNs g.1) (GuardLayer.layerNs g.2)
+  -- Product layer combines identifiers to keep layers distinct.
+  layerId := fun g => combineLayerId (GuardLayer.layerId g.1) (GuardLayer.layerId g.2)
   Resource := GuardLayer.Resource γ₁ × GuardLayer.Resource γ₂
   Evidence := GuardLayer.Evidence γ₁ × GuardLayer.Evidence γ₂
   open_ := fun r =>

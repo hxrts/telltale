@@ -1,12 +1,18 @@
 import Std
 import Runtime.VM.TypeClasses
 
-/-
-The Problem. The VM needs a core set of instruction and register types that
-can be shared across configuration, semantics, and proofs.
+/-!
+# Core VM Types
 
-Solution Structure. Define scalar aliases, the expression handle, and the
-bytecode instruction set parameterized by guard/effect models.
+Scalar aliases (`Reg`, `PC`, `CoroutineId`, etc.), the `Expr` handle for coroutine
+expressions, and the `Instr` bytecode instruction set. Instructions are parameterized
+by the guard layer `γ` and effect model `ε` so that domain-specific guard and effect
+actions appear directly in the bytecode.
+
+The instruction set is organized into paired groups that mirror the acquire/interact/release
+pattern described in `runtime.md` §3: communication (send/recv, offer/choose), resources
+(acquire/release), sessions (open/close), speculation (fork/join/abort), ownership and
+knowledge (transfer, tag/check), and control flow (loadImm, mov, jmp, spawn, yield, halt).
 -/
 
 set_option autoImplicit false
@@ -33,29 +39,23 @@ structure Expr where
 /-! ## Bytecode instructions -/
 
 inductive Instr (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
-  -- Communication
+  -- Bytecode instruction set.
   | send (chan val : Reg)
   | recv (chan dst : Reg)
   | offer (chan : Reg) (label : Label)
   | choose (chan : Reg) (table : List (Label × PC))
-  -- Resources
   | acquire (layer : γ) (dst : Reg)
   | release (layer : γ) (evidence : Reg)
-  -- Effects
   | invoke (action : EffectModel.EffectAction ε)
-  -- Sessions
   | open (roles : RoleSet) (localTypes : List (Role × LocalType))
       (handlers : List (Edge × HandlerId)) (dsts : List (Role × Reg))
   | close (session : Reg)
-  -- Speculation
   | fork (sid : Reg)
   | join
   | abort
-  -- Ownership and knowledge
   | transfer (endpoint : Reg) (targetCoro : Reg) (bundle : Reg)
   | tag (fact : Reg) (dst : Reg)
   | check (knowledge : Reg) (target : Reg) (dst : Reg)
-  -- Control
   | loadImm (dst : Reg) (v : Imm)
   | mov (dst src : Reg)
   | jmp (target : PC)

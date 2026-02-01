@@ -7,12 +7,22 @@ import Runtime.Monitor.Monitor
 import Runtime.Resources.Arena
 import Runtime.Resources.ResourceModel
 
-/-
-The Problem. Specify the runtime state and execution outcomes for the
-session-type VM in a form that can be reimplemented in Rust.
+/-!
+# VM Runtime State
 
-Solution Structure. Define coroutine state, VM state, and result/event
-containers that the instruction stepper updates.
+The mutable state of a running VM instance. Defines per-coroutine state (`CoroutineState`
+with registers, program counter, owned endpoints, progress tokens, knowledge set, cost
+budget, and speculation state), blocking and fault reasons, observable and internal events,
+execution result containers, scheduler bookkeeping (`SchedState`), and the top-level
+`VMState` record that ties everything together.
+
+`VMState` holds the configuration, loaded programs, coroutine array, signed buffers,
+persistent state, session store, scoped resource states, guard resources, the session
+monitor, the observable trace, failure model state (crashed sites, partitioned edges),
+and placeholder fields for ghost sessions and progress supply.
+
+This is the Lean specification of state that will be reimplemented in Rust. The
+`WFVMState` predicate captures basic well-formedness (PC bounds, session id validity).
 -/
 
 set_option autoImplicit false
@@ -102,8 +112,8 @@ inductive ObsEvent (ε : Type u) [EffectModel ε] where
   | received (edge : Edge) (val : Value) (seqNo : Nat)
   | offered (edge : Edge) (label : Label)
   | chose (edge : Edge) (label : Label)
-  | acquired (layer : Namespace) (endpoint : Endpoint)
-  | released (layer : Namespace) (endpoint : Endpoint)
+  | acquired (layer : LayerId) (endpoint : Endpoint)
+  | released (layer : LayerId) (endpoint : Endpoint)
   | invoked (endpoint : Endpoint) (action : EffectModel.EffectAction ε)
   | opened (sid : SessionId) (roles : RoleSet)
   | closed (sid : SessionId)

@@ -1,12 +1,14 @@
 import Runtime.VM.State
 import Runtime.VM.Exec
 
-/-
-The Problem. Provide a single import point for VM state and instruction
-semantics used across the runtime stack.
+/-!
+# VM Definition (Re-exports)
 
-Solution Structure. Re-export state definitions and the exec stepper from
-`Runtime.VM.State` and `Runtime.VM.Exec`.
+Single import point for the VM specification. Importing this file gives access to
+the full runtime state (`VMState`, `CoroutineState`, events, results) from `State`
+and the instruction stepper (`execInstr`) from `Exec`. Other modules in the runtime
+stack (scheduler, adequacy, program logic) should import this rather than reaching
+into individual files.
 -/
 
 set_option autoImplicit false

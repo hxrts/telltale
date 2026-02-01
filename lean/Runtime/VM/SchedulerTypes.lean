@@ -1,11 +1,14 @@
 import Std
 
-/-
-The Problem. Scheduler policy should be part of the runtime spec so it can
-be referenced by VM configuration without importing proof-heavy modules.
+/-!
+# Scheduler Policy Types
 
-Solution Structure. Define a small policy enum that later scheduler code can
-interpret without changing the VM-facing interface.
+`SchedPolicy`, the scheduling strategy enum referenced by `VMConfig`. Defined in
+its own file to avoid circular imports: `Config.lean` needs the policy type, but the
+full scheduler implementation (`Runtime/Scheduler/Scheduler.lean`) needs the config.
+
+The `progressAware` policy is the session-type-aware variant that prefers coroutines
+holding progress tokens, connecting to the liveness reasoning in `runtime.md` §18.
 -/
 
 set_option autoImplicit false

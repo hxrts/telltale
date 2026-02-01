@@ -17,7 +17,7 @@ import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
 import Runtime.Monitor.Monitor
-import Runtime.Monitor.DomainComposition
+import Runtime.VM.DomainComposition
 
 /- 
 The Problem. Provide a single entry point that re-exports the runtime spec
