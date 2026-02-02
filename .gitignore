@@ -45,9 +45,10 @@ iris-lean/
 /docs/book/
 /docs/SUMMARY.md
 
-# mdbook-mermaid generated files
-/docs/mermaid.min.js
-/docs/mermaid-init.js
+# mdbook generated files
+/mermaid.min.js
+/mermaid-init.js
+/theme/
 
 # Lean build artifacts
 /lean/.lake/
