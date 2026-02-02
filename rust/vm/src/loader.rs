@@ -94,25 +94,127 @@ impl UntrustedImage {
         }
     }
 
-    /// Validate the image: check well-formedness of the global type.
+    /// Validate the image: check well-formedness and projection correctness.
     ///
-    /// In a full implementation, this would also re-project and verify that
-    /// the claimed local types match the projection. For now, it checks
-    /// well-formedness only.
+    /// 1. Checks that the global type is well-formed.
+    /// 2. Re-projects the global type onto each role.
+    /// 3. Verifies that the claimed local types match the re-projected types.
+    /// 4. Recompiles from the verified local types (ignoring claimed bytecode).
     ///
     /// # Errors
     ///
-    /// Returns `LoadResult::ValidationFailed` if the global type is not well-formed.
+    /// Returns `LoadResult::ValidationFailed` if any check fails.
     pub fn validate(self) -> Result<CodeImage, LoadResult> {
         if !self.global_type.well_formed() {
             return Err(LoadResult::ValidationFailed {
                 reason: "global type is not well-formed".into(),
             });
         }
-        Ok(CodeImage {
-            programs: self.programs,
-            global_type: self.global_type,
-            local_types: self.local_types,
-        })
+
+        // Re-project global type onto all roles.
+        let projected = telltale_theory::projection::project_all(&self.global_type).map_err(
+            |e| LoadResult::ValidationFailed {
+                reason: format!("projection failed: {e}"),
+            },
+        )?;
+
+        let projected_map: BTreeMap<String, LocalTypeR> = projected.into_iter().collect();
+
+        // Verify claimed roles match projected roles.
+        if self.local_types.keys().collect::<Vec<_>>() != projected_map.keys().collect::<Vec<_>>()
+        {
+            return Err(LoadResult::ValidationFailed {
+                reason: format!(
+                    "role mismatch: claimed {:?}, projected {:?}",
+                    self.local_types.keys().collect::<Vec<_>>(),
+                    projected_map.keys().collect::<Vec<_>>(),
+                ),
+            });
+        }
+
+        // Verify each claimed local type matches the re-projected type.
+        for (role, claimed) in &self.local_types {
+            let expected = &projected_map[role];
+            if claimed != expected {
+                return Err(LoadResult::ValidationFailed {
+                    reason: format!(
+                        "local type mismatch for role {role}: claimed {claimed:?}, expected {expected:?}"
+                    ),
+                });
+            }
+        }
+
+        // Recompile from verified local types (ignore claimed bytecode).
+        Ok(CodeImage::from_local_types(&projected_map, &self.global_type))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use telltale_types::Label;
+
+    fn simple_global() -> GlobalType {
+        GlobalType::mu(
+            "step",
+            GlobalType::send(
+                "A",
+                "B",
+                Label::new("msg"),
+                GlobalType::send("B", "A", Label::new("msg"), GlobalType::var("step")),
+            ),
+        )
+    }
+
+    #[test]
+    fn test_untrusted_validate_correct() {
+        let global = simple_global();
+        let projected: BTreeMap<_, _> =
+            telltale_theory::projection::project_all(&global)
+                .unwrap()
+                .into_iter()
+                .collect();
+        let image = UntrustedImage::from_local_types(&projected, &global);
+        let verified = image.validate();
+        assert!(verified.is_ok());
+    }
+
+    #[test]
+    fn test_untrusted_validate_bad_local_type() {
+        let global = simple_global();
+        let mut locals = BTreeMap::new();
+        // Claim A has End instead of correct projection.
+        locals.insert("A".to_string(), LocalTypeR::End);
+        locals.insert(
+            "B".to_string(),
+            LocalTypeR::mu(
+                "step",
+                LocalTypeR::Recv {
+                    partner: "A".into(),
+                    branches: vec![(
+                        Label::new("msg"),
+                        None,
+                        LocalTypeR::Send {
+                            partner: "A".into(),
+                            branches: vec![(Label::new("msg"), None, LocalTypeR::var("step"))],
+                        },
+                    )],
+                },
+            ),
+        );
+        let image = UntrustedImage::from_local_types(&locals, &global);
+        let result = image.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_untrusted_validate_bad_global_type() {
+        // Self-communication is not well-formed.
+        let global = GlobalType::send("A", "A", Label::new("msg"), GlobalType::End);
+        let mut locals = BTreeMap::new();
+        locals.insert("A".to_string(), LocalTypeR::End);
+        let image = UntrustedImage::from_local_types(&locals, &global);
+        let result = image.validate();
+        assert!(result.is_err());
     }
 }

@@ -1,0 +1,15 @@
+name = "continuum_field_2site"
+roles = ["A", "B"]
+steps = 1000
+
+[material]
+layer = "continuum_field"
+
+[material.params]
+coupling = 1.0
+components = 1
+initial_fields = [1.0, 0.0]
+step_size = 0.01
+
+[output]
+format = "jsonl"

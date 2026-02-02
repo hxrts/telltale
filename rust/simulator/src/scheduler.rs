@@ -316,7 +316,10 @@ fn advance_local_type(lt: &LocalTypeR, original: &LocalTypeR) -> LocalTypeR {
                 cont
             }
         }
-        LocalTypeR::Mu { body, .. } => advance_local_type(body, original),
+        // Mu is a binder, not an action. Unwrap to the body so the next step
+        // sees the first active node (Send/Recv). This ensures every message
+        // exchange in the protocol is actually executed.
+        LocalTypeR::Mu { body, .. } => body.as_ref().clone(),
         LocalTypeR::Var(_) => original.clone(),
         LocalTypeR::End => LocalTypeR::End,
     }

@@ -21,6 +21,7 @@ multi-thread = []
 
 [dependencies]
 telltale-types = { path = "../types", version = "0.9.1" }
+telltale-theory = { path = "../theory", version = "0.9.1" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -30,6 +31,8 @@ getrandom = { workspace = true }
 
 [dev-dependencies]
 telltale-theory = { path = "../theory", version = "0.9.1" }
+proptest = { workspace = true }
+assert_matches = { workspace = true }
 
 [lints]
 workspace = true

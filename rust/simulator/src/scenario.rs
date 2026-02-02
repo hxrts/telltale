@@ -108,7 +108,7 @@ mod tests {
             MaterialParams::MeanField(mf) => {
                 assert!((mf.beta - 1.5).abs() < f64::EPSILON);
             }
-            MaterialParams::Hamiltonian(_) => panic!("expected MeanField"),
+            _ => panic!("expected MeanField"),
         }
     }
 }

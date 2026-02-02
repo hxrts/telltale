@@ -15,7 +15,7 @@ use crate::effect::EffectHandler;
 use crate::instr::{Endpoint, Instr, PC};
 use crate::loader::CodeImage;
 use crate::scheduler::{SchedPolicy, Scheduler};
-use crate::session::{unfold_if_var, SessionId, SessionStore};
+use crate::session::{unfold_if_var_with_scope, SessionId, SessionStore};
 
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,8 +164,25 @@ enum CoroUpdate {
 enum TypeUpdate {
     /// Advance to a new local type.
     Advance(LocalTypeR),
+    /// Advance to a new local type and update the original (for Mu unfolding).
+    AdvanceWithOriginal(LocalTypeR, LocalTypeR),
     /// Remove the type entry (endpoint completed).
     Remove,
+}
+
+/// Resolve a continuation and build the appropriate `TypeUpdate`.
+fn resolve_type_update(
+    cont: &LocalTypeR,
+    original: &LocalTypeR,
+    ep: &Endpoint,
+) -> (LocalTypeR, Option<(Endpoint, TypeUpdate)>) {
+    let (resolved, new_scope) = unfold_if_var_with_scope(cont, original);
+    let update = if let Some(mu) = new_scope {
+        Some((ep.clone(), TypeUpdate::AdvanceWithOriginal(resolved.clone(), mu)))
+    } else {
+        Some((ep.clone(), TypeUpdate::Advance(resolved.clone())))
+    };
+    (resolved, update)
 }
 
 /// Atomic result of executing one instruction.
@@ -486,7 +503,7 @@ impl VM {
                 self.step_choose(idx, &ep, &role, sid, &label, target)?
             }
             Instr::Offer { chan, ref table } => {
-                self.step_offer(idx, &ep, &role, sid, chan, table)?
+                self.step_offer(idx, &ep, &role, sid, chan, table, handler)?
             }
             Instr::Close { .. } => self.step_close(&ep, sid)?,
             Instr::Open {
@@ -578,11 +595,11 @@ impl VM {
             .sessions
             .original_type(ep)
             .unwrap_or(&LocalTypeR::End);
-        let resolved = unfold_if_var(&continuation, original);
+        let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
-            type_update: Some((ep.clone(), TypeUpdate::Advance(resolved))),
+            type_update,
             events: vec![ObsEvent::Sent {
                 session: sid,
                 from: role.to_string(),
@@ -666,14 +683,14 @@ impl VM {
             .sessions
             .original_type(ep)
             .unwrap_or(&LocalTypeR::End);
-        let resolved = unfold_if_var(&continuation, original);
+        let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePcWriteReg {
                 reg: dst_reg,
                 val,
             },
-            type_update: Some((ep.clone(), TypeUpdate::Advance(resolved))),
+            type_update,
             events: vec![ObsEvent::Received {
                 session: sid,
                 from: partner,
@@ -794,11 +811,11 @@ impl VM {
             .sessions
             .original_type(ep)
             .unwrap_or(&LocalTypeR::End);
-        let resolved = unfold_if_var(&continuation, original);
+        let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::SetPc(target),
-            type_update: Some((ep.clone(), TypeUpdate::Advance(resolved))),
+            type_update,
             events: vec![ObsEvent::Sent {
                 session: sid,
                 from: role.to_string(),
@@ -813,7 +830,7 @@ impl VM {
     /// Checks current type to determine mode:
     /// - Recv → external choice: dequeue label from buffer, dispatch
     /// - Send → internal choice: read label from register, enqueue, dispatch
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
     fn step_offer(
         &mut self,
         coro_idx: usize,
@@ -822,6 +839,7 @@ impl VM {
         sid: SessionId,
         chan: u16,
         table: &[(String, PC)],
+        handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
         let local_type = self
             .sessions
@@ -890,14 +908,14 @@ impl VM {
                     .sessions
                     .original_type(ep)
                     .unwrap_or(&LocalTypeR::End);
-                let resolved = unfold_if_var(&continuation, original);
+                let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
                 // Write received value to dst register.
                 self.coroutines[coro_idx].regs[usize::from(chan)] = val;
 
                 Ok(StepPack {
                     coro_update: CoroUpdate::SetPc(target_pc),
-                    type_update: Some((ep.clone(), TypeUpdate::Advance(resolved))),
+                    type_update,
                     events: vec![ObsEvent::Received {
                         session: sid,
                         from: partner,
@@ -913,16 +931,16 @@ impl VM {
                 let partner = partner.clone();
                 let branches = branches.clone();
 
-                let label = match &self.coroutines[coro_idx].regs[usize::from(chan)] {
-                    Value::Label(l) => l.clone(),
-                    other => {
-                        return Err(Fault::TypeViolation {
-                            message: format!(
-                                "{role}: Offer (send mode) expected Label in reg {chan}, got {other:?}"
-                            ),
-                        })
-                    }
-                };
+                let available_labels: Vec<String> =
+                    branches.iter().map(|(l, _, _)| l.name.clone()).collect();
+                let label = handler
+                    .handle_choose(
+                        role,
+                        &partner,
+                        &available_labels,
+                        &self.coroutines[coro_idx].regs,
+                    )
+                    .map_err(|e| Fault::InvokeFault { message: e })?;
 
                 // Find label in type branches.
                 let (_lbl, _vt, continuation) = branches
@@ -975,11 +993,11 @@ impl VM {
                     .sessions
                     .original_type(ep)
                     .unwrap_or(&LocalTypeR::End);
-                let resolved = unfold_if_var(&continuation, original);
+                let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
                 Ok(StepPack {
                     coro_update: CoroUpdate::SetPc(target_pc),
-                    type_update: Some((ep.clone(), TypeUpdate::Advance(resolved))),
+                    type_update,
                     events: vec![ObsEvent::Sent {
                         session: sid,
                         from: role.to_string(),
@@ -1066,6 +1084,10 @@ impl VM {
         if let Some((ep, update)) = pack.type_update {
             match update {
                 TypeUpdate::Advance(lt) => self.sessions.update_type(&ep, lt),
+                TypeUpdate::AdvanceWithOriginal(lt, orig) => {
+                    self.sessions.update_type(&ep, lt);
+                    self.sessions.update_original(&ep, orig);
+                }
                 TypeUpdate::Remove => self.sessions.remove_type(&ep),
             }
         }
@@ -1113,6 +1135,19 @@ mod tests {
             _payload: &Value,
         ) -> Result<(), String> {
             Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".into())
         }
 
         fn step(
@@ -1635,5 +1670,67 @@ mod tests {
         vm.run(&handler, 100).unwrap();
 
         assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+    }
+
+    #[test]
+    fn test_vm_single_branch_then_multi_branch_choice() {
+        // B→A:ack, then mu t. B→A:{continue→t, stop→End}
+        // This is the protocol that was failing in fuzz tests.
+        let projected: BTreeMap<String, LocalTypeR> = {
+            let global = GlobalType::Comm {
+                sender: "B".into(),
+                receiver: "A".into(),
+                branches: vec![(
+                    Label::new("ack"),
+                    GlobalType::Mu {
+                        var: "t".into(),
+                        body: Box::new(GlobalType::Comm {
+                            sender: "B".into(),
+                            receiver: "A".into(),
+                            branches: vec![
+                                (Label::new("continue"), GlobalType::Var("t".into())),
+                                (Label::new("stop"), GlobalType::End),
+                            ],
+                        }),
+                    },
+                )],
+            };
+            telltale_theory::projection::project_all(&global)
+                .unwrap()
+                .into_iter()
+                .collect()
+        };
+
+        let global = GlobalType::Comm {
+            sender: "B".into(),
+            receiver: "A".into(),
+            branches: vec![(
+                Label::new("ack"),
+                GlobalType::Mu {
+                    var: "t".into(),
+                    body: Box::new(GlobalType::Comm {
+                        sender: "B".into(),
+                        receiver: "A".into(),
+                        branches: vec![
+                            (Label::new("continue"), GlobalType::Var("t".into())),
+                            (Label::new("stop"), GlobalType::End),
+                        ],
+                    }),
+                },
+            )],
+        };
+        let image = CodeImage::from_local_types(&projected, &global);
+
+        let mut vm = VM::new(VMConfig::default());
+        let _sid = vm.load_choreography(&image).unwrap();
+
+        let handler = PassthroughHandler;
+        // Don't unwrap — just run to completion
+        vm.run(&handler, 500).unwrap_or(());
+
+        let faults: Vec<_> = vm.trace.iter()
+            .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
+            .collect();
+        assert!(faults.is_empty(), "faults: {faults:?}");
     }
 }

@@ -1580,7 +1580,9 @@ dependencies = [
 name = "telltale-vm"
 version = "0.9.1"
 dependencies = [
+ "assert_matches",
  "getrandom 0.2.16",
+ "proptest",
  "serde",
  "serde_json",
  "telltale-theory",

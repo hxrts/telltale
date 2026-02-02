@@ -217,6 +217,15 @@ impl SessionStore {
         }
     }
 
+    /// Update the original type (when entering a new Mu scope).
+    pub fn update_original(&mut self, ep: &Endpoint, new_original: LocalTypeR) {
+        if let Some(session) = self.sessions.get_mut(&ep.sid) {
+            if let Some(entry) = session.local_types.get_mut(ep) {
+                entry.original = new_original;
+            }
+        }
+    }
+
     /// Get the original type for recursive unfolding.
     #[must_use]
     pub fn original_type(&self, ep: &Endpoint) -> Option<&LocalTypeR> {
@@ -306,6 +315,23 @@ pub fn unfold_if_var(cont: &LocalTypeR, original: &LocalTypeR) -> LocalTypeR {
         LocalTypeR::Var(_) => unfold_mu(original),
         LocalTypeR::Mu { .. } => unfold_mu(cont),
         other => other.clone(),
+    }
+}
+
+/// Like `unfold_if_var`, but also returns the new Mu scope (original) if one was entered.
+///
+/// When the continuation is a `Mu`, the Mu itself becomes the new original
+/// for subsequent `Var` resolution. Returns `(resolved_type, Some(mu))` when
+/// entering a new Mu scope, `(resolved_type, None)` otherwise.
+#[must_use]
+pub fn unfold_if_var_with_scope(
+    cont: &LocalTypeR,
+    original: &LocalTypeR,
+) -> (LocalTypeR, Option<LocalTypeR>) {
+    match cont {
+        LocalTypeR::Var(_) => (unfold_mu(original), None),
+        LocalTypeR::Mu { .. } => (unfold_mu(cont), Some(cont.clone())),
+        other => (other.clone(), None),
     }
 }
 

@@ -49,6 +49,28 @@ pub trait EffectHandler {
         payload: &Value,
     ) -> Result<(), String>;
 
+    /// Choose which branch to take for internal choice (select).
+    ///
+    /// Called when executing a multi-branch Send (internal choice). The handler
+    /// receives the available labels and returns the chosen one. Matches the Lean
+    /// `stepChoose` semantics where the handler/process decides which label to select.
+    ///
+    /// # Arguments
+    /// * `role` - The choosing role
+    /// * `partner` - The partner role
+    /// * `labels` - The available branch labels
+    /// * `state` - The coroutine's register file (for reading state)
+    ///
+    /// # Errors
+    /// Returns an error string if the handler fails.
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[Value],
+    ) -> Result<String, String>;
+
     /// Perform an integration step after a protocol round.
     ///
     /// Called after all sends/receives for a tick are complete.

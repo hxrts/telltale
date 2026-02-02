@@ -15,6 +15,11 @@ use crate::instr::{Instr, PC};
 /// - Reg 0: channel/endpoint (set by VM at coroutine creation)
 /// - Reg 1: send value / recv destination
 ///
+/// The compiler emits `Invoke` (handler step) after every Send/Recv instruction
+/// **except** the first active instruction inside a Mu body. This matches the
+/// lightweight scheduler's behavior where the Mu step advances through the first
+/// active node without calling `step()`.
+///
 /// Returns the instruction sequence.
 #[must_use]
 pub fn compile(local_type: &LocalTypeR) -> Vec<Instr> {
@@ -34,6 +39,7 @@ fn compile_inner(
             if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
                     instrs.push(Instr::Send { chan: 0, val: 1 });
+                    instrs.push(Instr::Invoke { action: 0, dst: 0 });
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
@@ -44,6 +50,7 @@ fn compile_inner(
             if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
                     instrs.push(Instr::Recv { chan: 0, dst: 1 });
+                    instrs.push(Instr::Invoke { action: 0, dst: 0 });
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
@@ -108,6 +115,7 @@ mod tests {
         let code = compile(&lt);
         assert_eq!(code, vec![
             Instr::Send { chan: 0, val: 1 },
+            Instr::Invoke { action: 0, dst: 0 },
             Instr::Halt,
         ]);
     }
@@ -115,6 +123,7 @@ mod tests {
     #[test]
     fn test_compile_recursive() {
         // mu step. !B:msg. var step
+        // Invoke is emitted after every Send/Recv.
         let lt = LocalTypeR::mu(
             "step",
             LocalTypeR::Send {
@@ -125,6 +134,7 @@ mod tests {
         let code = compile(&lt);
         assert_eq!(code, vec![
             Instr::Send { chan: 0, val: 1 },
+            Instr::Invoke { action: 0, dst: 0 },
             Instr::Jmp { target: 0 },
         ]);
     }
@@ -132,6 +142,7 @@ mod tests {
     #[test]
     fn test_compile_send_recv_loop() {
         // mu step. !B:pos. ?B:pos. var step
+        // Invoke after both Send and Recv.
         let lt = LocalTypeR::mu(
             "step",
             LocalTypeR::Send {
@@ -149,7 +160,9 @@ mod tests {
         let code = compile(&lt);
         assert_eq!(code, vec![
             Instr::Send { chan: 0, val: 1 },
+            Instr::Invoke { action: 0, dst: 0 },
             Instr::Recv { chan: 0, dst: 1 },
+            Instr::Invoke { action: 0, dst: 0 },
             Instr::Jmp { target: 0 },
         ]);
     }

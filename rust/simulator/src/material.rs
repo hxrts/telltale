@@ -25,6 +25,10 @@ pub enum MaterialParams {
     /// Hamiltonian 2-body dynamics parameters.
     #[serde(rename = "hamiltonian")]
     Hamiltonian(HamiltonianParams),
+
+    /// Continuum field (two-site discretization) parameters.
+    #[serde(rename = "continuum_field")]
+    ContinuumField(ContinuumFieldParams),
 }
 
 /// Parameters for the mean-field Ising model.
@@ -61,6 +65,26 @@ pub struct HamiltonianParams {
     pub step_size: f64,
 }
 
+/// Parameters for continuum field dynamics on a two-site discretization.
+///
+/// Two sites exchange field values through a diffusion kernel K.
+/// The nonlocal operator at each site is:
+///   drift_i = K * (field_peer - field_self)
+/// where K is the coupling strength (kernel weight).
+///
+/// State vector per role: `[field_value]` (scalar field at each site).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinuumFieldParams {
+    /// Kernel coupling strength K. Controls diffusion rate between sites.
+    pub coupling: f64,
+    /// Number of field components per site (1 for scalar field).
+    pub components: usize,
+    /// Initial field values per role (length = number of roles).
+    pub initial_fields: Vec<f64>,
+    /// Integration step size.
+    pub step_size: f64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,7 +108,7 @@ mod tests {
                 assert_eq!(mf.initial_state, vec![0.6, 0.4]);
                 assert!((mf.step_size - 0.01).abs() < f64::EPSILON);
             }
-            MaterialParams::Hamiltonian(_) => panic!("expected MeanField"),
+            _ => panic!("expected MeanField"),
         }
     }
 
@@ -106,7 +130,7 @@ mod tests {
                 assert!((mf.beta - 1.5).abs() < f64::EPSILON);
                 assert_eq!(mf.species.len(), 2);
             }
-            MaterialParams::Hamiltonian(_) => panic!("expected MeanField"),
+            _ => panic!("expected MeanField"),
         }
     }
 }
