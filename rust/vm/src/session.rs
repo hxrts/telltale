@@ -1,0 +1,435 @@
+//! Session lifecycle and store.
+//!
+//! Matches the Lean `SessionState`, `SessionStore` from `runtime.md §7`.
+//! Local type state lives here — the session store is the single source
+//! of truth for per-endpoint type advancement.
+
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+use telltale_types::LocalTypeR;
+
+use crate::buffer::{BoundedBuffer, BufferConfig};
+use crate::coroutine::Value;
+use crate::instr::Endpoint;
+
+/// Session identifier. Each session gets a unique ID within the VM.
+pub type SessionId = usize;
+
+/// Edge between two roles in a session (directed: sender → receiver).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Edge {
+    /// Sender role name.
+    pub from: String,
+    /// Receiver role name.
+    pub to: String,
+}
+
+/// Session status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SessionStatus {
+    /// Session is active and processing messages.
+    Active,
+    /// Session is draining buffered messages before close.
+    Draining,
+    /// Session is closed normally.
+    Closed,
+    /// Session was cancelled.
+    Cancelled,
+    /// Session faulted.
+    Faulted {
+        /// Reason for the fault.
+        reason: String,
+    },
+}
+
+/// Per-endpoint type tracking: current state + original for unfolding.
+#[derive(Debug, Clone)]
+pub struct TypeEntry {
+    /// Current local type (advances with each completed instruction).
+    pub current: LocalTypeR,
+    /// Original local type (for unfolding recursive variables).
+    pub original: LocalTypeR,
+}
+
+/// State of a single session.
+///
+/// Stores per-endpoint local types (the type truth), message buffers,
+/// and lifecycle status. Matches Lean `SessionState`.
+#[derive(Debug)]
+pub struct SessionState {
+    /// Session identifier.
+    pub sid: SessionId,
+    /// Role names in this session.
+    pub roles: Vec<String>,
+    /// Per-endpoint local type state. This IS the type truth.
+    ///
+    /// Matches Lean `localTypes : List (Endpoint × LocalType)`.
+    pub local_types: BTreeMap<Endpoint, TypeEntry>,
+    /// Message buffers keyed by directed edge.
+    pub buffers: BTreeMap<Edge, BoundedBuffer>,
+    /// Current status.
+    pub status: SessionStatus,
+    /// Epoch counter for draining.
+    pub epoch: usize,
+}
+
+impl SessionState {
+    /// Send a value from one role to another.
+    ///
+    /// Returns the enqueue result from the buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no buffer exists for the given edge.
+    pub fn send(
+        &mut self,
+        from: &str,
+        to: &str,
+        val: Value,
+    ) -> Result<crate::buffer::EnqueueResult, String> {
+        let edge = Edge {
+            from: from.to_string(),
+            to: to.to_string(),
+        };
+        let buf = self
+            .buffers
+            .get_mut(&edge)
+            .ok_or_else(|| format!("no buffer for edge {from} → {to}"))?;
+        Ok(buf.enqueue(val))
+    }
+
+    /// Receive a value destined for a role from a specific sender.
+    pub fn recv(&mut self, from: &str, to: &str) -> Option<Value> {
+        let edge = Edge {
+            from: from.to_string(),
+            to: to.to_string(),
+        };
+        self.buffers.get_mut(&edge).and_then(|buf| buf.dequeue())
+    }
+
+    /// Check if there is a message available on an edge.
+    #[must_use]
+    pub fn has_message(&self, from: &str, to: &str) -> bool {
+        let edge = Edge {
+            from: from.to_string(),
+            to: to.to_string(),
+        };
+        self.buffers
+            .get(&edge)
+            .is_some_and(|buf| !buf.is_empty())
+    }
+}
+
+/// Store of all sessions managed by the VM.
+///
+/// Provides type lookup/update methods that match the Lean
+/// `SessionStore.lookupType` / `SessionStore.updateType` pattern.
+#[derive(Debug, Default)]
+pub struct SessionStore {
+    sessions: BTreeMap<SessionId, SessionState>,
+    next_id: SessionId,
+}
+
+impl SessionStore {
+    /// Create an empty session store.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Open a new session with the given roles, buffer config, and initial local types.
+    ///
+    /// Returns the session ID. Endpoints are constructed as `Endpoint { sid, role }`.
+    pub fn open(
+        &mut self,
+        roles: Vec<String>,
+        buffer_config: &BufferConfig,
+        initial_types: &BTreeMap<String, LocalTypeR>,
+    ) -> SessionId {
+        let sid = self.next_id;
+        self.next_id += 1;
+
+        // Build per-endpoint local types with initial unfolding.
+        let mut local_types = BTreeMap::new();
+        for role in &roles {
+            if let Some(lt) = initial_types.get(role) {
+                let ep = Endpoint {
+                    sid,
+                    role: role.clone(),
+                };
+                local_types.insert(ep, TypeEntry {
+                    current: unfold_mu(lt),
+                    original: lt.clone(),
+                });
+            }
+        }
+
+        // Create buffers for each directed edge.
+        let mut buffers = BTreeMap::new();
+        for from in &roles {
+            for to in &roles {
+                if from != to {
+                    let edge = Edge {
+                        from: from.clone(),
+                        to: to.clone(),
+                    };
+                    buffers.insert(edge, BoundedBuffer::new(buffer_config));
+                }
+            }
+        }
+
+        let state = SessionState {
+            sid,
+            roles,
+            local_types,
+            buffers,
+            status: SessionStatus::Active,
+            epoch: 0,
+        };
+
+        self.sessions.insert(sid, state);
+        sid
+    }
+
+    // ---- Type state methods (match Lean SessionStore.lookupType / updateType) ----
+
+    /// Lookup the current local type for an endpoint.
+    ///
+    /// Matches Lean `SessionStore.lookupType`.
+    #[must_use]
+    pub fn lookup_type(&self, ep: &Endpoint) -> Option<&LocalTypeR> {
+        self.sessions
+            .get(&ep.sid)?
+            .local_types
+            .get(ep)
+            .map(|e| &e.current)
+    }
+
+    /// Update the local type for an endpoint (type advancement on commit).
+    ///
+    /// Matches Lean `SessionStore.updateType`.
+    pub fn update_type(&mut self, ep: &Endpoint, new_type: LocalTypeR) {
+        if let Some(session) = self.sessions.get_mut(&ep.sid) {
+            if let Some(entry) = session.local_types.get_mut(ep) {
+                entry.current = new_type;
+            }
+        }
+    }
+
+    /// Get the original type for recursive unfolding.
+    #[must_use]
+    pub fn original_type(&self, ep: &Endpoint) -> Option<&LocalTypeR> {
+        self.sessions
+            .get(&ep.sid)?
+            .local_types
+            .get(ep)
+            .map(|e| &e.original)
+    }
+
+    /// Remove type entry (on Halt/End — session endpoint completed).
+    pub fn remove_type(&mut self, ep: &Endpoint) {
+        if let Some(session) = self.sessions.get_mut(&ep.sid) {
+            session.local_types.remove(ep);
+        }
+    }
+
+    // ---- Session access methods ----
+
+    /// Get a reference to a session.
+    #[must_use]
+    pub fn get(&self, sid: SessionId) -> Option<&SessionState> {
+        self.sessions.get(&sid)
+    }
+
+    /// Get a mutable reference to a session.
+    pub fn get_mut(&mut self, sid: SessionId) -> Option<&mut SessionState> {
+        self.sessions.get_mut(&sid)
+    }
+
+    /// Close a session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session is not found.
+    pub fn close(&mut self, sid: SessionId) -> Result<(), String> {
+        let session = self
+            .sessions
+            .get_mut(&sid)
+            .ok_or_else(|| format!("session {sid} not found"))?;
+
+        let has_pending = session.buffers.values().any(|b| !b.is_empty());
+        if has_pending {
+            session.status = SessionStatus::Draining;
+        } else {
+            session.status = SessionStatus::Closed;
+        }
+        Ok(())
+    }
+
+    /// Number of active sessions.
+    #[must_use]
+    pub fn active_count(&self) -> usize {
+        self.sessions
+            .values()
+            .filter(|s| s.status == SessionStatus::Active)
+            .count()
+    }
+
+    /// All session IDs.
+    #[must_use]
+    pub fn session_ids(&self) -> Vec<SessionId> {
+        self.sessions.keys().copied().collect()
+    }
+}
+
+// ---- Type unfolding utilities ----
+
+/// Unfold top-level `Mu` to its body.
+///
+/// Recursively strips `Mu` constructors to reach the first action.
+#[must_use]
+pub fn unfold_mu(lt: &LocalTypeR) -> LocalTypeR {
+    match lt {
+        LocalTypeR::Mu { body, .. } => unfold_mu(body),
+        other => other.clone(),
+    }
+}
+
+/// Resolve a continuation that may be a `Var` (recursive reference).
+///
+/// If `cont` is `Var`, unfolds back to the original type's mu body.
+/// If `cont` is `Mu`, unfolds it. Otherwise returns as-is.
+#[must_use]
+pub fn unfold_if_var(cont: &LocalTypeR, original: &LocalTypeR) -> LocalTypeR {
+    match cont {
+        LocalTypeR::Var(_) => unfold_mu(original),
+        LocalTypeR::Mu { .. } => unfold_mu(cont),
+        other => other.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use telltale_types::Label;
+
+    fn default_types() -> BTreeMap<String, LocalTypeR> {
+        let mut m = BTreeMap::new();
+        m.insert(
+            "A".to_string(),
+            LocalTypeR::mu(
+                "step",
+                LocalTypeR::Send {
+                    partner: "B".into(),
+                    branches: vec![(Label::new("msg"), None, LocalTypeR::var("step"))],
+                },
+            ),
+        );
+        m.insert(
+            "B".to_string(),
+            LocalTypeR::mu(
+                "step",
+                LocalTypeR::Recv {
+                    partner: "A".into(),
+                    branches: vec![(Label::new("msg"), None, LocalTypeR::var("step"))],
+                },
+            ),
+        );
+        m
+    }
+
+    #[test]
+    fn test_session_open_with_types() {
+        let mut store = SessionStore::new();
+        let types = default_types();
+        let sid = store.open(vec!["A".into(), "B".into()], &BufferConfig::default(), &types);
+
+        let ep_a = Endpoint { sid, role: "A".into() };
+        let ep_b = Endpoint { sid, role: "B".into() };
+
+        // Types should be unfolded (mu stripped).
+        assert!(matches!(store.lookup_type(&ep_a), Some(LocalTypeR::Send { .. })));
+        assert!(matches!(store.lookup_type(&ep_b), Some(LocalTypeR::Recv { .. })));
+    }
+
+    #[test]
+    fn test_type_advance_and_unfold() {
+        let mut store = SessionStore::new();
+        let types = default_types();
+        let sid = store.open(vec!["A".into(), "B".into()], &BufferConfig::default(), &types);
+
+        let ep_a = Endpoint { sid, role: "A".into() };
+
+        // Get current type: Send { ... Var("step") }
+        let lt = store.lookup_type(&ep_a).unwrap().clone();
+        let (_, _vt, continuation) = match &lt {
+            LocalTypeR::Send { branches, .. } => branches.first().unwrap().clone(),
+            _ => panic!("expected Send"),
+        };
+
+        // Continuation is Var("step") — resolve it.
+        let original = store.original_type(&ep_a).unwrap();
+        let resolved = unfold_if_var(&continuation, original);
+        assert!(matches!(resolved, LocalTypeR::Send { .. }));
+
+        // Advance type.
+        store.update_type(&ep_a, resolved);
+        assert!(matches!(store.lookup_type(&ep_a), Some(LocalTypeR::Send { .. })));
+    }
+
+    #[test]
+    fn test_session_send_recv() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+
+        let session = store.get_mut(sid).unwrap();
+        let _ = session.send("A", "B", Value::Int(42)).unwrap();
+        assert!(session.has_message("A", "B"));
+        assert!(!session.has_message("B", "A"));
+
+        let val = session.recv("A", "B");
+        assert_eq!(val, Some(Value::Int(42)));
+    }
+
+    #[test]
+    fn test_namespace_isolation() {
+        let mut store = SessionStore::new();
+        let sid1 = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+        let sid2 = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+
+        assert_ne!(sid1, sid2);
+
+        store
+            .get_mut(sid1)
+            .unwrap()
+            .send("A", "B", Value::Int(1))
+            .unwrap();
+        assert!(!store.get(sid2).unwrap().has_message("A", "B"));
+    }
+
+    #[test]
+    fn test_remove_type() {
+        let mut store = SessionStore::new();
+        let types = default_types();
+        let sid = store.open(vec!["A".into(), "B".into()], &BufferConfig::default(), &types);
+
+        let ep_a = Endpoint { sid, role: "A".into() };
+        assert!(store.lookup_type(&ep_a).is_some());
+
+        store.remove_type(&ep_a);
+        assert!(store.lookup_type(&ep_a).is_none());
+    }
+}

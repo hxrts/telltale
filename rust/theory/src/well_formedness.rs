@@ -218,16 +218,16 @@ pub fn unique_labels_local(lt: &LocalTypeR) -> bool {
             if !branches_unique_local(branches) {
                 return false;
             }
-            branches.iter().all(|(_, cont)| unique_labels_local(cont))
+            branches.iter().all(|(_l, _vt, cont)| unique_labels_local(cont))
         }
         LocalTypeR::Mu { body, .. } => unique_labels_local(body),
     }
 }
 
 /// Helper: check if all labels in a local branch list have unique names.
-fn branches_unique_local(branches: &[(Label, LocalTypeR)]) -> bool {
+fn branches_unique_local(branches: &[(Label, Option<telltale_types::ValType>, LocalTypeR)]) -> bool {
     let mut seen = std::collections::HashSet::new();
-    for (label, _) in branches {
+    for (label, _vt, _) in branches {
         if !seen.insert(&label.name) {
             return false;
         }
@@ -241,14 +241,14 @@ fn find_duplicate_label_local(lt: &LocalTypeR) -> Option<String> {
         LocalTypeR::End | LocalTypeR::Var(_) => None,
         LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
             let mut seen = std::collections::HashSet::new();
-            for (label, _) in branches {
+            for (label, _vt, _) in branches {
                 if !seen.insert(&label.name) {
                     return Some(label.name.clone());
                 }
             }
             branches
                 .iter()
-                .find_map(|(_, cont)| find_duplicate_label_local(cont))
+                .find_map(|(_l, _vt, cont)| find_duplicate_label_local(cont))
         }
         LocalTypeR::Mu { body, .. } => find_duplicate_label_local(body),
     }
@@ -460,8 +460,8 @@ mod tests {
         let lt = LocalTypeR::send_choice(
             "B",
             vec![
-                (Label::new("a"), LocalTypeR::End),
-                (Label::new("b"), LocalTypeR::End),
+                (Label::new("a"), None, LocalTypeR::End),
+                (Label::new("b"), None, LocalTypeR::End),
             ],
         );
         assert!(unique_labels_local(&lt));
@@ -469,8 +469,8 @@ mod tests {
         let bad = LocalTypeR::send_choice(
             "B",
             vec![
-                (Label::new("x"), LocalTypeR::End),
-                (Label::new("x"), LocalTypeR::End),
+                (Label::new("x"), None, LocalTypeR::End),
+                (Label::new("x"), None, LocalTypeR::End),
             ],
         );
         assert!(!unique_labels_local(&bad));
@@ -517,8 +517,8 @@ mod tests {
         let lt = LocalTypeR::send_choice(
             "B",
             vec![
-                (Label::new("x"), LocalTypeR::End),
-                (Label::new("x"), LocalTypeR::End),
+                (Label::new("x"), None, LocalTypeR::End),
+                (Label::new("x"), None, LocalTypeR::End),
             ],
         );
         let result = validate_local(&lt);
@@ -530,15 +530,15 @@ mod tests {
         let inner = LocalTypeR::recv_choice(
             "C",
             vec![
-                (Label::new("dup"), LocalTypeR::End),
-                (Label::new("dup"), LocalTypeR::End),
+                (Label::new("dup"), None, LocalTypeR::End),
+                (Label::new("dup"), None, LocalTypeR::End),
             ],
         );
         let lt = LocalTypeR::send_choice(
             "B",
             vec![
-                (Label::new("first"), inner),
-                (Label::new("second"), LocalTypeR::End),
+                (Label::new("first"), None, inner),
+                (Label::new("second"), None, LocalTypeR::End),
             ],
         );
         let result = validate_local(&lt);

@@ -19,7 +19,7 @@ open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
 private theorem CProjectTransRelComp_postfix_prefix_send_send
-    {p q : String} {bs cs : List (Label × LocalTypeR)} {b : LocalTypeR}
+    {p q : String} {bs cs : List BranchR} {b : LocalTypeR}
     (heq_ab : EQ2 (.send p bs) b) (hrel_bb' : CProjectTransRel b (.send q cs))
     (hWFa : LocalTypeR.WellFormed (.send p bs)) (hWFc : LocalTypeR.WellFormed (.send q cs)) :
     EQ2F (EQ2_closure CProjectTransRelCompWF) (.send p bs) (.send q cs) := by
@@ -31,11 +31,11 @@ private theorem CProjectTransRelComp_postfix_prefix_send_send
   | send pb bbs =>
       simp only [EQ2F] at heq_f hbase_f
       have hWFb : LocalTypeR.WellFormed (.send pb bbs) := CProjectTransRel_wf_left hrel_bb'
-      have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+      have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
         LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWFa
-      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2 :=
+      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2.2 :=
         LocalTypeR.WellFormed.branches_of_send (p := pb) (bs := bbs) hWFb
-      have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+      have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2 :=
         LocalTypeR.WellFormed.branches_of_send (p := q) (bs := cs) hWFc
       have hbase_br := BranchesRel_lift_compWF hbase_f.2 hWFbbs hWFcs
       exact ⟨heq_f.1.trans hbase_f.1,
@@ -49,7 +49,7 @@ private theorem CProjectTransRelComp_postfix_prefix_send_send
   | recv _ _ => simp only [EQ2F] at heq_f
 
 private theorem CProjectTransRelComp_postfix_prefix_recv_recv
-    {p q : String} {bs cs : List (Label × LocalTypeR)} {b : LocalTypeR}
+    {p q : String} {bs cs : List BranchR} {b : LocalTypeR}
     (heq_ab : EQ2 (.recv p bs) b) (hrel_bb' : CProjectTransRel b (.recv q cs))
     (hWFa : LocalTypeR.WellFormed (.recv p bs)) (hWFc : LocalTypeR.WellFormed (.recv q cs)) :
     EQ2F (EQ2_closure CProjectTransRelCompWF) (.recv p bs) (.recv q cs) := by
@@ -60,11 +60,11 @@ private theorem CProjectTransRelComp_postfix_prefix_recv_recv
   | recv pb bbs =>
       simp only [EQ2F] at heq_f hbase_f
       have hWFb : LocalTypeR.WellFormed (.recv pb bbs) := CProjectTransRel_wf_left hrel_bb'
-      have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+      have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
         LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWFa
-      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2 :=
+      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2.2 :=
         LocalTypeR.WellFormed.branches_of_recv (p := pb) (bs := bbs) hWFb
-      have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+      have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2 :=
         LocalTypeR.WellFormed.branches_of_recv (p := q) (bs := cs) hWFc
       have hbase_br := BranchesRel_lift_compWF hbase_f.2 hWFbbs hWFcs
       exact ⟨heq_f.1.trans hbase_f.1,
@@ -133,7 +133,7 @@ private theorem CProjectTransRelComp_postfix_prefix_var
 
 /- Helper: prefix case when lt is .send. -/
 private theorem CProjectTransRelComp_postfix_prefix_send
-    {p : String} {bs : List (Label × LocalTypeR)} {t b : LocalTypeR}
+    {p : String} {bs : List BranchR} {t b : LocalTypeR}
     (heq_ab : EQ2 (.send p bs) b) (hrel_bb' : CProjectTransRel b t)
     (hWFa : LocalTypeR.WellFormed (.send p bs)) (hWFc : LocalTypeR.WellFormed t) :
     EQ2F (EQ2_closure CProjectTransRelCompWF) (.send p bs) t := by
@@ -161,7 +161,7 @@ private theorem CProjectTransRelComp_postfix_prefix_send
 
 /- Helper: prefix case when lt is .recv. -/
 private theorem CProjectTransRelComp_postfix_prefix_recv
-    {p : String} {bs : List (Label × LocalTypeR)} {t b : LocalTypeR}
+    {p : String} {bs : List BranchR} {t b : LocalTypeR}
     (heq_ab : EQ2 (.recv p bs) b) (hrel_bb' : CProjectTransRel b t)
     (hWFa : LocalTypeR.WellFormed (.recv p bs)) (hWFc : LocalTypeR.WellFormed t) :
     EQ2F (EQ2_closure CProjectTransRelCompWF) (.recv p bs) t := by

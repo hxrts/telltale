@@ -86,8 +86,8 @@ fn bound_with_fuel(lt: &LocalTypeR, fuel: FuelSteps) -> LocalTypeR {
 
         LocalTypeR::Send { partner, branches } => {
             let mut bounded_branches = Vec::with_capacity(branches.len());
-            for (label, cont) in branches {
-                bounded_branches.push((label.clone(), bound_with_fuel(cont, fuel)));
+            for (label, vt, cont) in branches {
+                bounded_branches.push((label.clone(), vt.clone(), bound_with_fuel(cont, fuel)));
             }
             LocalTypeR::Send {
                 partner: partner.clone(),
@@ -97,8 +97,8 @@ fn bound_with_fuel(lt: &LocalTypeR, fuel: FuelSteps) -> LocalTypeR {
 
         LocalTypeR::Recv { partner, branches } => {
             let mut bounded_branches = Vec::with_capacity(branches.len());
-            for (label, cont) in branches {
-                bounded_branches.push((label.clone(), bound_with_fuel(cont, fuel)));
+            for (label, vt, cont) in branches {
+                bounded_branches.push((label.clone(), vt.clone(), bound_with_fuel(cont, fuel)));
             }
             LocalTypeR::Recv {
                 partner: partner.clone(),
@@ -146,9 +146,9 @@ fn bound_with_yield_after_impl(
                 (LocalTypeR::End, new_current)
             } else {
                 let mut bounded_branches = Vec::with_capacity(branches.len());
-                for (label, cont) in branches {
+                for (label, vt, cont) in branches {
                     let (bounded, _) = bound_with_yield_after_impl(cont, max_steps, new_current);
-                    bounded_branches.push((label.clone(), bounded));
+                    bounded_branches.push((label.clone(), vt.clone(), bounded));
                 }
                 (
                     LocalTypeR::Send {
@@ -166,9 +166,9 @@ fn bound_with_yield_after_impl(
                 (LocalTypeR::End, new_current)
             } else {
                 let mut bounded_branches = Vec::with_capacity(branches.len());
-                for (label, cont) in branches {
+                for (label, vt, cont) in branches {
                     let (bounded, _) = bound_with_yield_after_impl(cont, max_steps, new_current);
-                    bounded_branches.push((label.clone(), bounded));
+                    bounded_branches.push((label.clone(), vt.clone(), bounded));
                 }
                 (
                     LocalTypeR::Recv {
@@ -210,7 +210,7 @@ fn bound_with_yield_when_impl(
 
         LocalTypeR::Send { partner, branches } => {
             let mut bounded_branches = Vec::with_capacity(branches.len());
-            for (label, cont) in branches {
+            for (label, vt, cont) in branches {
                 let next = if label.name == condition {
                     // Yield when this condition is seen
                     if seen_conditions.contains(condition) {
@@ -222,7 +222,7 @@ fn bound_with_yield_when_impl(
                 } else {
                     bound_with_yield_when_impl(cont, condition, seen_conditions)
                 };
-                bounded_branches.push((label.clone(), next));
+                bounded_branches.push((label.clone(), vt.clone(), next));
             }
             LocalTypeR::Send {
                 partner: partner.clone(),
@@ -232,7 +232,7 @@ fn bound_with_yield_when_impl(
 
         LocalTypeR::Recv { partner, branches } => {
             let mut bounded_branches = Vec::with_capacity(branches.len());
-            for (label, cont) in branches {
+            for (label, vt, cont) in branches {
                 let next = if label.name == condition {
                     if seen_conditions.contains(condition) {
                         LocalTypeR::End
@@ -243,7 +243,7 @@ fn bound_with_yield_when_impl(
                 } else {
                     bound_with_yield_when_impl(cont, condition, seen_conditions)
                 };
-                bounded_branches.push((label.clone(), next));
+                bounded_branches.push((label.clone(), vt.clone(), next));
             }
             LocalTypeR::Recv {
                 partner: partner.clone(),
@@ -285,9 +285,10 @@ fn unfold_bounded_impl(
 
         LocalTypeR::Send { partner, branches } => {
             let mut unfolded_branches = Vec::with_capacity(branches.len());
-            for (label, cont) in branches {
+            for (label, vt, cont) in branches {
                 unfolded_branches.push((
                     label.clone(),
+                    vt.clone(),
                     unfold_bounded_impl(original, cont, max_depth, depth),
                 ));
             }
@@ -299,9 +300,10 @@ fn unfold_bounded_impl(
 
         LocalTypeR::Recv { partner, branches } => {
             let mut unfolded_branches = Vec::with_capacity(branches.len());
-            for (label, cont) in branches {
+            for (label, vt, cont) in branches {
                 unfolded_branches.push((
                     label.clone(),
+                    vt.clone(),
                     unfold_bounded_impl(original, cont, max_depth, depth),
                 ));
             }
@@ -397,7 +399,7 @@ mod tests {
             LocalTypeR::Mu { body, .. } => match *body {
                 LocalTypeR::Send { ref branches, .. } => {
                     // After the send (1 step), continuation should be End
-                    assert!(matches!(branches[0].1, LocalTypeR::End));
+                    assert!(matches!(branches[0].2, LocalTypeR::End));
                 }
                 LocalTypeR::End => {
                     // Or the whole body is End if we hit limit at Mu level
@@ -427,7 +429,7 @@ mod tests {
         // First occurrence of "stop" should pass, second should yield
         match bounded {
             LocalTypeR::Send { branches, .. } => {
-                let cont = &branches[0].1;
+                let cont = &branches[0].2;
                 match cont {
                     LocalTypeR::Mu { body, .. } => match body.as_ref() {
                         LocalTypeR::Send { branches, .. } => {
@@ -452,12 +454,12 @@ mod tests {
         // Should unfold to finite depth
         match unfolded {
             LocalTypeR::Send { branches, .. } => {
-                let cont = &branches[0].1;
+                let cont = &branches[0].2;
                 match cont {
                     LocalTypeR::Recv { branches, .. } => {
                         // After 2 levels, should end
                         assert!(matches!(
-                            branches[0].1,
+                            branches[0].2,
                             LocalTypeR::Send { .. } | LocalTypeR::End
                         ));
                     }

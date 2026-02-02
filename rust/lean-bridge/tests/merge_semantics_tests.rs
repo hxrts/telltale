@@ -106,7 +106,7 @@ fn test_recv_merge_different_labels_unions() {
         LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "A");
             assert_eq!(branches.len(), 2);
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
         }
@@ -121,15 +121,15 @@ fn test_recv_merge_overlapping_labels() {
     let t1 = LocalTypeR::Recv {
         partner: "A".to_string(),
         branches: vec![
-            (Label::new("x"), LocalTypeR::End),
-            (Label::new("y"), LocalTypeR::End),
+            (Label::new("x"), None, LocalTypeR::End),
+            (Label::new("y"), None, LocalTypeR::End),
         ],
     };
     let t2 = LocalTypeR::Recv {
         partner: "A".to_string(),
         branches: vec![
-            (Label::new("y"), LocalTypeR::End),
-            (Label::new("z"), LocalTypeR::End),
+            (Label::new("y"), None, LocalTypeR::End),
+            (Label::new("z"), None, LocalTypeR::End),
         ],
     };
 
@@ -139,7 +139,7 @@ fn test_recv_merge_overlapping_labels() {
         LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "A");
             assert_eq!(branches.len(), 3, "Should have x, y, z");
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
             assert!(labels.contains(&"z"));
@@ -248,7 +248,7 @@ fn test_projection_succeeds_for_recv_merge() {
         LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "B");
             assert_eq!(branches.len(), 2);
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
         }
@@ -266,8 +266,8 @@ fn test_merged_recv_json_roundtrip() {
     let merged = LocalTypeR::Recv {
         partner: "A".to_string(),
         branches: vec![
-            (Label::new("x"), LocalTypeR::End),
-            (Label::new("y"), LocalTypeR::End),
+            (Label::new("x"), None, LocalTypeR::End),
+            (Label::new("y"), None, LocalTypeR::End),
         ],
     };
 

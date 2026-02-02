@@ -242,7 +242,7 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
                 && b1
                     .iter()
                     .zip(b2.iter())
-                    .all(|((l1, c1), (l2, c2))| labels_equal(l1, l2) && local_types_equal(c1, c2))
+                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| labels_equal(l1, l2) && local_types_equal(c1, c2))
         }
 
         (
@@ -260,7 +260,7 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
                 && b1
                     .iter()
                     .zip(b2.iter())
-                    .all(|((l1, c1), (l2, c2))| labels_equal(l1, l2) && local_types_equal(c1, c2))
+                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| labels_equal(l1, l2) && local_types_equal(c1, c2))
         }
 
         (LocalTypeR::Mu { var: v1, body: b1 }, LocalTypeR::Mu { var: v2, body: b2 }) => {

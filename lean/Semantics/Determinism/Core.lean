@@ -121,9 +121,9 @@ mutual
     | .recv _ bs => uniqueBranchLabelsBranchesL bs
     | .mu _ body => uniqueBranchLabelsL body
 
-  def uniqueBranchLabelsBranchesL : List (Label × LocalTypeR) → Bool
+  def uniqueBranchLabelsBranchesL : List BranchR → Bool
     | [] => true
-    | (lbl, cont) :: rest =>
+    | (lbl, _vt, cont) :: rest =>
         !(rest.map Prod.fst).contains lbl &&
         uniqueBranchLabelsL cont &&
         uniqueBranchLabelsBranchesL rest
@@ -132,12 +132,12 @@ end
 /-! ## Unique Branch Labels -/
 
 /-- Helper: extract head/tail facts from uniqueBranchLabelsBranchesL. -/
-private theorem uniqueBranchLabelsBranchesL_cons {hd : Label × LocalTypeR}
-    {tl : List (Label × LocalTypeR)} (huniq : uniqueBranchLabelsBranchesL (hd :: tl) = true) :
+private theorem uniqueBranchLabelsBranchesL_cons {hd : BranchR}
+    {tl : List BranchR} (huniq : uniqueBranchLabelsBranchesL (hd :: tl) = true) :
     (tl.map Prod.fst).contains hd.1 = false ∧ uniqueBranchLabelsBranchesL tl = true := by
   -- Unfold only the boolean structure, keeping contains as a Bool.
   have h1 :
-      (!(tl.map Prod.fst).contains hd.1 && uniqueBranchLabelsL hd.2) = true ∧
+      (!(tl.map Prod.fst).contains hd.1 && uniqueBranchLabelsL hd.2.2) = true ∧
         uniqueBranchLabelsBranchesL tl = true := by
     exact (Bool.and_eq_true_iff).mp (by simpa [uniqueBranchLabelsBranchesL] using huniq)
   have hnodup : (tl.map Prod.fst).contains hd.1 = false := by
@@ -150,23 +150,23 @@ private theorem uniqueBranchLabelsBranchesL_cons {hd : Label × LocalTypeR}
         rfl
   exact ⟨hnodup, h1.2⟩
 
-private theorem mem_map_fst_of_mem {lbl : Label} {cont : LocalTypeR}
-    {branches : List (Label × LocalTypeR)} (hmem : (lbl, cont) ∈ branches) :
+private theorem mem_map_fst_of_mem {lbl : Label} {rest : Option ValType × LocalTypeR}
+    {branches : List BranchR} (hmem : (lbl, rest) ∈ branches) :
     lbl ∈ branches.map Prod.fst := by
   -- Lift pair membership to membership of first components.
   apply List.mem_map.mpr
-  exact ⟨(lbl, cont), hmem, rfl⟩
+  exact ⟨(lbl, rest), hmem, rfl⟩
 
-private theorem contains_true_of_mem {lbl : Label} {branches : List (Label × LocalTypeR)}
+private theorem contains_true_of_mem {lbl : Label} {branches : List BranchR}
     (hmem : lbl ∈ branches.map Prod.fst) :
     (branches.map Prod.fst).contains lbl = true := by
   -- contains is true when the label appears in the mapped list.
   rw [List.contains_iff_exists_mem_beq]
   exact ⟨lbl, hmem, beq_self_eq_true lbl⟩
 
-private theorem contains_false_contradiction {lbl : Label} {cont : LocalTypeR}
-    {branches : List (Label × LocalTypeR)} (hnodup : (branches.map Prod.fst).contains lbl = false)
-    (hmem : (lbl, cont) ∈ branches) : False := by
+private theorem contains_false_contradiction {lbl : Label} {rest : Option ValType × LocalTypeR}
+    {branches : List BranchR} (hnodup : (branches.map Prod.fst).contains lbl = false)
+    (hmem : (lbl, rest) ∈ branches) : False := by
   -- Membership forces contains = true, contradicting hnodup.
   have hmem_fst : lbl ∈ branches.map Prod.fst := mem_map_fst_of_mem hmem
   have hcontains : (branches.map Prod.fst).contains lbl = true :=
@@ -175,9 +175,9 @@ private theorem contains_false_contradiction {lbl : Label} {cont : LocalTypeR}
   cases hnodup
 
 /-- If branches have unique labels, then membership determines the continuation. -/
-theorem mem_branchL_unique_label {lbl : Label} {cont₁ cont₂ : LocalTypeR}
-    {branches : List (Label × LocalTypeR)} (huniq : uniqueBranchLabelsBranchesL branches = true)
-    (hmem₁ : (lbl, cont₁) ∈ branches) (hmem₂ : (lbl, cont₂) ∈ branches) : cont₁ = cont₂ := by
+theorem mem_branchL_unique_label {lbl : Label} {rest₁ rest₂ : Option ValType × LocalTypeR}
+    {branches : List BranchR} (huniq : uniqueBranchLabelsBranchesL branches = true)
+    (hmem₁ : (lbl, rest₁) ∈ branches) (hmem₂ : (lbl, rest₂) ∈ branches) : rest₁ = rest₂ := by
   -- Induct on the branch list and use the head/ tail contradiction.
   induction branches with
   | nil => cases hmem₁
@@ -203,15 +203,15 @@ theorem mem_branchL_unique_label {lbl : Label} {cont₁ cont₂ : LocalTypeR}
 /-- Local step relation (inductive, avoids recursion through substitute).
     A local type steps when it performs a send or receive with matching label. -/
 inductive LocalStepRep : LocalTypeR → LocalTypeR → LocalActionR → Prop
-  | send {p : String} {bs : List (Label × LocalTypeR)} {lt' : LocalTypeR} {act : LocalActionR}
+  | send {p : String} {bs : List BranchR} {lt' : LocalTypeR} {act : LocalActionR}
       (huniq : uniqueBranchLabelsBranchesL bs = true)
       (hp : act.participant = p)
-      (hmem : (act.label, lt') ∈ bs) :
+      (hmem : ∃ vt, (act.label, vt, lt') ∈ bs) :
       LocalStepRep (.send p bs) lt' act
-  | recv {p : String} {bs : List (Label × LocalTypeR)} {lt' : LocalTypeR} {act : LocalActionR}
+  | recv {p : String} {bs : List BranchR} {lt' : LocalTypeR} {act : LocalActionR}
       (huniq : uniqueBranchLabelsBranchesL bs = true)
       (hp : act.participant = p)
-      (hmem : (act.label, lt') ∈ bs) :
+      (hmem : ∃ vt, (act.label, vt, lt') ∈ bs) :
       LocalStepRep (.recv p bs) lt' act
   | mu {t : String} {body lt' : LocalTypeR} {act : LocalActionR}
       (hstep : LocalStepRep (body.substitute t (.mu t body)) lt' act) :
@@ -444,11 +444,17 @@ theorem local_step_det {lt lt₁ lt₂ : LocalTypeR} {act : LocalActionR}
   | send huniq₁ hp₁ hmem₁ =>
       cases h₂ with
       | send huniq₂ hp₂ hmem₂ =>
-          exact mem_branchL_unique_label huniq₁ hmem₁ hmem₂
+          obtain ⟨vt₁, hmem₁'⟩ := hmem₁
+          obtain ⟨vt₂, hmem₂'⟩ := hmem₂
+          have := mem_branchL_unique_label huniq₁ hmem₁' hmem₂'
+          exact congrArg Prod.snd this
   | recv huniq₁ hp₁ hmem₁ =>
       cases h₂ with
       | recv huniq₂ hp₂ hmem₂ =>
-          exact mem_branchL_unique_label huniq₁ hmem₁ hmem₂
+          obtain ⟨vt₁, hmem₁'⟩ := hmem₁
+          obtain ⟨vt₂, hmem₂'⟩ := hmem₂
+          have := mem_branchL_unique_label huniq₁ hmem₁' hmem₂'
+          exact congrArg Prod.snd this
   | mu hstep₁ ih =>
       cases h₂ with
       | mu hstep₂ =>

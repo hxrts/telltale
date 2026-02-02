@@ -77,7 +77,7 @@ private theorem bool_and_true {a b : Bool} (h : (a && b) = true) : a = true ∧ 
 
 /-- Helper: projectbBranches true implies BranchesProjRel SoundRel. -/
 private theorem projectbBranches_to_SoundRel
-    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (h : projectbBranches gbs role lbs = true) :
     BranchesProjRel SoundRel gbs role lbs := by
   induction gbs generalizing lbs with
@@ -213,7 +213,7 @@ private theorem SoundRel_postfix_mu (t : String) (body : GlobalType) (role : Str
 /-- Helper: sender comm case when candidate is a send. -/
 private theorem SoundRel_postfix_comm_sender_send
     (sender receiver role : String) (gbs : List (Label × GlobalType))
-    (partner : String) (lbs : List (Label × LocalTypeR)) (hs : role = sender)
+    (partner : String) (lbs : List BranchR) (hs : role = sender)
     (h : SoundRel (.comm sender receiver gbs) role (.send partner lbs)) :
     CProjectF SoundRel (.comm sender receiver gbs) role (.send partner lbs) := by
   -- Reduce to the branch checker and convert it into a BranchesProjRel witness.
@@ -254,7 +254,7 @@ private theorem SoundRel_postfix_comm_sender
 /-- Helper: receiver comm case when candidate is a recv. -/
 private theorem SoundRel_postfix_comm_receiver_recv
     (sender receiver role : String) (gbs : List (Label × GlobalType))
-    (partner : String) (lbs : List (Label × LocalTypeR)) (hr : role = receiver)
+    (partner : String) (lbs : List BranchR) (hr : role = receiver)
     (hs : role ≠ sender)
     (h : SoundRel (.comm sender receiver gbs) role (.recv partner lbs)) :
     CProjectF SoundRel (.comm sender receiver gbs) role (.recv partner lbs) := by
@@ -350,7 +350,7 @@ theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)
     The ih provides recursive evidence that for each branch global type,
     if CProject holds then projectb returns true. -/
 theorem BranchesProjRel_to_projectbBranches
-    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (hrel : BranchesProjRel CProject gbs role lbs)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → projectb gb.2 role lb = true) :
     projectbBranches gbs role lbs = true := by
@@ -363,7 +363,7 @@ theorem BranchesProjRel_to_projectbBranches
       have hbeq : (ghd.1 == lhd.1) = true := eq_to_label_beq_eq_true hlabel
       simp only [hbeq, ↓reduceIte, Bool.and_eq_true]
       constructor
-      · exact ih ghd (List.Mem.head gtl) lhd.2 hproj
+      · exact ih ghd (List.Mem.head gtl) lhd.2.2 hproj
       · exact ihrest (fun gb hmem lb hcp => ih gb (List.Mem.tail ghd hmem) lb hcp)
 
 /-- Helper: AllBranchesProj CProject implies projectbAllBranches.

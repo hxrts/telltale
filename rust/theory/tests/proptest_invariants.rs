@@ -124,7 +124,7 @@ fn local_type_strategy(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     .prop_map(move |(c1, c2)| {
                         LocalTypeR::send_choice(
                             &p,
-                            vec![(Label::new("yes"), c1), (Label::new("no"), c2)],
+                            vec![(Label::new("yes"), None, c1), (Label::new("no"), None, c2)],
                         )
                     })
             }),
@@ -137,7 +137,7 @@ fn local_type_strategy(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     .prop_map(move |(c1, c2)| {
                         LocalTypeR::recv_choice(
                             &p,
-                            vec![(Label::new("yes"), c1), (Label::new("no"), c2)],
+                            vec![(Label::new("yes"), None, c1), (Label::new("no"), None, c2)],
                         )
                     })
             }),
@@ -148,8 +148,8 @@ fn local_type_strategy(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     LocalTypeR::send_choice(
                         &p,
                         vec![
-                            (Label::new("continue"), LocalTypeR::var("t")),
-                            (Label::new("stop"), LocalTypeR::End),
+                            (Label::new("continue"), None, LocalTypeR::var("t")),
+                            (Label::new("stop"), None, LocalTypeR::End),
                         ],
                     ),
                 )
@@ -334,15 +334,15 @@ fn prop_merge_is_commutative() {
     let t1 = LocalTypeR::recv_choice(
         "A",
         vec![
-            (Label::new("x"), LocalTypeR::End),
-            (Label::new("y"), LocalTypeR::End),
+            (Label::new("x"), None, LocalTypeR::End),
+            (Label::new("y"), None, LocalTypeR::End),
         ],
     );
     let t2 = LocalTypeR::recv_choice(
         "A",
         vec![
-            (Label::new("y"), LocalTypeR::End),
-            (Label::new("z"), LocalTypeR::End),
+            (Label::new("y"), None, LocalTypeR::End),
+            (Label::new("z"), None, LocalTypeR::End),
         ],
     );
 

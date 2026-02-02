@@ -29,7 +29,7 @@ This allows us to rewrite the LHS of the crossed-unfold lemmas, and then apply
 namespace Choreography.Harmony.MuUnfoldLemmas
 
 open SessionTypes.GlobalType (GlobalType Label)
-open SessionTypes.LocalTypeR (LocalTypeR)
+open SessionTypes.LocalTypeR (LocalTypeR BranchR)
 open SessionTypes.LocalTypeR (isGuarded_of_closed isGuarded_substitute)
 open SessionCoTypes.EQ2
 open Choreography.Projection.ProjSubst (projTrans proj_subst)
@@ -135,7 +135,7 @@ private theorem isGuarded_false_substitute_preserved_var (w u v : String) (repl 
   · simp only [LocalTypeR.isGuarded, bne_self_eq_false]
 
 /-- Unguardedness preservation: `.send` case is impossible. -/
-private theorem isGuarded_false_substitute_preserved_send (p : String) (bs : List (Label × LocalTypeR))
+private theorem isGuarded_false_substitute_preserved_send (p : String) (bs : List BranchR)
     (u v : String) (repl : LocalTypeR) (hunguarded : (LocalTypeR.send p bs).isGuarded v = false) :
     ((LocalTypeR.send p bs).substitute u repl).isGuarded v = false := by
   -- isGuarded v (.send p bs) = true, contradicts hunguarded.
@@ -143,7 +143,7 @@ private theorem isGuarded_false_substitute_preserved_send (p : String) (bs : Lis
   exact absurd hunguarded (by decide)
 
 /-- Unguardedness preservation: `.recv` case is impossible. -/
-private theorem isGuarded_false_substitute_preserved_recv (p : String) (bs : List (Label × LocalTypeR))
+private theorem isGuarded_false_substitute_preserved_recv (p : String) (bs : List BranchR)
     (u v : String) (repl : LocalTypeR) (hunguarded : (LocalTypeR.recv p bs).isGuarded v = false) :
     ((LocalTypeR.recv p bs).substitute u repl).isGuarded v = false := by
   -- isGuarded v (.recv p bs) = true, contradicts hunguarded.

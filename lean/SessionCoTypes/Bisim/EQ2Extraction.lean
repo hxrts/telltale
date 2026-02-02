@@ -69,7 +69,7 @@ theorem EQ2.var_right_implies_UnfoldsToVar_of_fullUnfold_nonmu {x : LocalTypeR} 
       exact (False.elim (Nat.succ_ne_zero _ hmu'))
 
 theorem EQ2.send_right_implies_CanSend_of_fullUnfold_nonmu {x : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (hmu : x.fullUnfold.muHeight = 0)
+    {bs : List BranchR} (hmu : x.fullUnfold.muHeight = 0)
     (heq : EQ2 (.send p bs) x) : ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
   have hiter := (EQ2_unfold_right_iter (a := .send p bs) (b := x) heq) x.muHeight
   have hfull : EQ2 (.send p bs) x.fullUnfold := by
@@ -98,7 +98,7 @@ theorem EQ2.send_right_implies_CanSend_of_fullUnfold_nonmu {x : LocalTypeR} {p :
       exact (False.elim (Nat.succ_ne_zero _ hmu'))
 
 theorem EQ2.recv_right_implies_CanRecv_of_fullUnfold_nonmu {x : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (hmu : x.fullUnfold.muHeight = 0)
+    {bs : List BranchR} (hmu : x.fullUnfold.muHeight = 0)
     (heq : EQ2 (.recv p bs) x) : ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
   -- Reduce recv to send via duality.
   have hdual : EQ2 (.send p (dualBranches bs)) x.dual := by
@@ -135,7 +135,7 @@ private theorem UnfoldsToVar_transfer {a b : LocalTypeR} {v : String} (ha : Unfo
       simpa [LocalTypeR.unfold] using (EQ2_unfold_left (a := .mu t body) (b := b) h)
     exact ih h'
 
-private theorem CanSend_transfer {a b : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+private theorem CanSend_transfer {a b : LocalTypeR} {p : String} {bs : List BranchR}
     (ha : CanSend a p bs) (h : EQ2 a b) (hWFb : LocalTypeR.WellFormed b) :
     ∃ cs, CanSend b p cs ∧ BranchesRel EQ2 bs cs := by
   revert h
@@ -149,7 +149,7 @@ private theorem CanSend_transfer {a b : LocalTypeR} {p : String} {bs : List (Lab
       simpa [LocalTypeR.unfold] using (EQ2_unfold_left (a := .mu t body) (b := b) h)
     exact ih h'
 
-private theorem CanRecv_transfer {a b : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+private theorem CanRecv_transfer {a b : LocalTypeR} {p : String} {bs : List BranchR}
     (ha : CanRecv a p bs) (h : EQ2 a b) (hWFb : LocalTypeR.WellFormed b) :
     ∃ cs, CanRecv b p cs ∧ BranchesRel EQ2 bs cs := by
   -- Reduce recv to send on the dual type, then dualize the result back.
@@ -239,13 +239,13 @@ theorem EQ2.var_left_implies_UnfoldsToVar {x : LocalTypeR} {v : String}
 
 /-- If EQ2 (.send p bs) x, then x can send to p with EQ2-related branches. -/
 theorem EQ2.send_right_implies_CanSend {x : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (hWF : LocalTypeR.WellFormed x) (h : EQ2 (.send p bs) x) :
+    {bs : List BranchR} (hWF : LocalTypeR.WellFormed x) (h : EQ2 (.send p bs) x) :
     ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
   exact ActiveExtraction.send_right (x := x) (p := p) (bs := bs) ⟨hWF.closed, hWF.contractive⟩ h
 
 /-- If EQ2 x (.send p cs), then x can send to p with EQ2-related branches. -/
 theorem EQ2.send_left_implies_CanSend {x : LocalTypeR} {p : String}
-    {cs : List (Label × LocalTypeR)} (hWF : LocalTypeR.WellFormed x) (h : EQ2 x (.send p cs)) :
+    {cs : List BranchR} (hWF : LocalTypeR.WellFormed x) (h : EQ2 x (.send p cs)) :
     ∃ bs, CanSend x p bs ∧ BranchesRel EQ2 bs cs := by
   have hsymm := EQ2_symm h
   obtain ⟨bs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend hWF hsymm
@@ -253,13 +253,13 @@ theorem EQ2.send_left_implies_CanSend {x : LocalTypeR} {p : String}
 
 /-- If EQ2 (.recv p bs) x, then x can recv from p with EQ2-related branches. -/
 theorem EQ2.recv_right_implies_CanRecv {x : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (hWF : LocalTypeR.WellFormed x) (h : EQ2 (.recv p bs) x) :
+    {bs : List BranchR} (hWF : LocalTypeR.WellFormed x) (h : EQ2 (.recv p bs) x) :
     ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
   exact ActiveExtraction.recv_right (x := x) (p := p) (bs := bs) ⟨hWF.closed, hWF.contractive⟩ h
 
 /-- If EQ2 x (.recv p cs), then x can recv from p with EQ2-related branches. -/
 theorem EQ2.recv_left_implies_CanRecv {x : LocalTypeR} {p : String}
-    {cs : List (Label × LocalTypeR)} (hWF : LocalTypeR.WellFormed x) (h : EQ2 x (.recv p cs)) :
+    {cs : List BranchR} (hWF : LocalTypeR.WellFormed x) (h : EQ2 x (.recv p cs)) :
     ∃ bs, CanRecv x p bs ∧ BranchesRel EQ2 bs cs := by
   have hsymm := EQ2_symm h
   obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv hWF hsymm
@@ -298,7 +298,7 @@ private theorem BranchesRel_refl : ∀ bs, BranchesRel EQ2 bs bs := by
   induction bs with
   | nil => exact List.Forall₂.nil
   | cons head tail ih =>
-      exact List.Forall₂.cons ⟨rfl, EQ2_refl head.2⟩ ih
+      exact List.Forall₂.cons ⟨rfl, EQ2_refl head.2.2⟩ ih
 
 /-- Observable relation is reflexive. -/
 theorem ObservableRel.refl {a : LocalTypeR} (obs : Observable a) :
@@ -354,10 +354,10 @@ theorem EQ2_mus_to_BisimF {t s : String} {body body' : LocalTypeR}
     (t := t) (s := s) (body := body) (body' := body')
     ⟨hWF1.closed, hWF1.contractive⟩ ⟨hWF2.closed, hWF2.contractive⟩ h
 
-private theorem BranchesRelBisim_strengthen {bs cs : List (Label × LocalTypeR)}
+private theorem BranchesRelBisim_strengthen {bs cs : List BranchR}
     (hbr : BranchesRelBisim EQ2 bs cs)
-    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
-    (hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2) :
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
+    (hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2.2) :
     BranchesRelBisim (fun a b => EQ2 a b ∧ LocalTypeR.WellFormed a ∧ LocalTypeR.WellFormed b) bs cs := by
   induction hbr with
   | nil => exact List.Forall₂.nil

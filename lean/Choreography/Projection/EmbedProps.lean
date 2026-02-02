@@ -121,7 +121,7 @@ decreasing_by
     | exact sizeOf_branches_lt_sizeOf_send _ _
 
 /-- Determinism for branch-wise embedding. -/
-theorem branches_embed_deterministic {lbs : List (Label × LocalTypeR)} {role : String}
+theorem branches_embed_deterministic {lbs : List BranchR} {role : String}
      {gbs1 gbs2 : List (Label × GlobalType)}
      (h1 : BranchesEmbedRel CEmbed lbs role gbs1)
      (h2 : BranchesEmbedRel CEmbed lbs role gbs2) : gbs1 = gbs2 := by
@@ -247,8 +247,8 @@ decreasing_by
     | exact sizeOf_branches_lt_sizeOf_send _ _
 
 /-- Embed/project roundtrip for branches. -/
-theorem branches_embed_project_roundtrip {lbs : List (Label × LocalTypeR)} {role : String}
-    {gbs : List (Label × GlobalType)} {lbs' : List (Label × LocalTypeR)}
+theorem branches_embed_project_roundtrip {lbs : List BranchR} {role : String}
+    {gbs : List (Label × GlobalType)} {lbs' : List BranchR}
     (hbr : BranchesEmbedRel CEmbed lbs role gbs)
     (hpr : BranchesProjRel CProject gbs role lbs') : lbs = lbs' := by
   -- Induct on branch lists.
@@ -375,20 +375,20 @@ private theorem lcontractive_implies_isGuarded (t : String) (body : LocalTypeR)
 /-! ### Main Existence Theorems -/
 
 /-- Helper: derive branch well-formedness for send from parent well-formedness. -/
-private def derive_send_branch_wf (receiver : String) (lbs : List (Label × LocalTypeR)) (role : String)
+private def derive_send_branch_wf (receiver : String) (lbs : List BranchR) (role : String)
     (hwf : ∀ partner, (LocalTypeR.send receiver lbs).hasSendTo partner → role ≠ partner)
     (hwf' : ∀ partner, (LocalTypeR.send receiver lbs).hasRecvFrom partner → role ≠ partner) :
-    (∀ lb ∈ lbs, ∀ partner, lb.2.hasSendTo partner → role ≠ partner) ∧
-    (∀ lb ∈ lbs, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner) :=
+    (∀ lb ∈ lbs, ∀ partner, lb.2.2.hasSendTo partner → role ≠ partner) ∧
+    (∀ lb ∈ lbs, ∀ partner, lb.2.2.hasRecvFrom partner → role ≠ partner) :=
   ⟨fun _ hmem partner hsend => hwf partner (LocalTypeR.hasSendTo_send_branch hmem hsend),
    fun _ hmem partner hrecv => hwf' partner (LocalTypeR.hasRecvFrom_send_branch hmem hrecv)⟩
 
 /-- Helper: derive branch well-formedness for recv from parent well-formedness. -/
-private def derive_recv_branch_wf (sender : String) (lbs : List (Label × LocalTypeR)) (role : String)
+private def derive_recv_branch_wf (sender : String) (lbs : List BranchR) (role : String)
     (hwf : ∀ partner, (LocalTypeR.recv sender lbs).hasSendTo partner → role ≠ partner)
     (hwf' : ∀ partner, (LocalTypeR.recv sender lbs).hasRecvFrom partner → role ≠ partner) :
-    (∀ lb ∈ lbs, ∀ partner, lb.2.hasSendTo partner → role ≠ partner) ∧
-    (∀ lb ∈ lbs, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner) :=
+    (∀ lb ∈ lbs, ∀ partner, lb.2.2.hasSendTo partner → role ≠ partner) ∧
+    (∀ lb ∈ lbs, ∀ partner, lb.2.2.hasRecvFrom partner → role ≠ partner) :=
   ⟨fun _ hmem partner hsend => hwf partner (LocalTypeR.hasSendTo_recv_branch hmem hsend),
    fun _ hmem partner hrecv => hwf' partner (LocalTypeR.hasRecvFrom_recv_branch hmem hrecv)⟩
 
@@ -463,23 +463,23 @@ decreasing_by
     | exact sizeOf_branches_lt_sizeOf_send _ _
 
 /-- Helper theorem for embedding branch lists. -/
-theorem branches_have_embed (lbs : List (Label × LocalTypeR)) (role : String)
-    (hwf : ∀ lb ∈ lbs, ∀ partner, lb.2.hasSendTo partner → role ≠ partner)
-    (hwf' : ∀ lb ∈ lbs, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner) :
+theorem branches_have_embed (lbs : List BranchR) (role : String)
+    (hwf : ∀ lb ∈ lbs, ∀ partner, lb.2.2.hasSendTo partner → role ≠ partner)
+    (hwf' : ∀ lb ∈ lbs, ∀ partner, lb.2.2.hasRecvFrom partner → role ≠ partner) :
     ∃ gbs, BranchesEmbedRel CEmbed lbs role gbs := by
   -- Structural recursion on the branch list.
   cases lbs with
   | nil => exact ⟨[], List.Forall₂.nil⟩
   | cons hd tl =>
-      have hwf_hd : ∀ partner, hd.2.hasSendTo partner → role ≠ partner :=
+      have hwf_hd : ∀ partner, hd.2.2.hasSendTo partner → role ≠ partner :=
         fun p h => hwf hd (List.Mem.head tl) p h
-      have hwf'_hd : ∀ partner, hd.2.hasRecvFrom partner → role ≠ partner :=
+      have hwf'_hd : ∀ partner, hd.2.2.hasRecvFrom partner → role ≠ partner :=
         fun p h => hwf' hd (List.Mem.head tl) p h
-      have hwf_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasSendTo partner → role ≠ partner :=
+      have hwf_tl : ∀ lb ∈ tl, ∀ partner, lb.2.2.hasSendTo partner → role ≠ partner :=
         fun lb hmem p h => hwf lb (List.Mem.tail hd hmem) p h
-      have hwf'_tl : ∀ lb ∈ tl, ∀ partner, lb.2.hasRecvFrom partner → role ≠ partner :=
+      have hwf'_tl : ∀ lb ∈ tl, ∀ partner, lb.2.2.hasRecvFrom partner → role ≠ partner :=
         fun lb hmem p h => hwf' lb (List.Mem.tail hd hmem) p h
-      obtain ⟨gcont, hcont⟩ := localType_has_embed hd.2 role hwf_hd hwf'_hd
+      obtain ⟨gcont, hcont⟩ := localType_has_embed hd.2.2 role hwf_hd hwf'_hd
       obtain ⟨gtl, htl⟩ := branches_have_embed tl role hwf_tl hwf'_tl
       refine ⟨(hd.1, gcont) :: gtl, ?_⟩
       exact List.Forall₂.cons ⟨rfl, hcont⟩ htl

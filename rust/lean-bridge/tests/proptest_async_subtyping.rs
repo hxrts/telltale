@@ -33,7 +33,7 @@ fn async_equivalent(left: &LocalTypeR, right: &LocalTypeR) -> bool {
 fn contains_send(lt: &LocalTypeR) -> bool {
     match lt {
         LocalTypeR::Send { .. } => true,
-        LocalTypeR::Recv { branches, .. } => branches.iter().any(|(_, cont)| contains_send(cont)),
+        LocalTypeR::Recv { branches, .. } => branches.iter().any(|(_, _vt, cont)| contains_send(cont)),
         LocalTypeR::Mu { body, .. } => contains_send(body),
         LocalTypeR::Var(_) | LocalTypeR::End => false,
     }
@@ -262,7 +262,7 @@ fn choice_strategy() -> impl Strategy<Value = LocalTypeR> {
     )
         .prop_filter("distinct labels", |(_, l1, l2, _)| l1.name != l2.name)
         .prop_map(|(partner, l1, l2, is_send)| {
-            let branches = vec![(l1, LocalTypeR::End), (l2, LocalTypeR::End)];
+            let branches = vec![(l1, None, LocalTypeR::End), (l2, None, LocalTypeR::End)];
             if is_send {
                 LocalTypeR::Send { partner, branches }
             } else {
@@ -1013,7 +1013,7 @@ fn test_var_type() {
 fn test_single_branch_send() {
     let single = LocalTypeR::Send {
         partner: "B".to_string(),
-        branches: vec![(Label::new("only"), LocalTypeR::End)],
+        branches: vec![(Label::new("only"), None, LocalTypeR::End)],
     };
 
     let segs = siso_decompose(&single).unwrap();
@@ -1026,7 +1026,7 @@ fn test_single_branch_send() {
 fn test_single_branch_recv() {
     let single = LocalTypeR::Recv {
         partner: "A".to_string(),
-        branches: vec![(Label::new("only"), LocalTypeR::End)],
+        branches: vec![(Label::new("only"), None, LocalTypeR::End)],
     };
 
     let segs = siso_decompose(&single).unwrap();
@@ -1040,9 +1040,9 @@ fn test_three_branch_choice() {
     let three_way = LocalTypeR::Send {
         partner: "B".to_string(),
         branches: vec![
-            (Label::new("opt1"), LocalTypeR::End),
-            (Label::new("opt2"), LocalTypeR::End),
-            (Label::new("opt3"), LocalTypeR::End),
+            (Label::new("opt1"), None, LocalTypeR::End),
+            (Label::new("opt2"), None, LocalTypeR::End),
+            (Label::new("opt3"), None, LocalTypeR::End),
         ],
     };
 

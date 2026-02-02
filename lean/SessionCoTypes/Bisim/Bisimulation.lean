@@ -23,8 +23,8 @@ standard coinduction. -/
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
 
 /-- Branch-wise relation for bisimulation using List.Forall₂. -/
-def BranchesRelBisim (R : Rel) (bs cs : List (Label × LocalTypeR)) : Prop :=
-  List.Forall₂ (fun b c => b.1 = c.1 ∧ R b.2 c.2) bs cs
+def BranchesRelBisim (R : Rel) (bs cs : List BranchR) : Prop :=
+  List.Forall₂ (fun b c => b.1 = c.1 ∧ R b.2.2 c.2.2) bs cs
 
 /-- One-step bisimulation functor using membership predicates.
 
@@ -37,11 +37,11 @@ inductive BisimF (R : Rel) : Rel where
       UnfoldsToEnd a → UnfoldsToEnd b → BisimF R a b
   | eq_var {a b : LocalTypeR} {v : String} :
       UnfoldsToVar a v → UnfoldsToVar b v → BisimF R a b
-  | eq_send {a b : LocalTypeR} {partner : String} {bsa bsb : List (Label × LocalTypeR)} :
+  | eq_send {a b : LocalTypeR} {partner : String} {bsa bsb : List BranchR} :
       CanSend a partner bsa → CanSend b partner bsb →
       BranchesRelBisim R bsa bsb →
       BisimF R a b
-  | eq_recv {a b : LocalTypeR} {partner : String} {bsa bsb : List (Label × LocalTypeR)} :
+  | eq_recv {a b : LocalTypeR} {partner : String} {bsa bsb : List BranchR} :
       CanRecv a partner bsa → CanRecv b partner bsb →
       BranchesRelBisim R bsa bsb →
       BisimF R a b
@@ -136,7 +136,7 @@ theorem BisimF.unfold_iter {R : Rel} {a b : LocalTypeR} :
 
 /-- BranchesRelBisim is monotone. -/
 theorem BranchesRelBisim.mono {R S : Rel} (hrs : ∀ a b, R a b → S a b)
-    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    {bs cs : List BranchR} (h : BranchesRelBisim R bs cs) :
     BranchesRelBisim S bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
@@ -186,17 +186,17 @@ namespace Bisim
 
 /-- BranchesRelBisim is reflexive when the underlying relation is. -/
 theorem BranchesRelBisim.refl {R : Rel} (hrefl : ∀ t, R t t)
-    (bs : List (Label × LocalTypeR)) : BranchesRelBisim R bs bs := by
+    (bs : List BranchR) : BranchesRelBisim R bs bs := by
   induction bs with
   | nil => exact List.Forall₂.nil
   | cons b rest ih =>
-    exact List.Forall₂.cons ⟨rfl, hrefl b.2⟩ ih
+    exact List.Forall₂.cons ⟨rfl, hrefl b.2.2⟩ ih
 
 
 
 /-- BranchesRelBisim is symmetric when the underlying relation is. -/
 theorem BranchesRelBisim.symm {R : Rel} (hsymm : ∀ a b, R a b → R b a)
-    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    {bs cs : List BranchR} (h : BranchesRelBisim R bs cs) :
     BranchesRelBisim R cs bs := by
   induction h with
   | nil => exact List.Forall₂.nil
@@ -206,7 +206,7 @@ theorem BranchesRelBisim.symm {R : Rel} (hsymm : ∀ a b, R a b → R b a)
 /-- Convert BranchesRelBisim R bs cs to BranchesRelBisim S cs bs where S is the flip of R.
     This is used in the symmetry proof where S x y = R y x. -/
 theorem BranchesRelBisim.flip {R S : Rel} (hflip : ∀ a b, R a b → S b a)
-    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    {bs cs : List BranchR} (h : BranchesRelBisim R bs cs) :
     BranchesRelBisim S cs bs := by
   induction h with
   | nil => exact List.Forall₂.nil
@@ -242,7 +242,7 @@ theorem symm {a b : LocalTypeR} (h : Bisim a b) : Bisim b a := by
 /-- BranchesRelBisim is transitive when the underlying relation is. -/
 theorem BranchesRelBisim.trans {R : Rel}
     (htrans : ∀ a b c, R a b → R b c → R a c)
-    {as bs cs : List (Label × LocalTypeR)}
+    {as bs cs : List BranchR}
     (hab : BranchesRelBisim R as bs) (hbc : BranchesRelBisim R bs cs) :
     BranchesRelBisim R as cs := by
   induction hab generalizing cs with
@@ -256,7 +256,7 @@ theorem BranchesRelBisim.trans {R : Rel}
     Given R1 as bs and R2 bs cs, produce R3 as cs where R3 a c := ∃ b, R1 a b ∧ R2 b c. -/
 theorem BranchesRelBisim.compose {R1 R2 R3 : Rel}
     (hcomp : ∀ a b c, R1 a b → R2 b c → R3 a c)
-    {as bs cs : List (Label × LocalTypeR)}
+    {as bs cs : List BranchR}
     (hab : BranchesRelBisim R1 as bs) (hbc : BranchesRelBisim R2 bs cs) :
     BranchesRelBisim R3 as cs := by
   induction hab generalizing cs with

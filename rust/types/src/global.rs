@@ -43,6 +43,10 @@ pub enum PayloadSort {
     Bool,
     /// Strings
     String,
+    /// Real numbers (floating point physical quantities)
+    Real,
+    /// Fixed-size vectors (e.g. configuration space, phase space)
+    Vector(usize),
     /// Product types (pairs)
     Prod(Box<PayloadSort>, Box<PayloadSort>),
 }
@@ -54,10 +58,16 @@ impl PayloadSort {
         PayloadSort::Prod(Box::new(left), Box::new(right))
     }
 
-    /// Check if this is a simple (non-product) sort
+    /// Create a vector sort
+    #[must_use]
+    pub fn vector(n: usize) -> Self {
+        PayloadSort::Vector(n)
+    }
+
+    /// Check if this is a simple (non-compound) sort
     #[must_use]
     pub fn is_simple(&self) -> bool {
-        !matches!(self, PayloadSort::Prod(_, _))
+        !matches!(self, PayloadSort::Prod(_, _) | PayloadSort::Vector(_))
     }
 }
 
@@ -68,6 +78,8 @@ impl std::fmt::Display for PayloadSort {
             PayloadSort::Nat => write!(f, "Nat"),
             PayloadSort::Bool => write!(f, "Bool"),
             PayloadSort::String => write!(f, "String"),
+            PayloadSort::Real => write!(f, "Real"),
+            PayloadSort::Vector(n) => write!(f, "Vector({})", n),
             PayloadSort::Prod(l, r) => write!(f, "({} × {})", l, r),
         }
     }

@@ -185,18 +185,18 @@ inductive UnfoldPathVarBounded : ℕ → String → LocalTypeR → Prop where
       UnfoldPathVarBounded (n + 1) v (.mu t body)
 
 /-- `CanSendPathBounded n p bs a` holds when `a` unfolds to a send in at most `n` mu-steps. -/
-inductive CanSendPathBounded : ℕ → String → List (Label × LocalTypeR) → LocalTypeR → Prop where
-  | base {p : String} {bs : List (Label × LocalTypeR)} :
+inductive CanSendPathBounded : ℕ → String → List BranchR → LocalTypeR → Prop where
+  | base {p : String} {bs : List BranchR} :
       CanSendPathBounded 0 p bs (.send p bs)
-  | step {n : ℕ} {p : String} {bs : List (Label × LocalTypeR)} {t : String} {body : LocalTypeR} :
+  | step {n : ℕ} {p : String} {bs : List BranchR} {t : String} {body : LocalTypeR} :
       CanSendPathBounded n p bs (body.substitute t (.mu t body)) →
       CanSendPathBounded (n + 1) p bs (.mu t body)
 
 /-- `CanRecvPathBounded n p bs a` holds when `a` unfolds to a recv in at most `n` mu-steps. -/
-inductive CanRecvPathBounded : ℕ → String → List (Label × LocalTypeR) → LocalTypeR → Prop where
-  | base {p : String} {bs : List (Label × LocalTypeR)} :
+inductive CanRecvPathBounded : ℕ → String → List BranchR → LocalTypeR → Prop where
+  | base {p : String} {bs : List BranchR} :
       CanRecvPathBounded 0 p bs (.recv p bs)
-  | step {n : ℕ} {p : String} {bs : List (Label × LocalTypeR)} {t : String} {body : LocalTypeR} :
+  | step {n : ℕ} {p : String} {bs : List BranchR} {t : String} {body : LocalTypeR} :
       CanRecvPathBounded n p bs (body.substitute t (.mu t body)) →
       CanRecvPathBounded (n + 1) p bs (.mu t body)
 
@@ -207,7 +207,7 @@ allowing recv lemmas to be derived from send lemmas. -/
 
 /-- CanSendPathBounded on dual type gives CanRecvPathBounded. -/
 theorem CanSendPathBounded.to_CanRecvPathBounded_dual {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    {bs : List BranchR} {a : LocalTypeR}
     (h : CanSendPathBounded n p bs a) :
     CanRecvPathBounded n p (dualBranches bs) a.dual := by
   induction h with
@@ -221,7 +221,7 @@ theorem CanSendPathBounded.to_CanRecvPathBounded_dual {n : ℕ} {p : String}
 
 /-- CanRecvPathBounded on dual type gives CanSendPathBounded. -/
 theorem CanRecvPathBounded.to_CanSendPathBounded_dual {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    {bs : List BranchR} {a : LocalTypeR}
     (h : CanRecvPathBounded n p bs a) :
     CanSendPathBounded n p (dualBranches bs) a.dual := by
   induction h with
@@ -235,7 +235,7 @@ theorem CanRecvPathBounded.to_CanSendPathBounded_dual {n : ℕ} {p : String}
 
 /-- CanRecvPathBounded is equivalent to CanSendPathBounded on dual type with dual branches. -/
 theorem CanRecvPathBounded_iff_CanSendPathBounded_dual {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
+    {bs : List BranchR} {a : LocalTypeR} :
     CanRecvPathBounded n p bs a ↔ CanSendPathBounded n p (dualBranches bs) a.dual := by
   constructor
   · exact CanRecvPathBounded.to_CanSendPathBounded_dual
@@ -280,14 +280,14 @@ theorem UnfoldsToVar.toBounded {v : String} {a : LocalTypeR} (h : UnfoldsToVar a
 
 /-- Bounded send path implies unbounded. -/
 theorem CanSendPathBounded.toCanSend {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    {bs : List BranchR} {a : LocalTypeR}
     (h : CanSendPathBounded n p bs a) : CanSend a p bs := by
   induction h with
   | base => exact CanSend.base
   | step _ ih => exact CanSend.mu ih
 
 /-- Unbounded send implies bounded. -/
-theorem CanSend.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+theorem CanSend.toBounded {p : String} {bs : List BranchR} {a : LocalTypeR}
     (h : CanSend a p bs) : ∃ n, CanSendPathBounded n p bs a := by
   refine CanSend.rec (motive := fun a p bs _ => ∃ n, CanSendPathBounded n p bs a) ?base ?mu h
   · exact ⟨0, CanSendPathBounded.base⟩
@@ -298,7 +298,7 @@ theorem CanSend.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : Lo
 /-- Bounded recv path implies unbounded.
     Derived from `CanSendPathBounded.toCanSend` via duality. -/
 theorem CanRecvPathBounded.toCanRecv {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+    {bs : List BranchR} {a : LocalTypeR}
     (h : CanRecvPathBounded n p bs a) : CanRecv a p bs := by
   -- Dualize to send, then dualize back.
   simpa [dualBranches_dualBranches, LocalTypeR.dual_dual] using
@@ -307,7 +307,7 @@ theorem CanRecvPathBounded.toCanRecv {n : ℕ} {p : String}
 
 /-- Unbounded recv implies bounded.
     Derived from `CanSend.toBounded` via duality. -/
-theorem CanRecv.toBounded {p : String} {bs : List (Label × LocalTypeR)} {a : LocalTypeR}
+theorem CanRecv.toBounded {p : String} {bs : List BranchR} {a : LocalTypeR}
     (h : CanRecv a p bs) : ∃ n, CanRecvPathBounded n p bs a := by
   -- Dualize to send, bound, then dualize back.
   have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
@@ -337,7 +337,7 @@ private theorem UnfoldPathVarBounded.unfold_iter_eq {n : ℕ} {v : String} {a : 
 
 /-- Bounded send path yields a concrete unfold iteration. -/
 theorem CanSendPathBounded.unfold_iter_eq {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
+    {bs : List BranchR} {a : LocalTypeR} :
     CanSendPathBounded n p bs a → (LocalTypeR.unfold^[n] a = .send p bs) := by
   intro h
   induction h with
@@ -348,7 +348,7 @@ theorem CanSendPathBounded.unfold_iter_eq {n : ℕ} {p : String}
 /-- Bounded recv path yields a concrete unfold iteration.
     Derived from `CanSendPathBounded.unfold_iter_eq` via duality. -/
 theorem CanRecvPathBounded.unfold_iter_eq {n : ℕ} {p : String}
-    {bs : List (Label × LocalTypeR)} {a : LocalTypeR} :
+    {bs : List BranchR} {a : LocalTypeR} :
     CanRecvPathBounded n p bs a → (LocalTypeR.unfold^[n] a = .recv p bs) := by
   intro h
   -- Convert to send on the dual, then dualize the unfold equality.

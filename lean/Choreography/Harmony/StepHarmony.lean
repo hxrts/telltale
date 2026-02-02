@@ -346,7 +346,7 @@ private theorem transBranches_satisfies_BranchesProjRel
 
 /-- Helper: extract per-branch CProject witnesses from BranchesProjRel. -/
 private theorem branchesProjRel_to_CProject
-    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (h : BranchesProjRel CProject gbs role lbs) :
     ∀ p ∈ gbs, ∃ lt, CProject p.2 role lt := by
   induction h with

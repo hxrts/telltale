@@ -17,7 +17,7 @@ a local type that is EQ2-equivalent to `.end`.
 
 namespace Choreography.Harmony.SubstEndUnguarded
 
-open SessionTypes.LocalTypeR (LocalTypeR substituteBranches substitute_send substitute_recv substitute_end)
+open SessionTypes.LocalTypeR (LocalTypeR BranchR substituteBranches substitute_send substitute_recv substitute_end)
 open SessionTypes.GlobalType (Label)
 open SessionCoTypes.EQ2
 open SessionCoTypes.Observable
@@ -29,21 +29,21 @@ open SessionCoTypes.SubstCommBarendregt (isFreeIn isFreeInBranches substitute_no
 /-! ## Helper lemmas for termination -/
 
 /-- sizeOf of second component is less than sizeOf of the pair. -/
-private theorem sizeOf_snd_lt_sizeOf_pair (hd : Label × LocalTypeR) :
-    sizeOf hd.2 < sizeOf hd := by
-  -- sizeOf (a, b) = 1 + sizeOf a + sizeOf b
-  show sizeOf hd.2 < 1 + sizeOf hd.1 + sizeOf hd.2
+private theorem sizeOf_snd_lt_sizeOf_pair (hd : BranchR) :
+    sizeOf hd.2.2 < sizeOf hd := by
+  -- sizeOf (a, (b, c)) = 1 + sizeOf a + (1 + sizeOf b + sizeOf c)
+  show sizeOf hd.2.2 < 1 + sizeOf hd.1 + sizeOf hd.2
   omega
 
 /-- sizeOf of element is less than sizeOf of cons list. -/
-private theorem sizeOf_snd_lt_sizeOf_cons (hd : Label × LocalTypeR) (tl : List (Label × LocalTypeR)) :
-    sizeOf hd.2 < sizeOf (hd :: tl) := by
-  have h1 : sizeOf hd.2 < sizeOf hd := sizeOf_snd_lt_sizeOf_pair hd
+private theorem sizeOf_snd_lt_sizeOf_cons (hd : BranchR) (tl : List BranchR) :
+    sizeOf hd.2.2 < sizeOf (hd :: tl) := by
+  have h1 : sizeOf hd.2.2 < sizeOf hd := sizeOf_snd_lt_sizeOf_pair hd
   -- sizeOf (hd :: tl) = 1 + sizeOf hd + sizeOf tl
-  show sizeOf hd.2 < 1 + sizeOf hd + sizeOf tl
+  show sizeOf hd.2.2 < 1 + sizeOf hd + sizeOf tl
   omega
 
-private theorem sizeOf_tl_lt_sizeOf_cons (hd : Label × LocalTypeR) (tl : List (Label × LocalTypeR)) :
+private theorem sizeOf_tl_lt_sizeOf_cons (hd : BranchR) (tl : List BranchR) :
     sizeOf tl < sizeOf (hd :: tl) := by
   -- sizeOf (hd :: tl) = 1 + sizeOf hd + sizeOf tl
   show sizeOf tl < 1 + sizeOf hd + sizeOf tl
@@ -93,7 +93,7 @@ theorem isFreeIn_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
 termination_by sizeOf e
 
 /-- Free variables in branches preserved through substitution. -/
-theorem isFreeInBranches_subst_other (bs : List (Label × LocalTypeR)) (v t : String)
+theorem isFreeInBranches_subst_other (bs : List BranchR) (v t : String)
     (repl : LocalTypeR) (hvt : v ≠ t) (hfree : isFreeInBranches v bs = true) :
     isFreeInBranches v (substituteBranches bs t repl) = true := by
   -- Recurse over branches, preserving the witness from the head or tail.
@@ -103,7 +103,7 @@ theorem isFreeInBranches_subst_other (bs : List (Label × LocalTypeR)) (v t : St
       simp only [substituteBranches, isFreeInBranches]
       simp only [isFreeInBranches] at hfree
       cases Bool.or_eq_true_iff.mp hfree with
-      | inl h => exact Bool.or_eq_true_iff.mpr (Or.inl (isFreeIn_subst_other hd.2 v t repl hvt h))
+      | inl h => exact Bool.or_eq_true_iff.mpr (Or.inl (isFreeIn_subst_other hd.2.2 v t repl hvt h))
       | inr h => exact Bool.or_eq_true_iff.mpr (Or.inr (isFreeInBranches_subst_other tl v t repl hvt h))
 termination_by sizeOf bs
 decreasing_by
@@ -173,7 +173,7 @@ private theorem substitute_end_unguarded_unfolds_to_end_var (w v : String)
 
 /-- Unguarded substitution on `.send` cannot happen. -/
 private theorem substitute_end_unguarded_unfolds_to_end_send
-    (p : String) (bs : List (Label × LocalTypeR)) (v : String)
+    (p : String) (bs : List BranchR) (v : String)
     (hnotguard : (LocalTypeR.send p bs).isGuarded v = false) :
     UnfoldsToEnd ((LocalTypeR.send p bs).substitute v .end) := by
   -- isGuarded on send is true, contradiction.
@@ -182,7 +182,7 @@ private theorem substitute_end_unguarded_unfolds_to_end_send
 
 /-- Unguarded substitution on `.recv` cannot happen. -/
 private theorem substitute_end_unguarded_unfolds_to_end_recv
-    (p : String) (bs : List (Label × LocalTypeR)) (v : String)
+    (p : String) (bs : List BranchR) (v : String)
     (hnotguard : (LocalTypeR.recv p bs).isGuarded v = false) :
     UnfoldsToEnd ((LocalTypeR.recv p bs).substitute v .end) := by
   -- isGuarded on recv is true, contradiction.

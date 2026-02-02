@@ -93,11 +93,11 @@ mutual
         participatesAllBranches role cont && participatesAllBranchesList role rest
 end
 
-private theorem isGuarded_send (p : String) (bs : List (Label × LocalTypeR)) (v : String) :
+private theorem isGuarded_send (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.send p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
-private theorem isGuarded_recv (p : String) (bs : List (Label × LocalTypeR)) (v : String) :
+private theorem isGuarded_recv (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.recv p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 

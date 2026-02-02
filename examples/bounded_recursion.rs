@@ -74,9 +74,10 @@ fn main() {
             branches: vec![
                 (
                     Label::new("continue"),
+                    None,
                     LocalTypeR::recv("Server", Label::new("ack"), LocalTypeR::var("outer")),
                 ),
-                (Label::new("stop"), LocalTypeR::End),
+                (Label::new("stop"), None, LocalTypeR::End),
             ],
         },
     );

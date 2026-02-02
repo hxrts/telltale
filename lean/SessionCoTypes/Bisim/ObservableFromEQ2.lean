@@ -95,7 +95,7 @@ theorem EQ2.var_left_implies_UnfoldsToVar_of_contractive {x : LocalTypeR} {v : S
 
 /-- For contractive types, `EQ2 (.send p bs) x` implies `CanSend x p cs` with matching branches. -/
 theorem EQ2.send_right_implies_CanSend_of_contractive {x : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
+    {bs : List BranchR} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
     (heq : EQ2 (.send p bs) x) : ∃ cs, CanSend x p cs ∧ BranchesRel EQ2 bs cs := by
   have hobs := observable_of_closed_contractive hclosed hcontr
   cases hobs with
@@ -122,14 +122,14 @@ theorem EQ2.send_right_implies_CanSend_of_contractive {x : LocalTypeR} {p : Stri
       exact ⟨cs, hsend, hbr⟩
 
 /-- Flip the direction of a BranchesRel proof. -/
-theorem BranchesRel_flip {as bs : List (Label × LocalTypeR)}
+theorem BranchesRel_flip {as bs : List BranchR}
     (h : BranchesRel EQ2 as bs) : BranchesRel EQ2 bs as := by
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1.symm, EQ2_symm hbc.2⟩ ih
 
 /-- Flip BranchesRel EQ2 across duality on both sides. -/
-theorem BranchesRel_dual_eq2 {bs cs : List (Label × LocalTypeR)}
+theorem BranchesRel_dual_eq2 {bs cs : List BranchR}
     (h : BranchesRel EQ2 (dualBranches bs) cs) :
     BranchesRel EQ2 bs (dualBranches cs) := by
   induction bs generalizing cs with
@@ -141,19 +141,19 @@ theorem BranchesRel_dual_eq2 {bs cs : List (Label × LocalTypeR)}
       | nil => cases h
       | cons head' tail' =>
           cases head with
-          | mk l t =>
+          | mk l rest =>
               cases head' with
-              | mk l' u =>
+              | mk l' rest' =>
                   cases h with
                   | cons hbc htail =>
-                      have hdu : EQ2 t u.dual := by
+                      have hdu : EQ2 rest.2 rest'.2.dual := by
                         have h' := EQ2_dual_compat hbc.2
                         simpa [dual_involutive] using h'
                       exact List.Forall₂.cons ⟨hbc.1, hdu⟩ (ih htail)
 
 /-- Dualize CanSend into CanRecv along matching branches. -/
 theorem CanSend_dual_to_CanRecv {x : LocalTypeR} {p : String}
-    {bs cs : List (Label × LocalTypeR)}
+    {bs cs : List BranchR}
     (hcan : CanSend x.dual p cs) (hbr : BranchesRel EQ2 (dualBranches bs) cs) :
     ∃ cs', CanRecv x p cs' ∧ BranchesRel EQ2 bs cs' := by
   have hcan' : CanRecv x p (dualBranches cs) := by
@@ -174,7 +174,7 @@ theorem CanSend_dual_to_CanRecv {x : LocalTypeR} {p : String}
 
 /-- For contractive types, `EQ2 x (.send p cs)` implies `CanSend x p bs` with matching branches. -/
 theorem EQ2.send_left_implies_CanSend_of_contractive {x : LocalTypeR} {p : String}
-    {cs : List (Label × LocalTypeR)} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
+    {cs : List BranchR} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
     (heq : EQ2 x (.send p cs)) : ∃ bs, CanSend x p bs ∧ BranchesRel EQ2 bs cs := by
   have hsymm := EQ2_symm heq
   obtain ⟨bs, hcan, hbr⟩ := EQ2.send_right_implies_CanSend_of_contractive (x := x) hclosed hcontr hsymm
@@ -182,7 +182,7 @@ theorem EQ2.send_left_implies_CanSend_of_contractive {x : LocalTypeR} {p : Strin
 
 /-- For contractive types, `EQ2 (.recv p bs) x` implies `CanRecv x p cs` with matching branches. -/
 theorem EQ2.recv_right_implies_CanRecv_of_contractive {x : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
+    {bs : List BranchR} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
     (heq : EQ2 (.recv p bs) x) : ∃ cs, CanRecv x p cs ∧ BranchesRel EQ2 bs cs := by
   have hobs := observable_of_closed_contractive hclosed hcontr
   cases hobs with
@@ -210,7 +210,7 @@ theorem EQ2.recv_right_implies_CanRecv_of_contractive {x : LocalTypeR} {p : Stri
 
 /-- For contractive types, `EQ2 x (.recv p cs)` implies `CanRecv x p bs` with matching branches. -/
 theorem EQ2.recv_left_implies_CanRecv_of_contractive {x : LocalTypeR} {p : String}
-    {cs : List (Label × LocalTypeR)} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
+    {cs : List BranchR} (hclosed : x.isClosed) (hcontr : x.isContractive = true)
     (heq : EQ2 x (.recv p cs)) : ∃ bs, CanRecv x p bs ∧ BranchesRel EQ2 bs cs := by
   have hsymm := EQ2_symm heq
   obtain ⟨bs, hcan, hbr⟩ := EQ2.recv_right_implies_CanRecv_of_contractive (x := x) hclosed hcontr hsymm

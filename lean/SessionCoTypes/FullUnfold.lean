@@ -50,9 +50,9 @@ def muHeight : LocalTypeR → Nat
 
 @[simp] theorem muHeight_end : muHeight .end = 0 := rfl
 @[simp] theorem muHeight_var (v : String) : muHeight (.var v) = 0 := rfl
-@[simp] theorem muHeight_send (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem muHeight_send (p : String) (bs : List BranchR) :
     muHeight (.send p bs) = 0 := rfl
-@[simp] theorem muHeight_recv (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem muHeight_recv (p : String) (bs : List BranchR) :
     muHeight (.recv p bs) = 0 := rfl
 @[simp] theorem muHeight_mu (t : String) (body : LocalTypeR) :
     muHeight (.mu t body) = 1 + muHeight body := rfl
@@ -69,9 +69,9 @@ def singleUnfold : LocalTypeR → LocalTypeR
 
 @[simp] theorem singleUnfold_end : singleUnfold .end = .end := rfl
 @[simp] theorem singleUnfold_var (v : String) : singleUnfold (.var v) = .var v := rfl
-@[simp] theorem singleUnfold_send (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem singleUnfold_send (p : String) (bs : List BranchR) :
     singleUnfold (.send p bs) = .send p bs := rfl
-@[simp] theorem singleUnfold_recv (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem singleUnfold_recv (p : String) (bs : List BranchR) :
     singleUnfold (.recv p bs) = .recv p bs := rfl
 @[simp] theorem singleUnfold_mu (t : String) (body : LocalTypeR) :
     singleUnfold (.mu t body) = body.substitute t (.mu t body) := rfl
@@ -114,9 +114,9 @@ def fullUnfold (t : LocalTypeR) : LocalTypeR :=
 
 @[simp] theorem fullUnfold_end : fullUnfold .end = .end := rfl
 @[simp] theorem fullUnfold_var (v : String) : fullUnfold (.var v) = .var v := rfl
-@[simp] theorem fullUnfold_send (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem fullUnfold_send (p : String) (bs : List BranchR) :
     fullUnfold (.send p bs) = .send p bs := rfl
-@[simp] theorem fullUnfold_recv (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem fullUnfold_recv (p : String) (bs : List BranchR) :
     fullUnfold (.recv p bs) = .recv p bs := rfl
 
 /-! ## Key Lemmas

@@ -118,7 +118,7 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
                 let mut local_branches = Vec::with_capacity(branches.len());
                 for (label, cont) in branches {
                     let local_cont = project(cont, role)?;
-                    local_branches.push((label.clone(), local_cont));
+                    local_branches.push((label.clone(), None, local_cont));
                 }
 
                 Ok(LocalTypeR::Send {
@@ -130,7 +130,7 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
                 let mut local_branches = Vec::with_capacity(branches.len());
                 for (label, cont) in branches {
                     let local_cont = project(cont, role)?;
-                    local_branches.push((label.clone(), local_cont));
+                    local_branches.push((label.clone(), None, local_cont));
                 }
 
                 Ok(LocalTypeR::Recv {
@@ -154,16 +154,17 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
         GlobalType::Mu { var, body } => {
             let local_body = project(body, role)?;
 
-            // Optimization: if the role doesn't appear in the body, return End
-            // This handles the case where a role is not involved after a recursion point
-            if matches!(local_body, LocalTypeR::End) && !body_mentions_role(body, role) {
-                return Ok(LocalTypeR::End);
+            // Lean's `trans` algorithm: check if the recursion variable is
+            // guarded in the projected type. If not, the recursion is vacuous
+            // for this role and we collapse to End.
+            if local_body.is_var_guarded(var) {
+                Ok(LocalTypeR::Mu {
+                    var: var.clone(),
+                    body: Box::new(local_body),
+                })
+            } else {
+                Ok(LocalTypeR::End)
             }
-
-            Ok(LocalTypeR::Mu {
-                var: var.clone(),
-                body: Box::new(local_body),
-            })
         }
 
         GlobalType::Var(var) => Ok(LocalTypeR::Var(var.clone())),
@@ -171,6 +172,7 @@ pub fn project(global: &GlobalType, role: &str) -> ProjectionResult {
 }
 
 /// Check if a global type body mentions a specific role
+#[cfg(test)]
 fn body_mentions_role(global: &GlobalType, role: &str) -> bool {
     match global {
         GlobalType::End => false,
@@ -361,7 +363,7 @@ mod tests {
             assert_eq!(partner, "B");
             assert_eq!(branches.len(), 1);
             assert_eq!(branches[0].0.name, "msg");
-            assert_eq!(branches[0].1, LocalTypeR::End);
+            assert_eq!(branches[0].2, LocalTypeR::End);
         });
     }
 
@@ -425,7 +427,7 @@ mod tests {
             assert_eq!(var, "t");
             assert_matches!(body.as_ref(), LocalTypeR::Send { partner, branches } => {
                 assert_eq!(partner, "B");
-                assert_matches!(&branches[0].1, LocalTypeR::Var(v) if v == "t");
+                assert_matches!(&branches[0].2, LocalTypeR::Var(v) if v == "t");
             });
         });
     }
@@ -530,7 +532,7 @@ mod tests {
         assert_matches!(c_local, LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "B");
             assert_eq!(branches.len(), 2);
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _vt, _)| l.name.as_str()).collect();
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
         });
@@ -741,38 +743,32 @@ mod tests {
     #[test]
     fn test_project_recursive_non_participant_with_var_body() {
         // μt. A -> B: msg. t
-        // Role C is not involved. When we project the body for C:
-        // - A -> B: msg. t → C projects to End (for msg)
-        // - t → C projects to Var("t")
-        // So body projects to Var("t"), not End.
-        // The optimization only triggers when body projects to End AND role not mentioned.
+        // C is not involved. Body projects to Var("t") for C.
+        // Var("t").is_var_guarded("t") = false, so Lean's trans collapses to End.
         let g = GlobalType::mu(
             "t",
             GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t")),
         );
 
         let c_local = project(&g, "C").unwrap();
-        // C gets μt.t (the var propagates through)
-        assert_matches!(c_local, LocalTypeR::Mu { var, body } => {
-            assert_eq!(var, "t");
-            assert_matches!(body.as_ref(), LocalTypeR::Var(v) if v == "t");
-        });
+        assert_eq!(c_local, LocalTypeR::End);
     }
 
     #[test]
-    fn test_project_recursive_non_participant_gets_end() {
-        // μt. A -> B: {msg. end}
-        // Role C is not involved, body projects to End, optimization kicks in
+    fn test_project_recursive_non_participant_gets_mu_end() {
+        // μt. A -> B: msg. end
+        // C is not involved. Body projects to End for C.
+        // End.is_var_guarded("t") = true, so result is μt.end.
         let g = GlobalType::mu(
             "t",
             GlobalType::send("A", "B", Label::new("msg"), GlobalType::End),
         );
 
         let c_local = project(&g, "C").unwrap();
-        // C should get End directly because:
-        // 1. body projects to End for C
-        // 2. C is not mentioned in body
-        assert_eq!(c_local, LocalTypeR::End);
+        assert_matches!(c_local, LocalTypeR::Mu { var, body } => {
+            assert_eq!(var, "t");
+            assert_eq!(*body, LocalTypeR::End);
+        });
     }
 
     #[test]

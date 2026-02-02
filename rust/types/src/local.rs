@@ -14,7 +14,7 @@
 //! - `LocalTypeR::Mu` ↔ Lean's `LocalTypeR.mu`
 //! - `LocalTypeR::Var` ↔ Lean's `LocalTypeR.var`
 
-use crate::Label;
+use crate::{Label, ValType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -46,12 +46,12 @@ pub enum LocalTypeR {
     /// Internal choice: send to partner with choice of continuations
     Send {
         partner: String,
-        branches: Vec<(Label, LocalTypeR)>,
+        branches: Vec<(Label, Option<ValType>, LocalTypeR)>,
     },
     /// External choice: receive from partner with offered continuations
     Recv {
         partner: String,
-        branches: Vec<(Label, LocalTypeR)>,
+        branches: Vec<(Label, Option<ValType>, LocalTypeR)>,
     },
     /// Recursive type: μt.T binds variable t in body T
     Mu { var: String, body: Box<LocalTypeR> },
@@ -65,13 +65,16 @@ impl LocalTypeR {
     pub fn send(partner: impl Into<String>, label: Label, cont: LocalTypeR) -> Self {
         LocalTypeR::Send {
             partner: partner.into(),
-            branches: vec![(label, cont)],
+            branches: vec![(label, None, cont)],
         }
     }
 
     /// Create a send with multiple branches
     #[must_use]
-    pub fn send_choice(partner: impl Into<String>, branches: Vec<(Label, LocalTypeR)>) -> Self {
+    pub fn send_choice(
+        partner: impl Into<String>,
+        branches: Vec<(Label, Option<ValType>, LocalTypeR)>,
+    ) -> Self {
         LocalTypeR::Send {
             partner: partner.into(),
             branches,
@@ -83,13 +86,16 @@ impl LocalTypeR {
     pub fn recv(partner: impl Into<String>, label: Label, cont: LocalTypeR) -> Self {
         LocalTypeR::Recv {
             partner: partner.into(),
-            branches: vec![(label, cont)],
+            branches: vec![(label, None, cont)],
         }
     }
 
     /// Create a recv with multiple branches
     #[must_use]
-    pub fn recv_choice(partner: impl Into<String>, branches: Vec<(Label, LocalTypeR)>) -> Self {
+    pub fn recv_choice(
+        partner: impl Into<String>,
+        branches: Vec<(Label, Option<ValType>, LocalTypeR)>,
+    ) -> Self {
         LocalTypeR::Recv {
             partner: partner.into(),
             branches,
@@ -126,7 +132,7 @@ impl LocalTypeR {
         match self {
             LocalTypeR::End => {}
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                for (_, cont) in branches {
+                for (_, _, cont) in branches {
                     cont.collect_free_vars(free, bound);
                 }
             }
@@ -154,14 +160,14 @@ impl LocalTypeR {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), cont.substitute(var_name, replacement)))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.substitute(var_name, replacement)))
                     .collect(),
             },
             LocalTypeR::Recv { partner, branches } => LocalTypeR::Recv {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), cont.substitute(var_name, replacement)))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.substitute(var_name, replacement)))
                     .collect(),
             },
             LocalTypeR::Mu { var, body } => {
@@ -211,14 +217,14 @@ impl LocalTypeR {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), cont.dual()))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.dual()))
                     .collect(),
             },
             LocalTypeR::Recv { partner, branches } => LocalTypeR::Send {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), cont.dual()))
+                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.dual()))
                     .collect(),
             },
             LocalTypeR::Mu { var, body } => LocalTypeR::Mu {
@@ -242,7 +248,7 @@ impl LocalTypeR {
             LocalTypeR::End => true,
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => branches
                 .iter()
-                .all(|(_, cont)| cont.check_vars_bound(bound)),
+                .all(|(_, _, cont)| cont.check_vars_bound(bound)),
             LocalTypeR::Mu { var, body } => {
                 let mut new_bound = bound.clone();
                 new_bound.insert(var.clone());
@@ -263,7 +269,7 @@ impl LocalTypeR {
                 !branches.is_empty()
                     && branches
                         .iter()
-                        .all(|(_, cont)| cont.all_choices_non_empty())
+                        .all(|(_, _, cont)| cont.all_choices_non_empty())
             }
             LocalTypeR::Mu { body, .. } => body.all_choices_non_empty(),
             LocalTypeR::Var(_) => true,
@@ -290,7 +296,7 @@ impl LocalTypeR {
         match self {
             LocalTypeR::End => 0,
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                1 + branches.iter().map(|(_, t)| t.depth()).max().unwrap_or(0)
+                1 + branches.iter().map(|(_, _, t)| t.depth()).max().unwrap_or(0)
             }
             LocalTypeR::Mu { body, .. } => 1 + body.depth(),
             LocalTypeR::Var(_) => 0,
@@ -305,13 +311,30 @@ impl LocalTypeR {
         match self {
             LocalTypeR::End => true,
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                branches.iter().all(|(_, cont)| cont.is_guarded())
+                branches.iter().all(|(_, _, cont)| cont.is_guarded())
             }
             LocalTypeR::Mu { body, .. } => match body.as_ref() {
                 LocalTypeR::Var(_) | LocalTypeR::Mu { .. } => false,
                 _ => body.is_guarded(),
             },
             LocalTypeR::Var(_) => true,
+        }
+    }
+
+    /// Check if a specific recursion variable is guarded in this local type.
+    ///
+    /// A variable `v` is guarded if it does not appear "bare" (i.e., every
+    /// occurrence is under a send or recv). Corresponds to Lean's
+    /// `LocalTypeR.isGuarded v`.
+    #[must_use]
+    pub fn is_var_guarded(&self, var: &str) -> bool {
+        match self {
+            LocalTypeR::End => true,
+            LocalTypeR::Var(w) => w != var,
+            LocalTypeR::Send { .. } | LocalTypeR::Recv { .. } => true,
+            LocalTypeR::Mu { var: t, body, .. } => {
+                if var == t { true } else { body.is_var_guarded(var) }
+            }
         }
     }
 
@@ -323,7 +346,7 @@ impl LocalTypeR {
         match self {
             LocalTypeR::End | LocalTypeR::Var(_) => vec![],
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                branches.iter().map(|(l, _)| l.name.clone()).collect()
+                branches.iter().map(|(l, _, _)| l.name.clone()).collect()
             }
             LocalTypeR::Mu { body, .. } => body.labels(),
         }
@@ -344,7 +367,7 @@ impl LocalTypeR {
             LocalTypeR::End | LocalTypeR::Var(_) => {}
             LocalTypeR::Send { partner, branches } | LocalTypeR::Recv { partner, branches } => {
                 partners.insert(partner.clone());
-                for (_, cont) in branches {
+                for (_, _, cont) in branches {
                     cont.collect_partners(partners);
                 }
             }
@@ -412,7 +435,7 @@ mod tests {
         assert_matches!(recv, LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "B");
             assert_eq!(branches.len(), 1);
-            assert_eq!(branches[0].0.name, "msg");
+            assert_eq!((branches[0].0).name, "msg");
         });
     }
 
@@ -427,7 +450,7 @@ mod tests {
 
         assert_matches!(unfolded, LocalTypeR::Send { partner, branches } => {
             assert_eq!(partner, "B");
-            assert_matches!(branches[0].1, LocalTypeR::Mu { .. });
+            assert_matches!(branches[0].2, LocalTypeR::Mu { .. });
         });
     }
 
@@ -479,9 +502,10 @@ mod tests {
         let branches = vec![
             (
                 Label::with_sort("accept", PayloadSort::Bool),
+                None,
                 LocalTypeR::End,
             ),
-            (Label::with_sort("data", PayloadSort::Nat), LocalTypeR::End),
+            (Label::with_sort("data", PayloadSort::Nat), None, LocalTypeR::End),
         ];
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());

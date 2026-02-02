@@ -76,7 +76,7 @@ mutual
   termination_by sizeOf e
 
   /-- Branch version of subst_subst_comm_general. -/
-  theorem subst_subst_comm_branches_general (bs : List (Label × LocalTypeR)) (x y : String)
+  theorem subst_subst_comm_branches_general (bs : List BranchR) (x y : String)
       (rx ry ry' : LocalTypeR)
       (hxy : x ≠ y)
       (hx_not_bound : notBoundAtBranches x bs = true)
@@ -86,12 +86,12 @@ mutual
       = SessionTypes.LocalTypeR.substituteBranches (SessionTypes.LocalTypeR.substituteBranches bs y ry') x rx := by
     match bs with
     | [] => rfl
-    | (label, cont) :: rest =>
+    | (label, _vt, cont) :: rest =>
         simp only [SessionTypes.LocalTypeR.substituteBranches]
         simp only [notBoundAtBranches] at hx_not_bound
         have ⟨hx_not_bound_cont, hx_not_bound_rest⟩ := Bool.and_eq_true_iff.mp hx_not_bound
         congr 1
-        · congr 1
+        · congr 1; congr 1; congr 1
           exact subst_subst_comm_general cont x y rx ry ry' hxy hx_not_bound_cont hrx_closed hry_rel
         · exact subst_subst_comm_branches_general rest x y rx ry ry' hxy hx_not_bound_rest hrx_closed hry_rel
   termination_by sizeOf bs

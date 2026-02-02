@@ -19,7 +19,7 @@ open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
 private theorem CProjectTransRelComp_recv_extract_base
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
+    {p1 p2 : String} {bs1 bs2 : List BranchR}
     (hbase : CProjectTransRel (.recv p1 bs1) (.recv p2 bs2)) :
     p1 = p2 ∧ BranchesRel (EQ2_closure CProjectTransRelComp) bs1 bs2 := by
   -- Base CProjectTransRel implies postfix EQ2F on recv.
@@ -28,7 +28,7 @@ private theorem CProjectTransRelComp_recv_extract_base
 
 /- Helper: left case for CProjectTransRelComp_recv_extract. -/
 private theorem CProjectTransRelComp_recv_extract_left
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)} {b : LocalTypeR}
+    {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (heq : EQ2 (.recv p1 bs1) b) (hrel : CProjectTransRel b (.recv p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.recv p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.recv p2 bs2)) :
@@ -42,9 +42,9 @@ private theorem CProjectTransRelComp_recv_extract_left
       obtain ⟨hp1, hbs1⟩ := heq_f
       obtain ⟨hp2, hbs2⟩ := hrel_f
       refine ⟨hp1.trans hp2, ?_⟩
-      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2 := recv_branches_wf p1 bs1 hWFa;
-        have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2 := recv_branches_wf pb bbs hWFb
-      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2 := recv_branches_wf p2 bs2 hWFc
+      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2.2 := recv_branches_wf p1 bs1 hWFa;
+        have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2.2 := recv_branches_wf pb bbs hWFb
+      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2.2 := recv_branches_wf p2 bs2 hWFc
       exact BranchesRel_trans_chain_rev_noWF
         (fun a b c => CProjectTransRelComp_extend_left_noWF (a := a) (b := b) (c := c))
         hbs1 hbs2 hWFbs1 hWFbbs hWFbs2
@@ -57,7 +57,7 @@ private theorem CProjectTransRelComp_recv_extract_left
 
 /- Helper: right case for CProjectTransRelComp_recv_extract. -/
 private theorem CProjectTransRelComp_recv_extract_right
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)} {b : LocalTypeR}
+    {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (hrel : CProjectTransRel (.recv p1 bs1) b) (heq : EQ2 b (.recv p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.recv p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.recv p2 bs2)) :
@@ -71,9 +71,9 @@ private theorem CProjectTransRelComp_recv_extract_right
       simp [EQ2F] at hrel_f heq_f
       obtain ⟨hp1, hbs1⟩ := hrel_f; obtain ⟨hp2, hbs2⟩ := heq_f
       refine ⟨hp1.trans hp2, ?_⟩
-      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2 := recv_branches_wf p1 bs1 hWFa
-      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2 := recv_branches_wf pb bbs hWFb
-      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2 := recv_branches_wf p2 bs2 hWFc
+      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2.2 := recv_branches_wf p1 bs1 hWFa
+      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2.2 := recv_branches_wf pb bbs hWFb
+      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2.2 := recv_branches_wf p2 bs2 hWFc
       exact BranchesRel_trans_chain_noWF
         (fun a b c => CProjectTransRelComp_extend_right_noWF (a := a) (b := b) (c := c))
         hbs1 hbs2 hWFbs1 hWFbbs hWFbs2
@@ -93,7 +93,7 @@ private theorem CProjectTransRelComp_recv_extract_right
 
 /- Helper: both case for CProjectTransRelComp_recv_extract. -/
 private theorem CProjectTransRelComp_recv_extract_both
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)} {b b' : LocalTypeR}
+    {p1 p2 : String} {bs1 bs2 : List BranchR} {b b' : LocalTypeR}
     (heq : EQ2 (.recv p1 bs1) b) (hrel : CProjectTransRel b b') (heq' : EQ2 b' (.recv p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.recv p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.recv p2 bs2)) :
@@ -105,7 +105,7 @@ private theorem CProjectTransRelComp_recv_extract_both
   simpa [EQ2F] using hcomp
 
 private theorem CProjectTransRelComp_recv_extract
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
+    {p1 p2 : String} {bs1 bs2 : List BranchR}
     (h : CProjectTransRelComp (.recv p1 bs1) (.recv p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.recv p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.recv p2 bs2)) :
@@ -165,7 +165,7 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu_var
 
 private theorem EQ2_CProjectTransRel_compose_through_mu_mu_send
     {av v : String} {abody body : LocalTypeR} {cp : String}
-    {cbs : List (Label × LocalTypeR)}
+    {cbs : List BranchR}
     (heq_unfold_left : EQ2 (abody.substitute av (.mu av abody)) (.mu v body))
     (hrel : CProjectTransRel (.mu v body) (.send cp cbs)) :
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.send cp cbs) := by
@@ -176,7 +176,7 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_mu_send
 
 private theorem EQ2_CProjectTransRel_compose_through_mu_mu_recv
     {av v : String} {abody body : LocalTypeR} {cp : String}
-    {cbs : List (Label × LocalTypeR)}
+    {cbs : List BranchR}
     (heq_unfold_left : EQ2 (abody.substitute av (.mu av abody)) (.mu v body))
     (hrel : CProjectTransRel (.mu v body) (.recv cp cbs)) :
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.recv cp cbs) := by
@@ -259,7 +259,7 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_var
       exact CProjectTransRelComp_var_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
 private theorem EQ2_CProjectTransRel_compose_through_mu_send
-    {ap v : String} {abs : List (Label × LocalTypeR)} {body c : LocalTypeR}
+    {ap v : String} {abs : List BranchR} {body c : LocalTypeR}
     (heq : EQ2 (.send ap abs) (.mu v body)) (hrel : CProjectTransRel (.mu v body) c)
     (hWFa : LocalTypeR.WellFormed (.send ap abs)) (hWFc : LocalTypeR.WellFormed c) :
     EQ2F (EQ2_closure CProjectTransRelComp) (.send ap abs) c := by
@@ -283,7 +283,7 @@ private theorem EQ2_CProjectTransRel_compose_through_mu_send
       exact CProjectTransRelComp_send_not_recv (CProjectTransRelComp_of_mu heq hrel) hWFa hWFc
 
 private theorem EQ2_CProjectTransRel_compose_through_mu_recv
-    {ap v : String} {abs : List (Label × LocalTypeR)} {body c : LocalTypeR}
+    {ap v : String} {abs : List BranchR} {body c : LocalTypeR}
     (heq : EQ2 (.recv ap abs) (.mu v body)) (hrel : CProjectTransRel (.mu v body) c)
     (hWFa : LocalTypeR.WellFormed (.recv ap abs)) (hWFc : LocalTypeR.WellFormed c) :
     EQ2F (EQ2_closure CProjectTransRelComp) (.recv ap abs) c := by

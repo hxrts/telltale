@@ -13,7 +13,7 @@ open SessionTypes.GlobalType
 
 /-- Helper: lift BranchesRel through substitution. -/
 theorem BranchesRel_substitute (var : String) (repl : LocalTypeR)
-    (bs cs : List (Label × LocalTypeR))
+    (bs cs : List BranchR)
     (hbranches : BranchesRel EQ2 bs cs)
     (hbarBs : notBoundAtBranches var bs = true)
     (hbarCs : notBoundAtBranches var cs = true)
@@ -30,7 +30,7 @@ theorem BranchesRel_substitute (var : String) (repl : LocalTypeR)
     apply List.Forall₂.cons
     · constructor
       · exact hhead.1
-      · exact Or.inl (SubstRel.base a.2 b.2 hhead.2 hbarA hbarB)
+      · exact Or.inl (SubstRel.base a.2.2 b.2.2 hhead.2 hbarA hbarB)
     · exact ih hbarAs hbarBs'
 
 /-- Helper to convert htvar/hsvar proofs to the expected form. -/

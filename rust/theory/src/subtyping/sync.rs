@@ -70,8 +70,8 @@ pub enum SyncSubtypeError {
 ///
 /// // !B{a.end, b.end} <: !B{a.end} (send can have more options)
 /// let sub = LocalTypeR::send_choice("B", vec![
-///     (Label::new("a"), LocalTypeR::End),
-///     (Label::new("b"), LocalTypeR::End),
+///     (Label::new("a"), None, LocalTypeR::End),
+///     (Label::new("b"), None, LocalTypeR::End),
 /// ]);
 /// let sup = LocalTypeR::send("B", Label::new("a"), LocalTypeR::End);
 /// assert!(sync_subtype(&sub, &sup).is_ok());
@@ -113,9 +113,9 @@ fn sync_subtype_with_assumptions(
             }
 
             // Subtype must have all labels of supertype
-            let sub_labels: HashMap<_, _> = b1.iter().map(|(l, c)| (&l.name, c)).collect();
+            let sub_labels: HashMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
 
-            for (label, sup_cont) in b2 {
+            for (label, _vt, sup_cont) in b2 {
                 match sub_labels.get(&label.name) {
                     Some(sub_cont) => {
                         sync_subtype_with_assumptions(sub_cont, sup_cont, assumptions).map_err(
@@ -154,11 +154,11 @@ fn sync_subtype_with_assumptions(
             }
 
             // Supertype must have all labels of subtype (contravariance)
-            let sup_labels: HashMap<_, _> = b2.iter().map(|(l, c)| (&l.name, c)).collect();
-            let sub_labels: HashMap<_, _> = b1.iter().map(|(l, c)| (&l.name, c)).collect();
+            let sup_labels: HashMap<_, _> = b2.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
+            let sub_labels: HashMap<_, _> = b1.iter().map(|(l, _vt, c)| (&l.name, c)).collect();
 
             // Check subtype doesn't have extra labels
-            for (label, _) in b1 {
+            for (label, _vt, _) in b1 {
                 if !sup_labels.contains_key(&label.name) {
                     return Err(SyncSubtypeError::ExtraLabel {
                         label: label.name.clone(),
@@ -167,7 +167,7 @@ fn sync_subtype_with_assumptions(
             }
 
             // Check continuations for matching labels
-            for (label, sup_cont) in b2 {
+            for (label, _vt, sup_cont) in b2 {
                 if let Some(sub_cont) = sub_labels.get(&label.name) {
                     sync_subtype_with_assumptions(sub_cont, sup_cont, assumptions).map_err(
                         |_| SyncSubtypeError::ContinuationMismatch {
@@ -260,8 +260,8 @@ mod tests {
         let sub = LocalTypeR::send_choice(
             "B",
             vec![
-                (Label::new("a"), LocalTypeR::End),
-                (Label::new("b"), LocalTypeR::End),
+                (Label::new("a"), None, LocalTypeR::End),
+                (Label::new("b"), None, LocalTypeR::End),
             ],
         );
         let sup = LocalTypeR::send("B", Label::new("a"), LocalTypeR::End);
@@ -283,8 +283,8 @@ mod tests {
         let sup = LocalTypeR::recv_choice(
             "A",
             vec![
-                (Label::new("a"), LocalTypeR::End),
-                (Label::new("b"), LocalTypeR::End),
+                (Label::new("a"), None, LocalTypeR::End),
+                (Label::new("b"), None, LocalTypeR::End),
             ],
         );
         assert!(sync_subtype(&sub, &sup).is_ok());
@@ -296,8 +296,8 @@ mod tests {
         let sub = LocalTypeR::recv_choice(
             "A",
             vec![
-                (Label::new("a"), LocalTypeR::End),
-                (Label::new("b"), LocalTypeR::End),
+                (Label::new("a"), None, LocalTypeR::End),
+                (Label::new("b"), None, LocalTypeR::End),
             ],
         );
         let sup = LocalTypeR::recv("A", Label::new("a"), LocalTypeR::End);

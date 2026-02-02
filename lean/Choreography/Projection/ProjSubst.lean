@@ -163,8 +163,8 @@ theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl 
   let P1 : LocalTypeR → Prop := fun body =>
     ∀ t v repl, body.isGuarded v = true → repl.isGuarded v = true →
       (body.substitute t repl).isGuarded v = true
-  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True;
-  let P3 : Label × LocalTypeR → Prop := fun _ => True
+  let P2 : List BranchR → Prop := fun _ => True;
+  let P3 : BranchR → Prop := fun _ => True
   have hrec : P1 body := by
     refine (LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ body)

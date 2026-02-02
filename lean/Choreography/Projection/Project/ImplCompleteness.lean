@@ -127,13 +127,13 @@ theorem CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalT
 If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
 then the local branches are EQ2-related. -/
 private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
-    {gLabel : Label} {gCont : GlobalType} {lLabel : Label} {lCont : LocalTypeR}
-    {gbs_tail : List (Label × GlobalType)} {lbs_tail : List (Label × LocalTypeR)}
+    {gLabel : Label} {gCont : GlobalType} {lLabel : Label} {lVt : Option ValType} {lCont : LocalTypeR}
+    {gbs_tail : List (Label × GlobalType)} {lbs_tail : List BranchR}
     (role : String)
     (hlab : gLabel = lLabel) (hproj : CProject gCont role lCont)
     (hwf : ∀ gb, gb ∈ (gLabel, gCont) :: gbs_tail → gb.2.wellFormed = true)
     (htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role)) :
-    BranchesRel EQ2 ((lLabel, lCont) :: lbs_tail)
+    BranchesRel EQ2 ((lLabel, lVt, lCont) :: lbs_tail)
       (transBranches ((gLabel, gCont) :: gbs_tail) role) := by
   -- Use head well-formedness to relate the head continuation via trans.
   have hwf_head : (gLabel, gCont).2.wellFormed = true := by
@@ -141,24 +141,24 @@ private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
   have heq : EQ2 lCont (Trans.trans gCont role) :=
     CProject_implies_EQ2_trans _ _ _ hproj hwf_head
   have htail' :
-      List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2 b.2)
+      List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
         lbs_tail (transBranches gbs_tail role) := by
     simpa [BranchesRel] using htail
   have htb :
       transBranches ((gLabel, gCont) :: gbs_tail) role =
-        (gLabel, trans gCont role) :: transBranches gbs_tail role := by
+        (gLabel, none, trans gCont role) :: transBranches gbs_tail role := by
     simp [transBranches]
   have hcons :
-      List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2 b.2)
-        ((lLabel, lCont) :: lbs_tail)
-        ((gLabel, trans gCont role) :: transBranches gbs_tail role) :=
+      List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
+        ((lLabel, lVt, lCont) :: lbs_tail)
+        ((gLabel, none, trans gCont role) :: transBranches gbs_tail role) :=
     List.Forall₂.cons ⟨hlab.symm, by simpa using heq⟩ htail'
   simpa [BranchesRel, htb] using hcons
 
 /-- BranchesProjRel implies branch-wise EQ2 on transBranches. -/
 theorem BranchesProjRel_implies_BranchesRel_EQ2
     (gbs : List (Label × GlobalType)) (role : String)
-    (lbs : List (Label × LocalTypeR)) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
+    (lbs : List BranchR) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true)
     (h : BranchesProjRel CProject gbs role lbs) :
     BranchesRel EQ2 lbs (transBranches gbs role) := by
   -- By induction on BranchesProjRel, show each pair is EQ2-related
@@ -169,14 +169,13 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
       rename_i gb lb gbs_tail lbs_tail
       cases gb with
       | mk gLabel gCont =>
-          cases lb with
-          | mk lLabel lCont =>
-              rcases hpair with ⟨hlab, hproj⟩
-              have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
-                intro gb' hmem'
-                exact hwf gb' (List.mem_cons_of_mem _ hmem')
-              have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
-              exact BranchesProjRel_implies_BranchesRel_EQ2_cons role hlab hproj hwf htail
+          obtain ⟨lLabel, lVt, lCont⟩ := lb
+          rcases hpair with ⟨hlab, hproj⟩
+          have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
+            intro gb' hmem'
+            exact hwf gb' (List.mem_cons_of_mem _ hmem')
+          have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
+          exact BranchesProjRel_implies_BranchesRel_EQ2_cons role hlab hproj hwf htail
 
 /-- AllBranchesProj with trans gives EQ2.
 

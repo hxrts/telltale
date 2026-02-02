@@ -40,10 +40,10 @@ def Compatible (f : LocalTypeR → LocalTypeR) : Prop :=
 
 /-- BranchesRelBisim under RelImage. -/
 theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
-    {bs cs : List (Label × LocalTypeR)} (h : BranchesRelBisim R bs cs) :
+    {bs cs : List BranchR} (h : BranchesRelBisim R bs cs) :
     BranchesRelBisim (RelImage f R)
-      (bs.map (fun b => (b.1, f b.2)))
-      (cs.map (fun c => (c.1, f c.2))) := by
+      (bs.map (fun b => (b.1, b.2.1, f b.2.2)))
+      (cs.map (fun c => (c.1, c.2.1, f c.2.2))) := by
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih =>
@@ -121,17 +121,17 @@ open SessionCoTypes.SubstCommBarendregt in
 /-- If a variable is not free in a type, substituting for it is the identity on branches.
 
     This is used for the shadowed case in substitute_preserves_CanSend/CanRecv. -/
-theorem map_substitute_eq_self_of_not_free {bs : List (Label × LocalTypeR)} {var : String} {repl : LocalTypeR}
-    (hnot_free : ∀ (l : Label) (c : LocalTypeR), (l, c) ∈ bs → isFreeIn var c = false) :
-    bs.map (fun b => (b.1, b.2.substitute var repl)) = bs := by
+theorem map_substitute_eq_self_of_not_free {bs : List BranchR} {var : String} {repl : LocalTypeR}
+    (hnot_free : ∀ (l : Label) (_vt : Option ValType) (c : LocalTypeR), (l, _vt, c) ∈ bs → isFreeIn var c = false) :
+    bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl)) = bs := by
   induction bs with
   | nil => rfl
   | cons hd tl ih =>
     simp only [List.map_cons]
-    obtain ⟨l, c⟩ := hd
-    have hnot_free_c : isFreeIn var c = false := hnot_free l c (List.Mem.head _)
+    obtain ⟨l, vt, c⟩ := hd
+    have hnot_free_c : isFreeIn var c = false := hnot_free l vt c (List.Mem.head _)
     have hc_eq : c.substitute var repl = c := substitute_not_free c var repl hnot_free_c
-    have htl_eq := ih (fun l' c' hmem => hnot_free l' c' (List.Mem.tail _ hmem))
+    have htl_eq := ih (fun l' vt' c' hmem => hnot_free l' vt' c' (List.Mem.tail _ hmem))
     simp only [hc_eq, htl_eq]
 
 /-! ### Substitution Commutativity (EQ2 version)

@@ -47,42 +47,44 @@ theorem LocalTypeR.WellFormed.fullUnfold {t : LocalTypeR} (h : LocalTypeR.WellFo
   simpa [LocalTypeR.fullUnfold] using (LocalTypeR.WellFormed.unfold_iter (t := t) h t.muHeight)
 
 private theorem LocalTypeR.branches_wellFormed_of_closed_contractive
-    (bs : List (Label × LocalTypeR))
+    (bs : List BranchR)
     (hclosed : freeVarsOfBranches bs = [])
     (hcontr : isContractiveBranches bs = true) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   induction bs with
   | nil =>
       intro lb hmem
       cases hmem
   | cons head tail ih =>
       cases head with
-      | mk label cont =>
-          have happend : cont.freeVars ++ freeVarsOfBranches tail = [] := by
-            simpa [freeVarsOfBranches] using hclosed
-          have hcont_nil : cont.freeVars = [] := (List.append_eq_nil_iff.mp happend).1
-          have htail_nil : freeVarsOfBranches tail = [] := (List.append_eq_nil_iff.mp happend).2
-          have hcont_closed : cont.isClosed := by
-            simp [LocalTypeR.isClosed, List.isEmpty_eq_true, hcont_nil]
-          have hpair : cont.isContractive = true ∧ isContractiveBranches tail = true := by
-            simpa [isContractiveBranches, Bool.and_eq_true] using hcontr
-          have hcont_wf : LocalTypeR.WellFormed cont := ⟨hcont_closed, hpair.1⟩
-          have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2 :=
-            ih htail_nil hpair.2
-          intro lb hmem
-          have hmem' : lb = (label, cont) ∨ lb ∈ tail := by
-            simpa [List.mem_cons] using hmem
-          cases hmem' with
-          | inl h_eq =>
-              subst h_eq
-              exact hcont_wf
-          | inr hmem_tail =>
-              exact htail_wf lb hmem_tail
+      | mk label rest =>
+          cases rest with
+          | mk _vt cont =>
+              have happend : cont.freeVars ++ freeVarsOfBranches tail = [] := by
+                simpa [freeVarsOfBranches] using hclosed
+              have hcont_nil : cont.freeVars = [] := (List.append_eq_nil_iff.mp happend).1
+              have htail_nil : freeVarsOfBranches tail = [] := (List.append_eq_nil_iff.mp happend).2
+              have hcont_closed : cont.isClosed := by
+                simp [LocalTypeR.isClosed, List.isEmpty_eq_true, hcont_nil]
+              have hpair : cont.isContractive = true ∧ isContractiveBranches tail = true := by
+                simpa [isContractiveBranches, Bool.and_eq_true] using hcontr
+              have hcont_wf : LocalTypeR.WellFormed cont := ⟨hcont_closed, hpair.1⟩
+              have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2.2 :=
+                ih htail_nil hpair.2
+              intro lb hmem
+              have hmem' : lb = (label, _vt, cont) ∨ lb ∈ tail := by
+                simpa [List.mem_cons] using hmem
+              cases hmem' with
+              | inl h_eq =>
+                  subst h_eq
+                  exact hcont_wf
+              | inr hmem_tail =>
+                  exact htail_wf lb hmem_tail
 
 /-- Well-formed send branches are well-formed. -/
-theorem LocalTypeR.WellFormed.branches_of_send {p : String} {bs : List (Label × LocalTypeR)}
+theorem LocalTypeR.WellFormed.branches_of_send {p : String} {bs : List BranchR}
     (h : LocalTypeR.WellFormed (.send p bs)) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   have hclosed : freeVarsOfBranches bs = [] := by
     have hclosed' : (freeVarsOfBranches bs).isEmpty = true := by
       simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using h.closed
@@ -92,9 +94,9 @@ theorem LocalTypeR.WellFormed.branches_of_send {p : String} {bs : List (Label ×
   exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
 
 /-- Well-formed recv branches are well-formed. -/
-theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List (Label × LocalTypeR)}
+theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List BranchR}
     (h : LocalTypeR.WellFormed (.recv p bs)) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   have hclosed : freeVarsOfBranches bs = [] := by
     have hclosed' : (freeVarsOfBranches bs).isEmpty = true := by
       simpa [LocalTypeR.isClosed, LocalTypeR.freeVars] using h.closed
@@ -104,41 +106,45 @@ theorem LocalTypeR.WellFormed.branches_of_recv {p : String} {bs : List (Label ×
   exact LocalTypeR.branches_wellFormed_of_closed_contractive bs hclosed hcontr
 
 /-- If all branches are well-formed, then `freeVarsOfBranches` is empty. -/
-private theorem freeVarsOfBranches_of_wellFormed (bs : List (Label × LocalTypeR))
-    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+private theorem freeVarsOfBranches_of_wellFormed (bs : List BranchR)
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     freeVarsOfBranches bs = [] := by
   induction bs with
   | nil => simp [freeVarsOfBranches]
   | cons head tail ih =>
       cases head with
-      | mk label cont =>
-          have hcont_wf := hWFbs (label, cont) (List.Mem.head _)
-          have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2 :=
-            fun lb hm => hWFbs lb (List.Mem.tail _ hm)
-          have hcont_closed : cont.freeVars = [] := by
-            have h := hcont_wf.closed
-            simp [LocalTypeR.isClosed, List.isEmpty_eq_true] at h
-            exact h
-          have htail_nil := ih htail_wf
-          simp [freeVarsOfBranches, hcont_closed, htail_nil]
+      | mk label rest =>
+          cases rest with
+          | mk _vt cont =>
+              have hcont_wf := hWFbs (label, _vt, cont) (List.Mem.head _)
+              have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2.2 :=
+                fun lb hm => hWFbs lb (List.Mem.tail _ hm)
+              have hcont_closed : cont.freeVars = [] := by
+                have h := hcont_wf.closed
+                simp [LocalTypeR.isClosed, List.isEmpty_eq_true] at h
+                exact h
+              have htail_nil := ih htail_wf
+              simp [freeVarsOfBranches, hcont_closed, htail_nil]
 
 /-- If all branches are well-formed, then `isContractiveBranches` is true. -/
-private theorem isContractiveBranches_of_wellFormed (bs : List (Label × LocalTypeR))
-    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+private theorem isContractiveBranches_of_wellFormed (bs : List BranchR)
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     isContractiveBranches bs = true := by
   induction bs with
   | nil => simp [isContractiveBranches]
   | cons head tail ih =>
       cases head with
-      | mk label cont =>
-          have hcont_wf := hWFbs (label, cont) (List.Mem.head _)
-          have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2 :=
-            fun lb hm => hWFbs lb (List.Mem.tail _ hm)
-          simp [isContractiveBranches, hcont_wf.contractive, ih htail_wf]
+      | mk label rest =>
+          cases rest with
+          | mk _vt cont =>
+              have hcont_wf := hWFbs (label, _vt, cont) (List.Mem.head _)
+              have htail_wf : ∀ lb ∈ tail, LocalTypeR.WellFormed lb.2.2 :=
+                fun lb hm => hWFbs lb (List.Mem.tail _ hm)
+              simp [isContractiveBranches, hcont_wf.contractive, ih htail_wf]
 
 /-- Well-formed send: if all branches are well-formed, then the send type is well-formed. -/
-theorem LocalTypeR.WellFormed_send {p : String} {bs : List (Label × LocalTypeR)}
-    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+theorem LocalTypeR.WellFormed_send {p : String} {bs : List BranchR}
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     LocalTypeR.WellFormed (.send p bs) := by
   constructor
   · -- isClosed
@@ -149,8 +155,8 @@ theorem LocalTypeR.WellFormed_send {p : String} {bs : List (Label × LocalTypeR)
     exact isContractiveBranches_of_wellFormed bs hWFbs
 
 /-- Well-formed recv: if all branches are well-formed, then the recv type is well-formed. -/
-theorem LocalTypeR.WellFormed_recv {p : String} {bs : List (Label × LocalTypeR)}
-    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+theorem LocalTypeR.WellFormed_recv {p : String} {bs : List BranchR}
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     LocalTypeR.WellFormed (.recv p bs) := by
   constructor
   · -- isClosed

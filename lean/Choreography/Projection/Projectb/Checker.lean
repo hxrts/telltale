@@ -173,9 +173,9 @@ mutual
 
   /-- Check branch-wise projection for participant roles. -/
   def projectbBranches :
-      List (Label × GlobalType) → String → List (Label × LocalTypeR) → Bool
+      List (Label × GlobalType) → String → List BranchR → Bool
     | [], _, [] => true
-    | (label, cont) :: rest, role, (label', cand) :: rest' =>
+    | (label, cont) :: rest, role, (label', _vt, cand) :: rest' =>
         if label == label' then
           projectb cont role cand && projectbBranches rest role rest'
         else

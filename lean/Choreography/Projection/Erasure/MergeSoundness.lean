@@ -14,7 +14,7 @@ open Classical
 private theorem mergeBranchesSend_sound
     (m : Nat)
     (hmerge : ∀ a b c, sizeOf a + sizeOf b < m → merge a b = some c → Erases a b c)
-    {bs1 bs2 bs : List (Label × LocalTypeR)}
+    {bs1 bs2 bs : List BranchR}
     (hm : sizeOf bs1 + sizeOf bs2 < m)
     (h : mergeBranchesSend bs1 bs2 = some bs) :
     labelsSubset bs1 bs2 ∧ labelsSubset bs1 bs ∧ labelsSubset bs bs1 ∧
@@ -51,68 +51,67 @@ private theorem mergeBranchesSend_sound
             simp [hnone] at h
           exact this.elim
   | cons head tail ih =>
-      cases head with
-      | mk l t1 =>
-          rcases mergeBranchesSend_eq_some (lbl := l) (t1 := t1)
-              (rest := tail) (bs2 := bs2) (bs := bs) h with
-            ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
-          have hm_tail : sizeOf tail + sizeOf bs2 < m := by
-            have htail : sizeOf tail < sizeOf ((l, t1) :: tail) := by
-              simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, t1)) (tail := tail))
-            have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, t1) :: tail) + sizeOf bs2 :=
-              Nat.add_lt_add_right htail _
-            exact Nat.lt_trans hsum hm
-          have ih' := ih hm_tail hrest
-          rcases ih' with ⟨hsub12, hsub1b, hsubb1, hper⟩
-          refine ⟨?_, ?_, ?_, ?_⟩
-          · intro lbl hIn
-            by_cases hlt : l = lbl
-            ·
-              have hlookup' : lookupBranch lbl bs2 = some t2 := by
-                simpa [hlt] using hlookup
-              simp [labelIn, hlookup']
-            ·
-              have hIn_tail : labelIn lbl tail :=
-                (labelIn_tail_of_ne (lbl := lbl) (l := l) (t := t1) (rest := tail) hlt).1 hIn
-              exact hsub12 lbl hIn_tail
-          · intro lbl hIn
-            by_cases hlt : l = lbl
-            ·
-              simp [labelIn, lookupBranch, hlt]
-            ·
-              have hIn_tail : labelIn lbl tail :=
-                (labelIn_tail_of_ne (lbl := lbl) (l := l) (t := t1) (rest := tail) hlt).1 hIn
-              have hIn_rest' := hsub1b lbl hIn_tail
-              exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (t := t) (rest := rest') hlt).2 hIn_rest'
-          · intro lbl hIn
-            by_cases hlt : l = lbl
-            ·
-              simp [labelIn, lookupBranch, hlt]
-            ·
-              have hIn_rest' : labelIn lbl rest' :=
-                (labelIn_tail_of_ne (lbl := lbl) (l := l) (t := t) (rest := rest') hlt).1 hIn
-              have hIn_tail := hsubb1 lbl hIn_rest'
-              exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (t := t1) (rest := tail) hlt).2 hIn_tail
-          · intro lbl t1' t2' t' h1 h2 hbs
-            by_cases hlt : l = lbl
-            ·
-              simp [lookupBranch, hlt] at h1
-              cases h1
-              have hlookup' : lookupBranch lbl bs2 = some t2 := by
-                simpa [hlt] using hlookup
-              have hmem2 : t2 ∈ bs2.map Prod.snd := by
-                refine List.mem_map.2 ?_
-                exact ⟨(lbl, t2), mem_of_lookupBranch hlookup', rfl⟩
-              have hlt1 : sizeOf t1 < sizeOf ((lbl, t1) :: tail) :=
-                sizeOf_cont_lt_sizeOf_branches lbl t1 tail
-              have hlt2 : sizeOf t2 < sizeOf bs2 :=
-                sizeOf_cont_lt_sizeOf_branches_mem (cont := t2) hmem2
-              have hsum :
-                  sizeOf t1 + sizeOf t2 < sizeOf ((lbl, t1) :: tail) + sizeOf bs2 :=
-                Nat.add_lt_add hlt1 hlt2
-              have hm' : sizeOf ((lbl, t1) :: tail) + sizeOf bs2 < m := by
-                simpa [hlt] using hm
-              have hltm : sizeOf t1 + sizeOf t2 < m := Nat.lt_trans hsum hm'
+      obtain ⟨l, vt1, t1⟩ := head
+      rcases mergeBranchesSend_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
+          (rest := tail) (bs2 := bs2) (bs := bs) h with
+        ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
+      have hm_tail : sizeOf tail + sizeOf bs2 < m := by
+        have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
+          simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+        have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
+          Nat.add_lt_add_right htail _
+        exact Nat.lt_trans hsum hm
+      have ih' := ih hm_tail hrest
+      rcases ih' with ⟨hsub12, hsub1b, hsubb1, hper⟩
+      refine ⟨?_, ?_, ?_, ?_⟩
+      · intro lbl hIn
+        by_cases hlt : l = lbl
+        ·
+          have hlookup' : lookupBranch lbl bs2 = some t2 := by
+            simpa [hlt] using hlookup
+          simp [labelIn, hlookup']
+        ·
+          have hIn_tail : labelIn lbl tail :=
+            (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).1 hIn
+          exact hsub12 lbl hIn_tail
+      · intro lbl hIn
+        by_cases hlt : l = lbl
+        ·
+          simp [labelIn, lookupBranch, hlt]
+        ·
+          have hIn_tail : labelIn lbl tail :=
+            (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).1 hIn
+          have hIn_rest' := hsub1b lbl hIn_tail
+          exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).2 hIn_rest'
+      · intro lbl hIn
+        by_cases hlt : l = lbl
+        ·
+          simp [labelIn, lookupBranch, hlt]
+        ·
+          have hIn_rest' : labelIn lbl rest' :=
+            (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t) (rest := rest') hlt).1 hIn
+          have hIn_tail := hsubb1 lbl hIn_rest'
+          exact (labelIn_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).2 hIn_tail
+      · intro lbl t1' t2' t' h1 h2 hbs
+        by_cases hlt : l = lbl
+        ·
+          simp [lookupBranch, hlt] at h1
+          cases h1
+          have hlookup' : lookupBranch lbl bs2 = some t2 := by
+            simpa [hlt] using hlookup
+          obtain ⟨vt2, hmem2'⟩ := mem_of_lookupBranch hlookup'
+          have hmem2_cont : t2 ∈ bs2.map BranchR.cont := by
+            exact List.mem_map.2 ⟨(lbl, vt2, t2), hmem2', rfl⟩
+          have hlt1 : sizeOf t1 < sizeOf ((lbl, vt1, t1) :: tail) :=
+            sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 tail
+          have hlt2 : sizeOf t2 < sizeOf bs2 :=
+            sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+          have hsum :
+              sizeOf t1 + sizeOf t2 < sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 :=
+            Nat.add_lt_add hlt1 hlt2
+          have hm' : sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 < m := by
+            simpa [hlt] using hm
+          have hltm : sizeOf t1 + sizeOf t2 < m := Nat.lt_trans hsum hm'
               have ht2 : t2 = t2' := by
                 simpa [hlookup'] using h2
               subst ht2
@@ -128,7 +127,7 @@ private theorem mergeBranchesSend_sound
 private theorem mergeBranchesRecv_sound
     (m : Nat)
     (hmerge : ∀ a b c, sizeOf a + sizeOf b < m → merge a b = some c → Erases a b c)
-    {bs1 bs2 bs : List (Label × LocalTypeR)}
+    {bs1 bs2 bs : List BranchR}
     (hm : sizeOf bs1 + sizeOf bs2 < m)
     (h : mergeBranchesRecv bs1 bs2 = some bs) :
     (∀ lbl t1 t2 t,
@@ -157,83 +156,82 @@ private theorem mergeBranchesRecv_sound
         simp [appendMissing_nil] at h2 ⊢
         exact h2
   | cons head tail ih =>
-      cases head with
-      | mk l t1 =>
-          rcases mergeBranchesRecv_eq_some (lbl := l) (t1 := t1)
-              (rest := tail) (bs2 := bs2) (bs := bs) h with
-            hnone | hsome
-          · rcases hnone with ⟨hlookup, rest', hrest, rfl⟩
-            have hm_tail : sizeOf tail + sizeOf bs2 < m := by
-              have htail : sizeOf tail < sizeOf ((l, t1) :: tail) := by
-                simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, t1)) (tail := tail))
-              have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, t1) :: tail) + sizeOf bs2 :=
-                Nat.add_lt_add_right htail _
-              exact Nat.lt_trans hsum hm
-            have ih' := ih hm_tail hrest
-            rcases ih' with ⟨hper, hleft, hright⟩
-            refine ⟨?_, ?_, ?_⟩
-            · intro lbl t1' t2' t' h1' h2' hbs
-              by_cases hlt : l = lbl
-              ·
-                exfalso
-                have h2'' : lookupBranch l bs2 = some t2' := by
-                  simpa [hlt] using h2'
-                simp [hlookup] at h2''
-              ·
-                have h1_tail : lookupBranch lbl tail = some t1' := by
-                  simpa [lookupBranch, hlt] using h1'
-                have hbs' : lookupBranch lbl rest' = some t' := by
-                  simpa [lookupBranch, hlt] using hbs
-                exact hper lbl t1' t2' t' h1_tail h2' hbs'
-            · intro lbl t1' h1' h2'
-              by_cases hlt : l = lbl
-              ·
-                simp [lookupBranch, hlt] at h1'
-                cases h1'
-                simp [lookupBranch, hlt]
-              ·
-                have h1_tail : lookupBranch lbl tail = some t1' := by
-                  simpa [lookupBranch, hlt] using h1'
-                have htail := hleft lbl t1' h1_tail h2'
-                simpa [lookupBranch, hlt] using htail
-            · intro lbl t2' h1' h2'
-              by_cases hlt : l = lbl
-              · simp [lookupBranch, hlt] at h1'
-              ·
-                have h1_tail : lookupBranch lbl tail = none := by
-                  simpa [lookupBranch, hlt] using h1'
-                have htail := hright lbl t2' h1_tail h2'
-                simpa [lookupBranch, hlt] using htail
-          · rcases hsome with ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
-            have hm_tail : sizeOf tail + sizeOf bs2 < m := by
-              have htail : sizeOf tail < sizeOf ((l, t1) :: tail) := by
-                simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, t1)) (tail := tail))
-              have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, t1) :: tail) + sizeOf bs2 :=
-                Nat.add_lt_add_right htail _
-              exact Nat.lt_trans hsum hm
-            have ih' := ih hm_tail hrest
-            rcases ih' with ⟨hper, hleft, hright⟩
-            refine ⟨?_, ?_, ?_⟩
-            · intro lbl t1' t2' t' h1' h2' hbs
-              by_cases hlt : l = lbl
-              ·
-                simp [lookupBranch, hlt] at h1'
-                cases h1'
-                have hlookup' : lookupBranch lbl bs2 = some t2 := by
-                  simpa [hlt] using hlookup
-                have hmem2 : t2 ∈ bs2.map Prod.snd := by
-                  refine List.mem_map.2 ?_
-                  exact ⟨(lbl, t2), mem_of_lookupBranch hlookup', rfl⟩
-                have hlt1 : sizeOf t1 < sizeOf ((lbl, t1) :: tail) :=
-                  sizeOf_cont_lt_sizeOf_branches lbl t1 tail
-                have hlt2 : sizeOf t2 < sizeOf bs2 :=
-                  sizeOf_cont_lt_sizeOf_branches_mem (cont := t2) hmem2
-                have hsum :
-                    sizeOf t1 + sizeOf t2 < sizeOf ((lbl, t1) :: tail) + sizeOf bs2 :=
-                  Nat.add_lt_add hlt1 hlt2
-                have hm' : sizeOf ((lbl, t1) :: tail) + sizeOf bs2 < m := by
-                  simpa [hlt] using hm
-                have hltm : sizeOf t1 + sizeOf t2 < m := Nat.lt_trans hsum hm'
+      obtain ⟨l, vt1, t1⟩ := head
+      rcases mergeBranchesRecv_eq_some (lbl := l) (vt1 := vt1) (t1 := t1)
+          (rest := tail) (bs2 := bs2) (bs := bs) h with
+        hnone | hsome
+      · rcases hnone with ⟨hlookup, rest', hrest, rfl⟩
+        have hm_tail : sizeOf tail + sizeOf bs2 < m := by
+          have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
+            simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+          have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
+            Nat.add_lt_add_right htail _
+          exact Nat.lt_trans hsum hm
+        have ih' := ih hm_tail hrest
+        rcases ih' with ⟨hper, hleft, hright⟩
+        refine ⟨?_, ?_, ?_⟩
+        · intro lbl t1' t2' t' h1' h2' hbs
+          by_cases hlt : l = lbl
+          ·
+            exfalso
+            have h2'' : lookupBranch l bs2 = some t2' := by
+              simpa [hlt] using h2'
+            simp [hlookup] at h2''
+          ·
+            have h1_tail : lookupBranch lbl tail = some t1' := by
+              simpa [lookupBranch, hlt] using h1'
+            have hbs' : lookupBranch lbl rest' = some t' := by
+              simpa [lookupBranch, hlt] using hbs
+            exact hper lbl t1' t2' t' h1_tail h2' hbs'
+        · intro lbl t1' h1' h2'
+          by_cases hlt : l = lbl
+          ·
+            simp [lookupBranch, hlt] at h1'
+            cases h1'
+            simp [lookupBranch, hlt]
+          ·
+            have h1_tail : lookupBranch lbl tail = some t1' := by
+              simpa [lookupBranch, hlt] using h1'
+            have htail := hleft lbl t1' h1_tail h2'
+            simpa [lookupBranch, hlt] using htail
+        · intro lbl t2' h1' h2'
+          by_cases hlt : l = lbl
+          · simp [lookupBranch, hlt] at h1'
+          ·
+            have h1_tail : lookupBranch lbl tail = none := by
+              simpa [lookupBranch, hlt] using h1'
+            have htail := hright lbl t2' h1_tail h2'
+            simpa [lookupBranch, hlt] using htail
+      · rcases hsome with ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
+        have hm_tail : sizeOf tail + sizeOf bs2 < m := by
+          have htail : sizeOf tail < sizeOf ((l, vt1, t1) :: tail) := by
+            simpa using (sizeOf_tail_lt_sizeOf_branches (head := (l, vt1, t1)) (tail := tail))
+          have hsum : sizeOf tail + sizeOf bs2 < sizeOf ((l, vt1, t1) :: tail) + sizeOf bs2 :=
+            Nat.add_lt_add_right htail _
+          exact Nat.lt_trans hsum hm
+        have ih' := ih hm_tail hrest
+        rcases ih' with ⟨hper, hleft, hright⟩
+        refine ⟨?_, ?_, ?_⟩
+        · intro lbl t1' t2' t' h1' h2' hbs
+          by_cases hlt : l = lbl
+          ·
+            simp [lookupBranch, hlt] at h1'
+            cases h1'
+            have hlookup' : lookupBranch lbl bs2 = some t2 := by
+              simpa [hlt] using hlookup
+            obtain ⟨vt2, hmem2'⟩ := mem_of_lookupBranch hlookup'
+            have hmem2_cont : t2 ∈ bs2.map BranchR.cont := by
+              exact List.mem_map.2 ⟨(lbl, vt2, t2), hmem2', rfl⟩
+            have hlt1 : sizeOf t1 < sizeOf ((lbl, vt1, t1) :: tail) :=
+              sizeOf_cont_lt_sizeOf_branches lbl vt1 t1 tail
+            have hlt2 : sizeOf t2 < sizeOf bs2 :=
+              sizeOf_cont_lt_sizeOf_branches_mem hmem2_cont
+            have hsum :
+                sizeOf t1 + sizeOf t2 < sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 :=
+              Nat.add_lt_add hlt1 hlt2
+            have hm' : sizeOf ((lbl, vt1, t1) :: tail) + sizeOf bs2 < m := by
+              simpa [hlt] using hm
+            have hltm : sizeOf t1 + sizeOf t2 < m := Nat.lt_trans hsum hm'
                 have ht2 : t2 = t2' := by
                   simpa [hlookup'] using h2'
                 subst ht2

@@ -23,8 +23,8 @@ abbrev ProjRel := GlobalType → String → LocalTypeR → Prop
 
 /-- Branch-wise projection relation for send/recv. -/
 def BranchesProjRel (R : ProjRel)
-    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR)) : Prop :=
-  List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ R gb.2 role lb.2) gbs lbs
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR) : Prop :=
+  List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ R gb.2 role lb.2.2) gbs lbs
 
 /-- All branches project to the same candidate (for non-participants). -/
 def AllBranchesProj (R : ProjRel)
@@ -127,7 +127,7 @@ private theorem CProjectF_unfold_core_mono_comm_other
 private theorem CProjectF_unfold_core_mono_comm_send
     {R S : ProjRel} (h : ∀ g r c, R g r c → S g r c)
     {sender receiver role : String} {gbs : List (Label × GlobalType)}
-    {partner : String} {lbs : List (Label × LocalTypeR)}
+    {partner : String} {lbs : List BranchR}
     (hcore :
       (if role = sender then partner = receiver ∧ BranchesProjRel R gbs role lbs
        else if role = receiver then False
@@ -151,7 +151,7 @@ private theorem CProjectF_unfold_core_mono_comm_send
 private theorem CProjectF_unfold_core_mono_comm_recv
     {R S : ProjRel} (h : ∀ g r c, R g r c → S g r c)
     {sender receiver role : String} {gbs : List (Label × GlobalType)}
-    {partner : String} {lbs : List (Label × LocalTypeR)}
+    {partner : String} {lbs : List BranchR}
     (hcore :
       (if role = sender then False
        else if role = receiver then partner = sender ∧ BranchesProjRel R gbs role lbs
@@ -349,7 +349,7 @@ theorem CProject_mu (t : String) (body : GlobalType) (candBody : LocalTypeR) (ro
 
 /-- CProject for comm-send (role is sender). -/
 theorem CProject_comm_send (sender receiver : String)
-    (gbs : List (Label × GlobalType)) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (lbs : List BranchR)
     (hbranches : BranchesProjRel CProject gbs sender lbs) :
     CProject (.comm sender receiver gbs) sender (.send receiver lbs) := by
   have hfix : CProjectF CProject = CProject := CProject_fixed
@@ -364,7 +364,7 @@ theorem CProject_comm_send (sender receiver : String)
 
 /-- CProject for comm-recv (role is receiver). -/
 theorem CProject_comm_recv (sender receiver : String)
-    (gbs : List (Label × GlobalType)) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (lbs : List BranchR)
     (hns : sender ≠ receiver)
     (hbranches : BranchesProjRel CProject gbs receiver lbs) :
     CProject (.comm sender receiver gbs) receiver (.recv sender lbs) := by
@@ -412,12 +412,12 @@ theorem projectb_end_var (role t : String) :
   unfold projectb; rfl
 
 /-- Reflection: projectb for end with send candidate returns false. -/
-theorem projectb_end_send (role partner : String) (bs : List (Label × LocalTypeR)) :
+theorem projectb_end_send (role partner : String) (bs : List BranchR) :
     projectb .end role (.send partner bs) = false := by
   unfold projectb; rfl
 
 /-- Reflection: projectb for end with recv candidate returns false. -/
-theorem projectb_end_recv (role partner : String) (bs : List (Label × LocalTypeR)) :
+theorem projectb_end_recv (role partner : String) (bs : List BranchR) :
     projectb .end role (.recv partner bs) = false := by
   unfold projectb; rfl
 

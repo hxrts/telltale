@@ -239,9 +239,9 @@ pub fn merge(t1: &LocalTypeR, t2: &LocalTypeR) -> MergeResult {
 /// - `!B{x.end} ⊔ !B{x.end}` = `!B{x.end}` ✓ (same labels)
 /// - `!B{x.end} ⊔ !B{y.end}` = ERROR (different labels)
 fn merge_send_branches(
-    branches1: &[(Label, LocalTypeR)],
-    branches2: &[(Label, LocalTypeR)],
-) -> Result<Vec<(Label, LocalTypeR)>, MergeError> {
+    branches1: &[(Label, Option<crate::ValType>, LocalTypeR)],
+    branches2: &[(Label, Option<crate::ValType>, LocalTypeR)],
+) -> Result<Vec<(Label, Option<crate::ValType>, LocalTypeR)>, MergeError> {
     // Sort both branch lists for comparison
     let mut sorted1: Vec<_> = branches1.to_vec();
     let mut sorted2: Vec<_> = branches2.to_vec();
@@ -258,7 +258,7 @@ fn merge_send_branches(
 
     // Each branch must have the same label, merge continuations
     let mut result = Vec::with_capacity(sorted1.len());
-    for ((label1, cont1), (label2, cont2)) in sorted1.iter().zip(sorted2.iter()) {
+    for ((label1, vt1, cont1), (label2, _vt2, cont2)) in sorted1.iter().zip(sorted2.iter()) {
         // Labels must match exactly (name and sort)
         if label1.name != label2.name {
             return Err(MergeError::SendLabelMismatch {
@@ -278,7 +278,7 @@ fn merge_send_branches(
                 label: label1.name.clone(),
             })?;
 
-        result.push((label1.clone(), merged_cont));
+        result.push((label1.clone(), vt1.clone(), merged_cont));
     }
 
     Ok(result)
@@ -297,19 +297,19 @@ fn merge_send_branches(
 /// - `?A{x.end} ⊔ ?A{y.end}` = `?A{x.end, y.end}` ✓ (union of labels)
 /// - `?A{x.T1} ⊔ ?A{x.T2}` = `?A{x.(T1 ⊔ T2)}` ✓ (same label, merge continuations)
 fn merge_recv_branches(
-    branches1: &[(Label, LocalTypeR)],
-    branches2: &[(Label, LocalTypeR)],
-) -> Result<Vec<(Label, LocalTypeR)>, MergeError> {
-    let mut result: HashMap<String, (Label, LocalTypeR)> = HashMap::new();
+    branches1: &[(Label, Option<crate::ValType>, LocalTypeR)],
+    branches2: &[(Label, Option<crate::ValType>, LocalTypeR)],
+) -> Result<Vec<(Label, Option<crate::ValType>, LocalTypeR)>, MergeError> {
+    let mut result: HashMap<String, (Label, Option<crate::ValType>, LocalTypeR)> = HashMap::new();
 
     // Add all branches from the first set
-    for (label, cont) in branches1 {
-        result.insert(label.name.clone(), (label.clone(), cont.clone()));
+    for (label, vt, cont) in branches1 {
+        result.insert(label.name.clone(), (label.clone(), vt.clone(), cont.clone()));
     }
 
     // Union with branches from the second set
-    for (label, cont) in branches2 {
-        if let Some((existing_label, existing_cont)) = result.get(&label.name) {
+    for (label, vt, cont) in branches2 {
+        if let Some((existing_label, _existing_vt, existing_cont)) = result.get(&label.name) {
             // Label exists in both - merge continuations
             let merged_cont =
                 merge(existing_cont, cont).map_err(|_| MergeError::IncompatibleContinuations {
@@ -321,10 +321,10 @@ fn merge_recv_branches(
                     label: label.name.clone(),
                 });
             }
-            result.insert(label.name.clone(), (label.clone(), merged_cont));
+            result.insert(label.name.clone(), (label.clone(), vt.clone(), merged_cont));
         } else {
             // New label - add it (this is the key difference from send merge)
-            result.insert(label.name.clone(), (label.clone(), cont.clone()));
+            result.insert(label.name.clone(), (label.clone(), vt.clone(), cont.clone()));
         }
     }
 
@@ -419,8 +419,8 @@ mod tests {
         let t1 = LocalTypeR::Send {
             partner: "B".to_string(),
             branches: vec![
-                (Label::new("x"), LocalTypeR::End),
-                (Label::new("y"), LocalTypeR::End),
+                (Label::new("x"), None, LocalTypeR::End),
+                (Label::new("y"), None, LocalTypeR::End),
             ],
         };
         let t2 = LocalTypeR::send("B", Label::new("x"), LocalTypeR::End);
@@ -457,7 +457,7 @@ mod tests {
         assert_matches!(result, LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "A");
             assert_eq!(branches.len(), 2);
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _, _)| l.name.as_str()).collect();
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
         });
@@ -481,7 +481,7 @@ mod tests {
         assert_matches!(result, LocalTypeR::Recv { branches, .. } => {
             assert_eq!(branches.len(), 1);
             // Continuation should be merged (same as input since identical)
-            assert_matches!(&branches[0].1, LocalTypeR::Send { partner, .. } => {
+            assert_matches!(&branches[0].2, LocalTypeR::Send { partner, .. } => {
                 assert_eq!(partner, "B");
             });
         });
@@ -493,15 +493,15 @@ mod tests {
         let t1 = LocalTypeR::Recv {
             partner: "A".to_string(),
             branches: vec![
-                (Label::new("x"), LocalTypeR::End),
-                (Label::new("y"), LocalTypeR::End),
+                (Label::new("x"), None, LocalTypeR::End),
+                (Label::new("y"), None, LocalTypeR::End),
             ],
         };
         let t2 = LocalTypeR::Recv {
             partner: "A".to_string(),
             branches: vec![
-                (Label::new("y"), LocalTypeR::End),
-                (Label::new("z"), LocalTypeR::End),
+                (Label::new("y"), None, LocalTypeR::End),
+                (Label::new("z"), None, LocalTypeR::End),
             ],
         };
 
@@ -509,7 +509,7 @@ mod tests {
         assert_matches!(result, LocalTypeR::Recv { partner, branches } => {
             assert_eq!(partner, "A");
             assert_eq!(branches.len(), 3);
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _, _)| l.name.as_str()).collect();
             assert!(labels.contains(&"x"));
             assert!(labels.contains(&"y"));
             assert!(labels.contains(&"z"));

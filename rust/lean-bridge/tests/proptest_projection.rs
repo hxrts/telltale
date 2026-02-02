@@ -195,7 +195,7 @@ fn local_to_program_json(role: &str, local: &LocalTypeR) -> Value {
         match local {
             LocalTypeR::End | LocalTypeR::Var(_) => {}
             LocalTypeR::Send { partner, branches } => {
-                for (label, cont) in branches {
+                for (label, _vt, cont) in branches {
                     effects.push(json!({
                         "kind": "send",
                         "partner": partner,
@@ -209,7 +209,7 @@ fn local_to_program_json(role: &str, local: &LocalTypeR) -> Value {
                 }
             }
             LocalTypeR::Recv { partner, branches } => {
-                for (label, cont) in branches {
+                for (label, _vt, cont) in branches {
                     effects.push(json!({
                         "kind": "recv",
                         "partner": partner,
@@ -355,7 +355,7 @@ fn test_choice_projections_have_all_branches() {
         // Sender should see both branches in Send
         let sender_local = project(&global, &sender).expect("Sender projection should succeed");
         if let LocalTypeR::Send { branches, .. } = sender_local {
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
             assert!(
                 labels.contains(&label1.as_str()) && labels.contains(&label2.as_str()),
                 "Sender should see both labels {} and {}, got {:?}",
@@ -371,7 +371,7 @@ fn test_choice_projections_have_all_branches() {
         let receiver_local =
             project(&global, &receiver).expect("Receiver projection should succeed");
         if let LocalTypeR::Recv { branches, .. } = receiver_local {
-            let labels: Vec<_> = branches.iter().map(|(l, _)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
             assert!(
                 labels.contains(&label1.as_str()) && labels.contains(&label2.as_str()),
                 "Receiver should see both labels {} and {}, got {:?}",
@@ -415,7 +415,7 @@ fn test_choice_continuations_preserved() {
                     LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
                         branches
                             .iter()
-                            .all(|(_, cont)| has_nested_action(cont, depth + 1))
+                            .all(|(_, _vt, cont)| has_nested_action(cont, depth + 1))
                     }
                     LocalTypeR::Mu { body, .. } => has_nested_action(body, depth),
                 }
@@ -576,7 +576,7 @@ fn test_choice_continuation_bug_fix_against_lean() {
             assert_eq!(partner, "Server");
             assert_eq!(branches.len(), 2);
 
-            for (label, cont) in branches {
+            for (label, _vt, cont) in branches {
                 // Each branch should have a Recv continuation, not End
                 match cont {
                     LocalTypeR::Recv {
@@ -617,7 +617,7 @@ fn test_choice_continuation_bug_fix_against_lean() {
             assert_eq!(partner, "Client");
             assert_eq!(branches.len(), 2);
 
-            for (label, cont) in branches {
+            for (label, _vt, cont) in branches {
                 // Each branch should have a Send continuation, not End
                 match cont {
                     LocalTypeR::Send {
@@ -823,7 +823,7 @@ fn test_deep_nesting_projections() {
                     LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
                         1 + branches
                             .iter()
-                            .map(|(_, c)| count_depth(c))
+                            .map(|(_, _vt, c)| count_depth(c))
                             .max()
                             .unwrap_or(0)
                     }

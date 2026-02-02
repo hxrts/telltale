@@ -95,34 +95,33 @@ summary:
 
     echo "Wrote $out"
 
+# Generate transient build assets (mermaid, mathjax theme override)
+_gen-assets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mdbook-mermaid install . > /dev/null 2>&1 || true
+    # Patch mermaid-init.js with null guards for mdbook 0.5.x theme buttons
+    sed -i.bak 's/document\.getElementById(\(.*\))\.addEventListener/const el = document.getElementById(\1); if (el) el.addEventListener/' mermaid-init.js && rm -f mermaid-init.js.bak
+    # Generate theme/index.hbs with MathJax v2 inline $ config injected before MathJax loads
+    mkdir -p theme
+    mdbook init --theme /tmp/mdbook-theme-gen <<< $'n\n' > /dev/null 2>&1
+    sed 's|<script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>|<script>window.MathJax = { tex2jax: { inlineMath: [["$","$"],["\\\\(","\\\\)"]], displayMath: [["$$","$$"],["\\\\[","\\\\]"]], processEscapes: true } };</script>\n        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>|' /tmp/mdbook-theme-gen/theme/index.hbs > theme/index.hbs
+    rm -rf /tmp/mdbook-theme-gen
+
+# Clean transient build assets
+_clean-assets:
+    rm -f mermaid-init.js mermaid.min.js
+    rm -rf theme
+
 # Build the book after regenerating the summary
-book: summary
-    mdbook-mermaid install .
-    mv mermaid.min.js mermaid-init.js docs/ 2>/dev/null || true
-    mdbook build
-    rm -f docs/mermaid-init.js docs/mermaid.min.js
+book: summary _gen-assets
+    mdbook build && just _clean-assets
 
 # Serve locally with live reload
-serve: summary
+serve: summary _gen-assets
     #!/usr/bin/env bash
-    # Trap SIGINT (Ctrl+C) for graceful shutdown
-    trap 'echo -e "\nShutting down mdbook server..."; exit 0' INT
-
-    # Install mermaid assets
-    mdbook-mermaid install .
-    mv mermaid.min.js mermaid-init.js docs/ 2>/dev/null || true
-
-    # Try to serve on the default port, fallback to next available port if in use
-    for port in 3000 3001 3002 3003 3004 3005; do
-        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo "Starting mdbook server on http://localhost:$port"
-            echo "Press Ctrl+C to stop the server"
-            mdbook serve --port $port --open
-            exit 0
-        fi
-    done
-    # If we get here, all ports are in use, just show the error
-    echo "Error: All ports 3000-3005 are already in use" >&2
+    trap 'just _clean-assets' EXIT
+    mdbook serve --open
     exit 1
 
 # Test Lean installation

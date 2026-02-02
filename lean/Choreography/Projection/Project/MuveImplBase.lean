@@ -179,12 +179,12 @@ private def freeVars_substitute_subset_aux (lt : LocalTypeR) (varName : String) 
 termination_by sizeOf lt
 
 private def freeVars_substituteBranches_subset_aux
-    (branches : List (Label × LocalTypeR)) (varName : String) (repl : LocalTypeR)
+    (branches : List BranchR) (varName : String) (repl : LocalTypeR)
     (x : String) (hx : x ∈ SessionTypes.LocalTypeR.freeVarsOfBranches (SessionTypes.LocalTypeR.substituteBranches branches varName repl)) :
     x ∈ repl.freeVars ∨ (x ∈ SessionTypes.LocalTypeR.freeVarsOfBranches branches ∧ x ≠ varName) :=
   match branches with
   | [] => by simp only [SessionTypes.LocalTypeR.substituteBranches, SessionTypes.LocalTypeR.freeVarsOfBranches, List.not_mem_nil] at hx
-  | (label, cont) :: rest => by
+  | (label, _vt, cont) :: rest => by
       simp only [SessionTypes.LocalTypeR.substituteBranches, SessionTypes.LocalTypeR.freeVarsOfBranches, List.mem_append] at hx
       cases hx with
       | inl hxcont =>

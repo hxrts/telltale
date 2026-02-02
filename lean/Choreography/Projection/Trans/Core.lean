@@ -182,10 +182,10 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
 
   /-- Project branch continuations for `trans`. -/
-  def transBranches : List (Label × GlobalType) → String → List (Label × LocalTypeR)
+  def transBranches : List (Label × GlobalType) → String → List BranchR
     | [], _ => []
     | (label, cont) :: rest, role =>
-        (label, trans cont role) :: transBranches rest role
+        (label, none, trans cont role) :: transBranches rest role
   termination_by
     branches _ => sizeOf branches
   decreasing_by
@@ -349,7 +349,7 @@ mutual
   /-- Branch-wise free variable inclusion for `transBranches`. -/
   theorem transBranches_freeVars_subset (role : String) :
       ∀ branches y,
-        y ∈ (transBranches branches role).flatMap (fun (_, t) => t.freeVars) →
+        y ∈ (transBranches branches role).flatMap (fun (_, _, t) => t.freeVars) →
           y ∈ branches.flatMap (fun (_, g) => g.freeVars) := by
     intro branches y hy
     match branches with
@@ -413,11 +413,11 @@ Projection preserves well-formedness under all-branch participation. -/
 open SessionTypes.Participation
 
 /-- Helper: .send and .recv types are guarded for any variable. -/
-private theorem isGuarded_send (p : String) (bs : List (Label × LocalTypeR)) (v : String) :
+private theorem isGuarded_send (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.send p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 
-private theorem isGuarded_recv (p : String) (bs : List (Label × LocalTypeR)) (v : String) :
+private theorem isGuarded_recv (p : String) (bs : List BranchR) (v : String) :
     (LocalTypeR.recv p bs).isGuarded v = true := by
   simp [LocalTypeR.isGuarded]
 

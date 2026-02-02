@@ -71,12 +71,12 @@ mutual
           simp [LocalTypeR.substitute, hbeq, hbody']
   termination_by sizeOf e
 
-  theorem substituteBranches_not_free (bs : List (Label × LocalTypeR)) (x : String) (rx : LocalTypeR)
+  theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
       (hnot_free : isFreeInBranches' x bs = false) :
       LocalTypeR.substituteBranches bs x rx = bs := by
     match bs with
     | [] => rfl
-    | (label, cont) :: rest =>
+    | (label, _vt, cont) :: rest =>
         have hsplit : cont.isFreeIn x = false ∧ isFreeInBranches' x rest = false := by
           simpa [isFreeInBranches', Bool.or_eq_false_iff] using hnot_free
         have h1 : cont.substitute x rx = cont :=
@@ -253,7 +253,7 @@ mutual
           simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq, hguard', hbody']
   termination_by sizeOf body
 
-  theorem isContractiveBranches_substitute (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
+  theorem isContractiveBranches_substitute (bs : List BranchR) (t : String) (e : LocalTypeR) :
       isContractiveBranches bs = true → e.isContractive = true → e.isClosed →
       isContractiveBranches (substituteBranches bs t e) = true := by
     intro hbs hcontr hclosed
@@ -262,7 +262,7 @@ mutual
         simp [isContractiveBranches]
     | cons head tail =>
         cases head with
-        | mk label cont =>
+        | mk label rest => cases rest with | mk _vt cont =>
             have hpair : cont.isContractive = true ∧ isContractiveBranches tail = true := by
               simpa [isContractiveBranches, Bool.and_eq_true] using hbs
             have hcont' : (cont.substitute t e).isContractive = true :=

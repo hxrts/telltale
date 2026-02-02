@@ -37,8 +37,8 @@ open SessionCoTypes.CoinductiveRel
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
 
 /-- Branch-wise relation used by EQ2. -/
-def BranchesRel (R : Rel) (bs cs : List (Label × LocalTypeR)) : Prop :=
-  List.Forall₂ (fun a b => a.1 = b.1 ∧ R a.2 b.2) bs cs
+def BranchesRel (R : Rel) (bs cs : List BranchR) : Prop :=
+  List.Forall₂ (fun a b => a.1 = b.1 ∧ R a.2.2 b.2.2) bs cs
 
 private theorem BranchesRel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
@@ -228,7 +228,7 @@ private theorem BranchesRel_refl {R : Rel} (hrefl : ∀ t, R t t) :
   induction bs with
   | nil => exact List.Forall₂.nil
   | cons head tail ih =>
-      exact List.Forall₂.cons ⟨rfl, hrefl head.2⟩ ih
+      exact List.Forall₂.cons ⟨rfl, hrefl head.2.2⟩ ih
 
 /-- BranchesRel is symmetric when the underlying relation is. -/
 private theorem BranchesRel_symm {R : Rel}
@@ -277,11 +277,11 @@ private theorem nonmu_end : NonMu (.end : LocalTypeR) := by
 private theorem nonmu_var (v : String) : NonMu (.var v : LocalTypeR) := by
   intro t body h; cases h
 
-private theorem nonmu_send (p : String) (bs : List (Label × LocalTypeR)) :
+private theorem nonmu_send (p : String) (bs : List BranchR) :
     NonMu (.send p bs : LocalTypeR) := by
   intro t body h; cases h
 
-private theorem nonmu_recv (p : String) (bs : List (Label × LocalTypeR)) :
+private theorem nonmu_recv (p : String) (bs : List BranchR) :
     NonMu (.recv p bs : LocalTypeR) := by
   intro t body h; cases h
 

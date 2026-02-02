@@ -45,9 +45,9 @@ theorem EQ2F_mono {R S : Rel}
 /-! NOTE: EQ2 transitivity is used with explicit LocalTypeR.WellFormed witnesses. -/
 
 theorem wf_tail_of_cons
-    {lb : Label × LocalTypeR} {bs : List (Label × LocalTypeR)}
-    (hwf : ∀ lb' ∈ lb :: bs, LocalTypeR.WellFormed lb'.2) :
-    ∀ lb' ∈ bs, LocalTypeR.WellFormed lb'.2 := by
+    {lb : BranchR} {bs : List BranchR}
+    (hwf : ∀ lb' ∈ lb :: bs, LocalTypeR.WellFormed lb'.2.2) :
+    ∀ lb' ∈ bs, LocalTypeR.WellFormed lb'.2.2 := by
   -- Derive tail well-formedness from a cons list witness.
   intro lb' hmem
   exact hwf lb' (by simp [hmem])
@@ -55,13 +55,13 @@ theorem wf_tail_of_cons
 private theorem BranchesRel_trans_chain_head {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {lb_bs lb_cs lb_ds : Label × LocalTypeR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ (EQ2_closure R) lb_bs.2 lb_cs.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ EQ2 lb_cs.2 lb_ds.2)
-    (hWFa : LocalTypeR.WellFormed lb_bs.2)
-    (hWFb : LocalTypeR.WellFormed lb_cs.2)
-    (hWFc : LocalTypeR.WellFormed lb_ds.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2 lb_ds.2 := by
+    {lb_bs lb_cs lb_ds : BranchR}
+    (h1 : lb_bs.1 = lb_cs.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ EQ2 lb_cs.2.2 lb_ds.2.2)
+    (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
+    (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
+    (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
+    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   -- Combine labels and chain the continuation relation through hextend or EQ2_trans_wf.
   constructor
   · exact h1.1.trans h2.1
@@ -72,13 +72,13 @@ private theorem BranchesRel_trans_chain_head {R : Rel}
 theorem BranchesRel_trans_chain_rev_head {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {lb_bs lb_cs lb_ds : Label × LocalTypeR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ EQ2 lb_bs.2 lb_cs.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_cs.2 lb_ds.2)
-    (hWFa : LocalTypeR.WellFormed lb_bs.2)
-    (hWFb : LocalTypeR.WellFormed lb_cs.2)
-    (hWFc : LocalTypeR.WellFormed lb_ds.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2 lb_ds.2 := by
+    {lb_bs lb_cs lb_ds : BranchR}
+    (h1 : lb_bs.1 = lb_cs.1 ∧ EQ2 lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_cs.2.2 lb_ds.2.2)
+    (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
+    (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
+    (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
+    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   -- Combine labels and chain the continuation relation through hextend or EQ2_trans_wf.
   constructor
   · exact h1.1.trans h2.1
@@ -95,12 +95,12 @@ theorem BranchesRel_trans_chain_rev_head {R : Rel}
 theorem BranchesRel_trans_chain {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {bs cs ds : List (Label × LocalTypeR)}
+    {bs cs ds : List BranchR}
     (hbc : BranchesRel (EQ2_closure R) bs cs)
     (hcd : BranchesRel EQ2 cs ds)
-    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
-    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2)
-    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2) :
+    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2.2) :
     BranchesRel (EQ2_closure R) bs ds := by
   induction hbc generalizing ds with -- Head/tail split of Forall₂.
   | nil => cases hcd; exact List.Forall₂.nil
@@ -192,7 +192,7 @@ private theorem allCommsNonEmpty_of_mem_branch
     Requires wellFormedness of branch continuations to build CProjectTransRel witnesses. -/
 theorem branchesProjRel_to_branchesRel_CProjectTransRel
     (gbs : List (Label × GlobalType)) (role : String)
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (h : BranchesProjRel CProject gbs role lbs) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true) :
     BranchesRel CProjectTransRel lbs (transBranches gbs role) := by
   induction h with
@@ -201,23 +201,22 @@ theorem branchesProjRel_to_branchesRel_CProjectTransRel
       rename_i gb lb gbs_tail lbs_tail
       cases gb with
       | mk gLabel gCont =>
-          cases lb with
-          | mk lLabel lCont =>
-              simp only [transBranches, BranchesRel]
-              constructor
-              · -- Pair relation: labels match and continuations are in CProjectTransRel
-                constructor
-                · -- Labels match
-                  exact hpair.1.symm
-                · -- CProjectTransRel lCont (trans gCont role)
-                  have hwf_cont : gCont.wellFormed = true := by
-                    exact hwf (gLabel, gCont) (by simp)
-                  exact ⟨gCont, role, hpair.2, rfl, hwf_cont⟩
-              · -- Tail relation
-                have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
-                  intro gb' hmem
-                  exact hwf gb' (List.mem_cons_of_mem _ hmem)
-                exact ih hwf_tail
+          obtain ⟨lLabel, lVt, lCont⟩ := lb
+          simp only [transBranches, BranchesRel]
+          constructor
+          · -- Pair relation: labels match and continuations are in CProjectTransRel
+            constructor
+            · -- Labels match
+              exact hpair.1.symm
+            · -- CProjectTransRel lCont (trans gCont role)
+              have hwf_cont : gCont.wellFormed = true := by
+                exact hwf (gLabel, gCont) (by simp)
+              exact ⟨gCont, role, hpair.2, rfl, hwf_cont⟩
+          · -- Tail relation
+            have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
+              intro gb' hmem
+              exact hwf gb' (List.mem_cons_of_mem _ hmem)
+            exact ih hwf_tail
 
 
 theorem CProjectTransRel_postfix_mu_closure

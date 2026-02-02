@@ -91,8 +91,8 @@ This is because:
 inductive FullUnfoldResult where
   | is_end : FullUnfoldResult
   | is_var (v : String) : FullUnfoldResult
-  | is_send (p : String) (bs : List (Label × LocalTypeR)) : FullUnfoldResult
-  | is_recv (p : String) (bs : List (Label × LocalTypeR)) : FullUnfoldResult
+  | is_send (p : String) (bs : List BranchR) : FullUnfoldResult
+  | is_recv (p : String) (bs : List BranchR) : FullUnfoldResult
 
 /-- Classify the result of full unfolding a non-mu type. -/
 def LocalTypeR.classifyNonMu : LocalTypeR → FullUnfoldResult
@@ -175,7 +175,7 @@ mutual
     all_goals
       simp [*] <;> omega
 
-  theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List (Label × LocalTypeR)) (v : String) :
+  theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List BranchR) (v : String) :
       isFreeInBranches' v bs = true → v ∈ freeVarsOfBranches bs := by
     intro h
     cases hbs : bs with
@@ -183,7 +183,9 @@ mutual
         simp [isFreeInBranches', freeVarsOfBranches, hbs] at h
     | cons head tail =>
         cases hhead : head with
-        | mk label cont =>
+        | mk label rest =>
+          cases rest with
+          | mk _vt cont =>
             have h' : cont.isFreeIn v = true ∨ isFreeInBranches' v tail = true := by
               simpa [isFreeInBranches', hbs, hhead, Bool.or_eq_true] using h
             cases h' with

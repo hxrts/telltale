@@ -125,9 +125,9 @@ mutual
     t => sizeOf t
 
   def branchesToDB? (ctx : SessionTypes.LocalTypeConv.Context) :
-      List (Label × LocalTypeR) → Option (List (Label × SessionTypes.LocalTypeDB))
+      List BranchR → Option (List (Label × SessionTypes.LocalTypeDB))
     | [] => some []
-    | (l, t) :: rest =>
+    | (l, _vt, t) :: rest =>
         match t.toDB? ctx, branchesToDB? ctx rest with
         | some t', some rest' => some ((l, t') :: rest')
         | _, _ => none
@@ -169,11 +169,11 @@ mutual
     t => sizeOf t
 
   def branchesFromDB? (ctx : SessionTypes.LocalTypeConv.NameContext) :
-      List (Label × SessionTypes.LocalTypeDB) → Option (List (Label × LocalTypeR))
+      List (Label × SessionTypes.LocalTypeDB) → Option (List BranchR)
     | [] => some []
     | (l, t) :: rest =>
         match t.fromDB? ctx, branchesFromDB? ctx rest with
-        | some t', some rest' => some ((l, t') :: rest')
+        | some t', some rest' => some ((l, none, t') :: rest')
         | _, _ => none
   termination_by
     bs => sizeOf bs
@@ -201,9 +201,9 @@ mutual
     t => sizeOf t
 
   def branchesFromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
-      List (Label × SessionTypes.LocalTypeDB) → List (Label × LocalTypeR)
+      List (Label × SessionTypes.LocalTypeDB) → List BranchR
     | [] => []
-    | (l, t) :: rest => (l, t.fromDB ctx) :: branchesFromDB ctx rest
+    | (l, t) :: rest => (l, none, t.fromDB ctx) :: branchesFromDB ctx rest
   termination_by
     bs => sizeOf bs
 end

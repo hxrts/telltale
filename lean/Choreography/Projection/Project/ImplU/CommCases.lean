@@ -134,7 +134,7 @@ private theorem CProjectUEQ2Rel_postfix_comm_mu_case
 
 private theorem CProjectUEQ2Rel_postfix_comm_send_sender
     {g role cand e0 : _} {sender receiver p : String}
-    {gbs : List (Label × GlobalType)} {bs : List (Label × LocalTypeR)}
+    {gbs : List (Label × GlobalType)} {bs : List BranchR}
     (hg : GlobalType.fullUnfoldIter g = .comm sender receiver gbs)
     (he0 : LocalTypeR.fullUnfold e0 = .send p bs)
     (hrs : role = sender)
@@ -151,9 +151,9 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_sender
   have heq_send : EQ2 (.send p bs) cand :=
     EQ2_of_fullUnfold heq_full heq hWF_full hWF hWFcand he0
   rcases EQ2_fullUnfold_send hWFcand heq_send with ⟨cs, hfull, hrel_br⟩
-  have hWF_branches : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+  have hWF_branches : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) (by simpa [he0] using hWF_full)
-  have hWF_branches_cand : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+  have hWF_branches_cand : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_send (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
     BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
@@ -163,7 +163,7 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_sender
 
 private theorem CProjectUEQ2Rel_postfix_comm_send_nonpart
     {g role cand e0 : _} {sender receiver p : String}
-    {gbs : List (Label × GlobalType)} {bs : List (Label × LocalTypeR)}
+    {gbs : List (Label × GlobalType)} {bs : List BranchR}
     (hg : GlobalType.fullUnfoldIter g = .comm sender receiver gbs)
     (he0 : LocalTypeR.fullUnfold e0 = .send p bs)
     (hrs : role ≠ sender) (hrr : role ≠ receiver)
@@ -188,7 +188,7 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_nonpart
 
 private theorem CProjectUEQ2Rel_postfix_comm_send_case
     {g role cand e0 : _} {sender receiver p : String}
-    {gbs : List (Label × GlobalType)} {bs : List (Label × LocalTypeR)}
+    {gbs : List (Label × GlobalType)} {bs : List BranchR}
     (hg : GlobalType.fullUnfoldIter g = .comm sender receiver gbs)
     (he0 : LocalTypeR.fullUnfold e0 = .send p bs)
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
@@ -212,7 +212,7 @@ private theorem CProjectUEQ2Rel_postfix_comm_send_case
 
 private theorem CProjectUEQ2Rel_postfix_comm_recv_receiver
     {g role cand e0 : _} {sender receiver p : String}
-    {gbs : List (Label × GlobalType)} {bs : List (Label × LocalTypeR)}
+    {gbs : List (Label × GlobalType)} {bs : List BranchR}
     (hg : GlobalType.fullUnfoldIter g = .comm sender receiver gbs)
     (he0 : LocalTypeR.fullUnfold e0 = .recv p bs)
     (hrr : role = receiver) (hne : receiver ≠ sender)
@@ -229,9 +229,9 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_receiver
   have heq_recv : EQ2 (.recv p bs) cand :=
     EQ2_of_fullUnfold heq_full heq hWF_full hWF hWFcand he0
   rcases EQ2_fullUnfold_recv hWFcand heq_recv with ⟨cs, hfull, hrel_br⟩
-  have hWF_branches : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+  have hWF_branches : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) (by simpa [he0] using hWF_full)
-  have hWF_branches_cand : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+  have hWF_branches_cand : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
     BranchesProjRel_lift_EQ2_U hbranches hrel_br hWF_branches hWF_branches_cand
@@ -241,7 +241,7 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_receiver
 
 private theorem CProjectUEQ2Rel_postfix_comm_recv_nonpart
     {g role cand e0 : _} {sender receiver p : String}
-    {gbs : List (Label × GlobalType)} {bs : List (Label × LocalTypeR)}
+    {gbs : List (Label × GlobalType)} {bs : List BranchR}
     (hg : GlobalType.fullUnfoldIter g = .comm sender receiver gbs)
     (he0 : LocalTypeR.fullUnfold e0 = .recv p bs)
     (hrs : role ≠ sender) (hrr : role ≠ receiver)
@@ -266,7 +266,7 @@ private theorem CProjectUEQ2Rel_postfix_comm_recv_nonpart
 
 private theorem CProjectUEQ2Rel_postfix_comm_recv_case
     {g role cand e0 : _} {sender receiver p : String}
-    {gbs : List (Label × GlobalType)} {bs : List (Label × LocalTypeR)}
+    {gbs : List (Label × GlobalType)} {bs : List BranchR}
     (hg : GlobalType.fullUnfoldIter g = .comm sender receiver gbs)
     (he0 : LocalTypeR.fullUnfold e0 = .recv p bs)
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))

@@ -34,7 +34,7 @@ def ProjectDeterministic (g : GlobalType) (role : String) (e1 e2 : LocalTypeR) :
 
 /-- Branch-wise projection is deterministic up to EQ2 (assuming well-formed branches). -/
 def BranchesProjDeterministic (gbs : List (Label × GlobalType)) (role : String)
-    (lbs1 lbs2 : List (Label × LocalTypeR)) : Prop :=
+    (lbs1 lbs2 : List BranchR) : Prop :=
   BranchesProjRel CProject gbs role lbs1 →
   BranchesProjRel CProject gbs role lbs2 →
   (∀ gb ∈ gbs, gb.2.wellFormed = true) →
@@ -73,13 +73,13 @@ theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTyp
 
 /-- Helper: cons case for branches_proj_deterministic. -/
 private theorem branches_proj_deterministic_cons
-    (lb1 : Label × LocalTypeR) (lbs1' : List (Label × LocalTypeR))
-    (lb2 : Label × LocalTypeR) (lbs2' : List (Label × LocalTypeR))
+    (lb1 : BranchR) (lbs1' : List BranchR)
+    (lb2 : BranchR) (lbs2' : List BranchR)
     (gb : Label × GlobalType) (gbs' : List (Label × GlobalType))
     {role : String}
-    (hpair1 : gb.1 = lb1.1 ∧ CProject gb.2 role lb1.2)
+    (hpair1 : gb.1 = lb1.1 ∧ CProject gb.2 role lb1.2.2)
     (htail1 : BranchesProjRel CProject gbs' role lbs1')
-    (hpair2 : gb.1 = lb2.1 ∧ CProject gb.2 role lb2.2)
+    (hpair2 : gb.1 = lb2.1 ∧ CProject gb.2 role lb2.2.2)
     (htail2 : BranchesProjRel CProject gbs' role lbs2')
     (hwf : ∀ gb' ∈ (gb :: gbs'), gb'.2.wellFormed = true)
     (branches_det : ∀ {lbs1 lbs2}, BranchesProjRel CProject gbs' role lbs1 →
@@ -94,7 +94,7 @@ private theorem branches_proj_deterministic_cons
           | mk l2 t2 =>
               rcases hpair1 with ⟨hlabel1, hcont1⟩; rcases hpair2 with ⟨hlabel2, hcont2⟩
               have hwf_head : gcont.wellFormed = true := hwf (l, gcont) (by simp)
-              have hcont_eq : EQ2 t1 t2 := project_deterministic hcont1 hcont2 hwf_head
+              have hcont_eq : EQ2 t1.2 t2.2 := project_deterministic hcont1 hcont2 hwf_head
               have hlabel_eq : l1 = l2 := hlabel1.symm.trans hlabel2; cases hlabel_eq
               have hwf_tail : ∀ gb' ∈ gbs', gb'.2.wellFormed = true := by
                 intro gb' hmem; exact hwf gb' (by simp [hmem])
@@ -103,7 +103,7 @@ private theorem branches_proj_deterministic_cons
 
 /-- Determinism for branch-wise projection up to EQ2 (assuming well-formed branches). -/
 theorem branches_proj_deterministic {gbs : List (Label × GlobalType)} {role : String}
-    {lbs1 lbs2 : List (Label × LocalTypeR)}
+    {lbs1 lbs2 : List BranchR}
     (h1 : BranchesProjRel CProject gbs role lbs1)
     (h2 : BranchesProjRel CProject gbs role lbs2)
     (hwf : ∀ gb ∈ gbs, gb.2.wellFormed = true) :

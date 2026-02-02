@@ -62,10 +62,10 @@ lemma childRel_toCoind {t : LocalTypeR} {c : LocalTypeC}
         simpa [children_mkSend] using hi'
       let i' : Fin bs.length :=
         castFin (toCoindBranches_length bs) (castFin (by simp) i)
-      refine ⟨(bs.get i').2, ?_⟩
+      refine ⟨(bs.get i').2.2, ?_⟩
       have hcont :
           ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i')).2 =
-            toCoind (bs.get i').2 := by
+            toCoind (bs.get i').2.2 := by
         simpa using toCoindBranches_get_snd (bs := bs) i'
       have hidx :
           castFin (by simp) i =
@@ -82,10 +82,10 @@ lemma childRel_toCoind {t : LocalTypeR} {c : LocalTypeC}
         simpa [children_mkRecv] using hi'
       let i' : Fin bs.length :=
         castFin (toCoindBranches_length bs) (castFin (by simp) i)
-      refine ⟨(bs.get i').2, ?_⟩
+      refine ⟨(bs.get i').2.2, ?_⟩
       have hcont :
           ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i')).2 =
-            toCoind (bs.get i').2 := by
+            toCoind (bs.get i').2.2 := by
         simpa using toCoindBranches_get_snd (bs := bs) i'
       have hidx :
           castFin (by simp) i =
@@ -122,8 +122,8 @@ lemma productive_toCoind_of_projTrans (g : GlobalType) (role : String) :
 
 /-! ## Size bounds for branch elements -/
 
-@[simp] lemma sizeOf_get_lt_sizeOf_branches {bs : List (Label × LocalTypeR)} (i : Fin bs.length) :
-    sizeOf (bs.get i).2 < sizeOf bs := by
+@[simp] lemma sizeOf_get_lt_sizeOf_branches {bs : List BranchR} (i : Fin bs.length) :
+    sizeOf (bs.get i).2.2 < sizeOf bs := by
   induction bs with
   | nil =>
       exact (Fin.elim0 i)
@@ -131,35 +131,37 @@ lemma productive_toCoind_of_projTrans (g : GlobalType) (role : String) :
       cases i using Fin.cases with
       | zero =>
           cases head with
-          | mk label cont =>
-              simpa using (sizeOf_cont_lt_sizeOf_branches label cont tail)
+          | mk label rest =>
+            cases rest with
+            | mk vt cont =>
+              simpa using (sizeOf_cont_lt_sizeOf_branches label vt cont tail)
       | succ i =>
           have hlt := ih i
           have htail : sizeOf tail < sizeOf (head :: tail) :=
             sizeOf_tail_lt_sizeOf_branches head tail
           exact lt_trans hlt htail
 
-@[simp] lemma sizeOf_get_lt_sizeOf_send {p : String} {bs : List (Label × LocalTypeR)}
+@[simp] lemma sizeOf_get_lt_sizeOf_send {p : String} {bs : List BranchR}
     (i : Fin bs.length) :
-    sizeOf (bs.get i).2 < sizeOf (LocalTypeR.send p bs) := by
+    sizeOf (bs.get i).2.2 < sizeOf (LocalTypeR.send p bs) := by
   exact lt_trans (sizeOf_get_lt_sizeOf_branches i) (sizeOf_branches_lt_sizeOf_send p bs)
 
-@[simp] lemma sizeOf_get_lt_sizeOf_recv {p : String} {bs : List (Label × LocalTypeR)}
+@[simp] lemma sizeOf_get_lt_sizeOf_recv {p : String} {bs : List BranchR}
     (i : Fin bs.length) :
-    sizeOf (bs.get i).2 < sizeOf (LocalTypeR.recv p bs) := by
+    sizeOf (bs.get i).2.2 < sizeOf (LocalTypeR.recv p bs) := by
   exact lt_trans (sizeOf_get_lt_sizeOf_branches i) (sizeOf_branches_lt_sizeOf_recv p bs)
 
 @[simp] lemma sizeOf_get_lt_of_send_eq {t : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (i : Fin bs.length)
+    {bs : List BranchR} (i : Fin bs.length)
     (h : t = LocalTypeR.send p bs) :
-    sizeOf (bs.get i).2 < sizeOf t := by
+    sizeOf (bs.get i).2.2 < sizeOf t := by
   subst h
   simpa using (sizeOf_get_lt_sizeOf_send (p := p) (bs := bs) i)
 
 @[simp] lemma sizeOf_get_lt_of_recv_eq {t : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (i : Fin bs.length)
+    {bs : List BranchR} (i : Fin bs.length)
     (h : t = LocalTypeR.recv p bs) :
-    sizeOf (bs.get i).2 < sizeOf t := by
+    sizeOf (bs.get i).2.2 < sizeOf t := by
   subst h
   simpa using (sizeOf_get_lt_sizeOf_recv (p := p) (bs := bs) i)
 
@@ -190,10 +192,10 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
         simpa [children_mkSend] using hi'
       let i' : Fin bs.length :=
         castFin (toCoindBranches_length bs) (castFin (by simp) i)
-      refine ⟨(bs.get i').2, ?_, ?_⟩
+      refine ⟨(bs.get i').2.2, ?_, ?_⟩
       · have hcont :
             ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i')).2 =
-              toCoind (bs.get i').2 := by
+              toCoind (bs.get i').2.2 := by
           simpa using toCoindBranches_get_snd (bs := bs) i'
         have hidx :
             castFin (by simp) i =
@@ -201,7 +203,7 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
           cases i
           rfl
         simpa [hchild, hidx] using hcont
-      · have hlt : sizeOf (bs.get i').2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
+      · have hlt : sizeOf (bs.get i').2.2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
         exact lt_trans hlt (sizeOf_branches_lt_sizeOf_send p bs)
   | recv p bs =>
       rcases childRel_to_children h with ⟨i, hi⟩
@@ -212,10 +214,10 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
         simpa [children_mkRecv] using hi'
       let i' : Fin bs.length :=
         castFin (toCoindBranches_length bs) (castFin (by simp) i)
-      refine ⟨(bs.get i').2, ?_, ?_⟩
+      refine ⟨(bs.get i').2.2, ?_, ?_⟩
       · have hcont :
             ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i')).2 =
-              toCoind (bs.get i').2 := by
+              toCoind (bs.get i').2.2 := by
           simpa using toCoindBranches_get_snd (bs := bs) i'
         have hidx :
             castFin (by simp) i =
@@ -223,7 +225,7 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
           cases i
           rfl
         simpa [hchild, hidx] using hcont
-      · have hlt : sizeOf (bs.get i').2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
+      · have hlt : sizeOf (bs.get i').2.2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
         exact lt_trans hlt (sizeOf_branches_lt_sizeOf_recv p bs)
 
 /-! ## VisitedLt invariants -/
@@ -259,8 +261,8 @@ lemma childRel_toCoind_mu {x : String} {body : LocalTypeR} :
   refine ⟨.mu x, (fun _ => toCoind body), (), ?_, rfl⟩
   rfl
 
-lemma childRel_toCoind_send {p : String} {bs : List (Label × LocalTypeR)} (i : Fin bs.length) :
-    childRel (toCoind (.send p bs)) (toCoind (bs.get i).2) := by
+lemma childRel_toCoind_send {p : String} {bs : List BranchR} (i : Fin bs.length) :
+    childRel (toCoind (.send p bs)) (toCoind (bs.get i).2.2) := by
   refine ⟨head (toCoind (.send p bs)), children (toCoind (.send p bs)), ?_, rfl, ?_⟩
   ·
     have hlen : ((toCoindBranches bs).map Prod.fst).length = bs.length := by
@@ -272,7 +274,7 @@ lemma childRel_toCoind_send {p : String} {bs : List (Label × LocalTypeR)} (i : 
     have hchild' := children_mkSend p (toCoindBranches bs) (castFin hlen.symm i)
     have hcont :
         ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i)).2 =
-          toCoind (bs.get i).2 := by
+          toCoind (bs.get i).2.2 := by
       simpa using toCoindBranches_get_snd (bs := bs) i
     have hidx :
         castFin (by simp) (castFin hlen.symm i) =
@@ -285,8 +287,8 @@ lemma childRel_toCoind_send {p : String} {bs : List (Label × LocalTypeR)} (i : 
       simpa [toCoind, hidx, -children_mkSend] using hchild'
     exact hchild.trans hcont
 
-lemma childRel_toCoind_recv {p : String} {bs : List (Label × LocalTypeR)} (i : Fin bs.length) :
-    childRel (toCoind (.recv p bs)) (toCoind (bs.get i).2) := by
+lemma childRel_toCoind_recv {p : String} {bs : List BranchR} (i : Fin bs.length) :
+    childRel (toCoind (.recv p bs)) (toCoind (bs.get i).2.2) := by
   refine ⟨head (toCoind (.recv p bs)), children (toCoind (.recv p bs)), ?_, rfl, ?_⟩
   ·
     have hlen : ((toCoindBranches bs).map Prod.fst).length = bs.length := by
@@ -298,7 +300,7 @@ lemma childRel_toCoind_recv {p : String} {bs : List (Label × LocalTypeR)} (i : 
     have hchild' := children_mkRecv p (toCoindBranches bs) (castFin hlen.symm i)
     have hcont :
         ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i)).2 =
-          toCoind (bs.get i).2 := by
+          toCoind (bs.get i).2.2 := by
       simpa using toCoindBranches_get_snd (bs := bs) i
     have hidx :
         castFin (by simp) (castFin hlen.symm i) =
@@ -313,8 +315,8 @@ lemma childRel_toCoind_recv {p : String} {bs : List (Label × LocalTypeR)} (i : 
 
 /-! ## Free variable lemmas -/
 
-lemma mem_freeVarsOfBranches {bs : List (Label × LocalTypeR)} {v : String} :
-    v ∈ SessionTypes.LocalTypeR.freeVarsOfBranches bs → ∃ b ∈ bs, v ∈ b.2.freeVars := by
+lemma mem_freeVarsOfBranches {bs : List BranchR} {v : String} :
+    v ∈ SessionTypes.LocalTypeR.freeVarsOfBranches bs → ∃ b ∈ bs, v ∈ b.2.2.freeVars := by
   induction bs with
   | nil =>
       intro hv
@@ -361,28 +363,28 @@ lemma freeVars_subset_namesIn {t : LocalTypeR} {all : Finset LocalTypeC}
         simpa [LocalTypeR.freeVars] using hv
       rcases mem_freeVarsOfBranches (bs := bs) hv' with ⟨b, hb, hvb⟩
       have hidx :
-          ∃ i : Fin bs.length, v ∈ (bs.get i).2.freeVars := by
-        have : ∃ b ∈ bs, v ∈ b.2.freeVars := ⟨b, hb, hvb⟩
-        simpa using (List.exists_mem_iff_get (l := bs) (p := fun b => v ∈ b.2.freeVars)).1 this
+          ∃ i : Fin bs.length, v ∈ (bs.get i).2.2.freeVars := by
+        have : ∃ b ∈ bs, v ∈ b.2.2.freeVars := ⟨b, hb, hvb⟩
+        simpa using (List.exists_mem_iff_get (l := bs) (p := fun b => v ∈ b.2.2.freeVars)).1 this
       rcases hidx with ⟨i, hvi⟩
-      have hchild : childRel (toCoind (.send p bs)) (toCoind (bs.get i).2) :=
+      have hchild : childRel (toCoind (.send p bs)) (toCoind (bs.get i).2.2) :=
         childRel_toCoind_send (p := p) (bs := bs) i
-      have hmem_child : toCoind (bs.get i).2 ∈ all := mem_of_closed_child h_closed hmem hchild
-      exact freeVars_subset_namesIn (t := (bs.get i).2) (all := all) h_closed hmem_child v hvi
+      have hmem_child : toCoind (bs.get i).2.2 ∈ all := mem_of_closed_child h_closed hmem hchild
+      exact freeVars_subset_namesIn (t := (bs.get i).2.2) (all := all) h_closed hmem_child v hvi
   | recv p bs =>
       intro v hv
       have hv' : v ∈ SessionTypes.LocalTypeR.freeVarsOfBranches bs := by
         simpa [LocalTypeR.freeVars] using hv
       rcases mem_freeVarsOfBranches (bs := bs) hv' with ⟨b, hb, hvb⟩
       have hidx :
-          ∃ i : Fin bs.length, v ∈ (bs.get i).2.freeVars := by
-        have : ∃ b ∈ bs, v ∈ b.2.freeVars := ⟨b, hb, hvb⟩
-        simpa using (List.exists_mem_iff_get (l := bs) (p := fun b => v ∈ b.2.freeVars)).1 this
+          ∃ i : Fin bs.length, v ∈ (bs.get i).2.2.freeVars := by
+        have : ∃ b ∈ bs, v ∈ b.2.2.freeVars := ⟨b, hb, hvb⟩
+        simpa using (List.exists_mem_iff_get (l := bs) (p := fun b => v ∈ b.2.2.freeVars)).1 this
       rcases hidx with ⟨i, hvi⟩
-      have hchild : childRel (toCoind (.recv p bs)) (toCoind (bs.get i).2) :=
+      have hchild : childRel (toCoind (.recv p bs)) (toCoind (bs.get i).2.2) :=
         childRel_toCoind_recv (p := p) (bs := bs) i
-      have hmem_child : toCoind (bs.get i).2 ∈ all := mem_of_closed_child h_closed hmem hchild
-      exact freeVars_subset_namesIn (t := (bs.get i).2) (all := all) h_closed hmem_child v hvi
+      have hmem_child : toCoind (bs.get i).2.2 ∈ all := mem_of_closed_child h_closed hmem hchild
+      exact freeVars_subset_namesIn (t := (bs.get i).2.2) (all := all) h_closed hmem_child v hvi
 termination_by sizeOf t
 decreasing_by
   all_goals

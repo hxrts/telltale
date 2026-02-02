@@ -182,7 +182,7 @@ mod tests {
         match unfolded {
             LocalTypeR::Send { partner, branches } => {
                 assert_eq!(partner, "B");
-                assert!(matches!(branches[0].1, LocalTypeR::Mu { .. }));
+                assert!(matches!(branches[0].2, LocalTypeR::Mu { .. }));
             }
             _ => panic!("Expected Send after unfold"),
         }
@@ -234,9 +234,10 @@ mod tests {
         let branches = vec![
             (
                 Label::with_sort("accept", PayloadSort::Bool),
+                None,
                 LocalTypeR::End,
             ),
-            (Label::with_sort("data", PayloadSort::Nat), LocalTypeR::End),
+            (Label::with_sort("data", PayloadSort::Nat), None, LocalTypeR::End),
         ];
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());

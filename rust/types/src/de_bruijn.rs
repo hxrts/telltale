@@ -193,14 +193,14 @@ impl LocalTypeRDB {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), Self::from_local_type_with_env(cont, env)))
+                    .map(|(l, _vt, cont)| (l.clone(), Self::from_local_type_with_env(cont, env)))
                     .collect(),
             },
             LocalTypeR::Recv { partner, branches } => LocalTypeRDB::Recv {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, cont)| (l.clone(), Self::from_local_type_with_env(cont, env)))
+                    .map(|(l, _vt, cont)| (l.clone(), Self::from_local_type_with_env(cont, env)))
                     .collect(),
             },
             LocalTypeR::Mu { var, body } => {

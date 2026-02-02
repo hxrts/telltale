@@ -196,10 +196,11 @@ fn matches_direction(lt: &LocalTypeR, direction: Direction) -> bool {
 }
 
 /// Extract partner and branches from a LocalTypeR if it matches the direction
+#[allow(clippy::type_complexity)]
 fn extract_components(
     lt: &LocalTypeR,
     direction: Direction,
-) -> Option<(&String, &Vec<(Label, LocalTypeR)>)> {
+) -> Option<(&String, &[(Label, Option<telltale_types::ValType>, LocalTypeR)])> {
     match (direction, lt) {
         (Direction::Output, LocalTypeR::Send { partner, branches }) => Some((partner, branches)),
         (Direction::Input, LocalTypeR::Recv { partner, branches }) => Some((partner, branches)),
@@ -233,7 +234,7 @@ where
 
     let tree_branches: Vec<_> = branches
         .iter()
-        .map(|(label, cont)| {
+        .map(|(label, _vt, cont)| {
             let sub_tree = if matches_direction(cont, direction) {
                 build_siso_tree(cont, direction, empty, construct)?
             } else {
@@ -268,7 +269,7 @@ fn find_output_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
     match lt {
         LocalTypeR::Send { branches, .. } => {
             // Find first non-send continuation
-            for (_, cont) in branches {
+            for (_l, _vt, cont) in branches {
                 if !matches!(cont, LocalTypeR::Send { .. }) {
                     return Some(cont.clone());
                 }
@@ -286,7 +287,7 @@ fn find_input_continuation(lt: &LocalTypeR) -> Option<LocalTypeR> {
     match lt {
         LocalTypeR::Recv { branches, .. } => {
             // Find first non-recv continuation
-            for (_, cont) in branches {
+            for (_l, _vt, cont) in branches {
                 if !matches!(cont, LocalTypeR::Recv { .. }) {
                     return Some(cont.clone());
                 }
@@ -361,7 +362,7 @@ fn check_orphan_free(lt: &LocalTypeR, pending_sends: &mut Vec<(String, String)>)
         LocalTypeR::End => pending_sends.is_empty(),
 
         LocalTypeR::Send { partner, branches } => {
-            for (label, cont) in branches {
+            for (label, _vt, cont) in branches {
                 pending_sends.push((partner.clone(), label.name.clone()));
                 if !check_orphan_free(cont, pending_sends) {
                     return false;
@@ -377,7 +378,7 @@ fn check_orphan_free(lt: &LocalTypeR, pending_sends: &mut Vec<(String, String)>)
         } => {
             // A receive might consume a pending send
             // (simplified check - real implementation would track more precisely)
-            for (_label, cont) in branches {
+            for (_label, _vt, cont) in branches {
                 if !check_orphan_free(cont, pending_sends) {
                     return false;
                 }

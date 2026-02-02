@@ -50,27 +50,13 @@ fn test_direct_unguarded_recursion_rejected() {
         Ok(_) => panic!("Should not validate successfully"),
     }
 
-    // Step 4: Verify that even if projection succeeds structurally,
-    // the resulting local type is also ill-formed
+    // Step 4: Lean-compatible projection collapses unguarded recursion to End.
+    // μt. t projects to End because Var("t").is_var_guarded("t") = false.
     let projection_result = project(&deadlock_protocol, "A");
-
-    // Projection may succeed structurally (μt.t projects to μt.t for any role)
-    // But the result is also ill-formed
-    if let Ok(local) = projection_result {
-        assert!(
-            !local.is_guarded(),
-            "Projected local type should also be unguarded"
-        );
-        assert!(
-            !local.well_formed(),
-            "Projected local type should also be ill-formed"
-        );
-        assert!(
-            validate_local(&local).is_err(),
-            "Projected local type should fail validation"
-        );
-    }
-    // Either way (projection fails OR projected type is ill-formed), the protocol is rejected
+    assert!(
+        matches!(projection_result, Ok(LocalTypeR::End)),
+        "Unguarded recursion should project to End"
+    );
 }
 
 // ============================================================================
@@ -245,14 +231,14 @@ fn test_various_unguarded_patterns_all_rejected() {
             name
         );
 
-        // Projection may succeed structurally, but result is ill-formed
-        if let Ok(local) = project(&protocol, "A") {
-            assert!(
-                !local.well_formed(),
-                "{} projection should be ill-formed",
-                name
-            );
-        }
+        // Lean-compatible projection collapses unguarded recursion.
+        // The result is End or a trivial Mu wrapping End (well-formed but vacuous).
+        let local = project(&protocol, "A").unwrap();
+        assert!(
+            !matches!(local, LocalTypeR::Send { .. } | LocalTypeR::Recv { .. }),
+            "{} should not project to a communicating type",
+            name
+        );
     }
 }
 
@@ -293,13 +279,12 @@ fn test_deadlock_prevention_pipeline() {
     );
 
     // Stage 4: Projection (to local types)
-    // Projection may succeed structurally, but the result is ill-formed
-    if let Ok(unguarded_local) = project(&unguarded_protocol, "A") {
-        assert!(
-            !unguarded_local.well_formed(),
-            "❌ Stage 4: Projected unguarded type is ill-formed"
-        );
-    }
+    // Lean-compatible projection collapses unguarded recursion to End.
+    let unguarded_local = project(&unguarded_protocol, "A").unwrap();
+    assert!(
+        matches!(unguarded_local, LocalTypeR::End),
+        "❌ Stage 4: Unguarded protocol projects to End"
+    );
 
     let guarded_local = project(&guarded_protocol, "A");
     assert!(

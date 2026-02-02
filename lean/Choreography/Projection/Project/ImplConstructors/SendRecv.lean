@@ -35,7 +35,7 @@ private theorem CProjectF_comm_other_iff
 /-- Helper: sender case for send projection agreement (comm/cons). -/
 private theorem CProject_send_implies_trans_send_comm_cons_sender
     (sender receiver : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
-    (role partner : String) (lbs : List (Label × LocalTypeR))
+    (role partner : String) (lbs : List BranchR)
     (hf : CProjectF CProject (GlobalType.comm sender receiver (first :: rest)) role
       (LocalTypeR.send partner lbs))
     (hrs : role = sender) (hwf : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true) :
@@ -56,7 +56,7 @@ private theorem CProject_send_implies_trans_send_comm_cons_sender
 /-- Helper: receiver role cannot project to `.send`. -/
 private theorem CProject_send_implies_trans_send_comm_receiver_contra
     (sender receiver role partner : String) (gbs : List (Label × GlobalType))
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (hproj : CProject (.comm sender receiver gbs) role (.send partner lbs))
     (hrr : role = receiver) (hrs : role ≠ sender) : False := by
   -- CProjectF forbids .send when the role is receiver.
@@ -69,7 +69,7 @@ private theorem CProject_send_implies_trans_send_comm_receiver_contra
 /-- Helper: non-participant comm case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm_other
     (sender receiver role partner : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
-    (lbs : List (Label × LocalTypeR)) (hrs : role ≠ sender) (hrr : role ≠ receiver)
+    (lbs : List BranchR) (hrs : role ≠ sender) (hrr : role ≠ receiver)
     (hrec :
       ∃ gbs', trans first.2 role = .send partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
@@ -90,7 +90,7 @@ mutual
 /-- Helper: comm/cons case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm_cons (g : GlobalType) (sender receiver : String)
       (first : Label × GlobalType) (rest : List (Label × GlobalType)) (role partner : String)
-      (lbs : List (Label × LocalTypeR)) (hproj : CProject g role (.send partner lbs))
+      (lbs : List BranchR) (hproj : CProject g role (.send partner lbs))
       (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true) :
       ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .send partner (transBranches gbs' role) ∧
@@ -120,7 +120,7 @@ decreasing_by
 
 /-- Helper: comm case for send projection agreement. -/
 private theorem CProject_send_implies_trans_send_comm (sender receiver : String)
-      (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List (Label × LocalTypeR))
+      (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List BranchR)
       (hproj : CProject (.comm sender receiver gbs) role (.send partner lbs))
       (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
       ∃ gbs', trans (.comm sender receiver gbs) role =
@@ -150,7 +150,7 @@ decreasing_by
 /-- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
       (possibly through non-participant layers), and trans g role = .send partner (transBranches ...). -/
 theorem CProject_send_implies_trans_send (g : GlobalType) (role : String)
-      (partner : String) (lbs : List (Label × LocalTypeR))
+      (partner : String) (lbs : List BranchR)
       (hproj : CProject g role (.send partner lbs))
       (hwf : g.wellFormed = true) :
       ∃ gbs', trans g role = .send partner (transBranches gbs' role) ∧
@@ -177,7 +177,7 @@ end
 
 /-- Helper: `.end` cannot project to `.recv`. -/
 private theorem CProject_recv_implies_trans_recv_end (role partner : String)
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (hproj : CProject .end role (.recv partner lbs)) :
     ∃ gbs', trans .end role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
@@ -189,7 +189,7 @@ private theorem CProject_recv_implies_trans_recv_end (role partner : String)
 
 /-- Helper: `.var` cannot project to `.recv`. -/
 private theorem CProject_recv_implies_trans_recv_var (v role partner : String)
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (hproj : CProject (.var v) role (.recv partner lbs)) :
     ∃ gbs', trans (.var v) role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
@@ -201,7 +201,7 @@ private theorem CProject_recv_implies_trans_recv_var (v role partner : String)
 
 /-- Helper: `.mu` cannot project to `.recv`. -/
 private theorem CProject_recv_implies_trans_recv_mu (t : String) (body : GlobalType)
-    (role partner : String) (lbs : List (Label × LocalTypeR))
+    (role partner : String) (lbs : List BranchR)
     (hproj : CProject (.mu t body) role (.recv partner lbs)) :
     ∃ gbs', trans (.mu t body) role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
@@ -214,7 +214,7 @@ private theorem CProject_recv_implies_trans_recv_mu (t : String) (body : GlobalT
 /-- Helper: receiver case for recv projection agreement (comm/cons). -/
 private theorem CProject_recv_implies_trans_recv_comm_cons_receiver
     (sender receiver : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
-    (role partner : String) (lbs : List (Label × LocalTypeR))
+    (role partner : String) (lbs : List BranchR)
     (hf : CProjectF CProject (GlobalType.comm sender receiver (first :: rest)) role
       (LocalTypeR.recv partner lbs))
     (hrs : role ≠ sender) (hrr : role = receiver)
@@ -237,7 +237,7 @@ private theorem CProject_recv_implies_trans_recv_comm_cons_receiver
 /-- Helper: sender role cannot project to `.recv`. -/
 private theorem CProject_recv_implies_trans_recv_comm_sender_contra
     (sender receiver role partner : String) (gbs : List (Label × GlobalType))
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (hproj : CProject (.comm sender receiver gbs) role (.recv partner lbs))
     (hrs : role = sender) : False := by
   -- CProjectF forbids .recv when the role is sender.
@@ -247,7 +247,7 @@ private theorem CProject_recv_implies_trans_recv_comm_sender_contra
 /-- Helper: non-participant comm case for recv projection agreement. -/
 private theorem CProject_recv_implies_trans_recv_comm_other
     (sender receiver role partner : String) (first : Label × GlobalType) (rest : List (Label × GlobalType))
-    (lbs : List (Label × LocalTypeR)) (hrs : role ≠ sender) (hrr : role ≠ receiver)
+    (lbs : List BranchR) (hrs : role ≠ sender) (hrr : role ≠ receiver)
     (hrec :
       ∃ gbs', trans first.2 role = .recv partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
@@ -269,7 +269,7 @@ mutual
 /-- Helper: comm/cons case for recv projection agreement. -/
 private theorem CProject_recv_implies_trans_recv_comm_cons (g : GlobalType) (sender receiver : String)
       (first : Label × GlobalType) (rest : List (Label × GlobalType)) (role partner : String)
-      (lbs : List (Label × LocalTypeR)) (hproj : CProject g role (.recv partner lbs))
+      (lbs : List BranchR) (hproj : CProject g role (.recv partner lbs))
       (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true) :
       ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .recv partner (transBranches gbs' role) ∧
@@ -299,7 +299,7 @@ decreasing_by
 
 /-- Helper: comm case for recv projection agreement. -/
 private theorem CProject_recv_implies_trans_recv_comm (sender receiver : String)
-      (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List (Label × LocalTypeR))
+      (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List BranchR)
       (hproj : CProject (.comm sender receiver gbs) role (.recv partner lbs))
       (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
       ∃ gbs', trans (.comm sender receiver gbs) role =
@@ -328,7 +328,7 @@ decreasing_by
       simp [hgb, GlobalType.comm.sizeOf_spec]
 /-- Symmetric version for recv. -/
 theorem CProject_recv_implies_trans_recv (g : GlobalType) (role : String) (partner : String)
-      (lbs : List (Label × LocalTypeR)) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true) :
+      (lbs : List BranchR) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true) :
       ∃ gbs', trans g role = .recv partner (transBranches gbs' role) ∧ BranchesProjRel CProject gbs' role lbs ∧
         (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
     cases hg : g with -- Dispatch by constructor; comm uses the helper above.

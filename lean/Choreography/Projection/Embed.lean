@@ -46,8 +46,8 @@ abbrev EmbedRel := LocalTypeR → String → GlobalType → Prop
 
 Labels must match and each branch continuation must embed under R. -/
 def BranchesEmbedRel (R : EmbedRel)
-    (lbs : List (Label × LocalTypeR)) (role : String) (gbs : List (Label × GlobalType)) : Prop :=
-  List.Forall₂ (fun lb gb => lb.1 = gb.1 ∧ R lb.2 role gb.2) lbs gbs
+    (lbs : List BranchR) (role : String) (gbs : List (Label × GlobalType)) : Prop :=
+  List.Forall₂ (fun lb gb => lb.1 = gb.1 ∧ R lb.2.2 role gb.2) lbs gbs
 
 /-! ## One-Step Generator -/
 
@@ -139,7 +139,7 @@ theorem CEmbed_destruct {e : LocalTypeR} {role : String} {g : GlobalType}
 /-! ## Embedding implies projection -/
 
 /-- Convert BranchesEmbedRel into BranchesProjRel with swapped arguments. -/
-private theorem BranchesEmbedRel_to_Proj {lbs : List (Label × LocalTypeR)}
+private theorem BranchesEmbedRel_to_Proj {lbs : List BranchR}
     {gbs : List (Label × GlobalType)} {role : String}
     (h : BranchesEmbedRel CEmbed lbs role gbs) :
     BranchesProjRel (fun g r e => CEmbed e r g) gbs role lbs := by
@@ -183,7 +183,7 @@ private theorem embed_implies_project_mu {t : String} {body : LocalTypeR}
 
 /-- Helper: embed implies project for send case. -/
 private theorem embed_implies_project_send {receiver : String}
-    {lbs : List (Label × LocalTypeR)} {g : GlobalType} {role : String}
+    {lbs : List BranchR} {g : GlobalType} {role : String}
     (hF : CEmbedF CEmbed (LocalTypeR.send receiver lbs) role g) :
     CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.send receiver lbs) := by
   cases g with
@@ -197,7 +197,7 @@ private theorem embed_implies_project_send {receiver : String}
 
 /-- Helper: embed implies project for recv case. -/
 private theorem embed_implies_project_recv {sender : String}
-    {lbs : List (Label × LocalTypeR)} {g : GlobalType} {role : String}
+    {lbs : List BranchR} {g : GlobalType} {role : String}
     (hF : CEmbedF CEmbed (LocalTypeR.recv sender lbs) role g) :
     CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.recv sender lbs) := by
   cases g with

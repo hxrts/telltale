@@ -20,7 +20,7 @@ open Paco
 open SessionTypes.Participation
 private theorem CProjectTransRel_postfix_comm_send_sender
     {sender receiver role partner : String}
-    {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
+    {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hrs : role = sender)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
     (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
@@ -39,7 +39,7 @@ private theorem CProjectTransRel_postfix_comm_send_sender
 
 private theorem CProjectTransRel_postfix_comm_send_nonpart
     {sender receiver role partner : String}
-    {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
+    {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
     (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
@@ -55,7 +55,7 @@ private theorem CProjectTransRel_postfix_comm_send_nonpart
 
 private theorem CProjectTransRel_postfix_comm_recv_receiver
     {sender receiver role partner : String}
-    {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
+    {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hrr : role = receiver) (hne : receiver ≠ sender)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
     (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
@@ -74,7 +74,7 @@ private theorem CProjectTransRel_postfix_comm_recv_receiver
 
 private theorem CProjectTransRel_postfix_comm_recv_nonpart
     {sender receiver role partner : String}
-    {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
+    {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
     (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
@@ -90,7 +90,7 @@ private theorem CProjectTransRel_postfix_comm_recv_nonpart
 
 private theorem CProjectTransRel_postfix_comm_send
     {sender receiver role partner : String}
-    {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
+    {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
     (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
@@ -108,7 +108,7 @@ private theorem CProjectTransRel_postfix_comm_send
 
 private theorem CProjectTransRel_postfix_comm_recv
     {sender receiver role partner : String}
-    {gbs : List (Label × GlobalType)} {lbs : List (Label × LocalTypeR)} {t : LocalTypeR}
+    {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
     (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
@@ -327,12 +327,12 @@ theorem CProjectTransRelComp_extend_left
 theorem BranchesRel_trans_chain_rev {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {bs cs ds : List (Label × LocalTypeR)}
+    {bs cs ds : List BranchR}
     (hbc : BranchesRel EQ2 bs cs)
     (hcd : BranchesRel (EQ2_closure R) cs ds)
-    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
-    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2)
-    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2) :
+    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2.2) :
     BranchesRel (EQ2_closure R) bs ds := by
   -- Use Forall₂ transitivity with a head/tail split.
   induction hbc generalizing ds with

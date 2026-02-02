@@ -19,20 +19,20 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 
 /-- Lookup a label in a branch list (first match). -/
-def lookupBranch (lbl : Label) : List (Label × LocalTypeR) → Option LocalTypeR
+def lookupBranch (lbl : Label) : List BranchR → Option LocalTypeR
   | [] => none
-  | (l, t) :: rest => if l = lbl then some t else lookupBranch lbl rest
+  | (l, _vt, t) :: rest => if l = lbl then some t else lookupBranch lbl rest
 
 /-- Label presence predicate for a branch list. -/
-def labelIn (lbl : Label) (branches : List (Label × LocalTypeR)) : Prop :=
+def labelIn (lbl : Label) (branches : List BranchR) : Prop :=
   (lookupBranch lbl branches).isSome
 
 /-- Two branch lists have the same set of labels. -/
-def sameLabels (bs1 bs2 : List (Label × LocalTypeR)) : Prop :=
+def sameLabels (bs1 bs2 : List BranchR) : Prop :=
   ∀ lbl, labelIn lbl bs1 ↔ labelIn lbl bs2
 
 /-- A branch list carries exactly the union of labels from two inputs. -/
-def unionLabels (bs1 bs2 bs : List (Label × LocalTypeR)) : Prop :=
+def unionLabels (bs1 bs2 bs : List BranchR) : Prop :=
   ∀ lbl, labelIn lbl bs ↔ (labelIn lbl bs1 ∨ labelIn lbl bs2)
 
 /-- Erasure relation: `Erases a b c` means `c` is a common lower bound of `a` and `b`.
@@ -48,7 +48,7 @@ inductive Erases : LocalTypeR → LocalTypeR → LocalTypeR → Prop where
   | var (v : String) : Erases (.var v) (.var v) (.var v)
   | mu (v : String) {a b c : LocalTypeR} :
       Erases a b c → Erases (.mu v a) (.mu v b) (.mu v c)
-  | send {p : String} {bs1 bs2 bs : List (Label × LocalTypeR)} :
+  | send {p : String} {bs1 bs2 bs : List BranchR} :
       sameLabels bs1 bs2 →
       sameLabels bs1 bs →
       (∀ lbl t1 t2 t,
@@ -57,7 +57,7 @@ inductive Erases : LocalTypeR → LocalTypeR → LocalTypeR → Prop where
         lookupBranch lbl bs = some t →
         Erases t1 t2 t) →
       Erases (.send p bs1) (.send p bs2) (.send p bs)
-  | recv {p : String} {bs1 bs2 bs : List (Label × LocalTypeR)} :
+  | recv {p : String} {bs1 bs2 bs : List BranchR} :
       (∀ lbl t1 t2 t,
         lookupBranch lbl bs1 = some t1 →
         lookupBranch lbl bs2 = some t2 →

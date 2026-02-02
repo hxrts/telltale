@@ -311,14 +311,14 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
         LocalTypeR::Send { partner, branches } => {
             if act.kind == LocalKind::Send {
                 // send_head: direct match
-                if partner == &act.partner && branches.iter().any(|(l, _)| l.name == act.label.name)
+                if partner == &act.partner && branches.iter().any(|(l, _vt, _)| l.name == act.label.name)
                 {
                     return true;
                 }
 
                 // send_async: skip if different partner
                 if act.partner != *partner {
-                    for (_, cont) in branches {
+                    for (_l, _vt, cont) in branches {
                         if local_can_step_fuel(cont, act, fuel - 1) {
                             return true;
                         }
@@ -331,7 +331,7 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
             // recv_head: direct match
             if act.kind == LocalKind::Recv
                 && partner == &act.partner
-                && branches.iter().any(|(l, _)| l.name == act.label.name)
+                && branches.iter().any(|(l, _vt, _)| l.name == act.label.name)
             {
                 return true;
             }
@@ -367,7 +367,7 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
             if act.kind == LocalKind::Send {
                 // send_head: direct match
                 if partner == &act.partner {
-                    for (l, cont) in branches {
+                    for (l, _vt, cont) in branches {
                         if l.name == act.label.name {
                             return Some(cont.clone());
                         }
@@ -378,13 +378,13 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
                 if act.partner != *partner {
                     let enabled = branches
                         .iter()
-                        .any(|(_, cont)| local_can_step_fuel(cont, act, fuel - 1));
+                        .any(|(_l, _vt, cont)| local_can_step_fuel(cont, act, fuel - 1));
 
                     if enabled {
                         let mut new_branches = Vec::with_capacity(branches.len());
-                        for (l, cont) in branches {
+                        for (l, vt, cont) in branches {
                             if let Some(stepped) = local_step_fuel(cont, act, fuel - 1) {
-                                new_branches.push((l.clone(), stepped));
+                                new_branches.push((l.clone(), vt.clone(), stepped));
                             } else {
                                 return None;
                             }
@@ -401,7 +401,7 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
         LocalTypeR::Recv { partner, branches } => {
             // recv_head: direct match only (recv blocks)
             if act.kind == LocalKind::Recv && partner == &act.partner {
-                for (l, cont) in branches {
+                for (l, _vt, cont) in branches {
                     if l.name == act.label.name {
                         return Some(cont.clone());
                     }

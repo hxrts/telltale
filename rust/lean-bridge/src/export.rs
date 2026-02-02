@@ -100,7 +100,7 @@ pub fn local_to_json(lt: &LocalTypeR) -> Value {
         LocalTypeR::Send { partner, branches } => {
             let branches_json: Vec<Value> = branches
                 .iter()
-                .map(|(label, cont)| {
+                .map(|(label, _vt, cont)| {
                     json!({
                         "label": label_to_json(label),
                         "continuation": local_to_json(cont)
@@ -118,7 +118,7 @@ pub fn local_to_json(lt: &LocalTypeR) -> Value {
         LocalTypeR::Recv { partner, branches } => {
             let branches_json: Vec<Value> = branches
                 .iter()
-                .map(|(label, cont)| {
+                .map(|(label, _vt, cont)| {
                     json!({
                         "label": label_to_json(label),
                         "continuation": local_to_json(cont)
@@ -165,6 +165,8 @@ fn sort_to_json(sort: &PayloadSort) -> Value {
         PayloadSort::Nat => json!("nat"),
         PayloadSort::Bool => json!("bool"),
         PayloadSort::String => json!("string"),
+        PayloadSort::Real => json!("real"),
+        PayloadSort::Vector(n) => json!({ "vector": n }),
         PayloadSort::Prod(left, right) => {
             json!({
                 "prod": [sort_to_json(left), sort_to_json(right)]
@@ -258,5 +260,17 @@ mod tests {
         assert!(json["prod"].is_array());
         assert_eq!(json["prod"][0], "nat");
         assert_eq!(json["prod"][1], "bool");
+    }
+
+    #[test]
+    fn test_real_sort() {
+        let json = sort_to_json(&PayloadSort::Real);
+        assert_eq!(json, "real");
+    }
+
+    #[test]
+    fn test_vector_sort() {
+        let json = sort_to_json(&PayloadSort::Vector(4));
+        assert_eq!(json["vector"], 4);
     }
 }

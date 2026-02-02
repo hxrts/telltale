@@ -96,10 +96,9 @@ impl LeanRunner {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let mut path = PathBuf::from(manifest_dir);
 
-        // Walk up looking for the Lean binary
+        // Walk up looking for the lean/.lake/ directory as a workspace root marker.
         for _ in 0..5 {
-            let lean_path = path.join(Self::DEFAULT_BINARY_PATH);
-            if lean_path.exists() {
+            if path.join("lean/.lake").is_dir() {
                 return Some(path);
             }
             if !path.pop() {
@@ -149,6 +148,20 @@ impl LeanRunner {
     #[must_use]
     pub fn try_new() -> Option<Self> {
         Self::new().ok()
+    }
+
+    /// Create a LeanRunner for projection only (does not require the validation binary).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LeanRunnerError::BinaryNotFound`] if the projection binary doesn't exist.
+    pub fn for_projection() -> Result<Self, LeanRunnerError> {
+        match Self::get_projection_binary_path() {
+            Some(path) => Ok(Self { binary_path: path }),
+            None => Err(LeanRunnerError::BinaryNotFound(PathBuf::from(
+                Self::PROJECTION_BINARY_PATH,
+            ))),
+        }
     }
 
     /// Check if the Lean binary is available at the default path.
@@ -328,6 +341,108 @@ impl LeanRunner {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    // ========================================================================
+    // Projection Methods (for physical pipeline)
+    // ========================================================================
+
+    /// Default path to the projection runner binary (relative to workspace root).
+    pub const PROJECTION_BINARY_PATH: &'static str =
+        "lean/.lake/build/bin/projection_runner";
+
+    /// Get the full path to the projection runner binary.
+    fn get_projection_binary_path() -> Option<PathBuf> {
+        Self::find_workspace_root()
+            .map(|root| root.join(Self::PROJECTION_BINARY_PATH))
+            .filter(|p| p.exists())
+    }
+
+    /// Check if the projection runner binary is available.
+    #[must_use]
+    pub fn is_projection_available() -> bool {
+        Self::get_projection_binary_path().is_some()
+    }
+
+    /// Project a GlobalType for a list of roles using the Lean projection runner.
+    ///
+    /// Sends the GlobalType and role list as JSON to the projection_runner binary
+    /// via stdin and parses the projected LocalTypeR results from stdout.
+    ///
+    /// # Input format (sent to stdin)
+    ///
+    /// ```json
+    /// {
+    ///   "global_type": { "kind": "comm", ... },
+    ///   "roles": ["A", "B"]
+    /// }
+    /// ```
+    ///
+    /// # Output format (parsed from stdout)
+    ///
+    /// ```json
+    /// {
+    ///   "projections": {
+    ///     "A": { "kind": "send", ... },
+    ///     "B": { "kind": "recv", ... }
+    ///   }
+    /// }
+    /// ```
+    pub fn project(
+        &self,
+        global_json: &Value,
+        roles: &[String],
+    ) -> Result<std::collections::HashMap<String, Value>, LeanRunnerError> {
+        let projection_path = Self::get_projection_binary_path().ok_or_else(|| {
+            LeanRunnerError::BinaryNotFound(PathBuf::from(Self::PROJECTION_BINARY_PATH))
+        })?;
+
+        let input = serde_json::json!({
+            "global_type": global_json,
+            "roles": roles
+        });
+        let input_str = serde_json::to_string(&input)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        let mut child = Command::new(&projection_path)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+
+        // Write input to stdin
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            stdin
+                .write_all(input_str.as_bytes())
+                .map_err(LeanRunnerError::TempFileError)?;
+        }
+
+        let output = child.wait_with_output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let result: Value = serde_json::from_str(&stdout)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        let projections = result
+            .get("projections")
+            .and_then(|v| v.as_object())
+            .ok_or_else(|| {
+                LeanRunnerError::ParseError("missing projections field".to_string())
+            })?;
+
+        Ok(projections
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect())
     }
 
     // ========================================================================

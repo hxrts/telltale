@@ -46,13 +46,13 @@ theorem CProjectTransRelComp_extend_left_noWF
 private theorem BranchesRel_trans_chain_head_noWF {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {lb_bs lb_cs lb_ds : Label × LocalTypeR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ (EQ2_closure R) lb_bs.2 lb_cs.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ EQ2 lb_cs.2 lb_ds.2)
-    (hWFa : LocalTypeR.WellFormed lb_bs.2)
-    (hWFb : LocalTypeR.WellFormed lb_cs.2)
-    (hWFc : LocalTypeR.WellFormed lb_ds.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2 lb_ds.2 := by
+    {lb_bs lb_cs lb_ds : BranchR}
+    (h1 : lb_bs.1 = lb_cs.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ EQ2 lb_cs.2.2 lb_ds.2.2)
+    (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
+    (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
+    (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
+    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   constructor
   · exact h1.1.trans h2.1
   · cases h1.2 with
@@ -62,13 +62,13 @@ private theorem BranchesRel_trans_chain_head_noWF {R : Rel}
 private theorem BranchesRel_trans_chain_rev_head_noWF {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {lb_bs lb_cs lb_ds : Label × LocalTypeR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ EQ2 lb_bs.2 lb_cs.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_cs.2 lb_ds.2)
-    (hWFa : LocalTypeR.WellFormed lb_bs.2)
-    (hWFb : LocalTypeR.WellFormed lb_cs.2)
-    (hWFc : LocalTypeR.WellFormed lb_ds.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2 lb_ds.2 := by
+    {lb_bs lb_cs lb_ds : BranchR}
+    (h1 : lb_bs.1 = lb_cs.1 ∧ EQ2 lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_cs.2.2 lb_ds.2.2)
+    (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
+    (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
+    (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
+    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   constructor
   · exact h1.1.trans h2.1
   · cases h2.2 with
@@ -78,12 +78,12 @@ private theorem BranchesRel_trans_chain_rev_head_noWF {R : Rel}
 theorem BranchesRel_trans_chain_noWF {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {bs cs ds : List (Label × LocalTypeR)}
+    {bs cs ds : List BranchR}
     (hbc : BranchesRel (EQ2_closure R) bs cs)
     (hcd : BranchesRel EQ2 cs ds)
-    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
-    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2)
-    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2) :
+    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2.2) :
     BranchesRel (EQ2_closure R) bs ds := by
   induction hbc generalizing ds with
   | nil => cases hcd; exact List.Forall₂.nil
@@ -103,12 +103,12 @@ theorem BranchesRel_trans_chain_noWF {R : Rel}
 theorem BranchesRel_trans_chain_rev_noWF {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
-    {bs cs ds : List (Label × LocalTypeR)}
+    {bs cs ds : List BranchR}
     (hbc : BranchesRel EQ2 bs cs)
     (hcd : BranchesRel (EQ2_closure R) cs ds)
-    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
-    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2)
-    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2) :
+    (hwf_bs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_cs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2)
+    (hwf_ds : ∀ lb ∈ ds, LocalTypeR.WellFormed lb.2.2) :
     BranchesRel (EQ2_closure R) bs ds := by
   induction hbc generalizing ds with
   | nil => cases hcd; exact List.Forall₂.nil
@@ -188,15 +188,15 @@ theorem CProjectTransRelComp_var_extract
 
 /-- When send is CProjectTransRelComp-related to send, partners and branches match.
     Returns the partner equality and a BranchesRel for the continuation. -/
-private theorem send_branches_wf (p : String) (bs : List (Label × LocalTypeR))
+private theorem send_branches_wf (p : String) (bs : List BranchR)
     (hWF : LocalTypeR.WellFormed (.send p bs)) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   -- Extract per-branch well-formedness from send well-formedness.
   exact LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWF
 
 /- Helper: base case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_base
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
+    {p1 p2 : String} {bs1 bs2 : List BranchR}
     (hbase : CProjectTransRel (.send p1 bs1) (.send p2 bs2)) :
     p1 = p2 ∧ BranchesRel (EQ2_closure CProjectTransRelComp) bs1 bs2 := by
   -- Base CProjectTransRel implies postfix EQ2F on send.
@@ -205,7 +205,7 @@ private theorem CProjectTransRelComp_send_extract_base
 
 /- Helper: left case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_left
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)} {b : LocalTypeR}
+    {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (heq : EQ2 (.send p1 bs1) b) (hrel : CProjectTransRel b (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
@@ -219,9 +219,9 @@ private theorem CProjectTransRelComp_send_extract_left
       obtain ⟨hp1, hbs1⟩ := heq_f
       obtain ⟨hp2, hbs2⟩ := hrel_f
       refine ⟨hp1.trans hp2, ?_⟩
-      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2 := send_branches_wf p1 bs1 hWFa
-      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2 := send_branches_wf pb bbs hWFb
-      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2 := send_branches_wf p2 bs2 hWFc
+      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2.2 := send_branches_wf p1 bs1 hWFa
+      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2.2 := send_branches_wf pb bbs hWFb
+      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2.2 := send_branches_wf p2 bs2 hWFc
       exact BranchesRel_trans_chain_rev_noWF
         (fun a b c => CProjectTransRelComp_extend_left_noWF (a := a) (b := b) (c := c))
         hbs1 hbs2 hWFbs1 hWFbbs hWFbs2
@@ -234,7 +234,7 @@ private theorem CProjectTransRelComp_send_extract_left
 
 /- Helper: right case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_right
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)} {b : LocalTypeR}
+    {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (hrel : CProjectTransRel (.send p1 bs1) b) (heq : EQ2 b (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
@@ -246,9 +246,9 @@ private theorem CProjectTransRelComp_send_extract_right
       have heq_f : EQ2F EQ2 (.send pb bbs) (.send p2 bs2) := EQ2.destruct heq
       simp [EQ2F] at hrel_f heq_f; obtain ⟨hp1, hbs1⟩ := hrel_f; obtain ⟨hp2, hbs2⟩ := heq_f
       refine ⟨hp1.trans hp2, ?_⟩
-      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2 := send_branches_wf p1 bs1 hWFa
-      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2 := send_branches_wf pb bbs hWFb
-      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2 := send_branches_wf p2 bs2 hWFc
+      have hWFbs1 : ∀ lb ∈ bs1, LocalTypeR.WellFormed lb.2.2 := send_branches_wf p1 bs1 hWFa
+      have hWFbbs : ∀ lb ∈ bbs, LocalTypeR.WellFormed lb.2.2 := send_branches_wf pb bbs hWFb
+      have hWFbs2 : ∀ lb ∈ bs2, LocalTypeR.WellFormed lb.2.2 := send_branches_wf p2 bs2 hWFc
       exact BranchesRel_trans_chain_noWF
         (fun a b c => CProjectTransRelComp_extend_right_noWF (a := a) (b := b) (c := c))
         hbs1 hbs2 hWFbs1 hWFbbs hWFbs2
@@ -268,7 +268,7 @@ private theorem CProjectTransRelComp_send_extract_right
 
 /- Helper: both case for CProjectTransRelComp_send_extract. -/
 private theorem CProjectTransRelComp_send_extract_both
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)} {b b' : LocalTypeR}
+    {p1 p2 : String} {bs1 bs2 : List BranchR} {b b' : LocalTypeR}
     (heq : EQ2 (.send p1 bs1) b) (hrel : CProjectTransRel b b') (heq' : EQ2 b' (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
@@ -280,7 +280,7 @@ private theorem CProjectTransRelComp_send_extract_both
   simpa [EQ2F] using hcomp
 
 theorem CProjectTransRelComp_send_extract
-    {p1 p2 : String} {bs1 bs2 : List (Label × LocalTypeR)}
+    {p1 p2 : String} {bs1 bs2 : List BranchR}
     (h : CProjectTransRelComp (.send p1 bs1) (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1))
     (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
@@ -296,9 +296,9 @@ theorem CProjectTransRelComp_send_extract
 
 /-- When recv is CProjectTransRelComp-related to recv, partners and branches match.
     Returns the partner equality and a BranchesRel for the continuation. -/
-theorem recv_branches_wf (p : String) (bs : List (Label × LocalTypeR))
+theorem recv_branches_wf (p : String) (bs : List BranchR)
     (hWF : LocalTypeR.WellFormed (.recv p bs)) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   -- Extract per-branch well-formedness from recv well-formedness.
   exact LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWF
 

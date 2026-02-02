@@ -51,7 +51,7 @@ def SubstUnfoldClosure (var : String) (repl : LocalTypeR) : Rel :=
 /-- BranchesRelBisim reflexivity for SubstUnfoldClosure when all branches are well-formed. -/
 private theorem BranchesRelBisim_SubstUnfoldClosure_refl (var : String) (repl : LocalTypeR)
     (hWFrepl : LocalTypeR.WellFormed repl)
-    (bs : List (Label × LocalTypeR)) (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2) :
+    (bs : List BranchR) (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2) :
     BranchesRelBisim (SubstUnfoldClosure var repl)
       (substituteBranches bs var repl)
       (substituteBranches bs var repl) := by
@@ -59,7 +59,7 @@ private theorem BranchesRelBisim_SubstUnfoldClosure_refl (var : String) (repl : 
   | nil => exact List.Forall₂.nil
   | cons b rest ih =>
       constructor
-      · exact ⟨rfl, Or.inr (Bisim_refl (b.2.substitute var repl)
+      · exact ⟨rfl, Or.inr (Bisim_refl (b.2.2.substitute var repl)
           (WellFormed_substitute var (hWFbs b (List.Mem.head _)) hWFrepl))⟩
       · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
 

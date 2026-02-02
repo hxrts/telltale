@@ -32,10 +32,10 @@ private theorem lift_eq2_closure_compWF {a b : LocalTypeR}
   | inr heq => exact Or.inr heq
 
 theorem BranchesRel_lift_compWF
-    {bs cs : List (Label × LocalTypeR)}
+    {bs cs : List BranchR}
     (h : BranchesRel (EQ2_closure CProjectTransRelComp) bs cs)
-    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2)
-    (hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2) :
+    (hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2)
+    (hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2) :
     BranchesRel (EQ2_closure CProjectTransRelCompWF) bs cs := by
   -- Lift each branch pair using the endpoint well-formedness.
   induction h with
@@ -69,28 +69,28 @@ theorem CProjectTransRelCompWF_extend_left {a b c : LocalTypeR}
 /-! ### EQ2F Lifting Helpers -/
 
 private theorem EQ2F_lift_compWF_send
-    {p q : String} {bs cs : List (Label × LocalTypeR)}
+    {p q : String} {bs cs : List BranchR}
     {h : BranchesRel (EQ2_closure CProjectTransRelComp) bs cs}
     (hWFa : LocalTypeR.WellFormed (.send p bs))
     (hWFc : LocalTypeR.WellFormed (.send q cs)) :
     BranchesRel (EQ2_closure CProjectTransRelCompWF) bs cs := by
   -- Lift branch relations using well-formedness for send branches.
-  have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+  have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_send (p := p) (bs := bs) hWFa
-  have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+  have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_send (p := q) (bs := cs) hWFc
   exact BranchesRel_lift_compWF h hWFbs hWFcs
 
 private theorem EQ2F_lift_compWF_recv
-    {p q : String} {bs cs : List (Label × LocalTypeR)}
+    {p q : String} {bs cs : List BranchR}
     {h : BranchesRel (EQ2_closure CProjectTransRelComp) bs cs}
     (hWFa : LocalTypeR.WellFormed (.recv p bs))
     (hWFc : LocalTypeR.WellFormed (.recv q cs)) :
     BranchesRel (EQ2_closure CProjectTransRelCompWF) bs cs := by
   -- Lift branch relations using well-formedness for recv branches.
-  have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+  have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWFa
-  have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2 :=
+  have hWFcs : ∀ lb ∈ cs, LocalTypeR.WellFormed lb.2.2 :=
     LocalTypeR.WellFormed.branches_of_recv (p := q) (bs := cs) hWFc
   exact BranchesRel_lift_compWF h hWFbs hWFcs
 

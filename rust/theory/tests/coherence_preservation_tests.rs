@@ -98,7 +98,7 @@ fn well_formed_local(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     let partner = format!("Role{}", p % 4);
                     LocalTypeR::send_choice(
                         partner,
-                        vec![(Label::new("left"), c1), (Label::new("right"), c2)],
+                        vec![(Label::new("left"), None, c1), (Label::new("right"), None, c2)],
                     )
                 }),
             // Recv choice
@@ -111,7 +111,7 @@ fn well_formed_local(depth: usize) -> BoxedStrategy<LocalTypeR> {
                     let partner = format!("Role{}", p % 4);
                     LocalTypeR::recv_choice(
                         partner,
-                        vec![(Label::new("left"), c1), (Label::new("right"), c2)],
+                        vec![(Label::new("left"), None, c1), (Label::new("right"), None, c2)],
                     )
                 }),
         ]
@@ -434,9 +434,9 @@ fn test_duality_preserves_unique_labels() {
     let lt = LocalTypeR::send_choice(
         "B",
         vec![
-            (Label::new("opt1"), LocalTypeR::End),
-            (Label::new("opt2"), LocalTypeR::End),
-            (Label::new("opt3"), LocalTypeR::End),
+            (Label::new("opt1"), None, LocalTypeR::End),
+            (Label::new("opt2"), None, LocalTypeR::End),
+            (Label::new("opt3"), None, LocalTypeR::End),
         ],
     );
 

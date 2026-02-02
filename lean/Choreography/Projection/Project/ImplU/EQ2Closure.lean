@@ -28,20 +28,20 @@ def CProjectUEQ2Rel : ProjRel := fun g role cand =>
   ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0 ∧ LocalTypeR.WellFormed cand
 
 private theorem wf_tail_of_cons
-    {lb : Label × LocalTypeR} {lbs : List (Label × LocalTypeR)}
-    (hwf : ∀ lb' ∈ lb :: lbs, LocalTypeR.WellFormed lb'.2) :
-    ∀ lb' ∈ lbs, LocalTypeR.WellFormed lb'.2 := by
+    {lb : BranchR} {lbs : List BranchR}
+    (hwf : ∀ lb' ∈ lb :: lbs, LocalTypeR.WellFormed lb'.2.2) :
+    ∀ lb' ∈ lbs, LocalTypeR.WellFormed lb'.2.2 := by
   -- Derive tail well-formedness from a cons list witness.
   intro lb' hmem
   exact hwf lb' (by simp [hmem])
 
 theorem BranchesProjRel_lift_EQ2_U
     {gbs : List (Label × GlobalType)} {role : String}
-    {lbs0 lbs1 : List (Label × LocalTypeR)}
+    {lbs0 lbs1 : List BranchR}
     (hproj : BranchesProjRel CProjectU gbs role lbs0)
     (heq : BranchesRel EQ2 lbs0 lbs1)
-    (hwf0 : ∀ lb ∈ lbs0, LocalTypeR.WellFormed lb.2)
-    (hwf1 : ∀ lb ∈ lbs1, LocalTypeR.WellFormed lb.2) :
+    (hwf0 : ∀ lb ∈ lbs0, LocalTypeR.WellFormed lb.2.2)
+    (hwf1 : ∀ lb ∈ lbs1, LocalTypeR.WellFormed lb.2.2) :
     BranchesProjRel CProjectUEQ2Rel gbs role lbs1 := by
   -- Lift each branch pointwise through EQ2, preserving well-formedness.
   induction hproj generalizing lbs1 with
@@ -54,7 +54,7 @@ theorem BranchesProjRel_lift_EQ2_U
           constructor
           · constructor
             · exact hpair.1.trans hpair'.1
-            · exact ⟨lb0.2, hpair.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
+            · exact ⟨lb0.2.2, hpair.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
           · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
 
 private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
@@ -127,7 +127,7 @@ private theorem EQ2_fullUnfold_var_wf {t : String} {e : LocalTypeR} (hWF : Local
   exact EQ2_fullUnfold_var (t := t) hWF
 
 
-theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)}
+theorem EQ2_fullUnfold_send {p : String} {bs : List BranchR}
     {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.send p bs) e → ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq -- Transfer observables through EQ2 and eliminate impossible cases.
@@ -157,14 +157,14 @@ theorem EQ2_fullUnfold_send {p : String} {bs : List (Label × LocalTypeR)}
         (SessionCoTypes.Observable.CanSend.not_recv
           (a := .send p bs) (p := p) (q := p') (bs := bs) (cs := bs')
           (SessionCoTypes.Observable.CanSend.base (partner := p) (branches := bs))) ha
-private theorem EQ2_fullUnfold_send_wf {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR}
+private theorem EQ2_fullUnfold_send_wf {p : String} {bs : List BranchR} {e : LocalTypeR}
     (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.send p bs) e →
     ∃ cs, e.fullUnfold = .send p cs ∧ BranchesRel EQ2 bs cs := by
   exact EQ2_fullUnfold_send (p := p) (bs := bs) hWF
 
 
-theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)}
+theorem EQ2_fullUnfold_recv {p : String} {bs : List BranchR}
     {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.recv p bs) e → ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by
   intro heq -- Transfer observables through EQ2 and eliminate impossible cases.
@@ -194,7 +194,7 @@ theorem EQ2_fullUnfold_recv {p : String} {bs : List (Label × LocalTypeR)}
           (a := .recv p bs) (p := p') (q := p) (bs := bs') (cs := bs) ha)
           (SessionCoTypes.Observable.CanRecv.base (partner := p) (branches := bs))
 
-private theorem EQ2_fullUnfold_recv_wf {p : String} {bs : List (Label × LocalTypeR)} {e : LocalTypeR}
+private theorem EQ2_fullUnfold_recv_wf {p : String} {bs : List BranchR} {e : LocalTypeR}
     (hWF : LocalTypeR.WellFormed e) :
     EQ2 (.recv p bs) e →
     ∃ cs, e.fullUnfold = .recv p cs ∧ BranchesRel EQ2 bs cs := by

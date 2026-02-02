@@ -42,7 +42,7 @@ private theorem UnfoldPathVarBounded.not_mu_var (t : String) (v : String) :
       have h'' := by simpa [LocalTypeR.substitute] using h'
       exact ih h''
 
-private theorem CanSendPathBounded.not_mu_var (t : String) (p : String) (bs : List (Label × LocalTypeR)) :
+private theorem CanSendPathBounded.not_mu_var (t : String) (p : String) (bs : List BranchR) :
     ∀ n, ¬ CanSendPathBounded n p bs (.mu t (.var t)) := by
   intro n h
   induction n with
@@ -55,7 +55,7 @@ private theorem CanSendPathBounded.not_mu_var (t : String) (p : String) (bs : Li
       exact ih h''
 
 /-- Derived from `CanSendPathBounded.not_mu_var` via duality. -/
-private theorem CanRecvPathBounded.not_mu_var (t : String) (p : String) (bs : List (Label × LocalTypeR)) :
+private theorem CanRecvPathBounded.not_mu_var (t : String) (p : String) (bs : List BranchR) :
     ∀ n, ¬ CanRecvPathBounded n p bs (.mu t (.var t)) := by
   intro n h
   have hsend := CanRecvPathBounded.to_CanSendPathBounded_dual h
@@ -71,14 +71,14 @@ theorem UnfoldsToVar.not_mu_var {t v : String} : ¬ UnfoldsToVar (.mu t (.var t)
   obtain ⟨n, hn⟩ := UnfoldsToVar.toBounded h
   exact UnfoldPathVarBounded.not_mu_var t v n hn
 
-theorem CanSend.not_mu_var {t p : String} {bs : List (Label × LocalTypeR)} :
+theorem CanSend.not_mu_var {t p : String} {bs : List BranchR} :
     ¬ CanSend (.mu t (.var t)) p bs := by
   intro h
   obtain ⟨n, hn⟩ := CanSend.toBounded h
   exact CanSendPathBounded.not_mu_var t p bs n hn
 
 /-- Derived from `CanSend.not_mu_var` via duality. -/
-theorem CanRecv.not_mu_var {t p : String} {bs : List (Label × LocalTypeR)} :
+theorem CanRecv.not_mu_var {t p : String} {bs : List BranchR} :
     ¬ CanRecv (LocalTypeR.mu t (LocalTypeR.var t)) p bs := by
   intro h
   have hsend : CanSend (LocalTypeR.mu t (LocalTypeR.var t)).dual p (dualBranches bs) := CanRecv.dual h
@@ -159,7 +159,7 @@ private theorem unfold_iter_eq_var_to_UnfoldsToVar (a : LocalTypeR) (v : String)
           exact ih (a := .recv p bs) h'
 
 private theorem unfold_iter_eq_send_to_CanSend (a : LocalTypeR) (p : String)
-    (bs : List (Label × LocalTypeR)) :
+    (bs : List BranchR) :
     ∀ n, (LocalTypeR.unfold^[n] a = .send p bs) → CanSend a p bs := by
   intro n
   induction n generalizing a with
@@ -195,7 +195,7 @@ private theorem unfold_iter_eq_send_to_CanSend (a : LocalTypeR) (p : String)
 
 /-- Derived from `unfold_iter_eq_send_to_CanSend` via duality. -/
 private theorem unfold_iter_eq_recv_to_CanRecv (a : LocalTypeR) (p : String)
-    (bs : List (Label × LocalTypeR)) :
+    (bs : List BranchR) :
     ∀ n, (LocalTypeR.unfold^[n] a = LocalTypeR.recv p bs) → CanRecv a p bs := by
   intro n h
   -- Dualize the unfold equality, then reduce to send.
@@ -219,13 +219,13 @@ theorem UnfoldsToVar_of_fullUnfold_eq {a : LocalTypeR} {v : String} (h : a.fullU
   apply unfold_iter_eq_var_to_UnfoldsToVar a v a.muHeight
   simpa [LocalTypeR.fullUnfold] using h
 
-theorem CanSend_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+theorem CanSend_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : a.fullUnfold = .send p bs) : CanSend a p bs := by
   apply unfold_iter_eq_send_to_CanSend a p bs a.muHeight
   simpa [LocalTypeR.fullUnfold] using h
 
 /-- Derived from `CanSend_of_fullUnfold_eq` via duality. -/
-theorem CanRecv_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+theorem CanRecv_of_fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : a.fullUnfold = LocalTypeR.recv p bs) : CanRecv a p bs := by
   -- Reduce recv to send via duality on fullUnfold.
   have hdual : a.dual.fullUnfold = .send p (dualBranches bs) := by
@@ -286,7 +286,7 @@ theorem UnfoldsToVar.fullUnfold_eq {a : LocalTypeR} {v : String} (h : UnfoldsToV
       exact (False.elim (Nat.succ_ne_zero _ hcontra))
 
 /-- fullUnfold reflects send unfolding for well-formed types. -/
-theorem CanSend.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+theorem CanSend.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanSend a p bs) (hWF : LocalTypeR.WellFormed a) : a.fullUnfold = .send p bs := by
   have hmu : a.fullUnfold.muHeight = 0 :=
     LocalTypeR.fullUnfold_non_mu_of_contractive (lt := a) hWF.contractive hWF.closed
@@ -313,7 +313,7 @@ theorem CanSend.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label ×
       exact (False.elim (Nat.succ_ne_zero _ hcontra))
 
 /-- fullUnfold reflects recv unfolding for well-formed types. -/
-theorem CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label × LocalTypeR)}
+theorem CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List BranchR}
     (h : CanRecv a p bs) (hWF : LocalTypeR.WellFormed a) : a.fullUnfold = .recv p bs := by
   -- Reduce recv to send via duality, then translate back across fullUnfold.
   have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
@@ -327,8 +327,8 @@ theorem CanRecv.fullUnfold_eq {a : LocalTypeR} {p : String} {bs : List (Label ×
 
 /-- CanSend implies all branches are well-formed under LocalTypeR.WellFormed a. -/
 theorem WellFormed_branches_of_CanSend {a : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (h : CanSend a p bs) (hWF : LocalTypeR.WellFormed a) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    {bs : List BranchR} (h : CanSend a p bs) (hWF : LocalTypeR.WellFormed a) :
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   have hfull : a.fullUnfold = .send p bs := CanSend.fullUnfold_eq h hWF
   have hWFfull : LocalTypeR.WellFormed a.fullUnfold := LocalTypeR.WellFormed.fullUnfold hWF
   have hWFsend : LocalTypeR.WellFormed (.send p bs) := by
@@ -337,19 +337,19 @@ theorem WellFormed_branches_of_CanSend {a : LocalTypeR} {p : String}
 
 /-- CanRecv implies all branches are well-formed under LocalTypeR.WellFormed a. -/
 theorem WellFormed_branches_of_CanRecv {a : LocalTypeR} {p : String}
-    {bs : List (Label × LocalTypeR)} (h : CanRecv a p bs) (hWF : LocalTypeR.WellFormed a) :
-    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 := by
+    {bs : List BranchR} (h : CanRecv a p bs) (hWF : LocalTypeR.WellFormed a) :
+    ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 := by
   -- Use duality to lift branch well-formedness from the send case.
   have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
   have hWFdual : LocalTypeR.WellFormed a.dual := SessionTypes.LocalTypeR.WellFormed.dual hWF
   have hWFbs := WellFormed_branches_of_CanSend hsend hWFdual
   intro lb hlb
-  have hmem_dual : (lb.1, lb.2.dual) ∈ dualBranches bs := by
+  have hmem_dual : (lb.1, lb.2.1, lb.2.2.dual) ∈ dualBranches bs := by
     -- Map membership across dualBranches.
-    have hmem' : (lb.1, lb.2.dual) ∈ bs.map (fun b => (b.1, b.2.dual)) :=
-      List.mem_map_of_mem (f := fun b => (b.1, b.2.dual)) hlb
+    have hmem' : (lb.1, lb.2.1, lb.2.2.dual) ∈ bs.map (fun b => (b.1, b.2.1, b.2.2.dual)) :=
+      List.mem_map_of_mem (f := fun b => (b.1, b.2.1, b.2.2.dual)) hlb
     simpa [dualBranches_eq_map] using hmem'
-  have hWFdual_branch : LocalTypeR.WellFormed lb.2.dual := hWFbs _ hmem_dual
+  have hWFdual_branch : LocalTypeR.WellFormed lb.2.2.dual := hWFbs _ hmem_dual
   have hWF := SessionTypes.LocalTypeR.WellFormed.dual hWFdual_branch
   simpa [LocalTypeR.dual_dual] using hWF
 

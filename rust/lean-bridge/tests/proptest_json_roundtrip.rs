@@ -140,7 +140,7 @@ fn simple_local_strategy() -> impl Strategy<Value = LocalTypeR> {
             .prop_map(|(p, l1, l2)| {
                 LocalTypeR::Send {
                     partner: p,
-                    branches: vec![(l1, LocalTypeR::End), (l2, LocalTypeR::End)],
+                    branches: vec![(l1, None, LocalTypeR::End), (l2, None, LocalTypeR::End)],
                 }
             }),
     ]

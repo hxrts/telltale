@@ -60,7 +60,7 @@ theorem CProjectTransRelComp_end_not_var
 
 /-- End cannot be CProjectTransRelComp-related to send. -/
 theorem CProjectTransRelComp_end_not_send
-    {p : String} {bs : List (Label × LocalTypeR)}
+    {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp .end (.send p bs))
     (hWFa : LocalTypeR.WellFormed .end) (hWFc : LocalTypeR.WellFormed (.send p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -86,7 +86,7 @@ theorem CProjectTransRelComp_end_not_send
 
 /-- End cannot be CProjectTransRelComp-related to recv. -/
 theorem CProjectTransRelComp_end_not_recv
-    {p : String} {bs : List (Label × LocalTypeR)}
+    {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp .end (.recv p bs))
     (hWFa : LocalTypeR.WellFormed .end) (hWFc : LocalTypeR.WellFormed (.recv p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -137,7 +137,7 @@ theorem CProjectTransRelComp_var_not_end
 
 /-- Var cannot be CProjectTransRelComp-related to send. -/
 theorem CProjectTransRelComp_var_not_send
-    {v : String} {p : String} {bs : List (Label × LocalTypeR)}
+    {v : String} {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.var v) (.send p bs))
     (hWFa : LocalTypeR.WellFormed (.var v)) (hWFc : LocalTypeR.WellFormed (.send p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -163,7 +163,7 @@ theorem CProjectTransRelComp_var_not_send
 
 /-- Var cannot be CProjectTransRelComp-related to recv. -/
 theorem CProjectTransRelComp_var_not_recv
-    {v : String} {p : String} {bs : List (Label × LocalTypeR)}
+    {v : String} {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.var v) (.recv p bs))
     (hWFa : LocalTypeR.WellFormed (.var v)) (hWFc : LocalTypeR.WellFormed (.recv p bs)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -189,7 +189,7 @@ theorem CProjectTransRelComp_var_not_recv
 
 /-- Send cannot be CProjectTransRelComp-related to end. -/
 theorem CProjectTransRelComp_send_not_end
-    {p : String} {bs : List (Label × LocalTypeR)}
+    {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.send p bs) .end)
     (hWFa : LocalTypeR.WellFormed (.send p bs)) (hWFc : LocalTypeR.WellFormed .end) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -217,7 +217,7 @@ theorem CProjectTransRelComp_send_not_end
 
 /-- Send cannot be CProjectTransRelComp-related to var. -/
 theorem CProjectTransRelComp_send_not_var
-    {p : String} {bs : List (Label × LocalTypeR)} {v : String}
+    {p : String} {bs : List BranchR} {v : String}
     (h : CProjectTransRelComp (.send p bs) (.var v))
     (hWFa : LocalTypeR.WellFormed (.send p bs)) (hWFc : LocalTypeR.WellFormed (.var v)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -245,8 +245,8 @@ theorem CProjectTransRelComp_send_not_var
 
 /-- Send cannot be CProjectTransRelComp-related to recv. -/
 theorem CProjectTransRelComp_send_not_recv
-    {p1 : String} {bs1 : List (Label × LocalTypeR)}
-    {p2 : String} {bs2 : List (Label × LocalTypeR)}
+    {p1 : String} {bs1 : List BranchR}
+    {p2 : String} {bs2 : List BranchR}
     (h : CProjectTransRelComp (.send p1 bs1) (.recv p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.send p1 bs1)) (hWFc : LocalTypeR.WellFormed (.recv p2 bs2)) :
     False := by
@@ -275,7 +275,7 @@ theorem CProjectTransRelComp_send_not_recv
 
 /-- Recv cannot be CProjectTransRelComp-related to end. -/
 theorem CProjectTransRelComp_recv_not_end
-    {p : String} {bs : List (Label × LocalTypeR)}
+    {p : String} {bs : List BranchR}
     (h : CProjectTransRelComp (.recv p bs) .end)
     (hWFa : LocalTypeR.WellFormed (.recv p bs)) (hWFc : LocalTypeR.WellFormed .end) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -303,7 +303,7 @@ theorem CProjectTransRelComp_recv_not_end
 
 /-- Recv cannot be CProjectTransRelComp-related to var. -/
 theorem CProjectTransRelComp_recv_not_var
-    {p : String} {bs : List (Label × LocalTypeR)} {v : String}
+    {p : String} {bs : List BranchR} {v : String}
     (h : CProjectTransRelComp (.recv p bs) (.var v))
     (hWFa : LocalTypeR.WellFormed (.recv p bs)) (hWFc : LocalTypeR.WellFormed (.var v)) : False := by
   rcases h with hbase | ⟨b, heq, hrel⟩ | ⟨b, hrel, heq⟩ | ⟨b, b', heq, hrel, heq'⟩
@@ -331,8 +331,8 @@ theorem CProjectTransRelComp_recv_not_var
 
 /-- Recv cannot be CProjectTransRelComp-related to send. -/
 theorem CProjectTransRelComp_recv_not_send
-    {p1 : String} {bs1 : List (Label × LocalTypeR)}
-    {p2 : String} {bs2 : List (Label × LocalTypeR)}
+    {p1 : String} {bs1 : List BranchR}
+    {p2 : String} {bs2 : List BranchR}
     (h : CProjectTransRelComp (.recv p1 bs1) (.send p2 bs2))
     (hWFa : LocalTypeR.WellFormed (.recv p1 bs1)) (hWFc : LocalTypeR.WellFormed (.send p2 bs2)) :
     False := by

@@ -189,14 +189,14 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
   let P1 : LocalTypeR → Prop :=
     fun t =>
       ∀ ctx, Context.Covers ctx t → ∃ db, t.toDB? ctx = some db ∧ db.isClosedAt ctx.length = true
-  let P2 : List (Label × LocalTypeR) → Prop :=
+  let P2 : List BranchR → Prop :=
     fun bs =>
-      ∀ ctx, (∀ l t, (l, t) ∈ bs → Context.Covers ctx t) →
+      ∀ ctx, (∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t) →
         ∃ dbs, LocalTypeR.branchesToDB? ctx bs = some dbs ∧
           isClosedAtBranches ctx.length dbs = true
-  let P3 : Label × LocalTypeR → Prop :=
+  let P3 : BranchR → Prop :=
     fun b =>
-      ∀ ctx, Context.Covers ctx b.2 → ∃ db, b.2.toDB? ctx = some db ∧ db.isClosedAt ctx.length = true
+      ∀ ctx, Context.Covers ctx b.2.2 → ∃ db, b.2.2.toDB? ctx = some db ∧ db.isClosedAt ctx.length = true
   have hrec : P1 t := by
     refine (SessionTypes.LocalTypeR.LocalTypeR.rec
       (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
@@ -206,13 +206,13 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       · simp [LocalTypeR.toDB?]
       · simp [LocalTypeDB.isClosedAt]
     · intro p bs hbs ctx hcov
-      have hcov' : ∀ l t, (l, t) ∈ bs → Context.Covers ctx t := by
-        intro l t hmem v hv
+      have hcov' : ∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t := by
+        intro l _vt t hmem v hv
         apply hcov v
         have : v ∈ LocalTypeR.freeVarsOfBranches bs := by
-          have : v ∈ bs.flatMap (fun (_, t) => t.freeVars) := by
+          have : v ∈ bs.flatMap (fun (_, _, t) => t.freeVars) := by
             refine List.mem_flatMap.mpr ?_
-            refine ⟨(l, t), hmem, ?_⟩
+            refine ⟨(l, _vt, t), hmem, ?_⟩
             simpa using hv
           simpa [LocalTypeR.freeVarsOfBranches_eq_flatMap] using this
         simpa [LocalTypeR.freeVars] using this
@@ -221,13 +221,13 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       · simp [LocalTypeR.toDB?, hdbs]
       · simpa [LocalTypeDB.isClosedAt] using hclosed
     · intro p bs hbs ctx hcov
-      have hcov' : ∀ l t, (l, t) ∈ bs → Context.Covers ctx t := by
-        intro l t hmem v hv
+      have hcov' : ∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t := by
+        intro l _vt t hmem v hv
         apply hcov v
         have : v ∈ LocalTypeR.freeVarsOfBranches bs := by
-          have : v ∈ bs.flatMap (fun (_, t) => t.freeVars) := by
+          have : v ∈ bs.flatMap (fun (_, _, t) => t.freeVars) := by
             refine List.mem_flatMap.mpr ?_
-            refine ⟨(l, t), hmem, ?_⟩
+            refine ⟨(l, _vt, t), hmem, ?_⟩
             simpa using hv
           simpa [LocalTypeR.freeVarsOfBranches_eq_flatMap] using this
         simpa [LocalTypeR.freeVars] using this
@@ -266,10 +266,10 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       · simp [LocalTypeR.branchesToDB?]
       · simp [isClosedAtBranches]
     · intro head tail hhead htail ctx hcov
-      obtain ⟨l, t⟩ := head
-      have hcov_t : Context.Covers ctx t := hcov l t (by simp)
-      have hcov_tl : ∀ l t, (l, t) ∈ tail → Context.Covers ctx t :=
-        fun l t hmem => hcov l t (List.mem_cons_of_mem _ hmem)
+      obtain ⟨l, _vt, t⟩ := head
+      have hcov_t : Context.Covers ctx t := hcov l _vt t (by simp)
+      have hcov_tl : ∀ l _vt t, (l, _vt, t) ∈ tail → Context.Covers ctx t :=
+        fun l _vt t hmem => hcov l _vt t (List.mem_cons_of_mem _ hmem)
       obtain ⟨db, hdb, hclosed⟩ := hhead ctx hcov_t
       obtain ⟨dbs, hdbs, hclosedbs⟩ := htail ctx hcov_tl
       refine ⟨(l, db) :: dbs, ?_, ?_⟩
@@ -279,8 +279,8 @@ theorem toDB?_some_of_covers (t : LocalTypeR) (ctx : Context)
       exact hsnd
   exact hrec ctx hcov
 
-theorem branchesToDB?_some_of_covers (bs : List (Label × LocalTypeR)) (ctx : Context)
-    (hcov : ∀ l t, (l, t) ∈ bs → Context.Covers ctx t) :
+theorem branchesToDB?_some_of_covers (bs : List BranchR) (ctx : Context)
+    (hcov : ∀ l _vt t, (l, _vt, t) ∈ bs → Context.Covers ctx t) :
     ∃ dbs, LocalTypeR.branchesToDB? ctx bs = some dbs ∧
           isClosedAtBranches ctx.length dbs = true := by
   induction bs with
@@ -289,10 +289,10 @@ theorem branchesToDB?_some_of_covers (bs : List (Label × LocalTypeR)) (ctx : Co
       · simp [LocalTypeR.branchesToDB?]
       · simp [isClosedAtBranches]
   | cons hd tl ih =>
-      obtain ⟨l, t⟩ := hd
-      have hcov_t : Context.Covers ctx t := hcov l t (by simp)
-      have hcov_tl : ∀ l t, (l, t) ∈ tl → Context.Covers ctx t :=
-        fun l t hmem => hcov l t (List.mem_cons_of_mem _ hmem)
+      obtain ⟨l, _vt, t⟩ := hd
+      have hcov_t : Context.Covers ctx t := hcov l _vt t (by simp)
+      have hcov_tl : ∀ l _vt t, (l, _vt, t) ∈ tl → Context.Covers ctx t :=
+        fun l _vt t hmem => hcov l _vt t (List.mem_cons_of_mem _ hmem)
       obtain ⟨db, hdb, hclosed⟩ := toDB?_some_of_covers t ctx hcov_t
       obtain ⟨dbs, hdbs, hclosedbs⟩ := ih hcov_tl
       refine ⟨(l, db) :: dbs, ?_, ?_⟩

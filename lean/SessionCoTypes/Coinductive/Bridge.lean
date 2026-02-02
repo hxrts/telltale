@@ -33,9 +33,9 @@ mutual
     | .recv p bs => mkRecv p (toCoindBranches bs)
 
   /-- Embed a list of branches, converting each continuation. -/
-  def toCoindBranches : List (Label × LocalTypeR) → List (Label × LocalTypeC)
+  def toCoindBranches : List BranchR → List (Label × LocalTypeC)
     | []             => []
-    | (lb, t) :: rest => (lb, toCoind t) :: toCoindBranches rest
+    | (lb, _vt, t) :: rest => (lb, toCoind t) :: toCoindBranches rest
 end
 
 /-! ## Simp Lemmas -/
@@ -44,9 +44,9 @@ end
 @[simp] theorem toCoind_var (x : String) : toCoind (.var x) = mkVar x := rfl
 @[simp] theorem toCoind_mu (x : String) (body : LocalTypeR) :
     toCoind (.mu x body) = mkMu x (toCoind body) := rfl
-@[simp] theorem toCoind_send (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem toCoind_send (p : String) (bs : List BranchR) :
     toCoind (.send p bs) = mkSend p (toCoindBranches bs) := rfl
-@[simp] theorem toCoind_recv (p : String) (bs : List (Label × LocalTypeR)) :
+@[simp] theorem toCoind_recv (p : String) (bs : List BranchR) :
     toCoind (.recv p bs) = mkRecv p (toCoindBranches bs) := rfl
 
 end SessionCoTypes.Coinductive

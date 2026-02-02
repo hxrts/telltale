@@ -1537,11 +1537,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-simulator"
+version = "0.9.1"
+dependencies = [
+ "assert_matches",
+ "getrandom 0.2.16",
+ "serde",
+ "serde_json",
+ "telltale-lean-bridge",
+ "telltale-theory",
+ "telltale-types",
+ "telltale-vm",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "telltale-theory"
 version = "0.9.1"
 dependencies = [
  "assert_matches",
  "proptest",
+ "telltale-lean-bridge",
  "telltale-types",
  "thiserror",
 ]
@@ -1556,6 +1573,18 @@ dependencies = [
  "serde_ipld_dagcbor",
  "serde_json",
  "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "telltale-vm"
+version = "0.9.1"
+dependencies = [
+ "getrandom 0.2.16",
+ "serde",
+ "serde_json",
+ "telltale-theory",
+ "telltale-types",
  "thiserror",
 ]
 

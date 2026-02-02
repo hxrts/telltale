@@ -24,9 +24,9 @@ mutual
     | .mu t body => if v == t then false else isFreeIn v body
 
   /-- Check if a variable appears free in any branch. -/
-  def isFreeInBranches (v : String) : List (Label × LocalTypeR) → Bool
+  def isFreeInBranches (v : String) : List BranchR → Bool
     | [] => false
-    | (_, cont) :: rest => isFreeIn v cont || isFreeInBranches v rest
+    | (_, _, cont) :: rest => isFreeIn v cont || isFreeInBranches v rest
 end
 
 mutual
@@ -39,9 +39,9 @@ mutual
     | .mu t body => (v != t) && notBoundAt v body
 
   /-- Check notBoundAt for branches. -/
-  def notBoundAtBranches (v : String) : List (Label × LocalTypeR) → Bool
+  def notBoundAtBranches (v : String) : List BranchR → Bool
     | [] => true
-    | (_, cont) :: rest => notBoundAt v cont && notBoundAtBranches v rest
+    | (_, _, cont) :: rest => notBoundAt v cont && notBoundAtBranches v rest
 end
 
 /-! ## Duality Preservation for Barendregt Predicates -/
@@ -64,15 +64,17 @@ mutual
         · simp [LocalTypeR.dual, isFreeIn, hv, isFreeIn_dual v body]
 
   /-- isFreeInBranches is invariant under duality. -/
-  theorem isFreeInBranches_dual (v : String) (bs : List (Label × LocalTypeR)) :
+  theorem isFreeInBranches_dual (v : String) (bs : List BranchR) :
       isFreeInBranches v (dualBranches bs) = isFreeInBranches v bs := by
     -- Recurse over branches, dualizing continuations.
     cases bs with
     | nil => rfl
     | cons head tail =>
         cases head with
-        | mk l t =>
-            simp [dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
+        | mk l rest =>
+            cases rest with
+            | mk vt t =>
+                simp [dualBranches, isFreeInBranches, isFreeIn_dual, isFreeInBranches_dual]
 end
 
 mutual
@@ -91,15 +93,17 @@ mutual
         simp [LocalTypeR.dual, notBoundAt, notBoundAt_dual v body]
 
   /-- notBoundAtBranches is invariant under duality. -/
-  theorem notBoundAtBranches_dual (v : String) (bs : List (Label × LocalTypeR)) :
+  theorem notBoundAtBranches_dual (v : String) (bs : List BranchR) :
       notBoundAtBranches v (dualBranches bs) = notBoundAtBranches v bs := by
     -- Recurse over branches; dual does not affect binders.
     cases bs with
     | nil => rfl
     | cons head tail =>
         cases head with
-        | mk l t =>
-            simp [dualBranches, notBoundAtBranches, notBoundAt_dual, notBoundAtBranches_dual]
+        | mk l rest =>
+            cases rest with
+            | mk vt t =>
+                simp [dualBranches, notBoundAtBranches, notBoundAt_dual, notBoundAtBranches_dual]
 end
 
 mutual
@@ -134,7 +138,7 @@ mutual
   termination_by sizeOf a
 
   /-- notBoundAt for branches is preserved through substitution. -/
-  theorem notBoundAt_subst_branches (v var : String) (bs : List (Label × LocalTypeR)) (repl : LocalTypeR)
+  theorem notBoundAt_subst_branches (v var : String) (bs : List BranchR) (repl : LocalTypeR)
       (hbar : notBoundAtBranches v bs = true)
       (hvarRepl : notBoundAt v repl = true) :
       notBoundAtBranches v (SessionTypes.LocalTypeR.substituteBranches bs var repl) = true :=
@@ -144,7 +148,7 @@ mutual
         simp only [SessionTypes.LocalTypeR.substituteBranches, notBoundAtBranches]
         unfold notBoundAtBranches at hbar
         have ⟨hbarHd, hbarTl⟩ := Bool.and_eq_true_iff.mp hbar
-        exact Bool.and_eq_true_iff.mpr ⟨notBoundAt_subst v var hd.2 repl hbarHd hvarRepl,
+        exact Bool.and_eq_true_iff.mpr ⟨notBoundAt_subst v var hd.2.2 repl hbarHd hvarRepl,
           notBoundAt_subst_branches v var tl repl hbarTl hvarRepl⟩
   termination_by sizeOf bs
   decreasing_by
@@ -214,12 +218,12 @@ mutual
   termination_by sizeOf e
 
   /-- If x is not free in any branch, substituting for x leaves branches unchanged. -/
-  theorem substituteBranches_not_free (bs : List (Label × LocalTypeR)) (x : String) (rx : LocalTypeR)
+  theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
       (hnot_free : isFreeInBranches x bs = false) :
       SessionTypes.LocalTypeR.substituteBranches bs x rx = bs := by
     match bs with
     | [] => rfl
-    | (label, cont) :: rest =>
+    | (label, vt, cont) :: rest =>
         simp only [SessionTypes.LocalTypeR.substituteBranches]
         simp only [isFreeInBranches, Bool.or_eq_false_iff] at hnot_free
         have h1 : cont.substitute x rx = cont := substitute_not_free cont x rx hnot_free.1
@@ -287,12 +291,12 @@ mutual
   termination_by sizeOf e
 
   /-- Branch version of isFreeIn_subst_self_general. -/
-  theorem isFreeInBranches_subst_self_general (bs : List (Label × LocalTypeR)) (t : String)
+  theorem isFreeInBranches_subst_self_general (bs : List BranchR) (t : String)
       (repl : LocalTypeR) (hrepl : isFreeIn t repl = false) :
       isFreeInBranches t (SessionTypes.LocalTypeR.substituteBranches bs t repl) = false := by
     match bs with
     | [] => simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches]
-    | (label, cont) :: rest =>
+    | (label, _vt, cont) :: rest =>
         simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches, Bool.or_eq_false_iff]
         exact ⟨isFreeIn_subst_self_general cont t repl hrepl,
                isFreeInBranches_subst_self_general rest t repl hrepl⟩
@@ -359,13 +363,13 @@ mutual
   termination_by sizeOf e
 
   /-- Branch version of isFreeIn_subst_preserves. -/
-  theorem isFreeInBranches_subst_preserves (bs : List (Label × LocalTypeR)) (v t : String)
+  theorem isFreeInBranches_subst_preserves (bs : List BranchR) (v t : String)
       (repl : LocalTypeR)
       (hv_bs : isFreeInBranches v bs = false) (hv_repl : isFreeIn v repl = false) :
       isFreeInBranches v (SessionTypes.LocalTypeR.substituteBranches bs t repl) = false := by
     match bs with
     | [] => simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches]
-    | (label, cont) :: rest =>
+    | (label, _vt, cont) :: rest =>
         simp only [SessionTypes.LocalTypeR.substituteBranches, isFreeInBranches, Bool.or_eq_false_iff]
         simp only [isFreeInBranches, Bool.or_eq_false_iff] at hv_bs
         exact ⟨isFreeIn_subst_preserves cont v t repl hv_bs.1 hv_repl,

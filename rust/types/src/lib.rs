@@ -30,6 +30,7 @@ mod label;
 mod local;
 pub mod merge;
 mod role;
+mod val_type;
 
 pub use action::{Action, LocalAction};
 pub use content_id::{ContentId, ContentIdSha256, Hasher, Sha256Hasher};
@@ -40,3 +41,4 @@ pub use label::Label;
 pub use local::LocalTypeR;
 pub use merge::{can_merge, merge, merge_all, MergeError, MergeResult};
 pub use role::{Role, RoleSet};
+pub use val_type::ValType;

@@ -44,7 +44,7 @@ theorem CProjectTransRel_source_var {v : String} {b : LocalTypeR}
   simpa [htrans_var] using htrans
 
 /-- A CProjectTransRel from `.send` preserves the send constructor. -/
-theorem CProjectTransRel_source_send {p : String} {bs : List (Label × LocalTypeR)} {b : LocalTypeR}
+theorem CProjectTransRel_source_send {p : String} {bs : List BranchR} {b : LocalTypeR}
     (h : CProjectTransRel (.send p bs) b) : ∃ cs, b = .send p cs := by
   -- Pull out the trans witnesses and reconstruct the send branches.
   rcases h with ⟨g, role, hproj, htrans, hwf⟩
@@ -54,7 +54,7 @@ theorem CProjectTransRel_source_send {p : String} {bs : List (Label × LocalType
   simpa [htrans_send] using htrans
 
 /-- A CProjectTransRel from `.recv` preserves the recv constructor. -/
-theorem CProjectTransRel_source_recv {p : String} {bs : List (Label × LocalTypeR)} {b : LocalTypeR}
+theorem CProjectTransRel_source_recv {p : String} {bs : List BranchR} {b : LocalTypeR}
     (h : CProjectTransRel (.recv p bs) b) : ∃ cs, b = .recv p cs := by
   -- Pull out the trans witnesses and reconstruct the recv branches.
   rcases h with ⟨g, role, hproj, htrans, hwf⟩

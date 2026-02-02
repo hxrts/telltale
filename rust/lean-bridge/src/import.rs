@@ -158,7 +158,7 @@ pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
                 let cont = json_to_local(branch.get("continuation").ok_or_else(|| {
                     ImportError::MissingField("continuation in branch".to_string())
                 })?)?;
-                branches.push((label, cont));
+                branches.push((label, None, cont));
             }
 
             Ok(LocalTypeR::Send { partner, branches })
@@ -185,7 +185,7 @@ pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
                 let cont = json_to_local(branch.get("continuation").ok_or_else(|| {
                     ImportError::MissingField("continuation in branch".to_string())
                 })?)?;
-                branches.push((label, cont));
+                branches.push((label, None, cont));
             }
 
             Ok(LocalTypeR::Recv { partner, branches })
@@ -245,6 +245,7 @@ fn parse_sort(json: &Value) -> Result<PayloadSort, ImportError> {
             "nat" => Ok(PayloadSort::Nat),
             "bool" => Ok(PayloadSort::Bool),
             "string" => Ok(PayloadSort::String),
+            "real" => Ok(PayloadSort::Real),
             other => Err(ImportError::InvalidSort(other.to_string())),
         }
     } else if let Some(obj) = json.as_object() {
@@ -258,6 +259,8 @@ fn parse_sort(json: &Value) -> Result<PayloadSort, ImportError> {
                     "prod must have 2 elements".to_string(),
                 ))
             }
+        } else if let Some(n) = obj.get("vector").and_then(|v| v.as_u64()) {
+            Ok(PayloadSort::Vector(n as usize))
         } else {
             Err(ImportError::InvalidSort(format!("{:?}", obj)))
         }
@@ -385,6 +388,44 @@ mod tests {
             LocalTypeR::Send { branches, .. } => {
                 let sort = &branches[0].0.sort;
                 assert!(matches!(sort, PayloadSort::Prod(..)));
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_real_sort() {
+        let json = json!({
+            "kind": "send",
+            "partner": "B",
+            "branches": [{
+                "label": { "name": "value", "sort": "real" },
+                "continuation": { "kind": "end" }
+            }]
+        });
+        let lt = json_to_local(&json).unwrap();
+        match lt {
+            LocalTypeR::Send { branches, .. } => {
+                assert_eq!(branches[0].0.sort, PayloadSort::Real);
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_vector_sort() {
+        let json = json!({
+            "kind": "send",
+            "partner": "B",
+            "branches": [{
+                "label": { "name": "config", "sort": { "vector": 4 } },
+                "continuation": { "kind": "end" }
+            }]
+        });
+        let lt = json_to_local(&json).unwrap();
+        match lt {
+            LocalTypeR::Send { branches, .. } => {
+                assert_eq!(branches[0].0.sort, PayloadSort::Vector(4));
             }
             _ => panic!("Expected Send"),
         }

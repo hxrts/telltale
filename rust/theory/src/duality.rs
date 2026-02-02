@@ -72,7 +72,7 @@ mod tests {
             assert_eq!(partner, "B");
             assert_eq!(branches.len(), 1);
             assert_eq!(branches[0].0.name, "msg");
-            assert_eq!(branches[0].1, LocalTypeR::End);
+            assert_eq!(branches[0].2, LocalTypeR::End);
         });
     }
 
@@ -128,8 +128,8 @@ mod tests {
         let t = LocalTypeR::send_choice(
             "B",
             vec![
-                (Label::new("yes"), LocalTypeR::End),
-                (Label::new("no"), LocalTypeR::End),
+                (Label::new("yes"), None, LocalTypeR::End),
+                (Label::new("no"), None, LocalTypeR::End),
             ],
         );
         let d = dual(&t);

@@ -1,0 +1,43 @@
+[package]
+name = "telltale-simulator"
+version = "0.9.1"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Lightweight simulation engine for Telltale choreographic protocols"
+readme = "../../README.md"
+repository = "https://github.com/hxrts/telltale"
+license = "MIT OR Apache-2.0"
+keywords = ["session", "types", "simulation", "choreography"]
+categories = ["simulation"]
+
+[lib]
+bench = false
+
+[features]
+default = []
+wasm = ["getrandom/js"]
+vm = ["telltale-vm"]
+
+[dependencies]
+telltale-types = { path = "../types", version = "0.9.1" }
+telltale-vm = { path = "../vm", version = "0.9.1", optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Native-only dependencies (none yet)
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
+telltale-theory = { path = "../theory", version = "0.9.1" }
+telltale-vm = { path = "../vm", version = "0.9.1" }
+
+[lints]
+workspace = true

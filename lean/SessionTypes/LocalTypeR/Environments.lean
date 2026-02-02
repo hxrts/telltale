@@ -235,13 +235,13 @@ mutual
   termination_by sizeOf lt
 
   private def freeVars_substituteBranches_subset_aux
-      (branches : List (Label × LocalTypeR)) (varName : String) (repl : LocalTypeR)
+      (branches : List BranchR) (varName : String) (repl : LocalTypeR)
       (x : String) (hx : x ∈ freeVarsOfBranches (substituteBranches branches varName repl)) :
       x ∈ repl.freeVars ∨ (x ∈ freeVarsOfBranches branches ∧ x ≠ varName) :=
     match branches with
     | [] => by
         simp [substituteBranches, freeVarsOfBranches] at hx
-    | (label, cont) :: rest => by
+    | (label, _vt, cont) :: rest => by
         simp [substituteBranches, freeVarsOfBranches, List.mem_append, -substituteBranches_eq_map] at hx
         cases hx with
         | inl hxcont =>
@@ -285,7 +285,7 @@ theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTy
       exact hpair
 
 
-theorem freeVars_substituteBranches_closed (bs : List (Label × LocalTypeR)) (t : String) (e : LocalTypeR) :
+theorem freeVars_substituteBranches_closed (bs : List BranchR) (t : String) (e : LocalTypeR) :
     e.isClosed → ∀ v, v ∈ freeVarsOfBranches (substituteBranches bs t e) →
       v ∈ freeVarsOfBranches bs ∧ v ≠ t := by
   intro hclosed v hmem
@@ -296,23 +296,25 @@ theorem freeVars_substituteBranches_closed (bs : List (Label × LocalTypeR)) (t 
       exact this.elim
   | cons head tail ih =>
       cases head with
-      | mk label cont =>
-          -- Split membership across head or tail branches
-          have hmem' : v ∈ (cont.substitute t e).freeVars ∨
-              v ∈ freeVarsOfBranches (substituteBranches tail t e) := by
-            simpa [freeVarsOfBranches, substituteBranches, List.mem_append] using hmem
-          cases hmem' with
-          | inl hcont =>
-              have hres := freeVars_substitute_closed cont t e hclosed v hcont
-              -- v appears in head branch
-              have hmem_head : v ∈ freeVarsOfBranches ((label, cont) :: tail) := by
-                simp [freeVarsOfBranches, hres.1]
-              exact ⟨hmem_head, hres.2⟩
-          | inr htail =>
-              have hres := ih htail
-              have hmem_tail : v ∈ freeVarsOfBranches ((label, cont) :: tail) := by
-                simp [freeVarsOfBranches, hres.1]
-              exact ⟨hmem_tail, hres.2⟩
+      | mk label rest =>
+          cases rest with
+          | mk _vt cont =>
+              -- Split membership across head or tail branches
+              have hmem' : v ∈ (cont.substitute t e).freeVars ∨
+                  v ∈ freeVarsOfBranches (substituteBranches tail t e) := by
+                simpa [freeVarsOfBranches, substituteBranches, List.mem_append] using hmem
+              cases hmem' with
+              | inl hcont =>
+                  have hres := freeVars_substitute_closed cont t e hclosed v hcont
+                  -- v appears in head branch
+                  have hmem_head : v ∈ freeVarsOfBranches ((label, _vt, cont) :: tail) := by
+                    simp [freeVarsOfBranches, hres.1]
+                  exact ⟨hmem_head, hres.2⟩
+              | inr htail =>
+                  have hres := ih htail
+                  have hmem_tail : v ∈ freeVarsOfBranches ((label, _vt, cont) :: tail) := by
+                    simp [freeVarsOfBranches, hres.1]
+                  exact ⟨hmem_tail, hres.2⟩
 
 /-! ## Unfolding does not introduce new free variables -/
 

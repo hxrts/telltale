@@ -1,0 +1,17 @@
+name = "hamiltonian_2body"
+roles = ["A", "B"]
+steps = 1000
+
+[material]
+layer = "hamiltonian"
+
+[material.params]
+spring_constant = 1.0
+mass = 1.0
+dimensions = 1
+initial_positions = [1.0, -1.0]
+initial_momenta = [0.0, 0.0]
+step_size = 0.01
+
+[output]
+format = "jsonl"

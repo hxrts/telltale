@@ -15,7 +15,7 @@ open SessionCoTypes.CoinductiveRel
 
 /-- Helper: compute `transBranches` from a BranchesProjRel witness. -/
 private theorem transBranches_eq_of_BranchesProjRel
-    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (hrel : BranchesProjRel CProject gbs role lbs)
     (hne : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb) :
@@ -26,8 +26,8 @@ private theorem transBranches_eq_of_BranchesProjRel
   | cons hpair hrest ihrest =>
       rename_i gb lb gbs_tail lbs_tail
       obtain ⟨hlabel, hproj_cont⟩ := hpair
-      have htrans_head : Trans.trans gb.2 role = lb.2 :=
-        ih gb (List.Mem.head _) lb.2 hproj_cont
+      have htrans_head : Trans.trans gb.2 role = lb.2.2 :=
+        ih gb (List.Mem.head _) lb.2.2 hproj_cont
       have hne_tail : ∀ gb' ∈ gbs_tail, gb'.2.allCommsNonEmpty = true := by
         intro gb' hmem
         exact hne gb' (List.Mem.tail _ hmem)
@@ -85,7 +85,7 @@ private theorem trans_eq_of_CProject_mu
 /-- Helper: sender comm case once branches are aligned. -/
 private theorem trans_eq_of_CProject_comm_sender
     (sender receiver role : String) (branches : List (Label × GlobalType))
-    (lbs : List (Label × LocalTypeR)) (hrs : role = sender)
+    (lbs : List BranchR) (hrs : role = sender)
     (htrans_branches : Trans.transBranches branches role = lbs) :
     Trans.trans (.comm sender receiver branches) role = .send receiver lbs := by
   -- Rewrite the comm trans with the computed branch translation.
@@ -98,7 +98,7 @@ private theorem trans_eq_of_CProject_comm_sender
 /-- Helper: receiver comm case once branches are aligned. -/
 private theorem trans_eq_of_CProject_comm_receiver
     (sender receiver role : String) (branches : List (Label × GlobalType))
-    (lbs : List (Label × LocalTypeR)) (hrr : role = receiver) (hrs : role ≠ sender)
+    (lbs : List BranchR) (hrr : role = receiver) (hrs : role ≠ sender)
     (htrans_branches : Trans.transBranches branches role = lbs) :
     Trans.trans (.comm sender receiver branches) role = .recv sender lbs := by
   -- Rewrite the comm trans with the computed branch translation.
@@ -125,7 +125,7 @@ private theorem trans_eq_of_CProject_comm_other
 /-- Helper: sender comm case for send candidates. -/
 private theorem trans_eq_of_CProject_comm_sender_send
     (sender receiver role : String) (branches : List (Label × GlobalType))
-    (partner : String) (lbs : List (Label × LocalTypeR)) (hrs : role = sender)
+    (partner : String) (lbs : List BranchR) (hrs : role = sender)
     (hproj : CProject (GlobalType.comm sender receiver branches) role (.send partner lbs))
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
     (ih : ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb) :
@@ -150,7 +150,7 @@ private theorem trans_eq_of_CProject_comm_sender_send
 /-- Helper: receiver comm case for recv candidates. -/
 private theorem trans_eq_of_CProject_comm_receiver_recv
     (sender receiver role : String) (branches : List (Label × GlobalType))
-    (partner : String) (lbs : List (Label × LocalTypeR)) (hrr : role = receiver)
+    (partner : String) (lbs : List BranchR) (hrr : role = receiver)
     (hrs : role ≠ sender)
     (hproj : CProject (GlobalType.comm sender receiver branches) role (.recv partner lbs))
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true)
@@ -393,7 +393,7 @@ private theorem projectb_complete_mu
 
 private theorem projectb_complete_comm_sender
     (s r role : String) (gbs : List (Label × GlobalType))
-    (partner : String) (lbs : List (Label × LocalTypeR))
+    (partner : String) (lbs : List BranchR)
     (hs : role = s) (hpartner : partner = r)
     (hbranches_proj : projectbBranches gbs role lbs = true) :
     projectb (GlobalType.comm s r gbs) role (.send partner lbs) = true := by
@@ -403,7 +403,7 @@ private theorem projectb_complete_comm_sender
 
 private theorem projectb_complete_comm_receiver
     (s r role : String) (gbs : List (Label × GlobalType))
-    (partner : String) (lbs : List (Label × LocalTypeR))
+    (partner : String) (lbs : List BranchR)
     (hr : role = r) (hs : role ≠ s) (hpartner : partner = s)
     (hbranches_proj : projectbBranches gbs role lbs = true) :
     projectb (GlobalType.comm s r gbs) role (.recv partner lbs) = true := by
@@ -430,7 +430,7 @@ private theorem projectb_complete_comm_other
 
 /-- Helper: branch projection for comm sender/receiver cases. -/
 private theorem projectbBranches_of_CProject_comm
-    (gbs : List (Label × GlobalType)) (role : String) (lbs : List (Label × LocalTypeR))
+    (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR)
     (hbranches : BranchesProjRel CProject gbs role lbs)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → projectb gb.2 role lb = true) :
     projectbBranches gbs role lbs = true := by

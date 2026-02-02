@@ -390,7 +390,7 @@ and show trans produces the matching constructor. -/
 
 /-- Helper: `.end` cannot project to `.send`. -/
 theorem CProject_send_implies_trans_send_end (role partner : String)
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (hproj : CProject .end role (.send partner lbs)) :
     ∃ gbs', trans .end role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
@@ -402,7 +402,7 @@ theorem CProject_send_implies_trans_send_end (role partner : String)
 
 /-- Helper: `.var` cannot project to `.send`. -/
 theorem CProject_send_implies_trans_send_var (v role partner : String)
-    (lbs : List (Label × LocalTypeR))
+    (lbs : List BranchR)
     (hproj : CProject (.var v) role (.send partner lbs)) :
     ∃ gbs', trans (.var v) role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
@@ -414,7 +414,7 @@ theorem CProject_send_implies_trans_send_var (v role partner : String)
 
 /-- Helper: `.mu` cannot project to `.send`. -/
 theorem CProject_send_implies_trans_send_mu (t : String) (body : GlobalType)
-    (role partner : String) (lbs : List (Label × LocalTypeR))
+    (role partner : String) (lbs : List BranchR)
     (hproj : CProject (.mu t body) role (.send partner lbs)) :
     ∃ gbs', trans (.mu t body) role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧

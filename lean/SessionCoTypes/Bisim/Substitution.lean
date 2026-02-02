@@ -19,20 +19,20 @@ open SessionCoTypes.CoinductiveRel
 private theorem BranchesRelBisim_of_Bisim_with_relImage
     {f : LocalTypeR → LocalTypeR} {R : Rel}
     (h_rel : ∀ a b, Bisim a b → R a b)
-    {bs cs : List (Label × LocalTypeR)}
+    {bs cs : List BranchR}
     (hbr : BranchesRelBisim Bisim bs cs)
-    (hfix_bs : ∀ lb ∈ bs, f lb.2 = lb.2)
-    (hfix_cs : ∀ lc ∈ cs, f lc.2 = lc.2) :
+    (hfix_bs : ∀ lb ∈ bs, f lb.2.2 = lb.2.2)
+    (hfix_cs : ∀ lc ∈ cs, f lc.2.2 = lc.2.2) :
     BranchesRelBisim (RelImage f R) bs cs := by
   unfold BranchesRelBisim at hbr ⊢
   induction hbr with
   | nil => exact List.Forall₂.nil
   | cons hbc hrest ih =>
-      -- hbc : b.1 = c.1 ∧ Bisim b.2 c.2
+      -- hbc : b.1 = c.1 ∧ Bisim b.2.2 c.2.2
       rename_i b c bs' cs'
-      have hb_fix : f b.2 = b.2 := by
+      have hb_fix : f b.2.2 = b.2.2 := by
         simpa using hfix_bs b (List.Mem.head _)
-      have hc_fix : f c.2 = c.2 := by
+      have hc_fix : f c.2.2 = c.2.2 := by
         simpa using hfix_cs c (List.Mem.head _)
       refine List.Forall₂.cons ?head ?tail
       · refine ⟨hbc.1, ?_⟩
@@ -257,22 +257,22 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
     have hR'_to_Bisim : ∀ a b, R' a b → Bisim a b := fun a b hr' => ⟨R', hR'post, hr'⟩
     have hbr_bisim : BranchesRelBisim Bisim bs cs :=
       BranchesRelBisim.mono hR'_to_Bisim hbr
-    have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+    have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
       WellFormed_branches_of_CanSend hxsend hWFx_subst
-    have hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2 :=
+    have hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2.2 :=
       WellFormed_branches_of_CanSend hysend hWFy_subst
     -- Substitution is identity on closed branch continuations
-    have hfix_bs : ∀ lb ∈ bs, (lb.2.substitute var repl) = lb.2 := by
+    have hfix_bs : ∀ lb ∈ bs, (lb.2.2.substitute var repl) = lb.2.2 := by
       intro lb hmem
-      have hclosed : lb.2.isClosed := (hWFbs lb hmem).closed
-      have hnotfree : LocalTypeR.isFreeIn var lb.2 = false :=
-        isFreeIn_false_of_closed lb.2 var hclosed
+      have hclosed : lb.2.2.isClosed := (hWFbs lb hmem).closed
+      have hnotfree : LocalTypeR.isFreeIn var lb.2.2 = false :=
+        isFreeIn_false_of_closed lb.2.2 var hclosed
       exact substitute_not_free _ _ _ hnotfree
-    have hfix_cs : ∀ lc ∈ cs, (lc.2.substitute var repl) = lc.2 := by
+    have hfix_cs : ∀ lc ∈ cs, (lc.2.2.substitute var repl) = lc.2.2 := by
       intro lc hmem
-      have hclosed : lc.2.isClosed := (hWFcs lc hmem).closed
-      have hnotfree : LocalTypeR.isFreeIn var lc.2 = false :=
-        isFreeIn_false_of_closed lc.2 var hclosed
+      have hclosed : lc.2.2.isClosed := (hWFcs lc hmem).closed
+      have hnotfree : LocalTypeR.isFreeIn var lc.2.2 = false :=
+        isFreeIn_false_of_closed lc.2.2 var hclosed
       exact substitute_not_free _ _ _ hnotfree
     exact BranchesRelBisim_of_Bisim_with_relImage h_rel hbr_bisim hfix_bs hfix_cs
   | eq_recv hxrecv hyrecv hbr =>
@@ -282,21 +282,21 @@ theorem substitute_at_var_bisimF {x y : LocalTypeR} {var : String} {repl : Local
     have hR'_to_Bisim : ∀ a b, R' a b → Bisim a b := fun a b hr' => ⟨R', hR'post, hr'⟩
     have hbr_bisim : BranchesRelBisim Bisim bs cs :=
       BranchesRelBisim.mono hR'_to_Bisim hbr
-    have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2 :=
+    have hWFbs : ∀ lb ∈ bs, LocalTypeR.WellFormed lb.2.2 :=
       WellFormed_branches_of_CanRecv hxrecv hWFx_subst
-    have hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2 :=
+    have hWFcs : ∀ lc ∈ cs, LocalTypeR.WellFormed lc.2.2 :=
       WellFormed_branches_of_CanRecv hyrecv hWFy_subst
-    have hfix_bs : ∀ lb ∈ bs, (lb.2.substitute var repl) = lb.2 := by
+    have hfix_bs : ∀ lb ∈ bs, (lb.2.2.substitute var repl) = lb.2.2 := by
       intro lb hmem
-      have hclosed : lb.2.isClosed := (hWFbs lb hmem).closed
-      have hnotfree : LocalTypeR.isFreeIn var lb.2 = false :=
-        isFreeIn_false_of_closed lb.2 var hclosed
+      have hclosed : lb.2.2.isClosed := (hWFbs lb hmem).closed
+      have hnotfree : LocalTypeR.isFreeIn var lb.2.2 = false :=
+        isFreeIn_false_of_closed lb.2.2 var hclosed
       exact substitute_not_free _ _ _ hnotfree
-    have hfix_cs : ∀ lc ∈ cs, (lc.2.substitute var repl) = lc.2 := by
+    have hfix_cs : ∀ lc ∈ cs, (lc.2.2.substitute var repl) = lc.2.2 := by
       intro lc hmem
-      have hclosed : lc.2.isClosed := (hWFcs lc hmem).closed
-      have hnotfree : LocalTypeR.isFreeIn var lc.2 = false :=
-        isFreeIn_false_of_closed lc.2 var hclosed
+      have hclosed : lc.2.2.isClosed := (hWFcs lc hmem).closed
+      have hnotfree : LocalTypeR.isFreeIn var lc.2.2 = false :=
+        isFreeIn_false_of_closed lc.2.2 var hclosed
       exact substitute_not_free _ _ _ hnotfree
     exact BranchesRelBisim_of_Bisim_with_relImage h_rel hbr_bisim hfix_bs hfix_cs
 
@@ -314,11 +314,11 @@ private theorem Bisim_to_RelImage (f : LocalTypeR → LocalTypeR) {a b : LocalTy
     This is useful when we know branches are related by a strong relation R
     and want to show they're related by RelImage f S for some S ⊆ R. -/
 private theorem BranchesRelBisim_to_RelImage (f : LocalTypeR → LocalTypeR)
-    {R : Rel} {bs cs : List (Label × LocalTypeR)}
+    {R : Rel} {bs cs : List BranchR}
     (h : BranchesRelBisim R bs cs)
     (hlift : ∀ a b, R a b → RelImage f R (f a) (f b)) :
-    BranchesRelBisim (RelImage f R) (bs.map (fun p => (p.1, f p.2)))
-                                     (cs.map (fun p => (p.1, f p.2))) := by
+    BranchesRelBisim (RelImage f R) (bs.map (fun p => (p.1, p.2.1, f p.2.2)))
+                                     (cs.map (fun p => (p.1, p.2.1, f p.2.2))) := by
   induction h with
   | nil =>
     simp only [List.map_nil]
@@ -336,17 +336,17 @@ open SessionCoTypes.SubstCommBarendregt in
 
     Requires Barendregt conditions for the non-shadowed mu case. -/
 theorem substitute_preserves_CanSend {a : LocalTypeR} {var : String} {repl : LocalTypeR}
-    {p : String} {bs : List (Label × LocalTypeR)}
+    {p : String} {bs : List BranchR}
     (h : CanSend a p bs)
     (hbar : notBoundAt var a = true)
     (hfresh : ∀ w, isFreeIn w repl = false) :
-    CanSend (a.substitute var repl) p (bs.map (fun b => (b.1, b.2.substitute var repl))) := by
+    CanSend (a.substitute var repl) p (bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl))) := by
   refine (CanSend.rec
     (motive := fun a p bs _ =>
       ∀ {var repl}, notBoundAt var a = true →
         (∀ w, isFreeIn w repl = false) →
           CanSend (a.substitute var repl) p
-            (bs.map (fun b => (b.1, b.2.substitute var repl))))
+            (bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl))))
     ?base ?mu h) hbar hfresh
   · intro p bs var repl hbar hfresh
     simp only [LocalTypeR.substitute]
@@ -389,11 +389,11 @@ open SessionCoTypes.SubstCommBarendregt in
 
     Requires Barendregt conditions for the non-shadowed mu case. -/
 theorem substitute_preserves_CanRecv {a : LocalTypeR} {var : String} {repl : LocalTypeR}
-    {p : String} {bs : List (Label × LocalTypeR)}
+    {p : String} {bs : List BranchR}
     (h : CanRecv a p bs)
     (hbar : notBoundAt var a = true)
     (hfresh : ∀ w, isFreeIn w repl = false) :
-    CanRecv (a.substitute var repl) p (bs.map (fun b => (b.1, b.2.substitute var repl))) := by
+    CanRecv (a.substitute var repl) p (bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl))) := by
   -- Reduce recv to send via duality, then transport Barendregt conditions.
   have hsend : CanSend a.dual p (dualBranches bs) := CanRecv.dual h
   have hbar_dual : notBoundAt var a.dual = true := by
@@ -406,18 +406,18 @@ theorem substitute_preserves_CanRecv {a : LocalTypeR} {var : String} {repl : Loc
       (bs := dualBranches bs) hsend hbar_dual hfresh_dual
   have hsend' :
       CanSend (a.substitute var repl).dual p
-        (dualBranches (bs.map (fun b => (b.1, b.2.substitute var repl)))) := by
+        (dualBranches (bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl)))) := by
     -- Commute dual with substitution on types and branches.
     have hbranches :
-        (dualBranches bs).map (fun b => (b.1, b.2.substitute var repl.dual)) =
-          dualBranches (bs.map (fun b => (b.1, b.2.substitute var repl))) := by
+        (dualBranches bs).map (fun b => (b.1, b.2.1, b.2.2.substitute var repl.dual)) =
+          dualBranches (bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl))) := by
       calc
-        (dualBranches bs).map (fun b => (b.1, b.2.substitute var repl.dual))
+        (dualBranches bs).map (fun b => (b.1, b.2.1, b.2.2.substitute var repl.dual))
             = substituteBranches (dualBranches bs) var repl.dual := by
                 simp [substituteBranches_eq_map]
         _ = dualBranches (substituteBranches bs var repl) := by
                 simpa using (dualBranches_substituteBranches bs var repl).symm
-        _ = dualBranches (bs.map (fun b => (b.1, b.2.substitute var repl))) := by
+        _ = dualBranches (bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl))) := by
                 simp [substituteBranches_eq_map]
     simpa [LocalTypeR.dual_substitute, hbranches] using hsend_subst
   have hrecv := CanSend.dual hsend'

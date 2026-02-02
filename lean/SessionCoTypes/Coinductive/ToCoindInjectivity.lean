@@ -91,11 +91,11 @@ mutual
         subst hbs; rfl
 
   theorem toCoindBranches_injective :
-      ∀ {bs cs : List (Label × LocalTypeR)}, toCoindBranches bs = toCoindBranches cs → bs = cs
+      ∀ {bs cs : List BranchR}, toCoindBranches bs = toCoindBranches cs → bs = cs
     | [], [], _ => rfl
     | [], _ :: _, h => by simp [toCoindBranches] at h
     | _ :: _, [], h => by simp [toCoindBranches] at h
-    | (lb, t) :: bs, (lc, u) :: cs, h => by
+    | (lb, vt, t) :: bs, (lc, wt, u) :: cs, h => by
         have hcons :
             (lb, toCoind t) = (lc, toCoind u) ∧
               toCoindBranches bs = toCoindBranches cs := by
@@ -103,43 +103,44 @@ mutual
         rcases hcons with ⟨hhead, htail⟩
         have hlabel : lb = lc := congrArg Prod.fst hhead
         have ht : t = u := toCoind_injective (congrArg Prod.snd hhead)
-        subst hlabel; subst ht
+        have hvt : vt = wt := by simpa [toCoindBranches] using h
+        subst hlabel; subst ht; subst hvt
         have hrest : bs = cs := toCoindBranches_injective htail
         subst hrest; rfl
 end
 
 /-! ## toCoindBranches Indexing -/
 
-lemma toCoindBranches_length (bs : List (Label × LocalTypeR)) :
+lemma toCoindBranches_length (bs : List BranchR) :
     (toCoindBranches bs).length = bs.length := by
   induction bs with
   | nil => rfl
   | cons _ _ ih => simp [toCoindBranches, ih]
 
-lemma toCoindBranches_get {bs : List (Label × LocalTypeR)} (i : Fin bs.length) :
+lemma toCoindBranches_get {bs : List BranchR} (i : Fin bs.length) :
     (toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i) =
-      ((bs.get i).1, toCoind (bs.get i).2) := by
+      ((bs.get i).1, toCoind (bs.get i).2.2) := by
   induction bs with
   | nil => exact (Fin.elim0 i)
   | cons b bs ih =>
       cases i using Fin.cases with
       | zero =>
           cases b with
-          | mk label cont => simp [toCoindBranches, castFin, toCoindBranches_length]
+          | mk label rest => cases rest with | mk vt cont => simp [toCoindBranches, castFin, toCoindBranches_length]
       | succ i => simpa [castFin, toCoindBranches_length] using ih i
 
-lemma toCoindBranches_get_snd {bs : List (Label × LocalTypeR)} (i : Fin bs.length) :
+lemma toCoindBranches_get_snd {bs : List BranchR} (i : Fin bs.length) :
     ((toCoindBranches bs).get (castFin (toCoindBranches_length bs).symm i)).2 =
-      toCoind (bs.get i).2 := by
+      toCoind (bs.get i).2.2 := by
   simpa using congrArg Prod.snd (toCoindBranches_get (bs := bs) i)
 
-lemma labels_get_eq {bs : List (Label × LocalTypeR)} (i : Fin (bs.map Prod.fst).length) :
+lemma labels_get_eq {bs : List BranchR} (i : Fin (bs.map Prod.fst).length) :
     (bs.map Prod.fst).get i = (bs.get (castFin (by simp) i)).1 := by
   induction bs with
   | nil => exact (Fin.elim0 i)
   | cons b bs ih =>
       cases i using Fin.cases with
-      | zero => cases b with | mk label cont => simp [castFin]
+      | zero => cases b with | mk label rest => cases rest with | mk vt cont => simp [castFin]
       | succ i => simp [castFin]
 
 end SessionCoTypes.Coinductive

@@ -302,14 +302,14 @@ fn local_from_de_bruijn(db: &LocalTypeRDB, names: &mut Vec<String>) -> LocalType
             partner: partner.clone(),
             branches: branches
                 .iter()
-                .map(|(l, cont)| (l.clone(), local_from_de_bruijn(cont, names)))
+                .map(|(l, cont)| (l.clone(), None, local_from_de_bruijn(cont, names)))
                 .collect(),
         },
         LocalTypeRDB::Recv { partner, branches } => LocalTypeR::Recv {
             partner: partner.clone(),
             branches: branches
                 .iter()
-                .map(|(l, cont)| (l.clone(), local_from_de_bruijn(cont, names)))
+                .map(|(l, cont)| (l.clone(), None, local_from_de_bruijn(cont, names)))
                 .collect(),
         },
         LocalTypeRDB::Rec(body) => {

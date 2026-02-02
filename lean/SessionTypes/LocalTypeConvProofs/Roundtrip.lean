@@ -112,8 +112,8 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
         Context.indexOf ctx x = some i →
         t.toDB? (pref ++ x :: ctx) = some db →
           db.isGuarded (i + pref.length + 1) = true
-  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True
-  let P3 : Label × LocalTypeR → Prop := fun _ => True
+  let P2 : List BranchR → Prop := fun _ => True
+  let P3 : BranchR → Prop := fun _ => True
   have hrec : P1 t := by
     refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -211,8 +211,8 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
         ctx.indexOf x = some i →
         t.toDB? ctx = some db →
           db.isGuarded i = true
-  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True
-  let P3 : Label × LocalTypeR → Prop := fun _ => True
+  let P2 : List BranchR → Prop := fun _ => True
+  let P3 : BranchR → Prop := fun _ => True
   have hrec : P1 t := by
     refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -301,14 +301,14 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
   let P1 : LocalTypeR → Prop :=
     fun t =>
       ∀ ctx db, t.isContractive = true → t.toDB? ctx = some db → db.isContractive = true
-  let P2 : List (Label × LocalTypeR) → Prop :=
+  let P2 : List BranchR → Prop :=
     fun bs =>
       ∀ ctx dbs, LocalTypeR.isContractiveBranches bs = true →
         LocalTypeR.branchesToDB? ctx bs = some dbs →
           isContractiveBranches dbs = true
-  let P3 : Label × LocalTypeR → Prop :=
+  let P3 : BranchR → Prop :=
     fun b =>
-      ∀ ctx db, b.2.isContractive = true → b.2.toDB? ctx = some db → db.isContractive = true
+      ∀ ctx db, b.2.2.isContractive = true → b.2.2.toDB? ctx = some db → db.isContractive = true
   have hrec : P1 t := by
     refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -372,7 +372,7 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
       | cons hd tl =>
           simp [LocalTypeR.branchesToDB?] at hdbs
     · intro head tail hhead htail ctx dbs hcontr hdbs
-      obtain ⟨l, t⟩ := head
+      obtain ⟨l, _vt, t⟩ := head
       have hpair : t.isContractive = true ∧ LocalTypeR.isContractiveBranches tail = true := by
         simpa [LocalTypeR.isContractiveBranches, Bool.and_eq_true] using hcontr
       cases htdb : t.toDB? ctx with

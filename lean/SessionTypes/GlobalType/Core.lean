@@ -34,6 +34,8 @@ inductive PayloadSort where
   | nat : PayloadSort
   | bool : PayloadSort
   | string : PayloadSort
+  | real : PayloadSort
+  | vector : Nat → PayloadSort
   | prod : PayloadSort → PayloadSort → PayloadSort
   deriving Repr, DecidableEq, BEq, Inhabited
 

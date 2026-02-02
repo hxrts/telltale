@@ -57,17 +57,17 @@ fn main() {
     let sub_choice = LocalTypeR::Send {
         partner: "B".to_string(),
         branches: vec![
-            (Label::new("option1"), LocalTypeR::End),
-            (Label::new("option2"), LocalTypeR::End),
-            (Label::new("option3"), LocalTypeR::End),
+            (Label::new("option1"), None, LocalTypeR::End),
+            (Label::new("option2"), None, LocalTypeR::End),
+            (Label::new("option3"), None, LocalTypeR::End),
         ],
     };
 
     let sup_choice = LocalTypeR::Send {
         partner: "B".to_string(),
         branches: vec![
-            (Label::new("option1"), LocalTypeR::End),
-            (Label::new("option2"), LocalTypeR::End),
+            (Label::new("option1"), None, LocalTypeR::End),
+            (Label::new("option2"), None, LocalTypeR::End),
         ],
     };
 
