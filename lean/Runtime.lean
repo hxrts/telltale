@@ -10,13 +10,13 @@ import Runtime.Resources.SessionRA
 import Runtime.Resources.BufferRA
 import Runtime.Resources.Arena
 import Runtime.Invariants.SessionInv
-import Runtime.Scheduler.Scheduler
+import Runtime.VM.Scheduler
 import Runtime.Transport.Transport
 import Runtime.ProgramLogic.SessionWP
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
-import Runtime.Monitor.Monitor
+import Runtime.VM.Monitor
 import Runtime.VM.DomainComposition
 
 /- 

@@ -86,7 +86,7 @@ mutual
     | .end => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
     | .send _ branches =>
         match branches with
-        | [] => (code, loopTargets)
+        | [] => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
         | (_, _vt, cont) :: [] =>
             let code := code ++ [Instr.send (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
             compileInner defaultAction cont code loopTargets
@@ -96,7 +96,7 @@ mutual
             compileInner defaultAction cont code loopTargets
     | .recv _ branches =>
         match branches with
-        | [] => (code, loopTargets)
+        | [] => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
         | (_, _vt, cont) :: [] =>
             let code := code ++ [Instr.recv (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
             compileInner defaultAction cont code loopTargets
@@ -133,9 +133,18 @@ mutual
 end
 
 /-- Compile LocalTypeR into bytecode instructions. -/
+def ensureTerminal {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (code : List (Instr γ ε)) : List (Instr γ ε) :=
+  match code.getLast? with
+  | some .halt => code
+  | some (.jmp _) => code
+  | _ => code ++ [Instr.halt (γ:=γ) (ε:=ε)]
+
+/- ensureTerminal does not change program behavior for well-formed compiles; it
+   only guarantees a terminal instruction at the end. -/
 def compileLocalTypeR {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     [Inhabited (EffectModel.EffectAction ε)]
     (lt : LocalTypeR) : List (Instr γ ε) :=
   let defaultAction : EffectModel.EffectAction ε := default
   let (code, _) := compileInner (γ:=γ) (ε:=ε) defaultAction lt [] []
-  code
+  ensureTerminal (γ:=γ) (ε:=ε) code

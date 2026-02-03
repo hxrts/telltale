@@ -33,11 +33,8 @@ def obsTag : ObsEvent UnitEffect → String
   | .checked _ _ => "checked"
 
 /-- Extract tags from a filtered trace (UnitEffect only). -/
-def traceTags (trace : List (StepEvent UnitEffect)) : List String :=
-  trace.filterMap (fun ev =>
-    match ev with
-    | .obs o => some (obsTag o)
-    | .internal => none)
+def traceTags (trace : List (TickedObsEvent UnitEffect)) : List String :=
+  trace.map (fun ev => obsTag ev.event)
 
 /-- Minimal empty VM state for loading choreographies. -/
 def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
@@ -56,6 +53,7 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , sched := { policy := unitConfig.schedPolicy, readyQueue := [], blockedSet := [], timeslice := 1, stepCount := 0 }
   , monitor := exampleMonitor
   , obsTrace := []
+  , clock := 0
   , crashedSites := []
   , partitionedEdges := []
   , mask := ()

@@ -3,7 +3,7 @@ import Runtime.VM.Core
 import Runtime.VM.Config
 import Runtime.VM.Knowledge
 import Runtime.VM.Program
-import Runtime.Monitor.Monitor
+import Runtime.VM.Monitor
 import Runtime.Resources.Arena
 import Runtime.Resources.ResourceModel
 
@@ -126,6 +126,11 @@ inductive ObsEvent (ε : Type u) [EffectModel ε] where
   | tagged (fact : KnowledgeFact)
   | checked (target : Role) (permitted : Bool)
 
+structure TickedObsEvent (ε : Type u) [EffectModel ε] where
+  -- Observable event paired with a global or session-local tick.
+  tick : Nat
+  event : ObsEvent ε
+
 inductive StepEvent (ε : Type u) [EffectModel ε] where
   -- Step events are either observable or internal.
   | obs (ev : ObsEvent ε)
@@ -154,22 +159,50 @@ def obsSid? {ε : Type u} [EffectModel ε] : ObsEvent ε → Option SessionId
 
 /-- Filter observable events by session id. -/
 def filterBySid {ε : Type u} [EffectModel ε] (sid : SessionId)
-    (trace : List (StepEvent ε)) : List (StepEvent ε) :=
-  trace.filterMap (fun ev =>
-    match ev with
-    | .obs o => if obsSid? o = some sid then some ev else none
-    | .internal => none)
+    (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
+  trace.filter (fun ev => obsSid? ev.event = some sid)
 
- /-- Normalize a VM trace by erasing tick information (currently identity). -/
+private def getTick (sid : SessionId) (ticks : List (SessionId × Nat)) : Nat :=
+  match ticks.find? (fun p => decide (p.fst = sid)) with
+  | some (_, t) => t
+  | none => 0
+
+private def setTick (sid : SessionId) (t : Nat) (ticks : List (SessionId × Nat)) :
+    List (SessionId × Nat) :=
+  let rec go (xs : List (SessionId × Nat)) : List (SessionId × Nat) :=
+    match xs with
+    | [] => [(sid, t)]
+    | (sid', t') :: rest =>
+        if sid' = sid then
+          (sid, t) :: rest
+        else
+          (sid', t') :: go rest
+  go ticks
+
+/-- Normalize a VM trace by assigning session-local ticks. -/
 def normalizeVmTrace {ε : Type u} [EffectModel ε]
-    (trace : List (StepEvent ε)) : List (StepEvent ε) :=
-  trace
+    (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
+  let step :=
+    fun (acc : List (TickedObsEvent ε) × List (SessionId × Nat)) (ev : TickedObsEvent ε) =>
+      match obsSid? ev.event with
+      | some sid =>
+          let t := getTick sid acc.2
+          let ticks' := setTick sid (t + 1) acc.2
+          ({ tick := t, event := ev.event } :: acc.1, ticks')
+      | none =>
+          (ev :: acc.1, acc.2)
+  let (revTrace, _) := trace.foldl step ([], [])
+  revTrace.reverse
 
 namespace Runtime.VM
 
 abbrev normalizeTrace {ε : Type u} [EffectModel ε]
-    (trace : List (StepEvent ε)) : List (StepEvent ε) :=
+    (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
   normalizeVmTrace trace
+
+abbrev strictTrace {ε : Type u} [EffectModel ε]
+    (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
+  trace
 
 end Runtime.VM
 
@@ -229,7 +262,8 @@ structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
   guardResources : List (γ × GuardLayer.Resource γ)
   sched : SchedState γ
   monitor : SessionMonitor γ
-  obsTrace : List (StepEvent ε)
+  obsTrace : List (TickedObsEvent ε)
+  clock : Nat
   crashedSites : List (IdentityModel.SiteId ι)
   partitionedEdges : List Edge
   mask : Unit

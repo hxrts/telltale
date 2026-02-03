@@ -283,7 +283,8 @@ def appendEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   match ev with
   | none => st
   | some StepEvent.internal => st
-  | some e => { st with obsTrace := st.obsTrace ++ [e] }
+  | some (StepEvent.obs e) =>
+      { st with obsTrace := st.obsTrace ++ [{ tick := st.clock, event := e }] }
 
 /-! ## Register helpers -/
 

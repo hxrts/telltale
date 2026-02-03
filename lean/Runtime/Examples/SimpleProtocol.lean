@@ -2,7 +2,7 @@ import Runtime.VM.Program
 import Runtime.VM.Exec
 import Runtime.VM.ExecHelpers
 import Runtime.VM.UnitModel
-import Runtime.Monitor.Monitor
+import Runtime.VM.Monitor
 
 /-
 The Problem. Provide a concrete, runnable VM example that exercises
@@ -119,6 +119,7 @@ def exampleState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVer
   , sched := exampleSched
   , monitor := exampleMonitor
   , obsTrace := []
+  , clock := 0
   , crashedSites := []
   , partitionedEdges := []
   , mask := ()

@@ -1,5 +1,6 @@
 import Runtime.ProgramLogic.LanguageInstance
 import Runtime.VM.Program
+import Runtime.VM.State
 import Runtime.VM.Violation
 import Runtime.ProgramLogic.SessionWP
 import Runtime.Compat.WP
@@ -56,28 +57,25 @@ def obsWithSeqNo {ε : Type u} [EffectModel ε]
   | _ => ev
 
 def observeAt {ε : Type u} [EffectModel ε]
-    (idx : Nat) (ev : StepEvent ε) : Option (ObsEvent ε) :=
-  -- Project internal events to observable events with seqNo = index.
-  match ev with
-  | .obs e => some (obsWithSeqNo idx e)
-  | .internal => none
+    (idx : Nat) (ev : TickedObsEvent ε) : ObsEvent ε :=
+  -- Project observable events to indexed events with seqNo = index.
+  obsWithSeqNo idx ev.event
 
 def observe {ε : Type u} [EffectModel ε]
-    (ev : StepEvent ε) : Option (ObsEvent ε) :=
+    (ev : TickedObsEvent ε) : ObsEvent ε :=
   -- Index-free projection defaults seqNo to 0 for V1 convenience.
   observeAt 0 ev
 
 def obsTraceOf {ε : Type u} [EffectModel ε]
-    (trace : List (StepEvent ε)) : ObsTrace ε :=
+    (trace : List (TickedObsEvent ε)) : ObsTrace ε :=
   -- Enumerate events and keep the observable subset with indices.
-  let rec go (idx : Nat) (evs : List (StepEvent ε)) : ObsTrace ε :=
+  let rec go (idx : Nat) (evs : List (TickedObsEvent ε)) : ObsTrace ε :=
     match evs with
     | [] => []
     | ev :: rest =>
         let tail := go (idx + 1) rest
-        match observeAt idx ev with
-        | none => tail
-        | some obs => (idx, obs) :: tail
+        let obs := observeAt idx ev
+        (idx, obs) :: tail
   go 0 trace
 
 def SentAt {ε : Type u} [EffectModel ε]
@@ -134,7 +132,7 @@ def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
   -- Every observed event comes from some step event at that index.
   ∀ (st : VMState ι γ π ε ν) idx ev,
     (idx, ev) ∈ obsTraceOf (ε:=ε) st.obsTrace →
-      ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = some ev
+      ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = ev
 def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)

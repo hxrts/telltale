@@ -31,12 +31,13 @@ def edgeToJson (e : Edge) : Json :=
     , ("sender", Json.str e.sender)
     , ("receiver", Json.str e.receiver) ]
 
-/-- Serialize an observable event to JSON (UnitEffect only). -/
-def obsEventToJson (ev : ObsEvent UnitEffect) : Json :=
-  match ev with
+/-- Serialize a ticked observable event to JSON (UnitEffect only). -/
+def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
+  match ev.event with
   | .sent edge val _ =>
       Json.mkObj
         [ ("kind", Json.str "sent")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
@@ -44,6 +45,7 @@ def obsEventToJson (ev : ObsEvent UnitEffect) : Json :=
   | .received edge val _ =>
       Json.mkObj
         [ ("kind", Json.str "received")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
@@ -51,6 +53,7 @@ def obsEventToJson (ev : ObsEvent UnitEffect) : Json :=
   | .offered edge lbl =>
       Json.mkObj
         [ ("kind", Json.str "offered")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
@@ -58,6 +61,7 @@ def obsEventToJson (ev : ObsEvent UnitEffect) : Json :=
   | .chose edge lbl =>
       Json.mkObj
         [ ("kind", Json.str "chose")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
@@ -65,20 +69,24 @@ def obsEventToJson (ev : ObsEvent UnitEffect) : Json :=
   | .opened sid roles =>
       Json.mkObj
         [ ("kind", Json.str "opened")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("roles", Json.arr (roles.map Json.str).toArray) ]
   | .closed sid =>
       Json.mkObj
         [ ("kind", Json.str "closed")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
   | .epochAdvanced sid epoch =>
       Json.mkObj
         [ ("kind", Json.str "epoch_advanced")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("epoch", Json.num epoch) ]
   | .transferred ep fromCoro toCoro =>
       Json.mkObj
         [ ("kind", Json.str "transferred")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role)
         , ("from", Json.num fromCoro)
@@ -86,41 +94,52 @@ def obsEventToJson (ev : ObsEvent UnitEffect) : Json :=
   | .forked sid gsid =>
       Json.mkObj
         [ ("kind", Json.str "forked")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("ghost", Json.num gsid) ]
   | .joined sid =>
       Json.mkObj
         [ ("kind", Json.str "joined")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
   | .aborted sid =>
       Json.mkObj
         [ ("kind", Json.str "aborted")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
   | .acquired layer ep =>
       Json.mkObj
         [ ("kind", Json.str "acquired")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role)
         , ("layer", Json.str layer) ]
   | .released layer ep =>
       Json.mkObj
         [ ("kind", Json.str "released")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role)
         , ("layer", Json.str layer) ]
   | .invoked ep _ =>
       Json.mkObj
         [ ("kind", Json.str "invoked")
+        , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role) ]
-  | .tagged _ => Json.mkObj [("kind", Json.str "tagged")]
+  | .tagged _ =>
+      Json.mkObj [("kind", Json.str "tagged"), ("tick", Json.num ev.tick)]
   | .checked _ permitted =>
-      Json.mkObj [("kind", Json.str "checked"), ("permitted", Json.bool permitted)]
+      Json.mkObj
+        [ ("kind", Json.str "checked")
+        , ("tick", Json.num ev.tick)
+        , ("permitted", Json.bool permitted) ]
 
-/-- Serialize a list of step events to JSON, keeping only observable events. -/
-def traceToJson (trace : List (StepEvent UnitEffect)) : Json :=
-  let obs := trace.filterMap (fun ev =>
-    match ev with
-    | .obs o => some (obsEventToJson o)
-    | .internal => none)
-  Json.arr obs.toArray
+/-- Serialize a list of observable events to JSON using session-local ticks. -/
+def traceToJson (trace : List (TickedObsEvent UnitEffect)) : Json :=
+  let normalized := Runtime.VM.normalizeTrace trace
+  Json.arr (normalized.map obsEventToJson).toArray
+
+/-- Serialize a list of observable events to JSON using global ticks. -/
+def traceToJsonRaw (trace : List (TickedObsEvent UnitEffect)) : Json :=
+  Json.arr (trace.map obsEventToJson).toArray

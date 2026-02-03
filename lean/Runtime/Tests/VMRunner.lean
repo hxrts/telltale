@@ -3,7 +3,7 @@ import Runtime.VM.UnitModel
 import Runtime.VM.Json
 import Runtime.VM.LoadChoreography
 import Runtime.VM.RunScheduled
-import Runtime.Monitor.Monitor
+import Runtime.VM.Monitor
 import Choreography.Projection.Json
 import Choreography.Projection.Trans
 
@@ -43,6 +43,7 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , sched := { policy := unitConfig.schedPolicy, readyQueue := [], blockedSet := [], timeslice := 1, stepCount := 0 }
   , monitor := emptyMonitor
   , obsTrace := []
+  , clock := 0
   , crashedSites := []
   , partitionedEdges := []
   , mask := ()

@@ -1,5 +1,5 @@
 import Runtime.VM.State
-import Runtime.Scheduler.Scheduler
+import Runtime.VM.Scheduler
 import Runtime.Compat.Inv
 
 /-

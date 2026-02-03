@@ -91,7 +91,7 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   let (coroutines', readyQueue', nextCoroId') :=
     image.program.entryPoints.foldl mkCoro (st.coroutines, st.sched.readyQueue, st.nextCoroId)
   let sched' := { st.sched with readyQueue := readyQueue' }
-  let trace' := st.obsTrace ++ [StepEvent.obs (.opened sid roles)]
+  let trace' := st.obsTrace ++ [{ tick := st.clock, event := .opened sid roles }]
   let st' := { st with
     programs := programs'
     coroutines := coroutines'
@@ -105,7 +105,7 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
 
 /-! ## Disjointness lemma (stub) -/
 
-axiom loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -115,4 +115,7 @@ axiom loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
     (st : VMState ι γ π ε ν) (image : CodeImage γ ε)
     (_hwf : WFVMState st) :
     let (st', sid) := loadChoreography st image
-    ∀ sid' ∈ existingSessionIds st, SessionDisjoint st' sid sid'
+    ∀ sid' ∈ existingSessionIds st, SessionDisjoint st' sid sid' :=
+by
+  intro sid' _
+  simp [SessionDisjoint]

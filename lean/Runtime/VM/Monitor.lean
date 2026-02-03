@@ -26,7 +26,7 @@ from iris_runtime_2.md §14.
 - `monitor_sound`, `unified_monitor_preserves`
 - `cross_kind_interop`
 
-Failure model definitions live in `Runtime.Failure.Failure`.
+Failure model definitions live in `Runtime.VM.Failure`.
 
 Dependencies: Task 19, Shim.Invariants.
 -/
