@@ -109,7 +109,7 @@ protocol PingPong =
 "#);
 ```
 
-The macro automatically generates role types, message types, and session types. This is the recommended approach for most use cases. For advanced scenarios requiring runtime parsing, see [Choreographic DSL](03_choreographic_dsl.md).
+The macro automatically generates role types, message types, and session types. This is the recommended approach for most use cases. For advanced scenarios requiring runtime parsing, see [Choreographic DSL](04_choreographic_dsl.md).
 
 Run the protocol using the effect system.
 
@@ -139,7 +139,7 @@ let mut endpoint = ();
 let result = interpret(&mut handler, &mut endpoint, program).await?;
 ```
 
-The `InMemoryHandler` provides local message passing for testing. See [Using Telltale Handlers](07_telltale_handler.md) for production handlers.
+The `InMemoryHandler` provides local message passing for testing. See [Using Telltale Handlers](08_telltale_handler.md) for production handlers.
 
 ## Core Concepts
 

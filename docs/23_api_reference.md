@@ -853,7 +853,7 @@ pub fn new() -> Self
 ```
 
 Requires TelltaleEndpoint for connection management.
-See [Using Telltale Handlers](07_telltale_handler.md) for complete usage.
+See [Using Telltale Handlers](08_telltale_handler.md) for complete usage.
 
 ### TelltaleEndpoint
 

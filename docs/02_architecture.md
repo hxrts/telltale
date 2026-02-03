@@ -4,12 +4,13 @@
 
 Telltale implements choreographic programming for Rust. The system compiles global protocol specifications into local session types for each participant.
 
-The architecture has four main layers:
+The architecture has five main layers:
 
 1. DSL and parsing (choreographic syntax to AST)
 2. Projection (global protocol to local types)
 3. Code generation (local types to Rust code)
 4. Effect system (protocol execution with pluggable transports)
+5. VM execution (bytecode scheduling with N-concurrency)
 
 ## Component Diagram
 
@@ -41,6 +42,13 @@ graph TB
         Exec["Running Protocol"]
     end
 
+    subgraph Layer5["Layer 5: VM Execution"]
+        VM["Bytecode VM"]
+        Scheduler["Scheduler<br/>(N-concurrent)"]
+        Sessions["Session Store"]
+        Buffers["Bounded Buffers"]
+    end
+
     DSL --> Parser
     Parser --> AST
     AST --> Proj
@@ -52,6 +60,10 @@ graph TB
     Effects --> Handler
     Handler --> Transport
     Transport --> Exec
+    LT --> VM
+    VM --> Scheduler
+    Scheduler --> Sessions
+    Sessions --> Buffers
 ```
 
 This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation and effect handler execution.
@@ -192,6 +204,14 @@ pub trait ChoreoHandler: Send {
 
 Handlers implement this trait to provide different execution strategies.
 
+### VM Execution Layer
+
+The VM provides an alternative execution model to direct effect handler interpretation. Local types compile to bytecode instructions that the VM executes. The scheduler manages multiple coroutines with configurable concurrency parameter N.
+
+The VM maintains session state with bounded message buffers. Each coroutine references its assigned program via a programId. Sessions track type state and advance through protocol execution. The scheduler guarantees that per-session traces are invariant over N and scheduling policy.
+
+See [VM Overview](09_vm_overview.md) for details on the bytecode VM architecture.
+
 ## Data Flow
 
 This section demonstrates the transformation of a choreography through each layer.
@@ -295,7 +315,7 @@ This abstraction makes the core library portable. The same code runs on servers 
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](06_effect_handlers.md) for details.
+Implement `ChoreoHandler` to add new transport mechanisms. See [Effect Handlers](07_effect_handlers.md) for details.
 
 ### Middleware
 

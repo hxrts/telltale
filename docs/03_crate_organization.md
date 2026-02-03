@@ -1,4 +1,4 @@
-# Crate Architecture
+# Crate Organization
 
 This document describes the crate architecture introduced in v0.7.0. The structure aligns with Lean verification and provides clear separation of concerns.
 
@@ -18,6 +18,11 @@ graph TB
         lean["telltale-lean-bridge<br/>Lean interop & validation"]
     end
 
+    subgraph Runtime
+        vm["telltale-vm<br/>Bytecode VM & scheduler"]
+        simulator["telltale-simulator<br/>VM-based simulation"]
+    end
+
     subgraph Application
         choreo["telltale-choreography<br/>DSL, parsing & code generation"]
         macros["telltale-macros<br/>Proc macros"]
@@ -30,14 +35,21 @@ graph TB
     types --> theory
     types --> lean
     types --> choreo
+    types --> vm
 
     theory --> choreo
+    theory --> vm
+
+    vm --> simulator
+    choreo --> simulator
 
     choreo --> macros
 
     theory --> main
     choreo --> main
     lean --> main
+    vm --> main
+    simulator --> main
 ```
 
 This diagram shows the dependency relationships between crates. Arrows indicate dependency direction. The `telltale-types` crate serves as the foundation for all other crates.
@@ -78,7 +90,7 @@ The `projection` module handles `GlobalType` to `LocalTypeR` projection with mer
 
 The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates. The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
 
-The `content_id` module provides content addressing for all types. Projection results are memoized by content ID for performance. See [Content Addressing](05_content_addressing.md) for details.
+The `content_id` module provides content addressing for all types. Projection results are memoized by content ID for performance. See [Content Addressing](21_content_addressing.md) for details.
 
 ```rust
 use telltale_theory::{project, merge, sync_subtype, async_subtype};
@@ -95,7 +107,7 @@ The `project` function computes the local type for a given role. The `sync_subty
 
 ### telltale-lean-bridge
 
-This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](15_lean_rust_bridge.md) for detailed documentation.
+This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](20_lean_rust_bridge.md) for detailed documentation.
 
 The `export` module converts Rust types to JSON for Lean. The `import` module converts Lean JSON back to Rust types. The `validate` module provides cross-validation between Rust and Lean.
 
@@ -109,13 +121,57 @@ lean-bridge import --input protocol.json
 
 These commands generate samples, validate round-trips, and import JSON respectively.
 
+### telltale-vm
+
+This crate is located in `rust/vm/`. It provides a bytecode VM for executing session type protocols. The VM offers an alternative execution model to direct effect handler interpretation.
+
+The `instr` module defines the bytecode instruction set. Instructions include `Send`, `Recv`, `Offer`, `Choose` for communication. Instructions include `Open`, `Close` for session lifecycle. The `Invoke` instruction calls effect handlers. Control flow uses `Jmp`, `Yield`, and `Halt`.
+
+The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine has a `programId` that references its assigned program in the VM. The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, and `ProgressAware`.
+
+The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `FIFO` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
+
+The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The `load_choreography` method creates sessions and coroutines from a code image.
+
+```rust
+use telltale_vm::{VM, VMConfig, CodeImage};
+
+let mut vm = VM::new(VMConfig::default());
+let image = CodeImage::from_local_types(&local_types, &global_type);
+let sid = vm.load_choreography(&image)?;
+vm.run(&handler, 1000)?;
+```
+
+The first line creates a VM with default configuration. The second line creates a code image from local types. The third line loads the choreography and returns a session ID. The fourth line runs the VM with an effect handler.
+
+### telltale-simulator
+
+This crate is located in `rust/simulator/`. It wraps the VM for simulation and testing. The crate depends on `telltale-vm` and `telltale-choreography`.
+
+The `vm_runner` module provides the `run_vm` function for single-choreography execution. It also provides `run_vm_concurrent` for multiple choreographies. The `VmEffectAdapter` bridges simulator effect handlers to VM effect handlers.
+
+The `ChoreographySpec` struct packages a choreography for simulation. It includes local types, global type, and initial state. The `Trace` type collects step records during execution.
+
+```rust
+use telltale_simulator::{run_vm, ChoreographySpec};
+
+let spec = ChoreographySpec {
+    local_types: types,
+    global_type: global,
+    initial_states: states,
+};
+let trace = run_vm(&spec.local_types, &spec.global_type, &spec.initial_states, 100, &handler)?;
+```
+
+The `run_vm` function executes a choreography and returns a trace. The trace contains step records for each role at each step.
+
 ### telltale-choreography
 
 This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `telltale-types` and `telltale-theory`.
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation. The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
-The `topology/` directory provides deployment configuration. See [Topology](08_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](09_resource_heap.md) for nullifier-based consumption tracking.
+The `topology/` directory provides deployment configuration. See [Topology](14_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](22_resource_heap.md) for nullifier-based consumption tracking.
 
 ### telltale
 
@@ -143,19 +199,22 @@ DSL Text                 Choreography AST               GlobalType
                             LocalTypeR
                          (telltale-types)
                                 |
-                +---------------+---------------+
-                |                               |
-                v                               v
-          Session Types                       JSON
-          & Effect Programs                  (Lean)
-          (choreography)                  (lean-bridge)
-                |                               |
-                v                               v
-            Runtime                           Lean
-           Execution                       Validation
+                +---------------+---------------+---------------+
+                |               |                               |
+                v               v                               v
+          Session Types     CodeImage                         JSON
+          & Effect Programs  (vm)                            (Lean)
+          (choreography)        |                         (lean-bridge)
+                |               |                               |
+                v               v                               v
+           Effect Handler   VM Execution                      Lean
+           Interpretation   (scheduler,                    Validation
+                            coroutines)
 ```
 
-The flow begins with DSL text parsed into a choreography AST. The AST is lowered to `GlobalType`. Projection computes `LocalTypeR` for each role. From local types, code generation produces session types, effect programs, or JSON for Lean.
+The flow begins with DSL text parsed into a choreography AST. The AST is lowered to `GlobalType`. Projection computes `LocalTypeR` for each role.
+
+From local types, three paths are available. Code generation produces session types and effect programs for handler interpretation. The VM path compiles local types to bytecode for VM execution. The Lean path exports JSON for formal validation.
 
 ## Lean Correspondence
 
@@ -225,4 +284,4 @@ impl Validator {
 }
 ```
 
-Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](15_lean_rust_bridge.md) for more details.
+Custom validation methods can implement domain-specific comparison rules. See [Lean-Rust Bridge](20_lean_rust_bridge.md) for more details.

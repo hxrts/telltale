@@ -230,10 +230,12 @@ Telltale combines these concepts into a practical system. Choreographies define 
 
 The effect system decouples protocol logic from transport mechanisms. Handlers interpret send and receive operations. Middleware can add logging, retry logic, or fault injection. The same choreography works across different deployment scenarios. Content addressing assigns cryptographic identities to all protocol artifacts, enabling memoization and structural sharing.
 
+A bytecode VM provides an alternative execution model. The VM compiles local types to bytecode instructions and manages scheduling, buffers, and session lifecycle. The concurrency parameter N controls how many coroutines advance per scheduling round. Per-session traces are invariant over N, enabling testing at high concurrency and deployment at lower concurrency.
+
 Topology configuration separates deployment concerns from protocol logic. Resource heaps provide explicit state management with nullifier-based consumption tracking. This integration provides both safety and flexibility through a type system that prevents protocol errors and an effect system that allows diverse implementations.
 
 ## Further Reading
 
-See [Architecture](02_architecture.md) for system design details. See [Choreographic DSL](03_choreographic_dsl.md) for the choreography language. See [Effect Handlers](06_effect_handlers.md) for the handler system.
+See [Architecture](02_architecture.md) for system design details. See [Choreographic DSL](04_choreographic_dsl.md) for the choreography language. See [Effect Handlers](07_effect_handlers.md) for the handler system.
 
-See [Content Addressing](05_content_addressing.md) for cryptographic protocol identities. See [Topology](08_topology.md) for deployment configuration. See [Resource Heap](09_resource_heap.md) for explicit state management.
+See [Content Addressing](21_content_addressing.md) for cryptographic protocol identities. See [Topology](14_topology.md) for deployment configuration. See [Resource Heap](22_resource_heap.md) for explicit state management. See [VM Overview](09_vm_overview.md) for the bytecode execution model.

@@ -4,7 +4,7 @@ This tutorial integrates telltale into your project. It demonstrates composing d
 
 ## Prerequisites
 
-You need Rust 1.75 or later. Basic understanding of choreographic programming is required. See [Getting Started](01_getting_started.md) for fundamentals. Familiarity with effect handlers helps. See [Using Telltale Handlers](07_telltale_handler.md) for handler concepts.
+You need Rust 1.75 or later. Basic understanding of choreographic programming is required. See [Getting Started](01_getting_started.md) for fundamentals. Familiarity with effect handlers helps. See [Using Telltale Handlers](08_telltale_handler.md) for handler concepts.
 
 ## Step 1: Add Dependencies
 
@@ -478,4 +478,4 @@ Integration tests verify protocol execution. Unit tests check extension registra
 
 ## Next Steps
 
-Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](10_effect_extensions.md). Explore advanced examples in `rust/choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Telltale Handlers](07_telltale_handler.md).
+Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](16_effect_extensions.md). Explore advanced examples in `rust/choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Telltale Handlers](08_telltale_handler.md).

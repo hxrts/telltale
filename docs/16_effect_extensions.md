@@ -2,7 +2,7 @@
 
 The extension system enables domain-specific choreographic effects. This is Part 1 of the DSL extension guide, covering the runtime effect system that handles execution-time extensions like logging, validation, and metrics.
 
-Part 2 ([DSL Extensions Part 2: Syntax Extensions](11_syntax_extensions.md)) covers syntax-level extensions that add new grammar rules and custom protocol constructs to the choreographic DSL.
+Part 2 ([DSL Extensions Part 2: Syntax Extensions](17_syntax_extensions.md)) covers syntax-level extensions that add new grammar rules and custom protocol constructs to the choreographic DSL.
 
 ## Overview
 
@@ -560,9 +560,9 @@ Complete examples demonstrate extension usage. See the `rust/choreography/exampl
 
 This completes Part 1 of the DSL extension system. You now understand how to create runtime effects that execute during choreography interpretation.
 
-Continue to Part 2, [DSL Extensions Part 2: Syntax Extensions](11_syntax_extensions.md), to learn how to add custom syntax and grammar rules to the choreographic DSL.
+Continue to Part 2, [DSL Extensions Part 2: Syntax Extensions](17_syntax_extensions.md), to learn how to add custom syntax and grammar rules to the choreographic DSL.
 
 Other related topics:
-- [Choreographic Projection Patterns](04_projection.md) for how extensions project to different roles
-- [Effect Handlers](06_effect_handlers.md) for core effect system concepts
-- [Extension Guide](12_extension_guide.md) for building complete applications with extensions
+- [Choreographic Projection Patterns](05_projection.md) for how extensions project to different roles
+- [Effect Handlers](07_effect_handlers.md) for core effect system concepts
+- [Extension Guide](18_extension_guide.md) for building complete applications with extensions
