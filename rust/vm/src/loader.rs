@@ -112,17 +112,17 @@ impl UntrustedImage {
         }
 
         // Re-project global type onto all roles.
-        let projected = telltale_theory::projection::project_all(&self.global_type).map_err(
-            |e| LoadResult::ValidationFailed {
-                reason: format!("projection failed: {e}"),
-            },
-        )?;
+        let projected =
+            telltale_theory::projection::project_all(&self.global_type).map_err(|e| {
+                LoadResult::ValidationFailed {
+                    reason: format!("projection failed: {e}"),
+                }
+            })?;
 
         let projected_map: BTreeMap<String, LocalTypeR> = projected.into_iter().collect();
 
         // Verify claimed roles match projected roles.
-        if self.local_types.keys().collect::<Vec<_>>() != projected_map.keys().collect::<Vec<_>>()
-        {
+        if self.local_types.keys().collect::<Vec<_>>() != projected_map.keys().collect::<Vec<_>>() {
             return Err(LoadResult::ValidationFailed {
                 reason: format!(
                     "role mismatch: claimed {:?}, projected {:?}",
@@ -145,7 +145,10 @@ impl UntrustedImage {
         }
 
         // Recompile from verified local types (ignore claimed bytecode).
-        Ok(CodeImage::from_local_types(&projected_map, &self.global_type))
+        Ok(CodeImage::from_local_types(
+            &projected_map,
+            &self.global_type,
+        ))
     }
 }
 
@@ -169,11 +172,10 @@ mod tests {
     #[test]
     fn test_untrusted_validate_correct() {
         let global = simple_global();
-        let projected: BTreeMap<_, _> =
-            telltale_theory::projection::project_all(&global)
-                .unwrap()
-                .into_iter()
-                .collect();
+        let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
+            .unwrap()
+            .into_iter()
+            .collect();
         let image = UntrustedImage::from_local_types(&projected, &global);
         let verified = image.validate();
         assert!(verified.is_ok());

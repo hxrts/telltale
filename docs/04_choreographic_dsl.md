@@ -106,7 +106,7 @@ rec RoleDecidesLoop
       Client -> Server : Done
 ```
 
-**Requirement**: The first statement in a `loop decide by Role` body must be a send from
+Requirement: The first statement in a `loop decide by Role` body must be a send from
 the deciding role. This ensures the decision to continue is fused with the first message,
 saving a round trip compared to sending a separate "continue" signal.
 
@@ -306,7 +306,7 @@ protocol TimedOps =
   Server -> Client : Response
 ```
 
-Unlike `timed_choice`, this annotation does **not** change the session type. It is purely a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you don't want the protocol to branch on timeout.
+Unlike `timed_choice`, this annotation does not change the session type. It is a hint to the transport layer and is not verified in Lean. Use it for operational timeouts when you do not want the protocol to branch on timeout.
 
 #### 11) String-based Protocol Definition
 
@@ -432,6 +432,8 @@ Single-line comments use `--`. Multi-line comments use `{- ... -}`.
 {- This is a
    multi-line comment -}
 ```
+
+These comments are ignored by the parser. They use the same syntax as Haskell and PureScript.
 
 ### Whitespace and Layout
 

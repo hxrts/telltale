@@ -9,10 +9,10 @@
 //! - Logging
 //! - Metrics collection
 
-use telltale_choreography::effects::*;
-use telltale_choreography::RoleName;
 use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
+use telltale_choreography::effects::*;
+use telltale_choreography::RoleName;
 
 // ============================================================================
 // Domain Types

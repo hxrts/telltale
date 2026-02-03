@@ -18,8 +18,8 @@
 // environment variable to customize (or remove the limit to see true infinite behavior).
 
 use futures::{channel::mpsc, executor, try_join};
-use telltale::{session, try_session, Branch, Message, Receive, Role, Roles, Select, Send};
 use std::{convert::Infallible, error::Error, result};
+use telltale::{session, try_session, Branch, Message, Receive, Role, Roles, Select, Send};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 

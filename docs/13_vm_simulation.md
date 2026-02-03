@@ -1,28 +1,28 @@
 # VM Simulation
 
-This document covers observable events, trace collection, and simulation integration.
+This document covers observable events, trace collection, and the simulator runner.
 
 ## Observable Events
 
-The VM records observable events during execution for debugging and verification.
+The VM emits `ObsEvent` entries into its trace.
 
 ```rust
 pub enum ObsEvent {
-    Sent { tick: u64, session: SessionId, from: Role, to: Role, label: Label },
-    Received { tick: u64, session: SessionId, from: Role, to: Role, label: Label },
-    Opened { tick: u64, session: SessionId, roles: Vec<Role> },
+    Sent { tick: u64, session: SessionId, from: String, to: String, label: String },
+    Received { tick: u64, session: SessionId, from: String, to: String, label: String },
+    Opened { tick: u64, session: SessionId, roles: Vec<String> },
     Closed { tick: u64, session: SessionId },
-    Invoked { tick: u64, session: SessionId, role: Role, action: String },
-    Halted { tick: u64, coro: usize },
-    Faulted { tick: u64, coro: usize, error: Fault },
+    Halted { tick: u64, coro_id: usize },
+    Invoked { tick: u64, coro_id: usize, role: String },
+    Faulted { tick: u64, coro_id: usize, fault: Fault },
 }
 ```
 
-Every event carries a `tick` field from the simulation clock. The `Sent` and `Received` events record message passing. The `Opened` and `Closed` events mark session lifecycle boundaries. The `Invoked` event logs effect handler calls. The `Halted` and `Faulted` events indicate coroutine termination.
+Each event carries the scheduler tick from the simulation clock. The `Sent` and `Received` events track message flow by role name and label. The `Invoked` event records the role and coroutine that reached an effect boundary.
 
 ## Simulation Clock
 
-The VM carries a deterministic simulation clock for timing.
+The VM uses a deterministic `SimClock` for reproducible runs.
 
 ```rust
 pub struct SimClock {
@@ -39,114 +39,101 @@ impl SimClock {
 }
 ```
 
-The clock advances once per scheduling round. The `tick` field is a monotonic counter. The `time` field tracks simulated duration.
-
-All observable events receive the current tick at emission time. This provides a total ordering of events within a simulation run. The tick values enable reasoning about event sequencing.
+The clock advances once per scheduler round. The `tick` field is a monotonic counter and `time` is a simulated duration.
 
 ## Trace Collection
 
-The VM collects events into an observable trace during execution.
+The VM exposes its trace as a slice.
 
 ```rust
 impl VM {
-    pub fn trace(&self) -> &Vec<ObsEvent> {
-        &self.obs_trace
-    }
-
-    pub fn filter_by_session(&self, sid: SessionId) -> Vec<&ObsEvent> {
-        self.obs_trace
-            .iter()
-            .filter(|e| e.session_id() == Some(sid))
-            .collect()
+    pub fn trace(&self) -> &[ObsEvent] {
+        &self.trace
     }
 }
 ```
 
-The `trace` method returns the complete event log. The `filter_by_session` method extracts events for a specific session.
-
-Per-session filtering is essential for N-invariance verification. Different concurrency levels produce different global interleavings. The per-session subsequence remains identical across all N values.
-
-## Trace Normalization
-
-Trace normalization enables comparison across different execution runs.
+Consumers filter the slice to extract session specific subsequences. Tests often normalize events by projecting only `Sent` and `Received` tuples for comparison across runs.
 
 ```rust
-pub fn normalize_trace(trace: &[ObsEvent]) -> Vec<NormalizedEvent> {
-    trace.iter().map(|e| e.without_tick()).collect()
+let per_session: Vec<(String, String, String, String)> = vm
+    .trace()
+    .iter()
+    .filter_map(|ev| match ev {
+        ObsEvent::Sent { session, from, to, label, .. } if *session == sid => {
+            Some(("sent".into(), from.clone(), to.clone(), label.clone()))
+        }
+        ObsEvent::Received { session, from, to, label, .. } if *session == sid => {
+            Some(("recv".into(), from.clone(), to.clone(), label.clone()))
+        }
+        _ => None,
+    })
+    .collect();
+```
+
+This filtering pattern appears in the simulator and VM test suites. It supports N invariance checks by comparing per session traces.
+
+## Simulator Trace Format
+
+The simulator records state snapshots as `Trace` records.
+
+```rust
+pub struct StepRecord {
+    pub step: usize,
+    pub role: String,
+    pub state: Vec<f64>,
+}
+
+pub struct Trace {
+    pub records: Vec<StepRecord>,
 }
 ```
 
-The function erases tick fields from all events. The resulting trace captures only the event sequence without timing information.
-
-Two runs with different N values or scheduling policies produce equivalent normalized per-session traces. This property is the N-invariance theorem. Tests verify invariance by comparing normalized traces from multiple runs.
+Each `StepRecord` stores the post step register state for one role. The `Trace` type is a collection of those records and is the output of the simulator runners.
 
 ## VM Runner Integration
 
-The `telltale-simulator` crate wraps the VM for simulation and testing.
+The `telltale-simulator` runner executes bytecode and produces `Trace` output.
 
 ```rust
 pub struct ChoreographySpec {
-    pub local_types: Vec<(Role, LocalTypeR)>,
+    pub local_types: BTreeMap<String, LocalTypeR>,
     pub global_type: GlobalType,
-    pub initial_states: HashMap<Role, Value>,
+    pub initial_states: HashMap<String, Vec<f64>>,
 }
 
-pub fn run_vm(
-    spec: &ChoreographySpec,
+pub fn run(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    global_type: &GlobalType,
+    initial_states: &HashMap<String, Vec<f64>>,
+    steps: usize,
     handler: &dyn EffectHandler,
-    fuel: usize,
-) -> Result<Trace, SimError>
-```
+) -> Result<Trace, String>
 
-The `ChoreographySpec` struct packages a choreography for simulation. The `run_vm` function executes the spec and returns the collected trace.
-
-Multiple choreographies can execute concurrently in the same VM.
-
-```rust
-pub fn run_vm_concurrent(
+pub fn run_concurrent(
     specs: &[ChoreographySpec],
+    steps: usize,
     handler: &dyn EffectHandler,
-    fuel: usize,
-) -> Result<Vec<Trace>, SimError>
+) -> Result<Vec<Trace>, String>
 ```
 
-The concurrent runner loads all specs into a single VM instance. Sessions from different specs remain isolated. The function returns per-spec traces after execution.
-
-## Testing Patterns
-
-Several patterns support reliable simulation testing.
-
-Deterministic replay requires seeded random number generation. Effect handlers that need randomness accept an explicit seed. The same seed produces the same execution trace.
+The `run` function executes a single choreography and returns a `Trace` of role states. The `run_concurrent` function runs multiple choreographies in one VM and returns one trace per input spec.
 
 ```rust
-let handler = SeededHandler::new(42);
-let trace1 = run_vm(&spec, &handler, 1000)?;
+pub struct ScenarioResult {
+    pub trace: Trace,
+    pub violations: Vec<PropertyViolation>,
+}
 
-let handler = SeededHandler::new(42);
-let trace2 = run_vm(&spec, &handler, 1000)?;
-
-assert_eq!(normalize_trace(&trace1), normalize_trace(&trace2));
+pub fn run_with_scenario(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    global_type: &GlobalType,
+    initial_states: &HashMap<String, Vec<f64>>,
+    scenario: &Scenario,
+    handler: &dyn EffectHandler,
+) -> Result<ScenarioResult, String>
 ```
 
-The test verifies that identical seeds produce identical traces.
+The scenario runner applies fault injection, network models, and property monitoring. It returns both the trace and any property violations.
 
-N-invariance testing compares traces from different concurrency levels.
-
-```rust
-let trace_n1 = run_with_concurrency(&spec, 1)?;
-let trace_n4 = run_with_concurrency(&spec, 4)?;
-let trace_ninf = run_with_concurrency(&spec, usize::MAX)?;
-
-assert_eq!(
-    normalize_by_session(&trace_n1, sid),
-    normalize_by_session(&trace_n4, sid)
-);
-assert_eq!(
-    normalize_by_session(&trace_n1, sid),
-    normalize_by_session(&trace_ninf, sid)
-);
-```
-
-The test verifies that per-session traces are invariant over N.
-
-See [Effect Handlers](07_effect_handlers.md) for handler implementation. See [VM Scheduling](11_vm_scheduling.md) for concurrency details.
+See [Effect Handlers](07_effect_handlers.md) for handler implementation and [VM Scheduling](11_vm_scheduling.md) for concurrency details.

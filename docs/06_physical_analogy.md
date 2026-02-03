@@ -24,7 +24,7 @@ Telltale combines several formal systems into a verified runtime for choreograph
 
 ### The Principle
 
-Separation logic's physical analogue is **extensivity**, the principle that a composite system's state is the sum of its parts' states and decoupled parts don't interfere. Extensivity is one of three co-equal pillars, alongside symmetry (MPST) and conservation (invariants), connected by deep structural relationships (see §13).
+Separation logic's physical analogue is extensivity, the principle that a composite system's state is the sum of its parts' states and decoupled parts do not interfere. Extensivity is one of three co-equal pillars, alongside symmetry (MPST) and conservation (invariants), connected by deep structural relationships (see §13).
 
 ### Separating Conjunction is Independent Subsystems
 
@@ -68,7 +68,7 @@ Without extensivity, you can't reason about parts independently because you'd ne
 
 ### The Principle
 
-A global type G describes the full choreography: all interactions, all roles, all branches. This is a **symmetry structure** of the protocol: it specifies which transformations (message exchanges) are permitted and how they compose. It's closer to a coordination grammar or algebra than a literal group (steps are not invertible).
+A global type G describes the full choreography: all interactions, all roles, all branches. This is a symmetry structure of the protocol: it specifies which transformations (message exchanges) are permitted and how they compose. It's closer to a coordination grammar or algebra than a literal group (steps are not invertible).
 
 ### The Symmetry Group Analogy
 
@@ -86,7 +86,7 @@ A crystal's symmetry group tells you every allowed transformation. A global sess
 
 ### Noether-Style Link: Structure Implies Preservation
 
-Noether's theorem says every continuous symmetry yields a conserved quantity. The MPST analogue is softer: **every well-formed global type yields preservation theorems** (coherence is maintained by each protocol step).
+Noether's theorem says every continuous symmetry yields a conserved quantity. The MPST analogue is softer: every well-formed global type yields preservation theorems (coherence is maintained by each protocol step).
 
 | Symmetry            | Conserved Quantity                                   |
 |---------------------|------------------------------------------------------|
@@ -114,7 +114,7 @@ The harmony theorem (`Choreography/Harmony/`) proves that projection is sound: t
 
 ### The Principle
 
-A choreography describes a system from the "God's-eye view," the full joint state of all roles. Projection produces a local view by erasing interactions that don't involve a given role. This is **coarse-graining** (or marginalization), tracing out degrees of freedom you can't observe to produce a reduced description.
+A choreography describes a system from the "God's-eye view," the full joint state of all roles. Projection produces a local view by erasing interactions that don't involve a given role. This is coarse-graining (or marginalization), tracing out degrees of freedom you can't observe to produce a reduced description.
 
 This is *not* symmetry breaking. Symmetry breaking selects a particular value from a set of equivalent options (spins choosing a direction). Projection doesn't commit to anything because it simply can't see certain interactions. The local type is still polymorphic over all branches and values, and no choice has been made.
 
@@ -147,7 +147,7 @@ The branches π_r(G₁), π_r(G₂), ... must agree on r's observable behavior. 
 
 ### The Principle
 
-Algebraic effects define the interface between protocol structure and internal dynamics. The protocol says "send a message" and the effect handler decides *how*. This is an **equation of state**: the protocol provides the thermodynamic framework (state variables, constraints, allowed transitions), and the equation of state fills in the material-specific behavior.
+Algebraic effects define the interface between protocol structure and internal dynamics. The protocol says "send a message" and the effect handler decides *how*. This is an equation of state: the protocol provides the thermodynamic framework (state variables, constraints, allowed transitions), and the equation of state fills in the material-specific behavior.
 
 ### The Analogy
 
@@ -193,7 +193,7 @@ The session layer is provably Markovian because separation logic guarantees that
 
 ### The Principle
 
-Iris resource algebras generalize ownership into an algebraic structure with composition, validity, and frame-preserving updates. Their physical analogue is **conserved charges**, quantities that are created, split, combined, and transferred but never fabricated from nothing.
+Iris resource algebras generalize ownership into an algebraic structure with composition, validity, and frame-preserving updates. Their physical analogue is conserved charges, quantities that are created, split, combined, and transferred but never fabricated from nothing.
 
 ### The Auth RA is Total Energy
 
@@ -236,7 +236,7 @@ Energy can be partitioned among subsystems and recombined. The total is preserve
 
 ### The Principle
 
-An Iris invariant `inv N P` asserts: P holds now, and will hold at every future step. Anyone can temporarily open the invariant to inspect or use P, but must restore it before closing. This is a **conservation law**, a quantity preserved by every allowed transition.
+An Iris invariant `inv N P` asserts: P holds now, and will hold at every future step. Anyone can temporarily open the invariant to inspect or use P, but must restore it before closing. This is a conservation law, a quantity preserved by every allowed transition.
 
 ### The Session Invariant
 
@@ -275,7 +275,7 @@ Opening `inv N P` removes N from the mask, preventing re-entry. This prevents do
 
 ### The Principle
 
-`wp Λ E e Φ` says: given the right initial resources, executing expression e reaches a state satisfying postcondition Φ. The physical analogue: **sufficient conditions for reaching equilibrium**.
+`wp Λ E e Φ` says: given the right initial resources, executing expression e reaches a state satisfying postcondition Φ. The physical analogue is sufficient conditions for reaching equilibrium.
 
 ### The Analogy
 
@@ -319,7 +319,7 @@ This is exactly numerical integration with invariant checking: at each Euler ste
 
 ### The Principle
 
-Cost credits (§21 of `runtime.md`) are consumed monotonically by computation. Their physical analogue is **fuel** or **available work**. If you want a thermodynamic mapping, treat them as free energy in a closed system (monotone dissipation).
+Cost credits (§21 of `runtime.md`) are consumed monotonically by computation. Their physical analogue is fuel or available work. If you want a thermodynamic mapping, treat them as free energy in a closed system (monotone dissipation).
 
 ### The Analogy
 
@@ -348,7 +348,7 @@ A `send` instruction consumes both, like an exothermic reaction that does mechan
 
 ### The Principle
 
-The unified session monitor (`SessionMonitor` in §3.9 of `runtime.md`) tracks local types for all active sessions and validates every instruction against the expected protocol state. It is a **safety interlock / thermostat** that can measure and can also prevent unsafe transitions (depending on `ViolationPolicy`).
+The unified session monitor (`SessionMonitor` in §3.9 of `runtime.md`) tracks local types for all active sessions and validates every instruction against the expected protocol state. It is a safety interlock or thermostat that can measure and can also prevent unsafe transitions (depending on `ViolationPolicy`).
 
 ### The Analogy
 
@@ -368,18 +368,20 @@ The monitor is the observability and enforcement layer. It makes the abstract ty
 
 ### The Principle
 
-Aura's guard chain (CapGuard → FlowGuard → JournalCoupler → LeakageTracker) interposes checks before every send. Each guard must pass for the operation to proceed. This is an **activation energy barrier**, a sequence of energy thresholds that must be cleared for a reaction to occur.
+A configured guard chain interposes checks before every send. Each guard must pass for the operation to proceed. This is an activation energy barrier, a sequence of energy thresholds that must be cleared for a reaction to occur.
 
 ### The Analogy
 
 A chemical reaction has an activation energy: reactants must reach a transition state before products can form. The guard chain imposes a sequence of activation barriers:
 
-| Guard Layer                    | Activation Barrier                                      |
-|--------------------------------|---------------------------------------------------------|
-| CapGuard (capability check)    | Electronic energy barrier (orbital symmetry)            |
-| FlowGuard (budget check)       | Entropic barrier (probability of correct configuration) |
-| JournalCoupler (atomic commit) | Transition state (committed intermediate)               |
-| LeakageTracker (privacy check) | Steric barrier (spatial accessibility)                  |
+| Guard Layer (example)     | Activation Barrier                                      |
+|---------------------------|---------------------------------------------------------|
+| Capability check          | Electronic energy barrier (orbital symmetry)            |
+| Budget or flow check      | Entropic barrier (probability of correct configuration) |
+| Atomic commit             | Transition state (committed intermediate)               |
+| Privacy or leakage check  | Steric barrier (spatial accessibility)                  |
+
+The Aura example in `lean/Runtime/Examples/Aura.lean` currently uses an empty guard chain stub. Treat the layer list above as illustrative rather than implemented.
 
 If any barrier isn't cleared, the reaction (send) doesn't proceed. The system remains in its current state with no partial progress and no side effects. This is the `acquire`/`release` pattern: each guard opens a namespace invariant, checks a condition, and either commits or aborts cleanly.
 
@@ -390,7 +392,7 @@ The guard chain is composable (adding a layer doesn't break existing layers) bec
 
 ### The Principle
 
-Ghost sessions (§17 of `runtime.md`) allow speculative execution where the system tentatively advances along one path, then either commits (join) or rolls back (abort). This is **metastability**: the system explores a local energy minimum, then either settles into it or returns to the original state.
+Ghost sessions (§17 of `runtime.md`) allow speculative execution where the system tentatively advances along one path, then either commits (join) or rolls back (abort). This is metastability: the system explores a local energy minimum, then either settles into it or returns to the original state.
 
 ### The Analogy
 
@@ -413,7 +415,7 @@ Progress tokens (§18 of `runtime.md`) are resources that guarantee a specific s
 
 ### The Analogy
 
-A catalyst lowers the activation energy for a reaction, guaranteeing it will proceed. Without the catalyst, the reaction may stall indefinitely. Progress tokens are closer to **liveness permits**: they are *consumed* by `recv`, but the session type guarantees they can always be re-minted for well-typed sessions. If you keep the catalyst analogy, it's a catalytic **cycle** (consume → regenerate), not a permanently free enabler.
+A catalyst lowers the activation energy for a reaction, guaranteeing it will proceed. Without the catalyst, the reaction may stall indefinitely. Progress tokens are closer to liveness permits: they are *consumed* by `recv`, but the session type guarantees they can always be re-minted for well-typed sessions. If you keep the catalyst analogy, it is a catalytic cycle (consume → regenerate), not a permanently free enabler.
 
 | Progress Token                                     | Catalyst (cycle)                                     |
 |----------------------------------------------------|------------------------------------------------------|
@@ -450,7 +452,7 @@ Locality (non-interaction)               ←→  Frame rule, erasure
 Noether link (structure → preservation)  ←→  Well-typed global type → safety invariants
 ```
 
-The three foundational pillars (**symmetry**, **conservation**, and **extensivity**) are co-equal and mutually entangled, none more fundamental than the others:
+The three foundational pillars (symmetry, conservation, and extensivity) are co-equal and mutually entangled, none more fundamental than the others:
 
 ```
         Symmetry (MPST)
@@ -461,9 +463,9 @@ Conservation ----------- Extensivity
   (Invariants)   Frame rule   (Separation logic)
 ```
 
-- **Symmetry → Conservation** (Noether-style link): Every well-formed global type yields safety invariants. The coherence preservation theorems are conservation laws derived from the protocol's symmetry structure.
-- **Conservation → Extensivity** (frame rule): Conservation laws compose locally because the frame rule guarantees that preserving an invariant in one subsystem doesn't disturb another. Without extensivity, conservation laws couldn't be checked modularly.
-- **Extensivity → Symmetry** (coarse-graining): Projection produces local views by tracing out non-local interactions, which is only well-defined because the frame rule lets each role's state be handled independently. Without extensivity, the partial trace wouldn't produce consistent local descriptions.
+- Symmetry → Conservation (Noether-style link): Every well-formed global type yields safety invariants. The coherence preservation theorems are conservation laws derived from the protocol's symmetry structure.
+- Conservation → Extensivity (frame rule): Conservation laws compose locally because the frame rule guarantees that preserving an invariant in one subsystem does not disturb another. Without extensivity, conservation laws could not be checked modularly.
+- Extensivity → Symmetry (coarse-graining): Projection produces local views by tracing out non-local interactions, which is only well-defined because the frame rule lets each role's state be handled independently. Without extensivity, the partial trace would not produce consistent local descriptions.
 
 Each pillar needs the other two. Symmetry without conservation gives structure with no invariants. Conservation without extensivity gives global properties with no modular reasoning. Extensivity without symmetry gives independent parts with no coordination. The three together, connected by the Noether-style link, the frame rule, and compositional projection, form the theoretical core of the runtime.
 
@@ -478,17 +480,17 @@ The strong correspondences are structural. Separating conjunction *is* extensivi
 
 ### Distributed → thermodynamic: what has no physical counterpart
 
-- **Intent and adversaries.** Participants have goals and can strategically deviate. Molecules follow the Hamiltonian, and there is no "Byzantine particle." Session types enforce compliance in a way that has no thermodynamic analogue because particles don't need coercion.
-- **Discrete choice.** Branching (select/branch) is an intentional decision by a named role. Thermodynamic systems follow gradients, not decision trees. The merge operator, subtyping, and the entire branching apparatus lack clean physical counterparts.
-- **Named identity and topology.** Roles have persistent identity and communicate over a specific graph. In statistical mechanics, particles are typically indistinguishable and interact via fields, not named channels.
-- **Recursion and protocol structure.** Session types have recursive structure (μ-types, unfolding). Thermodynamic evolution is continuous or Markovian, and there is no analogue of "loop back to the protocol's entry point."
+- Intent and adversaries. Participants have goals and can strategically deviate. Molecules follow the Hamiltonian, and there is no "Byzantine particle." Session types enforce compliance in a way that has no thermodynamic analogue because particles do not need coercion.
+- Discrete choice. Branching (select/branch) is an intentional decision by a named role. Thermodynamic systems follow gradients, not decision trees. The merge operator, subtyping, and the entire branching apparatus lack clean physical counterparts.
+- Named identity and topology. Roles have persistent identity and communicate over a specific graph. In statistical mechanics, particles are typically indistinguishable and interact via fields, not named channels.
+- Recursion and protocol structure. Session types have recursive structure (μ-types, unfolding). Thermodynamic evolution is continuous or Markovian, and there is no analogue of "loop back to the protocol's entry point."
 
 ### Thermodynamic → distributed: what has no protocol counterpart
 
-- **Continuum, fluctuations, and criticality.** Thermodynamics operates over continuous state spaces with fluctuations, phase transitions at critical points, and universality classes. Distributed systems have discrete state, finite participants, and no thermodynamic limit. Every use of "phase transition" in this document is loose.
-- **Entropy and equilibrium.** There is no real entropy in a session-typed system. The system doesn't tend toward a maximum-entropy state but instead follows a prescribed protocol to termination. "Equilibrium" in §7 means "postcondition satisfied," which is teleological, not thermodynamic.
-- **Intensive quantities.** Temperature, pressure, chemical potential (in its full thermodynamic sense), Legendre transforms, response functions: none of this transfers. The intensive/extensive duality that structures thermodynamics has no protocol counterpart.
-- **Reversibility.** Thermodynamic processes can be quasi-static and reversible. Protocol steps are irreversible by design (you can't un-send a message). Cost credit consumption is monotone, matching free energy dissipation, but the broader reversibility structure doesn't exist.
+- Continuum, fluctuations, and criticality. Thermodynamics operates over continuous state spaces with fluctuations, phase transitions at critical points, and universality classes. Distributed systems have discrete state, finite participants, and no thermodynamic limit. Every use of "phase transition" in this document is loose.
+- Entropy and equilibrium. There is no real entropy in a session-typed system. The system does not tend toward a maximum-entropy state but instead follows a prescribed protocol to termination. "Equilibrium" in §7 means "postcondition satisfied," which is teleological, not thermodynamic.
+- Intensive quantities. Temperature, pressure, chemical potential (in its full thermodynamic sense), Legendre transforms, response functions: none of this transfers. The intensive or extensive duality that structures thermodynamics has no protocol counterpart.
+- Reversibility. Thermodynamic processes can be quasi-static and reversible. Protocol steps are irreversible by design (you cannot un-send a message). Cost credit consumption is monotone, matching free energy dissipation, but the broader reversibility structure does not exist.
 
 ### Why partial is enough
 

@@ -27,6 +27,14 @@
 //!     // ... other methods
 //! }
 //! ```
+//!
+//! ## VM Boundary
+//!
+//! The bytecode VM in `telltale-vm` exposes a separate, synchronous
+//! `EffectHandler` trait for simulation/runtime integration. It is not
+//! interchangeable with `ChoreoHandler`: `ChoreoHandler` is async and typed
+//! over concrete message/role types, while the VM handler operates over
+//! bytecode values and must remain session-local for determinism.
 
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};

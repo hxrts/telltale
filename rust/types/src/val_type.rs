@@ -16,5 +16,8 @@ pub enum ValType {
     String,
     Prod(Box<ValType>, Box<ValType>),
     /// Channel endpoint type (session id, role)
-    Chan { sid: usize, role: std::string::String },
+    Chan {
+        sid: usize,
+        role: std::string::String,
+    },
 }

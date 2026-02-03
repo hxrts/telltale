@@ -1,6 +1,6 @@
 # Crate Organization
 
-This document describes the crate architecture introduced in v0.7.0. The structure aligns with Lean verification and provides clear separation of concerns.
+This document describes the current crate architecture. The structure aligns with Lean verification and provides clear separation of concerns.
 
 ## Crate Dependency Graph
 
@@ -36,12 +36,12 @@ graph TB
     types --> lean
     types --> choreo
     types --> vm
+    types --> simulator
 
     theory --> choreo
     theory --> vm
 
     vm --> simulator
-    choreo --> simulator
 
     choreo --> macros
 
@@ -64,9 +64,9 @@ The crate defines `GlobalType` for global protocol views. It defines `LocalTypeR
 
 The crate also provides content addressing infrastructure. The `ContentId` type wraps a cryptographic hash. The `Contentable` trait defines canonical serialization. The `Hasher` trait abstracts hash algorithms.
 
-**Feature flags:**
+#### Feature Flags
 
-- `dag-cbor` — Enables DAG-CBOR serialization for IPLD/IPFS compatibility. Adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
+`dag-cbor` enables DAG-CBOR serialization for IPLD or IPFS compatibility. It adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
 
 ```rust
 use telltale_types::{GlobalType, LocalTypeR, Label, PayloadSort};
@@ -90,7 +90,7 @@ The `projection` module handles `GlobalType` to `LocalTypeR` projection with mer
 
 The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates. The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
 
-The `content_id` module provides content addressing for all types. Projection results are memoized by content ID for performance. See [Content Addressing](21_content_addressing.md) for details.
+Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](21_content_addressing.md) for details.
 
 ```rust
 use telltale_theory::{project, merge, sync_subtype, async_subtype};
@@ -123,18 +123,19 @@ These commands generate samples, validate round-trips, and import JSON respectiv
 
 ### telltale-vm
 
-This crate is located in `rust/vm/`. It provides a bytecode VM for executing session type protocols. The VM offers an alternative execution model to direct effect handler interpretation.
+This crate is located in `rust/vm/`. It provides a bytecode VM for executing session type protocols. The VM is the core engine used by the simulator and can also be embedded directly.
 
-The `instr` module defines the bytecode instruction set. Instructions include `Send`, `Recv`, `Offer`, `Choose` for communication. Instructions include `Open`, `Close` for session lifecycle. The `Invoke` instruction calls effect handlers. Control flow uses `Jmp`, `Yield`, and `Halt`.
+The `instr` module defines the bytecode instruction set. Instructions include `Send`, `Recv`, `Offer`, and `Choose` for communication. Instructions include `Open` and `Close` for session lifecycle. The `Invoke` instruction calls the VM effect handler. Control flow uses `LoadImm`, `Mov`, `Jmp`, `Yield`, and `Halt`.
 
-The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine has a `programId` that references its assigned program in the VM. The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, and `ProgressAware`.
+The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine stores its session ID, role, and bytecode program. The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, and `ProgressAware`.
 
-The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `FIFO` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
+The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `Fifo` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
 
 The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The `load_choreography` method creates sessions and coroutines from a code image.
 
 ```rust
-use telltale_vm::{VM, VMConfig, CodeImage};
+use telltale_vm::{VM, VMConfig};
+use telltale_vm::loader::CodeImage;
 
 let mut vm = VM::new(VMConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);
@@ -142,28 +143,28 @@ let sid = vm.load_choreography(&image)?;
 vm.run(&handler, 1000)?;
 ```
 
-The first line creates a VM with default configuration. The second line creates a code image from local types. The third line loads the choreography and returns a session ID. The fourth line runs the VM with an effect handler.
+The first line creates a VM with default configuration. The second line creates a code image from local types. The third line loads the choreography and returns a session ID. The fourth line runs the VM with an effect handler that implements `telltale_vm::effect::EffectHandler`.
 
 ### telltale-simulator
 
-This crate is located in `rust/simulator/`. It wraps the VM for simulation and testing. The crate depends on `telltale-vm` and `telltale-choreography`.
+This crate is located in `rust/simulator/`. It wraps the VM for simulation and testing. The crate depends on `telltale-vm` and `telltale-types`.
 
-The `vm_runner` module provides the `run_vm` function for single-choreography execution. It also provides `run_vm_concurrent` for multiple choreographies. The `VmEffectAdapter` bridges simulator effect handlers to VM effect handlers.
+The `runner` module provides `run`, `run_concurrent`, and `run_with_scenario` for single or multi choreography execution. Scenario runs attach middleware for faults, network latency, property monitors, and checkpoints.
 
-The `ChoreographySpec` struct packages a choreography for simulation. It includes local types, global type, and initial state. The `Trace` type collects step records during execution.
+The `ChoreographySpec` struct packages a choreography for simulation. It includes local types, global type, and initial state vectors. The `Trace` type collects step records during execution.
 
 ```rust
-use telltale_simulator::{run_vm, ChoreographySpec};
+use telltale_simulator::runner::{run, ChoreographySpec};
 
 let spec = ChoreographySpec {
     local_types: types,
     global_type: global,
     initial_states: states,
 };
-let trace = run_vm(&spec.local_types, &spec.global_type, &spec.initial_states, 100, &handler)?;
+let trace = run(&spec.local_types, &spec.global_type, &spec.initial_states, 100, &handler)?;
 ```
 
-The `run_vm` function executes a choreography and returns a trace. The trace contains step records for each role at each step.
+The `run` function executes a choreography and returns a trace. The trace contains step records for each role at each step.
 
 ### telltale-choreography
 
@@ -187,29 +188,61 @@ The prelude provides access to types, theory algorithms, and other commonly used
 
 ## Data Flow
 
-```
-DSL Text                 Choreography AST               GlobalType
------------► Parser -------------------► Lower -------------------►
- "A -> B"                    (DSL)                    (telltale-types)
+```mermaid
+flowchart TB
+    subgraph Input
+        dsl["DSL Text<br/>'A -> B'"]
+    end
 
-                                |
-                                | project()
-                                v
+    subgraph Parsing
+        parser["Parser"]
+        ast["Choreography AST<br/>(DSL)"]
+    end
 
-                            LocalTypeR
-                         (telltale-types)
-                                |
-                +---------------+---------------+---------------+
-                |               |                               |
-                v               v                               v
-          Session Types     CodeImage                         JSON
-          & Effect Programs  (vm)                            (Lean)
-          (choreography)        |                         (lean-bridge)
-                |               |                               |
-                v               v                               v
-           Effect Handler   VM Execution                      Lean
-           Interpretation   (scheduler,                    Validation
-                            coroutines)
+    subgraph Lowering
+        lower["Lower"]
+        global["GlobalType<br/>(telltale-types)"]
+    end
+
+    subgraph Projection
+        proj["project()"]
+        local["LocalTypeR<br/>(telltale-types)"]
+    end
+
+    subgraph ExecutionPaths["Execution Paths"]
+        direction TB
+        subgraph EffectPath["Effect Handler Path"]
+            session["Session Types &<br/>Effect Programs<br/>(choreography)"]
+            handler["Effect Handler<br/>Interpretation"]
+        end
+
+        subgraph VMPath["VM Path"]
+            image["CodeImage<br/>(vm)"]
+            vmexec["VM Execution<br/>(scheduler, coroutines)"]
+        end
+
+        subgraph LeanPath["Lean Path"]
+            json["JSON<br/>(lean-bridge)"]
+            lean["Lean Validation"]
+        end
+    end
+
+    dsl --> parser
+    parser --> ast
+    ast --> lower
+    lower --> global
+    global --> proj
+    proj --> local
+
+    local --> session
+    local --> image
+    local --> json
+
+    session --> handler
+    image --> vmexec
+    json --> lean
+
+    style ExecutionPaths fill:#f5f5f5,stroke:#9e9e9e
 ```
 
 The flow begins with DSL text parsed into a choreography AST. The AST is lowered to `GlobalType`. Projection computes `LocalTypeR` for each role.
@@ -224,17 +257,18 @@ The types crate mirrors Lean definitions exactly. The following table shows the 
 |-----------|-----------|------|
 | `GlobalType.end` | `GlobalType::End` | `rust/types/src/global.rs` |
 | `GlobalType.comm p q bs` | `GlobalType::Comm { sender, receiver, branches }` | `rust/types/src/global.rs` |
-| `GlobalType.rec t G` | `GlobalType::Mu { var, body }` | `rust/types/src/global.rs` |
+| `GlobalType.mu t G` | `GlobalType::Mu { var, body }` | `rust/types/src/global.rs` |
 | `GlobalType.var t` | `GlobalType::Var(String)` | `rust/types/src/global.rs` |
 | `LocalTypeR.end` | `LocalTypeR::End` | `rust/types/src/local.rs` |
 | `LocalTypeR.send q bs` | `LocalTypeR::Send { partner, branches }` | `rust/types/src/local.rs` |
 | `LocalTypeR.recv p bs` | `LocalTypeR::Recv { partner, branches }` | `rust/types/src/local.rs` |
-| `LocalTypeR.rec t T` | `LocalTypeR::Mu { var, body }` | `rust/types/src/local.rs` |
+| `LocalTypeR.mu t T` | `LocalTypeR::Mu { var, body }` | `rust/types/src/local.rs` |
 | `LocalTypeR.var t` | `LocalTypeR::Var(String)` | `rust/types/src/local.rs` |
 | `PayloadSort.unit` | `PayloadSort::Unit` | `rust/types/src/global.rs` |
 | `Label` | `Label { name, sort }` | `rust/types/src/global.rs` |
 
 The Rust variant names match Lean constructor names. Field names are consistent across both implementations.
+Rust `LocalTypeR` branches also carry `Option<ValType>` payload annotations. Lean tracks payload sorts at the label level in `GlobalType`.
 
 ## Extension Points
 

@@ -7,6 +7,7 @@
 #![allow(clippy::expect_used)]
 
 use quote::format_ident;
+use std::collections::HashMap;
 use telltale_choreography::ast::{
     annotation::Annotations, Choreography, LocalType, MessageType, Protocol, Role, RoleParam,
 };
@@ -15,7 +16,6 @@ use telltale_choreography::compiler::codegen::{
     generate_session_type, generate_topology_integration, InlineTopology,
 };
 use telltale_choreography::topology::Topology;
-use std::collections::HashMap;
 
 // Helper to create simple roles
 fn role(name: &str) -> Role {

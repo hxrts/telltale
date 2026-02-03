@@ -16,8 +16,8 @@
 //! - `?p{lᵢ.Sᵢ} <: ?p{l'ⱼ.T'ⱼ}` if `{lᵢ} ⊆ {l'ⱼ}` and `Sᵢ <: T'ᵢ` for matching labels
 //! - `μt.S <: μt.T` if `S <: T` (under assumption `t <: t`)
 
-use telltale_types::LocalTypeR;
 use std::collections::{HashMap, HashSet};
+use telltale_types::LocalTypeR;
 use thiserror::Error;
 
 /// Errors that can occur during synchronous subtyping check

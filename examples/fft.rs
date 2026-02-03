@@ -8,15 +8,15 @@ use futures::{
     executor, try_join,
 };
 use num_complex::{Complex, Complex32};
-use telltale::{
-    channel::{Bidirectional, Nil},
-    session, try_session, End, Message, Receive, Role, Roles, Route, Send,
-};
 use std::{
     error::Error,
     f32::consts::PI,
     fmt::{self, Display, Formatter},
     result,
+};
+use telltale::{
+    channel::{Bidirectional, Nil},
+    session, try_session, End, Message, Receive, Role, Roles, Route, Send,
 };
 
 type Result<T> = result::Result<T, Box<dyn Error>>;

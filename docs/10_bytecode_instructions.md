@@ -20,7 +20,7 @@ The `Send` instruction transmits a value to a partner role.
 Send { chan: Reg, val: Reg }
 ```
 
-The `chan` register holds the channel endpoint. The `val` register holds the value to send. The instruction enqueues the value into the appropriate buffer for the destination role.
+The `chan` register identifies the endpoint register. The `val` register is reserved for payloads, but the current VM computes payloads via the `EffectHandler` instead of reading from registers. The instruction enqueues the handler-provided value into the appropriate buffer for the destination role.
 
 ### Recv
 
@@ -30,27 +30,27 @@ The `Recv` instruction receives a value from a partner role.
 Recv { chan: Reg, dst: Reg }
 ```
 
-The `chan` register holds the channel endpoint. The `dst` register receives the incoming value. If no message is available, the coroutine blocks with status `RecvWait`.
+The `chan` register identifies the endpoint register. The `dst` register receives the incoming value. If no message is available, the coroutine blocks with status `RecvWait`.
 
 ### Offer
 
-The `Offer` instruction sends a label for branch selection.
+The `Offer` instruction waits for a label and dispatches based on a jump table.
 
 ```rust
-Offer { chan: Reg, label: Label }
+Offer { chan: Reg, table: Vec<(String, PC)> }
 ```
 
-The sender uses `Offer` to communicate their choice to the receiver. The label determines which branch the session will follow.
+For external choice, the instruction dequeues a label from the partner and jumps to the matching entry. For internal choice, the handler selects a label and the VM enqueues it before jumping. The `chan` register receives the label value.
 
 ### Choose
 
-The `Choose` instruction branches based on an offered label.
+The `Choose` instruction selects a fixed label and jumps.
 
 ```rust
-Choose { chan: Reg, table: Vec<(Label, PC)> }
+Choose { chan: Reg, label: String, target: PC }
 ```
 
-The receiver uses `Choose` to read the offered label and jump to the corresponding program counter. The table maps labels to branch entry points.
+The instruction enqueues the provided label and jumps to the target PC. It is useful when the label is statically known.
 
 ## Session Instructions
 
@@ -62,14 +62,12 @@ The `Open` instruction creates a new session.
 
 ```rust
 Open {
-    roles: Vec<Role>,
-    local_types: Vec<(Role, LocalTypeR)>,
-    handlers: Vec<(Edge, HandlerId)>,
-    dsts: Vec<(Role, Reg)>,
+    roles: Vec<String>,
+    endpoints: Vec<(String, Reg)>,
 }
 ```
 
-The instruction allocates buffers for all role pairs. It binds effect handlers to edges at this point. Channel endpoints are written to the destination registers. If handler binding fails, the instruction faults.
+The instruction allocates a new session with the given roles. Endpoints are written to the destination registers. The current VM uses default buffer settings and does not bind handlers per edge.
 
 ### Close
 
@@ -79,7 +77,7 @@ The `Close` instruction terminates a session.
 Close { session: Reg }
 ```
 
-The instruction drains any remaining buffered messages. It releases all resources held by the session. Further access to the session causes a fault.
+The instruction closes the session and removes its type state. Further access to the session causes a fault.
 
 ## Effect Instructions
 
@@ -90,10 +88,10 @@ Effect instructions invoke domain-specific behavior.
 The `Invoke` instruction calls an effect handler.
 
 ```rust
-Invoke { action: EffectAction }
+Invoke { action: Reg, dst: Reg }
 ```
 
-The instruction sends a request to the bound effect handler. Execution blocks until the handler responds. The handler must satisfy the determinism contract for N-invariance guarantees. See [Effect Handlers](07_effect_handlers.md) for handler implementation details.
+The instruction calls `EffectHandler::step` and records an observable event. The handler must satisfy the determinism contract for scheduling confluence. The registers are reserved for future effect payloads.
 
 ## Control Instructions
 
@@ -104,7 +102,7 @@ Control instructions manage program flow and register state.
 The `LoadImm` instruction loads an immediate value.
 
 ```rust
-LoadImm { dst: Reg, value: Value }
+LoadImm { dst: Reg, val: ImmValue }
 ```
 
 The value is written directly to the destination register.
@@ -156,9 +154,9 @@ The compiler translates `LocalTypeR` directly to bytecode instructions.
 | LocalTypeR | Instructions |
 |------------|--------------|
 | `Send(partner, [(label, sort, cont)])` | `Send`, `Invoke`, recurse on cont |
-| `Send(partner, branches)` | `Choose`, then branch blocks with `Jmp` |
+| `Send(partner, branches)` | `Offer` with jump table, then branch blocks |
 | `Recv(partner, [(label, sort, cont)])` | `Recv`, `Invoke`, recurse on cont |
-| `Recv(partner, branches)` | `Offer`, then branch blocks |
+| `Recv(partner, branches)` | `Offer` with jump table, then branch blocks |
 | `Mu(var, body)` | Record loop target PC, recurse on body |
 | `Var(name)` | `Jmp` to loop target |
 | `End` | `Halt` |

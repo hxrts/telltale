@@ -1,44 +1,25 @@
 # Examples
 
+This document points to the example programs and common usage patterns.
+
 ## Example Index
 
-### Basic Protocols
+Top level examples in `examples/`:
 
-The `adder.rs` example shows a simple addition service. It uses client and server roles.
+- `adder.rs` for a simple request response protocol
+- `alternating_bit.rs` for a reliable message delivery pattern
+- `client_server_log.rs` for logging in a client server protocol
+- `ring.rs` and `ring_choice.rs` for ring topologies and branching
+- `double_buffering.rs` and `elevator.rs` for multi step coordination
+- `fft.rs` for distributed computation
+- `oauth.rs` for a multi role authentication flow
+- `wasm-ping-pong/` for browser builds
 
-The `alternating_bit.rs` example implements the alternating bit protocol. This provides reliable message delivery.
-
-The `client_server_log.rs` example demonstrates client‑server interaction. It includes logging functionality.
-
-The `ring.rs` example shows ring topology. Messages pass sequentially through the ring.
-
-### Advanced Protocols
-
-The `three_adder.rs` example shows a three‑party protocol. It includes coordination logic.
-
-The `oauth.rs` example implements OAuth authentication flow. It uses client, authorization server, and resource server roles.
-
-The `double_buffering.rs` example shows producer‑consumer pattern. It uses double buffering for efficiency.
-
-The `elevator.rs` example implements multi‑floor elevator control. The protocol coordinates elevator movements.
-
-The `fft.rs` example shows distributed Fast Fourier Transform. Computation is distributed across roles.
-
-### Choice and Branching
-
-The `ring_choice.rs` example shows ring topology with choice points. Roles make decisions at each node. The example demonstrates choice constructs and branching patterns.
-
-### WASM
-
-The `wasm-ping-pong` example runs in browsers. It shows browser‑based ping‑pong protocol. See examples/wasm-ping-pong/README.md for details.
-
-`TelltaleEndpoint` supports two patterns. Use `register_channel` for `SimpleChannel`. Use `register_session` for custom transports. Call `TelltaleSession::from_sink_stream` for WebSockets or other transports.
+Advanced examples live under `examples/advanced_features/` and runnable bundles under `examples/running_examples/`.
 
 ## Common Patterns
 
-### Request‑Response
-
-Client sends request to server. Server processes and sends response back.
+### Request Response
 
 ```rust
 choreography!(r#"
@@ -49,11 +30,9 @@ protocol RequestResponse =
 "#);
 ```
 
-Use this pattern for synchronous operations. Client waits for server response.
+Use this pattern when the client waits for a reply before continuing.
 
 ### Choice
-
-One role decides between branches. Other roles react to the decision.
 
 ```rust
 choreography!(r#"
@@ -67,45 +46,9 @@ protocol ChoicePattern =
 "#);
 ```
 
-The deciding role chooses which branch to execute. Other participants react accordingly.
-
-### Sequential Messages
-
-Send multiple messages in sequence. Each message may depend on previous responses.
-
-```rust
-choreography!(r#"
-protocol SequentialMessages =
-  roles Client, Server
-  Client -> Server : Message1
-  Server -> Client : Ack
-  Client -> Server : Message2
-  Server -> Client : Ack
-"#);
-```
-
-This pattern provides acknowledgment after each step.
-
-### Multi‑Party Coordination
-
-Three or more roles coordinate. Messages flow between different pairs.
-
-```rust
-choreography!(r#"
-protocol MultiPartyCoordination =
-  roles Buyer, Coordinator, Seller
-  Buyer -> Coordinator : Offer
-  Coordinator -> Seller : Offer
-  Seller -> Coordinator : Response
-  Coordinator -> Buyer : Response
-"#);
-```
-
-The coordinator role mediates between other participants.
+Only the deciding role selects the branch. Other roles react to that choice.
 
 ### Loops
-
-Repeat protocol steps. Loop condition determines when to stop.
 
 ```rust
 choreography!(r#"
@@ -117,11 +60,9 @@ protocol LoopPattern =
 "#);
 ```
 
-Use loops for batch processing or iterative protocols. This example repeats 5 times.
+Use bounded loops for batch workflows or retries.
 
-### Parallel Composition
-
-Execute independent protocol branches concurrently via adjacent `branch` blocks.
+### Parallel Branches
 
 ```rust
 choreography!(r#"
@@ -134,32 +75,15 @@ protocol ParallelPattern =
 "#);
 ```
 
-Branches must not conflict. Different recipients allow parallel execution.
-
-### Dynamic Role Binding
-
-Bind role counts at runtime for threshold protocols.
-
-```rust
-choreography!(r#"
-protocol Threshold =
-  roles Coordinator, Signers[*]
-  Coordinator -> Signers[*] : Request
-  Signers[0..threshold] -> Coordinator : Signature
-"#);
-```
-
-The wildcard syntax `Signers[*]` defers count to runtime. Range syntax `Signers[0..threshold]` selects a subset. Generated code supports runtime validation and binding.
+Parallel branches must be independent in order to remain well formed.
 
 ## Testing Patterns
 
-### Unit Test with InMemoryHandler
-
-Test protocol logic without network.
+### Unit Test With InMemoryHandler
 
 ```rust
 #[tokio::test]
-async fn test_protocol() {
+async fn test_send_only() {
     let mut handler = InMemoryHandler::new(Role::Alice);
     let program = Program::new()
         .send(Role::Bob, TestMessage)
@@ -171,11 +95,9 @@ async fn test_protocol() {
 }
 ```
 
-InMemoryHandler provides fast deterministic testing.
+Use `InMemoryHandler::with_channels` and shared channel maps when a test needs both send and receive.
 
-### Integration Test with TelltaleHandler
-
-Test actual session‑typed communication.
+### Integration Test With TelltaleHandler
 
 ```rust
 #[tokio::test]
@@ -188,56 +110,46 @@ async fn test_session_types() {
     let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
     bob_ep.register_channel(Role::Alice, bob_ch);
 
-    // Run protocol with both endpoints
+    let mut handler = TelltaleHandler::<Role, Message>::new();
+    // run protocol on both endpoints
 }
 ```
 
-This tests real message passing with session type checking.
+This pattern validates the channel based handler without custom transports. Ensure the role type implements both `telltale::Role` and `RoleId`.
 
-### Verification with RecordingHandler
-
-Verify protocol execution sequence.
+### RecordingHandler
 
 ```rust
-let mut handler = RecordingHandler::new(Role::Alice);
-// ... execute protocol ...
-
+let handler = RecordingHandler::new(Role::Alice);
 let events = handler.events();
-assert_eq!(events[0], RecordedEvent::Send { to: Role::Bob, ... });
-assert_eq!(events[1], RecordedEvent::Recv { from: Role::Bob, ... });
 ```
 
-RecordingHandler captures operation history for assertions.
+`RecordingHandler` captures send, recv, choose, and offer events for assertions. It does not generate values, so use it for structural tests.
 
-### Fault Injection Testing
+### Fault Injection
 
-Test error handling with FaultInjection middleware.
+Fault injection is available behind the `test-utils` feature.
 
 ```rust
 let base = InMemoryHandler::new(Role::Alice);
-let mut handler = FaultInjection::new(base)
-    .with_failure_rate(0.1);
-
-// Protocol should handle 10% random failures
+let mut handler = FaultInjection::new(base, 0.1);
 ```
 
-Use this to verify retry logic and error recovery.
+Use this to validate retry behavior and error handling.
 
 ## Running Examples
 
-Navigate to the example and run with cargo.
+Run a single example with Cargo.
 
 ```bash
 cargo run --example adder
 ```
 
-Some examples require specific setup. Check comments at the top of each file.
-
-The wasm-ping-pong example has its own build script.
+The `wasm-ping-pong` example uses its own build script.
 
 ```bash
 cd examples/wasm-ping-pong
 ./build.sh
 ```
 
-See individual example files for detailed documentation.
+See the comments in each example file for setup requirements.

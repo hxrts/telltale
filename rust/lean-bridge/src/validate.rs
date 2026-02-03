@@ -6,8 +6,8 @@
 use crate::export::{global_to_json, local_to_json};
 use crate::import::{json_to_global, json_to_local, ImportError};
 use crate::runner::LeanRunner;
-use telltale_types::{GlobalType, LocalTypeR};
 use serde_json::Value;
+use telltale_types::{GlobalType, LocalTypeR};
 use thiserror::Error;
 
 /// Result of a validation operation.
@@ -242,7 +242,9 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
                 && b1
                     .iter()
                     .zip(b2.iter())
-                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| labels_equal(l1, l2) && local_types_equal(c1, c2))
+                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
+                        labels_equal(l1, l2) && local_types_equal(c1, c2)
+                    })
         }
 
         (
@@ -260,7 +262,9 @@ fn local_types_equal(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
                 && b1
                     .iter()
                     .zip(b2.iter())
-                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| labels_equal(l1, l2) && local_types_equal(c1, c2))
+                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
+                        labels_equal(l1, l2) && local_types_equal(c1, c2)
+                    })
         }
 
         (LocalTypeR::Mu { var: v1, body: b1 }, LocalTypeR::Mu { var: v2, body: b2 }) => {

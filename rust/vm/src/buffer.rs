@@ -54,7 +54,7 @@ impl Default for BufferConfig {
 }
 
 /// Bounded ring buffer for inter-role message passing.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundedBuffer {
     data: Vec<Option<Value>>,
     head: usize,
@@ -266,7 +266,10 @@ mod tests {
         let mut buf = BoundedBuffer::new(&config);
         buf.enqueue(Value::Int(1));
         buf.enqueue(Value::Int(2));
-        assert!(matches!(buf.enqueue(Value::Int(3)), EnqueueResult::WouldBlock));
+        assert!(matches!(
+            buf.enqueue(Value::Int(3)),
+            EnqueueResult::WouldBlock
+        ));
     }
 
     #[test]

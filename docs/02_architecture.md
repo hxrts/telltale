@@ -4,13 +4,13 @@
 
 Telltale implements choreographic programming for Rust. The system compiles global protocol specifications into local session types for each participant.
 
-The architecture has five main layers:
+The architecture has three compile-time stages and two runtime paths:
 
 1. DSL and parsing (choreographic syntax to AST)
 2. Projection (global protocol to local types)
-3. Code generation (local types to Rust code)
-4. Effect system (protocol execution with pluggable transports)
-5. VM execution (bytecode scheduling with N-concurrency)
+3. Code generation (local types to Rust code and effect programs)
+4. Effect handler execution (async interpreter with pluggable transports)
+5. VM execution and simulation (bytecode VM with scheduler and deterministic middleware)
 
 ## Component Diagram
 
@@ -36,17 +36,19 @@ graph TB
         Effects["Generated Effect Programs"]
     end
 
-    subgraph Layer4["Layer 4: Runtime Execution"]
+    subgraph Layer4["Layer 4: Effect Runtime"]
         Handler["Effect Handler<br/>(InMemory / Telltale)"]
         Transport["Transport Layer<br/>(Channels / Network)"]
         Exec["Running Protocol"]
     end
 
-    subgraph Layer5["Layer 5: VM Execution"]
+    subgraph Layer5["Layer 5: VM + Simulation"]
+        VMCompiler["VM Compiler<br/>(LocalTypeR → Bytecode)"]
         VM["Bytecode VM"]
-        Scheduler["Scheduler<br/>(N-concurrent)"]
+        Scheduler["Scheduler<br/>(Policy-Based)"]
         Sessions["Session Store"]
         Buffers["Bounded Buffers"]
+        Middleware["Simulator Middleware<br/>(Latency / Faults / Properties / Checkpoints)"]
     end
 
     DSL --> Parser
@@ -60,10 +62,12 @@ graph TB
     Effects --> Handler
     Handler --> Transport
     Transport --> Exec
-    LT --> VM
+    LT --> VMCompiler
+    VMCompiler --> VM
     VM --> Scheduler
     Scheduler --> Sessions
     Sessions --> Buffers
+    Middleware --> VM
 ```
 
 This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation and effect handler execution.
@@ -88,7 +92,7 @@ pub struct Choreography {
 
 This struct holds the protocol name and optional namespace. It contains participating roles and the protocol tree. Metadata attributes are stored in the attrs field.
 
-The `Protocol` enum defines all possible protocol actions.
+The `Protocol` enum defines all protocol actions.
 
 ```rust
 pub enum Protocol {
@@ -97,37 +101,37 @@ pub enum Protocol {
         to: Role,
         message: MessageType,
         continuation: Box<Protocol>,
-        annotations: HashMap<String, String>,
-        from_annotations: HashMap<String, String>,
-        to_annotations: HashMap<String, String>,
+        annotations: Annotations,
+        from_annotations: Annotations,
+        to_annotations: Annotations,
     },
     Broadcast {
         from: Role,
-        to_all: Vec<Role>,
+        to_all: NonEmptyVec<Role>,
         message: MessageType,
         continuation: Box<Protocol>,
-        annotations: HashMap<String, String>,
-        from_annotations: HashMap<String, String>,
+        annotations: Annotations,
+        from_annotations: Annotations,
     },
     Choice {
         role: Role,
-        branches: Vec<Branch>,
-        annotations: HashMap<String, String>,
+        branches: NonEmptyVec<Branch>,
+        annotations: Annotations,
     },
     Loop { condition: Option<Condition>, body: Box<Protocol> },
-    Parallel { protocols: Vec<Protocol> },
+    Parallel { protocols: NonEmptyVec<Protocol> },
     Rec { label: Ident, body: Box<Protocol> },
     Var(Ident),
     Extension {
         extension: Box<dyn ProtocolExtension>,
         continuation: Box<Protocol>,
-        annotations: HashMap<String, String>,
+        annotations: Annotations,
     },
     End,
 }
 ```
 
-Protocol is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts and recursive definitions are supported.
+Protocol is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, and recursive definitions are supported. `NonEmptyVec` is used where the DSL enforces at least one branch.
 
 ### Parser Module
 
@@ -166,12 +170,28 @@ The generator creates compile-time type-safe protocol implementations.
 ```rust
 pub fn generate_session_type(role: &Role, local_type: &LocalType, protocol_name: &str) -> TokenStream
 pub fn generate_choreography_code(name: &str, roles: &[Role], local_types: &[(Role, LocalType)]) -> TokenStream
-pub fn generate_choreography_code_with_dynamic_roles(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
-pub fn generate_choreography_code_with_namespacing(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
+pub fn generate_choreography_code_with_extensions(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+    extensions: &[Box<dyn ProtocolExtension>],
+) -> TokenStream
+pub fn generate_choreography_code_with_dynamic_roles(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+) -> TokenStream
+pub fn generate_choreography_code_with_namespacing(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+) -> TokenStream
+pub fn generate_choreography_code_with_annotations(
+    choreography: &Choreography,
+    local_types: &[(Role, LocalType)],
+) -> TokenStream
 pub fn generate_choreography_code_with_topology(choreography: &Choreography, local_types: &[(Role, LocalType)]) -> TokenStream
 pub fn generate_dynamic_role_support(choreography: &Choreography) -> TokenStream
 pub fn generate_role_implementations(roles: &[Role]) -> TokenStream
 pub fn generate_topology_integration(choreography: &Choreography) -> TokenStream
+pub fn generate_helpers(name: &str, messages: &[MessageType]) -> TokenStream
 ```
 
 The generator creates session types and role structs. It supports dynamic roles including parameterized roles and runtime management.
@@ -199,16 +219,22 @@ pub trait ChoreoHandler: Send {
     async fn offer(
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
     ) -> ChoreoResult<<Self::Role as RoleId>::Label>;
+
+    async fn with_timeout<F, T>(
+        &mut self, ep: &mut Self::Endpoint, at: Self::Role, dur: Duration, body: F
+    ) -> ChoreoResult<T>
+    where
+        F: Future<Output = ChoreoResult<T>> + Send;
 }
 ```
 
-Handlers implement this trait to provide different execution strategies.
+Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_vm::effect::EffectHandler` used by the VM.
 
 ### VM Execution Layer
 
-The VM provides an alternative execution model to direct effect handler interpretation. Local types compile to bytecode instructions that the VM executes. The scheduler manages multiple coroutines with configurable concurrency parameter N.
+The VM provides a bytecode execution model for local types. The `telltale-vm` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. `telltale-simulator` wraps the VM with deterministic middleware for latency, faults, property monitoring, and checkpointing.
 
-The VM maintains session state with bounded message buffers. Each coroutine references its assigned program via a programId. Sessions track type state and advance through protocol execution. The scheduler guarantees that per-session traces are invariant over N and scheduling policy.
+The VM maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested VMs can be hosted inside a coroutine for hierarchical simulation.
 
 See [VM Overview](09_vm_overview.md) for details on the bytecode VM architecture.
 
@@ -361,7 +387,8 @@ telltale/
 │   │       ├── export.rs   Rust to JSON export
 │   │       ├── import.rs   JSON to Rust import
 │   │       └── runner.rs   Lean binary invocation
-│   ├── transport/          Transport abstractions (telltale-transport)
+│   ├── vm/                 Bytecode VM engine (telltale-vm)
+│   ├── simulator/          Deterministic simulation (telltale-simulator)
 │   └── macros/             Procedural macros (telltale-macros)
 ├── lean/                   Lean 4 verification code
 ├── examples/               Example protocols
@@ -375,5 +402,7 @@ This tree outlines the workspace layout and crate locations. It helps map each c
 The `telltale-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `telltale-theory` crate contains pure algorithms for projection, merge, duality, subtyping, and well-formedness checks. This crate depends only on `telltale-types`.
 
 The `telltale-choreography` crate is the choreographic programming layer including the DSL parser, effect handlers, code generation, and runtime support. The `telltale-lean-bridge` crate provides Lean integration through JSON export and import with a runner for invoking the verification binary.
+
+The `telltale-vm` crate provides the bytecode VM, scheduler, and compiler for `LocalTypeR`. The `telltale-simulator` crate wraps the VM with deterministic middleware for latency, faults, property monitoring, and checkpointing.
 
 The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users import from this crate.

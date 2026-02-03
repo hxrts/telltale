@@ -7,9 +7,9 @@
 
 use proptest::prelude::*;
 use quote::format_ident;
+use std::collections::HashMap;
 use telltale_choreography::ast::{Choreography, LocalType, Protocol, Role};
 use telltale_choreography::compiler::projection::project;
-use std::collections::HashMap;
 
 fn simple_role_strategy() -> impl Strategy<Value = Role> {
     prop_oneof![

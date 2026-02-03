@@ -372,30 +372,35 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                 if choosing_role == &role.name {
                     // This role makes the choice
                     // Generate: Choose<Label1, S1> + Choose<Label2, S2> + ...
-                    let branch_types: Vec<TokenStream> = branches.iter().map(|branch| {
-                        let label = &branch.label;
-                        // Project each branch's interactions for this role
-                        let mut branch_type = type_expr.clone();
-                        for branch_interaction in branch.interactions.iter().rev() {
-                            match branch_interaction {
-                                Interaction::Send { from, to, message, .. } => {
-                                    if from == &role.name {
-                                        branch_type = quote! {
-                                            ::telltale::Send<#to, #message, #branch_type>
-                                        };
-                                    } else if to == &role.name {
-                                        branch_type = quote! {
-                                            ::telltale::Receive<#from, #message, #branch_type>
-                                        };
+                    let branch_types: Vec<TokenStream> = branches
+                        .iter()
+                        .map(|branch| {
+                            let label = &branch.label;
+                            // Project each branch's interactions for this role
+                            let mut branch_type = type_expr.clone();
+                            for branch_interaction in branch.interactions.iter().rev() {
+                                match branch_interaction {
+                                    Interaction::Send {
+                                        from, to, message, ..
+                                    } => {
+                                        if from == &role.name {
+                                            branch_type = quote! {
+                                                ::telltale::Send<#to, #message, #branch_type>
+                                            };
+                                        } else if to == &role.name {
+                                            branch_type = quote! {
+                                                ::telltale::Receive<#from, #message, #branch_type>
+                                            };
+                                        }
+                                    }
+                                    Interaction::Choice { .. } => {
+                                        // Nested choices - recursively handle
                                     }
                                 }
-                                Interaction::Choice { .. } => {
-                                    // Nested choices - recursively handle
-                                }
                             }
-                        }
-                        quote! { ::telltale::Choose<#label, #branch_type> }
-                    }).collect();
+                            quote! { ::telltale::Choose<#label, #branch_type> }
+                        })
+                        .collect();
 
                     // Combine branches into a choice type (sum type)
                     if !branch_types.is_empty() {
@@ -403,39 +408,42 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> proc_macro2::TokenStr
                             .into_iter()
                             .fold(None, |acc, branch| match acc {
                                 None => Some(branch),
-                                Some(prev) => {
-                                    Some(quote! { ::telltale::Branch<#prev, #branch> })
-                                }
+                                Some(prev) => Some(quote! { ::telltale::Branch<#prev, #branch> }),
                             })
                             .unwrap();
                     }
                 } else {
                     // This role offers (receives the choice from choosing_role)
                     // Generate: Offer<Role, { Label1 => S1, Label2 => S2, ... }>
-                    let branch_types: Vec<TokenStream> = branches.iter().map(|branch| {
-                        let label = &branch.label;
-                        // Project each branch's interactions for this role
-                        let mut branch_type = type_expr.clone();
-                        for branch_interaction in branch.interactions.iter().rev() {
-                            match branch_interaction {
-                                Interaction::Send { from, to, message, .. } => {
-                                    if from == &role.name {
-                                        branch_type = quote! {
-                                            ::telltale::Send<#to, #message, #branch_type>
-                                        };
-                                    } else if to == &role.name {
-                                        branch_type = quote! {
-                                            ::telltale::Receive<#from, #message, #branch_type>
-                                        };
+                    let branch_types: Vec<TokenStream> = branches
+                        .iter()
+                        .map(|branch| {
+                            let label = &branch.label;
+                            // Project each branch's interactions for this role
+                            let mut branch_type = type_expr.clone();
+                            for branch_interaction in branch.interactions.iter().rev() {
+                                match branch_interaction {
+                                    Interaction::Send {
+                                        from, to, message, ..
+                                    } => {
+                                        if from == &role.name {
+                                            branch_type = quote! {
+                                                ::telltale::Send<#to, #message, #branch_type>
+                                            };
+                                        } else if to == &role.name {
+                                            branch_type = quote! {
+                                                ::telltale::Receive<#from, #message, #branch_type>
+                                            };
+                                        }
+                                    }
+                                    Interaction::Choice { .. } => {
+                                        // Nested choices - recursively handle
                                     }
                                 }
-                                Interaction::Choice { .. } => {
-                                    // Nested choices - recursively handle
-                                }
                             }
-                        }
-                        quote! { #label => #branch_type }
-                    }).collect();
+                            quote! { #label => #branch_type }
+                        })
+                        .collect();
 
                     if !branch_types.is_empty() {
                         type_expr = quote! {

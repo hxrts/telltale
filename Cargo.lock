@@ -1542,13 +1542,14 @@ version = "0.9.1"
 dependencies = [
  "assert_matches",
  "getrandom 0.2.16",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "serde",
  "serde_json",
  "telltale-lean-bridge",
  "telltale-theory",
  "telltale-types",
  "telltale-vm",
- "thiserror",
  "toml",
 ]
 
@@ -1583,8 +1584,10 @@ dependencies = [
  "assert_matches",
  "getrandom 0.2.16",
  "proptest",
+ "rayon",
  "serde",
  "serde_json",
+ "telltale-lean-bridge",
  "telltale-theory",
  "telltale-types",
  "thiserror",

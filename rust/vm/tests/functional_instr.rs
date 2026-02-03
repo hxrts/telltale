@@ -64,10 +64,17 @@ fn test_send_type_mismatch() {
 
     // Override A's code to be a Send instruction (mismatched with Recv type).
     let mut programs = BTreeMap::new();
-    programs.insert("A".to_string(), vec![Instr::Send { chan: 0, val: 1 }, Instr::Halt]);
+    programs.insert(
+        "A".to_string(),
+        vec![Instr::Send { chan: 0, val: 1 }, Instr::Halt],
+    );
     programs.insert(
         "B".to_string(),
-        vec![Instr::Send { chan: 0, val: 1 }, Instr::Invoke { action: 0, dst: 0 }, Instr::Halt],
+        vec![
+            Instr::Send { chan: 0, val: 1 },
+            Instr::Invoke { action: 0, dst: 0 },
+            Instr::Halt,
+        ],
     );
 
     let image = CodeImage {
@@ -81,7 +88,13 @@ fn test_send_type_mismatch() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::TypeViolation { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::TypeViolation { .. },
+            ..
+        })
+    );
 }
 
 #[test]
@@ -99,7 +112,13 @@ fn test_send_no_type() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::TypeViolation { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::TypeViolation { .. },
+            ..
+        })
+    );
 }
 
 #[test]
@@ -140,7 +159,13 @@ fn test_send_buffer_full_error() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::BufferFull { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::BufferFull { .. },
+            ..
+        })
+    );
 }
 
 #[test]
@@ -257,7 +282,13 @@ fn test_send_handler_error() {
 
     let handler = FailingHandler::new("handler failed");
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::InvokeFault { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::InvokeFault { .. },
+            ..
+        })
+    );
 }
 
 // ============================================================================
@@ -323,9 +354,15 @@ fn test_recv_type_mismatch() {
     let global = GlobalType::send("B", "A", Label::new("msg"), GlobalType::End);
 
     let mut programs = BTreeMap::new();
-    programs.insert("A".to_string(), vec![Instr::Recv { chan: 0, dst: 1 }, Instr::Halt]);
+    programs.insert(
+        "A".to_string(),
+        vec![Instr::Recv { chan: 0, dst: 1 }, Instr::Halt],
+    );
     // Give B a Recv instruction, but B has Send type → mismatch.
-    programs.insert("B".to_string(), vec![Instr::Recv { chan: 0, dst: 1 }, Instr::Halt]);
+    programs.insert(
+        "B".to_string(),
+        vec![Instr::Recv { chan: 0, dst: 1 }, Instr::Halt],
+    );
 
     let image = CodeImage {
         programs,
@@ -338,7 +375,13 @@ fn test_recv_type_mismatch() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::TypeViolation { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::TypeViolation { .. },
+            ..
+        })
+    );
 }
 
 #[test]
@@ -449,7 +492,13 @@ fn test_choose_unknown_label() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::UnknownLabel { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::UnknownLabel { .. },
+            ..
+        })
+    );
 }
 
 #[test]
@@ -487,7 +536,11 @@ fn test_choose_type_not_send() {
     );
     programs.insert(
         "B".to_string(),
-        vec![Instr::Send { chan: 0, val: 1 }, Instr::Invoke { action: 0, dst: 0 }, Instr::Halt],
+        vec![
+            Instr::Send { chan: 0, val: 1 },
+            Instr::Invoke { action: 0, dst: 0 },
+            Instr::Halt,
+        ],
     );
 
     let image = CodeImage {
@@ -501,7 +554,13 @@ fn test_choose_type_not_send() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::TypeViolation { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::TypeViolation { .. },
+            ..
+        })
+    );
 }
 
 // ============================================================================
@@ -535,7 +594,10 @@ fn test_offer_recv_mode_blocks() {
     vm.run(&handler, 100).unwrap();
 
     // Both should complete.
-    assert!(vm.trace().iter().any(|e| matches!(e, ObsEvent::Received { .. })));
+    assert!(vm
+        .trace()
+        .iter()
+        .any(|e| matches!(e, ObsEvent::Received { .. })));
 }
 
 #[test]
@@ -607,7 +669,13 @@ fn test_offer_unknown_label_in_table() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::UnknownLabel { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::UnknownLabel { .. },
+            ..
+        })
+    );
 }
 
 #[test]
@@ -643,7 +711,13 @@ fn test_offer_wrong_type() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::TypeViolation { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::TypeViolation { .. },
+            ..
+        })
+    );
 }
 
 // ============================================================================
@@ -733,7 +807,14 @@ fn test_invoke_calls_step() {
     let handler = RecordingHandler::new();
     vm.run(&handler, 100).unwrap();
 
-    assert!(!handler.steps.borrow().is_empty(), "handler.step() should have been called");
+    assert!(
+        !handler
+            .steps
+            .lock()
+            .expect("recording handler lock poisoned")
+            .is_empty(),
+        "handler.step() should have been called"
+    );
 }
 
 #[test]
@@ -764,7 +845,13 @@ fn test_invoke_handler_error() {
     // FailingHandler: handle_send returns Err.
     let handler = FailingHandler::new("invoke error");
     let result = vm.run(&handler, 100);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::InvokeFault { .. }, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::InvokeFault { .. },
+            ..
+        })
+    );
 }
 
 // ============================================================================
@@ -1004,5 +1091,11 @@ fn test_pc_out_of_bounds() {
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 10);
-    assert_matches!(result, Err(VMError::Fault { fault: Fault::PcOutOfBounds, .. }));
+    assert_matches!(
+        result,
+        Err(VMError::Fault {
+            fault: Fault::PcOutOfBounds,
+            ..
+        })
+    );
 }

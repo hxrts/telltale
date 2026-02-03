@@ -33,7 +33,9 @@ fn async_equivalent(left: &LocalTypeR, right: &LocalTypeR) -> bool {
 fn contains_send(lt: &LocalTypeR) -> bool {
     match lt {
         LocalTypeR::Send { .. } => true,
-        LocalTypeR::Recv { branches, .. } => branches.iter().any(|(_, _vt, cont)| contains_send(cont)),
+        LocalTypeR::Recv { branches, .. } => {
+            branches.iter().any(|(_, _vt, cont)| contains_send(cont))
+        }
         LocalTypeR::Mu { body, .. } => contains_send(body),
         LocalTypeR::Var(_) | LocalTypeR::End => false,
     }

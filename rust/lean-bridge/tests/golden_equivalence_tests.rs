@@ -22,9 +22,9 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use std::path::PathBuf;
 use telltale_lean_bridge::equivalence::EquivalenceChecker;
 use telltale_lean_bridge::import::json_to_global;
-use std::path::PathBuf;
 
 /// Get the path to the golden files directory.
 fn golden_dir() -> PathBuf {

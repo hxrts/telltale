@@ -7,13 +7,13 @@
 //! Protocol: same 2-role send/recv structure as Ising (exchange field values).
 //! State vector per role: `[field_value]`.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-
-use serde_json::Value;
+use std::sync::Mutex;
 
 use crate::material::ContinuumFieldParams;
-use crate::scheduler::EffectHandler;
+use crate::value_conv::{registers_to_f64s, value_to_f64, write_f64s};
+use telltale_vm::coroutine::Value;
+use telltale_vm::effect::EffectHandler;
 
 /// Effect handler for two-site continuum field dynamics.
 ///
@@ -28,9 +28,9 @@ use crate::scheduler::EffectHandler;
 pub struct ContinuumFieldHandler {
     params: ContinuumFieldParams,
     /// Per-role: received peer field value.
-    peer_fields: RefCell<HashMap<String, f64>>,
+    peer_fields: Mutex<HashMap<String, f64>>,
     /// Tick counter per role (2-tick cycle: send then recv).
-    tick_count: RefCell<HashMap<String, usize>>,
+    tick_count: Mutex<HashMap<String, usize>>,
 }
 
 impl ContinuumFieldHandler {
@@ -39,8 +39,8 @@ impl ContinuumFieldHandler {
     pub fn new(params: ContinuumFieldParams) -> Self {
         Self {
             params,
-            peer_fields: RefCell::new(HashMap::new()),
-            tick_count: RefCell::new(HashMap::new()),
+            peer_fields: Mutex::new(HashMap::new()),
+            tick_count: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -51,12 +51,13 @@ impl EffectHandler for ContinuumFieldHandler {
         _role: &str,
         _partner: &str,
         _label: &str,
-        state: &[f64],
+        state: &[Value],
     ) -> Result<Value, String> {
-        if state.is_empty() {
+        let vals = registers_to_f64s(state);
+        if vals.is_empty() {
             return Err("continuum field expects at least 1 field component".into());
         }
-        serde_json::to_value(state[0]).map_err(|e| e.to_string())
+        Ok(Value::Real(vals[0]))
     }
 
     fn handle_recv(
@@ -64,25 +65,46 @@ impl EffectHandler for ContinuumFieldHandler {
         role: &str,
         _partner: &str,
         _label: &str,
-        _state: &mut Vec<f64>,
+        _state: &mut Vec<Value>,
         payload: &Value,
     ) -> Result<(), String> {
-        let val: f64 = serde_json::from_value(payload.clone()).map_err(|e| e.to_string())?;
+        let val = value_to_f64(payload)?;
         self.peer_fields
-            .borrow_mut()
+            .lock()
+            .expect("continuum handler lock poisoned")
             .insert(role.to_string(), val);
         Ok(())
     }
 
-    fn step(&self, role: &str, state: &mut Vec<f64>) -> Result<(), String> {
-        if state.is_empty() {
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> Result<String, String> {
+        labels
+            .first()
+            .cloned()
+            .ok_or_else(|| "no labels available".into())
+    }
+
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
+        let mut vals = registers_to_f64s(state);
+        if vals.is_empty() {
             return Err("continuum field expects at least 1 field component".into());
         }
 
-        let mut ticks = self.tick_count.borrow_mut();
-        let tick = ticks.entry(role.to_string()).or_insert(0);
-        let phase = *tick % 2;
-        *tick += 1;
+        let phase = {
+            let mut ticks = self
+                .tick_count
+                .lock()
+                .expect("continuum handler lock poisoned");
+            let tick = ticks.entry(role.to_string()).or_insert(0);
+            let phase = *tick % 2;
+            *tick += 1;
+            phase
+        };
 
         // Only integrate on tick 1 (after recv, when peer field is available).
         if phase != 1 {
@@ -91,18 +113,20 @@ impl EffectHandler for ContinuumFieldHandler {
 
         let peer_field = self
             .peer_fields
-            .borrow()
+            .lock()
+            .expect("continuum handler lock poisoned")
             .get(role)
             .copied()
-            .unwrap_or(state[0]);
+            .unwrap_or(vals[0]);
 
         let dt = self.params.step_size;
         let k = self.params.coupling;
 
         // Diffusion drift: K * (peer - self).
-        let drift = k * (peer_field - state[0]);
-        state[0] += drift * dt;
+        let drift = k * (peer_field - vals[0]);
+        vals[0] += drift * dt;
 
+        write_f64s(state, &vals);
         Ok(())
     }
 }
@@ -111,6 +135,7 @@ impl EffectHandler for ContinuumFieldHandler {
 mod tests {
     use super::*;
     use crate::material::ContinuumFieldParams;
+    use crate::value_conv::{registers_to_f64s, write_f64s};
 
     fn test_params() -> ContinuumFieldParams {
         ContinuumFieldParams {
@@ -125,9 +150,11 @@ mod tests {
     fn test_diffusion_conserves_total_field() {
         let handler = ContinuumFieldHandler::new(test_params());
 
-        let mut state_a = vec![1.0];
-        let mut state_b = vec![0.0];
-        let initial_total = state_a[0] + state_b[0];
+        let mut state_a = vec![Value::Unit, Value::Unit];
+        let mut state_b = vec![Value::Unit, Value::Unit];
+        write_f64s(&mut state_a, &[1.0]);
+        write_f64s(&mut state_b, &[0.0]);
+        let initial_total = registers_to_f64s(&state_a)[0] + registers_to_f64s(&state_b)[0];
 
         for _ in 0..1000 {
             // Tick 0: A sends, B recvs.
@@ -147,7 +174,7 @@ mod tests {
             handler.step("B", &mut state_b).unwrap(); // tick 1 for B (integrate)
         }
 
-        let final_total = state_a[0] + state_b[0];
+        let final_total = registers_to_f64s(&state_a)[0] + registers_to_f64s(&state_b)[0];
         assert!(
             (final_total - initial_total).abs() < 1e-10,
             "total field should be conserved: initial={initial_total}, final={final_total}"
@@ -158,8 +185,10 @@ mod tests {
     fn test_diffusion_converges_to_equilibrium() {
         let handler = ContinuumFieldHandler::new(test_params());
 
-        let mut state_a = vec![1.0];
-        let mut state_b = vec![0.0];
+        let mut state_a = vec![Value::Unit, Value::Unit];
+        let mut state_b = vec![Value::Unit, Value::Unit];
+        write_f64s(&mut state_a, &[1.0]);
+        write_f64s(&mut state_b, &[0.0]);
 
         for _ in 0..10000 {
             // Tick 0: A→B send, B recv.
@@ -180,15 +209,17 @@ mod tests {
         }
 
         // Should converge to equal field values (average = 0.5).
+        let vals_a = registers_to_f64s(&state_a);
+        let vals_b = registers_to_f64s(&state_b);
         assert!(
-            (state_a[0] - 0.5).abs() < 1e-4,
+            (vals_a[0] - 0.5).abs() < 1e-4,
             "A should converge to 0.5, got {}",
-            state_a[0]
+            vals_a[0]
         );
         assert!(
-            (state_b[0] - 0.5).abs() < 1e-4,
+            (vals_b[0] - 0.5).abs() < 1e-4,
             "B should converge to 0.5, got {}",
-            state_b[0]
+            vals_b[0]
         );
     }
 }

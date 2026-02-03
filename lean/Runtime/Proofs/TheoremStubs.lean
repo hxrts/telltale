@@ -1,6 +1,7 @@
 import Runtime.Monitor.Monitor
 import Runtime.Transport.Transport
 import Runtime.Scheduler.Scheduler
+import Runtime.VM.LoadChoreography
 import Runtime.ProgramLogic.GhostState
 
 /- 
@@ -53,6 +54,65 @@ def guard_hot_swap : Prop :=
 def wp_doEffect : Prop :=
   -- Placeholder: doEffect composes via wp_bind.
   True
+
+/-! ## Multi-Session Refinement Stubs -/
+
+/-- Heuristic session lookup for a coroutine (placeholder). -/
+def sessionOf {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (cid : CoroutineId) : SessionId :=
+  match st.coroutines[cid]? with
+  | none => 0
+  | some c =>
+      match c.ownedEndpoints with
+      | [] => 0
+      | ep :: _ => ep.sid
+
+/-- Cross-session diamond property (stub). -/
+axiom cross_session_diamond {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (hwf : WFVMState st)
+    (c1 c2 : CoroutineId) (hne : c1 ≠ c2)
+    (hdisj : SessionDisjoint st (sessionOf st c1) (sessionOf st c2)) :
+    ∃ st', (execInstr (execInstr st c1).1 c2).1 = st' ∧
+           (execInstr (execInstr st c2).1 c1).1 = st'
+
+/-! ## Frame Rules (stubs) -/
+
+/-- Placeholder predicate for existing-session WPs. -/
+def WPExisting {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (_st : VMState ι γ π ε ν)
+    (_Q : VMState ι γ π ε ν → Prop) : Prop :=
+  True
+
+/-- Loading a new protocol preserves existing session specs (stub). -/
+axiom wp_frame_load {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [Inhabited (EffectModel.EffectCtx ε)]
+    (st : VMState ι γ π ε ν) (image : CodeImage γ ε)
+    (Q : VMState ι γ π ε ν → Prop) :
+    WPExisting st Q →
+    (let (st', _) := loadChoreography st image; WPExisting st' Q)
+
+/-- Per-session WP composes under disjoint resources (stub). -/
+axiom wp_frame_concurrent : Prop
 
 /-! ## Handler and Effect Polymorphism -/
 

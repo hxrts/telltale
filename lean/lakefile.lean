@@ -61,3 +61,8 @@ lean_exe runtime_tests where
 lean_exe projection_runner where
   root := `Choreography.Projection.Runner
   moreLinkArgs := macosLinkArgs
+
+/-- VM runner: executes choreographies and emits observable traces. -/
+lean_exe vm_runner where
+  root := `Runtime.Tests.VMRunner
+  moreLinkArgs := macosLinkArgs

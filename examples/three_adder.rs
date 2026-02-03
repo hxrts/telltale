@@ -7,10 +7,10 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor, try_join,
 };
+use std::{error::Error, result};
 use telltale::{
     channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
 };
-use std::{error::Error, result};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 

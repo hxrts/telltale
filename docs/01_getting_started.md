@@ -10,13 +10,13 @@ telltale = "*"
 telltale-choreography = "*"
 ```
 
-This adds the main facade crate and the choreographic programming layer.
+This adds the facade crate and the choreographic programming layer.
 
 ### Understanding the Crates
 
 Telltale is organized as a Cargo workspace with several crates. The crate structure mirrors the Lean formalization for verified correspondence. The `telltale-types` crate contains core type definitions (`GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`) that match Lean exactly. The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks.
 
-The `telltale-choreography` crate is the choreographic programming layer providing the DSL parser, effect handlers, and code generation. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
+The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation. The `telltale-lean-bridge` crate enables cross-validation with Lean through JSON import and export functions.
 
 The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-choreography` for session types and the high-level DSL.
 
@@ -28,7 +28,6 @@ The workspace provides granular feature flags to control dependencies and functi
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `serialize` | no | Serialization support for session types |
 | `test-utils` | no | Testing utilities (random generation) |
 | `wasm` | no | WebAssembly support |
 | `theory` | no | Session type algorithms via `telltale-theory` |
@@ -40,15 +39,15 @@ The workspace provides granular feature flags to control dependencies and functi
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `projection` | **yes** | Global to local type projection |
-| `duality` | **yes** | Dual type computation |
-| `merge` | **yes** | Local type merging |
-| `well-formedness` | **yes** | Type validation |
-| `bounded` | **yes** | Bounded recursion strategies |
-| `async-subtyping` | **yes** | POPL 2021 asynchronous subtyping |
-| `sync-subtyping` | **yes** | Synchronous subtyping |
-| `semantics` | **yes** | Async step semantics from ECOOP 2025 |
-| `coherence` | **yes** | Coherence predicates |
+| `projection` | yes | Global to local type projection |
+| `duality` | yes | Dual type computation |
+| `merge` | yes | Local type merging |
+| `well-formedness` | yes | Type validation |
+| `bounded` | yes | Bounded recursion strategies |
+| `async-subtyping` | yes | POPL 2021 asynchronous subtyping |
+| `sync-subtyping` | yes | Synchronous subtyping |
+| `semantics` | yes | Async step semantics from ECOOP 2025 |
+| `coherence` | yes | Coherence predicates |
 
 #### Choreography Crate (`telltale-choreography`)
 
@@ -61,7 +60,7 @@ The workspace provides granular feature flags to control dependencies and functi
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `runner` | **yes** | LeanRunner for invoking Lean binary |
+| `runner` | yes | LeanRunner for invoking Lean binary |
 | `cli` | no | Command-line interface binary |
 | `exporter` | no | Choreography exporter binary |
 | `golden` | no | Golden file management CLI |

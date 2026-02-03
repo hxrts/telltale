@@ -48,7 +48,7 @@ pub use effects::{
     ProgramMessage, RoleId,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
-pub use effects::{TelltaleEndpoint, TelltaleHandler, SimpleChannel};
+pub use effects::{SimpleChannel, TelltaleEndpoint, TelltaleHandler};
 pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,

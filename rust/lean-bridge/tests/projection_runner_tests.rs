@@ -32,7 +32,9 @@ fn test_simple_two_role_projection() {
 
     let json = global_to_json(&g);
     let roles = vec!["A".to_string(), "B".to_string()];
-    let projections = runner.project(&json, &roles).expect("projection should succeed");
+    let projections = runner
+        .project(&json, &roles)
+        .expect("projection should succeed");
 
     // A should see send
     let a_local = json_to_local(&projections["A"]).expect("parse A local type");
@@ -71,7 +73,9 @@ fn test_recursive_protocol_projection() {
 
     let json = global_to_json(&g);
     let roles = vec!["A".to_string(), "B".to_string()];
-    let projections = runner.project(&json, &roles).expect("projection should succeed");
+    let projections = runner
+        .project(&json, &roles)
+        .expect("projection should succeed");
 
     // A: mu step. send B position. recv B force. var step
     let a_local = json_to_local(&projections["A"]).expect("parse A local type");

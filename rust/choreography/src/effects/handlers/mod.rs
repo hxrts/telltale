@@ -14,4 +14,4 @@ pub mod telltale;
 // Re-export handler types for convenience
 pub use in_memory::InMemoryHandler;
 pub use recording::{RecordedEvent, RecordingHandler};
-pub use telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession, SimpleChannel};
+pub use telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler, TelltaleSession};

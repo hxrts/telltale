@@ -10,15 +10,15 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use telltale::Message;
-use telltale_choreography::effects::{
-    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, SimpleChannel},
-    ChoreoHandler, LabelId, RoleId,
-};
-use telltale_choreography::RoleName;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::hash::Hash;
+use telltale::Message;
+use telltale_choreography::effects::{
+    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
+    ChoreoHandler, LabelId, RoleId,
+};
+use telltale_choreography::RoleName;
 
 // ============================================================================
 // Test Role Setup

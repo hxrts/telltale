@@ -16,11 +16,11 @@ When N equals infinity (or exceeds the ready queue size), all ready coroutines a
 
 The scheduler supports multiple policies for selecting coroutines from the ready queue.
 
-The `Cooperative` policy executes coroutines until they yield. Coroutines must explicitly return control to the scheduler. This policy works well for WASM where true parallelism is unavailable.
+The `Cooperative` policy is single-threaded round-robin with explicit `Yield` points. It works well for WASM where true parallelism is unavailable.
 
 The `RoundRobin` policy cycles through ready coroutines in order. Each coroutine gets one instruction per round before the next is selected. This provides fair scheduling across all coroutines.
 
-The `ProgressAware` policy prefers coroutines holding progress tokens. These tokens guarantee that the associated session will eventually advance. This policy prevents starvation for coroutines with liveness guarantees.
+The `ProgressAware` policy is intended to prefer coroutines holding progress tokens. The current Rust scheduler treats it the same as round robin, matching the placeholder implementation.
 
 ```rust
 pub enum SchedPolicy {
@@ -36,14 +36,21 @@ The policy enum defines the available scheduling strategies.
 
 Each scheduling round consists of distinct phases.
 
-The `tryUnblockReceivers` function moves blocked receivers to the ready queue when their buffer has a message. This function runs once per round before coroutine selection.
+The `try_unblock_receivers` helper moves blocked receivers to the ready queue when their session buffers have messages. This function runs once per round before coroutine selection.
 
 ```rust
-fn try_unblock_receivers(state: &mut VMState) {
-    for (coro_id, reason) in state.scheduler.blocked.iter() {
-        if let BlockReason::RecvWait(edge) = reason {
-            if state.sessions.buffer_has_message(edge) {
-                state.scheduler.ready.push(*coro_id);
+fn try_unblock_receivers(vm: &mut VM) {
+    for coro_id in vm.scheduler.blocked_ids() {
+        if let Some(BlockReason::RecvWait { endpoint }) = vm.scheduler.block_reason(coro_id).cloned()
+        {
+            if let Some(session) = vm.sessions.get(endpoint.sid) {
+                let has_msg = session
+                    .roles
+                    .iter()
+                    .any(|sender| sender != &endpoint.role && session.has_message(sender, &endpoint.role));
+                if has_msg {
+                    vm.scheduler.unblock(coro_id);
+                }
             }
         }
     }
@@ -55,11 +62,13 @@ The implementation checks each blocked coroutine and moves those with available 
 The `schedRound` function executes one round with concurrency N.
 
 ```rust
-fn sched_round(n: usize, state: &mut VMState) {
-    let ready = state.scheduler.pick_ready(n);
-    for coro_id in ready {
-        let result = exec_instr(state, coro_id);
-        handle_result(state, coro_id, result);
+fn step_round(vm: &mut VM, handler: &dyn EffectHandler, n: usize) {
+    vm.try_unblock_receivers();
+    for _ in 0..n {
+        if let Some(coro_id) = vm.scheduler.schedule() {
+            let result = vm.exec_instr(coro_id, handler);
+            vm.handle_result(coro_id, result);
+        }
     }
 }
 ```
@@ -72,14 +81,14 @@ Coroutines block for several reasons during execution.
 
 ```rust
 pub enum BlockReason {
-    RecvWait(Edge),
-    SendWait(Edge),
-    InvokeWait(HandlerId),
-    CloseWait(SessionId),
+    RecvWait { endpoint: Endpoint },
+    SendWait { endpoint: Endpoint },
+    InvokeWait,
+    CloseWait { sid: SessionId },
 }
 ```
 
-The `RecvWait` reason indicates the coroutine is waiting for a message on the given edge. The `SendWait` reason indicates the buffer is full and backpressure is blocking the send. The `InvokeWait` reason indicates the coroutine is waiting for an effect handler response. The `CloseWait` reason indicates the coroutine is waiting for a session to drain.
+The `RecvWait` reason indicates the coroutine is waiting for a message on the given endpoint. The `SendWait` reason indicates the buffer is full and backpressure is blocking the send. The `InvokeWait` reason indicates the coroutine is waiting for an effect handler response. The `CloseWait` reason indicates the coroutine is waiting for a session close to complete.
 
 ## N-Invariance
 
@@ -109,23 +118,4 @@ The handler contract is required for N-invariance. The effect handler must be de
 
 WASM targets use single-threaded cooperative execution.
 
-The `wasm` feature configures the VM for browser environments. The cooperative backend executes all coroutines in a single thread using manual yielding. Random number generation uses the `getrandom` crate with JavaScript compatibility.
-
-```rust
-#[cfg(feature = "wasm")]
-impl VMBackend for CooperativeBackend {
-    fn run(&mut self, vm: &mut VM, handler: &dyn EffectHandler, fuel: usize) -> RunResult {
-        for _ in 0..fuel {
-            if vm.all_terminal() {
-                return RunResult::Complete;
-            }
-            vm.sched_round(1);
-        }
-        RunResult::FuelExhausted
-    }
-}
-```
-
-The cooperative backend runs rounds with N equals 1 until completion or fuel exhaustion.
-
-The N-invariance theorem guarantees that cooperative execution produces the same per-session traces as concurrent execution. Testing on native targets with higher N values validates correctness for WASM deployment.
+The `wasm` feature configures the VM for browser environments. The default `VMConfig` uses `SchedPolicy::Cooperative` and the `getrandom` crate for JavaScript-compatible randomness. The N-invariance theorem guarantees that cooperative execution produces the same per-session traces as concurrent execution. Testing on native targets with higher N values validates correctness for WASM deployment.

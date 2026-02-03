@@ -17,11 +17,11 @@
 //! ```
 
 use clap::{Parser, Subcommand};
-use telltale_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use telltale_lean_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Lean Bridge CLI - Convert between Rust session types and Lean JSON format
 #[derive(Parser)]

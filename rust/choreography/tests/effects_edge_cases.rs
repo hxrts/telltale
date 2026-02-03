@@ -10,12 +10,12 @@
 // - Complex protocol scenarios
 
 use futures::executor;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use telltale_choreography::{
     interpret, LabelId, Metrics, NoOpHandler, Program, RecordingHandler, Retry, RoleId, RoleName,
     Trace,
 };
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 enum TestRole {

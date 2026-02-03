@@ -8,9 +8,9 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use serde_json::{json, Value};
 use telltale_lean_bridge::{LeanRunner, Validator};
 use telltale_types::{GlobalType, Label};
-use serde_json::{json, Value};
 
 /// Helper macro to skip tests when Lean binary is unavailable.
 macro_rules! skip_without_lean {

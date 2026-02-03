@@ -18,8 +18,6 @@ set_option autoImplicit false
 inductive SchedPolicy where
   -- Round-robin over runnable coroutines.
   | roundRobin
-  -- Work stealing with a fixed number of workers.
-  | workStealing (workers : Nat)
   -- Cooperative single-threaded scheduling.
   | cooperative
   -- Priority policy from coroutine id to priority.

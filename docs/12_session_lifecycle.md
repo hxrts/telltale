@@ -7,24 +7,27 @@ This document details session state management and buffer configuration.
 A session represents an active protocol instance in the VM.
 
 ```rust
-pub struct Session {
-    pub id: SessionId,
-    pub roles: Vec<Role>,
+pub struct SessionState {
+    pub sid: SessionId,
+    pub roles: Vec<String>,
+    pub local_types: BTreeMap<Endpoint, TypeEntry>,
+    pub buffers: BTreeMap<Edge, BoundedBuffer>,
     pub status: SessionStatus,
-    pub buffers: HashMap<Edge, Buffer>,
-    pub types: HashMap<Role, LocalTypeR>,
+    pub epoch: usize,
 }
 
 pub enum SessionStatus {
     Active,
     Draining,
     Closed,
+    Cancelled,
+    Faulted { reason: String },
 }
 ```
 
-The `Session` struct holds the session ID, participating roles, and current status. The `buffers` map holds message queues indexed by edge. The `types` map tracks the current local type for each role.
+The `SessionState` struct holds the session ID, participating roles, and current status. The `buffers` map holds message queues indexed by edge. The `local_types` map tracks the current and original local type for each endpoint.
 
-The session progresses through three statuses. Active sessions allow all operations. Draining sessions accept no new sends but allow receives to empty buffers. Closed sessions reject all operations.
+The session progresses through several statuses. Active sessions allow all operations. Draining sessions are used when closing with pending messages. Closed sessions reject all operations. Cancelled and faulted sessions capture exceptional shutdown.
 
 ## Lifecycle Overview
 
@@ -40,7 +43,7 @@ sequenceDiagram
     Session->>Buffers: allocate(role_pairs, config)
     Buffers-->>Session: buffer_map
     Session->>Session: status = Active
-    VM->>Coroutines: spawn(role, program_id, session_id)
+    VM->>Coroutines: spawn(role, program, session_id)
     Session-->>VM: session_id
 
     Note over VM,Coroutines: Active Phase
@@ -71,70 +74,73 @@ sequenceDiagram
     VM->>VM: release_namespace(session_id)
 ```
 
-This diagram shows the four phases of a session lifecycle. The opening phase allocates resources and spawns coroutines. The active phase executes protocol operations with type state tracking. The draining phase empties buffers while rejecting new sends. The closed phase releases all resources.
+This diagram shows the phases of a session lifecycle. The opening phase allocates resources and spawns coroutines. The active phase executes protocol operations with type state tracking. The draining status is set when a close occurs with pending messages. The current VM does not automatically drain buffers, so higher-level logic must decide when to mark a session closed.
 
 ## Opening Sessions
 
-The `Open` instruction creates a new session through several phases.
+Sessions are created by `VM::load_choreography`, which calls `SessionStore::open`.
 
 Buffer allocation creates a bounded buffer for each role pair. The buffer configuration specifies capacity and mode. All buffers start empty with type state initialized from the code image.
 
 ```rust
 fn open_session(
-    vm: &mut VM,
-    roles: &[Role],
-    local_types: &[(Role, LocalTypeR)],
+    store: &mut SessionStore,
+    roles: Vec<String>,
+    buffer_config: &BufferConfig,
+    initial_types: &BTreeMap<String, LocalTypeR>,
 ) -> SessionId {
-    let sid = vm.next_session_id();
-    let buffers = allocate_buffers(roles, &vm.config.buffer_config);
-    let types = local_types.iter().cloned().collect();
-    vm.sessions.insert(Session {
-        id: sid,
-        roles: roles.to_vec(),
-        status: SessionStatus::Active,
-        buffers,
-        types,
-    });
-    sid
+    store.open(roles, buffer_config, initial_types)
 }
 ```
 
-The function generates a fresh session ID and allocates resources.
-
-Handler binding associates effect handlers with edges during open. Each edge must have exactly one handler. The handler must satisfy the transport specification for that edge.
+The function generates a fresh session ID, allocates buffers for each directed edge, and initializes local type state.
 
 ## Type State Management
 
 The VM tracks the current local type for each role as the session progresses.
 
 ```rust
-impl Session {
-    pub fn lookup_type(&self, role: &Role) -> Option<&LocalTypeR> {
-        self.types.get(role)
+impl SessionStore {
+    pub fn lookup_type(&self, ep: &Endpoint) -> Option<&LocalTypeR> {
+        self.sessions
+            .get(&ep.sid)?
+            .local_types
+            .get(ep)
+            .map(|e| &e.current)
     }
 
-    pub fn update_type(&mut self, role: &Role, new_type: LocalTypeR) {
-        self.types.insert(role.clone(), new_type);
+    pub fn update_type(&mut self, ep: &Endpoint, new_type: LocalTypeR) {
+        if let Some(session) = self.sessions.get_mut(&ep.sid) {
+            if let Some(entry) = session.local_types.get_mut(ep) {
+                entry.current = new_type;
+            }
+        }
     }
 }
 ```
 
-The `lookup_type` method retrieves the current type for a role. The `update_type` method advances the type after an instruction executes.
+The `lookup_type` method retrieves the current type for an endpoint. The `update_type` method advances the type after an instruction executes.
 
-Recursive types require unfolding before use. The `unfold_mu` function substitutes the recursion body for the variable.
+Recursive types require unfolding before use. The VM uses `unfold_mu` and `unfold_if_var` to resolve recursion.
 
 ```rust
 fn unfold_mu(lt: &LocalTypeR) -> LocalTypeR {
     match lt {
-        LocalTypeR::Mu { var, body } => {
-            substitute(body, var, lt)
-        }
-        _ => lt.clone(),
+        LocalTypeR::Mu { body, .. } => unfold_mu(body),
+        other => other.clone(),
+    }
+}
+
+fn unfold_if_var(cont: &LocalTypeR, original: &LocalTypeR) -> LocalTypeR {
+    match cont {
+        LocalTypeR::Var(_) => unfold_mu(original),
+        LocalTypeR::Mu { .. } => unfold_mu(cont),
+        other => other.clone(),
     }
 }
 ```
 
-The function handles the `Mu` constructor by performing substitution.
+These helpers keep recursive sessions progressing by unfolding to the first active node.
 
 ## Bounded Buffers
 
@@ -142,7 +148,7 @@ Each buffer has a mode that controls message handling.
 
 ```rust
 pub enum BufferMode {
-    FIFO,
+    Fifo,
     LatestValue,
 }
 ```
@@ -152,15 +158,14 @@ The `FIFO` mode preserves message ordering. Messages are delivered in the order 
 The `LatestValue` mode keeps only the most recent message. Older messages are discarded when a new message arrives. This mode suits scenarios where only current state matters.
 
 ```rust
-pub struct Buffer {
+pub struct BufferConfig {
     pub mode: BufferMode,
-    pub capacity: usize,
-    pub messages: VecDeque<Value>,
-    pub backpressure: BackpressurePolicy,
+    pub initial_capacity: usize,
+    pub policy: BackpressurePolicy,
 }
 ```
 
-The `Buffer` struct holds configuration and message storage.
+`BoundedBuffer` is an internal ring buffer constructed from `BufferConfig`. It stores `Value` items and enforces the backpressure policy.
 
 ## Backpressure Policies
 
@@ -178,53 +183,21 @@ pub enum BackpressurePolicy {
 The `Block` policy causes the sending coroutine to block until space becomes available. The `Drop` policy silently discards the message and continues. The `Error` policy causes the send instruction to fault. The `Resize` policy grows the buffer up to the maximum capacity.
 
 ```rust
-fn try_send(buffer: &mut Buffer, value: Value) -> SendResult {
-    if buffer.messages.len() < buffer.capacity {
-        buffer.messages.push_back(value);
-        return SendResult::Sent;
-    }
-    match buffer.backpressure {
-        BackpressurePolicy::Block => SendResult::Blocked,
-        BackpressurePolicy::Drop => SendResult::Sent,
-        BackpressurePolicy::Error => SendResult::Faulted,
-        BackpressurePolicy::Resize { max_capacity } => {
-            if buffer.capacity < max_capacity {
-                buffer.capacity += 1;
-                buffer.messages.push_back(value);
-                SendResult::Sent
-            } else {
-                SendResult::Blocked
-            }
-        }
-    }
+fn enqueue(buffer: &mut BoundedBuffer, value: Value) -> EnqueueResult {
+    buffer.enqueue(value)
 }
 ```
 
-The function implements the backpressure logic for each policy.
+The `enqueue` method applies the backpressure policy and returns `EnqueueResult` to indicate success, blocking, drop, or full buffer.
 
 ## Closing Sessions
 
-The `Close` instruction terminates a session through several phases.
-
-The session status transitions to Draining. No new sends are accepted. Pending receives continue to drain remaining buffered messages.
+The `Close` instruction marks a session as `Draining` when any buffer still has messages. It marks the session as `Closed` when all buffers are empty at the time of the call.
 
 ```rust
-fn close_session(vm: &mut VM, sid: SessionId) -> CloseResult {
-    let session = vm.sessions.get_mut(&sid)?;
-    session.status = SessionStatus::Draining;
-
-    // Wait for buffers to empty
-    if session.buffers.values().any(|b| !b.messages.is_empty()) {
-        return CloseResult::Draining;
-    }
-
-    // Release resources
-    session.status = SessionStatus::Closed;
-    vm.release_namespace(sid);
-    CloseResult::Closed
+fn close_session(store: &mut SessionStore, sid: SessionId) -> Result<(), String> {
+    store.close(sid)
 }
 ```
 
-The function transitions the session through draining to closed.
-
-Once all buffers are empty, the session releases its namespace. The namespace removal prevents further access. Any subsequent operation on the session causes a fault.
+The `SessionStore::close` method checks all buffers and updates the status. The VM does not perform automatic draining, so higher-level logic decides when to retry close or drop pending messages.

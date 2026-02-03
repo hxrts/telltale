@@ -9,13 +9,13 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use telltale_choreography::effects::{
     handlers::in_memory::InMemoryHandler, ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 // ============================================================================
 // Test Role Setup

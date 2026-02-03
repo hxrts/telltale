@@ -6,13 +6,13 @@
 // work correctly when compiled to WASM.
 #![cfg(target_arch = "wasm32")]
 
-use telltale_choreography::{
-    interpret, Effect, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
-};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use telltale_choreography::{
+    interpret, Effect, InMemoryHandler, InterpretResult, InterpreterState, Label, Program, RoleId,
+};
 use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);

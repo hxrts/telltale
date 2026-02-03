@@ -31,8 +31,8 @@
 //! ```
 
 use crate::limits::{FuelSteps, YieldAfterSteps};
-use telltale_types::LocalTypeR;
 use std::collections::HashSet;
+use telltale_types::LocalTypeR;
 
 /// Strategy for bounding recursive types.
 #[derive(Debug, Clone)]

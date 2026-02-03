@@ -4,8 +4,8 @@
 #![allow(missing_docs)]
 
 use futures::{channel::mpsc, executor, try_join};
-use telltale::{session, try_session, End, Message, Receive, Role, Roles, Send};
 use std::{error::Error, result};
+use telltale::{session, try_session, End, Message, Receive, Role, Roles, Send};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 

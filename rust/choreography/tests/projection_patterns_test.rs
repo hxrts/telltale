@@ -9,12 +9,12 @@
 // 3. Improved parallel branch merging with conflict detection
 
 use quote::{format_ident, quote};
+use std::collections::HashMap;
 use telltale_choreography::ast::{
     protocol::Condition, Annotations, Branch, Choreography, LocalType, MessageType, NonEmptyVec,
     Protocol, Role,
 };
 use telltale_choreography::compiler::projection::project;
-use std::collections::HashMap;
 
 // Helper to create roles
 fn role(name: &str) -> Role {

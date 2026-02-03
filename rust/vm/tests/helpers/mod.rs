@@ -1,7 +1,7 @@
 //! Shared test infrastructure for VM conformance tests.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use proptest::prelude::*;
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -68,17 +68,17 @@ impl EffectHandler for PassthroughHandler {
 
 /// Records all (role, partner, label) triples for send/recv/step calls.
 pub struct RecordingHandler {
-    pub sends: RefCell<Vec<(String, String, String)>>,
-    pub recvs: RefCell<Vec<(String, String, String)>>,
-    pub steps: RefCell<Vec<String>>,
+    pub sends: Mutex<Vec<(String, String, String)>>,
+    pub recvs: Mutex<Vec<(String, String, String)>>,
+    pub steps: Mutex<Vec<String>>,
 }
 
 impl RecordingHandler {
     pub fn new() -> Self {
         Self {
-            sends: RefCell::new(Vec::new()),
-            recvs: RefCell::new(Vec::new()),
-            steps: RefCell::new(Vec::new()),
+            sends: Mutex::new(Vec::new()),
+            recvs: Mutex::new(Vec::new()),
+            steps: Mutex::new(Vec::new()),
         }
     }
 }
@@ -92,7 +92,8 @@ impl EffectHandler for RecordingHandler {
         _state: &[Value],
     ) -> Result<Value, String> {
         self.sends
-            .borrow_mut()
+            .lock()
+            .expect("recording handler lock poisoned")
             .push((role.into(), partner.into(), label.into()));
         Ok(Value::Int(42))
     }
@@ -106,7 +107,8 @@ impl EffectHandler for RecordingHandler {
         _payload: &Value,
     ) -> Result<(), String> {
         self.recvs
-            .borrow_mut()
+            .lock()
+            .expect("recording handler lock poisoned")
             .push((role.into(), partner.into(), label.into()));
         Ok(())
     }
@@ -125,7 +127,10 @@ impl EffectHandler for RecordingHandler {
     }
 
     fn step(&self, role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
-        self.steps.borrow_mut().push(role.into());
+        self.steps
+            .lock()
+            .expect("recording handler lock poisoned")
+            .push(role.into());
         Ok(())
     }
 }
@@ -418,7 +423,9 @@ pub fn buffer_config_strategy() -> impl Strategy<Value = BufferConfig> {
 /// Project a well-formed GlobalType and compile to CodeImage.
 /// Returns None if projection fails.
 pub fn code_image_from_global(global: &GlobalType) -> Option<CodeImage> {
-    let projected: BTreeMap<String, LocalTypeR> =
-        telltale_theory::projection::project_all(global).ok()?.into_iter().collect();
+    let projected: BTreeMap<String, LocalTypeR> = telltale_theory::projection::project_all(global)
+        .ok()?
+        .into_iter()
+        .collect();
     Some(CodeImage::from_local_types(&projected, global))
 }

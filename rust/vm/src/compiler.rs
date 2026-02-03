@@ -29,11 +29,7 @@ pub fn compile(local_type: &LocalTypeR) -> Vec<Instr> {
     instrs
 }
 
-fn compile_inner(
-    lt: &LocalTypeR,
-    instrs: &mut Vec<Instr>,
-    loop_targets: &mut HashMap<String, PC>,
-) {
+fn compile_inner(lt: &LocalTypeR, instrs: &mut Vec<Instr>, loop_targets: &mut HashMap<String, PC>) {
     match lt {
         LocalTypeR::Send { branches, .. } => {
             if branches.len() == 1 {
@@ -78,7 +74,11 @@ fn compile_inner(
 
 /// Compile multi-branch choice: emit Offer with jump table, then each branch's code.
 fn compile_choice_branches(
-    branches: &[(telltale_types::Label, Option<telltale_types::ValType>, LocalTypeR)],
+    branches: &[(
+        telltale_types::Label,
+        Option<telltale_types::ValType>,
+        LocalTypeR,
+    )],
     instrs: &mut Vec<Instr>,
     loop_targets: &mut HashMap<String, PC>,
 ) {
@@ -113,11 +113,14 @@ mod tests {
             branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
         };
         let code = compile(&lt);
-        assert_eq!(code, vec![
-            Instr::Send { chan: 0, val: 1 },
-            Instr::Invoke { action: 0, dst: 0 },
-            Instr::Halt,
-        ]);
+        assert_eq!(
+            code,
+            vec![
+                Instr::Send { chan: 0, val: 1 },
+                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Halt,
+            ]
+        );
     }
 
     #[test]
@@ -132,11 +135,14 @@ mod tests {
             },
         );
         let code = compile(&lt);
-        assert_eq!(code, vec![
-            Instr::Send { chan: 0, val: 1 },
-            Instr::Invoke { action: 0, dst: 0 },
-            Instr::Jmp { target: 0 },
-        ]);
+        assert_eq!(
+            code,
+            vec![
+                Instr::Send { chan: 0, val: 1 },
+                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Jmp { target: 0 },
+            ]
+        );
     }
 
     #[test]
@@ -158,12 +164,15 @@ mod tests {
             },
         );
         let code = compile(&lt);
-        assert_eq!(code, vec![
-            Instr::Send { chan: 0, val: 1 },
-            Instr::Invoke { action: 0, dst: 0 },
-            Instr::Recv { chan: 0, dst: 1 },
-            Instr::Invoke { action: 0, dst: 0 },
-            Instr::Jmp { target: 0 },
-        ]);
+        assert_eq!(
+            code,
+            vec![
+                Instr::Send { chan: 0, val: 1 },
+                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Recv { chan: 0, dst: 1 },
+                Instr::Invoke { action: 0, dst: 0 },
+                Instr::Jmp { target: 0 },
+            ]
+        );
     }
 }

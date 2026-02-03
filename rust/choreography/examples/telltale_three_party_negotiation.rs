@@ -6,12 +6,12 @@
 // This example demonstrates a negotiation protocol between a buyer, seller, and broker.
 // The broker facilitates the negotiation by coordinating offers and acceptances.
 
+use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
-    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, SimpleChannel},
+    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Role {

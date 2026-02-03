@@ -1,255 +1,202 @@
-# Composition Tutorial
+# Extension Guide
 
-This tutorial integrates telltale into your project. It demonstrates composing domain-specific choreographies with extensions.
+This guide shows how to build and run runtime extensions with the effect system.
 
 ## Prerequisites
 
-You need Rust 1.75 or later. Basic understanding of choreographic programming is required. See [Getting Started](01_getting_started.md) for fundamentals. Familiarity with effect handlers helps. See [Using Telltale Handlers](08_telltale_handler.md) for handler concepts.
+You need a recent Rust toolchain and the choreography crate. See [Getting Started](01_getting_started.md) for setup and [DSL Extensions Part 1: Runtime Effect System](16_effect_extensions.md) for the API reference.
 
 ## Step 1: Add Dependencies
 
-Add telltale to your `Cargo.toml`.
+Add the choreography crate and an async runtime.
 
 ```toml
 [dependencies]
-telltale = "0.7"
-telltale-choreography = "0.7"
+telltale-choreography = { path = "../rust/choreography" }
 tokio = { version = "1", features = ["full"] }
 ```
 
-The core library provides session types. The choreography layer provides effects and projection. Macros enable the choreography DSL. Tokio provides the async runtime.
+Use a path dependency inside this workspace. For external projects, pin to the published crate version.
 
-## Step 2: Define Domain Types
+## Step 2: Define Roles and Messages
 
-Create domain-specific types for your choreography.
+Define roles, labels, and messages for your protocol.
 
 ```rust
 use serde::{Deserialize, Serialize};
+use telltale_choreography::{LabelId, RoleId, RoleName};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Role {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Role {
     Client,
     Server,
-    Database,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Label {
+    Ok,
+}
+
+impl LabelId for Label {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Label::Ok => "ok",
+        }
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "ok" => Some(Label::Ok),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for Role {
+    type Label = Label;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            Role::Client => RoleName::from_static("Client"),
+            Role::Server => RoleName::from_static("Server"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AuthRequest {
-    pub username: String,
-    pub password: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AuthResponse {
-    pub token: String,
-    pub user_id: u64,
+enum Message {
+    Ping,
+    Pong,
 }
 ```
 
-Roles represent participants. Messages are the data exchanged. Roles must implement `Copy`, `Clone`, `Debug`, `PartialEq`, `Eq`, and `Hash`. Messages must implement `Serialize` and `Deserialize`.
+Roles implement `RoleId`, labels implement `LabelId`, and messages are serializable.
 
-## Step 3: Create Domain Extensions
+## Step 3: Define an Extension
 
-Define extensions for domain needs.
+Create a domain specific extension that scopes to one role.
 
 ```rust
-use telltale_choreography::effects::*;
 use std::any::{Any, TypeId};
+use telltale_choreography::effects::ExtensionEffect;
 
 #[derive(Clone, Debug)]
-pub struct ValidateCapability {
-    pub capability: String,
-    pub role: Role,
+struct ValidateCapability {
+    role: Role,
+    capability: String,
 }
 
-impl ExtensionEffect for ValidateCapability {
+impl ExtensionEffect<Role> for ValidateCapability {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
-    
+
     fn type_name(&self) -> &'static str {
         "ValidateCapability"
     }
-    
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![Box::new(self.role)]
+
+    fn participating_roles(&self) -> Vec<Role> {
+        vec![self.role]
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
-    
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
+
+    fn clone_box(&self) -> Box<dyn ExtensionEffect<Role>> {
         Box::new(self.clone())
     }
 }
 ```
 
-The `ValidateCapability` extension checks permissions. Only the specified role participates. The `participating_role_ids()` method returns a single boxed role.
+Use `participating_roles` to scope the extension. Return an empty vector to make it global.
 
-Define a logging extension for all roles.
+## Step 4: Build an Extensible Handler
 
-```rust
-#[derive(Clone, Debug)]
-pub struct LogEvent {
-    pub message: String,
-    pub level: LogLevel,
-}
-
-#[derive(Clone, Debug)]
-pub enum LogLevel {
-    Info,
-    Warn,
-    Error,
-}
-
-impl ExtensionEffect for LogEvent {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-    
-    fn type_name(&self) -> &'static str {
-        "LogEvent"
-    }
-    
-    fn participating_role_ids(&self) -> Vec<Box<dyn Any>> {
-        vec![]
-    }
-    
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    
-    fn clone_box(&self) -> Box<dyn ExtensionEffect> {
-        Box::new(self.clone())
-    }
-}
-```
-
-The `LogEvent` extension appears in all role projections. An empty vector makes it global.
-
-## Step 4: Create an Extensible Handler
-
-Build a handler with extension support.
+Register extension handlers and implement `ExtensibleHandler`.
 
 ```rust
-use telltale_choreography::effects::*;
-use async_trait::async_trait;
+use telltale_choreography::effects::{
+    ChoreoHandler, ChoreoResult, ExtensionError, ExtensionRegistry, ExtensibleHandler,
+};
 
-pub struct DomainHandler {
-    role: Role,
-    registry: ExtensionRegistry<()>,
-    capabilities: Vec<String>,
+struct DomainHandler {
+    registry: ExtensionRegistry<(), Role>,
 }
 
 impl DomainHandler {
-    pub fn new(role: Role, capabilities: Vec<String>) -> Self {
+    fn new() -> Self {
         let mut registry = ExtensionRegistry::new();
-        
-        let caps = capabilities.clone();
-        registry.register::<ValidateCapability, _>(move |_ep, ext| {
-            let caps = caps.clone();
-            Box::pin(async move {
-                let validate = ext.as_any()
-                    .downcast_ref::<ValidateCapability>()
-                    .ok_or(ExtensionError::TypeMismatch {
-                        expected: "ValidateCapability",
-                        actual: ext.type_name(),
-                    })?;
-                
-                if !caps.contains(&validate.capability) {
-                    return Err(ExtensionError::ExecutionFailed {
-                        type_name: "ValidateCapability",
-                        error: format!("Missing capability: {}", validate.capability),
-                    });
-                }
-                
-                println!("Validated capability: {}", validate.capability);
-                Ok(())
+        registry
+            .register::<ValidateCapability, _>(|_ep, ext| {
+                Box::pin(async move {
+                    let validate = ext
+                        .as_any()
+                        .downcast_ref::<ValidateCapability>()
+                        .ok_or(ExtensionError::TypeMismatch {
+                            expected: "ValidateCapability",
+                            actual: ext.type_name(),
+                        })?;
+                    tracing::info!(cap = %validate.capability, "validated capability");
+                    Ok(())
+                })
             })
-        });
-        
-        registry.register::<LogEvent, _>(|_ep, ext| {
-            Box::pin(async move {
-                let log = ext.as_any()
-                    .downcast_ref::<LogEvent>()
-                    .ok_or(ExtensionError::TypeMismatch {
-                        expected: "LogEvent",
-                        actual: ext.type_name(),
-                    })?;
-                
-                println!("[{:?}] {}", log.level, log.message);
-                Ok(())
-            })
-        });
-        
-        Self { role, registry, capabilities }
+            .expect("register extension");
+
+        Self { registry }
     }
 }
-```
 
-The handler stores capabilities. The registry maps extension types to handlers. Each registration provides an async handler function.
-
-Implement the handler traits.
-
-```rust
-#[async_trait]
+#[async_trait::async_trait]
 impl ExtensibleHandler for DomainHandler {
     type Endpoint = ();
-    
-    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint> {
+
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Role> {
         &self.registry
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl ChoreoHandler for DomainHandler {
     type Role = Role;
     type Endpoint = ();
-    
+
     async fn send<M: serde::Serialize + Send + Sync>(
         &mut self,
         _ep: &mut Self::Endpoint,
-        to: Self::Role,
-        msg: &M,
+        _to: Self::Role,
+        _msg: &M,
     ) -> ChoreoResult<()> {
-        println!("{:?} -> {:?}: sending message", self.role, to);
         Ok(())
     }
 
     async fn recv<M: serde::de::DeserializeOwned + Send>(
         &mut self,
         _ep: &mut Self::Endpoint,
-        from: Self::Role,
+        _from: Self::Role,
     ) -> ChoreoResult<M> {
-        Err(ChoreographyError::Transport("recv not implemented".into()))
+        Err(telltale_choreography::ChoreographyError::Transport("recv not implemented".into()))
     }
 
     async fn choose(
         &mut self,
         _ep: &mut Self::Endpoint,
         _who: Self::Role,
-        label: <Self::Role as RoleId>::Label,
+        _label: <Self::Role as RoleId>::Label,
     ) -> ChoreoResult<()> {
-        println!("{:?}: choosing {:?}", self.role, label);
         Ok(())
     }
 
     async fn offer(
         &mut self,
         _ep: &mut Self::Endpoint,
-        from: Self::Role,
+        _from: Self::Role,
     ) -> ChoreoResult<<Self::Role as RoleId>::Label> {
-        println!("{:?}: offering choice from {:?}", self.role, from);
-        unimplemented!("offer not implemented for example")
+        Err(telltale_choreography::ChoreographyError::Transport("offer not implemented".into()))
     }
 
     async fn with_timeout<F, T>(
@@ -267,215 +214,44 @@ impl ChoreoHandler for DomainHandler {
 }
 ```
 
-The handler implements both `ExtensibleHandler` and `ChoreoHandler`. Extension handling happens through the registry. Choreographic operations implement protocol communication.
+`ExtensionRegistry` stores handlers for each extension type. The `interpret_extensible` entry point uses this registry during execution.
 
-## Step 5: Build a Choreography
+## Step 5: Build and Run a Program
 
-Create a choreography using the effect algebra.
-
-```rust
-use telltale_choreography::effects::*;
-
-pub fn auth_protocol() -> Program<Role, String> {
-    Program::new()
-        .ext(LogEvent {
-            message: "Starting authentication protocol".into(),
-            level: LogLevel::Info,
-        })
-        .ext(ValidateCapability {
-            capability: "authenticate".into(),
-            role: Role::Client,
-        })
-        .send(Role::Server, "auth_request".to_string())
-        .ext(LogEvent {
-            message: "Authentication request sent".into(),
-            level: LogLevel::Info,
-        })
-        .ext(ValidateCapability {
-            capability: "query_database".into(),
-            role: Role::Server,
-        })
-        .send(Role::Database, "user_query".to_string())
-        .send(Role::Server, "user_data".to_string())
-        .send(Role::Client, "auth_response".to_string())
-        .ext(LogEvent {
-            message: "Authentication complete".into(),
-            level: LogLevel::Info,
-        })
-        .end()
-}
-```
-
-The program combines extensions and communication. Logging appears before and after operations. Capability validation precedes privileged actions. Messages flow between roles.
-
-## Step 6: Execute the Choreography
-
-Combine the components and execute.
+Insert extensions with `Program::ext` and interpret with `interpret_extensible`.
 
 ```rust
-use telltale_choreography::effects::*;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut handler = DomainHandler::new(
-        Role::Client,
-        vec!["authenticate".into(), "query_database".into()],
-    );
-    
-    let program = auth_protocol();
-    let mut endpoint = ();
-    
-    let result = interpret_extensible(&mut handler, &mut endpoint, program).await?;
-    
-    match result.final_state {
-        InterpreterState::Completed => {
-            println!("Protocol completed successfully");
-        }
-        InterpreterState::Failed(err) => {
-            println!("Protocol failed: {}", err);
-        }
-        InterpreterState::Timeout => {
-            println!("Protocol timed out");
-        }
-    }
-    
-    Ok(())
-}
-```
-
-The handler receives capabilities at construction. The program executes through the interpreter. The final state indicates success or failure.
-
-## Advanced Patterns
-
-Three advanced patterns enable sophisticated choreographies.
-
-### Pattern 1: Reusable Primitives
-
-Create composable protocol fragments.
-
-```rust
-pub fn with_retry<R: RoleId, M: Clone>(
-    program: Program<R, M>,
-    max_attempts: u32,
-) -> Program<R, M> {
-    Program::new()
-        .ext(RetryMetadata { max_attempts })
-        .then(program)
-}
-
-pub fn with_timeout_ext<R: RoleId, M>(
-    program: Program<R, M>,
-    timeout_ms: u64,
-) -> Program<R, M> {
-    Program::new()
-        .ext(TimeoutMetadata { timeout_ms })
-        .then(program)
-}
-```
-
-Functions wrap protocols with cross-cutting concerns. Retry logic and timeouts apply to any program. Composition builds complex protocols from simple pieces.
-
-Use the primitives in protocols.
-
-```rust
-let resilient_protocol = with_retry(
-    with_timeout_ext(auth_protocol(), 5000),
-    3
-);
-```
-
-The protocol gains retry and timeout behavior. Primitives compose without modifying the base protocol.
-
-### Pattern 2: Handler Composition
-
-Compose multiple handlers into one.
-
-```rust
-pub struct ComposedHandler<H1, H2> {
-    primary: H1,
-    secondary: H2,
-    registry: ExtensionRegistry<()>,
-}
-
-impl<H1, H2> ComposedHandler<H1, H2>
-where
-    H1: ExtensibleHandler,
-    H2: ExtensibleHandler<Endpoint = H1::Endpoint>,
-{
-    pub fn new(primary: H1, secondary: H2) -> Self {
-        let mut registry = ExtensionRegistry::new();
-        registry.merge(primary.extension_registry().clone());
-        registry.merge(secondary.extension_registry().clone());
-        
-        Self { primary, secondary, registry }
-    }
-}
-```
-
-The composed handler merges extension registries. Both handlers contribute extensions. This enables modular handler design.
-
-### Pattern 3: Cross-Crate Extensions
-
-Share extensions across projects.
-
-```rust
-pub mod extensions {
-    pub use crate::ValidateCapability;
-    pub use crate::LogEvent;
-    pub use crate::RetryMetadata;
-}
-```
-
-Library crates export extension modules. Consuming crates import and use them.
-
-```rust
-use my_library::extensions::*;
+use telltale_choreography::{interpret_extensible, Program};
 
 let program = Program::new()
-    .ext(ValidateCapability { /* ... */ })
-    .ext(LogEvent { /* ... */ });
+    .ext(ValidateCapability {
+        role: Role::Client,
+        capability: "send".into(),
+    })
+    .send(Role::Server, Message::Ping)
+    .end();
+
+let mut handler = DomainHandler::new();
+let mut endpoint = ();
+let _ = interpret_extensible(&mut handler, &mut endpoint, program).await?;
 ```
 
-Extensions compose across crate boundaries. The type system maintains safety.
+Extensions appear in the projected program for participating roles. Use `interpret_extensible` whenever a program contains extensions.
 
 ## Testing
 
-Test choreographies and extensions independently.
+Unit tests can validate registry setup and projection behavior.
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[tokio::test]
-    async fn test_auth_protocol() {
-        let mut handler = DomainHandler::new(
-            Role::Client,
-            vec!["authenticate".into()],
-        );
-        
-        let program = auth_protocol();
-        let mut endpoint = ();
-        
-        let result = interpret_extensible(&mut handler, &mut endpoint, program)
-            .await
-            .unwrap();
-        
-        assert_eq!(result.final_state, InterpreterState::Completed);
-    }
-    
-    #[test]
-    fn test_extension_registration() {
-        let handler = DomainHandler::new(Role::Client, vec![]);
-        
-        assert!(handler.registry.is_registered::<ValidateCapability>());
-        assert!(handler.registry.is_registered::<LogEvent>());
-    }
+#[test]
+fn test_registry() {
+    let handler = DomainHandler::new();
+    assert!(handler
+        .extension_registry()
+        .is_registered::<ValidateCapability>());
 }
 ```
 
-Integration tests verify protocol execution. Unit tests check extension registration. Both test types ensure correctness.
+Use integration tests to check end to end protocol behavior with `interpret_extensible`.
 
-## Next Steps
-
-Learn extension architecture in [DSL Extensions Part 1: Runtime Effect System](16_effect_extensions.md). Explore advanced examples in `rust/choreography/examples/`. Read about testing in the examples directory. See production handlers in [Using Telltale Handlers](08_telltale_handler.md).
+See [Effect Handlers](07_effect_handlers.md) for handler patterns and [Choreographic DSL](04_choreographic_dsl.md) for core protocol syntax.

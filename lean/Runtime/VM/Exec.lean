@@ -66,12 +66,18 @@ private def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   | .done => (st, mkRes .halted none)
   | .faulted err => (st, mkRes (.faulted err) (some StepEvent.internal))
   | _ =>
-      match st.code.code[coro.pc]? with
+      match st.programs[coro.programId]? with
       | none =>
-          let coro' := { coro with status := .faulted (.closeFault "pc out of range") }
+          let coro' := { coro with status := .faulted (.closeFault "unknown program") }
           let st' := updateCoro st coroId coro'
-          (st', mkRes (.faulted (.closeFault "pc out of range")) (some StepEvent.internal))
-      | some instr => execWithInstr st coroId coro instr
+          (st', mkRes (.faulted (.closeFault "unknown program")) (some StepEvent.internal))
+      | some prog =>
+          match prog.code[coro.pc]? with
+          | none =>
+              let coro' := { coro with status := .faulted (.closeFault "pc out of range") }
+              let st' := updateCoro st coroId coro'
+              (st', mkRes (.faulted (.closeFault "pc out of range")) (some StepEvent.internal))
+          | some instr => execWithInstr st coroId coro instr
 
 /-! ## Main stepper -/
 

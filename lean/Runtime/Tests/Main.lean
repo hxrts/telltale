@@ -1,54 +1,100 @@
 import Runtime.Examples.SimpleProtocol
-import Runtime.VM.Exec
-import Runtime.VM.ExecHelpers
+import Runtime.VM.RunScheduled
+import Runtime.VM.LoadChoreography
+import SessionTypes.LocalTypeR
+import SessionTypes.GlobalType
 
 /-
-The Problem. Provide an executable Lean test that runs the example VM
-program and checks the resulting trace and session typing.
-
-Solution Structure. Step the VM for a fixed number of instructions,
-then assert expected register values, local types, and trace length.
+Executable Lean tests for the scheduled VM runner.
 -/
 
 set_option autoImplicit false
 
-/-! ## VM test runner -/
+open SessionTypes.LocalTypeR
+open SessionTypes.GlobalType
 
-def runSteps (n : Nat)
-    (st : VMState TestIdentity TestGuard TestPersist TestEffect TestVerify) :
-    VMState TestIdentity TestGuard TestPersist TestEffect TestVerify :=
-  -- Execute n single-instruction steps on coroutine 0.
-  match n with
-  | 0 => st
-  | n' + 1 =>
-      let (st', _) := execInstr st 0
-      runSteps n' st'
+/-- Tag observable events for comparison (UnitEffect only). -/
+def obsTag : ObsEvent UnitEffect → String
+  | .sent _ _ _ => "sent"
+  | .received _ _ _ => "received"
+  | .offered _ _ => "offered"
+  | .chose _ _ => "chose"
+  | .acquired _ _ => "acquired"
+  | .released _ _ => "released"
+  | .invoked _ _ => "invoked"
+  | .opened _ _ => "opened"
+  | .closed _ => "closed"
+  | .epochAdvanced _ _ => "epoch"
+  | .transferred _ _ _ => "transferred"
+  | .forked _ _ => "forked"
+  | .joined _ => "joined"
+  | .aborted _ => "aborted"
+  | .tagged _ => "tagged"
+  | .checked _ _ => "checked"
 
+/-- Extract tags from a filtered trace (UnitEffect only). -/
+def traceTags (trace : List (StepEvent UnitEffect)) : List String :=
+  trace.filterMap (fun ev =>
+    match ev with
+    | .obs o => some (obsTag o)
+    | .internal => none)
+
+/-- Minimal empty VM state for loading choreographies. -/
+def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
+  { config := unitConfig
+  , code := exampleProgram
+  , programs := #[]
+  , coroutines := #[]
+  , buffers := []
+  , persistent := ()
+  , nextCoroId := 0
+  , nextSessionId := 0
+  , arena := exampleArena
+  , sessions := []
+  , resourceStates := []
+  , guardResources := []
+  , sched := { policy := unitConfig.schedPolicy, readyQueue := [], blockedSet := [], timeslice := 1, stepCount := 0 }
+  , monitor := exampleMonitor
+  , obsTrace := []
+  , crashedSites := []
+  , partitionedEdges := []
+  , mask := ()
+  , ghostSessions := ()
+  , progressSupply := () }
+
+/-- Simple two-party LocalTypeR image. -/
+def twoPartyImage : CodeImage UnitGuard UnitEffect :=
+  let lbl : SessionTypes.GlobalType.Label := { name := "msg" }
+  let ltA : LocalTypeR := .send "B" [(lbl, none, .end)]
+  let ltB : LocalTypeR := .recv "A" [(lbl, none, .end)]
+  CodeImage.fromLocalTypes [ ("A", ltA), ("B", ltB) ] .end
+
+/-- Test helper: assert a boolean. -/
 def expect (ok : Bool) (msg : String) : IO Unit :=
-  -- Fail fast when a test condition is false.
   if ok then pure () else throw (IO.userError msg)
 
-/-! ## Main test entry point -/
-
+/-- Main test entry point. -/
 def main : IO Unit := do
-  -- Run the example program for 7 instructions.
-  let st' := runSteps 7 exampleState
-  let coroOk :=
-    match st'.coroutines[0]? with
-    | none => false
-    | some c => decide (c.regs[3]? = some (.nat 7))
-  let epA : Endpoint := { sid := 0, role := "Alice" }
-  let epB : Endpoint := { sid := 0, role := "Bob" }
-  let typeAOk :=
-    match SessionStore.lookupType st'.sessions epA with
-    | some .end_ => true
-    | _ => false
-  let typeBOk :=
-    match SessionStore.lookupType st'.sessions epB with
-    | some .end_ => true
-    | _ => false
-  let traceOk := decide (st'.obsTrace.length = 5)
-  expect coroOk "recv did not write the expected value"
-  expect typeAOk "Alice endpoint did not reach end_"
-  expect typeBOk "Bob endpoint did not reach end_"
-  expect traceOk "unexpected observable trace length"
+  -- Test 1: N=1, single protocol.
+  let (st1, _) := loadChoreography emptyState twoPartyImage
+  let st1' := runScheduled 50 1 st1
+  expect (allTerminal st1') "N=1: not all done"
+
+  -- Test 2: N=∞ (use large N), single protocol.
+  let (st2, _) := loadChoreography emptyState twoPartyImage
+  let st2' := runScheduled 50 100 st2
+  expect (allTerminal st2') "N=∞: not all done"
+
+  -- Test 3: N=1 and N=∞, multi-session, per-session traces match.
+  let (st3, sid1) := loadChoreography emptyState twoPartyImage
+  let (st4, sid2) := loadChoreography st3 twoPartyImage
+  let seq := runScheduled 100 1 st4
+  let par := runScheduled 100 100 st4
+  let seqTrace := Runtime.VM.normalizeTrace seq.obsTrace
+  let parTrace := Runtime.VM.normalizeTrace par.obsTrace
+  let seq1 := traceTags (filterBySid sid1 seqTrace)
+  let par1 := traceTags (filterBySid sid1 parTrace)
+  expect (decide (seq1 = par1)) "session 1 traces differ"
+  let seq2 := traceTags (filterBySid sid2 seqTrace)
+  let par2 := traceTags (filterBySid sid2 parTrace)
+  expect (decide (seq2 = par2)) "session 2 traces differ"

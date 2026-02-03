@@ -7,13 +7,13 @@
 // the choreography compilation pipeline.
 
 use proc_macro2::{Ident, Span};
+use std::collections::HashMap;
 use telltale_choreography::ast::{
     Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, ProtocolAnnotation, Role,
 };
 use telltale_choreography::compiler::{
     generate_choreography_code_with_namespacing, parse_choreography_str,
 };
-use std::collections::HashMap;
 
 // Helper to create identifiers
 fn ident(s: &str) -> Ident {

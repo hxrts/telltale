@@ -16,6 +16,22 @@
 //! - **Loader** ([`loader`]): dynamic choreography loading with validation
 //! - **Compiler** ([`compiler`]): compile `LocalTypeR` to bytecode
 //!
+//! The VM is the **single execution engine** for simulation and runtime
+//! orchestration. Higher-level systems (e.g. `telltale-simulator`) wrap the
+//! VM with deterministic middleware for network latency, faults, property
+//! monitoring, and checkpointing.
+//!
+//! **Nested simulation** is supported via [`nested::NestedVMHandler`], which
+//! allows a VM coroutine to host an inner VM for distributed or hierarchical
+//! simulations.
+//!
+//! # Effect Handler Contract
+//!
+//! The VM's [`effect::EffectHandler`] is synchronous, deterministic, and
+//! **session-local**. It must not depend on global time or shared mutable
+//! state across sessions. This is distinct from the async, typed
+//! `telltale_choreography::ChoreoHandler` used by generated choreography code.
+//!
 //! # Usage
 //!
 //! ```ignore
@@ -28,18 +44,28 @@
 //! while vm.step(&handler)? {}
 //! ```
 
+pub mod backend;
 pub mod buffer;
+pub mod clock;
 pub mod compiler;
 pub mod coroutine;
 pub mod effect;
 pub mod instr;
 pub mod loader;
+pub mod nested;
 pub mod scheduler;
 pub mod session;
+#[cfg(feature = "multi-thread")]
+pub mod threaded;
 pub mod vm;
 
+pub use backend::VMBackend;
+pub use clock::SimClock;
 pub use coroutine::{CoroStatus, Coroutine, Value};
 pub use instr::Instr;
+pub use nested::NestedVMHandler;
 pub use scheduler::{SchedPolicy, Scheduler};
 pub use session::{SessionId, SessionStore};
+#[cfg(feature = "multi-thread")]
+pub use threaded::ThreadedVM;
 pub use vm::{VMConfig, VM};

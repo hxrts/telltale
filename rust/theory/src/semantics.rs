@@ -21,8 +21,8 @@
 //! - `step` ↔ Lean's `step` inductive
 //! - `ConsumeResult` ↔ Lean's `ConsumeResult` inductive
 
-use telltale_types::{GlobalType, Label, LocalTypeR};
 use std::collections::HashSet;
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Direction of a local action (send or receive).
 ///
@@ -311,7 +311,8 @@ fn local_can_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> bool 
         LocalTypeR::Send { partner, branches } => {
             if act.kind == LocalKind::Send {
                 // send_head: direct match
-                if partner == &act.partner && branches.iter().any(|(l, _vt, _)| l.name == act.label.name)
+                if partner == &act.partner
+                    && branches.iter().any(|(l, _vt, _)| l.name == act.label.name)
                 {
                     return true;
                 }

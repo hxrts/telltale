@@ -1,171 +1,62 @@
 # Lean Verification
 
-Telltale uses Lean 4 to formally verify the correctness of choreographic projection. This chapter describes what properties are proven, what remains axiomatized, and how verification integrates with the Rust implementation.
+Telltale uses Lean 4 to formalize session types, projection, and runtime models. This document summarizes what is proven, what remains axiomatized, and how the Lean tooling integrates with Rust.
 
-## Verification Strategy
+## Verified Scope
 
-The project employs a defense-in-depth approach with three layers. Core session type theory is proven in Lean. Two independent projection implementations are compared for equivalence. Randomized protocols are validated against the Lean binary. This layered approach ensures that bugs in one layer are caught by another.
+The Lean codebase defines the core session type theory and projection pipeline. The `SessionTypes` and `SessionCoTypes` libraries cover inductive and coinductive representations, along with duality and roundtrip lemmas. The `Choreography` library proves projection properties using blindness arguments to avoid projectability axioms.
 
-## What is Formally Proven
+## Axiomatized Areas
 
-The following properties have complete proofs in the `Semantics` and `Choreography` libraries:
+Several areas are still axiomatized. The main stubs live in:
 
-### Merge Operator Properties
+- `lean/Protocol/Preservation.lean` and `lean/Protocol/DeadlockFreedom.lean`
+- `lean/Protocol/Deployment/Linking.lean` and related deployment files
+- `lean/Runtime/Shim/*` for the Iris style logic shims
+- `lean/Runtime/VM/*` proof stubs for scheduler invariants
 
-The merge operator combines local types for non-participants in choices. Proofs establish reflexivity (`merge lt lt = lt`), commutativity (`merge a b = merge b a`), and associativity (`merge (merge a b) c = merge a (merge b c)`). These properties ensure that merge order does not affect projection results.
+Use the axiom inventory in `lean/CODE_MAP.md` for the complete list.
 
-### Subtyping and Ordering
+## Module Map
 
-The subtyping relation ensures projected programs conform to their specifications:
+The Lean tree is organized into top level libraries:
 
-```lean
-theorem subLabelsOf_refl (lt : LocalType) : subLabelsOf lt lt = true := by
-  unfold subLabelsOf; simp [List.all_eq_true, List.any_eq_true]
+- `SessionTypes` for inductive global and local types
+- `SessionCoTypes` for coinductive equality and bisimulation
+- `Choreography` for projection and harmony proofs
+- `Semantics` for operational rules
+- `Protocol` for buffered MPST and monitoring
+- `Runtime` for VM models and Iris shims
 
-theorem isSubsequence_refl {α} [DecidableEq α] (xs : List α) :
-  isSubsequence xs xs = true := by induction xs <;> simp [isSubsequence, *]
+See [Lean Verification Code Map](../lean/CODE_MAP.md) for file level detail.
 
-theorem isSubtype_refl (lt : LocalType) : isSubtype lt lt = true := by
-  simp [isSubtype, isSubsequence_refl]
-```
+## Rust Integration
 
-`subLabelsOf_refl` uses `all_eq_true` and `any_eq_true` to show every projected label witnesses itself. `isSubsequence_refl` and `isSubtype_refl` prove the order check is reflexive. These lemmas ensure only differences between exporter output and projection trigger failures.
+The `telltale-lean-bridge` crate exports choreographies and runs the Lean runner. The main entry points are the `lean-bridge-exporter` binary and the `telltale_runner` Lean executable.
 
-### Global Type Consumption
-
-Safe traversal lemmas for global type structures ensure projection terminates and produces valid results.
-
-## What is Axiomatized
-
-The following properties are stated as axioms but not yet proven:
-
-| Property | Description | Impact |
-|----------|-------------|--------|
-| Subject Reduction | Type preservation during execution | Safety guarantee |
-| Progress | Well-typed programs don't deadlock | Liveness guarantee |
-| Non-participant Correctness | Merging produces valid local types | Projection soundness |
-| Merge Composition | Complex merge interactions | Edge case coverage |
-
-These axioms represent the theoretical foundations that the implementation relies upon. They do not affect the correctness of tested protocol patterns, which are validated empirically against the Lean runner.
-
-## Core Lean Predicates
-
-The runner enforces three predicates for each branch:
-
-```lean
-def subLabelsOf (lt sup : LocalType) : Bool :=
-  lt.actions.all (fun a => sup.actions.any (fun b => decide (b = a)))
-
-def isSubsequence {α} [DecidableEq α] : List α → List α → Bool
-  | [], _ => true
-  | _, [] => false
-  | a :: as, b :: bs => if a = b then isSubsequence as bs else isSubsequence (a :: as) bs
-
-def isSubtype (sub sup : LocalType) : Bool :=
-  sub.actions.length <= sup.actions.length ∧ isSubsequence sub.actions sup.actions
-```
-
-- `subLabelsOf`: Symmetric label matching. Every exported action must appear in the projection.
-- `isSubsequence`: Asymmetric ordering. Exported actions must preserve projection order.
-- `isSubtype`: Combines length guard with ordering to reject reordered or extended traces.
-
-## Module Structure
-
-The Lean codebase is organized into focused modules:
-
-- **SessionTypes**: Inductive session type definitions (global types, local types, participation)
-- **SessionCoTypes**: Coinductive equality, bisimulation, duality, and observables
-- **Choreography**: Projection from global to local types, harmony proofs, blindness, erasure
-- **Semantics**: Operational semantics, typing, determinism, deadlock freedom, subject reduction
-- **Protocol**: Async buffered MPST with coherence, preservation, monitoring, deployment
-- **Runtime**: VM definition, Iris separation logic backend, resource algebras, WP rules
-
-## Features Without Lean Formalization
-
-The DSL includes features that extend beyond the formally verified core:
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| Dynamic Roles | Parameterized role arrays `R[i]` | Runtime checks only |
-| Broadcasts | One-to-many messages | Desugars to nested sends |
-| Local Choices | Non-communicating decisions | Type-checked |
-| Parallel Composition | Concurrent branches | Structural checks |
-| Protocol Extensions | Custom DSL syntax | User-defined |
-
-These features are tested but not formally proven correct.
-
-### Recursion Model
-
-The DSL uses explicit recursion with `rec` blocks and `continue` statements:
-
-**DSL syntax:**
-```
-rec Loop {
-    A -> B: Msg
-    continue Loop
-}
-```
-
-**Theory (µ-binders):**
-```
-µX. A → B: Msg. X
-```
-
-The `continue` keyword provides explicit back-references that align with the theory's `Var` constructor. Cross-validation tests verify that recursive protocols project equivalently in both implementations.
-
-## Running Verification
-
-Use the Nix shell to ensure Rust, Lean, and Lake versions match:
+The Justfile includes convenience recipes:
 
 ```bash
-nix develop --command just telltale-lean-check
+just telltale-lean-check
+just telltale-lean-check-extended
+just telltale-lean-check-failing
 ```
 
-This exports the sample choreography for Chef, SousChef, and Baker from `lean/choreo/lean-sample.choreo`, builds the Lean runner, and validates each role. Logs are written to `lean/artifacts/runner-<role>.{log,json}`.
+These recipes expect `.choreo` inputs under `lean/choreo/` and write artifacts to `lean/artifacts`. The `.choreo` inputs are not tracked in this repository, so you may need to supply them or update the recipe paths.
 
-### Extended Scenario
+## Golden Equivalence Tests
+
+There are golden comparison tests in `telltale-lean-bridge` that check Rust and Lean outputs.
 
 ```bash
-nix develop --command just telltale-lean-check-extended
+just check-golden-drift
+just test-live-equivalence
 ```
 
-Validates `lean/choreo/lean-extended.choreo` with two course cycles before dessert options.
+These commands build the Lean runner and execute the bridge tests.
 
-### Negative Testing
+## Working With Lean
 
-```bash
-nix develop --command just telltale-lean-check-failing
-```
+Lean builds use Lake with the toolchain in `lean/lean-toolchain`. Use `just lean-test` to confirm the toolchain is available before running the full recipes.
 
-Exports `lean/choreo/lean-failing.choreo` with a corrupted label. The runner exits non-zero, confirming error detection works.
-
-### Full CI Sweep
-
-```bash
-nix develop --command just ci-dry-run
-```
-
-Runs Rust fmt, clippy, tests, and all Lean verification scenarios.
-
-## Sample Choreography
-
-`lean/choreo/lean-sample.choreo` models a collaborative dinner with two meal branches (pasta, tacos) and three dessert options (cake, fruit, none). The runner checks that each branch for Chef, SousChef, and Baker is a subsequence of its projection and introduces no extra labels.
-
-## Editing Scenarios
-
-Update inputs in `lean/choreo/`. Change `--role` in the Just recipes to validate other roles. Regenerate and re-run the verification commands to test new scenarios.
-
-## Known Limitations
-
-1. **Axioms**: Safety properties (subject reduction, progress) are assumed, not proven
-2. **Recursion**: DSL implicit loops cannot be cross-validated against theory explicit µ-binders
-3. **Extensions**: Custom DSL extensions bypass formal verification
-4. **Payloads**: Type annotations on messages are not semantically verified
-5. **Coinductive round-trip**: The EQ2C round-trip proof currently assumes `ProductiveC` on the RHS; regularity alone does not imply productivity
-
-## Future Work
-
-- Prove axiomatized properties in Lean
-- Unify recursion models between DSL and theory
-- Add formal verification for broadcast desugaring
-- Extend proofs to cover parallel composition
+See [Lean-Rust Bridge](20_lean_rust_bridge.md) for the exporter format and the runner protocol.

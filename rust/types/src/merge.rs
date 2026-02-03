@@ -304,7 +304,10 @@ fn merge_recv_branches(
 
     // Add all branches from the first set
     for (label, vt, cont) in branches1 {
-        result.insert(label.name.clone(), (label.clone(), vt.clone(), cont.clone()));
+        result.insert(
+            label.name.clone(),
+            (label.clone(), vt.clone(), cont.clone()),
+        );
     }
 
     // Union with branches from the second set
@@ -324,7 +327,10 @@ fn merge_recv_branches(
             result.insert(label.name.clone(), (label.clone(), vt.clone(), merged_cont));
         } else {
             // New label - add it (this is the key difference from send merge)
-            result.insert(label.name.clone(), (label.clone(), vt.clone(), cont.clone()));
+            result.insert(
+                label.name.clone(),
+                (label.clone(), vt.clone(), cont.clone()),
+            );
         }
     }
 

@@ -7,12 +7,12 @@
 #![allow(clippy::expect_used)]
 
 use quote::format_ident;
+use std::collections::HashMap;
 use telltale_choreography::ast::{
     annotation::Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role,
     RoleParam,
 };
 use telltale_choreography::compiler::projection::{project, ProjectionError};
-use std::collections::HashMap;
 
 // Helper to create simple roles
 fn role(name: &str) -> Role {

@@ -218,14 +218,18 @@ pub fn unique_labels_local(lt: &LocalTypeR) -> bool {
             if !branches_unique_local(branches) {
                 return false;
             }
-            branches.iter().all(|(_l, _vt, cont)| unique_labels_local(cont))
+            branches
+                .iter()
+                .all(|(_l, _vt, cont)| unique_labels_local(cont))
         }
         LocalTypeR::Mu { body, .. } => unique_labels_local(body),
     }
 }
 
 /// Helper: check if all labels in a local branch list have unique names.
-fn branches_unique_local(branches: &[(Label, Option<telltale_types::ValType>, LocalTypeR)]) -> bool {
+fn branches_unique_local(
+    branches: &[(Label, Option<telltale_types::ValType>, LocalTypeR)],
+) -> bool {
     let mut seen = std::collections::HashSet::new();
     for (label, _vt, _) in branches {
         if !seen.insert(&label.name) {

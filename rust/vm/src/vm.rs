@@ -7,11 +7,14 @@
 //! - Blocking never advances type state
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::time::Duration;
 use telltale_types::LocalTypeR;
 
 use crate::buffer::{BufferConfig, EnqueueResult};
+use crate::clock::SimClock;
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, Value};
-use crate::effect::EffectHandler;
+use crate::effect::{EffectHandler, SendDecision};
 use crate::instr::{Endpoint, Instr, PC};
 use crate::loader::CodeImage;
 use crate::scheduler::{SchedPolicy, Scheduler};
@@ -30,6 +33,8 @@ pub struct VMConfig {
     pub max_coroutines: usize,
     /// Number of registers per coroutine.
     pub num_registers: u16,
+    /// Simulated time per scheduler round.
+    pub tick_duration: Duration,
 }
 
 impl Default for VMConfig {
@@ -40,6 +45,7 @@ impl Default for VMConfig {
             max_sessions: 256,
             max_coroutines: 1024,
             num_registers: 16,
+            tick_duration: Duration::from_millis(1),
         }
     }
 }
@@ -49,6 +55,8 @@ impl Default for VMConfig {
 pub enum ObsEvent {
     /// Value sent on an edge.
     Sent {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Session ID.
         session: SessionId,
         /// Sender role.
@@ -60,6 +68,8 @@ pub enum ObsEvent {
     },
     /// Value received on an edge.
     Received {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Session ID.
         session: SessionId,
         /// Sender role.
@@ -71,6 +81,8 @@ pub enum ObsEvent {
     },
     /// Session opened.
     Opened {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Session ID.
         session: SessionId,
         /// Participating roles.
@@ -78,16 +90,22 @@ pub enum ObsEvent {
     },
     /// Session closed.
     Closed {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Session ID.
         session: SessionId,
     },
     /// Coroutine halted.
     Halted {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Coroutine ID.
         coro_id: usize,
     },
     /// Effect handler invoked.
     Invoked {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Coroutine ID.
         coro_id: usize,
         /// Role name.
@@ -95,6 +113,8 @@ pub enum ObsEvent {
     },
     /// Coroutine faulted.
     Faulted {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
         /// Coroutine ID.
         coro_id: usize,
         /// The fault.
@@ -142,6 +162,12 @@ pub enum VMError {
     /// Effect handler error.
     #[error("effect handler error: {0}")]
     HandlerError(String),
+    /// Invalid concurrency parameter.
+    #[error("invalid concurrency level: {n}")]
+    InvalidConcurrency {
+        /// Requested concurrency.
+        n: usize,
+    },
 }
 
 // ---- StepPack: atomic instruction result (matches Lean StepPack) ----
@@ -178,7 +204,10 @@ fn resolve_type_update(
 ) -> (LocalTypeR, Option<(Endpoint, TypeUpdate)>) {
     let (resolved, new_scope) = unfold_if_var_with_scope(cont, original);
     let update = if let Some(mu) = new_scope {
-        Some((ep.clone(), TypeUpdate::AdvanceWithOriginal(resolved.clone(), mu)))
+        Some((
+            ep.clone(),
+            TypeUpdate::AdvanceWithOriginal(resolved.clone(), mu),
+        ))
     } else {
         Some((ep.clone(), TypeUpdate::Advance(resolved.clone())))
     };
@@ -215,19 +244,23 @@ enum ExecOutcome {
 /// Manages coroutines, sessions (which own type state), and a scheduler.
 /// Multiple choreographies can be loaded into a single VM, each in its
 /// own session namespace — justified by separation logic.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VM {
     config: VMConfig,
     coroutines: Vec<Coroutine>,
     sessions: SessionStore,
     scheduler: Scheduler,
     trace: Vec<ObsEvent>,
+    clock: SimClock,
     next_coro_id: usize,
+    paused_roles: BTreeSet<String>,
 }
 
 impl VM {
     /// Create a new VM with the given configuration.
     #[must_use]
     pub fn new(config: VMConfig) -> Self {
+        let tick_duration = config.tick_duration;
         let scheduler = Scheduler::new(config.sched_policy.clone());
         Self {
             config,
@@ -235,7 +268,9 @@ impl VM {
             sessions: SessionStore::new(),
             scheduler,
             trace: Vec::new(),
+            clock: SimClock::new(tick_duration),
             next_coro_id: 0,
+            paused_roles: BTreeSet::new(),
         }
     }
 
@@ -263,6 +298,7 @@ impl VM {
         );
 
         self.trace.push(ObsEvent::Opened {
+            tick: self.clock.tick,
             session: sid,
             roles: roles.clone(),
         });
@@ -298,50 +334,122 @@ impl VM {
         Ok(sid)
     }
 
-    /// Execute one scheduler step: pick a coroutine, run one instruction.
+    /// Execute one scheduler round: advance up to N ready coroutines.
     ///
     /// # Errors
     ///
     /// Returns a `VMError` if a coroutine faults.
-    pub fn step(&mut self, handler: &dyn EffectHandler) -> Result<StepResult, VMError> {
+    pub fn step_round(
+        &mut self,
+        handler: &dyn EffectHandler,
+        n: usize,
+    ) -> Result<StepResult, VMError> {
+        if n == 0 {
+            return Err(VMError::InvalidConcurrency { n });
+        }
+        self.clock.advance();
         if self.coroutines.iter().all(|c| c.is_terminal()) {
             return Ok(StepResult::AllDone);
         }
 
         self.try_unblock_receivers();
 
-        let coro_id = match self.scheduler.schedule() {
-            Some(id) => id,
-            None => return Ok(StepResult::Stuck),
-        };
+        let mut progressed = false;
+        for _ in 0..n {
+            if self.coroutines.iter().all(|c| c.is_terminal()) {
+                return Ok(StepResult::AllDone);
+            }
 
-        let result = self.exec_instr(coro_id, handler);
+            let mut coro_id = None;
+            let mut attempts = self.scheduler.ready_count();
+            while attempts > 0 {
+                attempts -= 1;
+                let next_id = match self.scheduler.schedule() {
+                    Some(id) => id,
+                    None => break,
+                };
+                let idx = self.coro_index(next_id);
+                if self.paused_roles.contains(&self.coroutines[idx].role) {
+                    self.scheduler.reschedule(next_id);
+                    continue;
+                }
+                coro_id = Some(next_id);
+                break;
+            }
 
-        match result {
-            Ok(ExecOutcome::Continue) => {
-                self.scheduler.reschedule(coro_id);
-                Ok(StepResult::Continue)
-            }
-            Ok(ExecOutcome::Blocked(reason)) => {
-                self.scheduler.mark_blocked(coro_id, reason);
-                Ok(StepResult::Continue)
-            }
-            Ok(ExecOutcome::Halted) => {
-                self.scheduler.mark_done(coro_id);
-                self.trace.push(ObsEvent::Halted { coro_id });
-                Ok(StepResult::Continue)
-            }
-            Err(fault) => {
-                self.trace.push(ObsEvent::Faulted {
-                    coro_id,
-                    fault: fault.clone(),
-                });
-                let idx = self.coro_index(coro_id);
-                self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
-                self.scheduler.mark_done(coro_id);
-                Err(VMError::Fault { coro_id, fault })
+            let Some(coro_id) = coro_id else {
+                break;
+            };
+
+            let result = self.exec_instr(coro_id, handler);
+
+            match result {
+                Ok(ExecOutcome::Continue) => {
+                    progressed = true;
+                    self.scheduler.reschedule(coro_id);
+                }
+                Ok(ExecOutcome::Blocked(reason)) => {
+                    progressed = true;
+                    self.scheduler.mark_blocked(coro_id, reason);
+                }
+                Ok(ExecOutcome::Halted) => {
+                    progressed = true;
+                    self.scheduler.mark_done(coro_id);
+                    self.trace.push(ObsEvent::Halted {
+                        tick: self.clock.tick,
+                        coro_id,
+                    });
+                }
+                Err(fault) => {
+                    self.trace.push(ObsEvent::Faulted {
+                        tick: self.clock.tick,
+                        coro_id,
+                        fault: fault.clone(),
+                    });
+                    let idx = self.coro_index(coro_id);
+                    self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
+                    self.scheduler.mark_done(coro_id);
+                    return Err(VMError::Fault { coro_id, fault });
+                }
             }
         }
+
+        if progressed {
+            Ok(StepResult::Continue)
+        } else {
+            Ok(StepResult::Stuck)
+        }
+    }
+
+    /// Execute one scheduler step: pick a coroutine, run one instruction.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if a coroutine faults.
+    pub fn step(&mut self, handler: &dyn EffectHandler) -> Result<StepResult, VMError> {
+        self.step_round(handler, 1)
+    }
+
+    /// Run the VM until all coroutines complete or an error occurs, with concurrency N.
+    ///
+    /// `max_rounds` prevents infinite loops.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `VMError` if any coroutine faults.
+    pub fn run_concurrent(
+        &mut self,
+        handler: &dyn EffectHandler,
+        max_rounds: usize,
+        concurrency: usize,
+    ) -> Result<(), VMError> {
+        for _ in 0..max_rounds {
+            match self.step_round(handler, concurrency)? {
+                StepResult::AllDone | StepResult::Stuck => return Ok(()),
+                StepResult::Continue => {}
+            }
+        }
+        Ok(())
     }
 
     /// Run the VM until all coroutines complete or an error occurs.
@@ -351,24 +459,26 @@ impl VM {
     /// # Errors
     ///
     /// Returns a `VMError` if any coroutine faults.
-    pub fn run(
-        &mut self,
-        handler: &dyn EffectHandler,
-        max_steps: usize,
-    ) -> Result<(), VMError> {
-        for _ in 0..max_steps {
-            match self.step(handler)? {
-                StepResult::AllDone | StepResult::Stuck => return Ok(()),
-                StepResult::Continue => {}
-            }
-        }
-        Ok(())
+    pub fn run(&mut self, handler: &dyn EffectHandler, max_steps: usize) -> Result<(), VMError> {
+        self.run_concurrent(handler, max_steps, 1)
     }
 
     /// Get the observable trace.
     #[must_use]
     pub fn trace(&self) -> &[ObsEvent] {
         &self.trace
+    }
+
+    /// Access the simulation clock.
+    #[must_use]
+    pub fn clock(&self) -> &SimClock {
+        &self.clock
+    }
+
+    /// Whether all coroutines are terminal (done or faulted).
+    #[must_use]
+    pub fn all_done(&self) -> bool {
+        self.coroutines.iter().all(|c| c.is_terminal())
     }
 
     /// Get a coroutine by ID.
@@ -402,6 +512,57 @@ impl VM {
         &mut self.sessions
     }
 
+    /// Inject a message directly into a session buffer.
+    ///
+    /// Used by simulation middleware (network/fault injection) to deliver
+    /// in-flight messages without executing a VM send instruction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session does not exist.
+    pub fn inject_message(
+        &mut self,
+        sid: SessionId,
+        from: &str,
+        to: &str,
+        value: Value,
+    ) -> Result<EnqueueResult, VMError> {
+        let session = self
+            .sessions
+            .get_mut(sid)
+            .ok_or(VMError::SessionNotFound(sid))?;
+        session
+            .send(from, to, value)
+            .map_err(|_| VMError::SessionNotFound(sid))
+    }
+
+    /// Access all coroutines.
+    #[must_use]
+    pub fn coroutines(&self) -> &[Coroutine] {
+        &self.coroutines
+    }
+
+    /// Pause execution for all coroutines of a role.
+    pub fn pause_role(&mut self, role: &str) {
+        self.paused_roles.insert(role.to_string());
+    }
+
+    /// Resume execution for all coroutines of a role.
+    pub fn resume_role(&mut self, role: &str) {
+        self.paused_roles.remove(role);
+    }
+
+    /// Replace the paused role set.
+    pub fn set_paused_roles(&mut self, roles: &BTreeSet<String>) {
+        self.paused_roles = roles.clone();
+    }
+
+    /// Access paused roles.
+    #[must_use]
+    pub fn paused_roles(&self) -> &BTreeSet<String> {
+        &self.paused_roles
+    }
+
     // ---- Private ----
 
     fn coro_index(&self, id: usize) -> usize {
@@ -415,16 +576,17 @@ impl VM {
     fn try_unblock_receivers(&mut self) {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {
+            let idx = self.coro_index(coro_id);
+            let role = &self.coroutines[idx].role;
+            if self.paused_roles.contains(role) {
+                continue;
+            }
             let reason = self.scheduler.block_reason(coro_id).cloned();
             if let Some(BlockReason::RecvWait { endpoint }) = reason {
                 if let Some(session) = self.sessions.get(endpoint.sid) {
-                    let has_msg = session
-                        .roles
-                        .iter()
-                        .any(|sender| {
-                            sender != &endpoint.role
-                                && session.has_message(sender, &endpoint.role)
-                        });
+                    let has_msg = session.roles.iter().any(|sender| {
+                        sender != &endpoint.role && session.has_message(sender, &endpoint.role)
+                    });
                     if has_msg {
                         self.scheduler.unblock(coro_id);
                     }
@@ -500,7 +662,7 @@ impl VM {
                 }
             }
             Instr::Choose { label, target, .. } => {
-                self.step_choose(idx, &ep, &role, sid, &label, target)?
+                self.step_choose(idx, &ep, &role, sid, &label, target, handler)?
             }
             Instr::Offer { chan, ref table } => {
                 self.step_offer(idx, &ep, &role, sid, chan, table, handler)?
@@ -509,7 +671,7 @@ impl VM {
             Instr::Open {
                 ref roles,
                 ref endpoints,
-            } => self.step_open(idx, roles, endpoints)?
+            } => self.step_open(idx, roles, endpoints)?,
         };
 
         // 3. Commit atomically.
@@ -550,27 +712,33 @@ impl VM {
         };
 
         // Extract continuation (L') from first branch.
-        let (label, _vt, continuation) = branches.first().ok_or_else(|| Fault::TypeViolation {
-            message: format!("{role}: send has no branches"),
-        })?.clone();
+        let (label, _vt, continuation) = branches
+            .first()
+            .ok_or_else(|| Fault::TypeViolation {
+                message: format!("{role}: send has no branches"),
+            })?
+            .clone();
 
-        // Compute payload via handler.
+        // Compute payload/decision via handler.
         let coro = &self.coroutines[coro_idx];
-        let payload = handler
-            .handle_send(role, &partner, &label.name, &coro.regs)
+        let decision = handler
+            .send_decision(sid, role, &partner, &label.name, &coro.regs, None)
             .map_err(|e| Fault::InvokeFault { message: e })?;
 
-        // Enqueue into buffer.
+        // Enqueue into buffer (if delivered).
         let session = self
             .sessions
             .get_mut(sid)
             .ok_or_else(|| Fault::ChannelClosed {
                 endpoint: ep.clone(),
             })?;
-        match session
-            .send(role, &partner, payload)
-            .map_err(|e| Fault::InvokeFault { message: e })?
-        {
+        let enqueue = match decision {
+            SendDecision::Deliver(payload) => session
+                .send(role, &partner, payload)
+                .map_err(|e| Fault::InvokeFault { message: e })?,
+            SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
+        };
+        match enqueue {
             EnqueueResult::Ok => {}
             EnqueueResult::WouldBlock => {
                 // Block — NO type advancement.
@@ -591,16 +759,14 @@ impl VM {
         }
 
         // Success: resolve continuation and advance type.
-        let original = self
-            .sessions
-            .original_type(ep)
-            .unwrap_or(&LocalTypeR::End);
+        let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
             type_update,
             events: vec![ObsEvent::Sent {
+                tick: self.clock.tick,
                 session: sid,
                 from: role.to_string(),
                 to: partner,
@@ -640,9 +806,12 @@ impl VM {
             }
         };
 
-        let (label, _vt, continuation) = branches.first().ok_or_else(|| Fault::TypeViolation {
-            message: format!("{role}: recv has no branches"),
-        })?.clone();
+        let (label, _vt, continuation) = branches
+            .first()
+            .ok_or_else(|| Fault::TypeViolation {
+                message: format!("{role}: recv has no branches"),
+            })?
+            .clone();
 
         // Try dequeue.
         let session = self.sessions.get(sid).ok_or_else(|| Fault::ChannelClosed {
@@ -679,19 +848,14 @@ impl VM {
             .map_err(|e| Fault::InvokeFault { message: e })?;
 
         // Resolve continuation and advance type.
-        let original = self
-            .sessions
-            .original_type(ep)
-            .unwrap_or(&LocalTypeR::End);
+        let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
         Ok(StepPack {
-            coro_update: CoroUpdate::AdvancePcWriteReg {
-                reg: dst_reg,
-                val,
-            },
+            coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst_reg, val },
             type_update,
             events: vec![ObsEvent::Received {
+                tick: self.clock.tick,
                 session: sid,
                 from: partner,
                 to: role.to_string(),
@@ -731,6 +895,7 @@ impl VM {
             coro_update: CoroUpdate::AdvancePc,
             type_update: None,
             events: vec![ObsEvent::Invoked {
+                tick: self.clock.tick,
                 coro_id,
                 role: role.to_string(),
             }],
@@ -743,12 +908,13 @@ impl VM {
     /// advance type to that branch's continuation → jump to target PC.
     fn step_choose(
         &mut self,
-        _coro_idx: usize,
+        coro_idx: usize,
         ep: &Endpoint,
         role: &str,
         sid: SessionId,
         label: &str,
         target: PC,
+        handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
         let local_type = self
             .sessions
@@ -778,17 +944,30 @@ impl VM {
             })?
             .clone();
 
-        // Enqueue the label to the buffer.
+        // Enqueue the label to the buffer (with middleware decision).
+        let decision = handler
+            .send_decision(
+                sid,
+                role,
+                &partner,
+                label,
+                &self.coroutines[coro_idx].regs,
+                Some(Value::Label(label.to_string())),
+            )
+            .map_err(|e| Fault::InvokeFault { message: e })?;
         let session = self
             .sessions
             .get_mut(sid)
             .ok_or_else(|| Fault::ChannelClosed {
                 endpoint: ep.clone(),
             })?;
-        match session
-            .send(role, &partner, Value::Label(label.to_string()))
-            .map_err(|e| Fault::InvokeFault { message: e })?
-        {
+        let enqueue = match decision {
+            SendDecision::Deliver(payload) => session
+                .send(role, &partner, payload)
+                .map_err(|e| Fault::InvokeFault { message: e })?,
+            SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
+        };
+        match enqueue {
             EnqueueResult::Ok => {}
             EnqueueResult::WouldBlock => {
                 return Ok(StepPack {
@@ -807,16 +986,14 @@ impl VM {
             EnqueueResult::Dropped => {}
         }
 
-        let original = self
-            .sessions
-            .original_type(ep)
-            .unwrap_or(&LocalTypeR::End);
+        let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::SetPc(target),
             type_update,
             events: vec![ObsEvent::Sent {
+                tick: self.clock.tick,
                 session: sid,
                 from: role.to_string(),
                 to: partner,
@@ -904,10 +1081,7 @@ impl VM {
                         label: label.clone(),
                     })?;
 
-                let original = self
-                    .sessions
-                    .original_type(ep)
-                    .unwrap_or(&LocalTypeR::End);
+                let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
                 let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
                 // Write received value to dst register.
@@ -917,6 +1091,7 @@ impl VM {
                     coro_update: CoroUpdate::SetPc(target_pc),
                     type_update,
                     events: vec![ObsEvent::Received {
+                        tick: self.clock.tick,
                         session: sid,
                         from: partner,
                         to: role.to_string(),
@@ -960,17 +1135,30 @@ impl VM {
                         label: label.clone(),
                     })?;
 
-                // Enqueue label to buffer.
+                // Enqueue label to buffer (with middleware decision).
+                let decision = handler
+                    .send_decision(
+                        sid,
+                        role,
+                        &partner,
+                        &label,
+                        &self.coroutines[coro_idx].regs,
+                        Some(Value::Label(label.clone())),
+                    )
+                    .map_err(|e| Fault::InvokeFault { message: e })?;
                 let session = self
                     .sessions
                     .get_mut(sid)
                     .ok_or_else(|| Fault::ChannelClosed {
                         endpoint: ep.clone(),
                     })?;
-                match session
-                    .send(role, &partner, Value::Label(label.clone()))
-                    .map_err(|e| Fault::InvokeFault { message: e })?
-                {
+                let enqueue = match decision {
+                    SendDecision::Deliver(payload) => session
+                        .send(role, &partner, payload)
+                        .map_err(|e| Fault::InvokeFault { message: e })?,
+                    SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
+                };
+                match enqueue {
                     EnqueueResult::Ok => {}
                     EnqueueResult::WouldBlock => {
                         return Ok(StepPack {
@@ -989,16 +1177,14 @@ impl VM {
                     EnqueueResult::Dropped => {}
                 }
 
-                let original = self
-                    .sessions
-                    .original_type(ep)
-                    .unwrap_or(&LocalTypeR::End);
+                let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
                 let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
 
                 Ok(StepPack {
                     coro_update: CoroUpdate::SetPc(target_pc),
                     type_update,
                     events: vec![ObsEvent::Sent {
+                        tick: self.clock.tick,
                         session: sid,
                         from: role.to_string(),
                         to: partner,
@@ -1021,7 +1207,10 @@ impl VM {
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
             type_update: Some((ep.clone(), TypeUpdate::Remove)),
-            events: vec![ObsEvent::Closed { session: sid }],
+            events: vec![ObsEvent::Closed {
+                tick: self.clock.tick,
+                session: sid,
+            }],
         })
     }
 
@@ -1042,6 +1231,7 @@ impl VM {
             coro_update: CoroUpdate::AdvancePc,
             type_update: None,
             events: vec![ObsEvent::Opened {
+                tick: self.clock.tick,
                 session: sid,
                 roles: roles.to_vec(),
             }],
@@ -1049,11 +1239,7 @@ impl VM {
     }
 
     /// Commit a `StepPack` atomically: apply coroutine update, type update, events.
-    fn commit_pack(
-        &mut self,
-        coro_idx: usize,
-        pack: StepPack,
-    ) -> Result<ExecOutcome, Fault> {
+    fn commit_pack(&mut self, coro_idx: usize, pack: StepPack) -> Result<ExecOutcome, Fault> {
         let coro = &mut self.coroutines[coro_idx];
 
         // Apply coroutine update.
@@ -1150,11 +1336,7 @@ mod tests {
                 .ok_or_else(|| "no labels available".into())
         }
 
-        fn step(
-            &self,
-            _role: &str,
-            _state: &mut Vec<Value>,
-        ) -> Result<(), String> {
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
             Ok(())
         }
     }
@@ -1181,12 +1363,7 @@ mod tests {
     #[test]
     fn test_vm_simple_send_recv() {
         let local_types = simple_send_recv_types();
-        let global = GlobalType::send(
-            "A",
-            "B",
-            Label::new("msg"),
-            GlobalType::End,
-        );
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
         let mut vm = VM::new(VMConfig::default());
@@ -1257,7 +1434,10 @@ mod tests {
         vm.run(&handler, 200).unwrap();
 
         // Should not fault — recursive protocol with blocking should work.
-        assert!(vm.coroutines.iter().all(|c| !matches!(c.status, CoroStatus::Faulted(_))));
+        assert!(vm
+            .coroutines
+            .iter()
+            .all(|c| !matches!(c.status, CoroStatus::Faulted(_))));
     }
 
     #[test]
@@ -1400,8 +1580,14 @@ mod tests {
         assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
 
         // Verify events include Sent (from Choose) and Received (from Offer).
-        let sent = vm.trace.iter().any(|e| matches!(e, ObsEvent::Sent { label, .. } if label == "yes"));
-        let recv = vm.trace.iter().any(|e| matches!(e, ObsEvent::Received { label, .. } if label == "yes"));
+        let sent = vm
+            .trace
+            .iter()
+            .any(|e| matches!(e, ObsEvent::Sent { label, .. } if label == "yes"));
+        let recv = vm
+            .trace
+            .iter()
+            .any(|e| matches!(e, ObsEvent::Received { label, .. } if label == "yes"));
         assert!(sent, "expected Sent event with label 'yes'");
         assert!(recv, "expected Received event with label 'yes'");
     }
@@ -1412,21 +1598,11 @@ mod tests {
         let mut local_types = BTreeMap::new();
         local_types.insert(
             "A".to_string(),
-            LocalTypeR::send_choice(
-                "B",
-                vec![
-                    (Label::new("go"), None, LocalTypeR::End),
-                ],
-            ),
+            LocalTypeR::send_choice("B", vec![(Label::new("go"), None, LocalTypeR::End)]),
         );
         local_types.insert(
             "B".to_string(),
-            LocalTypeR::recv_choice(
-                "A",
-                vec![
-                    (Label::new("go"), None, LocalTypeR::End),
-                ],
-            ),
+            LocalTypeR::recv_choice("A", vec![(Label::new("go"), None, LocalTypeR::End)]),
         );
 
         let global = GlobalType::send("A", "B", Label::new("go"), GlobalType::End);
@@ -1517,7 +1693,11 @@ mod tests {
         vm.run(&handler, 100).unwrap();
 
         assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
-        let closed_count = vm.trace.iter().filter(|e| matches!(e, ObsEvent::Closed { .. })).count();
+        let closed_count = vm
+            .trace
+            .iter()
+            .filter(|e| matches!(e, ObsEvent::Closed { .. }))
+            .count();
         assert!(closed_count >= 1, "expected at least one Closed event");
     }
 
@@ -1640,10 +1820,7 @@ mod tests {
         let b_code = vec![
             Instr::Offer {
                 chan: 0,
-                table: vec![
-                    ("continue".into(), 1),
-                    ("stop".into(), 3),
-                ],
+                table: vec![("continue".into(), 1), ("stop".into(), 3)],
             },
             // continue branch: Recv data, then loop back to Offer
             Instr::Recv { chan: 0, dst: 1 },
@@ -1728,7 +1905,9 @@ mod tests {
         // Don't unwrap — just run to completion
         vm.run(&handler, 500).unwrap_or(());
 
-        let faults: Vec<_> = vm.trace.iter()
+        let faults: Vec<_> = vm
+            .trace
+            .iter()
             .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
             .collect();
         assert!(faults.is_empty(), "faults: {faults:?}");

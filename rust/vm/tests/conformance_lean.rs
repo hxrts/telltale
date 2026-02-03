@@ -1,8 +1,5 @@
 //! Named Lean theorem conformance tests.
-#![allow(
-    clippy::needless_collect,
-    clippy::let_underscore_must_use
-)]
+#![allow(clippy::needless_collect, clippy::let_underscore_must_use)]
 //!
 //! Each test maps to a specific Lean definition/theorem from the
 //! `lean/Runtime/VM/` specification files.
@@ -36,12 +33,24 @@ fn test_lean_session_coherent() {
 
     let handler = PassthroughHandler;
 
-    let ep_a = Endpoint { sid, role: "A".into() };
-    let ep_b = Endpoint { sid, role: "B".into() };
+    let ep_a = Endpoint {
+        sid,
+        role: "A".into(),
+    };
+    let ep_b = Endpoint {
+        sid,
+        role: "B".into(),
+    };
 
     // Before execution: A has Send, B has Recv.
-    assert_matches!(vm.sessions().lookup_type(&ep_a), Some(LocalTypeR::Send { .. }));
-    assert_matches!(vm.sessions().lookup_type(&ep_b), Some(LocalTypeR::Recv { .. }));
+    assert_matches!(
+        vm.sessions().lookup_type(&ep_a),
+        Some(LocalTypeR::Send { .. })
+    );
+    assert_matches!(
+        vm.sessions().lookup_type(&ep_b),
+        Some(LocalTypeR::Recv { .. })
+    );
 
     // Run to completion.
     vm.run(&handler, 100).unwrap();
@@ -62,8 +71,14 @@ fn test_lean_session_ns_disjoint() {
     let sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
-    let ep1 = Endpoint { sid: sid1, role: "A".into() };
-    let ep2 = Endpoint { sid: sid2, role: "A".into() };
+    let ep1 = Endpoint {
+        sid: sid1,
+        role: "A".into(),
+    };
+    let ep2 = Endpoint {
+        sid: sid2,
+        role: "A".into(),
+    };
 
     // Both have Send types but in separate namespaces.
     assert!(vm.sessions().lookup_type(&ep1).is_some());
@@ -153,10 +168,22 @@ fn test_lean_transport_fifo() {
 
     for event in vm.trace() {
         match event {
-            ObsEvent::Sent { session, from, to, label } if *session == sid && from == "A" && to == "B" => {
+            ObsEvent::Sent {
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *session == sid && from == "A" && to == "B" => {
                 sent_order.push(label.clone());
             }
-            ObsEvent::Received { session, from, to, label } if *session == sid && from == "A" && to == "B" => {
+            ObsEvent::Received {
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *session == sid && from == "A" && to == "B" => {
                 recv_order.push(label.clone());
             }
             _ => {}
@@ -180,12 +207,16 @@ fn test_lean_transport_no_dup() {
     let handler = PassthroughHandler;
     vm.run(&handler, 100).unwrap();
 
-    let sent_count = vm.trace().iter().filter(|e| {
-        matches!(e, ObsEvent::Sent { session, .. } if *session == sid)
-    }).count();
-    let recv_count = vm.trace().iter().filter(|e| {
-        matches!(e, ObsEvent::Received { session, .. } if *session == sid)
-    }).count();
+    let sent_count = vm
+        .trace()
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Sent { session, .. } if *session == sid))
+        .count();
+    let recv_count = vm
+        .trace()
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Received { session, .. } if *session == sid))
+        .count();
 
     assert!(recv_count <= sent_count, "more receives than sends");
 }
@@ -206,10 +237,22 @@ fn test_lean_transport_no_create() {
 
     for event in vm.trace() {
         match event {
-            ObsEvent::Sent { session, from, to, label } if *session == sid => {
+            ObsEvent::Sent {
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *session == sid => {
                 sent_edges.push((from.clone(), to.clone(), label.clone()));
             }
-            ObsEvent::Received { session, from, to, label } if *session == sid => {
+            ObsEvent::Received {
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *session == sid => {
                 recv_edges.push((from.clone(), to.clone(), label.clone()));
             }
             _ => {}
@@ -218,10 +261,7 @@ fn test_lean_transport_no_create() {
 
     // Every received edge must have a matching sent edge.
     for r in &recv_edges {
-        assert!(
-            sent_edges.contains(r),
-            "received without prior send: {r:?}"
-        );
+        assert!(sent_edges.contains(r), "received without prior send: {r:?}");
     }
 }
 
@@ -302,7 +342,11 @@ fn test_lean_monitor_sound_send() {
     let handler = PassthroughHandler;
     vm.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm.trace().iter().filter(|e| matches!(e, ObsEvent::Faulted { .. })).collect();
+    let faults: Vec<_> = vm
+        .trace()
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
+        .collect();
     assert!(faults.is_empty());
 }
 
@@ -317,7 +361,11 @@ fn test_lean_monitor_sound_recv() {
     let handler = PassthroughHandler;
     vm.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm.trace().iter().filter(|e| matches!(e, ObsEvent::Faulted { .. })).collect();
+    let faults: Vec<_> = vm
+        .trace()
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
+        .collect();
     assert!(faults.is_empty());
 }
 
@@ -332,7 +380,11 @@ fn test_lean_monitor_sound_choose() {
     let handler = PassthroughHandler;
     vm.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm.trace().iter().filter(|e| matches!(e, ObsEvent::Faulted { .. })).collect();
+    let faults: Vec<_> = vm
+        .trace()
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
+        .collect();
     assert!(faults.is_empty());
 }
 
@@ -347,7 +399,11 @@ fn test_lean_monitor_sound_offer() {
     let handler = PassthroughHandler;
     vm.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm.trace().iter().filter(|e| matches!(e, ObsEvent::Faulted { .. })).collect();
+    let faults: Vec<_> = vm
+        .trace()
+        .iter()
+        .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
+        .collect();
     assert!(faults.is_empty());
 }
 
@@ -397,10 +453,22 @@ fn test_lean_fifo_consistency() {
 
     for event in vm.trace() {
         match event {
-            ObsEvent::Sent { session, from, to, label } if *session == sid && from == "A" && to == "B" => {
+            ObsEvent::Sent {
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *session == sid && from == "A" && to == "B" => {
                 sent_labels.push(label.clone());
             }
-            ObsEvent::Received { session, from, to, label } if *session == sid && from == "A" && to == "B" => {
+            ObsEvent::Received {
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *session == sid && from == "A" && to == "B" => {
                 recv_labels.push(label.clone());
             }
             _ => {}
@@ -439,10 +507,22 @@ fn test_lean_no_phantom_events() {
     }
 
     // Verify we got the expected events for a simple send/recv.
-    let has_opened = vm.trace().iter().any(|e| matches!(e, ObsEvent::Opened { .. }));
-    let has_sent = vm.trace().iter().any(|e| matches!(e, ObsEvent::Sent { .. }));
-    let has_recv = vm.trace().iter().any(|e| matches!(e, ObsEvent::Received { .. }));
-    let has_halted = vm.trace().iter().any(|e| matches!(e, ObsEvent::Halted { .. }));
+    let has_opened = vm
+        .trace()
+        .iter()
+        .any(|e| matches!(e, ObsEvent::Opened { .. }));
+    let has_sent = vm
+        .trace()
+        .iter()
+        .any(|e| matches!(e, ObsEvent::Sent { .. }));
+    let has_recv = vm
+        .trace()
+        .iter()
+        .any(|e| matches!(e, ObsEvent::Received { .. }));
+    let has_halted = vm
+        .trace()
+        .iter()
+        .any(|e| matches!(e, ObsEvent::Halted { .. }));
 
     assert!(has_opened);
     assert!(has_sent);

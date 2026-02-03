@@ -53,6 +53,7 @@
 
 pub mod export;
 pub mod import;
+pub mod vm_trace;
 
 #[cfg(feature = "runner")]
 pub mod equivalence;
@@ -68,6 +69,7 @@ pub mod test_utils;
 
 pub use export::{global_to_json, local_to_json};
 pub use import::{json_to_global, json_to_local, ImportError};
+pub use vm_trace::{partition_by_session, NormalizedEvent, SessionTrace};
 
 #[cfg(feature = "runner")]
 pub use equivalence::{
@@ -76,7 +78,9 @@ pub use equivalence::{
 };
 
 #[cfg(feature = "runner")]
-pub use runner::{BranchResult, LeanRunner, LeanRunnerError, LeanValidationResult};
+pub use runner::{
+    BranchResult, ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,
+};
 
 #[cfg(feature = "runner")]
 pub use validate::{ValidationResult, Validator};

@@ -16,13 +16,12 @@ use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use telltale_types::{GlobalType, Label};
-use telltale_vm::buffer::{BoundedBuffer, BufferConfig, BufferMode, BackpressurePolicy};
+use telltale_vm::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode};
 use telltale_vm::coroutine::Value;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
 use helpers::{
-    code_image_from_global, well_formed_global_strategy,
-    FailingHandler, PassthroughHandler, SEED,
+    code_image_from_global, well_formed_global_strategy, FailingHandler, PassthroughHandler, SEED,
 };
 
 fn make_runner(cases: u32) -> TestRunner {
@@ -82,13 +81,17 @@ fn fuzz_random_protocol_compile_execute() {
 
         for event in vm.trace() {
             match event {
-                ObsEvent::Sent { from, to, label, .. } => {
+                ObsEvent::Sent {
+                    from, to, label, ..
+                } => {
                     sent_by_edge
                         .entry((from.clone(), to.clone()))
                         .or_default()
                         .push(label.clone());
                 }
-                ObsEvent::Received { from, to, label, .. } => {
+                ObsEvent::Received {
+                    from, to, label, ..
+                } => {
                     recv_by_edge
                         .entry((from.clone(), to.clone()))
                         .or_default()
@@ -249,7 +252,10 @@ fn fuzz_recursive_protocols_bounded() {
             .iter()
             .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
             .collect();
-        assert!(faults.is_empty(), "faults in recursive protocol: {faults:?}");
+        assert!(
+            faults.is_empty(),
+            "faults in recursive protocol: {faults:?}"
+        );
     }
 }
 

@@ -6,12 +6,12 @@
 //! - Collecting responses from a threshold of signers
 //! - Topology-based role constraint validation
 
+use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{LabelId, RoleId};
 use telltale_choreography::identifiers::RoleName;
 use telltale_choreography::runtime::adapter::ChoreographicAdapter;
 use telltale_choreography::runtime::test_adapter::TestAdapter;
 use telltale_choreography::topology::Topology;
-use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Role and Label Definitions

@@ -3,8 +3,8 @@
 //! This module provides functions to parse JSON (from Lean output)
 //! back into GlobalType and LocalTypeR.
 
-use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 use serde_json::Value;
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 use thiserror::Error;
 
 /// Errors that can occur during JSON import.

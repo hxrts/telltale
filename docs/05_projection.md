@@ -4,6 +4,8 @@ The projection algorithm transforms global choreographic protocols into local se
 
 ## Supported Patterns
 
+The snippets below are schematic. The AST uses `NonEmptyVec` and `Ident` values, which are omitted for readability.
+
 ### 1. Basic Send/Receive
 
 The global protocol specifies a send operation.
@@ -140,6 +142,8 @@ Alice makes a local decision.
 
 The key difference is between `LocalChoice` and `Select`. The `Select` variant indicates communicated choice where the selection is sent to another role. The `LocalChoice` variant indicates local decision with no communication.
 
+The standard DSL requires choices to start with a send from the deciding role, so `LocalChoice` does not appear in normal projections. It is available when building the AST programmatically or via extensions.
+
 ### 4. Loop with Conditions
 
 Loop conditions are preserved in the projected local types.
@@ -166,7 +170,7 @@ LocalType::Loop {
 
 The count condition is maintained.
 
-Supported conditions include `Condition::Count(n)` for fixed iteration count. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally.
+Supported conditions include `Condition::Count(n)` for fixed iteration count. Custom boolean expressions use `Condition::Custom(expr)`. Infinite loops use `None` and must be terminated externally. The AST also includes `Fuel`, `YieldAfter`, and `YieldWhen` for tooling or extensions.
 
 Note: `Condition::RoleDecides(role)` loops are desugared at parse time to a choice+recursion pattern, so they don't appear in the AST after parsing and are handled as standard `Protocol::Rec` with `Protocol::Choice` during projection.
 
@@ -244,7 +248,7 @@ Send merge requires identical label sets. A non-participant cannot choose which 
 
 Receive merge unions label sets. A non-participant can receive any message regardless of which branch was taken. Different incoming messages in different branches are combined into a single receive with multiple labels.
 
-This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `ProjectionR.lean`.
+This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `lean/Choreography/Projection/`.
 
 ### Parallel Composition
 
@@ -365,6 +369,7 @@ pub enum LocalType {
     Loop { condition, body },
     Rec { label, body },
     Var(label),
+    Timeout { duration, body },
     End,
 }
 ```
@@ -373,6 +378,6 @@ Each variant represents a different local type pattern.
 
 ### Code Generation
 
-The `generate_type_expr` function in `codegen.rs` handles all variants. This includes the new `LocalChoice` and `Loop` types. Code generation transforms local types into Rust session types.
+The `generate_type_expr` function in `codegen.rs` handles all variants. This includes `LocalChoice`, `Loop`, and `Timeout`. Code generation transforms local types into Rust session types. Timeout annotations are currently ignored in the type expression.
 
 Dynamic roles use specialized code generation via `generate_choreography_code_with_dynamic_roles`. This function includes runtime role binding. Validation occurs at choreography initialization. Generated code supports dynamic role counts.

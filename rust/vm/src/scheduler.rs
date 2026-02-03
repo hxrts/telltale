@@ -22,18 +22,12 @@ pub enum SchedPolicy {
     Cooperative,
     /// Basic multi-coroutine round-robin.
     RoundRobin,
-    /// Multi-threaded work-stealing (native only, requires `multi-thread` feature).
-    WorkStealing {
-        /// Number of worker threads.
-        workers: usize,
-    },
     /// Prefer coroutines holding progress tokens (starvation freedom).
     ProgressAware,
 }
 
-
 /// Scheduler state.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Scheduler {
     policy: SchedPolicy,
     ready_queue: VecDeque<usize>,
@@ -85,10 +79,6 @@ impl Scheduler {
         match &self.policy {
             SchedPolicy::Cooperative | SchedPolicy::RoundRobin => {
                 // Round-robin: take from front, put at back after execution.
-                self.ready_queue.pop_front()
-            }
-            SchedPolicy::WorkStealing { .. } => {
-                // Placeholder: same as round-robin for now.
                 self.ready_queue.pop_front()
             }
             SchedPolicy::ProgressAware => {
@@ -171,7 +161,15 @@ mod tests {
         sched.add_ready(0);
         sched.add_ready(1);
 
-        sched.mark_blocked(0, BlockReason::RecvWait { endpoint: Endpoint { sid: 0, role: "A".into() } });
+        sched.mark_blocked(
+            0,
+            BlockReason::RecvWait {
+                endpoint: Endpoint {
+                    sid: 0,
+                    role: "A".into(),
+                },
+            },
+        );
         assert_eq!(sched.ready_count(), 1);
         assert_eq!(sched.blocked_count(), 1);
 

@@ -9,12 +9,12 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
     handlers::recording::{RecordedEvent, RecordingHandler},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
-use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Test Role Setup

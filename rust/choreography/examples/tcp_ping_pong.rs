@@ -36,12 +36,12 @@
 //! - N bytes: message payload
 
 use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::Arc;
 use telltale_choreography::{
     topology::{Transport, TransportError, TransportResult},
     RoleName,
 };
-use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex, RwLock};

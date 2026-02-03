@@ -8,11 +8,11 @@ use futures::{
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
+use std::{error::Error, future::Future, marker, result};
 use telltale::{
     channel::{Bidirectional, Nil},
     session, try_session, End, Message, Receive, Role, Roles, Send,
 };
-use std::{error::Error, future::Future, marker, result};
 
 type Result<T> = result::Result<T, Box<dyn Error + marker::Send + Sync>>;
 

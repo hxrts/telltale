@@ -17,8 +17,8 @@ use crate::merge::can_merge;
 use crate::projection::MemoizedProjector;
 use crate::semantics::{can_step, step, GlobalAction};
 use crate::well_formedness::unique_labels;
-use telltale_types::GlobalType;
 use std::collections::HashSet;
+use telltale_types::GlobalType;
 
 /// Coherence bundle for global types.
 ///

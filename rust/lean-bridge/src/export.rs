@@ -3,8 +3,8 @@
 //! This module provides functions to convert GlobalType and LocalTypeR
 //! into JSON format that matches the Lean type definitions.
 
-use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 use serde_json::{json, Value};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
 /// Convert a GlobalType to Lean-compatible JSON.
 ///

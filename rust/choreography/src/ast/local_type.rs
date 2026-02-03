@@ -237,7 +237,11 @@ mod tests {
                 None,
                 LocalTypeR::End,
             ),
-            (Label::with_sort("data", PayloadSort::Nat), None, LocalTypeR::End),
+            (
+                Label::with_sort("data", PayloadSort::Nat),
+                None,
+                LocalTypeR::End,
+            ),
         ];
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());

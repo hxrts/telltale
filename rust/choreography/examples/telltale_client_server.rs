@@ -6,12 +6,12 @@
 // This example demonstrates a simple request-response protocol between
 // a client and server using Telltale's session-typed channels.
 
+use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
-    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, TelltaleSession, SimpleChannel},
+    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler, TelltaleSession},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Role {

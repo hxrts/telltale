@@ -7,12 +7,12 @@
 //! - Backwards compatibility
 //! - Error handling and edge cases
 
+use std::time::Instant;
 use telltale_choreography::{
     ast::*,
     compiler::{extension_parser::*, grammar::*, parser::parse_choreography_str, ProjectionError},
     extensions::*,
 };
-use std::time::Instant;
 
 // ============================================================================
 // Test Extensions for Comprehensive Testing

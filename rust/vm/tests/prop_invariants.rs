@@ -14,7 +14,7 @@ use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use std::collections::BTreeMap;
 use telltale_types::{GlobalType, Label, LocalTypeR};
-use telltale_vm::buffer::{BoundedBuffer, BufferConfig, BufferMode, BackpressurePolicy};
+use telltale_vm::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode};
 use telltale_vm::compiler::compile;
 use telltale_vm::coroutine::Value;
 use telltale_vm::instr::{Endpoint, Instr};
@@ -23,8 +23,8 @@ use telltale_vm::session::{unfold_if_var, unfold_mu};
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
 use helpers::{
-    code_image_from_global, role_pair_strategy, value_strategy,
-    well_formed_global_strategy, PassthroughHandler, SEED,
+    code_image_from_global, role_pair_strategy, value_strategy, well_formed_global_strategy,
+    PassthroughHandler, SEED,
 };
 
 fn make_runner(cases: u32) -> TestRunner {
@@ -56,10 +56,7 @@ fn prop_send_advances_to_continuation() {
         };
 
         let mut local_types = BTreeMap::new();
-        local_types.insert(
-            s.clone(),
-            lt,
-        );
+        local_types.insert(s.clone(), lt);
         local_types.insert(
             r.clone(),
             LocalTypeR::Recv {
@@ -132,7 +129,10 @@ fn prop_choose_advances_to_selected_branch() {
     vm.run(&handler, 100).unwrap();
 
     // A chose "yes", type removed after Halt.
-    let ep = Endpoint { sid, role: "A".into() };
+    let ep = Endpoint {
+        sid,
+        role: "A".into(),
+    };
     assert!(vm.sessions().lookup_type(&ep).is_none());
 }
 
@@ -145,7 +145,10 @@ fn prop_offer_advances_to_received_label() {
     let handler = PassthroughHandler;
     vm.run(&handler, 100).unwrap();
 
-    let ep = Endpoint { sid, role: "B".into() };
+    let ep = Endpoint {
+        sid,
+        role: "B".into(),
+    };
     assert!(vm.sessions().lookup_type(&ep).is_none());
 }
 
@@ -351,7 +354,10 @@ fn prop_session_type_independence() {
     let _sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
-    let ep2a = Endpoint { sid: sid2, role: "A".into() };
+    let ep2a = Endpoint {
+        sid: sid2,
+        role: "A".into(),
+    };
     let ty_before = vm.sessions().lookup_type(&ep2a).cloned();
 
     // Step only a few times (session 1 may advance).
@@ -390,7 +396,10 @@ fn prop_block_preserves_type() {
     let mut vm = VM::new(VMConfig::default());
     let sid = vm.load_choreography(&image).unwrap();
 
-    let ep_b = Endpoint { sid, role: "B".into() };
+    let ep_b = Endpoint {
+        sid,
+        role: "B".into(),
+    };
     let ty_before = vm.sessions().lookup_type(&ep_b).cloned();
 
     let handler = PassthroughHandler;

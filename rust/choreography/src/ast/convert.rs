@@ -365,9 +365,12 @@ pub fn local_types_equivalent(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
         ) => {
             p1 == p2
                 && bs1.len() == bs2.len()
-                && bs1.iter().zip(bs2.iter()).all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
-                    l1.name == l2.name && local_types_equivalent(c1, c2)
-                })
+                && bs1
+                    .iter()
+                    .zip(bs2.iter())
+                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
+                        l1.name == l2.name && local_types_equivalent(c1, c2)
+                    })
         }
 
         (
@@ -382,9 +385,12 @@ pub fn local_types_equivalent(lt1: &LocalTypeR, lt2: &LocalTypeR) -> bool {
         ) => {
             p1 == p2
                 && bs1.len() == bs2.len()
-                && bs1.iter().zip(bs2.iter()).all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
-                    l1.name == l2.name && local_types_equivalent(c1, c2)
-                })
+                && bs1
+                    .iter()
+                    .zip(bs2.iter())
+                    .all(|((l1, _vt1, c1), (l2, _vt2, c2))| {
+                        l1.name == l2.name && local_types_equivalent(c1, c2)
+                    })
         }
 
         _ => false,

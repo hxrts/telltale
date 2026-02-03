@@ -11,6 +11,9 @@
 #![allow(clippy::expect_used)]
 
 use parking_lot::Mutex;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 use telltale_choreography::effects::LabelId;
 use telltale_choreography::simulation::{
     clock::{Clock, MockClock, Rng, SeededRng},
@@ -22,9 +25,6 @@ use telltale_choreography::simulation::{
     transport::{FaultyTransport, InMemoryTransport, SimulatedTransport, TransportError},
 };
 use telltale_choreography::RoleName;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum TestLabel {

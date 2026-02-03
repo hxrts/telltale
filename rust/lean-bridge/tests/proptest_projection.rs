@@ -17,10 +17,10 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
+use serde_json::{json, Value};
 use telltale_lean_bridge::{global_to_json, local_to_json, LeanRunner};
 use telltale_theory::projection::{project, project_all};
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
-use serde_json::{json, Value};
 
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [
@@ -355,7 +355,10 @@ fn test_choice_projections_have_all_branches() {
         // Sender should see both branches in Send
         let sender_local = project(&global, &sender).expect("Sender projection should succeed");
         if let LocalTypeR::Send { branches, .. } = sender_local {
-            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches
+                .iter()
+                .map(|(l, _vt, _c)| l.name.as_str())
+                .collect();
             assert!(
                 labels.contains(&label1.as_str()) && labels.contains(&label2.as_str()),
                 "Sender should see both labels {} and {}, got {:?}",
@@ -371,7 +374,10 @@ fn test_choice_projections_have_all_branches() {
         let receiver_local =
             project(&global, &receiver).expect("Receiver projection should succeed");
         if let LocalTypeR::Recv { branches, .. } = receiver_local {
-            let labels: Vec<_> = branches.iter().map(|(l, _vt, _c)| l.name.as_str()).collect();
+            let labels: Vec<_> = branches
+                .iter()
+                .map(|(l, _vt, _c)| l.name.as_str())
+                .collect();
             assert!(
                 labels.contains(&label1.as_str()) && labels.contains(&label2.as_str()),
                 "Receiver should see both labels {} and {}, got {:?}",

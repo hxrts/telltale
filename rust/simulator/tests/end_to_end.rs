@@ -1,6 +1,6 @@
 //! End-to-end integration test: GlobalType → Lean projection → simulation → analysis.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::import::json_to_local;
@@ -9,7 +9,7 @@ use telltale_simulator::analysis;
 use telltale_simulator::hamiltonian::HamiltonianHandler;
 use telltale_simulator::ising::IsingHandler;
 use telltale_simulator::material::{HamiltonianParams, MeanFieldParams};
-use telltale_simulator::scheduler::Scheduler;
+use telltale_simulator::runner;
 use telltale_types::{GlobalType, Label, PayloadSort};
 
 /// Skip if the Lean projection binary is unavailable.
@@ -60,8 +60,7 @@ fn test_mean_field_ising_end_to_end() {
 
     let handler = IsingHandler::new(params.clone());
 
-    let mut scheduler = Scheduler::new();
-    let mut local_types = HashMap::new();
+    let mut local_types = BTreeMap::new();
     local_types.insert("A".to_string(), a_local);
     local_types.insert("B".to_string(), b_local);
 
@@ -69,10 +68,9 @@ fn test_mean_field_ising_end_to_end() {
     initial_states.insert("A".to_string(), params.initial_state.clone());
     initial_states.insert("B".to_string(), params.initial_state.clone());
 
-    scheduler.add_choreography(local_types, &initial_states);
-
     // 4. Run simulation.
-    let trace = scheduler.run(100, &handler).expect("simulation succeeds");
+    let trace =
+        runner::run(&local_types, &g, &initial_states, 100, &handler).expect("simulation succeeds");
 
     // 5. Validate.
     let equilibrium = [0.5, 0.5];
@@ -138,21 +136,25 @@ fn test_hamiltonian_2body_end_to_end() {
 
     let handler = HamiltonianHandler::new(params.clone());
 
-    let mut scheduler = Scheduler::new();
-    let mut local_types = HashMap::new();
+    let mut local_types = BTreeMap::new();
     local_types.insert("A".to_string(), a_local);
     local_types.insert("B".to_string(), b_local);
 
     // State per role: [position, momentum]
     let mut initial_states = HashMap::new();
-    initial_states.insert("A".to_string(), vec![params.initial_positions[0], params.initial_momenta[0]]);
-    initial_states.insert("B".to_string(), vec![params.initial_positions[1], params.initial_momenta[1]]);
-
-    scheduler.add_choreography(local_types, &initial_states);
+    initial_states.insert(
+        "A".to_string(),
+        vec![params.initial_positions[0], params.initial_momenta[0]],
+    );
+    initial_states.insert(
+        "B".to_string(),
+        vec![params.initial_positions[1], params.initial_momenta[1]],
+    );
 
     // 4. Run simulation. Protocol has 4 steps per cycle (2 position + 2 force exchanges).
     //    To get 250 integration steps, run 1000 scheduler ticks.
-    let trace = scheduler.run(1000, &handler).expect("simulation succeeds");
+    let trace = runner::run(&local_types, &g, &initial_states, 1000, &handler)
+        .expect("simulation succeeds");
 
     // 5. Validate energy conservation.
     let energy_check = analysis::check_energy_conservation(
@@ -161,6 +163,9 @@ fn test_hamiltonian_2body_end_to_end() {
         params.mass,
         params.spring_constant,
     );
-    eprintln!("  {}: {} - {}", energy_check.name, energy_check.passed, energy_check.message);
+    eprintln!(
+        "  {}: {} - {}",
+        energy_check.name, energy_check.passed, energy_check.message
+    );
     assert!(energy_check.passed, "energy should be conserved");
 }

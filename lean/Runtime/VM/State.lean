@@ -94,6 +94,7 @@ inductive CoroStatus (γ : Type u) where
 structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
   -- Per-coroutine execution state.
   id : CoroutineId
+  programId : Nat
   pc : PC
   regs : RegFile
   status : CoroStatus γ
@@ -129,6 +130,48 @@ inductive StepEvent (ε : Type u) [EffectModel ε] where
   -- Step events are either observable or internal.
   | obs (ev : ObsEvent ε)
   | internal
+
+/-! ## Trace helpers -/
+
+/-- Extract a session id from an observable event when present. -/
+def obsSid? {ε : Type u} [EffectModel ε] : ObsEvent ε → Option SessionId
+  | .sent edge _ _ => some edge.sid
+  | .received edge _ _ => some edge.sid
+  | .offered edge _ => some edge.sid
+  | .chose edge _ => some edge.sid
+  | .acquired _ ep => some ep.sid
+  | .released _ ep => some ep.sid
+  | .invoked ep _ => some ep.sid
+  | .opened sid _ => some sid
+  | .closed sid => some sid
+  | .epochAdvanced sid _ => some sid
+  | .transferred ep _ _ => some ep.sid
+  | .forked sid _ => some sid
+  | .joined sid => some sid
+  | .aborted sid => some sid
+  | .tagged _ => none
+  | .checked _ _ => none
+
+/-- Filter observable events by session id. -/
+def filterBySid {ε : Type u} [EffectModel ε] (sid : SessionId)
+    (trace : List (StepEvent ε)) : List (StepEvent ε) :=
+  trace.filterMap (fun ev =>
+    match ev with
+    | .obs o => if obsSid? o = some sid then some ev else none
+    | .internal => none)
+
+ /-- Normalize a VM trace by erasing tick information (currently identity). -/
+def normalizeVmTrace {ε : Type u} [EffectModel ε]
+    (trace : List (StepEvent ε)) : List (StepEvent ε) :=
+  trace
+
+namespace Runtime.VM
+
+abbrev normalizeTrace {ε : Type u} [EffectModel ε]
+    (trace : List (StepEvent ε)) : List (StepEvent ε) :=
+  normalizeVmTrace trace
+
+end Runtime.VM
 
 inductive ExecStatus (γ : Type u) where
   -- Result status of a single instruction step.
@@ -201,7 +244,8 @@ def WFVMState {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : Prop :=
-  -- Check PC bounds and session ids against the next counter.
+  -- Check PC bounds (per-coroutine program) and session ids against the next counter.
   (∀ i (h : i < st.coroutines.size),
-    (st.coroutines[i]'h).pc < st.code.code.size) ∧
+    let c := st.coroutines[i]'h
+    ∃ prog, st.programs[c.programId]? = some prog ∧ c.pc < prog.code.size) ∧
   (∀ s ∈ st.sessions, s.fst < st.nextSessionId)

@@ -133,7 +133,6 @@ private def pickRunnable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
   | .priority f => pickPriority st f
   | .roundRobin => pickRoundRobin st
   | .cooperative => pickRoundRobin st
-  | .workStealing _ => pickRoundRobin st
 
 private def dropBlocked {γ : Type u} (blocked : BlockedSet γ) (cid : CoroutineId) :
     BlockedSet γ :=
@@ -179,7 +178,10 @@ def currentInstr_coro {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
   -- Use the coroutine PC to fetch the next instruction.
   match st.coroutines[coroId]? with
   | none => none
-  | some c => st.code.code[c.pc]?
+  | some c =>
+      match st.programs[c.programId]? with
+      | none => none
+      | some prog => prog.code[c.pc]?
 
 /-- Instruction about to execute given a scheduling step. -/
 def currentInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]

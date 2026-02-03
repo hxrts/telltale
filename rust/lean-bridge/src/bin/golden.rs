@@ -23,10 +23,10 @@
 //! ```
 
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 use telltale_lean_bridge::equivalence::EquivalenceChecker;
 use telltale_lean_bridge::import::json_to_global;
 use telltale_lean_bridge::runner::LeanRunner;
-use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "golden")]

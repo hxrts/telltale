@@ -44,7 +44,7 @@ pub enum SessionStatus {
 }
 
 /// Per-endpoint type tracking: current state + original for unfolding.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypeEntry {
     /// Current local type (advances with each completed instruction).
     pub current: LocalTypeR,
@@ -56,7 +56,7 @@ pub struct TypeEntry {
 ///
 /// Stores per-endpoint local types (the type truth), message buffers,
 /// and lifecycle status. Matches Lean `SessionState`.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SessionState {
     /// Session identifier.
     pub sid: SessionId,
@@ -115,9 +115,7 @@ impl SessionState {
             from: from.to_string(),
             to: to.to_string(),
         };
-        self.buffers
-            .get(&edge)
-            .is_some_and(|buf| !buf.is_empty())
+        self.buffers.get(&edge).is_some_and(|buf| !buf.is_empty())
     }
 }
 
@@ -125,7 +123,7 @@ impl SessionState {
 ///
 /// Provides type lookup/update methods that match the Lean
 /// `SessionStore.lookupType` / `SessionStore.updateType` pattern.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SessionStore {
     sessions: BTreeMap<SessionId, SessionState>,
     next_id: SessionId,
@@ -158,10 +156,13 @@ impl SessionStore {
                     sid,
                     role: role.clone(),
                 };
-                local_types.insert(ep, TypeEntry {
-                    current: unfold_mu(lt),
-                    original: lt.clone(),
-                });
+                local_types.insert(
+                    ep,
+                    TypeEntry {
+                        current: unfold_mu(lt),
+                        original: lt.clone(),
+                    },
+                );
             }
         }
 
@@ -369,23 +370,46 @@ mod tests {
     fn test_session_open_with_types() {
         let mut store = SessionStore::new();
         let types = default_types();
-        let sid = store.open(vec!["A".into(), "B".into()], &BufferConfig::default(), &types);
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &types,
+        );
 
-        let ep_a = Endpoint { sid, role: "A".into() };
-        let ep_b = Endpoint { sid, role: "B".into() };
+        let ep_a = Endpoint {
+            sid,
+            role: "A".into(),
+        };
+        let ep_b = Endpoint {
+            sid,
+            role: "B".into(),
+        };
 
         // Types should be unfolded (mu stripped).
-        assert!(matches!(store.lookup_type(&ep_a), Some(LocalTypeR::Send { .. })));
-        assert!(matches!(store.lookup_type(&ep_b), Some(LocalTypeR::Recv { .. })));
+        assert!(matches!(
+            store.lookup_type(&ep_a),
+            Some(LocalTypeR::Send { .. })
+        ));
+        assert!(matches!(
+            store.lookup_type(&ep_b),
+            Some(LocalTypeR::Recv { .. })
+        ));
     }
 
     #[test]
     fn test_type_advance_and_unfold() {
         let mut store = SessionStore::new();
         let types = default_types();
-        let sid = store.open(vec!["A".into(), "B".into()], &BufferConfig::default(), &types);
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &types,
+        );
 
-        let ep_a = Endpoint { sid, role: "A".into() };
+        let ep_a = Endpoint {
+            sid,
+            role: "A".into(),
+        };
 
         // Get current type: Send { ... Var("step") }
         let lt = store.lookup_type(&ep_a).unwrap().clone();
@@ -401,7 +425,10 @@ mod tests {
 
         // Advance type.
         store.update_type(&ep_a, resolved);
-        assert!(matches!(store.lookup_type(&ep_a), Some(LocalTypeR::Send { .. })));
+        assert!(matches!(
+            store.lookup_type(&ep_a),
+            Some(LocalTypeR::Send { .. })
+        ));
     }
 
     #[test]
@@ -450,9 +477,16 @@ mod tests {
     fn test_remove_type() {
         let mut store = SessionStore::new();
         let types = default_types();
-        let sid = store.open(vec!["A".into(), "B".into()], &BufferConfig::default(), &types);
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &types,
+        );
 
-        let ep_a = Endpoint { sid, role: "A".into() };
+        let ep_a = Endpoint {
+            sid,
+            role: "A".into(),
+        };
         assert!(store.lookup_type(&ep_a).is_some());
 
         store.remove_type(&ep_a);

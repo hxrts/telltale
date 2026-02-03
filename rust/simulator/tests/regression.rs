@@ -3,7 +3,7 @@
 //! Runs both materials (mean-field Ising and Hamiltonian 2-body) through
 //! both Lean and Rust projection paths, verifying identical traces.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::import::json_to_local;
@@ -12,8 +12,9 @@ use telltale_simulator::analysis;
 use telltale_simulator::hamiltonian::HamiltonianHandler;
 use telltale_simulator::ising::IsingHandler;
 use telltale_simulator::material::{HamiltonianParams, MeanFieldParams};
-use telltale_simulator::scheduler::{EffectHandler, Scheduler};
+use telltale_simulator::runner;
 use telltale_simulator::trace::Trace;
+use telltale_simulator::EffectHandler;
 use telltale_theory::project;
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
@@ -31,10 +32,12 @@ fn project_lean(
     runner: &LeanRunner,
     g: &GlobalType,
     roles: &[&str],
-) -> HashMap<String, LocalTypeR> {
+) -> BTreeMap<String, LocalTypeR> {
     let json = global_to_json(g);
     let role_strings: Vec<String> = roles.iter().map(|r| (*r).to_string()).collect();
-    let projections = runner.project(&json, &role_strings).expect("Lean projection");
+    let projections = runner
+        .project(&json, &role_strings)
+        .expect("Lean projection");
     roles
         .iter()
         .map(|r| {
@@ -45,7 +48,7 @@ fn project_lean(
 }
 
 /// Project via Rust, returning local types per role.
-fn project_rust(g: &GlobalType, roles: &[&str]) -> HashMap<String, LocalTypeR> {
+fn project_rust(g: &GlobalType, roles: &[&str]) -> BTreeMap<String, LocalTypeR> {
     roles
         .iter()
         .map(|r| {
@@ -57,14 +60,13 @@ fn project_rust(g: &GlobalType, roles: &[&str]) -> HashMap<String, LocalTypeR> {
 
 /// Run a simulation and return the trace.
 fn run_sim(
-    projections: HashMap<String, LocalTypeR>,
+    global: &GlobalType,
+    projections: BTreeMap<String, LocalTypeR>,
     initial_states: &HashMap<String, Vec<f64>>,
     steps: usize,
     handler: &dyn EffectHandler,
 ) -> Trace {
-    let mut scheduler = Scheduler::new();
-    scheduler.add_choreography(projections, initial_states);
-    scheduler.run(steps, handler).expect("simulation succeeds")
+    runner::run(&projections, global, initial_states, steps, handler).expect("simulation succeeds")
 }
 
 /// Assert two traces are identical within tolerance (comparing by step+role key).
@@ -143,8 +145,8 @@ fn test_ising_lean_vs_rust_identical_traces() {
     let lean_projs = project_lean(&runner, &g, &["A", "B"]);
     let rust_projs = project_rust(&g, &["A", "B"]);
 
-    let lean_trace = run_sim(lean_projs, &initial_states, 100, &handler);
-    let rust_trace = run_sim(rust_projs, &initial_states, 100, &handler);
+    let lean_trace = run_sim(&g, lean_projs, &initial_states, 100, &handler);
+    let rust_trace = run_sim(&g, rust_projs, &initial_states, 100, &handler);
 
     assert_traces_equal(&lean_trace, &rust_trace, 1e-12);
 
@@ -152,8 +154,14 @@ fn test_ising_lean_vs_rust_identical_traces() {
     let eq = [0.5, 0.5];
     let lean_result = analysis::validate(&lean_trace, &["A", "B"], &eq);
     let rust_result = analysis::validate(&rust_trace, &["A", "B"], &eq);
-    assert!(lean_result.passed, "Lean-projected trace should pass validation");
-    assert!(rust_result.passed, "Rust-projected trace should pass validation");
+    assert!(
+        lean_result.passed,
+        "Lean-projected trace should pass validation"
+    );
+    assert!(
+        rust_result.passed,
+        "Rust-projected trace should pass validation"
+    );
 }
 
 // ============================================================================
@@ -205,8 +213,14 @@ fn test_hamiltonian_lean_vs_rust_identical_traces() {
     let params = hamiltonian_params();
 
     let mut initial_states = HashMap::new();
-    initial_states.insert("A".to_string(), vec![params.initial_positions[0], params.initial_momenta[0]]);
-    initial_states.insert("B".to_string(), vec![params.initial_positions[1], params.initial_momenta[1]]);
+    initial_states.insert(
+        "A".to_string(),
+        vec![params.initial_positions[0], params.initial_momenta[0]],
+    );
+    initial_states.insert(
+        "B".to_string(),
+        vec![params.initial_positions[1], params.initial_momenta[1]],
+    );
 
     let lean_projs = project_lean(&runner, &g, &["A", "B"]);
     let rust_projs = project_rust(&g, &["A", "B"]);
@@ -215,18 +229,30 @@ fn test_hamiltonian_lean_vs_rust_identical_traces() {
     let lean_handler = HamiltonianHandler::new(params.clone());
     let rust_handler = HamiltonianHandler::new(params.clone());
 
-    let lean_trace = run_sim(lean_projs, &initial_states, 100, &lean_handler);
-    let rust_trace = run_sim(rust_projs, &initial_states, 100, &rust_handler);
+    let lean_trace = run_sim(&g, lean_projs, &initial_states, 100, &lean_handler);
+    let rust_trace = run_sim(&g, rust_projs, &initial_states, 100, &rust_handler);
 
     assert_traces_equal(&lean_trace, &rust_trace, 1e-12);
 
     // Validate energy conservation on both traces.
     let lean_energy = analysis::check_energy_conservation(
-        &lean_trace, &["A", "B"], params.mass, params.spring_constant,
+        &lean_trace,
+        &["A", "B"],
+        params.mass,
+        params.spring_constant,
     );
     let rust_energy = analysis::check_energy_conservation(
-        &rust_trace, &["A", "B"], params.mass, params.spring_constant,
+        &rust_trace,
+        &["A", "B"],
+        params.mass,
+        params.spring_constant,
     );
-    assert!(lean_energy.passed, "Lean-projected trace should conserve energy");
-    assert!(rust_energy.passed, "Rust-projected trace should conserve energy");
+    assert!(
+        lean_energy.passed,
+        "Lean-projected trace should conserve energy"
+    );
+    assert!(
+        rust_energy.passed,
+        "Rust-projected trace should conserve energy"
+    );
 }

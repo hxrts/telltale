@@ -24,10 +24,10 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
+use std::path::PathBuf;
 use telltale_lean_bridge::equivalence::EquivalenceChecker;
 use telltale_lean_bridge::runner::LeanRunner;
 use telltale_types::{GlobalType, Label};
-use std::path::PathBuf;
 
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [

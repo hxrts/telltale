@@ -8,12 +8,12 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{ChoreographyError, LabelId, RoleId};
 use telltale_choreography::identifiers::RoleName;
 use telltale_choreography::runtime::adapter::ChoreographicAdapter;
 use telltale_choreography::runtime::test_adapter::TestAdapter;
 use telltale_choreography::topology::{RoleFamilyConstraint, Topology};
-use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Test Role and Label Setup

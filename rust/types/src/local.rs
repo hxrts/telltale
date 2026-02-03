@@ -160,14 +160,26 @@ impl LocalTypeR {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.substitute(var_name, replacement)))
+                    .map(|(l, vt, cont)| {
+                        (
+                            l.clone(),
+                            vt.clone(),
+                            cont.substitute(var_name, replacement),
+                        )
+                    })
                     .collect(),
             },
             LocalTypeR::Recv { partner, branches } => LocalTypeR::Recv {
                 partner: partner.clone(),
                 branches: branches
                     .iter()
-                    .map(|(l, vt, cont)| (l.clone(), vt.clone(), cont.substitute(var_name, replacement)))
+                    .map(|(l, vt, cont)| {
+                        (
+                            l.clone(),
+                            vt.clone(),
+                            cont.substitute(var_name, replacement),
+                        )
+                    })
                     .collect(),
             },
             LocalTypeR::Mu { var, body } => {
@@ -296,7 +308,11 @@ impl LocalTypeR {
         match self {
             LocalTypeR::End => 0,
             LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-                1 + branches.iter().map(|(_, _, t)| t.depth()).max().unwrap_or(0)
+                1 + branches
+                    .iter()
+                    .map(|(_, _, t)| t.depth())
+                    .max()
+                    .unwrap_or(0)
             }
             LocalTypeR::Mu { body, .. } => 1 + body.depth(),
             LocalTypeR::Var(_) => 0,
@@ -333,7 +349,11 @@ impl LocalTypeR {
             LocalTypeR::Var(w) => w != var,
             LocalTypeR::Send { .. } | LocalTypeR::Recv { .. } => true,
             LocalTypeR::Mu { var: t, body, .. } => {
-                if var == t { true } else { body.is_var_guarded(var) }
+                if var == t {
+                    true
+                } else {
+                    body.is_var_guarded(var)
+                }
             }
         }
     }
@@ -505,7 +525,11 @@ mod tests {
                 None,
                 LocalTypeR::End,
             ),
-            (Label::with_sort("data", PayloadSort::Nat), None, LocalTypeR::End),
+            (
+                Label::with_sort("data", PayloadSort::Nat),
+                None,
+                LocalTypeR::End,
+            ),
         ];
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());

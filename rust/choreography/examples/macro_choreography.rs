@@ -15,11 +15,11 @@
 // - Static analysis of choreographic programs
 
 use futures::executor;
+use serde::{Deserialize, Serialize};
 use telltale_choreography::{
     interpret, ChoreoResult, InterpretResult, LabelId, Metrics, NoOpHandler, Program,
     RecordingHandler, RoleId, RoleName,
 };
-use serde::{Deserialize, Serialize};
 
 // NOTE: The choreography! macro generates Telltale session types
 // For this example, we'll demonstrate the algebraic effect API directly

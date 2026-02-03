@@ -9,19 +9,57 @@ The `TelltaleHandler` provides a production-ready implementation of choreographi
 ### Basic Two-Party Protocol
 
 ```rust
-use telltale_choreography::effects::{
-    ChoreoHandler,
-    handlers::telltale::{TelltaleHandler, TelltaleEndpoint, SimpleChannel},
+use serde::{Deserialize, Serialize};
+use telltale::{Message, Role};
+use telltale_choreography::{
+    ChoreoHandler, LabelId, RoleId, RoleName, SimpleChannel, TelltaleEndpoint, TelltaleHandler,
 };
 
 // Define roles
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum Role { Alice, Bob }
+enum MyRole {
+    Alice,
+    Bob,
+}
 
-impl telltale::Role for Role {
+// Define a label type for choices (unused in this example)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum Choice {
+    Default,
+}
+
+impl LabelId for Choice {
+    fn as_str(&self) -> &'static str {
+        "Default"
+    }
+
+    fn from_str(label: &str) -> Option<Self> {
+        match label {
+            "Default" => Some(Choice::Default),
+            _ => None,
+        }
+    }
+}
+
+impl RoleId for MyRole {
+    type Label = Choice;
+
+    fn role_name(&self) -> RoleName {
+        match self {
+            MyRole::Alice => RoleName::from_static("Alice"),
+            MyRole::Bob => RoleName::from_static("Bob"),
+        }
+    }
+}
+
+impl Role for MyRole {
     type Message = MyMessage;
+
     fn seal(&mut self) {}
-    fn is_sealed(&self) -> bool { false }
+
+    fn is_sealed(&self) -> bool {
+        false
+    }
 }
 
 // Define messages
@@ -30,10 +68,11 @@ struct MyMessage {
     content: String,
 }
 
-impl telltale::Message<Box<dyn std::any::Any + Send>> for MyMessage {
+impl Message<Box<dyn std::any::Any + Send>> for MyMessage {
     fn upcast(msg: Box<dyn std::any::Any + Send>) -> Self {
         *msg.downcast::<MyMessage>().unwrap()
     }
+
     fn downcast(self) -> Result<Box<dyn std::any::Any + Send>, Self> {
         Ok(Box::new(self))
     }
@@ -42,25 +81,27 @@ impl telltale::Message<Box<dyn std::any::Any + Send>> for MyMessage {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create endpoints
-    let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
-    let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
-    
+    let mut alice_ep = TelltaleEndpoint::new(MyRole::Alice);
+    let mut bob_ep = TelltaleEndpoint::new(MyRole::Bob);
+
     // Setup channels
     let (alice_ch, bob_ch) = SimpleChannel::pair();
-    alice_ep.register_channel(Role::Bob, alice_ch);
-    bob_ep.register_channel(Role::Alice, bob_ch);
-    
+    alice_ep.register_channel(MyRole::Bob, alice_ch);
+    bob_ep.register_channel(MyRole::Alice, bob_ch);
+
     // Create handlers
-    let mut alice_handler = TelltaleHandler::<Role, MyMessage>::new();
-    let mut bob_handler = TelltaleHandler::<Role, MyMessage>::new();
-    
+    let mut alice_handler = TelltaleHandler::<MyRole, MyMessage>::new();
+    let mut bob_handler = TelltaleHandler::<MyRole, MyMessage>::new();
+
     // Send and receive
-    let msg = MyMessage { content: "Hello!".to_string() };
-    alice_handler.send(&mut alice_ep, Role::Bob, &msg).await?;
-    
-    let received: MyMessage = bob_handler.recv(&mut bob_ep, Role::Alice).await?;
+    let msg = MyMessage {
+        content: "Hello!".to_string(),
+    };
+    alice_handler.send(&mut alice_ep, MyRole::Bob, &msg).await?;
+
+    let received: MyMessage = bob_handler.recv(&mut bob_ep, MyRole::Alice).await?;
     println!("Received: {}", received.content);
-    
+
     Ok(())
 }
 ```
@@ -75,7 +116,10 @@ This example creates two endpoints and connects them with a `SimpleChannel` pair
 
 Roles represent participants in the choreography. They must implement:
 - `telltale::Role`
+- `RoleId` (from `telltale_choreography::effects`)
 - `Clone`, `Copy`, `Debug`, `PartialEq`, `Eq`, `Hash`
+
+`RoleId` requires an associated label type that implements `LabelId`. You only need labels if your protocol uses choice.
 
 ### Messages
 
@@ -93,10 +137,10 @@ Messages are the data exchanged between roles. They must:
 
 ### Channels
 
-`SimpleChannel` provides bidirectional async message passing:
+`SimpleChannel` provides bidirectional async byte passing:
 - Created in pairs: `SimpleChannel::pair()`
 - Uses mpsc unbounded channels internally
-- Automatically serializes/deserializes messages
+- The handler serializes and deserializes messages with bincode
 
 ### Handlers
 
@@ -112,7 +156,7 @@ Messages are the data exchanged between roles. They must:
 ### TelltaleEndpoint
 
 ```rust
-impl<R: Role + Eq + Hash + Clone> TelltaleEndpoint<R>
+impl<R: Role + Eq + Hash + Clone + Debug> TelltaleEndpoint<R>
 ```
 
 This shows the generic bounds required by the endpoint type.
@@ -125,7 +169,7 @@ Create a new endpoint for a role.
 
 #### Channel Management
 ```rust
-pub fn register_channel<T>(&mut self, peer: R, channel: T)
+pub fn register_channel(&mut self, peer: R, channel: SimpleChannel)
 ```
 Register a channel with a peer role.
 
@@ -190,30 +234,30 @@ Create a new handler.
 #### ChoreoHandler Implementation
 
 ```rust
-async fn send<Msg>(&mut self, ep: &mut Endpoint, to: Role, msg: &Msg) -> Result<()>
+async fn send<Msg>(&mut self, ep: &mut Endpoint, to: Role, msg: &Msg) -> ChoreoResult<()>
 where Msg: Serialize + Send + Sync
 ```
 Send a message to a role.
 
 ```rust
-async fn recv<Msg>(&mut self, ep: &mut Endpoint, from: Role) -> Result<Msg>
+async fn recv<Msg>(&mut self, ep: &mut Endpoint, from: Role) -> ChoreoResult<Msg>
 where Msg: DeserializeOwned + Send
 ```
 Receive a message from a role.
 
 ```rust
-async fn choose(&mut self, ep: &mut Endpoint, who: Role, label: Label) -> Result<()>
+async fn choose(&mut self, ep: &mut Endpoint, who: Role, label: Label) -> ChoreoResult<()>
 ```
 Make a choice (internal choice).
 
 ```rust
-async fn offer(&mut self, ep: &mut Endpoint, from: Role) -> Result<Label>
+async fn offer(&mut self, ep: &mut Endpoint, from: Role) -> ChoreoResult<Label>
 ```
 Offer a choice (external choice).
 
 ```rust
-async fn with_timeout<F, T>(&mut self, ep: &mut Endpoint, at: Role, dur: Duration, body: F) -> Result<T>
-where F: Future<Output = Result<T>> + Send
+async fn with_timeout<F, T>(&mut self, ep: &mut Endpoint, at: Role, dur: Duration, body: F) -> ChoreoResult<T>
+where F: Future<Output = ChoreoResult<T>> + Send
 ```
 Execute operation with timeout.
 
@@ -291,22 +335,21 @@ This pattern sends a request and waits for a response. It is the simplest round 
 ```rust
 // Sender
 let decision = if condition {
-    Label("accept")
+    Choice::Accept
 } else {
-    Label("reject")
+    Choice::Reject
 };
 handler.choose(&mut endpoint, Role::Other, decision).await?;
 
 // Receiver
 let choice = handler.offer(&mut endpoint, Role::Other).await?;
-match choice.0 {
-    "accept" => {
+match choice {
+    Choice::Accept => {
         // Handle accept branch
     }
-    "reject" => {
+    Choice::Reject => {
         // Handle reject branch
     }
-    _ => unreachable!(),
 }
 ```
 
@@ -339,29 +382,26 @@ This pattern relays messages between two peers. It keeps the coordinator role in
 ### Pattern 5: Timeout Protection
 
 ```rust
-let result = handler.with_timeout(
-    &mut endpoint,
-    Role::Self_,
+let result = tokio::time::timeout(
     Duration::from_secs(5),
-    async {
-        handler.recv(&mut endpoint, Role::Peer).await
-    }
-).await;
+    handler.recv::<Response>(&mut endpoint, Role::Server),
+)
+.await;
 
 match result {
-    Ok(msg) => {
+    Ok(Ok(msg)) => {
         // Process message
     }
-    Err(ChoreographyError::Timeout(_)) => {
-        // Handle timeout
+    Ok(Err(e)) => {
+        // Handle handler errors
     }
-    Err(e) => {
-        // Handle other errors
+    Err(_) => {
+        // Handle timeout
     }
 }
 ```
 
-This pattern wraps a receive in `with_timeout`. It distinguishes timeout errors from other failures.
+This pattern wraps a receive in a runtime timeout. Generated effect programs use `with_timeout` internally when `@runtime_timeout` or `timed_choice` is present.
 
 ## Best Practices
 

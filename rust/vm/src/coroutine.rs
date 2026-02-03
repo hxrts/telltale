@@ -125,7 +125,7 @@ impl std::fmt::Display for Fault {
 }
 
 /// A single coroutine executing a role's local protocol.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Coroutine {
     /// Unique coroutine identifier.
     pub id: usize,

@@ -8,11 +8,11 @@
 
 use proc_macro2::{Ident, Span};
 use quote::quote;
+use std::collections::HashMap;
 use telltale_choreography::ast::{
     Annotations, Branch, Choreography, Condition, MessageType, NonEmptyVec, Protocol, Role,
 };
 use telltale_choreography::compiler::{analyze, project};
-use std::collections::HashMap;
 
 // Helper to create identifiers
 fn ident(s: &str) -> Ident {

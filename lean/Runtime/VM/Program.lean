@@ -1,5 +1,7 @@
 import Runtime.VM.Core
 import Runtime.VM.TypeClasses
+import Runtime.VM.CompileLocalTypeR
+import SessionTypes.LocalTypeR
 import Protocol.Process
 
 /-!
@@ -73,6 +75,31 @@ def programLocalTypes (roles : RoleSet) (types : Role → LocalType) :
   -- Preserve role order in the role set.
   roles.map (fun r => (r, types r))
 
+/-! ## Code image construction from LocalTypeR -/
+
+/-- Build a CodeImage by compiling LocalTypeR per role and concatenating the bytecode. -/
+def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    [Inhabited (EffectModel.EffectAction ε)]
+    (localTypes : List (Role × SessionTypes.LocalTypeR.LocalTypeR))
+    (globalType : GlobalType) : CodeImage γ ε :=
+  let step := fun (acc : List (Instr γ ε) × List (Role × PC)) (entry : Role × SessionTypes.LocalTypeR.LocalTypeR) =>
+    let (code, entryPoints) := acc
+    let (role, lt) := entry
+    let startPc := code.length
+    let code' := code ++ compileLocalTypeR (γ:=γ) (ε:=ε) lt
+    (code', entryPoints ++ [(role, startPc)])
+  let (code, entryPoints) := localTypes.foldl step ([], [])
+  let localTypes' := localTypes.map (fun (r, lt) => (r, localTypeRToLocalType lt))
+  { program :=
+      { code := code.toArray
+      , entryPoints := entryPoints
+      , localTypes := localTypes'
+      , handlerTypes := []
+      , metadata := ProgramMeta.empty }
+  , globalType := globalType
+  , wfBlind := True
+  , projectionCorrect := True }
+
 def regOf (v : Var) : Reg :=
   -- V1 register mapping: deterministic by variable name length.
   v.length
@@ -94,6 +121,7 @@ def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
   | .newSession _ _ p' => compileBlock p'
 
 /-- Compile a process into a program (stub). -/
+@[deprecated "Use compileLocalTypeR / CodeImage.fromLocalTypes instead."]
 def compile {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (p : Process) (roles : RoleSet) (types : Role → LocalType)
     (chain : GuardChain γ) : Program γ ε :=

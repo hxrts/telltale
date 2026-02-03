@@ -4,12 +4,12 @@
 // Performance benchmarks for TelltaleHandler
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
-    handlers::telltale::{TelltaleEndpoint, TelltaleHandler, SimpleChannel},
+    handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
     ChoreoHandler, LabelId, RoleId,
 };
 use telltale_choreography::RoleName;
-use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

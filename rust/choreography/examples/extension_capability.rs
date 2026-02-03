@@ -6,9 +6,9 @@
 //! This example demonstrates a role-specific extension that validates
 //! capabilities before allowing operations.
 
+use std::any::{Any, TypeId};
 use telltale_choreography::effects::{ExtensionEffect, LabelId, Program, RoleId};
 use telltale_choreography::RoleName;
-use std::any::{Any, TypeId};
 
 // Define roles
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

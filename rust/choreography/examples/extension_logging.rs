@@ -6,9 +6,9 @@
 //! This example demonstrates how to create and use a basic extension
 //! that logs events during choreography execution.
 
+use std::any::{Any, TypeId};
 use telltale_choreography::effects::{ExtensionEffect, LabelId, Program, RoleId};
 use telltale_choreography::RoleName;
-use std::any::{Any, TypeId};
 
 // Define a simple logging extension
 #[derive(Clone, Debug)]

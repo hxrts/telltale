@@ -8,7 +8,9 @@ use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
 use telltale_types::LocalTypeR;
-use telltale_vm::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode, EnqueueResult};
+use telltale_vm::buffer::{
+    BackpressurePolicy, BoundedBuffer, BufferConfig, BufferMode, EnqueueResult,
+};
 use telltale_vm::coroutine::Value;
 use telltale_vm::instr::Endpoint;
 use telltale_vm::session::{SessionStatus, SessionStore};
@@ -236,8 +238,14 @@ fn test_two_sessions_independent_types() {
     let sid1 = vm.load_choreography(&image1).unwrap();
     let sid2 = vm.load_choreography(&image2).unwrap();
 
-    let ep1a = Endpoint { sid: sid1, role: "A".into() };
-    let ep2a = Endpoint { sid: sid2, role: "A".into() };
+    let ep1a = Endpoint {
+        sid: sid1,
+        role: "A".into(),
+    };
+    let ep2a = Endpoint {
+        sid: sid2,
+        role: "A".into(),
+    };
 
     // Types should be independent.
     let t1 = vm.sessions().lookup_type(&ep1a).cloned();

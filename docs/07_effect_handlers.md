@@ -109,13 +109,13 @@ The recorded events can be inspected in tests to verify protocol behavior.
 
 ### NoOpHandler
 
-The NoOpHandler is located in `rust/choreography/src/effects/handler.rs`. It implements all operations as no-ops. This is useful for testing protocol structure without actual communication.
+The NoOpHandler is located in `rust/choreography/src/effects/handler.rs`. It implements send and choose as no-ops and returns errors for recv and offer. This is useful for testing protocol structure without actual communication.
 
 ```rust
 let handler = NoOpHandler::<MyRole>::new();
 ```
 
-All operations succeed immediately without side effects.
+Send and choose succeed immediately without side effects. Recv and offer return transport errors.
 
 ## Middleware
 
@@ -123,7 +123,7 @@ Middleware wraps handlers to add cross-cutting functionality. Multiple middlewar
 
 ### Trace
 
-The Trace middleware is located in `rust/choreography/src/effects/middleware/mod.rs`. It logs all operations for debugging. The middleware outputs send, recv, choose, and offer calls with role and message details.
+The Trace middleware is located in `rust/choreography/src/effects/middleware/trace.rs`. It logs all operations for debugging. The middleware outputs send, recv, choose, and offer calls with role and message details.
 
 Usage example shows wrapping a handler.
 
@@ -131,7 +131,7 @@ Usage example shows wrapping a handler.
 use telltale_choreography::middleware::Trace;
 
 let base_handler = InMemoryHandler::new(role);
-let mut handler = Trace::new(base_handler, "Alice".to_string());
+let mut handler = Trace::with_prefix(base_handler, "Alice");
 ```
 
 Each operation logs before delegating to the inner handler.
@@ -164,7 +164,7 @@ use telltale_choreography::middleware::Retry;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
-let mut handler = Retry::new(base_handler, 3, Duration::from_millis(100));
+let mut handler = Retry::with_config(base_handler, 3, Duration::from_millis(100));
 ```
 
 The handler retries up to 3 times. Delays are 100ms, 200ms, 400ms using exponential backoff.
@@ -180,9 +180,8 @@ use telltale_choreography::middleware::FaultInjection;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
-let mut handler = FaultInjection::new(base_handler)
-    .with_failure_rate(0.1)
-    .with_delay_range(Duration::from_millis(10), Duration::from_millis(100));
+let mut handler = FaultInjection::new(base_handler, 0.1)
+    .with_delays(Duration::from_millis(10), Duration::from_millis(100));
 ```
 
 Operations randomly fail 10% of the time. Delays range from 10ms to 100ms.
@@ -193,8 +192,8 @@ Middleware can stack in layers.
 
 ```rust
 let handler = InMemoryHandler::new(role);
-let handler = Retry::new(handler, 3, Duration::from_millis(100));
-let handler = Trace::new(handler, "Alice".to_string());
+let handler = Retry::with_config(handler, 3, Duration::from_millis(100));
+let handler = Trace::with_prefix(handler, "Alice");
 let handler = Metrics::new(handler);
 ```
 
@@ -290,6 +289,8 @@ pub trait ChoreographicAdapter: Sized {
 }
 ```
 
+These methods resolve role families and support fan out and fan in messaging. Generated code uses them when a protocol includes wildcard or range roles.
+
 ### TestAdapter for Role Families
 
 The `TestAdapter` implements `ChoreographicAdapter` for testing protocols with role families.
@@ -312,6 +313,8 @@ let threshold = adapter.resolve_range("Witness", 0, 3)?;  // 3 witnesses
 let size = adapter.family_size("Witness")?;  // 5
 ```
 
+`TestAdapter` keeps role families in memory and is intended for local tests.
+
 ### Broadcast and Collect
 
 For one-to-many and many-to-one communication patterns:
@@ -325,6 +328,8 @@ adapter.broadcast(&witnesses, SigningRequest { ... }).await?;
 let threshold = adapter.resolve_range("Witness", 0, 3)?;
 let responses: Vec<PartialSignature> = adapter.collect(&threshold).await?;
 ```
+
+Use these helpers for one to many and many to one exchanges in role family protocols.
 
 ### Execution Hints
 
@@ -377,6 +382,8 @@ let topology = Topology::parse(config)?.topology;
 let count = adapter.family_size("Witness")?;
 topology.validate_family("Witness", count)?;
 ```
+
+Run this check during initialization to ensure deployment configuration matches the resolved family size.
 
 ## Effect Interpretation
 

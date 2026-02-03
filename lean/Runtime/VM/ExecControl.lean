@@ -46,7 +46,7 @@ def stepSpawn {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   let newRegs := copyArgs coro.regs coro.regs.size args
   let budget := st.config.costModel.defaultBudget
   let newCoro : CoroutineState γ ε :=
-    { id := newId, pc := target, regs := newRegs, status := .ready
+    { id := newId, programId := coro.programId, pc := target, regs := newRegs, status := .ready
       effectCtx := coro.effectCtx, ownedEndpoints := [], progressTokens := []
       knowledgeSet := [], costBudget := budget, specState := none }
   let coros' := st.coroutines.push newCoro

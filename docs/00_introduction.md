@@ -1,10 +1,10 @@
 # Background
 
-This document provides an introduction to the theory behind Telltale. It covers multiparty session types, choreographic programming, and algebraic effects. Understanding these concepts helps explain how the system achieves type-safe distributed programming.
+This document introduces the theory behind Telltale. It covers multiparty session types, choreographic programming, and algebraic effects. These concepts explain how the system enforces type-safe distributed programming.
 
 ## Session Types
 
-Session types encode communication protocols as types in the type system. They specify the sequence and structure of messages exchanged between processes. A session type acts as a contract that all communication must follow. The compiler verifies that implementations adhere to this contract.
+Session types encode communication protocols as types. They specify the sequence and structure of messages exchanged between processes. A session type is a contract for communication. The compiler checks that implementations follow this contract.
 
 Traditional type systems ensure data safety. They prevent type errors like passing a string where an integer is expected. Session types extend this to communication safety. They prevent protocol errors like sending when you should receive or terminating when more messages are expected.
 
@@ -12,15 +12,17 @@ A session type describes a communication channel from one endpoint's perspective
 
 ## Multiparty Session Types (MPST)
 
-Multiparty session types extend binary session types to protocols with three or more participants. While session types handle point-to-point channels, MPST handles protocols where multiple parties interact. Each participant can communicate with multiple others. The type system ensures all interactions remain synchronized.
+Multiparty session types extend binary session types to protocols with three or more participants. Session types handle point-to-point channels. MPST handles protocols where multiple parties interact. The type system ensures all interactions remain synchronized.
 
-MPST introduces new challenges beyond binary sessions. Participants must agree on the overall protocol flow. Messages between two participants affect what other participants can do next. The type system must track these dependencies to prevent global deadlocks. Consider a three-party payment protocol where a customer requests a quote from a merchant, the merchant checks with a bank, and the bank approves or denies.
+MPST introduces challenges beyond binary sessions. Participants must agree on the overall protocol flow. Messages between two participants affect what other participants can do next. The type system tracks these dependencies to prevent global deadlocks.
 
-In MPST, each participant has a local view that includes all their partners. The customer's type shows communication with both merchant and bank. The system ensures all three views are compatible. For a more in-depth discussion of MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf). Advanced optimizations through asynchronous subtyping are covered in [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf). And [Mechanised Subject Reduction for Multiparty Asynchronous Session Types](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.31) includes a mechanized Coq proof that adds a well-typed condition that fixes the original MPST formulation by Honda et al. The type theory in this crate draws from this revised forumulation.
+In MPST, each participant has a local view that includes all partners. The customer type shows communication with both merchant and bank. The system ensures all views are compatible. For a deeper discussion of MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
+
+Advanced optimizations through asynchronous subtyping are covered in [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf). [Mechanised Subject Reduction for Multiparty Asynchronous Session Types](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.31) includes a mechanized Coq proof that adds a well-typed condition that fixes the original MPST formulation by Honda et al. The type theory in this crate draws from this revised formulation.
 
 ## Global Types and Projection
 
-Global types describe protocols from a neutral, third-party perspective. They specify all interactions between all participants. Local types describe the protocol from one participant's viewpoint. Projection transforms global types into local types for each participant.
+Global types describe protocols from a neutral perspective. They specify all interactions between all participants. Local types describe the protocol from one participant's viewpoint. Projection transforms global types into local types for each participant.
 
 ```
 G = Alice -> Bob: Int.
@@ -33,23 +35,22 @@ The projection algorithm ensures the local types are compatible. If projection s
 
 ## Lean Signatures (Core Types)
 
-Telltale’s formal core is specified in Lean. The core session types are:
-1) the **global protocol type** (`GlobalType`),
-2) the **recursive local type** (`LocalTypeR`), and
-3) the **coinductive local type** used in bisimulation proofs (`LocalTypeC`).
+Telltale formalizes its core in Lean. The core session types are `GlobalType`, `LocalTypeR`, and `LocalTypeC`. These are the global protocol type, the recursive local type, and the coinductive local type used in bisimulation proofs.
 
-Below are their exact Lean signatures, with namespaces preserved.
+The signatures below match the current Lean modules with namespaces preserved.
 
-**Global types and labels** (`lean/TelltaleV2/Protocol/GlobalType.lean`):
+### Global types and labels (`lean/SessionTypes/GlobalType/Core.lean`)
 
 ```lean
-namespace TelltaleV2.Protocol.GlobalType
+namespace SessionTypes.GlobalType
 
 inductive PayloadSort where
   | unit : PayloadSort
   | nat : PayloadSort
   | bool : PayloadSort
   | string : PayloadSort
+  | real : PayloadSort
+  | vector : Nat → PayloadSort
   | prod : PayloadSort → PayloadSort → PayloadSort
   deriving Repr, DecidableEq, BEq, Inhabited
 
@@ -65,33 +66,38 @@ inductive GlobalType where
   | var : String → GlobalType
   deriving Repr, Inhabited
 
-end TelltaleV2.Protocol.GlobalType
+end SessionTypes.GlobalType
 ```
 
-**Inductive local types** (`lean/TelltaleV2/Protocol/LocalTypeR.lean`):
+This file defines the global protocol structure and its label and payload types. It is the source of truth for Lean global type syntax.
+
+### Inductive local types (`lean/SessionTypes/LocalTypeR/Core.lean`)
 
 ```lean
-namespace TelltaleV2.Protocol.LocalTypeR
+namespace SessionTypes.LocalTypeR
 
-open TelltaleV2.Protocol.GlobalType
+open SessionTypes.GlobalType
+open SessionTypes (ValType)
 
 inductive LocalTypeR where
   | end : LocalTypeR
-  | send : String → List (Label × LocalTypeR) → LocalTypeR
-  | recv : String → List (Label × LocalTypeR) → LocalTypeR
+  | send : String → List (Label × Option ValType × LocalTypeR) → LocalTypeR
+  | recv : String → List (Label × Option ValType × LocalTypeR) → LocalTypeR
   | mu : String → LocalTypeR → LocalTypeR
   | var : String → LocalTypeR
   deriving Repr, Inhabited
 
-end TelltaleV2.Protocol.LocalTypeR
+end SessionTypes.LocalTypeR
 ```
 
-**Coinductive local types (M-types)** (`lean/TelltaleV2/Coinductive/LocalTypeC.lean`):
+This file defines the recursive local type used for projection and type checking. It mirrors the Rust `LocalTypeR` structure.
+
+### Coinductive local types (`lean/SessionCoTypes/Coinductive/LocalTypeC.lean`)
 
 ```lean
-namespace TelltaleV2.Coinductive
+namespace SessionCoTypes.Coinductive
 
-open TelltaleV2.Protocol.GlobalType
+open SessionTypes.GlobalType
 
 inductive LocalTypeHead where
   | end  : LocalTypeHead
@@ -112,19 +118,23 @@ def LocalTypeF : PFunctor := ⟨LocalTypeHead, LocalTypeChild⟩
 
 abbrev LocalTypeC := PFunctor.M LocalTypeF
 
-end TelltaleV2.Coinductive
+end SessionCoTypes.Coinductive
 ```
+
+This file defines the coinductive local type encoding. It supports bisimulation proofs and coinductive reasoning.
 
 ## Well-Formedness (Lean)
 
 Well-formedness is explicit in the Lean development.
 
-**Global types** are well-formed when all of the following hold:
+Global types are well-formed when all of the following hold.
 
 ```lean
 def GlobalType.wellFormed (g : GlobalType) : Bool :=
   g.allVarsBound && g.allCommsNonEmpty && g.noSelfComm && g.isProductive
 ```
+
+This definition checks variable binding, non-empty branches, lack of self-communication, and productivity.
 
 Intuitively:
 - `allVarsBound`: recursion variables are bound
@@ -132,7 +142,7 @@ Intuitively:
 - `noSelfComm`: no self-send
 - `isProductive`: recursion must pass through a communication
 
-**Local types** are well-formed when they are closed and contractive:
+Local types are well-formed when they are closed and contractive.
 
 ```lean
 structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
@@ -140,7 +150,9 @@ structure LocalTypeR.WellFormed (t : LocalTypeR) : Prop where
   contractive : t.isContractive = true
 ```
 
-**Coinductive local types** are well-formed when they are closed and observable:
+This structure encodes the two core constraints for recursive local types.
+
+Coinductive local types are well-formed when they are closed and observable.
 
 ```lean
 def ClosedC (t : LocalTypeC) : Prop :=
@@ -151,11 +163,11 @@ structure WellFormedC (t : LocalTypeC) : Prop where
   observable : ObservableC t
 ```
 
+This structure defines the basic well-formedness conditions for coinductive local types.
+
 ## Progress Conditions (Lean)
 
-Progress is not derived from well-formedness alone. The V2 proofs separate
-structural well-formedness from a *progress predicate* that asserts a
-communication is reachable.
+Progress is not derived from well-formedness alone. The V2 proofs separate structural well-formedness from a progress predicate that asserts communication is reachable.
 
 The progress predicate is:
 
@@ -168,8 +180,9 @@ inductive ReachesComm : GlobalType → Prop where
       ReachesComm (.mu t body)
 ```
 
-The associated progress theorem uses this predicate together with
-well-formedness and well-typedness:
+This predicate states that a communication can be reached by unfolding recursion.
+
+The associated progress theorem uses this predicate together with well-formedness and well-typedness.
 
 ```lean
 def CanProgress (c : Configuration) : Prop :=
@@ -182,13 +195,11 @@ theorem deadlock_free (c : Configuration)
     CanProgress c
 ```
 
-In other words: **well-formedness ensures validity of recursion and structure,
-while `ReachesComm` ensures actual progress is possible**. Both are required
-to justify progress.
+Well-formedness ensures validity of recursion and structure. `ReachesComm` ensures progress is possible. Both are required to justify progress.
 
 ## Choreographic Programming
 
-Choreographic programming takes the global types concept further. Instead of just types, you write actual program logic from a global perspective. The choreography describes computations and data flow between participants. Endpoint projection generates local implementations for each participant.
+Choreographic programming builds on global types. It lets you write program logic from a global perspective. The choreography describes computations and data flow between participants. Endpoint projection generates local implementations for each participant.
 
 ```rust
 choreography!(r#"
@@ -198,6 +209,8 @@ protocol Calculator =
   Bob -> Alice : Result
 "#);
 ```
+
+This example defines a two-role protocol in the DSL. The compiler projects this to per-role local code.
 
 This choreography specifies the communication protocol. The system projects it into separate programs for Alice and Bob. Alice's program sends a value and receives a result. Bob's program receives a value and sends back a result.
 

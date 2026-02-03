@@ -200,7 +200,10 @@ fn matches_direction(lt: &LocalTypeR, direction: Direction) -> bool {
 fn extract_components(
     lt: &LocalTypeR,
     direction: Direction,
-) -> Option<(&String, &[(Label, Option<telltale_types::ValType>, LocalTypeR)])> {
+) -> Option<(
+    &String,
+    &[(Label, Option<telltale_types::ValType>, LocalTypeR)],
+)> {
     match (direction, lt) {
         (Direction::Output, LocalTypeR::Send { partner, branches }) => Some((partner, branches)),
         (Direction::Input, LocalTypeR::Recv { partner, branches }) => Some((partner, branches)),

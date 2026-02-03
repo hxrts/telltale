@@ -3,12 +3,12 @@
 //! This example shows how to create and use extensions to the choreographic DSL,
 //! including custom grammar rules, parsers, and protocol behaviors.
 
+use std::any::{Any, TypeId};
 use telltale_choreography::{
     ast::LocalType, compiler::projection::ProjectionError, CodegenContext, ExtensionParserBuilder,
     ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext, ParseError,
     ProjectionContext, ProtocolExtension, Role, StatementParser,
 };
-use std::any::{Any, TypeId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Telltale DSL Extension System Demo");

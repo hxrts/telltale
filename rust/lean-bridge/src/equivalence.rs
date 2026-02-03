@@ -35,12 +35,12 @@
 use crate::export::{global_to_json, local_to_json};
 use crate::import::ImportError;
 use crate::runner::{LeanRunner, LeanRunnerError};
-use telltale_theory::projection::{project, ProjectionError};
-use telltale_types::GlobalType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use telltale_theory::projection::{project, ProjectionError};
+use telltale_types::GlobalType;
 use thiserror::Error;
 
 /// Errors from equivalence checking operations.

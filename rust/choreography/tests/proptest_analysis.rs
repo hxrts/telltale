@@ -12,9 +12,9 @@
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use quote::{format_ident, quote};
+use std::collections::HashMap;
 use telltale_choreography::ast::{Annotations, Choreography, MessageType, Protocol, Role};
 use telltale_choreography::compiler::analysis::analyze;
-use std::collections::HashMap;
 
 // Reuse strategies from projection tests
 fn role_strategy() -> impl Strategy<Value = Role> {
