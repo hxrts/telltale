@@ -146,7 +146,7 @@ fn demonstrate_preconfigured_topologies() {
     // Kubernetes topology
     let k8s_topology = TopologyBuilder::new()
         .mode(TopologyMode::Kubernetes(
-            Namespace::new("my-namespace").unwrap(),
+            Namespace::new("my_namespace").unwrap(),
         ))
         .build();
 

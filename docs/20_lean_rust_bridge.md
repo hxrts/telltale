@@ -61,14 +61,14 @@ The bridge test coverage lives in `rust/lean-bridge/tests`:
 - `projection_equivalence_tests.rs` compares theory and DSL projections
 - `proptest_projection.rs` validates randomized protocols against Lean when available
 - `proptest_json_roundtrip.rs` checks JSON round trip stability
-- `lean_integration_tests.rs` and `projection_runner_tests.rs` run the Lean runner
+- `lean_integration_tests.rs` runs the Lean validator; `projection_runner_tests.rs` exercises the validator export mode
 - `golden_equivalence_tests.rs` and `live_equivalence_tests.rs` compare fixed suites
 
 Use `cargo test -p telltale-lean-bridge` to run the full suite.
 
 ## Lean Runner
 
-`LeanRunner` invokes `lean/.lake/build/bin/telltale_runner` and validates a choreography against a program export.
+`LeanRunner` invokes `lean/.lake/build/bin/telltale_validator` and validates a choreography against a local type export.
 
 ```rust
 use telltale_lean_bridge::LeanRunner;
@@ -80,7 +80,9 @@ if LeanRunner::is_available() {
 }
 ```
 
-The runner returns per branch results with exported and projected traces.
+The runner returns a success flag plus a brief message when validation succeeds.
+
+The program JSON is a `{ "role": "...", "local_type": { ... } }` wrapper around a LocalTypeR JSON object.
 
 ## Validator
 

@@ -5,12 +5,12 @@
 
 use crate::runner::LeanRunner;
 
-/// Path to the Lean runner binary (relative to workspace root).
-pub const LEAN_BINARY_PATH: &str = "lean/.lake/build/bin/telltale_runner";
+/// Path to the Lean validator binary (relative to workspace root).
+pub const LEAN_BINARY_PATH: &str = "lean/.lake/build/bin/telltale_validator";
 
 /// Skip message displayed when Lean binary is unavailable.
 pub const LEAN_SKIP_MESSAGE: &str =
-    "SKIPPED: Lean binary not available. Run `cd lean && lake build` to enable.";
+    "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable.";
 
 /// Check if the Lean binary is available for testing.
 #[must_use]

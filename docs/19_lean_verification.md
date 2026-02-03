@@ -32,7 +32,7 @@ See [Lean Verification Code Map](../lean/CODE_MAP.md) for file level detail.
 
 ## Rust Integration
 
-The `telltale-lean-bridge` crate exports choreographies and runs the Lean runner. The main entry points are the `lean-bridge-exporter` binary and the `telltale_runner` Lean executable.
+The `telltale-lean-bridge` crate exports GlobalType JSON plus per-role LocalTypeR JSON and runs the Lean validator. The main entry points are the `lean-bridge-exporter` binary and the `telltale_validator` Lean executable.
 
 The Justfile includes convenience recipes:
 
@@ -42,7 +42,7 @@ just telltale-lean-check-extended
 just telltale-lean-check-failing
 ```
 
-These recipes expect `.choreo` inputs under `lean/choreo/` and write artifacts to `lean/artifacts`. The `.choreo` inputs are not tracked in this repository, so you may need to supply them or update the recipe paths.
+These recipes expect `.choreo` inputs under `fixtures/choreo/` and write artifacts to `lean/artifacts`.
 
 ## Golden Equivalence Tests
 

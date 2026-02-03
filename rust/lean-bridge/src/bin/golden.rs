@@ -213,10 +213,10 @@ fn require_lean() -> anyhow::Result<()> {
         eprintln!("Error: Lean runner not available");
         eprintln!();
         eprintln!("Build the Lean runner first:");
-        eprintln!("  cd lean && lake build telltale_runner");
+        eprintln!("  cd lean && lake build telltale_validator");
         eprintln!();
         eprintln!("Or with Nix:");
-        eprintln!("  nix develop --command bash -c \"cd lean && lake build\"");
+        eprintln!("  nix develop --command bash -c \"cd lean && lake build telltale_validator\"");
         std::process::exit(1);
     }
     Ok(())

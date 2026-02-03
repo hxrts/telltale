@@ -56,13 +56,13 @@ lean_exe runtime_tests where
   root := `Runtime.Tests.Main
   moreLinkArgs := macosLinkArgs
 
-/-- Projection runner: reads GlobalType JSON from stdin, projects per role, writes LocalTypeR JSON. -/
-@[default_target]
-lean_exe projection_runner where
-  root := `Choreography.Projection.Runner
-  moreLinkArgs := macosLinkArgs
-
 /-- VM runner: executes choreographies and emits observable traces. -/
 lean_exe vm_runner where
   root := `Runtime.Tests.VMRunner
+  moreLinkArgs := macosLinkArgs
+
+/-- Projection validator (compares projected local types). -/
+@[default_target]
+lean_exe telltale_validator where
+  root := `Choreography.Projection.Validator
   moreLinkArgs := macosLinkArgs

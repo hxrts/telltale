@@ -1,7 +1,7 @@
-//! Lean Runner - Invokes the Lean verification binary.
+//! Lean Runner - Invokes the Lean validator binary.
 //!
 //! This module provides the [`LeanRunner`] struct which wraps invocation of
-//! the Lean `telltale_runner` binary for validating choreography projections.
+//! the Lean `telltale_validator` binary for validating choreography projections.
 //!
 //! # Example
 //!
@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::NamedTempFile;
@@ -50,21 +51,6 @@ pub enum LeanRunnerError {
     ValidationFailed(String),
 }
 
-/// Result of validating a single branch.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BranchResult {
-    /// Branch name (or `<default>` for unnamed branches).
-    pub name: String,
-    /// Whether this branch passed validation.
-    pub status: bool,
-    /// Human-readable message describing the result.
-    pub message: String,
-    /// Actions exported by the program.
-    pub exported: Vec<String>,
-    /// Actions from the projected local type.
-    pub projected: Vec<String>,
-}
-
 /// Choreography input for the VM runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChoreographyJson {
@@ -77,19 +63,19 @@ pub struct ChoreographyJson {
 /// Result of a Lean validation run.
 #[derive(Debug, Clone)]
 pub struct LeanValidationResult {
-    /// Whether all branches passed validation.
+    /// Whether validation succeeded.
     pub success: bool,
     /// The role that was validated.
     pub role: String,
-    /// Per-branch validation results.
-    pub branches: Vec<BranchResult>,
+    /// Human-readable message describing the result.
+    pub message: String,
     /// Raw output from the Lean process.
     pub raw_output: String,
 }
 
 /// Runner for invoking the Lean verification binary.
 ///
-/// The runner manages invocation of the `telltale_runner` Lean executable,
+/// The runner manages invocation of the `telltale_validator` Lean executable,
 /// handling temporary file creation for JSON exchange and parsing results.
 pub struct LeanRunner {
     binary_path: PathBuf,
@@ -97,7 +83,7 @@ pub struct LeanRunner {
 
 impl LeanRunner {
     /// Default path to the Lean binary (relative to workspace root).
-    pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/telltale_runner";
+    pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/telltale_validator";
 
     /// Get the workspace root path by walking up from the manifest directory.
     fn find_workspace_root() -> Option<PathBuf> {
@@ -159,18 +145,13 @@ impl LeanRunner {
         Self::new().ok()
     }
 
-    /// Create a LeanRunner for projection only (does not require the validation binary).
+    /// Create a LeanRunner for projection export (uses the validator binary).
     ///
     /// # Errors
     ///
-    /// Returns [`LeanRunnerError::BinaryNotFound`] if the projection binary doesn't exist.
+    /// Returns [`LeanRunnerError::BinaryNotFound`] if the validator binary doesn't exist.
     pub fn for_projection() -> Result<Self, LeanRunnerError> {
-        match Self::get_projection_binary_path() {
-            Some(path) => Ok(Self { binary_path: path }),
-            None => Err(LeanRunnerError::BinaryNotFound(PathBuf::from(
-                Self::PROJECTION_BINARY_PATH,
-            ))),
-        }
+        Self::new()
     }
 
     /// Check if the Lean binary is available at the default path.
@@ -197,10 +178,10 @@ impl LeanRunner {
                 ║  The Lean binary is required but not found.                       ║\n\
                 ║                                                                   ║\n\
                 ║  To build Lean:                                                   ║\n\
-                ║    cd lean && lake build                                          ║\n\
+                ║    cd lean && lake build telltale_validator                       ║\n\
                 ║                                                                   ║\n\
                 ║  Or with Nix:                                                     ║\n\
-                ║    nix develop --command bash -c \"cd lean && lake build\"         ║\n\
+                ║    nix develop --command bash -c \"cd lean && lake build telltale_validator\"         ║\n\
                 ║                                                                   ║\n\
                 ║  Expected path: {path}           \n\
                 ╚══════════════════════════════════════════════════════════════════╝\n",
@@ -211,22 +192,13 @@ impl LeanRunner {
 
     /// Run validation with choreography and program JSON.
     ///
-    /// The choreography JSON should have the format:
-    /// ```json
-    /// {
-    ///   "roles": ["A", "B"],
-    ///   "actions": [{"from": "A", "to": "B", "label": "msg"}]
-    /// }
-    /// ```
+    /// The choreography JSON should be a GlobalType JSON object.
     ///
     /// The program JSON should have the format:
     /// ```json
     /// {
     ///   "role": "A",
-    ///   "programs": [{
-    ///     "branch": null,
-    ///     "effects": [{"kind": "send", "partner": "B", "label": "msg"}]
-    ///   }]
+    ///   "local_type": { "kind": "send", ... }
     /// }
     /// ```
     ///
@@ -303,7 +275,7 @@ impl LeanRunner {
         Ok(LeanValidationResult {
             success: true,
             role: String::new(),
-            branches: vec![],
+            message: String::new(),
             raw_output: stdout,
         })
     }
@@ -315,59 +287,23 @@ impl LeanRunner {
         raw_output: String,
     ) -> Result<LeanValidationResult, LeanRunnerError> {
         let role = log["role"].as_str().unwrap_or("").to_string();
-        let branches_arr = log["branches"].as_array();
-
-        let branches: Vec<BranchResult> = branches_arr
-            .map(|arr| {
-                arr.iter()
-                    .map(|b| BranchResult {
-                        name: b["branch"].as_str().unwrap_or("<default>").to_string(),
-                        status: b["status"].as_str() == Some("ok"),
-                        message: b["message"].as_str().unwrap_or("").to_string(),
-                        exported: Self::parse_action_array(&b["exported"]),
-                        projected: Self::parse_action_array(&b["projected"]),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let success = branches.iter().all(|b| b.status);
+        let success = log["status"].as_str() == Some("ok");
+        let message = log["message"].as_str().unwrap_or("").to_string();
 
         Ok(LeanValidationResult {
             success,
             role,
-            branches,
+            message,
             raw_output,
         })
     }
 
-    /// Parse an array of action strings from JSON.
-    fn parse_action_array(arr: &Value) -> Vec<String> {
-        arr.as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     // ========================================================================
-    // Projection Methods (for physical pipeline)
+    // Projection Methods (validator export mode)
     // ========================================================================
-
-    /// Default path to the projection runner binary (relative to workspace root).
-    pub const PROJECTION_BINARY_PATH: &'static str = "lean/.lake/build/bin/projection_runner";
 
     /// Default path to the VM runner binary (relative to workspace root).
     pub const VM_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
-
-    /// Get the full path to the projection runner binary.
-    fn get_projection_binary_path() -> Option<PathBuf> {
-        Self::find_workspace_root()
-            .map(|root| root.join(Self::PROJECTION_BINARY_PATH))
-            .filter(|p| p.exists())
-    }
 
     /// Get the full path to the VM runner binary.
     fn get_vm_runner_path() -> Option<PathBuf> {
@@ -376,34 +312,23 @@ impl LeanRunner {
             .filter(|p| p.exists())
     }
 
-    /// Check if the projection runner binary is available.
+    /// Check if the validator binary is available for projection export.
     #[must_use]
     pub fn is_projection_available() -> bool {
-        Self::get_projection_binary_path().is_some()
+        Self::is_available()
     }
 
-    /// Project a GlobalType for a list of roles using the Lean projection runner.
+    /// Project a GlobalType for a list of roles using the Lean validator export mode.
     ///
-    /// Sends the GlobalType and role list as JSON to the projection_runner binary
-    /// via stdin and parses the projected LocalTypeR results from stdout.
+    /// Writes the GlobalType JSON to a temp file, runs
+    /// `telltale_validator --export-all-projections`, and parses the projections.
     ///
-    /// # Input format (sent to stdin)
-    ///
-    /// ```json
-    /// {
-    ///   "global_type": { "kind": "comm", ... },
-    ///   "roles": ["A", "B"]
-    /// }
-    /// ```
-    ///
-    /// # Output format (parsed from stdout)
+    /// # Output format (parsed from output file)
     ///
     /// ```json
     /// {
-    ///   "projections": {
-    ///     "A": { "kind": "send", ... },
-    ///     "B": { "kind": "recv", ... }
-    ///   }
+    ///   "success": true,
+    ///   "projections": { "A": { "kind": "send", ... }, "B": { "kind": "recv", ... } }
     /// }
     /// ```
     pub fn project(
@@ -411,32 +336,20 @@ impl LeanRunner {
         global_json: &Value,
         roles: &[String],
     ) -> Result<std::collections::HashMap<String, Value>, LeanRunnerError> {
-        let projection_path = Self::get_projection_binary_path().ok_or_else(|| {
-            LeanRunnerError::BinaryNotFound(PathBuf::from(Self::PROJECTION_BINARY_PATH))
-        })?;
-
-        let input = serde_json::json!({
-            "global_type": global_json,
-            "roles": roles
-        });
-        let input_str = serde_json::to_string(&input)
+        let mut input_file = NamedTempFile::new()?;
+        serde_json::to_writer(&mut input_file, global_json)
             .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+        input_file.flush()?;
 
-        let mut child = Command::new(&projection_path)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()?;
+        let output_file = NamedTempFile::new()?;
+        let output_path = output_file.path().to_path_buf();
 
-        // Write input to stdin
-        if let Some(mut stdin) = child.stdin.take() {
-            use std::io::Write;
-            stdin
-                .write_all(input_str.as_bytes())
-                .map_err(LeanRunnerError::TempFileError)?;
-        }
-
-        let output = child.wait_with_output()?;
+        let output = Command::new(&self.binary_path)
+            .arg("--export-all-projections")
+            .arg(input_file.path())
+            .arg("--output")
+            .arg(&output_path)
+            .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -446,19 +359,70 @@ impl LeanRunner {
             });
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let result: Value = serde_json::from_str(&stdout)
+        let output_contents = std::fs::read_to_string(&output_path)?;
+        let payload: Value = serde_json::from_str(&output_contents)
             .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
 
-        let projections = result
+        if let Some(false) = payload.get("success").and_then(|v| v.as_bool()) {
+            let err = payload
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Lean export failed");
+            return Err(LeanRunnerError::ParseError(err.to_string()));
+        }
+
+        let projections_val = payload
             .get("projections")
-            .and_then(|v| v.as_object())
             .ok_or_else(|| LeanRunnerError::ParseError("missing projections field".to_string()))?;
 
-        Ok(projections
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect())
+        let projections_map = match projections_val {
+            Value::Object(map) => map
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<std::collections::HashMap<_, _>>(),
+            Value::Array(items) => {
+                let mut out = std::collections::HashMap::new();
+                for item in items {
+                    let obj = item.as_object().ok_or_else(|| {
+                        LeanRunnerError::ParseError("invalid projection entry".to_string())
+                    })?;
+                    let role = obj
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            LeanRunnerError::ParseError("missing role in projection".to_string())
+                        })?;
+                    let local = obj
+                        .get("local_type")
+                        .or_else(|| obj.get("localType"))
+                        .ok_or_else(|| {
+                            LeanRunnerError::ParseError(
+                                "missing local_type in projection".to_string(),
+                            )
+                        })?;
+                    out.insert(role.to_string(), local.clone());
+                }
+                out
+            }
+            _ => {
+                return Err(LeanRunnerError::ParseError(
+                    "invalid projections format".to_string(),
+                ))
+            }
+        };
+
+        if roles.is_empty() {
+            return Ok(projections_map);
+        }
+
+        let mut selected = std::collections::HashMap::new();
+        for role in roles {
+            let projection = projections_map.get(role).ok_or_else(|| {
+                LeanRunnerError::ParseError(format!("missing projection for role {role}"))
+            })?;
+            selected.insert(role.clone(), projection.clone());
+        }
+        Ok(selected)
     }
 
     // ========================================================================
@@ -533,7 +497,7 @@ impl LeanRunner {
     /// ```json
     /// {
     ///   "success": true,
-    ///   "result": { "kind": "send", ... }
+    ///   "projection": { "kind": "send", ... }
     /// }
     /// ```
     ///
@@ -541,7 +505,7 @@ impl LeanRunner {
     /// ```json
     /// {
     ///   "success": false,
-    ///   "error": { "error": "merge_failed", ... }
+    ///   "error": "decode failure"
     /// }
     /// ```
     pub fn export_projection(
@@ -597,10 +561,10 @@ impl LeanRunner {
     /// ```json
     /// {
     ///   "success": true,
-    ///   "projections": [
-    ///     { "role": "Alice", "localType": { "kind": "send", ... } },
-    ///     { "role": "Bob", "localType": { "kind": "recv", ... } }
-    ///   ]
+    ///   "projections": {
+    ///     "Alice": { "kind": "send", ... },
+    ///     "Bob": { "kind": "recv", ... }
+    ///   }
     /// }
     /// ```
     ///
@@ -608,7 +572,7 @@ impl LeanRunner {
     /// ```json
     /// {
     ///   "success": false,
-    ///   "error": { "error": "merge_failed", ... }
+    ///   "error": "decode failure"
     /// }
     /// ```
     pub fn export_all_projections(&self, global_json: &Value) -> Result<Value, LeanRunnerError> {
@@ -675,24 +639,5 @@ mod tests {
         assert!(matches!(result, Err(LeanRunnerError::BinaryNotFound(_))));
     }
 
-    #[test]
-    fn test_parse_action_array_empty() {
-        let arr = serde_json::json!([]);
-        let result = LeanRunner::parse_action_array(&arr);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_parse_action_array_with_values() {
-        let arr = serde_json::json!(["send-B-msg", "recv-A-response"]);
-        let result = LeanRunner::parse_action_array(&arr);
-        assert_eq!(result, vec!["send-B-msg", "recv-A-response"]);
-    }
-
-    #[test]
-    fn test_parse_action_array_null() {
-        let arr = serde_json::json!(null);
-        let result = LeanRunner::parse_action_array(&arr);
-        assert!(result.is_empty());
-    }
+    // No log parsing tests yet; validator logs are integration-tested elsewhere.
 }

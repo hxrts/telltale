@@ -14,7 +14,7 @@
 #![allow(clippy::expect_used)]
 
 use serde_json::json;
-use telltale_lean_bridge::{json_to_local, local_to_json, LeanRunner};
+use telltale_lean_bridge::{global_to_json, json_to_local, local_to_json, LeanRunner};
 use telltale_theory::{can_merge, merge, project};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -22,7 +22,9 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 macro_rules! skip_without_lean {
     () => {
         if !LeanRunner::is_available() {
-            eprintln!("SKIPPED: Lean binary not available. Run `cd lean && lake build` to enable.");
+            eprintln!(
+                "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable."
+            );
             return;
         }
     };
@@ -302,29 +304,31 @@ fn test_merged_recv_json_roundtrip() {
 fn test_lean_validates_compatible_projection() {
     skip_without_lean!();
 
-    // Build choreography JSON for: A -> B: {l1. C -> B: msg. end, l2. C -> B: msg. end}
-    let choreo = json!({
-        "roles": ["A", "B", "C"],
-        "actions": [
-            {"from": "A", "to": "B", "label": "l1"},
-            {"from": "C", "to": "B", "label": "msg"},
-            {"from": "A", "to": "B", "label": "l2"},
-            {"from": "C", "to": "B", "label": "msg"}
-        ]
-    });
+    // Global: A -> B: {l1. C -> B: msg. end, l2. C -> B: msg. end}
+    let global = GlobalType::comm(
+        "A",
+        "B",
+        vec![
+            (
+                Label::new("l1"),
+                GlobalType::send("C", "B", Label::new("msg"), GlobalType::End),
+            ),
+            (
+                Label::new("l2"),
+                GlobalType::send("C", "B", Label::new("msg"), GlobalType::End),
+            ),
+        ],
+    );
 
-    // C's program: just sends msg to B
+    // C's local type: single send to B (merge of identical branches)
     let program = json!({
         "role": "C",
-        "programs": [{
-            "branch": null,
-            "effects": [{"kind": "send", "partner": "B", "label": "msg"}]
-        }]
+        "local_type": local_to_json(&LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End))
     });
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program)
+        .validate(&global_to_json(&global), &program)
         .expect("Validation should not crash");
 
     // This should succeed because C sends the same message in both branches
@@ -335,46 +339,47 @@ fn test_lean_validates_compatible_projection() {
     );
 }
 
-/// Test: Validate that Lean accepts recv merge with different labels.
+/// Test: Validate that Lean uses the first branch for non-participants.
 #[test]
-fn test_lean_accepts_recv_merge_projection() {
+fn test_lean_accepts_first_branch_for_nonparticipant() {
     skip_without_lean!();
 
-    // Build choreography JSON for: A -> B: {l1. B -> C: x. end, l2. B -> C: y. end}
-    let choreo = json!({
-        "roles": ["A", "B", "C"],
-        "actions": [
-            {"from": "A", "to": "B", "label": "l1"},
-            {"from": "B", "to": "C", "label": "x"},
-            {"from": "A", "to": "B", "label": "l2"},
-            {"from": "B", "to": "C", "label": "y"}
-        ]
-    });
+    // Global: A -> B: {l1. B -> C: x. end, l2. B -> C: y. end}
+    let global = GlobalType::comm(
+        "A",
+        "B",
+        vec![
+            (
+                Label::new("l1"),
+                GlobalType::send("B", "C", Label::new("x"), GlobalType::End),
+            ),
+            (
+                Label::new("l2"),
+                GlobalType::send("B", "C", Label::new("y"), GlobalType::End),
+            ),
+        ],
+    );
 
-    // C's program: receives from B (could be x or y)
+    // C's local type: projection chooses the first branch (x)
     let program = json!({
         "role": "C",
-        "programs": [
-            {
-                "branch": "x",
-                "effects": [{"kind": "recv", "partner": "B", "label": "x"}]
-            },
-            {
-                "branch": "y",
-                "effects": [{"kind": "recv", "partner": "B", "label": "y"}]
-            }
-        ]
+        "local_type": local_to_json(&LocalTypeR::recv_choice(
+            "B",
+            vec![
+                (Label::new("x"), None, LocalTypeR::End)
+            ],
+        ))
     });
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program)
+        .validate(&global_to_json(&global), &program)
         .expect("Validation should not crash");
 
-    // This should succeed because C can receive any label from B
+    // This should succeed because Lean's `trans` chooses the first branch for non-participants.
     assert!(
         result.success,
-        "Lean should validate recv merge projection: {:?}",
+        "Lean should validate first-branch projection: {:?}",
         result
     );
 }

@@ -34,7 +34,9 @@ const DETERMINISTIC_SEED: [u8; 32] = [
 macro_rules! skip_without_lean {
     () => {
         if !LeanRunner::is_available() {
-            eprintln!("SKIPPED: Lean binary not available. Run `cd lean && lake build` to enable.");
+            eprintln!(
+                "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable."
+            );
             return;
         }
     };
@@ -155,86 +157,16 @@ fn choice_with_continuation_strategy() -> impl Strategy<Value = GlobalType> {
 // Conversion helpers
 // ============================================================================
 
-/// Convert a GlobalType to the JSON format expected by the Lean runner.
+/// Convert a GlobalType to the JSON format expected by the Lean validator.
 fn global_to_choreography_json(g: &GlobalType) -> Value {
-    // Extract actions from the global type
-    fn extract_actions(g: &GlobalType, actions: &mut Vec<Value>) {
-        match g {
-            GlobalType::End | GlobalType::Var(_) => {}
-            GlobalType::Comm {
-                sender,
-                receiver,
-                branches,
-            } => {
-                for (label, cont) in branches {
-                    actions.push(json!({
-                        "from": sender,
-                        "to": receiver,
-                        "label": label.name
-                    }));
-                    extract_actions(cont, actions);
-                }
-            }
-            GlobalType::Mu { body, .. } => extract_actions(body, actions),
-        }
-    }
-
-    let roles = g.roles();
-    let mut actions = Vec::new();
-    extract_actions(g, &mut actions);
-
-    json!({
-        "roles": roles,
-        "actions": actions
-    })
+    global_to_json(g)
 }
 
-/// Convert a LocalTypeR to the program JSON format expected by the Lean runner.
+/// Convert a LocalTypeR to the program JSON format expected by the Lean validator.
 fn local_to_program_json(role: &str, local: &LocalTypeR) -> Value {
-    fn extract_effects(local: &LocalTypeR, effects: &mut Vec<Value>) {
-        match local {
-            LocalTypeR::End | LocalTypeR::Var(_) => {}
-            LocalTypeR::Send { partner, branches } => {
-                for (label, _vt, cont) in branches {
-                    effects.push(json!({
-                        "kind": "send",
-                        "partner": partner,
-                        "label": label.name
-                    }));
-                    extract_effects(cont, effects);
-                    // For single-branch sends, only extract once
-                    if branches.len() == 1 {
-                        break;
-                    }
-                }
-            }
-            LocalTypeR::Recv { partner, branches } => {
-                for (label, _vt, cont) in branches {
-                    effects.push(json!({
-                        "kind": "recv",
-                        "partner": partner,
-                        "label": label.name
-                    }));
-                    extract_effects(cont, effects);
-                    // For single-branch recvs, only extract once
-                    if branches.len() == 1 {
-                        break;
-                    }
-                }
-            }
-            LocalTypeR::Mu { body, .. } => extract_effects(body, effects),
-        }
-    }
-
-    let mut effects = Vec::new();
-    extract_effects(local, &mut effects);
-
     json!({
         "role": role,
-        "programs": [{
-            "branch": Value::Null,
-            "effects": effects
-        }]
+        "local_type": local_to_json(local)
     })
 }
 

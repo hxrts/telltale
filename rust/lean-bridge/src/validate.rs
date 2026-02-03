@@ -161,13 +161,12 @@ impl Validator {
                 if result.success {
                     Ok(ValidationResult::Valid)
                 } else {
-                    let msgs: Vec<String> = result
-                        .branches
-                        .iter()
-                        .filter(|b| !b.status)
-                        .map(|b| format!("{}: {}", b.name, b.message))
-                        .collect();
-                    Ok(ValidationResult::Invalid(msgs.join("; ")))
+                    let msg = if result.message.is_empty() {
+                        "projection mismatch".to_string()
+                    } else {
+                        result.message
+                    };
+                    Ok(ValidationResult::Invalid(msg))
                 }
             }
             Err(e) => Err(ValidateError::LeanExecutionFailed(e.to_string())),

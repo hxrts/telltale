@@ -9,13 +9,15 @@ use telltale_lean_bridge::runner::LeanRunner;
 use telltale_theory::project;
 use telltale_types::{GlobalType, Label, PayloadSort};
 
-/// Skip if the Lean projection binary is unavailable.
+/// Skip if the Lean validator binary is unavailable.
 fn require_lean() -> LeanRunner {
     if !LeanRunner::is_projection_available() {
-        eprintln!("SKIP: projection_runner not found, run `cd lean && lake build`");
+        eprintln!(
+            "SKIP: telltale_validator not found, run `cd lean && lake build telltale_validator`"
+        );
         std::process::exit(0);
     }
-    LeanRunner::for_projection().expect("projection runner available")
+    LeanRunner::for_projection().expect("validator available")
 }
 
 /// Project via Lean and Rust, assert results match.

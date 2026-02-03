@@ -79,7 +79,7 @@ pub use equivalence::{
 
 #[cfg(feature = "runner")]
 pub use runner::{
-    BranchResult, ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,
+    ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,
 };
 
 #[cfg(feature = "runner")]

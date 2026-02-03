@@ -1,0 +1,25 @@
+-- MealService: A three-party kitchen coordination protocol
+-- Chef orchestrates SousChef (prep work) and Baker (oven/bread)
+
+protocol MealService =
+  roles Chef, SousChef, Baker
+
+  -- Setup phase: request ingredients and confirm kitchen status
+  Chef -> SousChef : IngredientRequest { items : List String }
+  SousChef -> Chef : DeliveryConfirm
+  Chef -> Baker : OvenStatus { status : String }
+  Chef -> SousChef : CourseRequest { course : String }
+  SousChef -> Chef : CourseReady
+
+  -- Cooking phase: Chef decides the dish, then coordinates preparation
+  case choose Chef of
+    pasta ->
+      Chef -> SousChef : BoilPasta
+      SousChef -> Chef : PastaReady
+      Chef -> Baker : PrepareGarlicBread  -- side dish
+      Baker -> Chef : BreadReady
+    tacos ->
+      Chef -> SousChef : PrepTortillas
+      SousChef -> Chef : TortillasReady
+      Chef -> Baker : HeatFillings
+      Baker -> Chef : FillingsReady

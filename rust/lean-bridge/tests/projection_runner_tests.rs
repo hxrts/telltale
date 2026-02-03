@@ -1,21 +1,20 @@
-//! Integration tests for the Lean projection runner.
+//! Integration tests for Lean projection export via `telltale_validator`.
 //!
-//! These tests invoke the projection_runner Lean binary via LeanRunner::project
-//! and verify the projected local types match expectations.
+//! These tests invoke the validator export mode via `LeanRunner::project` and
+//! verify the projected local types match expectations.
 
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::import::json_to_local;
 use telltale_lean_bridge::runner::LeanRunner;
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
-/// Skip test if projection runner binary is not available.
+/// Skip test if the validator binary is not available.
 fn require_projection_runner() -> LeanRunner {
     if !LeanRunner::is_projection_available() {
-        eprintln!("SKIP: projection_runner binary not found, run `cd lean && lake build`");
+        eprintln!("SKIP: telltale_validator not found, run `cd lean && lake build telltale_validator`");
         std::process::exit(0);
     }
-    // Use the projection binary path as the runner path; project() resolves its own binary.
-    LeanRunner::for_projection().expect("projection runner should be available")
+    LeanRunner::for_projection().expect("validator should be available")
 }
 
 #[test]

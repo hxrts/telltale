@@ -1,6 +1,6 @@
 //! Integration tests that compare Rust and Lean verification.
 //!
-//! These tests invoke the Lean runner binary to validate that
+//! These tests invoke the Lean validator binary to validate that
 //! Rust projections match the formally verified Lean implementation.
 //!
 //! Tests gracefully skip when the Lean binary is not available.
@@ -9,67 +9,27 @@
 #![allow(clippy::expect_used)]
 
 use serde_json::{json, Value};
+use telltale_lean_bridge::export::{global_to_json, local_to_json};
 use telltale_lean_bridge::{LeanRunner, Validator};
-use telltale_types::{GlobalType, Label};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Helper macro to skip tests when Lean binary is unavailable.
 macro_rules! skip_without_lean {
     () => {
         if !LeanRunner::is_available() {
-            eprintln!("SKIPPED: Lean binary not available. Run `cd lean && lake build` to enable.");
+            eprintln!(
+                "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable."
+            );
             return;
         }
     };
 }
 
-/// Build choreography JSON from roles and actions.
-fn build_choreography_json(roles: &[&str], actions: &[(&str, &str, &str)]) -> Value {
-    json!({
-        "roles": roles,
-        "actions": actions.iter().map(|(from, to, label)| {
-            json!({
-                "from": from,
-                "to": to,
-                "label": label
-            })
-        }).collect::<Vec<_>>()
-    })
-}
-
-/// Build program export JSON from role and effects.
-fn build_program_json(role: &str, effects: &[(&str, &str, &str)]) -> Value {
+/// Build program export JSON from role and LocalTypeR.
+fn build_program_json(role: &str, local: &LocalTypeR) -> Value {
     json!({
         "role": role,
-        "programs": [{
-            "branch": Value::Null,
-            "effects": effects.iter().map(|(kind, partner, label)| {
-                json!({
-                    "kind": kind,
-                    "partner": partner,
-                    "label": label
-                })
-            }).collect::<Vec<_>>()
-        }]
-    })
-}
-
-/// Build program export JSON with multiple branches.
-#[allow(clippy::type_complexity)]
-fn build_branching_program_json(role: &str, branches: &[(&str, &[(&str, &str, &str)])]) -> Value {
-    json!({
-        "role": role,
-        "programs": branches.iter().map(|(branch_name, effects)| {
-            json!({
-                "branch": branch_name,
-                "effects": effects.iter().map(|(kind, partner, label)| {
-                    json!({
-                        "kind": kind,
-                        "partner": partner,
-                        "label": label
-                    })
-                }).collect::<Vec<_>>()
-            })
-        }).collect::<Vec<_>>()
+        "local_type": local_to_json(local)
     })
 }
 
@@ -81,14 +41,25 @@ fn build_branching_program_json(role: &str, branches: &[(&str, &[(&str, &str, &s
 fn test_simple_ping_pong() {
     skip_without_lean!();
 
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping"), ("B", "A", "pong")]);
+    let global = GlobalType::send(
+        "A",
+        "B",
+        Label::new("ping"),
+        GlobalType::send("B", "A", Label::new("pong"), GlobalType::End),
+    );
 
-    // Role A: send ping, recv pong
-    let program_a = build_program_json("A", &[("send", "B", "ping"), ("recv", "B", "pong")]);
+    let program_a = build_program_json(
+        "A",
+        &LocalTypeR::send(
+            "B",
+            Label::new("ping"),
+            LocalTypeR::recv("B", Label::new("pong"), LocalTypeR::End),
+        ),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_a)
+        .validate(&global_to_json(&global), &program_a)
         .expect("Validation should succeed");
 
     assert!(result.success, "Lean validation failed: {:?}", result);
@@ -98,14 +69,25 @@ fn test_simple_ping_pong() {
 fn test_role_b_ping_pong() {
     skip_without_lean!();
 
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping"), ("B", "A", "pong")]);
+    let global = GlobalType::send(
+        "A",
+        "B",
+        Label::new("ping"),
+        GlobalType::send("B", "A", Label::new("pong"), GlobalType::End),
+    );
 
-    // Role B: recv ping, send pong
-    let program_b = build_program_json("B", &[("recv", "A", "ping"), ("send", "A", "pong")]);
+    let program_b = build_program_json(
+        "B",
+        &LocalTypeR::recv(
+            "A",
+            Label::new("ping"),
+            LocalTypeR::send("A", Label::new("pong"), LocalTypeR::End),
+        ),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_b)
+        .validate(&global_to_json(&global), &program_b)
         .expect("Validation should succeed");
 
     assert!(result.success, "Role B validation failed: {:?}", result);
@@ -120,33 +102,50 @@ fn test_three_party_ring() {
     skip_without_lean!();
 
     // A -> B: msg1. B -> C: msg2. C -> A: msg3. end
-    let choreo = build_choreography_json(
-        &["A", "B", "C"],
-        &[("A", "B", "msg1"), ("B", "C", "msg2"), ("C", "A", "msg3")],
+    let global = GlobalType::send(
+        "A",
+        "B",
+        Label::new("msg1"),
+        GlobalType::send(
+            "B",
+            "C",
+            Label::new("msg2"),
+            GlobalType::send("C", "A", Label::new("msg3"), GlobalType::End),
+        ),
     );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
 
-    // Test each role
-    let test_cases = [
-        ("A", vec![("send", "B", "msg1"), ("recv", "C", "msg3")]),
-        ("B", vec![("recv", "A", "msg1"), ("send", "C", "msg2")]),
-        ("C", vec![("recv", "B", "msg2"), ("send", "A", "msg3")]),
-    ];
+    let program_a = build_program_json(
+        "A",
+        &LocalTypeR::send(
+            "B",
+            Label::new("msg1"),
+            LocalTypeR::recv("C", Label::new("msg3"), LocalTypeR::End),
+        ),
+    );
+    let program_b = build_program_json(
+        "B",
+        &LocalTypeR::recv(
+            "A",
+            Label::new("msg1"),
+            LocalTypeR::send("C", Label::new("msg2"), LocalTypeR::End),
+        ),
+    );
+    let program_c = build_program_json(
+        "C",
+        &LocalTypeR::recv(
+            "B",
+            Label::new("msg2"),
+            LocalTypeR::send("A", Label::new("msg3"), LocalTypeR::End),
+        ),
+    );
 
-    for (role, effects) in test_cases {
-        let effects_refs: Vec<(&str, &str, &str)> =
-            effects.iter().map(|(k, p, l)| (*k, *p, *l)).collect();
-        let program = build_program_json(role, &effects_refs);
+    for (role, program) in [("A", program_a), ("B", program_b), ("C", program_c)] {
         let result = runner
-            .validate(&choreo, &program)
+            .validate(&global_to_json(&global), &program)
             .unwrap_or_else(|_| panic!("Validation should succeed for role {}", role));
-
-        assert!(
-            result.success,
-            "Role {} failed validation: {:?}",
-            role, result
-        );
+        assert!(result.success, "Role {} failed validation: {:?}", role, result);
     }
 }
 
@@ -155,40 +154,62 @@ fn test_three_party_ring() {
 // ============================================================================
 
 #[test]
-fn test_choice_accept_branch() {
+fn test_choice_sender_projection() {
     skip_without_lean!();
 
     // A -> B: { accept | reject }
-    let choreo =
-        build_choreography_json(&["A", "B"], &[("A", "B", "accept"), ("A", "B", "reject")]);
+    let global = GlobalType::comm(
+        "A",
+        "B",
+        vec![(Label::new("accept"), GlobalType::End), (Label::new("reject"), GlobalType::End)],
+    );
 
-    // A chooses accept
-    let program_a = build_program_json("A", &[("send", "B", "accept")]);
+    let program_a = build_program_json(
+        "A",
+        &LocalTypeR::send_choice(
+            "B",
+            vec![
+                (Label::new("accept"), None, LocalTypeR::End),
+                (Label::new("reject"), None, LocalTypeR::End),
+            ],
+        ),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_a)
+        .validate(&global_to_json(&global), &program_a)
         .expect("Validation should succeed");
 
-    assert!(result.success, "Accept branch failed: {:?}", result);
+    assert!(result.success, "Choice sender validation failed: {:?}", result);
 }
 
 #[test]
-fn test_choice_reject_branch() {
+fn test_choice_receiver_projection() {
     skip_without_lean!();
 
-    let choreo =
-        build_choreography_json(&["A", "B"], &[("A", "B", "accept"), ("A", "B", "reject")]);
+    let global = GlobalType::comm(
+        "A",
+        "B",
+        vec![(Label::new("accept"), GlobalType::End), (Label::new("reject"), GlobalType::End)],
+    );
 
-    // A chooses reject
-    let program_a = build_program_json("A", &[("send", "B", "reject")]);
+    let program_b = build_program_json(
+        "B",
+        &LocalTypeR::recv_choice(
+            "A",
+            vec![
+                (Label::new("accept"), None, LocalTypeR::End),
+                (Label::new("reject"), None, LocalTypeR::End),
+            ],
+        ),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_a)
+        .validate(&global_to_json(&global), &program_b)
         .expect("Validation should succeed");
 
-    assert!(result.success, "Reject branch failed: {:?}", result);
+    assert!(result.success, "Choice receiver validation failed: {:?}", result);
 }
 
 // ============================================================================
@@ -200,21 +221,19 @@ fn test_invalid_projection_detected() {
     skip_without_lean!();
 
     // A -> B: msg
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "msg")]);
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
     // Wrong program: A sends to C (which doesn't exist in choreography)
-    let bad_program = build_program_json("A", &[("send", "C", "msg")]);
+    let bad_program = build_program_json(
+        "A",
+        &LocalTypeR::send("C", Label::new("msg"), LocalTypeR::End),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
-    let result = runner.validate(&choreo, &bad_program);
+    let result = runner.validate(&global_to_json(&global), &bad_program);
 
-    // This should either fail validation or return an error
     if let Ok(r) = result {
-        assert!(
-            !r.success,
-            "Should have detected invalid projection, but got: {:?}",
-            r
-        );
+        assert!(!r.success, "Should have detected invalid projection");
     }
     // Error is also acceptable
 }
@@ -223,13 +242,16 @@ fn test_invalid_projection_detected() {
 fn test_wrong_label_detected() {
     skip_without_lean!();
 
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping")]);
+    let global = GlobalType::send("A", "B", Label::new("ping"), GlobalType::End);
 
     // Wrong label
-    let bad_program = build_program_json("A", &[("send", "B", "wrong_label")]);
+    let bad_program = build_program_json(
+        "A",
+        &LocalTypeR::send("B", Label::new("wrong_label"), LocalTypeR::End),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
-    let result = runner.validate(&choreo, &bad_program);
+    let result = runner.validate(&global_to_json(&global), &bad_program);
 
     if let Ok(r) = result {
         assert!(!r.success, "Should have detected wrong label");
@@ -241,20 +263,25 @@ fn test_missing_action_detected() {
     skip_without_lean!();
 
     // Two-message protocol
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "first"), ("A", "B", "second")]);
+    let global = GlobalType::send(
+        "A",
+        "B",
+        Label::new("first"),
+        GlobalType::send("A", "B", Label::new("second"), GlobalType::End),
+    );
 
     // Program only has first message (missing second)
-    let incomplete_program = build_program_json("A", &[("send", "B", "first")]);
+    let incomplete_program = build_program_json(
+        "A",
+        &LocalTypeR::send("B", Label::new("first"), LocalTypeR::End),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
-    let result = runner
-        .validate(&choreo, &incomplete_program)
-        .expect("Should not crash");
+    let result = runner.validate(&global_to_json(&global), &incomplete_program);
 
-    // Lean should accept this as a valid subsequence (omitting optional actions is OK)
-    // This depends on Lean's subtyping semantics
-    // Just verify it doesn't crash
-    let _ = result;
+    if let Ok(r) = result {
+        assert!(!r.success, "Should detect missing action");
+    }
 }
 
 // ============================================================================
@@ -271,11 +298,14 @@ fn test_validator_with_lean() {
         "Lean should be available after skip_without_lean"
     );
 
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "msg")]);
-    let program = build_program_json("A", &[("send", "B", "msg")]);
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let program = build_program_json(
+        "A",
+        &LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+    );
 
     let result = validator
-        .validate_projection_with_lean(&choreo, &program)
+        .validate_projection_with_lean(&global_to_json(&global), &program)
         .expect("Validation should succeed");
 
     assert!(result.is_valid(), "Validator result should be valid");
@@ -287,10 +317,13 @@ fn test_validator_detects_invalid() {
 
     let validator = Validator::new();
 
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "msg")]);
-    let bad_program = build_program_json("A", &[("send", "C", "wrong")]);
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let bad_program = build_program_json(
+        "A",
+        &LocalTypeR::send("C", Label::new("wrong"), LocalTypeR::End),
+    );
 
-    let result = validator.validate_projection_with_lean(&choreo, &bad_program);
+    let result = validator.validate_projection_with_lean(&global_to_json(&global), &bad_program);
 
     if let Ok(r) = result {
         assert!(r.is_invalid(), "Should detect invalid projection");
@@ -307,7 +340,7 @@ fn test_rust_globaltype_matches_lean() {
     skip_without_lean!();
 
     // Define protocol using Rust types
-    let _global = GlobalType::comm(
+    let global = GlobalType::comm(
         "Client",
         "Server",
         vec![
@@ -316,21 +349,20 @@ fn test_rust_globaltype_matches_lean() {
         ],
     );
 
-    // Build equivalent choreography JSON
-    let choreo = build_choreography_json(
-        &["Client", "Server"],
-        &[
-            ("Client", "Server", "request"),
-            ("Client", "Server", "quit"),
-        ],
+    let program = build_program_json(
+        "Client",
+        &LocalTypeR::send_choice(
+            "Server",
+            vec![
+                (Label::new("request"), None, LocalTypeR::End),
+                (Label::new("quit"), None, LocalTypeR::End),
+            ],
+        ),
     );
-
-    // Client projection: internal choice between request and quit
-    let program = build_program_json("Client", &[("send", "Server", "request")]);
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program)
+        .validate(&global_to_json(&global), &program)
         .expect("Validation should succeed");
 
     assert!(
@@ -349,34 +381,50 @@ fn test_calculator_protocol() {
 
     // Calculator: Client -> Server: { add | sub | quit }
     // For add/sub: Server -> Client: result
-    let choreo = build_choreography_json(
-        &["Client", "Server"],
-        &[
-            ("Client", "Server", "add"),
-            ("Server", "Client", "result"),
-            ("Client", "Server", "sub"),
-            ("Server", "Client", "result"),
-            ("Client", "Server", "quit"),
+    let global = GlobalType::comm(
+        "Client",
+        "Server",
+        vec![
+            (
+                Label::new("add"),
+                GlobalType::send("Server", "Client", Label::new("result"), GlobalType::End),
+            ),
+            (
+                Label::new("sub"),
+                GlobalType::send("Server", "Client", Label::new("result"), GlobalType::End),
+            ),
+            (Label::new("quit"), GlobalType::End),
         ],
     );
 
-    // Client chooses add path
-    let program = build_branching_program_json(
+    let program = build_program_json(
         "Client",
-        &[(
-            "add",
-            &[("send", "Server", "add"), ("recv", "Server", "result")],
-        )],
+        &LocalTypeR::send_choice(
+            "Server",
+            vec![
+                (
+                    Label::new("add"),
+                    None,
+                    LocalTypeR::recv("Server", Label::new("result"), LocalTypeR::End),
+                ),
+                (
+                    Label::new("sub"),
+                    None,
+                    LocalTypeR::recv("Server", Label::new("result"), LocalTypeR::End),
+                ),
+                (Label::new("quit"), None, LocalTypeR::End),
+            ],
+        ),
     );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program)
+        .validate(&global_to_json(&global), &program)
         .expect("Validation should succeed");
 
     assert!(
         result.success,
-        "Calculator add branch should validate: {:?}",
+        "Calculator protocol validation failed: {:?}",
         result
     );
 }
@@ -385,28 +433,36 @@ fn test_calculator_protocol() {
 // Recursive Protocol Tests
 // ============================================================================
 
-// Note: The Lean runner uses a flat choreography format (roles + actions array),
-// not the hierarchical GlobalType format with Mu/Var. Recursive protocols are
-// validated by unrolling the first iteration of the loop body.
-//
-// Full recursive type validation happens in:
-// - rust/lean-bridge/tests/proptest_projection.rs (property-based tests)
-// - rust/lean-bridge/tests/projection_equivalence_tests.rs (DSL cross-validation)
-
 #[test]
-fn test_recursive_ping_pong_unrolled() {
+fn test_recursive_ping_pong() {
     skip_without_lean!();
 
     // µLoop. A -> B: ping. B -> A: pong. Loop
-    // Represented as flat actions (one iteration of the loop body)
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping"), ("B", "A", "pong")]);
+    let global = GlobalType::mu(
+        "Loop",
+        GlobalType::send(
+            "A",
+            "B",
+            Label::new("ping"),
+            GlobalType::send("B", "A", Label::new("pong"), GlobalType::var("Loop")),
+        ),
+    );
 
-    // Role A: send ping, recv pong
-    let program_a = build_program_json("A", &[("send", "B", "ping"), ("recv", "B", "pong")]);
+    let program_a = build_program_json(
+        "A",
+        &LocalTypeR::mu(
+            "Loop",
+            LocalTypeR::send(
+                "B",
+                Label::new("ping"),
+                LocalTypeR::recv("B", Label::new("pong"), LocalTypeR::var("Loop")),
+            ),
+        ),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_a)
+        .validate(&global_to_json(&global), &program_a)
         .expect("Recursive validation should succeed");
 
     assert!(
@@ -420,15 +476,31 @@ fn test_recursive_ping_pong_unrolled() {
 fn test_recursive_ping_pong_role_b() {
     skip_without_lean!();
 
-    // Same recursive protocol, testing role B
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "ping"), ("B", "A", "pong")]);
+    let global = GlobalType::mu(
+        "Loop",
+        GlobalType::send(
+            "A",
+            "B",
+            Label::new("ping"),
+            GlobalType::send("B", "A", Label::new("pong"), GlobalType::var("Loop")),
+        ),
+    );
 
-    // Role B: recv ping, send pong
-    let program_b = build_program_json("B", &[("recv", "A", "ping"), ("send", "A", "pong")]);
+    let program_b = build_program_json(
+        "B",
+        &LocalTypeR::mu(
+            "Loop",
+            LocalTypeR::recv(
+                "A",
+                Label::new("ping"),
+                LocalTypeR::send("A", Label::new("pong"), LocalTypeR::var("Loop")),
+            ),
+        ),
+    );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_b)
+        .validate(&global_to_json(&global), &program_b)
         .expect("Recursive validation should succeed");
 
     assert!(
@@ -439,32 +511,46 @@ fn test_recursive_ping_pong_role_b() {
 }
 
 #[test]
-fn test_recursive_choice_unrolled() {
+fn test_recursive_choice() {
     skip_without_lean!();
 
     // µLoop. A -> B: { continue. B -> A: data. Loop | stop }
-    // Unrolled as: A -> B: continue | stop, B -> A: data (for continue branch)
-    let choreo = build_choreography_json(
-        &["A", "B"],
-        &[
-            ("A", "B", "continue"),
-            ("B", "A", "data"),
-            ("A", "B", "stop"),
-        ],
+    let global = GlobalType::mu(
+        "Loop",
+        GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (
+                    Label::new("continue"),
+                    GlobalType::send("B", "A", Label::new("data"), GlobalType::var("Loop")),
+                ),
+                (Label::new("stop"), GlobalType::End),
+            ],
+        ),
     );
 
-    // Role A chooses the continue branch
-    let program_a = build_branching_program_json(
+    let program_a = build_program_json(
         "A",
-        &[(
-            "continue",
-            &[("send", "B", "continue"), ("recv", "B", "data")],
-        )],
+        &LocalTypeR::mu(
+            "Loop",
+            LocalTypeR::send_choice(
+                "B",
+                vec![
+                    (
+                        Label::new("continue"),
+                        None,
+                        LocalTypeR::recv("B", Label::new("data"), LocalTypeR::var("Loop")),
+                    ),
+                    (Label::new("stop"), None, LocalTypeR::End),
+                ],
+            ),
+        ),
     );
 
     let runner = LeanRunner::new().expect("Lean binary should exist");
     let result = runner
-        .validate(&choreo, &program_a)
+        .validate(&global_to_json(&global), &program_a)
         .expect("Recursive choice validation should succeed");
 
     assert!(
@@ -483,8 +569,8 @@ fn test_recursive_choice_unrolled() {
 /// In CI, this test is mandatory and will fail if Lean isn't built.
 /// This ensures that Lean validation is always run in the CI pipeline.
 ///
-/// To build Lean locally: `cd lean && lake build`
-/// With Nix: `nix develop --command bash -c "cd lean && lake build"`
+/// To build Lean locally: `cd lean && lake build telltale_validator`
+/// With Nix: `nix develop --command bash -c "cd lean && lake build telltale_validator"`
 #[test]
 #[ignore = "temporarily disabled during Lean refactoring"]
 fn test_lean_binary_available_for_ci() {
@@ -496,11 +582,14 @@ fn test_lean_binary_available_for_ci() {
         LeanRunner::new().expect("Lean runner should be constructable after require_available()");
 
     // Run a minimal validation to confirm the binary works
-    let choreo = build_choreography_json(&["A", "B"], &[("A", "B", "msg")]);
-    let program = build_program_json("A", &[("send", "B", "msg")]);
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let program = build_program_json(
+        "A",
+        &LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End),
+    );
 
     let result = runner
-        .validate(&choreo, &program)
+        .validate(&global_to_json(&global), &program)
         .expect("Lean validation should work");
     assert!(result.success, "Basic validation should pass");
 }

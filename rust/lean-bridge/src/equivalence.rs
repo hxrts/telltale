@@ -75,7 +75,7 @@ pub enum EquivalenceError {
     JsonError(#[from] serde_json::Error),
 
     /// The Lean runner is not available.
-    #[error("Lean runner not available - build with: cd lean && lake build")]
+    #[error("Lean runner not available - build with: cd lean && lake build telltale_validator")]
     LeanNotAvailable,
 
     /// Golden file mismatch detected.
@@ -222,6 +222,46 @@ impl EquivalenceChecker {
         &self.config.golden_dir
     }
 
+    fn parse_projections_map(
+        lean_output: &Value,
+    ) -> Result<HashMap<String, Value>, EquivalenceError> {
+        let projections_val = lean_output.get("projections").ok_or_else(|| {
+            EquivalenceError::ParseError("Missing projections in Lean output".into())
+        })?;
+
+        match projections_val {
+            Value::Object(map) => Ok(map
+                .iter()
+                .map(|(role, local)| (role.clone(), local.clone()))
+                .collect()),
+            Value::Array(items) => {
+                let mut projections = HashMap::new();
+                for item in items {
+                    let obj = item.as_object().ok_or_else(|| {
+                        EquivalenceError::ParseError("Expected projection object".into())
+                    })?;
+                    let role = obj
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            EquivalenceError::ParseError("Expected role string".into())
+                        })?;
+                    let local_type = obj
+                        .get("local_type")
+                        .or_else(|| obj.get("localType"))
+                        .ok_or_else(|| {
+                            EquivalenceError::ParseError("Expected local type".into())
+                        })?;
+                    projections.insert(role.to_string(), local_type.clone());
+                }
+                Ok(projections)
+            }
+            _ => Err(EquivalenceError::ParseError(
+                "Invalid projections format".into(),
+            )),
+        }
+    }
+
     // ========================================================================
     // Golden File Comparison
     // ========================================================================
@@ -338,7 +378,13 @@ impl EquivalenceChecker {
             )));
         }
 
-        let expected = lean_output["result"].clone();
+        let expected = lean_output
+            .get("projection")
+            .or_else(|| lean_output.get("result"))
+            .ok_or_else(|| {
+                EquivalenceError::ParseError("Missing projection in Lean output".into())
+            })?
+            .clone();
 
         // Compute Rust projection
         let rust_local = project(global, role)?;
@@ -373,23 +419,16 @@ impl EquivalenceChecker {
             )));
         }
 
-        let projections = lean_output["projections"]
-            .as_array()
-            .ok_or_else(|| EquivalenceError::ParseError("Expected projections array".into()))?;
-
         let mut results = Vec::new();
+        let projections = Self::parse_projections_map(&lean_output)?;
 
-        for proj in projections {
-            let role = proj["role"]
-                .as_str()
-                .ok_or_else(|| EquivalenceError::ParseError("Expected role string".into()))?;
-            let expected = proj["localType"].clone();
+        for (role, expected) in projections {
 
             // Compute Rust projection
-            let rust_local = project(global, role)?;
+            let rust_local = project(global, &role)?;
             let rust_output = local_to_json(&rust_local);
 
-            let result = self.compare_local_types(role, &rust_output, &expected)?;
+            let result = self.compare_local_types(&role, &rust_output, &expected)?;
             results.push(result);
         }
 
@@ -425,19 +464,7 @@ impl EquivalenceChecker {
             )));
         }
 
-        let projections_arr = lean_output["projections"]
-            .as_array()
-            .ok_or_else(|| EquivalenceError::ParseError("Expected projections array".into()))?;
-
-        let mut projections = HashMap::new();
-        for proj in projections_arr {
-            let role = proj["role"]
-                .as_str()
-                .ok_or_else(|| EquivalenceError::ParseError("Expected role string".into()))?
-                .to_string();
-            let local_type = proj["localType"].clone();
-            projections.insert(role, local_type);
-        }
+        let projections = Self::parse_projections_map(&lean_output)?;
 
         Ok(GoldenBundle {
             input: global_json,
@@ -508,16 +535,12 @@ impl EquivalenceChecker {
                     continue; // Skip failed projections
                 }
 
-                let projections_arr = lean_output["projections"].as_array();
-                if projections_arr.is_none() {
-                    continue;
-                }
+                let projections = match Self::parse_projections_map(&lean_output) {
+                    Ok(projections) => projections,
+                    Err(_) => continue,
+                };
 
-                for proj in projections_arr.unwrap() {
-                    let role = match proj["role"].as_str() {
-                        Some(r) => r,
-                        None => continue,
-                    };
+                for (role, fresh) in projections {
 
                     let golden_path = entry.path().join(format!("{}.expected.json", role));
                     if !golden_path.exists() {
@@ -527,7 +550,6 @@ impl EquivalenceChecker {
 
                     let golden: Value =
                         serde_json::from_str(&std::fs::read_to_string(&golden_path)?)?;
-                    let fresh = proj["localType"].clone();
 
                     if !self.json_structurally_equal(&golden, &fresh) {
                         drifted.push(format!("{}:{}", test_name, role));

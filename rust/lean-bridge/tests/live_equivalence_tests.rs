@@ -7,9 +7,9 @@
 //!
 //! ## Prerequisites
 //!
-//! Build the Lean runner:
+//! Build the Lean validator:
 //! ```bash
-//! cd lean && lake build telltale_runner
+//! cd lean && lake build telltale_validator
 //! ```
 //!
 //! ## When to Use
@@ -46,7 +46,7 @@ fn golden_dir() -> PathBuf {
 fn try_get_lean_checker() -> Option<EquivalenceChecker> {
     if !LeanRunner::is_available() {
         println!("Lean runner not available, skipping test");
-        println!("Build with: cd lean && lake build telltale_runner");
+        println!("Build with: cd lean && lake build telltale_validator");
         return None;
     }
 
@@ -59,7 +59,7 @@ fn try_get_lean_checker() -> Option<EquivalenceChecker> {
         .is_err()
     {
         println!("Lean runner not responding correctly (may need rebuild)");
-        println!("Rebuild with: cd lean && lake build telltale_runner");
+        println!("Rebuild with: cd lean && lake build telltale_validator");
         return None;
     }
 

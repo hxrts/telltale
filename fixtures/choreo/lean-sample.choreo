@@ -1,0 +1,22 @@
+-- MealPrep: Simplified kitchen protocol for Lean verification testing
+
+protocol MealPrep =
+  roles Chef, SousChef, Baker
+
+  -- Setup phase
+  Chef -> SousChef : IngredientRequest { items : List String }
+  SousChef -> Chef : DeliveryConfirm
+  Chef -> Baker : OvenStatus { status : String }
+
+  -- Cooking phase
+  case choose Chef of
+    pasta ->
+      Chef -> SousChef : BoilPasta
+      SousChef -> Chef : PastaReady
+      Chef -> Baker : PrepareGarlicBread
+      Baker -> Chef : BreadReady
+    tacos ->
+      Chef -> SousChef : PrepTortillas
+      SousChef -> Chef : TortillasReady
+      Chef -> Baker : HeatFillings
+      Baker -> Chef : FillingsReady
