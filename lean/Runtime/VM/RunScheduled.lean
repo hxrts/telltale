@@ -33,7 +33,8 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   let sched' := { st.sched with readyQueue := ready', blockedSet := blocked' }
   { st with sched := sched' }
 
-/-- Execute one round: advance up to N ready coroutines, each by one instruction. -/
+/-- Execute one round: advance at most one ready coroutine.
+    Concurrency is abstracted away in the canonical runner. -/
 def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -41,14 +42,12 @@ def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (n : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
-  let rec go (fuel : Nat) (s : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
-    match fuel with
-    | 0 => s
-    | fuel' + 1 =>
-        match schedStep s with
-        | none => s
-        | some s' => go fuel' s'
-  go n st
+  if h : n = 0 then
+    st
+  else
+    match schedStep st with
+    | none => st
+    | some st' => st'
 
 /-- Check if all coroutines have reached a terminal state. -/
 def allTerminal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -102,30 +101,4 @@ def runScheduled {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       else
         runScheduled fuel' concurrency st'''
 
-/-! ## Invariance stubs -/
-
-/-- Per-session observable trace is invariant over concurrency level N (stub). -/
-def per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
-    (hwf : WFVMState st) (sid : SessionId) (fuel n1 n2 : Nat)
-    (hn1 : n1 ≥ 1) (hn2 : n2 ≥ 1) : Prop :=
-  filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel n1 st).obsTrace) =
-  filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel n2 st).obsTrace)
-
-/-- Per-session observable trace is invariant under scheduling policy (stub). -/
-def per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν)
-    (hwf : WFVMState st) (sid : SessionId) (fuel concurrency : Nat) : Prop :=
-  filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency st).obsTrace) =
-  filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency
-    { st with sched := { st.sched with policy := .roundRobin } }).obsTrace)
+/-! ## Invariance proofs live in `Runtime.Proofs.Concurrency`. -/

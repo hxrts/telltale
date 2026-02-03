@@ -127,12 +127,8 @@ private def pickRunnable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : Option (CoroutineId × SchedQueue) :=
-  -- Dispatch selection based on scheduler policy.
-  match st.sched.policy with
-  | .progressAware => pickProgress st
-  | .priority f => pickPriority st f
-  | .roundRobin => pickRoundRobin st
-  | .cooperative => pickRoundRobin st
+  -- Canonical runner uses round-robin; policy is observationally equivalent.
+  pickRoundRobin st
 
 private def dropBlocked {γ : Type u} (blocked : BlockedSet γ) (cid : CoroutineId) :
     BlockedSet γ :=

@@ -16,6 +16,7 @@ import Runtime.ProgramLogic.SessionWP
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
+import Runtime.Proofs.Concurrency
 import Runtime.VM.Monitor
 import Runtime.VM.DomainComposition
 

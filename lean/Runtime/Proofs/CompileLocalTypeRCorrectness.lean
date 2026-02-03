@@ -18,15 +18,19 @@ private theorem ensureTerminal_nonempty {γ ε : Type u} [GuardLayer γ] [Effect
   | nil =>
       simp [ensureTerminal]
   | cons head tail =>
-      cases h : (List.getLast? (head :: tail)) <;> simp [ensureTerminal, h]
+      cases h : (List.getLast? (head :: tail)) with
+      | none =>
+          simp [ensureTerminal, h]
+      | some val =>
+          cases val <;> simp [ensureTerminal, h]
 
 private theorem ensureTerminal_last_halt_or_jmp {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (code : List (Instr γ ε)) :
     let code' := ensureTerminal (γ:=γ) (ε:=ε) code
     code'.getLast? = some .halt ∨ ∃ pc, code'.getLast? = some (.jmp pc) := by
-  cases h : code.getLast? <;> simp [ensureTerminal, h]
+  cases h : code.getLast? <;> simp [h, ensureTerminal]
   case some instr =>
-    cases instr <;> simp [ensureTerminal, h]
+    cases instr <;> simp [h]
 
 theorem compile_nonempty {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     [Inhabited (EffectModel.EffectAction ε)]
