@@ -39,24 +39,24 @@ pub type RoleValidationResult<T> = Result<T, RoleValidationError>;
 /// Role parameter expression for dynamic role counts
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RoleParam {
-    /// Static count: Worker[3]
+    /// Static count: `Worker[3]`
     Static(u32),
-    /// Symbolic count: Worker[N]
+    /// Symbolic count: `Worker[N]`
     Symbolic(String),
-    /// Runtime determined: Worker[*]
+    /// Runtime determined: `Worker[*]`
     Runtime,
 }
 
 /// Role index expression for role references
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RoleIndex {
-    /// Concrete index: Worker[0]
+    /// Concrete index: `Worker[0]`
     Concrete(u32),
-    /// Symbolic index: Worker[i]
+    /// Symbolic index: `Worker[i]`
     Symbolic(String),
-    /// Wildcard: Worker[*] - all instances
+    /// Wildcard: `Worker[*]` - all instances
     Wildcard,
-    /// Range: Worker[0..3]
+    /// Range: `Worker[0..3]`
     Range(RoleRange),
 }
 
@@ -163,14 +163,14 @@ impl Role {
         Ok(role)
     }
 
-    /// Create a role with a parameter (e.g., Worker[3], Worker[N], Worker[*])
+    /// Create a role with a parameter (e.g., `Worker[3]`, `Worker[N]`, `Worker[*]`)
     pub fn with_param(name: Ident, param: RoleParam) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(name, Some(param), None, None);
         role.validate()?;
         Ok(role)
     }
 
-    /// Create a role reference with an index (e.g., Worker[0], Worker[i], Worker[*])
+    /// Create a role reference with an index (e.g., `Worker[0]`, `Worker[i]`, `Worker[*]`)
     pub fn with_index(name: Ident, index: RoleIndex) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(name, None, Some(index), None);
         role.validate()?;
@@ -196,7 +196,7 @@ impl Role {
         Ok(role)
     }
 
-    /// Create a parameterized role with symbolic parameter (e.g., Worker[N])
+    /// Create a parameterized role with symbolic parameter (e.g., `Worker[N]`)
     pub fn parameterized(name: Ident, param: TokenStream) -> RoleValidationResult<Self> {
         let role = Self::new_unchecked(
             name,
@@ -208,7 +208,7 @@ impl Role {
         Ok(role)
     }
 
-    /// Create a role array with a concrete size (e.g., Worker[3])
+    /// Create a role array with a concrete size (e.g., `Worker[3]`)
     pub fn array(name: Ident, size: usize) -> RoleValidationResult<Self> {
         let size_token: TokenStream = size.to_string().parse().unwrap();
         let role = Self::new_unchecked(
@@ -263,7 +263,7 @@ impl Role {
         self.index.is_some() || self.param.is_some()
     }
 
-    /// Check if this is a role array (declared with size like Worker[N])
+    /// Check if this is a role array (declared with size like `Worker[N]`)
     #[must_use]
     pub fn is_array(&self) -> bool {
         self.array_size.is_some() || matches!(self.param, Some(RoleParam::Static(_)))
@@ -329,7 +329,7 @@ impl Role {
     /// ignoring specific indices. For example:
     /// - `Worker[0]` matches `Worker[N]`
     /// - `Worker[i]` matches `Worker[N]`
-    /// - `Worker[1]` matches `Worker[3]` (if Worker[3] is the array declaration)
+    /// - `Worker[1]` matches `Worker[3]` (if `Worker[3]` is the array declaration)
     /// - `Client` only matches `Client` (exact match for non-parameterized)
     #[must_use]
     pub fn matches_family(&self, family: &Role) -> bool {
@@ -344,7 +344,7 @@ impl Role {
             return self.is_indexed() || self.param.is_some() || !self.is_array();
         }
 
-        // If the family has a param (symbolic like Worker[N]), indexed instances match
+        // If the family has a param (symbolic like `Worker[N]`), indexed instances match
         if family.param.is_some() && (self.is_indexed() || self.param.is_some()) {
             return true;
         }

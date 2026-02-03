@@ -31,7 +31,7 @@ use proc_macro2::{Ident, TokenStream};
 pub struct MessageType {
     /// The name identifier of the message
     pub name: Ident,
-    /// Optional type annotation for the message (e.g., <String>, <i32, bool>)
+    /// Optional type annotation for the message (e.g., `<String>`, `<i32, bool>`)
     pub type_annotation: Option<TokenStream>,
     /// Optional payload type (as token stream)
     pub payload: Option<TokenStream>,

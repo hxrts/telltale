@@ -16,7 +16,7 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```text
 //! error[R001]: Undefined role 'Bob'
 //!   --> protocol.chor:5:3
 //!    |
@@ -139,10 +139,7 @@ impl DiagnosticCode {
     /// Get a documentation URL for this error code.
     #[must_use]
     pub fn doc_url(&self) -> String {
-        format!(
-            "https://telltale.dev/errors/{}",
-            self.code().to_lowercase()
-        )
+        format!("https://telltale.dev/errors/{}", self.code().to_lowercase())
     }
 }
 

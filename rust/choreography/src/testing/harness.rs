@@ -100,7 +100,7 @@ impl RoleBinding {
         }
     }
 
-    /// Get the display name (e.g., "Witness[2]" for indexed roles).
+    /// Get the display name (e.g., `Witness[2]` for indexed roles).
     #[must_use]
     pub fn display_name(&self) -> String {
         match self.index {

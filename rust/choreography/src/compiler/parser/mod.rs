@@ -5,11 +5,11 @@
 //!
 //! # Module Structure
 //!
-//! - [`error`]: Error types and span information for diagnostics
-//! - [`types`]: Internal AST types for parsing (Statement, ChoiceBranch, etc.)
-//! - [`role`]: Role parsing (declarations, references, indices, ranges)
-//! - [`statement`]: Statement parsing (send, choice, loop, etc.)
-//! - [`conversion`]: Protocol conversion and call inlining
+//! - `error`: Error types and span information for diagnostics
+//! - `types`: Internal AST types for parsing (Statement, ChoiceBranch, etc.)
+//! - `role`: Role parsing (declarations, references, indices, ranges)
+//! - `statement`: Statement parsing (send, choice, loop, etc.)
+//! - `conversion`: Protocol conversion and call inlining
 
 mod conversion;
 mod error;

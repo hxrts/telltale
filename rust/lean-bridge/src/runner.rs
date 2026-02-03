@@ -53,7 +53,7 @@ pub enum LeanRunnerError {
 /// Result of validating a single branch.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BranchResult {
-    /// Branch name (or "<default>" for unnamed branches).
+    /// Branch name (or `<default>` for unnamed branches).
     pub name: String,
     /// Whether this branch passed validation.
     pub status: bool,
@@ -63,6 +63,15 @@ pub struct BranchResult {
     pub exported: Vec<String>,
     /// Actions from the projected local type.
     pub projected: Vec<String>,
+}
+
+/// Choreography input for the VM runner.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChoreographyJson {
+    /// Global type JSON (Lean-compatible).
+    pub global_type: Value,
+    /// Role list.
+    pub roles: Vec<String>,
 }
 
 /// Result of a Lean validation run.
@@ -348,13 +357,22 @@ impl LeanRunner {
     // ========================================================================
 
     /// Default path to the projection runner binary (relative to workspace root).
-    pub const PROJECTION_BINARY_PATH: &'static str =
-        "lean/.lake/build/bin/projection_runner";
+    pub const PROJECTION_BINARY_PATH: &'static str = "lean/.lake/build/bin/projection_runner";
+
+    /// Default path to the VM runner binary (relative to workspace root).
+    pub const VM_RUNNER_BINARY_PATH: &'static str = "lean/.lake/build/bin/vm_runner";
 
     /// Get the full path to the projection runner binary.
     fn get_projection_binary_path() -> Option<PathBuf> {
         Self::find_workspace_root()
             .map(|root| root.join(Self::PROJECTION_BINARY_PATH))
+            .filter(|p| p.exists())
+    }
+
+    /// Get the full path to the VM runner binary.
+    fn get_vm_runner_path() -> Option<PathBuf> {
+        Self::find_workspace_root()
+            .map(|root| root.join(Self::VM_RUNNER_BINARY_PATH))
             .filter(|p| p.exists())
     }
 
@@ -435,14 +453,69 @@ impl LeanRunner {
         let projections = result
             .get("projections")
             .and_then(|v| v.as_object())
-            .ok_or_else(|| {
-                LeanRunnerError::ParseError("missing projections field".to_string())
-            })?;
+            .ok_or_else(|| LeanRunnerError::ParseError("missing projections field".to_string()))?;
 
         Ok(projections
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect())
+    }
+
+    // ========================================================================
+    // VM Runner Methods
+    // ========================================================================
+
+    /// Run one or more choreographies on the Lean VM at a given concurrency level.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the VM runner binary is missing, the process fails,
+    /// or the output is not valid JSON.
+    pub fn run_vm_protocol(
+        &self,
+        choreographies: &[ChoreographyJson],
+        concurrency: usize,
+        max_steps: usize,
+    ) -> Result<Value, LeanRunnerError> {
+        let vm_path = Self::get_vm_runner_path().ok_or_else(|| {
+            LeanRunnerError::BinaryNotFound(PathBuf::from(Self::VM_RUNNER_BINARY_PATH))
+        })?;
+
+        let input = serde_json::json!({
+            "choreographies": choreographies,
+            "concurrency": concurrency,
+            "max_steps": max_steps
+        });
+        let input_str = serde_json::to_string(&input)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        let mut child = Command::new(&vm_path)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            stdin
+                .write_all(input_str.as_bytes())
+                .map_err(LeanRunnerError::TempFileError)?;
+        }
+
+        let output = child.wait_with_output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        if !output.status.success() {
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        let json: Value = serde_json::from_str(&stdout)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+        Ok(json)
     }
 
     // ========================================================================
