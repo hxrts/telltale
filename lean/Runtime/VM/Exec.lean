@@ -26,7 +26,7 @@ universe u
 
 /-! ## Step assembly helpers -/
 
-private def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -36,7 +36,7 @@ private def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
   let st' := updateCoro pack'.st coroId pack'.coro
   (appendEvent st' pack'.res.event, pack'.res)
 
-private def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -55,7 +55,7 @@ private def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
     let pack' := faultPack st coro (.specFault "monitor rejected") "monitor rejected"
     commitPack coroId pack'
 
-private def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]

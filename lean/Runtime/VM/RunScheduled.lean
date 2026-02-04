@@ -42,7 +42,7 @@ def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (n : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
-  if h : n = 0 then
+  if n = 0 then
     st
   else
     match schedStep st with
@@ -88,6 +88,7 @@ def runScheduled {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (fuel : Nat) (concurrency : Nat) (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
+  let st := { st with sched := { st.sched with policy := .roundRobin } }
   match fuel with
   | 0 => st
   | fuel' + 1 =>

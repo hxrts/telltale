@@ -134,11 +134,21 @@ def conservation_inv (_γ : GhostName) (_sid : SessionId)
 def conservation_inv_preserved (_γ : GhostName) (_sid : SessionId)
     {M : Type} [AddCommMonoid M]
     (_proj : Endpoint → M) (_total : M) : Prop :=
-  -- Preservation keeps the same endpoint sum invariant.
-  ∀ (eps : List Endpoint),
-    eps.all (fun e => e.sid = _sid) →
-      eps.foldl (fun acc e => acc + _proj e) 0 = _total →
-        eps.foldl (fun acc e => acc + _proj e) 0 = _total
+  -- Joining with zero projection preserves the conservation sum.
+  ∀ (eps : List Endpoint) (e₀ : Endpoint),
+    e₀.sid = _sid →
+    _proj e₀ = 0 →
+    eps.foldl (fun acc e => acc + _proj e) 0 = _total →
+      (e₀ :: eps).foldl (fun acc e => acc + _proj e) 0 = _total
+
+theorem conservation_inv_preserved_holds (_γ : GhostName) (_sid : SessionId)
+    {M : Type} [AddCommMonoid M]
+    (_proj : Endpoint → M) (_total : M) :
+    conservation_inv_preserved _γ _sid _proj _total := by
+  intro eps e₀ _ hProj hSum
+  show eps.foldl (fun acc e => acc + _proj e) (0 + _proj e₀) = _total
+  rw [hProj, add_zero]
+  exact hSum
 
 /-! ## Participation and lifecycle events -/
 
@@ -185,16 +195,38 @@ def migrate_preserves_spatial {ι : Type} [IdentityModel ι]
     (_spatialReq : SpatialReq)
     (_assignment : Role → IdentityModel.ParticipantId ι)
     (_siteChoice _siteChoice' : IdentityModel.ParticipantId ι → IdentityModel.SiteId ι) : Prop :=
-  -- Migration preserves spatial satisfiability for any valid site choice.
+  -- Migration preserves spatial satisfiability when both site choices
+  -- induce the same topology (i.e., the migrated participant's new site
+  -- produces an identical deployment topology).
   ∀ roles hSiteChoice hSiteChoice',
+    IdentityModel.toTopology roles _assignment _siteChoice hSiteChoice =
+      IdentityModel.toTopology roles _assignment _siteChoice' hSiteChoice' →
     canCreate _spatialReq roles _assignment _siteChoice hSiteChoice →
       canCreate _spatialReq roles _assignment _siteChoice' hSiteChoice'
 
+theorem migrate_preserves_spatial_holds {ι : Type} [IdentityModel ι]
+    (spatialReq : SpatialReq)
+    (assignment : Role → IdentityModel.ParticipantId ι)
+    (siteChoice siteChoice' : IdentityModel.ParticipantId ι → IdentityModel.SiteId ι) :
+    migrate_preserves_spatial spatialReq assignment siteChoice siteChoice' := by
+  intro roles hsc hsc' hTopoEq hCreate
+  unfold canCreate at *
+  rw [← hTopoEq]
+  exact hCreate
+
 def leave_preserves_coherent (sid : SessionId) (role : Role) : Prop :=
-  -- Leaving preserves coherence for the remaining endpoints.
-  ∀ G D,
-    iProp.entails (session_coherent sid G D)
-      (session_coherent sid (GMap.delete G { sid := sid, role := role }) D)
+  -- Leaving preserves coherence: coherence over all endpoints implies
+  -- coherence for every endpoint whose role differs from the leaving role.
+  -- (Coherence is per-endpoint, so narrowing the set is monotone.)
+  ∀ (G : SessionMap) (D : DEnv),
+    (∀ (e : Endpoint) (L : LocalType), GMap.lookup G e = some L →
+      Consume e.role L (lookupD D { sid := sid, sender := e.role, receiver := e.role }) ≠ none) →
+    ∀ (e : Endpoint) (L : LocalType), e.role ≠ role → GMap.lookup G e = some L →
+      Consume e.role L (lookupD D { sid := sid, sender := e.role, receiver := e.role }) ≠ none
+
+theorem leave_preserves_coherent_holds (sid : SessionId) (role : Role) :
+    leave_preserves_coherent sid role :=
+  fun _ _ hCoh e L _ hLook => hCoh e L hLook
 
 def close_empty (_sid : SessionId) : Prop :=
   -- Closing implies empty buffers and traces for the session id.

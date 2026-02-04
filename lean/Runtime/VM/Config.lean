@@ -70,5 +70,14 @@ def deterministic_finalization_ok {ι γ π ε ν : Type u}
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (_cfg : VMConfig ι γ π ε ν) : Prop :=
-  -- Placeholder: deterministic handlers, agreed time, no nondet reads, persistence commutes.
-  True
+  -- Safety violations halt execution deterministically.
+  (∀ msg, _cfg.violationPolicy.allow (.safety msg) = false) ∧
+  -- Speculation depth is bounded when enabled.
+  (_cfg.speculationEnabled → _cfg.maxSpeculationDepth > 0) ∧
+  -- Cost budget supports at least one minimum-cost step.
+  (_cfg.costModel.defaultBudget ≥ _cfg.costModel.minCost) ∧
+  -- Persistence deltas commute (deterministic state reconstruction).
+  (∀ (s : PersistenceModel.PState (π := π))
+     (d1 d2 : PersistenceModel.Delta (π := π)),
+    PersistenceModel.apply (PersistenceModel.apply s d1) d2 =
+    PersistenceModel.apply (PersistenceModel.apply s d2) d1)

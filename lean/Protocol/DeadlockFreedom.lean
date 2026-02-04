@@ -1,5 +1,6 @@
 import Protocol.Semantics
 import Protocol.Typing
+import Protocol.Preservation
 
 /-!
 # MPST Deadlock Freedom
@@ -203,9 +204,27 @@ private theorem reachesComm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
 /-! ## Unfold Soundness Helpers -/
 
 /-- Substitution preserves muDepth for types that can reach communication. -/
-private axiom muDepth_subst_of_decide (n : Nat) (r L : LocalType)
+private theorem muDepth_subst_of_decide (n : Nat) (r L : LocalType)
     (h : reachesCommDecide L = true) :
-    muDepth (LocalType.subst n r L) = muDepth L
+    muDepth (LocalType.subst n r L) = muDepth L := by
+  cases L with
+  | send r' T L' =>
+      simp [LocalType.subst, muDepth]
+  | recv r' T L' =>
+      simp [LocalType.subst, muDepth]
+  | select r' bs =>
+      simp [LocalType.subst, muDepth]
+  | branch r' bs =>
+      simp [LocalType.subst, muDepth]
+  | end_ =>
+      exact Bool.noConfusion h
+  | var m =>
+      exact Bool.noConfusion h
+  | mu L' =>
+      have h' : reachesCommDecide L' = true := by
+        simpa [reachesCommDecide] using h
+      have ih := muDepth_subst_of_decide (n + 1) r L' h'
+      simp [LocalType.subst, muDepth, ih]
 
 /-- Non-mu case: unfold is identity, so ReachesComm follows from the decision. -/
 private theorem reachesComm_unfold_nonmu (L : LocalType) (h : reachesCommDecide L = true)
@@ -235,24 +254,129 @@ private theorem muDepth_le_of_mu_mu_le {L : LocalType} {fuel : Nat} :
   omega
 
 /-- Mu case: prove reachability by recursing on the unfolded body. -/
-private axiom reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
+private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
     (hFuel : muDepth (LocalType.mu L) ≤ fuel.succ) (hBody : reachesCommDecide L = true)
     (ih : ∀ L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold) :
-    ReachesComm (LocalType.unfold (LocalType.mu L))
+    ReachesComm (LocalType.unfold (LocalType.mu L)) := by
+  cases L with
+  | send r T L' =>
+      simp [LocalType.unfold, LocalType.subst]
+      exact ReachesComm.send
+  | recv r T L' =>
+      simp [LocalType.unfold, LocalType.subst]
+      exact ReachesComm.recv
+  | select r bs =>
+      have hNonEmpty : bs ≠ [] := by
+        by_cases hEmpty : bs = []
+        · simp [reachesCommDecide, hEmpty] at hBody
+        · exact hEmpty
+      simp [LocalType.unfold, LocalType.subst]
+      exact ReachesComm.select hNonEmpty
+  | branch r bs =>
+      have hNonEmpty : bs ≠ [] := by
+        by_cases hEmpty : bs = []
+        · simp [reachesCommDecide, hEmpty] at hBody
+        · exact hEmpty
+      simp [LocalType.unfold, LocalType.subst]
+      exact ReachesComm.branch hNonEmpty
+  | end_ =>
+      exact Bool.noConfusion hBody
+  | var m =>
+      exact Bool.noConfusion hBody
+  | mu L' =>
+      -- L = .mu L' so unfold (mu (mu L')) = mu (subst 1 (mu (mu L')) L')
+      have hBody' : reachesCommDecide L' = true := by
+        simpa [reachesCommDecide] using hBody
+      have hFuel' : muDepth L' ≤ fuel :=
+        muDepth_le_of_mu_mu_le (L:=L') (fuel:=fuel) (by simpa using hFuel)
+      set L1 : LocalType := LocalType.subst 1 (.mu (.mu L')) L'
+      have hEq : muDepth L1 = muDepth L' :=
+        muDepth_subst_of_decide (n:=1) (r:=.mu (.mu L')) (L:=L') hBody'
+      have hFuel1 : muDepth L1 ≤ fuel := by
+        simpa [hEq] using hFuel'
+      have hDec1 : reachesCommDecide L1 = true :=
+        subst_preserves_reachesCommDecide (n:=1) (replacement:=.mu (.mu L')) (L:=L') hBody'
+      have hIH : ReachesComm L1.unfold := ih L1 hFuel1 hDec1
+      have hMu : ReachesComm (.mu L1) := ReachesComm.mu hIH
+      simpa [LocalType.unfold, LocalType.subst, L1] using hMu
 
 /-- Auxiliary: ReachesComm after unfolding, with explicit fuel for termination. -/
-private axiom reachesComm_body_implies_unfold_aux (fuel : Nat) (L : LocalType)
-    (hFuel : muDepth L ≤ fuel) (hBody : reachesCommDecide L = true) :
-    ReachesComm L.unfold
+private theorem reachesComm_body_implies_unfold_aux :
+    ∀ fuel L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold
+  | fuel, L, hFuel, hBody =>
+      cases L with
+      | send r T L' =>
+          simp [LocalType.unfold]
+          exact ReachesComm.send
+      | recv r T L' =>
+          simp [LocalType.unfold]
+          exact ReachesComm.recv
+      | select r bs =>
+          have hNonEmpty : bs ≠ [] := by
+            by_cases hEmpty : bs = []
+            · simp [reachesCommDecide, hEmpty] at hBody
+            · exact hEmpty
+          simp [LocalType.unfold]
+          exact ReachesComm.select hNonEmpty
+      | branch r bs =>
+          have hNonEmpty : bs ≠ [] := by
+            by_cases hEmpty : bs = []
+            · simp [reachesCommDecide, hEmpty] at hBody
+            · exact hEmpty
+          simp [LocalType.unfold]
+          exact ReachesComm.branch hNonEmpty
+      | end_ =>
+          exact Bool.noConfusion hBody
+      | var m =>
+          exact Bool.noConfusion hBody
+      | mu L' =>
+          cases fuel with
+          | zero =>
+              have : False := by
+                simp [muDepth] at hFuel
+              exact this.elim
+          | succ fuel' =>
+              have hBody' : reachesCommDecide L' = true := by
+                simpa [reachesCommDecide] using hBody
+              have ih :
+                  ∀ L, muDepth L ≤ fuel' → reachesCommDecide L = true → ReachesComm L.unfold :=
+                fun L hF hD => reachesComm_body_implies_unfold_aux fuel' L hF hD
+              exact reachesComm_unfold_mu (fuel:=fuel') (L:=L') (by simpa using hFuel) hBody' ih
 
 /-- Helper: reachesCommDecide is monotonic under unfolding for guarded types. -/
-axiom reachesComm_body_implies_unfold (L : LocalType)
+theorem reachesComm_body_implies_unfold (L : LocalType)
     (hBody : reachesCommDecide L = true) :
-    ReachesComm L.unfold
+    ReachesComm L.unfold := by
+  exact reachesComm_body_implies_unfold_aux (muDepth L) L (by exact le_rfl) hBody
 
 /-- Soundness: if decidable checker returns true, the type reaches communication. -/
-axiom reachesCommDecide_sound (L : LocalType) (h : reachesCommDecide L = true) :
-    ReachesComm L
+theorem reachesCommDecide_sound (L : LocalType) (h : reachesCommDecide L = true) :
+    ReachesComm L := by
+  cases L with
+  | send r T L' =>
+      exact ReachesComm.send
+  | recv r T L' =>
+      exact ReachesComm.recv
+  | select r bs =>
+      have hNonEmpty : bs ≠ [] := by
+        by_cases hEmpty : bs = []
+        · simp [reachesCommDecide, hEmpty] at h
+        · exact hEmpty
+      exact ReachesComm.select hNonEmpty
+  | branch r bs =>
+      have hNonEmpty : bs ≠ [] := by
+        by_cases hEmpty : bs = []
+        · simp [reachesCommDecide, hEmpty] at h
+        · exact hEmpty
+      exact ReachesComm.branch hNonEmpty
+  | end_ =>
+      exact Bool.noConfusion h
+  | var m =>
+      exact Bool.noConfusion h
+  | mu L' =>
+      have hBody : reachesCommDecide L' = true := by
+        simpa [reachesCommDecide] using h
+      exact ReachesComm.mu (reachesComm_body_implies_unfold L' hBody)
 
 /-! ## Progress Predicates -/
 
@@ -316,18 +440,36 @@ is either done or can progress.
 **Dependencies**:
 - Requires `progress` theorem from Preservation.lean
 - Uses ReachesComm to ensure types aren't stuck -/
-axiom deadlock_free (C : Config) (Ssh Sown : SEnv)
+theorem deadlock_free (C : Config) (Ssh Sown : SEnv)
     (hWF : LocalTypeR.WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
     (hReady : ProgressReady C)
     (hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
-    Done C.G C ∨ CanProgress C
+    Done C.G C ∨ CanProgress C := by
+  rcases hReady with ⟨hDoneIfSkip, hNotBlocked⟩
+  have hProgress := progress (G:=C.G) (D:=C.D) (Ssh:=Ssh) (Sown:=Sown)
+    (store:=C.store) (bufs:=C.bufs) (P:=C.proc) hWF
+  rcases hProgress with hSkip | hStep | hBlocked
+  · left
+    exact ⟨hSkip, hDoneIfSkip hSkip⟩
+  · right
+    rcases hStep with ⟨G', D', Sown', store', bufs', P', hTS⟩
+    refine ⟨{ proc := P', store := store', bufs := bufs', G := G', D := D',
+              nextSid := C.nextSid }, ?_⟩
+    exact subject_reduction (n:=C.nextSid) hTS
+  · exact (hNotBlocked hBlocked).elim
 
 /-- Corollary: well-typed configurations with progressive types are never stuck. -/
-axiom not_stuck (C : Config) (Ssh Sown : SEnv)
+theorem not_stuck (C : Config) (Ssh Sown : SEnv)
     (hWF : LocalTypeR.WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
     (hReady : ProgressReady C)
     (hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
-    ¬Stuck C.G C
+    ¬Stuck C.G C := by
+  intro hStuck
+  rcases hStuck with ⟨hNotDone, hNotProg⟩
+  have h := deadlock_free (C:=C) (Ssh:=Ssh) (Sown:=Sown) hWF hReady hReaches
+  cases h with
+  | inl hDone => exact hNotDone hDone
+  | inr hProg => exact hNotProg hProg
 
 /-! ## Session Isolation -/
 

@@ -1591,6 +1591,8 @@ dependencies = [
  "telltale-theory",
  "telltale-types",
  "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]

@@ -66,9 +66,18 @@ axiom link_preserves_WTMon_complete_full (p₁ p₂ : DeployedProtocol)
     (hWT₂ : WTMonComplete p₂.initMonitorState) :
     WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState)
 
-axiom disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
+theorem disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂) :
-    p₁.sessionId ≠ p₂.sessionId
+    p₁.sessionId ≠ p₂.sessionId := by
+  obtain ⟨hDisj, _, _⟩ := hLink
+  intro heq
+  simp only [InterfaceType.disjointSessions, List.all_eq_true] at hDisj
+  have h := hDisj _ p₁.sessionId_in_interface
+  simp only [Bool.not_eq_true'] at h
+  rw [heq] at h
+  have h2 : p₂.interface.sessionIds.contains p₂.sessionId = true :=
+    List.contains_iff.mpr ⟨p₂.sessionId, p₂.sessionId_in_interface, beq_self_eq_true _⟩
+  simp_all
 
 axiom compose_deadlock_free (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂)

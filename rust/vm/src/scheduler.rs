@@ -82,9 +82,30 @@ impl Scheduler {
                 self.ready_queue.pop_front()
             }
             SchedPolicy::ProgressAware => {
-                // Placeholder: same as round-robin for now.
+                // Fallback: no progress hints provided.
                 self.ready_queue.pop_front()
             }
+        }
+    }
+
+    /// Pick the next coroutine using a progress predicate.
+    pub fn schedule_with<F>(&mut self, has_progress: F) -> Option<usize>
+    where
+        F: Fn(usize) -> bool,
+    {
+        self.step_count += 1;
+        match &self.policy {
+            SchedPolicy::ProgressAware => {
+                if let Some(pos) = self
+                    .ready_queue
+                    .iter()
+                    .position(|id| has_progress(*id))
+                {
+                    return self.ready_queue.remove(pos);
+                }
+                self.ready_queue.pop_front()
+            }
+            SchedPolicy::Cooperative | SchedPolicy::RoundRobin => self.ready_queue.pop_front(),
         }
     }
 

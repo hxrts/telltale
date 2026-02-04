@@ -120,8 +120,9 @@ def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
   | .par p₁ p₂ => compileBlock p₁ ++ compileBlock p₂
   | .newSession _ _ p' => compileBlock p'
 
-/-- Compile a process into a program (stub). -/
-@[deprecated "Use compileLocalTypeR / CodeImage.fromLocalTypes instead."]
+/-- Compile a process into a program (stub). Deprecated. Use `compileLocalTypeR` or
+`CodeImage.fromLocalTypes` instead. -/
+@[deprecated "Use compileLocalTypeR / CodeImage.fromLocalTypes instead." (since := "2026-02-03")]
 def compile {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (p : Process) (roles : RoleSet) (types : Role → LocalType)
     (chain : GuardChain γ) : Program γ ε :=

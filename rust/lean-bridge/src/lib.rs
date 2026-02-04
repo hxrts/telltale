@@ -64,6 +64,9 @@ pub mod runner;
 #[cfg(feature = "runner")]
 pub mod validate;
 
+#[cfg(feature = "runner")]
+pub mod vm_runner;
+
 #[cfg(test)]
 pub mod test_utils;
 
@@ -81,6 +84,9 @@ pub use equivalence::{
 pub use runner::{
     ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,
 };
+
+#[cfg(feature = "runner")]
+pub use vm_runner::{VmRunInput, VmRunOutput, VmRunner, VmRunnerError, VmSessionStatus, VmTraceEvent};
 
 #[cfg(feature = "runner")]
 pub use validate::{ValidationResult, Validator};

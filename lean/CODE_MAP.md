@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-02-01
+**Last Updated:** 2026-02-04
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -28,13 +28,13 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 
 | Library | Files | Lines | Focus |
 |---------|-------|-------|-------|
-| SessionTypes | 29 | ~8,177 | Global/local type definitions, de Bruijn, participation |
-| SessionCoTypes | 62 | ~14,045 | Coinductive EQ2, bisimulation, duality, roundtrip bridge |
-| Choreography | 68 | ~15,879 | Projection, harmony, blindness, embedding, erasure |
-| Semantics | 8 | ~2,165 | Operational semantics, determinism, deadlock freedom |
-| Protocol | 41 | ~17,046 | Async buffered MPST, coherence, preservation, monitoring |
-| Runtime | 53 | ~6,945 | VM, Iris separation logic shims, resource algebras, session invariants |
-| **Total** | **261** | **~64,257** | |
+| SessionTypes | 30 | ~8,253 | Global/local type definitions, de Bruijn, participation |
+| SessionCoTypes | 63 | ~14,058 | Coinductive EQ2, bisimulation, duality, roundtrip bridge |
+| Choreography | 69 | ~16,251 | Projection, harmony, blindness, embedding, erasure |
+| Semantics | 8 | ~2,171 | Operational semantics, determinism, deadlock freedom |
+| Protocol | 41 | ~18,590 | Async buffered MPST, coherence, preservation, monitoring |
+| Runtime | 62 | ~8,030 | VM, Iris separation logic shims, resource algebras, session invariants |
+| **Total** | **273** | **~67,353** | |
 
 **Architectural Layers:**
 ```
@@ -100,6 +100,7 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Participation/Core.lean | 297 | Participant classification in global protocols |
 | Participation/Extra.lean | 410 | Extended participation properties |
 | TypeContext.lean | 518 | Unified parametric context infrastructure |
+| ValType.lean | 39 | Shared value types for message payloads (unit, bool, nat, string, prod, chan) |
 | ObservableClosed.lean | 267 | Termination for observable behavior of closed types |
 
 ---
@@ -207,6 +208,8 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Coinductive/RegularSystemBisim.lean | 159 | Bisimulation for finite regular systems |
 | Coinductive/FiniteSystem.lean | 68 | Finite regular system representation |
 
+Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.lean, Coinductive/BisimDecidable.lean, Coinductive/Roundtrip.lean.
+
 ---
 
 ## Choreography
@@ -262,6 +265,7 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 |------|-------|-------------|
 | Projection/Blind/Core.lean | 492 | Definition and basic properties |
 | Projection/Blind/Preservation.lean | 187 | Preservation and composition |
+| Projection/Blind.lean | 7 | Re-export wrapper for Blind/Core and Blind/Preservation |
 
 ### Harmony (Projection Correctness)
 
@@ -356,8 +360,8 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Typing/Compatibility.lean | 992 | SEnv append/lookup lemmas |
 | Typing/MergeLemmas.lean | 327 | Additional environment lemmas |
 | Typing/StepLemmas.lean | 478 | `WTConfigN` well-typed configuration |
-| Typing/Framing.lean | 1,633 | Frame lemmas — 2 axioms |
-| Typing/Preservation.lean | 2,128 | Preservation sub-lemmas (`Compatible`) — 1 axiom |
+| Typing/Framing.lean | 1,228 | Frame lemmas — 1 axiom |
+| Typing/Preservation.lean | 2,137 | Preservation sub-lemmas (`Compatible`) — 1 axiom |
 | Typing/Progress.lean | 472 | DEnv union and environment append properties |
 
 ### Operational Semantics
@@ -370,9 +374,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Preservation.lean | 192 | `preservation_typed`, `progress_*`, `subject_reduction` — 6 axioms |
+| Preservation.lean | 1,933 | `preservation_typed`, `progress_*`, `subject_reduction` |
 | Determinism.lean | 359 | `stepBase_det`, `diamond_independent`, `session_isolation` |
-| DeadlockFreedom.lean | 490 | `Guarded`, `ReachesComm`, `deadlock_free`, `not_stuck` — 7 axioms |
+| DeadlockFreedom.lean | 632 | `Guarded`, `ReachesComm`, `deadlock_free`, `not_stuck` |
 
 ### Runtime Monitoring
 
@@ -385,9 +389,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Deployment/Interface.lean | 391 | `InterfaceType`, `DeployedProtocol`, `ProtocolBundle` — 6 axioms |
+| Deployment/Interface.lean | 438 | `InterfaceType`, `DeployedProtocol`, `ProtocolBundle` |
 | Deployment/Merge.lean | 296 | `MergeDEnv`, disjoint sessions |
-| Deployment/Linking.lean | 78 | Composition metatheory — 9 axioms |
+| Deployment/Linking.lean | 87 | Composition metatheory — 8 axioms |
 
 ### Supporting Modules
 
@@ -443,6 +447,7 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 | VM/Knowledge.lean | 30 | Knowledge base and fact management |
 | VM/Violation.lean | 29 | Violation policy and fault types |
 | VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
+| VM/UnitModel.lean | 181 | Minimal computable instances for all VM domain typeclasses |
 
 ### VM Execution
 
@@ -457,6 +462,15 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 | VM/ExecGuardEffect.lean | 111 | Guard chain evaluation and effect dispatch |
 | VM/ExecSpeculation.lean | 66 | Speculative execution (fork/join/abort) |
 | VM/ExecSteps.lean | 54 | Multi-step execution wrapper |
+| VM/CompileLocalTypeR.lean | 150 | Compiler from LocalTypeR to VM bytecode instructions |
+
+### VM Loading and Scheduling
+
+| File | Lines | Description |
+|------|-------|-------------|
+| VM/LoadChoreography.lean | 140 | Dynamic choreography loading into running VM state |
+| VM/RunScheduled.lean | 104 | N-concurrent scheduler-driven execution loop |
+| VM/Json.lean | 145 | JSON serialization for runtime values and trace events |
 
 ### Resources
 
@@ -474,7 +488,7 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 |------|-------|-------------|
 | ProgramLogic/LanguageInstance.lean | 93 | Iris `Language`/`EctxLanguage` instances |
 | ProgramLogic/SessionWP.lean | 122 | Session-level WP rules |
-| ProgramLogic/GhostState.lean | 242 | Ghost state management (session maps, buffer maps) |
+| ProgramLogic/GhostState.lean | 247 | Ghost state management (session maps, buffer maps) |
 | ProgramLogic/CodeLoading.lean | 99 | Code loading and program verification |
 | ProgramLogic/ProofInterfaces.lean | 91 | Proof interface typeclasses |
 | ProgramLogic/WPPair.lean | 131 | WP pairing for send/recv duality |
@@ -486,7 +500,7 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 | File | Lines | Description |
 |------|-------|-------------|
 | Invariants/SessionInv.lean | 215 | Session invariant: coherence, buffers, endpoint state |
-| Scheduler/Scheduler.lean | 240 | Process scheduler with fairness and priority |
+| VM/Scheduler.lean | 240 | Process scheduler with fairness and priority |
 | Transport/Transport.lean | 232 | Abstract transport layer with handler specs |
 | Cost/Credits.lean | 56 | Cost credit resource algebra |
 
@@ -495,15 +509,17 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 | File | Lines | Description |
 |------|-------|-------------|
 | VM/DomainComposition.lean | 326 | Domain-specific composition and guard chain |
-| Monitor/Monitor.lean | 123 | Unified session monitor |
-| Failure/Failure.lean | 235 | Failure modes and recovery |
+| VM/Monitor.lean | 123 | SessionKind, WellTypedInstr judgment, unified session monitor |
+| VM/Failure.lean | 235 | Failure modes (crash, partition, heal), FStep relation, recovery predicates |
 
 ### Adequacy and Proofs
 
 | File | Lines | Description |
 |------|-------|-------------|
 | Adequacy/Adequacy.lean | 145 | Adequacy theorem connecting WP to execution |
-| Proofs/TheoremStubs.lean | 199 | Top-level theorem statements |
+| Proofs/TheoremStubs.lean | 294 | Top-level theorem statements |
+| Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
+| Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
 
 ### Examples and Tests
 
@@ -512,6 +528,7 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 | Examples/SimpleProtocol.lean | 301 | Simple two-party protocol example |
 | Examples/Aura.lean | 133 | Aura instantiation example |
 | Tests/Main.lean | 54 | Runtime test harness |
+| Tests/VMRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
 
 ---
 
@@ -537,17 +554,14 @@ telltale (package)
 
 ## Axiom Inventory
 
-### Protocol Library (34 axioms)
+### Protocol Library (13 axioms)
 
 | File | Count | Axioms |
 |------|-------|--------|
-| Preservation.lean | 6 | `preservation_typed`, `progress_send`, `progress_recv`, `progress_select`, `progress_branch`, `subject_reduction` |
-| DeadlockFreedom.lean | 7 | `muDepth_subst_of_decide`, `reachesComm_unfold_mu`, `reachesComm_body_implies_unfold_aux`, `reachesComm_body_implies_unfold`, `reachesCommDecide_sound`, `deadlock_free`, `not_stuck` |
-| Deployment/Interface.lean | 6 | `mkInitGEnv_lookup`, `mkInitGEnv_sessionsOf_of_mem`, `mkInitBufs_lookup_mem`, `mkInit_bConsistent`, `mkInit_bufsDom`, `mkInit_dConsistent` |
-| Deployment/Linking.lean | 9 | `mergeBufs_typed`, `mergeLin_valid`, `mergeLin_unique`, `link_preserves_WTMon_full`, `link_preserves_WTMon`, `link_preserves_WTMon_complete`, `link_preserves_WTMon_complete_full`, `disjoint_sessions_independent`, `compose_deadlock_free` |
+| Deployment/Linking.lean | 8 | `mergeBufs_typed`, `mergeLin_valid`, `mergeLin_unique`, `link_preserves_WTMon_full`, `link_preserves_WTMon`, `link_preserves_WTMon_complete`, `link_preserves_WTMon_complete_full`, `compose_deadlock_free` |
 | Monitor/Preservation.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
 | Typing/Core.lean | 1 | `ParSplit.unique` |
-| Typing/Framing.lean | 2 | `SessionsOf_subset_of_HasTypeProcPreOut`, `updateSEnv_append_left_any` |
+| Typing/Framing.lean | 1 | `SessionsOf_subset_of_HasTypeProcPreOut` |
 | Typing/Preservation.lean | 1 | `DisjointS_preserved_TypedStep_right` |
 
 ### Runtime Library (~108 shim axioms)
@@ -556,11 +570,11 @@ All shim axioms retire when upstream Iris PRs land. See `work/iris_3.md` for ret
 
 | File | Count | Description |
 |------|-------|-------------|
-| Shim/ResourceAlgebra.lean | 39 | iProp connectives, sep logic rules, own, bupd, Auth RA, GMap, ghost_map ops, big_sep |
-| Shim/Invariants.lean | 20 | Mask/Namespace ops, fupd rules, inv alloc/acc, cinv alloc/acc/cancel |
-| Shim/WeakestPre.lean | 14 | wp rules (value, mono, bind, frame, fupd, lift_step), MultiStep, adequacy, invariance |
+| Shim/ResourceAlgebra.lean | 51 | iProp connectives, sep logic rules, own, bupd, Auth RA, GMap, ghost_map ops, big_sep |
+| Shim/Invariants.lean | 31 | Mask/Namespace ops, fupd rules, inv alloc/acc, cinv alloc/acc/cancel |
+| Shim/WeakestPre.lean | 12 | wp rules (value, mono, bind, frame, fupd, lift_step), MultiStep, adequacy, invariance |
 | Shim/SavedProp.lean | 8 | saved_prop (own/alloc/agree/persistent), ghost_var (alloc/agree/update) + ghost_var itself |
-| Shim/GenHeap.lean | 7 | HeapLookup, HeapInsert, pointsto, gen_heap (alloc/valid/update) |
+| Shim/GenHeap.lean | 6 | HeapLookup, HeapInsert, pointsto, gen_heap (alloc/valid/update) |
 
 **Sorries:** 0 across all libraries.
 
@@ -609,4 +623,9 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Deployment composition?** → Protocol/Deployment/Interface.lean, Protocol/Deployment/Merge.lean, Protocol/Deployment/Linking.lean
 - **Iris separation logic shims?** → Runtime/Shim/ResourceAlgebra.lean
 - **Weakest preconditions?** → Runtime/Shim/WeakestPre.lean
+- **VM bytecode compiler?** → Runtime/VM/CompileLocalTypeR.lean
+- **Dynamic choreography loading?** → Runtime/VM/LoadChoreography.lean
+- **N-concurrent scheduling?** → Runtime/VM/RunScheduled.lean, Runtime/Proofs/Concurrency.lean
+- **VM failure model?** → Runtime/VM/Failure.lean
+- **VM JSON runner?** → Runtime/Tests/VMRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)

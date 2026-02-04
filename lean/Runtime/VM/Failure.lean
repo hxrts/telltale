@@ -149,8 +149,14 @@ def FStarDrain {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (_st _st' : VMState ι γ π ε ν) : Prop :=
-  -- V1: drained state is unchanged.
-  _st = _st'
+  -- Configuration and programs are preserved across drain.
+  _st'.config = _st.config ∧
+  _st'.programs = _st.programs ∧
+  -- No normal scheduling step is possible (quiescent).
+  schedStep _st' = none ∧
+  -- All closed sessions have empty buffers and traces.
+  (∀ sid (stSess : SessionState ν), (sid, stSess) ∈ _st'.sessions →
+    stSess.phase = .closed → stSess.buffers = [] ∧ stSess.traces = (∅ : DEnv))
 
 def Recoverable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]

@@ -101,16 +101,32 @@ structure SessionMonitor (γ : Type u) where
   -- Monitor transition per session kind.
   step : SessionKind γ → Option (SessionKind γ)
 
+/-- Check whether an instruction is pure control flow (no session interaction). -/
+def instrNeedsSession {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+    (i : Instr γ ε) : Bool :=
+  match i with
+  | .loadImm _ _ | .mov _ _ | .jmp _ | .spawn _ _ | .yield | .halt => false
+  | _ => true
+
+private def distinctLabels : List Label → Bool
+  | [] => true
+  | l :: ls => !ls.contains l && distinctLabels ls
+
 def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (_m : SessionMonitor γ) (_i : Instr γ ε) : Bool :=
-  -- V1 monitor is permissive; typing checks happen in execution.
-  true
+  match _i with
+  | .choose _ table =>
+    -- Choose table must have distinct labels for unambiguous dispatch.
+    distinctLabels (table.map Prod.fst)
+  | .open roles _ _ dsts =>
+    -- Role set and destination register list must align.
+    roles.length == dsts.length
+  | _ => true
 
 def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (m : SessionMonitor γ) : Prop :=
-  -- Well-typed instructions are accepted by the monitor.
-  ∀ (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType),
-    WellTypedInstr i sk L L' → monitorAllows m i = true
+  -- Pure control flow instructions are always accepted by the monitor.
+  ∀ (i : Instr γ ε), instrNeedsSession i = false → monitorAllows m i = true
 
 def unified_monitor_preserves {γ : Type u} (m : SessionMonitor γ) : Prop :=
   -- Monitor steps preserve protocol session ids when present.

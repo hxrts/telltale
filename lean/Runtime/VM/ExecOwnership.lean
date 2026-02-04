@@ -72,7 +72,8 @@ private def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
 /-! ## Transfer conservation lemmas -/
 
 /-- Transfer preserves session-level state: the session store and signed buffer
-    store are unchanged by `transferCommit`. Transfer rearranges coroutine
+    store are unchanged by `transferCommit`. This mirrors the conservation
+    pattern from Gibbs's `drift_conserves` — transfer rearranges coroutine
     ownership (a zero-sum operation) without modifying session-level typing
     state. Since session coherence (`EdgeCoherent`) depends on `GEnv` and `DEnv`
     (ghost state in the Iris sense), not on which coroutine owns which endpoint,

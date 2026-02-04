@@ -23,6 +23,15 @@ pub enum SendDecision {
     Defer,
 }
 
+/// Decision returned by [`EffectHandler::handle_acquire`].
+#[derive(Debug, Clone)]
+pub enum AcquireDecision {
+    /// Acquire succeeded and produced evidence.
+    Grant(Value),
+    /// Acquire denied and should block.
+    Block,
+}
+
 /// VM-level effect handler.
 ///
 /// This is the interface between the VM and the host application. Each
@@ -121,6 +130,39 @@ pub trait EffectHandler: Send + Sync {
     /// # Errors
     /// Returns an error string if the handler fails.
     fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String>;
+
+    /// Attempt to acquire a guard layer.
+    ///
+    /// Returning `AcquireDecision::Block` causes the coroutine to block.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string if acquisition fails.
+    fn handle_acquire(
+        &self,
+        _sid: SessionId,
+        _role: &str,
+        _layer: &str,
+        _state: &[Value],
+    ) -> Result<AcquireDecision, String> {
+        Ok(AcquireDecision::Grant(Value::Unit))
+    }
+
+    /// Release a guard layer using previously acquired evidence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string if release fails.
+    fn handle_release(
+        &self,
+        _sid: SessionId,
+        _role: &str,
+        _layer: &str,
+        _evidence: &Value,
+        _state: &[Value],
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 impl<T: EffectHandler + ?Sized> EffectHandler for &T {
@@ -169,5 +211,26 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> Result<(), String> {
         (**self).step(role, state)
+    }
+
+    fn handle_acquire(
+        &self,
+        sid: SessionId,
+        role: &str,
+        layer: &str,
+        state: &[Value],
+    ) -> Result<AcquireDecision, String> {
+        (**self).handle_acquire(sid, role, layer, state)
+    }
+
+    fn handle_release(
+        &self,
+        sid: SessionId,
+        role: &str,
+        layer: &str,
+        evidence: &Value,
+        state: &[Value],
+    ) -> Result<(), String> {
+        (**self).handle_release(sid, role, layer, evidence, state)
     }
 }

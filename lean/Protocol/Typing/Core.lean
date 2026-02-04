@@ -66,6 +66,7 @@ structure ParSplit (S : SEnv) (G : GEnv) where
   S2 : SEnv
   G1 : GEnv
   G2 : GEnv
+  -- Note: the full environment is ordered as left ++ right.
   hS : S = S1 ++ S2
   hG : G = G1 ++ G2
 
@@ -494,9 +495,21 @@ theorem lookupSEnv_none_of_disjoint_left {S₁ S₂ : SEnv} {x : Var} {T : ValTy
     | some T₁ =>
         exact (hDisj x T₁ T hL1 hL2).elim
 
-/-- Combined variable environment: shared first, owned second. -/
-def SEnvAll (Ssh Sown : SEnv) : SEnv :=
-  Ssh ++ Sown
+/-- Combined variable environment: shared first, then owned (right ++ left). -/
+def SEnvAll (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
+  Ssh ++ Sown.right ++ Sown.left
+
+@[simp] theorem SEnvAll_ofLeft (Ssh S : SEnv) :
+    SEnvAll Ssh (S : OwnedEnv) = Ssh ++ S := by
+  simp [SEnvAll]
+
+@[simp] theorem SEnvAll_all (Ssh : SEnv) (Sown : OwnedEnv) :
+    SEnvAll Ssh Sown = Ssh ++ (Sown : SEnv) := by
+  simp [SEnvAll, OwnedEnv.all, List.append_assoc]
+
+/-- Owned env disjointness between right and left portions. -/
+def OwnedDisjoint (Sown : OwnedEnv) : Prop :=
+  DisjointS Sown.right Sown.left
 
 theorem updateSEnv_append_left {Ssh Sown : SEnv} {x : Var} {T : ValType}
     (h : lookupSEnv Ssh x = none) :

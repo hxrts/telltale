@@ -266,7 +266,7 @@ fn test_lean_transport_no_create() {
 }
 
 // ============================================================================
-// Scheduler.lean
+// Runtime/VM/Scheduler.lean
 // ============================================================================
 
 /// Lean: `Scheduler.schedule_confluence`
@@ -328,7 +328,7 @@ fn test_lean_cooperative_refines_concurrent() {
 }
 
 // ============================================================================
-// Monitor.lean
+// Runtime/VM/Monitor.lean
 // ============================================================================
 
 /// Lean: `Monitor.sound_send`
@@ -503,6 +503,7 @@ fn test_lean_no_phantom_events() {
             | ObsEvent::Halted { .. }
             | ObsEvent::Invoked { .. }
             | ObsEvent::Faulted { .. } => {}
+            _ => {}
         }
     }
 

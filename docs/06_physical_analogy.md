@@ -164,7 +164,7 @@ The ideal gas law PV = nRT is an equation of state that closes the thermodynamic
 
 The thermodynamic framework works for any material that satisfies the equation of state interface. The session type framework works for any handler that satisfies the effect signature. This is universality: the structure is independent of the specific realization.
 
-The `EffectModel` typeclass in the VM (§2 of `runtime.md`) is the formal equation of state interface:
+The `EffectModel` typeclass in the VM specification is the formal equation of state interface:
 
 ```lean
 class EffectModel (ε : Type) where
@@ -319,7 +319,7 @@ This is exactly numerical integration with invariant checking: at each Euler ste
 
 ### The Principle
 
-Cost credits (§21 of `runtime.md`) are consumed monotonically by computation. Their physical analogue is fuel or available work. If you want a thermodynamic mapping, treat them as free energy in a closed system (monotone dissipation).
+Cost credits in the VM specification are consumed monotonically by computation. Their physical analogue is fuel or available work. If you want a thermodynamic mapping, treat them as free energy in a closed system (monotone dissipation).
 
 ### The Analogy
 
@@ -348,7 +348,7 @@ A `send` instruction consumes both, like an exothermic reaction that does mechan
 
 ### The Principle
 
-The unified session monitor (`SessionMonitor` in §3.9 of `runtime.md`) tracks local types for all active sessions and validates every instruction against the expected protocol state. It is a safety interlock or thermostat that can measure and can also prevent unsafe transitions (depending on `ViolationPolicy`).
+The unified session monitor (`SessionMonitor` in the VM specification) tracks local types for all active sessions and validates every instruction against the expected protocol state. It is a safety interlock or thermostat that can measure and can also prevent unsafe transitions (depending on `ViolationPolicy`).
 
 ### The Analogy
 
@@ -392,7 +392,7 @@ The guard chain is composable (adding a layer doesn't break existing layers) bec
 
 ### The Principle
 
-Ghost sessions (§17 of `runtime.md`) allow speculative execution where the system tentatively advances along one path, then either commits (join) or rolls back (abort). This is metastability: the system explores a local energy minimum, then either settles into it or returns to the original state.
+Ghost sessions in the VM specification allow speculative execution where the system tentatively advances along one path, then either commits (join) or rolls back (abort). This is metastability: the system explores a local energy minimum, then either settles into it or returns to the original state.
 
 ### The Analogy
 
@@ -411,7 +411,7 @@ The key property: speculation is bounded (by `maxSpeculationDepth`), just as met
 
 ### The Principle
 
-Progress tokens (§18 of `runtime.md`) are resources that guarantee a specific session will advance. A `recv` instruction requires a progress token, and without one, the instruction can't execute.
+Progress tokens in the VM specification are resources that guarantee a specific session will advance. A `recv` instruction requires a progress token, and without one, the instruction can't execute.
 
 ### The Analogy
 
@@ -462,6 +462,8 @@ The three foundational pillars (symmetry, conservation, and extensivity) are co-
 Conservation ----------- Extensivity
   (Invariants)   Frame rule   (Separation logic)
 ```
+
+This diagram shows the three pillars and the links between them. It summarizes how projection, invariants, and separation logic reinforce each other in the proof structure.
 
 - Symmetry → Conservation (Noether-style link): Every well-formed global type yields safety invariants. The coherence preservation theorems are conservation laws derived from the protocol's symmetry structure.
 - Conservation → Extensivity (frame rule): Conservation laws compose locally because the frame rule guarantees that preserving an invariant in one subsystem does not disturb another. Without extensivity, conservation laws could not be checked modularly.

@@ -13,9 +13,9 @@ Several areas are still axiomatized. The main stubs live in:
 - `lean/Protocol/Preservation.lean` and `lean/Protocol/DeadlockFreedom.lean`
 - `lean/Protocol/Deployment/Linking.lean` and related deployment files
 - `lean/Runtime/Shim/*` for the Iris style logic shims
-- `lean/Runtime/VM/*` proof stubs for scheduler invariants
+- `lean/Runtime/Proofs/TheoremStubs.lean` for remaining runtime level placeholders
 
-Use the axiom inventory in `lean/CODE_MAP.md` for the complete list.
+Use the axiom inventory in [Lean Verification Code Map](../lean/CODE_MAP.md) for the complete list.
 
 ## Module Map
 

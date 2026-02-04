@@ -55,9 +55,12 @@ pub mod loader;
 pub mod nested;
 pub mod scheduler;
 pub mod session;
+pub mod trace;
 #[cfg(feature = "multi-thread")]
 pub mod threaded;
 pub mod vm;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 
 pub use backend::VMBackend;
 pub use clock::SimClock;
@@ -66,6 +69,9 @@ pub use instr::Instr;
 pub use nested::NestedVMHandler;
 pub use scheduler::{SchedPolicy, Scheduler};
 pub use session::{SessionId, SessionStore};
+pub use trace::{normalize_trace, obs_session, strict_trace, with_tick};
+#[cfg(target_arch = "wasm32")]
+pub use wasm::WasmVM;
 #[cfg(feature = "multi-thread")]
 pub use threaded::ThreadedVM;
 pub use vm::{VMConfig, VM};

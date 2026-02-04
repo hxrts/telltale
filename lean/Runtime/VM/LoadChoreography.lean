@@ -31,15 +31,15 @@ def existingSessionIds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     VMState ι γ π ε ν → List SessionId :=
   fun st => st.sessions.map (fun p => p.fst)
 
-/-- Two sessions have disjoint resources (placeholder predicate). -/
+/-- Two sessions have disjoint resources when they have distinct identifiers. -/
 def SessionDisjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (_st : VMState ι γ π ε ν) (_sid1 _sid2 : SessionId) : Prop :=
-  True
+    (_st : VMState ι γ π ε ν) (sid1 sid2 : SessionId) : Prop :=
+  sid1 ≠ sid2
 
 /-- Load a choreography into a running VM, returning the updated state and session id. -/
 def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -103,7 +103,18 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     nextSessionId := sid + 1 }
   (st', sid)
 
-/-! ## Disjointness lemma (stub) -/
+/-! ## Disjointness lemma -/
+
+private lemma loadChoreography_snd {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [Inhabited (EffectModel.EffectCtx ε)]
+    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
+    (loadChoreography st image).2 = st.nextSessionId := by
+  simp [loadChoreography]
 
 theorem loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
@@ -117,5 +128,13 @@ theorem loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [
     let (st', sid) := loadChoreography st image
     ∀ sid' ∈ existingSessionIds st, SessionDisjoint st' sid sid' :=
 by
-  intro sid' _
-  simp [SessionDisjoint]
+  intro sid' hMem
+  -- Convert match-bound sid to projection form so we can rewrite
+  show (loadChoreography st image).2 ≠ sid'
+  rw [loadChoreography_snd]
+  simp only [existingSessionIds, List.mem_map] at hMem
+  obtain ⟨⟨sid'', sess⟩, hIn, rfl⟩ := hMem
+  have ⟨_, hSess⟩ := _hwf
+  have hLt : sid'' < st.nextSessionId := hSess (sid'', sess) hIn
+  exact Nat.ne_of_gt hLt
+

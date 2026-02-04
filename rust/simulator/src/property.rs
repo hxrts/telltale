@@ -6,6 +6,7 @@ use telltale_types::LocalTypeR;
 use telltale_vm::coroutine::{CoroStatus, Coroutine};
 use telltale_vm::instr::Endpoint;
 use telltale_vm::session::{SessionId, SessionStore};
+use telltale_vm::trace::obs_session;
 use telltale_vm::vm::ObsEvent;
 
 use crate::value_conv::registers_to_f64s;
@@ -250,6 +251,7 @@ pub struct PropertyMonitor {
     states: Vec<PropertyState>,
     violations: Vec<PropertyViolation>,
     last_trace_len: usize,
+    session_counters: BTreeMap<SessionId, u64>,
 }
 
 impl PropertyMonitor {
@@ -287,6 +289,7 @@ impl PropertyMonitor {
             states,
             violations: Vec::new(),
             last_trace_len: 0,
+            session_counters: BTreeMap::new(),
         }
     }
 
@@ -299,6 +302,16 @@ impl PropertyMonitor {
     /// Check all properties against the current VM context.
     pub fn check(&mut self, ctx: &PropertyContext<'_>) {
         let new_events = ctx.trace.get(self.last_trace_len..).unwrap_or(&[]);
+        let mut new_events_local = Vec::with_capacity(new_events.len());
+        for event in new_events {
+            let local_tick = obs_session(event).map(|sid| {
+                let counter = self.session_counters.entry(sid).or_insert(0);
+                let tick = *counter;
+                *counter += 1;
+                tick
+            });
+            new_events_local.push((event, local_tick));
+        }
 
         for (idx, prop) in self.properties.iter().enumerate() {
             match (&prop, &mut self.states[idx]) {
@@ -345,10 +358,12 @@ impl PropertyMonitor {
                     if *violated {
                         continue;
                     }
-                    for event in new_events {
+                    for (event, local_tick) in &new_events_local {
                         match event {
-                            ObsEvent::Sent { session, tick, .. } if session == sid => {
-                                tracking.pending_sends.push_back(*tick);
+                            ObsEvent::Sent { session, .. } if session == sid => {
+                                if let Some(tick) = *local_tick {
+                                    tracking.pending_sends.push_back(tick);
+                                }
                             }
                             ObsEvent::Received { session, .. } if session == sid => {
                                 tracking.pending_sends.pop_front();
@@ -357,13 +372,14 @@ impl PropertyMonitor {
                         }
                     }
                     if let Some(&send_tick) = tracking.pending_sends.front() {
-                        if ctx.tick.saturating_sub(send_tick) > *bound as u64 {
+                        let current_tick = self.session_counters.get(sid).copied().unwrap_or(0);
+                        if current_tick.saturating_sub(send_tick) > *bound as u64 {
                             *violated = true;
                             self.violations.push(PropertyViolation {
                                 property_name: prop.name(),
                                 tick: ctx.tick,
                                 details: format!(
-                                    "send at tick {send_tick} not received within {bound} ticks"
+                                    "send at local tick {send_tick} not received within {bound} ticks"
                                 ),
                             });
                         }

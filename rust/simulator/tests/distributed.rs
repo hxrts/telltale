@@ -7,6 +7,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
 use telltale_vm::loader::CodeImage;
+use telltale_vm::trace::normalize_trace as normalize_ticks;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
 
 struct NoOpHandler;
@@ -128,39 +129,53 @@ fn outer_loop_protocol(
     (global, locals)
 }
 
-fn normalize_trace(trace: &[ObsEvent]) -> Vec<(String, String, String, String)> {
-    trace
+fn normalized_pairs(trace: &[ObsEvent]) -> Vec<(u64, String, String, String, String)> {
+    normalize_ticks(trace)
         .iter()
         .filter_map(|ev| match ev {
             ObsEvent::Sent {
-                from, to, label, ..
-            } => Some(("sent".into(), from.clone(), to.clone(), label.clone())),
+                tick,
+                from,
+                to,
+                label,
+                ..
+            } => Some((*tick, "sent".into(), from.clone(), to.clone(), label.clone())),
             ObsEvent::Received {
-                from, to, label, ..
-            } => Some(("recv".into(), from.clone(), to.clone(), label.clone())),
+                tick,
+                from,
+                to,
+                label,
+                ..
+            } => Some((*tick, "recv".into(), from.clone(), to.clone(), label.clone())),
             _ => None,
         })
         .collect()
 }
 
-fn per_session(trace: &[ObsEvent], sid: usize) -> Vec<(String, String, String, String)> {
-    trace
+fn per_session(trace: &[ObsEvent], sid: usize) -> Vec<(u64, String, String, String, String)> {
+    normalize_ticks(trace)
         .iter()
         .filter_map(|ev| match ev {
             ObsEvent::Sent {
+                tick,
                 session,
                 from,
                 to,
                 label,
                 ..
-            } if *session == sid => Some(("sent".into(), from.clone(), to.clone(), label.clone())),
+            } if *session == sid => {
+                Some((*tick, "sent".into(), from.clone(), to.clone(), label.clone()))
+            }
             ObsEvent::Received {
+                tick,
                 session,
                 from,
                 to,
                 label,
                 ..
-            } if *session == sid => Some(("recv".into(), from.clone(), to.clone(), label.clone())),
+            } if *session == sid => {
+                Some((*tick, "recv".into(), from.clone(), to.clone(), label.clone()))
+            }
             _ => None,
         })
         .collect()
@@ -190,14 +205,8 @@ fn test_distributed_two_site() {
 
     let trace_a = sim.handler().site_trace("site_A").expect("site A trace");
     let trace_b = sim.handler().site_trace("site_B").expect("site B trace");
-    assert!(
-        !normalize_trace(&trace_a).is_empty(),
-        "site A should emit events"
-    );
-    assert!(
-        !normalize_trace(&trace_b).is_empty(),
-        "site B should emit events"
-    );
+    assert!(!normalized_pairs(&trace_a).is_empty(), "site A should emit events");
+    assert!(!normalized_pairs(&trace_b).is_empty(), "site B should emit events");
 }
 
 #[test]
@@ -219,8 +228,8 @@ fn test_nested_matches_flat_per_site() {
 
     sim.run(50).expect("run outer vm");
 
-    let nested_a = normalize_trace(&sim.handler().site_trace("site_A").expect("site A trace"));
-    let nested_b = normalize_trace(&sim.handler().site_trace("site_B").expect("site B trace"));
+    let nested_a = normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace"));
+    let nested_b = normalized_pairs(&sim.handler().site_trace("site_B").expect("site B trace"));
 
     let mut flat = VM::new(VMConfig::default());
     let sid_a = flat.load_choreography(&inner_image).expect("load A");

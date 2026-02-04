@@ -1,7 +1,7 @@
 //! VM-backed simulation runner.
 //!
 //! Wraps `telltale-vm` to execute choreographies through the bytecode VM,
-//! producing the same `Trace` format as the lightweight scheduler.
+//! producing simulator traces via the canonical runtime.
 
 use std::collections::{BTreeMap, HashMap};
 

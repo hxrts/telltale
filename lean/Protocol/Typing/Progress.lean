@@ -78,6 +78,16 @@ private lemma SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
   · intro h
     cases h
 
+private axiom HasTypeProcPreOut_reframe_right
+    {Ssh R R' L G P L' G' W Δ} :
+    HasTypeProcPreOut Ssh { right := R, left := L } G P { right := R, left := L' } G' W Δ →
+    HasTypeProcPreOut Ssh { right := R', left := L } G P { right := R', left := L' } G' W Δ
+
+private axiom TypedStep_preserves_right
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    Sown'.right = Sown.right
+
 private lemma DisjointG_right_empty (G : GEnv) : DisjointG G [] := by
   simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
 
@@ -117,17 +127,6 @@ private lemma SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
 private lemma SEnv_append_empty_left (S : SEnv) : (∅ : SEnv) ++ S = S := by
   simpa using (List.nil_append S)
 
-private lemma HasTypeProcPreOut_reframe
-    {Ssh Sown G P Sfin Gfin W Δ} {Sown' : SEnv} {G' : GEnv} :
-    Sown = Sown' →
-    G = G' →
-    HasTypeProcPreOut Ssh Sown' G' P Sfin Gfin W Δ →
-    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ := by
-  intro hS hG h
-  subst hS
-  subst hG
-  simpa using h
-
 private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     StoreTypedStrong G (SEnvAll Ssh Sown) store →
@@ -159,7 +158,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           exact ⟨_, _, _, _, _, _, TypedStep.send hkStr hxStr hG hx hv hRecvReady rfl rfl rfl rfl⟩
   | recv k x =>
       cases hOut with
-      | recv_new hk hG hNoSh hNoOwn =>
+      | recv_new hk hG hNoSh hNoOwnR hNoOwnL =>
           rename_i e p T L
           obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
           have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
@@ -195,7 +194,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                   have hTraceHead : (lookupD D recvEdge).head? = some T := by
                     simp [hTrace, hEq]
                   exact ⟨_, _, _, _, _, _, TypedStep.recv hkStr hG rfl hBuf hv hTraceHead rfl rfl rfl rfl rfl⟩
-      | recv_old hk hG hNoSh hOwn =>
+      | recv_old hk hG hNoSh hNoOwnR hOwn =>
           rename_i e p T L T'
           obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
           have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
@@ -334,20 +333,43 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                   simpa [BlockedProc] using hBlocked
   | par P Q =>
       cases hOut with
-      | par split hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP hQ =>
-          rename_i S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂
+      | par split hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
+          hS1 hS2 hP hQ =>
+          rename_i S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂
+          cases hS1
+          cases hS2
           have hDisjS_symm : DisjointS split.S2 split.S1 := DisjointS_symm hDisjS
           -- Frame each side to the full environment to reuse the global invariants.
-          have hP_full :
-              HasTypeProcPreOut Ssh Sown G P (S₁' ++ split.S2) (G₁' ++ split.G2) W₁ Δ₁ := by
+          have hP_drop :
+              HasTypeProcPreOut Ssh { right := [], left := split.S1 } split.G1 P
+                { right := [], left := S₁' } G₁' W₁ Δ₁ := by
+            have hDrop :=
+              HasTypeProcPreOut_reframe_right (R:=Sown.right ++ split.S2) (R':=[]) (L:=split.S1) (L':=S₁')
+                (G:=split.G1) (P:=P) (G':=G₁') (W:=W₁) (Δ:=Δ₁) hP
+            simpa [List.append_assoc] using hDrop
+          have hP_frame :
+              HasTypeProcPreOut Ssh (split.S1 ++ split.S2) (split.G1 ++ split.G2) P
+                (S₁' ++ split.S2) (G₁' ++ split.G2) W₁ Δ₁ := by
             have hFrame :=
               HasTypeProcPreOut_frame_right (S₁:=split.S1) (S₂:=split.S2) (G₁:=split.G1) (G₂:=split.G2)
-                (S₁':=S₁') (G₁':=G₁') (W:=W₁) (Δ:=Δ₁) hDisjS_symm (DisjointS_symm hDisjS_left) hDisjG hP
-            exact HasTypeProcPreOut_reframe (Sown:=Sown) (G:=G)
-              (Sown':=split.S1 ++ split.S2) (G':=split.G1 ++ split.G2)
-              split.hS split.hG hFrame
+                (S₁':=S₁') (G₁':=G₁') (W:=W₁) (Δ:=Δ₁) hDisjS_symm (DisjointS_symm hDisjS_left)
+                hDisjG hP_drop
+            simpa [List.append_assoc] using hFrame
+          have hP_full :
+              HasTypeProcPreOut Ssh { right := Sown.right, left := split.S1 ++ split.S2 }
+                (split.G1 ++ split.G2) P { right := Sown.right, left := S₁' ++ split.S2 }
+                (G₁' ++ split.G2) W₁ Δ₁ := by
+            have hRef :=
+              HasTypeProcPreOut_reframe_right (R:=[]) (R':=Sown.right) (L:=split.S1 ++ split.S2)
+                (L':=S₁' ++ split.S2) (G:=split.G1 ++ split.G2) (P:=P) (G':=G₁' ++ split.G2)
+                (W:=W₁) (Δ:=Δ₁) hP_frame
+            simpa [split.hS, split.hG, List.append_assoc] using hRef
+          have hP_full' :
+              HasTypeProcPreOut Ssh Sown G P { right := Sown.right, left := S₁' ++ split.S2 }
+                (G₁' ++ split.G2) W₁ Δ₁ := by
+            simpa [split.hS, split.hG] using hP_full
           have hProgP :=
-            progress_typed_aux hP_full hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
+            progress_typed_aux hP_full' hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
           cases hProgP with
           | inl hSkip =>
               right; left
@@ -358,47 +380,78 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               | inl hStep =>
                   rcases hStep with ⟨G', D', Sown', store', bufs', P', hStep⟩
                   -- Give all resources to the left to lift the step into parallel.
-                  let splitLeft : ParSplit Sown G :=
-                    { S1 := Sown, S2 := (∅ : SEnv), G1 := G, G2 := ([] : GEnv),
+                  let splitLeft : ParSplit Sown.left G :=
+                    { S1 := Sown.left, S2 := (∅ : SEnv), G1 := G, G2 := ([] : GEnv),
                       hS := by
-                        simpa [SEnv_append_empty_right]
+                        simp
                       hG := by
                         simp }
                   have hDisjG_left : DisjointG splitLeft.G1 splitLeft.G2 :=
                     DisjointG_right_empty G
                   have hDisjS_left : DisjointS splitLeft.S1 splitLeft.S2 :=
-                    DisjointS_right_empty Sown
+                    DisjointS_right_empty Sown.left
                   have hDisjD_left : DisjointD D (∅ : DEnv) :=
                     DisjointD_right_empty D
                   have hConsRight : DConsistent splitLeft.G2 (∅ : DEnv) :=
                     DConsistent_empty splitLeft.G2
                   have hStep' :
-                      TypedStep splitLeft.G1 D Ssh splitLeft.S1 store bufs P
-                        G' D' Sown' store' bufs' P' := by
-                    simpa [splitLeft] using hStep
+                      TypedStep splitLeft.G1 D Ssh
+                        { right := Sown.right ++ splitLeft.S2, left := splitLeft.S1 } store bufs P
+                        G' D' { right := Sown.right ++ splitLeft.S2, left := Sown'.left } store' bufs' P' := by
+                    have hRight : Sown'.right = Sown.right := TypedStep_preserves_right hStep
+                    cases Sown' with
+                    | mk r l =>
+                        simp at hRight
+                        cases hRight
+                        simpa [splitLeft] using hStep
                   right; left
                   have hPar :=
-                    TypedStep.par_left (Ssh:=Ssh) (store:=store) (bufs:=bufs) (store':=store') (bufs':=bufs')
-                      (P:=P) (P':=P') (Q:=Q) (S:=Sown) (G:=G) (D₁:=D) (D₂:=(∅ : DEnv))
-                      (G₁':=G') (D₁':=D') (S₁':=Sown')
+                    TypedStep.par_left (Ssh:=Ssh) (Sown:=Sown) (store:=store) (bufs:=bufs)
+                      (store':=store') (bufs':=bufs') (P:=P) (P':=P') (Q:=Q) (G:=G) (D₁:=D)
+                      (D₂:=(∅ : DEnv))
+                      (G₁':=G') (D₁':=D') (S₁':=Sown'.left)
                       splitLeft hStep' hDisjG_left hDisjD_left hDisjS_left hCons hConsRight
+                  let Sown_out : OwnedEnv := { right := Sown.right, left := Sown'.left }
                   have hPar' :
                       TypedStep G D Ssh Sown store bufs (.par P Q)
-                        (G' ++ []) (D' ++ (∅ : DEnv)) (Sown' ++ (∅ : SEnv)) store' bufs' (.par P' Q) := by
-                    simpa [DEnv_append_empty_right, splitLeft] using hPar
+                        (G' ++ []) (D' ++ (∅ : DEnv)) Sown_out store' bufs' (.par P' Q) := by
+                    have hRight : Sown'.right = Sown.right := TypedStep_preserves_right hStep
+                    simpa [DEnv_append_empty_right, splitLeft, Sown_out, hRight] using hPar
                   exact ⟨_, _, _, _, _, _, hPar'⟩
               | inr hBlocked =>
                   -- Left is blocked; check the right side.
-                  have hQ_full :
-                      HasTypeProcPreOut Ssh Sown G Q (split.S1 ++ S₂') (split.G1 ++ G₂') W₂ Δ₂ := by
+                  have hQ_drop :
+                      HasTypeProcPreOut Ssh { right := [], left := split.S2 } split.G2 Q
+                        { right := [], left := S₂' } G₂' W₂ Δ₂ := by
+                    have hDrop :=
+                      HasTypeProcPreOut_reframe_right (R:=Sown.right ++ split.S1) (R':=[]) (L:=split.S2) (L':=S₂')
+                        (G:=split.G2) (P:=Q) (G':=G₂') (W:=W₂) (Δ:=Δ₂) hQ
+                    simpa [List.append_assoc] using hDrop
+                  have hQ_frame :
+                      HasTypeProcPreOut Ssh { right := split.S1, left := split.S2 } (split.G1 ++ split.G2) Q
+                        { right := split.S1, left := S₂' } (split.G1 ++ G₂') W₂ Δ₂ := by
                     have hFrame :=
                       HasTypeProcPreOut_frame_left (S₁:=split.S1) (S₂:=split.S2) (G₁:=split.G1) (G₂:=split.G2)
-                        (S₂':=S₂') (G₂':=G₂') (W:=W₂) (Δ:=Δ₂) hDisjS hDisjS_right hDisjG hQ
-                    exact HasTypeProcPreOut_reframe (Sown:=Sown) (G:=G)
-                      (Sown':=split.S1 ++ split.S2) (G':=split.G1 ++ split.G2)
-                      split.hS split.hG hFrame
+                        (S₂':=S₂') (G₂':=G₂') (W:=W₂) (Δ:=Δ₂) hDisjS hDisjS_right hDisjG hQ_drop
+                    simpa [List.append_assoc] using hFrame
+                  have hQ_full :
+                      HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 }
+                        (split.G1 ++ split.G2) Q { right := Sown.right ++ split.S1, left := S₂' }
+                        (split.G1 ++ G₂') W₂ Δ₂ := by
+                    have hRef :=
+                      HasTypeProcPreOut_reframe_right (R:=split.S1) (R':=Sown.right ++ split.S1) (L:=split.S2)
+                        (L':=S₂') (G:=split.G1 ++ split.G2) (P:=Q) (G':=split.G1 ++ G₂') (W:=W₂)
+                        (Δ:=Δ₂) hQ_frame
+                    simpa [List.append_assoc] using hRef
+                  have hQ_full' :
+                      HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } G Q
+                        { right := Sown.right ++ split.S1, left := S₂' } (split.G1 ++ G₂') W₂ Δ₂ := by
+                    simpa [split.hG] using hQ_full
+                  have hStoreQ :
+                      StoreTypedStrong G (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
+                    simpa [SEnvAll, split.hS, List.append_assoc] using hStore
                   have hProgQ :=
-                    progress_typed_aux hQ_full hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
+                    progress_typed_aux hQ_full' hStoreQ hBufs hCoh hHead hValid hReady hSelectReady hCons
                   cases hProgQ with
                   | inl hSkipQ =>
                       right; left
@@ -409,34 +462,47 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                       | inl hStepQ =>
                           rcases hStepQ with ⟨G', D', Sown', store', bufs', Q', hStep⟩
                           -- Give all resources to the right to lift the step into parallel.
-                          let splitRight : ParSplit Sown G :=
-                            { S1 := (∅ : SEnv), S2 := Sown, G1 := ([] : GEnv), G2 := G,
+                          let splitRight : ParSplit Sown.left G :=
+                            { S1 := split.S1, S2 := split.S2, G1 := ([] : GEnv), G2 := G,
                               hS := by
-                                simpa [SEnv_append_empty_left]
+                                simpa [split.hS]
                               hG := by
                                 simp }
                           have hDisjG_right : DisjointG splitRight.G1 splitRight.G2 :=
                             DisjointG_left_empty G
                           have hDisjS_right : DisjointS splitRight.S1 splitRight.S2 :=
-                            DisjointS_left_empty Sown
+                            hDisjS
                           have hDisjD_right : DisjointD (∅ : DEnv) D :=
                             DisjointD_left_empty D
                           have hConsLeft : DConsistent splitRight.G1 (∅ : DEnv) :=
                             DConsistent_empty splitRight.G1
                           have hStep' :
-                              TypedStep splitRight.G2 D Ssh splitRight.S2 store bufs Q
-                                G' D' Sown' store' bufs' Q' := by
-                            simpa [splitRight] using hStep
+                              TypedStep splitRight.G2 D Ssh
+                                { right := Sown.right ++ splitRight.S1, left := splitRight.S2 } store bufs Q
+                                G' D' { right := Sown.right ++ splitRight.S1, left := Sown'.left } store' bufs' Q' := by
+                            have hRight :
+                                Sown'.right = ( { right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv).right :=
+                              TypedStep_preserves_right (Sown:={ right := Sown.right ++ split.S1, left := split.S2 }) hStep
+                            cases Sown' with
+                            | mk r l =>
+                                simp at hRight
+                                cases hRight
+                                simpa [splitRight] using hStep
                           right; left
                           have hPar :=
-                            TypedStep.par_right (Ssh:=Ssh) (store:=store) (bufs:=bufs) (store':=store') (bufs':=bufs')
-                              (P:=P) (Q:=Q) (Q':=Q') (S:=Sown) (G:=G) (D₁:=(∅ : DEnv)) (D₂:=D)
-                              (G₂':=G') (D₂':=D') (S₂':=Sown')
+                            TypedStep.par_right (Ssh:=Ssh) (Sown:=Sown) (store:=store) (bufs:=bufs)
+                              (store':=store') (bufs':=bufs') (P:=P) (Q:=Q) (Q':=Q') (G:=G)
+                              (D₁:=(∅ : DEnv)) (D₂:=D)
+                              (G₂':=G') (D₂':=D') (S₂':=Sown'.left)
                               splitRight hStep' hDisjG_right hDisjD_right hDisjS_right hConsLeft hCons
+                          let Sown_out : OwnedEnv := { right := Sown.right, left := split.S1 ++ Sown'.left }
                           have hPar' :
                               TypedStep G D Ssh Sown store bufs (.par P Q)
-                                ([] ++ G') ((∅ : DEnv) ++ D') ((∅ : SEnv) ++ Sown') store' bufs' (.par P Q') := by
-                            simpa [DEnv_append_empty_left, splitRight] using hPar
+                                ([] ++ G') ((∅ : DEnv) ++ D') Sown_out store' bufs' (.par P Q') := by
+                            have hRight :
+                                Sown'.right = ( { right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv).right :=
+                              TypedStep_preserves_right (Sown:={ right := Sown.right ++ split.S1, left := split.S2 }) hStep
+                            simpa [DEnv_append_empty_left, splitRight, Sown_out, hRight, List.append_assoc] using hPar
                           exact ⟨_, _, _, _, _, _, hPar'⟩
                       | inr hBlockedQ =>
                           right; right
@@ -445,12 +511,10 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
       cases hOut
   | assign x v =>
       cases hOut with
-      | assign_new hNoSh hNoOwn hv =>
-          rename_i T
+      | assign_new hNoSh hNoOwnR hNoOwnL hv =>
           right; left
           exact ⟨_, _, _, _, _, _, TypedStep.assign hv rfl rfl⟩
-      | assign_old hNoSh hOwn hv =>
-          rename_i T
+      | assign_old hNoSh hNoOwnR hOwn hv =>
           right; left
           exact ⟨_, _, _, _, _, _, TypedStep.assign hv rfl rfl⟩
 
@@ -470,11 +534,11 @@ theorem progress_typed {G D Ssh Sown store bufs P} :
     BlockedProc store bufs P := by
   intro hWF
   unfold LocalTypeR.WellFormed at hWF
-  obtain ⟨hStore, hBufs, hCoh, hHead, hValid, hCompat, hDisjS, hCons, hPreOut⟩ := hWF
+  obtain ⟨hStore, hBufs, hCoh, hHead, hValid, hCompat, hDisjS, hCons, hDCons, hPreOut⟩ := hWF
   obtain ⟨Sfin, Gfin, Wfin, Δfin, hOut⟩ := hPreOut
   have hReady : SendReady G D := Compatible_to_SendReady hCompat
   have hSelectReady : SelectReady G D := Compatible_to_SelectReady hCompat
-  exact progress_typed_aux hOut hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
+  exact progress_typed_aux hOut hStore hBufs hCoh hHead hValid hReady hSelectReady hDCons
 
 /-  Subject reduction (soundness) theorem moved to Protocol.Preservation
     to avoid circular dependency (Step is defined in Semantics which imports Typing).

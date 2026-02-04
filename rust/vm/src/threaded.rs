@@ -5,7 +5,7 @@
 
 use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -34,6 +34,7 @@ pub struct ThreadedVM {
     next_coro_id: usize,
     pool: ThreadPool,
     workers: usize,
+    guard_resources: Arc<Mutex<HashMap<String, Value>>>,
 }
 
 /// Session-scoped locks for concurrent execution.
@@ -185,6 +186,13 @@ fn resolve_type_update(
     (resolved, update)
 }
 
+fn coro_has_progress(coros: &[Arc<Mutex<Coroutine>>], coro_id: usize) -> bool {
+    coros
+        .get(coro_id)
+        .map(|coro| !coro.lock().expect("coroutine lock poisoned").progress_tokens.is_empty())
+        .unwrap_or(false)
+}
+
 /// Atomic result of executing one instruction.
 struct StepPack {
     /// How to update the coroutine.
@@ -229,6 +237,10 @@ impl ThreadedVM {
             .expect("thread pool build failed");
         let tick_duration = config.tick_duration;
         let scheduler = Scheduler::new(config.sched_policy.clone());
+        let mut guard_resources = HashMap::new();
+        for layer in &config.guard_layers {
+            guard_resources.insert(layer.id.clone(), Value::Unit);
+        }
         Self {
             config,
             coroutines: Vec::new(),
@@ -239,6 +251,7 @@ impl ThreadedVM {
             next_coro_id: 0,
             pool,
             workers: worker_count,
+            guard_resources: Arc::new(Mutex::new(guard_resources)),
         }
     }
 
@@ -334,7 +347,15 @@ impl ThreadedVM {
                 picks
                     .par_iter()
                     .map(|pick| {
-                        exec_instr(&pick.coro, &pick.session, &self.sessions, handler, tick)
+                        exec_instr(
+                            &pick.coro,
+                            &pick.session,
+                            &self.sessions,
+                            &self.config,
+                            &self.guard_resources,
+                            handler,
+                            tick,
+                        )
                     })
                     .collect()
             });
@@ -474,13 +495,17 @@ impl ThreadedVM {
         let mut deferred = Vec::new();
         let mut used_sessions = BTreeSet::new();
         let attempts = self.scheduler.ready_count();
+        let coros = &self.coroutines;
 
         for _ in 0..attempts {
             if picks.len() >= n {
                 break;
             }
 
-            let coro_id = match self.scheduler.schedule() {
+            let coro_id = match self
+                .scheduler
+                .schedule_with(|id| coro_has_progress(coros, id))
+            {
                 Some(id) => id,
                 None => break,
             };
@@ -568,6 +593,80 @@ impl ThreadedVM {
             }
         }
 
+        let transfer = pack.events.iter().find_map(|event| match event {
+            ObsEvent::Transferred {
+                session,
+                role,
+                from,
+                to,
+                ..
+            } => Some((
+                Endpoint {
+                    sid: *session,
+                    role: role.clone(),
+                },
+                *from,
+                *to,
+            )),
+            _ => None,
+        });
+
+        if let Some((endpoint, from_id, to_id)) = transfer {
+            if from_id != coro_guard.id {
+                return Err(Fault::TransferFault {
+                    message: "transfer source mismatch".into(),
+                });
+            }
+            if !coro_guard.owned_endpoints.contains(&endpoint) {
+                return Err(Fault::TransferFault {
+                    message: "endpoint not owned".into(),
+                });
+            }
+            let target = if to_id == coro_guard.id {
+                None
+            } else {
+                Some(
+                    self.coroutines
+                        .get(to_id)
+                        .cloned()
+                        .ok_or(Fault::TransferFault {
+                            message: "target coroutine not found".into(),
+                        })?,
+                )
+            };
+
+            let mut moved_tokens = Vec::new();
+            coro_guard.progress_tokens.retain(|token| {
+                if token == &endpoint {
+                    moved_tokens.push(token.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            let mut moved_knowledge = Vec::new();
+            coro_guard.knowledge.retain(|fact| {
+                if fact.endpoint == endpoint {
+                    moved_knowledge.push(fact.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            coro_guard.owned_endpoints.retain(|e| e != &endpoint);
+
+            if let Some(target) = target {
+                let mut target_guard = target.lock().expect("coroutine lock poisoned");
+                target_guard.owned_endpoints.push(endpoint);
+                target_guard.progress_tokens.extend(moved_tokens);
+                target_guard.knowledge.extend(moved_knowledge);
+            } else {
+                coro_guard.owned_endpoints.push(endpoint);
+                coro_guard.progress_tokens.extend(moved_tokens);
+                coro_guard.knowledge.extend(moved_knowledge);
+            }
+        }
+
         self.trace.extend(pack.events);
 
         match &coro_guard.status {
@@ -583,6 +682,8 @@ fn exec_instr(
     coro: &Arc<Mutex<Coroutine>>,
     session: &Arc<Mutex<SessionState>>,
     store: &ThreadedSessionStore,
+    config: &VMConfig,
+    guard_resources: &Arc<Mutex<HashMap<String, Value>>>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
@@ -642,6 +743,51 @@ fn exec_instr(
             events: vec![],
         }),
         Instr::Invoke { .. } => step_invoke(&mut coro_guard, &role, handler, tick),
+        Instr::Acquire { layer, dst } => step_acquire(
+            &mut coro_guard,
+            &ep,
+            &role,
+            sid,
+            &layer,
+            dst,
+            config,
+            guard_resources,
+            handler,
+            tick,
+        ),
+        Instr::Release { layer, evidence } => step_release(
+            &mut coro_guard,
+            &ep,
+            &role,
+            sid,
+            &layer,
+            evidence,
+            config,
+            guard_resources,
+            handler,
+            tick,
+        ),
+        Instr::Fork { ghost } => step_fork(&mut coro_guard, &role, sid, ghost, config, tick),
+        Instr::Join => step_join(&mut coro_guard, sid, tick),
+        Instr::Abort => step_abort(&mut coro_guard, sid, tick),
+        Instr::Transfer {
+            endpoint,
+            target,
+            bundle,
+        } => step_transfer(
+            &mut coro_guard,
+            &role,
+            endpoint,
+            target,
+            bundle,
+            tick,
+        ),
+        Instr::Tag { fact, dst } => step_tag(&mut coro_guard, &role, fact, dst, tick),
+        Instr::Check {
+            knowledge,
+            target,
+            dst,
+        } => step_check(&mut coro_guard, &role, knowledge, target, dst, tick),
         Instr::LoadImm { dst, val } => {
             let v = match val {
                 crate::instr::ImmValue::Unit => Value::Unit,
@@ -699,7 +845,7 @@ fn exec_instr(
         Instr::Open {
             ref roles,
             ref endpoints,
-        } => step_open(store, roles, endpoints, tick),
+        } => step_open(&mut coro_guard, &role, store, roles, endpoints, tick),
     }
 }
 
@@ -898,6 +1044,321 @@ fn step_invoke(
             tick,
             coro_id,
             role: role.to_string(),
+        }],
+    })
+}
+
+fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
+    if config.guard_layers.is_empty() {
+        return Ok(());
+    }
+    match config.guard_layers.iter().find(|cfg| cfg.id == layer) {
+        None => Err(Fault::AcquireFault {
+            layer: layer.to_string(),
+            message: "unknown layer".into(),
+        }),
+        Some(cfg) if !cfg.active => Err(Fault::AcquireFault {
+            layer: layer.to_string(),
+            message: "inactive layer".into(),
+        }),
+        Some(_) => Ok(()),
+    }
+}
+
+fn step_acquire(
+    coro: &mut Coroutine,
+    ep: &Endpoint,
+    role: &str,
+    sid: SessionId,
+    layer: &str,
+    dst: u16,
+    config: &VMConfig,
+    guard_resources: &Arc<Mutex<HashMap<String, Value>>>,
+    handler: &dyn EffectHandler,
+    tick: u64,
+) -> Result<StepPack, Fault> {
+    guard_active(config, layer)?;
+    {
+        let mut resources = guard_resources.lock().expect("guard resources lock poisoned");
+        resources.entry(layer.to_string()).or_insert(Value::Unit);
+    }
+    let decision = handler
+        .handle_acquire(sid, role, layer, &coro.regs)
+        .map_err(|e| Fault::AcquireFault {
+            layer: layer.to_string(),
+            message: e,
+        })?;
+    match decision {
+        crate::effect::AcquireDecision::Grant(evidence) => {
+            let mut resources = guard_resources.lock().expect("guard resources lock poisoned");
+            resources.insert(layer.to_string(), evidence.clone());
+            Ok(StepPack {
+                coro_update: CoroUpdate::AdvancePcWriteReg {
+                    reg: dst,
+                    val: evidence,
+                },
+                type_update: None,
+                events: vec![ObsEvent::Acquired {
+                    tick,
+                    session: ep.sid,
+                    role: role.to_string(),
+                    layer: layer.to_string(),
+                }],
+            })
+        }
+        crate::effect::AcquireDecision::Block => Ok(StepPack {
+            coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
+                layer: layer.to_string(),
+            }),
+            type_update: None,
+            events: vec![],
+        }),
+    }
+}
+
+fn step_release(
+    coro: &mut Coroutine,
+    ep: &Endpoint,
+    role: &str,
+    sid: SessionId,
+    layer: &str,
+    evidence: u16,
+    config: &VMConfig,
+    guard_resources: &Arc<Mutex<HashMap<String, Value>>>,
+    handler: &dyn EffectHandler,
+    tick: u64,
+) -> Result<StepPack, Fault> {
+    guard_active(config, layer)?;
+    {
+        let mut resources = guard_resources.lock().expect("guard resources lock poisoned");
+        resources.entry(layer.to_string()).or_insert(Value::Unit);
+    }
+    let ev = coro
+        .regs
+        .get(usize::from(evidence))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    handler
+        .handle_release(sid, role, layer, &ev, &coro.regs)
+        .map_err(|e| Fault::AcquireFault {
+            layer: layer.to_string(),
+            message: e,
+        })?;
+    {
+        let mut resources = guard_resources.lock().expect("guard resources lock poisoned");
+        resources.insert(layer.to_string(), ev.clone());
+    }
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePc,
+        type_update: None,
+        events: vec![ObsEvent::Released {
+            tick,
+            session: ep.sid,
+            role: role.to_string(),
+            layer: layer.to_string(),
+        }],
+    })
+}
+
+fn step_fork(
+    coro: &mut Coroutine,
+    role: &str,
+    sid: SessionId,
+    ghost: u16,
+    config: &VMConfig,
+    tick: u64,
+) -> Result<StepPack, Fault> {
+    if !config.speculation_enabled {
+        return Err(Fault::SpecFault {
+            message: "speculation disabled".into(),
+        });
+    }
+    let ghost_val = coro
+        .regs
+        .get(usize::from(ghost))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    let ghost_sid = match ghost_val {
+        Value::Int(v) if v >= 0 => v as usize,
+        _ => {
+            return Err(Fault::TypeViolation {
+                message: format!("{role}: fork expects integer ghost id"),
+            })
+        }
+    };
+    coro.spec_state = Some(crate::coroutine::SpeculationState {
+        ghost_sid,
+        depth: 0,
+    });
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePc,
+        type_update: None,
+        events: vec![ObsEvent::Forked {
+            tick,
+            session: sid,
+            ghost: ghost_sid,
+        }],
+    })
+}
+
+fn step_join(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPack, Fault> {
+    coro.spec_state = None;
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePc,
+        type_update: None,
+        events: vec![ObsEvent::Joined { tick, session: sid }],
+    })
+}
+
+fn step_abort(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPack, Fault> {
+    coro.spec_state = None;
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePc,
+        type_update: None,
+        events: vec![ObsEvent::Aborted { tick, session: sid }],
+    })
+}
+
+fn step_transfer(
+    coro: &mut Coroutine,
+    role: &str,
+    endpoint: u16,
+    target: u16,
+    _bundle: u16,
+    tick: u64,
+) -> Result<StepPack, Fault> {
+    let ep_val = coro
+        .regs
+        .get(usize::from(endpoint))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    let ep = match ep_val {
+        Value::Endpoint(ep) => ep,
+        _ => {
+            return Err(Fault::TransferFault {
+                message: format!("{role}: transfer expects endpoint register"),
+            })
+        }
+    };
+    let target_val = coro
+        .regs
+        .get(usize::from(target))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    let target_id = match target_val {
+        Value::Int(v) if v >= 0 => v as usize,
+        _ => {
+            return Err(Fault::TransferFault {
+                message: format!("{role}: transfer expects target coroutine id"),
+            })
+        }
+    };
+    if !coro.owned_endpoints.contains(&ep) {
+        return Err(Fault::TransferFault {
+            message: "endpoint not owned".into(),
+        });
+    }
+
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePc,
+        type_update: None,
+        events: vec![ObsEvent::Transferred {
+            tick,
+            session: ep.sid,
+            role: role.to_string(),
+            from: coro.id,
+            to: target_id,
+        }],
+    })
+}
+
+fn step_tag(
+    coro: &mut Coroutine,
+    role: &str,
+    fact_reg: u16,
+    dst: u16,
+    tick: u64,
+) -> Result<StepPack, Fault> {
+    let fact_val = coro
+        .regs
+        .get(usize::from(fact_reg))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    let (endpoint, fact) = match fact_val {
+        Value::Knowledge { endpoint, fact } => (endpoint, fact),
+        _ => {
+            return Err(Fault::TransferFault {
+                message: format!("{role}: tag expects knowledge value"),
+            })
+        }
+    };
+    coro.knowledge
+        .push(crate::coroutine::KnowledgeFact { endpoint: endpoint.clone(), fact: fact.clone() });
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePcWriteReg {
+            reg: dst,
+            val: Value::Bool(true),
+        },
+        type_update: None,
+        events: vec![ObsEvent::Tagged {
+            tick,
+            session: endpoint.sid,
+            role: role.to_string(),
+            fact,
+        }],
+    })
+}
+
+fn step_check(
+    coro: &mut Coroutine,
+    role: &str,
+    knowledge: u16,
+    target: u16,
+    dst: u16,
+    tick: u64,
+) -> Result<StepPack, Fault> {
+    let know_val = coro
+        .regs
+        .get(usize::from(knowledge))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    let (endpoint, fact) = match know_val {
+        Value::Knowledge { endpoint, fact } => (endpoint, fact),
+        _ => {
+            return Err(Fault::TransferFault {
+                message: format!("{role}: check expects knowledge value"),
+            })
+        }
+    };
+    let target_val = coro
+        .regs
+        .get(usize::from(target))
+        .ok_or(Fault::OutOfRegisters)?
+        .clone();
+    let target_role = match target_val {
+        Value::Str(s) => s,
+        _ => {
+            return Err(Fault::TransferFault {
+                message: format!("{role}: check expects target role string"),
+            })
+        }
+    };
+    let permitted = coro
+        .knowledge
+        .iter()
+        .any(|k| k.endpoint == endpoint && k.fact == fact);
+    Ok(StepPack {
+        coro_update: CoroUpdate::AdvancePcWriteReg {
+            reg: dst,
+            val: Value::Bool(permitted),
+        },
+        type_update: None,
+        events: vec![ObsEvent::Checked {
+            tick,
+            session: endpoint.sid,
+            role: role.to_string(),
+            target: target_role,
+            permitted,
         }],
     })
 }
@@ -1195,15 +1656,31 @@ fn step_close(
 }
 
 fn step_open(
+    coro: &mut Coroutine,
+    role: &str,
     store: &ThreadedSessionStore,
     roles: &[String],
-    _endpoints: &[(String, u16)],
+    endpoints: &[(String, u16)],
     tick: u64,
 ) -> Result<StepPack, Fault> {
     let sid = store.open(roles.to_vec(), &BufferConfig::default(), &BTreeMap::new());
+    let mut coro_update = CoroUpdate::AdvancePc;
+    if let Some((_, reg)) = endpoints.iter().find(|(r, _)| r == role) {
+        if usize::from(*reg) >= coro.regs.len() {
+            return Err(Fault::OutOfRegisters);
+        }
+        let ep = Endpoint {
+            sid,
+            role: role.to_string(),
+        };
+        coro_update = CoroUpdate::AdvancePcWriteReg {
+            reg: *reg,
+            val: Value::Endpoint(ep),
+        };
+    }
 
     Ok(StepPack {
-        coro_update: CoroUpdate::AdvancePc,
+        coro_update,
         type_update: None,
         events: vec![ObsEvent::Opened {
             tick,

@@ -61,7 +61,7 @@ The bridge test coverage lives in `rust/lean-bridge/tests`:
 - `projection_equivalence_tests.rs` compares theory and DSL projections
 - `proptest_projection.rs` validates randomized protocols against Lean when available
 - `proptest_json_roundtrip.rs` checks JSON round trip stability
-- `lean_integration_tests.rs` runs the Lean validator; `projection_runner_tests.rs` exercises the validator export mode
+- `lean_integration_tests.rs` runs the Lean validator. `projection_runner_tests.rs` exercises the validator export mode.
 - `golden_equivalence_tests.rs` and `live_equivalence_tests.rs` compare fixed suites
 
 Use `cargo test -p telltale-lean-bridge` to run the full suite.

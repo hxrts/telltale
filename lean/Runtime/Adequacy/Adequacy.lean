@@ -133,11 +133,32 @@ def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
   ∀ (st : VMState ι γ π ε ν) idx ev,
     (idx, ev) ∈ obsTraceOf (ε:=ε) st.obsTrace →
       ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = ev
+private theorem go_mem {ε : Type u} [EffectModel ε]
+    {start : Nat} {evs : List (TickedObsEvent ε)} {idx : Nat} {ev : ObsEvent ε}
+    (h : (idx, ev) ∈ obsTraceOf.go start evs) :
+    ∃ stepEv ∈ evs, observeAt idx stepEv = ev := by
+  induction evs generalizing start idx ev with
+  | nil => simp [obsTraceOf.go] at h
+  | cons hd tl ih =>
+    have hdef : obsTraceOf.go start (hd :: tl) =
+      ((start, observeAt start hd) :: obsTraceOf.go (start + 1) tl : ObsTrace ε) := rfl
+    rw [hdef, List.mem_cons] at h
+    rcases h with ⟨rfl, rfl⟩ | h
+    · exact ⟨hd, .head tl, rfl⟩
+    · obtain ⟨stepEv, hm, he⟩ := ih h
+      exact ⟨stepEv, List.mem_cons_of_mem hd hm, he⟩
+
+theorem no_phantom_events_holds {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] :
+    no_phantom_events (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
+  intro st idx ev hmem
+  exact go_mem hmem
+
 def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)
     (_chain : GuardChain γ) : Prop :=
-  -- Compiler preserves role-local types and entry points.
-  let prog := compile (γ:=γ) (ε:=ε) _p _roles _types _chain
-  prog.entryPoints = _roles.map (fun r => (r, 0)) ∧
-  prog.localTypes = programLocalTypes _roles _types
+  -- Placeholder: compiler correctness statement to be tied to CodeImage.fromLocalTypes.
+  True

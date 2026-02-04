@@ -7,7 +7,7 @@
 //! - Blocking never advances type state
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::time::Duration;
 use telltale_types::LocalTypeR;
 
@@ -19,6 +19,15 @@ use crate::instr::{Endpoint, Instr, PC};
 use crate::loader::CodeImage;
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::session::{unfold_if_var_with_scope, SessionId, SessionStore};
+
+/// Guard layer configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuardLayerConfig {
+    /// Guard layer identifier.
+    pub id: String,
+    /// Whether the layer is active.
+    pub active: bool,
+}
 
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +44,10 @@ pub struct VMConfig {
     pub num_registers: u16,
     /// Simulated time per scheduler round.
     pub tick_duration: Duration,
+    /// Guard layers configured for the VM.
+    pub guard_layers: Vec<GuardLayerConfig>,
+    /// Whether speculative execution is enabled.
+    pub speculation_enabled: bool,
 }
 
 impl Default for VMConfig {
@@ -46,12 +59,14 @@ impl Default for VMConfig {
             max_coroutines: 1024,
             num_registers: 16,
             tick_duration: Duration::from_millis(1),
+            guard_layers: Vec::new(),
+            speculation_enabled: false,
         }
     }
 }
 
 /// Observable event emitted by the VM.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ObsEvent {
     /// Value sent on an edge.
     Sent {
@@ -110,6 +125,88 @@ pub enum ObsEvent {
         coro_id: usize,
         /// Role name.
         role: String,
+    },
+    /// Guard layer acquired.
+    Acquired {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Role name.
+        role: String,
+        /// Guard layer identifier.
+        layer: String,
+    },
+    /// Guard layer released.
+    Released {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Role name.
+        role: String,
+        /// Guard layer identifier.
+        layer: String,
+    },
+    /// Endpoint transferred between coroutines.
+    Transferred {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Role name.
+        role: String,
+        /// Source coroutine.
+        from: usize,
+        /// Target coroutine.
+        to: usize,
+    },
+    /// Speculation forked for a ghost session.
+    Forked {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Ghost session id.
+        ghost: usize,
+    },
+    /// Speculation joined.
+    Joined {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+    },
+    /// Speculation aborted.
+    Aborted {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+    },
+    /// Knowledge fact tagged.
+    Tagged {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Role name.
+        role: String,
+        /// Fact payload.
+        fact: String,
+    },
+    /// Knowledge fact checked.
+    Checked {
+        /// Scheduler tick when the event occurred.
+        tick: u64,
+        /// Session ID.
+        session: SessionId,
+        /// Role name.
+        role: String,
+        /// Target role.
+        target: String,
+        /// Whether the flow policy permitted the fact.
+        permitted: bool,
     },
     /// Coroutine faulted.
     Faulted {
@@ -254,6 +351,7 @@ pub struct VM {
     clock: SimClock,
     next_coro_id: usize,
     paused_roles: BTreeSet<String>,
+    guard_resources: HashMap<String, Value>,
 }
 
 impl VM {
@@ -262,6 +360,10 @@ impl VM {
     pub fn new(config: VMConfig) -> Self {
         let tick_duration = config.tick_duration;
         let scheduler = Scheduler::new(config.sched_policy.clone());
+        let mut guard_resources = HashMap::new();
+        for layer in &config.guard_layers {
+            guard_resources.insert(layer.id.clone(), Value::Unit);
+        }
         Self {
             config,
             coroutines: Vec::new(),
@@ -271,6 +373,7 @@ impl VM {
             clock: SimClock::new(tick_duration),
             next_coro_id: 0,
             paused_roles: BTreeSet::new(),
+            guard_resources,
         }
     }
 
@@ -360,11 +463,26 @@ impl VM {
                 return Ok(StepResult::AllDone);
             }
 
+            let progress_ids: BTreeSet<usize> = self
+                .coroutines
+                .iter()
+                .filter(|c| !c.progress_tokens.is_empty())
+                .map(|c| c.id)
+                .collect();
+
             let mut coro_id = None;
             let mut attempts = self.scheduler.ready_count();
             while attempts > 0 {
                 attempts -= 1;
-                let next_id = match self.scheduler.schedule() {
+                let next_id = match self.scheduler.policy() {
+                    SchedPolicy::ProgressAware => {
+                        let progress_ids = &progress_ids;
+                        self.scheduler
+                            .schedule_with(|id| progress_ids.contains(&id))
+                    }
+                    _ => self.scheduler.schedule(),
+                };
+                let next_id = match next_id {
                     Some(id) => id,
                     None => break,
                 };
@@ -639,6 +757,26 @@ impl VM {
                 events: vec![],
             },
             Instr::Invoke { .. } => self.step_invoke(idx, &role, handler)?,
+            Instr::Acquire { layer, dst } => {
+                self.step_acquire(idx, &ep, &role, sid, &layer, dst, handler)?
+            }
+            Instr::Release { layer, evidence } => {
+                self.step_release(idx, &ep, &role, sid, &layer, evidence, handler)?
+            }
+            Instr::Fork { ghost } => self.step_fork(idx, &role, sid, ghost)?,
+            Instr::Join => self.step_join(idx, &role, sid)?,
+            Instr::Abort => self.step_abort(idx, &role, sid)?,
+            Instr::Transfer {
+                endpoint,
+                target,
+                bundle,
+            } => self.step_transfer(idx, &role, sid, endpoint, target, bundle)?,
+            Instr::Tag { fact, dst } => self.step_tag(idx, &role, sid, fact, dst)?,
+            Instr::Check {
+                knowledge,
+                target,
+                dst,
+            } => self.step_check(idx, &role, sid, knowledge, target, dst)?,
             Instr::LoadImm { dst, val } => {
                 let v = match val {
                     crate::instr::ImmValue::Unit => Value::Unit,
@@ -671,7 +809,7 @@ impl VM {
             Instr::Open {
                 ref roles,
                 ref endpoints,
-            } => self.step_open(idx, roles, endpoints)?,
+            } => self.step_open(idx, &role, roles, endpoints)?,
         };
 
         // 3. Commit atomically.
@@ -898,6 +1036,362 @@ impl VM {
                 tick: self.clock.tick,
                 coro_id,
                 role: role.to_string(),
+            }],
+        })
+    }
+
+    fn guard_active(&self, layer: &str) -> Result<(), Fault> {
+        if self.config.guard_layers.is_empty() {
+            return Ok(());
+        }
+        match self.config.guard_layers.iter().find(|cfg| cfg.id == layer) {
+            None => Err(Fault::AcquireFault {
+                layer: layer.to_string(),
+                message: "unknown layer".into(),
+            }),
+            Some(cfg) if !cfg.active => Err(Fault::AcquireFault {
+                layer: layer.to_string(),
+                message: "inactive layer".into(),
+            }),
+            Some(_) => Ok(()),
+        }
+    }
+
+    fn step_acquire(
+        &mut self,
+        coro_idx: usize,
+        ep: &Endpoint,
+        role: &str,
+        sid: SessionId,
+        layer: &str,
+        dst: u16,
+        handler: &dyn EffectHandler,
+    ) -> Result<StepPack, Fault> {
+        self.guard_active(layer)?;
+        if self.guard_resources.is_empty() {
+            self.guard_resources
+                .entry(layer.to_string())
+                .or_insert(Value::Unit);
+        }
+        let decision = handler
+            .handle_acquire(sid, role, layer, &self.coroutines[coro_idx].regs)
+            .map_err(|e| Fault::AcquireFault {
+                layer: layer.to_string(),
+                message: e,
+            })?;
+        match decision {
+            crate::effect::AcquireDecision::Grant(evidence) => {
+                self.guard_resources
+                    .insert(layer.to_string(), evidence.clone());
+                Ok(StepPack {
+                    coro_update: CoroUpdate::AdvancePcWriteReg {
+                        reg: dst,
+                        val: evidence,
+                    },
+                    type_update: None,
+                    events: vec![ObsEvent::Acquired {
+                        tick: self.clock.tick,
+                        session: ep.sid,
+                        role: role.to_string(),
+                        layer: layer.to_string(),
+                    }],
+                })
+            }
+            crate::effect::AcquireDecision::Block => Ok(StepPack {
+                coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
+                    layer: layer.to_string(),
+                }),
+                type_update: None,
+                events: vec![],
+            }),
+        }
+    }
+
+    fn step_release(
+        &mut self,
+        coro_idx: usize,
+        ep: &Endpoint,
+        role: &str,
+        sid: SessionId,
+        layer: &str,
+        evidence: u16,
+        handler: &dyn EffectHandler,
+    ) -> Result<StepPack, Fault> {
+        self.guard_active(layer)?;
+        if self.guard_resources.is_empty() {
+            self.guard_resources
+                .entry(layer.to_string())
+                .or_insert(Value::Unit);
+        }
+        let ev = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(evidence))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        handler
+            .handle_release(sid, role, layer, &ev, &self.coroutines[coro_idx].regs)
+            .map_err(|e| Fault::AcquireFault {
+                layer: layer.to_string(),
+                message: e,
+            })?;
+        self.guard_resources.insert(layer.to_string(), ev.clone());
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Released {
+                tick: self.clock.tick,
+                session: ep.sid,
+                role: role.to_string(),
+                layer: layer.to_string(),
+            }],
+        })
+    }
+
+    fn step_fork(
+        &mut self,
+        coro_idx: usize,
+        role: &str,
+        sid: SessionId,
+        ghost: u16,
+    ) -> Result<StepPack, Fault> {
+        if !self.config.speculation_enabled {
+            return Err(Fault::SpecFault {
+                message: "speculation disabled".into(),
+            });
+        }
+        let ghost_val = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(ghost))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        let ghost_sid = match ghost_val {
+            Value::Int(v) if v >= 0 => v as usize,
+            _ => {
+                return Err(Fault::TypeViolation {
+                    message: format!("{role}: fork expects integer ghost id"),
+                })
+            }
+        };
+        self.coroutines[coro_idx].spec_state = Some(crate::coroutine::SpeculationState {
+            ghost_sid,
+            depth: 0,
+        });
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Forked {
+                tick: self.clock.tick,
+                session: sid,
+                ghost: ghost_sid,
+            }],
+        })
+    }
+
+    fn step_join(
+        &mut self,
+        coro_idx: usize,
+        _role: &str,
+        sid: SessionId,
+    ) -> Result<StepPack, Fault> {
+        self.coroutines[coro_idx].spec_state = None;
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Joined {
+                tick: self.clock.tick,
+                session: sid,
+            }],
+        })
+    }
+
+    fn step_abort(
+        &mut self,
+        coro_idx: usize,
+        _role: &str,
+        sid: SessionId,
+    ) -> Result<StepPack, Fault> {
+        self.coroutines[coro_idx].spec_state = None;
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Aborted {
+                tick: self.clock.tick,
+                session: sid,
+            }],
+        })
+    }
+
+    fn step_transfer(
+        &mut self,
+        coro_idx: usize,
+        role: &str,
+        _sid: SessionId,
+        endpoint: u16,
+        target: u16,
+        _bundle: u16,
+    ) -> Result<StepPack, Fault> {
+        let ep_val = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(endpoint))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        let ep = match ep_val {
+            Value::Endpoint(ep) => ep,
+            _ => {
+                return Err(Fault::TransferFault {
+                    message: format!("{role}: transfer expects endpoint register"),
+                })
+            }
+        };
+        let target_val = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(target))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        let target_id = match target_val {
+            Value::Int(v) if v >= 0 => v as usize,
+            _ => {
+                return Err(Fault::TransferFault {
+                    message: format!("{role}: transfer expects target coroutine id"),
+                })
+            }
+        };
+        let target_idx = self
+            .coroutines
+            .iter()
+            .position(|c| c.id == target_id)
+            .ok_or(Fault::TransferFault {
+                message: "target coroutine not found".into(),
+            })?;
+        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
+            return Err(Fault::TransferFault {
+                message: "endpoint not owned".into(),
+            });
+        }
+
+        self.coroutines[coro_idx]
+            .owned_endpoints
+            .retain(|e| e != &ep);
+        self.coroutines[target_idx].owned_endpoints.push(ep.clone());
+
+        let mut moved = Vec::new();
+        self.coroutines[coro_idx].knowledge.retain(|fact| {
+            if fact.endpoint == ep {
+                moved.push(fact.clone());
+                false
+            } else {
+                true
+            }
+        });
+        self.coroutines[target_idx].knowledge.extend(moved);
+
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Transferred {
+                tick: self.clock.tick,
+                session: ep.sid,
+                role: role.to_string(),
+                from: self.coroutines[coro_idx].id,
+                to: self.coroutines[target_idx].id,
+            }],
+        })
+    }
+
+    fn step_tag(
+        &mut self,
+        coro_idx: usize,
+        role: &str,
+        _sid: SessionId,
+        fact_reg: u16,
+        dst: u16,
+    ) -> Result<StepPack, Fault> {
+        let fact_val = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(fact_reg))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        let (endpoint, fact) = match fact_val {
+            Value::Knowledge { endpoint, fact } => (endpoint, fact),
+            _ => {
+                return Err(Fault::TransferFault {
+                    message: format!("{role}: tag expects knowledge value"),
+                })
+            }
+        };
+        self.coroutines[coro_idx]
+            .knowledge
+            .push(crate::coroutine::KnowledgeFact {
+                endpoint: endpoint.clone(),
+                fact: fact.clone(),
+            });
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePcWriteReg {
+                reg: dst,
+                val: Value::Bool(true),
+            },
+            type_update: None,
+            events: vec![ObsEvent::Tagged {
+                tick: self.clock.tick,
+                session: endpoint.sid,
+                role: role.to_string(),
+                fact,
+            }],
+        })
+    }
+
+    fn step_check(
+        &mut self,
+        coro_idx: usize,
+        role: &str,
+        _sid: SessionId,
+        knowledge: u16,
+        target: u16,
+        dst: u16,
+    ) -> Result<StepPack, Fault> {
+        let know_val = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(knowledge))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        let (endpoint, fact) = match know_val {
+            Value::Knowledge { endpoint, fact } => (endpoint, fact),
+            _ => {
+                return Err(Fault::TransferFault {
+                    message: format!("{role}: check expects knowledge value"),
+                })
+            }
+        };
+        let target_val = self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(target))
+            .ok_or(Fault::OutOfRegisters)?
+            .clone();
+        let target_role = match target_val {
+            Value::Str(s) => s,
+            _ => {
+                return Err(Fault::TransferFault {
+                    message: format!("{role}: check expects target role string"),
+                })
+            }
+        };
+        let permitted = self
+            .coroutines[coro_idx]
+            .knowledge
+            .iter()
+            .any(|k| k.endpoint == endpoint && k.fact == fact);
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePcWriteReg {
+                reg: dst,
+                val: Value::Bool(permitted),
+            },
+            type_update: None,
+            events: vec![ObsEvent::Checked {
+                tick: self.clock.tick,
+                session: endpoint.sid,
+                role: role.to_string(),
+                target: target_role,
+                permitted,
             }],
         })
     }
@@ -1217,9 +1711,10 @@ impl VM {
     /// Open: create a new session with the given roles.
     fn step_open(
         &mut self,
-        _coro_idx: usize,
+        coro_idx: usize,
+        role: &str,
         roles: &[String],
-        _endpoints: &[(String, u16)],
+        endpoints: &[(String, u16)],
     ) -> Result<StepPack, Fault> {
         let sid = self.sessions.open(
             roles.to_vec(),
@@ -1227,8 +1722,23 @@ impl VM {
             &std::collections::BTreeMap::new(),
         );
 
+        let mut coro_update = CoroUpdate::AdvancePc;
+        if let Some((_, reg)) = endpoints.iter().find(|(r, _)| r == role) {
+            if usize::from(*reg) >= self.coroutines[coro_idx].regs.len() {
+                return Err(Fault::OutOfRegisters);
+            }
+            let ep = Endpoint {
+                sid,
+                role: role.to_string(),
+            };
+            coro_update = CoroUpdate::AdvancePcWriteReg {
+                reg: *reg,
+                val: Value::Endpoint(ep),
+            };
+        }
+
         Ok(StepPack {
-            coro_update: CoroUpdate::AdvancePc,
+            coro_update,
             type_update: None,
             events: vec![ObsEvent::Opened {
                 tick: self.clock.tick,

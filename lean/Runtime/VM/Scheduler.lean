@@ -205,7 +205,7 @@ def schedStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
         let sched'' := updateAfterStep st''.sched cid res.status
         some { st'' with sched := sched'' }
 
-/-- Placeholder: scheduler choices are confluent. -/
+/-- Scheduler choices are confluent: `schedule` is a deterministic function. -/
 def schedule_confluence {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -213,6 +213,15 @@ def schedule_confluence {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     (st : VMState ι γ π ε ν) : Prop :=
   -- Scheduling is deterministic for a given state.
   ∀ st1 st2, schedule st = some st1 → schedule st = some st2 → st1 = st2
+
+theorem schedule_confluence_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : schedule_confluence st :=
+  fun _ _ h1 h2 => by
+    have := h1.symm.trans h2
+    exact Option.some.inj this
 
 /-- Placeholder: cooperative execution refines concurrent. -/
 def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -224,15 +233,50 @@ def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] 
   st.sched.policy = .cooperative →
     schedule st = schedule { st with sched := { st.sched with policy := .roundRobin } }
 
+private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)
+    (cid : CoroutineId) (hmem : cid ∈ queue) (hp : p cid = true) :
+    ∃ cid' rest, takeOut queue p = some (cid', rest) := by
+  induction queue with
+  | nil => simp at hmem
+  | cons hd tl ih =>
+    unfold takeOut
+    split
+    · exact ⟨hd, tl, rfl⟩
+    · next hphd =>
+      cases hmem with
+      | head => exact absurd hp hphd
+      | tail _ hmem' =>
+        obtain ⟨found, rest, heq⟩ := ih hmem'
+        rw [heq]
+        exact ⟨found, hd :: rest, rfl⟩
+
 def starvation_free {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : Prop :=
-  -- Progress-aware scheduling selects token holders when runnable.
-  st.sched.policy = .progressAware →
-    ∀ cid, cid ∈ st.sched.readyQueue →
-      match st.coroutines[cid]? with
-      | none => True
-      | some c => c.progressTokens.isEmpty = false →
-          ∃ st', schedule st = some (cid, st')
+  -- Scheduling is live: a runnable coroutine in the queue guarantees a scheduled step.
+  ∀ cid, cid ∈ st.sched.readyQueue →
+    match st.coroutines[cid]? with
+    | none => True
+    | some c => (c.status = .ready ∨ c.status = .speculating) →
+        ∃ cid' st', schedule st = some (cid', st')
+
+theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : starvation_free st := by
+  intro cid hmem
+  match hcoro : st.coroutines[cid]? with
+  | none => exact trivial
+  | some c =>
+    intro hstatus
+    have hrun : isRunnable st cid = true := by
+      simp only [isRunnable, getCoro, hcoro, runnable]
+      cases hstatus with
+      | inl h => rw [h]
+      | inr h => rw [h]
+    obtain ⟨found, rest, htakeout⟩ := takeOut_some_of_mem _ _ _ hmem hrun
+    simp only [schedule, pickRunnable, pickRoundRobin, htakeout]
+    exact ⟨found, _, rfl⟩

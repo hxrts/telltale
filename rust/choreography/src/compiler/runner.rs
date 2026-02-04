@@ -125,10 +125,11 @@ pub fn generate_runner_fn_with_hints(
     quote! {
         #fn_signature {
             #ctx_creation
+            let mut output = #output_type::default();
 
             #body
 
-            Ok(#output_type::default())
+            Ok(output)
         }
     }
 }
@@ -296,6 +297,7 @@ fn generate_runner_body_with_hints(
             quote! {
                 // Send to #to
                 let msg: #msg_type = adapter.provide_message(#to_role).await?;
+                output.metadata.messages_sent += 1;
                 adapter.send(#to_role, msg).await?;
                 #cont
             }
@@ -540,6 +542,15 @@ pub(crate) fn generate_runner_body(
                                 ).into());
                             }
                             let _msgs: Vec<#msg_type> = adapter.collect(&roles).await?;
+                            output.metadata.messages_received += _msgs.len();
+                            for msg in &_msgs {
+                                let value = ::serde_json::to_value(msg).map_err(|e| {
+                                    ::telltale_choreography::ChoreographyError::ExecutionError(
+                                        e.to_string(),
+                                    )
+                                })?;
+                                output.received.push(value);
+                            }
                             #cont
                         };
                     }
@@ -556,6 +567,15 @@ pub(crate) fn generate_runner_body(
                                 ).into());
                             }
                             let _msgs: Vec<#msg_type> = adapter.collect(&roles).await?;
+                            output.metadata.messages_received += _msgs.len();
+                            for msg in &_msgs {
+                                let value = ::serde_json::to_value(msg).map_err(|e| {
+                                    ::telltale_choreography::ChoreographyError::ExecutionError(
+                                        e.to_string(),
+                                    )
+                                })?;
+                                output.received.push(value);
+                            }
                             #cont
                         };
                     }
@@ -568,6 +588,11 @@ pub(crate) fn generate_runner_body(
             quote! {
                 // Receive from #from
                 let _msg: #msg_type = adapter.recv(#from_role).await?;
+                output.metadata.messages_received += 1;
+                let value = ::serde_json::to_value(&_msg).map_err(|e| {
+                    ::telltale_choreography::ChoreographyError::ExecutionError(e.to_string())
+                })?;
+                output.received.push(value);
                 #cont
             }
         }
@@ -599,6 +624,7 @@ pub(crate) fn generate_runner_body(
             quote! {
                 // Internal choice - select branch to send to #to
                 let choice = adapter.select_branch(&[#(#choice_variants),*]).await?;
+                output.choices.push(choice);
                 match choice {
                     #(#match_arms)*
                 }
@@ -624,6 +650,7 @@ pub(crate) fn generate_runner_body(
             quote! {
                 // External choice - receive branch selection from #from
                 let label = adapter.offer(#from_role).await?;
+                output.choices.push(label);
                 match label {
                     #(#match_arms)*
                 }
@@ -654,6 +681,7 @@ pub(crate) fn generate_runner_body(
             quote! {
                 // Local choice - no communication
                 let choice = adapter.select_branch(&[#(#choice_variants),*]).await?;
+                output.choices.push(choice);
                 match choice {
                     #(#match_arms)*
                 }

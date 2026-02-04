@@ -86,6 +86,58 @@ pub enum Instr {
         /// Destination register for the result.
         dst: Reg,
     },
+    /// Acquire a guard layer and store evidence in a register.
+    Acquire {
+        /// Guard layer identifier.
+        layer: String,
+        /// Destination register for evidence.
+        dst: Reg,
+    },
+    /// Release a guard layer using evidence from a register.
+    Release {
+        /// Guard layer identifier.
+        layer: String,
+        /// Register holding evidence.
+        evidence: Reg,
+    },
+
+    // -- Speculation --
+    /// Enter speculation using a ghost session id.
+    Fork {
+        /// Register holding the ghost session id.
+        ghost: Reg,
+    },
+    /// Join speculative execution.
+    Join,
+    /// Abort speculative execution.
+    Abort,
+
+    // -- Ownership and knowledge --
+    /// Transfer an endpoint to another coroutine.
+    Transfer {
+        /// Register holding the endpoint.
+        endpoint: Reg,
+        /// Register holding the target coroutine id.
+        target: Reg,
+        /// Register holding a bundle descriptor.
+        bundle: Reg,
+    },
+    /// Tag a knowledge fact and return success.
+    Tag {
+        /// Register holding the fact.
+        fact: Reg,
+        /// Destination register for the result.
+        dst: Reg,
+    },
+    /// Check a knowledge fact against the flow policy.
+    Check {
+        /// Register holding the knowledge fact.
+        knowledge: Reg,
+        /// Register holding the target role.
+        target: Reg,
+        /// Destination register for the result.
+        dst: Reg,
+    },
 
     // -- Control --
     /// Load an immediate value into a register.

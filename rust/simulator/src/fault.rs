@@ -232,6 +232,7 @@ impl<H: EffectHandler> FaultInjector<H> {
     }
 
     /// Advance fault schedule, activating and expiring faults.
+    /// Uses the VM's global tick (not session-local normalization).
     pub fn tick(&self, tick: u64, trace: &[ObsEvent]) {
         let mut state = self.state.lock().expect("fault state lock poisoned");
         state.current_tick = tick;
@@ -466,6 +467,7 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
         }
         ObsEvent::Halted { .. } => kind == "halted" && role.is_none(),
         ObsEvent::Faulted { .. } => kind == "faulted" && role.is_none(),
+        _ => false,
     }
 }
 
@@ -499,6 +501,8 @@ fn corrupt_value(val: Value) -> Value {
             }
             Value::Json(j)
         }
+        Value::Endpoint(_) => val,
+        Value::Knowledge { .. } => val,
         Value::Unit => Value::Unit,
     }
 }

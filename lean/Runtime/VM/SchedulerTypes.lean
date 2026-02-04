@@ -5,7 +5,7 @@ import Std
 
 `SchedPolicy`, the scheduling strategy enum referenced by `VMConfig`. Defined in
 its own file to avoid circular imports: `Config.lean` needs the policy type, but the
-full scheduler implementation (`Runtime/Scheduler/Scheduler.lean`) needs the config.
+ full scheduler implementation (`Runtime/VM/Scheduler.lean`) needs the config.
 
 The `progressAware` policy is the session-type-aware variant that prefers coroutines
 holding progress tokens, connecting to the liveness reasoning in `runtime.md` §18.

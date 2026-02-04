@@ -80,7 +80,7 @@ impl<H: EffectHandler> NetworkModel<H> {
         }
     }
 
-    /// Update the logical tick (called by the runner).
+    /// Update the logical tick (VM global tick, called by the runner).
     pub fn set_tick(&self, tick: u64) {
         self.current_tick.store(tick, Ordering::Relaxed);
     }

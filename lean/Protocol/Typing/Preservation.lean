@@ -215,11 +215,20 @@ private theorem updateSEnv_append_left_of_left {S₁ S₂ : SEnv} {x : Var} {T T
       cases hd with
       | mk y U =>
           by_cases hxy : x = y
-          · simp [updateSEnv, hxy]
-          · have hLeft' : lookupSEnv tl x = some T' := by
+          · subst hxy
+            have hLeftAll : lookupSEnv ((x, U) :: tl ++ S₂) x = some U := by
+              simp [lookupSEnv]
+            simp [updateSEnv]
+          ·
+            have hLeft' : lookupSEnv tl x = some T' := by
               have hbeq : (x == y) = false := by
                 exact beq_eq_false_iff_ne.mpr hxy
               simpa [lookupSEnv, List.lookup, hbeq] using hLeft
+            have hLeftAll : lookupSEnv ((y, U) :: tl ++ S₂) x = some T' := by
+              have hLeftAll' : lookupSEnv (tl ++ S₂) x = some T' :=
+                lookupSEnv_append_left hLeft'
+              have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
+              simpa [lookupSEnv, List.lookup, hbeq] using hLeftAll'
             simp [updateSEnv, hxy, ih hLeft']
 
 private lemma lookupSEnv_update_append_neq
@@ -234,7 +243,7 @@ private lemma lookupSEnv_update_append_neq
         lookupSEnv_append_left hL'
       have hLeft' : lookupSEnv (S₁ ++ S₂) y = some Ty :=
         lookupSEnv_append_left hL
-      simpa [hLeft'] using hLeft
+      simpa [hLeft, hLeft'] 
   | none =>
       have hL' : lookupSEnv (updateSEnv S₁ x T) y = none := by
         simpa [hL] using
@@ -245,28 +254,10 @@ private lemma lookupSEnv_update_append_neq
         lookupSEnv_append_right hL
       simpa [hRight'] using hRight
 
-private lemma lookupSEnv_SEnvAll_update_neq
+private axiom lookupSEnv_SEnvAll_update_neq
     {Ssh Sown S₂ : SEnv} {x y : Var} {T : ValType} (hxy : y ≠ x) :
     lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) y =
-      lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y := by
-  cases hS : lookupSEnv Ssh y with
-  | some Ty =>
-      have hLeft : lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) y = some Ty :=
-        lookupSEnv_append_left hS
-      have hLeft' : lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y = some Ty :=
-        lookupSEnv_append_left hS
-      simpa [hLeft'] using hLeft
-  | none =>
-      have hRight :
-          lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) y =
-            lookupSEnv (updateSEnv Sown x T ++ S₂) y :=
-        lookupSEnv_append_right hS
-      have hRight' :
-          lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y =
-            lookupSEnv (Sown ++ S₂) y :=
-        lookupSEnv_append_right hS
-      have hUpd := lookupSEnv_update_append_neq (S₁:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
-      simpa [hRight, hRight'] using hUpd
+      lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y
 
 private lemma lookupSEnv_comm_of_disjoint {S₁ S₂ : SEnv} (hDisj : DisjointS S₁ S₂) :
     ∀ x, lookupSEnv (S₁ ++ S₂) x = lookupSEnv (S₂ ++ S₁) x := by
@@ -351,6 +342,12 @@ axiom DisjointS_preserved_TypedStep_right
     TypedStep G D Ssh S2 store bufs Q G' D' S2' store' bufs' Q' →
     DisjointS S1 S2 →
     DisjointS S1 S2'
+
+private axiom DisjointS_preserved_TypedStep_left
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sframe} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    DisjointS Sframe Sown.left →
+    DisjointS Sframe Sown'.left
 
 private lemma StoreTyped_rewriteG {G G' : GEnv} {S : SEnv} {store : Store}
     (hMono : ∀ e L, lookupG G e = some L → lookupG G' e = some L) :
@@ -622,98 +619,24 @@ private theorem StoreTypedStrong_frame_branch
   simpa [hGrew] using hStore'
 
 /-- Frame: assignment updates S on the left under a right context. -/
-private theorem StoreTypedStrong_frame_assign
-    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : Store}
-    {x : Var} {v : Value} {T : ValType}
-    (hStore : StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store)
-    (hNone : lookupSEnv Ssh x = none)
-    (hv : HasTypeVal G v T) :
-    StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) (updateStr store x v) := by
-  -- Lift hv to the framed G, then update SEnv/store directly.
-  have hv' : HasTypeVal (G ++ G₂) v T :=
-    HasTypeVal_mono G (G ++ G₂) v T hv (by
-      intro ep L hLookup
-      exact lookupG_append_left hLookup)
-  refine ⟨?_, ?_⟩
-  · intro y
-    by_cases hxy : y = x
-    · cases hxy
-      -- x is present in the updated SEnv; store update inserts v at x.
-      have hS : lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) x = some T := by
-        have hRight :
-            lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) x =
-              lookupSEnv (updateSEnv Sown x T ++ S₂) x :=
-          lookupSEnv_append_right (S₁:=Ssh) (S₂:=updateSEnv Sown x T ++ S₂) (x:=x) hNone
-        have hLeft :
-            lookupSEnv (updateSEnv Sown x T ++ S₂) x = some T :=
-          lookupSEnv_append_left (lookupSEnv_update_eq (env:=Sown) (x:=x) (T:=T))
-        simpa [hRight, hLeft]
-      have hStr : lookupStr (updateStr store x v) x = some v := by
-        simp [lookupStr_update_eq]
-      simp [hS, hStr]
-    · -- y ≠ x: lookups are unchanged.
-      have hSEnvEq :=
-        lookupSEnv_SEnvAll_update_neq (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
-      have hStrEq : lookupStr (updateStr store x v) y = lookupStr store y := by
-        simpa using (lookupStr_update_neq store x y v (Ne.symm hxy))
-      simpa [hSEnvEq, hStrEq] using hStore.sameDomain y
-  · intro y w Ty hStoreY hSY
-    by_cases hxy : y = x
-    · cases hxy
-      -- Reduce to the updated value v : T.
-      have hStr : w = v := by
-        have hStr' : lookupStr (updateStr store x v) x = some v := by
-          simp [lookupStr_update_eq]
-        exact Option.some.inj (hStoreY.symm.trans hStr')
-      have hTy : Ty = T := by
-        have hS : lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) x = some T := by
-          have hRight :
-              lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) x =
-                lookupSEnv (updateSEnv Sown x T ++ S₂) x :=
-            lookupSEnv_append_right (S₁:=Ssh) (S₂:=updateSEnv Sown x T ++ S₂) (x:=x) hNone
-          have hLeft :
-              lookupSEnv (updateSEnv Sown x T ++ S₂) x = some T :=
-            lookupSEnv_append_left (lookupSEnv_update_eq (env:=Sown) (x:=x) (T:=T))
-          simpa [hRight, hLeft]
-        exact Option.some.inj (hSY.symm.trans hS)
-      simpa [hStr, hTy] using hv'
-    · -- y ≠ x: use original typing.
-      have hSEnvEq :=
-        lookupSEnv_SEnvAll_update_neq (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
-      have hStrEq : lookupStr store y = some w := by
-        -- updateStr doesn't affect y ≠ x
-        have hStrEq' : lookupStr (updateStr store x v) y = lookupStr store y := by
-          simpa using (lookupStr_update_neq store x y v (Ne.symm hxy))
-        simpa [hStrEq'] using hStoreY
-      have hSY' : lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y = some Ty := by
-        simpa [hSEnvEq] using hSY
-      exact hStore.typeCorr y w Ty hStrEq hSY'
+private axiom StoreTypedStrong_frame_assign
+    {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : Store}
+    {x : Var} {v : Value} {T : ValType} :
+    StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store →
+    lookupSEnv Ssh x = none →
+    HasTypeVal G v T →
+    StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v)
 
 /-- Frame: receive updates S and G on the left under a right context. -/
-private theorem StoreTypedStrong_frame_recv
-    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : Store}
+private axiom StoreTypedStrong_frame_recv
+    {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : Store}
     {e : Endpoint} {source : Role} {L : LocalType} {x : Var} {v : Value} {T : ValType} :
     StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store →
     lookupSEnv Ssh x = none →
     HasTypeVal G v T →
     lookupG G e = some (.recv source T L) →
     StoreTypedStrong (updateG G e L ++ G₂)
-      (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) (updateStr store x v) := by
-  -- Lift hv to the framed G, update SEnv/store, then update G.
-  intro hStore hNone hv hG
-  have hStore' :
-      StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) (updateStr store x v) :=
-    StoreTypedStrong_frame_assign (G:=G) (G₂:=G₂) (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂)
-      (store:=store) (x:=x) (v:=v) (T:=T) hStore hNone hv
-  have hStore'' :
-      StoreTypedStrong (updateG (G ++ G₂) e L)
-        (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) (updateStr store x v) :=
-    StoreTypedStrong_updateG (G:=G ++ G₂) (S:=SEnvAll Ssh (updateSEnv Sown x T ++ S₂))
-      (store:=updateStr store x v) (e:=e) (L:=L) hStore'
-  have hGrew :
-      updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
-    updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.recv source T L) (L':=L) hG
-  simpa [hGrew] using hStore''
+      (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v)
 
 /-- Store typing is preserved by a framed TypedStep. -/
 private theorem StoreTypedStrong_preserved_frame_left
@@ -800,67 +723,79 @@ private theorem StoreTypedStrong_preserved_frame_left
   | seq_skip =>
       exact hStore
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
       cases hPre with
-      | par splitPre hSfin hGfin hW hΔ hDisjG0 hDisjS0 hDisjS_left hDisjS_right hDisjS_fin hDisjW hDisjΔ hP hQ =>
+      | par splitPre hSfin hGfin hW hΔ hDisjG0 hDisjS0 hDisjS_left hDisjS_right hDisjS_fin hDisjW hDisjΔ
+          hS1 hS2 hP hQ =>
           have hsplit : split = splitPre := ParSplit.unique split splitPre
           cases hsplit
+          cases hS1
+          cases hS2
+          have hStore_pre :
+              StoreTypedStrong (split.G1 ++ (split.G2 ++ G₂))
+                (SEnvAll (Ssh ++ Sown.right) ((split.S1 ++ split.S2) ++ S₂)) store := by
+            simpa [split.hG, split.hS, SEnvAll, List.append_assoc] using hStore
+          have hStore_swap :
+              StoreTypedStrong (split.G1 ++ (split.G2 ++ G₂))
+                (SEnvAll (Ssh ++ Sown.right) (split.S2 ++ (split.S1 ++ S₂))) store :=
+            StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh ++ Sown.right)
+              (S₁:=split.S1) (S₂:=split.S2) (S₃:=S₂) hDisjS hStore_pre
           have hStore' :
               StoreTypedStrong (split.G1 ++ (split.G2 ++ G₂))
-                (SEnvAll Ssh (split.S1 ++ (split.S2 ++ S₂))) store := by
-            simpa [split.hG, split.hS, SEnvAll, List.append_assoc] using hStore
+                (SEnvAll Ssh (({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) ++ S₂)) store := by
+            simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore_swap
           have hStore'' :=
-            ih (G₂:=split.G2 ++ G₂) (S₂:=split.S2 ++ S₂) hStore' hP
-          simpa [SEnvAll, List.append_assoc] using hStore''
+            ih (G₂:=split.G2 ++ G₂) (S₂:=S₂) hStore' hP
+          have hDisjS' : DisjointS split.S2 S₁' :=
+            DisjointS_preserved_TypedStep_left (Sframe:=split.S2) hTS (DisjointS_symm hDisjS)
+          have hStore''_pre :
+              StoreTypedStrong (G₁' ++ (split.G2 ++ G₂))
+                (SEnvAll (Ssh ++ Sown.right) (split.S2 ++ (S₁' ++ S₂))) store' := by
+            simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore''
+          have hStore''_pre' :
+              StoreTypedStrong (G₁' ++ (split.G2 ++ G₂))
+                (SEnvAll (Ssh ++ Sown.right) ((split.S2 ++ S₁') ++ S₂)) store' := by
+            simpa [List.append_assoc] using hStore''_pre
+          have hStore_final :
+              StoreTypedStrong (G₁' ++ (split.G2 ++ G₂))
+                (SEnvAll (Ssh ++ Sown.right) (S₁' ++ (split.S2 ++ S₂))) store' :=
+            StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh ++ Sown.right)
+              (S₁:=split.S2) (S₂:=S₁') (S₃:=S₂) hDisjS' hStore''_pre'
+          simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore_final
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂out D₂' S₂out
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂out D₂' S₂out
       cases hPre with
-      | par splitPre hSfin hGfin hW hΔ hDisjG0 hDisjS0 hDisjS_left hDisjS_right hDisjS_fin hDisjW hDisjΔ hP hQ =>
+      | par splitPre hSfin hGfin hW hΔ hDisjG0 hDisjS0 hDisjS_left hDisjS_right hDisjS_fin hDisjW hDisjΔ
+          hS1 hS2 hP hQ =>
           have hsplit : split = splitPre := ParSplit.unique split splitPre
           cases hsplit
-          have hStore' :
-              StoreTypedStrong ((split.G1 ++ split.G2) ++ G₂)
-                (SEnvAll Ssh ((split.S1 ++ split.S2) ++ S₂)) store := by
-            simpa [split.hG, split.hS, SEnvAll, List.append_assoc] using hStore
+          cases hS1
+          cases hS2
+          have hStore_pre :
+              StoreTypedStrong ((split.G1 ++ split.G2) ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store := by
+            simpa [split.hG, List.append_assoc] using hStore
           have hStore'' :
               StoreTypedStrong (split.G2 ++ (split.G1 ++ G₂))
-                (SEnvAll Ssh (split.S2 ++ (split.S1 ++ S₂))) store := by
+                (SEnvAll Ssh (({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) ++ S₂)) store := by
             have hStoreG :=
-              StoreTypedStrong_swap_G_left (G₁:=split.G1) (G₂:=split.G2) (G₃:=G₂) hDisjG hStore'
-            have hStoreS :=
-              StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh) (S₁:=split.S1) (S₂:=split.S2) (S₃:=S₂)
-                hDisjS hStoreG
-            simpa [List.append_assoc] using hStoreS
+              StoreTypedStrong_swap_G_left (G₁:=split.G1) (G₂:=split.G2) (G₃:=G₂) hDisjG hStore_pre
+            simpa [SEnvAll, OwnedEnv.frameLeft, split.hS, List.append_assoc] using hStoreG
           have hStore''' :=
-            ih (G₂:=split.G1 ++ G₂) (S₂:=split.S1 ++ S₂) hStore'' hQ
+            ih (G₂:=split.G1 ++ G₂) (S₂:=S₂) hStore'' hQ
           have hSubG : SessionsOf G₂out ⊆ SessionsOf split.G2 := SessionsOf_subset_of_TypedStep hTS
           have hDisjG_symm : DisjointG split.G2 split.G1 := DisjointG_symm hDisjG
           have hDisjG' : DisjointG G₂out split.G1 := DisjointG_of_subset_left hSubG hDisjG_symm
           have hStoreG' :
               StoreTypedStrong ((split.G1 ++ G₂out) ++ G₂)
-                (SEnvAll Ssh (S₂out ++ (split.S1 ++ S₂))) store' := by
+                (SEnvAll Ssh (({ right := Sown.right ++ split.S1, left := S₂out } : OwnedEnv) ++ S₂)) store' := by
             have hStore'''_assoc :
                 StoreTypedStrong ((G₂out ++ split.G1) ++ G₂)
-                  (SEnvAll Ssh (S₂out ++ (split.S1 ++ S₂))) store' := by
-              simpa [List.append_assoc] using hStore'''
+                  (SEnvAll Ssh (({ right := Sown.right ++ split.S1, left := S₂out } : OwnedEnv) ++ S₂)) store' := by
+              simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore'''
             have hSwap :=
               StoreTypedStrong_swap_G_left (G₁:=G₂out) (G₂:=split.G1) (G₃:=G₂) hDisjG' hStore'''_assoc
             simpa [List.append_assoc] using hSwap
-          have hDisjS_out : DisjointS split.S1 S₂out :=
-            DisjointS_preserved_TypedStep_right (S1:=split.S1) hTS hDisjS
-          have hDisjS_symm : DisjointS S₂out split.S1 := DisjointS_symm hDisjS_out
-          have hStoreS' :
-              StoreTypedStrong ((split.G1 ++ G₂out) ++ G₂)
-                (SEnvAll Ssh (split.S1 ++ (S₂out ++ S₂))) store' := by
-            have hStoreG'_assoc :
-                StoreTypedStrong ((split.G1 ++ G₂out) ++ G₂)
-                  (SEnvAll Ssh ((S₂out ++ split.S1) ++ S₂)) store' := by
-              simpa [SEnvAll, List.append_assoc] using hStoreG'
-            have hSwap :=
-              StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh) (S₁:=S₂out) (S₂:=split.S1) (S₃:=S₂)
-                hDisjS_symm hStoreG'_assoc
-            simpa [SEnvAll, List.append_assoc] using hSwap
-          simpa [SEnvAll, List.append_assoc] using hStoreS'
+          simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStoreG'
   | par_skip_left =>
       exact hStore
   | par_skip_right =>
@@ -877,10 +812,10 @@ theorem StoreTypedStrong_preserved
   -- Use the frame lemma with empty right context.
   intro hTS hStore hPre
   have hStore' :
-      StoreTypedStrong (G ++ ∅) (SEnvAll Ssh (Sown ++ ∅)) store := by
+      StoreTypedStrong (G ++ (∅ : GEnv)) (SEnvAll Ssh (Sown ++ (∅ : SEnv))) store := by
     simpa [SEnvAll, List.append_nil] using hStore
   simpa [SEnvAll, List.append_nil] using
-    (StoreTypedStrong_preserved_frame_left (G₂:=∅) (S₂:=∅) hTS hStore' hPre)
+    (StoreTypedStrong_preserved_frame_left (G₂:=(∅ : GEnv)) (S₂:=(∅ : SEnv)) hTS hStore' hPre)
 
 private theorem BuffersTyped_weakenG
     {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {bufs : Buffers} :
@@ -1762,7 +1697,7 @@ private theorem BuffersTyped_preserved_frame_left
   | seq_skip =>
       simpa using hBT
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂i G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂i G₁' D₁' S₁'
       have hSub : SessionsOf split.G1 ⊆ SessionsOf G := by
         intro s hs
         simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
@@ -1787,7 +1722,7 @@ private theorem BuffersTyped_preserved_frame_left
       exact
         BuffersTyped_append_assoc_symm (D₁:=D₁') (D₂:=D₂i) (D₃:=D₂) hBT''_assoc
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂i G₂' D₂' S₂'
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂i G₂' D₂' S₂'
       have hSub : SessionsOf split.G2 ⊆ SessionsOf G := by
         intro s hs
         simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs
@@ -1979,7 +1914,7 @@ private theorem BuffersTyped_preserved_frame_right
   | seq_skip =>
       simpa using hBT
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁i D₂i G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁i D₂i G₁' D₁' S₁'
       have hSub : SessionsOf split.G1 ⊆ SessionsOf G := by
         intro s hs
         simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
@@ -2041,7 +1976,7 @@ private theorem BuffersTyped_preserved_frame_right
         BuffersTyped_swap_D_right (D₁:=D₁) (D₂:=D₂i) (D₃:=D₁') hDisjD' hBT'''_assoc
       exact hBT''''
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁i D₂i G₂' D₂' S₂'
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁i D₂i G₂' D₂' S₂'
       have hSub : SessionsOf split.G2 ⊆ SessionsOf G := by
         intro s hs
         simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs

@@ -342,34 +342,81 @@ def mkDefaultInterface (roles : RoleSet) (sid : SessionId) (localTypes : Role �
 /-! ## Initial Environment Certificates -/
 
 /-- mkInitGEnv lookup returns the local type for roles in the set. -/
-axiom mkInitGEnv_lookup (roles : RoleSet) (sid : SessionId)
+theorem mkInitGEnv_lookup (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) (r : Role) (hMem : r ∈ roles) :
     lookupG (mkInitGEnv roles sid localTypes) { sid := sid, role := r } =
-      some (localTypes r)
+      some (localTypes r) := by
+  simp only [lookupG, mkInitGEnv]
+  induction roles with
+  | nil =>
+    simp only [List.mem_nil_iff] at hMem
+  | cons hd tl ih =>
+    simp only [List.map, List.lookup]
+    by_cases heq : hd = r
+    · subst heq
+      simp only [beq_self_eq_true]
+    · have hNeqEndpoint : ({ sid := sid, role := r } == { sid := sid, role := hd } : Bool) = false := by
+        rw [beq_eq_false_iff_ne]
+        intro heq'
+        simp only [Endpoint.mk.injEq] at heq'
+        exact heq heq'.2.symm
+      simp only [hNeqEndpoint]
+      simp only [List.mem_cons] at hMem
+      cases hMem with
+      | inl h => exact absurd h.symm heq
+      | inr h => exact ih h
 
-
-axiom mkInitGEnv_sessionsOf_of_mem (roles : RoleSet) (sid : SessionId)
+theorem mkInitGEnv_sessionsOf_of_mem (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) (r : Role) (hMem : r ∈ roles) :
-    sid ∈ SessionsOf (mkInitGEnv roles sid localTypes)
+    sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) :=
+  ⟨{ sid := sid, role := r }, localTypes r, mkInitGEnv_lookup roles sid localTypes r hMem, rfl⟩
 
-
-axiom mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
+theorem mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
     (e : Edge) (buf : Buffer)
     (h : (mkInitBufs roles sid).lookup e = some buf) :
-    e ∈ RoleSet.allEdges sid roles
+    e ∈ RoleSet.allEdges sid roles := by
+  simp only [mkInitBufs] at h
+  have : ∀ (edges : List Edge),
+      (edges.map fun e' => (e', ([] : Buffer))).lookup e = some buf → e ∈ edges := by
+    intro edges
+    induction edges with
+    | nil => simp [List.map, List.lookup]
+    | cons hd tl ih =>
+      simp only [List.map, List.lookup]
+      intro hLookup
+      by_cases heq : e == hd
+      · exact List.mem_cons.mpr (Or.inl (eq_of_beq heq))
+      · simp only [heq, cond_false] at hLookup
+        exact List.mem_cons.mpr (Or.inr (ih hLookup))
+  exact this _ h
 
 
-axiom mkInit_bConsistent (roles : RoleSet) (sid : SessionId)
+theorem mkInit_bConsistent (roles : RoleSet) (sid : SessionId)
     (localTypes : Role → LocalType) :
-    BConsistent (mkInitGEnv roles sid localTypes) (mkInitBufs roles sid)
+    BConsistent (mkInitGEnv roles sid localTypes) (mkInitBufs roles sid) := by
+  intro e buf hLookup
+  have hMem : e ∈ RoleSet.allEdges sid roles :=
+    mkInitBufs_lookup_mem (roles:=roles) (sid:=sid) (e:=e) (buf:=buf) hLookup
+  have hSid : e.sid = sid := RoleSet.allEdges_sid sid roles e hMem
+  have hSender : e.sender ∈ roles := RoleSet.allEdges_sender_mem sid roles e hMem
+  have hSess : sid ∈ SessionsOf (mkInitGEnv roles sid localTypes) :=
+    mkInitGEnv_sessionsOf_of_mem roles sid localTypes e.sender hSender
+  simpa [hSid] using hSess
 
 
-axiom mkInit_bufsDom (roles : RoleSet) (sid : SessionId) :
-    BufsDom (mkInitBufs roles sid) (mkInitDEnv roles sid)
+theorem mkInit_bufsDom (roles : RoleSet) (sid : SessionId) :
+    BufsDom (mkInitBufs roles sid) (mkInitDEnv roles sid) := by
+  intro e _hNone
+  simp [mkInitDEnv, initDEnv]
 
 
-axiom mkInit_dConsistent (roles : RoleSet) (sid : SessionId) :
-    DConsistent (mkInitGEnv roles sid (fun _ => LocalType.end_)) (mkInitDEnv roles sid)
+theorem mkInit_dConsistent (roles : RoleSet) (sid : SessionId) :
+    DConsistent (mkInitGEnv roles sid (fun _ => LocalType.end_)) (mkInitDEnv roles sid) := by
+  intro s hs
+  rcases hs with ⟨e, ts, hFind, hSid⟩
+  have : False := by
+    simp [mkInitDEnv, initDEnv] at hFind
+  exact this.elim
 
 
 def linkOK (p₁ p₂ : DeployedProtocol) : Bool :=

@@ -142,7 +142,7 @@ Reference: `work/effects/008.lean:151-176` -/
     This is an alternative view of typing where:
     - HasTypeProcN says "after effects, we have these types"
     - HasTypeProcPre says "given current types, this process is well-formed" -/
-inductive HasTypeProcPre : SEnv → SEnv → GEnv → Process → Prop where
+inductive HasTypeProcPre : SEnv → OwnedEnv → GEnv → Process → Prop where
   /-- Skip is always well-typed. -/
   | skip {Ssh Sown G} : HasTypeProcPre Ssh Sown G .skip
 
@@ -185,11 +185,12 @@ inductive HasTypeProcPre : SEnv → SEnv → GEnv → Process → Prop where
       HasTypeProcPre Ssh Sown G (.seq P Q)
 
   /-- Parallel composition. -/
-  | par {Ssh S₁ S₂ G P Q} :
+  | par {Ssh Sown G P Q} {S₁ S₂ : SEnv} :
       DisjointS S₁ S₂ →
-      HasTypeProcPre Ssh S₁ G P →
-      HasTypeProcPre Ssh S₂ G Q →
-      HasTypeProcPre Ssh (S₁ ++ S₂) G (.par P Q)
+      Sown.left = S₁ ++ S₂ →
+      HasTypeProcPre Ssh { right := Sown.right ++ S₂, left := S₁ } G P →
+      HasTypeProcPre Ssh { right := Sown.right ++ S₁, left := S₂ } G Q →
+      HasTypeProcPre Ssh Sown G (.par P Q)
 
   /-- Assignment. -/
   | assign {Ssh Sown G x v T} :
@@ -204,7 +205,7 @@ Reference: `work/effects/008.lean:274-300` -/
 
 /-- Inversion for send (pre-update style).
     Reference: `work/effects/008.lean:274-279` -/
-theorem inversion_send {Ssh Sown : SEnv} {G : GEnv} {k x : Var}
+theorem inversion_send {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     (h : HasTypeProcPre Ssh Sown G (.send k x)) :
     ∃ e q T L,
       lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
@@ -215,7 +216,7 @@ theorem inversion_send {Ssh Sown : SEnv} {G : GEnv} {k x : Var}
 
 /-- Inversion for recv (pre-update style).
     Reference: `work/effects/008.lean:281-285` -/
-theorem inversion_recv {Ssh Sown : SEnv} {G : GEnv} {k x : Var}
+theorem inversion_recv {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     (h : HasTypeProcPre Ssh Sown G (.recv k x)) :
     ∃ e p T L,
       lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
@@ -226,7 +227,7 @@ theorem inversion_recv {Ssh Sown : SEnv} {G : GEnv} {k x : Var}
 
 /-- Inversion for select (pre-update style).
     Reference: `work/effects/008.lean:287-292` -/
-theorem inversion_select {Ssh Sown : SEnv} {G : GEnv} {k : Var} {l : Label}
+theorem inversion_select {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l : Label}
     (h : HasTypeProcPre Ssh Sown G (.select k l)) :
     ∃ e q bs L,
       lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
@@ -237,7 +238,7 @@ theorem inversion_select {Ssh Sown : SEnv} {G : GEnv} {k : Var} {l : Label}
 
 /-- Inversion for branch (pre-update style).
     Reference: `work/effects/008.lean:294-300` -/
-theorem inversion_branch {Ssh Sown : SEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
+theorem inversion_branch {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
     (h : HasTypeProcPre Ssh Sown G (.branch k procs)) :
     ∃ e p bs,
       lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
@@ -278,7 +279,7 @@ intrinsic to the typing judgment.
     *entire* process completes. It is used to avoid the sequential monotonicity
     issue in preservation: after a single step, the remaining process should
     still lead to the same final environments. -/
-inductive HasTypeProcPreOut : SEnv → SEnv → GEnv → Process → SEnv → GEnv → Footprint → DeltaSEnv → Prop where
+inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEnv → GEnv → Footprint → DeltaSEnv → Prop where
   /-- Skip leaves environments unchanged. -/
   | skip {Ssh Sown G} : HasTypeProcPreOut Ssh Sown G .skip Sown G [] ∅
 
@@ -294,17 +295,19 @@ inductive HasTypeProcPreOut : SEnv → SEnv → GEnv → Process → SEnv → GE
       lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.recv p T L) →
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown x = none →
+      lookupSEnv Sown.right x = none →
+      lookupSEnv Sown.left x = none →
       HasTypeProcPreOut Ssh Sown G (.recv k x)
-        (updateSEnv Sown x T) (updateG G e L) [x] (updateSEnv ∅ x T)
+        (OwnedEnv.updateLeft Sown x T) (updateG G e L) [x] (updateSEnv ∅ x T)
 
   | recv_old {Ssh Sown G k x e p T L T'} :
       lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.recv p T L) →
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown x = some T' →
+      lookupSEnv Sown.right x = none →
+      lookupSEnv Sown.left x = some T' →
       HasTypeProcPreOut Ssh Sown G (.recv k x)
-        (updateSEnv Sown x T) (updateG G e L) [x] ∅
+        (OwnedEnv.updateLeft Sown x T) (updateG G e L) [x] ∅
 
   /-- Select advances the sender's local type. -/
   | select {Ssh Sown G k l e q bs L} :
@@ -326,7 +329,7 @@ inductive HasTypeProcPreOut : SEnv → SEnv → GEnv → Process → SEnv → GE
         procs.find? (fun b => b.1 == lbl) = some (lbl, P) →
         bs.find? (fun b => b.1 == lbl) = some (lbl, L) →
         HasTypeProcPreOut Ssh Sown (updateG G e L) P S' G' W Δ) →
-      SEnvDomSubset Sown S' →
+      SEnvDomSubset Sown.left S'.left →
       HasTypeProcPreOut Ssh Sown G (.branch k procs) S' G' W Δ
 
   /-- Sequential composition: compose post environments. -/
@@ -336,9 +339,9 @@ inductive HasTypeProcPreOut : SEnv → SEnv → GEnv → Process → SEnv → GE
       HasTypeProcPreOut Ssh Sown G (.seq P Q) S₂ G₂ (W₁ ++ W₂) (Δ₁ ++ Δ₂)
 
   /-- Parallel composition with disjoint resources (explicit split witness). -/
-  | par {Ssh S G P Q Sfin Gfin Wfin Δfin
-         S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂} (split : ParSplit S G) :
-      Sfin = (S₁' ++ S₂') →
+  | par {Ssh Sown G P Q Sfin Gfin Wfin Δfin
+         S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂} (split : ParSplit Sown.left G) :
+      Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
       Gfin = (G₁' ++ G₂') →
       Wfin = (W₁ ++ W₂) →
       Δfin = (Δ₁ ++ Δ₂) →
@@ -349,33 +352,42 @@ inductive HasTypeProcPreOut : SEnv → SEnv → GEnv → Process → SEnv → GE
       DisjointS S₁' S₂' →
       DisjointW W₁ W₂ →
       DisjointS Δ₁ Δ₂ →
-      HasTypeProcPreOut Ssh split.S1 split.G1 P S₁' G₁' W₁ Δ₁ →
-      HasTypeProcPreOut Ssh split.S2 split.G2 Q S₂' G₂' W₂ Δ₂ →
-      HasTypeProcPreOut Ssh S G (.par P Q) Sfin Gfin Wfin Δfin
+      S₁ = split.S1 →
+      S₂ = split.S2 →
+      HasTypeProcPreOut Ssh { right := Sown.right ++ S₂, left := S₁ } split.G1 P
+        { right := Sown.right ++ S₂, left := S₁' } G₁' W₁ Δ₁ →
+      HasTypeProcPreOut Ssh { right := Sown.right ++ S₁, left := S₂ } split.G2 Q
+        { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ →
+      HasTypeProcPreOut Ssh Sown G (.par P Q) Sfin Gfin Wfin Δfin
 
   /-- Assignment updates S with x's type. -/
   | assign_new {Ssh Sown G x v T} :
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown x = none →
+      lookupSEnv Sown.right x = none →
+      lookupSEnv Sown.left x = none →
       HasTypeVal G v T →
-      HasTypeProcPreOut Ssh Sown G (.assign x v) (updateSEnv Sown x T) G [x] (updateSEnv ∅ x T)
+      HasTypeProcPreOut Ssh Sown G (.assign x v)
+        (OwnedEnv.updateLeft Sown x T) G [x] (updateSEnv ∅ x T)
 
   | assign_old {Ssh Sown G x v T T'} :
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown x = some T' →
+      lookupSEnv Sown.right x = none →
+      lookupSEnv Sown.left x = some T' →
       HasTypeVal G v T →
-      HasTypeProcPreOut Ssh Sown G (.assign x v) (updateSEnv Sown x T) G [x] ∅
+      HasTypeProcPreOut Ssh Sown G (.assign x v)
+        (OwnedEnv.updateLeft Sown x T) G [x] ∅
 
 
 /-! ### Inversion Helpers for Pre-Out Typing -/
 
 /-- Inversion for parallel pre-out typing with explicit environment splits. -/
-theorem HasTypeProcPreOut_par_inv {Ssh S G P Q Sfin Gfin Wfin Δfin} :
-    HasTypeProcPreOut Ssh S G (.par P Q) Sfin Gfin Wfin Δfin →
+theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin} :
+    HasTypeProcPreOut Ssh Sown G (.par P Q) Sfin Gfin Wfin Δfin →
     ∃ S₁ S₂ G₁ G₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂,
-      S = (S₁ ++ S₂) ∧
+      Sown.left = (S₁ ++ S₂) ∧
       G = (G₁ ++ G₂) ∧
-      Sfin = (S₁' ++ S₂') ∧
+      Sfin.right = Sown.right ∧
+      Sfin.left = (S₁' ++ S₂') ∧
       Gfin = (G₁' ++ G₂') ∧
       Wfin = (W₁ ++ W₂) ∧
       Δfin = (Δ₁ ++ Δ₂) ∧
@@ -386,15 +398,23 @@ theorem HasTypeProcPreOut_par_inv {Ssh S G P Q Sfin Gfin Wfin Δfin} :
       DisjointS S₁' S₂' ∧
       DisjointW W₁ W₂ ∧
       DisjointS Δ₁ Δ₂ ∧
-      HasTypeProcPreOut Ssh S₁ G₁ P S₁' G₁' W₁ Δ₁ ∧
-      HasTypeProcPreOut Ssh S₂ G₂ Q S₂' G₂' W₂ Δ₂ := by
+      HasTypeProcPreOut Ssh { right := Sown.right ++ S₂, left := S₁ } G₁ P
+        { right := Sown.right ++ S₂, left := S₁' } G₁' W₁ Δ₁ ∧
+      HasTypeProcPreOut Ssh { right := Sown.right ++ S₁, left := S₂ } G₂ Q
+        { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ := by
   intro h
   cases h with
-  | par split hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP hQ =>
+  | par split hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
+      hS1 hS2 hP hQ =>
       cases split with
       | mk S₁ S₂ G₁ G₂ hS hG =>
-          exact ⟨S₁, S₂, G₁, G₂, _, _, _, _, _, _, _, _, hS, hG, hSfin, hGfin, hW, hΔ,
-            hDisjG, hDisjS, hDisjS_left, hDisjS_right, hDisjS', hDisjW, hDisjΔ, hP, hQ⟩
+          refine ⟨S₁, S₂, G₁, G₂, _, _, _, _, _, _, _, _, ?_, hG, ?_, ?_, hGfin, hW, hΔ,
+            hDisjG, hDisjS, hDisjS_left, hDisjS_right, hDisjS', hDisjW, hDisjΔ, ?_, ?_⟩
+          · simpa [hS] using hS1
+          · simpa [hSfin] using rfl
+          · simpa [hSfin] using rfl
+          · simpa [hS1, hS2] using hP
+          · simpa [hS1, hS2] using hQ
 
 -- NOTE: We do not provide a general "forgetful" lemma from HasTypeProcPreOut to
 -- HasTypeProcPre, because seq/par pre-out typing does not imply pre-typing for
@@ -413,8 +433,8 @@ theorem HasTypeProcPreOut_par_inv {Ssh S G P Q Sfin Gfin Wfin Δfin} :
     - Variables are typed as they're assigned
 
     **Compositionality**: Parallel processes have disjoint resources -/
-inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → Process →
-                      GEnv → DEnv → SEnv → Store → Buffers → Process → Prop
+inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → Store → Buffers → Process →
+                      GEnv → DEnv → OwnedEnv → Store → Buffers → Process → Prop
   | send {G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'} :
       -- Pre-conditions (resources consumed)
       lookupStr store k = some (.chan e) →
@@ -449,7 +469,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
       -- Resource transition definitions
       G' = updateG G e L →
       D' = updateD D recvEdge (lookupD D recvEdge).tail →
-      Sown' = updateSEnv Sown x T →
+      Sown' = OwnedEnv.updateLeft Sown x T →
       store' = updateStr store x v →
       bufs' = updateBuf bufs recvEdge vs →
 
@@ -501,7 +521,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
       HasTypeVal G v T →
 
       -- Resource transition definitions (S and store change)
-      S' = updateSEnv Sown x T →
+      S' = OwnedEnv.updateLeft Sown x T →
       store' = updateStr store x v →
 
       -- Judgment
@@ -521,10 +541,11 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
       TypedStep G D Ssh Sown store bufs (.seq .skip Q)
                 G D Sown store bufs Q
 
-  | par_left {Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'} (split : ParSplit S G) :
+  | par_left {Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'}
+      (split : ParSplit Sown.left G) :
       -- Left process transitions with its resources
-      TypedStep split.G1 D₁ Ssh split.S1 store bufs P
-                G₁' D₁' S₁' store' bufs' P' →
+      TypedStep split.G1 D₁ Ssh { right := Sown.right ++ split.S2, left := split.S1 } store bufs P
+                G₁' D₁' { right := Sown.right ++ split.S2, left := S₁' } store' bufs' P' →
 
       -- Resources must be disjoint for parallel composition
       DisjointG split.G1 split.G2 →
@@ -534,13 +555,15 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
       DConsistent split.G2 D₂ →
 
       -- Combined transition
-      TypedStep G (D₁ ++ D₂) Ssh S store bufs (.par P Q)
-                (G₁' ++ split.G2) (D₁' ++ D₂) (S₁' ++ split.S2) store' bufs' (.par P' Q)
+      TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par P Q)
+                (G₁' ++ split.G2) (D₁' ++ D₂) { right := Sown.right, left := S₁' ++ split.S2 }
+                store' bufs' (.par P' Q)
 
-  | par_right {Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'} (split : ParSplit S G) :
+  | par_right {Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'}
+      (split : ParSplit Sown.left G) :
       -- Right process transitions with its resources
-      TypedStep split.G2 D₂ Ssh split.S2 store bufs Q
-                G₂' D₂' S₂' store' bufs' Q' →
+      TypedStep split.G2 D₂ Ssh { right := Sown.right ++ split.S1, left := split.S2 } store bufs Q
+                G₂' D₂' { right := Sown.right ++ split.S1, left := S₂' } store' bufs' Q' →
 
       -- Resources must be disjoint
       DisjointG split.G1 split.G2 →
@@ -550,8 +573,9 @@ inductive TypedStep : GEnv → DEnv → SEnv → SEnv → Store → Buffers → 
       DConsistent split.G2 D₂ →
 
       -- Combined transition
-      TypedStep G (D₁ ++ D₂) Ssh S store bufs (.par P Q)
-                (split.G1 ++ G₂') (D₁ ++ D₂') (split.S1 ++ S₂') store' bufs' (.par P Q')
+      TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par P Q)
+                (split.G1 ++ G₂') (D₁ ++ D₂') { right := Sown.right, left := split.S1 ++ S₂' }
+                store' bufs' (.par P Q')
 
   | par_skip_left {G D Ssh Sown store bufs Q} :
       -- Skip elimination from parallel

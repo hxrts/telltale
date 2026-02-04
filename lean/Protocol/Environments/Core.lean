@@ -74,6 +74,77 @@ def updateSEnv (env : SEnv) (x : Var) (T : ValType) : SEnv :=
 def SEnvUnion (S₁ S₂ : SEnv) : SEnv :=
   S₁ ++ S₂
 
+/-! ## OwnedEnv: Explicit Right/Left Boundary -/
+
+/-- OwnedEnv splits owned variables into a right (framed) prefix and a left (local) suffix. -/
+structure OwnedEnv where
+  right : SEnv
+  left : SEnv
+
+instance : Inhabited OwnedEnv where
+  default := { right := [], left := [] }
+
+instance : Coe SEnv OwnedEnv where
+  coe s := { right := [], left := s }
+
+instance : EmptyCollection OwnedEnv := ⟨{ right := (∅ : SEnv), left := (∅ : SEnv) }⟩
+
+namespace OwnedEnv
+
+/-- Full owned environment as a single SEnv. -/
+def all (S : OwnedEnv) : SEnv :=
+  S.right ++ S.left
+
+instance : Coe OwnedEnv SEnv := ⟨OwnedEnv.all⟩
+
+/-- Lookup in the full owned environment. -/
+def lookup (S : OwnedEnv) (x : Var) : Option ValType :=
+  lookupSEnv (all S) x
+
+/-- Lookup only in the right (framed) portion. -/
+def lookupRight (S : OwnedEnv) (x : Var) : Option ValType :=
+  lookupSEnv S.right x
+
+/-- Lookup only in the left (local) portion. -/
+def lookupLeft (S : OwnedEnv) (x : Var) : Option ValType :=
+  lookupSEnv S.left x
+
+/-- Update only the left (local) portion. -/
+def updateLeft (S : OwnedEnv) (x : Var) (T : ValType) : OwnedEnv :=
+  { right := S.right, left := updateSEnv S.left x T }
+
+/-- Add a frame to the right portion (low priority within right). -/
+def frameRight (Sframe : SEnv) (S : OwnedEnv) : OwnedEnv :=
+  { right := S.right ++ Sframe, left := S.left }
+
+/-- Add a frame to the left (local) portion (low priority within left). -/
+def frameLeft (Sframe : SEnv) (S : OwnedEnv) : OwnedEnv :=
+  { right := S.right, left := S.left ++ Sframe }
+
+instance : HAppend OwnedEnv SEnv OwnedEnv where
+  hAppend := fun S Sframe => OwnedEnv.frameLeft Sframe S
+
+/-- Treat a plain SEnv as an owned env with empty right frame. -/
+def ofLeft (S : SEnv) : OwnedEnv :=
+  { right := [], left := S }
+
+@[simp] theorem toSEnv_coe (S : OwnedEnv) : (S : SEnv) = S.right ++ S.left := by
+  rfl
+
+@[simp] theorem frameLeft_left (S : OwnedEnv) (Sframe : SEnv) :
+    (S ++ Sframe).left = S.left ++ Sframe := by
+  rfl
+
+@[simp] theorem frameLeft_right (S : OwnedEnv) (Sframe : SEnv) :
+    (S ++ Sframe).right = S.right := by
+  rfl
+
+@[simp] theorem toSEnv_frameLeft (S : OwnedEnv) (Sframe : SEnv) :
+    ((S ++ Sframe : OwnedEnv) : SEnv) = (S : SEnv) ++ Sframe := by
+  simp [OwnedEnv.all, List.append_assoc]
+
+end OwnedEnv
+
 /-! ## GEnv: Endpoint → LocalType -/
 
 /-- GEnv maps session endpoints to their current local session types. -/
