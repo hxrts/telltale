@@ -303,7 +303,7 @@ private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
 /-- Auxiliary: ReachesComm after unfolding, with explicit fuel for termination. -/
 private theorem reachesComm_body_implies_unfold_aux :
     ∀ fuel L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold
-  | fuel, L, hFuel, hBody =>
+  | fuel, L, hFuel, hBody => by
       cases L with
       | send r T L' =>
           simp [LocalType.unfold]

@@ -367,7 +367,13 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           have hP_full' :
               HasTypeProcPreOut Ssh Sown G P { right := Sown.right, left := S₁' ++ split.S2 }
                 (G₁' ++ split.G2) W₁ Δ₁ := by
-            simpa [split.hS, split.hG] using hP_full
+            have hSown_eq : { right := Sown.right, left := split.S1 ++ split.S2 } = Sown := by
+              cases Sown with
+              | mk r l =>
+                  simpa [split.hS.symm]
+            have hG_eq : split.G1 ++ split.G2 = G := by
+              exact split.hG.symm
+            simpa [hSown_eq, hG_eq] using hP_full
           have hProgP :=
             progress_typed_aux hP_full' hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
           cases hProgP with

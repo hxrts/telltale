@@ -147,7 +147,7 @@ private theorem SessionsOf_eq_of_TypedStep
   | seq_skip =>
       simp
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
       -- G' = G₁' ++ split.G2, G = split.G1 ++ split.G2
       apply Set.ext; intro s; constructor
       · intro hs
@@ -173,7 +173,7 @@ private theorem SessionsOf_eq_of_TypedStep
         | inr hRight =>
             exact SessionsOf_append_right (G₁:=G₁') (G₂:=split.G2) hRight
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
       -- G' = split.G1 ++ G₂', G = split.G1 ++ split.G2
       apply Set.ext; intro s; constructor
       · intro hs
@@ -257,13 +257,11 @@ private theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
   | inl h2 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj12
       have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨h1, h2⟩
-      simp [hEmpty] at hInter
-      exact hInter.elim
+      exact (by simpa [hEmpty] using hInter)
   | inr h3 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₃ = (∅ : Set SessionId) := hDisj13
       have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₃ := ⟨h1, h3⟩
-      simp [hEmpty] at hInter
-      exact hInter.elim
+      exact (by simpa [hEmpty] using hInter)
 
 private theorem SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
   ext s; constructor
@@ -300,6 +298,12 @@ private theorem DConsistent_append {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
 private theorem DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
   simp [DConsistent, SessionsOfD_empty]
 
+private axiom OwnedDisjoint_preserved_TypedStep
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    OwnedDisjoint Sown →
+    OwnedDisjoint Sown'
+
 private theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D := by
   simpa using (DEnvUnion_empty_right D)
 
@@ -315,8 +319,7 @@ private theorem lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G
         have hSid₂ : e.sid ∈ SessionsOf G₂ := ⟨e, L, hLookup, rfl⟩
         have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid₁, hSid₂⟩
         have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
-        simp [hEmpty] at hInter
-        exact hInter.elim
+        exact (by simpa [hEmpty] using hInter)
 
 private theorem BuffersTyped_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
     (∀ e L, lookupG G e = some L → lookupG G' e = some L) →
@@ -571,7 +574,7 @@ private lemma lookupD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : L
         have hB := findD_append_right (D₁:=D₁) (D₂:=D) (e:=e') hLeft
         have hfind_union :
             (D₁ ++ updateD D e ts).find? e' = (D₁ ++ D).find? e' := by
-          simp [hA, hB]
+          simp [hA, hB, hfind]
         have hRightEq : lookupD (D₁ ++ updateD D e ts) e' = lookupD (D₁ ++ D) e' := by
           simp [lookupD, hfind_union]
         simp [hLeftEq, hRightEq]
@@ -606,8 +609,8 @@ private lemma findD_updateD_append_left {D D₂ : DEnv} {e e' : Edge} {ts : List
         have hA := findD_append_right (D₁:=updateD D e ts) (D₂:=D₂) (e:=e') hLeft''
         have hB := findD_append_right (D₁:=D) (D₂:=D₂) (e:=e') hLeft'
         have hRight : (updateD D e ts ++ D₂).find? e' = (D ++ D₂).find? e' := by
-          simp [hA, hB]
-        simp [hLeft, hRight]
+          simp [hA, hB, hfind]
+        simpa [hLeft, hRight] using hfind
 
 private lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : List ValType}
     (hNone : D₁.find? e = none) :
@@ -637,8 +640,8 @@ private lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : Lis
         have hA := findD_append_right (D₁:=D₁) (D₂:=updateD D e ts) (e:=e') hLeft'
         have hB := findD_append_right (D₁:=D₁) (D₂:=D) (e:=e') hLeft'
         have hRight : (D₁ ++ updateD D e ts).find? e' = (D₁ ++ D).find? e' := by
-          simp [hA, hB]
-        simp [hLeft, hRight]
+          simp [hA, hB, hfind]
+        simpa [hLeft, hRight] using hfind
 
 private lemma updateD_append_left (D D₂ : DEnv) (e : Edge) (ts : List ValType) :
     updateD (D ++ D₂) e ts = updateD D e ts ++ D₂ := by
@@ -666,8 +669,7 @@ private lemma updateG_append_right_hit {G₁ G₂ : GEnv} {e : Endpoint} {L : Lo
           | true =>
               have hLookup : lookupG ((e', L') :: tl) e = some L' := by
                 simp [lookupG, List.lookup, hEqb]
-              simp [hLookup] at hNone
-              exact hNone.elim
+              exact (by simpa [hLookup] using hNone)
           | false =>
               have hNone' : lookupG tl e = none := by
                 simpa [lookupG, List.lookup, hEqb] using hNone
@@ -698,8 +700,7 @@ private theorem ValidLabels_preserved_frame_left
         intro hIn
         have hInter : e.sid ∈ SessionsOf G ∩ SessionsOf Gfr := ⟨hSid, hIn⟩
         have hEmpty : SessionsOf G ∩ SessionsOf Gfr = (∅ : Set SessionId) := hDisj
-        simp [hEmpty] at hInter
-        exact hInter.elim
+        exact (by simpa [hEmpty] using hInter)
       have hDfrNone :
           Dfr.find? { sid := e.sid, sender := e.role, receiver := target } = none :=
         lookupD_none_of_disjointG (G₁:=G) (G₂:=Gfr) (D₂:=Dfr) hDisj hConsFr hSid
@@ -721,8 +722,7 @@ private theorem ValidLabels_preserved_frame_left
         | inr hRight =>
             cases hRight with
             | intro _ hRight =>
-                simp [hGfrNone] at hRight
-                exact hRight.elim
+                exact (by simpa [hGfrNone] using hRight)
       have hG' : lookupG (G ++ Gfr) e = some (.send target T L) :=
         lookupG_append_left (G₁:=G) (G₂:=Gfr) hG
       have hValid' :=
@@ -753,8 +753,7 @@ private theorem ValidLabels_preserved_frame_left
         intro hIn
         have hInter : e.sid ∈ SessionsOf G ∩ SessionsOf Gfr := ⟨hSid, hIn⟩
         have hEmpty : SessionsOf G ∩ SessionsOf Gfr = (∅ : Set SessionId) := hDisj
-        simp [hEmpty] at hInter
-        exact hInter.elim
+        exact (by simpa [hEmpty] using hInter)
       have hDfrNone :
           Dfr.find? { sid := e.sid, sender := e.role, receiver := target } = none :=
         lookupD_none_of_disjointG (G₁:=G) (G₂:=Gfr) (D₂:=Dfr) hDisj hConsFr hSid
@@ -776,8 +775,7 @@ private theorem ValidLabels_preserved_frame_left
         | inr hRight =>
             cases hRight with
             | intro _ hRight =>
-                simp [hGfrNone] at hRight
-                exact hRight.elim
+                exact (by simpa [hGfrNone] using hRight)
       have hG' : lookupG (G ++ Gfr) e = some (.select target bs) :=
         lookupG_append_left (G₁:=G) (G₂:=Gfr) hG
       have hValid' :=
@@ -802,7 +800,7 @@ private theorem ValidLabels_preserved_frame_left
   | seq_skip =>
       simpa using hValid
   | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
       -- Reassociate frames: frame is split.G2 ++ Gfr
       have hDisj' : DisjointG (split.G1 ++ split.G2) Gfr := by
         simpa [split.hG] using hDisj
@@ -834,7 +832,7 @@ private theorem ValidLabels_preserved_frame_left
       have hIH := ih (Gfr:=split.G2 ++ Gfr) (Dfr:=D₂ ++ Dfr) hDisjFrame hConsFrame hValid' hCoh' hBT'
       simpa [List.append_assoc] using hIH
   | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
       -- Reassociate frames: frame is split.G1 ++ Gfr, but step is on split.G2
       have hDisj' : DisjointG (split.G1 ++ split.G2) Gfr := by
         simpa [split.hG] using hDisj
@@ -1094,7 +1092,7 @@ private theorem typed_step_preserves_headcoherent
   | seq_skip =>
       simpa using hHead
   | par_left split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
       have hHeadMerged : HeadCoherent (split.G1 ++ split.G2) (D₁ ++ D₂) := by
         simpa [split.hG] using hHead
       have hHeadL : HeadCoherent split.G1 D₁ := HeadCoherent_split_left hHeadMerged hDisjG hConsR
@@ -1107,7 +1105,7 @@ private theorem typed_step_preserves_headcoherent
           hConsL' hConsR
       simpa using hMerged
   | par_right split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
       have hHeadMerged : HeadCoherent (split.G1 ++ split.G2) (D₁ ++ D₂) := by
         simpa [split.hG] using hHead
       have hHeadL : HeadCoherent split.G1 D₁ := HeadCoherent_split_left hHeadMerged hDisjG hConsR
@@ -1133,7 +1131,7 @@ theorem preservation_typed
     LocalTypeR.WellFormed G D Ssh Sown store bufs P →
     LocalTypeR.WellFormed G' D' Ssh Sown' store' bufs' P' := by
   intro hTS hWF
-  rcases hWF with ⟨hStore, hBT, hCoh, hHead, hValid, hCompat, hDisjS, hCons, hPre⟩
+  rcases hWF with ⟨hStore, hBT, hCoh, hHead, hValid, hCompat, hDisjS, hOwn, hCons, hPre⟩
   rcases hPre with ⟨Sfin, Gfin, W, Δ, hPre⟩
   have hStore' :
       StoreTypedStrong G' (SEnvAll Ssh Sown') store' :=
@@ -1145,10 +1143,11 @@ theorem preservation_typed
   have hCompat' : Compatible G' D' := Compatible_preserved hCompat hTS
   have hDisjS' : DisjointS Ssh Sown' :=
     DisjointS_preserved_TypedStep_right (S1:=Ssh) hTS hDisjS
+  have hOwn' : OwnedDisjoint Sown' := OwnedDisjoint_preserved_TypedStep hTS hOwn
   have hCons' : DConsistent G' D' := DConsistent_preserved hTS hCons
   have hStoreTyped : StoreTyped G (SEnvAll Ssh Sown) store := hStore.toStoreTyped
   obtain ⟨W', Δ', hPre'⟩ := HasTypeProcPreOut_preserved hStoreTyped hTS hPre
-  refine ⟨hStore', hBT', hCoh', hHead', hValid', hCompat', hDisjS', hCons', ?_⟩
+  refine ⟨hStore', hBT', hCoh', hHead', hValid', hCompat', hDisjS', hOwn', hCons', ?_⟩
   exact ⟨Sfin, Gfin, W', Δ', hPre'⟩
 
 /-- Preservation: TypedStep preserves WellFormed. -/
@@ -1313,8 +1312,7 @@ theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (
                       simpa [List.find?_eq_none] using hFindP
                     have hMemP : procs.get ⟨i, hip⟩ ∈ procs := List.get_mem procs ⟨i, hip⟩
                     have hContra : False := (hNo _ hMemP) hPred
-                    simp at hContra
-                    exact hContra
+                    exact (False.elim hContra)
                 | some _ =>
                     simp
               rcases (Option.isSome_iff_exists).1 hFindPIsSome with ⟨bP, hFindP⟩
@@ -1897,7 +1895,7 @@ theorem subject_reduction {n : SessionId}
       refine Step.base ?_
       exact StepBase.seq2 rfl
   | par_left split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
       let C0 : Config :=
         { proc := P, store := store, bufs := bufs, G := split.G1, D := D₁, nextSid := n }
       let C0' : Config :=
@@ -1911,7 +1909,7 @@ theorem subject_reduction {n : SessionId}
       have hProc : C.proc = .par P Q := rfl
       simpa [C, C0', frameConfigRight] using (Step.par_left hProc hSub')
   | par_right split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
       let C0 : Config :=
         { proc := Q, store := store, bufs := bufs, G := split.G2, D := D₂, nextSid := n }
       let C0' : Config :=

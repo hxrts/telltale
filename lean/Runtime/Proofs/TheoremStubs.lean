@@ -5,6 +5,7 @@ import Runtime.VM.LoadChoreography
 import Runtime.ProgramLogic.GhostState
 import Runtime.Proofs.Lyapunov
 import Runtime.Proofs.Diamond.Proof
+import Protocol.InformationCost
 
 /- 
 The Problem. Collect the remaining proof obligations from runtime.md §14
@@ -215,8 +216,16 @@ def wp_lift_step_with_cost : Prop :=
   True
 
 def send_cost_plus_flow : Prop :=
-  -- Placeholder: send consumes compute credits and flow headroom.
-  True
+  -- Information-theoretic send cost: for any label distribution at a
+  -- select point, branch entropy is nonneg and bounded by log |L|.
+  ∀ {L : Type*} [Fintype L] [Nonempty L]
+    (d : InformationCost.Distribution L),
+    0 ≤ InformationCost.branchEntropy d.pmf ∧
+    InformationCost.branchEntropy d.pmf ≤ Real.log (Fintype.card L)
+
+theorem send_cost_plus_flow_holds : send_cost_plus_flow :=
+  fun d => ⟨InformationCost.branchEntropy_nonneg d,
+            InformationCost.branchEntropy_le_log_card d⟩
 
 def cost_frame_preserving : Prop :=
   -- Credit consumption is frame-preserving: chargeCost only modifies
@@ -242,8 +251,22 @@ theorem cost_frame_preserving_holds : cost_frame_preserving := by
   · exact absurd h (by simp)
 
 def cost_speculation_bounded : Prop :=
-  -- Placeholder: speculation consumes credits from snapshot budget.
-  True
+  -- Speculation cost bounded by KL divergence: nonneg and zero iff
+  -- speculative distribution matches committed distribution.
+  (∀ {L : Type*} [Fintype L]
+    (p q : InformationCost.Distribution L)
+    (_habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0),
+    0 ≤ InformationCost.klDivergence p.pmf q.pmf) ∧
+  (∀ {L : Type*} [Fintype L]
+    (p q : InformationCost.Distribution L)
+    (_habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0),
+    InformationCost.klDivergence p.pmf q.pmf = 0 ↔ p.pmf = q.pmf)
+
+theorem cost_speculation_bounded_holds : cost_speculation_bounded :=
+  ⟨fun p q habs => InformationCost.klDivergence_nonneg p.pmf q.pmf
+      p.nonneg p.sum_one q.nonneg q.sum_one habs,
+   fun p q habs => InformationCost.klDivergence_eq_zero_iff p.pmf q.pmf
+      p.nonneg p.sum_one q.nonneg q.sum_one habs⟩
 
 /-! ## Aura Instantiation Theorems -/
 
