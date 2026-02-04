@@ -46,10 +46,10 @@ theorem vm_deadlock_free_holds : vm_deadlock_free :=
 def transfer_preserves_coherent : Prop :=
   -- Endpoint transfer preserves coherence: session store and buffers unchanged.
   -- Proved in ExecOwnership.lean via conservation argument.
-  transfer_preserves_coherent_prop
+  transfer_preserves_coherent_prop.{0}
 
 theorem transfer_preserves_coherent_holds : transfer_preserves_coherent :=
-  transfer_preserves_coherent_proof
+  transfer_preserves_coherent_proof.{0}
 
 def guard_chain_compose : Prop :=
   -- Placeholder: guard layers compose via accessors.
@@ -238,7 +238,7 @@ theorem cost_frame_preserving_holds : cost_frame_preserving := by
   intro ι γ π ε ν _ _ _ _ _ _ _ _ _ _ _ _ cfg coro coro' i h
   simp only [chargeCost] at h
   split at h
-  · subst h; exact ⟨rfl, rfl, rfl, rfl⟩
+  · simp at h; subst h; exact ⟨rfl, rfl, rfl, rfl⟩
   · exact absurd h (by simp)
 
 def cost_speculation_bounded : Prop :=

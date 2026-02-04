@@ -81,6 +81,9 @@ structure OwnedEnv where
   right : SEnv
   left : SEnv
 
+@[simp] theorem OwnedEnv.eta (o : OwnedEnv) :
+    OwnedEnv.mk o.right o.left = o := by cases o; rfl
+
 instance : Inhabited OwnedEnv where
   default := { right := [], left := [] }
 
