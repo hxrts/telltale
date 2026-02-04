@@ -36,8 +36,12 @@ def vm_deadlock_free : Prop :=
   True
 
 def transfer_preserves_coherent : Prop :=
-  -- Placeholder: endpoint transfer preserves coherence.
-  True
+  -- Endpoint transfer preserves coherence: session store and buffers unchanged.
+  -- Proved in ExecOwnership.lean via conservation argument.
+  transfer_preserves_coherent_prop.{0}
+
+theorem transfer_preserves_coherent_holds : transfer_preserves_coherent :=
+  transfer_preserves_coherent_proof.{0}
 
 def guard_chain_compose : Prop :=
   -- Placeholder: guard layers compose via accessors.
@@ -188,8 +192,27 @@ def send_cost_plus_flow : Prop :=
   True
 
 def cost_frame_preserving : Prop :=
-  -- Placeholder: credit consumption is frame-preserving.
-  True
+  -- Credit consumption is frame-preserving: chargeCost only modifies
+  -- the coroutine's cost budget, preserving all other fields.
+  ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (cfg : VMConfig ι γ π ε ν) (coro coro' : CoroutineState γ ε) (i : Instr γ ε),
+    chargeCost cfg coro i = some coro' →
+    coro'.id = coro.id ∧
+    coro'.ownedEndpoints = coro.ownedEndpoints ∧
+    coro'.progressTokens = coro.progressTokens ∧
+    coro'.knowledgeSet = coro.knowledgeSet
+
+theorem cost_frame_preserving_holds : cost_frame_preserving := by
+  intro ι γ π ε ν _ _ _ _ _ _ _ _ _ _ _ _ cfg coro coro' i h
+  simp only [chargeCost] at h
+  split at h
+  · simp at h; subst h; exact ⟨rfl, rfl, rfl, rfl⟩
+  · exact absurd h (by simp)
 
 def cost_speculation_bounded : Prop :=
   -- Placeholder: speculation consumes credits from snapshot budget.

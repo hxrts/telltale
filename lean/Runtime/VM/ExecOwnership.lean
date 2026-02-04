@@ -69,6 +69,30 @@ private def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
                                     , knowledgeSet := keptFacts }
   pack coro' st' (mkRes (.transferred ep tid) (some (.obs (.transferred ep coro.id tid))))
 
+/-! ## Transfer conservation lemmas -/
+
+/-- Transfer preserves session-level state: the session store and signed buffer
+    store are unchanged by `transferCommit`. Transfer rearranges coroutine
+    ownership (a zero-sum operation) without modifying session-level typing
+    state. Since session coherence (`EdgeCoherent`) depends on `GEnv` and `DEnv`
+    (ghost state in the Iris sense), not on which coroutine owns which endpoint,
+    coherence is automatically preserved by any operation that leaves the
+    session store and buffers untouched. -/
+def transfer_preserves_coherent_prop : Prop :=
+  ∀ {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (ep : Endpoint) (tid : Nat) (resources' : List (ScopeId × ResourceState ν)),
+    (transferCommit st coro ep tid resources').st.sessions = st.sessions ∧
+    (transferCommit st coro ep tid resources').st.buffers = st.buffers
+
+theorem transfer_preserves_coherent_proof : transfer_preserves_coherent_prop :=
+  fun _st _coro _ep _tid _resources' => ⟨rfl, rfl⟩
+
 private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]

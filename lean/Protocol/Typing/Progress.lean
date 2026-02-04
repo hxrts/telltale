@@ -117,6 +117,17 @@ private lemma SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
 private lemma SEnv_append_empty_left (S : SEnv) : (∅ : SEnv) ++ S = S := by
   simpa using (List.nil_append S)
 
+private lemma HasTypeProcPreOut_reframe
+    {Ssh Sown G P Sfin Gfin W Δ} {Sown' : SEnv} {G' : GEnv} :
+    Sown = Sown' →
+    G = G' →
+    HasTypeProcPreOut Ssh Sown' G' P Sfin Gfin W Δ →
+    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ := by
+  intro hS hG h
+  subst hS
+  subst hG
+  simpa using h
+
 private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     StoreTypedStrong G (SEnvAll Ssh Sown) store →
@@ -332,7 +343,9 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
             have hFrame :=
               HasTypeProcPreOut_frame_right (S₁:=split.S1) (S₂:=split.S2) (G₁:=split.G1) (G₂:=split.G2)
                 (S₁':=S₁') (G₁':=G₁') (W:=W₁) (Δ:=Δ₁) hDisjS_symm (DisjointS_symm hDisjS_left) hDisjG hP
-            simpa [split.hS, split.hG] using hFrame
+            exact HasTypeProcPreOut_reframe (Sown:=Sown) (G:=G)
+              (Sown':=split.S1 ++ split.S2) (G':=split.G1 ++ split.G2)
+              split.hS split.hG hFrame
           have hProgP :=
             progress_typed_aux hP_full hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
           cases hProgP with
@@ -381,7 +394,9 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                     have hFrame :=
                       HasTypeProcPreOut_frame_left (S₁:=split.S1) (S₂:=split.S2) (G₁:=split.G1) (G₂:=split.G2)
                         (S₂':=S₂') (G₂':=G₂') (W:=W₂) (Δ:=Δ₂) hDisjS hDisjS_right hDisjG hQ
-                    simpa [split.hS, split.hG] using hFrame
+                    exact HasTypeProcPreOut_reframe (Sown:=Sown) (G:=G)
+                      (Sown':=split.S1 ++ split.S2) (G':=split.G1 ++ split.G2)
+                      split.hS split.hG hFrame
                   have hProgQ :=
                     progress_typed_aux hQ_full hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
                   cases hProgQ with
