@@ -223,15 +223,42 @@ theorem schedule_confluence_holds {ι γ π ε ν : Type u} [IdentityModel ι] [
     have := h1.symm.trans h2
     exact Option.some.inj this
 
-/-- Placeholder: cooperative execution refines concurrent. -/
+/-- Cooperative scheduling refines round-robin: swapping the policy field before
+    scheduling gives the same result as scheduling first and normalizing the
+    policy afterward. This is full-state equality, not just coroutine-id
+    agreement — the only field that differs is the preserved policy tag, and
+    the `map` normalization accounts for that. -/
 def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : Prop :=
-  -- Cooperative scheduling coincides with round-robin selection.
+  -- Scheduling is policy-independent up to the preserved policy tag.
   st.sched.policy = .cooperative →
-    schedule st = schedule { st with sched := { st.sched with policy := .roundRobin } }
+    schedule { st with sched := { st.sched with policy := .roundRobin } } =
+      (schedule st).map
+        (fun (cid, s) => (cid, { s with sched := { s.sched with policy := .roundRobin } }))
+
+/-- `pickRunnable` only reads `readyQueue` and `coroutines`; the policy field
+    is never inspected, so swapping it does not change the selection. -/
+private theorem pickRunnable_ignores_policy {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (p : SchedPolicy) :
+    pickRunnable { st with sched := { st.sched with policy := p } } = pickRunnable st := by
+  simp only [pickRunnable, pickRoundRobin, isRunnable, getCoro]
+
+theorem cooperative_refines_concurrent_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : cooperative_refines_concurrent st := by
+  intro _
+  simp only [schedule, pickRunnable_ignores_policy st .roundRobin]
+  cases pickRunnable st with
+  | none => rfl
+  | some => rfl
 
 private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)
     (cid : CoroutineId) (hmem : cid ∈ queue) (hp : p cid = true) :
