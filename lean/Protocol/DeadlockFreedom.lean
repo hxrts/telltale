@@ -443,7 +443,7 @@ is either done or can progress.
 theorem deadlock_free (C : Config) (Ssh Sown : SEnv)
     (hWF : LocalTypeR.WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
     (hReady : ProgressReady C)
-    (hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
+    (_hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
     Done C.G C ∨ CanProgress C := by
   rcases hReady with ⟨hDoneIfSkip, hNotBlocked⟩
   have hProgress := progress (G:=C.G) (D:=C.D) (Ssh:=Ssh) (Sown:=Sown)

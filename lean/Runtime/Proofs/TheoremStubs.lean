@@ -212,8 +212,41 @@ theorem cost_budget_bounds_steps_holds : cost_budget_bounds_steps :=
     Nat.le_trans (Nat.le_mul_of_pos_right n cm.hMinPos) h
 
 def wp_lift_step_with_cost : Prop :=
-  -- Placeholder: wp_lift_step extended with cost credits.
-  True
+  -- wp_lift_step extended with cost credits: each non-halt instruction
+  -- step strictly decreases the coroutine's cost budget, providing a
+  -- well-founded measure for WP induction.  Specifically:
+  -- (1) sufficient budget implies chargeCost succeeds,
+  -- (2) budget conservation: old budget = new budget + step cost,
+  -- (3) strict decrease: new budget < old budget (since step cost ≥ 1).
+  ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (cfg : VMConfig ι γ π ε ν) (coro : CoroutineState γ ε) (i : Instr γ ε),
+    i ≠ .halt →
+    cfg.costModel.stepCost i ≤ coro.costBudget →
+    ∃ coro' : CoroutineState γ ε,
+      chargeCost cfg coro i = some coro' ∧
+      coro'.costBudget + cfg.costModel.stepCost i = coro.costBudget ∧
+      coro'.costBudget < coro.costBudget
+
+theorem wp_lift_step_with_cost_holds : wp_lift_step_with_cost := by
+  intro ι γ π ε ν _ _ _ _ _ _ _ _ _ _ _ _ cfg coro i hNotHalt hAfford
+  refine ⟨{ coro with costBudget := coro.costBudget - cfg.costModel.stepCost i }, ?_, ?_, ?_⟩
+  · -- chargeCost succeeds when budget is sufficient
+    simp only [chargeCost]
+    split
+    next => rfl
+    next h => exact absurd hAfford h
+  · -- Budget conservation: (budget - cost) + cost = budget
+    exact Nat.sub_add_cancel hAfford
+  · -- Strict decrease: stepCost ≥ 1 from CostModel invariants
+    show coro.costBudget - cfg.costModel.stepCost i < coro.costBudget
+    have hCost : cfg.costModel.stepCost i ≥ 1 :=
+      Nat.le_trans cfg.costModel.hMinPos (cfg.costModel.hMinCost i hNotHalt)
+    omega
 
 def send_cost_plus_flow : Prop :=
   -- Information-theoretic send cost: for any label distribution at a

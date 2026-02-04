@@ -257,11 +257,11 @@ private theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
   | inl h2 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj12
       have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨h1, h2⟩
-      exact (by simpa [hEmpty] using hInter)
+      simp [hEmpty] at hInter
   | inr h3 =>
       have hEmpty : SessionsOf G₁ ∩ SessionsOf G₃ = (∅ : Set SessionId) := hDisj13
       have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₃ := ⟨h1, h3⟩
-      exact (by simpa [hEmpty] using hInter)
+      simp [hEmpty] at hInter
 
 private theorem SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
   ext s; constructor
@@ -319,7 +319,7 @@ private theorem lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G
         have hSid₂ : e.sid ∈ SessionsOf G₂ := ⟨e, L, hLookup, rfl⟩
         have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid₁, hSid₂⟩
         have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
-        exact (by simpa [hEmpty] using hInter)
+        simp [hEmpty] at hInter
 
 private theorem BuffersTyped_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
     (∀ e L, lookupG G e = some L → lookupG G' e = some L) →
@@ -609,8 +609,8 @@ private lemma findD_updateD_append_left {D D₂ : DEnv} {e e' : Edge} {ts : List
         have hA := findD_append_right (D₁:=updateD D e ts) (D₂:=D₂) (e:=e') hLeft''
         have hB := findD_append_right (D₁:=D) (D₂:=D₂) (e:=e') hLeft'
         have hRight : (updateD D e ts ++ D₂).find? e' = (D ++ D₂).find? e' := by
-          simp [hA, hB, hfind]
-        simpa [hLeft, hRight] using hfind
+          simp [hA, hB]
+        simp [hLeft, hRight]
 
 private lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : List ValType}
     (hNone : D₁.find? e = none) :
@@ -621,7 +621,7 @@ private lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : Lis
     have hRight : (D₁ ++ updateD D e ts).find? e = some ts := by
       have hFind : (updateD D e ts).find? e = some ts := findD_update_eq (env:=D) (e:=e) (ts:=ts)
       have hRight' := findD_append_right (D₁:=D₁) (D₂:=updateD D e ts) (e:=e) hNone
-      simpa [hRight', hFind]
+      simp [hRight', hFind]
     simp [hLeft, hRight]
   · have hLeft : (updateD (D₁ ++ D) e ts).find? e' = (D₁ ++ D).find? e' :=
       findD_update_neq (env:=D₁ ++ D) (e:=e) (e':=e') (ts:=ts) (by
@@ -641,7 +641,7 @@ private lemma findD_updateD_append_right {D₁ D : DEnv} {e e' : Edge} {ts : Lis
         have hB := findD_append_right (D₁:=D₁) (D₂:=D) (e:=e') hLeft'
         have hRight : (D₁ ++ updateD D e ts).find? e' = (D₁ ++ D).find? e' := by
           simp [hA, hB, hfind]
-        simpa [hLeft, hRight] using hfind
+        simp [hLeft, hRight]
 
 private lemma updateD_append_left (D D₂ : DEnv) (e : Edge) (ts : List ValType) :
     updateD (D ++ D₂) e ts = updateD D e ts ++ D₂ := by
@@ -669,7 +669,7 @@ private lemma updateG_append_right_hit {G₁ G₂ : GEnv} {e : Endpoint} {L : Lo
           | true =>
               have hLookup : lookupG ((e', L') :: tl) e = some L' := by
                 simp [lookupG, List.lookup, hEqb]
-              exact (by simpa [hLookup] using hNone)
+              simp [hLookup] at hNone
           | false =>
               have hNone' : lookupG tl e = none := by
                 simpa [lookupG, List.lookup, hEqb] using hNone
@@ -700,7 +700,7 @@ private theorem ValidLabels_preserved_frame_left
         intro hIn
         have hInter : e.sid ∈ SessionsOf G ∩ SessionsOf Gfr := ⟨hSid, hIn⟩
         have hEmpty : SessionsOf G ∩ SessionsOf Gfr = (∅ : Set SessionId) := hDisj
-        exact (by simpa [hEmpty] using hInter)
+        simp [hEmpty] at hInter
       have hDfrNone :
           Dfr.find? { sid := e.sid, sender := e.role, receiver := target } = none :=
         lookupD_none_of_disjointG (G₁:=G) (G₂:=Gfr) (D₂:=Dfr) hDisj hConsFr hSid
@@ -722,7 +722,7 @@ private theorem ValidLabels_preserved_frame_left
         | inr hRight =>
             cases hRight with
             | intro _ hRight =>
-                exact (by simpa [hGfrNone] using hRight)
+                simp [hGfrNone] at hRight
       have hG' : lookupG (G ++ Gfr) e = some (.send target T L) :=
         lookupG_append_left (G₁:=G) (G₂:=Gfr) hG
       have hValid' :=
@@ -753,7 +753,7 @@ private theorem ValidLabels_preserved_frame_left
         intro hIn
         have hInter : e.sid ∈ SessionsOf G ∩ SessionsOf Gfr := ⟨hSid, hIn⟩
         have hEmpty : SessionsOf G ∩ SessionsOf Gfr = (∅ : Set SessionId) := hDisj
-        exact (by simpa [hEmpty] using hInter)
+        simp [hEmpty] at hInter
       have hDfrNone :
           Dfr.find? { sid := e.sid, sender := e.role, receiver := target } = none :=
         lookupD_none_of_disjointG (G₁:=G) (G₂:=Gfr) (D₂:=Dfr) hDisj hConsFr hSid
@@ -775,7 +775,7 @@ private theorem ValidLabels_preserved_frame_left
         | inr hRight =>
             cases hRight with
             | intro _ hRight =>
-                exact (by simpa [hGfrNone] using hRight)
+                simp [hGfrNone] at hRight
       have hG' : lookupG (G ++ Gfr) e = some (.select target bs) :=
         lookupG_append_left (G₁:=G) (G₂:=Gfr) hG
       have hValid' :=
@@ -985,9 +985,7 @@ private theorem HeadCoherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
         intro hIn
         have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hSid⟩
         have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
-        have : e.sid ∈ (∅ : Set SessionId) := by
-          simpa [hEmpty] using hInter
-        exact this.elim
+        simp [hEmpty] at hInter
       have hG1none : lookupG G₁ { sid := e.sid, role := e.receiver } = none :=
         lookupG_none_of_not_session hNot
       have hG' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv := by
