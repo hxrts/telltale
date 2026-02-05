@@ -18,6 +18,9 @@ require mathlib from "/Users/hxrts/projects/lean_common/mathlib4"
 require paco from git
   "https://github.com/hxrts/paco-lean" @ "v0.1.3"
 
+-- Iris separation logic framework (local checkout).
+require iris from "/Users/hxrts/projects/iris-lean"
+
 /-- Global and local session type definitions. -/
 lean_lib SessionTypes where
   globs := #[`SessionTypes.*]

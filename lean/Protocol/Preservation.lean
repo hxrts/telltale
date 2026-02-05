@@ -146,58 +146,10 @@ private theorem SessionsOf_eq_of_TypedStep
       exact ih
   | seq_skip =>
       simp
-  | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
-      -- G' = G₁' ++ split.G2, G = split.G1 ++ split.G2
-      apply Set.ext; intro s; constructor
-      · intro hs
-        have hs' : s ∈ SessionsOf G₁' ∪ SessionsOf split.G2 :=
-          SessionsOf_append_subset (G₁:=G₁') (G₂:=split.G2) hs
-        cases hs' with
-        | inl hLeft =>
-            have hLeft' : s ∈ SessionsOf split.G1 := by simpa [ih] using hLeft
-            simpa [split.hG] using
-              (SessionsOf_append_left (G₁:=split.G1) (G₂:=split.G2) hLeft')
-        | inr hRight =>
-            simpa [split.hG] using
-              (SessionsOf_append_right (G₁:=split.G1) (G₂:=split.G2) hRight)
-      · intro hs
-        have hs' : s ∈ SessionsOf split.G1 ∪ SessionsOf split.G2 := by
-          have hs'' : s ∈ SessionsOf (split.G1 ++ split.G2) := by
-            simpa [split.hG] using hs
-          exact SessionsOf_append_subset (G₁:=split.G1) (G₂:=split.G2) hs''
-        cases hs' with
-        | inl hLeft =>
-            have hLeft' : s ∈ SessionsOf G₁' := by simpa [ih] using hLeft
-            exact SessionsOf_append_left (G₁:=G₁') (G₂:=split.G2) hLeft'
-        | inr hRight =>
-            exact SessionsOf_append_right (G₁:=G₁') (G₂:=split.G2) hRight
-  | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
-      -- G' = split.G1 ++ G₂', G = split.G1 ++ split.G2
-      apply Set.ext; intro s; constructor
-      · intro hs
-        have hs' : s ∈ SessionsOf split.G1 ∪ SessionsOf G₂' :=
-          SessionsOf_append_subset (G₁:=split.G1) (G₂:=G₂') hs
-        cases hs' with
-        | inl hLeft =>
-            simpa [split.hG] using
-              (SessionsOf_append_left (G₁:=split.G1) (G₂:=split.G2) hLeft)
-        | inr hRight =>
-            have hRight' : s ∈ SessionsOf split.G2 := by simpa [ih] using hRight
-            simpa [split.hG] using
-              (SessionsOf_append_right (G₁:=split.G1) (G₂:=split.G2) hRight')
-      · intro hs
-        have hs' : s ∈ SessionsOf split.G1 ∪ SessionsOf split.G2 := by
-          have hs'' : s ∈ SessionsOf (split.G1 ++ split.G2) := by
-            simpa [split.hG] using hs
-          exact SessionsOf_append_subset (G₁:=split.G1) (G₂:=split.G2) hs''
-        cases hs' with
-        | inl hLeft =>
-            exact SessionsOf_append_left (G₁:=split.G1) (G₂:=G₂') hLeft
-        | inr hRight =>
-            have hRight' : s ∈ SessionsOf G₂' := by simpa [ih] using hRight
-            exact SessionsOf_append_right (G₁:=split.G1) (G₂:=G₂') hRight'
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih
   | par_skip_left =>
       simp
   | par_skip_right =>
@@ -799,131 +751,10 @@ private theorem ValidLabels_preserved_frame_left
       exact ih hDisj hConsFr hValid hCoh hBT
   | seq_skip =>
       simpa using hValid
-  | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
-      -- Reassociate frames: frame is split.G2 ++ Gfr
-      have hDisj' : DisjointG (split.G1 ++ split.G2) Gfr := by
-        simpa [split.hG] using hDisj
-      have hSub : SessionsOf split.G1 ⊆ SessionsOf (split.G1 ++ split.G2) :=
-        SessionsOf_append_left (G₁:=split.G1) (G₂:=split.G2)
-      have hDisj1 : DisjointG split.G1 Gfr :=
-        DisjointG_of_subset_left hSub hDisj'
-      have hDisjFrame : DisjointG split.G1 (split.G2 ++ Gfr) :=
-        DisjointG_append_right hDisjG hDisj1
-      have hValid' :
-          ValidLabels (split.G1 ++ (split.G2 ++ Gfr)) (D₁ ++ (D₂ ++ Dfr)) bufs := by
-        simpa [split.hG, List.append_assoc] using hValid
-      have hCoh' :
-          Coherent (split.G1 ++ (split.G2 ++ Gfr)) (D₁ ++ (D₂ ++ Dfr)) := by
-        have hEq : ∀ e, lookupD ((D₁ ++ D₂) ++ Dfr) e = lookupD (D₁ ++ (D₂ ++ Dfr)) e :=
-          lookupD_append_assoc (D₁:=D₁) (D₂:=D₂) (D₃:=Dfr)
-        have hCoh'' : Coherent ((split.G1 ++ split.G2) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) := by
-          simpa [split.hG, List.append_assoc] using hCoh
-        exact Coherent_rewriteD hEq (by simpa [List.append_assoc] using hCoh'')
-      have hBT' :
-          BuffersTyped (split.G1 ++ (split.G2 ++ Gfr)) (D₁ ++ (D₂ ++ Dfr)) bufs := by
-        have hEq : ∀ e, lookupD ((D₁ ++ D₂) ++ Dfr) e = lookupD (D₁ ++ (D₂ ++ Dfr)) e :=
-          lookupD_append_assoc (D₁:=D₁) (D₂:=D₂) (D₃:=Dfr)
-        have hBT'' : BuffersTyped ((split.G1 ++ split.G2) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) bufs := by
-          simpa [split.hG, List.append_assoc] using hBT
-        exact BuffersTyped_rewriteD hEq (by simpa [List.append_assoc] using hBT'')
-      have hConsFrame : DConsistent (split.G2 ++ Gfr) (D₂ ++ Dfr) :=
-        DConsistent_append hConsR hConsFr
-      have hIH := ih (Gfr:=split.G2 ++ Gfr) (Dfr:=D₂ ++ Dfr) hDisjFrame hConsFrame hValid' hCoh' hBT'
-      simpa [List.append_assoc] using hIH
-  | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
-      -- Reassociate frames: frame is split.G1 ++ Gfr, but step is on split.G2
-      have hDisj' : DisjointG (split.G1 ++ split.G2) Gfr := by
-        simpa [split.hG] using hDisj
-      have hSub : SessionsOf split.G2 ⊆ SessionsOf (split.G1 ++ split.G2) :=
-        SessionsOf_append_right (G₁:=split.G1) (G₂:=split.G2)
-      have hDisj2 : DisjointG split.G2 Gfr :=
-        DisjointG_of_subset_left hSub hDisj'
-      have hDisjFrame : DisjointG split.G2 (split.G1 ++ Gfr) := by
-        have hDisjGsym : DisjointG split.G2 split.G1 := DisjointG_symm hDisjG
-        exact DisjointG_append_right hDisjGsym hDisj2
-      have hValidMerged :
-          ValidLabels ((split.G1 ++ split.G2) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) bufs := by
-        simpa [split.hG, List.append_assoc] using hValid
-      have hValidSwapG :
-          ValidLabels ((split.G2 ++ split.G1) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) bufs := by
-        have hEq :
-            ∀ ep,
-              lookupG ((split.G1 ++ split.G2) ++ Gfr) ep =
-                lookupG ((split.G2 ++ split.G1) ++ Gfr) ep := by
-          intro ep
-          simpa [List.append_assoc] using
-            (lookupG_swap_left (G₁:=split.G1) (G₂:=split.G2) (G₃:=Gfr) hDisjG ep)
-        exact ValidLabels_mono hEq hValidMerged
-      have hValid' :
-          ValidLabels (split.G2 ++ (split.G1 ++ Gfr)) (D₂ ++ (D₁ ++ Dfr)) bufs := by
-        simpa [List.append_assoc, ValidLabels] using hValidSwapG
-      have hCohMerged :
-          Coherent ((split.G1 ++ split.G2) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) := by
-        simpa [split.hG, List.append_assoc] using hCoh
-      have hCohSwapG :
-          Coherent ((split.G2 ++ split.G1) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) := by
-        have hEq :
-            ∀ ep,
-              lookupG ((split.G1 ++ split.G2) ++ Gfr) ep =
-                lookupG ((split.G2 ++ split.G1) ++ Gfr) ep := by
-          intro ep
-          simpa [List.append_assoc] using
-            (lookupG_swap_left (G₁:=split.G1) (G₂:=split.G2) (G₃:=Gfr) hDisjG ep)
-        exact Coherent_mono hEq hCohMerged
-      have hCohSwapD :
-          Coherent ((split.G2 ++ split.G1) ++ Gfr) ((D₂ ++ D₁) ++ Dfr) :=
-        Coherent_rewriteD (lookupD_swap_left (D₁:=D₁) (D₂:=D₂) (D₃:=Dfr) hDisjD) hCohSwapG
-      have hCohAssoc :
-          Coherent ((split.G2 ++ split.G1) ++ Gfr) (D₂ ++ (D₁ ++ Dfr)) :=
-        Coherent_rewriteD (lookupD_append_assoc (D₁:=D₂) (D₂:=D₁) (D₃:=Dfr)) hCohSwapD
-      have hCoh' :
-          Coherent (split.G2 ++ (split.G1 ++ Gfr)) (D₂ ++ (D₁ ++ Dfr)) := by
-        simpa [List.append_assoc] using hCohAssoc
-      have hBTMerged :
-          BuffersTyped ((split.G1 ++ split.G2) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) bufs := by
-        simpa [split.hG, List.append_assoc] using hBT
-      have hBTSwapG :
-          BuffersTyped ((split.G2 ++ split.G1) ++ Gfr) ((D₁ ++ D₂) ++ Dfr) bufs := by
-        apply BuffersTyped_mono (G:=((split.G1 ++ split.G2) ++ Gfr))
-          (G':=((split.G2 ++ split.G1) ++ Gfr))
-        · intro ep L hLookup
-          have hEq :=
-            lookupG_swap_left (G₁:=split.G1) (G₂:=split.G2) (G₃:=Gfr) hDisjG ep
-          simpa [hEq, List.append_assoc] using hLookup
-        · exact hBTMerged
-      have hBTSwapD :
-          BuffersTyped ((split.G2 ++ split.G1) ++ Gfr) ((D₂ ++ D₁) ++ Dfr) bufs :=
-        BuffersTyped_rewriteD (lookupD_swap_left (D₁:=D₁) (D₂:=D₂) (D₃:=Dfr) hDisjD) hBTSwapG
-      have hBTAssoc :
-          BuffersTyped ((split.G2 ++ split.G1) ++ Gfr) (D₂ ++ (D₁ ++ Dfr)) bufs :=
-        BuffersTyped_rewriteD (lookupD_append_assoc (D₁:=D₂) (D₂:=D₁) (D₃:=Dfr)) hBTSwapD
-      have hBT' :
-          BuffersTyped (split.G2 ++ (split.G1 ++ Gfr)) (D₂ ++ (D₁ ++ Dfr)) bufs := by
-        simpa [List.append_assoc] using hBTAssoc
-      have hConsFrame : DConsistent (split.G1 ++ Gfr) (D₁ ++ Dfr) :=
-        DConsistent_append hConsL hConsFr
-      have hIH := ih (Gfr:=split.G1 ++ Gfr) (Dfr:=D₁ ++ Dfr) hDisjFrame hConsFrame hValid' hCoh' hBT'
-      have hSubG : SessionsOf G₂' ⊆ SessionsOf split.G2 :=
-        SessionsOf_subset_of_TypedStep hTS
-      have hDisjG' : DisjointG G₂' split.G1 :=
-        DisjointG_of_subset_left (G₁:=split.G2) (G₁':=G₂') (G₂:=split.G1) hSubG (DisjointG_symm hDisjG)
-      have hDisjGsym : DisjointG split.G1 G₂' := DisjointG_symm hDisjG'
-      have hEqG :
-          ∀ ep, lookupG (G₂' ++ (split.G1 ++ Gfr)) ep =
-            lookupG (split.G1 ++ (G₂' ++ Gfr)) ep := by
-        intro ep
-        have hEq :=
-          lookupG_swap_left (G₁:=split.G1) (G₂:=G₂') (G₃:=Gfr) hDisjGsym ep
-        simpa using hEq.symm
-      have hIH' :
-          ValidLabels (split.G1 ++ (G₂' ++ Gfr)) (D₂' ++ (D₁ ++ Dfr)) bufs' :=
-        ValidLabels_mono hEqG hIH
-      have hIH'' :
-          ValidLabels (split.G1 ++ (G₂' ++ Gfr)) ((D₁ ++ D₂') ++ Dfr) bufs' := by
-        simpa [ValidLabels, List.append_assoc] using hIH'
-      simpa [split.hG, List.append_assoc] using hIH''
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hDisj hConsFr hValid hCoh hBT
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hDisj hConsFr hValid hCoh hBT
   | par_skip_left =>
       simpa using hValid
   | par_skip_right =>
@@ -1089,32 +920,10 @@ private theorem typed_step_preserves_headcoherent
       exact ih hHead hCoh
   | seq_skip =>
       simpa using hHead
-  | par_left split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
-      have hHeadMerged : HeadCoherent (split.G1 ++ split.G2) (D₁ ++ D₂) := by
-        simpa [split.hG] using hHead
-      have hHeadL : HeadCoherent split.G1 D₁ := HeadCoherent_split_left hHeadMerged hDisjG hConsR
-      have hHeadR : HeadCoherent split.G2 D₂ := HeadCoherent_split_right hHeadMerged hDisjG hConsL
-      have hConsL' : DConsistent G₁' D₁' := DConsistent_preserved hStep hConsL
-      have hHeadL' : HeadCoherent G₁' D₁' := ih hHeadL (Coherent_split_left (G₁:=split.G1) (G₂:=split.G2) (D₁:=D₁) (D₂:=D₂)
-        (by simpa [split.hG] using hCoh) hDisjG)
-      have hMerged :=
-        HeadCoherent_merge hHeadL' hHeadR (DisjointG_of_subset_left (SessionsOf_subset_of_TypedStep hStep) hDisjG)
-          hConsL' hConsR
-      simpa using hMerged
-  | par_right split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
-      have hHeadMerged : HeadCoherent (split.G1 ++ split.G2) (D₁ ++ D₂) := by
-        simpa [split.hG] using hHead
-      have hHeadL : HeadCoherent split.G1 D₁ := HeadCoherent_split_left hHeadMerged hDisjG hConsR
-      have hHeadR : HeadCoherent split.G2 D₂ := HeadCoherent_split_right hHeadMerged hDisjG hConsL
-      have hConsR' : DConsistent G₂' D₂' := DConsistent_preserved hStep hConsR
-      have hHeadR' : HeadCoherent G₂' D₂' := ih hHeadR (Coherent_split_right (G₁:=split.G1) (G₂:=split.G2) (D₁:=D₁) (D₂:=D₂)
-        (by simpa [split.hG] using hCoh) hDisjG hConsL)
-      have hMerged :=
-        HeadCoherent_merge hHeadL hHeadR' (DisjointG_symm (DisjointG_of_subset_left (SessionsOf_subset_of_TypedStep hStep) (DisjointG_symm hDisjG)))
-          hConsL hConsR'
-      simpa using hMerged
+  | par_left split hSlen hGlen hStep hDisjG hDisjD hDisjS ih =>
+      exact ih hHead hCoh
+  | par_right split hSlen hGlen hStep hDisjG hDisjD hDisjS ih =>
+      exact ih hHead hCoh
   | par_skip_left =>
       simpa using hHead
   | par_skip_right =>
@@ -1140,7 +949,7 @@ theorem preservation_typed
   have hValid' : ValidLabels G' D' bufs' := ValidLabels_preserved hTS hValid hCoh hBT
   have hCompat' : Compatible G' D' := Compatible_preserved hCompat hTS
   have hDisjS' : DisjointS Ssh Sown' :=
-    DisjointS_preserved_TypedStep_right (S1:=Ssh) hTS hDisjS
+    DisjointS_preserved_TypedStep_right hTS hPre hDisjS
   have hOwn' : OwnedDisjoint Sown' := OwnedDisjoint_preserved_TypedStep hTS hOwn
   have hCons' : DConsistent G' D' := DConsistent_preserved hTS hCons
   have hStoreTyped : StoreTyped G (SEnvAll Ssh Sown) store := hStore.toStoreTyped
@@ -1525,7 +1334,7 @@ private lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             simp [frameConfigRight]
           simpa [hEq] using (Step.base hStep')
       | par_skip_left hProc =>
-          rename_i Ccfg Q
+          rename_i Ccfg Q nS nG
           have hStep' : StepBase (frameConfigRight Ccfg Gfr Dfr)
               { frameConfigRight Ccfg Gfr Dfr with proc := Q } :=
             StepBase.par_skip_left (C:=frameConfigRight Ccfg Gfr Dfr) (Q:=Q)
@@ -1536,7 +1345,7 @@ private lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             simp [frameConfigRight]
           simpa [hEq] using (Step.base hStep')
       | par_skip_right hProc =>
-          rename_i Ccfg P
+          rename_i Ccfg P nS nG
           have hStep' : StepBase (frameConfigRight Ccfg Gfr Dfr)
               { frameConfigRight Ccfg Gfr Dfr with proc := P } :=
             StepBase.par_skip_right (C:=frameConfigRight Ccfg Gfr Dfr) (P:=P)
@@ -1555,16 +1364,16 @@ private lemma step_frame_right {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
       have hSub' := ih hDisj'
       simpa [frameConfigRight] using (Step.seq_left hProc' hSub')
   | par_left hProc hSub ih =>
-      rename_i Ccfg Ccfg' P Q
-      have hProc' : (frameConfigRight Ccfg Gfr Dfr).proc = .par P Q := by
+      rename_i Ccfg Ccfg' P Q nS nG nS' nG'
+      have hProc' : (frameConfigRight Ccfg Gfr Dfr).proc = .par nS nG P Q := by
         simpa [frameConfigRight] using hProc
       have hDisj' : DisjointG { Ccfg with proc := P }.G Gfr := by
         simpa using hDisj
       have hSub' := ih hDisj'
       simpa [frameConfigRight] using (Step.par_left hProc' hSub')
   | par_right hProc hSub ih =>
-      rename_i Ccfg Ccfg' P Q
-      have hProc' : (frameConfigRight Ccfg Gfr Dfr).proc = .par P Q := by
+      rename_i Ccfg Ccfg' P Q nS nG nS' nG'
+      have hProc' : (frameConfigRight Ccfg Gfr Dfr).proc = .par nS nG P Q := by
         simpa [frameConfigRight] using hProc
       have hDisj' : DisjointG { Ccfg with proc := Q }.G Gfr := by
         simpa using hDisj
@@ -1775,7 +1584,7 @@ private lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             simp [frameConfigLeft]
           simpa [hEq] using (Step.base hStep')
       | par_skip_left hProc =>
-          rename_i Ccfg Q
+          rename_i Ccfg Q nS nG
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
               { frameConfigLeft Ccfg Gfr Dfr with proc := Q } :=
             StepBase.par_skip_left (C:=frameConfigLeft Ccfg Gfr Dfr) (Q:=Q)
@@ -1786,7 +1595,7 @@ private lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
             simp [frameConfigLeft]
           simpa [hEq] using (Step.base hStep')
       | par_skip_right hProc =>
-          rename_i Ccfg P
+          rename_i Ccfg P nS nG
           have hStep' : StepBase (frameConfigLeft Ccfg Gfr Dfr)
               { frameConfigLeft Ccfg Gfr Dfr with proc := P } :=
             StepBase.par_skip_right (C:=frameConfigLeft Ccfg Gfr Dfr) (P:=P)
@@ -1805,16 +1614,16 @@ private lemma step_frame_left {C C' : Config} {Gfr : GEnv} {Dfr : DEnv} :
       have hSub' := ih hDisj'
       simpa [frameConfigLeft] using (Step.seq_left hProc' hSub')
   | par_left hProc hSub ih =>
-      rename_i Ccfg Ccfg' P Q
-      have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par P Q := by
+      rename_i Ccfg Ccfg' P Q nS nG nS' nG'
+      have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par nS nG P Q := by
         simpa [frameConfigLeft] using hProc
       have hDisj' : DisjointG Gfr { Ccfg with proc := P }.G := by
         simpa using hDisj
       have hSub' := ih hDisj'
       simpa [frameConfigLeft] using (Step.par_left hProc' hSub')
   | par_right hProc hSub ih =>
-      rename_i Ccfg Ccfg' P Q
-      have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par P Q := by
+      rename_i Ccfg Ccfg' P Q nS nG nS' nG'
+      have hProc' : (frameConfigLeft Ccfg Gfr Dfr).proc = .par nS nG P Q := by
         simpa [frameConfigLeft] using hProc
       have hDisj' : DisjointG Gfr { Ccfg with proc := Q }.G := by
         simpa using hDisj
@@ -1892,35 +1701,36 @@ theorem subject_reduction {n : SessionId}
   | seq_skip =>
       refine Step.base ?_
       exact StepBase.seq2 rfl
-  | par_left split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'
+  | par_left split hSlen hGlen hStep hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG
       let C0 : Config :=
-        { proc := P, store := store, bufs := bufs, G := split.G1, D := D₁, nextSid := n }
+        { proc := P, store := store, bufs := bufs, G := G, D := D₁ ++ D₂, nextSid := n }
       let C0' : Config :=
-        { proc := P', store := store', bufs := bufs', G := G₁', D := D₁', nextSid := n }
-      have hSub : Step (frameConfigRight C0 split.G2 D₂) (frameConfigRight C0' split.G2 D₂) :=
-        step_frame_right (C:=C0) (C':=C0') (Gfr:=split.G2) (Dfr:=D₂) hDisjG hConsR ih
+        { proc := P', store := store', bufs := bufs', G := G₁' ++ split.G2, D := D₁' ++ D₂, nextSid := n }
+      have hSub : Step C0 C0' := by
+        simpa [C0, C0'] using ih
       let C : Config :=
-        { proc := .par P Q, store := store, bufs := bufs, G := G, D := D₁ ++ D₂, nextSid := n }
-      have hSub' : Step { C with proc := P } (frameConfigRight C0' split.G2 D₂) := by
-        simpa [C, C0, frameConfigRight, split.hG] using hSub
-      have hProc : C.proc = .par P Q := rfl
-      simpa [C, C0', frameConfigRight] using (Step.par_left hProc hSub')
-  | par_right split hStep hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'
+        { proc := .par nS nG P Q, store := store, bufs := bufs, G := G, D := D₁ ++ D₂, nextSid := n }
+      have hSub' : Step { C with proc := P } C0' := by
+        simpa [C, C0] using hSub
+      have hProc : C.proc = .par nS nG P Q := rfl
+      simpa [C, C0'] using
+        (Step.par_left (nS':=S₁'.length) (nG':=G₁'.length) hProc hSub')
+  | par_right split hSlen hGlen hStep hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG
       let C0 : Config :=
-        { proc := Q, store := store, bufs := bufs, G := split.G2, D := D₂, nextSid := n }
+        { proc := Q, store := store, bufs := bufs, G := G, D := D₁ ++ D₂, nextSid := n }
       let C0' : Config :=
-        { proc := Q', store := store', bufs := bufs', G := G₂', D := D₂', nextSid := n }
-      have hSub : Step (frameConfigLeft C0 split.G1 D₁) (frameConfigLeft C0' split.G1 D₁) :=
-        step_frame_left (C:=C0) (C':=C0') (Gfr:=split.G1) (Dfr:=D₁)
-          hDisjG hConsL ih
+        { proc := Q', store := store', bufs := bufs', G := split.G1 ++ G₂', D := D₁ ++ D₂', nextSid := n }
+      have hSub : Step C0 C0' := by
+        simpa [C0, C0'] using ih
       let C : Config :=
-        { proc := .par P Q, store := store, bufs := bufs, G := G, D := D₁ ++ D₂, nextSid := n }
-      have hSub' : Step { C with proc := Q } (frameConfigLeft C0' split.G1 D₁) := by
-        simpa [C, C0, frameConfigLeft, split.hG] using hSub
-      have hProc : C.proc = .par P Q := rfl
-      simpa [C, C0', frameConfigLeft] using (Step.par_right hProc hSub')
+        { proc := .par nS nG P Q, store := store, bufs := bufs, G := G, D := D₁ ++ D₂, nextSid := n }
+      have hSub' : Step { C with proc := Q } C0' := by
+        simpa [C, C0] using hSub
+      have hProc : C.proc = .par nS nG P Q := rfl
+      simpa [C, C0'] using
+        (Step.par_right (nS':=split.S1.length) (nG':=split.G1.length) hProc hSub')
   | par_skip_left =>
       refine Step.base ?_
       exact StepBase.par_skip_left rfl

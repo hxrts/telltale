@@ -287,38 +287,16 @@ theorem SessionsOf_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' st
       exact ih
   | seq_skip =>
       simp
-  | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG
       intro s hs
-      have hs' : s ∈ SessionsOf G₁' ∪ SessionsOf split.G2 :=
-        SessionsOf_append_subset (G₁:=G₁') (G₂:=split.G2) hs
-      have hs'' : s ∈ SessionsOf split.G1 ∪ SessionsOf split.G2 := by
-        cases hs' with
-        | inl hleft => exact Or.inl (ih hleft)
-        | inr hright => exact Or.inr hright
-      have hUnion : SessionsOf split.G1 ∪ SessionsOf split.G2 ⊆ SessionsOf (split.G1 ++ split.G2) := by
-        intro s' hs'
-        cases hs' with
-        | inl hleft => exact SessionsOf_append_left (G₂:=split.G2) hleft
-        | inr hright => exact SessionsOf_append_right (G₁:=split.G1) hright
-      have : s ∈ SessionsOf (split.G1 ++ split.G2) := hUnion hs''
-      simpa [split.hG] using this
-  | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
+      have hIn : s ∈ SessionsOf G := ih hs
+      simpa [split.hG] using hIn
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG
       intro s hs
-      have hs' : s ∈ SessionsOf split.G1 ∪ SessionsOf G₂' :=
-        SessionsOf_append_subset (G₁:=split.G1) (G₂:=G₂') hs
-      have hs'' : s ∈ SessionsOf split.G1 ∪ SessionsOf split.G2 := by
-        cases hs' with
-        | inl hleft => exact Or.inl hleft
-        | inr hright => exact Or.inr (ih hright)
-      have hUnion : SessionsOf split.G1 ∪ SessionsOf split.G2 ⊆ SessionsOf (split.G1 ++ split.G2) := by
-        intro s' hs'
-        cases hs' with
-        | inl hleft => exact SessionsOf_append_left (G₂:=split.G2) hleft
-        | inr hright => exact SessionsOf_append_right (G₁:=split.G1) hright
-      have : s ∈ SessionsOf (split.G1 ++ split.G2) := hUnion hs''
-      simpa [split.hG] using this
+      have hIn : s ∈ SessionsOf G := ih hs
+      simpa [split.hG] using hIn
   | par_skip_left =>
       simp
   | par_skip_right =>

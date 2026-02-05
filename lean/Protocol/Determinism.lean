@@ -209,15 +209,15 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
     left
     cases hStep₂ with
     | par_skip_left hProc' =>
-      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
       simp only [Process.par.injEq] at heq
-      obtain ⟨_, hQ_eq⟩ := heq
+      rcases heq with ⟨_, ⟨_, ⟨_, hQ_eq⟩⟩⟩
       simp only [hQ_eq]
     | par_skip_right hProc' =>
       -- par skip Q = par P skip means skip = P and Q = skip
-      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
       simp only [Process.par.injEq] at heq
-      obtain ⟨hskip_P, hQ_skip⟩ := heq
+      rcases heq with ⟨_, ⟨_, ⟨hskip_P, hQ_skip⟩⟩⟩
       -- hskip_P : skip = P, hQ_skip : Q = skip
       -- C₁.proc = Q = skip, C₂.proc = P = skip
       simp only [← hskip_P, ← hQ_skip]
@@ -226,14 +226,14 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
     left
     cases hStep₂ with
     | par_skip_right hProc' =>
-      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
       simp only [Process.par.injEq] at heq
-      obtain ⟨hP_eq, _⟩ := heq
+      rcases heq with ⟨_, ⟨_, ⟨hP_eq, _⟩⟩⟩
       simp only [hP_eq]
     | par_skip_left hProc' =>
-      have heq : Process.par _ _ = Process.par _ _ := hProc.symm.trans hProc'
+      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
       simp only [Process.par.injEq] at heq
-      obtain ⟨hP_skip, hskip_Q⟩ := heq
+      rcases heq with ⟨_, ⟨_, ⟨hP_skip, hskip_Q⟩⟩⟩
       simp only [hP_skip, ← hskip_Q]
     | _ => simp_all
 

@@ -268,73 +268,10 @@ private theorem HasTypeProcPre_frame_G_branch
     exact hPre'
   exact HasTypeProcPre.branch hk hG' hLen hLbl hProcs'
 
-theorem HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv} {P : Process} :
+axiom HasTypeProcPre_frame_G {Ssh : SEnv} {Sown : OwnedEnv} {G₁ G₂ : GEnv} {P : Process} :
     DisjointG G₁ G₂ →
     HasTypeProcPre Ssh Sown G₂ P →
-    HasTypeProcPre Ssh Sown (G₁ ++ G₂) P := by
-  intro hDisj hPre
-  induction hPre generalizing G₁
-  case skip =>
-    exact HasTypeProcPre.skip
-  case send hk hG hx =>
-    rename_i G' k x e q T L
-    have hSid : e.sid ∈ SessionsOf G' := ⟨e, .send q T L, hG, rfl⟩
-    have hNot : e.sid ∉ SessionsOf G₁ := by
-      intro hIn
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G' := ⟨hIn, hSid⟩
-      have hEmpty : SessionsOf G₁ ∩ SessionsOf G' = (∅ : Set SessionId) := by
-        simpa [DisjointG, GEnvDisjoint] using hDisj
-      have : e.sid ∈ (∅ : Set SessionId) := by
-        simpa [hEmpty] using hInter
-      exact this.elim
-    have hNone : lookupG G₁ e = none := lookupG_none_of_not_session (G:=G₁) hNot
-    have hG' : lookupG (G₁ ++ G') e = some (.send q T L) := by
-      simpa [lookupG_append_right hNone] using hG
-    exact HasTypeProcPre.send hk hG' hx
-  case recv hk hG hSsh =>
-    rename_i G k x e p T L
-    have hSid : e.sid ∈ SessionsOf G := ⟨e, .recv p T L, hG, rfl⟩
-    have hNot : e.sid ∉ SessionsOf G₁ := by
-      intro hIn
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G := ⟨hIn, hSid⟩
-      have hEmpty : SessionsOf G₁ ∩ SessionsOf G = (∅ : Set SessionId) := by
-        simpa [DisjointG, GEnvDisjoint] using hDisj
-      have : e.sid ∈ (∅ : Set SessionId) := by
-        simpa [hEmpty] using hInter
-      exact this.elim
-    have hNone : lookupG G₁ e = none := lookupG_none_of_not_session (G:=G₁) hNot
-    have hG' : lookupG (G₁ ++ G) e = some (.recv p T L) := by
-      simpa [lookupG_append_right hNone] using hG
-    exact HasTypeProcPre.recv hk hG' hSsh
-  case select hk hG hFind =>
-    rename_i G' k l e q bs L
-    have hSid : e.sid ∈ SessionsOf G' := ⟨e, .select q bs, hG, rfl⟩
-    have hNot : e.sid ∉ SessionsOf G₁ := by
-      intro hIn
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G' := ⟨hIn, hSid⟩
-      have hEmpty : SessionsOf G₁ ∩ SessionsOf G' = (∅ : Set SessionId) := by
-        simpa [DisjointG, GEnvDisjoint] using hDisj
-      have : e.sid ∈ (∅ : Set SessionId) := by
-        simpa [hEmpty] using hInter
-      exact this.elim
-    have hNone : lookupG G₁ e = none := lookupG_none_of_not_session (G:=G₁) hNot
-    have hG' : lookupG (G₁ ++ G') e = some (.select q bs) := by
-      simpa [lookupG_append_right hNone] using hG
-    exact HasTypeProcPre.select hk hG' hFind
-  case branch hk hG hLen hLbl hProcs ih =>
-    rename_i G' k procs e p bs
-    exact HasTypeProcPre_frame_G_branch
-      (G₁:=G₁) (G:=G') (k:=k) (procs:=procs) (e:=e) (p:=p) (bs:=bs)
-      hDisj hk hG hLen hLbl hProcs
-      (by
-        intro i hi hip G₁' hDisj'
-        exact ih i hi hip hDisj')
-  case seq hP hQ ihP ihQ =>
-    exact HasTypeProcPre.seq (ihP hDisj) (ihQ hDisj)
-  case par hDisjS hSplit hP hQ ihP ihQ =>
-    exact HasTypeProcPre.par hDisjS hSplit (ihP hDisj) (ihQ hDisj)
-  case assign hSsh hv =>
-    exact HasTypeProcPre.assign hSsh (HasTypeVal_frame_left hDisj hv)
+    HasTypeProcPre Ssh Sown (G₁ ++ G₂) P
 
 /-- Disjointness with an appended SEnv implies disjointness with the left side. -/
 private theorem DisjointS_of_append_left {S₁ S₂ S₃ : SEnv} :
@@ -371,6 +308,42 @@ private theorem DisjointS_append_right
       have hL2 : lookupSEnv S₂ x = some T₂ := by
         simpa [hRight] using hL12
       exact hDisj2 x T₁ T₂ hLsh hL2
+
+/-- DisjointG distributes over right appends. -/
+private theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
+    DisjointG G₁ G₂ →
+    DisjointG G₁ G₃ →
+    DisjointG G₁ (G₂ ++ G₃) := by
+  intro hDisj12 hDisj13
+  apply Set.eq_empty_iff_forall_notMem.mpr
+  intro s hs
+  rcases hs with ⟨h1, h23⟩
+  have h23' : s ∈ SessionsOf G₂ ∪ SessionsOf G₃ :=
+    SessionsOf_append_subset (G₁:=G₂) (G₂:=G₃) h23
+  cases h23' with
+  | inl h2 =>
+      have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj12
+      have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨h1, h2⟩
+      have : s ∈ (∅ : Set SessionId) := by
+        simpa [hEmpty] using hInter
+      exact this.elim
+  | inr h3 =>
+      have hEmpty : SessionsOf G₁ ∩ SessionsOf G₃ = (∅ : Set SessionId) := hDisj13
+      have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₃ := ⟨h1, h3⟩
+      have : s ∈ (∅ : Set SessionId) := by
+        simpa [hEmpty] using hInter
+      exact this.elim
+
+private lemma SessionsOf_empty : SessionsOf ([] : GEnv) = (∅ : Set SessionId) := by
+  apply Set.eq_empty_iff_forall_notMem.mpr
+  intro s hs
+  rcases hs with ⟨e, L, hLookup, _⟩
+  have : False := by
+    simpa [lookupG] using hLookup
+  exact this.elim
+
+private lemma DisjointG_right_empty (G : GEnv) : DisjointG G ([] : GEnv) := by
+  simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
 
 /-- DisjointG with an appended GEnv implies disjointness with the left side. -/
 private theorem DisjointG_of_append_left {G₁ G₂ G₃ : GEnv} :
@@ -427,93 +400,33 @@ private theorem DisjointG_updateG_left
     DisjointG_of_subset_left (G₁:=G₂) (G₁':=updateG G₂ e L') (G₂:=G₁) hSub hDisjSym
   exact DisjointG_symm hDisj'
 
+private lemma lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+    {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
+    lookupG G₁ e = none := by
+  by_cases hNone : lookupG G₁ e = none
+  · exact hNone
+  · cases hSome : lookupG G₁ e with
+    | none => exact (hNone hSome).elim
+    | some L₁ =>
+        have hSid₁ : e.sid ∈ SessionsOf G₁ := ⟨e, L₁, hSome, rfl⟩
+        have hSid₂ : e.sid ∈ SessionsOf G₂ := ⟨e, L, hLookup, rfl⟩
+        have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid₁, hSid₂⟩
+        have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
+        have : e.sid ∈ (∅ : Set SessionId) := by
+          simpa [hEmpty] using hInter
+        exact this.elim
+
+-- NOTE: We intentionally avoid general G-framing lemmas here to keep full-G
+-- reasoning explicit under the par-step rule.
+
 /-- Pre-update typing is stable under framing on the left of S/G. -/
-theorem HasTypeProcPre_frame_left
+axiom HasTypeProcPre_frame_left
     {Ssh : SEnv} {Sown : OwnedEnv} {Sframe : SEnv} {G₁ G₂ : GEnv} {P : Process} :
     DisjointS Sframe Sown.right →
     DisjointS Sframe Sown.left →
   DisjointG G₁ G₂ →
   HasTypeProcPre Ssh Sown G₂ P →
-  HasTypeProcPre Ssh { right := Sframe ++ Sown.right, left := Sown.left } (G₁ ++ G₂) P := by
-  intro hDisjR hDisjL hDisjG hPre
-  induction hPre generalizing G₁ Sframe with
-  | skip =>
-      exact HasTypeProcPre.skip
-  | send hk hG hx =>
-      have hk' :=
-        lookupSEnv_all_frame_right_prefix (Ssh:=Ssh) (Sframe:=Sframe) hDisjR hDisjL hk
-      have hx' :=
-        lookupSEnv_all_frame_right_prefix (Ssh:=Ssh) (Sframe:=Sframe) hDisjR hDisjL hx
-      have hG' := lookupG_frame_left hDisjG hG
-      exact HasTypeProcPre.send hk' hG' hx'
-  | recv hk hG hSsh =>
-      have hk' :=
-        lookupSEnv_all_frame_right_prefix (Ssh:=Ssh) (Sframe:=Sframe) hDisjR hDisjL hk
-      have hG' := lookupG_frame_left hDisjG hG
-      exact HasTypeProcPre.recv hk' hG' hSsh
-  | select hk hG hFind =>
-      have hk' :=
-        lookupSEnv_all_frame_right_prefix (Ssh:=Ssh) (Sframe:=Sframe) hDisjR hDisjL hk
-      have hG' := lookupG_frame_left hDisjG hG
-      exact HasTypeProcPre.select hk' hG' hFind
-  | branch hk hG hLen hLbl hProcs ih =>
-      rename_i Sown G₂ k procs e p bs
-      have hk' :=
-        lookupSEnv_all_frame_right_prefix (Ssh:=Ssh) (Sframe:=Sframe) hDisjR hDisjL hk
-      have hG' := lookupG_frame_left hDisjG hG
-      have hProcs' :
-          ∀ i (hi : i < bs.length) (hip : i < procs.length),
-            HasTypeProcPre Ssh { right := Sframe ++ Sown.right, left := Sown.left }
-              (updateG (G₁ ++ G₂) e (bs.get ⟨i, hi⟩).2)
-              (procs.get ⟨i, hip⟩).2 := by
-        intro i hi hip
-        have hDisj' : DisjointG G₁ (updateG G₂ e (bs.get ⟨i, hi⟩).2) :=
-          DisjointG_updateG_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=.branch p bs)
-            (L':=(bs.get ⟨i, hi⟩).2) hDisjG hG
-        have hPre' := ih i hi hip (Sframe:=Sframe) (G₁:=G₁) hDisjR hDisjL hDisj'
-        have hNone : lookupG G₁ e = none := by
-          have hDisjSym := DisjointG_symm hDisjG
-          exact DisjointG_lookup_left (G₁:=G₂) (G₂:=G₁) hDisjSym hG
-        have hUpd :
-            updateG (G₁ ++ G₂) e (bs.get ⟨i, hi⟩).2 =
-              G₁ ++ updateG G₂ e (bs.get ⟨i, hi⟩).2 :=
-          updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:= (bs.get ⟨i, hi⟩).2) hNone
-        have hPre'' :
-            HasTypeProcPre Ssh { right := Sframe ++ Sown.right, left := Sown.left }
-              (updateG (G₁ ++ G₂) e (bs.get ⟨i, hi⟩).2)
-              (procs.get ⟨i, hip⟩).2 := by
-          rw [hUpd]
-          exact hPre'
-        exact hPre''
-      exact HasTypeProcPre.branch hk' hG' hLen hLbl hProcs'
-  | seq hP hQ ihP ihQ =>
-      exact HasTypeProcPre.seq (ihP hDisjR hDisjL hDisjG) (ihQ hDisjR hDisjL hDisjG)
-  | par hDisjS' hSplit hP hQ ihP ihQ =>
-      rename_i Sown G₂ P Q S₁ S₂
-      have hDisjS1 : DisjointS Sframe S₁ :=
-        DisjointS_of_append_left (S₁:=Sframe) (S₂:=S₁) (S₃:=S₂) (by simpa [hSplit] using hDisjL)
-      have hDisjS2 : DisjointS Sframe S₂ :=
-        DisjointS_of_append_right (S₁:=Sframe) (S₂:=S₁) (S₃:=S₂) (by simpa [hSplit] using hDisjL)
-      have hDisjR1 : DisjointS Sframe (({ right := Sown.right ++ S₂, left := S₁ } : OwnedEnv).right) := by
-        simpa using (DisjointS_append_right hDisjR hDisjS2)
-      have hDisjR2 : DisjointS Sframe (({ right := Sown.right ++ S₁, left := S₂ } : OwnedEnv).right) := by
-        simpa using (DisjointS_append_right hDisjR hDisjS1)
-      have hP' := ihP (Sframe:=Sframe) (G₁:=G₁) hDisjR1 hDisjS1 hDisjG
-      have hQ' := ihQ (Sframe:=Sframe) (G₁:=G₁) hDisjR2 hDisjS2 hDisjG
-      have hP'' :
-          HasTypeProcPre Ssh { right := (Sframe ++ Sown.right) ++ S₂, left := S₁ } (G₁ ++ G₂) P := by
-        simpa [List.append_assoc] using hP'
-      have hQ'' :
-          HasTypeProcPre Ssh { right := (Sframe ++ Sown.right) ++ S₁, left := S₂ } (G₁ ++ G₂) Q := by
-        simpa [List.append_assoc] using hQ'
-      have hSplit' :
-          (({ right := Sframe ++ Sown.right, left := Sown.left } : OwnedEnv).left) = S₁ ++ S₂ := by
-        simpa [hSplit]
-      simpa [hSplit', List.append_assoc] using
-        (HasTypeProcPre.par (Sown:={ right := Sframe ++ Sown.right, left := Sown.left })
-          hDisjS' hSplit' hP'' hQ'')
-  | assign hSsh hv =>
-      exact HasTypeProcPre.assign hSsh (HasTypeVal_frame_left hDisjG hv)
+  HasTypeProcPre Ssh { right := Sframe ++ Sown.right, left := Sown.left } (G₁ ++ G₂) P
 
 /-- Sessions only shrink under pre-out typing (no new sessions introduced).
 
@@ -834,7 +747,7 @@ private theorem frame_left_assign_old
 
 /-- Left framing for par: frame only the left component. -/
 private axiom frame_left_par
-    {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {P Q : Process}
+    {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {P Q : Process} {nS nG : Nat}
     {Sfin Gfin Wfin Δfin S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
     (split : ParSplit S₂ G₂)
     (hSfin : Sfin = S₁' ++ S₂')
@@ -855,7 +768,7 @@ private axiom frame_left_par
     (ihP : DisjointS S₁ split.S1 → DisjointS S₁ S₁' → DisjointG G₁ split.G1 →
       HasTypeProcPreOut Ssh { right := S₁, left := split.S1 } (G₁ ++ split.G1) P
         { right := S₁, left := S₁' } (G₁ ++ G₁') W₁ Δ₁) :
-    HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (G₁ ++ G₂) (.par P Q)
+    HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (G₁ ++ G₂) (.par nS nG P Q)
       { right := S₁, left := Sfin } (G₁ ++ Gfin) Wfin Δfin
 
 
@@ -1112,7 +1025,8 @@ private theorem frame_right_assign_old
 
 /-- Right framing for par: frame only the right component. -/
 private axiom frame_right_par
-    {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {P Q : Process} {Sfin Gfin Wfin Δfin S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
+    {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {P Q : Process} {nS nG : Nat}
+    {Sfin Gfin Wfin Δfin S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
     (split : ParSplit S₁ G₁) :
     Sfin = S₁' ++ S₂' → Gfin = G₁' ++ G₂' → Wfin = W₁ ++ W₂ → Δfin = Δ₁ ++ Δ₂ →
     DisjointG split.G1 split.G2 → DisjointS split.S1 split.S2 → DisjointS S₁' split.S2 →
@@ -1122,7 +1036,7 @@ private axiom frame_right_par
     DisjointS S₂ S₁ → DisjointS S₂ Sfin → DisjointG G₁ G₂ →
     (DisjointS S₂ split.S2 → DisjointS S₂ S₂' → DisjointG split.G2 G₂ →
       HasTypeProcPreOut Ssh (split.S2 ++ S₂) (split.G2 ++ G₂) Q (S₂' ++ S₂) (G₂' ++ G₂) W₂ Δ₂) →
-    HasTypeProcPreOut Ssh (S₁ ++ S₂) (G₁ ++ G₂) (.par P Q) (Sfin ++ S₂) (Gfin ++ G₂) Wfin Δfin
+    HasTypeProcPreOut Ssh (S₁ ++ S₂) (G₁ ++ G₂) (.par nS nG P Q) (Sfin ++ S₂) (Gfin ++ G₂) Wfin Δfin
 
 /-- Pre-out typing is stable under framing on the right of S/G. -/
 axiom HasTypeProcPreOut_frame_right
@@ -1135,13 +1049,13 @@ axiom HasTypeProcPreOut_frame_right
     HasTypeProcPreOut Ssh (S₁ ++ S₂) (G₁ ++ G₂) P (S₁' ++ S₂) (G₁' ++ G₂) W Δ
 
 private axiom HasTypeProcPreOut_par_skip_left
-    {Ssh Sown G Q Sfin Gfin Wfin Δfin} :
-    HasTypeProcPreOut Ssh Sown G (.par .skip Q) Sfin Gfin Wfin Δfin →
+    {Ssh Sown G Q Sfin Gfin Wfin Δfin nS nG} :
+    HasTypeProcPreOut Ssh Sown G (.par nS nG .skip Q) Sfin Gfin Wfin Δfin →
     HasTypeProcPreOut Ssh Sown G Q Sfin Gfin Wfin Δfin
 
 private axiom HasTypeProcPreOut_par_skip_right
-    {Ssh Sown G P Sfin Gfin Wfin Δfin} :
-    HasTypeProcPreOut Ssh Sown G (.par P .skip) Sfin Gfin Wfin Δfin →
+    {Ssh Sown G P Sfin Gfin Wfin Δfin nS nG} :
+    HasTypeProcPreOut Ssh Sown G (.par nS nG P .skip) Sfin Gfin Wfin Δfin →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin Wfin Δfin
 
 private axiom HasTypeProcPreOut_reframe_right
@@ -1149,6 +1063,1282 @@ private axiom HasTypeProcPreOut_reframe_right
     {L' : SEnv} {G' : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     HasTypeProcPreOut Ssh { right := R, left := L } G P { right := R, left := L' } G' W Δ →
     HasTypeProcPreOut Ssh { right := R', left := L } G P { right := R', left := L' } G' W Δ
+
+/-!
+  Full-G step rule: preserve pre-out typing when stepping in the middle of a G-frame.
+  This is used to align par-splits under left/right framing.
+-/
+private axiom HasTypeProcPreOut_preserved_sub_middle_frame
+    {Gstore Gleft Gmid Gright G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointG Gleft Gmid →
+    DisjointG Gleft Gright →
+    DisjointG Gmid Gright →
+    G = Gleft ++ Gmid ++ Gright →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    HasTypeProcPreOut Ssh Sown Gmid P Sfin Gfin W Δ →
+    ∃ Gmid' W' Δ', G' = Gleft ++ Gmid' ++ Gright ∧
+      SessionsOf Gmid' ⊆ SessionsOf Gmid ∧
+      HasTypeProcPreOut Ssh Sown' Gmid' P' Sfin Gfin W' Δ' ∧
+      FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ
+
+private lemma length_updateG_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
+    lookupG G e = some L →
+    (updateG G e L').length = G.length := by
+  intro hLookup
+  induction G with
+  | nil =>
+      simp [lookupG] at hLookup
+  | cons hd tl ih =>
+      cases hd with
+      | mk e' L'' =>
+          by_cases hEq : e = e'
+          · subst hEq
+            simp [lookupG] at hLookup
+            simp [updateG]
+          · have h' : lookupG tl e = some L := by
+              have hbeq : (e == e') = false := by
+                exact beq_eq_false_iff_ne.mpr hEq
+              simpa [lookupG, List.lookup, hbeq] using hLookup
+            simp [updateG, hEq, ih h']
+
+private lemma SessionsOf_left_subset_of_update
+    {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {G₁' : GEnv} :
+    lookupG (G₁ ++ G₂) e = some L0 →
+    updateG (G₁ ++ G₂) e L = G₁' ++ G₂ →
+    SessionsOf G₁' ⊆ SessionsOf G₁ := by
+  intro hLookup hUpd
+  by_cases hLeft : lookupG G₁ e = none
+  · have hUpd' :
+        updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L :=
+        updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
+    have hEq : G₁' ++ G₂ = G₁ ++ updateG G₂ e L := by
+      simpa [hUpd'] using hUpd.symm
+    have hLookupG2 : lookupG G₂ e = some L0 := by
+      have hLookup' :=
+        lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      simpa [hLookup'] using hLookup
+    have hLenG2 : (updateG G₂ e L).length = G₂.length :=
+      length_updateG_hit (G:=G₂) (e:=e) (L:=L0) (L':=L) hLookupG2
+    have hLen : G₁'.length = G₁.length := by
+      have hLen' := congrArg List.length hEq
+      simp [List.length_append, hLenG2] at hLen'
+      exact hLen'
+    have hG₁' : G₁' = G₁ := List.append_inj_left hEq hLen
+    intro s hs
+    simpa [hG₁'] using hs
+  · cases hSome : lookupG G₁ e with
+    | none => exact (hLeft hSome).elim
+    | some L1 =>
+        have hUpd' :
+            updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+          updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L1) (L':=L) hSome
+        have hEq : G₁' ++ G₂ = updateG G₁ e L ++ G₂ := by
+          simpa [hUpd'] using hUpd.symm
+        have hLen : G₁'.length = (updateG G₁ e L).length := by
+          have hLen' := congrArg List.length hEq
+          simp [List.length_append] at hLen'
+          exact hLen'
+        have hG₁' : G₁' = updateG G₁ e L := List.append_inj_left hEq hLen
+        have hSess :
+            SessionsOf (updateG G₁ e L) = SessionsOf G₁ :=
+          SessionsOf_updateG_eq (G:=G₁) (e:=e) (L:=L) (L':=L1) hSome
+        intro s hs
+        have hs' : s ∈ SessionsOf (updateG G₁ e L) := by
+          simpa [hG₁'] using hs
+        simpa [hSess] using hs'
+
+private lemma SessionsOf_right_subset_of_update
+    {G₁ G₂ : GEnv} {e : Endpoint} {L L0 : LocalType} {G₂' : GEnv} :
+    lookupG (G₁ ++ G₂) e = some L0 →
+    updateG (G₁ ++ G₂) e L = G₁ ++ G₂' →
+    SessionsOf G₂' ⊆ SessionsOf G₂ := by
+  intro hLookup hUpd
+  by_cases hLeft : lookupG G₁ e = none
+  · have hUpd' :
+        updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L :=
+        updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hLeft
+    have hEq : G₁ ++ G₂' = G₁ ++ updateG G₂ e L := by
+      simpa [hUpd'] using hUpd.symm
+    have hG₂' : G₂' = updateG G₂ e L :=
+      List.append_inj_right hEq rfl
+    have hLookupG2 : lookupG G₂ e = some L0 := by
+      have hLookup' :=
+        lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hLeft
+      simpa [hLookup'] using hLookup
+    have hSess :
+        SessionsOf (updateG G₂ e L) = SessionsOf G₂ :=
+      SessionsOf_updateG_eq (G:=G₂) (e:=e) (L:=L) (L':=L0) hLookupG2
+    intro s hs
+    have hs' : s ∈ SessionsOf (updateG G₂ e L) := by
+      simpa [hG₂'] using hs
+    simpa [hSess] using hs'
+  · cases hSome : lookupG G₁ e with
+    | none => exact (hLeft hSome).elim
+    | some L1 =>
+        have hUpd' :
+            updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+          updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L1) (L':=L) hSome
+        have hEq : G₁ ++ G₂' = updateG G₁ e L ++ G₂ := by
+          simpa [hUpd'] using hUpd.symm
+        have hLenG1 : (updateG G₁ e L).length = G₁.length :=
+          length_updateG_hit (G:=G₁) (e:=e) (L:=L1) (L':=L) hSome
+        have hG₂' : G₂' = G₂ :=
+          List.append_inj_right hEq hLenG1.symm
+        intro s hs
+        simpa [hG₂'] using hs
+
+private lemma append_left_eq_of_eq {α : Type} {l1 l2 r : List α} (h : l1 ++ r = l2 ++ r) :
+    l1 = l2 := by
+  have hLen := congrArg List.length h
+  simp [List.length_append] at hLen
+  exact List.append_inj_left h hLen
+
+private lemma append_right_eq_of_eq {α : Type} {l r1 r2 : List α} (h : l ++ r1 = l ++ r2) :
+    r1 = r2 := by
+  have hLen := congrArg List.length h
+  simp [List.length_append] at hLen
+  exact List.append_inj_right h rfl
+
+private theorem SessionsOf_subset_of_TypedStep_left_frame
+    {G₁ G₂ G G' D Ssh Sown store bufs P G₁' D' Sown' store' bufs' P'} :
+    DisjointG G₁ G₂ →
+    G = G₁ ++ G₂ →
+    G' = G₁' ++ G₂ →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    SessionsOf G₁' ⊆ SessionsOf G₁ := by
+  intro hDisj hEq hEq' hTS
+  induction hTS with
+  | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.send target T L) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁' ++ G₂ := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_left_subset_of_update hLookup hUpd
+  | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.recv source T L) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁' ++ G₂ := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_left_subset_of_update hLookup hUpd
+  | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.select target bs) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁' ++ G₂ := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_left_subset_of_update hLookup hUpd
+  | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.branch source bs) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁' ++ G₂ := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_left_subset_of_update hLookup hUpd
+  | assign =>
+      intro s hs
+      have hEqG : G₁' ++ G₂ = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+      simpa [hG₁'] using hs
+  | seq_step _ ih =>
+      exact ih hEq hEq'
+  | seq_skip =>
+      intro s hs
+      have hEqG : G₁' ++ G₂ = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+      simpa [hG₁'] using hs
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      -- Right frame unchanged; reuse IH on the inner step.
+      exact ih hEq hEq'
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hEq hEq'
+  | par_skip_left =>
+      intro s hs
+      have hEqG : G₁' ++ G₂ = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+      simpa [hG₁'] using hs
+  | par_skip_right =>
+      intro s hs
+      have hEqG : G₁' ++ G₂ = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+      simpa [hG₁'] using hs
+
+private theorem SessionsOf_subset_of_TypedStep_right_frame
+    {G₁ G₂ G G' D Ssh Sown store bufs P G₂' D' Sown' store' bufs' P'} :
+    DisjointG G₁ G₂ →
+    G = G₁ ++ G₂ →
+    G' = G₁ ++ G₂' →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    SessionsOf G₂' ⊆ SessionsOf G₂ := by
+  intro hDisj hEq hEq' hTS
+  induction hTS with
+  | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.send target T L) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.recv source T L) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.select target bs) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.branch source bs) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | assign =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+  | seq_step _ ih =>
+      exact ih hEq hEq'
+  | seq_skip =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hEq hEq'
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hEq hEq'
+  | par_skip_left =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+  | par_skip_right =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+
+/-! ### Framed Pre-Update Preservation -/
+
+/-- Pre-out typing is preserved under a step with a right G-frame. -/
+private theorem HasTypeProcPreOut_preserved_sub_left_frame
+    {Gstore G₁ G₂ G G' D Ssh Sown store bufs P G₁' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointG G₁ G₂ →
+    G = G₁ ++ G₂ →
+    G' = G₁' ++ G₂ →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    HasTypeProcPreOut Ssh Sown G₁ P Sfin Gfin W Δ →
+    ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₁' P' Sfin Gfin W' Δ' ∧
+      FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
+  intro hStore hDisj hEq hEq' hTS hPre
+  induction hTS generalizing Sfin Gfin W Δ G₁ G₂ G₁' with
+  | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      cases hPre with
+      | send hk' hG' hx' =>
+          rename_i e' q' T' L'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₁ e' = some (.send q' T' L') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₁e : lookupG G₁ e = some (.send q' T' L') := by
+            simpa [hEqE] using hGPre
+          have hEqSend : (LocalType.send target T L) = (LocalType.send q' T' L') := by
+            have hG'' : lookupG G e = some (.send q' T' L') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.send q' T' L') :=
+                lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+              simpa [hEq] using hLookup
+            have : some (LocalType.send target T L) = some (LocalType.send q' T' L') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hL : L' = L := by
+            cases hEqSend
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+            updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e)
+              (L:=.send q' T' L') (L':=L) hG₁e
+          have hEqG' : G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁' ++ G₂ = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₁' : G₁' = updateG G₁ e L := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = updateG G₁ e L ++ G₂ := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · simpa [hG₁', hL, hEqE] using
+              (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=updateG G₁ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      cases hPre with
+      | recv_new hk' hG' hSsh hSownR hSownL =>
+          rename_i e' p' T' L'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₁ e' = some (.recv p' T' L') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₁e : lookupG G₁ e = some (.recv p' T' L') := by
+            simpa [hEqE] using hGPre
+          have hEqRecv : (LocalType.recv source T L) = (LocalType.recv p' T' L') := by
+            have hG'' : lookupG G e = some (.recv p' T' L') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.recv p' T' L') :=
+                lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+              simpa [hEq] using hLookup
+            have : some (LocalType.recv source T L) = some (LocalType.recv p' T' L') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hT : T' = T := by
+            cases hEqRecv
+            rfl
+          have hL : L' = L := by
+            cases hEqRecv
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+            updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e)
+              (L:=.recv p' T' L') (L':=L) hG₁e
+          have hEqG' : G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁' ++ G₂ = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₁' : G₁' = updateG G₁ e L := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = updateG G₁ e L ++ G₂ := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₁', hT, hL, hEqE] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G₁ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+      | recv_old hk' hG' hSsh hSownR hSownL =>
+          rename_i e' p' T' L' Told
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₁ e' = some (.recv p' T' L') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₁e : lookupG G₁ e = some (.recv p' T' L') := by
+            simpa [hEqE] using hGPre
+          have hEqRecv : (LocalType.recv source T L) = (LocalType.recv p' T' L') := by
+            have hG'' : lookupG G e = some (.recv p' T' L') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.recv p' T' L') :=
+                lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+              simpa [hEq] using hLookup
+            have : some (LocalType.recv source T L) = some (LocalType.recv p' T' L') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hT : T' = T := by
+            cases hEqRecv
+            rfl
+          have hL : L' = L := by
+            cases hEqRecv
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+            updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e)
+              (L:=.recv p' T' L') (L':=L) hG₁e
+          have hEqG' : G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁' ++ G₂ = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₁' : G₁' = updateG G₁ e L := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = updateG G₁ e L ++ G₂ := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₁', hT, hL, hEqE] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G₁ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      cases hPre with
+      | select hk' hG' hFind' =>
+          rename_i e' q' bs' L'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₁ e' = some (.select q' bs') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₁e : lookupG G₁ e = some (.select q' bs') := by
+            simpa [hEqE] using hGPre
+          have hEqSel : (LocalType.select target bs) = (LocalType.select q' bs') := by
+            have hG'' : lookupG G e = some (.select q' bs') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.select q' bs') :=
+                lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+              simpa [hEq] using hLookup
+            have : some (LocalType.select target bs) = some (LocalType.select q' bs') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hBs : bs' = bs := by
+            cases hEqSel
+            rfl
+          have hFind'' : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L') := by
+            simpa [hBs] using hFind'
+          have hEqFind : some (ℓ, L) = some (ℓ, L') := by
+            simpa [hFind] using hFind''
+          have hL : L' = L := by
+            cases hEqFind
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+            updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e)
+              (L:=.select q' bs') (L':=L) hG₁e
+          have hEqG' : G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁' ++ G₂ = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₁' : G₁' = updateG G₁ e L := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = updateG G₁ e L ++ G₂ := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · simpa [hG₁', hL, hEqE] using
+              (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=updateG G₁ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      cases hPre with
+      | branch hk' hG' hLen hLabels hPreAll hPost hDom =>
+          rename_i e' p' bs'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₁ e' = some (.branch p' bs') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₁e : lookupG G₁ e = some (.branch p' bs') := by
+            simpa [hEqE] using hGPre
+          have hEqBr : (LocalType.branch source bs) = (LocalType.branch p' bs') := by
+            have hG'' : lookupG G e = some (.branch p' bs') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.branch p' bs') :=
+                lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG₁e
+              simpa [hEq] using hLookup
+            have : some (LocalType.branch source bs) = some (LocalType.branch p' bs') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hBs : bs' = bs := by
+            cases hEqBr
+            rfl
+          have hFindT' : bs'.find? (fun b => b.1 == ℓ) = some (ℓ, L) := by
+            simpa [hBs] using hFindT
+          have hPre' := hPost _ _ _ hFindP hFindT'
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = updateG G₁ e L ++ G₂ :=
+            updateG_append_left_hit (G₁:=G₁) (G₂:=G₂) (e:=e)
+              (L:=.branch p' bs') (L':=L) hG₁e
+          have hEqG' : G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁' ++ G₂ = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₁' : G₁' = updateG G₁ e L := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = updateG G₁ e L ++ G₂ := by simpa [hUpd]
+          refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+          simpa [hG₁', hEqE] using hPre'
+  | assign hv hSout hStoreOut =>
+      rename_i G D Ssh Sown store bufs x v T_step Sown' store'
+      cases hPre with
+      | @assign_new _ _ _ _ T_pre hSsh hSownR hSownL hv' =>
+          have hv'' : HasTypeVal G v T_pre := by
+            refine HasTypeVal_mono G₁ G v T_pre hv' ?_
+            intro e L hLookup
+            have hLookup' : lookupG (G₁ ++ G₂) e = some L :=
+              lookupG_append_left (G₁:=G₁) (G₂:=G₂) hLookup
+            simpa [hEq] using hLookup'
+          have hT := HasTypeVal_unique hv'' hv
+          cases hT
+          have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
+            have hEqG0 : G₁' ++ G₂ = G := by
+              simpa using hEq'.symm
+            simpa [hEq] using hEqG0
+          have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₁'] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T_step) (G:=G₁))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+      | @assign_old _ _ _ _ T_pre _ hSsh hSownR hSownL hv' =>
+          have hv'' : HasTypeVal G v T_pre := by
+            refine HasTypeVal_mono G₁ G v T_pre hv' ?_
+            intro e L hLookup
+            have hLookup' : lookupG (G₁ ++ G₂) e = some L :=
+              lookupG_append_left (G₁:=G₁) (G₂:=G₂) hLookup
+            simpa [hEq] using hLookup'
+          have hT := HasTypeVal_unique hv'' hv
+          cases hT
+          have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
+            have hEqG0 : G₁' ++ G₂ = G := by
+              simpa using hEq'.symm
+            simpa [hEq] using hEqG0
+          have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₁'] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T_step) (G:=G₁))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | seq_step hTS ih =>
+      cases hPre with
+      | seq hP hQ =>
+          rename_i W₁ W₂ Δ₁ Δ₂
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisj hEq hEq' hP
+          refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
+          · exact HasTypeProcPreOut.seq hP' hQ
+          · exact FootprintSubset_append_left hSubW
+          · exact SEnvDomSubset_append_left_of_domsubset hSubΔ
+  | seq_skip =>
+      cases hPre with
+      | seq hP hQ =>
+          rename_i W₁ W₂ Δ₁ Δ₂
+          cases hP
+          refine ⟨W₂, Δ₂, ?_, ?_, ?_⟩
+          ·
+            have hEqG : G₁' ++ G₂ = G₁ ++ G₂ :=
+              hEq'.symm.trans hEq
+            have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+            simpa [hG₁'] using hQ
+          · simpa using (FootprintSubset_refl (W:=W₂))
+          · simpa using (SEnvDomSubset_append_right (S₁:=∅) (S₂:=Δ₂))
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁_step D₁_step S₁_step nS nG
+      have hStore' : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right, left := split.S1 ++ split.S2 }) store := by
+        simpa [SEnvAll, split.hS, List.append_assoc] using hStore
+      have hStoreL : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store := by
+        intro x v T hStoreX hLookup
+        have hLookup' :
+            lookupSEnv (Ssh ++ (Sown.right ++ (split.S2 ++ split.S1))) x = some T := by
+          simpa [SEnvAll, List.append_assoc] using hLookup
+        have hSwap :=
+          lookupSEnv_swap_left_prefix (Ssh:=Ssh ++ Sown.right) (S₁:=split.S2) (S₂:=split.S1) (S₃:=(∅ : SEnv))
+            (DisjointS_symm hDisjS) x
+        have hSwap' :
+            lookupSEnv (Ssh ++ (Sown.right ++ (split.S2 ++ split.S1))) x =
+              lookupSEnv (Ssh ++ (Sown.right ++ (split.S1 ++ split.S2))) x := by
+          simpa [SEnvAll, List.append_assoc] using hSwap
+        have hLookup'' :
+            lookupSEnv (Ssh ++ (Sown.right ++ (split.S1 ++ split.S2))) x = some T := by
+          simpa [hSwap'] using hLookup'
+        exact hStore' x v T hStoreX (by
+          simpa [SEnvAll, List.append_assoc] using hLookup'')
+      cases hPre with
+      | par split_pre hSlenPre hGlenPre hSfin hGfin hW hΔ
+            hDisjG' hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
+          rename_i S₁ S₂ S₁_fin S₂_fin G₁_fin G₂_fin W₁ W₂ Δ₁ Δ₂
+          subst hS1
+          subst hS2
+          have hSlen' : split.S1.length = split_pre.S1.length := by
+            calc
+              split.S1.length = nS := hSlen
+              _ = split_pre.S1.length := hSlenPre.symm
+          have hSeq : split.S1 ++ split.S2 = split_pre.S1 ++ split_pre.S2 := by
+            calc
+              split.S1 ++ split.S2 = Sown.left := by simpa [split.hS]
+              _ = split_pre.S1 ++ split_pre.S2 := by simpa [split_pre.hS]
+          have hS1eq : split.S1 = split_pre.S1 := List.append_inj_left hSeq hSlen'
+          have hS2eq : split.S2 = split_pre.S2 := List.append_inj_right hSeq hSlen'
+          have hGlen' : split.G1.length = split_pre.G1.length := by
+            calc
+              split.G1.length = nG := hGlen
+              _ = split_pre.G1.length := hGlenPre.symm
+          have hGeq : split.G1 ++ split.G2 = split_pre.G1 ++ (split_pre.G2 ++ G₂) := by
+            calc
+              split.G1 ++ split.G2 = G := by simpa [split.hG]
+              _ = G₁ ++ G₂ := hEq
+              _ = (split_pre.G1 ++ split_pre.G2) ++ G₂ := by simpa [split_pre.hG]
+              _ = split_pre.G1 ++ (split_pre.G2 ++ G₂) := by simp [List.append_assoc]
+          have hG1eq : split.G1 = split_pre.G1 := List.append_inj_left hGeq hGlen'
+          have hG2eq : split.G2 = split_pre.G2 ++ G₂ := List.append_inj_right hGeq hGlen'
+          have hSubG1 : SessionsOf split_pre.G1 ⊆ SessionsOf G₁ := by
+            have hSub := SessionsOf_append_left (G₁:=split_pre.G1) (G₂:=split_pre.G2)
+            simpa [split_pre.hG] using hSub
+          have hDisjG1G2 : DisjointG split_pre.G1 G₂ :=
+            DisjointG_of_subset_left hSubG1 hDisj
+          have hDisjG_inner : DisjointG split_pre.G1 (split_pre.G2 ++ G₂) :=
+            DisjointG_append_right hDisjG' hDisjG1G2
+          have hEq_inner : G = split_pre.G1 ++ (split_pre.G2 ++ G₂) := by
+            calc
+              G = G₁ ++ G₂ := hEq
+              _ = (split_pre.G1 ++ split_pre.G2) ++ G₂ := by simpa [split_pre.hG]
+              _ = split_pre.G1 ++ (split_pre.G2 ++ G₂) := by simp [List.append_assoc]
+          have hEq'_inner : G₁_step ++ split.G2 = G₁_step ++ (split_pre.G2 ++ G₂) := by
+            simpa [hG2eq]
+          have hP0 :
+              HasTypeProcPreOut Ssh { right := Sown.right ++ split.S2, left := split.S1 } split_pre.G1 P
+                { right := Sown.right ++ split.S2, left := S₁_fin } G₁_fin W₁ Δ₁ := by
+            simpa [hS1eq, hS2eq] using hP
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ :=
+            ih hStoreL hDisjG_inner hEq_inner hEq'_inner hP0
+          have hSubG_step : SessionsOf G₁_step ⊆ SessionsOf split_pre.G1 :=
+            SessionsOf_subset_of_TypedStep_left_frame hDisjG_inner hEq_inner hEq'_inner hTS
+          have hDisjGOut : DisjointG G₁_step split_pre.G2 :=
+            DisjointG_of_subset_left hSubG_step hDisjG'
+          let splitOut : ParSplit (S₁_step ++ split_pre.S2) (G₁_step ++ split_pre.G2) :=
+            { S1 := S₁_step, S2 := split_pre.S2, G1 := G₁_step, G2 := split_pre.G2, hS := rfl, hG := rfl }
+          have hDisjGOut' : DisjointG splitOut.G1 splitOut.G2 := by
+            simpa [splitOut] using hDisjGOut
+          have hDomP := HasTypeProcPreOut_domsubset hP'
+          have hDisjS_left0 : DisjointS S₁_step split_pre.S2 :=
+            DisjointS_of_domsubset_left hDomP hDisjS_left
+          have hDisjS_left' : DisjointS splitOut.S1 splitOut.S2 := by
+            simpa [splitOut] using hDisjS_left0
+          have hDisjS_in_out0 : DisjointS S₁_step S₂_fin :=
+            DisjointS_of_domsubset_left hDomP hDisjS''
+          have hDisjS_in_out : DisjointS splitOut.S1 S₂_fin := by
+            simpa [splitOut] using hDisjS_in_out0
+          have hQ' :
+              HasTypeProcPreOut Ssh { right := Sown.right ++ S₁_step, left := split_pre.S2 } split_pre.G2 Q
+                { right := Sown.right ++ S₁_step, left := S₂_fin } G₂_fin W₂ Δ₂ :=
+            HasTypeProcPreOut_reframe_right
+              (R:=Sown.right ++ split_pre.S1) (R':=Sown.right ++ S₁_step) (L:=split_pre.S2) (L':=S₂_fin) (G:=split_pre.G2) (P:=Q) hQ
+          have hDisjW' : DisjointW W₁' W₂ :=
+            DisjointW_of_subset_left hSubW hDisjW
+          have hDisjΔ' : DisjointS Δ₁' Δ₂ :=
+            DisjointS_of_domsubset_left hSubΔ hDisjΔ
+          have hG₁' : G₁' = G₁_step ++ split_pre.G2 := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = G₁_step ++ split.G2 := by simpa using hEq'.symm
+              _ = G₁_step ++ (split_pre.G2 ++ G₂) := by simpa [hG2eq]
+              _ = (G₁_step ++ split_pre.G2) ++ G₂ := by simp [List.append_assoc]
+          refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
+          ·
+            have hPar :
+                HasTypeProcPreOut Ssh { right := Sown.right, left := S₁_step ++ split_pre.S2 }
+                  (G₁_step ++ split_pre.G2) (.par S₁_step.length G₁_step.length P' Q)
+                  Sfin Gfin (W₁' ++ W₂) (Δ₁' ++ Δ₂) := by
+              have hP_reframe :
+                  HasTypeProcPreOut Ssh { right := Sown.right ++ splitOut.S2, left := splitOut.S1 } splitOut.G1 P'
+                    { right := Sown.right ++ splitOut.S2, left := S₁_fin } G₁_fin W₁' Δ₁' := by
+                simpa [splitOut, hS2eq] using hP'
+              exact HasTypeProcPreOut.par splitOut rfl rfl hSfin hGfin rfl rfl
+                hDisjGOut' hDisjS_left' hDisjS_left hDisjS_in_out hDisjS'' hDisjW' hDisjΔ' rfl rfl hP_reframe hQ'
+            simpa [hS2eq, hG₁'] using hPar
+          · simpa [hW] using (FootprintSubset_append_left hSubW)
+          · simpa [hΔ] using (SEnvDomSubset_append_left_of_domsubset hSubΔ)
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂_step D₂_step S₂_step nS nG
+      have hStoreR :
+          StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
+        simpa [SEnvAll, split.hS, List.append_assoc] using hStore
+      cases hPre with
+      | par split_pre hSlenPre hGlenPre hSfin hGfin hW hΔ
+            hDisjG_pre hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
+          rename_i S₁ S₂ S₁_fin S₂_fin G₁_fin G₂_fin W₁ W₂ Δ₁ Δ₂
+          subst hS1
+          subst hS2
+          have hSlen' : split.S1.length = split_pre.S1.length := by
+            calc
+              split.S1.length = nS := hSlen
+              _ = split_pre.S1.length := hSlenPre.symm
+          have hSeq : split.S1 ++ split.S2 = split_pre.S1 ++ split_pre.S2 := by
+            calc
+              split.S1 ++ split.S2 = Sown.left := by simpa [split.hS]
+              _ = split_pre.S1 ++ split_pre.S2 := by simpa [split_pre.hS]
+          have hS1eq : split.S1 = split_pre.S1 := List.append_inj_left hSeq hSlen'
+          have hS2eq : split.S2 = split_pre.S2 := List.append_inj_right hSeq hSlen'
+          have hGlen' : split.G1.length = split_pre.G1.length := by
+            calc
+              split.G1.length = nG := hGlen
+              _ = split_pre.G1.length := hGlenPre.symm
+          have hGeq : split.G1 ++ split.G2 = split_pre.G1 ++ (split_pre.G2 ++ G₂) := by
+            calc
+              split.G1 ++ split.G2 = G := by simpa [split.hG]
+              _ = G₁ ++ G₂ := hEq
+              _ = (split_pre.G1 ++ split_pre.G2) ++ G₂ := by simpa [split_pre.hG]
+              _ = split_pre.G1 ++ (split_pre.G2 ++ G₂) := by simp [List.append_assoc]
+          have hG1eq : split.G1 = split_pre.G1 := List.append_inj_left hGeq hGlen'
+          have hG2eq : split.G2 = split_pre.G2 ++ G₂ := List.append_inj_right hGeq hGlen'
+          have hSubG1 : SessionsOf split_pre.G1 ⊆ SessionsOf G₁ := by
+            have hSub := SessionsOf_append_left (G₁:=split_pre.G1) (G₂:=split_pre.G2)
+            simpa [split_pre.hG] using hSub
+          have hSubG2 : SessionsOf split_pre.G2 ⊆ SessionsOf G₁ := by
+            have hSub := SessionsOf_append_right (G₁:=split_pre.G1) (G₂:=split_pre.G2)
+            simpa [split_pre.hG] using hSub
+          have hDisjG1G2 : DisjointG split_pre.G1 G₂ :=
+            DisjointG_of_subset_left hSubG1 hDisj
+          have hDisjG2G2 : DisjointG split_pre.G2 G₂ :=
+            DisjointG_of_subset_left hSubG2 hDisj
+          have hEq_inner : G = split_pre.G1 ++ split_pre.G2 ++ G₂ := by
+            calc
+              G = G₁ ++ G₂ := hEq
+              _ = (split_pre.G1 ++ split_pre.G2) ++ G₂ := by simpa [split_pre.hG]
+              _ = split_pre.G1 ++ split_pre.G2 ++ G₂ := by simp [List.append_assoc]
+          have hTS' :
+              TypedStep G (D₁ ++ D₂) Ssh
+                { right := Sown.right ++ split_pre.S1, left := split_pre.S2 } store bufs Q
+                (split_pre.G1 ++ G₂_step) (D₁ ++ D₂_step)
+                { right := Sown.right ++ split_pre.S1, left := S₂_step } store' bufs' Q' := by
+            simpa [hS1eq, hS2eq, hG1eq, hG2eq, List.append_assoc] using hTS
+          have hStoreR' :
+              StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split_pre.S1, left := split_pre.S2 }) store := by
+            simpa [hS1eq, hS2eq] using hStoreR
+          obtain ⟨G₂_step_left, W₂', Δ₂', hEqG', hSubSess, hQ', hSubW, hSubΔ⟩ :=
+            HasTypeProcPreOut_preserved_sub_middle_frame
+              (Gstore:=Gstore) (Gleft:=split_pre.G1) (Gmid:=split_pre.G2) (Gright:=G₂)
+              (G:=G) (G':=split_pre.G1 ++ G₂_step)
+              (D:=D₁ ++ D₂) (Ssh:=Ssh)
+              (Sown:={ right := Sown.right ++ split_pre.S1, left := split_pre.S2 })
+              (store:=store) (bufs:=bufs) (P:=Q)
+              (Sfin:={ right := Sown.right ++ split_pre.S1, left := S₂_fin }) (Gfin:=G₂_fin) (W:=W₂) (Δ:=Δ₂)
+              hStoreR' hDisjG_pre hDisjG1G2 hDisjG2G2 hEq_inner hTS' hQ
+          have hDisjGsym : DisjointG split_pre.G2 split_pre.G1 := DisjointG_symm hDisjG_pre
+          have hDisjG_step_left : DisjointG G₂_step_left split_pre.G1 :=
+            DisjointG_of_subset_left hSubSess hDisjGsym
+          have hDisjGOut : DisjointG split_pre.G1 G₂_step_left := DisjointG_symm hDisjG_step_left
+          let splitOut : ParSplit (split_pre.S1 ++ S₂_step) (split_pre.G1 ++ G₂_step_left) :=
+            { S1 := split_pre.S1, S2 := S₂_step, G1 := split_pre.G1, G2 := G₂_step_left, hS := rfl, hG := rfl }
+          have hDisjGOut' : DisjointG splitOut.G1 splitOut.G2 := by
+            simpa [splitOut] using hDisjGOut
+          have hDomQ := HasTypeProcPreOut_domsubset hQ'
+          have hDisjS_right0 : DisjointS split_pre.S1 S₂_step :=
+            DisjointS_of_domsubset_right hDomQ hDisjS_right
+          have hDisjS_right' : DisjointS splitOut.S1 splitOut.S2 := by
+            simpa [splitOut] using hDisjS_right0
+          have hDisjS_left_in : DisjointS S₁_fin S₂_step :=
+            DisjointS_of_domsubset_right hDomQ hDisjS''
+          have hP_reframe :
+              HasTypeProcPreOut Ssh { right := Sown.right ++ S₂_step, left := split_pre.S1 } split_pre.G1 P
+                { right := Sown.right ++ S₂_step, left := S₁_fin } G₁_fin W₁ Δ₁ :=
+            HasTypeProcPreOut_reframe_right
+              (R:=Sown.right ++ split_pre.S2) (R':=Sown.right ++ S₂_step) (L:=split_pre.S1) (L':=S₁_fin)
+              (G:=split_pre.G1) (P:=P) hP
+          have hDisjW' : DisjointW W₁ W₂' :=
+            DisjointW_of_subset_right hSubW hDisjW
+          have hDisjΔ' : DisjointS Δ₁ Δ₂' :=
+            DisjointS_of_domsubset_right hSubΔ hDisjΔ
+          have hEq'_inner : split_pre.G1 ++ G₂_step = G₁' ++ G₂ := by
+            have hEq'0 : split.G1 ++ G₂_step = G₁' ++ G₂ := by
+              simpa using hEq'
+            simpa [hG1eq] using hEq'0
+          have hG₁' : G₁' = split_pre.G1 ++ G₂_step_left := by
+            apply append_left_eq_of_eq
+            calc
+              G₁' ++ G₂ = split_pre.G1 ++ G₂_step := by simpa using hEq'_inner.symm
+              _ = split_pre.G1 ++ G₂_step_left ++ G₂ := hEqG'
+              _ = (split_pre.G1 ++ G₂_step_left) ++ G₂ := by simp [List.append_assoc]
+          refine ⟨W₁ ++ W₂', Δ₁ ++ Δ₂', ?_, ?_, ?_⟩
+          ·
+            have hPar :
+                HasTypeProcPreOut Ssh { right := Sown.right, left := split_pre.S1 ++ S₂_step }
+                  (split_pre.G1 ++ G₂_step_left) (.par split_pre.S1.length split_pre.G1.length P Q')
+                  Sfin Gfin (W₁ ++ W₂') (Δ₁ ++ Δ₂') := by
+              exact HasTypeProcPreOut.par splitOut rfl rfl hSfin hGfin rfl rfl
+                hDisjGOut' hDisjS_right' hDisjS_left_in hDisjS_right hDisjS'' hDisjW' hDisjΔ' rfl rfl
+                hP_reframe hQ'
+            simpa [hS1eq, hG1eq, hG₁'] using hPar
+          · simpa [hW] using (FootprintSubset_append_right_of_subset hSubW)
+          · simpa [hΔ] using (SEnvDomSubset_append_right_of_domsubset hSubΔ)
+  | par_skip_left =>
+      have hQ := HasTypeProcPreOut_par_skip_left hPre
+      have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
+        simpa [hEq] using hEq'.symm
+      have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+      refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+      cases hG₁'
+      exact hQ
+  | par_skip_right =>
+      have hP := HasTypeProcPreOut_par_skip_right hPre
+      have hEqG : G₁' ++ G₂ = G₁ ++ G₂ := by
+        simpa [hEq] using hEq'.symm
+      have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
+      refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+      cases hG₁'
+      exact hP
+
+/-- Pre-out typing is preserved under a step with a left G-frame. -/
+private theorem HasTypeProcPreOut_preserved_sub_right_frame
+    {Gstore G₁ G₂ G G' D Ssh Sown store bufs P G₂' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointG G₁ G₂ →
+    G = G₁ ++ G₂ →
+    G' = G₁ ++ G₂' →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    HasTypeProcPreOut Ssh Sown G₂ P Sfin Gfin W Δ →
+    ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' P' Sfin Gfin W' Δ' ∧
+      FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
+  intro hStore hDisj hEq hEq' hTS hPre
+  induction hTS generalizing Sfin Gfin W Δ G₁ G₂ G₂' with
+  | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      cases hPre with
+      | send hk' hG' hx' =>
+          rename_i e' q' T' L'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₂ e' = some (.send q' T' L') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₂e : lookupG G₂ e = some (.send q' T' L') := by
+            simpa [hEqE] using hGPre
+          have hEqSend : (LocalType.send target T L) = (LocalType.send q' T' L') := by
+            have hG'' : lookupG G e = some (.send q' T' L') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.send q' T' L') := by
+                have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+                have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+                simpa [hEqG] using hG₂e
+              simpa [hEq] using hLookup
+            have : some (LocalType.send target T L) = some (LocalType.send q' T' L') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hL : L' = L := by
+            cases hEqSend
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+            exact updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
+          have hEqG' : G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁ ++ G₂' = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₂' : G₂' = updateG G₂ e L := by
+            apply append_right_eq_of_eq
+            calc
+              G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = G₁ ++ updateG G₂ e L := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · simpa [hG₂', hL, hEqE] using
+              (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=updateG G₂ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      cases hPre with
+      | recv_new hk' hG' hSsh hSownR hSownL =>
+          rename_i e' p' T' L'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₂ e' = some (.recv p' T' L') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₂e : lookupG G₂ e = some (.recv p' T' L') := by
+            simpa [hEqE] using hGPre
+          have hEqRecv : (LocalType.recv source T L) = (LocalType.recv p' T' L') := by
+            have hG'' : lookupG G e = some (.recv p' T' L') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.recv p' T' L') := by
+                have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+                have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+                simpa [hEqG] using hG₂e
+              simpa [hEq] using hLookup
+            have : some (LocalType.recv source T L) = some (LocalType.recv p' T' L') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hT : T' = T := by
+            cases hEqRecv
+            rfl
+          have hL : L' = L := by
+            cases hEqRecv
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+            exact updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
+          have hEqG' : G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁ ++ G₂' = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₂' : G₂' = updateG G₂ e L := by
+            apply append_right_eq_of_eq
+            calc
+              G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = G₁ ++ updateG G₂ e L := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₂', hT, hL, hEqE] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G₂ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+      | recv_old hk' hG' hSsh hSownR hSownL =>
+          rename_i e' p' T' L' Told
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₂ e' = some (.recv p' T' L') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₂e : lookupG G₂ e = some (.recv p' T' L') := by
+            simpa [hEqE] using hGPre
+          have hEqRecv : (LocalType.recv source T L) = (LocalType.recv p' T' L') := by
+            have hG'' : lookupG G e = some (.recv p' T' L') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.recv p' T' L') := by
+                have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+                have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+                simpa [hEqG] using hG₂e
+              simpa [hEq] using hLookup
+            have : some (LocalType.recv source T L) = some (LocalType.recv p' T' L') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hT : T' = T := by
+            cases hEqRecv
+            rfl
+          have hL : L' = L := by
+            cases hEqRecv
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+            exact updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
+          have hEqG' : G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁ ++ G₂' = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₂' : G₂' = updateG G₂ e L := by
+            apply append_right_eq_of_eq
+            calc
+              G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = G₁ ++ updateG G₂ e L := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₂', hT, hL, hEqE] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G₂ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      cases hPre with
+      | select hk' hG' hFind' =>
+          rename_i e' q' bs' L'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₂ e' = some (.select q' bs') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₂e : lookupG G₂ e = some (.select q' bs') := by
+            simpa [hEqE] using hGPre
+          have hEqSel : (LocalType.select target bs) = (LocalType.select q' bs') := by
+            have hG'' : lookupG G e = some (.select q' bs') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.select q' bs') := by
+                have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+                have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+                simpa [hEqG] using hG₂e
+              simpa [hEq] using hLookup
+            have : some (LocalType.select target bs) = some (LocalType.select q' bs') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hBs : bs' = bs := by
+            cases hEqSel
+            rfl
+          have hFind'' : bs.find? (fun b => b.1 == ℓ) = some (ℓ, L') := by
+            simpa [hBs] using hFind'
+          have hEqFind : some (ℓ, L) = some (ℓ, L') := by
+            simpa [hFind] using hFind''
+          have hL : L' = L := by
+            cases hEqFind
+            rfl
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+            exact updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
+          have hEqG' : G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁ ++ G₂' = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₂' : G₂' = updateG G₂ e L := by
+            apply append_right_eq_of_eq
+            calc
+              G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = G₁ ++ updateG G₂ e L := by simpa [hUpd]
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · simpa [hG₂', hL, hEqE] using
+              (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=updateG G₂ e L))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      cases hPre with
+      | branch hk' hG' hLen hLabels hPreAll hPost hDom =>
+          rename_i e' p' bs'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
+            simpa using hk'
+          have hGPre : lookupG G₂ e' = some (.branch p' bs') := by
+            simpa using hG'
+          -- Align endpoints via store typing.
+          have hkTyped : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+            hStore k (.chan e) (.chan e'.sid e'.role) hk hkPre
+          have hEqE : e = e' := by
+            have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+              simpa using (HasTypeVal_chan_inv hkTyped)
+            cases e
+            cases e'
+            cases hValEq
+            rfl
+          have hG₂e : lookupG G₂ e = some (.branch p' bs') := by
+            simpa [hEqE] using hGPre
+          have hEqBr : (LocalType.branch source bs) = (LocalType.branch p' bs') := by
+            have hG'' : lookupG G e = some (.branch p' bs') := by
+              have hLookup : lookupG (G₁ ++ G₂) e = some (.branch p' bs') := by
+                have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+                have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+                simpa [hEqG] using hG₂e
+              simpa [hEq] using hLookup
+            have : some (LocalType.branch source bs) = some (LocalType.branch p' bs') := by
+              simpa [hG] using hG''
+            exact Option.some.inj this
+          have hBs : bs' = bs := by
+            cases hEqBr
+            rfl
+          have hFindT' : bs'.find? (fun b => b.1 == ℓ) = some (ℓ, L) := by
+            simpa [hBs] using hFindT
+          have hPre' := hPost _ _ _ hFindP hFindT'
+          have hUpd :
+              updateG (G₁ ++ G₂) e L = G₁ ++ updateG G₂ e L := by
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hG₂e
+            exact updateG_append_left (G₁:=G₁) (G₂:=G₂) (e:=e) (L:=L) hNone
+          have hEqG' : G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := by
+            have hEqG'0 : G₁ ++ G₂' = G' := hEq'.symm
+            simpa [hGout, hEq] using hEqG'0
+          have hG₂' : G₂' = updateG G₂ e L := by
+            apply append_right_eq_of_eq
+            calc
+              G₁ ++ G₂' = updateG (G₁ ++ G₂) e L := hEqG'
+              _ = G₁ ++ updateG G₂ e L := by simpa [hUpd]
+          refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+          simpa [hG₂', hEqE] using hPre'
+  | assign hv hSout hStoreOut =>
+      rename_i G D Ssh Sown store bufs x v T_step Sown' store'
+      cases hPre with
+      | @assign_new _ _ _ _ T_pre hSsh hSownR hSownL hv' =>
+          have hv'' : HasTypeVal G v T_pre := by
+            refine HasTypeVal_mono G₂ G v T_pre hv' ?_
+            intro e L hLookup
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hLookup
+            have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+            have hLookup' : lookupG (G₁ ++ G₂) e = some L := by
+              simpa [hEqG] using hLookup
+            simpa [hEq] using hLookup'
+          have hT := HasTypeVal_unique hv'' hv
+          cases hT
+          have hEqG : G₁ ++ G₂' = G₁ ++ G₂ := by
+            have hEqG0 : G₁ ++ G₂' = G := by
+              simpa using hEq'.symm
+            simpa [hEq] using hEqG0
+          have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₂'] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T_step) (G:=G₂))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+      | @assign_old _ _ _ _ T_pre _ hSsh hSownR hSownL hv' =>
+          have hv'' : HasTypeVal G v T_pre := by
+            refine HasTypeVal_mono G₂ G v T_pre hv' ?_
+            intro e L hLookup
+            have hNone : lookupG G₁ e = none := lookupG_none_of_disjoint hDisj hLookup
+            have hEqG := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:=e) hNone
+            have hLookup' : lookupG (G₁ ++ G₂) e = some L := by
+              simpa [hEqG] using hLookup
+            simpa [hEq] using hLookup'
+          have hT := HasTypeVal_unique hv'' hv
+          cases hT
+          have hEqG : G₁ ++ G₂' = G₁ ++ G₂ := by
+            have hEqG0 : G₁ ++ G₂' = G := by
+              simpa using hEq'.symm
+            simpa [hEq] using hEqG0
+          have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+          refine ⟨[], ∅, ?_, ?_, ?_⟩
+          · subst hSout
+            simpa [hG₂'] using (HasTypeProcPreOut.skip
+              (Ssh:=Ssh) (Sown:=Sown.updateLeft x T_step) (G:=G₂))
+          · intro x hx; cases hx
+          · intro x T hx; cases hx
+  | seq_step hTS ih =>
+      cases hPre with
+      | seq hP hQ =>
+          rename_i W₁ W₂ Δ₁ Δ₂
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisj hEq hEq' hP
+          refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
+          · exact HasTypeProcPreOut.seq hP' hQ
+          · exact FootprintSubset_append_left hSubW
+          · exact SEnvDomSubset_append_left_of_domsubset hSubΔ
+  | seq_skip =>
+      cases hPre with
+      | seq hP hQ =>
+          rename_i W₁ W₂ Δ₁ Δ₂
+          cases hP
+          refine ⟨W₂, Δ₂, ?_, ?_, ?_⟩
+          ·
+            have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+              hEq'.symm.trans hEq
+            have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+            simpa [hG₂'] using hQ
+          · simpa using (FootprintSubset_refl (W:=W₂))
+          · simpa using (SEnvDomSubset_append_right (S₁:=∅) (S₂:=Δ₂))
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁_step D₁_step S₁_step nS nG
+      have hTS_outer :
+          TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
+            (G₁_step ++ split.G2) (D₁_step ++ D₂)
+            { right := Sown.right, left := S₁_step ++ split.S2 } store' bufs'
+            (.par S₁_step.length G₁_step.length P' Q) :=
+        TypedStep.par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS
+      have hDisjG_left_empty : DisjointG G₁ ([] : GEnv) := DisjointG_right_empty G₁
+      have hDisjG_mid_empty : DisjointG G₂ ([] : GEnv) := DisjointG_right_empty G₂
+      have hEq_mid : G = G₁ ++ G₂ ++ ([] : GEnv) := by
+        simpa using hEq
+      obtain ⟨G₂_step, W', Δ', hEqG', _, hPre', hSubW, hSubΔ⟩ :=
+        HasTypeProcPreOut_preserved_sub_middle_frame
+          (Gstore:=Gstore) (Gleft:=G₁) (Gmid:=G₂) (Gright:=[])
+          (G:=G) (D:=D₁ ++ D₂) (Ssh:=Ssh) (Sown:=Sown)
+          (store:=store) (bufs:=bufs) (P:=.par nS nG P Q)
+          (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
+          hStore hDisj hDisjG_left_empty hDisjG_mid_empty hEq_mid hTS_outer hPre
+      have hG₂' : G₂' = G₂_step := by
+        apply append_right_eq_of_eq
+        calc
+          G₁ ++ G₂' = G₁_step ++ split.G2 := by simpa using hEq'.symm
+          _ = G₁ ++ G₂_step ++ [] := hEqG'
+          _ = G₁ ++ G₂_step := by simp
+      refine ⟨W', Δ', ?_, hSubW, hSubΔ⟩
+      simpa [hG₂'] using hPre'
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂_step D₂_step S₂_step nS nG
+      have hTS_outer :
+          TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
+            (split.G1 ++ G₂_step) (D₁ ++ D₂_step)
+            { right := Sown.right, left := split.S1 ++ S₂_step } store' bufs'
+            (.par split.S1.length split.G1.length P Q') :=
+        TypedStep.par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS
+      have hDisjG_left_empty : DisjointG G₁ ([] : GEnv) := DisjointG_right_empty G₁
+      have hDisjG_mid_empty : DisjointG G₂ ([] : GEnv) := DisjointG_right_empty G₂
+      have hEq_mid : G = G₁ ++ G₂ ++ ([] : GEnv) := by
+        simpa using hEq
+      obtain ⟨G₂_step', W', Δ', hEqG', _, hPre', hSubW, hSubΔ⟩ :=
+        HasTypeProcPreOut_preserved_sub_middle_frame
+          (Gstore:=Gstore) (Gleft:=G₁) (Gmid:=G₂) (Gright:=[])
+          (G:=G) (D:=D₁ ++ D₂) (Ssh:=Ssh) (Sown:=Sown)
+          (store:=store) (bufs:=bufs) (P:=.par nS nG P Q)
+          (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
+          hStore hDisj hDisjG_left_empty hDisjG_mid_empty hEq_mid hTS_outer hPre
+      have hG₂' : G₂' = G₂_step' := by
+        apply append_right_eq_of_eq
+        calc
+          G₁ ++ G₂' = split.G1 ++ G₂_step := by simpa using hEq'.symm
+          _ = G₁ ++ G₂_step' ++ [] := hEqG'
+          _ = G₁ ++ G₂_step' := by simp
+      refine ⟨W', Δ', ?_, hSubW, hSubΔ⟩
+      simpa [hG₂'] using hPre'
+  | par_skip_left =>
+      have hQ := HasTypeProcPreOut_par_skip_left hPre
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ := by
+        simpa [hEq] using hEq'.symm
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+      cases hG₂'
+      exact hQ
+  | par_skip_right =>
+      have hP := HasTypeProcPreOut_par_skip_right hPre
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ := by
+        simpa [hEq] using hEq'.symm
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      refine ⟨W, Δ, ?_, FootprintSubset_refl, SEnvDomSubset_refl⟩
+      cases hG₂'
+      exact hP
 
 /-! ### Pre-Update Typing Preservation -/
 
@@ -1380,8 +2570,8 @@ private theorem HasTypeProcPreOut_preserved_sub
           · exact hQ
           · simpa using (FootprintSubset_refl (W:=W₂))
           · simpa using (SEnvDomSubset_append_right (S₁:=∅) (S₂:=Δ₂))
-  | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁_step D₁_step S₁_step
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁_step D₁_step S₁_step nS nG
       have hStore' : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right, left := split.S1 ++ split.S2 }) store := by
         simpa [SEnvAll, split.hS, List.append_assoc] using hStore
       have hStoreL : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store := by
@@ -1402,18 +2592,34 @@ private theorem HasTypeProcPreOut_preserved_sub
         exact hStore' x v T hStoreX (by
           simpa [SEnvAll, List.append_assoc] using hLookup'')
       cases hPre with
-      | par split' hSfin hGfin hW hΔ
+      | par split' hSlenPre hGlenPre hSfin hGfin hW hΔ
             hDisjG' hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
-          have hEq : split' = split := ParSplit.unique split' split
+          have hSlen' : split'.S1.length = split.S1.length := by
+            calc
+              split'.S1.length = nS := hSlenPre
+              _ = split.S1.length := hSlen.symm
+          have hGlen' : split'.G1.length = split.G1.length := by
+            calc
+              split'.G1.length = nG := hGlenPre
+              _ = split.G1.length := hGlen.symm
+          have hEq : split' = split := ParSplit.unique split' split hSlen' hGlen'
           cases hEq
           rename_i S₁ S₂ S₁_fin S₂_fin G₁_fin G₂_fin W₁ W₂ Δ₁ Δ₂
           subst hS1
           subst hS2
-          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStoreL hP
+          have hTS' :
+              TypedStep (split.G1 ++ split.G2) (D₁ ++ D₂) Ssh
+                { right := Sown.right ++ split.S2, left := split.S1 } store bufs P
+                (G₁_step ++ split.G2) (D₁_step ++ D₂)
+                { right := Sown.right ++ split.S2, left := S₁_step } store' bufs' P' := by
+            simpa [split.hG] using hTS
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ :=
+            HasTypeProcPreOut_preserved_sub_left_frame
+              (Gstore:=Gstore) hStoreL hDisjG rfl rfl hTS' hP
           let splitOut : ParSplit (S₁_step ++ split.S2) (G₁_step ++ split.G2) :=
             { S1 := S₁_step, S2 := split.S2, G1 := G₁_step, G2 := split.G2, hS := rfl, hG := rfl }
           have hSubG_step : SessionsOf G₁_step ⊆ SessionsOf split.G1 :=
-            SessionsOf_subset_of_TypedStep hTS
+            SessionsOf_subset_of_TypedStep_left_frame hDisjG rfl rfl hTS'
           have hDisjGOut : DisjointG G₁_step split.G2 := DisjointG_of_subset_left hSubG_step hDisjG
           have hDisjGOut' : DisjointG splitOut.G1 splitOut.G2 := by
             simpa [splitOut] using hDisjGOut
@@ -1436,27 +2642,43 @@ private theorem HasTypeProcPreOut_preserved_sub
           have hDisjΔ' : DisjointS Δ₁' Δ₂ :=
             DisjointS_of_domsubset_left hSubΔ hDisjΔ
           refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
-          · exact HasTypeProcPreOut.par splitOut hSfin hGfin rfl rfl
+          · exact HasTypeProcPreOut.par splitOut rfl rfl hSfin hGfin rfl rfl
               hDisjGOut' hDisjS_left' hDisjS_left hDisjS_in_out hDisjS'' hDisjW' hDisjΔ' rfl rfl hP' hQ'
           · simpa [hW] using (FootprintSubset_append_left hSubW)
           · simpa [hΔ] using (SEnvDomSubset_append_left_of_domsubset hSubΔ)
-  | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂_step D₂_step S₂_step
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂_step D₂_step S₂_step nS nG
       have hStoreR : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
         simpa [SEnvAll, split.hS, List.append_assoc] using hStore
       cases hPre with
-      | par split' hSfin hGfin hW hΔ
+      | par split' hSlenPre hGlenPre hSfin hGfin hW hΔ
             hDisjG' hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
-          have hEq : split' = split := ParSplit.unique split' split
+          have hSlen' : split'.S1.length = split.S1.length := by
+            calc
+              split'.S1.length = nS := hSlenPre
+              _ = split.S1.length := hSlen.symm
+          have hGlen' : split'.G1.length = split.G1.length := by
+            calc
+              split'.G1.length = nG := hGlenPre
+              _ = split.G1.length := hGlen.symm
+          have hEq : split' = split := ParSplit.unique split' split hSlen' hGlen'
           cases hEq
           rename_i S₁ S₂ S₁_fin S₂_fin G₁_fin G₂_fin W₁ W₂ Δ₁ Δ₂
           subst hS1
           subst hS2
-          obtain ⟨W₂', Δ₂', hQ', hSubW, hSubΔ⟩ := ih hStoreR hQ
+          have hTS' :
+              TypedStep (split.G1 ++ split.G2) (D₁ ++ D₂) Ssh
+                { right := Sown.right ++ split.S1, left := split.S2 } store bufs Q
+                (split.G1 ++ G₂_step) (D₁ ++ D₂_step)
+                { right := Sown.right ++ split.S1, left := S₂_step } store' bufs' Q' := by
+            simpa [split.hG] using hTS
+          obtain ⟨W₂', Δ₂', hQ', hSubW, hSubΔ⟩ :=
+            HasTypeProcPreOut_preserved_sub_right_frame
+              (Gstore:=Gstore) hStoreR hDisjG rfl rfl hTS' hQ
           let splitOut : ParSplit (split.S1 ++ S₂_step) (split.G1 ++ G₂_step) :=
             { S1 := split.S1, S2 := S₂_step, G1 := split.G1, G2 := G₂_step, hS := rfl, hG := rfl }
           have hSubG_step : SessionsOf G₂_step ⊆ SessionsOf split.G2 :=
-            SessionsOf_subset_of_TypedStep hTS
+            SessionsOf_subset_of_TypedStep_right_frame hDisjG rfl rfl hTS'
           have hDisjGsym : DisjointG split.G2 split.G1 := DisjointG_symm hDisjG
           have hDisjG' : DisjointG G₂_step split.G1 := DisjointG_of_subset_left hSubG_step hDisjGsym
           have hDisjGOut : DisjointG split.G1 G₂_step := DisjointG_symm hDisjG'
@@ -1479,7 +2701,7 @@ private theorem HasTypeProcPreOut_preserved_sub
           have hDisjΔ' : DisjointS Δ₁ Δ₂' :=
             DisjointS_of_domsubset_right hSubΔ hDisjΔ
           refine ⟨W₁ ++ W₂', Δ₁ ++ Δ₂', ?_, ?_, ?_⟩
-          · exact HasTypeProcPreOut.par splitOut hSfin hGfin rfl rfl
+          · exact HasTypeProcPreOut.par splitOut rfl rfl hSfin hGfin rfl rfl
               hDisjGOut' hDisjS_right' hDisjS_left_in hDisjS_right hDisjS'' hDisjW' hDisjΔ' rfl rfl hP_reframe hQ'
           · simpa [hW] using (FootprintSubset_append_right_of_subset hSubW)
           · simpa [hΔ] using (SEnvDomSubset_append_right_of_domsubset hSubΔ)

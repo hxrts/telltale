@@ -40,7 +40,7 @@ noncomputable section
 inductive Process where
   | skip : Process
   | seq : Process → Process → Process
-  | par : Process → Process → Process
+  | par : Nat → Nat → Process → Process → Process
   | send : Var → Var → Process  -- send k x: send x through channel k
   | recv : Var → Var → Process  -- recv k x: receive into x through channel k
   | select : Var → Label → Process  -- select k ℓ
@@ -59,7 +59,7 @@ def isSkip : Process → Bool
 def freeVarsImmediate : Process → List Var
   | .skip => []
   | .seq P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
-  | .par P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
+  | .par _ _ P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
   | .send k x => [k, x]
   | .recv k _ => [k]  -- x is bound
   | .select k _ => [k]

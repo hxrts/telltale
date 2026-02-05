@@ -70,7 +70,18 @@ structure ParSplit (S : SEnv) (G : GEnv) where
   hS : S = S1 ++ S2
   hG : G = G1 ++ G2
 
-axiom ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G) : s₁ = s₂
+theorem ParSplit.unique {S : SEnv} {G : GEnv} (s₁ s₂ : ParSplit S G)
+    (hSlen : s₁.S1.length = s₂.S1.length)
+    (hGlen : s₁.G1.length = s₂.G1.length) : s₁ = s₂ := by
+  have hSS : s₁.S1 ++ s₁.S2 = s₂.S1 ++ s₂.S2 := by
+    rw [← s₁.hS, ← s₂.hS]
+  have hGG : s₁.G1 ++ s₁.G2 = s₂.G1 ++ s₂.G2 := by
+    rw [← s₁.hG, ← s₂.hG]
+  have hS1 := List.append_inj_left hSS hSlen
+  have hS2 := List.append_inj_right hSS hSlen
+  have hG1 := List.append_inj_left hGG hGlen
+  have hG2 := List.append_inj_right hGG hGlen
+  cases s₁; cases s₂; simp_all
 
 /-- DEnv consistency with GEnv: all sessions in D appear in G. -/
 def DConsistent (G : GEnv) (D : DEnv) : Prop :=
@@ -587,10 +598,10 @@ inductive HasTypeProcN : SessionId → SEnv → GEnv → DEnv → Process → Pr
       HasTypeProcN n S G D (.seq P Q)
 
   /-- Parallel composition (simplified, without linear splitting). -/
-  | par {n S G D P Q} :
+  | par {n S G D P Q nS nG} :
       HasTypeProcN n S G D P →
       HasTypeProcN n S G D Q →
-      HasTypeProcN n S G D (.par P Q)
+      HasTypeProcN n S G D (.par nS nG P Q)
 
   /-- Send: send value x through channel k.
       Requires:

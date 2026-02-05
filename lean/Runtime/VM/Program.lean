@@ -117,7 +117,7 @@ def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
       let table := branches.map (fun b => (b.1, 0))
       [Instr.choose (regOf k) table]
   | .seq p₁ p₂ => compileBlock p₁ ++ compileBlock p₂
-  | .par p₁ p₂ => compileBlock p₁ ++ compileBlock p₂
+  | .par _ _ p₁ p₂ => compileBlock p₁ ++ compileBlock p₂
   | .newSession _ _ p' => compileBlock p'
 
 /-- Compile a process into a program (stub). Deprecated. Use `compileLocalTypeR` or

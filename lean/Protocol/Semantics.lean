@@ -116,13 +116,13 @@ inductive StepBase : Config → Config → Prop where
       StepBase C { C with proc := Q }
 
   /-- Par with skip left: par skip Q → Q -/
-  | par_skip_left {C Q} :
-      C.proc = .par .skip Q →
+  | par_skip_left {C Q nS nG} :
+      C.proc = .par nS nG .skip Q →
       StepBase C { C with proc := Q }
 
   /-- Par with skip right: par P skip → P -/
-  | par_skip_right {C P} :
-      C.proc = .par P .skip →
+  | par_skip_right {C P nS nG} :
+      C.proc = .par nS nG P .skip →
       StepBase C { C with proc := P }
 
 /-! ## Contextual Step Relation -/
@@ -139,16 +139,16 @@ inductive Step : Config → Config → Prop where
       Step C { C' with proc := .seq C'.proc Q }
 
   /-- Step in left of par. -/
-  | par_left {C C' P Q} :
-      C.proc = .par P Q →
+  | par_left {C C' P Q nS nG nS' nG'} :
+      C.proc = .par nS nG P Q →
       Step { C with proc := P } C' →
-      Step C { C' with proc := .par C'.proc Q }
+      Step C { C' with proc := .par nS' nG' C'.proc Q }
 
   /-- Step in right of par. -/
-  | par_right {C C' P Q} :
-      C.proc = .par P Q →
+  | par_right {C C' P Q nS nG nS' nG'} :
+      C.proc = .par nS nG P Q →
       Step { C with proc := Q } C' →
-      Step C { C' with proc := .par P C'.proc }
+      Step C { C' with proc := .par nS' nG' P C'.proc }
 
 /-! ## Step Properties -/
 
@@ -158,7 +158,7 @@ inductive Step : Config → Config → Prop where
     non-determinism is `par skip skip` which can reduce via either
     `par_skip_left` or `par_skip_right`. -/
 theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂) :
-    C₁ = C₂ ∨ (∃ P Q, C.proc = .par P Q) := by
+    C₁ = C₂ ∨ (∃ nS nG P Q, C.proc = .par nS nG P Q) := by
   cases h₁ with
   | send hProc₁ hk₁ hx₁ hG₁ =>
     cases h₂ with
@@ -284,7 +284,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       left
       have heq := hProc₁.symm.trans hProc₂
       simp only [Process.seq.injEq] at heq
-      obtain ⟨_, hQ_eq⟩ := heq
+      rcases heq with ⟨_, ⟨_, ⟨_, hQ_eq⟩⟩⟩
       simp only [hQ_eq]
     | _ => simp_all
   | par_skip_left hProc₁ =>
@@ -297,7 +297,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       simp only [hQ_eq]
     | par_skip_right hProc₂ =>
       right
-      exact ⟨_, _, hProc₁⟩
+      exact ⟨_, _, _, _, hProc₁⟩
     | _ => simp_all
   | par_skip_right hProc₁ =>
     cases h₂ with
@@ -305,11 +305,11 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       left
       have heq := hProc₁.symm.trans hProc₂
       simp only [Process.par.injEq] at heq
-      obtain ⟨hP_eq, _⟩ := heq
+      rcases heq with ⟨_, ⟨_, ⟨hP_eq, _⟩⟩⟩
       simp only [hP_eq]
     | par_skip_left hProc₂ =>
       right
-      exact ⟨_, _, hProc₁⟩
+      exact ⟨_, _, _, _, hProc₁⟩
     | _ => simp_all
 
 /-- A configuration terminates if its process is skip. -/

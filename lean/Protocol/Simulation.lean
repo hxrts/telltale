@@ -117,7 +117,7 @@ def stepBaseDecide (C : Config) : Option Config :=
     | .skip => some { C with proc := Q }  -- seq skip Q → Q
     | _ => none  -- Would need recursive step in P
 
-  | .par P Q =>
+  | .par nS nG P Q =>
     match P with
     | .skip => some { C with proc := Q }  -- par skip Q → Q
     | _ =>
@@ -129,7 +129,7 @@ def stepBaseDecide (C : Config) : Option Config :=
 private def procSize : Process → Nat
   | .skip => 0
   | .seq P Q => procSize P + procSize Q + 1
-  | .par P Q => procSize P + procSize Q + 1
+  | .par _ _ P Q => procSize P + procSize Q + 1
   | .send _ _ => 0
   | .recv _ _ => 0
   | .select _ _ => 0
@@ -142,12 +142,14 @@ private lemma procSize_lt_seq_left (P Q : Process) : procSize P < procSize (.seq
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
   simp [procSize, Nat.add_assoc]
 
-private lemma procSize_lt_par_left (P Q : Process) : procSize P < procSize (.par P Q) := by
+private lemma procSize_lt_par_left (nS nG : Nat) (P Q : Process) :
+    procSize P < procSize (.par nS nG P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
   simp [procSize, Nat.add_assoc]
 
-private lemma procSize_lt_par_right (P Q : Process) : procSize Q < procSize (.par P Q) := by
+private lemma procSize_lt_par_right (nS nG : Nat) (P Q : Process) :
+    procSize Q < procSize (.par nS nG P Q) := by
   have hpos : 0 < procSize P + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_left (n := procSize Q) hpos
   simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
@@ -168,7 +170,7 @@ private def stepDecideAux (proc : Process) (C : Config) : Option Config :=
       | some C' => some { C' with proc := .seq C'.proc Q }
       | none => none
 
-  | .par P Q =>
+  | .par nS nG P Q =>
     if P = .skip then
       some { C with proc := Q }
     else if Q = .skip then
@@ -176,11 +178,11 @@ private def stepDecideAux (proc : Process) (C : Config) : Option Config :=
     else
       -- Try left first
       match stepDecideAux P { C with proc := P } with
-      | some C' => some { C' with proc := .par C'.proc Q }
+      | some C' => some { C' with proc := .par nS nG C'.proc Q }
       | none =>
         -- Try right
         match stepDecideAux Q { C with proc := Q } with
-        | some C' => some { C' with proc := .par P C'.proc }
+        | some C' => some { C' with proc := .par nS nG P C'.proc }
         | none => none
 
   | _ => stepBaseDecide C
@@ -395,7 +397,7 @@ theorem stepBaseDecide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
         simpa [stepBaseDecide, hProc, hP] using h.symm
       subst hC'
       exact StepBase.seq2 (by simpa [hP] using hProc)
-  | par P Q =>
+  | par nS nG P Q =>
       cases hP : P with
       | skip =>
           have hC' : C' = { C with proc := Q } := by
@@ -453,7 +455,7 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
             have hStepSub : Step { C with proc := P } C0 := by
               exact ih _ hlt _ hsub
             exact Step.seq_left hProc hStepSub
-  | par P Q =>
+  | par nS nG P Q =>
       by_cases hPskip : P = .skip
       · subst hPskip
         have hC' : C' = { C with proc := Q } := by
@@ -470,11 +472,11 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
           | some C0 =>
               have hsub' : stepDecideAux P { C with proc := P } = some C0 := by
                 simpa [stepDecide] using hsub
-              have hC' : C' = { C0 with proc := .par C0.proc Q } := by
+              have hC' : C' = { C0 with proc := .par nS nG C0.proc Q } := by
                 simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub'] using hstep.symm
               subst hC'
               have hlt : procSize ({ C with proc := P }.proc) < procSize C.proc := by
-                simpa [hProc] using procSize_lt_par_left P Q
+                simpa [hProc] using procSize_lt_par_left nS nG P Q
               have hStepSub : Step { C with proc := P } C0 := by
                 exact ih _ hlt _ hsub
               exact Step.par_left hProc hStepSub
@@ -485,11 +487,11 @@ theorem stepDecide_sound {C C' : Config} (h : stepDecide C = some C') :
               | some C0 =>
                   have hsubR' : stepDecideAux Q { C with proc := Q } = some C0 := by
                     simpa [stepDecide] using hsubR
-                  have hC' : C' = { C0 with proc := .par P C0.proc } := by
+                  have hC' : C' = { C0 with proc := .par nS nG P C0.proc } := by
                     simpa [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR'] using hstep.symm
                   subst hC'
                   have hlt : procSize ({ C with proc := Q }.proc) < procSize C.proc := by
-                    simpa [hProc] using procSize_lt_par_right P Q
+                    simpa [hProc] using procSize_lt_par_right nS nG P Q
                   have hStepSub : Step { C with proc := Q } C0 := by
                     exact ih _ hlt _ hsubR
                   exact Step.par_right hProc hStepSub

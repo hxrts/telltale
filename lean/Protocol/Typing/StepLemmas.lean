@@ -111,36 +111,10 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       exact ih
   | seq_skip =>
       simp
-  | par_left split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P P' Q S G D₁ D₂ G₁' D₁' S₁'
-      intro s hs
-      have hs' : s ∈ SessionsOfD D₁' ∪ SessionsOfD D₂ :=
-        SessionsOfD_append_subset (D₁:=D₁') (D₂:=D₂) hs
-      cases hs' with
-      | inl hleft =>
-          have hleft' : s ∈ SessionsOfD D₁ ∪ SessionsOf split.G1 := ih hleft
-          cases hleft' with
-          | inl hD1 =>
-              exact Or.inl (SessionsOfD_append_left (D₂:=D₂) hD1)
-          | inr hG1 =>
-              exact Or.inr (by simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hG1)
-      | inr hright =>
-          exact Or.inl (SessionsOfD_append_right (D₁:=D₁) hright)
-  | par_right split hTS hDisjG hDisjD hDisjS hConsL hConsR ih =>
-      rename_i Ssh store bufs store' bufs' P Q Q' S G D₁ D₂ G₂' D₂' S₂'
-      intro s hs
-      have hs' : s ∈ SessionsOfD D₁ ∪ SessionsOfD D₂' :=
-        SessionsOfD_append_subset (D₁:=D₁) (D₂:=D₂') hs
-      cases hs' with
-      | inl hleft =>
-          exact Or.inl (SessionsOfD_append_left (D₂:=D₂) hleft)
-      | inr hright =>
-          have hright' : s ∈ SessionsOfD D₂ ∪ SessionsOf split.G2 := ih hright
-          cases hright' with
-          | inl hD2 =>
-              exact Or.inl (SessionsOfD_append_right (D₁:=D₁) hD2)
-          | inr hG2 =>
-              exact Or.inr (by simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hG2)
+  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih
+  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih
   | par_skip_left =>
       simp
   | par_skip_right =>

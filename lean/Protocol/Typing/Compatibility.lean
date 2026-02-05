@@ -890,10 +890,10 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
       exact hDom
   | seq hP hQ ihP ihQ =>
       exact SEnvDomSubset_trans ihP ihQ
-  | par split hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
-      hS1 hS2 hP hQ ihP ihQ =>
+  | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hS1 hS2 hP hQ ihP ihQ =>
       -- Show dom subset for the left portion of the owned env.
-      rename_i S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂
+      rename_i S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
       intro x T hLookup
       have hLookupS : lookupSEnv (split.S1 ++ split.S2) x = some T := by
         simpa [split.hS, hS1, hS2] using hLookup

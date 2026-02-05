@@ -185,12 +185,12 @@ inductive HasTypeProcPre : SEnv → OwnedEnv → GEnv → Process → Prop where
       HasTypeProcPre Ssh Sown G (.seq P Q)
 
   /-- Parallel composition. -/
-  | par {Ssh Sown G P Q} {S₁ S₂ : SEnv} :
+  | par {Ssh Sown G P Q} {S₁ S₂ : SEnv} {nS nG : Nat} :
       DisjointS S₁ S₂ →
       Sown.left = S₁ ++ S₂ →
       HasTypeProcPre Ssh { right := Sown.right ++ S₂, left := S₁ } G P →
       HasTypeProcPre Ssh { right := Sown.right ++ S₁, left := S₂ } G Q →
-      HasTypeProcPre Ssh Sown G (.par P Q)
+      HasTypeProcPre Ssh Sown G (.par nS nG P Q)
 
   /-- Assignment. -/
   | assign {Ssh Sown G x v T} :
@@ -340,7 +340,9 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
 
   /-- Parallel composition with disjoint resources (explicit split witness). -/
   | par {Ssh Sown G P Q Sfin Gfin Wfin Δfin
-         S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂} (split : ParSplit Sown.left G) :
+         S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG} (split : ParSplit Sown.left G) :
+      split.S1.length = nS →
+      split.G1.length = nG →
       Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
       Gfin = (G₁' ++ G₂') →
       Wfin = (W₁ ++ W₂) →
@@ -358,7 +360,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
         { right := Sown.right ++ S₂, left := S₁' } G₁' W₁ Δ₁ →
       HasTypeProcPreOut Ssh { right := Sown.right ++ S₁, left := S₂ } split.G2 Q
         { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ →
-      HasTypeProcPreOut Ssh Sown G (.par P Q) Sfin Gfin Wfin Δfin
+      HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin
 
   /-- Assignment updates S with x's type. -/
   | assign_new {Ssh Sown G x v T} :
@@ -381,8 +383,8 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
 /-! ### Inversion Helpers for Pre-Out Typing -/
 
 /-- Inversion for parallel pre-out typing with explicit environment splits. -/
-theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin} :
-    HasTypeProcPreOut Ssh Sown G (.par P Q) Sfin Gfin Wfin Δfin →
+theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
+    HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
     ∃ S₁ S₂ G₁ G₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂,
       Sown.left = (S₁ ++ S₂) ∧
       G = (G₁ ++ G₂) ∧
@@ -404,7 +406,7 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin} :
         { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ := by
   intro h
   cases h with
-  | par split hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
+  | par split _ _ hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
       hS1 hS2 hP hQ =>
       cases split with
       | mk S₁ S₂ G₁ G₂ hS hG =>
@@ -541,50 +543,52 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → Store → Buffers 
       TypedStep G D Ssh Sown store bufs (.seq .skip Q)
                 G D Sown store bufs Q
 
-  | par_left {Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁'}
+  | par_left {Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG}
       (split : ParSplit Sown.left G) :
+      split.S1.length = nS →
+      split.G1.length = nG →
       -- Left process transitions with its resources
-      TypedStep split.G1 D₁ Ssh { right := Sown.right ++ split.S2, left := split.S1 } store bufs P
-                G₁' D₁' { right := Sown.right ++ split.S2, left := S₁' } store' bufs' P' →
+      TypedStep G (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S2, left := split.S1 } store bufs P
+                (G₁' ++ split.G2) (D₁' ++ D₂)
+                { right := Sown.right ++ split.S2, left := S₁' } store' bufs' P' →
 
       -- Resources must be disjoint for parallel composition
       DisjointG split.G1 split.G2 →
       DisjointD D₁ D₂ →
       DisjointS split.S1 split.S2 →
-      DConsistent split.G1 D₁ →
-      DConsistent split.G2 D₂ →
 
       -- Combined transition
-      TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par P Q)
+      TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
                 (G₁' ++ split.G2) (D₁' ++ D₂) { right := Sown.right, left := S₁' ++ split.S2 }
-                store' bufs' (.par P' Q)
+                store' bufs' (.par S₁'.length G₁'.length P' Q)
 
-  | par_right {Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂'}
+  | par_right {Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG}
       (split : ParSplit Sown.left G) :
+      split.S1.length = nS →
+      split.G1.length = nG →
       -- Right process transitions with its resources
-      TypedStep split.G2 D₂ Ssh { right := Sown.right ++ split.S1, left := split.S2 } store bufs Q
-                G₂' D₂' { right := Sown.right ++ split.S1, left := S₂' } store' bufs' Q' →
+      TypedStep G (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S1, left := split.S2 } store bufs Q
+                (split.G1 ++ G₂') (D₁ ++ D₂')
+                { right := Sown.right ++ split.S1, left := S₂' } store' bufs' Q' →
 
       -- Resources must be disjoint
       DisjointG split.G1 split.G2 →
       DisjointD D₁ D₂ →
       DisjointS split.S1 split.S2 →
-      DConsistent split.G1 D₁ →
-      DConsistent split.G2 D₂ →
 
       -- Combined transition
-      TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par P Q)
+      TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
                 (split.G1 ++ G₂') (D₁ ++ D₂') { right := Sown.right, left := split.S1 ++ S₂' }
-                store' bufs' (.par P Q')
+                store' bufs' (.par split.S1.length split.G1.length P Q')
 
-  | par_skip_left {G D Ssh Sown store bufs Q} :
+  | par_skip_left {G D Ssh Sown store bufs Q nS nG} :
       -- Skip elimination from parallel
-      TypedStep G D Ssh Sown store bufs (.par .skip Q)
+      TypedStep G D Ssh Sown store bufs (.par nS nG .skip Q)
                 G D Sown store bufs Q
 
-  | par_skip_right {G D Ssh Sown store bufs P} :
+  | par_skip_right {G D Ssh Sown store bufs P nS nG} :
       -- Skip elimination from parallel
-      TypedStep G D Ssh Sown store bufs (.par P .skip)
+      TypedStep G D Ssh Sown store bufs (.par nS nG P .skip)
                 G D Sown store bufs P
 
 
