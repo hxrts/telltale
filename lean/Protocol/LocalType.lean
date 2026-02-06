@@ -148,6 +148,105 @@ def advanceBranch (r : Role) (ℓ : Label) : LocalType → Option LocalType
 
 end LocalType
 
+/-! ## Depth Measure for Weighted Liveness
+
+The depth of a local type counts the maximum number of communication
+actions to termination. This is used in the weighted liveness measure:
+
+  W = 2 * Σ depth(L) + Σ buffer_size(e)
+
+Key property: each communication action decreases depth by at least 1,
+so send decreases W by 2*1 - 1 = 1 (buffer grows), recv by 2*1 + 1 = 3
+(buffer shrinks), select by 1, branch by 3.
+-/
+
+mutual
+  /-- Depth of a local type: maximum communication actions to termination.
+      Uses `max` for branches since only one continuation is taken. -/
+  def LocalType.depth : LocalType → Nat
+    | .send _ _ L => 1 + L.depth
+    | .recv _ _ L => 1 + L.depth
+    | .select _ bs => 1 + LocalType.depthList bs
+    | .branch _ bs => 1 + LocalType.depthList bs
+    | .end_ => 0
+    | .var _ => 0
+    | .mu L => L.depth
+
+  /-- Maximum depth across branch continuations. -/
+  def LocalType.depthList : List (Label × LocalType) → Nat
+    | [] => 0
+    | (_, L) :: rest => max L.depth (LocalType.depthList rest)
+end
+
+namespace LocalType
+
+/-! ### Depth Properties -/
+
+@[simp] theorem depth_end : LocalType.depth .end_ = 0 := rfl
+@[simp] theorem depth_var (n : Nat) : (LocalType.var n).depth = 0 := rfl
+
+theorem depth_send_pos (r : Role) (T : ValType) (L : LocalType) :
+    0 < (LocalType.send r T L).depth := by
+  simp [LocalType.depth]
+
+theorem depth_recv_pos (r : Role) (T : ValType) (L : LocalType) :
+    0 < (LocalType.recv r T L).depth := by
+  simp [LocalType.depth]
+
+theorem depth_select_pos (r : Role) (bs : List (Label × LocalType)) :
+    0 < (LocalType.select r bs).depth := by
+  simp [LocalType.depth]
+
+theorem depth_branch_pos (r : Role) (bs : List (Label × LocalType)) :
+    0 < (LocalType.branch r bs).depth := by
+  simp [LocalType.depth]
+
+/-- Advancing through send decreases depth. -/
+theorem depth_advance_send (r : Role) (T : ValType) (L : LocalType) :
+    L.depth < (LocalType.send r T L).depth := by
+  show L.depth < 1 + L.depth
+  omega
+
+/-- Advancing through recv decreases depth. -/
+theorem depth_advance_recv (r : Role) (T : ValType) (L : LocalType) :
+    L.depth < (LocalType.recv r T L).depth := by
+  show L.depth < 1 + L.depth
+  omega
+
+/-- A branch continuation has depth at most the depthList. -/
+theorem depthList_mem_le (ℓ : Label) (L : LocalType) (bs : List (Label × LocalType))
+    (h : (ℓ, L) ∈ bs) :
+    L.depth ≤ LocalType.depthList bs := by
+  induction bs with
+  | nil => cases h
+  | cons hd tl ih =>
+    obtain ⟨ℓ', L'⟩ := hd
+    simp only [LocalType.depthList]
+    rcases List.mem_cons.mp h with heq | hmem
+    · have hL : L = L' := congrArg Prod.snd heq
+      rw [hL]
+      exact Nat.le_max_left _ _
+    · have htl := ih hmem
+      exact Nat.le_trans htl (Nat.le_max_right _ _)
+
+/-- Selecting a branch strictly decreases depth. -/
+theorem depth_advance_select (r : Role) (bs : List (Label × LocalType))
+    (ℓ : Label) (L : LocalType) (h : (ℓ, L) ∈ bs) :
+    L.depth < (LocalType.select r bs).depth := by
+  show L.depth < 1 + LocalType.depthList bs
+  have := depthList_mem_le ℓ L bs h
+  omega
+
+/-- Branching strictly decreases depth. -/
+theorem depth_advance_branch (r : Role) (bs : List (Label × LocalType))
+    (ℓ : Label) (L : LocalType) (h : (ℓ, L) ∈ bs) :
+    L.depth < (LocalType.branch r bs).depth := by
+  show L.depth < 1 + LocalType.depthList bs
+  have := depthList_mem_le ℓ L bs h
+  omega
+
+end LocalType
+
 /-- Shorthand constructors -/
 abbrev LocalType.send' (r : Role) (T : ValType) (L : LocalType) := LocalType.send r T L
 abbrev LocalType.recv' (r : Role) (T : ValType) (L : LocalType) := LocalType.recv r T L

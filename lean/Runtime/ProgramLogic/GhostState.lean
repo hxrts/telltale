@@ -146,9 +146,14 @@ structure FinalizationToken where
     Actual implementation needs encoding for ScopeId. -/
 abbrev FinalizationRA := List (Positive × FinalizationMode)
 
+instance : Iris.Countable ScopeId where
+  encode s := Iris.Countable.encode s.id
+  decode n := ScopeId.mk <$> Iris.Countable.decode n
+  decode_encode s := by simp [Iris.Countable.decode_encode]
+
 /-- Encode ScopeId to Positive. -/
 def encodeScopeId (s : ScopeId) : Positive :=
-  [Iris.Countable.encode s]
+  [Iris.Countable.encode s.id]
 
 variable [GhostMapSlot FinalizationMode]
 
@@ -222,6 +227,8 @@ structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
   effectSlice : EffectModel.EffectCtx ε -- Effect context slice.
   progressTokens : List (SessionId × Endpoint × Nat) -- Liveness tokens.
   knowledge : List KnowledgeFact -- Knowledge facts.
+
+variable [GhostMapSlot LocalType]
 
 def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : iProp :=

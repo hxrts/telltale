@@ -33,7 +33,7 @@ Once resolved, the proofs here connect to VM execution via:
 - `instr_frame`: instruction i preserves SessionCoherent s when s ∉ footprint(i)
 - `cross_session_diamond`: disjoint footprints → commutativity
 
-See `work/vm_session.md` for the full design document.
+See `work/vm_instructions.md` for the full specification.
 -/
 
 set_option autoImplicit false

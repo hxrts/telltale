@@ -972,7 +972,15 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hGrecv' : lookupG (G₁ ++ G₂) recvEp = some Lrecv := lookupG_append_left hGrecv
   have hActive' : ActiveEdge (G₁ ++ G₂) e := by
-    simp [ActiveEdge, hGrecv']
+    simp only [ActiveEdge]
+    constructor
+    · -- Sender isSome in G₁ ++ G₂
+      have hS := hActive.1
+      simp only [Option.isSome_iff_exists] at hS ⊢
+      obtain ⟨Ls, hLs⟩ := hS
+      exact ⟨Ls, lookupG_append_left hLs⟩
+    · -- Receiver isSome in G₁ ++ G₂
+      rw [hGrecv']; trivial
   have hCoh' := hCoh e hActive' Lrecv hGrecv'
   rcases hCoh' with ⟨Lsender, hGsenderMerged, hConsume⟩
   -- sender must live in G₁ because sessions are disjoint and receiver is in G₁

@@ -23,15 +23,15 @@ unfolding.
 
 ## Relationship to Gibbs
 
-| Gibbs (continuous)          | Telltale (discrete)                |
-|-----------------------------|------------------------------------|
-| `LyapunovData`             | `ProgressMeasureData`              |
-| `StrictLyapunovData`       | `StrictProgressMeasureData`        |
-| `PhasePoint n → ℝ`         | `State → ℕ`                       |
-| `V_decreasing`             | `step_nonincreasing`               |
-| `V_to_zero`                | `productive_step_decreasing`       |
-| `HasDerivAt`               | `step s = some s'`                 |
-| `energy_dissipation`       | communication consumes measure     |
+| Gibbs (continuous)   | Telltale (discrete)            |
+|----------------------|--------------------------------|
+| `LyapunovData`       | `ProgressMeasureData`          |
+| `StrictLyapunovData` | `StrictProgressMeasureData`    |
+| `PhasePoint n → ℝ`   | `State → ℕ`                    |
+| `V_decreasing`       | `step_nonincreasing`           |
+| `V_to_zero`          | `productive_step_decreasing`   |
+| `HasDerivAt`         | `step s = some s'`             |
+| `energy_dissipation` | communication consumes measure |
 
 ## Key Results
 

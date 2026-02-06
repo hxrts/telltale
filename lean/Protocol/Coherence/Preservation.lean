@@ -90,6 +90,8 @@ theorem Coherent_send_preserved
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
     Coherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
   intro sendEdge e hActive  -- The edge we need to show coherence for
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simpa [hG])
 
   -- Case split: updated edge / shares sender endpoint / unrelated
   rcases edge_case_split e sendEdge senderEp with heq | hShare | hOther
@@ -186,7 +188,7 @@ theorem Coherent_send_preserved
         -- Need to show Consume e.sender L (lookupD D e) is some
         -- Original coherence: sender had type .send receiverRole T L, receiver had same type
         -- Consume on SEND type only succeeds with empty trace
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.send receiverRole T L) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
@@ -215,7 +217,7 @@ theorem Coherent_send_preserved
         have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
           simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
         -- Original coherence gives Consume for the unchanged receiver/trace
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         -- Sender endpoint is senderEp, so its updated lookup provides existence
         have hSid : e.sid = senderEp.sid := congrArg Endpoint.sid hSenderMatch
@@ -246,7 +248,7 @@ theorem Coherent_send_preserved
           simpa [hRecvLookup] using hGrecv
         exact (Option.some.inj this).symm
       -- Original coherence: receiver had SEND type, so Consume only works on empty trace
-      have hOrigCoh := Coherent_edge_any hCoh e
+      have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
       have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.send receiverRole T L) := by
         conv => lhs; rw [hSid, hRole]; exact hG
       have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecv
@@ -278,7 +280,7 @@ theorem Coherent_send_preserved
       apply hOther'
       exact Or.inr h.symm
     apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
-    exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh e)
+    exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh hActiveOrig)
 
 /-- Coherence is preserved when we receive a value at q from p.
     Receiving updates:
@@ -312,6 +314,8 @@ theorem Coherent_recv_preserved
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     Coherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
   intro recvEdge e hActive  -- The edge we need to show coherence for
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simpa [hG])
 
   -- Case split: updated edge / shares receiver endpoint / unrelated
   rcases edge_case_split e recvEdge receiverEp with heq | hShare | hOther
@@ -337,7 +341,7 @@ theorem Coherent_recv_preserved
       refine ⟨L, hSenderLookup, ?_⟩
       simp only [lookupD_update_eq]
       -- Original coherence at this edge
-      have hOrigCoh := Coherent_edge_any hCoh recvEdge
+      have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
       -- Receiver's original type was .recv, so original coherence worked
       -- The trace was T :: rest (from hTrace), original Consume consumed T and continued
       -- After recv, we consume from rest
@@ -378,7 +382,7 @@ theorem Coherent_recv_preserved
         exact (Option.some.inj this).symm
       simp only [lookupD_update_eq]
       -- Original coherence
-      have hOrigCoh := Coherent_edge_any hCoh recvEdge
+      have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
       -- Sender existence (unchanged by update)
       rcases EdgeCoherent_sender_of_receiver hOrigCoh hG with ⟨Lsender, hGsender⟩
       have hSenderLookup : lookupG (updateG G receiverEp L) { sid := receiverEp.sid, role := senderRole } = some Lsender := by
@@ -431,7 +435,7 @@ theorem Coherent_recv_preserved
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
         -- Original coherence at e with receiver's original type .recv
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.recv senderRole T L) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
@@ -465,7 +469,7 @@ theorem Coherent_recv_preserved
         intro Lrecv hGrecv
         have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
           simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         have hSid : e.sid = receiverEp.sid := congrArg Endpoint.sid hSenderMatch
         have hRole : e.sender = receiverEp.role := congrArg Endpoint.role hSenderMatch
@@ -490,7 +494,7 @@ theorem Coherent_recv_preserved
           simpa [hRecvLookup] using hGrecv
         exact (Option.some.inj this).symm
       -- Original coherence: receiver had .recv type
-      have hOrigCoh := Coherent_edge_any hCoh e
+      have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
       have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.recv senderRole T L) := by
         conv => lhs; rw [hSid, hRole]; exact hG
       have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecv
@@ -534,7 +538,7 @@ theorem Coherent_recv_preserved
       apply hOther'
       exact Or.inr h.symm
     apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
-    exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh e)
+    exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh hActiveOrig)
 
 /-
 Coherent is preserved when selecting (sending a label).

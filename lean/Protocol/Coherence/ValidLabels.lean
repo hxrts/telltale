@@ -70,8 +70,10 @@ theorem ValidLabels_send_preserved
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
     ValidLabels (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T]))
                (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) := by
-  intro sendEdge e source bs hBranch
+  intro sendEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simpa [hG])
   by_cases hRecvEq : recvEp = senderEp
   · -- Receiver is the updated endpoint: original type is .send, so buffers must be empty.
     have hNoSelf : receiverRole ≠ senderEp.role := by
@@ -93,7 +95,7 @@ theorem ValidLabels_send_preserved
     have hSend : lookupG G recvEp = some (.send receiverRole T L) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
-      trace_empty_when_send_receiver (Coherent_edge_any hCoh e) hSend
+      trace_empty_when_send_receiver (Coherent_edge_any hCoh hActiveOrig) hSend
     have hBufEmpty : lookupBuf bufs e = [] := by
       rcases hBT e with ⟨hLen, _⟩
       cases hBuf : lookupBuf bufs e with
@@ -143,7 +145,7 @@ theorem ValidLabels_send_preserved
           lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e =
             lookupBuf bufs e := by
         exact lookupBuf_update_neq _ _ _ _ (Ne.symm hEdge)
-      have hValidOld := hValid e source bs hBranchOld
+      have hValidOld := hValid e source bs hActiveOrig hBranchOld
       simpa [hBufEq] using hValidOld
 
 /-- ValidLabels is preserved when selecting (sending a label).
@@ -164,8 +166,10 @@ theorem ValidLabels_select_preserved
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
     ValidLabels (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string]))
                (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) := by
-  intro selectEdge e source bs hBranch
+  intro selectEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simpa [hG])
   by_cases hRecvEq : recvEp = selectorEp
   · -- Receiver is the updated endpoint: original type is .select, so buffers must be empty.
     have hNoSelf : targetRole ≠ selectorEp.role := by
@@ -187,7 +191,7 @@ theorem ValidLabels_select_preserved
     have hSelect : lookupG G recvEp = some (.select targetRole selectBranches) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
-      trace_empty_when_select_receiver (Coherent_edge_any hCoh e) hSelect
+      trace_empty_when_select_receiver (Coherent_edge_any hCoh hActiveOrig) hSelect
     have hBufEmpty : lookupBuf bufs e = [] := by
       rcases hBT e with ⟨hLen, _⟩
       cases hBuf : lookupBuf bufs e with
@@ -237,7 +241,7 @@ theorem ValidLabels_select_preserved
           lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e =
             lookupBuf bufs e := by
         exact lookupBuf_update_neq _ _ _ _ (Ne.symm hEdge)
-      have hValidOld := hValid e source bs hBranchOld
+      have hValidOld := hValid e source bs hActiveOrig hBranchOld
       simpa [hBufEq] using hValidOld
 
 /-! ## Buffer Typing Preservation Helpers -/
@@ -536,8 +540,10 @@ theorem ValidLabels_recv_preserved
     let recvEdge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     ValidLabels (updateG G receiverEp L) (updateD D recvEdge (lookupD D recvEdge).tail)
                (updateBuf bufs recvEdge vs) := by
-  intro recvEdge e source bs hBranch
+  intro recvEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simpa [hG])
   have hTypedEdge := hBT recvEdge
   have hTrace : (lookupD D recvEdge).head? = some T :=
     trace_head_from_buffer hBuf hv hTypedEdge
@@ -547,7 +553,7 @@ theorem ValidLabels_recv_preserved
   by_cases hRecvEq : recvEp = receiverEp
   · -- Receiver is the updated endpoint; if L is branch, traces must be empty.
     have hTraceEmpty : lookupD (updateD D recvEdge (lookupD D recvEdge).tail) e = [] :=
-      trace_empty_when_branch_receiver (hCoh' e) hBranch
+      trace_empty_when_branch_receiver (Coherent_edge_any hCoh' hActive) hBranch
     have hBufEmpty : lookupBuf (updateBuf bufs recvEdge vs) e = [] :=
       buffer_empty_of_typed_trace_empty hBT' hTraceEmpty
     simp [hBufEmpty]
@@ -563,7 +569,7 @@ theorem ValidLabels_recv_preserved
       rfl
     have hBufEq : lookupBuf (updateBuf bufs recvEdge vs) e = lookupBuf bufs e := by
       exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
-    have hValidOld := hValid e source bs hBranchOld
+    have hValidOld := hValid e source bs hActiveOrig hBranchOld
     simpa [hBufEq] using hValidOld
 
 theorem ValidLabels_branch_preserved
@@ -579,8 +585,10 @@ theorem ValidLabels_branch_preserved
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
     ValidLabels (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail)
                (updateBuf bufs branchEdge vs) := by
-  intro branchEdge e source bs hBranch
+  intro branchEdge e source bs hActive hBranch
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simpa [hG])
   have hv : HasTypeVal G (.string ℓ) .string := HasTypeVal.string ℓ
   have hTypedEdge := hBT branchEdge
   have hTrace : (lookupD D branchEdge).head? = some .string :=
@@ -591,7 +599,7 @@ theorem ValidLabels_branch_preserved
   by_cases hRecvEq : recvEp = brancherEp
   · -- Receiver is the updated endpoint; if L is branch, traces must be empty.
     have hTraceEmpty : lookupD (updateD D branchEdge (lookupD D branchEdge).tail) e = [] :=
-      trace_empty_when_branch_receiver (hCoh' e) hBranch
+      trace_empty_when_branch_receiver (Coherent_edge_any hCoh' hActive) hBranch
     have hBufEmpty : lookupBuf (updateBuf bufs branchEdge vs) e = [] :=
       buffer_empty_of_typed_trace_empty hBT' hTraceEmpty
     simp [hBufEmpty]
@@ -607,7 +615,7 @@ theorem ValidLabels_branch_preserved
       rfl
     have hBufEq' : lookupBuf (updateBuf bufs branchEdge vs) e = lookupBuf bufs e := by
       exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
-    have hValidOld := hValid e source bs hBranchOld
+    have hValidOld := hValid e source bs hActiveOrig hBranchOld
     simpa [hBufEq'] using hValidOld
 
 /-! ## Initialization Lemma -/

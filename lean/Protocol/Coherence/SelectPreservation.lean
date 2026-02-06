@@ -63,6 +63,8 @@ theorem Coherent_select_preserved
     Coherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
   -- Similar structure to Coherent_send_preserved, with .string for labels
   intro selectEdge e hActive
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simp [hG])
   by_cases heq : e = selectEdge
   · -- Case 1: e = selectEdge
     subst heq
@@ -130,7 +132,7 @@ theorem Coherent_select_preserved
           exact (Option.some.inj this).symm
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
@@ -149,7 +151,7 @@ theorem Coherent_select_preserved
         intro Lrecv hGrecv
         have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
           simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         have hSid : e.sid = selectorEp.sid := congrArg Endpoint.sid hSenderMatch
         have hRole : e.sender = selectorEp.role := congrArg Endpoint.role hSenderMatch
@@ -171,7 +173,7 @@ theorem Coherent_select_preserved
           have : some L = some Lrecv := by
             simpa [hRecvLookup] using hGrecv
           exact (Option.some.inj this).symm
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.select targetRole bs) := by
           conv => lhs; rw [hSid, hRole]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecv
@@ -188,7 +190,7 @@ theorem Coherent_select_preserved
       · -- Neither endpoint is selectorEp
         have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
-        exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh e)
+        exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh hActiveOrig)
 
 /-- Coherent is preserved when branching (receiving a label).
     Branch removes .string from trace HEAD, advances brancher type.
@@ -204,6 +206,8 @@ theorem Coherent_branch_preserved
     Coherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
   -- Similar structure to Coherent_recv_preserved, adapted for branch/select
   intro branchEdge e hActive
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simp [hG])
   by_cases heq : e = branchEdge
   · -- Case 1: e = branchEdge
     subst heq
@@ -222,7 +226,7 @@ theorem Coherent_branch_preserved
         simpa using hRecvLookup
       refine ⟨L, hSenderLookup, ?_⟩
       simp only [lookupD_update_eq]
-      have hOrigCoh := Coherent_edge_any hCoh branchEdge
+      have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
       cases hTraceVal : lookupD D branchEdge with
       | nil =>
         rw [hTraceVal] at hTrace
@@ -249,7 +253,7 @@ theorem Coherent_branch_preserved
           simpa [hRecvLookup, branchEdge] using hGrecv
         exact (Option.some.inj this).symm
       simp only [lookupD_update_eq]
-      have hOrigCoh := Coherent_edge_any hCoh branchEdge
+      have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
       rcases EdgeCoherent_sender_of_receiver hOrigCoh hG with ⟨Lsender, hGsender⟩
       have hSenderLookup : lookupG (updateG G brancherEp L) { sid := brancherEp.sid, role := senderRole } = some Lsender := by
         simpa [lookupG_update_neq _ _ _ _ hSenderNeq] using hGsender
@@ -292,7 +296,7 @@ theorem Coherent_branch_preserved
           exact (Option.some.inj this).symm
         refine ⟨L, hLookupS, ?_⟩
         rw [lookupD_update_neq _ _ _ _ hNeSymm]
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hOrigRecvG : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
           conv => lhs; rw [hSid2, hRole2]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecvG
@@ -311,7 +315,7 @@ theorem Coherent_branch_preserved
         intro Lrecv hGrecv
         have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
           simpa [lookupG_update_neq _ _ _ _ hRecvNoMatch] using hGrecv
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hConsume := EdgeCoherent_consume_of_receiver hOrigCoh hGrecv'
         have hSid : e.sid = brancherEp.sid := congrArg Endpoint.sid hSenderMatch
         have hRole : e.sender = brancherEp.role := congrArg Endpoint.role hSenderMatch
@@ -333,7 +337,7 @@ theorem Coherent_branch_preserved
           have : some L = some Lrecv := by
             simpa [hRecvLookup] using hGrecv
           exact (Option.some.inj this).symm
-        have hOrigCoh := Coherent_edge_any hCoh e
+        have hOrigCoh := Coherent_edge_any hCoh hActiveOrig
         have hOrigRecv : lookupG G { sid := e.sid, role := e.receiver } = some (.branch senderRole bs) := by
           conv => lhs; rw [hSid, hRole]; exact hG
         have hOrig := EdgeCoherent_consume_of_receiver hOrigCoh hOrigRecv
@@ -350,7 +354,7 @@ theorem Coherent_branch_preserved
       · -- Neither endpoint is brancherEp
         have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
         apply EdgeCoherent_updateD_irrelevant _ _ _ _ _ hNeSymm
-        exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh e)
+        exact EdgeCoherent_updateG_irrelevant _ _ _ _ _ hSenderNoMatch hRecvNoMatch (Coherent_edge_any hCoh hActiveOrig)
 
 
 end

@@ -67,8 +67,9 @@ def EdgeCoherent (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
 
 /-! ### Active Edges -/
 
-/-- An edge is active if its receiver endpoint exists in G. -/
+/-- An edge is active if both sender and receiver endpoints exist in G. -/
 def ActiveEdge (G : GEnv) (e : Edge) : Prop :=
+  (lookupG G { sid := e.sid, role := e.sender }).isSome ∧
   (lookupG G { sid := e.sid, role := e.receiver }).isSome
 
 /-- Full coherence: edge-coherent for all **active** edges. -/
@@ -77,33 +78,65 @@ def Coherent (G : GEnv) (D : DEnv) : Prop :=
 
 /-! ### Small Helpers -/
 
-/-- ActiveEdge from a concrete receiver lookup. -/
-theorem ActiveEdge_of_receiver {G : GEnv} {e : Edge} {Lrecv : LocalType}
+/-- ActiveEdge from concrete sender/receiver lookups. -/
+theorem ActiveEdge_of_endpoints {G : GEnv} {e : Edge} {Lsender Lrecv : LocalType}
+    (hGsender : lookupG G { sid := e.sid, role := e.sender } = some Lsender)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     ActiveEdge G e := by
-  simp [ActiveEdge, hGrecv]
+  simp [ActiveEdge, hGsender, hGrecv]
 
-/-- Extract EdgeCoherent from Coherent given a receiver lookup. -/
-theorem Coherent_edge_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+/-- If an edge is active after updating one endpoint, it was already active before. -/
+theorem ActiveEdge_updateG_inv {G : GEnv} {e : Edge} {ep : Endpoint} {L : LocalType} :
+    ActiveEdge (updateG G ep L) e →
+    (lookupG G ep).isSome →
+    ActiveEdge G e := by
+  intro hActive hEp
+  rcases hActive with ⟨hSender, hRecv⟩
+  have hSender' : (lookupG G { sid := e.sid, role := e.sender }).isSome := by
+    rcases (Option.isSome_iff_exists).1 hSender with ⟨Ls, hLs⟩
+    by_cases hEq : ({ sid := e.sid, role := e.sender } : Endpoint) = ep
+    · simpa [hEq] using hEp
+    · have hNe : ep ≠ { sid := e.sid, role := e.sender } := by
+        exact Ne.symm hEq
+      have hLs' : lookupG G { sid := e.sid, role := e.sender } = some Ls := by
+        simpa [lookupG_update_neq _ _ _ _ hNe] using hLs
+      exact (Option.isSome_iff_exists).2 ⟨Ls, hLs'⟩
+  have hRecv' : (lookupG G { sid := e.sid, role := e.receiver }).isSome := by
+    rcases (Option.isSome_iff_exists).1 hRecv with ⟨Lr, hLr⟩
+    by_cases hEq : ({ sid := e.sid, role := e.receiver } : Endpoint) = ep
+    · simpa [hEq] using hEp
+    · have hNe : ep ≠ { sid := e.sid, role := e.receiver } := by
+        exact Ne.symm hEq
+      have hLr' : lookupG G { sid := e.sid, role := e.receiver } = some Lr := by
+        simpa [lookupG_update_neq _ _ _ _ hNe] using hLr
+      exact (Option.isSome_iff_exists).2 ⟨Lr, hLr'⟩
+  exact ⟨hSender', hRecv'⟩
+
+/-- Extract EdgeCoherent from Coherent given sender/receiver lookups. -/
+theorem Coherent_edge_of_endpoints {G : GEnv} {D : DEnv} {e : Edge}
+    {Lsender Lrecv : LocalType}
     (hCoh : Coherent G D)
+    (hGsender : lookupG G { sid := e.sid, role := e.sender } = some Lsender)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     EdgeCoherent G D e := by
-  exact hCoh e (ActiveEdge_of_receiver hGrecv)
+  exact hCoh e (ActiveEdge_of_endpoints hGsender hGrecv)
 
-/-- Inactive edges are vacuously EdgeCoherent. -/
-theorem EdgeCoherent_of_inactive {G : GEnv} {D : DEnv} {e : Edge}
-    (hInactive : ¬ ActiveEdge G e) : EdgeCoherent G D e := by
-  intro Lrecv hGrecv
-  have hActive : ActiveEdge G e := by
-    simp [ActiveEdge, hGrecv]
-  exact (False.elim (hInactive hActive))
-
-/-- Coherent gives EdgeCoherent for any edge (active or not). -/
-theorem Coherent_edge_any {G : GEnv} {D : DEnv} (hCoh : Coherent G D) (e : Edge) :
+/-- Coherent gives EdgeCoherent for any active edge. -/
+theorem Coherent_edge_any {G : GEnv} {D : DEnv} (hCoh : Coherent G D) {e : Edge}
+    (hActive : ActiveEdge G e) :
     EdgeCoherent G D e := by
-  by_cases hActive : ActiveEdge G e
-  · exact hCoh e hActive
-  · exact EdgeCoherent_of_inactive (G:=G) (D:=D) (e:=e) hActive
+  exact hCoh e hActive
+
+/-- Extract EdgeCoherent content from Coherent given receiver lookup and active edge.
+    Returns sender exists and consume succeeds. -/
+theorem Coherent_edge_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+    (hCoh : Coherent G D)
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv)
+    (hActive : ActiveEdge G e := by simp [ActiveEdge, hGrecv, *]) :
+    ∃ Lsender,
+      lookupG G { sid := e.sid, role := e.sender } = some Lsender ∧
+      (Consume e.sender Lrecv (lookupD D e)).isSome := by
+  exact hCoh e hActive Lrecv hGrecv
 
 /-- Extract the consume condition from `EdgeCoherent` given a receiver lookup. -/
 theorem EdgeCoherent_consume_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
@@ -241,7 +274,7 @@ When the receiver expects `branch`, the buffer head (if any) must be a string la
 This property is needed for progress: it ensures that when we have a non-empty
 buffer, we can actually take a recv/branch step. -/
 def HeadCoherent (G : GEnv) (D : DEnv) : Prop :=
-  ∀ (e : Edge),
+  ∀ (e : Edge), ActiveEdge G e →
     let receiverEp : Endpoint := ⟨e.sid, e.receiver⟩
     match lookupG G receiverEp with
     | some (.recv _ T _) =>
@@ -288,6 +321,7 @@ that label must be one of the valid branch options.
 Reference: `work/effects/008.lean:392-397` -/
 def ValidLabels (G : GEnv) (_D : DEnv) (bufs : Buffers) : Prop :=
   ∀ (e : Edge) (source : Role) (bs : List (Label × LocalType)),
+    ActiveEdge G e →
     lookupG G ⟨e.sid, e.receiver⟩ = some (.branch source bs) →
     match lookupBuf bufs e with
     | (.string l) :: _ => (bs.find? (fun b => b.1 == l)).isSome

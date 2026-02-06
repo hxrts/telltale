@@ -175,13 +175,30 @@ theorem BuffersTyped_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {bufs : Buffers
 private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₁ : Coherent G₁ D₁) (hDisjG : DisjointG G₁ G₂) (hCons₂ : DConsistent G₂ D₂)
     {e : Edge} {Lrecv : LocalType}
-    (hGrecvL : lookupG G₁ { sid := e.sid, role := e.receiver } = some Lrecv) :
+    (hGrecvL : lookupG G₁ { sid := e.sid, role := e.receiver } = some Lrecv)
+    (hActive : ActiveEdge (G₁ ++ G₂) e) :
     ∃ Lsender,
       lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender ∧
       (Consume e.sender Lrecv (lookupD (D₁ ++ D₂) e)).isSome := by
   -- Use left coherence and lift lookups/trace into the merged environment.
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
-  have hCoh := Coherent_edge_of_receiver (G:=G₁) (D:=D₁) (e:=e) hC₁ hGrecvL
+  -- Sender is Some in G₁ ++ G₂; since sessions are disjoint and receiver is in G₁,
+  -- sender must also be in G₁
+  have hSidInG1 : e.sid ∈ SessionsOf G₁ := by
+    let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+    exact ⟨recvEp, Lrecv, hGrecvL, rfl⟩
+  have hSidNotInG2 : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSidInG1
+  have hSenderNoneG2 : lookupG G₂ senderEp = none := lookupG_none_of_not_session hSidNotInG2
+  -- Extract sender lookup from ActiveEdge in merged environment
+  have hSenderSomeMerged : (lookupG (G₁ ++ G₂) senderEp).isSome := hActive.1
+  rcases Option.isSome_iff_exists.mp hSenderSomeMerged with ⟨Ls, hLsMerged⟩
+  have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) (L:=Ls) hLsMerged
+  have hSenderSomeG1 : (lookupG G₁ senderEp).isSome := by
+    cases hInv with
+    | inl h => rw [h]; trivial
+    | inr h => rw [hSenderNoneG2] at h; exact h.1.symm ▸ (h.2 ▸ trivial)
+  have hActiveG1 : ActiveEdge G₁ e := ⟨hSenderSomeG1, by rw [hGrecvL]; trivial⟩
+  have hCoh := Coherent_edge_of_receiver (G:=G₁) (D:=D₁) (e:=e) hC₁ hGrecvL hActiveG1
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
   have hSid : e.sid ∈ SessionsOf G₁ := ⟨senderEp, Lsender, hGsender, rfl⟩
   have hNot : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSid
@@ -197,16 +214,33 @@ private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
 private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hC₂ : Coherent G₂ D₂) (hDisjG : DisjointG G₁ G₂) (hCons₁ : DConsistent G₁ D₁)
     {e : Edge} {Lrecv : LocalType}
-    (hGrecvR : lookupG G₂ { sid := e.sid, role := e.receiver } = some Lrecv) :
+    (hGrecvR : lookupG G₂ { sid := e.sid, role := e.receiver } = some Lrecv)
+    (hActive : ActiveEdge (G₁ ++ G₂) e) :
     ∃ Lsender,
       lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender ∧
       (Consume e.sender Lrecv (lookupD (D₁ ++ D₂) e)).isSome := by
   -- Use right coherence and lift lookups/trace into the merged environment.
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
-  have hCoh := Coherent_edge_of_receiver (G:=G₂) (D:=D₂) (e:=e) hC₂ hGrecvR
+  -- Sender is Some in G₁ ++ G₂; since sessions are disjoint and receiver is in G₂,
+  -- sender must also be in G₂
+  have hSidInG2 : e.sid ∈ SessionsOf G₂ := by
+    let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
+    exact ⟨recvEp, Lrecv, hGrecvR, rfl⟩
+  have hDisjG' : DisjointG G₂ G₁ := DisjointG_symm hDisjG
+  have hSidNotInG1 : e.sid ∉ SessionsOf G₁ := sid_not_in_right_of_left hDisjG' hSidInG2
+  have hSenderNoneG1 : lookupG G₁ senderEp = none := lookupG_none_of_not_session hSidNotInG1
+  -- Extract sender lookup from ActiveEdge in merged environment
+  have hSenderSomeMerged : (lookupG (G₁ ++ G₂) senderEp).isSome := hActive.1
+  rcases Option.isSome_iff_exists.mp hSenderSomeMerged with ⟨Ls, hLsMerged⟩
+  have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:=senderEp) (L:=Ls) hLsMerged
+  have hSenderSomeG2 : (lookupG G₂ senderEp).isSome := by
+    cases hInv with
+    | inl h => rw [hSenderNoneG1] at h; cases h
+    | inr h => rw [h.2]; trivial
+  have hActiveG2 : ActiveEdge G₂ e := ⟨hSenderSomeG2, by rw [hGrecvR]; trivial⟩
+  have hCoh := Coherent_edge_of_receiver (G:=G₂) (D:=D₂) (e:=e) hC₂ hGrecvR hActiveG2
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
   have hSid : e.sid ∈ SessionsOf G₂ := ⟨senderEp, Lsender, hGsender, rfl⟩
-  have hDisjG' : DisjointG G₂ G₁ := DisjointG_symm hDisjG
   have hNot : e.sid ∉ SessionsOf G₁ := sid_not_in_right_of_left hDisjG' hSid
   have hD1none : D₁.find? e = none := DEnv_find_none_of_notin_sessions (G:=G₁) (D:=D₁) hCons₁ hNot
   have hEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
@@ -229,9 +263,9 @@ theorem Coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (e:={ sid := e.sid, role := e.receiver }) hGrecv
   cases hInv with
   | inl hLeft =>
-      exact EdgeCoherent_merge_left hC₁ hDisjG hCons₂ hLeft
+      exact EdgeCoherent_merge_left hC₁ hDisjG hCons₂ hLeft hActive
   | inr hRight =>
-      exact EdgeCoherent_merge_right hC₂ hDisjG hCons₁ hRight.2
+      exact EdgeCoherent_merge_right hC₂ hDisjG hCons₁ hRight.2 hActive
 
 /-- Updating an existing endpoint preserves the set of sessions. -/
 theorem SessionsOf_updateG_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}

@@ -63,8 +63,10 @@ theorem HeadCoherent_select_preserved
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
     HeadCoherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
   -- Same structure as HeadCoherent_send_preserved: appending to END doesn't change HEAD
-  intro selectEdge e
+  intro selectEdge e hActive
   simp only [HeadCoherent] at hHead ⊢
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=selectorEp) (L:=L) hActive (by simp [hG])
   by_cases heq : e = selectEdge
   · -- e = selectEdge: trace gets .string appended at END
     subst heq
@@ -126,7 +128,7 @@ theorem HeadCoherent_select_preserved
       -- Target's type unchanged
       rw [lookupG_update_neq _ _ _ _ hTargetNeq]
       simp only [lookupD_update_eq]
-      have hOrigHead := hHead selectEdge
+      have hOrigHead := hHead selectEdge hActiveOrig
       -- Case on target's type in original G
       cases hTargetType : lookupG G { sid := selectorEp.sid, role := targetRole } with
       | none => trivial
@@ -196,7 +198,7 @@ theorem HeadCoherent_select_preserved
       | recv r T' L' =>
         -- HeadCoherent for recv: check if trace head matches T'
         -- Key insight: Original G[selectorEp] = .select, so by trace_empty_when_select_receiver, D[e] = []
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hSelectType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.select targetRole bs) := by
           simp only [hG]
         have hTraceEmpty := trace_empty_when_select_receiver hEdgeCoh hSelectType'
@@ -204,7 +206,7 @@ theorem HeadCoherent_select_preserved
         trivial
       | branch source bs' =>
         -- HeadCoherent for branch: same reasoning
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hSelectType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.select targetRole bs) := by
           simp only [hG]
         have hTraceEmpty := trace_empty_when_select_receiver hEdgeCoh hSelectType'
@@ -213,7 +215,7 @@ theorem HeadCoherent_select_preserved
     · -- selectorEp is not the receiver
       have hRecvNoMatch : selectorEp ≠ { sid := e.sid, role := e.receiver } := hRecvMatch
       rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
-      exact hHead e
+      exact hHead e hActiveOrig
 
 /-- HeadCoherent is preserved when branching (receiving a label).
     Branch removes trace HEAD and advances receiver type to selected branch. -/
@@ -228,8 +230,10 @@ theorem HeadCoherent_branch_preserved
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
     HeadCoherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
   -- Same structure as HeadCoherent_recv_preserved: removes HEAD, advances type
-  intro branchEdge e
+  intro branchEdge e hActive
   simp only [HeadCoherent] at hHead ⊢
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=brancherEp) (L:=L) hActive (by simp [hG])
   by_cases heq : e = branchEdge
   · -- Case 1: e = branchEdge - type and trace both change
     subst heq
@@ -237,7 +241,7 @@ theorem HeadCoherent_branch_preserved
     by_cases hSenderIsBrancher : senderRole = brancherEp.role
     · -- Self-branch: sender = receiver, Coherent forces empty trace; hTrace contradicts.
       subst hSenderIsBrancher
-      have hEdgeCoh : EdgeCoherent G D branchEdge := Coherent_edge_any hCoh branchEdge
+      have hEdgeCoh : EdgeCoherent G D branchEdge := Coherent_edge_any hCoh hActiveOrig
       have hConsume :
           (Consume brancherEp.role (.branch brancherEp.role bs) (lookupD D branchEdge)).isSome :=
         by
@@ -288,7 +292,7 @@ theorem HeadCoherent_branch_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hEdgeCoh : EdgeCoherent G D branchEdge := Coherent_edge_any hCoh branchEdge
+            have hEdgeCoh : EdgeCoherent G D branchEdge := Coherent_edge_any hCoh hActiveOrig
             have hConsume :
                 (Consume senderRole (.branch senderRole bs) (.string :: t' :: ts')).isSome := by
               obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.branch senderRole bs) hG
@@ -301,7 +305,7 @@ theorem HeadCoherent_branch_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hEdgeCoh : EdgeCoherent G D branchEdge := Coherent_edge_any hCoh branchEdge
+            have hEdgeCoh : EdgeCoherent G D branchEdge := Coherent_edge_any hCoh hActiveOrig
             have hConsume :
                 (Consume senderRole (.branch senderRole bs) (.string :: t' :: ts')).isSome := by
               obtain ⟨Ls, _hSender, hConsume⟩ := hEdgeCoh (.branch senderRole bs) hG
@@ -329,7 +333,7 @@ theorem HeadCoherent_branch_preserved
         -- Key insight: Original G[brancherEp] = .branch senderRole bs
         -- e.sender ≠ senderRole (since e ≠ branchEdge but e.receiver = brancherEp.role)
         -- By trace_empty_when_branch_other_sender: D[e] = []
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hBranchType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.branch senderRole bs) := by
           simp only [hG]
         have hSenderNe : e.sender ≠ senderRole := by
@@ -349,7 +353,7 @@ theorem HeadCoherent_branch_preserved
         trivial
       | branch source bs' =>
         -- Same reasoning
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hBranchType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.branch senderRole bs) := by
           simp only [hG]
         have hSenderNe : e.sender ≠ senderRole := by
@@ -370,7 +374,7 @@ theorem HeadCoherent_branch_preserved
     · -- brancherEp is not the receiver
       have hRecvNoMatch : brancherEp ≠ { sid := e.sid, role := e.receiver } := hRecvMatch
       rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
-      exact hHead e
+      exact hHead e hActiveOrig
 
 
 end

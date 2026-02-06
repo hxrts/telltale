@@ -441,7 +441,7 @@ is either done or can progress.
 - Requires `progress` theorem from Preservation.lean
 - Uses ReachesComm to ensure types aren't stuck -/
 theorem deadlock_free (C : Config) (Ssh Sown : SEnv)
-    (hWF : LocalTypeR.WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
+    (hWF : WellFormedComplete C.G C.D Ssh Sown C.store C.bufs C.proc)
     (hReady : ProgressReady C)
     (_hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
     Done C.G C ∨ CanProgress C := by
@@ -460,7 +460,7 @@ theorem deadlock_free (C : Config) (Ssh Sown : SEnv)
 
 /-- Corollary: well-typed configurations with progressive types are never stuck. -/
 theorem not_stuck (C : Config) (Ssh Sown : SEnv)
-    (hWF : LocalTypeR.WellFormed C.G C.D Ssh Sown C.store C.bufs C.proc)
+    (hWF : WellFormedComplete C.G C.D Ssh Sown C.store C.bufs C.proc)
     (hReady : ProgressReady C)
     (hReaches : ∀ e L, lookupG C.G e = some L → L ≠ .end_ → ReachesComm L) :
     ¬Stuck C.G C := by

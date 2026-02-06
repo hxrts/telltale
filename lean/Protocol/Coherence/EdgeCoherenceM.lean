@@ -30,8 +30,9 @@ def EdgeCoherent (M : DeliveryModel) (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
 
 /-! ### Active Edges -/
 
-/-- An edge is active if its receiver endpoint exists in G. -/
+/-- An edge is active if both sender and receiver endpoints exist in G. -/
 def ActiveEdge (G : GEnv) (e : Edge) : Prop :=
+  (lookupG G { sid := e.sid, role := e.sender }).isSome ∧
   (lookupG G { sid := e.sid, role := e.receiver }).isSome
 
 /-- Full coherence under a delivery model (active edges only). -/
@@ -40,33 +41,27 @@ def Coherent (M : DeliveryModel) (G : GEnv) (D : DEnv) : Prop :=
 
 /-! ### Small Helpers -/
 
-/-- ActiveEdge from a concrete receiver lookup. -/
-theorem ActiveEdge_of_receiver {G : GEnv} {e : Edge} {Lrecv : LocalType}
+/-- ActiveEdge from concrete sender/receiver lookups. -/
+theorem ActiveEdge_of_endpoints {G : GEnv} {e : Edge} {Lsender Lrecv : LocalType}
+    (hGsender : lookupG G { sid := e.sid, role := e.sender } = some Lsender)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     ActiveEdge G e := by
-  simp [ActiveEdge, hGrecv]
+  simp [ActiveEdge, hGsender, hGrecv]
 
-/-- Extract EdgeCoherent from Coherent given a receiver lookup. -/
-theorem Coherent_edge_of_receiver {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+/-- Extract EdgeCoherent from Coherent given sender/receiver lookups. -/
+theorem Coherent_edge_of_endpoints {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge}
+    {Lsender Lrecv : LocalType}
     (hCoh : Coherent M G D)
+    (hGsender : lookupG G { sid := e.sid, role := e.sender } = some Lsender)
     (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
     EdgeCoherent M G D e := by
-  exact hCoh e (ActiveEdge_of_receiver hGrecv)
+  exact hCoh e (ActiveEdge_of_endpoints hGsender hGrecv)
 
-/-- Inactive edges are vacuously EdgeCoherent. -/
-theorem EdgeCoherent_of_inactive {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge}
-    (hInactive : ¬ ActiveEdge G e) : EdgeCoherent M G D e := by
-  intro Lrecv hGrecv
-  have hActive : ActiveEdge G e := by
-    simp [ActiveEdge, hGrecv]
-  exact (False.elim (hInactive hActive))
-
-/-- Coherent gives EdgeCoherent for any edge (active or not). -/
+/-- Coherent gives EdgeCoherent for any active edge. -/
 theorem Coherent_edge_any {M : DeliveryModel} {G : GEnv} {D : DEnv}
-    (hCoh : Coherent M G D) (e : Edge) : EdgeCoherent M G D e := by
-  by_cases hActive : ActiveEdge G e
-  · exact hCoh e hActive
-  · exact EdgeCoherent_of_inactive (M:=M) (G:=G) (D:=D) (e:=e) hActive
+    (hCoh : Coherent M G D) {e : Edge} (hActive : ActiveEdge G e) :
+    EdgeCoherent M G D e := by
+  exact hCoh e hActive
 
 /-- Extract the consume condition from `EdgeCoherent` given a receiver lookup. -/
 theorem EdgeCoherent_consume_of_receiver {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}

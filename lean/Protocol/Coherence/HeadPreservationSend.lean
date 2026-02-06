@@ -94,8 +94,10 @@ theorem HeadCoherent_send_preserved
             (Consume senderEp.role L' [T]).isSome) :
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
     HeadCoherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
-  intro sendEdge e  -- The edge we check HeadCoherent for
+  intro sendEdge e hActive  -- The edge we check HeadCoherent for
   simp only [HeadCoherent] at hHead ⊢
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=senderEp) (L:=L) hActive (by simp [hG])
   -- Case split: is e the send edge or not?
   by_cases heq : e = sendEdge
   · -- Case 1: e = sendEdge - type and trace both change
@@ -159,12 +161,14 @@ theorem HeadCoherent_send_preserved
       rw [lookupG_update_neq _ _ _ _ hRecvNeq]
       -- Trace was ts, now ts ++ [T]
       simp only [lookupD_update_eq]
-      -- Original HeadCoherent at sendEdge
-      have hOrigHead := hHead sendEdge
       -- Case on receiver's type in original G
       cases hRecvType : lookupG G { sid := senderEp.sid, role := receiverRole } with
       | none => trivial
       | some Lr =>
+        -- Original HeadCoherent at sendEdge (sender and receiver exist)
+        have hActiveOrig : ActiveEdge G sendEdge :=
+          ActiveEdge_of_endpoints (G:=G) (e:=sendEdge) hG hRecvType
+        have hOrigHead := hHead sendEdge hActiveOrig
         cases Lr with
         | end_ => trivial
         | send _ _ _ => trivial
@@ -252,7 +256,7 @@ theorem HeadCoherent_send_preserved
         -- HeadCoherent for recv: check if trace head matches T'
         -- Key insight: Original G[senderEp] = .send, so by trace_empty_when_send_receiver, D[e] = []
         -- After update, D'[e] = D[e] = [] (since e ≠ sendEdge), so HeadCoherent is trivially True
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         -- e.receiver = senderEp.role, and G[senderEp] = .send receiverRole T L
         have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.send receiverRole T L) := by
           simp only [hG]  -- e.receiver = senderEp.role after subst
@@ -261,7 +265,7 @@ theorem HeadCoherent_send_preserved
         trivial
       | branch source bs' =>
         -- HeadCoherent for branch: same reasoning - original D[e] = [] because sender type is .send
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.send receiverRole T L) := by
           simp only [hG]
         have hTraceEmpty := trace_empty_when_send_receiver hEdgeCoh hRecvType'
@@ -274,7 +278,7 @@ theorem HeadCoherent_send_preserved
       have hNeSymm : sendEdge ≠ e := Ne.symm heq
       rw [lookupD_update_neq _ _ _ _ hNeSymm]
       -- Original HeadCoherent at e
-      exact hHead e
+      exact hHead e hActiveOrig
 
 /-- HeadCoherent is preserved when receiving.
     Recv action removes trace HEAD, and receiver type advances from recv to continuation.
@@ -291,8 +295,10 @@ theorem HeadCoherent_recv_preserved
       some Trecv) :
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
     HeadCoherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
-  intro recvEdge e  -- The edge we check HeadCoherent for
+  intro recvEdge e hActive  -- The edge we check HeadCoherent for
   simp only [HeadCoherent] at hHead ⊢
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simp [hG])
   -- Case split: is e the recv edge or not?
   by_cases heq : e = recvEdge
   · -- Case 1: e = recvEdge - type and trace both change
@@ -319,7 +325,15 @@ theorem HeadCoherent_recv_preserved
             simpa [List.head?] using hTrace
           simp [List.tail_cons]
           -- Use coherence on the self-edge to get Consume success on the full trace.
-          have hEdgeCoh : EdgeCoherent G D recvEdge := Coherent_edge_any hCoh recvEdge
+          have hActiveRecv : ActiveEdge G recvEdge := by
+            have hSender : lookupG G { sid := recvEdge.sid, role := recvEdge.sender } =
+                some (.recv receiverEp.role Trecv L) := by
+              simpa [recvEdge] using hG
+            have hRecv : lookupG G { sid := recvEdge.sid, role := recvEdge.receiver } =
+                some (.recv receiverEp.role Trecv L) := by
+              simpa [recvEdge] using hG
+            exact ActiveEdge_of_endpoints hSender hRecv
+          have hEdgeCoh : EdgeCoherent G D recvEdge := Coherent_edge_any hCoh hActiveRecv
           have hRecvLookup' :
               lookupG G ⟨recvEdge.sid, recvEdge.receiver⟩ = some (.recv receiverEp.role Trecv L) := by
             -- Receiver endpoint equals receiverEp after subst.
@@ -394,7 +408,7 @@ theorem HeadCoherent_recv_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hEdgeCoh : EdgeCoherent G D recvEdge := Coherent_edge_any hCoh recvEdge
+            have hEdgeCoh : EdgeCoherent G D recvEdge := Coherent_edge_any hCoh hActiveOrig
             have hG' : lookupG G receiverEp = some (.recv senderRole t L) := by
               simpa [hHeadEq] using hG
             have hConsumeFull :
@@ -416,7 +430,7 @@ theorem HeadCoherent_recv_preserved
           cases ts with
           | nil => trivial
           | cons t' ts' =>
-            have hEdgeCoh : EdgeCoherent G D recvEdge := Coherent_edge_any hCoh recvEdge
+            have hEdgeCoh : EdgeCoherent G D recvEdge := Coherent_edge_any hCoh hActiveOrig
             have hG' : lookupG G receiverEp = some (.recv senderRole t L) := by
               simpa [hHeadEq] using hG
             have hConsumeFull :
@@ -451,7 +465,7 @@ theorem HeadCoherent_recv_preserved
         -- Key insight: Original G[receiverEp] = .recv senderRole Trecv L
         -- e.sender ≠ senderRole (since e ≠ recvEdge but e.receiver = receiverEp.role)
         -- By trace_empty_when_recv_other_sender: D[e] = []
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.recv senderRole Trecv L) := by
           simp only [hG]
         -- Need: e.sender ≠ senderRole
@@ -474,7 +488,7 @@ theorem HeadCoherent_recv_preserved
         trivial
       | branch source bs' =>
         -- HeadCoherent for branch: same reasoning
-        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh e
+        have hEdgeCoh : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOrig
         have hRecvType' : lookupG G ⟨e.sid, e.receiver⟩ = some (.recv senderRole Trecv L) := by
           simp only [hG]
         have hSenderNe : e.sender ≠ senderRole := by
@@ -497,7 +511,7 @@ theorem HeadCoherent_recv_preserved
       rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
       have hNeSymm : recvEdge ≠ e := Ne.symm heq
       rw [lookupD_update_neq _ _ _ _ hNeSymm]
-      exact hHead e
+      exact hHead e hActiveOrig
 
 /-
 HeadCoherent is preserved when selecting (sending a label).

@@ -1,4 +1,4 @@
-import Runtime.Proofs.DelegationAxiom
+import Runtime.Proofs.Delegation
 import Protocol.Coherence.EdgeCoherence
 
 /-!
@@ -11,7 +11,7 @@ the frame rule and cross-session diamond proofs at the VM level.
 ## Key Definitions
 
 - `SessionCoherent s`: Coherence restricted to edges within session `s`
-- `Footprint`: The set of sessions a coroutine can affect (abstract)
+- `SessionFootprint`: The set of sessions a coroutine can affect (abstract)
 
 ## Key Theorems
 
@@ -33,11 +33,11 @@ session `s` preserves `SessionCoherent s'` for all `s' ≠ s`.
 ## Connection to Paper 3
 
 Delegation provides the mechanism for coroutines to dynamically participate in
-multiple sessions. The `delegation_preserves_coherent` axiom (from DelegationAxiom.lean)
+multiple sessions. The `delegation_preserves_coherent` theorem (from Delegation.lean)
 is used here to prove that receiving a delegated endpoint safely extends the
 coroutine's footprint.
 
-See `work/vm_session.md` for the full design document.
+See `work/vm_instructions.md` for the full specification.
 
 Note: This module is kept at the Protocol level (GEnv, DEnv, Coherent) to avoid
 the Iris import collision. VM-level integration requires resolving the Store
@@ -82,7 +82,7 @@ theorem VMCoherent_iff_forall_SessionCoherent {G : GEnv} {D : DEnv} :
   · intro h
     exact SessionCoherent_forall_implies_Coherent h
 
-/-! ## Abstract Footprint
+/-! ## Abstract SessionFootprint
 
 A footprint is the set of sessions an entity (coroutine, instruction) can affect.
 This includes:
@@ -99,7 +99,7 @@ to govern permitted operations.
 
     Note: At the VM level, this will be computed from CoroutineState.ownedEndpoints.
     Here we define the abstract structure to enable Protocol-level reasoning. -/
-structure Footprint where
+structure SessionFootprint where
   /-- The primary session -/
   nativeSession : SessionId
   /-- Delegated sessions: (session, delegated local type) pairs.
@@ -107,39 +107,39 @@ structure Footprint where
   delegated : List (SessionId × LocalType)
 
 /-- Compute the set of sessions in a footprint. -/
-def Footprint.sessions (fp : Footprint) : List SessionId :=
+def SessionFootprint.sessions (fp : SessionFootprint) : List SessionId :=
   fp.nativeSession :: fp.delegated.map Prod.fst
 
 /-- Check if a session is in a footprint. -/
-def Footprint.contains (fp : Footprint) (s : SessionId) : Bool :=
+def SessionFootprint.contains (fp : SessionFootprint) (s : SessionId) : Bool :=
   s = fp.nativeSession || fp.delegated.any (·.1 = s)
 
 /-- A footprint as a set. -/
-def Footprint.toSet (fp : Footprint) : Set SessionId :=
+def SessionFootprint.toSet (fp : SessionFootprint) : Set SessionId :=
   {s | fp.contains s}
 
-/-! ## Footprint Dynamics -/
+/-! ## SessionFootprint Dynamics -/
 
 /-- Receiving a delegated endpoint extends the footprint.
     When a coroutine receives a message containing `chan s L` (a delegated endpoint),
     session `s` is added to its footprint with delegated type `L`. -/
-def footprint_extend (fp : Footprint) (s : SessionId) (L : LocalType) :
-    Footprint :=
+def footprint_extend (fp : SessionFootprint) (s : SessionId) (L : LocalType) :
+    SessionFootprint :=
   { fp with delegated := (s, L) :: fp.delegated }
 
-/-- Footprint grows when receiving delegation. -/
-theorem footprint_extend_contains (fp : Footprint) (s : SessionId) (L : LocalType) :
+/-- SessionFootprint grows when receiving delegation. -/
+theorem footprint_extend_contains (fp : SessionFootprint) (s : SessionId) (L : LocalType) :
     (footprint_extend fp s L).contains s := by
-  simp [footprint_extend, Footprint.contains]
+  simp [footprint_extend, SessionFootprint.contains]
 
 /-- Completing a delegated protocol shrinks the footprint.
     When a delegated endpoint's type reaches `end`, the delegation is consumed
     and the session is removed from the footprint. -/
-def footprint_remove (fp : Footprint) (s : SessionId) : Footprint :=
+def footprint_remove (fp : SessionFootprint) (s : SessionId) : SessionFootprint :=
   { fp with delegated := fp.delegated.filter (·.1 ≠ s) }
 
 /-- Native session always remains in footprint. -/
-theorem footprint_remove_preserves_native (fp : Footprint) (s : SessionId) :
+theorem footprint_remove_preserves_native (fp : SessionFootprint) (s : SessionId) :
     (footprint_remove fp s).nativeSession = fp.nativeSession := by
   simp [footprint_remove]
 
@@ -156,27 +156,27 @@ theorem disjoint_sessions_no_edge_overlap {s s' : SessionId} (h : SessionsDisjoi
   rw [hEs]
   exact h
 
-/-! ## Footprint Disjointness -/
+/-! ## SessionFootprint Disjointness -/
 
 /-- Two footprints are disjoint if they share no sessions. -/
-def FootprintsDisjoint (fp₁ fp₂ : Footprint) : Prop :=
+def SessionFootprintsDisjoint (fp₁ fp₂ : SessionFootprint) : Prop :=
   ∀ s, ¬(fp₁.contains s ∧ fp₂.contains s)
 
 /-- Disjoint footprints imply operations on different sessions. -/
-theorem disjoint_footprints_different_sessions {fp₁ fp₂ : Footprint}
-    (h : FootprintsDisjoint fp₁ fp₂)
+theorem disjoint_footprints_different_sessions {fp₁ fp₂ : SessionFootprint}
+    (h : SessionFootprintsDisjoint fp₁ fp₂)
     {s₁ s₂ : SessionId} (h₁ : fp₁.contains s₁) (h₂ : fp₂.contains s₂) :
     s₁ ≠ s₂ := by
   intro hEq
   subst hEq
   exact h s₁ ⟨h₁, h₂⟩
 
-/-! ## Delegation Preservation (Uses Axiom) -/
+/-! ## Delegation Preservation -/
 
 /-- Receiving a delegated endpoint preserves session coherence for other sessions.
 
     This is the key lemma connecting Protocol-level delegation preservation to
-    VM-level reasoning. It uses the `delegation_preserves_coherent` axiom.
+    VM-level reasoning. It uses the `delegation_preserves_coherent` theorem.
 
     **Intuition:** Delegation is message passing where the payload includes a channel.
     The sender's type changes (endpoint sent away), the receiver's type changes
@@ -188,7 +188,7 @@ theorem delegation_recv_preserves_other_sessions
     (hDeleg : DelegationStep G G' D D' s A B)
     (_hDiff : sOther ≠ s) :
     SessionCoherent G' D' sOther := by
-  -- Use the axiom to get global coherence after delegation
+  -- Use the theorem to get global coherence after delegation
   have hCoh' : Coherent G' D' := delegation_preserves_coherent G G' D D' s A B hCoh hDeleg
   -- Extract per-session coherence
   exact Coherent_implies_SessionCoherent hCoh'
@@ -197,11 +197,11 @@ theorem delegation_recv_preserves_other_sessions
 
     When coroutine C receives message containing `chan s L`:
     1. C's footprint grows to include s
-    2. Coherence is preserved (by delegation_preserves_coherent axiom)
+    2. Coherence is preserved (by delegation_preserves_coherent)
     3. C can now perform operations on session s per type L -/
 theorem footprint_grows_on_delegation
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
-    {fp : Footprint} {L : LocalType}
+    {fp : SessionFootprint} {L : LocalType}
     (hCoh : Coherent G D)
     (hDeleg : DelegationStep G G' D D' s A B)
     (_hNotIn : ¬fp.contains s) :
@@ -242,8 +242,14 @@ theorem session_local_op_preserves_other {s : SessionId}
   have hGrecvOrig : lookupG G ⟨e.sid, e.receiver⟩ = some Lrecv := by
     rw [← hEp ⟨e.sid, e.receiver⟩ hRecvSid]
     exact hGrecv
+  -- Sender endpoint lookup is unchanged (ActiveEdge gives us sender existence in G').
+  have hSenderSome : (lookupG (f (G, D)).1 ⟨e.sid, e.sender⟩).isSome := hActive.1
+  rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨Lsender0, hGsenderNew0⟩
+  have hSendSid : (⟨e.sid, e.sender⟩ : Endpoint).sid = sOther := hSid
+  have hGsenderOrig0 : lookupG G ⟨e.sid, e.sender⟩ = some Lsender0 := by
+    simpa [hEp ⟨e.sid, e.sender⟩ hSendSid] using hGsenderNew0
   have hActiveOrig : ActiveEdge G e :=
-    ActiveEdge_of_receiver (G:=G) (e:=e) hGrecvOrig
+    ActiveEdge_of_endpoints (G:=G) (e:=e) hGsenderOrig0 hGrecvOrig
   -- Get coherence from original state
   have hEdgeCoh := hCoh e hSid hActiveOrig
   rcases hEdgeCoh Lrecv hGrecvOrig with ⟨Lsender, hGsender, hConsume⟩
@@ -267,8 +273,8 @@ between Protocol.Environments.Core and Iris.Std.Heap before they can be
 connected to this module.
 
 The key definitions that need VM types:
-- `instrFootprint : Instr → CoroutineState → Set SessionId`
-- `DisjointInstrFootprints : Instr → Instr → CoroutineState → CoroutineState → Prop`
+- `instrSessionFootprint : Instr → CoroutineState → Set SessionId`
+- `DisjointInstrSessionFootprints : Instr → Instr → CoroutineState → CoroutineState → Prop`
 - `cross_session_diamond_from_frame`
 
 These are temporarily defined in Frame.lean with stubs until the import collision

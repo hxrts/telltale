@@ -15,7 +15,7 @@ design issues that blocked the original preservation theorems below.
 
 The new preservation theorems are:
 - `preservation_typed` (in Typing.lean) - TypedStep preserves LocalTypeR.WellFormed
-- `progress_typed` (in Typing.lean) - LocalTypeR.WellFormed processes can step or terminate
+- `progress_typed` (in Typing.lean) - WellFormedComplete processes can step or terminate
 - `subject_reduction` (this file) - TypedStep implies Step (soundness)
 
 The old theorems (`preservation_send`, `preservation_recv`, `preservation`, `progress`)
@@ -44,7 +44,7 @@ The proof proceeds by case analysis on the step relation:
 ## Key Lemmas
 
 - `preservation` (this file): TypedStep preserves LocalTypeR.WellFormed (wrapper)
-- `progress` (this file): LocalTypeR.WellFormed processes can step or are blocked (wrapper)
+- `progress` (this file): WellFormedComplete processes can step or are blocked (wrapper)
 - `subject_reduction` (this file): TypedStep implies Step (soundness)
 
 ## Proof Techniques
@@ -288,10 +288,14 @@ private theorem Coherent_mono {G G' : GEnv} {D : DEnv} :
     Coherent G D →
     Coherent G' D := by
   intro hEq hCoh e hActive Lrecv hGrecv
+  rcases hActive with ⟨hSenderSome, hRecvSome⟩
+  have hSenderSome' : (lookupG G { sid := e.sid, role := e.sender }).isSome := by
+    simpa [hEq _] using hSenderSome
+  have hRecvSome' : (lookupG G { sid := e.sid, role := e.receiver }).isSome := by
+    simpa [hEq _] using hRecvSome
+  have hActive' : ActiveEdge G e := ⟨hSenderSome', hRecvSome'⟩
   have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
     simpa [hEq _] using hGrecv
-  have hActive' : ActiveEdge G e := by
-    simp [ActiveEdge, hGrecv']
   rcases hCoh e hActive' Lrecv hGrecv' with ⟨Lsender, hGsender, hConsume⟩
   have hGsender' : lookupG G' { sid := e.sid, role := e.sender } = some Lsender := by
     simpa [hEq _] using hGsender
@@ -301,10 +305,17 @@ private theorem ValidLabels_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
     (∀ e, lookupG G e = lookupG G' e) →
     ValidLabels G D bufs →
     ValidLabels G' D bufs := by
-  intro hEq hValid e source bs hGrecv
+  intro hEq hValid e source bs hActive hGrecv
+  have hActive' : ActiveEdge G e := by
+    rcases hActive with ⟨hSender, hRecv⟩
+    have hSender' : (lookupG G { sid := e.sid, role := e.sender }).isSome := by
+      simpa [hEq _] using hSender
+    have hRecv' : (lookupG G { sid := e.sid, role := e.receiver }).isSome := by
+      simpa [hEq _] using hRecv
+    exact ⟨hSender', hRecv'⟩
   have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some (.branch source bs) := by
     simpa [hEq _] using hGrecv
-  exact hValid e source bs hGrecv'
+  exact hValid e source bs hActive' hGrecv'
 
 private lemma lookupD_append_assoc {D₁ D₂ D₃ : DEnv} :
     ∀ e, lookupD ((D₁ ++ D₂) ++ D₃) e = lookupD (D₁ ++ (D₂ ++ D₃)) e := by
@@ -786,51 +797,60 @@ private theorem HeadCoherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     DisjointG G₁ G₂ →
     DConsistent G₂ D₂ →
     HeadCoherent G₁ D₁ := by
-  intro hHead hDisj hCons e
-  cases hG : lookupG G₁ { sid := e.sid, role := e.receiver } with
-  | none =>
-      simp [hG]
-  | some Lrecv =>
-      have hG' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv :=
-        lookupG_append_left (G₁:=G₁) (G₂:=G₂) hG
-      have hSid : e.sid ∈ SessionsOf G₁ :=
-        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hG, rfl⟩
-      have hD2none : D₂.find? e = none := lookupD_none_of_disjointG hDisj hCons hSid
-      have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
-        lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
-      have hHeadMerged := hHead e
-      simp [hG', hTraceEq] at hHeadMerged
-      simpa [hG, hTraceEq] using hHeadMerged
+  intro hHead hDisj hCons e hActive
+  rcases hActive with ⟨hSenderSome, hRecvSome⟩
+  rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨Lsender, hGsender⟩
+  rcases (Option.isSome_iff_exists).1 hRecvSome with ⟨Lrecv, hGrecv⟩
+  have hGrecv' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv :=
+    lookupG_append_left (G₁:=G₁) (G₂:=G₂) hGrecv
+  have hGsender' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender :=
+    lookupG_append_left (G₁:=G₁) (G₂:=G₂) hGsender
+  have hActiveMerged : ActiveEdge (G₁ ++ G₂) e :=
+    ActiveEdge_of_endpoints hGsender' hGrecv'
+  have hSid : e.sid ∈ SessionsOf G₁ :=
+    ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hGrecv, rfl⟩
+  have hD2none : D₂.find? e = none := lookupD_none_of_disjointG hDisj hCons hSid
+  have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
+    lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
+  have hHeadMerged := hHead e hActiveMerged
+  simp [hGrecv', hTraceEq] at hHeadMerged
+  simpa [hGrecv, hTraceEq] using hHeadMerged
 
 private theorem HeadCoherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     HeadCoherent (G₁ ++ G₂) (D₁ ++ D₂) →
     DisjointG G₁ G₂ →
     DConsistent G₁ D₁ →
     HeadCoherent G₂ D₂ := by
-  intro hHead hDisj hCons e
-  cases hG : lookupG G₂ { sid := e.sid, role := e.receiver } with
-  | none =>
-      simp [hG]
-  | some Lrecv =>
-      have hSid : e.sid ∈ SessionsOf G₂ :=
-        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hG, rfl⟩
-      have hNot : e.sid ∉ SessionsOf G₁ := by
-        intro hIn
-        have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hSid⟩
-        have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
-        simp [hEmpty] at hInter
-      have hG1none : lookupG G₁ { sid := e.sid, role := e.receiver } = none :=
-        lookupG_none_of_not_session hNot
-      have hG' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv := by
-        simpa [lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.receiver }) hG1none]
-          using hG
-      have hD1none : D₁.find? e = none :=
-        lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons hSid
-      have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
-        lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
-      have hHeadMerged := hHead e
-      simp [hG', hTraceEq] at hHeadMerged
-      simpa [hG, hTraceEq] using hHeadMerged
+  intro hHead hDisj hCons e hActive
+  rcases hActive with ⟨hSenderSome, hRecvSome⟩
+  rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨Lsender, hGsender⟩
+  rcases (Option.isSome_iff_exists).1 hRecvSome with ⟨Lrecv, hGrecv⟩
+  have hSid : e.sid ∈ SessionsOf G₂ :=
+    ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hGrecv, rfl⟩
+  have hNot : e.sid ∉ SessionsOf G₁ := by
+    intro hIn
+    have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hSid⟩
+    have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
+    simp [hEmpty] at hInter
+  have hG1none : lookupG G₁ { sid := e.sid, role := e.receiver } = none :=
+    lookupG_none_of_not_session hNot
+  have hGrecv' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } = some Lrecv := by
+    simpa [lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.receiver }) hG1none]
+      using hGrecv
+  have hGsender' : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender } = some Lsender := by
+    have hG1none' : lookupG G₁ { sid := e.sid, role := e.sender } = none :=
+      lookupG_none_of_not_session hNot
+    simpa [lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none']
+      using hGsender
+  have hActiveMerged : ActiveEdge (G₁ ++ G₂) e :=
+    ActiveEdge_of_endpoints hGsender' hGrecv'
+  have hD1none : D₁.find? e = none :=
+    lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons hSid
+  have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
+    lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
+  have hHeadMerged := hHead e hActiveMerged
+  simp [hGrecv', hTraceEq] at hHeadMerged
+  simpa [hGrecv, hTraceEq] using hHeadMerged
 
 private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     HeadCoherent G₁ D₁ →
@@ -839,54 +859,81 @@ private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     DConsistent G₁ D₁ →
     DConsistent G₂ D₂ →
     HeadCoherent (G₁ ++ G₂) (D₁ ++ D₂) := by
-  intro hHead1 hHead2 hDisj hCons1 hCons2 e
-  cases hG : lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver } with
-  | none =>
-      simp [hG]
-  | some Lrecv =>
-      have hCases :=
-        lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.receiver }) (L:=Lrecv)
-          (by simpa using hG)
-      cases hCases with
-      | inl hLeft =>
-          have hSid : e.sid ∈ SessionsOf G₁ :=
-            ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hLeft, rfl⟩
-          have hD2none : D₂.find? e = none := lookupD_none_of_disjointG hDisj hCons2 hSid
-          have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
-            lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
-          have hHeadLeft := hHead1 e
-          have hHeadLeft' : match some Lrecv with
-            | some (LocalType.recv a T a_1) =>
-              match lookupD D₁ e with
-              | [] => True
-              | T' :: tail => T = T'
-            | some (LocalType.branch a a_1) =>
-              match lookupD D₁ e with
-              | [] => True
-              | T' :: tail => T' = ValType.string
-            | x => True := by
-              simpa [HeadCoherent, hLeft] using hHeadLeft
-          simpa [HeadCoherent, hG, hTraceEq] using hHeadLeft'
-      | inr hRight =>
-          have hSid : e.sid ∈ SessionsOf G₂ :=
-            ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRight.2, rfl⟩
-          have hD1none : D₁.find? e = none :=
-            lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons1 hSid
-          have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
-            lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
-          have hHeadRight := hHead2 e
-          have hHeadRight' : match some Lrecv with
-            | some (LocalType.recv a T a_1) =>
-              match lookupD D₂ e with
-              | [] => True
-              | T' :: tail => T = T'
-            | some (LocalType.branch a a_1) =>
-              match lookupD D₂ e with
-              | [] => True
-              | T' :: tail => T' = ValType.string
-            | x => True := by
-              simpa [HeadCoherent, hRight.2] using hHeadRight
-          simpa [HeadCoherent, hG, hTraceEq] using hHeadRight'
+  intro hHead1 hHead2 hDisj hCons1 hCons2 e hActive
+  rcases hActive with ⟨hSenderSome, hRecvSome⟩
+  rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨Lsender, hGsender⟩
+  rcases (Option.isSome_iff_exists).1 hRecvSome with ⟨Lrecv, hGrecv⟩
+  have hCases :=
+    lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.receiver }) (L:=Lrecv)
+      (by simpa using hGrecv)
+  cases hCases with
+  | inl hLeft =>
+      have hSid : e.sid ∈ SessionsOf G₁ :=
+        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hLeft, rfl⟩
+      have hSenderCases :=
+        lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) (L:=Lsender)
+          (by simpa using hGsender)
+      have hSenderLeft : lookupG G₁ { sid := e.sid, role := e.sender } = some Lsender := by
+        cases hSenderCases with
+        | inl h => exact h
+        | inr h =>
+            have hSidSender : e.sid ∈ SessionsOf G₂ :=
+              ⟨{ sid := e.sid, role := e.sender }, Lsender, h.2, rfl⟩
+            have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid, hSidSender⟩
+            have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
+            simp [hEmpty] at hInter
+      have hD2none : D₂.find? e = none := lookupD_none_of_disjointG hDisj hCons2 hSid
+      have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₁ e :=
+        lookupD_append_left_of_right_none (D₁:=D₁) (D₂:=D₂) (e:=e) hD2none
+      have hActiveLeft : ActiveEdge G₁ e :=
+        ActiveEdge_of_endpoints hSenderLeft hLeft
+      have hHeadLeft := hHead1 e hActiveLeft
+      have hHeadLeft' : match some Lrecv with
+        | some (LocalType.recv a T a_1) =>
+          match lookupD D₁ e with
+          | [] => True
+          | T' :: tail => T = T'
+        | some (LocalType.branch a a_1) =>
+          match lookupD D₁ e with
+          | [] => True
+          | T' :: tail => T' = ValType.string
+        | x => True := by
+          simpa [HeadCoherent, hLeft] using hHeadLeft
+      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
+  | inr hRight =>
+      have hSid : e.sid ∈ SessionsOf G₂ :=
+        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRight.2, rfl⟩
+      have hSenderCases :=
+        lookupG_append_inv (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) (L:=Lsender)
+          (by simpa using hGsender)
+      have hSenderRight : lookupG G₂ { sid := e.sid, role := e.sender } = some Lsender := by
+        cases hSenderCases with
+        | inl h =>
+            have hSidSender : e.sid ∈ SessionsOf G₁ :=
+              ⟨{ sid := e.sid, role := e.sender }, Lsender, h, rfl⟩
+            have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSidSender, hSid⟩
+            have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj
+            simp [hEmpty] at hInter
+        | inr h => exact h.2
+      have hD1none : D₁.find? e = none :=
+        lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) (DisjointG_symm hDisj) hCons1 hSid
+      have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
+        lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
+      have hActiveRight : ActiveEdge G₂ e :=
+        ActiveEdge_of_endpoints hSenderRight hRight.2
+      have hHeadRight := hHead2 e hActiveRight
+      have hHeadRight' : match some Lrecv with
+        | some (LocalType.recv a T a_1) =>
+          match lookupD D₂ e with
+          | [] => True
+          | T' :: tail => T = T'
+        | some (LocalType.branch a a_1) =>
+          match lookupD D₂ e with
+          | [] => True
+          | T' :: tail => T' = ValType.string
+        | x => True := by
+          simpa [HeadCoherent, hRight.2] using hHeadRight
+      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadRight'
 
 private theorem typed_step_preserves_headcoherent
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
@@ -972,13 +1019,25 @@ theorem preservation
 
 /-- Progress: a well-formed process can step or is blocked. -/
 theorem progress {G D Ssh Sown store bufs P} :
-    LocalTypeR.WellFormed G D Ssh Sown store bufs P →
+    WellFormedComplete G D Ssh Sown store bufs P →
     (P = .skip) ∨
       (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
         G' D' Sown' store' bufs' P') ∨
       BlockedProc store bufs P := by
   -- Delegate to the canonical progress proof in Typing.Preservation.
   exact progress_typed
+
+/-- Progress with explicit RoleComplete (wrapper for convenience). -/
+theorem progress_with_rolecomplete {G D Ssh Sown store bufs P} :
+    LocalTypeR.WellFormed G D Ssh Sown store bufs P →
+    RoleComplete G →
+    (P = .skip) ∨
+      (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
+        G' D' Sown' store' bufs' P') ∨
+      BlockedProc store bufs P := by
+  intro hWF hComplete
+  exact progress (G:=G) (D:=D) (Ssh:=Ssh) (Sown:=Sown) (store:=store) (bufs:=bufs) (P:=P)
+    ⟨hWF, hComplete⟩
 
 /-! ## Progress Lemmas for Individual Process Forms
 
@@ -1060,13 +1119,20 @@ theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (
     (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store)
     (hBufs : BuffersTyped C.G C.D C.bufs)
     (hHead : HeadCoherent C.G C.D)
-    (hValid : ValidLabels C.G C.D C.bufs) :
+    (hValid : ValidLabels C.G C.D C.bufs)
+    (hComplete : RoleComplete C.G) :
     (∃ C', Step C C') ∨ BlockedRecv C := by
   rcases inversion_branch hProc with ⟨e, p, bs, hk, hG, hLen, hLabels, hBodies⟩
   obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
   have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
   subst hkChan
   set branchEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
+  have hActiveBranch : ActiveEdge C.G branchEdge := by
+    have hGrecv :
+        lookupG C.G { sid := branchEdge.sid, role := branchEdge.receiver } = some (.branch p bs) := by
+      simpa [branchEdge] using hG
+    rcases RoleComplete_branch hComplete hG with ⟨Lsender, hGsender⟩
+    exact ActiveEdge_of_endpoints (e:=branchEdge) hGsender hGrecv
   cases hBuf : lookupBuf C.bufs branchEdge with
   | nil =>
       right
@@ -1089,13 +1155,14 @@ theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (
       | nil =>
           simp [hTrace] at h0trace
       | cons T' ts =>
-          have hHeadEdge := hHead branchEdge
+          have hHeadEdge := hHead branchEdge hActiveBranch
           have hEqT : T' = .string := by
             simpa [HeadCoherent, hG, branchEdge, hTrace] using hHeadEdge
           have hv : HasTypeVal C.G v .string := by
             simpa [hTrace, hEqT] using hv'
           rcases HasTypeVal_string_inv hv with ⟨lbl, rfl⟩
-          have hValidEdge := hValid branchEdge p bs (by simpa [branchEdge] using hG)
+          have hValidEdge := hValid branchEdge p bs hActiveBranch
+            (by simpa [branchEdge] using hG)
           have hBsSome : (bs.find? (fun b => b.1 == lbl)).isSome := by
             simpa [hBuf] using hValidEdge
           rcases (Option.isSome_iff_exists).1 hBsSome with ⟨b, hFindBs⟩

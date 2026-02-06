@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-02-04
+**Last Updated:** 2026-02-06
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -24,21 +24,21 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 
 **Toolchain:** Lean 4 v4.26.0
 **Build:** Lake with 6 library targets
-**Dependencies:** mathlib, paco-lean v0.1.3
+**Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
 
-| Library | Files | Lines | Focus |
-|---------|-------|-------|-------|
-| SessionTypes | 30 | ~8,253 | Global/local type definitions, de Bruijn, participation |
-| SessionCoTypes | 63 | ~14,058 | Coinductive EQ2, bisimulation, duality, roundtrip bridge |
-| Choreography | 69 | ~16,251 | Projection, harmony, blindness, embedding, erasure |
-| Semantics | 8 | ~2,171 | Operational semantics, determinism, deadlock freedom |
-| Protocol | 41 | ~18,590 | Async buffered MPST, coherence, preservation, monitoring |
-| Runtime | 62 | ~8,030 | VM, Iris separation logic shims, resource algebras, session invariants |
-| **Total** | **273** | **~67,353** | |
+| Library        | Files | Lines   | Focus                                                      |
+|----------------|------:|--------:|------------------------------------------------------------|
+| SessionTypes   |    30 |  ~8,253 | Global/local type definitions, de Bruijn, participation    |
+| SessionCoTypes |    63 | ~14,058 | Coinductive EQ2, bisimulation, duality, roundtrip bridge   |
+| Choreography   |    69 | ~16,251 | Projection, harmony, blindness, embedding, erasure         |
+| Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
+| Protocol       |    49 | ~24,094 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |    68 | ~10,542 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| **Total**      | **287** | **~75,369** |                                                       |
 
 **Architectural Layers:**
 ```
-Layer 6: Runtime          → VM, Iris backend, resource algebras, WP, adequacy
+Layer 6: Runtime          → VM, iris-lean backend, resource algebras, WP, adequacy
 Layer 5: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
 Layer 4: Semantics        → Operational semantics, typing judgments, determinism, deadlock freedom
 Layer 3: Choreography     → Projection, harmony, blindness, embedding, erasure
@@ -331,25 +331,31 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 ### Environments
 
 | File | Lines | Description |
-|------|-------|-------------|
+|------|------:|-------------|
 | Environments/Core.lean | 938 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init |
 | Environments/Renaming.lean | 493 | Session renaming with injectivity/commutativity |
+| Environments/RoleRenaming.lean | 83 | Role-based session renaming with correctness properties |
 
-### Coherence (9 parts)
+### Coherence (14 parts)
 
 Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
-|------|-------|-------------|
+|------|------:|-------------|
 | Coherence/Consume.lean | 253 | `Consume`, `EdgeCoherent`, `Coherent`, `HasTypeVal` |
-| Coherence/EdgeCoherence.lean | 458 | `BufferTyped`, `StoreTyped` |
+| Coherence/EdgeCoherence.lean | 492 | `BufferTyped`, `StoreTyped`, `ActiveEdge` |
 | Coherence/StoreTyping.lean | 136 | `StoreTypedStrong`, irrelevance lemmas |
-| Coherence/Preservation.lean | 601 | `Coherent_send_preserved`, `Coherent_recv_preserved` |
+| Coherence/Preservation.lean | 545 | `Coherent_send_preserved`, `Coherent_recv_preserved` |
 | Coherence/SelectPreservation.lean | 356 | `Coherent_select_preserved`, `Coherent_branch_preserved` |
 | Coherence/HeadPreservationSend.lean | 507 | Helper lemmas |
 | Coherence/HeadPreservationSelect.lean | 376 | `HeadCoherent_select/branch_preserved` |
-| Coherence/ValidLabels.lean | 661 | `Coherent_empty`, `initSession_coherent`, ValidLabels |
-| Coherence/Renaming.lean | 303 | `CoherentRenaming`, `Dual_implies_Coherent_empty` |
+| Coherence/ValidLabels.lean | 660 | `Coherent_empty`, `initSession_coherent`, ValidLabels |
+| Coherence/Renaming.lean | 305 | `CoherentRenaming`, `Dual_implies_Coherent_empty` |
+| Coherence/ConfigEquiv.lean | 737 | `CoherenceConfig`, `ConfigEquiv`, quotient structure for session isomorphisms |
+| Coherence/Unified.lean | 31 | `edge_case_split` — 3-way edge case analysis for preservation proofs |
+| Coherence/EdgeCoherenceM.lean | 115 | Model-parametric `EdgeCoherent` variants |
+| Coherence/HeadCoherenceM.lean | 28 | Model-parametric `HeadCoherent` |
+| Coherence/PreservationDeliveryModels.lean | 157 | Parametrized preservation lemmas for different delivery models |
 
 ### Typing (8 parts)
 
@@ -396,37 +402,38 @@ Central invariant replacing traditional duality for multiparty async settings.
 ### Supporting Modules
 
 | File | Lines | Description |
-|------|-------|-------------|
+|------|------:|-------------|
 | Spatial.lean | 364 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound` |
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
+| CrashTolerance.lean | 225 | `CommGraph`, `CrashTolerant`, `Critical`, crash tolerance predicates |
+| Noninterference.lean | 264 | `CEquiv`, `BlindTo`, noninterference security properties |
+| DeliveryModel.lean | 214 | `DeliveryModel` typeclass, FIFO/causal/lossy instances |
+| CoherenceM.lean | 15 | Model-parametric coherence re-export wrapper |
+| InformationCost.lean | 1050 | `ProjectionMap`, entropy, mutual information, blind projection |
 
 ---
 
 ## Runtime
 
 **Root Module:** `Runtime.lean`
-**Description:** VM definition, Iris separation logic backend, resource algebras, session invariants, WP rules, and adequacy. Scaffolded, shims populated, task stubs expanding incrementally.
+**Description:** VM definition, Iris separation logic backend via iris-lean, resource algebras, session invariants, WP rules, and adequacy.
 
-### Iris Separation Logic Shims
+### Iris Bridge (iris-lean integration)
 
-Axiom shims for Iris primitives. Each retires when the corresponding upstream PR lands.
+Consolidated interface to iris-lean separation logic. **0 sorry** — ghost maps use `Positive` keys with encoding.
 
 | File | Lines | Description |
-|------|-------|-------------|
-| Shim/ResourceAlgebra.lean | 129 | `iProp`, `GhostName`, sep logic connectives, `own`, `bupd`, `Auth`, `GMap`, `ghost_map_*`, `big_sepL/M` |
-| Shim/Invariants.lean | 77 | `Mask`, `Namespace`, `fupd`, `inv`, `cinv`, `CancelToken` |
-| Shim/WeakestPre.lean | 108 | `Language`/`EctxLanguage` classes, `wp`, `state_interp`, WP rules, `MultiStep`, `wp_adequacy` |
-| Shim/SavedProp.lean | 32 | `saved_prop_own/alloc/agree/persistent`, `ghost_var` operations |
-| Shim/GenHeap.lean | 36 | `HeapLookup/Insert`, `pointsto`, `gen_heap_alloc/valid/update` |
+|------|------:|-------------|
+| IrisBridge.lean | 398 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
 
 ### Compat Layer
 
-Swap modules that re-export shim definitions. When upstream Iris lands, these swap to real implementations.
+Thin adapters that re-export IrisBridge definitions for downstream modules.
 
 | File | Lines | Description |
-|------|-------|-------------|
+|------|------:|-------------|
 | Compat.lean | 13 | Single import point for all Iris compat modules |
 | Compat/RA.lean | 10 | Resource algebra compat |
 | Compat/Inv.lean | 10 | Invariant compat |
@@ -515,11 +522,17 @@ Swap modules that re-export shim definitions. When upstream Iris lands, these sw
 ### Adequacy and Proofs
 
 | File | Lines | Description |
-|------|-------|-------------|
+|------|------:|-------------|
 | Adequacy/Adequacy.lean | 145 | Adequacy theorem connecting WP to execution |
 | Proofs/TheoremStubs.lean | 294 | Top-level theorem statements |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
+| Proofs/SessionLocal.lean | 278 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
+| Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
+| Proofs/Delegation.lean | 482 | `DelegationStep`, `DelegationWF`, role-renaming Consume lemmas |
+| Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
+| Proofs/Diamond/Lemmas.lean | 364 | Cross-session diamond lemmas |
+| Proofs/Diamond/Proof.lean | 816 | Main diamond theorem proof |
 
 ### Examples and Tests
 
@@ -548,33 +561,35 @@ telltale (package)
 └── Runtime          ← VM, Iris backend, WP, adequacy (default target)
 ```
 
-**Dependencies:** mathlib, paco-lean v0.1.3
+**Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
 
 ---
 
 ## Axiom Inventory
 
-### Protocol Library (13 axioms)
+### Protocol Library (9 axioms)
 
 | File | Count | Axioms |
-|------|-------|--------|
-| Deployment/Linking.lean | 8 | `mergeBufs_typed`, `mergeLin_valid`, `mergeLin_unique`, `link_preserves_WTMon_full`, `link_preserves_WTMon`, `link_preserves_WTMon_complete`, `link_preserves_WTMon_complete_full`, `compose_deadlock_free` |
+|------|------:|--------|
+| Deployment/Linking.lean | 6 | `mergeBufs_typed`, `link_preserves_WTMon` (4 variants), `compose_deadlock_free` |
 | Monitor/Preservation.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
 | Typing/Core.lean | 1 | `ParSplit.unique` |
-| Typing/Framing.lean | 1 | `SessionsOf_subset_of_HasTypeProcPreOut` |
-| Typing/Preservation.lean | 1 | `DisjointS_preserved_TypedStep_right` |
 
-### Runtime Library (~108 shim axioms)
+**Retired this cycle:** `mergeLin_valid`, `mergeLin_unique`, `SessionsOf_subset`, `DisjointS_preserved`
 
-All shim axioms retire when upstream Iris PRs land. See `work/iris_3.md` for retirement schedule.
+### Runtime Library (IrisBridge — 0 sorry)
 
-| File | Count | Description |
-|------|-------|-------------|
-| Shim/ResourceAlgebra.lean | 51 | iProp connectives, sep logic rules, own, bupd, Auth RA, GMap, ghost_map ops, big_sep |
-| Shim/Invariants.lean | 31 | Mask/Namespace ops, fupd rules, inv alloc/acc, cinv alloc/acc/cancel |
-| Shim/WeakestPre.lean | 12 | wp rules (value, mono, bind, frame, fupd, lift_step), MultiStep, adequacy, invariance |
-| Shim/SavedProp.lean | 8 | saved_prop (own/alloc/agree/persistent), ghost_var (alloc/agree/update) + ghost_var itself |
-| Shim/GenHeap.lean | 6 | HeapLookup, HeapInsert, pointsto, gen_heap (alloc/valid/update) |
+**IrisBridge.lean now connects to iris-lean directly.** Ghost maps use `Positive` keys with application-level encoding via `Iris.Countable.encode`. The `GhostMapSlot V` typeclass registers value types.
+
+| Category | Status | Description |
+|----------|:------:|-------------|
+| Sep logic connectives | Done | `iProp.sep`, `iProp.wand`, `iProp.pure`, etc. via iris-lean |
+| Ghost variables | Done | `ghost_var`, `ghost_var_alloc`, `ghost_var_agree`, `ghost_var_update` |
+| Ghost maps | Done | `ghost_map_auth`, `ghost_map_elem`, `ghost_map_alloc`, `ghost_map_lookup`, `ghost_map_insert`, `ghost_map_update`, `ghost_map_delete` |
+| Invariants | Done | `inv`, `fupd`, `Mask`, `Namespace` via iris-lean |
+| Saved props | Done | `saved_prop_own`, `saved_prop_alloc`, `saved_prop_agree` |
+
+**Remaining downstream work:** polymorphic CMRA for `own`, Language instance for WP/adequacy, cancelable invariants need `CinvR` instance.
 
 **Sorries:** 0 across all libraries.
 
@@ -594,8 +609,8 @@ Coherence preservation proofs split per edge: updated (type+trace change), relat
 ### 4. Parametrized Coinduction (paco)
 EQ2 and bisimulation proofs use paco-lean for parametrized coinduction, avoiding manual guardedness arguments.
 
-### 5. Iris Axiom Shims
-Runtime library axiomatizes Iris separation logic primitives to enable parallel development. Shims retire individually as upstream PRs are merged.
+### 5. Iris Integration via iris-lean
+Runtime library connects to iris-lean for separation logic primitives. Ghost maps use `Positive` keys with application-level encoding. The `GhostMapSlot V` typeclass registers value types.
 
 ### 6. Linear Capability Tokens
 Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor validates token ownership before permitting actions.
@@ -612,17 +627,25 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Bisimulation?** → SessionCoTypes/Bisim/Core.lean
 - **Inductive ↔ coinductive bridge?** → SessionCoTypes/Coinductive/Roundtrip/
 - **Projection algorithm?** → Choreography/Projection/Project/Core.lean, ImplBase.lean
-- **Projection correctness (harmony)?** → Choreography/Harmony.lean, Harmony/StepHarmony.lean, Harmony/Substitution.lean, Harmony/ParticipantSteps.lean, Harmony/NonParticipantHelpers.lean, Harmony/NonParticipantSteps.lean
+- **Projection correctness (harmony)?** → Choreography/Harmony.lean, Harmony/StepHarmony.lean
 - **Operational semantics?** → Semantics/Environment.lean, Protocol/Semantics.lean
-- **Coherence invariant?** → Protocol/Coherence/Consume.lean
-- **Coherence preservation?** → Protocol/Coherence/Preservation.lean (send/recv), Protocol/Coherence/SelectPreservation.lean (select/branch)
+- **Coherence invariant?** → Protocol/Coherence/Consume.lean, Protocol/Coherence/EdgeCoherence.lean
+- **Coherence preservation?** → Protocol/Coherence/Preservation.lean, Protocol/Coherence/SelectPreservation.lean
+- **Configuration equivalence (quotient)?** → Protocol/Coherence/ConfigEquiv.lean
+- **Unified preservation skeleton?** → Protocol/Coherence/Unified.lean
 - **Type system?** → Protocol/Typing/Judgments.lean (`HasTypeProcN`, `WTConfigN`)
 - **Type safety?** → Protocol/Preservation.lean
 - **Deadlock freedom?** → Protocol/DeadlockFreedom.lean
 - **Runtime monitoring?** → Protocol/Monitor/Core.lean
-- **Deployment composition?** → Protocol/Deployment/Interface.lean, Protocol/Deployment/Merge.lean, Protocol/Deployment/Linking.lean
-- **Iris separation logic shims?** → Runtime/Shim/ResourceAlgebra.lean
-- **Weakest preconditions?** → Runtime/Shim/WeakestPre.lean
+- **Deployment composition?** → Protocol/Deployment/Interface.lean, Protocol/Deployment/Linking.lean
+- **Crash tolerance?** → Protocol/CrashTolerance.lean
+- **Noninterference?** → Protocol/Noninterference.lean
+- **Delivery models?** → Protocol/DeliveryModel.lean
+- **Iris separation logic (iris-lean)?** → Runtime/IrisBridge.lean
+- **Ghost state?** → Runtime/ProgramLogic/GhostState.lean
+- **Session-local proofs?** → Runtime/Proofs/SessionLocal.lean, Runtime/Proofs/Frame.lean
+- **Delegation proofs?** → Runtime/Proofs/Delegation.lean
+- **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean
 - **VM bytecode compiler?** → Runtime/VM/CompileLocalTypeR.lean
 - **Dynamic choreography loading?** → Runtime/VM/LoadChoreography.lean
 - **N-concurrent scheduling?** → Runtime/VM/RunScheduled.lean, Runtime/Proofs/Concurrency.lean

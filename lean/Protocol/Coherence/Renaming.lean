@@ -79,9 +79,36 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
   -- The trace is the renamed original trace.
   have hTraceEq : lookupD (renameDEnv ρ D) e = (lookupD D e').map (renameValType ρ) := by
     simpa [hEdgeEq] using (lookupD_rename (ρ:=ρ) (D:=D) (e:=e'))
+  -- Sender preimage from ActiveEdge.
+  rcases hActive with ⟨hSenderSome, _⟩
+  rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨Lsender, hGsender⟩
+  obtain ⟨sendEp', Lsender', hsendEq, hLsenderEq, hGsender'⟩ :=
+    lookupG_rename_inv ρ G _ _ hGsender
+  have hSenderRole : e.sender = sendEp'.role := by
+    have h := congrArg Endpoint.role hsendEq
+    simp [renameEndpoint] at h
+    exact h
+  have hSidSender : e.sid = ρ.f sendEp'.sid := by
+    have h := congrArg Endpoint.sid hsendEq
+    simp [renameEndpoint] at h
+    exact h
+  have hSidEq : sendEp'.sid = recvEp'.sid := by
+    apply ρ.inj
+    calc
+      ρ.f sendEp'.sid = e.sid := by simpa [hSidSender]
+      _ = ρ.f recvEp'.sid := hSid
+  have hGsender'' : lookupG G ⟨e'.sid, e'.sender⟩ = some Lsender' := by
+    cases sendEp' with
+    | mk sid role =>
+        -- e'.sid = recvEp'.sid = sid, e'.sender = e.sender = role
+        have hSidEq' : sid = recvEp'.sid := by simpa using hSidEq
+        have hSenderRole' : e.sender = role := by simpa using hSenderRole
+        have hEq : (⟨e'.sid, e'.sender⟩ : Endpoint) = ⟨sid, role⟩ := by
+          simp [e', hSidEq'.symm, hSenderRole']
+        simpa [hEq] using hGsender'
   -- Apply original coherence at e'.
   have hActive' : ActiveEdge G e' :=
-    ActiveEdge_of_receiver (G:=G) (e:=e') hGrecv'
+    ActiveEdge_of_endpoints (G:=G) (e:=e') hGsender'' hGrecv'
   have hCoh' := hCoh e' hActive' Lrecv' hGrecv'
   rcases hCoh' with ⟨Lsender', hGsender', hConsumeOrig⟩
   -- Sender lookup after renaming.

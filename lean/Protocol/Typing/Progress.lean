@@ -754,6 +754,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
     Coherent G D →
     HeadCoherent G D →
     ValidLabels G D bufs →
+    RoleComplete G →
     SendReady G D →
     SelectReady G D →
     DConsistent G D →
@@ -761,7 +762,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
       (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
         G' D' Sown' store' bufs' P') ∨
       BlockedProc store bufs P := by
-  intro hOut hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
+  intro hOut hStore hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
   cases P with
   | skip =>
       left; rfl
@@ -784,6 +785,11 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
           subst hkChan
           set recvEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
+          have hActiveRecv : ActiveEdge G recvEdge := by
+            have hGrecv : lookupG G { sid := recvEdge.sid, role := recvEdge.receiver } = some (.recv p T L) := by
+              simpa [recvEdge] using hG
+            rcases RoleComplete_recv hComplete hG with ⟨Lsender, hGsender⟩
+            exact ActiveEdge_of_endpoints (e:=recvEdge) hGsender hGrecv
           cases hBuf : lookupBuf bufs recvEdge with
           | nil =>
               right; right
@@ -804,7 +810,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               | nil =>
                   simp [hTrace] at h0trace
               | cons T' ts =>
-                  have hHeadEdge := hHead recvEdge
+                  have hHeadEdge := hHead recvEdge hActiveRecv
                   have hEq : T = T' := by
                     simpa [HeadCoherent, hG, recvEdge, hTrace] using hHeadEdge
                   have hEq' : T' = T := by
@@ -820,6 +826,11 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
           subst hkChan
           set recvEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
+          have hActiveRecv : ActiveEdge G recvEdge := by
+            have hGrecv : lookupG G { sid := recvEdge.sid, role := recvEdge.receiver } = some (.recv p T L) := by
+              simpa [recvEdge] using hG
+            rcases RoleComplete_recv hComplete hG with ⟨Lsender, hGsender⟩
+            exact ActiveEdge_of_endpoints (e:=recvEdge) hGsender hGrecv
           cases hBuf : lookupBuf bufs recvEdge with
           | nil =>
               right; right
@@ -840,7 +851,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               | nil =>
                   simp [hTrace] at h0trace
               | cons T' ts =>
-                  have hHeadEdge := hHead recvEdge
+                  have hHeadEdge := hHead recvEdge hActiveRecv
                   have hEq : T = T' := by
                     simpa [HeadCoherent, hG, recvEdge, hTrace] using hHeadEdge
                   have hEq' : T' = T := by
@@ -868,6 +879,12 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
           subst hkChan
           set branchEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
+          have hActiveBranch : ActiveEdge G branchEdge := by
+            have hGrecv : lookupG G { sid := branchEdge.sid, role := branchEdge.receiver } =
+                some (.branch p bs) := by
+              simpa [branchEdge] using hG
+            rcases RoleComplete_branch hComplete hG with ⟨Lsender, hGsender⟩
+            exact ActiveEdge_of_endpoints (e:=branchEdge) hGsender hGrecv
           cases hBuf : lookupBuf bufs branchEdge with
           | nil =>
               right; right
@@ -888,14 +905,15 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               | nil =>
                   simp [hTrace] at h0trace
               | cons T' ts =>
-                  have hHeadEdge := hHead branchEdge
+                  have hHeadEdge := hHead branchEdge hActiveBranch
                   have hEq : T' = .string := by
                     simpa [HeadCoherent, hG, branchEdge, hTrace] using hHeadEdge
                   have hv := by
                     simpa [hTrace, hEq] using hv'
                   cases hv with
                   | string lbl =>
-                      have hValidEdge := hValid branchEdge p bs (by simpa [branchEdge] using hG)
+                      have hValidEdge := hValid branchEdge p bs hActiveBranch
+                        (by simpa [branchEdge] using hG)
                       have hBsSome : (bs.find? (fun b => b.1 == lbl)).isSome := by
                         simpa [hBuf] using hValidEdge
                       rcases (Option.isSome_iff_exists).1 hBsSome with ⟨b, hFindBs⟩
@@ -936,7 +954,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
       cases hOut with
       | seq hP hQ =>
           have hProgP :=
-            progress_typed_aux hP hStore hBufs hCoh hHead hValid hReady hSelectReady hCons
+            progress_typed_aux hP hStore hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
           cases hProgP with
           | inl hSkip =>
               right; left
@@ -983,7 +1001,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
 
           -- Progress on left process.
           have hProgP :=
-            progress_typed_aux hP_full hStoreL hBufs hCoh hHead hValid hReady hSelectReady hCons
+            progress_typed_aux hP_full hStoreL hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
           cases hProgP with
           | inl hSkipP =>
               right; left
@@ -1023,7 +1041,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               | inr hBlockedP =>
                   -- Progress on right process.
                   have hProgQ :=
-                    progress_typed_aux hQ_full hStoreR hBufs hCoh hHead hValid hReady hSelectReady hCons
+                    progress_typed_aux hQ_full hStoreR hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
                   cases hProgQ with
                   | inl hSkipQ =>
                       right; left
@@ -1074,7 +1092,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           right; left
           exact ⟨_, _, _, _, _, _, TypedStep.assign hv rfl rfl⟩
 
-/-- Progress theorem: A well-formed process can either step or is in a final/blocked state.
+/-- Progress theorem: A complete well-formed process can either step or is in a final/blocked state.
 
     **Proof strategy**: Case analysis on process P:
     - `skip`: Terminates
@@ -1083,18 +1101,33 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
     - `seq P Q`: Use IH on P or skip elimination
     - `par P Q`: Use IH on P or Q or skip elimination -/
 theorem progress_typed {G D Ssh Sown store bufs P} :
-    LocalTypeR.WellFormed G D Ssh Sown store bufs P →
+    WellFormedComplete G D Ssh Sown store bufs P →
     (P = .skip) ∨
     (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
       G' D' Sown' store' bufs' P') ∨
     BlockedProc store bufs P := by
   intro hWF
+  rcases hWF with ⟨hWF, hComplete⟩
   unfold LocalTypeR.WellFormed at hWF
   obtain ⟨hStore, hBufs, hCoh, hHead, hValid, hCompat, hDisjS, hCons, hDCons, hPreOut⟩ := hWF
   obtain ⟨Sfin, Gfin, Wfin, Δfin, hOut⟩ := hPreOut
   have hReady : SendReady G D := Compatible_to_SendReady hCompat
   have hSelectReady : SelectReady G D := Compatible_to_SelectReady hCompat
-  exact progress_typed_aux hOut hStore hBufs hCoh hHead hValid hReady hSelectReady hDCons
+  exact progress_typed_aux hOut hStore hBufs hCoh hHead hValid hComplete hReady hSelectReady hDCons
+
+/-! ### Convenience Wrapper -/
+
+/-- Progress with explicit RoleComplete (keeps the old WellFormed ergonomics). -/
+theorem progress_typed_with_rolecomplete {G D Ssh Sown store bufs P} :
+    LocalTypeR.WellFormed G D Ssh Sown store bufs P →
+    RoleComplete G →
+    (P = .skip) ∨
+    (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
+      G' D' Sown' store' bufs' P') ∨
+    BlockedProc store bufs P := by
+  intro hWF hComplete
+  exact progress_typed (G:=G) (D:=D) (Ssh:=Ssh) (Sown:=Sown) (store:=store) (bufs:=bufs) (P:=P)
+    ⟨hWF, hComplete⟩
 
 /-  Subject reduction (soundness) theorem moved to Protocol.Preservation
     to avoid circular dependency (Step is defined in Semantics which imports Typing).
