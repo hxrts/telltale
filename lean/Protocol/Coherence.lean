@@ -7,6 +7,8 @@ import Protocol.Coherence.HeadPreservationSend
 import Protocol.Coherence.HeadPreservationSelect
 import Protocol.Coherence.ValidLabels
 import Protocol.Coherence.Renaming
+import Protocol.Coherence.ConfigEquiv
+import Protocol.Coherence.Unified
 
 /-!
 # MPST Coherence
@@ -31,7 +33,7 @@ For role p's view:
 
 ## Coherence Invariant
 
-`Coherent G D` states that for every session and every directed edge:
+`Coherent G D` states that for every session and every **active** directed edge:
 - Sender's continuation after sending matches what's in the queue
 - Receiver's continuation after consuming matches sender's intent
 

@@ -28,11 +28,45 @@ def EdgeCoherent (M : DeliveryModel) (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
       lookupG G senderEp = some Lsender ∧
       (M.consume e.sender Lrecv trace).isSome
 
-/-- Full coherence under a delivery model. -/
+/-! ### Active Edges -/
+
+/-- An edge is active if its receiver endpoint exists in G. -/
+def ActiveEdge (G : GEnv) (e : Edge) : Prop :=
+  (lookupG G { sid := e.sid, role := e.receiver }).isSome
+
+/-- Full coherence under a delivery model (active edges only). -/
 def Coherent (M : DeliveryModel) (G : GEnv) (D : DEnv) : Prop :=
-  ∀ e, EdgeCoherent M G D e
+  ∀ e, ActiveEdge G e → EdgeCoherent M G D e
 
 /-! ### Small Helpers -/
+
+/-- ActiveEdge from a concrete receiver lookup. -/
+theorem ActiveEdge_of_receiver {G : GEnv} {e : Edge} {Lrecv : LocalType}
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
+    ActiveEdge G e := by
+  simp [ActiveEdge, hGrecv]
+
+/-- Extract EdgeCoherent from Coherent given a receiver lookup. -/
+theorem Coherent_edge_of_receiver {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+    (hCoh : Coherent M G D)
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
+    EdgeCoherent M G D e := by
+  exact hCoh e (ActiveEdge_of_receiver hGrecv)
+
+/-- Inactive edges are vacuously EdgeCoherent. -/
+theorem EdgeCoherent_of_inactive {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge}
+    (hInactive : ¬ ActiveEdge G e) : EdgeCoherent M G D e := by
+  intro Lrecv hGrecv
+  have hActive : ActiveEdge G e := by
+    simp [ActiveEdge, hGrecv]
+  exact (False.elim (hInactive hActive))
+
+/-- Coherent gives EdgeCoherent for any edge (active or not). -/
+theorem Coherent_edge_any {M : DeliveryModel} {G : GEnv} {D : DEnv}
+    (hCoh : Coherent M G D) (e : Edge) : EdgeCoherent M G D e := by
+  by_cases hActive : ActiveEdge G e
+  · exact hCoh e hActive
+  · exact EdgeCoherent_of_inactive (M:=M) (G:=G) (D:=D) (e:=e) hActive
 
 /-- Extract the consume condition from `EdgeCoherent` given a receiver lookup. -/
 theorem EdgeCoherent_consume_of_receiver {M : DeliveryModel} {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}

@@ -15,6 +15,8 @@ noncomputable section
 
 universe u
 
+variable [Telltale.TelltaleIris]
+
 /-! ## Instruction pairs -/
 
 structure InstrPair (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where

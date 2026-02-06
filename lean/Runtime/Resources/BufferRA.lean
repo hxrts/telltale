@@ -246,7 +246,10 @@ def BoundedBuffer.drainEpoch (buf : BoundedBuffer) (newEpoch : Nat) : BoundedBuf
 
 /-! ## Refinement stubs -/
 
-abbrev BufferRA := GMap Edge BoundedBuffer -- Ghost map for edge buffers.
+/-- Ghost map for edge buffers.
+    Keys (Edge) encoded to Positive via pattern similar to encodeEndpoint.
+    Stub: actual implementation needs GhostMapSlot BoundedBuffer instance. -/
+abbrev BufferRA := List (Positive × BoundedBuffer)
 
 def tracePayloads {ν : Type} [VerificationModel ν]
     (trace : SignedBuffer ν) : Buffer :=

@@ -1,10 +1,11 @@
 import Protocol.Coherence.EdgeCoherence
+import Protocol.Environments.RoleRenaming
 
 /-!
 # Delegation Axiom (Paper 3)
 
 The delegation preservation axiom states that receiving a delegated channel endpoint
-preserves coherence. This is the interface between Protocol-level metatheory (Paper 3)
+preserves coherence (active-edge Coherent). This is the interface between Protocol-level metatheory (Paper 3)
 and VM-level instruction execution.
 
 **Development strategy:** We axiomatize delegation preservation to validate the
@@ -99,11 +100,22 @@ structure DelegationStep (G G' : GEnv) (D D' : DEnv) (s : SessionId) (A B : Role
   /-- Well-formedness: A in session, B not in session, A ≠ B -/
   wf : DelegationWF G s A B
 
+  /-- A's original local type in session s. -/
+  A_type : LocalType
+
+  /-- A's endpoint lookup before delegation. -/
+  A_lookup : lookupG G ⟨s, A⟩ = some A_type
+
   /-- A is removed from session s -/
   A_removed : lookupG G' ⟨s, A⟩ = none
 
   /-- B gains an endpoint in session s -/
-  B_added : (lookupG G' ⟨s, B⟩).isSome
+  B_added : lookupG G' ⟨s, B⟩ = some (renameLocalTypeRole s A B A_type)
+
+  /-- Other roles in session s get their local types renamed (A → B). -/
+  other_roles_G :
+    ∀ ep, ep.sid = s → ep.role ≠ A → ep.role ≠ B →
+      lookupG G' ep = (lookupG G ep).map (renameLocalTypeRole s A B)
 
   /-- Endpoints outside session s are unchanged -/
   other_sessions_G : ∀ ep, ep.sid ≠ s → lookupG G' ep = lookupG G ep

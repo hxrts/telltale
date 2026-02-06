@@ -16,6 +16,8 @@ noncomputable section
 
 universe u
 
+variable [Telltale.TelltaleIris]
+
 /-! ## Guard-layer invariants -/
 
 class GuardLayerInv (γ : Type u) [GuardLayer γ] where

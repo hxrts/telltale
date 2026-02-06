@@ -93,7 +93,7 @@ theorem ValidLabels_send_preserved
     have hSend : lookupG G recvEp = some (.send receiverRole T L) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
-      trace_empty_when_send_receiver (hCoh e) hSend
+      trace_empty_when_send_receiver (Coherent_edge_any hCoh e) hSend
     have hBufEmpty : lookupBuf bufs e = [] := by
       rcases hBT e with ⟨hLen, _⟩
       cases hBuf : lookupBuf bufs e with
@@ -187,7 +187,7 @@ theorem ValidLabels_select_preserved
     have hSelect : lookupG G recvEp = some (.select targetRole selectBranches) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
-      trace_empty_when_select_receiver (hCoh e) hSelect
+      trace_empty_when_select_receiver (Coherent_edge_any hCoh e) hSelect
     have hBufEmpty : lookupBuf bufs e = [] := by
       rcases hBT e with ⟨hLen, _⟩
       cases hBuf : lookupBuf bufs e with
@@ -614,12 +614,11 @@ theorem ValidLabels_branch_preserved
 
 /-- Empty environments are coherent. -/
 theorem Coherent_empty : Coherent [] (∅ : DEnv) := by
-  intro e Lrecv hGrecv
-  -- lookupG [] _ = none for any endpoint
-  unfold lookupG at hGrecv
-  simp only [List.lookup] at hGrecv
-  -- hGrecv : none = some Lrecv is a contradiction
-  exact (Option.some_ne_none Lrecv hGrecv.symm).elim
+  intro e hActive
+  -- No receiver exists in the empty environment
+  have : False := by
+    simp [ActiveEdge, lookupG] at hActive
+  exact (False.elim this)
 
 /-- Initialize coherent environments for a new session with local types. -/
 def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType) :
@@ -643,7 +642,7 @@ theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : R
       Coherent G D := by
   -- Buffers/traces are initialized empty for all edges, so Consume always succeeds.
   simp [initSession, Coherent, EdgeCoherent]
-  intro e Lrecv hGrecv
+  intro e hActive Lrecv hGrecv
   rcases hSenders e Lrecv hGrecv with ⟨Lsender, hGsender⟩
   refine ⟨?_, ?_⟩
   · exact ⟨Lsender, hGsender⟩

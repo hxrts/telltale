@@ -14,6 +14,7 @@ noncomputable section
 
 universe u
 
+variable [Telltale.TelltaleIris]
 variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
 
 def wp_send_pipeline (layer : γ) (action : EffectModel.EffectAction ε) : iProp :=

@@ -57,7 +57,7 @@ noncomputable section
 theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
     (hCoh : Coherent G D) :
     Coherent (renameGEnv ρ G) (renameDEnv ρ D) := by
-  intro e Lrecv hGrecv
+  intro e hActive Lrecv hGrecv
   -- Receiver preimage in the original environment.
   obtain ⟨recvEp', Lrecv', hrecvEq, hLrecvEq, hGrecv'⟩ :=
     lookupG_rename_inv ρ G _ _ hGrecv
@@ -80,7 +80,9 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
   have hTraceEq : lookupD (renameDEnv ρ D) e = (lookupD D e').map (renameValType ρ) := by
     simpa [hEdgeEq] using (lookupD_rename (ρ:=ρ) (D:=D) (e:=e'))
   -- Apply original coherence at e'.
-  have hCoh' := hCoh e' Lrecv' hGrecv'
+  have hActive' : ActiveEdge G e' :=
+    ActiveEdge_of_receiver (G:=G) (e:=e') hGrecv'
+  have hCoh' := hCoh e' hActive' Lrecv' hGrecv'
   rcases hCoh' with ⟨Lsender', hGsender', hConsumeOrig⟩
   -- Sender lookup after renaming.
   let senderEp' : Endpoint := { sid := e'.sid, role := e'.sender }

@@ -82,7 +82,7 @@ theorem coherent_all_empty (G : GEnv) (D : DEnv)
       lookupG G { sid := e.sid, role := e.receiver } = some Lrecv →
       ∃ Lsender, lookupG G { sid := e.sid, role := e.sender } = some Lsender) :
     Coherent G D := by
-  intro e
+  intro e hActive
   exact edgeCoherent_empty_trace G D e (hAll e) (hSenders e)
 
 /-! ## BufferTyped for Empty Buffers -/

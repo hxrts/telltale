@@ -33,6 +33,8 @@ noncomputable section
 
 universe u
 
+variable [Telltale.TelltaleIris]
+
 /-! ## Shared list helpers -/
 
 /-- Separate conjunction over a list of propositions. -/
@@ -42,11 +44,21 @@ def sepList (ps : List iProp) : iProp :=
 
 /-! ## Knowledge RA -/
 
-abbrev KnowledgeRA := GMap KnowledgeFact Unit -- Ghost map for facts.
+/-- Stub: ghost map for knowledge facts.
+    Actual implementation needs GhostMapSlot and encoding for KnowledgeFact. -/
+abbrev KnowledgeRA := List (Positive × Unit)
+
+/-- Encode a knowledge fact to Positive for ghost map key. -/
+def encodeKnowledgeFact (k : KnowledgeFact) : Positive :=
+  [Iris.Countable.encode k.endpoint.sid,
+   Iris.Countable.encode k.endpoint.role,
+   Iris.Countable.encode k.fact]
+
+variable [GhostMapSlot Unit]
 
 def knows (γ : GhostName) (k : KnowledgeFact) : iProp :=
   -- Ownership of a single knowledge fact.
-  ghost_map_elem γ k ()
+  ghost_map_elem γ (encodeKnowledgeFact k) ()
 
 def knowledge_set_owns (γ : GhostName) (ks : List KnowledgeFact) : iProp :=
   -- Ownership of a list of knowledge facts.
@@ -84,11 +96,19 @@ def check_enforces_policy : Prop :=
 
 /-! ## Progress RA -/
 
-abbrev ProgressRA := GMap (SessionId × Endpoint) Nat -- Token counts per endpoint.
+/-- Stub: ghost map for progress tokens.
+    Actual implementation needs GhostMapSlot and encoding for (SessionId × Endpoint). -/
+abbrev ProgressRA := List (Positive × Nat)
+
+/-- Encode (SessionId, Endpoint) to Positive for ghost map key. -/
+def encodeProgressKey (sid : SessionId) (e : Endpoint) : Positive :=
+  [Iris.Countable.encode sid, Iris.Countable.encode e.sid, Iris.Countable.encode e.role]
+
+variable [GhostMapSlot Nat]
 
 def progress_token_own (γ : GhostName) (sid : SessionId) (e : Endpoint) (n : Nat) : iProp :=
   -- Ownership of n progress tokens for a session endpoint.
-  ghost_map_elem γ (sid, e) n
+  ghost_map_elem γ (encodeProgressKey sid e) n
 
 def session_progress_supply (_γ : GhostName) (_sid : SessionId) : iProp :=
   -- Placeholder: session-wide supply of progress tokens.
@@ -122,15 +142,23 @@ structure FinalizationToken where
   mode : FinalizationMode
   deriving Repr
 
-abbrev FinalizationRA := GMap ScopeId FinalizationMode -- Finalization mode per scope.
+/-- Stub: ghost map for finalization modes.
+    Actual implementation needs encoding for ScopeId. -/
+abbrev FinalizationRA := List (Positive × FinalizationMode)
 
-def finalization_auth (γ : GhostName) (M : FinalizationRA) : iProp :=
+/-- Encode ScopeId to Positive. -/
+def encodeScopeId (s : ScopeId) : Positive :=
+  [Iris.Countable.encode s]
+
+variable [GhostMapSlot FinalizationMode]
+
+def finalization_auth (γ : GhostName) (M : GhostMap FinalizationMode) : iProp :=
   -- Authoritative finalization map for scopes.
   ghost_map_auth γ M
 
 def finalization_token_own (γ : GhostName) (ft : FinalizationToken) : iProp :=
   -- Fragment indicating finalization permission for a scope.
-  ghost_map_elem γ ft.scope ft.mode
+  ghost_map_elem γ (encodeScopeId ft.scope) ft.mode
 
 def finalization_token_persistent (ft : FinalizationToken) : Prop :=
   -- Finalization tokens with the same scope and mode are equal (structural identity).

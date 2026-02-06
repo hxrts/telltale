@@ -145,7 +145,7 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     DisjointG G₁ G₂ →
     DConsistent G₁ D₁ →
     Coherent G₂ D₂ := by
-  intro hCoh hDisj hCons e Lrecv hGrecv
+  intro hCoh hDisj hCons e hActive Lrecv hGrecv
   -- endpoints are in G₂; ensure G₁ has none for this session
   have hSid : e.sid ∈ SessionsOf G₂ := ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hGrecv, rfl⟩
   have hG1none_sender : lookupG G₁ { sid := e.sid, role := e.sender } = none := by
@@ -176,7 +176,9 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     lookupD_none_of_disjointG (G₁:=G₂) (G₂:=G₁) (D₂:=D₁) hDisjSym hCons hSid
   have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
     lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
-  have hCohEdge := hCoh e Lrecv hGrecv'
+  have hActive' : ActiveEdge (G₁ ++ G₂) e := by
+    simp [ActiveEdge, hGrecv']
+  have hCohEdge := hCoh e hActive' Lrecv hGrecv'
   rcases hCohEdge with ⟨Lsender, hGsenderMerged, hConsume⟩
   have hSenderEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none_sender
   have hGsenderG2 : lookupG G₂ { sid := e.sid, role := e.sender } = some Lsender := by

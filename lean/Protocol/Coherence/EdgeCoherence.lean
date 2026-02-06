@@ -23,7 +23,7 @@ For role p's view:
 
 ## Coherence Invariant
 
-`Coherent G D` states that for every session and every directed edge:
+`Coherent G D` states that for every session and every **active** directed edge:
 - Sender's continuation after sending matches what's in the queue
 - Receiver's continuation after consuming matches sender's intent
 
@@ -65,11 +65,45 @@ def EdgeCoherent (G : GEnv) (D : DEnv) (e : Edge) : Prop :=
       -- from receiver's perspective, receiver can handle it
       (Consume e.sender Lrecv trace).isSome
 
-/-- Full coherence: edge-coherent for all edges in all sessions. -/
+/-! ### Active Edges -/
+
+/-- An edge is active if its receiver endpoint exists in G. -/
+def ActiveEdge (G : GEnv) (e : Edge) : Prop :=
+  (lookupG G { sid := e.sid, role := e.receiver }).isSome
+
+/-- Full coherence: edge-coherent for all **active** edges. -/
 def Coherent (G : GEnv) (D : DEnv) : Prop :=
-  ∀ e, EdgeCoherent G D e
+  ∀ e, ActiveEdge G e → EdgeCoherent G D e
 
 /-! ### Small Helpers -/
+
+/-- ActiveEdge from a concrete receiver lookup. -/
+theorem ActiveEdge_of_receiver {G : GEnv} {e : Edge} {Lrecv : LocalType}
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
+    ActiveEdge G e := by
+  simp [ActiveEdge, hGrecv]
+
+/-- Extract EdgeCoherent from Coherent given a receiver lookup. -/
+theorem Coherent_edge_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}
+    (hCoh : Coherent G D)
+    (hGrecv : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv) :
+    EdgeCoherent G D e := by
+  exact hCoh e (ActiveEdge_of_receiver hGrecv)
+
+/-- Inactive edges are vacuously EdgeCoherent. -/
+theorem EdgeCoherent_of_inactive {G : GEnv} {D : DEnv} {e : Edge}
+    (hInactive : ¬ ActiveEdge G e) : EdgeCoherent G D e := by
+  intro Lrecv hGrecv
+  have hActive : ActiveEdge G e := by
+    simp [ActiveEdge, hGrecv]
+  exact (False.elim (hInactive hActive))
+
+/-- Coherent gives EdgeCoherent for any edge (active or not). -/
+theorem Coherent_edge_any {G : GEnv} {D : DEnv} (hCoh : Coherent G D) (e : Edge) :
+    EdgeCoherent G D e := by
+  by_cases hActive : ActiveEdge G e
+  · exact hCoh e hActive
+  · exact EdgeCoherent_of_inactive (G:=G) (D:=D) (e:=e) hActive
 
 /-- Extract the consume condition from `EdgeCoherent` given a receiver lookup. -/
 theorem EdgeCoherent_consume_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv : LocalType}

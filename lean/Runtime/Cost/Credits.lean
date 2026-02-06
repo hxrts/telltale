@@ -12,17 +12,20 @@ that can later be refined with real Iris proofs.
 set_option autoImplicit false
 noncomputable section
 
+variable [Telltale.TelltaleIris]
+variable [GhostVarSlot Nat]
+
 /-! ## Credits -/
 
 abbrev CostCredit := Nat -- Base unit of computation credits.
 
 def cost_credit_own (γ : GhostName) (n : CostCredit) : iProp :=
-  -- Ownership of n computation credits.
-  own γ n
+  -- Ownership of n computation credits (using ghost_var for simplicity).
+  ghost_var γ n
 
 def cost_credit_auth (γ : GhostName) (n : CostCredit) : iProp :=
   -- Authoritative credit counter for the total budget.
-  own γ n
+  ghost_var γ n
 
 def cost_credit_split (_n m k : CostCredit) : Prop :=
   -- Split credits into two parts.

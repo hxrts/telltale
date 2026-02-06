@@ -967,11 +967,13 @@ theorem Coherent_split_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
     Coherent (G₁ ++ G₂) (D₁ ++ D₂) →
     DisjointG G₁ G₂ →
     Coherent G₁ D₁ := by
-  intro hCoh hDisj e Lrecv hGrecv
+  intro hCoh hDisj e hActive Lrecv hGrecv
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
   let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
   have hGrecv' : lookupG (G₁ ++ G₂) recvEp = some Lrecv := lookupG_append_left hGrecv
-  have hCoh' := hCoh e Lrecv hGrecv'
+  have hActive' : ActiveEdge (G₁ ++ G₂) e := by
+    simp [ActiveEdge, hGrecv']
+  have hCoh' := hCoh e hActive' Lrecv hGrecv'
   rcases hCoh' with ⟨Lsender, hGsenderMerged, hConsume⟩
   -- sender must live in G₁ because sessions are disjoint and receiver is in G₁
   have hSid : e.sid ∈ SessionsOf G₁ := ⟨recvEp, Lrecv, hGrecv, rfl⟩

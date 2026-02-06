@@ -189,8 +189,8 @@ private theorem Coherent_rewriteD
     (∀ e, lookupD D e = lookupD D' e) →
     Coherent G D →
     Coherent G D' := by
-  intro hEq hCoh e Lrecv hGrecv
-  have hCohEdge := hCoh e Lrecv hGrecv
+  intro hEq hCoh e hActive Lrecv hGrecv
+  have hCohEdge := hCoh e hActive Lrecv hGrecv
   rcases hCohEdge with ⟨Lsender, hGsender, hConsume⟩
   refine ⟨Lsender, hGsender, ?_⟩
   simpa [hEq e] using hConsume
@@ -287,10 +287,12 @@ private theorem Coherent_mono {G G' : GEnv} {D : DEnv} :
     (∀ e, lookupG G e = lookupG G' e) →
     Coherent G D →
     Coherent G' D := by
-  intro hEq hCoh e Lrecv hGrecv
+  intro hEq hCoh e hActive Lrecv hGrecv
   have hGrecv' : lookupG G { sid := e.sid, role := e.receiver } = some Lrecv := by
     simpa [hEq _] using hGrecv
-  rcases hCoh e Lrecv hGrecv' with ⟨Lsender, hGsender, hConsume⟩
+  have hActive' : ActiveEdge G e := by
+    simp [ActiveEdge, hGrecv']
+  rcases hCoh e hActive' Lrecv hGrecv' with ⟨Lsender, hGsender, hConsume⟩
   have hGsender' : lookupG G' { sid := e.sid, role := e.sender } = some Lsender := by
     simpa [hEq _] using hGsender
   exact ⟨Lsender, hGsender', hConsume⟩

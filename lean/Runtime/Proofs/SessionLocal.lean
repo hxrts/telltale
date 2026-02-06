@@ -56,21 +56,21 @@ universe u
 /-! ## Per-Session Coherence -/
 
 /-- Coherence restricted to a single session.
-    An edge belongs to session s iff edge.sid = s. -/
+    An edge belongs to session s iff edge.sid = s, and only active edges matter. -/
 def SessionCoherent (G : GEnv) (D : DEnv) (s : SessionId) : Prop :=
-  ∀ e : Edge, e.sid = s → EdgeCoherent G D e
+  ∀ e : Edge, e.sid = s → ActiveEdge G e → EdgeCoherent G D e
 
 /-- Global coherence implies per-session coherence. -/
 theorem Coherent_implies_SessionCoherent {G : GEnv} {D : DEnv} {s : SessionId}
     (hCoh : Coherent G D) : SessionCoherent G D s := by
-  intro e _
-  exact hCoh e
+  intro e _ hActive
+  exact hCoh e hActive
 
 /-- Per-session coherence for all sessions implies global coherence. -/
 theorem SessionCoherent_forall_implies_Coherent {G : GEnv} {D : DEnv}
     (h : ∀ s, SessionCoherent G D s) : Coherent G D := by
-  intro e
-  exact h e.sid e rfl
+  intro e hActive
+  exact h e.sid e rfl hActive
 
 /-- **Global coherence decomposes as conjunction over sessions.**
     This is the key structural lemma enabling the frame rule. -/
@@ -233,7 +233,7 @@ theorem session_local_op_preserves_other {s : SessionId}
     let (G', D') := f (G, D)
     SessionCoherent G' D' sOther := by
   obtain ⟨hEp, hTrace⟩ := hLocal G D sOther hDiff
-  intro e hSid
+  intro e hSid hActive
   simp only [EdgeCoherent]
   intro Lrecv hGrecv
   -- The receiver endpoint lookup is unchanged
@@ -242,8 +242,10 @@ theorem session_local_op_preserves_other {s : SessionId}
   have hGrecvOrig : lookupG G ⟨e.sid, e.receiver⟩ = some Lrecv := by
     rw [← hEp ⟨e.sid, e.receiver⟩ hRecvSid]
     exact hGrecv
+  have hActiveOrig : ActiveEdge G e :=
+    ActiveEdge_of_receiver (G:=G) (e:=e) hGrecvOrig
   -- Get coherence from original state
-  have hEdgeCoh := hCoh e hSid
+  have hEdgeCoh := hCoh e hSid hActiveOrig
   rcases hEdgeCoh Lrecv hGrecvOrig with ⟨Lsender, hGsender, hConsume⟩
   -- The sender endpoint lookup is unchanged
   have hSendSid : (⟨e.sid, e.sender⟩ : Endpoint).sid = sOther := hSid

@@ -181,7 +181,7 @@ private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
       (Consume e.sender Lrecv (lookupD (D₁ ++ D₂) e)).isSome := by
   -- Use left coherence and lift lookups/trace into the merged environment.
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
-  have hCoh := hC₁ e Lrecv hGrecvL
+  have hCoh := Coherent_edge_of_receiver (G:=G₁) (D:=D₁) (e:=e) hC₁ hGrecvL
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
   have hSid : e.sid ∈ SessionsOf G₁ := ⟨senderEp, Lsender, hGsender, rfl⟩
   have hNot : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSid
@@ -203,7 +203,7 @@ private theorem EdgeCoherent_merge_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
       (Consume e.sender Lrecv (lookupD (D₁ ++ D₂) e)).isSome := by
   -- Use right coherence and lift lookups/trace into the merged environment.
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
-  have hCoh := hC₂ e Lrecv hGrecvR
+  have hCoh := Coherent_edge_of_receiver (G:=G₂) (D:=D₂) (e:=e) hC₂ hGrecvR
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
   have hSid : e.sid ∈ SessionsOf G₂ := ⟨senderEp, Lsender, hGsender, rfl⟩
   have hDisjG' : DisjointG G₂ G₁ := DisjointG_symm hDisjG
@@ -224,7 +224,7 @@ theorem Coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hDisjG : DisjointG G₁ G₂) (hCons₁ : DConsistent G₁ D₁) (hCons₂ : DConsistent G₂ D₂) :
     Coherent (G₁ ++ G₂) (D₁ ++ D₂) := by
   -- Split on which side provides the receiver endpoint.
-  intro e Lrecv hGrecv
+  intro e hActive Lrecv hGrecv
   have hInv := lookupG_append_inv (G₁:=G₁) (G₂:=G₂)
     (e:={ sid := e.sid, role := e.receiver }) hGrecv
   cases hInv with
