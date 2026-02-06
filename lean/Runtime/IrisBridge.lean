@@ -531,9 +531,9 @@ theorem saved_prop_agree [SavedPropSlot] (γ : GhostName) (P Q : iProp) :
 theorem saved_prop_persistent [SavedPropSlot] (γ : GhostName) (P : iProp) :
     iProp.entails (saved_prop_own γ P)
       (iProp.persistently (saved_prop_own γ P)) := by
-  -- Our saved_prop_own uses DFrac.own 1, not DFrac.discard, so it's not
-  -- automatically persistent. We need to go through bupd to discard the fraction.
-  -- The proper fix is to use discarded fractions for persistence.
+  -- iris-lean only makes saved_prop_own persistent for DFrac.discard, not DFrac.own 1.
+  -- Our saved_prop_own uses DFrac.own 1 for exclusivity.
+  -- To get persistence, we'd need to use DFrac.discard instead.
   sorry
 
 /-! ## Ghost Variables (SavedProp.lean lines 26–32) -/
