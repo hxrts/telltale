@@ -19,10 +19,10 @@ Single facade for all iris-lean imports. Provides:
 1. `TelltaleIris` typeclass bundling abstract Iris parameters
 2. Type aliases (`iProp`, `GhostName`, `Mask`, `Namespace`)
 3. Dispatch typeclasses (`GhostMapSlot`, `GhostVarSlot`, `SavedPropSlot`)
-4. Adapter definitions matching every axiom signature in the shim files
+4. Separation logic, ghost state, update modalities, invariants, WP, and heap primitives
 
-To retire an axiom: delete the `axiom` line, add `import Runtime.Iris.Bridge`,
-and add `variable [Telltale.TelltaleIris]` to the shim file.
+Usage: Import `Runtime.IrisBridge` and add `variable [Telltale.TelltaleIris]`.
+The Compat layer (`Runtime.Compat`) re-exports this for downstream modules.
 -/
 
 set_option autoImplicit false
@@ -135,6 +135,13 @@ export Telltale (iProp GhostName GhostMapSlot GhostVarSlot SavedPropSlot)
 
 -- Mask and Namespace are exported separately to control ambiguity.
 export Telltale (Mask Namespace)
+
+-- Convenience alias for backwards compatibility (avoids collision with iris-lean's root Auth)
+abbrev TAuth := Telltale.Auth
+
+namespace TAuth
+export Telltale.Auth (auth frag)
+end TAuth
 
 variable [ti : Telltale.TelltaleIris]
 

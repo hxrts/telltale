@@ -1,10 +1,10 @@
-import Runtime.Shim.ResourceAlgebra
+import Runtime.IrisBridge
 
 /-!
 # Compat RA
 
-Compatibility layer for resource algebra shims.
-Swap this import to upstream Iris modules when available.
+Compatibility layer for resource algebra primitives.
+Now backed by iris-lean via IrisBridge.
 -/
 
 set_option autoImplicit false

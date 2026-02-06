@@ -1,10 +1,10 @@
-import Runtime.Shim.SavedProp
+import Runtime.IrisBridge
 
 /-!
 # Compat SavedProp
 
-Compatibility layer for saved propositions/ghost var shims.
-Swap this import to upstream Iris modules when available.
+Compatibility layer for saved propositions and ghost variables.
+Now backed by iris-lean via IrisBridge.
 -/
 
 set_option autoImplicit false

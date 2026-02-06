@@ -1,10 +1,10 @@
-import Runtime.Shim.WeakestPre
+import Runtime.IrisBridge
 
 /-!
 # Compat WP
 
-Compatibility layer for Language/WP shims.
-Swap this import to upstream Iris modules when available.
+Compatibility layer for Language/WP primitives.
+Now backed by iris-lean via IrisBridge.
 -/
 
 set_option autoImplicit false

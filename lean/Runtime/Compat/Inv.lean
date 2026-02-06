@@ -1,10 +1,10 @@
-import Runtime.Shim.Invariants
+import Runtime.IrisBridge
 
 /-!
 # Compat Invariants
 
-Compatibility layer for invariants/fupd shims.
-Swap this import to upstream Iris modules when available.
+Compatibility layer for invariants/fupd primitives.
+Now backed by iris-lean via IrisBridge.
 -/
 
 set_option autoImplicit false
