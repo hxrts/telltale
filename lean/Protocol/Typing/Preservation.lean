@@ -558,13 +558,13 @@ private theorem DisjointS_preserved_TypedStep_left
   | par_skip_right =>
       simpa using hDisj
 
-private lemma StoreTyped_rewriteG {G G' : GEnv} {S : SEnv} {store : Store}
+private lemma StoreTyped_rewriteG {G G' : GEnv} {S : SEnv} {store : VarStore}
     (hMono : ∀ e L, lookupG G e = some L → lookupG G' e = some L) :
     StoreTyped G S store → StoreTyped G' S store := by
   intro hStore x v T hStr hS
   exact HasTypeVal_mono G G' v T (hStore x v T hStr hS) hMono
 
-private lemma StoreTyped_rewriteS {G : GEnv} {S S' : SEnv} {store : Store}
+private lemma StoreTyped_rewriteS {G : GEnv} {S S' : SEnv} {store : VarStore}
     (hEq : ∀ x, lookupSEnv S x = lookupSEnv S' x) :
     StoreTyped G S store → StoreTyped G S' store := by
   intro hStore x v T hStr hS'
@@ -572,13 +572,13 @@ private lemma StoreTyped_rewriteS {G : GEnv} {S S' : SEnv} {store : Store}
     simpa [hEq x] using hS'
   exact hStore x v T hStr hS
 
-private lemma StoreTyped_weakenS {G : GEnv} {S S' : SEnv} {store : Store}
+private lemma StoreTyped_weakenS {G : GEnv} {S S' : SEnv} {store : VarStore}
     (hMono : ∀ x T, lookupSEnv S' x = some T → lookupSEnv S x = some T) :
     StoreTyped G S store → StoreTyped G S' store := by
   intro hStore x v T hStr hS'
   exact hStore x v T hStr (hMono x T hS')
 
-private lemma StoreTypedStrong_rewriteG {G G' : GEnv} {S : SEnv} {store : Store}
+private lemma StoreTypedStrong_rewriteG {G G' : GEnv} {S : SEnv} {store : VarStore}
     (hEq : ∀ e, lookupG G e = lookupG G' e) :
     StoreTypedStrong G S store → StoreTypedStrong G' S store := by
   intro hStore
@@ -592,7 +592,7 @@ private lemma StoreTypedStrong_rewriteG {G G' : GEnv} {S : SEnv} {store : Store}
         simpa [hEq e] using hLookup)
     exact hStore.typeCorr
 
-private lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : Store}
+private lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : VarStore}
     (hEq : ∀ x, lookupSEnv S x = lookupSEnv S' x) :
     StoreTypedStrong G S store → StoreTypedStrong G S' store := by
   intro hStore
@@ -667,7 +667,7 @@ private lemma lookupG_swap_left {G₁ G₂ G₃ : GEnv} (hDisj : DisjointG G₁ 
         simpa [List.append_assoc] using hB
       simpa [hA', hB']
 
-private lemma StoreTypedStrong_swap_G_left {G₁ G₂ G₃ : GEnv} {S : SEnv} {store : Store}
+private lemma StoreTypedStrong_swap_G_left {G₁ G₂ G₃ : GEnv} {S : SEnv} {store : VarStore}
     (hDisj : DisjointG G₁ G₂) :
     StoreTypedStrong ((G₁ ++ G₂) ++ G₃) S store →
     StoreTypedStrong ((G₂ ++ G₁) ++ G₃) S store := by
@@ -679,7 +679,7 @@ private lemma StoreTypedStrong_swap_G_left {G₁ G₂ G₃ : GEnv} {S : SEnv} {s
   exact hStore
 
 private lemma StoreTypedStrong_swap_S_left_prefix
-    {Ssh S₁ S₂ S₃ : SEnv} {G : GEnv} {store : Store}
+    {Ssh S₁ S₂ S₃ : SEnv} {G : GEnv} {store : VarStore}
     (hDisj : DisjointS S₁ S₂) :
     StoreTypedStrong G (SEnvAll Ssh ((S₁ ++ S₂) ++ S₃)) store →
     StoreTypedStrong G (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) store := by
@@ -1043,7 +1043,7 @@ private theorem lookupSEnv_none_of_disjoint_update
 
 /-- Same-domain is preserved by a matching SEnv/store update. -/
 private theorem StoreTypedStrong_sameDomain_update
-    {S : SEnv} {store : Store} {x : Var} {T : ValType} {v : Value}
+    {S : SEnv} {store : VarStore} {x : Var} {T : ValType} {v : Value}
     (hDom : ∀ y, (lookupSEnv S y).isSome ↔ (lookupStr store y).isSome) :
     ∀ y, (lookupSEnv (updateSEnv S x T) y).isSome ↔
       (lookupStr (updateStr store x v) y).isSome := by
@@ -1060,7 +1060,7 @@ private theorem StoreTypedStrong_sameDomain_update
 
 /-- StoreTypedStrong is stable under updating G at a single endpoint. -/
 private theorem StoreTypedStrong_updateG
-    {G : GEnv} {S : SEnv} {store : Store} {e : Endpoint} {L : LocalType}
+    {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType}
     (hStore : StoreTypedStrong G S store) :
     StoreTypedStrong (updateG G e L) S store := by
   -- Same-domain is unchanged; typing weakens along updateG.
@@ -1074,7 +1074,7 @@ private theorem StoreTypedStrong_updateG
 
 /-- Assignment preserves StoreTypedStrong on shared+owned SEnv. -/
 private theorem StoreTypedStrong_assign_update
-    {G : GEnv} {Ssh Sown : SEnv} {store : Store} {x : Var} {v : Value} {T : ValType}
+    {G : GEnv} {Ssh Sown : SEnv} {store : VarStore} {x : Var} {v : Value} {T : ValType}
     (hStore : StoreTypedStrong G (SEnvAll Ssh Sown) store)
     (hNone : lookupSEnv Ssh x = none)
     (hv : HasTypeVal G v T) :
@@ -1093,7 +1093,7 @@ private theorem StoreTypedStrong_assign_update
 
 /-- Receive preserves StoreTypedStrong on shared+owned SEnv. -/
 private theorem StoreTypedStrong_recv_update
-    {G : GEnv} {Ssh Sown : SEnv} {store : Store} {e : Endpoint} {L : LocalType}
+    {G : GEnv} {Ssh Sown : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType}
     {x : Var} {v : Value} {T : ValType}
     (hStore : StoreTypedStrong G (SEnvAll Ssh Sown) store)
     (hNone : lookupSEnv Ssh x = none)
@@ -1113,7 +1113,7 @@ private theorem StoreTypedStrong_recv_update
 
 /-- Frame: send updates G on the left under a right context. -/
 private theorem StoreTypedStrong_frame_send
-    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : Store}
+    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : VarStore}
     {e : Endpoint} {target : Role} {T : ValType} {L : LocalType}
     (hStore : StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store)
     (hG : lookupG G e = some (.send target T L)) :
@@ -1130,7 +1130,7 @@ private theorem StoreTypedStrong_frame_send
 
 /-- Frame: select updates G on the left under a right context. -/
 private theorem StoreTypedStrong_frame_select
-    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : Store}
+    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : VarStore}
     {e : Endpoint} {target : Role} {bs : List (Label × LocalType)} {L : LocalType}
     (hStore : StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store)
     (hG : lookupG G e = some (.select target bs)) :
@@ -1147,7 +1147,7 @@ private theorem StoreTypedStrong_frame_select
 
 /-- Frame: branch updates G on the left under a right context. -/
 private theorem StoreTypedStrong_frame_branch
-    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : Store}
+    {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : VarStore}
     {e : Endpoint} {source : Role} {bs : List (Label × LocalType)} {L : LocalType}
     (hStore : StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store)
     (hG : lookupG G e = some (.branch source bs)) :
@@ -1164,7 +1164,7 @@ private theorem StoreTypedStrong_frame_branch
 
 /-- Frame: assignment updates S on the left under a right context. -/
 private axiom StoreTypedStrong_frame_assign
-    {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : Store}
+    {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : VarStore}
     {x : Var} {v : Value} {T : ValType} :
     StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store →
     lookupSEnv Ssh x = none →
@@ -1173,7 +1173,7 @@ private axiom StoreTypedStrong_frame_assign
 
 /-- Frame: receive updates S and G on the left under a right context. -/
 private axiom StoreTypedStrong_frame_recv
-    {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : Store}
+    {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : VarStore}
     {e : Endpoint} {source : Role} {L : LocalType} {x : Var} {v : Value} {T : ValType} :
     StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store →
     lookupSEnv Ssh x = none →

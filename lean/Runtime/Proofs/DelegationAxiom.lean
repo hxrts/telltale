@@ -24,6 +24,21 @@ R.3: Cross-session diamond (disjoint footprints commute)
 ```
 
 Protocol-level proofs don't use VM theorems; VM proofs use Protocol theorems as lemmas.
+
+## Delegation Step (from Aristotle 13b/13c)
+
+Delegation transfers an endpoint from role A to role B in session s:
+- A's endpoint is removed from GEnv
+- B's endpoint is added with A's old type (with A→B renaming)
+- Other participants' types have A→B renaming in session s
+- Edges are redirected: (A,C)→(B,C) and (C,A)→(C,B)
+- Edge traces are preserved under redirection
+
+The key theorems (proved in Aristotle, to be ported):
+- `delegateGEnv_B_lookup`: After delegation, B has A's old type
+- `delegateGEnv_A_removed`: After delegation, A is removed
+- `delegateDEnv_redirected_trace`: Redirected edges have original traces
+- `delegate_redirected_edge_coherent`: Redirected edges are coherent
 -/
 
 set_option autoImplicit false
@@ -33,17 +48,75 @@ open scoped Classical
 
 noncomputable section
 
-/-- Placeholder for delegation step relation.
-    In Paper 3, this will be defined as: role A delegates endpoint for session s to role B.
-    The message payload contains `chan s L` where L is the delegated local type. -/
-def DelegationStep (G G' : GEnv) (D D' : DEnv) (_s : SessionId) (_A _B : Role) : Prop :=
-  -- Placeholder: will be replaced by actual definition in Paper 3
-  -- A delegation step transfers an endpoint from A to B:
-  -- - A's type for s changes (endpoint sent away)
-  -- - B's type for s changes (endpoint received)
-  -- - Buffer on (A → B) changes (message containing endpoint consumed)
-  -- - All other edges unchanged
-  True ∧ G' = G' ∧ D' = D' -- Use params to avoid unused variable warnings
+/-! ## Well-Formedness Conditions -/
+
+/-- Well-formedness conditions for delegation from A to B in session s. -/
+structure DelegationWF (G : GEnv) (s : SessionId) (A B : Role) : Prop where
+  /-- A is in session s (has an endpoint) -/
+  A_in_session : (lookupG G ⟨s, A⟩).isSome
+  /-- B is not already in session s (simple delegation case) -/
+  B_not_in_session : (lookupG G ⟨s, B⟩).isNone
+  /-- A and B are distinct roles -/
+  A_ne_B : A ≠ B
+
+/-! ## Edge Redirection -/
+
+/-- Redirect an edge from A to B in session s.
+    - If sender is A, becomes B
+    - If receiver is A, becomes B
+    - Edges in other sessions unchanged -/
+def redirectEdge (e : Edge) (s : SessionId) (A B : Role) : Edge :=
+  if e.sid == s then
+    { sid := s,
+      sender := if e.sender == A then B else e.sender,
+      receiver := if e.receiver == A then B else e.receiver }
+  else e
+
+/-- An edge e' is the redirection of edge e. -/
+def IsRedirectedEdge (e e' : Edge) (s : SessionId) (A B : Role) : Prop :=
+  e' = redirectEdge e s A B
+
+/-! ## Delegation Step Relation -/
+
+/-- A delegation step transfers an endpoint from role A to role B in session s.
+
+    This is defined as a predicate specifying what the post-delegation environments
+    must satisfy, rather than computing them explicitly.
+
+    **GEnv conditions:**
+    - A's endpoint for session s is removed
+    - B's endpoint for session s is added with (a renamed version of) A's old type
+    - Other endpoints are unchanged or have A→B renaming in their types
+
+    **DEnv conditions:**
+    - Edges are redirected: (A,C,s) → (B,C,s) and (C,A,s) → (C,B,s)
+    - Traces are preserved under redirection
+    - Edges in other sessions are unchanged
+
+    The simple case assumes B is not already in session s. The general case
+    (B already participates) requires type merging via Consume_mono (task 3.6). -/
+structure DelegationStep (G G' : GEnv) (D D' : DEnv) (s : SessionId) (A B : Role) : Prop where
+  /-- Well-formedness: A in session, B not in session, A ≠ B -/
+  wf : DelegationWF G s A B
+
+  /-- A is removed from session s -/
+  A_removed : lookupG G' ⟨s, A⟩ = none
+
+  /-- B gains an endpoint in session s -/
+  B_added : (lookupG G' ⟨s, B⟩).isSome
+
+  /-- Endpoints outside session s are unchanged -/
+  other_sessions_G : ∀ ep, ep.sid ≠ s → lookupG G' ep = lookupG G ep
+
+  /-- Redirected edges have the same trace as their pre-images -/
+  trace_preserved : ∀ e e',
+    IsRedirectedEdge e e' s A B →
+    lookupD D' e' = lookupD D e
+
+  /-- Edges in other sessions are unchanged -/
+  other_sessions_D : ∀ e, e.sid ≠ s → lookupD D' e = lookupD D e
+
+/-! ## The Axiom -/
 
 /-- **Delegation preserves coherence (AXIOM).**
 
@@ -54,9 +127,15 @@ def DelegationStep (G G' : GEnv) (D D' : DEnv) (_s : SessionId) (_A _B : Role) :
     then we have coherence after.
 
     **To discharge:** Prove Paper 3's delegation preservation theorem (task 3.3).
-    The proof will show that delegation is a special case of message passing where
-    the payload type is `chan s L`, and coherence preservation follows from the
-    higher-order coherence definitions (tasks 3.1, 3.2).
+    The Aristotle files 13b/13c have proved the key supporting lemmas:
+    - `delegate_redirected_edge_coherent`: Redirected edges are coherent
+    - `Consume_rename_*`: Consume commutes with role renaming
+    - `delegateGEnv_*`, `delegateDEnv_*`: Environment update lemmas
+
+    The proof follows the standard three-way edge case analysis:
+    1. Redirected edges (A,C)→(B,C): Use delegate_redirected_edge_coherent
+    2. Edges in other sessions: Unchanged by session isolation
+    3. Edges involving B on the receiver side: B now has a type, use trace_preserved
 
     **Tracked in:** C.1 axiom budget (implementation.md) -/
 axiom delegation_preserves_coherent :
