@@ -196,7 +196,7 @@ private theorem EdgeCoherent_merge_left {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
   have hSenderSomeG1 : (lookupG G₁ senderEp).isSome := by
     cases hInv with
     | inl h => rw [h]; trivial
-    | inr h => rw [hSenderNoneG2] at h; exact h.1.symm ▸ (h.2 ▸ trivial)
+    | inr h => rw [hSenderNoneG2] at h; exact (Option.noConfusion h.2).elim
   have hActiveG1 : ActiveEdge G₁ e := ⟨hSenderSomeG1, by rw [hGrecvL]; trivial⟩
   have hCoh := Coherent_edge_of_receiver (G:=G₁) (D:=D₁) (e:=e) hC₁ hGrecvL hActiveG1
   rcases hCoh with ⟨Lsender, hGsender, hConsume⟩
