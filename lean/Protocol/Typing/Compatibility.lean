@@ -97,7 +97,7 @@ theorem Compatible_preserved
 
     This predicate is preserved by TypedStep transitions. -/
 def LocalTypeR.WellFormed (G : GEnv) (D : DEnv) (Ssh : SEnv) (Sown : OwnedEnv)
-    (store : Store) (bufs : Buffers) (P : Process) : Prop :=
+    (store : VarStore) (bufs : Buffers) (P : Process) : Prop :=
   StoreTypedStrong G (SEnvAll Ssh Sown) store ∧
   BuffersTyped G D bufs ∧
   Coherent G D ∧
@@ -111,13 +111,13 @@ def LocalTypeR.WellFormed (G : GEnv) (D : DEnv) (Ssh : SEnv) (Sown : OwnedEnv)
 
 /-- Complete well-formedness: core invariants plus role-completeness of GEnv. -/
 def WellFormedComplete (G : GEnv) (D : DEnv) (Ssh : SEnv) (Sown : OwnedEnv)
-    (store : Store) (bufs : Buffers) (P : Process) : Prop :=
+    (store : VarStore) (bufs : Buffers) (P : Process) : Prop :=
   LocalTypeR.WellFormed G D Ssh Sown store bufs P ∧ RoleComplete G
 
 /-- WellFormedComplete implies LocalTypeR.WellFormed (projection). -/
 theorem WellFormedComplete.toWellFormed
     {G : GEnv} {D : DEnv} {Ssh : SEnv} {Sown : OwnedEnv}
-    {store : Store} {bufs : Buffers} {P : Process} :
+    {store : VarStore} {bufs : Buffers} {P : Process} :
     WellFormedComplete G D Ssh Sown store bufs P →
     LocalTypeR.WellFormed G D Ssh Sown store bufs P := by
   -- Drop the RoleComplete component.
@@ -936,7 +936,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
       exact SEnvDomSubset_update_left
 
 /-- StoreTyped splits to the left portion of SEnv. -/
-theorem StoreTyped_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : Store} :
+theorem StoreTyped_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore} :
     StoreTyped G (S₁ ++ S₂) store →
     StoreTyped G S₁ store := by
   intro hST x v T hStore hS
@@ -945,7 +945,7 @@ theorem StoreTyped_split_left {G : GEnv} {S₁ S₂ : SEnv} {store : Store} :
   exact hST x v T hStore hS'
 
 /-- StoreTyped splits to the right portion of SEnv (requires disjointness). -/
-theorem StoreTyped_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : Store}
+theorem StoreTyped_split_right {G : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
     (hDisj : DisjointS S₁ S₂) :
     StoreTyped G (S₁ ++ S₂) store →
     StoreTyped G S₂ store := by

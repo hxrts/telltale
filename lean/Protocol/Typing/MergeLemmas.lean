@@ -121,7 +121,7 @@ private theorem BufferTyped_lift_right {G₁ G₂ : GEnv} (hDisj : DisjointG G�
   simpa [hEq] using hLookup
 
 /-- StoreTyped merges when SEnv is split and endpoints are disjoint. -/
-theorem StoreTyped_merge {G₁ G₂ : GEnv} {S₁ S₂ : SEnv} {store : Store}
+theorem StoreTyped_merge {G₁ G₂ : GEnv} {S₁ S₂ : SEnv} {store : VarStore}
     (hDisj : DisjointG G₁ G₂) :
     StoreTyped G₁ S₁ store →
     StoreTyped G₂ S₂ store →

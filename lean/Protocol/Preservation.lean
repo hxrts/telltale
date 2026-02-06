@@ -80,7 +80,7 @@ private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label ×
   exact (beq_iff_eq).1 hPred'
 
 /-- StoreTyped is preserved when updating a non-channel variable. -/
-theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : Store}
+theorem StoreTyped_update_nonChan {G : GEnv} {S : SEnv} {store : VarStore}
     {x : Var} {v : Value} {T : ValType}
     (hST : StoreTyped G S store)
     (hv : HasTypeVal G v T)

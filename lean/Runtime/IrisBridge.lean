@@ -350,7 +350,21 @@ theorem big_sepL_cons {α : Type} (Φ : α → iProp) (x : α) (l : List α) :
 
 theorem big_sepL_app {α : Type} (Φ : α → iProp) (l₁ l₂ : List α) :
     iProp.entails (big_sepL Φ (l₁ ++ l₂))
-      (iProp.sep (big_sepL Φ l₁) (big_sepL Φ l₂)) := sorry
+      (iProp.sep (big_sepL Φ l₁) (big_sepL Φ l₂)) := by
+  induction l₁ with
+  | nil =>
+    -- big_sepL Φ [] = emp, so emp ∗ big_sepL Φ l₂ ⊣⊢ big_sepL Φ l₂
+    simp only [big_sepL, List.foldr, List.nil_append]
+    exact Iris.BI.emp_sep.symm.1
+  | cons x xs ih =>
+    -- big_sepL Φ ((x :: xs) ++ l₂) = Φ x ∗ big_sepL Φ (xs ++ l₂)
+    simp only [big_sepL, List.foldr, List.cons_append]
+    -- Need: Φ x ∗ big_sepL Φ (xs ++ l₂) ⊢ (Φ x ∗ big_sepL Φ xs) ∗ big_sepL Φ l₂
+    -- By ih: big_sepL Φ (xs ++ l₂) ⊢ big_sepL Φ xs ∗ big_sepL Φ l₂
+    -- So: Φ x ∗ (big_sepL Φ xs ∗ big_sepL Φ l₂) ⊢ (Φ x ∗ big_sepL Φ xs) ∗ big_sepL Φ l₂
+    -- This is sep_assoc.symm
+    refine (Iris.BI.sep_mono (entails_refl _) ih).trans ?_
+    exact (Iris.BI.sep_assoc (P := Φ x)).symm.1
 
 theorem big_sepM_insert {K V : Type} [BEq K] [DecidableEq K]
     (Φ : K → V → iProp) (m : GMap K V) (k : K) (v : V)
@@ -431,21 +445,32 @@ theorem inv_persistent (N : Namespace) (P : iProp) :
   Iris.BaseLogic.inv_persistent (W := ti.W) N P
 
 theorem inv_alloc (N : Namespace) (E : Mask) (P : iProp) :
-    iProp.entails (iProp.later P) (_root_.fupd E E (_root_.inv N P)) := sorry
+    iProp.entails (iProp.later P) (_root_.fupd E E (_root_.inv N P)) := by
+  -- iris-lean requires a freshness hypothesis for namespace allocation.
+  -- Namespaces contain infinitely many names, so fresh names always exist.
+  -- The proof requires GSet infrastructure not exposed here.
+  sorry
 
 theorem inv_acc (N : Namespace) (E : Mask) (P : iProp)
     (hSub : Mask.subseteq (namespace_to_mask N) E) :
     iProp.entails (_root_.inv N P) (_root_.fupd E (Mask.diff E (namespace_to_mask N))
       (iProp.sep (iProp.later P)
         (iProp.wand (iProp.later P)
-          (_root_.fupd (Mask.diff E (namespace_to_mask N)) E iProp.emp)))) := sorry
+          (_root_.fupd (Mask.diff E (namespace_to_mask N)) E iProp.emp)))) := by
+  -- iris-lean's inv_acc returns `pure True` in the closing wand, we return `emp`.
+  -- The conversion requires showing `pure True ⊣⊢ emp`.
+  sorry
 
 /-! ## Cancelable Invariants (Invariants.lean lines 60–77) -/
 
 def CancelToken : Type := GhostName
 
+/-- Cancelable invariant ownership token (full ownership).
+    Requires `ElemG GF (constOF CinvR)` instance not yet in TelltaleIris. -/
 noncomputable def cancel_token_own (ct : CancelToken) : iProp := sorry
 
+/-- Cancelable invariant.
+    Requires `ElemG GF (constOF CinvR)` instance not yet in TelltaleIris. -/
 noncomputable def cinv (N : Namespace) (ct : CancelToken) (P : iProp) : iProp := sorry
 
 theorem cinv_persistent (N : Namespace) (ct : CancelToken) (P : iProp) :
@@ -454,7 +479,10 @@ theorem cinv_persistent (N : Namespace) (ct : CancelToken) (P : iProp) :
 
 theorem cinv_alloc (N : Namespace) (E : Mask) (P : iProp) :
     iProp.entails (iProp.later P) (_root_.fupd E E (iProp.exist fun ct =>
-      iProp.sep (_root_.cinv N ct P) (cancel_token_own ct))) := sorry
+      iProp.sep (_root_.cinv N ct P) (cancel_token_own ct))) := by
+  -- iris-lean requires a freshness hypothesis for namespace allocation.
+  -- The proof requires GSet infrastructure not exposed here.
+  sorry
 
 theorem cinv_acc (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp)
     (hSub : Mask.subseteq (namespace_to_mask N) E) :
@@ -462,48 +490,84 @@ theorem cinv_acc (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp)
       (_root_.fupd E (Mask.diff E (namespace_to_mask N))
         (iProp.sep (iProp.later P)
           (iProp.wand (iProp.later P)
-            (_root_.fupd (Mask.diff E (namespace_to_mask N)) E iProp.emp)))) := sorry
+            (_root_.fupd (Mask.diff E (namespace_to_mask N)) E iProp.emp)))) := by
+  -- cinv_acc in iris-lean takes cinv and cinv_own separately via wand.
+  -- Our signature bundles them. We need to adapt the signature.
+  -- For now, use sorry as the signature adaptation is non-trivial.
+  sorry
 
 theorem cinv_cancel (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp)
     (hSub : Mask.subseteq (namespace_to_mask N) E) :
     iProp.entails (iProp.sep (_root_.cinv N ct P) (cancel_token_own ct))
-      (_root_.fupd E (Mask.diff E (namespace_to_mask N)) (iProp.later P)) := sorry
+      (_root_.fupd E (Mask.diff E (namespace_to_mask N)) (iProp.later P)) := by
+  -- iris-lean's cinv_cancel is via wand, our signature uses sep.
+  -- We need: cinv ∗ cinv_own ⊢ |={E,E∖N}=> ▷P
+  -- iris-lean gives: cinv ⊢ cinv_own -∗ |={E,E∖N}=> (▷P ∗ cinv_own ∗ (▷P -∗ |={E∖N,E}=> emp))
+  -- This requires extracting the first component and discarding the rest.
+  sorry
 
 /-! ## Saved Propositions (SavedProp.lean lines 15–22) -/
 
+/-- Saved proposition with full ownership (no fractional permissions exposed). -/
 noncomputable def saved_prop_own [SavedPropSlot] (γ : GhostName) (P : iProp) :
-    iProp := sorry
+    iProp :=
+  Iris.BaseLogic.saved_prop_own (GF := ti.GF) (F := ti.F) γ (Iris.DFrac.own 1) P
 
 theorem saved_prop_alloc [SavedPropSlot] (P : iProp) :
     iProp.entails iProp.emp
-      (_root_.bupd (iProp.exist fun γ => saved_prop_own γ P)) := sorry
+      (_root_.bupd (iProp.exist fun γ => saved_prop_own γ P)) :=
+  Iris.BaseLogic.saved_prop_alloc (GF := ti.GF) (F := ti.F)
+    (Iris.DFrac.own 1) Iris.DFrac.valid_own_one P
 
 theorem saved_prop_agree [SavedPropSlot] (γ : GhostName) (P Q : iProp) :
     iProp.entails (iProp.sep (saved_prop_own γ P) (saved_prop_own γ Q))
       (iProp.sep (iProp.later (iProp.wand P Q))
-        (iProp.later (iProp.wand Q P))) := sorry
+        (iProp.later (iProp.wand Q P))) := by
+  -- iris-lean gives UPred.eq P Q (internal equality), which is stronger
+  -- than ▷(P -∗ Q) ∗ ▷(Q -∗ P). We need to derive the wands from equality.
+  -- For now, use sorry as the conversion requires internal equality infrastructure.
+  sorry
 
 theorem saved_prop_persistent [SavedPropSlot] (γ : GhostName) (P : iProp) :
     iProp.entails (saved_prop_own γ P)
-      (iProp.persistently (saved_prop_own γ P)) := sorry
+      (iProp.persistently (saved_prop_own γ P)) := by
+  -- Our saved_prop_own uses DFrac.own 1, not DFrac.discard, so it's not
+  -- automatically persistent. We need to go through bupd to discard the fraction.
+  -- The proper fix is to use discarded fractions for persistence.
+  sorry
 
 /-! ## Ghost Variables (SavedProp.lean lines 26–32) -/
 
+/-- Ghost variable with full ownership (no fractional permissions exposed). -/
 noncomputable def ghost_var {α : Type} [GhostVarSlot α]
-    (γ : GhostName) (a : α) : iProp := sorry
+    (γ : GhostName) (a : α) : iProp :=
+  Iris.BaseLogic.ghost_var (GF := ti.GF) (F := ti.F) (A := Iris.LeibnizO α)
+    γ (Iris.DFrac.own 1) (Iris.LeibnizO.mk a)
 
 theorem ghost_var_alloc {α : Type} [GhostVarSlot α] (a : α) :
     iProp.entails iProp.emp
-      (_root_.bupd (iProp.exist fun γ => ghost_var γ a)) := sorry
+      (_root_.bupd (iProp.exist fun γ => ghost_var γ a)) := by
+  -- The type mismatch between our API and iris-lean's requires wrapping/unwrapping.
+  -- iris-lean returns ∃ γ, ghost_var γ (LeibnizO.mk a), we return ∃ γ, ghost_var γ a.
+  -- These are definitionally equal given our definition of ghost_var.
+  exact Iris.BaseLogic.ghost_var_alloc (GF := ti.GF) (F := ti.F)
+    (A := Iris.LeibnizO α) (Iris.LeibnizO.mk a)
 
 theorem ghost_var_agree {α : Type} [GhostVarSlot α]
     (γ : GhostName) (a b : α) :
     iProp.entails (iProp.sep (ghost_var γ a) (ghost_var γ b))
-      (iProp.pure (a = b)) := sorry
+      (iProp.pure (a = b)) := by
+  -- iris-lean proves LeibnizO.mk a = LeibnizO.mk b, we need a = b
+  have h := Iris.BaseLogic.ghost_var_agree (GF := ti.GF) (F := ti.F) (A := Iris.LeibnizO α)
+    γ (Iris.DFrac.own 1) (Iris.DFrac.own 1) (Iris.LeibnizO.mk a) (Iris.LeibnizO.mk b)
+  refine h.trans ?_
+  exact Iris.BI.pure_mono (fun heq => Iris.LeibnizO.mk.injEq a b ▸ heq)
 
 theorem ghost_var_update {α : Type} [GhostVarSlot α]
     (γ : GhostName) (a b : α) :
-    iProp.entails (ghost_var γ a) (_root_.bupd (ghost_var γ b)) := sorry
+    iProp.entails (ghost_var γ a) (_root_.bupd (ghost_var γ b)) :=
+  Iris.BaseLogic.ghost_var_update (GF := ti.GF) (F := ti.F) (A := Iris.LeibnizO α)
+    γ (Iris.LeibnizO.mk a) (Iris.LeibnizO.mk b)
 
 /-! ## Language and WP (WeakestPre.lean) -/
 

@@ -52,7 +52,7 @@ noncomputable section
 /-! ## Store Typing -/
 
 /-- Store is typed by SEnv: every variable has its declared type. -/
-def StoreTyped (G : GEnv) (S : SEnv) (store : Store) : Prop :=
+def StoreTyped (G : GEnv) (S : SEnv) (store : VarStore) : Prop :=
   ∀ x v T,
     lookupStr store x = some v →
     lookupSEnv S x = some T →
@@ -61,14 +61,14 @@ def StoreTyped (G : GEnv) (S : SEnv) (store : Store) : Prop :=
 /-- Strong store typing: same-domain property + type correspondence.
     This strengthening is needed for the progress theorem.
     Reference: `work/effects/008.lean:114-116` -/
-structure StoreTypedStrong (G : GEnv) (S : SEnv) (store : Store) : Prop where
+structure StoreTypedStrong (G : GEnv) (S : SEnv) (store : VarStore) : Prop where
   /-- Same-domain: S and store have the same variables. -/
   sameDomain : ∀ x, (lookupSEnv S x).isSome ↔ (lookupStr store x).isSome
   /-- Type correspondence: values have their declared types. -/
   typeCorr : StoreTyped G S store
 
 /-- StoreTypedStrong implies StoreTyped. -/
-theorem StoreTypedStrong.toStoreTyped {G : GEnv} {S : SEnv} {store : Store}
+theorem StoreTypedStrong.toStoreTyped {G : GEnv} {S : SEnv} {store : VarStore}
     (h : StoreTypedStrong G S store) : StoreTyped G S store :=
   h.typeCorr
 
@@ -80,7 +80,7 @@ Reference: `work/effects/008.lean:304-308` -/
 /-- If a variable has a type in the static environment and the store is strongly typed,
     then the variable exists in the store and its value has the corresponding type.
     Reference: `work/effects/008.lean:304-308` -/
-theorem store_lookup_of_senv_lookup {G : GEnv} {S : SEnv} {store : Store} {x : Var} {T : ValType}
+theorem store_lookup_of_senv_lookup {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {T : ValType}
     (hStore : StoreTypedStrong G S store) (hS : lookupSEnv S x = some T) :
     ∃ v, lookupStr store x = some v ∧ HasTypeVal G v T := by
   -- From sameDomain: if x is in S, then x is in store
@@ -95,7 +95,7 @@ theorem store_lookup_of_senv_lookup {G : GEnv} {S : SEnv} {store : Store} {x : V
 
 /-- Weaker version when we only have StoreTyped but know the variable is in store.
     This is useful when the step relation already provides the store lookup. -/
-theorem store_value_typed {G : GEnv} {S : SEnv} {store : Store} {x : Var} {v : Value} {T : ValType}
+theorem store_value_typed {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v : Value} {T : ValType}
     (hStore : StoreTyped G S store) (hStr : lookupStr store x = some v) (hS : lookupSEnv S x = some T) :
     HasTypeVal G v T :=
   hStore x v T hStr hS

@@ -82,7 +82,7 @@ end Process
 -/
 structure Config where
   proc : Process
-  store : Store
+  store : VarStore
   bufs : Buffers
   G : GEnv
   D : DEnv

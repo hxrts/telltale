@@ -31,17 +31,18 @@ noncomputable section
 /-- Variables are strings. -/
 abbrev Var := String
 
-/-! ## Store: Variable → Value -/
+/-! ## VarStore: Variable → Value -/
 
-/-- Store maps variables to runtime values. -/
-abbrev Store := List (Var × Value)
+/-- VarStore maps variables to runtime values.
+    Named VarStore to avoid collision with Iris.Std.Heap.Store. -/
+abbrev VarStore := List (Var × Value)
 
 /-- Lookup a value in the store. -/
-def lookupStr (store : Store) (x : Var) : Option Value :=
+def lookupStr (store : VarStore) (x : Var) : Option Value :=
   store.lookup x
 
 /-- Update or insert a variable in the store. -/
-def updateStr (store : Store) (x : Var) (v : Value) : Store :=
+def updateStr (store : VarStore) (x : Var) (v : Value) : VarStore :=
   match store with
   | [] => [(x, v)]
   | (y, w) :: rest =>
@@ -787,7 +788,7 @@ theorem initDEnv_find?_none_of_notin (sid : SessionId) (roles : RoleSet) (e : Ed
 
 /-! ## Environment Lemmas -/
 
-theorem lookupStr_update_eq (store : Store) (x : Var) (v : Value) :
+theorem lookupStr_update_eq (store : VarStore) (x : Var) (v : Value) :
     lookupStr (updateStr store x v) x = some v := by
   induction store with
   | nil =>
@@ -801,7 +802,7 @@ theorem lookupStr_update_eq (store : Store) (x : Var) (v : Value) :
       simp only [hne]
       exact ih
 
-theorem lookupStr_update_neq (store : Store) (x y : Var) (v : Value) (hne : x ≠ y) :
+theorem lookupStr_update_neq (store : VarStore) (x y : Var) (v : Value) (hne : x ≠ y) :
     lookupStr (updateStr store x v) y = lookupStr store y := by
   induction store with
   | nil =>

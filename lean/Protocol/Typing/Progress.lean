@@ -45,7 +45,7 @@ private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label ×
     simpa using hPred
   exact (beq_iff_eq).1 hPred'
 
-def BlockedProc (store : Store) (bufs : Buffers) : Process → Prop
+def BlockedProc (store : VarStore) (bufs : Buffers) : Process → Prop
   | .recv k _ =>
       ∃ e source,
         lookupStr store k = some (.chan e) ∧
@@ -86,7 +86,7 @@ private lemma TypedStep_preserves_right
   cases hStep <;> simp [OwnedEnv.updateLeft]
 
 private lemma channel_endpoint_eq_of_store
-    {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : Store}
+    {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
     {k : Var} {e e' : Endpoint} :
     StoreTypedStrong G (SEnvAll Ssh Sown) store →
     lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
@@ -237,7 +237,7 @@ private lemma lookupSEnv_swap_left_prefix {Ssh S₁ S₂ S₃ : SEnv} (hDisj : D
         _ = lookupSEnv (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) x := by
                 simp [SEnvAll, List.append_assoc]
 
-private lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : Store}
+private lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : VarStore}
     (hEq : ∀ x, lookupSEnv S x = lookupSEnv S' x) :
     StoreTypedStrong G S store → StoreTypedStrong G S' store := by
   intro hStore
@@ -251,7 +251,7 @@ private lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : Store}
     exact hStore.typeCorr x v T hStr hS
 
 private lemma StoreTypedStrong_swap_S_left_prefix
-    {G : GEnv} {Ssh S₁ S₂ S₃ : SEnv} {store : Store}
+    {G : GEnv} {Ssh S₁ S₂ S₃ : SEnv} {store : VarStore}
     (hDisj : DisjointS S₁ S₂) :
     StoreTypedStrong G (SEnvAll Ssh ((S₁ ++ S₂) ++ S₃)) store →
     StoreTypedStrong G (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) store := by
@@ -473,8 +473,8 @@ private lemma HasTypeProcPreOut_frame_G_left
 
 private lemma TypedStep_preserves_frames
     {Ssh : SEnv} {Sown : OwnedEnv} {Gleft Gmid Gright : GEnv}
-    {D : DEnv} {store : Store} {bufs : Buffers} {P : Process}
-    {G' : GEnv} {D' : DEnv} {Sown' : OwnedEnv} {store' : Store} {bufs' : Buffers} {P' : Process}
+    {D : DEnv} {store : VarStore} {bufs : Buffers} {P : Process}
+    {G' : GEnv} {D' : DEnv} {Sown' : OwnedEnv} {store' : VarStore} {bufs' : Buffers} {P' : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     DisjointG Gleft Gmid →
     DisjointG Gleft Gright →

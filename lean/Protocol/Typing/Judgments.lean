@@ -435,8 +435,8 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
     - Variables are typed as they're assigned
 
     **Compositionality**: Parallel processes have disjoint resources -/
-inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → Store → Buffers → Process →
-                      GEnv → DEnv → OwnedEnv → Store → Buffers → Process → Prop
+inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffers → Process →
+                      GEnv → DEnv → OwnedEnv → VarStore → Buffers → Process → Prop
   | send {G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'} :
       -- Pre-conditions (resources consumed)
       lookupStr store k = some (.chan e) →

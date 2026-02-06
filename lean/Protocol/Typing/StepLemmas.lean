@@ -230,7 +230,7 @@ theorem HasTypeVal_updateG_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {v :
 
 /-- For the send case: StoreTyped is trivially preserved because store is unchanged.
     We just need to weaken G, which works for all values (with caveat for sent channel). -/
-theorem StoreTyped_send_preserved {G : GEnv} {S : SEnv} {store : Store} {e : Endpoint} {L : LocalType} :
+theorem StoreTyped_send_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType} :
     StoreTyped G S store →
     StoreTyped (updateG G e L) S store := by
   intro hST
@@ -242,7 +242,7 @@ theorem StoreTyped_send_preserved {G : GEnv} {S : SEnv} {store : Store} {e : End
 /-- For the assign case: StoreTyped with updated S and updated store.
     The value v has type T in G (from TypedStep.assign premise). After update,
     store[x] = v and S[x] = T match. -/
-theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : Store} {x : Var} {v : Value} {T : ValType} :
+theorem StoreTyped_assign_preserved {G : GEnv} {S : SEnv} {store : VarStore} {x : Var} {v : Value} {T : ValType} :
     StoreTyped G S store →
     HasTypeVal G v T →
     StoreTyped G (updateSEnv S x T) (updateStr store x v) := by
@@ -280,7 +280,7 @@ theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffers} {e : 
 
 /-- For the recv case: StoreTyped is preserved when receiving a value into the store.
     The received value has type T in G, so it has type T in (updateG G e L) by weakening. -/
-theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : Store} {e : Endpoint} {L : LocalType}
+theorem StoreTyped_recv_preserved {G : GEnv} {S : SEnv} {store : VarStore} {e : Endpoint} {L : LocalType}
     {x : Var} {v : Value} {T : ValType} :
     StoreTyped G S store →
     HasTypeVal G v T →
