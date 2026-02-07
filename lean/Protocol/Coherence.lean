@@ -1,4 +1,5 @@
 import Protocol.Coherence.Consume
+import Protocol.Coherence.GraphDelta
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.StoreTyping
 import Protocol.Coherence.Preservation

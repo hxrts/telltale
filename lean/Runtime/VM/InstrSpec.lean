@@ -1,6 +1,7 @@
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Preservation
 import Protocol.Coherence.SelectPreservation
+import Protocol.Coherence.ConfigEquiv
 import Runtime.Proofs.Delegation
 
 /-!
@@ -547,5 +548,582 @@ theorem AcquireSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   -- The spec includes a DelegationStep, which preserves coherence
   exact delegation_preserves_coherent G G' D D' delegatedSession senderRole receiverEp.role
     hCoh hSpec.delegation_applied
+
+/-! ## Quotient-Respecting Theorems (ConfigEquiv)
+
+Each instruction spec is equivariant under session renaming. This ensures that
+instructions are true morphisms on the quotient space S/G (configurations
+modulo session ID renaming).
+
+The pattern: if Spec holds for (G, D, ep, params...), then the renamed spec
+holds for (renameGEnv ρ G, renameDEnv ρ D, renameEndpoint ρ ep, renameParams ρ params...).
+
+From this equivariance, ConfigEquiv preservation follows:
+if C₁ ≈ C₂ and we apply the same instruction to both, then C₁' ≈ C₂'.
+
+**Note:** These theorems require "update commutes with renaming" lemmas
+(renameGEnv_updateG, renameDEnv_updateD) which are infrastructure gaps. -/
+
+/-- Send is equivariant under session renaming.
+
+    If a send spec holds, then the same spec holds on renamed environments
+    with renamed operands. -/
+theorem SendSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv} {ep : Endpoint} {r : Role} {T : ValType}
+    (hSpec : SendSpec G G' D D' ep r T) :
+    SendSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+             (renameEndpoint ρ ep) r (renameValType ρ T) where
+  sender_type := by
+    obtain ⟨L', hSender⟩ := hSpec.sender_type
+    use renameLocalType ρ L'
+    rw [lookupG_rename, hSender]
+    simp only [Option.map_some, renameLocalType]
+  type_updated := by
+    intro L'_renamed hSender_renamed
+    rw [lookupG_rename] at hSender_renamed
+    obtain ⟨L', hSender⟩ := hSpec.sender_type
+    rw [hSender] at hSender_renamed
+    simp only [Option.map_some, renameLocalType] at hSender_renamed
+    have hL'_eq : L'_renamed = renameLocalType ρ L' := by
+      cases hSender_renamed
+      rfl
+    have hG' := hSpec.type_updated L' hSender
+    rw [hG', renameGEnv_updateG, hL'_eq]
+  trace_extended := by
+    have hD' := hSpec.trace_extended
+    simp only at hD'
+    simp only [renameEndpoint]
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    congr 1
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := r })
+    simp only [renameEdge] at hLookup
+    rw [List.map_append, List.map, hLookup]
+    simp
+  frame_G := by
+    intro ep' hne
+    obtain ⟨L', hSender⟩ := hSpec.sender_type
+    have hG' := hSpec.type_updated L' hSender
+    rw [hG', renameGEnv_updateG]
+    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+      (renameLocalType ρ L') hne.symm
+  frame_D := by
+    intro e hne
+    have hD' := hSpec.trace_extended
+    simp only at hD'
+    simp only [renameEndpoint] at hne ⊢
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    exact lookupD_update_neq (renameDEnv ρ D)
+      { sid := ρ.f ep.sid, sender := ep.role, receiver := r } e
+      ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [T]).map (renameValType ρ))
+      hne.symm
+
+/-- Send respects ConfigEquiv: equivalent configs produce equivalent results. -/
+theorem SendSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {ep : Endpoint} {r : Role} {T : ValType}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : SendSpec G₁ G₁' D₁ D₁' ep r T)
+    (hSpec₂ : SendSpec G₂ G₂' D₂ D₂'
+              (renameEndpoint (hEquiv.choose.toRenaming) ep) r
+              (renameValType hEquiv.choose.toRenaming T)) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  -- Follows from SendSpec_respects_renaming + ConfigEquiv structure.
+  sorry
+
+/-- Receive is equivariant under session renaming. -/
+theorem RecvSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv} {ep : Endpoint} {r : Role} {T : ValType}
+    (hSpec : RecvSpec G G' D D' ep r T) :
+    RecvSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+             (renameEndpoint ρ ep) r (renameValType ρ T) where
+  receiver_type := by
+    obtain ⟨L', hRecv⟩ := hSpec.receiver_type
+    use renameLocalType ρ L'
+    rw [lookupG_rename, hRecv]
+    simp only [Option.map_some, renameLocalType]
+  buffer_has_data := by
+    obtain ⟨rest, hBuffer⟩ := hSpec.buffer_has_data
+    use rest.map (renameValType ρ)
+    simp only [renameEndpoint]
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
+    simp only [renameEdge] at hLookup
+    rw [hLookup, hBuffer]
+    simp only [List.map_cons]
+  type_updated := by
+    intro L'_renamed hRecv_renamed
+    rw [lookupG_rename] at hRecv_renamed
+    obtain ⟨L', hRecv⟩ := hSpec.receiver_type
+    rw [hRecv] at hRecv_renamed
+    simp only [Option.map_some, renameLocalType] at hRecv_renamed
+    have hL'_eq : L'_renamed = renameLocalType ρ L' := by
+      cases hRecv_renamed
+      rfl
+    have hG' := hSpec.type_updated L' hRecv
+    rw [hG', renameGEnv_updateG, hL'_eq]
+  trace_consumed := by
+    obtain ⟨rest, hBuffer, hD'⟩ := hSpec.trace_consumed
+    use rest.map (renameValType ρ)
+    simp only [renameEndpoint]
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
+    simp only [renameEdge] at hLookup
+    constructor
+    · rw [hLookup, hBuffer]
+      simp only [List.map_cons]
+    · rw [hD', renameDEnv_updateD]
+      simp only [renameEdge]
+  frame_G := by
+    intro ep' hne
+    obtain ⟨L', hRecv⟩ := hSpec.receiver_type
+    have hG' := hSpec.type_updated L' hRecv
+    rw [hG', renameGEnv_updateG]
+    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+      (renameLocalType ρ L') hne.symm
+  frame_D := by
+    intro e hne
+    obtain ⟨rest, _, hD'⟩ := hSpec.trace_consumed
+    simp only [renameEndpoint] at hne ⊢
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    exact lookupD_update_neq (renameDEnv ρ D)
+      { sid := ρ.f ep.sid, sender := r, receiver := ep.role } e
+      (rest.map (renameValType ρ)) hne.symm
+
+/-- Receive respects ConfigEquiv. -/
+theorem RecvSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {ep : Endpoint} {r : Role} {T : ValType}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : RecvSpec G₁ G₁' D₁ D₁' ep r T)
+    (hSpec₂ : RecvSpec G₂ G₂' D₂ D₂'
+              (renameEndpoint (hEquiv.choose.toRenaming) ep) r
+              (renameValType hEquiv.choose.toRenaming T)) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  sorry
+
+/-- Select is equivariant under session renaming. -/
+theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv} {ep : Endpoint} {r : Role} {chosen : Label}
+    (hSpec : SelectSpec G G' D D' ep r chosen) :
+    SelectSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+               (renameEndpoint ρ ep) r chosen where
+  sender_type := by
+    obtain ⟨branches, L', hSender, hFind⟩ := hSpec.sender_type
+    use renameBranches ρ branches, renameLocalType ρ L'
+    constructor
+    · rw [lookupG_rename, hSender]
+      simp only [Option.map_some, renameLocalType]
+    · rw [find_renameBranches, hFind]
+      simp
+  type_updated := by
+    intro branches_renamed L'_renamed hSender_renamed hFind_renamed
+    rw [lookupG_rename] at hSender_renamed
+    obtain ⟨branches, L', hSender, hFind⟩ := hSpec.sender_type
+    rw [hSender] at hSender_renamed
+    simp only [Option.map_some, renameLocalType] at hSender_renamed
+    have hBranches_eq : branches_renamed = renameBranches ρ branches := by
+      cases hSender_renamed
+      rfl
+    have hL'_eq : L'_renamed = renameLocalType ρ L' := by
+      rw [hBranches_eq, find_renameBranches, hFind] at hFind_renamed
+      simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind_renamed
+      exact hFind_renamed.2.symm
+    have hG' := hSpec.type_updated branches L' hSender hFind
+    rw [hG', renameGEnv_updateG, hL'_eq]
+  trace_extended := by
+    have hD' := hSpec.trace_extended
+    simp only at hD'
+    simp only [renameEndpoint]
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    congr 1
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := r })
+    simp only [renameEdge] at hLookup
+    rw [List.map_append, List.map, hLookup, renameValType]
+    simp
+  frame_G := by
+    intro ep' hne
+    obtain ⟨branches, L', hSender, hFind⟩ := hSpec.sender_type
+    have hG' := hSpec.type_updated branches L' hSender hFind
+    rw [hG', renameGEnv_updateG]
+    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+      (renameLocalType ρ L') hne.symm
+  frame_D := by
+    intro e hne
+    have hD' := hSpec.trace_extended
+    simp only at hD'
+    simp only [renameEndpoint] at hne ⊢
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    exact lookupD_update_neq (renameDEnv ρ D)
+      { sid := ρ.f ep.sid, sender := ep.role, receiver := r } e
+      ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [ValType.string]).map (renameValType ρ))
+      hne.symm
+
+/-- Select respects ConfigEquiv. -/
+theorem SelectSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {ep : Endpoint} {r : Role} {chosen : Label}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : SelectSpec G₁ G₁' D₁ D₁' ep r chosen)
+    (hSpec₂ : SelectSpec G₂ G₂' D₂ D₂'
+              (renameEndpoint (hEquiv.choose.toRenaming) ep) r chosen) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  sorry
+
+/-- Branch is equivariant under session renaming. -/
+theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv} {ep : Endpoint} {r : Role} {received : Label}
+    (hSpec : BranchSpec G G' D D' ep r received) :
+    BranchSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+               (renameEndpoint ρ ep) r received where
+  receiver_type := by
+    obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
+    use renameBranches ρ branches, renameLocalType ρ L'
+    constructor
+    · rw [lookupG_rename, hRecv]
+      simp only [Option.map_some, renameLocalType]
+    · rw [find_renameBranches, hFind]
+      simp
+  buffer_has_label := by
+    obtain ⟨rest, hBuffer⟩ := hSpec.buffer_has_label
+    use rest.map (renameValType ρ)
+    simp only [renameEndpoint]
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
+    simp only [renameEdge] at hLookup
+    rw [hLookup, hBuffer]
+    simp only [List.map_cons, renameValType]
+  type_updated := by
+    intro branches_renamed L'_renamed hRecv_renamed hFind_renamed
+    rw [lookupG_rename] at hRecv_renamed
+    obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
+    rw [hRecv] at hRecv_renamed
+    simp only [Option.map_some, renameLocalType] at hRecv_renamed
+    have hBranches_eq : branches_renamed = renameBranches ρ branches := by
+      cases hRecv_renamed
+      rfl
+    have hL'_eq : L'_renamed = renameLocalType ρ L' := by
+      rw [hBranches_eq, find_renameBranches, hFind] at hFind_renamed
+      simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind_renamed
+      exact hFind_renamed.2.symm
+    have hG' := hSpec.type_updated branches L' hRecv hFind
+    rw [hG', renameGEnv_updateG, hL'_eq]
+  trace_consumed := by
+    obtain ⟨rest, hBuffer, hD'⟩ := hSpec.trace_consumed
+    use rest.map (renameValType ρ)
+    simp only [renameEndpoint]
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := r, receiver := ep.role })
+    simp only [renameEdge] at hLookup
+    constructor
+    · rw [hLookup, hBuffer]
+      simp only [List.map_cons, renameValType]
+    · rw [hD', renameDEnv_updateD]
+      simp only [renameEdge]
+  frame_G := by
+    intro ep' hne
+    obtain ⟨branches, L', hRecv, hFind⟩ := hSpec.receiver_type
+    have hG' := hSpec.type_updated branches L' hRecv hFind
+    rw [hG', renameGEnv_updateG]
+    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+      (renameLocalType ρ L') hne.symm
+  frame_D := by
+    intro e hne
+    obtain ⟨rest, _, hD'⟩ := hSpec.trace_consumed
+    simp only [renameEndpoint] at hne ⊢
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    exact lookupD_update_neq (renameDEnv ρ D)
+      { sid := ρ.f ep.sid, sender := r, receiver := ep.role } e
+      (rest.map (renameValType ρ)) hne.symm
+
+/-- Branch respects ConfigEquiv. -/
+theorem BranchSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {ep : Endpoint} {r : Role} {received : Label}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : BranchSpec G₁ G₁' D₁ D₁' ep r received)
+    (hSpec₂ : BranchSpec G₂ G₂' D₂ D₂'
+              (renameEndpoint (hEquiv.choose.toRenaming) ep) r received) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  sorry
+
+/-- Open is equivariant under session renaming. -/
+theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv} {s : SessionId} {roles : List Role}
+    (hSpec : OpenSpec G G' D D' s roles) :
+    OpenSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+             (ρ.f s) roles where
+  fresh := by
+    intro ep hSome hEq
+    -- If ep.sid = ρ.f s, need to derive contradiction from freshness
+    -- lookupG (renameGEnv ρ G) ep = some _ means there's a preimage
+    rw [Option.isSome_iff_exists] at hSome
+    obtain ⟨L, hL⟩ := hSome
+    obtain ⟨ep', L', hEp, hL'_eq, hLookup⟩ := lookupG_rename_inv ρ G ep L hL
+    have hPreimage : ep'.sid = s := by
+      have hSidEq : ep.sid = ρ.f ep'.sid := by
+        rw [hEp]
+        simp only [renameEndpoint]
+      rw [hEq] at hSidEq
+      exact ρ.inj _ _ hSidEq.symm
+    have hSome' : (lookupG G ep').isSome := by
+      rw [Option.isSome_iff_exists]
+      exact ⟨L', hLookup⟩
+    exact hSpec.fresh ep' hSome' hPreimage
+  endpoints_added := by
+    intro r hr
+    have hAdded := hSpec.endpoints_added r hr
+    rw [Option.isSome_iff_exists] at hAdded ⊢
+    obtain ⟨L, hL⟩ := hAdded
+    use renameLocalType ρ L
+    have hEp : { sid := ρ.f s, role := r : Endpoint } = renameEndpoint ρ { sid := s, role := r } := by
+      simp only [renameEndpoint]
+    rw [hEp, lookupG_rename, hL]
+    simp only [Option.map_some]
+  frame_G := by
+    intro ep hSidNe
+    have hSidNe' : ep.sid ≠ ρ.f s := hSidNe
+    -- If ep.sid ≠ ρ.f s, check if ep is in the renamed image
+    by_cases hPre : ∃ ep', renameEndpoint ρ ep' = ep
+    case pos =>
+      obtain ⟨ep', hEp⟩ := hPre
+      have hSidNe'' : ep'.sid ≠ s := by
+        intro hEq
+        have hSid : ep.sid = ρ.f ep'.sid := by
+          rw [← hEp]
+          simp only [renameEndpoint]
+        rw [hEq] at hSid
+        exact hSidNe' hSid
+      have hFrame := hSpec.frame_G ep' hSidNe''
+      rw [← hEp, lookupG_rename, lookupG_rename, hFrame]
+    case neg =>
+      -- ep not in renamed image, so lookupG is none on both sides
+      have hNone : lookupG (renameGEnv ρ G) ep = none := by
+        by_contra hSome
+        rw [← ne_eq, Option.ne_none_iff_exists'] at hSome
+        obtain ⟨L, hL⟩ := hSome
+        obtain ⟨ep', _, hEp, _, _⟩ := lookupG_rename_inv ρ G ep L hL
+        exact hPre ⟨ep', hEp.symm⟩
+      have hNone' : lookupG (renameGEnv ρ G') ep = none := by
+        by_contra hSome
+        rw [← ne_eq, Option.ne_none_iff_exists'] at hSome
+        obtain ⟨L, hL⟩ := hSome
+        obtain ⟨ep', _, hEp, _, _⟩ := lookupG_rename_inv ρ G' ep L hL
+        exact hPre ⟨ep', hEp.symm⟩
+      rw [hNone, hNone']
+  traces_empty := by
+    intro e hSidEq
+    -- e.sid = ρ.f s, need to find preimage edge
+    -- The trace should be empty because original trace was empty
+    by_cases hPre : ∃ e', renameEdge ρ e' = e
+    case pos =>
+      obtain ⟨e', hE⟩ := hPre
+      have hSidEq' : e'.sid = s := by
+        have hSid : e.sid = ρ.f e'.sid := by
+          rw [← hE]
+          simp only [renameEdge]
+        rw [hSidEq] at hSid
+        exact ρ.inj _ _ hSid.symm
+      have hEmpty := hSpec.traces_empty e' hSidEq'
+      rw [← hE, lookupD_rename, hEmpty]
+      simp only [List.map_nil]
+    case neg =>
+      -- Not in preimage, so lookup returns empty by default
+      by_contra hNe
+      obtain ⟨e', hE, _⟩ := lookupD_rename_inv ρ D' e hNe
+      exact hPre ⟨e', hE.symm⟩
+  frame_D := by
+    intro e hSidNe
+    by_cases hPre : ∃ e', renameEdge ρ e' = e
+    case pos =>
+      obtain ⟨e', hE⟩ := hPre
+      have hSidNe' : e'.sid ≠ s := by
+        intro hEq
+        have hSid : e.sid = ρ.f e'.sid := by
+          rw [← hE]
+          simp only [renameEdge]
+        rw [hEq] at hSid
+        exact hSidNe hSid
+      have hFrame := hSpec.frame_D e' hSidNe'
+      rw [← hE, lookupD_rename, lookupD_rename, hFrame]
+    case neg =>
+      -- Not in preimage, lookup returns empty on both
+      have hEmpty : lookupD (renameDEnv ρ D) e = [] := by
+        by_contra hNe
+        obtain ⟨e', hE, _⟩ := lookupD_rename_inv ρ D e hNe
+        exact hPre ⟨e', hE.symm⟩
+      have hEmpty' : lookupD (renameDEnv ρ D') e = [] := by
+        by_contra hNe
+        obtain ⟨e', hE, _⟩ := lookupD_rename_inv ρ D' e hNe
+        exact hPre ⟨e', hE.symm⟩
+      rw [hEmpty, hEmpty']
+
+/-- Open respects ConfigEquiv. -/
+theorem OpenSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {s : SessionId} {roles : List Role}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : OpenSpec G₁ G₁' D₁ D₁' s roles)
+    (hSpec₂ : OpenSpec G₂ G₂' D₂ D₂' (hEquiv.choose.fwd s) roles) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  sorry
+
+/-- Close is equivariant under session renaming. -/
+theorem CloseSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D : DEnv} {ep : Endpoint}
+    (hSpec : CloseSpec G G' D ep) :
+    CloseSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D)
+              (renameEndpoint ρ ep) where
+  endpoint_at_end := by
+    rw [lookupG_rename, hSpec.endpoint_at_end]
+    simp only [Option.map_some, renameLocalType]
+  outgoing_empty := by
+    intro other
+    have hEmpty := hSpec.outgoing_empty other
+    simp only [renameEndpoint]
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := other })
+    simp only [renameEdge] at hLookup
+    rw [hLookup, hEmpty]
+    simp only [List.map_nil]
+  incoming_empty := by
+    intro other
+    have hEmpty := hSpec.incoming_empty other
+    simp only [renameEndpoint]
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := other, receiver := ep.role })
+    simp only [renameEdge] at hLookup
+    rw [hLookup, hEmpty]
+    simp only [List.map_nil]
+  endpoint_removed := by
+    rw [lookupG_rename, hSpec.endpoint_removed]
+    simp only [Option.map_none]
+  frame_G := by
+    intro ep' hne
+    by_cases hPre : ∃ ep'', renameEndpoint ρ ep'' = ep'
+    case pos =>
+      obtain ⟨ep'', hEp⟩ := hPre
+      have hne'' : ep'' ≠ ep := by
+        intro hEq
+        subst hEq
+        exact hne hEp.symm
+      have hFrame := hSpec.frame_G ep'' hne''
+      rw [← hEp, lookupG_rename, lookupG_rename, hFrame]
+    case neg =>
+      -- ep' not in renamed image
+      have hNone : lookupG (renameGEnv ρ G) ep' = none := by
+        by_contra hSome
+        rw [← ne_eq, Option.ne_none_iff_exists'] at hSome
+        obtain ⟨L, hL⟩ := hSome
+        obtain ⟨ep'', _, hEp, _, _⟩ := lookupG_rename_inv ρ G ep' L hL
+        exact hPre ⟨ep'', hEp.symm⟩
+      have hNone' : lookupG (renameGEnv ρ G') ep' = none := by
+        by_contra hSome
+        rw [← ne_eq, Option.ne_none_iff_exists'] at hSome
+        obtain ⟨L, hL⟩ := hSome
+        obtain ⟨ep'', _, hEp, _, _⟩ := lookupG_rename_inv ρ G' ep' L hL
+        exact hPre ⟨ep'', hEp.symm⟩
+      rw [hNone, hNone']
+
+/-- Close respects ConfigEquiv.
+    Note: Close doesn't modify D, so D₁ = D₁' and D₂ = D₂'. -/
+theorem CloseSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₂ : DEnv}
+    {ep : Endpoint}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : CloseSpec G₁ G₁' D₁ ep)
+    (hSpec₂ : CloseSpec G₂ G₂' D₂ (renameEndpoint (hEquiv.choose.toRenaming) ep)) :
+    ConfigEquiv ⟨G₁', D₁⟩ ⟨G₂', D₂⟩ := by
+  sorry
+
+/-- Transfer is equivariant under session renaming. -/
+theorem TransferSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv}
+    {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
+    (hSpec : TransferSpec G G' D D' ep r delegatedSession delegatedRole) :
+    TransferSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+                 (renameEndpoint ρ ep) r (ρ.f delegatedSession) delegatedRole where
+  sender_type := by
+    obtain ⟨L', hSender⟩ := hSpec.sender_type
+    use renameLocalType ρ L'
+    rw [lookupG_rename]
+    simp only [hSender, Option.map_some, renameLocalType, renameValType]
+  type_updated := by
+    intro L'_renamed hSender_renamed
+    rw [lookupG_rename] at hSender_renamed
+    obtain ⟨L', hSender⟩ := hSpec.sender_type
+    rw [hSender] at hSender_renamed
+    simp only [Option.map_some, renameLocalType, renameValType] at hSender_renamed
+    have hL'_eq : L'_renamed = renameLocalType ρ L' := by
+      cases hSender_renamed
+      rfl
+    have hG' := hSpec.type_updated L' hSender
+    rw [hG', renameGEnv_updateG, hL'_eq]
+  trace_extended := by
+    have hD' := hSpec.trace_extended
+    simp only at hD'
+    simp only [renameEndpoint]
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    congr 1
+    have hLookup := lookupD_rename (ρ := ρ) (D := D) (e := { sid := ep.sid, sender := ep.role, receiver := r })
+    simp only [renameEdge] at hLookup
+    rw [List.map_append, List.map, hLookup, renameValType]
+    simp
+  frame_G := by
+    intro ep' hne
+    obtain ⟨L', hSender⟩ := hSpec.sender_type
+    have hG' := hSpec.type_updated L' hSender
+    rw [hG', renameGEnv_updateG]
+    exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) ep'
+      (renameLocalType ρ L') hne.symm
+  frame_D := by
+    intro e hne
+    have hD' := hSpec.trace_extended
+    simp only at hD'
+    simp only [renameEndpoint] at hne ⊢
+    rw [hD', renameDEnv_updateD]
+    simp only [renameEdge]
+    exact lookupD_update_neq (renameDEnv ρ D)
+      { sid := ρ.f ep.sid, sender := ep.role, receiver := r } e
+      ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [ValType.chan delegatedSession delegatedRole]).map (renameValType ρ))
+      hne.symm
+
+/-- Transfer respects ConfigEquiv. -/
+theorem TransferSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : TransferSpec G₁ G₁' D₁ D₁' ep r delegatedSession delegatedRole)
+    (hSpec₂ : TransferSpec G₂ G₂' D₂ D₂'
+              (renameEndpoint (hEquiv.choose.toRenaming) ep) r
+              (hEquiv.choose.fwd delegatedSession) delegatedRole) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  sorry
+
+/-- Acquire is equivariant under session renaming.
+
+    Note: This is a `def` rather than `theorem` because `AcquireSpec` contains
+    data (via `DelegationStep.A_type : LocalType`) and is thus not a Prop. -/
+def AcquireSpec_respects_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {D D' : DEnv}
+    {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
+    (hSpec : AcquireSpec G G' D D' ep r delegatedSession delegatedRole) :
+    AcquireSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
+                (renameEndpoint ρ ep) r (ρ.f delegatedSession) delegatedRole := by
+  -- Construct the renamed AcquireSpec from the original.
+  -- This requires renaming infrastructure for DelegationStep.
+  sorry
+
+/-- Acquire respects ConfigEquiv. -/
+theorem AcquireSpec_respects_ConfigEquiv
+    {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
+    {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
+    (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
+    (hSpec₁ : AcquireSpec G₁ G₁' D₁ D₁' ep r delegatedSession delegatedRole)
+    (hSpec₂ : AcquireSpec G₂ G₂' D₂ D₂'
+              (renameEndpoint (hEquiv.choose.toRenaming) ep) r
+              (hEquiv.choose.fwd delegatedSession) delegatedRole) :
+    ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  sorry
 
 end

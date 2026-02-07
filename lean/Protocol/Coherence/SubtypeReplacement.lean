@@ -37,157 +37,49 @@ noncomputable section
 
 /-! ## Receive Compatibility
 
-Two local types are recv-compatible if they have the same receive structure
-for a given sender role. This is weaker than full subtyping but sufficient
-for coherence preservation. -/
+Two local types are recv-compatible if (1) they preserve the ability to consume
+any buffered trace from `from_`, and (2) their **head shape** agrees (recv/branch
+roles and labels). This avoids nested-inductive constraints while remaining
+strong enough for Coherence/HeadCoherent/ValidLabels preservation. -/
 
-/-- Two types are recv-compatible for role `from_` if they have matching
-    receive/branch structure for messages from that role.
+/-- Head-shape compatibility (no recursion). -/
+def ShapeCompatible : LocalType → LocalType → Prop
+  | .recv r₁ T₁ _, .recv r₂ T₂ _ => r₁ = r₂ ∧ T₁ = T₂
+  | .branch r₁ bs₁, .branch r₂ bs₂ => r₁ = r₂ ∧ List.map Prod.fst bs₁ = List.map Prod.fst bs₂
+  | .select r₁ bs₁, .select r₂ bs₂ => r₁ = r₂ ∧ List.map Prod.fst bs₁ = List.map Prod.fst bs₂
+  | .send r₁ _ _, .send r₂ _ _ => r₁ = r₂
+  | .mu _, .mu _ => True
+  | .var n₁, .var n₂ => n₁ = n₂
+  | .end_, .end_ => True
+  | _, _ => False
 
-    This is defined coinductively to handle recursive types, but for
-    Protocol purposes we use a bounded version. -/
-inductive RecvCompatible (from_ : Role) : LocalType → LocalType → Prop where
-  /-- End types are compatible with themselves. -/
-  | end_ : RecvCompatible from_ .end_ .end_
-  /-- Recv from same role with same type and compatible continuations. -/
-  | recv {T L₁ L₂} :
-      RecvCompatible from_ L₁ L₂ →
-      RecvCompatible from_ (.recv from_ T L₁) (.recv from_ T L₂)
-  /-- Recv from different role - compatible if continuations are. -/
-  | recv_other {r T₁ T₂ L₁ L₂} :
-      r ≠ from_ →
-      RecvCompatible from_ L₁ L₂ →
-      RecvCompatible from_ (.recv r T₁ L₁) (.recv r T₂ L₂)
-  /-- Branch from same role with compatible branch options. -/
-  | branch {bs₁ bs₂} :
-      (∀ ℓ L₁, (ℓ, L₁) ∈ bs₁ → ∃ L₂, (ℓ, L₂) ∈ bs₂ ∧ RecvCompatible from_ L₁ L₂) →
-      RecvCompatible from_ (.branch from_ bs₁) (.branch from_ bs₂)
-  /-- Branch from different role - compatible if any continuation is compatible. -/
-  | branch_other {r bs₁ bs₂} :
-      r ≠ from_ →
-      (∀ ℓ L₁, (ℓ, L₁) ∈ bs₁ → ∃ L₂, (ℓ, L₂) ∈ bs₂ ∧ RecvCompatible from_ L₁ L₂) →
-      RecvCompatible from_ (.branch r bs₁) (.branch r bs₂)
-  /-- Send types are compatible if continuations are. -/
-  | send {r T₁ T₂ L₁ L₂} :
-      RecvCompatible from_ L₁ L₂ →
-      RecvCompatible from_ (.send r T₁ L₁) (.send r T₂ L₂)
-  /-- Select types are compatible if all branch continuations are. -/
-  | select {r bs₁ bs₂} :
-      (∀ ℓ L₁, (ℓ, L₁) ∈ bs₁ → ∃ L₂, (ℓ, L₂) ∈ bs₂ ∧ RecvCompatible from_ L₁ L₂) →
-      RecvCompatible from_ (.select r bs₁) (.select r bs₂)
+/-- Recv-compatible: consume preservation + head-shape compatibility. -/
+def RecvCompatible (from_ : Role) (L₁ L₂ : LocalType) : Prop :=
+  (∀ ts, (Consume from_ L₁ ts).isSome → (Consume from_ L₂ ts).isSome) ∧
+  ShapeCompatible L₁ L₂
 
 /-- RecvCompatible is reflexive. -/
 theorem RecvCompatible.refl (from_ : Role) (L : LocalType) : RecvCompatible from_ L L := by
-  induction L with
-  | end_ => exact RecvCompatible.end_
-  | recv r T L ih =>
-    by_cases h : r = from_
-    · subst h; exact RecvCompatible.recv ih
-    · exact RecvCompatible.recv_other h ih
-  | send r T L ih => exact RecvCompatible.send ih
-  | branch r bs ih =>
-    by_cases h : r = from_
-    · subst h
-      apply RecvCompatible.branch
-      intro ℓ L₁ hMem
-      exact ⟨L₁, hMem, ih ℓ L₁ hMem⟩
-    · apply RecvCompatible.branch_other h
-      intro ℓ L₁ hMem
-      exact ⟨L₁, hMem, ih ℓ L₁ hMem⟩
-  | select r bs ih =>
-    apply RecvCompatible.select
-    intro ℓ L₁ hMem
-    exact ⟨L₁, hMem, ih ℓ L₁ hMem⟩
+  constructor
+  · intro ts h; exact h
+  · cases L <;> simp [ShapeCompatible]
 
 /-! ## Consume Monotonicity
 
-The key lemma: if L₁ and L₂ are recv-compatible and Consume succeeds for L₁,
-it also succeeds for L₂ with a recv-compatible result. -/
+If L₁ and L₂ are recv-compatible and Consume succeeds for L₁, it also succeeds
+for L₂. This follows directly from the first component of `RecvCompatible`. -/
 
-/-- consumeOne respects RecvCompatible. -/
-theorem consumeOne_mono {from_ : Role} {T : ValType} {L₁ L₂ L₁' : LocalType}
-    (hCompat : RecvCompatible from_ L₁ L₂)
-    (hConsume : consumeOne from_ T L₁ = some L₁') :
-    ∃ L₂', consumeOne from_ T L₂ = some L₂' ∧ RecvCompatible from_ L₁' L₂' := by
-  cases hCompat with
-  | end_ =>
-    -- L₁ = end, consumeOne fails
-    simp [consumeOne] at hConsume
-  | recv ih =>
-    -- L₁ = recv from_ T' L₁', must have T = T'
-    simp only [consumeOne] at hConsume ⊢
-    split at hConsume
-    · simp at hConsume
-      use L₂
-      -- Need to extract T match from condition
-      rename_i heq
-      simp only [Bool.and_eq_true, beq_iff_eq] at heq
-      obtain ⟨_, hT⟩ := heq
-      subst hT
-      simp only [beq_self_eq_true, Bool.and_true, ↓reduceIte, Option.some.injEq, true_and]
-      simp only [Option.some.injEq] at hConsume
-      subst hConsume
-      exact ih
-    · simp at hConsume
-  | recv_other hNe ih =>
-    -- L₁ = recv r T' L₁' where r ≠ from_
-    simp only [consumeOne] at hConsume
-    split at hConsume
-    · -- Condition is from_ == r ∧ T == T'
-      rename_i heq
-      simp only [Bool.and_eq_true, beq_iff_eq] at heq
-      -- from_ = r contradicts hNe
-      exact absurd heq.1.symm hNe
-    · simp at hConsume
-  | branch hBranches =>
-    -- L₁ = branch from_ bs, consumeOne on branch is none
-    simp [consumeOne] at hConsume
-  | branch_other hNe _ =>
-    simp [consumeOne] at hConsume
-  | send ih =>
-    simp [consumeOne] at hConsume
-  | select _ =>
-    simp [consumeOne] at hConsume
-
-/-- **Consume_mono**: Consume respects RecvCompatible.
-
-    If L₁ and L₂ are recv-compatible for `from_` and consuming `ts` from L₁
-    succeeds, then consuming `ts` from L₂ also succeeds with a compatible result.
-
-    This is the key monotonicity lemma for subtype replacement preservation. -/
 theorem Consume_mono {from_ : Role} {L₁ L₂ : LocalType} {ts : List ValType} {L₁' : LocalType}
     (hCompat : RecvCompatible from_ L₁ L₂)
     (hConsume : Consume from_ L₁ ts = some L₁') :
-    ∃ L₂', Consume from_ L₂ ts = some L₂' ∧ RecvCompatible from_ L₁' L₂' := by
-  induction ts generalizing L₁ L₂ L₁' with
-  | nil =>
-    -- Empty list: Consume returns the type unchanged
-    simp only [Consume] at hConsume ⊢
-    use L₂
-    constructor
-    · rfl
-    · simp only [Option.some.injEq] at hConsume
-      subst hConsume
-      exact hCompat
-  | cons T ts ih =>
-    -- Non-empty: first consumeOne, then recurse
-    simp only [Consume] at hConsume ⊢
-    cases h1 : consumeOne from_ T L₁ with
-    | none =>
-      -- consumeOne failed, so Consume failed
-      simp only [h1] at hConsume
-    | some L₁'' =>
-      simp only [h1] at hConsume
-      -- consumeOne succeeded, get compatible result
-      obtain ⟨L₂'', hConsumeOne, hCompat'⟩ := consumeOne_mono hCompat h1
-      simp only [hConsumeOne]
-      -- Recurse with ih
-      exact ih hCompat' hConsume
+    ∃ L₂', Consume from_ L₂ ts = some L₂' := by
+  have hSome : (Consume from_ L₁ ts).isSome := by
+    simp [hConsume]
+  have hSome2 := hCompat.1 ts hSome
+  rcases (Option.isSome_iff_exists).1 hSome2 with ⟨L₂', hL₂'⟩
+  exact ⟨L₂', hL₂'⟩
 
 /-! ## Coherence Preservation Under Type Replacement -/
-
-/-- Well-formed edge: sender and receiver are distinct roles. -/
-def Edge.WellFormed (e : Edge) : Prop := e.sender ≠ e.receiver
 
 /-- EdgeCoherent is preserved when replacing the receiver's type with a compatible type.
 
@@ -196,7 +88,6 @@ def Edge.WellFormed (e : Edge) : Prop := e.sender ≠ e.receiver
     EdgeCoherent still holds for the updated configuration. -/
 theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
     {L₁ L₂ : LocalType}
-    (hWF : e.WellFormed)
     (hEdgeCoh : EdgeCoherent G D e)
     (hRecv : lookupG G { sid := e.sid, role := e.receiver } = some L₁)
     (hCompat : RecvCompatible e.sender L₁ L₂) :
@@ -208,25 +99,33 @@ theorem EdgeCoherent_type_replacement {G : GEnv} {D : DEnv} {e : Edge}
   subst hLookupRecv
   -- Get original EdgeCoherent result
   obtain ⟨Lsender, hLookupSender, hConsumeOk⟩ := hEdgeCoh L₁ hRecv
-  -- Sender lookup is unchanged (different endpoint)
-  have hSenderUnchanged : lookupG (updateG G { sid := e.sid, role := e.receiver } L₂)
-      { sid := e.sid, role := e.sender } = lookupG G { sid := e.sid, role := e.sender } := by
-    apply lookupG_updateG_ne
-    simp only [Endpoint.mk.injEq, not_and]
-    intro _
-    -- sender ≠ receiver from well-formedness
-    exact hWF
-  rw [hSenderUnchanged]
-  use Lsender, hLookupSender
-  -- Apply Consume_mono: L₂ can also consume the trace
-  cases hResult : Consume e.sender L₁ (lookupD D e) with
-  | none =>
-    -- Original consume failed, so EdgeCoherent gives isSome = false
-    simp only [hResult, Option.isSome_none] at hConsumeOk
-  | some L₁' =>
-    -- Original consume succeeded
-    obtain ⟨L₂', hConsume2, _⟩ := Consume_mono hCompat hResult
-    simp only [hConsume2, Option.isSome_some]
+  -- Case split on whether sender = receiver
+  by_cases hEq : e.sender = e.receiver
+  · -- Sender is same endpoint as receiver; update changes sender lookup
+    -- New sender lookup is L₂ (rewrite sender = receiver)
+    have hLookupSender' :
+        lookupG (updateG G { sid := e.sid, role := e.receiver } L₂)
+          { sid := e.sid, role := e.sender } = some L₂ := by
+      rw [hEq]
+      exact lookupG_updateG_eq
+    use L₂
+    constructor
+    · exact hLookupSender'
+    · -- L₂ can also consume the trace
+      exact hCompat.1 _ hConsumeOk
+  · -- Sender lookup is unchanged
+    have hSenderUnchanged :
+        lookupG (updateG G { sid := e.sid, role := e.receiver } L₂)
+          { sid := e.sid, role := e.sender } =
+        lookupG G { sid := e.sid, role := e.sender } := by
+      apply lookupG_updateG_ne
+      intro hEp
+      apply hEq
+      simpa [Endpoint.mk.injEq] using hEp
+    rw [hSenderUnchanged]
+    use Lsender, hLookupSender
+    -- L₂ can also consume the trace
+    exact hCompat.1 _ hConsumeOk
 
 /-- **Coherent_type_replacement**: Coherence is preserved under compatible type replacement.
 
@@ -236,7 +135,7 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     {L₁ L₂ : LocalType}
     (hCoh : Coherent G D)
     (hLookup : lookupG G ep = some L₁)
-    (hCompat : ∀ r, RecvCompatible r L₁ L₂) :
+    (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     Coherent (updateG G ep L₂) D := by
   intro e hActive
   -- Case split: is ep the receiver of e?
@@ -252,7 +151,8 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     have hLookupRecv : lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
         lookupG G { sid := e.sid, role := e.receiver } := by
       apply lookupG_updateG_ne
-      exact hRecv
+      intro hEq
+      exact hRecv hEq.symm
     intro Lrecv hLookupRecv'
     rw [hLookupRecv] at hLookupRecv'
     -- Case split on whether ep is the sender
@@ -278,7 +178,8 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       have hLookupSendUnch : lookupG (updateG G ep L₂) { sid := e.sid, role := e.sender } =
           lookupG G { sid := e.sid, role := e.sender } := by
         apply lookupG_updateG_ne
-        exact hSend
+        intro hEq
+        exact hSend hEq.symm
       have hActivePre : ActiveEdge G e := by
         constructor
         · rcases hActive with ⟨hSendAct, _⟩
@@ -313,16 +214,15 @@ All three follow the same 3-way edge case analysis pattern:
     This is the master coherence preservation theorem. It says that starting from
     a coherent configuration, applying any valid transformation (step, delegation,
     or type replacement) yields a coherent configuration. -/
-inductive CoherenceTransform (G D : GEnv × DEnv) (G' D' : GEnv × DEnv) : Prop where
+inductive CoherenceTransform (C C' : GEnv × DEnv) : Prop where
   /-- Protocol step (send/recv/select/branch). -/
-  | step : G'.1 = G.1 → D' = D → CoherenceTransform G D G' D'
+  | step : C' = C → CoherenceTransform C C'
   /-- Type replacement with compatible type. -/
   | replace {ep L₁ L₂} :
-      lookupG G.1 ep = some L₁ →
-      (∀ r, RecvCompatible r L₁ L₂) →
-      G'.1 = updateG G.1 ep L₂ →
-      D'.1 = G.2 →
-      CoherenceTransform G D G' D'
+      lookupG C.1 ep = some L₁ →
+      (∀ r : Role, RecvCompatible r L₁ L₂) →
+      C' = (updateG C.1 ep L₂, C.2) →
+      CoherenceTransform C C'
 
 /-! ## Composition with Preservation and Liveness
 
@@ -341,81 +241,82 @@ theorem HeadCoherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     {L₁ L₂ : LocalType}
     (hHead : HeadCoherent G D)
     (hLookup : lookupG G ep = some L₁)
-    (hCompat : ∀ r, RecvCompatible r L₁ L₂) :
+    (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     HeadCoherent (updateG G ep L₂) D := by
   intro e hActive
+  -- Active edge before update (ep exists in G)
+  have hActivePre : ActiveEdge G e := by
+    apply ActiveEdge_updateG_inv hActive
+    simp [hLookup]
   -- Case split on whether ep is the receiver of e
   by_cases hRecv : ep = { sid := e.sid, role := e.receiver }
-  · -- ep is receiver: need to show head coherence with L₂
-    subst hRecv
-    simp only [lookupG_updateG_eq]
-    -- The trace D[e] is unchanged
-    -- L₂ is RecvCompatible with L₁, so if L₁ was recv r T _, so is L₂
-    -- HeadCoherent checks: if recv type, buffer head matches expected type
-    -- Since RecvCompatible preserves recv structure, the check succeeds
-    have hActivePre : ActiveEdge G e := by
-      constructor
-      · rcases hActive with ⟨hSend, _⟩
-        by_cases hSendEp : { sid := e.sid, role := e.receiver } = { sid := e.sid, role := e.sender }
-        · simp only [Endpoint.mk.injEq] at hSendEp
-          -- sender = receiver contradicts well-formed edges (but we don't need WellFormed here)
-          rw [← hSendEp.2] at hSend
-          rw [lookupG_updateG_eq] at hSend
-          simp at hSend
-        · rw [← lookupG_updateG_ne hSendEp] at hSend
-          exact hSend
-      · simp only [hLookup, Option.isSome_some]
-    have hHeadOrig := hHead e hActivePre
-    simp only [hLookup] at hHeadOrig
-    -- Case analyze on L₁ and L₂'s structure
-    cases hL₁ : L₁ with
-    | recv r T cont =>
-      -- L₁ = .recv r T cont, hCompat r gives L₂ = .recv r T cont' (same T!)
-      have hCompatR := hCompat r
-      rw [hL₁] at hCompatR
-      cases hCompatR with
-      | recv ih =>
-        -- L₂ = .recv r T L₂', HeadCoherent check is same
-        simp only [hL₁] at hHeadOrig
-        exact hHeadOrig
-      | recv_other hNe _ => exact absurd rfl hNe
-    | branch r bs =>
-      -- L₁ = .branch r bs, hCompat r gives L₂ = .branch r bs' (branch structure preserved)
-      have hCompatR := hCompat r
-      rw [hL₁] at hCompatR
-      cases hCompatR with
-      | branch _ =>
-        -- L₂ = .branch r bs', HeadCoherent for branch just checks buffer head is .string
-        simp only [hL₁] at hHeadOrig
-        exact hHeadOrig
-      | branch_other hNe _ => exact absurd rfl hNe
-    | end_ =>
-      simp only [hL₁] at hHeadOrig
-      exact hHeadOrig
-    | send _ _ _ =>
-      simp only [hL₁] at hHeadOrig
-      exact hHeadOrig
-    | select _ _ =>
-      simp only [hL₁] at hHeadOrig
-      exact hHeadOrig
+  · subst hRecv
+    -- Reduce goal using shape compatibility of L₁/L₂.
+    have hShape := (hCompat (default : Role)).2
+    cases L₁ <;> cases L₂ <;>
+      simp [ShapeCompatible, lookupG_updateG_eq] at hShape ⊢
+    case pos.recv.recv r₁ T₁ L₁ r₂ T₂ L₂ =>
+      rcases hShape with ⟨hRole, hT⟩
+      subst hRole
+      subst hT
+      simpa [hLookup] using hHead e hActivePre
+    case pos.branch.branch r₁ bs₁ r₂ bs₂ =>
+      rcases hShape with ⟨hRole, _⟩
+      subst hRole
+      simpa [hLookup] using hHead e hActivePre
   · -- ep is not receiver: lookup unchanged
-    have hLookupRecv : lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
+    have hLookupRecv :
+        lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
         lookupG G { sid := e.sid, role := e.receiver } := by
       apply lookupG_updateG_ne
-      exact hRecv
-    simp only [hLookupRecv]
-    have hActivePre : ActiveEdge G e := by
-      rcases hActive with ⟨hSend, hRecvAct⟩
-      constructor
-      · -- Sender: may or may not be ep
-        by_cases hSendEp : ep = { sid := e.sid, role := e.sender }
-        · subst hSendEp
-          simp only [hLookup, Option.isSome_some]
-        · rw [← lookupG_updateG_ne hSendEp] at hSend
-          exact hSend
-      · rw [← hLookupRecv]
-        exact hRecvAct
-    exact hHead e hActivePre
+      intro hEq
+      exact hRecv hEq.symm
+    simpa [hLookupRecv] using hHead e hActivePre
+
+/-! ### ValidLabels helpers -/
+
+private lemma find?_isSome_of_label_mem {bs : List (Label × LocalType)} {ℓ : Label}
+    (hMem : ℓ ∈ List.map Prod.fst bs) :
+    (bs.find? (fun b => b.1 == ℓ)).isSome := by
+  rcases List.mem_map.mp hMem with ⟨b, hMemB, hLbl⟩
+  have hPred : (b.1 == ℓ) = true := by
+    simp [hLbl]
+  exact List.find?_isSome.mpr ⟨b, hMemB, hPred⟩
+
+private lemma ValidLabels_branch_transfer {bufs : Buffers} {e : Edge}
+    {bs bs₁ : List (Label × LocalType)}
+    (hLabels : List.map Prod.fst bs₁ = List.map Prod.fst bs)
+    (hOrig :
+      match lookupBuf bufs e with
+      | (.string l) :: _ => (bs₁.find? (fun b => b.1 == l)).isSome
+      | _ => True) :
+    match lookupBuf bufs e with
+    | (.string l) :: _ => (bs.find? (fun b => b.1 == l)).isSome
+    | _ => True := by
+  cases hBuf : lookupBuf bufs e with
+  | nil =>
+      simp
+  | cons v _ =>
+      cases v with
+      | unit => simp
+      | bool _ => simp
+      | nat _ => simp
+      | prod _ _ => simp
+      | chan _ => simp
+      | string ℓ =>
+          have hSome₁ : (bs₁.find? (fun b => b.1 == ℓ)).isSome := by
+            simpa [hBuf] using hOrig
+          rcases (List.find?_isSome.mp hSome₁) with ⟨b, hMem, hPred⟩
+          have hLbl : b.1 = ℓ := (beq_iff_eq).1 hPred
+          have hMemLbl₁ : ℓ ∈ List.map Prod.fst bs₁ := by
+            have : b.1 ∈ List.map Prod.fst bs₁ := by
+              exact List.mem_map.mpr ⟨b, hMem, rfl⟩
+            simpa [hLbl] using this
+          have hMemLbl₂ : ℓ ∈ List.map Prod.fst bs := by
+            simpa [hLabels] using hMemLbl₁
+          have hSome₂ : (bs.find? (fun b => b.1 == ℓ)).isSome :=
+            find?_isSome_of_label_mem hMemLbl₂
+          simpa [hBuf] using hSome₂
 
 /-- ValidLabels is preserved under compatible type replacement.
 
@@ -424,124 +325,91 @@ theorem ValidLabels_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffers}
     {ep : Endpoint} {L₁ L₂ : LocalType}
     (hValid : ValidLabels G D bufs)
     (hLookup : lookupG G ep = some L₁)
-    (hCompat : ∀ r, RecvCompatible r L₁ L₂) :
+    (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     ValidLabels (updateG G ep L₂) D bufs := by
   intro e source bs hActive hBranch
+  have hActivePre : ActiveEdge G e := by
+    apply ActiveEdge_updateG_inv hActive
+    simp [hLookup]
   -- Case split: is ep the receiver of e?
   by_cases hRecv : ep = { sid := e.sid, role := e.receiver }
-  · -- ep is receiver: L₂ = .branch source bs was asserted
+  case pos =>
     subst hRecv
-    simp only [lookupG_updateG_eq, Option.some.injEq] at hBranch
-    -- L₂ = .branch source bs
-    -- hCompat source gives RecvCompatible source L₁ L₂
-    have hCompatS := hCompat source
-    -- Need to show L₁ was also a branch to use original ValidLabels
-    cases hL₁ : L₁ with
+    -- L₂ is the receiver type
+    have hBranch' : L₂ = .branch source bs := by
+      simpa [lookupG_updateG_eq] using hBranch
+    have hShape := (hCompat source).2
+    -- L₁ must also be a matching branch with the same labels.
+    cases L₁ with
+    | send r T L =>
+        have hFalse : False := by
+          simp [hBranch', ShapeCompatible] at hShape
+        cases hFalse
+    | recv r T L =>
+        have hFalse : False := by
+          simp [hBranch', ShapeCompatible] at hShape
+        cases hFalse
+    | select r bs =>
+        have hFalse : False := by
+          simp [hBranch', ShapeCompatible] at hShape
+        cases hFalse
+    | end_ =>
+        have hFalse : False := by
+          simp [hBranch', ShapeCompatible] at hShape
+        cases hFalse
+    | var n =>
+        have hFalse : False := by
+          simp [hBranch', ShapeCompatible] at hShape
+        cases hFalse
+    | mu L =>
+        have hFalse : False := by
+          simp [hBranch', ShapeCompatible] at hShape
+        cases hFalse
     | branch r bs₁ =>
-      -- L₁ = .branch r bs₁
-      rw [hL₁] at hCompatS
-      cases hCompatS with
-      | branch hBranches =>
-        -- r = source and we have label correspondence
-        subst hBranch
-        -- Original ValidLabels: if buffer head is ℓ, then ℓ ∈ bs₁
-        have hActivePre : ActiveEdge G e := by
-          constructor
-          · rcases hActive with ⟨hSend, _⟩
-            by_cases hSendEp : { sid := e.sid, role := e.receiver } = { sid := e.sid, role := e.sender }
-            · simp only [Endpoint.mk.injEq] at hSendEp
-              rw [← hSendEp.2] at hSend
-              rw [lookupG_updateG_eq] at hSend
-              simp at hSend
-            · rw [← lookupG_updateG_ne hSendEp] at hSend
-              exact hSend
-          · simp only [hLookup, Option.isSome_some]
-        have hOrig := hValid e source bs₁ hActivePre hLookup
-        -- Buffer head check is the same because labels are preserved
-        cases hBuf : lookupBuf bufs e with
-        | nil => trivial
-        | cons v _ =>
-          cases v with
-          | string ℓ =>
-            simp only [hBuf] at hOrig ⊢
-            -- hOrig: (bs₁.find? ℓ).isSome
-            -- Need: (bs.find? ℓ).isSome where bs came from L₂
-            -- hBranches: ∀ ℓ L₁', (ℓ, L₁') ∈ bs₁ → ∃ L₂', (ℓ, L₂') ∈ bs ∧ ...
-            cases hFind : List.find? (fun b => b.1 == ℓ) bs₁ with
-            | none => simp only [hFind, Option.isSome_none] at hOrig
-            | some p =>
-              -- Found (ℓ', L') in bs₁ with ℓ' = ℓ
-              have hMem : p ∈ bs₁ := List.find?_some hFind
-              have hEq : p.1 == ℓ = true := by
-                have := List.find?_some_eq_true hFind
-                exact this
-              simp only [beq_iff_eq] at hEq
-              -- Apply hBranches to get corresponding entry in bs
-              obtain ⟨L₂', hMem₂, _⟩ := hBranches p.1 p.2 hMem
-              rw [hEq] at hMem₂
-              -- (ℓ, L₂') ∈ bs, so find? succeeds
-              have : (List.find? (fun b => b.1 == ℓ) bs).isSome := by
-                apply List.find?_isSome.mpr
-                use (ℓ, L₂')
-                constructor
-                · exact hMem₂
-                · simp only [beq_self_eq_true]
-              exact this
-          | _ => trivial
-      | branch_other hNe _ => exact absurd rfl hNe
-    | _ =>
-      -- L₁ not a branch, but L₂ is - check what RecvCompatible gives
-      rw [hL₁] at hCompatS
-      cases hCompatS <;> subst hBranch <;> first
-        | exact trivial
-        | contradiction
-  · -- ep is not receiver: lookup unchanged
-    have hLookupRecv : lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
+        have hShape' :
+            r = source ∧ List.map Prod.fst bs₁ = List.map Prod.fst bs := by
+          simpa [hBranch', ShapeCompatible] using hShape
+        rcases hShape' with ⟨hRole, hLabels⟩
+        subst r
+        have hLookup₁ :
+            lookupG G { sid := e.sid, role := e.receiver } = some (.branch source bs₁) := by
+          simpa using hLookup
+        have hOrig := hValid e source bs₁ hActivePre hLookup₁
+        exact ValidLabels_branch_transfer hLabels hOrig
+  case neg =>
+    -- ep is not receiver: lookup unchanged
+    have hLookupRecv :
+        lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
         lookupG G { sid := e.sid, role := e.receiver } := by
       apply lookupG_updateG_ne
-      exact hRecv
-    rw [hLookupRecv] at hBranch
-    have hActivePre : ActiveEdge G e := by
-      rcases hActive with ⟨hSend, hRecvAct⟩
-      constructor
-      · by_cases hSendEp : ep = { sid := e.sid, role := e.sender }
-        · subst hSendEp
-          simp only [hLookup, Option.isSome_some]
-        · rw [← lookupG_updateG_ne hSendEp] at hSend
-          exact hSend
-      · rw [← hLookupRecv]
-        exact hRecvAct
-    exact hValid e source bs hActivePre hBranch
+      intro hEq
+      exact hRecv hEq.symm
+    have hBranch' : lookupG G { sid := e.sid, role := e.receiver } = some (.branch source bs) := by
+      simpa [hLookupRecv] using hBranch
+    simpa using hValid e source bs hActivePre hBranch'
 
 /-- RecvCompatible preserves target role structure.
 
     If RecvCompatible for all roles, then the targetRole? is preserved. -/
-theorem RecvCompatible_targetRole {L₁ L₂ : LocalType}
-    (hCompat : ∀ r, RecvCompatible r L₁ L₂) :
+private lemma ShapeCompatible_targetRole {L₁ L₂ : LocalType}
+    (hShape : ShapeCompatible L₁ L₂) :
     LocalType.targetRole? L₁ = LocalType.targetRole? L₂ := by
-  cases L₁ with
-  | end_ =>
-    have h := hCompat default
-    cases h
-    rfl
-  | recv r T L =>
-    have h := hCompat r
-    cases h with
-    | recv _ => rfl
-    | recv_other hNe _ => exact absurd rfl hNe
-  | send r T L =>
-    have h := hCompat r
-    cases h with
-    | send _ => rfl
-  | branch r bs =>
-    have h := hCompat r
-    cases h with
-    | branch _ => rfl
-    | branch_other hNe _ => exact absurd rfl hNe
-  | select r bs =>
-    have h := hCompat r
-    cases h with
-    | select _ => rfl
+  cases L₁ <;> cases L₂
+  all_goals
+    simp [ShapeCompatible, LocalType.targetRole?] at hShape ⊢
+  case send.send r₁ T₁ L₁ r₂ T₂ L₂ =>
+    simp [hShape]
+  case recv.recv r₁ T₁ L₁ r₂ T₂ L₂ =>
+    exact hShape.1
+  case branch.branch r₁ bs₁ r₂ bs₂ =>
+    exact hShape.1
+  case select.select r₁ bs₁ r₂ bs₂ =>
+    exact hShape.1
+
+theorem RecvCompatible_targetRole {L₁ L₂ : LocalType}
+    (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
+    LocalType.targetRole? L₁ = LocalType.targetRole? L₂ := by
+  exact ShapeCompatible_targetRole (hCompat (default : Role)).2
 
 /-- RoleComplete is preserved under type replacement.
 
@@ -549,7 +417,7 @@ theorem RecvCompatible_targetRole {L₁ L₂ : LocalType}
 theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : LocalType}
     (hComplete : RoleComplete G)
     (hLookup : lookupG G ep = some L₁)
-    (hCompat : ∀ r, RecvCompatible r L₁ L₂) :
+    (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     RoleComplete (updateG G ep L₂) := by
   intro e L hLookupE
   by_cases h : e = ep
@@ -565,14 +433,16 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
     | none => trivial
     | some r =>
       -- L₁ had the same target role r
-      rw [← hSameTarget] at hTarget
-      obtain ⟨L', hL'⟩ := hComplete ep L₁ hLookup
-      rw [hTarget] at hL'
+      have hTarget₁ : LocalType.targetRole? L₁ = some r := by
+        simpa [hTarget] using hSameTarget
+      have hComplete' := hComplete e L₁ hLookup
+      simp [hTarget₁] at hComplete'
+      rcases hComplete' with ⟨L', hL'⟩
       -- The peer exists at { sid := ep.sid, role := r }
-      by_cases hPeer : { sid := ep.sid, role := r } = ep
+      by_cases hPeer : { sid := e.sid, role := r } = e
       · -- Peer is self: L₂ is there
         use L₂
-        subst hPeer
+        rw [hPeer]
         exact lookupG_updateG_eq
       · -- Peer is not self: unchanged
         use L'
@@ -586,16 +456,17 @@ theorem RoleComplete_type_replacement {G : GEnv} {ep : Endpoint} {L₁ L₂ : Lo
     cases hTarget : LocalType.targetRole? L with
     | none => trivial
     | some r =>
-      obtain ⟨L', hL'⟩ := hOrig
+      simp [hTarget] at hOrig
+      rcases hOrig with ⟨L', hL'⟩
       -- The target role's endpoint still exists after update
-      by_cases hTarget : { sid := e.sid, role := r } = ep
+      by_cases hTarget' : { sid := e.sid, role := r } = ep
       · -- Target is ep: L₂ is there
         use L₂
-        subst hTarget
+        subst hTarget'
         exact lookupG_updateG_eq
       · -- Target is not ep: unchanged
         use L'
-        rw [lookupG_updateG_ne hTarget]
+        rw [lookupG_updateG_ne hTarget']
         exact hL'
 
 /-- **Full liveness preservation**: All progress conditions are preserved
@@ -610,7 +481,7 @@ theorem progress_conditions_type_replacement {G : GEnv} {D : DEnv} {bufs : Buffe
     (hComplete : RoleComplete G)
     (hValid : ValidLabels G D bufs)
     (hLookup : lookupG G ep = some L₁)
-    (hCompat : ∀ r, RecvCompatible r L₁ L₂) :
+    (hCompat : ∀ r : Role, RecvCompatible r L₁ L₂) :
     HeadCoherent (updateG G ep L₂) D ∧
     RoleComplete (updateG G ep L₂) ∧
     ValidLabels (updateG G ep L₂) D bufs :=

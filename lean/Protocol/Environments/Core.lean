@@ -690,6 +690,30 @@ theorem lookupD_update_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne :
 @[simp] theorem lookupD_empty (e : Edge) : lookupD (∅ : DEnv) e = [] := by
   simp [lookupD, DEnv.find?, DEnv_map_find?_empty]
 
+/-- find? after update on the same edge. -/
+theorem find?_updateD_eq (env : DEnv) (e : Edge) (ts : List ValType) :
+    (updateD env e ts).find? e = some ts := by
+  have hEq : compare e e = .eq := by simp
+  let m := env.map.insert e ts
+  have hmap : (DEnv.ofMap m).map.find? e = m.find? e := by
+    simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e))
+  have hfind : m.find? e = some ts := by
+    simpa [m] using (RBMap.find?_insert_of_eq (t := env.map) (k := e) (v := ts) (k' := e) hEq)
+  simp only [updateD, DEnv.find?, hmap, hfind, m]
+
+/-- find? after update on a different edge. -/
+theorem find?_updateD_neq (env : DEnv) (e e' : Edge) (ts : List ValType) (hne : e ≠ e') :
+    (updateD env e ts).find? e' = env.find? e' := by
+  have hne' : compare e' e ≠ .eq := by
+    intro hEq
+    exact hne ((Edge.compare_eq_iff_eq e' e).1 hEq).symm
+  let m := env.map.insert e ts
+  have hmap : (DEnv.ofMap m).map.find? e' = m.find? e' := by
+    simpa [DEnv.ofMap, m] using (rbmapOfList_toList_find? (m := m) (e := e'))
+  have hfind : m.find? e' = env.map.find? e' := by
+    simpa [m] using (RBMap.find?_insert_of_ne (t := env.map) (k := e) (v := ts) (k' := e') hne')
+  simp only [updateD, DEnv.find?, hmap, hfind, m]
+
 /-- Append a type to the in-flight trace. -/
 def appendD (env : DEnv) (e : Edge) (T : ValType) : DEnv :=
   updateD env e (lookupD env e ++ [T])
@@ -785,24 +809,241 @@ theorem DEnvUnion_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
     (h : D1.find? e = some ts) :
     (D1 ++ D2).find? e = some ts := by
   -- Key in D1.map means conditional fold won't overwrite it
-  sorry
+  have h0 : D1.map.find? e = some ts := by
+    simpa [DEnv.find?] using h
+  change (DEnvUnion D1 D2).find? e = some ts
+  simp only [DEnvUnion, DEnv_find?_ofMap]
+  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  -- Fold over D2.map.toList preserves existing keys in D1.map.
+  let f := fun (acc : RBMap Edge Trace compare) (p : Edge × Trace) =>
+    match acc.find? p.1 with
+    | some _ => acc
+    | none => acc.insert p.1 p.2
+  have hfold :
+      ∀ (ps : List (Edge × Trace)) (acc : RBMap Edge Trace compare),
+        acc.find? e = some ts →
+        (ps.foldl f acc).find? e = some ts := by
+    intro ps acc hacc
+    induction ps generalizing acc with
+    | nil =>
+        simpa using hacc
+    | cons p ps ih =>
+        cases hfind : acc.find? p.1 with
+        | some v =>
+            simpa [List.foldl_cons, f, hfind] using ih (acc := acc) hacc
+        | none =>
+            have hne : e ≠ p.1 := by
+              intro hEq
+              subst hEq
+              have : (none : Option Trace) = some ts := by
+                exact hfind.symm.trans hacc
+              cases this
+            have hne' : compare e p.1 ≠ .eq := by
+              intro hEq
+              exact hne ((Edge.compare_eq_iff_eq e p.1).1 hEq)
+            have hinsert :
+                (acc.insert p.1 p.2).find? e = acc.find? e := by
+              simpa using
+                (RBMap.find?_insert_of_ne (t := acc) (k := p.1) (v := p.2) (k' := e) hne')
+            have hacc' : (acc.insert p.1 p.2).find? e = some ts := by
+              simpa [hinsert] using hacc
+            simpa [List.foldl_cons, f, hfind] using
+              ih (acc := acc.insert p.1 p.2) hacc'
+  simpa [f] using hfold (ps := D2.map.toList) (acc := D1.map) h0
 
 /-- DEnvUnion find? when key not in left. -/
 theorem DEnvUnion_find?_right {D1 D2 : DEnv} {e : Edge}
     (h : D1.find? e = none) :
     (D1 ++ D2).find? e = D2.find? e := by
   -- Key not in D1.map means it can only come from D2
-  sorry
+  have h0 : D1.map.find? e = none := by
+    simpa [DEnv.find?] using h
+  change (DEnvUnion D1 D2).find? e = D2.find? e
+  simp only [DEnvUnion, DEnv_find?_ofMap]
+  rw [Batteries.RBMap.foldl_eq_foldl_toList]
+  let f := fun (acc : RBMap Edge Trace compare) (p : Edge × Trace) =>
+    match acc.find? p.1 with
+    | some _ => acc
+    | none => acc.insert p.1 p.2
+  -- Folding preserves equality of find? at e when the initial maps agree on e.
+  have hfold :
+      ∀ (ps : List (Edge × Trace)) (acc1 acc2 : RBMap Edge Trace compare),
+        acc1.find? e = acc2.find? e →
+        (ps.foldl f acc1).find? e = (ps.foldl f acc2).find? e := by
+    intro ps acc1 acc2 hEq
+    induction ps generalizing acc1 acc2 with
+    | nil =>
+        simpa [f] using hEq
+    | cons p ps ih =>
+        by_cases hkey : p.1 = e
+        · cases h1 : acc1.find? e with
+          | some v =>
+              have h2 : acc2.find? e = some v := by
+                simpa [h1] using hEq.symm
+              simpa [List.foldl_cons, f, hkey, h1, h2] using
+                ih (acc1 := acc1) (acc2 := acc2) hEq
+          | none =>
+              have h2 : acc2.find? e = none := by
+                simpa [h1] using hEq.symm
+              have hEq1 : (acc1.insert e p.2).find? e = some p.2 := by
+                have hcmp : compare e e = .eq := by simp
+                simpa using
+                  (RBMap.find?_insert_of_eq (t := acc1) (k := e) (v := p.2) (k' := e) hcmp)
+              have hEq2 : (acc2.insert e p.2).find? e = some p.2 := by
+                have hcmp : compare e e = .eq := by simp
+                simpa using
+                  (RBMap.find?_insert_of_eq (t := acc2) (k := e) (v := p.2) (k' := e) hcmp)
+              have hEq' :
+                  (acc1.insert e p.2).find? e = (acc2.insert e p.2).find? e := by
+                simp [hEq1, hEq2]
+              simpa [List.foldl_cons, f, hkey, h1, h2] using
+                ih (acc1 := acc1.insert e p.2) (acc2 := acc2.insert e p.2) hEq'
+        · have hne' : compare e p.1 ≠ .eq := by
+            intro hEq
+            apply hkey
+            exact (Edge.compare_eq_iff_eq e p.1).1 hEq |>.symm
+          have hstep1 : (f acc1 p).find? e = acc1.find? e := by
+            cases h1 : acc1.find? p.1 with
+            | some v =>
+                simp [f, h1]
+            | none =>
+                have hfind :=
+                  RBMap.find?_insert_of_ne (t := acc1) (k := p.1) (v := p.2) (k' := e) hne'
+                simpa [f, h1] using hfind
+          have hstep2 : (f acc2 p).find? e = acc2.find? e := by
+            cases h2 : acc2.find? p.1 with
+            | some v =>
+                simp [f, h2]
+            | none =>
+                have hfind :=
+                  RBMap.find?_insert_of_ne (t := acc2) (k := p.1) (v := p.2) (k' := e) hne'
+                simpa [f, h2] using hfind
+          have hEq' : (f acc1 p).find? e = (f acc2 p).find? e := by
+            simpa [hstep1, hstep2] using hEq
+          simpa [List.foldl_cons, f] using
+            ih (acc1 := f acc1 p) (acc2 := f acc2 p) hEq'
+  have hEqFold :
+      (D2.map.toList.foldl f D1.map).find? e =
+      (D2.map.toList.foldl f (∅ : RBMap Edge Trace compare)).find? e := by
+    have hEmpty : (∅ : RBMap Edge Trace compare).find? e = none := by
+      simp
+    exact hfold (ps := D2.map.toList) (acc1 := D1.map) (acc2 := (∅ : RBMap Edge Trace compare))
+      (by simpa [hEmpty] using h0)
+  have hEmptyUnion :
+      (DEnvUnion (∅ : DEnv) D2).find? e = D2.find? e := by
+    simpa using congrArg (fun D => D.find? e) (DEnvUnion_empty_left (D := D2))
+  have hEmptyFold :
+      (D2.map.toList.foldl f (∅ : RBMap Edge Trace compare)).find? e = D2.find? e := by
+    have hEmptyUnion' :
+        (RBMap.foldl (fun acc k v =>
+          match acc.find? k with
+          | some _ => acc
+          | none => acc.insert k v) (∅ : RBMap Edge Trace compare) D2.map).find? e =
+        D2.find? e := by
+      simpa [DEnvUnion, DEnv_find?_ofMap] using hEmptyUnion
+    simpa [Batteries.RBMap.foldl_eq_foldl_toList] using hEmptyUnion'
+  exact hEqFold.trans hEmptyFold
 
 /-- updateD distributes over DEnvUnion when key not in left. -/
 theorem updateD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
     (h : D1.find? e = none) :
     updateD (D1 ++ D2) e ts = D1 ++ updateD D2 e ts := by
-  sorry
+  apply DEnv_eq_of_find?_eq
+  intro e'
+  by_cases he' : e' = e
+  · subst e'
+    -- updated key
+    have hLeft : (updateD (D1 ++ D2) e ts).find? e = some ts := by
+      have hEq : compare e e = .eq := by simp
+      have hfind : ((D1 ++ D2).map.insert e ts).find? e = some ts := by
+        simpa using
+          (RBMap.find?_insert_of_eq (t := (D1 ++ D2).map) (k := e) (v := ts) (k' := e) hEq)
+      simpa [updateD, DEnv_find?_ofMap] using hfind
+    have hRight :
+        (D1 ++ updateD D2 e ts).find? e = some ts := by
+      have hnone : D1.find? e = none := h
+      have hRight' := DEnvUnion_find?_right (D1 := D1) (D2 := updateD D2 e ts) (e := e) hnone
+      -- reduce to updateD on right
+      have hEq : compare e e = .eq := by simp
+      have hUpd : (updateD D2 e ts).find? e = some ts := by
+        have hfind : (D2.map.insert e ts).find? e = some ts := by
+          simpa using
+            (RBMap.find?_insert_of_eq (t := D2.map) (k := e) (v := ts) (k' := e) hEq)
+        simpa [updateD, DEnv_find?_ofMap] using hfind
+      simp [hUpd] at hRight'
+      exact hRight'
+    simp [hLeft, hRight]
+  · -- other keys unchanged
+    have hLeft :
+        (updateD (D1 ++ D2) e ts).find? e' = (D1 ++ D2).find? e' := by
+      have hne' : compare e' e ≠ .eq := by
+        intro hEq
+        exact he' ((Edge.compare_eq_iff_eq e' e).1 hEq)
+      have hfind :
+          ((D1 ++ D2).map.insert e ts).find? e' = (D1 ++ D2).map.find? e' := by
+        simpa using
+          (RBMap.find?_insert_of_ne (t := (D1 ++ D2).map) (k := e) (v := ts) (k' := e') hne')
+      simpa [updateD, DEnv_find?_ofMap] using hfind
+    cases hfind : D1.find? e' with
+    | some ts' =>
+        -- key in left; both unions agree on left value
+        have hLeftUnion := DEnvUnion_find?_left (D1 := D1) (D2 := D2) (e := e') (ts := ts') hfind
+        have hRightUnion :=
+          DEnvUnion_find?_left (D1 := D1) (D2 := updateD D2 e ts) (e := e') (ts := ts') hfind
+        simp [hLeft, hLeftUnion, hRightUnion]
+    | none =>
+        -- key not in left; reduce to right
+        have hLeftUnion := DEnvUnion_find?_right (D1 := D1) (D2 := D2) (e := e') hfind
+        have hRightUnion :=
+          DEnvUnion_find?_right (D1 := D1) (D2 := updateD D2 e ts) (e := e') hfind
+        -- updateD doesn't affect e' (since e' ≠ e)
+        have hUpd :
+            (updateD D2 e ts).find? e' = D2.find? e' := by
+          have hne' : compare e' e ≠ .eq := by
+            intro hEq
+            exact he' ((Edge.compare_eq_iff_eq e' e).1 hEq)
+          have hfind :
+              (D2.map.insert e ts).find? e' = D2.map.find? e' := by
+            simpa using
+              (RBMap.find?_insert_of_ne (t := D2.map) (k := e) (v := ts) (k' := e') hne')
+          simpa [updateD, DEnv_find?_ofMap] using hfind
+        simp [hLeft, hLeftUnion, hRightUnion, hUpd]
 
 /-- DEnvUnion is associative. -/
 theorem DEnvUnion_assoc (D1 D2 D3 : DEnv) : (D1 ++ D2) ++ D3 = D1 ++ (D2 ++ D3) := by
-  sorry
+  apply DEnv_eq_of_find?_eq
+  intro e
+  cases h1 : D1.find? e with
+  | some ts =>
+      -- in left, both sides pick left
+      have hLeft :=
+        DEnvUnion_find?_left (D1 := D1 ++ D2) (D2 := D3) (e := e) (ts := ts)
+          (DEnvUnion_find?_left (D1 := D1) (D2 := D2) (e := e) (ts := ts) h1)
+      have hRight :=
+        DEnvUnion_find?_left (D1 := D1) (D2 := D2 ++ D3) (e := e) (ts := ts) h1
+      simp [hLeft, hRight]
+  | none =>
+      -- not in left; reduce to D2/D3
+      have hD1none : D1.find? e = none := by simpa using h1
+      have hD12 : (D1 ++ D2).find? e = D2.find? e :=
+        DEnvUnion_find?_right (D1 := D1) (D2 := D2) (e := e) hD1none
+      cases h2 : D2.find? e with
+      | some ts =>
+          have hLeft :=
+            DEnvUnion_find?_left (D1 := D1 ++ D2) (D2 := D3) (e := e) (ts := ts) (by simp [hD12, h2])
+          have hRight1 :=
+            DEnvUnion_find?_right (D1 := D1) (D2 := D2 ++ D3) (e := e) hD1none
+          have hRight2 :=
+            DEnvUnion_find?_left (D1 := D2) (D2 := D3) (e := e) (ts := ts) h2
+          simp [hLeft, hRight1, hRight2]
+      | none =>
+          have hLeft :=
+            DEnvUnion_find?_right (D1 := D1 ++ D2) (D2 := D3) (e := e) (by simp [hD12, h2])
+          have hRight1 :=
+            DEnvUnion_find?_right (D1 := D1) (D2 := D2 ++ D3) (e := e) hD1none
+          have hRight2 :=
+            DEnvUnion_find?_right (D1 := D2) (D2 := D3) (e := e) h2
+          simp [hLeft, hRight1, hRight2]
 
 /-- Looking up an edge in initBuffers returns empty if edge is in allEdges. -/
 theorem initBuffers_lookup_mem (sid : SessionId) (roles : RoleSet) (e : Edge)

@@ -70,6 +70,20 @@ termination_by bs => sizeOf bs
 
 end
 
+/-- find? commutes with renameBranches: the label is preserved, type is renamed. -/
+theorem find_renameBranches (ρ : SessionRenaming) (chosen : Label)
+    (branches : List (Label × LocalType)) :
+    (renameBranches ρ branches).find? (fun b => b.1 == chosen) =
+    (branches.find? (fun b => b.1 == chosen)).map (fun (l, L) => (l, renameLocalType ρ L)) := by
+  induction branches with
+  | nil => simp [renameBranches]
+  | cons hd tl ih =>
+    obtain ⟨l, L⟩ := hd
+    simp only [renameBranches, List.find?_cons]
+    by_cases h : l == chosen
+    · simp [h]
+    · simp [h, ih]
+
 /-- Rename a runtime value by updating any embedded endpoints. -/
 def renameValue (ρ : SessionRenaming) : Value → Value
   | .unit => .unit
@@ -148,6 +162,28 @@ private lemma lookupD_foldl_update_neq (ρ : SessionRenaming) :
           (ts := hd.2.map (renameValType ρ)) (hne := hne_hd)
       simpa [List.foldl, hupd] using (ih (acc := updateD acc (renameEdge ρ hd.1)
         (hd.2.map (renameValType ρ))) hne_tl)
+
+private lemma find?_foldl_update_neq (ρ : SessionRenaming) :
+    ∀ (l : List (Edge × Trace)) (acc : DEnv) (edge : Edge),
+      (∀ p ∈ l, renameEdge ρ p.1 ≠ edge) →
+      (l.foldl
+          (fun acc p => updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+          acc).find? edge = acc.find? edge := by
+  intro l acc edge hne
+  induction l generalizing acc with
+  | nil => rfl
+  | cons hd tl ih =>
+      have hne_hd : renameEdge ρ hd.1 ≠ edge :=
+        hne hd (List.mem_cons.mpr (Or.inl rfl))
+      have hne_tl : ∀ p ∈ tl, renameEdge ρ p.1 ≠ edge := by
+        intro p hp
+        exact hne p (List.mem_cons.mpr (Or.inr hp))
+      have hupd :
+          (updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))).find? edge =
+            acc.find? edge :=
+        find?_updateD_neq acc (renameEdge ρ hd.1) edge (hd.2.map (renameValType ρ)) hne_hd
+      simpa [List.foldl, hupd] using
+        (ih (acc := updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))) hne_tl)
 
 /-- Rename all edges in Buffers. -/
 def renameBufs (ρ : SessionRenaming) (bufs : Buffers) : Buffers :=
@@ -378,6 +414,67 @@ theorem lookupD_rename (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
   cases h : D.list.lookup e <;>
     simp [hfold, hlookup, h]
 
+private lemma find?_rename_foldl (ρ : SessionRenaming) :
+    ∀ (l : List (Edge × Trace)) (sorted : l.Pairwise edgeCmpLT) (acc : DEnv) (e : Edge),
+      (l.foldl
+          (fun acc p => updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+          acc).find? (renameEdge ρ e) =
+        match l.lookup e with
+        | some ts => some (ts.map (renameValType ρ))
+        | none => acc.find? (renameEdge ρ e) := by
+  intro l sorted acc e
+  revert sorted
+  induction l generalizing acc with
+  | nil =>
+      intro sorted
+      simp [List.lookup]
+  | cons hd tl ih =>
+      intro sorted
+      have hpair := (List.pairwise_cons.1 sorted)
+      have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
+      have htl : tl.Pairwise edgeCmpLT := hpair.2
+      by_cases hEq : e = hd.1
+      case pos =>
+        subst hEq
+        have hne : ∀ p ∈ tl, renameEdge ρ p.1 ≠ renameEdge ρ hd.1 := by
+          intro p hp hEq'
+          have hEq0 : p.1 = hd.1 := renameEdge_inj ρ _ _ hEq'
+          have hlt : compare hd.1 p.1 = .lt := edgeCmpLT_eq_lt (hhd p hp)
+          have hEqCmp : compare hd.1 p.1 = .eq :=
+            (Edge.compare_eq_iff_eq hd.1 p.1).2 hEq0.symm
+          have : (.lt : Ordering) = .eq := hlt.symm.trans hEqCmp
+          cases this
+        have htail :
+            (tl.foldl
+                (fun acc p => updateD acc (renameEdge ρ p.1) (p.2.map (renameValType ρ)))
+                (updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ)))).find?
+              (renameEdge ρ hd.1) =
+            (updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))).find?
+              (renameEdge ρ hd.1) := by
+          simpa [List.foldl] using
+            (find?_foldl_update_neq (ρ := ρ) (l := tl)
+              (acc := updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ)))
+              (edge := renameEdge ρ hd.1) hne)
+        have hupd :
+            (updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))).find?
+              (renameEdge ρ hd.1) = some (hd.2.map (renameValType ρ)) :=
+          find?_updateD_eq acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))
+        simp [List.lookup, htail, hupd]
+      case neg =>
+        have hne : renameEdge ρ e ≠ renameEdge ρ hd.1 := fun h =>
+          hEq (renameEdge_inj ρ _ _ h)
+        have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
+        have ih' :=
+          ih (acc := updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))) htl
+        have hupd :
+            (updateD acc (renameEdge ρ hd.1) (hd.2.map (renameValType ρ))).find?
+              (renameEdge ρ e) = acc.find? (renameEdge ρ e) :=
+          find?_updateD_neq acc (renameEdge ρ hd.1) (renameEdge ρ e)
+            (hd.2.map (renameValType ρ)) (by
+              intro h
+              exact hne h.symm)
+        simpa [List.lookup, hbeq, hupd] using ih'
+
 /-- Looking up a renamed edge in renamed buffers. -/
 theorem lookupBuf_rename (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
     lookupBuf (renameBufs ρ bufs) (renameEdge ρ e) =
@@ -489,5 +586,181 @@ theorem lookupBuf_rename_inv (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) 
       refine ⟨e', he', ?_⟩
       simp only [beq_eq_false_iff_ne.mpr hne]
       exact hLookup
+
+/-! ## Update Commutes with Renaming
+
+These lemmas are essential for proving that instruction specs are equivariant
+under session renaming (R.6 in implementation.md). -/
+
+/-- Renaming commutes with GEnv update.
+
+    This is the key infrastructure lemma for proving instruction equivariance.
+    It states that updating then renaming equals renaming then updating. -/
+theorem renameGEnv_updateG (ρ : SessionRenaming) (G : GEnv) (ep : Endpoint) (L : LocalType) :
+    renameGEnv ρ (updateG G ep L) =
+      updateG (renameGEnv ρ G) (renameEndpoint ρ ep) (renameLocalType ρ L) := by
+  induction G with
+  | nil =>
+    simp [renameGEnv, updateG]
+  | cons hd tl ih =>
+    simp only [updateG, renameGEnv, List.map]
+    by_cases heq : ep = hd.1
+    case pos =>
+      subst heq
+      -- After substitution: ep = hd.1, so if_true applies
+      simp only [ite_true, List.map]
+    case neg =>
+      have hne : renameEndpoint ρ ep ≠ renameEndpoint ρ hd.1 := fun h =>
+        heq (renameEndpoint_inj ρ _ _ h)
+      -- Unfold the if-then-else for the non-equal case
+      simp only [if_neg heq, if_neg hne, List.map, List.cons.injEq, true_and]
+      exact ih
+
+/-- Renaming commutes with DEnv update.
+
+    This lemma handles the map-based DEnv structure. The proof relies on
+    the fact that renameEdge is injective (via renameEdge_inj).
+
+    The key insight is that for any edge e':
+    - If e' = renameEdge ρ e: both sides have find? = some (ts.map f)
+    - If e' is not in the image of renameEdge: both sides have find? = none
+    - If e' = renameEdge ρ e'' for e'' ≠ e: both sides have the same lookup as D at e''
+
+    The proof uses DEnv_eq_of_find?_eq and case analysis on the preimage of e'. -/
+theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Trace) :
+    renameDEnv ρ (updateD D e ts) =
+      updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ)) := by
+  apply DEnv_eq_of_find?_eq
+  intro e'
+  by_cases heq : e' = renameEdge ρ e
+  case pos =>
+    subst heq
+    have hFold :=
+      find?_rename_foldl (ρ := ρ) (l := (updateD D e ts).list)
+        (sorted := (updateD D e ts).sorted) (acc := (∅ : DEnv)) (e := e)
+    have hFind := find?_updateD_eq D e ts
+    have hLookup : (updateD D e ts).list.lookup e = some ts := by
+      calc
+        (updateD D e ts).list.lookup e
+            = (updateD D e ts).find? e := by
+                symm; exact DEnv_find?_eq_lookup (env := updateD D e ts) (e := e)
+        _ = some ts := hFind
+    have hLhs :
+        (renameDEnv ρ (updateD D e ts)).find? (renameEdge ρ e) =
+          some (ts.map (renameValType ρ)) := by
+      simpa [renameDEnv, hLookup] using hFold
+    have hRhs :
+        (updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))).find?
+          (renameEdge ρ e) = some (ts.map (renameValType ρ)) :=
+      find?_updateD_eq (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))
+    rw [hLhs, hRhs]
+  case neg =>
+    have hrhs :
+        (updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))).find? e' =
+          (renameDEnv ρ D).find? e' :=
+      find?_updateD_neq (renameDEnv ρ D) (renameEdge ρ e) e' (ts.map (renameValType ρ))
+        (fun h => heq h.symm)
+    cases hpre : preimageEdge ρ e' with
+    | none =>
+        have hno_lhs : ∀ p ∈ (updateD D e ts).list, renameEdge ρ p.1 ≠ e' := by
+          intro p hp hEq
+          have hex : ∃ e'', renameEdge ρ e'' = e' := ⟨p.1, hEq⟩
+          have hsome : preimageEdge ρ e' = some (Classical.choose hex) := by
+            simp [preimageEdge, hex]
+          exact Option.noConfusion (hpre ▸ hsome)
+        have hLhs : (renameDEnv ρ (updateD D e ts)).find? e' = none := by
+          simpa [renameDEnv] using
+            (find?_foldl_update_neq (ρ := ρ) (l := (updateD D e ts).list)
+              (acc := (∅ : DEnv)) (edge := e') hno_lhs)
+        have hno_rhs : ∀ p ∈ D.list, renameEdge ρ p.1 ≠ e' := by
+          intro p hp hEq
+          have hex : ∃ e'', renameEdge ρ e'' = e' := ⟨p.1, hEq⟩
+          have hsome : preimageEdge ρ e' = some (Classical.choose hex) := by
+            simp [preimageEdge, hex]
+          exact Option.noConfusion (hpre ▸ hsome)
+        have hRhsBase : (renameDEnv ρ D).find? e' = none := by
+          simpa [renameDEnv] using
+            (find?_foldl_update_neq (ρ := ρ) (l := D.list)
+              (acc := (∅ : DEnv)) (edge := e') hno_rhs)
+        rw [hLhs, hrhs, hRhsBase]
+    | some e'' =>
+        have he'_eq : e' = renameEdge ρ e'' :=
+          (preimageEdge_spec (by simp [hpre])).symm
+        have hne : e'' ≠ e := by
+          intro hc
+          subst hc
+          exact heq he'_eq
+        have hL :=
+          find?_rename_foldl (ρ := ρ) (l := (updateD D e ts).list)
+            (sorted := (updateD D e ts).sorted) (acc := (∅ : DEnv)) (e := e'')
+        have hEqUpd : (updateD D e ts).list.lookup e'' = (updateD D e ts).find? e'' := by
+          symm
+          exact DEnv_find?_eq_lookup (env := updateD D e ts) (e := e'')
+        have hL' :
+            (renameDEnv ρ (updateD D e ts)).find? e' =
+              match (updateD D e ts).find? e'' with
+              | some ts' => some (ts'.map (renameValType ρ))
+              | none => none := by
+          simpa [renameDEnv, he'_eq, hEqUpd] using hL
+        have hFindUpd : (updateD D e ts).find? e'' = D.find? e'' :=
+          find?_updateD_neq D e e'' ts hne.symm
+        have hR :=
+          find?_rename_foldl (ρ := ρ) (l := D.list) (sorted := D.sorted)
+            (acc := (∅ : DEnv)) (e := e'')
+        have hEqD : D.list.lookup e'' = D.find? e'' := by
+          symm
+          exact DEnv_find?_eq_lookup (env := D) (e := e'')
+        have hR' :
+            (renameDEnv ρ D).find? e' =
+              match D.find? e'' with
+              | some ts' => some (ts'.map (renameValType ρ))
+              | none => none := by
+          simpa [renameDEnv, he'_eq, hEqD] using hR
+        have hL'' :
+            (renameDEnv ρ (updateD D e ts)).find? e' =
+              match D.find? e'' with
+              | some ts' => some (ts'.map (renameValType ρ))
+              | none => none := by
+          simpa [hFindUpd] using hL'
+        have hEqLR :
+            (renameDEnv ρ (updateD D e ts)).find? e' = (renameDEnv ρ D).find? e' := by
+          simpa [hR'] using hL''
+        rw [hEqLR, hrhs]
+
+/-- Lookup after updateG at the same endpoint (renamed version). -/
+theorem lookupG_updateG_rename_eq (ρ : SessionRenaming) (G : GEnv) (ep : Endpoint) (L : LocalType) :
+    lookupG (renameGEnv ρ (updateG G ep L)) (renameEndpoint ρ ep) =
+      some (renameLocalType ρ L) := by
+  rw [renameGEnv_updateG]
+  exact lookupG_updateG_eq
+
+/-- Lookup after updateG at a different endpoint (renamed version). -/
+theorem lookupG_updateG_rename_neq (ρ : SessionRenaming) (G : GEnv) (ep ep' : Endpoint) (L : LocalType)
+    (hne : ep ≠ ep') :
+    lookupG (renameGEnv ρ (updateG G ep L)) (renameEndpoint ρ ep') =
+      lookupG (renameGEnv ρ G) (renameEndpoint ρ ep') := by
+  rw [renameGEnv_updateG]
+  have hne' : renameEndpoint ρ ep ≠ renameEndpoint ρ ep' := fun h =>
+    hne (renameEndpoint_inj ρ _ _ h)
+  exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) (renameEndpoint ρ ep')
+    (renameLocalType ρ L) hne'
+
+/-- Lookup after updateD at the same edge (renamed version). -/
+theorem lookupD_updateD_rename_eq (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Trace) :
+    lookupD (renameDEnv ρ (updateD D e ts)) (renameEdge ρ e) =
+      ts.map (renameValType ρ) := by
+  rw [renameDEnv_updateD]
+  exact lookupD_update_eq (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))
+
+/-- Lookup after updateD at a different edge (renamed version). -/
+theorem lookupD_updateD_rename_neq (ρ : SessionRenaming) (D : DEnv) (e e' : Edge) (ts : Trace)
+    (hne : e ≠ e') :
+    lookupD (renameDEnv ρ (updateD D e ts)) (renameEdge ρ e') =
+      lookupD (renameDEnv ρ D) (renameEdge ρ e') := by
+  rw [renameDEnv_updateD]
+  have hne' : renameEdge ρ e ≠ renameEdge ρ e' := fun h =>
+    hne (renameEdge_inj ρ _ _ h)
+  exact lookupD_update_neq (renameDEnv ρ D) (renameEdge ρ e) (renameEdge ρ e')
+    (ts.map (renameValType ρ)) hne'
 
 end
