@@ -34,7 +34,7 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
 | Protocol       |    49 | ~24,094 | Async buffered MPST, coherence, preservation, monitoring   |
 | Runtime        |    68 | ~10,542 | VM, Iris backend via iris-lean, resource algebras, WP      |
-| **Total**      | **287** | **~75,369** |                                                       |
+| **Total**      | **287** | **~75,369** |                                                      |
 
 **Architectural Layers:**
 ```
@@ -356,6 +356,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Coherence/EdgeCoherenceM.lean | 115 | Model-parametric `EdgeCoherent` variants |
 | Coherence/HeadCoherenceM.lean | 28 | Model-parametric `HeadCoherent` |
 | Coherence/PreservationDeliveryModels.lean | 157 | Parametrized preservation lemmas for different delivery models |
+| Coherence/SubtypeReplacement.lean | 438 | `RecvCompatible`, `Consume_mono`, `Coherent_type_replacement`, liveness preservation |
 
 ### Typing (8 parts)
 
@@ -451,6 +452,7 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | VM/State.lean | 207 | Full machine state, session table, buffer management |
 | VM/Program.lean | 108 | Program representation and code segments |
 | VM/Definition.lean | 14 | Re-export wrapper for VM.State and VM.Exec |
+| VM/InstrSpec.lean | ~330 | Denotational specs for instructions (SendSpec, RecvSpec, etc.) |
 | VM/Knowledge.lean | 30 | Knowledge base and fact management |
 | VM/Violation.lean | 29 | Violation policy and fault types |
 | VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
@@ -530,6 +532,7 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | Proofs/SessionLocal.lean | 278 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
 | Proofs/Delegation.lean | 482 | `DelegationStep`, `DelegationWF`, role-renaming Consume lemmas |
+| Proofs/Progress.lean | ~315 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
 | Proofs/Diamond/Lemmas.lean | 364 | Cross-session diamond lemmas |
 | Proofs/Diamond/Proof.lean | 816 | Main diamond theorem proof |
@@ -631,6 +634,7 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Operational semantics?** → Semantics/Environment.lean, Protocol/Semantics.lean
 - **Coherence invariant?** → Protocol/Coherence/Consume.lean, Protocol/Coherence/EdgeCoherence.lean
 - **Coherence preservation?** → Protocol/Coherence/Preservation.lean, Protocol/Coherence/SelectPreservation.lean
+- **Subtype replacement preservation?** → Protocol/Coherence/SubtypeReplacement.lean
 - **Configuration equivalence (quotient)?** → Protocol/Coherence/ConfigEquiv.lean
 - **Unified preservation skeleton?** → Protocol/Coherence/Unified.lean
 - **Type system?** → Protocol/Typing/Judgments.lean (`HasTypeProcN`, `WTConfigN`)
@@ -645,6 +649,7 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Ghost state?** → Runtime/ProgramLogic/GhostState.lean
 - **Session-local proofs?** → Runtime/Proofs/SessionLocal.lean, Runtime/Proofs/Frame.lean
 - **Delegation proofs?** → Runtime/Proofs/Delegation.lean
+- **VM-level progress theorem?** → Runtime/Proofs/Progress.lean
 - **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean
 - **VM bytecode compiler?** → Runtime/VM/CompileLocalTypeR.lean
 - **Dynamic choreography loading?** → Runtime/VM/LoadChoreography.lean

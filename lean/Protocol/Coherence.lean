@@ -9,6 +9,7 @@ import Protocol.Coherence.ValidLabels
 import Protocol.Coherence.Renaming
 import Protocol.Coherence.ConfigEquiv
 import Protocol.Coherence.Unified
+import Protocol.Coherence.RoleSwap
 
 /-!
 # MPST Coherence

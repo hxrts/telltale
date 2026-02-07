@@ -355,7 +355,7 @@ theorem mkInitGEnv_lookup (roles : RoleSet) (sid : SessionId)
     by_cases heq : hd = r
     · subst heq
       simp only [beq_self_eq_true]
-    · have hNeqEndpoint : ({ sid := sid, role := r } == { sid := sid, role := hd } : Bool) = false := by
+    · have hNeqEndpoint : ((⟨sid, r⟩ : Endpoint) == (⟨sid, hd⟩ : Endpoint) : Bool) = false := by
         rw [beq_eq_false_iff_ne]
         intro heq'
         simp only [Endpoint.mk.injEq] at heq'

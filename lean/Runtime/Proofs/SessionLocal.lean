@@ -1,5 +1,6 @@
 import Runtime.Proofs.Delegation
 import Protocol.Coherence.EdgeCoherence
+import Protocol.Coherence.RoleSwap
 
 /-!
 # Session-Local State for Protocol Coherence
@@ -264,6 +265,58 @@ theorem session_local_op_preserves_other {s : SessionId}
   refine ⟨Lsender, hGsenderNew, ?_⟩
   rw [hTraceUnch]
   exact hConsume
+
+/-! ## Role Swap as Session-Local Operation -/
+
+/-- Swap roles A and B within a session as a G/D operation. -/
+def swapRolesOp (s : SessionId) (A B : Role) : GEnv × DEnv → GEnv × DEnv
+  | (G, D) => (swapGEnvRole s A B G, swapDEnvRole s A B D)
+
+/-- Role swap is session-local: other sessions are unaffected. -/
+theorem swapRoles_session_local (s : SessionId) (A B : Role) :
+    SessionLocalOp s (swapRolesOp s A B) := by
+  intro G D s' hDiff
+  constructor
+  · intro ep hSid
+    have hSidNe : ep.sid ≠ s := by
+      intro hEq
+      apply hDiff
+      calc
+        s' = ep.sid := by symm; exact hSid
+        _ = s := hEq
+    have hLookup := lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=ep)
+    -- swapEndpointRole is identity when ep.sid ≠ s
+    have hSwap : swapEndpointRole s A B ep = ep := by
+      simp [swapEndpointRole, hSidNe]
+    -- Reduce to unchanged lookup
+    simpa [swapRolesOp, hSwap, hSidNe] using hLookup
+  · intro e hSid
+    have hSidNe : e.sid ≠ s := by
+      intro hEq
+      apply hDiff
+      calc
+        s' = e.sid := by symm; exact hSid
+        _ = s := hEq
+    have hLookup := lookupD_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e)
+    have hSwap : swapEdgeRole s A B e = e := by
+      simp [swapEdgeRole, hSidNe]
+    simpa [swapRolesOp, hSwap, hSidNe] using hLookup
+
+/-- Role swap preserves global coherence. -/
+theorem swapRoles_preserves_coherent {G : GEnv} {D : DEnv}
+    (s : SessionId) (A B : Role) (hCoh : Coherent G D) :
+    Coherent (swapGEnvRole s A B G) (swapDEnvRole s A B D) := by
+  exact CoherentRoleSwap (s:=s) (A:=A) (B:=B) (G:=G) (D:=D) hCoh
+
+/-- Role swap preserves coherence for sessions other than s. -/
+theorem swapRoles_preserves_other_sessions {G : GEnv} {D : DEnv}
+    (s sOther : SessionId) (A B : Role)
+    (hDiff : sOther ≠ s)
+    (hCoh : SessionCoherent G D sOther) :
+    let (G', D') := swapRolesOp s A B (G, D)
+    SessionCoherent G' D' sOther := by
+  exact session_local_op_preserves_other (s:=s) (f:=swapRolesOp s A B)
+    (hLocal:=swapRoles_session_local (s:=s) (A:=A) (B:=B)) sOther hDiff hCoh
 
 /-! ## VM Integration Notes
 

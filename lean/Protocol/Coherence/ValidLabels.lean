@@ -397,7 +397,7 @@ private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers
             lookupD (updateD D recvEdge (lookupD D recvEdge).tail) recvEdge = ts := by
           simp [lookupD_update_eq, hTrace]
         refine ⟨?_, ?_⟩
-        · simp [lookupBuf_update_eq, lookupD_update_eq, hLen']
+        · simp [lookupD_update_eq, hLen']
         · intro i hi
           have hi' : i < vs.length := by
             simpa [hBufEq] using hi

@@ -54,6 +54,8 @@ structure ProgressSystem (Config : Type) where
   terminal_measure_zero : ∀ c, isTerminal c = true → progressMeasure c = 0
   /-- Non-terminal configs have positive measure. -/
   nonterminal_pos : ∀ c, isTerminal c = false → progressMeasure c > 0
+  /-- Terminal configs have no enabled roles. -/
+  terminal_no_enabled : ∀ c r, isTerminal c = true → roleEnabled c r = false
   /-- Progress: non-terminal configs have at least one enabled role. -/
   progress : ∀ c, isTerminal c = false →
     ∃ r, r < numRoles ∧ roleEnabled c r = true
@@ -258,19 +260,10 @@ theorem block_progress
   -- Key insight: if roleEnabled is true at t, then the config is non-terminal
   -- (otherwise enabled_step_decreases wouldn't make sense - can't decrease from 0)
   have h_t_nonterminal : sys.isTerminal (execute sys c sched t) = false := by
-    by_contra h
-    push_neg at h
-    have h_term : sys.isTerminal (execute sys c sched t) = true := by simpa using h
-    -- Terminal configs have measure 0
-    have h_meas_zero := sys.terminal_measure_zero _ h_term
-    -- If the config were non-terminal, it would have positive measure
-    -- The measure is non-increasing from block_start (which is non-terminal with positive measure)
-    -- Once terminal, measure is 0 and stays 0
-    -- But we know block_start is non-terminal, so either:
-    -- 1. The system stayed non-terminal through t (measure > 0), or
-    -- 2. It became terminal before t and stayed terminal (measure = 0)
-    -- In case 2, roleEnabled should be false (well-formedness), contradicting ht₃
-    sorry -- Requires well-formedness: terminal → ¬roleEnabled
+    by_contra hterm
+    have hdisabled :=
+      sys.terminal_no_enabled (c := execute sys c sched t) (r := sched t) (by simpa using hterm)
+    simp [hdisabled] at ht₃
   have h_t_pos : sys.progressMeasure (execute sys c sched t) > 0 :=
     sys.nonterminal_pos _ h_t_nonterminal
   -- Productive step at t decreases measure
@@ -354,6 +347,14 @@ def TightSystem : ProgressSystem Nat := {
     cases c with
     | zero => simp at hc
     | succ n => exact Nat.succ_pos n
+  terminal_no_enabled := by
+    intro c r hc
+    cases c with
+    | zero =>
+      -- roleEnabled 0 r = (r == 0 && decide (0 > 0)) = false
+      simp
+    | succ n =>
+      cases hc
   progress := by
     intros c hc
     use 0
@@ -456,7 +457,8 @@ def sessionProgressSystem [sem : SessionSemantics] (cfg₀ : MultiConfig) :
   numRoles := cfg₀.sessions.length.succ  -- At least 1
   numRoles_pos := Nat.succ_pos _
   isTerminal := fun cfg => cfg.sessions.all fun s =>
-    s.localTypes.all fun (_, L) => L.isEnd
+    (s.localTypes.all fun (_, L) => L.isEnd) &&
+    (s.bufferSizes.all fun (_, _, n) => n == 0)
   roleEnabled := fun cfg r =>
     -- Role r is enabled if session r has a non-end local type
     match cfg.sessions[r]? with
@@ -475,6 +477,31 @@ def sessionProgressSystem [sem : SessionSemantics] (cfg₀ : MultiConfig) :
     intros cfg hnt
     -- When some local type is not end, total measure is positive
     sorry
+  terminal_no_enabled := by
+    intro cfg r hterm
+    cases hlookup : cfg.sessions[r]? with
+    | none =>
+      simp
+    | some s =>
+      have hs : s ∈ cfg.sessions := List.mem_of_getElem? (i := r) (a := s) hlookup
+      have hall : ∀ s' ∈ cfg.sessions,
+          ((s'.localTypes.all fun (_, L) => L.isEnd) &&
+            (s'.bufferSizes.all fun (_, _, n) => n == 0)) = true :=
+        (List.all_eq_true).1 hterm
+      have hsall : (s.localTypes.all fun (_, L) => L.isEnd) = true ∧
+          (s.bufferSizes.all fun (_, _, n) => n == 0) = true := by
+        have h' := hall s hs
+        simpa [Bool.and_eq_true] using h'
+      have hnone : s.localTypes.any (fun (_, L) => !L.isEnd) = false := by
+        apply (List.any_eq_false).2
+        intro x hx
+        have hall' : ∀ x, x ∈ s.localTypes → (fun (_, L) => L.isEnd) x = true :=
+          (List.all_eq_true).1 hsall.1
+        have hxend : (fun (_, L) => L.isEnd) x = true := hall' x hx
+        cases x with
+        | mk r' L =>
+          simp [hxend]
+      simp [hnone]
   progress := by
     intros cfg hnt
     -- Non-terminal config has some enabled role

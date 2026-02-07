@@ -27,15 +27,15 @@ theorem swapRole_involutive (A B : Role) (r : Role) :
     swapRole A B (swapRole A B r) = r := by
   by_cases hA : r == A
   · have hA' : r = A := beq_iff_eq.1 hA
-    simp [swapRole, hA, hA']
+    simp [swapRole, hA']
   · have hA' : r ≠ A := by
       exact (beq_eq_false_iff_ne (a:=r) (b:=A)).1 (by simpa using hA)
     by_cases hB : r == B
     · have hB' : r = B := beq_iff_eq.1 hB
-      simp [swapRole, hA, hB, hB']
+      simp [swapRole, hB']
     · have hB' : r ≠ B := by
         exact (beq_eq_false_iff_ne (a:=r) (b:=B)).1 (by simpa using hB)
-      simp [swapRole, hA, hB, hA', hB']
+      simp [swapRole, hA, hB]
 
 /-- Swap roles inside value types (only for endpoints in session s). -/
 def swapValTypeRole (s : SessionId) (A B : Role) : ValType → ValType
@@ -270,11 +270,11 @@ theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
       by_cases heq : e = hd.1
       · subst heq
         by_cases hSid : hd.1.sid = s
-        · simp [swapGEnvRole, lookupG, List.lookup, hSid, beq_self_eq_true]
+        · simp [swapGEnvRole, lookupG, List.lookup, hSid]
         · have hSidNe : hd.1.sid ≠ s := hSid
           have hSwap : swapEndpointRole s A B hd.1 = hd.1 := by
             simp [swapEndpointRole, hSid]
-          simp [swapGEnvRole, lookupG, List.lookup, hSid, hSidNe, hSwap, beq_self_eq_true]
+          simp [swapGEnvRole, lookupG, List.lookup, hSid, hSwap]
       · have hne :
           swapEndpointRole s A B e ≠
             (if hd.1.sid = s then swapEndpointRole s A B hd.1 else hd.1) := by
@@ -431,7 +431,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                     apply lookupD_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
                     intro p hp
                     exact hne p hp
-                  simp [List.lookup, List.foldl, hSid, hSidHd, htail, lookupD_update_eq]
+                  simp [List.lookup, List.foldl, hSid, htail, lookupD_update_eq]
                 · -- e ≠ hd.1
                   have hne :
                       (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠
@@ -650,17 +650,17 @@ theorem consumeOne_swap (s : SessionId) (A B : Role) (from_ : Role)
         have hRoleEq : from_ = r := eq_of_beq hBoth.1
         have hTypeEq : T = T' := eq_of_beq hBoth.2
         have hRoleEq' : swapRole A B from_ = swapRole A B r := by
-          simpa [hRoleEq]
+          simp [hRoleEq]
         have hTypeEq' : swapValTypeRole s A B T = swapValTypeRole s A B T' := by
-          simpa [hTypeEq]
+          simp [hTypeEq]
         have hBeqRole : (swapRole A B from_ == swapRole A B r) = true :=
           beq_iff_eq.2 hRoleEq'
         have hBeqType :
             (swapValTypeRole s A B T == swapValTypeRole s A B T') = true :=
           beq_iff_eq.2 hTypeEq'
-        simp [consumeOne, swapLocalTypeRole, swapValTypeRole, hBeqRole, hBeqType, hL]
+        simp [consumeOne, swapLocalTypeRole, hBeqRole, hBeqType, hL]
       · have : False := by
-          simpa [consumeOne, hCond] using h
+          simp [consumeOne, hCond] at h
         exact (False.elim this)
   | send r T' Lr =>
       cases h
@@ -691,7 +691,7 @@ theorem Consume_swap (s : SessionId) (A B : Role) (from_ : Role)
       cases hOne : consumeOne from_ t L with
       | none =>
           have : False := by
-            simpa [hOne] using h
+            simp [hOne] at h
           exact (False.elim this)
       | some L1 =>
           have hTail : Consume from_ L1 ts = some L' := by
@@ -737,7 +737,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     cases hLookupR : lookupG G recvEp' with
     | none =>
         have : False := by
-          simpa [hLookupR] using hLookupRecvEq
+          simp [hLookupR] at hLookupRecvEq
         exact this.elim
     | some Lrecv0 =>
         have hLrecv : Lrecv = swapLocalTypeRole s A B Lrecv0 := by
@@ -766,10 +766,10 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
           cases hLookupS : lookupG G senderEp' with
           | none =>
               have : False := by
-                simpa [hLookupS] using hLookupSenderEq
+                simp [hLookupS] at hLookupSenderEq
               exact this.elim
           | some Lsender0 =>
-              exact ⟨Lsender0, by simpa using hLookupS⟩
+              exact ⟨Lsender0, rfl⟩
         rcases hGsender0 with ⟨Lsender0, hGsender0⟩
         have hActive' : ActiveEdge G e' :=
           ActiveEdge_of_endpoints (e:=e') hGsender0 hGrecv0
@@ -811,7 +811,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
               some (swapLocalTypeRole s A B Lafter) := by
           simpa [hSenderEq, hLrecv, hTrace] using hConsumeSwap
         refine ⟨swapLocalTypeRole s A B Lsender1, hLookupSender', ?_⟩
-        simpa [hConsumeSwapped]
+        simp [hConsumeSwapped]
   · -- Other-session edges are unchanged.
     have hSidNe : e.sid ≠ s := hSid
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
@@ -842,7 +842,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
       have hSenderSome : (lookupG G senderEp).isSome := by
         simpa [hMap, senderEp] using hActive.1
       have hRecvSome : (lookupG G recvEp).isSome := by
-        simpa [hGrecv'] using (Option.isSome_iff_exists.mpr ⟨Lrecv, hGrecv'⟩)
+        exact (Option.isSome_iff_exists.mpr ⟨Lrecv, hGrecv'⟩)
       exact ⟨hSenderSome, hRecvSome⟩
     have hCoh' := hCoh e hActive' Lrecv hGrecv'
     rcases hCoh' with ⟨Lsender, hGsender, hConsume⟩

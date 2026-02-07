@@ -334,7 +334,7 @@ theorem BuffersTyped_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
     simp only [enqueueBuf, lookupBuf_update_eq, lookupD_update_eq]
     have hBufUpdate :
         lookupBuf (updateBuf bufs a (lookupBuf bufs a ++ [v])) a = (lookupBuf bufs a ++ [v]) := by
-      simp [lookupBuf_update_eq]
+      simp
     have hTraceUpdate :
         lookupD (updateD D a (lookupD D a ++ [T])) a = (lookupD D a ++ [T]) := by
       simp [lookupD_update_eq]
@@ -431,7 +431,7 @@ theorem BuffersTyped_dequeue {G : GEnv} {D : DEnv} {bufs : Buffers}
         refine ⟨?_, ?_⟩
         · -- length equality
           -- Simplify lookups on the updated environments
-          simp [lookupBuf_update_eq, lookupD_update_eq, hLen']
+          simp [lookupD_update_eq, hLen']
         · intro i hi
           -- Use original typing at index i+1
           have hi' : i < vs.length := by

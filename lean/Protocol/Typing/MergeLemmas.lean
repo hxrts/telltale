@@ -287,7 +287,7 @@ theorem SessionsOf_updateG_eq {G : GEnv} {e : Endpoint} {L L' : LocalType}
     rcases hs with ⟨e', L'', hLookup', hSid⟩
     by_cases heq : e' = e
     · cases heq
-      exact ⟨e, L, by simpa using (lookupG_update_eq G e L), hSid⟩
+      exact ⟨e, L, lookupG_update_eq G e L, hSid⟩
     · have hLookup'' : lookupG (updateG G e L) e' = some L'' := by
         simpa [lookupG_update_neq _ _ _ _ (Ne.symm heq)] using hLookup'
       exact ⟨e', L'', hLookup'', hSid⟩

@@ -160,8 +160,7 @@ theorem EdgeCoherent_sender_of_receiver {G : GEnv} {D : DEnv} {e : Edge} {Lrecv 
 These lemmas show that EdgeCoherent constrains trace structure:
 1. For non-recv/branch receiver types (send, select, etc.), trace must be empty
 2. For recv/branch with different sender, trace must be empty
-
-These shortcuts resolve "different sender" sorries. -/
+-/
 
 /-- If receiver type is send (or other non-recv/branch), trace must be empty.
     This is because Consume for .send only succeeds on empty trace. -/

@@ -101,10 +101,8 @@ theorem send_G_locality {C : Config} {ep : Endpoint} {target : Role}
     {v : Value} {T : ValType} {L : LocalType}
     (ep' : Endpoint) (hne : ep' ≠ ep) :
     lookupG (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).G ep' = lookupG C.G ep' := by
-  -- sendStep updates G at ep only.
   simp only [sendStep]
-  -- updateG at ep doesn't affect lookup at ep'.
-  sorry -- TODO: Requires updateG_ne lemma
+  exact lookupG_updateG_ne hne
 
 /-- Recv step only changes G at the receiver's endpoint. -/
 theorem recv_G_locality {C : Config} {ep : Endpoint} {edge : Edge}
@@ -112,7 +110,9 @@ theorem recv_G_locality {C : Config} {ep : Endpoint} {edge : Edge}
     (ep' : Endpoint) (hne : ep' ≠ ep) :
     lookupG (recvStep C ep edge x v L).G ep' = lookupG C.G ep' := by
   simp only [recvStep]
-  sorry -- TODO: Requires updateG_ne lemma
+  cases hdq : dequeueBuf C.bufs edge with
+  | none => rfl
+  | some p => simp only [hdq]; exact lookupG_updateG_ne hne
 
 /-! ## Step Locality: Buffers -/
 
@@ -123,9 +123,8 @@ theorem send_buf_locality {C : Config} {ep : Endpoint} {target : Role}
     (edge : Edge) (hne : edge ≠ ⟨ep.sid, ep.role, target⟩) :
     lookupBuf (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).bufs edge =
     lookupBuf C.bufs edge := by
-  -- sendStep enqueues at the send edge only.
   simp only [sendStep]
-  sorry -- TODO: Requires enqueueBuf_ne lemma
+  exact lookupBuf_enqueueBuf_ne hne
 
 /-- Recv step only dequeues from the source→receiver buffer. -/
 theorem recv_buf_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
@@ -133,7 +132,9 @@ theorem recv_buf_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     (hne : edge' ≠ edge) :
     lookupBuf (recvStep C ep edge x v L).bufs edge' = lookupBuf C.bufs edge' := by
   simp only [recvStep]
-  sorry -- TODO: Requires dequeueBuf_ne lemma
+  cases hdq : dequeueBuf C.bufs edge with
+  | none => rfl
+  | some p => simp only [hdq]; exact lookupBuf_dequeueBuf_ne hdq hne
 
 /-! ## Step Locality: Traces -/
 
@@ -145,7 +146,7 @@ theorem send_D_locality {C : Config} {ep : Endpoint} {target : Role}
     lookupD (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L).D edge =
     lookupD C.D edge := by
   simp only [sendStep]
-  sorry -- TODO: Requires updateD_ne lemma
+  exact lookupD_update_neq C.D ⟨ep.sid, ep.role, target⟩ edge (lookupD C.D _ ++ [T]) hne.symm
 
 /-- Recv step only shortens the source→receiver trace. -/
 theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
@@ -153,7 +154,11 @@ theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     (hne : edge' ≠ edge) :
     lookupD (recvStep C ep edge x v L).D edge' = lookupD C.D edge' := by
   simp only [recvStep]
-  sorry -- TODO: Requires updateD_ne lemma
+  cases hdq : dequeueBuf C.bufs edge with
+  | none => rfl
+  | some p =>
+    simp only [hdq]
+    exact lookupD_update_neq C.D edge edge' (lookupD C.D edge).tail hne.symm
 
 /-! ## Noninterference Theorem -/
 

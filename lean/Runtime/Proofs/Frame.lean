@@ -67,6 +67,16 @@ theorem session_local_op_compose {s : SessionId}
   · intro e hSid
     rw [hgTrace e hSid, hfTrace e hSid]
 
+/-! ## Example: Role Swap Frame -/
+
+/-- Example use of the frame rule: role swap preserves coherence for other sessions. -/
+theorem swapRoles_frame_example {s sOther : SessionId} {A B : Role}
+    {G : GEnv} {D : DEnv} (hDiff : sOther ≠ s)
+    (hCoh : SessionCoherent G D sOther) :
+    let (G', D') := swapRolesOp s A B (G, D)
+    SessionCoherent G' D' sOther := by
+  exact swapRoles_preserves_other_sessions (s:=s) (sOther:=sOther) (A:=A) (B:=B) hDiff hCoh
+
 /-- Operations on disjoint sessions preserve coherence for "unrelated" sessions.
     The third-session case: if s ∉ {s₁, s₂}, coherence for s is preserved. -/
 theorem disjoint_ops_preserve_unrelated {s₁ s₂ s : SessionId}

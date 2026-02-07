@@ -13,11 +13,11 @@ Protocol-level metatheory to VM-level instruction execution.
 
 ## Proof Strategy
 
-Three-way edge case analysis after delegation from A to B in session s:
-1. **Redirected edges** `(A,C)→(B,C)` or `(C,A)→(C,B)`: Use role-renaming lemmas
+Four-way edge case analysis after delegation from A to B in session s:
+1. **Edges created by delegation** `(B,C)` or `(C,B)` (with C ≠ B): Redirected from old `(A,C)`/`(C,A)`
 2. **Self-edge** `(A,A)→(B,B)`: Combine sender and receiver renaming
-3. **Other-session edges**: Unchanged by session isolation
-4. **Unrelated edges**: Neither endpoint is A or B, apply renaming to types/traces
+3. **Unrelated edges**: Neither endpoint is A or B, apply renaming to types/traces
+4. **Other-session edges**: Unchanged by session isolation
 -/
 
 /-

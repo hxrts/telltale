@@ -136,6 +136,16 @@ class SessionSemantics where
   /-- Apply a step to a configuration, producing a new local type. -/
   applyStep : MultiConfig → SessionStep → LocalType → MultiConfig
 
+  /-- Apply a step to a single session state. This captures the concrete
+      session-local effect (type update + buffer update). -/
+  applySessionStep : SessionState → SessionStep → LocalType → SessionState
+
+  /-- Global step is a map update on the single session identified by sid. -/
+  applyStep_map (cfg : MultiConfig) (step : SessionStep) (newType : LocalType) :
+    (applyStep cfg step newType).sessions =
+      cfg.sessions.map (fun s =>
+        if s.sid == step.sid then applySessionStep s step newType else s)
+
   /-- Steps don't affect sessions with different SIDs. -/
   step_isolation (cfg : MultiConfig) (step : SessionStep) (newType : LocalType)
       (s : SessionState) :
@@ -189,6 +199,43 @@ def SessionState.decrBuffer (s : SessionState) (actor partner : Role) : SessionS
   { s with bufferSizes := s.bufferSizes.map fun (s', r', n) =>
       if s' == partner && r' == actor then (s', r', n - 1) else (s', r', n) }
 
+/-! ## Concrete Session Semantics -/
+
+/-- Concrete session-local step: update local type, then adjust the buffer.
+    This matches the G/D updates of send/recv/select/branch in StepBase. -/
+def applySessionStepConcrete (s : SessionState) (step : SessionStep) (newType : LocalType) :
+    SessionState :=
+  if step.isSend then
+    (s.updateType step.actor newType).incrBuffer step.actor step.partner
+  else
+    (s.updateType step.actor newType).decrBuffer step.actor step.partner
+
+/-- Concrete multi-session step: map update on the target session id. -/
+def applyStepConcrete (cfg : MultiConfig) (step : SessionStep) (newType : LocalType) :
+    MultiConfig :=
+  { sessions := cfg.sessions.map fun s =>
+      if s.sid == step.sid then applySessionStepConcrete s step newType else s }
+
+lemma applyStepConcrete_isolation
+    (cfg : MultiConfig) (step : SessionStep) (newType : LocalType)
+    (s : SessionState) (hs : s ∈ cfg.sessions) (hne : s.sid ≠ step.sid) :
+    s ∈ (applyStepConcrete cfg step newType).sessions := by
+  have hfalse : (s.sid == step.sid) = false :=
+    (beq_eq_false_iff_ne (a := s.sid) (b := step.sid)).2 hne
+  unfold applyStepConcrete
+  refine List.mem_map.2 ?_
+  refine ⟨s, hs, ?_⟩
+  simp [hfalse]
+
+instance : SessionSemantics where
+  applyStep := applyStepConcrete
+  applySessionStep := applySessionStepConcrete
+  applyStep_map _ _ _ := rfl
+  step_isolation := applyStepConcrete_isolation
+  step_nonincreasing_other := by
+    intro cfg step newType s hs hne
+    refine ⟨s, applyStepConcrete_isolation cfg step newType s hs hne, rfl, le_rfl⟩
+
 /-- Sum update lemma: updating one unique key changes sum by the difference. -/
 theorem sum_update_unique {α : Type} [DecidableEq α]
     (l : List (α × Nat)) (key : α) (oldVal newVal : Nat)
@@ -196,7 +243,35 @@ theorem sum_update_unique {α : Type} [DecidableEq α]
     (hmem : (key, oldVal) ∈ l) :
     (l.map (fun (k, v) => if k == key then newVal else v)).foldl (· + ·) 0 + oldVal =
     (l.map Prod.snd).foldl (· + ·) 0 + newVal := by
-  -- This requires careful induction with uniqueness tracking
+  -- Unique key update changes sum by difference oldVal → newVal
+  sorry
+
+/-! ## Lookup/Buffer Membership Helpers -/
+
+lemma lookupType_mem {s : SessionState} {r : Role} {L : LocalType}
+    (h : s.lookupType r = some L) : (r, L) ∈ s.localTypes := by
+  -- If lookup finds L, then (r, L) is in the list
+  sorry
+
+lemma getBuffer_mem_of_pos {s : SessionState} {sender receiver : Role}
+    (hpos : s.getBuffer sender receiver > 0) :
+    ∃ n, (sender, receiver, n) ∈ s.bufferSizes ∧ n = s.getBuffer sender receiver := by
+  -- If getBuffer > 0, there must be a matching entry in bufferSizes
+  sorry
+
+lemma sumBuffers_incr_eq_of_no_entry
+    (s : SessionState) (actor partner : Role)
+    (hmem : ¬ ∃ n, (actor, partner, n) ∈ s.bufferSizes) :
+    sumBuffers (s.incrBuffer actor partner) = sumBuffers s := by
+  -- When no buffer entry exists, incrBuffer creates a new entry with value 1
+  sorry
+
+lemma sumDepths_updateType
+    (s : SessionState) (actor : Role) (old new : LocalType)
+    (hlookup : s.lookupType actor = some old)
+    (hunique : s.uniqueRoles) :
+    sumDepths (s.updateType actor new) + old.depth = sumDepths s + new.depth := by
+  -- updateType replaces old.depth with new.depth in the sum
   sorry
 
 /-- Send step decreases the weighted measure.
@@ -213,9 +288,7 @@ theorem send_step_decreases
     (s' : SessionState)
     (hs' : s' = (s.updateType actor L).incrBuffer actor partner) :
     weightedMeasure s' < weightedMeasure s := by
-  -- The depth sum decreases by at least 1 (actor's type: send partner T L → L)
-  -- The buffer sum increases by at most 1
-  -- Net: 2*(-1) + 1 = -1, so W decreases by at least 1
+  -- Sending decreases depth by 1 and buffer increases by at most 1
   sorry
 
 /-- Recv step decreases the weighted measure.
@@ -233,6 +306,7 @@ theorem recv_step_decreases
     (s' : SessionState)
     (hs' : s' = (s.updateType actor L).decrBuffer actor partner) :
     weightedMeasure s' < weightedMeasure s := by
+  -- Receiving decreases depth by 1 and buffer by 1
   sorry
 
 /-- Select step decreases the weighted measure.
@@ -252,6 +326,7 @@ theorem select_step_decreases
     (s' : SessionState)
     (hs' : s' = (s.updateType actor L).incrBuffer actor partner) :
     weightedMeasure s' < weightedMeasure s := by
+  -- Selection decreases depth by at least 1, buffer increases by 1
   sorry
 
 /-- Branch step decreases the weighted measure.
@@ -272,6 +347,7 @@ theorem branch_step_decreases
     (s' : SessionState)
     (hs' : s' = (s.updateType actor L).decrBuffer actor partner) :
     weightedMeasure s' < weightedMeasure s := by
+  -- Branching decreases depth by at least 1 and buffer by 1
   sorry
 
 /-! ## Total Measure Decrease -/
@@ -285,8 +361,11 @@ theorem total_measure_decreasing [sem : SessionSemantics]
     (hunique_roles : s_stepped.uniqueRoles)
     (hunique_buffers : s_stepped.uniqueBuffers)
     (hunique_sids : cfg.uniqueSids)
-    (hdecrease : weightedMeasure s_stepped > weightedMeasure (s_stepped.updateType step.actor newType)) :
+    (hdecrease :
+      weightedMeasure (sem.applySessionStep s_stepped step newType) <
+        weightedMeasure s_stepped) :
     totalWeightedMeasure (sem.applyStep cfg step newType) < totalWeightedMeasure cfg := by
+  -- Step decreases session measure; total measure is sum over sessions
   sorry
 
 /-! ## Productive Trace Bound -/
@@ -322,6 +401,14 @@ def roleSessions (cfg : MultiConfig) (r : Role) : List SessionId :=
 def SharedParticipant (cfg : MultiConfig) (s1 s2 : SessionId) (r : Role) : Prop :=
   s1 ∈ roleSessions cfg r ∧ s2 ∈ roleSessions cfg r ∧ s1 ≠ s2
 
+/-- Pull a session to the front of a unique-sid list, filtering the rest by sid. -/
+lemma perm_cons_filter_sid
+    (l : List SessionState) (s : SessionState)
+    (hs : s ∈ l) (hunique : (l.map (·.sid)).Nodup) :
+    List.Perm l (s :: (l.filter (fun t => t.sid != s.sid))) := by
+  -- Permutation follows from uniqueness of session IDs
+  sorry
+
 /-- Measure additivity: the total measure is the sum of session measures.
     Shared participants do not introduce multiplicative overhead. -/
 theorem shared_participant_no_overhead_unique
@@ -330,7 +417,9 @@ theorem shared_participant_no_overhead_unique
     (hshared : SharedParticipant cfg s1.sid s2.sid r)
     (hunique : cfg.uniqueSids) :
     totalWeightedMeasure cfg ≤ weightedMeasure s1 + weightedMeasure s2 +
-      ((cfg.sessions.filter (fun s => s.sid ≠ s1.sid ∧ s.sid ≠ s2.sid)).map weightedMeasure).foldl (· + ·) 0 := by
+      List.foldl (· + ·) 0
+        ((cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid)).map weightedMeasure) := by
+  -- Total measure is additive over sessions; shared participants don't create overhead
   sorry
 
 end
