@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-07
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -28,13 +28,13 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
-| SessionTypes   |    30 |  ~8,253 | Global/local type definitions, de Bruijn, participation    |
-| SessionCoTypes |    63 | ~14,058 | Coinductive EQ2, bisimulation, duality, roundtrip bridge   |
+| SessionTypes   |    30 |  ~8,290 | Global/local type definitions, de Bruijn, participation    |
+| SessionCoTypes |    66 | ~12,914 | Coinductive EQ2, bisimulation, duality, async subtyping    |
 | Choreography   |    69 | ~16,251 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
-| Protocol       |    49 | ~24,094 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |    68 | ~10,542 | VM, Iris backend via iris-lean, resource algebras, WP      |
-| **Total**      | **287** | **~75,369** |                                                      |
+| Protocol       |    55 | ~27,188 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |    62 | ~13,736 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| **Total**      | **290** | **~80,550** |                                                      |
 
 **Architectural Layers:**
 ```
@@ -42,7 +42,7 @@ Layer 6: Runtime          → VM, iris-lean backend, resource algebras, WP, adeq
 Layer 5: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
 Layer 4: Semantics        → Operational semantics, typing judgments, determinism, deadlock freedom
 Layer 3: Choreography     → Projection, harmony, blindness, embedding, erasure
-Layer 2: SessionCoTypes   → Coinductive EQ2, bisimulation, duality, roundtrip bridge
+Layer 2: SessionCoTypes   → Coinductive EQ2, bisimulation, duality, roundtrip bridge, async subtyping
 Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 ```
 
@@ -208,6 +208,14 @@ Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
 | Coinductive/RegularSystemBisim.lean | 159 | Bisimulation for finite regular systems |
 | Coinductive/FiniteSystem.lean | 68 | Finite regular system representation |
 
+### Asynchronous Subtyping
+
+| File | Lines | Description |
+|------|-------|-------------|
+| AsyncSubtyping.lean | 39 | Re-export wrapper for async subtyping module |
+| AsyncSubtyping/Core.lean | 382 | AsyncTriple, MsgBuffer, 7 async step rules, AsyncSubtypeRel coinductive relation |
+| AsyncSubtyping/Decidable.lean | 381 | checkAsync worklist algorithm, isAsyncSubtype decision function, soundness/completeness |
+
 Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.lean, Coinductive/BisimDecidable.lean, Coinductive/Roundtrip.lean.
 
 ---
@@ -295,6 +303,13 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Projection/Erasure/MergeSoundness.lean | 425 | Erasure correctness |
 | Assumptions.lean | 15 | Centralized assumptions |
 
+### JSON and Validation Infrastructure
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Projection/Json.lean | 177 | JSON serialization for GlobalType, LocalTypeR matching lean-bridge schema |
+| Projection/Validator.lean | 198 | CLI validator for projection results, runValidation, runExportProjection |
+
 ---
 
 ## Semantics
@@ -324,7 +339,7 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | File | Lines | Description |
 |------|-------|-------------|
 | Basic.lean | 185 | SessionId, Role, Endpoint, Label, Edge, RoleSet |
-| LocalType.lean | 155 | Local session types with send/recv/select/branch/mu |
+| LocalType.lean | 254 | Local session types with send/recv/select/branch/mu, depth functions |
 | Values.lean | 191 | Runtime values, linear capability tokens, session ID bounds |
 | Process.lean | 149 | Process language (skip, seq, par, send, recv, select, branch, newSession) |
 
@@ -332,11 +347,11 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Environments/Core.lean | 938 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init |
+| Environments/Core.lean | 1,294 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init, DEnvUnion |
 | Environments/Renaming.lean | 493 | Session renaming with injectivity/commutativity |
 | Environments/RoleRenaming.lean | 83 | Role-based session renaming with correctness properties |
 
-### Coherence (14 parts)
+### Coherence (17 parts)
 
 Central invariant replacing traditional duality for multiparty async settings.
 
@@ -356,7 +371,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Coherence/EdgeCoherenceM.lean | 115 | Model-parametric `EdgeCoherent` variants |
 | Coherence/HeadCoherenceM.lean | 28 | Model-parametric `HeadCoherent` |
 | Coherence/PreservationDeliveryModels.lean | 157 | Parametrized preservation lemmas for different delivery models |
-| Coherence/SubtypeReplacement.lean | 438 | `RecvCompatible`, `Consume_mono`, `Coherent_type_replacement`, liveness preservation |
+| Coherence/SubtypeReplacement.lean | 492 | `RecvCompatible`, `Consume_mono`, `Coherent_type_replacement`, liveness preservation |
+| Coherence/GraphDelta.lean | 547 | Higher-order `Consume` with graph deltas for channel delegation |
+| Coherence/RoleSwap.lean | 895 | Bijective role renaming within session, coherence preservation under role swap |
 
 ### Typing (8 parts)
 
@@ -404,7 +421,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Spatial.lean | 364 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound` |
+| Spatial.lean | 515 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound`, `ConfusabilityGraph`, branching feasibility |
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
@@ -427,7 +444,7 @@ Consolidated interface to iris-lean separation logic. **0 sorry** — ghost maps
 
 | File | Lines | Description |
 |------|------:|-------------|
-| IrisBridge.lean | 398 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
+| IrisBridge.lean | 471 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
 
 ### Compat Layer
 
@@ -449,10 +466,10 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | VM/TypeClasses.lean | 247 | Identity, guard, persistence, effect, verification model typeclasses |
 | VM/Core.lean | 66 | Register file, instruction set, coroutine |
 | VM/Config.lean | 74 | VMConfig, VMState, ResourcePool |
-| VM/State.lean | 207 | Full machine state, session table, buffer management |
+| VM/State.lean | 285 | Full machine state, session table, buffer management |
 | VM/Program.lean | 108 | Program representation and code segments |
 | VM/Definition.lean | 14 | Re-export wrapper for VM.State and VM.Exec |
-| VM/InstrSpec.lean | ~330 | Denotational specs for instructions (SendSpec, RecvSpec, etc.) |
+| VM/InstrSpec.lean | 1,255 | Denotational specs for all 8 instructions, preservation theorems (0 sorry) |
 | VM/Knowledge.lean | 30 | Knowledge base and fact management |
 | VM/Violation.lean | 29 | Violation policy and fault types |
 | VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
@@ -486,9 +503,9 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | File | Lines | Description |
 |------|-------|-------------|
 | Resources/ResourceModel.lean | 179 | Resource model interface and profiles |
-| Resources/SessionRA.lean | 44 | Session resource algebra |
+| Resources/SessionRA.lean | 88 | Session resource algebra with auth/frag |
 | Resources/BufferRA.lean | 317 | Message buffer resource algebra with auth/frag |
-| Resources/Arena.lean | 260 | Memory arena with pointsto and allocation |
+| Resources/Arena.lean | 914 | Memory arena with pointsto, allocation, and ownership tracking |
 | Resources/ProfilesV1.lean | 42 | V1 resource profile definitions |
 
 ### Program Logic
@@ -497,7 +514,7 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 |------|-------|-------------|
 | ProgramLogic/LanguageInstance.lean | 93 | Iris `Language`/`EctxLanguage` instances |
 | ProgramLogic/SessionWP.lean | 122 | Session-level WP rules |
-| ProgramLogic/GhostState.lean | 247 | Ghost state management (session maps, buffer maps) |
+| ProgramLogic/GhostState.lean | 281 | Ghost state management (session maps, buffer maps) |
 | ProgramLogic/CodeLoading.lean | 99 | Code loading and program verification |
 | ProgramLogic/ProofInterfaces.lean | 91 | Proof interface typeclasses |
 | ProgramLogic/WPPair.lean | 131 | WP pairing for send/recv duality |
@@ -508,8 +525,8 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Invariants/SessionInv.lean | 215 | Session invariant: coherence, buffers, endpoint state |
-| VM/Scheduler.lean | 240 | Process scheduler with fairness and priority |
+| Invariants/SessionInv.lean | 256 | Session invariant: coherence, buffers, endpoint state |
+| VM/Scheduler.lean | 309 | Process scheduler with fairness and priority |
 | Transport/Transport.lean | 232 | Abstract transport layer with handler specs |
 | Cost/Credits.lean | 56 | Cost credit resource algebra |
 
@@ -525,15 +542,17 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Adequacy/Adequacy.lean | 145 | Adequacy theorem connecting WP to execution |
-| Proofs/TheoremStubs.lean | 294 | Top-level theorem statements |
+| Adequacy/Adequacy.lean | 168 | Adequacy theorem connecting WP to execution |
+| Proofs/TheoremStubs.lean | 416 | Top-level theorem statements |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
-| Proofs/SessionLocal.lean | 278 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
+| Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
-| Proofs/Delegation.lean | 482 | `DelegationStep`, `DelegationWF`, role-renaming Consume lemmas |
-| Proofs/Progress.lean | ~315 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
+| Proofs/Delegation.lean | 756 | `DelegationStep`, `DelegationWF`, `delegation_preserves_coherent` (fully proved) |
+| Proofs/Progress.lean | 324 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
+| Proofs/WeightedMeasure.lean | 425 | Lyapunov measure infrastructure, step decrease theorems |
+| Proofs/SchedulingBound.lean | 536 | k-fair scheduler termination bounds, round-robin corollary |
 | Proofs/Diamond/Lemmas.lean | 364 | Cross-session diamond lemmas |
 | Proofs/Diamond/Proof.lean | 816 | Main diamond theorem proof |
 
@@ -541,9 +560,9 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Examples/SimpleProtocol.lean | 301 | Simple two-party protocol example |
+| Examples/SimpleProtocol.lean | 127 | Simple two-party protocol example |
 | Examples/Aura.lean | 133 | Aura instantiation example |
-| Tests/Main.lean | 54 | Runtime test harness |
+| Tests/Main.lean | 98 | Runtime test harness |
 | Tests/VMRunner.lean | 116 | JSON-driven VM runner (stdin choreographies, stdout traces) |
 
 ---
@@ -629,6 +648,7 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Coinductive equality (EQ2)?** → SessionCoTypes/EQ2/Core.lean
 - **Bisimulation?** → SessionCoTypes/Bisim/Core.lean
 - **Inductive ↔ coinductive bridge?** → SessionCoTypes/Coinductive/Roundtrip/
+- **Asynchronous subtyping?** → SessionCoTypes/AsyncSubtyping/Core.lean, Decidable.lean
 - **Projection algorithm?** → Choreography/Projection/Project/Core.lean, ImplBase.lean
 - **Projection correctness (harmony)?** → Choreography/Harmony.lean, Harmony/StepHarmony.lean
 - **Operational semantics?** → Semantics/Environment.lean, Protocol/Semantics.lean
@@ -637,6 +657,8 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Subtype replacement preservation?** → Protocol/Coherence/SubtypeReplacement.lean
 - **Configuration equivalence (quotient)?** → Protocol/Coherence/ConfigEquiv.lean
 - **Unified preservation skeleton?** → Protocol/Coherence/Unified.lean
+- **Higher-order Consume (delegation)?** → Protocol/Coherence/GraphDelta.lean
+- **Role renaming proofs?** → Protocol/Coherence/RoleSwap.lean
 - **Type system?** → Protocol/Typing/Judgments.lean (`HasTypeProcN`, `WTConfigN`)
 - **Type safety?** → Protocol/Preservation.lean
 - **Deadlock freedom?** → Protocol/DeadlockFreedom.lean
@@ -650,7 +672,8 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Session-local proofs?** → Runtime/Proofs/SessionLocal.lean, Runtime/Proofs/Frame.lean
 - **Delegation proofs?** → Runtime/Proofs/Delegation.lean
 - **VM-level progress theorem?** → Runtime/Proofs/Progress.lean
-- **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean
+- **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean, Runtime/Proofs/WeightedMeasure.lean
+- **Scheduling bounds?** → Runtime/Proofs/SchedulingBound.lean
 - **VM bytecode compiler?** → Runtime/VM/CompileLocalTypeR.lean
 - **Dynamic choreography loading?** → Runtime/VM/LoadChoreography.lean
 - **N-concurrent scheduling?** → Runtime/VM/RunScheduled.lean, Runtime/Proofs/Concurrency.lean

@@ -629,8 +629,70 @@ theorem SendSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (renameValType hEquiv.choose.toRenaming T)) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  -- Follows from SendSpec_respects_renaming + ConfigEquiv structure.
-  sorry
+  -- Use the same SessionIso that witnesses the input equivalence.
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
+  -- Witness: the same σ works for the output.
+  refine ⟨σ, ?_, ?_⟩
+  -- G condition: lookupG G₂' (rename e') = (lookupG G₁' e').map rename
+  · intro e'
+    by_cases he : e' = ep
+    · -- Case: e' = ep (the updated endpoint)
+      obtain ⟨L', hSender₁⟩ := hSpec₁.sender_type
+      have hG₁' := hSpec₁.type_updated L' hSender₁
+      obtain ⟨L'₂, hSender₂⟩ := hSpec₂.sender_type
+      have hG₂' := hSpec₂.type_updated L'₂ hSender₂
+      -- Get the renamed sender type in G₂ to determine L'₂
+      have hSender₂_raw := hG_equiv ep
+      rw [hSender₁] at hSender₂_raw
+      simp only [Option.map_some, renameLocalType] at hSender₂_raw
+      rw [hSender₂_raw] at hSender₂
+      simp only [Option.some.injEq, LocalType.send.injEq] at hSender₂
+      obtain ⟨_, _, hL'₂_eq⟩ := hSender₂
+      -- Compute both sides using he : e' = ep
+      calc lookupG G₂' (renameEndpoint ρ e')
+          = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
+        _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
+        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some (renameLocalType ρ L') := by rw [hL'₂_eq]
+        _ = (some L').map (renameLocalType ρ) := by simp only [Option.map_some]
+        _ = (lookupG (updateG G₁ ep L') ep).map (renameLocalType ρ) := by
+            rw [lookupG_update_eq]
+        _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
+        _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+    · -- Case: e' ≠ ep (frame)
+      have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
+        intro heq
+        exact he (renameEndpoint_inj ρ e' ep heq)
+      rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
+      exact hG_equiv e'
+  -- D condition: lookupD D₂' (rename e') = (lookupD D₁' e').map rename
+  · intro e'
+    let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
+    by_cases he : e' = sendEdge
+    · -- Case: e' = sendEdge (the updated edge)
+      have hD₁' := hSpec₁.trace_extended
+      have hD₂' := hSpec₂.trace_extended
+      simp only at hD₁' hD₂'
+      simp only [renameEndpoint] at hD₂'
+      have hTrace := hD_equiv sendEdge
+      simp only [renameEdge] at hTrace
+      -- Rewrite goal with he, then use the update equations
+      rw [he]
+      simp only [renameEdge]
+      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      -- Now show: (trace ++ [T]).map rename = (trace.map rename) ++ [rename T]
+      simp only [List.map_append, List.map_cons, List.map_nil, List.singleton_append]
+      -- Apply hTrace to match the trace lookups
+      rw [hTrace]
+    · -- Case: e' ≠ sendEdge (frame)
+      have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
+        intro heq
+        exact he (renameEdge_inj ρ e' sendEdge heq)
+      simp only [renameEndpoint, renameEdge] at hne₂
+      rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
+      exact hD_equiv e'
 
 /-- Receive is equivariant under session renaming. -/
 theorem RecvSpec_respects_renaming (ρ : SessionRenaming)
@@ -700,7 +762,71 @@ theorem RecvSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (renameValType hEquiv.choose.toRenaming T)) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  sorry
+  -- Use the same SessionIso that witnesses the input equivalence.
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
+  refine ⟨σ, ?_, ?_⟩
+  -- G condition
+  · intro e'
+    by_cases he : e' = ep
+    · -- Case: e' = ep (the updated endpoint)
+      obtain ⟨L', hRecv₁⟩ := hSpec₁.receiver_type
+      have hG₁' := hSpec₁.type_updated L' hRecv₁
+      obtain ⟨L'₂, hRecv₂⟩ := hSpec₂.receiver_type
+      have hG₂' := hSpec₂.type_updated L'₂ hRecv₂
+      -- Determine L'₂ from input equivalence
+      have hRecv₂_raw := hG_equiv ep
+      rw [hRecv₁] at hRecv₂_raw
+      simp only [Option.map_some, renameLocalType] at hRecv₂_raw
+      rw [hRecv₂_raw] at hRecv₂
+      simp only [Option.some.injEq, LocalType.recv.injEq] at hRecv₂
+      obtain ⟨_, _, hL'₂_eq⟩ := hRecv₂
+      -- Compute both sides
+      calc lookupG G₂' (renameEndpoint ρ e')
+          = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
+        _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
+        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some (renameLocalType ρ L') := by rw [hL'₂_eq]
+        _ = (some L').map (renameLocalType ρ) := by simp only [Option.map_some]
+        _ = (lookupG (updateG G₁ ep L') ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
+        _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
+        _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+    · -- Case: e' ≠ ep (frame)
+      have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
+        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+      rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
+      exact hG_equiv e'
+  -- D condition
+  · intro e'
+    let recvEdge : Edge := { sid := ep.sid, sender := r, receiver := ep.role }
+    by_cases he : e' = recvEdge
+    · -- Case: e' = recvEdge (the updated edge)
+      obtain ⟨rest₁, hBuf₁, hD₁'⟩ := hSpec₁.trace_consumed
+      obtain ⟨rest₂, hBuf₂, hD₂'⟩ := hSpec₂.trace_consumed
+      simp only [renameEndpoint] at hD₂' hBuf₂
+      have hTrace := hD_equiv recvEdge
+      simp only [renameEdge] at hTrace
+      -- Rewrite goal
+      rw [he]
+      simp only [renameEdge]
+      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      -- rest₁ and rest₂ are the tails after consuming T
+      -- From hBuf₁: lookupD D₁ recvEdge = T :: rest₁
+      -- From hTrace: lookupD D₂ (rename recvEdge) = (lookupD D₁ recvEdge).map rename
+      --            = (T :: rest₁).map rename = renameT :: rest₁.map rename
+      -- From hBuf₂: lookupD D₂ (rename recvEdge) = renameT :: rest₂
+      -- So rest₂ = rest₁.map rename
+      rw [hBuf₁, List.map_cons] at hTrace
+      rw [hBuf₂] at hTrace
+      simp only [List.cons.injEq] at hTrace
+      rw [hTrace.2]
+    · -- Case: e' ≠ recvEdge (frame)
+      have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
+        intro heq; exact he (renameEdge_inj ρ e' recvEdge heq)
+      simp only [renameEndpoint, renameEdge] at hne₂
+      rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
+      exact hD_equiv e'
 
 /-- Select is equivariant under session renaming. -/
 theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
@@ -770,7 +896,69 @@ theorem SelectSpec_respects_ConfigEquiv
     (hSpec₂ : SelectSpec G₂ G₂' D₂ D₂'
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r chosen) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  sorry
+  -- Use the same SessionIso that witnesses the input equivalence.
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
+  refine ⟨σ, ?_, ?_⟩
+  -- G condition
+  · intro e'
+    by_cases he : e' = ep
+    · -- Case: e' = ep (the updated endpoint)
+      obtain ⟨branches₁, L'₁, hSender₁, hFind₁⟩ := hSpec₁.sender_type
+      have hG₁' := hSpec₁.type_updated branches₁ L'₁ hSender₁ hFind₁
+      obtain ⟨branches₂, L'₂, hSender₂, hFind₂⟩ := hSpec₂.sender_type
+      have hG₂' := hSpec₂.type_updated branches₂ L'₂ hSender₂ hFind₂
+      -- Determine L'₂ from input equivalence
+      have hSender₂_raw := hG_equiv ep
+      rw [hSender₁] at hSender₂_raw
+      simp only [Option.map_some, renameLocalType] at hSender₂_raw
+      rw [hSender₂_raw] at hSender₂
+      simp only [Option.some.injEq, LocalType.select.injEq] at hSender₂
+      obtain ⟨_, hBranches₂_eq⟩ := hSender₂
+      -- Get L'₂ = renameLocalType ρ L'₁ from find correspondence
+      have hL'₂_eq : L'₂ = renameLocalType ρ L'₁ := by
+        subst hBranches₂_eq
+        rw [find_renameBranches, hFind₁] at hFind₂
+        simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind₂
+        exact hFind₂.2.symm
+      -- Compute both sides
+      calc lookupG G₂' (renameEndpoint ρ e')
+          = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
+        _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
+        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some (renameLocalType ρ L'₁) := by rw [hL'₂_eq]
+        _ = (some L'₁).map (renameLocalType ρ) := by simp only [Option.map_some]
+        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
+        _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
+        _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+    · -- Case: e' ≠ ep (frame)
+      have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
+        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+      rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
+      exact hG_equiv e'
+  -- D condition
+  · intro e'
+    let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
+    by_cases he : e' = sendEdge
+    · -- Case: e' = sendEdge (the updated edge)
+      have hD₁' := hSpec₁.trace_extended
+      have hD₂' := hSpec₂.trace_extended
+      simp only [renameEndpoint] at hD₂'
+      have hTrace := hD_equiv sendEdge
+      simp only [renameEdge] at hTrace
+      -- Rewrite goal: lookupD D₂' (renameEdge ρ e') = (lookupD D₁' e').map (renameValType ρ)
+      rw [he]
+      simp only [renameEdge]
+      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      -- Goal: lookupD D₂ (...) ++ [string] = (lookupD D₁ sendEdge ++ [string]).map (renameValType ρ)
+      rw [List.map_append, List.map_singleton, renameValType, hTrace]
+    · -- Case: e' ≠ sendEdge (frame)
+      have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
+        intro heq; exact he (renameEdge_inj ρ e' sendEdge heq)
+      simp only [renameEndpoint, renameEdge] at hne₂
+      rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
+      exact hD_equiv e'
 
 /-- Branch is equivariant under session renaming. -/
 theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
@@ -846,7 +1034,77 @@ theorem BranchSpec_respects_ConfigEquiv
     (hSpec₂ : BranchSpec G₂ G₂' D₂ D₂'
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r received) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  sorry
+  -- Use the same SessionIso that witnesses the input equivalence.
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
+  refine ⟨σ, ?_, ?_⟩
+  -- G condition
+  · intro e'
+    by_cases he : e' = ep
+    · -- Case: e' = ep (the updated endpoint)
+      obtain ⟨branches₁, L'₁, hRecv₁, hFind₁⟩ := hSpec₁.receiver_type
+      have hG₁' := hSpec₁.type_updated branches₁ L'₁ hRecv₁ hFind₁
+      obtain ⟨branches₂, L'₂, hRecv₂, hFind₂⟩ := hSpec₂.receiver_type
+      have hG₂' := hSpec₂.type_updated branches₂ L'₂ hRecv₂ hFind₂
+      -- Determine L'₂ from input equivalence
+      have hRecv₂_raw := hG_equiv ep
+      rw [hRecv₁] at hRecv₂_raw
+      simp only [Option.map_some, renameLocalType] at hRecv₂_raw
+      rw [hRecv₂_raw] at hRecv₂
+      simp only [Option.some.injEq, LocalType.branch.injEq] at hRecv₂
+      obtain ⟨_, hBranches₂_eq⟩ := hRecv₂
+      -- Get L'₂ = renameLocalType ρ L'₁ from find correspondence
+      have hL'₂_eq : L'₂ = renameLocalType ρ L'₁ := by
+        subst hBranches₂_eq
+        rw [find_renameBranches, hFind₁] at hFind₂
+        simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hFind₂
+        exact hFind₂.2.symm
+      -- Compute both sides
+      calc lookupG G₂' (renameEndpoint ρ e')
+          = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
+        _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
+        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some (renameLocalType ρ L'₁) := by rw [hL'₂_eq]
+        _ = (some L'₁).map (renameLocalType ρ) := by simp only [Option.map_some]
+        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
+        _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
+        _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+    · -- Case: e' ≠ ep (frame)
+      have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
+        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+      rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
+      exact hG_equiv e'
+  -- D condition
+  · intro e'
+    let recvEdge : Edge := { sid := ep.sid, sender := r, receiver := ep.role }
+    by_cases he : e' = recvEdge
+    · -- Case: e' = recvEdge (the updated edge)
+      obtain ⟨rest₁, hBuf₁, hD₁'⟩ := hSpec₁.trace_consumed
+      obtain ⟨rest₂, hBuf₂, hD₂'⟩ := hSpec₂.trace_consumed
+      simp only [renameEndpoint] at hD₂' hBuf₂
+      have hTrace := hD_equiv recvEdge
+      simp only [renameEdge] at hTrace
+      -- Rewrite goal
+      rw [he]
+      simp only [renameEdge]
+      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      -- rest₁ and rest₂ are the tails after consuming the label
+      -- From hBuf₁: lookupD D₁ recvEdge = label :: rest₁
+      -- From hTrace: lookupD D₂ (rename recvEdge) = (lookupD D₁ recvEdge).map rename
+      --            = (label :: rest₁).map rename = label' :: rest₁.map rename
+      -- From hBuf₂: lookupD D₂ (rename recvEdge) = label' :: rest₂
+      -- So rest₂ = rest₁.map rename
+      rw [hBuf₁, List.map_cons] at hTrace
+      rw [hBuf₂] at hTrace
+      simp only [List.cons.injEq] at hTrace
+      rw [hTrace.2]
+    · -- Case: e' ≠ recvEdge (frame)
+      have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
+        intro heq; exact he (renameEdge_inj ρ e' recvEdge heq)
+      simp only [renameEndpoint, renameEdge] at hne₂
+      rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
+      exact hD_equiv e'
 
 /-- Open is equivariant under session renaming. -/
 theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
@@ -959,7 +1217,16 @@ theorem OpenSpec_respects_renaming (ρ : SessionRenaming)
         exact hPre ⟨e', hE.symm⟩
       rw [hEmpty, hEmpty']
 
-/-- Open respects ConfigEquiv. -/
+/-- Open respects ConfigEquiv.
+
+    Note: This proof requires additional specification constraints on OpenSpec.
+    Specifically, OpenSpec needs to constrain:
+    1. What types are assigned to new endpoints (must be projections of global type)
+    2. What happens to non-role endpoints in the new session (should remain None)
+
+    These constraints would ensure that two Opens with related session IDs
+    produce ConfigEquiv outputs. For now, the core structure is in place
+    with sorries for the parts needing specification enhancement. -/
 theorem OpenSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
     {s : SessionId} {roles : List Role}
@@ -967,6 +1234,10 @@ theorem OpenSpec_respects_ConfigEquiv
     (hSpec₁ : OpenSpec G₁ G₁' D₁ D₁' s roles)
     (hSpec₂ : OpenSpec G₂ G₂' D₂ D₂' (hEquiv.choose.fwd s) roles) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+  -- OpenSpec is under-specified for ConfigEquiv preservation.
+  -- The specification doesn't constrain what types are assigned to new endpoints,
+  -- only that they exist. For ConfigEquiv to be preserved, we need additional
+  -- constraints relating the types in G₁' and G₂'.
   sorry
 
 /-- Close is equivariant under session renaming. -/
@@ -1033,7 +1304,28 @@ theorem CloseSpec_respects_ConfigEquiv
     (hSpec₁ : CloseSpec G₁ G₁' D₁ ep)
     (hSpec₂ : CloseSpec G₂ G₂' D₂ (renameEndpoint (hEquiv.choose.toRenaming) ep)) :
     ConfigEquiv ⟨G₁', D₁⟩ ⟨G₂', D₂⟩ := by
-  sorry
+  -- Use the same SessionIso that witnesses the input equivalence.
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
+  refine ⟨σ, ?_, ?_⟩
+  -- G condition
+  · intro e'
+    by_cases he : e' = ep
+    · -- Case: e' = ep (the removed endpoint)
+      calc lookupG G₂' (renameEndpoint ρ e')
+          = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
+        _ = none := hSpec₂.endpoint_removed
+        _ = Option.map (renameLocalType ρ) none := by simp only [Option.map_none]
+        _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [hSpec₁.endpoint_removed]
+        _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+    · -- Case: e' ≠ ep (frame)
+      have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
+        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+      rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
+      exact hG_equiv e'
+  -- D condition: unchanged
+  · exact hD_equiv
 
 /-- Transfer is equivariant under session renaming. -/
 theorem TransferSpec_respects_renaming (ρ : SessionRenaming)
@@ -1098,7 +1390,66 @@ theorem TransferSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (hEquiv.choose.fwd delegatedSession) delegatedRole) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  sorry
+  -- Use the same SessionIso that witnesses the input equivalence.
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
+  refine ⟨σ, ?_, ?_⟩
+  -- G condition
+  · intro e'
+    by_cases he : e' = ep
+    · -- Case: e' = ep (the updated endpoint)
+      obtain ⟨L'₁, hSender₁⟩ := hSpec₁.sender_type
+      have hG₁' := hSpec₁.type_updated L'₁ hSender₁
+      obtain ⟨L'₂, hSender₂⟩ := hSpec₂.sender_type
+      have hG₂' := hSpec₂.type_updated L'₂ hSender₂
+      -- Determine L'₂ from input equivalence
+      have hSender₂_raw := hG_equiv ep
+      rw [hSender₁] at hSender₂_raw
+      simp only [Option.map_some, renameLocalType, renameValType] at hSender₂_raw
+      rw [hSender₂_raw] at hSender₂
+      simp only [Option.some.injEq, LocalType.send.injEq] at hSender₂
+      -- send has 3 fields: role, valtype, continuation
+      obtain ⟨_, _, hL'₂_eq⟩ := hSender₂
+      -- Compute both sides
+      calc lookupG G₂' (renameEndpoint ρ e')
+          = lookupG G₂' (renameEndpoint ρ ep) := by rw [he]
+        _ = lookupG (updateG G₂ (renameEndpoint ρ ep) L'₂) (renameEndpoint ρ ep) := by rw [hG₂']
+        _ = some L'₂ := lookupG_update_eq _ _ _
+        _ = some (renameLocalType ρ L'₁) := by rw [hL'₂_eq]
+        _ = (some L'₁).map (renameLocalType ρ) := by simp only [Option.map_some]
+        _ = (lookupG (updateG G₁ ep L'₁) ep).map (renameLocalType ρ) := by rw [lookupG_update_eq]
+        _ = (lookupG G₁' ep).map (renameLocalType ρ) := by rw [← hG₁']
+        _ = (lookupG G₁' e').map (renameLocalType ρ) := by rw [← he]
+    · -- Case: e' ≠ ep (frame)
+      have hne₂ : renameEndpoint ρ e' ≠ renameEndpoint ρ ep := by
+        intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
+      rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
+      exact hG_equiv e'
+  -- D condition
+  · intro e'
+    let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
+    by_cases he : e' = sendEdge
+    · -- Case: e' = sendEdge (the updated edge)
+      have hD₁' := hSpec₁.trace_extended
+      have hD₂' := hSpec₂.trace_extended
+      simp only [renameEndpoint] at hD₂'
+      have hTrace := hD_equiv sendEdge
+      simp only [renameEdge] at hTrace
+      -- Rewrite goal: lookupD D₂' (renameEdge ρ e') = (lookupD D₁' e').map (renameValType ρ)
+      rw [he]
+      simp only [renameEdge]
+      rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
+      -- Goal: lookupD D₂ (...) ++ [chan...] = (lookupD D₁ sendEdge ++ [chan...]).map (renameValType ρ)
+      rw [List.map_append, List.map_singleton, renameValType, hTrace]
+      -- The remaining goal equates σ.fwd with σ.toRenaming.f which are definitionally equal
+      rfl
+    · -- Case: e' ≠ sendEdge (frame)
+      have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
+        intro heq; exact he (renameEdge_inj ρ e' sendEdge heq)
+      simp only [renameEndpoint, renameEdge] at hne₂
+      rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
+      exact hD_equiv e'
 
 /-- Acquire is equivariant under session renaming.
 

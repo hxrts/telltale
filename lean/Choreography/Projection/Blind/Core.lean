@@ -67,6 +67,7 @@ mutual
     | .mu _ body => isBlind body
     | .comm sender receiver branches =>
         commBlindFor sender receiver branches && isBlindBranches branches
+    | .delegate _ _ _ _ cont => isBlind cont
 
   /-- Helper for checking blindness in branches. -/
   def isBlindBranches : List (Label × GlobalType) → Bool
@@ -106,6 +107,12 @@ private theorem label_beq_refl (lbl : Label) : (lbl == lbl) = true := by
 /-- noSelfComm propagates to mu body (trivially, by definition). -/
 theorem noSelfComm_mu_body {t : String} {body : GlobalType}
     (h : (GlobalType.mu t body).noSelfComm = true) : body.noSelfComm = true := h
+
+/-- noSelfComm propagates to delegate continuation. -/
+theorem noSelfComm_delegate_cont {p q : String} {sid : Nat} {r : String} {cont : GlobalType}
+    (h : (GlobalType.delegate p q sid r cont).noSelfComm = true) : cont.noSelfComm = true := by
+  simp only [GlobalType.noSelfComm, Bool.and_eq_true, bne_iff_ne, ne_eq] at h
+  exact h.2
 
 /-- Helper: noSelfCommBranches implies noSelfComm for each element. -/
 private theorem noSelfComm_of_noSelfCommBranches {bs : List (Label × GlobalType)}
@@ -174,6 +181,10 @@ theorem isBlind_comm_branches {s r : String} {bs : List (Label × GlobalType)}
     ∀ p ∈ bs, isBlind p.2 = true := by
   simp only [isBlind, Bool.and_eq_true] at h
   exact isBlind_of_isBlindBranches h.2
+
+/-- isBlind propagates to delegate continuation. -/
+theorem isBlind_delegate_cont {p q : String} {sid : Nat} {r : String} {cont : GlobalType}
+    (h : isBlind (GlobalType.delegate p q sid r cont) = true) : isBlind cont = true := h
 
 /-! ## Non-Empty Branch Lemmas -/
 
@@ -443,12 +454,47 @@ theorem projectb_trans_of_noSelfComm_blind (g : GlobalType) (role : String)
                   unfold projectb
                   simp [hbs, hbr]
                   exact hproj_all'
+  | .delegate p q sid r cont =>
+      -- delegate case: recurse on continuation
+      have hnoself' := noSelfComm_delegate_cont hnoself
+      have hblind' := isBlind_delegate_cont hblind
+      have hcont_proj := projectb_trans_of_noSelfComm_blind cont role hnoself' hblind'
+      -- The projection depends on role
+      by_cases hp : role = p
+      · -- role = delegator: sends the capability
+        have htrans : Trans.trans (.delegate p q sid r cont) role =
+            .send q [(⟨"_delegate", .unit⟩, some (.chan sid r), Trans.trans cont role)] := by
+          simp [Trans.trans, hp]
+        rw [htrans]
+        -- projectb for send with single branch
+        simp [projectb, projectbBranches, hcont_proj]
+      · by_cases hq : role = q
+        · -- role = delegatee: receives the capability
+          have hpe : (role == p) = false := by
+            simpa using (beq_false_of_ne hp)
+          have htrans : Trans.trans (.delegate p q sid r cont) role =
+              .recv p [(⟨"_delegate", .unit⟩, some (.chan sid r), Trans.trans cont role)] := by
+            simp [Trans.trans, hpe, hq]
+          rw [htrans]
+          -- projectb for recv with single branch
+          simp [projectb, projectbBranches, hcont_proj]
+        · -- role is non-participant: follows continuation
+          have hpe : (role == p) = false := by
+            simpa using (beq_false_of_ne hp)
+          have hqe : (role == q) = false := by
+            simpa using (beq_false_of_ne hq)
+          have htrans : Trans.trans (.delegate p q sid r cont) role =
+              Trans.trans cont role := by
+            simp [Trans.trans, hpe, hqe]
+          rw [htrans]
+          exact hcont_proj
 termination_by g
 decreasing_by
   all_goals
     first
     | exact sizeOf_body_lt_mu _ _
     | apply sizeOf_elem_snd_lt_comm; assumption
+    | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
 end
 

@@ -164,12 +164,29 @@ mutual
           | _ => false
         else
           projectbAllBranches branches role cand
+    | .delegate p q _sid _r cont, role, cand =>
+        if role == p then
+          -- delegator: must be send to q
+          match cand with
+          | .send partner [(_, _, contCand)] =>
+              if partner == q then projectb cont role contCand else false
+          | _ => false
+        else if role == q then
+          -- delegatee: must be recv from p
+          match cand with
+          | .recv partner [(_, _, contCand)] =>
+              if partner == p then projectb cont role contCand else false
+          | _ => false
+        else
+          -- non-participant: follows continuation
+          projectb cont role cand
   termination_by g _ _ => sizeOf g
   decreasing_by
     all_goals
       first
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_bs_lt_comm _ _ _
+      | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   /-- Check branch-wise projection for participant roles. -/
   def projectbBranches :

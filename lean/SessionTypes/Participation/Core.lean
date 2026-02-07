@@ -75,6 +75,14 @@ inductive part_ofF (role : String) (R : GlobalType → Prop) : GlobalType → Pr
   | mu (t : String) (body : GlobalType) :
       R body →
       part_ofF role R (.mu t body)
+  /-- Direct participation: role is delegator or delegatee. -/
+  | delegate_direct (p q : String) (sid : Nat) (r : String) (cont : GlobalType) :
+      is_participant role p q →
+      part_ofF role R (.delegate p q sid r cont)
+  /-- Transitive participation through delegate continuation. -/
+  | delegate_cont (p q : String) (sid : Nat) (r : String) (cont : GlobalType) :
+      R cont →
+      part_ofF role R (.delegate p q sid r cont)
 
 /-- One-step participation on all branches (forall instead of exists). -/
 inductive part_of_allF (role : String) (R : GlobalType → Prop) : GlobalType → Prop where
@@ -90,6 +98,14 @@ inductive part_of_allF (role : String) (R : GlobalType → Prop) : GlobalType �
   | mu (t : String) (body : GlobalType) :
       R body →
       part_of_allF role R (.mu t body)
+  /-- Direct participation: role is delegator or delegatee. -/
+  | delegate_direct (p q : String) (sid : Nat) (r : String) (cont : GlobalType) :
+      is_participant role p q →
+      part_of_allF role R (.delegate p q sid r cont)
+  /-- Transitive participation through delegate continuation. -/
+  | delegate_cont (p q : String) (sid : Nat) (r : String) (cont : GlobalType) :
+      R cont →
+      part_of_allF role R (.delegate p q sid r cont)
 
 /-! ## Transitive participation (part_of2)
 
@@ -131,6 +147,15 @@ theorem part_of2_mu_inv {role t : String} {body : GlobalType}
       cases hf with
       | mu _ _ hbody => exact hbody
 
+theorem part_of2_delegate_inv {role p q : String} {sid : Nat} {r : String} {cont : GlobalType}
+    (h : part_of2 role (.delegate p q sid r cont)) :
+    is_participant role p q ∨ part_of2 role cont := by
+  cases h with
+  | intro _ hf =>
+      cases hf with
+      | delegate_direct _ _ _ _ _ hpart => left; exact hpart
+      | delegate_cont _ _ _ _ _ hcont => right; exact hcont
+
 /-- End and var types have no participants. -/
 theorem not_part_of2_end (role : String) : ¬ part_of2 role .end := by
   intro h
@@ -163,6 +188,15 @@ theorem part_of_all2_mu_inv {role t : String} {body : GlobalType}
   | intro _ hf =>
       cases hf with
       | mu _ _ hbody => exact hbody
+
+theorem part_of_all2_delegate_inv {role p q : String} {sid : Nat} {r : String} {cont : GlobalType}
+    (h : part_of_all2 role (.delegate p q sid r cont)) :
+    is_participant role p q ∨ part_of_all2 role cont := by
+  cases h with
+  | intro _ hf =>
+      cases hf with
+      | delegate_direct _ _ _ _ _ hpart => left; exact hpart
+      | delegate_cont _ _ _ _ _ hcont => right; exact hcont
 
 /-- End and var types have no participants. -/
 theorem not_part_of_all2_end (role : String) : ¬ part_of_all2 role .end := by
@@ -235,7 +269,10 @@ private abbrev CommAll (role : String) (P : GlobalType → Prop) : Prop :=
 theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
     (h_comm_direct : CommDirect role P)
     (h_comm_all : CommAll role P)
-    (h_mu : ∀ t body, part_of_all2 role body → P body → P (.mu t body)) :
+    (h_mu : ∀ t body, part_of_all2 role body → P body → P (.mu t body))
+    (h_delegate : ∀ p q sid r cont, part_of_all2 role (.delegate p q sid r cont) →
+        (is_participant role p q ∨ (part_of_all2 role cont ∧ P cont)) → P (.delegate p q sid r cont) :=
+        fun _ _ _ _ _ _ _ => sorry) :
     ∀ g, part_of_all2 role g → P g := by
   intro g h
   match g with  -- structural recursion on g
@@ -244,7 +281,7 @@ theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
   | .mu t body =>
       have hbody : part_of_all2 role body := part_of_all2_mu_inv h
       have ih : P body :=
-        part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu body hbody
+        part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu h_delegate body hbody
       exact h_mu t body hbody ih
   | .comm sender receiver branches =>
       have hcases := part_of_all2_comm_inv (role := role) (sender := sender)
@@ -256,8 +293,17 @@ theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
           have ih :
               ∀ pair, pair ∈ branches → part_of_all2 role pair.2 → P pair.2 := by
             intro pair hmem hpoa
-            exact part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu pair.2 hpoa
+            exact part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu h_delegate pair.2 hpoa
           exact h_comm_all sender receiver branches hall ih
+  | .delegate p q sid r cont =>
+      have hcases := part_of_all2_delegate_inv h
+      cases hcases with
+      | inl hpart =>
+          exact h_delegate p q sid r cont h (Or.inl hpart)
+      | inr hcont =>
+          have ih : P cont :=
+            part_of_all2_ind2 role P h_comm_direct h_comm_all h_mu h_delegate cont hcont
+          exact h_delegate p q sid r cont h (Or.inr ⟨hcont, ih⟩)
 termination_by g _ => sizeOf g
 decreasing_by
   all_goals

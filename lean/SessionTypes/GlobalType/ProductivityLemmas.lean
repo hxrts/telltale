@@ -72,6 +72,11 @@ mutual
         simp only [GlobalType.isProductive] at hprod ⊢
         -- Comm resets unguarded to [], so hprod suffices.
         exact hprod
+    | .delegate _ _ _ _ cont =>
+        simp only [GlobalType.allVarsBound] at hbound
+        simp only [GlobalType.isProductive] at hprod ⊢
+        -- Delegate resets unguarded to [], so hprod suffices.
+        exact hprod
 
   theorem isProductiveBranches_extend (branches : List (Label × GlobalType))
       (bound extra : List String)
@@ -167,6 +172,10 @@ mutual
         -- comm resets unguarded to [], so hg : isProductiveBranches branches [] = true
         -- Goal: isProductiveBranches (substituteBranches branches varName repl) [] = true
         exact isProductiveBranches_substitute_any branches varName repl [] hg hrepl
+    | .delegate p q sid r cont =>
+        simp only [GlobalType.substitute, GlobalType.isProductive] at hg ⊢
+        -- delegate resets unguarded to [], so hg : cont.isProductive [] = true
+        exact isProductive_substitute_any cont varName repl [] hg hrepl
 
   -- For branches, if replacement is always productive, substitution preserves productivity
   -- regardless of whether varName is in unguarded
@@ -206,6 +215,9 @@ mutual
     | .comm sender receiver branches =>
         simp only [GlobalType.substitute, GlobalType.isProductive] at hg ⊢
         exact isProductiveBranches_substitute_any branches varName repl [] hg hrepl
+    | .delegate p q sid r cont =>
+        simp only [GlobalType.substitute, GlobalType.isProductive] at hg ⊢
+        exact isProductive_substitute_any cont varName repl [] hg hrepl
 end
 
 /-- Mu-unfolding preserves well-formedness components that don't depend on variable binding.

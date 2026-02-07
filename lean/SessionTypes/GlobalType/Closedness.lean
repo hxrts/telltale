@@ -46,6 +46,10 @@ mutual
         cases hmem with
         | inl hxt => exact absurd hxt hxnet
         | inr hbound => exact hbound
+    | .delegate _ _ _ _ cont => by
+        simp only [GlobalType.freeVars] at hx
+        simp only [GlobalType.allVarsBound] at h
+        exact allVarsBound_implies_freeVars_subset_aux cont bound h x hx
   termination_by sizeOf g
 
   private def allVarsBoundBranches_implies_freeVars_subset_aux
@@ -423,6 +427,14 @@ private theorem freeVars_substitute_subset_strong (n : Nat) :
       | .comm sender receiver branches =>
           simp [GlobalType.substitute, GlobalType.freeVars] at hv
           exact freeVars_substitute_subset_strong_comm ih' sender receiver branches hsize hv
+      | .delegate p q sid r cont =>
+          -- Delegate case: freeVars of delegate = freeVars of cont
+          simp [GlobalType.substitute, GlobalType.freeVars] at hv
+          have hcont_size : sizeOf cont < sizeOf (GlobalType.delegate p q sid r cont) := by
+            simp only [GlobalType.delegate.sizeOf_spec]
+            omega
+          have hcont_lt : sizeOf cont < n := Nat.lt_of_lt_of_le hcont_size hsize
+          exact ih' cont hcont_lt v hv
 
 /-- Main theorem: free vars of substituted type are bounded. -/
 theorem freeVars_substitute_subset (body : GlobalType) (t : String) (repl : GlobalType)

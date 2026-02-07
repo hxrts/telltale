@@ -161,34 +161,22 @@ theorem selectReady_of_ProgressVMState {store : SessionStore ν}
 
 /-- Store lookups agree with environment projections.
 
-    This connects SessionStore operations to Protocol-level environments. -/
+    This connects SessionStore operations to Protocol-level environments.
+    These bridge lemmas require store consistency invariants from Arena.lean.
+    For now, we axiomatize them pending full integration. -/
 theorem store_lookupTrace_eq_lookupD {store : SessionStore ν} {edge : Edge} :
     lookupD (SessionStore.toDEnv store) edge = SessionStore.lookupTrace store edge := by
-  -- By induction on store structure, toDEnv accumulates traces consistently.
-  induction store with
-  | nil => simp [SessionStore.toDEnv, SessionStore.lookupTrace, lookupD]
-  | cons hd tl ih =>
-    simp only [SessionStore.toDEnv, SessionStore.lookupTrace, List.foldl]
-    by_cases h : hd.1 = edge.sid
-    · -- Edge is in this session
-      simp [h]
-      sorry -- Need to show foldl accumulation preserves lookup
-    · -- Edge is in another session
-      simp [h]
-      sorry -- Need ih and that hd doesn't affect this edge
+  -- DEnv uses a more complex structure (RBMap-backed).
+  -- The relationship is established by sessionStore_refines_envs in Arena.lean.
+  sorry
 
 /-- Store lookups agree with environment projections for types. -/
 theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint} :
     lookupG (SessionStore.toGEnv store) ep = SessionStore.lookupType store ep := by
-  induction store with
-  | nil => simp [SessionStore.toGEnv, SessionStore.lookupType, lookupG]
-  | cons hd tl ih =>
-    simp only [SessionStore.toGEnv, SessionStore.lookupType, List.foldl]
-    by_cases h : hd.1 = ep.sid
-    · simp [h]
-      sorry -- Similar accumulation argument
-    · simp [h]
-      sorry
+  -- GEnv uses foldl concatenation. The proof requires store consistency
+  -- (each session's localTypes only contains endpoints with matching sid).
+  -- This is established by sessionStore_refines_envs in Arena.lean.
+  sorry
 
 /-- If HeadCoherent and receiver has recv type with non-empty trace, the head matches.
 
@@ -197,25 +185,48 @@ theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint} :
 theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     {ep : Endpoint} {source : Role} {T : ValType} {L' : LocalType} {edge : Edge}
     (hHead : HeadCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store))
+    (hComplete : RoleComplete (SessionStore.toGEnv store))
     (hRecvType : SessionStore.lookupType store ep = some (.recv source T L'))
     (hNonEmpty : SessionStore.lookupTrace store edge ≠ [])
     (hEdge : edge = { sid := ep.sid, sender := source, receiver := ep.role }) :
     ∃ rest, SessionStore.lookupTrace store edge = T :: rest := by
-  -- 1. Convert to Protocol-level lookups
+  -- Convert to Protocol-level lookups
   let G := SessionStore.toGEnv store
   let D := SessionStore.toDEnv store
-  -- 2. Get ActiveEdge from the fact that receiver exists
-  have hRecvEp : ep = { sid := edge.sid, role := edge.receiver } := by
-    simp [hEdge]
-  -- 3. Apply HeadCoherent
-  -- HeadCoherent says: for recv type, if trace non-empty, head = T
+  -- Convert store lookup to GEnv lookup
   have hLookupG : lookupG G ep = some (.recv source T L') := by
-    simpa [G, store_lookupType_eq_lookupG] using hRecvType
-  have hLookupD : lookupD D edge = SessionStore.lookupTrace store edge := by
-    exact store_lookupTrace_eq_lookupD
-  -- HeadCoherent at this edge gives us the result
-  -- But we need to show ActiveEdge first
-  sorry
+    rw [← store_lookupType_eq_lookupG]
+    exact hRecvType
+  -- Get sender exists from RoleComplete
+  obtain ⟨L_sender, hSender⟩ := RoleComplete_recv hComplete hLookupG
+  -- Construct ActiveEdge
+  have hActive : ActiveEdge G edge := by
+    subst hEdge
+    constructor
+    · -- sender exists at edge.sender = source
+      simp only [Option.isSome_some]
+      exact ⟨L_sender, hSender⟩
+    · -- receiver exists at edge.receiver = ep.role
+      simp only [Option.isSome_some]
+      exact ⟨.recv source T L', hLookupG⟩
+  -- Apply HeadCoherent at this edge
+  have hHeadAtEdge := hHead edge hActive
+  -- Convert store trace to DEnv lookup
+  have hTraceEq : lookupD D edge = SessionStore.lookupTrace store edge :=
+    store_lookupTrace_eq_lookupD
+  -- The receiver endpoint in HeadCoherent
+  have hRecvEp : Endpoint.mk edge.sid edge.receiver = ep := by
+    subst hEdge; rfl
+  -- Substitute into HeadCoherent result
+  simp only [hRecvEp, hLookupG] at hHeadAtEdge
+  -- Now we have: match lookupD D edge with | [] => True | T' :: _ => T = T'
+  rw [hTraceEq] at hHeadAtEdge
+  -- Case split on the trace
+  match h : SessionStore.lookupTrace store edge with
+  | [] => exact absurd h hNonEmpty
+  | T' :: rest =>
+    simp only [h] at hHeadAtEdge
+    exact ⟨rest, by rw [hHeadAtEdge]⟩
 
 /-- After a send, HeadCoherent holds for the corresponding edge.
 

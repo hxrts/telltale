@@ -45,12 +45,21 @@ structure Label where
   sort : PayloadSort := PayloadSort.unit
   deriving Repr, DecidableEq, BEq, Inhabited
 
-/-- Global types describe protocols from the bird's-eye view. -/
+/-- Global types describe protocols from the bird's-eye view.
+
+**Constructors:**
+- `end`: Protocol termination
+- `comm sender receiver branches`: Communication from sender to receiver with labeled branches
+- `mu t body`: Recursive type binding variable t in body
+- `var t`: Recursion variable reference
+- `delegate p q sid r cont`: Role p delegates endpoint (sid, r) to role q, continuing as cont
+-/
 inductive GlobalType where
   | end : GlobalType
   | comm : String → String → List (Label × GlobalType) → GlobalType
   | mu : String → GlobalType → GlobalType
   | var : String → GlobalType
+  | delegate : String → String → Nat → String → GlobalType → GlobalType
   deriving Repr, Inhabited
 
 /-! ## Roles and Free Variables -/
@@ -64,6 +73,7 @@ mutual
         ([sender, receiver] ++ branchRoles).eraseDups
     | .mu _ body => body.roles
     | .var _ => []
+    | .delegate p q _ _ cont => ([p, q] ++ cont.roles).eraseDups
 
   def rolesOfBranches : List (Label × GlobalType) → List String
     | [] => []
@@ -77,6 +87,7 @@ mutual
     | .comm _ _ branches => freeVarsOfBranches branches
     | .mu t body => body.freeVars.filter (· != t)
     | .var t => [t]
+    | .delegate _ _ _ _ cont => cont.freeVars
 
   def freeVarsOfBranches : List (Label × GlobalType) → List String
     | [] => []
@@ -107,6 +118,8 @@ mutual
           .mu t (body.substitute varName replacement)
     | .var t, varName, replacement =>
         if t == varName then replacement else .var t
+    | .delegate p q sid r cont, varName, replacement =>
+        .delegate p q sid r (cont.substitute varName replacement)
 
   def substituteBranches : List (Label × GlobalType) → String → GlobalType → List (Label × GlobalType)
     | [], _, _ => []
@@ -125,6 +138,7 @@ mutual
     | .var t => bound.contains t
     | .mu t body => body.allVarsBound (t :: bound)
     | .comm _ _ branches => allVarsBoundBranches branches bound
+    | .delegate _ _ _ _ cont => cont.allVarsBound bound
 
   def allVarsBoundBranches (branches : List (Label × GlobalType)) (bound : List String) : Bool :=
     match branches with
@@ -155,6 +169,7 @@ mutual
     | .mu _ body => body.allCommsNonEmpty
     | .comm _ _ branches =>
         branches.isEmpty = false && allCommsNonEmptyBranches branches
+    | .delegate _ _ _ _ cont => cont.allCommsNonEmpty
 
   def allCommsNonEmptyBranches : List (Label × GlobalType) → Bool
     | [] => true
@@ -162,13 +177,16 @@ mutual
 end
 
 mutual
-  /-- Disallow self-communication in all subterms. -/
+  /-- Disallow self-communication in all subterms.
+      For delegation, requires delegator ≠ delegatee. -/
   def GlobalType.noSelfComm : GlobalType → Bool
     | .end => true
     | .var _ => true
     | .mu _ body => body.noSelfComm
     | .comm sender receiver branches =>
         sender != receiver && noSelfCommBranches branches
+    | .delegate p q _ _ cont =>
+        p != q && cont.noSelfComm
 
   def noSelfCommBranches : List (Label × GlobalType) → Bool
     | [] => true
@@ -183,9 +201,9 @@ mutual
       non-productive protocols like `mu X. X` that loop forever silently.
 
       The `unguarded` parameter tracks mu variables that have NOT yet seen
-      a communication since their binding. When we see a comm, all variables
-      become guarded (reset to empty). When we see a var, it must not be
-      in the unguarded set. -/
+      a communication since their binding. When we see a comm or delegate,
+      all variables become guarded (reset to empty). When we see a var,
+      it must not be in the unguarded set. -/
   def GlobalType.isProductive (g : GlobalType) (unguarded : List String := []) : Bool :=
     match g with
     | .end => true
@@ -194,6 +212,9 @@ mutual
     | .comm _ _ branches =>
         -- After comm, all vars become guarded (reset unguarded to [])
         isProductiveBranches branches []
+    | .delegate _ _ _ _ cont =>
+        -- Delegation is a visible action, so it guards recursion
+        cont.isProductive []
 
   def isProductiveBranches (branches : List (Label × GlobalType)) (unguarded : List String) : Bool :=
     match branches with
@@ -242,6 +263,7 @@ mutual
     | .comm _ _ branches =>
         let labels := branchLabels branches
         labels.Nodup && uniqueBranchLabelsBranches branches
+    | .delegate _ _ _ _ cont => cont.uniqueBranchLabels
 
   def uniqueBranchLabelsBranches : List (Label × GlobalType) → Bool
     | [] => true
@@ -313,6 +335,9 @@ mutual
         simp only [GlobalType.substitute, GlobalType.uniqueBranchLabels, Bool.and_eq_true,
                    branchLabels_substituteBranches] at huniq ⊢
         exact ⟨huniq.1, uniqueBranchLabelsBranches_substitute branches varName replacement huniq.2 huniq_repl⟩
+    | .delegate p q sid r cont =>
+        simp only [GlobalType.substitute, GlobalType.uniqueBranchLabels] at huniq ⊢
+        exact GlobalType.uniqueBranchLabels_substitute cont varName replacement huniq huniq_repl
 
   /-- uniqueBranchLabels is preserved by substitution on branches. -/
   theorem uniqueBranchLabelsBranches_substitute (branches : List (Label × GlobalType))

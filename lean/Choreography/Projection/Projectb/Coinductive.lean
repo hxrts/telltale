@@ -53,6 +53,20 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
         | _ => False
       else
         AllBranchesProj R gbs role cand
+  | .delegate p q _sid _r cont, cand =>
+      if role = p then
+        -- delegator: sends the capability
+        match cand with
+        | .send partner [(_, _, contCand)] => partner = q ∧ R cont role contCand
+        | _ => False
+      else if role = q then
+        -- delegatee: receives the capability
+        match cand with
+        | .recv partner [(_, _, contCand)] => partner = p ∧ R cont role contCand
+        | _ => False
+      else
+        -- non-participant: follows continuation
+        R cont role cand
   | _, _ => False
 
 /-- One-step generator for CProjectU (fully-unfolded).
@@ -222,6 +236,10 @@ private theorem CProjectF_unfold_core_mono : Monotone CProjectF_unfold_core := b
             exact CProjectF_unfold_core_mono_comm_other_cand h hcore
         | mu _ _ =>
             exact CProjectF_unfold_core_mono_comm_other_cand h hcore
+    | delegate _ _ _ _ _ =>
+        -- Delegate: follow CProjectF monotonicity pattern
+        have : CProjectF S (.delegate _ _ _ _ _) role cand := CProjectF_mono h _ _ _ hcore
+        simpa [CProjectF_unfold_core, CProjectF] using this
 
 private theorem CProjectF_unfold_mono : Monotone CProjectF_unfold := by
   intro R S h g role cand hrel

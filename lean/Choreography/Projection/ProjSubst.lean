@@ -53,7 +53,7 @@ The lemma is semantically sound - proven in Coq's `indProj.v:173`.
 namespace Choreography.Projection.ProjSubst
 
 open SessionTypes.GlobalType (GlobalType Label)
-open SessionTypes.LocalTypeR (LocalTypeR)
+open SessionTypes.LocalTypeR (LocalTypeR BranchR)
 open SessionCoTypes.EQ2 (EQ2 EQ2_refl)
 
 -- Aliases to avoid name collision with _root_.trans
@@ -233,8 +233,8 @@ theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl 
   let P1 : LocalTypeR → Prop := fun body =>
     ∀ t v repl, body.isGuarded v = false → t ≠ v →
       (body.substitute t repl).isGuarded v = false
-  let P2 : List (Label × LocalTypeR) → Prop := fun _ => True
-  let P3 : Label × LocalTypeR → Prop := fun _ => True
+  let P2 : List BranchR → Prop := fun _ => True
+  let P3 : BranchR → Prop := fun _ => True
   have hrec : P1 body := by
     refine (LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ body)
@@ -345,6 +345,20 @@ mutual
                 isGuarded_substitute_unguarded e t s repl hguard (Ne.symm hst)
               simp [GlobalType.substitute, hst, projTrans, Choreography.Projection.Trans.trans,
                 hproj', e, repl, hguard, hguard']
+    | .delegate p q sid r cont, t, G, role, hclosed => by
+        -- Delegate case: projection follows the trans definition
+        have hrec := proj_subst cont t G role hclosed
+        by_cases hp : role = p
+        · -- role = delegator
+          simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans, hp, hrec]
+        · by_cases hq : role = q
+          · -- role = delegatee
+            have hpe : (role == p) = false := by simpa using (beq_false_of_ne hp)
+            simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans, hpe, hq, hrec]
+          · -- role is non-participant
+            have hpe : (role == p) = false := by simpa using (beq_false_of_ne hp)
+            have hqe : (role == q) = false := by simpa using (beq_false_of_ne hq)
+            simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans, hpe, hqe, hrec]
   termination_by
     g => sizeOf g
   decreasing_by
@@ -353,6 +367,7 @@ mutual
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_bs_lt_comm _ _ _
       | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   /-- Branch-wise version of proj_subst for transBranches/substituteBranches. -/
   theorem proj_subst_branches :

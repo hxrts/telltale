@@ -204,6 +204,22 @@ theorem part_of2_substitute (role : String) :
         | inr hrepl =>
             right
             exact hrepl
+  | .delegate p q sid r cont =>
+      have hcases := part_of2_delegate_inv (role := role) h
+      simp only [GlobalType.substitute] at hcases h
+      cases hcases with
+      | inl hpart =>
+          left
+          exact .intro _ (.delegate_direct _ _ _ _ _ hpart)
+      | inr hcont_subst =>
+          have hih := part_of2_substitute role cont t repl hcont_subst
+          cases hih with
+          | inl hcont =>
+              left
+              exact .intro _ (.delegate_cont _ _ _ _ _ hcont)
+          | inr hrepl =>
+              right
+              exact hrepl
 termination_by g _ _ _ => sizeOf g
 decreasing_by
   all_goals
@@ -236,6 +252,9 @@ theorem part_of2_unfold (role : String) (g : GlobalType) :
           exact .intro _ (.mu _ _ hbody)
       | inr hmu =>
           exact hmu
+  | delegate p q sid r cont =>
+      intro h
+      simpa [GlobalType.unfold] using h
 
 theorem part_of2_unfold_iter (role : String) (g : GlobalType) :
     ∀ n, part_of2 role (Nat.rec g (fun _ acc => GlobalType.unfold acc) n) → part_of2 role g := by
@@ -282,6 +301,8 @@ mutual
     | .comm sender receiver branches =>
         is_participant role sender receiver ||
         participatesBranches role branches
+    | .delegate p q _ _ cont =>
+        is_participant role p q || participates role cont
 
   /-- Helper for participates on branches. -/
   def participatesBranches (role : String) : List (Label × GlobalType) → Bool
@@ -348,6 +369,28 @@ mutual
                 (participatesBranches_iff_part_of2 role branches).1 hbranches
               obtain ⟨pair, hmem, hcont⟩ := hexists
               exact .intro _ (.comm_branch _ _ pair.1 pair.2 _ hmem hcont)
+    | delegate p q sid r cont =>
+        constructor
+        · intro h
+          have hcases := part_of2_delegate_inv (role := role) (p := p) (q := q)
+            (sid := sid) (r := r) (cont := cont) h
+          cases hcases with
+          | inl hpart =>
+              have hpart' : is_participant role p q = true := by
+                simpa using hpart
+              simp [participates, hpart']
+          | inr hcont =>
+              have ih := (part_of2_iff_participates role cont).1 hcont
+              simp [participates, ih]
+        · intro h
+          simp [participates] at h
+          cases h with
+          | inl hpart =>
+              exact .intro _ (.delegate_direct _ _ _ _ _ hpart)
+          | inr hcont =>
+              have hcont' : part_of2 role cont :=
+                (part_of2_iff_participates role cont).2 hcont
+              exact .intro _ (.delegate_cont _ _ _ _ _ hcont')
 
   /-- `participatesBranches` is equivalent to existence of a participating branch. -/
   theorem participatesBranches_iff_part_of2 (role : String) :

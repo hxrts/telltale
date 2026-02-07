@@ -98,12 +98,23 @@ theorem participatesAllBranches_imp_participatesFirstBranch (g : GlobalType) (ro
       | false =>
           simp only [hpart, Bool.false_and, Bool.false_or] at h ⊢
           exact participatesAllBranches_imp_participatesFirstBranch cont role h
+  | .delegate p q sid r cont =>
+      unfold participatesAllBranches at h
+      unfold participatesFirstBranch
+      cases hpart : is_participant role p q with
+      | true =>
+          simp
+      | false =>
+          simp only [hpart, Bool.false_and, Bool.false_or] at h ⊢
+          exact participatesAllBranches_imp_participatesFirstBranch cont role h
 termination_by sizeOf g
 decreasing_by
   all_goals
+    simp_wf
     first
     | exact sizeOf_body_lt_mu _ _
     | exact sizeOf_cont_lt_comm _ _ _ _ _
+    | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
 mutual
   /-- Projection is contractive when role participates through all branches. -/
@@ -195,13 +206,41 @@ mutual
               simp at hpart_direct
             rw [trans_comm_other sender receiver role ((label, cont) :: rest) hne_s hne_r]
             exact trans_isContractive_of_participatesAllBranches cont role hpart
+    | .delegate p q sid r cont =>
+        simp only [trans]
+        cases hp : role == p with
+        | true =>
+            -- Sender case: send is contractive
+            simp only [hp, ↓reduceIte, LocalTypeR.isContractive, isContractiveBranches, Bool.and_true]
+            unfold participatesAllBranches at hpart
+            simp only [is_participant, hp, Bool.true_or, Bool.true_and, Bool.not_true, Bool.false_and,
+              Bool.or_false] at hpart
+            exact trans_isContractive_of_participatesAllBranches cont role hpart
+        | false =>
+            cases hq : role == q with
+            | true =>
+                -- Receiver case: recv is contractive
+                simp only [hp, Bool.false_eq_true, ↓reduceIte, hq, LocalTypeR.isContractive,
+                  isContractiveBranches, Bool.and_true]
+                unfold participatesAllBranches at hpart
+                simp only [is_participant, hp, Bool.false_or, hq, Bool.true_or, Bool.true_and,
+                  Bool.not_true, Bool.false_and, Bool.or_false] at hpart
+                exact trans_isContractive_of_participatesAllBranches cont role hpart
+            | false =>
+                -- Other role: follow continuation
+                simp only [hp, Bool.false_eq_true, ↓reduceIte, hq]
+                unfold participatesAllBranches at hpart
+                simp only [is_participant, hp, Bool.false_or, hq, Bool.false_and, Bool.false_or] at hpart
+                exact trans_isContractive_of_participatesAllBranches cont role hpart
   termination_by sizeOf g
   decreasing_by
     all_goals
+      simp_wf
       first
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_bs_lt_comm _ _ _
       | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   /-- Helper: transBranches is contractive when role participates in all branches. -/
   theorem transBranches_isContractive_of_participatesAllBranches
@@ -290,6 +329,21 @@ mutual
                     isProductiveBranches tail [] = true := by
                   simpa [isProductiveBranches, Bool.and_eq_true] using hprod'
                 exact trans_isContractive_of_isProductive cont role hpair.1
+    | .delegate p q sid r cont =>
+        -- Delegate is productive → cont is productive with [] unguarded
+        have hcont_prod : cont.isProductive = true := by
+          simp only [GlobalType.isProductive] at hprod
+          apply isProductive_mono cont [] []
+          · intro x hx; exact hx
+          · exact hprod
+        by_cases hp : role == p
+        · simp [trans, hp, LocalTypeR.isContractive, isContractiveBranches]
+          exact trans_isContractive_of_isProductive cont role hcont_prod
+        · by_cases hq : role == q
+          · simp [trans, hp, hq, LocalTypeR.isContractive, isContractiveBranches]
+            exact trans_isContractive_of_isProductive cont role hcont_prod
+          · simp [trans, hp, hq]
+            exact trans_isContractive_of_isProductive cont role hcont_prod
   termination_by sizeOf g
   decreasing_by
     all_goals
@@ -297,6 +351,7 @@ mutual
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_bs_lt_comm _ _ _
       | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   /-- Helper: transBranches is contractive for productive branches. -/
   theorem transBranches_isContractive_of_isProductive

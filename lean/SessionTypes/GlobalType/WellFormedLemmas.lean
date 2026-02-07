@@ -53,6 +53,9 @@ mutual
     | .comm _ _ branches =>
         simp only [GlobalType.allVarsBound] at hbound ⊢
         exact allVarsBoundBranches_mono branches bound₁ bound₂ hsub hbound
+    | .delegate _ _ _ _ cont =>
+        simp only [GlobalType.allVarsBound] at hbound ⊢
+        exact allVarsBound_mono cont bound₁ bound₂ hsub hbound
 
   theorem allVarsBoundBranches_mono (branches : List (Label × GlobalType))
       (bound₁ bound₂ : List String)
@@ -204,6 +207,9 @@ mutual
     | .comm sender receiver branches =>
         simp only [GlobalType.substitute, GlobalType.allVarsBound] at hg ⊢
         exact allVarsBoundBranches_substitute branches varName repl bound hg hrepl
+    | .delegate p q sid r cont =>
+        simp only [GlobalType.substitute, GlobalType.allVarsBound] at hg ⊢
+        exact allVarsBound_substitute cont varName repl bound hg hrepl
 
   theorem allVarsBoundBranches_substitute (branches : List (Label × GlobalType))
       (varName : String) (repl : GlobalType) (bound : List String)
@@ -246,6 +252,9 @@ mutual
           | [] => simp [List.isEmpty] at hg
           | _ :: _ => simp [substituteBranches, List.isEmpty]
         · exact allCommsNonEmptyBranches_substitute branches varName repl hg.2 hrepl
+    | .delegate p q sid r cont =>
+        simp only [GlobalType.substitute, GlobalType.allCommsNonEmpty] at hg ⊢
+        exact allCommsNonEmpty_substitute cont varName repl hg hrepl
 
   theorem allCommsNonEmptyBranches_substitute (branches : List (Label × GlobalType))
       (varName : String) (repl : GlobalType)
@@ -282,6 +291,9 @@ mutual
     | .comm sender receiver branches =>
         simp only [GlobalType.substitute, GlobalType.noSelfComm, Bool.and_eq_true] at hg ⊢
         exact ⟨hg.1, noSelfCommBranches_substitute branches varName repl hg.2 hrepl⟩
+    | .delegate p q sid r cont =>
+        simp only [GlobalType.substitute, GlobalType.noSelfComm, Bool.and_eq_true] at hg ⊢
+        exact ⟨hg.1, noSelfComm_substitute cont varName repl hg.2 hrepl⟩
 
   theorem noSelfCommBranches_substitute (branches : List (Label × GlobalType))
       (varName : String) (repl : GlobalType)
@@ -330,6 +342,9 @@ mutual
     | .comm _ _ branches =>
         simp only [GlobalType.isProductive] at hprod ⊢
         exact hprod  -- comm resets unguarded to [], so independent of ug1/ug2
+    | .delegate _ _ _ _ cont =>
+        simp only [GlobalType.isProductive] at hprod ⊢
+        exact hprod  -- delegate resets unguarded to [], so independent of ug1/ug2
 
   theorem isProductiveBranches_mono (branches : List (Label × GlobalType))
       (ug1 ug2 : List String)

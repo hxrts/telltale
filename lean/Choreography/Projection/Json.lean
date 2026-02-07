@@ -100,6 +100,10 @@ partial def globalTypeToJson : GlobalType → Json
       Json.mkObj [("kind", "rec"), ("var", Json.str var), ("body", globalTypeToJson body)]
   | .var name =>
       Json.mkObj [("kind", "var"), ("name", Json.str name)]
+  | .delegate delegator delegatee sessionId role cont =>
+      Json.mkObj [("kind", "delegate"), ("delegator", Json.str delegator),
+        ("delegatee", Json.str delegatee), ("session_id", Json.num sessionId),
+        ("role", Json.str role), ("continuation", globalTypeToJson cont)]
 
 /-- Deserialize a GlobalType from JSON. -/
 partial def globalTypeFromJson (j : Json) : Except String GlobalType := do
@@ -122,6 +126,13 @@ partial def globalTypeFromJson (j : Json) : Except String GlobalType := do
   | "var" =>
       let name ← j.getObjValAs? String "name"
       .ok (.var name)
+  | "delegate" =>
+      let delegator ← j.getObjValAs? String "delegator"
+      let delegatee ← j.getObjValAs? String "delegatee"
+      let sessionId ← j.getObjValAs? Nat "session_id"
+      let role ← j.getObjValAs? String "role"
+      let cont ← globalTypeFromJson (j.getObjValD "continuation")
+      .ok (.delegate delegator delegatee sessionId role cont)
   | other => .error s!"invalid GlobalType kind: {other}"
 
 /-! ## LocalTypeR Serialization -/

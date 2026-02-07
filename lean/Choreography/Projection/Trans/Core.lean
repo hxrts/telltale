@@ -55,20 +55,22 @@ open SessionTypes.LocalTypeR
 
 /-- Check if a global type is locally contractive (guarded recursion).
     A type is contractive if:
-    - `end`, `var`, and `comm` are always contractive
-    - `mu t body` is contractive iff body starts with a `comm` (not `var` or another `mu`)
+    - `end`, `var`, `comm`, and `delegate` are always contractive
+    - `mu t body` is contractive iff body starts with a `comm` or `delegate` (not `var` or another `mu`)
 
     This ensures that unfolding recursion makes progress (necessary for coinductive projection). -/
 def lcontractive : GlobalType → Bool
   | .end => true
   | .var _ => true
   | .comm _ _ _ => true
+  | .delegate _ _ _ _ _ => true
   | .mu _ body =>
       match body with
-      | .var _ => false    -- Immediately recursive without guard
-      | .mu _ _ => false   -- Nested mu without guard
+      | .var _ => false         -- Immediately recursive without guard
+      | .mu _ _ => false        -- Nested mu without guard
       | .comm _ _ _ => true
-      | .end => true       -- Degenerate but contractive
+      | .delegate _ _ _ _ _ => true
+      | .end => true            -- Degenerate but contractive
 
 /-! ## Size-Of Lemmas for Termination -/
 
@@ -172,6 +174,20 @@ mutual
           match branches with
           | [] => .end
           | (_, cont) :: _ => trans cont role
+    | .delegate p q sid r cont, role =>
+        -- Delegation: p sends channel (sid, r) to q
+        -- - delegator p: sends the channel endpoint
+        -- - delegatee q: receives the channel endpoint
+        -- - others: not involved in this delegation step
+        if role == p then
+          -- Delegator sends channel type to delegatee
+          .send q [(⟨"_delegate", .unit⟩, some (.chan sid r), trans cont role)]
+        else if role == q then
+          -- Delegatee receives channel type from delegator
+          .recv p [(⟨"_delegate", .unit⟩, some (.chan sid r), trans cont role)]
+        else
+          -- Other roles just continue
+          trans cont role
   termination_by
     g _ => sizeOf g
   decreasing_by
@@ -180,6 +196,7 @@ mutual
       | exact sizeOf_body_lt_mu _ _
       | exact sizeOf_bs_lt_comm _ _ _
       | exact sizeOf_cont_lt_comm _ _ _ _ _
+      | simp only [sizeOf, GlobalType._sizeOf_1]; omega
 
   /-- Project branch continuations for `trans`. -/
   def transBranches : List (Label × GlobalType) → String → List BranchR
@@ -332,6 +349,24 @@ mutual
                         have hmem' : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
                         simp [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap,
                           List.flatMap_cons, List.mem_append, hmem']
+    | .delegate p q sid r cont =>
+        -- Delegate projects to continuation's freeVars
+        simp only [trans] at hx
+        by_cases hp : role == p
+        · simp only [hp, ↓reduceIte, LocalTypeR.freeVars,
+            SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap,
+            List.append_nil, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil] at hx
+          have hmem : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
+          simp [GlobalType.freeVars, hmem]
+        · by_cases hq : role == q
+          · simp only [hp, Bool.false_eq_true, ↓reduceIte, hq, LocalTypeR.freeVars,
+              SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap, List.flatMap,
+              List.append_nil, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil] at hx
+            have hmem : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
+            simp [GlobalType.freeVars, hmem]
+          · simp only [hp, Bool.false_eq_true, ↓reduceIte, hq] at hx
+            have hmem : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
+            simp [GlobalType.freeVars, hmem]
 
   termination_by g _ _ => sizeOf g
   decreasing_by

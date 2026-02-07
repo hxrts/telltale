@@ -273,6 +273,7 @@ def GlobalType.roles_nodup : (g : GlobalType) → g.roles.Nodup
   | .var _ => List.Pairwise.nil
   | .mu _ body => GlobalType.roles_nodup body
   | .comm _ _ _ => nodup_eraseDups _
+  | .delegate _ _ _ _ _ => nodup_eraseDups _
 
 /-! ## Substitution preserves role containment
 
@@ -320,6 +321,21 @@ mutual
           | inr hr => right; exact hr
     | .comm sender receiver branches => fun p hp => by
         exact substitute_roles_subset_comm sender receiver branches t repl p hp
+    | .delegate delegator delegatee sid role cont => fun p hp => by
+        simp only [GlobalType.substitute, GlobalType.roles] at hp ⊢
+        have hp' := mem_of_mem_eraseDups hp
+        simp only [List.mem_append] at hp'
+        cases hp' with
+        | inl hpq =>
+            left
+            exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inl hpq))
+        | inr hcont =>
+            have ih := substitute_roles_subset cont t repl p hcont
+            cases ih with
+            | inl horiginal =>
+                left
+                exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
+            | inr hrepl => right; exact hrepl
 
   /-- Branch substitution preserves role containment. -/
   theorem substituteBranches_roles_subset (branches : List (Label × GlobalType))

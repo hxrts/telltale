@@ -31,6 +31,9 @@ mutual
         match branches with
         | [] => false
         | (_, cont) :: _ => participatesFirstBranch role cont
+    | .delegate p q _ _ cont =>
+        SessionTypes.Participation.is_participant role p q ||
+        participatesFirstBranch role cont
 
   /-- Branches version for mutual recursion (unused but needed for termination). -/
   def participatesFirstBranchBranches (role : String) : List (Label × GlobalType) → Bool
@@ -68,6 +71,17 @@ theorem participatesFirstBranch_imp_participates (g : GlobalType) (role : String
               have hcont_part : SessionTypes.Participation.participates role cont = true :=
                 participatesFirstBranch_imp_participates cont role hcont
               simp [SessionTypes.Participation.participatesBranches, hcont_part]
+  | .delegate p q sid r cont =>
+      unfold participatesFirstBranch at h
+      unfold SessionTypes.Participation.participates
+      cases hpart : SessionTypes.Participation.is_participant role p q with
+      | true =>
+          simp
+      | false =>
+          simp [hpart] at h
+          have hcont_part : SessionTypes.Participation.participates role cont = true :=
+            participatesFirstBranch_imp_participates cont role h
+          simp [hcont_part]
 
 mutual
   /-- Participation that continues through ALL branch continuations, not just first branch.
@@ -85,6 +99,11 @@ mutual
          match branches with
          | [] => false
          | (_, cont) :: _ => participatesAllBranches role cont)
+    | .delegate p q _ _ cont =>
+        SessionTypes.Participation.is_participant role p q &&
+        participatesAllBranches role cont ||
+        (!(SessionTypes.Participation.is_participant role p q) &&
+         participatesAllBranches role cont)
 
   /-- Helper for branch list participation. -/
   def participatesAllBranchesList (role : String) : List (Label × GlobalType) → Bool
@@ -192,5 +211,39 @@ theorem trans_isGuarded_of_participatesFirstBranch
                     | inr hright =>
                         exact hright
                   exact trans_isGuarded_of_participatesFirstBranch cont v role hcont
+  | .delegate p q sid r cont =>
+      -- Delegate case: direct participant or follow the continuation.
+      cases hpart_direct : SessionTypes.Participation.is_participant role p q with
+      | true =>
+          -- Direct participant: projection is send or recv, which are guarded
+          simp only [trans]
+          by_cases hp : role == p
+          · simp only [hp, ↓reduceIte, LocalTypeR.isGuarded]
+          · by_cases hq : role == q
+            · simp only [hp, Bool.false_eq_true, ↓reduceIte, hq, LocalTypeR.isGuarded]
+            · -- Contradiction: is_participant but neither p nor q
+              unfold SessionTypes.Participation.is_participant at hpart_direct
+              simp only [Bool.or_eq_true] at hpart_direct
+              cases hpart_direct with
+              | inl heqp => exact absurd heqp hp
+              | inr heqq => exact absurd heqq hq
+      | false =>
+          -- Not direct participant: follow continuation
+          simp only [trans]
+          have hp : (role == p) = false := by
+            by_contra h
+            simp only [Bool.not_eq_false] at h
+            unfold SessionTypes.Participation.is_participant at hpart_direct
+            simp [h] at hpart_direct
+          have hq : (role == q) = false := by
+            by_contra h
+            simp only [Bool.not_eq_false] at h
+            unfold SessionTypes.Participation.is_participant at hpart_direct
+            simp [h] at hpart_direct
+          simp only [hp, Bool.false_eq_true, ↓reduceIte, hq]
+          have hcont : participatesFirstBranch role cont = true := by
+            simp [participatesFirstBranch, hpart_direct] at hpart
+            exact hpart
+          exact trans_isGuarded_of_participatesFirstBranch cont v role hcont
 
 end Choreography.Projection.Trans
