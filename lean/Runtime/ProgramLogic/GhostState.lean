@@ -1,8 +1,6 @@
 import Runtime.Resources.SessionRA
 import Runtime.VM.Knowledge
-import Runtime.Compat.RA
-import Runtime.Compat.Inv
-import Runtime.Compat.SavedProp
+import Runtime.IrisBridge
 
 /- 
 The Problem. Capture ghost resources for knowledge, progress, and transfer
@@ -169,6 +167,8 @@ def finalization_token_persistent (ft : FinalizationToken) : Prop :=
   -- Finalization tokens with the same scope and mode are equal (structural identity).
   ∀ ft' : FinalizationToken, ft'.scope = ft.scope → ft'.mode = ft.mode → ft' = ft
 
+omit [Telltale.TelltaleIris] [GhostMapSlot Unit] [GhostMapSlot Nat]
+    [GhostMapSlot FinalizationMode] in
 theorem finalization_token_persistent_holds (ft : FinalizationToken) :
     finalization_token_persistent ft := by
   intro ft' hs hm

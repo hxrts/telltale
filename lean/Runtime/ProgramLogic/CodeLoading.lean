@@ -2,8 +2,7 @@ import Protocol.Coherence.Consume
 import Protocol.DeadlockFreedom
 import Runtime.VM.Definition
 import Runtime.Invariants.SessionInv
-import Runtime.Compat.Inv
-import Runtime.Compat.WP
+import Runtime.IrisBridge
 
 /-
 The Problem. The VM needs a code loading interface with V1 hash checks

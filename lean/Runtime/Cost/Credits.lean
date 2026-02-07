@@ -1,5 +1,5 @@
 import Runtime.VM.Config
-import Runtime.Compat.RA
+import Runtime.IrisBridge
 
 /- 
 The Problem. The runtime needs a lightweight credit resource for metering

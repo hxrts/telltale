@@ -1,7 +1,7 @@
 import Runtime.VM.RunScheduled
 import Runtime.VM.Scheduler
 import Runtime.ProgramLogic.LanguageInstance
-import Runtime.Compat.WP
+import Runtime.IrisBridge
 
 /-
 The Problem. Show that per-session normalized traces are invariant under
@@ -19,6 +19,8 @@ noncomputable section
 
 universe u
 
+variable [Telltale.TelltaleIris]
+
 /-! ## Iris invariance helper -/
 
 theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
@@ -26,18 +28,28 @@ theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [Guard
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (e : Expr) (σ : VMState ι γ π ε ν) (Φ : Iris.Language.val (SessionVM ι γ π ε ν) → iProp)
+    (e : Expr) (σ : VMState ι γ π ε ν) (Φ : SessionVMVal → iProp)
     (hWP : iProp.entails iProp.emp
-      (iProp.wand (Iris.state_interp (SessionVM ι γ π ε ν) σ)
-        (Iris.wp (SessionVM ι γ π ε ν) Mask.top e Φ))) :
+      (iProp.wand
+        (Iris.state_interp
+          (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) σ)
+        (Iris.wp
+          (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) Mask.top e Φ))) :
     ∀ e' σ',
-      Iris.MultiStep' (Λ:=SessionVM ι γ π ε ν) e σ e' σ' →
-      iProp.entails iProp.emp (bupd (Iris.state_interp (SessionVM ι γ π ε ν) σ')) :=
+      Iris.MultiStep' (Λ:=instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
+        e σ e' σ' →
+      iProp.entails iProp.emp
+        (bupd
+          (Iris.state_interp
+            (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) σ')) :=
   -- Delegate to the generic Iris invariance lemma.
-  Iris.wp_invariance (Λ:=SessionVM ι γ π ε ν) (e:=e) (σ:=σ) (Φ:=Φ) hWP
+  Iris.wp_invariance
+    (Λ:=instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
+    (e:=e) (σ:=σ) (Φ:=Φ) hWP
 
 /-! ## Scheduler invariance helpers -/
 
+omit [Telltale.TelltaleIris] in
 private lemma schedRound_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -53,6 +65,7 @@ private lemma schedRound_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
       -- Only the nonzero case is used by `schedRound`.
       simp [schedRound]
 
+omit [Telltale.TelltaleIris] in
 private lemma runScheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -69,6 +82,7 @@ private lemma runScheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [
       -- Inductive step: normalize the round count to one.
       simp [runScheduled, schedRound_eq_one (n:=n) (st:=_) hn, ih]
 
+omit [Telltale.TelltaleIris] in
 private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -88,6 +102,7 @@ private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι
 
 /-! ## Per-session trace invariance -/
 
+omit [Telltale.TelltaleIris] in
 theorem per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -104,6 +119,7 @@ theorem per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel �
   have h2 := runScheduled_eq_one (fuel:=fuel) (n:=n2) (st:=st) hn2
   simp [h1, h2]
 
+omit [Telltale.TelltaleIris] in
 theorem per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]

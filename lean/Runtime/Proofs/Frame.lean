@@ -94,7 +94,7 @@ The diamond property at the Protocol level: operations on disjoint sessions comm
 
 /-- Operations on disjoint sessions preserve coherence independently. -/
 theorem disjoint_sessions_independent {s₁ s₂ : SessionId}
-    (hDiff : s₁ ≠ s₂)
+    (_hDiff : s₁ ≠ s₂)
     {G : GEnv} {D : DEnv}
     (hCoh : Coherent G D) :
     -- Coherence for s₁ is independent of changes to s₂ and vice versa

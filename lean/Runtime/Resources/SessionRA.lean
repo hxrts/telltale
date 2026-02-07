@@ -1,5 +1,5 @@
 import Runtime.VM.TypeClasses
-import Runtime.Compat.RA
+import Runtime.IrisBridge
 
 /-!
 # Task 13: Session Resource Algebra
@@ -34,7 +34,7 @@ def encodeEndpoint (e : Endpoint) : Positive :=
 theorem encodeEndpoint_inj : Function.Injective encodeEndpoint := by
   intro ⟨sid1, role1⟩ ⟨sid2, role2⟩ h
   simp only [encodeEndpoint, List.cons.injEq, and_true] at h
-  simp only [Iris.Countable.encode_inj h.1, Iris.Countable.encode_inj h.2, and_self]
+  simp only [Iris.Countable.encode_inj h.1, Iris.Countable.encode_inj h.2]
 
 /-! ## Session Map Type -/
 
@@ -43,6 +43,16 @@ variable [slot : GhostMapSlot LocalType]
 
 /-- Session map: ghost map from encoded endpoints to local types. -/
 abbrev SessionMap := GhostMap LocalType
+
+namespace GMap
+
+/-- Lookup an endpoint's local type from a session ghost map. -/
+def lookup (m : SessionMap) (e : Endpoint) : Option LocalType :=
+  match Iris.Std.get? m (encodeEndpoint e) with
+  | some (Iris.LeibnizO.mk L) => some L
+  | none => none
+
+end GMap
 
 /-! ## Ghost State Propositions -/
 

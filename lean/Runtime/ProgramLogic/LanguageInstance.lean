@@ -1,5 +1,5 @@
 import Runtime.VM.Definition
-import Runtime.Compat.WP
+import Runtime.IrisBridge
 
 /-!
 # Task 12: Language Instance
@@ -23,38 +23,68 @@ inductive SessionVM (ι γ π ε ν : Type) : Type where
   -- Tag type for the VM language instance.
   | mk
 
-def SessionVM.to_val (e : Expr) : Option Expr :=
+/-- Values are halted expressions. -/
+abbrev SessionVMVal := { e : Expr // e.halted = true }
+
+def SessionVM.to_val (e : Expr) : Option SessionVMVal :=
   -- A halted expression is treated as a value.
-  if e.halted then some e else none
+  if h : e.halted then some ⟨e, h⟩ else none
 
-def SessionVM.of_val (v : Expr) : Expr :=
-  -- Wrap a value as a halted expression.
-  { v with halted := true }
+def SessionVM.of_val (v : SessionVMVal) : Expr :=
+  -- Unwrap a halted expression.
+  v.1
 
-instance instLanguageSessionVM {ι γ π ε ν : Type}
+def SessionVM.prim_step {ι γ π ε ν : Type}
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (e : Expr) (σ : VMState ι γ π ε ν) (κ : List Unit)
+    (e' : Expr) (σ' : VMState ι γ π ε ν) (efs : List Expr) : Prop :=
+  κ = [] ∧
+  e.halted = false ∧
+  let (σ1, res) := execInstr σ e.cid
+  match res.status with
+  | .blocked _ => False
+  | _ =>
+      let halted' :=
+        match σ1.coroutines[e.cid]? with
+        | some c => match c.status with | .done => true | _ => false
+        | none => true
+      e' = { cid := e.cid, halted := halted' } ∧ σ' = σ1 ∧ efs = []
+
+def instLanguageSessionVM {ι γ π ε ν : Type}
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] :
-    Iris.Language (SessionVM ι γ π ε ν) where
+    Iris.ProgramLogic.Language where
   expr := Expr
-  val := Expr
+  val := SessionVMVal
   state := VMState ι γ π ε ν
+  observation := Unit
   of_val := SessionVM.of_val
   to_val := SessionVM.to_val
-  prim_step := fun e σ =>
-    -- Do not step halted expressions.
-    if e.halted then [] else
-      let (σ', res) := execInstr σ e.cid
-      match res.status with
-      | .blocked _ => []
-      | _ =>
-          let halted' :=
-            match σ'.coroutines[e.cid]? with
-            | some c => match c.status with | .done => true | _ => false
-            | none => true
-          [({ cid := e.cid, halted := halted' }, σ', [])]
+  prim_step := SessionVM.prim_step
+  mixin :=
+    { to_of_val := by
+        intro v
+        cases v with
+        | mk v hv =>
+            simp [SessionVM.to_val, SessionVM.of_val, hv]
+      of_to_val := by
+        intro e v h
+        by_cases hhalted : e.halted
+        · simp [SessionVM.to_val, hhalted] at h
+          cases h
+          rfl
+        · simp [SessionVM.to_val, hhalted] at h
+      val_stuck := by
+        intro e σ κ e' σ' efs hstep
+        rcases hstep with ⟨_, hhalted, _⟩
+        simp [SessionVM.to_val, hhalted] }
 
 /-- `to_val` after `of_val` yields the halted expression. -/
 theorem to_of_val {ι γ π ε ν : Type}
@@ -63,10 +93,11 @@ theorem to_of_val {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (v : Expr) :
-    SessionVM.to_val (SessionVM.of_val v) = some { v with halted := true } := by
-  -- The wrapper forces `halted = true`.
-  simp [SessionVM.to_val, SessionVM.of_val]
+    (v : SessionVMVal) :
+    SessionVM.to_val (SessionVM.of_val v) = some v := by
+  cases v with
+  | mk v hv =>
+      simp [SessionVM.to_val, SessionVM.of_val, hv]
 
 /-- `of_val` simply flips the `halted` flag. -/
 theorem of_to_val {ι γ π ε ν : Type}
@@ -75,19 +106,11 @@ theorem of_to_val {ι γ π ε ν : Type}
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (e : Expr) :
-    SessionVM.of_val e = { e with halted := true } := by
-  -- Definition is by record update.
-  rfl
-
-/-- Values are head-stuck in the VM language. -/
-theorem val_head_stuck {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (v : Expr) (σ : VMState ι γ π ε ν) :
-    Iris.Language.prim_step (Λ:=SessionVM ι γ π ε ν) (SessionVM.of_val v) σ = [] := by
-  -- A halted expression produces no steps.
-  simp [Iris.Language.prim_step, instLanguageSessionVM, SessionVM.of_val]
+    (e : Expr) (v : SessionVMVal) :
+    SessionVM.to_val e = some v → SessionVM.of_val v = e := by
+  intro h
+  by_cases hhalted : e.halted
+  · simp [SessionVM.to_val, hhalted] at h
+    cases h
+    rfl
+  · simp [SessionVM.to_val, hhalted] at h

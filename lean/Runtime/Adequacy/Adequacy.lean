@@ -3,7 +3,7 @@ import Runtime.VM.Program
 import Runtime.VM.State
 import Runtime.VM.Violation
 import Runtime.ProgramLogic.SessionWP
-import Runtime.Compat.WP
+import Runtime.IrisBridge
 
 /- 
 The Problem. Define observable traces and adequacy statements that connect
@@ -37,6 +37,8 @@ set_option autoImplicit false
 noncomputable section
 
 universe u
+
+variable [Telltale.TelltaleIris]
 
 -- Trace of observable events.
 abbrev ObsTrace (ε : Type u) [EffectModel ε] := List (Nat × ObsEvent ε)
@@ -133,6 +135,7 @@ def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
   ∀ (st : VMState ι γ π ε ν) idx ev,
     (idx, ev) ∈ obsTraceOf (ε:=ε) st.obsTrace →
       ∃ stepEv ∈ st.obsTrace, observeAt (ε:=ε) idx stepEv = ev
+omit [Telltale.TelltaleIris] in
 private theorem go_mem {ε : Type u} [EffectModel ε]
     {start : Nat} {evs : List (TickedObsEvent ε)} {idx : Nat} {ev : ObsEvent ε}
     (h : (idx, ev) ∈ obsTraceOf.go start evs) :
@@ -148,6 +151,7 @@ private theorem go_mem {ε : Type u} [EffectModel ε]
     · obtain ⟨stepEv, hm, he⟩ := ih h
       exact ⟨stepEv, List.mem_cons_of_mem hd hm, he⟩
 
+omit [Telltale.TelltaleIris] in
 theorem no_phantom_events_holds {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]

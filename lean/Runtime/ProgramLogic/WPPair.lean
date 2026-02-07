@@ -1,6 +1,5 @@
 import Runtime.VM.Core
-import Runtime.Compat.Inv
-import Runtime.Compat.WP
+import Runtime.IrisBridge
 
 /- 
 The Problem. Many instruction WP rules share the same acquire/interact/release

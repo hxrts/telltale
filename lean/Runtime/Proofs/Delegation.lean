@@ -43,6 +43,7 @@ Solution Structure. The proof decomposes into four helper theorems:
 
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
+set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
@@ -250,7 +251,7 @@ theorem consumeOne_rename_unrelated (s : SessionId) (A B : Role) (from_ : Role)
         simp [hRoleEq, hRoleRen]
       have hBeqType : (renameValTypeRole s A B T == renameValTypeRole s A B T') = true := by
         simp [hTypeEq]
-      simp [consumeOne, renameLocalTypeRole, renameValTypeRole, hBeqRole, hBeqType, hL]
+      simp [consumeOne, renameLocalTypeRole, hBeqRole, hBeqType, hL]
   | send r T' Lr =>
       cases h
   | select r bs =>

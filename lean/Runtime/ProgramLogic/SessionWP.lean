@@ -1,8 +1,7 @@
 import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Invariants.SessionInv
 import Runtime.ProgramLogic.WPPair
-import Runtime.Compat.Inv
-import Runtime.Compat.WP
+import Runtime.IrisBridge
 
 /- 
 The Problem. Provide uniform WP rules for VM instructions without repeating
@@ -35,6 +34,10 @@ noncomputable section
 universe u
 
 variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+variable [Telltale.TelltaleIris]
+variable [GhostMapSlot Unit]
+variable [GhostMapSlot Nat]
+variable [GhostMapSlot LocalType]
 
 def wp_send (γn : GhostName) (sid : SessionId) (ct : CancelToken)
     (e : Endpoint) (L : LocalType) : iProp :=

@@ -3,8 +3,7 @@ import Protocol.Coherence.Consume
 import Runtime.Resources.SessionRA
 import Runtime.ProgramLogic.GhostState
 import Runtime.VM.State
-import Runtime.Compat.Inv
-import Runtime.Compat.SavedProp
+import Runtime.IrisBridge
 
 /-
 The Problem. The runtime needs a per-session cancelable invariant that
@@ -37,6 +36,11 @@ Dependencies: Task 13, Shim.Invariants + Shim.SavedProp.
 set_option autoImplicit false
 noncomputable section
 
+variable [Telltale.TelltaleIris]
+variable [GhostMapSlot Unit]
+variable [GhostMapSlot Nat]
+variable [GhostMapSlot LocalType]
+
 /-! ## Session coherence stubs -/
 
 def session_coherent (sid : SessionId) (G : SessionMap) (D : DEnv) : iProp :=
@@ -64,9 +68,9 @@ def knowledge_inv (γ : GhostName) (sid : SessionId) (e : Endpoint) : iProp :=
   -- Endpoint-specific knowledge invariant.
   knows γ (knowledge_fact sid e)
 
-def knowledge_inv_all (γ : GhostName) (sid : SessionId) (G : SessionMap) : iProp :=
-  -- Conjunction of knowledge invariants over the session map.
-  big_sepM (fun e _ => knowledge_inv γ sid e) G
+def knowledge_inv_all (_γ : GhostName) (_sid : SessionId) (_G : SessionMap) : iProp :=
+  -- Placeholder: omit map traversal until endpoint-keyed ghost maps land.
+  iProp.emp
 
 /-! ## Cancelable session invariant -/
 
@@ -141,6 +145,8 @@ def conservation_inv_preserved (_γ : GhostName) (_sid : SessionId)
     eps.foldl (fun acc e => acc + _proj e) 0 = _total →
       (e₀ :: eps).foldl (fun acc e => acc + _proj e) 0 = _total
 
+omit [Telltale.TelltaleIris] [GhostMapSlot Unit] [GhostMapSlot Nat]
+    [GhostMapSlot LocalType] in
 theorem conservation_inv_preserved_holds (_γ : GhostName) (_sid : SessionId)
     {M : Type} [AddCommMonoid M]
     (_proj : Endpoint → M) (_total : M) :
@@ -204,6 +210,8 @@ def migrate_preserves_spatial {ι : Type} [IdentityModel ι]
     canCreate _spatialReq roles _assignment _siteChoice hSiteChoice →
       canCreate _spatialReq roles _assignment _siteChoice' hSiteChoice'
 
+omit [Telltale.TelltaleIris] [GhostMapSlot Unit] [GhostMapSlot Nat]
+    [GhostMapSlot LocalType] in
 theorem migrate_preserves_spatial_holds {ι : Type} [IdentityModel ι]
     (spatialReq : SpatialReq)
     (assignment : Role → IdentityModel.ParticipantId ι)
@@ -224,6 +232,7 @@ def leave_preserves_coherent (sid : SessionId) (role : Role) : Prop :=
     ∀ (e : Endpoint) (L : LocalType), e.role ≠ role → GMap.lookup G e = some L →
       Consume e.role L (lookupD D { sid := sid, sender := e.role, receiver := e.role }) ≠ none
 
+omit [GhostMapSlot Unit] [GhostMapSlot Nat] [GhostMapSlot LocalType] in
 theorem leave_preserves_coherent_holds (sid : SessionId) (role : Role) :
     leave_preserves_coherent sid role :=
   fun _ _ hCoh e L _ hLook => hCoh e L hLook

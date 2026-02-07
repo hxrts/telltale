@@ -27,16 +27,12 @@ theorem swapRole_involutive (A B : Role) (r : Role) :
     swapRole A B (swapRole A B r) = r := by
   by_cases hA : r == A
   · have hA' : r = A := beq_iff_eq.1 hA
-    subst hA
-    simp [swapRole, beq_self_eq_true]
+    simp [swapRole, hA, hA']
   · have hA' : r ≠ A := by
       exact (beq_eq_false_iff_ne (a:=r) (b:=A)).1 (by simpa using hA)
     by_cases hB : r == B
     · have hB' : r = B := beq_iff_eq.1 hB
-      subst hB
-      have hBA : (B == A) = false := beq_eq_false_iff_ne.mpr (by
-        intro h; exact hA' h)
-      simp [swapRole, hA, hB, hBA]
+      simp [swapRole, hA, hB, hB']
     · have hB' : r ≠ B := by
         exact (beq_eq_false_iff_ne (a:=r) (b:=B)).1 (by simpa using hB)
       simp [swapRole, hA, hB, hA', hB']
@@ -77,14 +73,14 @@ end
 
 /-- Swap a role in an endpoint, but only for session s. -/
 def swapEndpointRole (s : SessionId) (A B : Role) (ep : Endpoint) : Endpoint :=
-  if ep.sid == s then
+  if ep.sid = s then
     { sid := ep.sid, role := swapRole A B ep.role }
   else
     ep
 
 /-- Swap roles in an edge, but only for session s. -/
 def swapEdgeRole (s : SessionId) (A B : Role) (e : Edge) : Edge :=
-  if e.sid == s then
+  if e.sid = s then
     { sid := e.sid
       sender := swapRole A B e.sender
       receiver := swapRole A B e.receiver }
@@ -93,39 +89,31 @@ def swapEdgeRole (s : SessionId) (A B : Role) (e : Edge) : Edge :=
 
 theorem swapEndpointRole_sid (s : SessionId) (A B : Role) (ep : Endpoint) :
     (swapEndpointRole s A B ep).sid = ep.sid := by
-  by_cases hSid : ep.sid == s
+  by_cases hSid : ep.sid = s
   · simp [swapEndpointRole, hSid]
   · simp [swapEndpointRole, hSid]
 
 theorem swapEdgeRole_sid (s : SessionId) (A B : Role) (e : Edge) :
     (swapEdgeRole s A B e).sid = e.sid := by
-  by_cases hSid : e.sid == s
+  by_cases hSid : e.sid = s
   · simp [swapEdgeRole, hSid]
   · simp [swapEdgeRole, hSid]
 
 theorem swapEndpointRole_involutive (s : SessionId) (A B : Role) (ep : Endpoint) :
     swapEndpointRole s A B (swapEndpointRole s A B ep) = ep := by
-  by_cases hSid : ep.sid == s
-  · have hSid' : ep.sid = s := beq_iff_eq.1 hSid
-    subst hSid'
-    cases ep with
-    | mk sid role =>
-        simp [swapEndpointRole, swapRole_involutive, beq_self_eq_true]
-  · have hSid' : ep.sid ≠ s := by
-      exact (beq_eq_false_iff_ne (a:=ep.sid) (b:=s)).1 (by simpa using hSid)
-    simp [swapEndpointRole, hSid, hSid']
+  cases ep with
+  | mk sid role =>
+      by_cases hSid : sid = s
+      · simp [swapEndpointRole, hSid, swapRole_involutive]
+      · simp [swapEndpointRole, hSid]
 
 theorem swapEdgeRole_involutive (s : SessionId) (A B : Role) (e : Edge) :
     swapEdgeRole s A B (swapEdgeRole s A B e) = e := by
-  by_cases hSid : e.sid == s
-  · have hSid' : e.sid = s := beq_iff_eq.1 hSid
-    subst hSid'
-    cases e with
-    | mk sid sender receiver =>
-        simp [swapEdgeRole, swapRole_involutive, beq_self_eq_true]
-  · have hSid' : e.sid ≠ s := by
-      exact (beq_eq_false_iff_ne (a:=e.sid) (b:=s)).1 (by simpa using hSid)
-    simp [swapEdgeRole, hSid, hSid']
+  cases e with
+  | mk sid sender receiver =>
+      by_cases hSid : sid = s
+      · simp [swapEdgeRole, hSid, swapRole_involutive]
+      · simp [swapEdgeRole, hSid]
 
 theorem swapEndpointRole_inj (s : SessionId) (A B : Role) (e1 e2 : Endpoint) :
     swapEndpointRole s A B e1 = swapEndpointRole s A B e2 → e1 = e2 := by
@@ -142,7 +130,7 @@ theorem swapEdgeRole_inj (s : SessionId) (A B : Role) (e1 e2 : Edge) :
 /-- Swap all endpoints and their local types for session s. -/
 def swapGEnvRole (s : SessionId) (A B : Role) (G : GEnv) : GEnv :=
   G.map fun (ep, L) =>
-    if ep.sid == s then
+    if ep.sid = s then
       (swapEndpointRole s A B ep, swapLocalTypeRole s A B L)
     else
       (ep, L)
@@ -151,7 +139,7 @@ def swapGEnvRole (s : SessionId) (A B : Role) (G : GEnv) : GEnv :=
 def swapDEnvRole (s : SessionId) (A B : Role) (D : DEnv) : DEnv :=
   D.list.foldl
     (fun acc p =>
-      if p.1.sid == s then
+      if p.1.sid = s then
         updateD acc (swapEdgeRole s A B p.1) (p.2.map (swapValTypeRole s A B))
       else
         updateD acc p.1 p.2)
@@ -173,11 +161,11 @@ private lemma lookupD_eq_list_lookup (D : DEnv) (e : Edge) :
 private lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
     ∀ (l : List (Edge × Trace)) (acc : DEnv) (edge : Edge),
       (∀ p ∈ l,
-        (if p.1.sid == s then swapEdgeRole s A B p.1 else p.1) ≠ edge) →
+        (if p.1.sid = s then swapEdgeRole s A B p.1 else p.1) ≠ edge) →
       lookupD
           (l.foldl
             (fun acc p =>
-              if p.1.sid == s then
+              if p.1.sid = s then
                 updateD acc (swapEdgeRole s A B p.1) (p.2.map (swapValTypeRole s A B))
               else
                 updateD acc p.1 p.2)
@@ -188,72 +176,171 @@ private lemma lookupD_foldl_update_neq_swap (s : SessionId) (A B : Role) :
   | nil => rfl
   | cons hd tl ih =>
       have hne' : ∀ p ∈ tl,
-          (if p.1.sid == s then swapEdgeRole s A B p.1 else p.1) ≠ edge := by
+          (if p.1.sid = s then swapEdgeRole s A B p.1 else p.1) ≠ edge := by
         intro p hp
         exact hne p (List.mem_cons.mpr (Or.inr hp))
       have hhd :
-          (if hd.1.sid == s then swapEdgeRole s A B hd.1 else hd.1) ≠ edge :=
+          (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠ edge :=
         hne hd (List.mem_cons.mpr (Or.inl rfl))
-      by_cases hSid : hd.1.sid == s
-      · simp [List.foldl, hSid, lookupD_update_neq _ _ _ hhd, ih hne']
-      · simp [List.foldl, hSid, lookupD_update_neq _ _ _ hhd, ih hne']
+      by_cases hSid : hd.1.sid = s
+      · have hneEdge : swapEdgeRole s A B hd.1 ≠ edge := by
+          simpa [hSid] using hhd
+        have ih' :=
+          ih (acc:=updateD acc (swapEdgeRole s A B hd.1)
+                (List.map (swapValTypeRole s A B) hd.2)) hne'
+        have ih'' :
+            lookupD
+                (List.foldl
+                  (fun acc p =>
+                    if p.1.sid = s then
+                      updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                    else
+                      updateD acc p.1 p.2)
+                  (updateD acc (swapEdgeRole s A B hd.1)
+                    (List.map (swapValTypeRole s A B) hd.2))
+                  tl)
+                edge =
+              lookupD
+                (updateD acc (swapEdgeRole s A B hd.1)
+                  (List.map (swapValTypeRole s A B) hd.2))
+                edge := by
+          simpa using ih'
+        dsimp [List.foldl]
+        simp [hSid]
+        calc
+          lookupD
+              (List.foldl
+                (fun acc p =>
+                  if p.1.sid = s then
+                    updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                  else
+                    updateD acc p.1 p.2)
+                (updateD acc (swapEdgeRole s A B hd.1)
+                  (List.map (swapValTypeRole s A B) hd.2))
+                tl)
+              edge =
+            lookupD
+              (updateD acc (swapEdgeRole s A B hd.1)
+                (List.map (swapValTypeRole s A B) hd.2))
+              edge := ih''
+          _ = lookupD acc edge :=
+            lookupD_update_neq (env:=acc) (e:=swapEdgeRole s A B hd.1) (e':=edge)
+              (ts:=hd.2.map (swapValTypeRole s A B)) hneEdge
+      · have hneEdge : hd.1 ≠ edge := by
+          simpa [hSid] using hhd
+        have ih' := ih (acc:=updateD acc hd.1 hd.2) hne'
+        have ih'' :
+            lookupD
+                (List.foldl
+                  (fun acc p =>
+                    if p.1.sid = s then
+                      updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                    else
+                      updateD acc p.1 p.2)
+                  (updateD acc hd.1 hd.2) tl)
+                edge =
+              lookupD (updateD acc hd.1 hd.2) edge := by
+          simpa using ih'
+        dsimp [List.foldl]
+        simp [hSid]
+        calc
+          lookupD
+              (List.foldl
+                (fun acc p =>
+                  if p.1.sid = s then
+                    updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                  else
+                    updateD acc p.1 p.2)
+                (updateD acc hd.1 hd.2) tl)
+              edge =
+            lookupD (updateD acc hd.1 hd.2) edge := ih''
+          _ = lookupD acc edge :=
+            lookupD_update_neq (env:=acc) (e:=hd.1) (e':=edge) (ts:=hd.2) hneEdge
 
 /-- Looking up a swapped endpoint in a swapped GEnv. -/
 theorem lookupG_swap (s : SessionId) (A B : Role) (G : GEnv) (e : Endpoint) :
     lookupG (swapGEnvRole s A B G) (swapEndpointRole s A B e) =
-      if e.sid == s then (lookupG G e).map (swapLocalTypeRole s A B) else lookupG G e := by
+      if e.sid = s then (lookupG G e).map (swapLocalTypeRole s A B) else lookupG G e := by
   induction G with
   | nil =>
-      by_cases hSid : e.sid == s
+      by_cases hSid : e.sid = s
       · simp [swapGEnvRole, lookupG, List.lookup, hSid]
       · simp [swapGEnvRole, lookupG, List.lookup, hSid, swapEndpointRole]
   | cons hd tl ih =>
       by_cases heq : e = hd.1
       · subst heq
-        by_cases hSid : hd.1.sid == s
-        · simp [swapGEnvRole, lookupG, List.lookup, hSid]
-        · simp [swapGEnvRole, lookupG, List.lookup, hSid]
+        by_cases hSid : hd.1.sid = s
+        · simp [swapGEnvRole, lookupG, List.lookup, hSid, beq_self_eq_true]
+        · have hSidNe : hd.1.sid ≠ s := hSid
+          have hSwap : swapEndpointRole s A B hd.1 = hd.1 := by
+            simp [swapEndpointRole, hSid]
+          simp [swapGEnvRole, lookupG, List.lookup, hSid, hSidNe, hSwap, beq_self_eq_true]
       · have hne :
           swapEndpointRole s A B e ≠
-            (if hd.1.sid == s then swapEndpointRole s A B hd.1 else hd.1) := by
-          by_cases hHdSid : hd.1.sid == s
+            (if hd.1.sid = s then swapEndpointRole s A B hd.1 else hd.1) := by
+          by_cases hHdSid : hd.1.sid = s
           · intro hEq
             apply heq
             apply swapEndpointRole_inj s A B
             simpa [hHdSid] using hEq
-          · by_cases hSid : e.sid == s
+          · have hHdSidNe : hd.1.sid ≠ s := hHdSid
+            by_cases hSid : e.sid = s
             · intro hEq
+              have hEq' : swapEndpointRole s A B e = hd.1 := by
+                simpa [hHdSid, hHdSidNe] using hEq
               have hSidEq : (swapEndpointRole s A B e).sid = hd.1.sid :=
-                congrArg Endpoint.sid hEq
+                congrArg Endpoint.sid hEq'
               have hSidL : (swapEndpointRole s A B e).sid = e.sid := by
                 simpa using (swapEndpointRole_sid (s:=s) (A:=A) (B:=B) (ep:=e))
               have hSidEq' : e.sid = hd.1.sid := by simpa [hSidL] using hSidEq
-              have hSidNe : hd.1.sid ≠ s :=
-                (beq_eq_false_iff_ne (a:=hd.1.sid) (b:=s)).1 (by simpa using hHdSid)
-              have hSidEq'' : s = hd.1.sid := by
-                have hSidProp : e.sid = s := beq_iff_eq.1 hSid
-                simpa [hSidProp] using hSidEq'
-              exact (hSidNe hSidEq'').elim
+              have hSidEq'' : hd.1.sid = s := by
+                exact hSidEq'.symm.trans hSid
+              exact (hHdSidNe hSidEq'').elim
             · intro hEq
-              have hSidNe : e.sid ≠ s :=
-                (beq_eq_false_iff_ne (a:=e.sid) (b:=s)).1 (by simpa using hSid)
+              have hSidNe : e.sid ≠ s := hSid
               have hSwap : swapEndpointRole s A B e = e := by
                 simp [swapEndpointRole, hSid]
               exact (heq (by simpa [hSwap, hHdSid] using hEq)).elim
-        have hbeq :
+        have hne1 :
+            swapEndpointRole s A B e ≠
+              (if hd.1.sid = s then
+                  (swapEndpointRole s A B hd.1, swapLocalTypeRole s A B hd.2)
+                else
+                  hd).1 := by
+          intro hEq
+          apply hne
+          by_cases hHdSid : hd.1.sid = s <;> simpa [hHdSid] using hEq
+        have hbeq1 :
             (swapEndpointRole s A B e ==
-              (if hd.1.sid == s then swapEndpointRole s A B hd.1 else hd.1)) = false :=
-          beq_eq_false_iff_ne.mpr hne
+              (if hd.1.sid = s then
+                  (swapEndpointRole s A B hd.1, swapLocalTypeRole s A B hd.2)
+                else
+                  hd).1) = false :=
+          beq_eq_false_iff_ne.mpr hne1
         have hbeq' : (e == hd.1) = false := beq_eq_false_iff_ne.mpr heq
-        simp [swapGEnvRole, lookupG, List.lookup, hbeq, hbeq', ih]
+        have ih' :
+            List.lookup (swapEndpointRole s A B e)
+                (List.map
+                  (fun x =>
+                    if x.1.sid = s then
+                      (swapEndpointRole s A B x.1, swapLocalTypeRole s A B x.2)
+                    else
+                      x)
+                  tl) =
+              if e.sid = s then
+                Option.map (swapLocalTypeRole s A B) (List.lookup e tl)
+              else
+                List.lookup e tl := by
+          simpa [swapGEnvRole, lookupG] using ih
+        simpa [swapGEnvRole, lookupG, List.lookup, hbeq1, hbeq'] using ih'
 
 /-- Looking up a swapped edge in a swapped DEnv. -/
 theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
     lookupD (swapDEnvRole s A B D) (swapEdgeRole s A B e) =
-      if e.sid == s then (lookupD D e).map (swapValTypeRole s A B) else lookupD D e := by
+      if e.sid = s then (lookupD D e).map (swapValTypeRole s A B) else lookupD D e := by
   have hfold :
       lookupD (swapDEnvRole s A B D) (swapEdgeRole s A B e) =
-        if e.sid == s then
+        if e.sid = s then
           match D.list.lookup e with
           | some ts => ts.map (swapValTypeRole s A B)
           | none => []
@@ -268,14 +355,14 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
               lookupD
                   (l.foldl
                     (fun acc p =>
-                      if p.1.sid == s then
+                      if p.1.sid = s then
                         updateD acc (swapEdgeRole s A B p.1)
                           (p.2.map (swapValTypeRole s A B))
                       else
                         updateD acc p.1 p.2)
                     acc)
                   (swapEdgeRole s A B e) =
-                if e.sid == s then
+                if e.sid = s then
                   match l.lookup e with
                   | some ts => ts.map (swapValTypeRole s A B)
                   | none => lookupD acc (swapEdgeRole s A B e)
@@ -288,7 +375,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
           induction l generalizing acc with
           | nil =>
               intro sorted
-              by_cases hSid : e.sid == s
+              by_cases hSid : e.sid = s
               · simp [List.lookup, hSid]
               · simp [List.lookup, hSid, swapEdgeRole]
           | cons hd tl ih =>
@@ -296,16 +383,16 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
               have hpair := (List.pairwise_cons.1 sorted)
               have hhd : ∀ p ∈ tl, edgeCmpLT hd p := hpair.1
               have htl : tl.Pairwise edgeCmpLT := hpair.2
-              by_cases hSid : e.sid == s
+              by_cases hSid : e.sid = s
               · by_cases hEq : e = hd.1
                 · subst hEq
-                  have hSidHd : hd.1.sid == s := by simpa using hSid
+                  have hSidHd : hd.1.sid = s := by simpa using hSid
                   have hne :
                       ∀ p ∈ tl,
-                        (if p.1.sid == s then swapEdgeRole s A B p.1 else p.1) ≠
+                        (if p.1.sid = s then swapEdgeRole s A B p.1 else p.1) ≠
                           swapEdgeRole s A B hd.1 := by
                     intro p hp
-                    by_cases hPsid : p.1.sid == s
+                    by_cases hPsid : p.1.sid = s
                     · intro hEq
                       have hEq' : p.1 = hd.1 := by
                         apply swapEdgeRole_inj (s:=s) (A:=A) (B:=B)
@@ -317,10 +404,9 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                         exact hlt.symm.trans hEqCmp
                       cases this
                     · intro hEq
-                      have hSidNe : p.1.sid ≠ s :=
-                        (beq_eq_false_iff_ne (a:=p.1.sid) (b:=s)).1 (by simpa using hPsid)
+                      have hSidNe : p.1.sid ≠ s := hPsid
                       have hSidTarget : (swapEdgeRole s A B hd.1).sid = s := by
-                        have hSidProp : hd.1.sid = s := beq_iff_eq.1 hSidHd
+                        have hSidProp : hd.1.sid = s := hSidHd
                         simpa [hSidProp] using
                           (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=hd.1))
                       have hSidEq : p.1.sid = (swapEdgeRole s A B hd.1).sid :=
@@ -330,7 +416,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       lookupD
                           (tl.foldl
                             (fun acc p =>
-                              if p.1.sid == s then
+                              if p.1.sid = s then
                                 updateD acc (swapEdgeRole s A B p.1)
                                   (p.2.map (swapValTypeRole s A B))
                               else
@@ -348,44 +434,86 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                   simp [List.lookup, List.foldl, hSid, hSidHd, htail, lookupD_update_eq]
                 · -- e ≠ hd.1
                   have hne :
-                      (if hd.1.sid == s then swapEdgeRole s A B hd.1 else hd.1) ≠
+                      (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠
                         swapEdgeRole s A B e := by
-                    by_cases hHdSid : hd.1.sid == s
+                    by_cases hHdSid : hd.1.sid = s
+                    · intro hEqSwap
+                      have hEqSwap' : swapEdgeRole s A B hd.1 = swapEdgeRole s A B e := by
+                        simpa [hHdSid] using hEqSwap
+                      have hEq' : hd.1 = e :=
+                        swapEdgeRole_inj (s:=s) (A:=A) (B:=B) (e1:=hd.1) (e2:=e) hEqSwap'
+                      exact (hEq hEq'.symm).elim
                     · intro hEq
-                      apply heq
-                      apply swapEdgeRole_inj s A B
-                      simpa [hHdSid] using hEq
-                    · intro hEq
-                      have hSidNe : hd.1.sid ≠ s :=
-                        (beq_eq_false_iff_ne (a:=hd.1.sid) (b:=s)).1 (by simpa using hHdSid)
+                      have hSidNe : hd.1.sid ≠ s := hHdSid
                       have hSidTarget : (swapEdgeRole s A B e).sid = s := by
-                        have hSidProp : e.sid = s := beq_iff_eq.1 hSid
+                        have hSidProp : e.sid = s := hSid
                         simpa [hSidProp] using
                           (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=e))
                       have hSidEq : hd.1.sid = (swapEdgeRole s A B e).sid :=
                         congrArg Edge.sid (by simpa [hHdSid] using hEq)
                       exact (hSidNe (by simpa [hSidTarget] using hSidEq)).elim
-                  by_cases hHdSid : hd.1.sid == s
-                  · simp [List.foldl, hSid, hHdSid, lookupD_update_neq _ _ _ hne, ih htl]
-                  · simp [List.foldl, hSid, hHdSid, lookupD_update_neq _ _ _ hne, ih htl]
+                  have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
+                  by_cases hHdSid : hd.1.sid = s
+                  · have hne' : swapEdgeRole s A B hd.1 ≠ swapEdgeRole s A B e := by
+                      simpa [hHdSid] using hne
+                    have ih' :=
+                      ih (acc:=updateD acc (swapEdgeRole s A B hd.1)
+                        (hd.2.map (swapValTypeRole s A B))) htl
+                    have ih'' :
+                        lookupD
+                            (List.foldl
+                              (fun acc p =>
+                                if p.1.sid = s then
+                                  updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                                else
+                                  updateD acc p.1 p.2)
+                              (updateD acc (swapEdgeRole s A B hd.1)
+                                (hd.2.map (swapValTypeRole s A B))) tl)
+                            (swapEdgeRole s A B e) =
+                          match List.lookup e tl with
+                          | some ts => ts.map (swapValTypeRole s A B)
+                          | none => lookupD acc (swapEdgeRole s A B e) := by
+                      simpa [hSid, lookupD_update_neq, hne'] using ih'
+                    dsimp [List.foldl]
+                    simp [hSid, hHdSid, List.lookup, hbeq, ih'']
+                  · have hne' : hd.1 ≠ swapEdgeRole s A B e := by
+                      simpa [hHdSid] using hne
+                    have ih' := ih (acc:=updateD acc hd.1 hd.2) htl
+                    have ih'' :
+                        lookupD
+                            (List.foldl
+                              (fun acc p =>
+                                if p.1.sid = s then
+                                  updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                                else
+                                  updateD acc p.1 p.2)
+                              (updateD acc hd.1 hd.2) tl)
+                            (swapEdgeRole s A B e) =
+                          match List.lookup e tl with
+                          | some ts => ts.map (swapValTypeRole s A B)
+                          | none => lookupD acc (swapEdgeRole s A B e) := by
+                      simpa [hSid, lookupD_update_neq, hne'] using ih'
+                    dsimp [List.foldl]
+                    simp [hSid, hHdSid, List.lookup, hbeq, ih'']
               · -- hSid false
                 by_cases hEq : e = hd.1
                 · subst hEq
-                  have hSidHd : hd.1.sid ≠ s :=
-                    (beq_eq_false_iff_ne (a:=hd.1.sid) (b:=s)).1 (by simpa using hSid)
+                  have hSidHd : hd.1.sid ≠ s := hSid
                   have hne :
                       ∀ p ∈ tl,
-                        (if p.1.sid == s then swapEdgeRole s A B p.1 else p.1) ≠ hd.1 := by
+                        (if p.1.sid = s then swapEdgeRole s A B p.1 else p.1) ≠ hd.1 := by
                     intro p hp
-                    by_cases hPsid : p.1.sid == s
+                    by_cases hPsid : p.1.sid = s
                     · intro hEq
                       have hSidTarget : (swapEdgeRole s A B p.1).sid = s := by
-                        have hSidProp : p.1.sid = s := beq_iff_eq.1 hPsid
+                        have hSidProp : p.1.sid = s := hPsid
                         simpa [hSidProp] using
                           (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=p.1))
                       have hSidEq : (swapEdgeRole s A B p.1).sid = hd.1.sid :=
                         congrArg Edge.sid (by simpa [hPsid] using hEq)
-                      exact (hSidHd (by simpa [hSidTarget] using hSidEq)).elim
+                      have hSidEq' : hd.1.sid = s := by
+                        simpa [eq_comm, hSidTarget] using hSidEq
+                      exact (hSidHd hSidEq').elim
                     · intro hEq
                       -- p.1.sid != s, key = p.1; use edgeCmpLT to show p.1 ≠ hd.1
                       have hEq' : p.1 = hd.1 := by simpa [hPsid] using hEq
@@ -399,7 +527,7 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                       lookupD
                           (tl.foldl
                             (fun acc p =>
-                              if p.1.sid == s then
+                              if p.1.sid = s then
                                 updateD acc (swapEdgeRole s A B p.1)
                                   (p.2.map (swapValTypeRole s A B))
                               else
@@ -410,38 +538,85 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                     apply lookupD_foldl_update_neq_swap (s:=s) (A:=A) (B:=B)
                     intro p hp
                     exact hne p hp
-                  simp [List.lookup, List.foldl, hSid, htail, lookupD_update_eq]
+                  have hSwap : swapEdgeRole s A B hd.1 = hd.1 := by
+                    simp [swapEdgeRole, hSidHd]
+                  dsimp [List.foldl]
+                  simp [List.lookup, hSid, hSwap, htail, lookupD_update_eq]
                 · -- e ≠ hd.1
                   have hne :
-                      (if hd.1.sid == s then swapEdgeRole s A B hd.1 else hd.1) ≠ e := by
-                    by_cases hHdSid : hd.1.sid == s
+                      (if hd.1.sid = s then swapEdgeRole s A B hd.1 else hd.1) ≠ e := by
+                    by_cases hHdSid : hd.1.sid = s
                     · intro hEq
                       have hSidTarget : (swapEdgeRole s A B hd.1).sid = s := by
-                        have hSidProp : hd.1.sid = s := beq_iff_eq.1 hHdSid
+                        have hSidProp : hd.1.sid = s := hHdSid
                         simpa [hSidProp] using
                           (swapEdgeRole_sid (s:=s) (A:=A) (B:=B) (e:=hd.1))
                       have hSidEq : (swapEdgeRole s A B hd.1).sid = e.sid :=
                         congrArg Edge.sid (by simpa [hHdSid] using hEq)
-                      have hSidNe : e.sid ≠ s :=
-                        (beq_eq_false_iff_ne (a:=e.sid) (b:=s)).1 (by simpa using hSid)
-                      exact (hSidNe (by simpa [hSidTarget] using hSidEq)).elim
-                    · intro hEq
-                      exact heq (by simpa [hHdSid] using hEq)
-                  by_cases hHdSid : hd.1.sid == s
-                  · simp [List.foldl, hSid, hHdSid, lookupD_update_neq _ _ _ hne, ih htl]
-                  · simp [List.foldl, hSid, hHdSid, lookupD_update_neq _ _ _ hne, ih htl]
+                      have hSidNe : e.sid ≠ s := hSid
+                      have hSidEq' : e.sid = s := by
+                        simpa [eq_comm, hSidTarget] using hSidEq
+                      exact (hSidNe hSidEq').elim
+                    · intro hEq'
+                      exact hEq (by simpa [hHdSid] using hEq'.symm)
+                  have hbeq : (e == hd.1) = false := beq_eq_false_iff_ne.mpr hEq
+                  by_cases hHdSid : hd.1.sid = s
+                  · have hne' : swapEdgeRole s A B hd.1 ≠ e := by
+                      simpa [hHdSid] using hne
+                    have hne'' :
+                        { sid := s, sender := swapRole A B hd.1.sender, receiver := swapRole A B hd.1.receiver } ≠ e := by
+                      simpa [swapEdgeRole, hHdSid] using hne'
+                    have ih' :=
+                      ih (acc:=updateD acc (swapEdgeRole s A B hd.1)
+                        (hd.2.map (swapValTypeRole s A B))) htl
+                    have ih'' :
+                        lookupD
+                            (List.foldl
+                              (fun acc p =>
+                                if p.1.sid = s then
+                                  updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                                else
+                                  updateD acc p.1 p.2)
+                              (updateD acc (swapEdgeRole s A B hd.1)
+                                (hd.2.map (swapValTypeRole s A B))) tl)
+                            e =
+                          match List.lookup e tl with
+                          | some ts => ts
+                          | none => lookupD acc e := by
+                      simpa [hSid, hHdSid, swapEdgeRole, lookupD_update_neq, hne''] using ih'
+                    dsimp [List.foldl]
+                    simpa [List.lookup, hbeq, swapEdgeRole, hSid, hHdSid] using ih''
+                  · have hne' : hd.1 ≠ e := by
+                      simpa [hHdSid] using hne
+                    have ih' := ih (acc:=updateD acc hd.1 hd.2) htl
+                    have ih'' :
+                        lookupD
+                            (List.foldl
+                              (fun acc p =>
+                                if p.1.sid = s then
+                                  updateD acc (swapEdgeRole s A B p.1) (List.map (swapValTypeRole s A B) p.2)
+                                else
+                                  updateD acc p.1 p.2)
+                              (updateD acc hd.1 hd.2) tl)
+                            e =
+                          match List.lookup e tl with
+                          | some ts => ts
+                          | none => lookupD acc e := by
+                      simpa [hSid, hHdSid, swapEdgeRole, lookupD_update_neq, hne'] using ih'
+                    dsimp [List.foldl]
+                    simpa [List.lookup, hbeq, swapEdgeRole, hSid, hHdSid] using ih''
         have hfold'' :
             lookupD
                 (l.foldl
                   (fun acc p =>
-                    if p.1.sid == s then
+                    if p.1.sid = s then
                       updateD acc (swapEdgeRole s A B p.1)
                         (p.2.map (swapValTypeRole s A B))
                     else
                       updateD acc p.1 p.2)
                   (∅ : DEnv))
                 (swapEdgeRole s A B e) =
-              if e.sid == s then
+              if e.sid = s then
                 match l.lookup e with
                 | some ts => ts.map (swapValTypeRole s A B)
                 | none => []
@@ -451,10 +626,10 @@ theorem lookupD_swap (s : SessionId) (A B : Role) (D : DEnv) (e : Edge) :
                 | none => [] := by
           simpa using hfold' (l:=l) (sorted:=sorted) (acc:=(∅ : DEnv)) (e:=e)
         simpa [swapDEnvRole] using hfold''
-  rw [lookupD_eq_list_lookup, hfold]
-  by_cases hSid : e.sid == s
-  · simp [hSid, lookupD_eq_list_lookup]
-  · simp [hSid, lookupD_eq_list_lookup]
+  rw [hfold]
+  by_cases hSid : e.sid = s
+  · cases h : D.list.lookup e <;> simp [hSid, lookupD_eq_list_lookup, h]
+  · cases h : D.list.lookup e <;> simp [hSid, lookupD_eq_list_lookup, h]
 
 /-! ## Consume Preservation for Role Swap -/
 
@@ -533,7 +708,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     (hCoh : Coherent G D) :
     Coherent (swapGEnvRole s A B G) (swapDEnvRole s A B D) := by
   intro e hActive Lrecv hGrecv
-  by_cases hSid : e.sid == s
+  by_cases hSid : e.sid = s
   · -- Session-local swap case.
     let e' : Edge := swapEdgeRole s A B e
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
@@ -547,13 +722,18 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
     have hLookupRecvMap :
         lookupG (swapGEnvRole s A B G) recvEp =
           (lookupG G recvEp').map (swapLocalTypeRole s A B) := by
-      have hSid' : recvEp'.sid == s := by
+      have hSid' : recvEp'.sid = s := by
         simp [recvEp', e', swapEdgeRole, hSid]
       simpa [hRecvEp, hSid'] using
         (lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=recvEp'))
     have hLookupRecvEq :
         (lookupG G recvEp').map (swapLocalTypeRole s A B) = some Lrecv := by
-      simpa [hLookupRecvMap] using hGrecv
+      calc
+        (lookupG G recvEp').map (swapLocalTypeRole s A B)
+            = lookupG (swapGEnvRole s A B G) recvEp := by
+              symm
+              exact hLookupRecvMap
+        _ = some Lrecv := hGrecv
     cases hLookupR : lookupG G recvEp' with
     | none =>
         have : False := by
@@ -561,12 +741,14 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         exact this.elim
     | some Lrecv0 =>
         have hLrecv : Lrecv = swapLocalTypeRole s A B Lrecv0 := by
-          simpa [hLookupR] using hLookupRecvEq
+          have : some (swapLocalTypeRole s A B Lrecv0) = some Lrecv := by
+            simpa [hLookupR] using hLookupRecvEq
+          exact (Option.some.inj this).symm
         have hGrecv0 : lookupG G recvEp' = some Lrecv0 := hLookupR
         have hLookupSenderMap :
             lookupG (swapGEnvRole s A B G) senderEp =
               (lookupG G senderEp').map (swapLocalTypeRole s A B) := by
-          have hSid' : senderEp'.sid == s := by
+          have hSid' : senderEp'.sid = s := by
             simp [senderEp', e', swapEdgeRole, hSid]
           simpa [hSenderEp, hSid'] using
             (lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp'))
@@ -574,7 +756,12 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         have hLookupSenderEq :
             (lookupG G senderEp').map (swapLocalTypeRole s A B) =
               some LsenderSwapped := by
-          simpa [hLookupSenderMap] using hGsenderSwapped
+          calc
+            (lookupG G senderEp').map (swapLocalTypeRole s A B)
+                = lookupG (swapGEnvRole s A B G) senderEp := by
+                  symm
+                  exact hLookupSenderMap
+            _ = some LsenderSwapped := hGsenderSwapped
         have hGsender0 : ∃ Lsender0, lookupG G senderEp' = some Lsender0 := by
           cases hLookupS : lookupG G senderEp' with
           | none =>
@@ -582,7 +769,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
                 simpa [hLookupS] using hLookupSenderEq
               exact this.elim
           | some Lsender0 =>
-              exact ⟨Lsender0, hLookupS⟩
+              exact ⟨Lsender0, by simpa using hLookupS⟩
         rcases hGsender0 with ⟨Lsender0, hGsender0⟩
         have hActive' : ActiveEdge G e' :=
           ActiveEdge_of_endpoints (e:=e') hGsender0 hGrecv0
@@ -591,7 +778,15 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         have hLookupSender' :
             lookupG (swapGEnvRole s A B G) senderEp =
               some (swapLocalTypeRole s A B Lsender1) := by
-          simpa [hGsender1] using hLookupSenderMap
+          have : (lookupG G senderEp').map (swapLocalTypeRole s A B) =
+              some (swapLocalTypeRole s A B Lsender1) := by
+            rw [hGsender1]
+            rfl
+          exact (by
+            calc
+              lookupG (swapGEnvRole s A B G) senderEp
+                  = (lookupG G senderEp').map (swapLocalTypeRole s A B) := hLookupSenderMap
+              _ = some (swapLocalTypeRole s A B Lsender1) := this)
         rcases (Option.isSome_iff_exists).1 hConsume with ⟨Lafter, hConsumeEq⟩
         have hConsumeSwap :
             Consume (swapRole A B e'.sender) (swapLocalTypeRole s A B Lrecv0)
@@ -606,7 +801,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
             lookupD_swap (s:=s) (A:=A) (B:=B) (D:=D) (e:=e')
           have hSwap : swapEdgeRole s A B e' = e := by
             simp [e', swapEdgeRole_involutive]
-          have hSid' : e'.sid == s := by
+          have hSid' : e'.sid = s := by
             simp [e', swapEdgeRole, hSid]
           simpa [hSwap, hSid'] using hLookup
         have hSenderEq : e.sender = swapRole A B e'.sender := by
@@ -618,28 +813,32 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         refine ⟨swapLocalTypeRole s A B Lsender1, hLookupSender', ?_⟩
         simpa [hConsumeSwapped]
   · -- Other-session edges are unchanged.
-    have hSidNe : e.sid ≠ s :=
-      (beq_eq_false_iff_ne (a:=e.sid) (b:=s)).1 (by simpa using hSid)
+    have hSidNe : e.sid ≠ s := hSid
     let recvEp : Endpoint := { sid := e.sid, role := e.receiver }
     let senderEp : Endpoint := { sid := e.sid, role := e.sender }
+    have hSwapRecv : swapEndpointRole s A B recvEp = recvEp := by
+      simp [swapEndpointRole, recvEp, hSid]
+    have hSwapSender : swapEndpointRole s A B senderEp = senderEp := by
+      simp [swapEndpointRole, senderEp, hSid]
     have hGrecv' : lookupG G recvEp = some Lrecv := by
       have hLookup :=
         lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=recvEp)
-      have hSwap : swapEndpointRole s A B recvEp = recvEp := by
-        simp [swapEndpointRole, hSid]
       have hMap : lookupG (swapGEnvRole s A B G) recvEp =
           lookupG G recvEp := by
-        simpa [hSid, hSwap] using hLookup
-      simpa [hMap] using hGrecv
+        simpa [hSid, hSwapRecv, recvEp] using hLookup
+      calc
+        lookupG G recvEp = lookupG (swapGEnvRole s A B G) recvEp := by
+          symm
+          exact hMap
+        _ = some Lrecv := by
+          simpa using hGrecv
     have hActive' : ActiveEdge G e := by
       have hLookupSender :=
         lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
-      have hSwap : swapEndpointRole s A B senderEp = senderEp := by
-        simp [swapEndpointRole, hSid]
       have hMap :
           lookupG (swapGEnvRole s A B G) senderEp =
             lookupG G senderEp := by
-        simpa [hSid, hSwap] using hLookupSender
+        simpa [hSid, hSwapSender, senderEp] using hLookupSender
       have hSenderSome : (lookupG G senderEp).isSome := by
         simpa [hMap, senderEp] using hActive.1
       have hRecvSome : (lookupG G recvEp).isSome := by
@@ -651,9 +850,7 @@ theorem CoherentRoleSwap (s : SessionId) (A B : Role) (G : GEnv) (D : DEnv)
         lookupG (swapGEnvRole s A B G) senderEp = some Lsender := by
       have hLookup :=
         lookupG_swap (s:=s) (A:=A) (B:=B) (G:=G) (e:=senderEp)
-      have hSwap : swapEndpointRole s A B senderEp = senderEp := by
-        simp [swapEndpointRole, hSid]
-      simpa [hSid, hSwap, hGsender] using hLookup
+      simpa [hSid, hSwapSender, hGsender, senderEp] using hLookup
     have hTrace :
         lookupD (swapDEnvRole s A B D) e = lookupD D e := by
       have hLookup :=

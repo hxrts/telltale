@@ -284,8 +284,8 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       left
       have heq := hProc₁.symm.trans hProc₂
       simp only [Process.seq.injEq] at heq
-      rcases heq with ⟨_, ⟨_, ⟨_, hQ_eq⟩⟩⟩
-      simp only [hQ_eq]
+      rcases heq with ⟨_, hQ_eq⟩
+      simp [hQ_eq]
     | _ => simp_all
   | par_skip_left hProc₁ =>
     cases h₂ with

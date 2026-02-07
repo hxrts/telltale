@@ -1,5 +1,7 @@
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Preservation
+import Protocol.Coherence.SelectPreservation
+import Runtime.Proofs.Delegation
 
 /-!
 # Instruction Denotational Specifications
@@ -38,7 +40,9 @@ structure SendSpec (G G' : GEnv) (D D' : DEnv)
   /-- Sender has the expected send type. -/
   sender_type : ∃ L', lookupG G senderEp = some (.send receiverRole T L')
   /-- Sender's type is updated to continuation. -/
-  type_updated : ∃ L', G' = updateG G senderEp L'
+  type_updated :
+    ∀ L', lookupG G senderEp = some (.send receiverRole T L') →
+      G' = updateG G senderEp L'
   /-- Trace is extended with the sent value. -/
   trace_extended :
     let edge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }
@@ -74,7 +78,9 @@ structure RecvSpec (G G' : GEnv) (D D' : DEnv)
     let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
     ∃ rest, lookupD D edge = T :: rest
   /-- Receiver's type is updated to continuation. -/
-  type_updated : ∃ L', G' = updateG G receiverEp L'
+  type_updated :
+    ∀ L', lookupG G receiverEp = some (.recv senderRole T L') →
+      G' = updateG G receiverEp L'
   /-- Trace head is consumed. -/
   trace_consumed :
     let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
@@ -108,7 +114,11 @@ structure SelectSpec (G G' : GEnv) (D D' : DEnv)
     lookupG G senderEp = some (.select receiverRole branches) ∧
     branches.find? (fun b => b.1 == chosen) = some (chosen, L')
   /-- Sender's type is updated to chosen continuation. -/
-  type_updated : ∃ L', G' = updateG G senderEp L'
+  type_updated :
+    ∀ branches L',
+      lookupG G senderEp = some (.select receiverRole branches) →
+      branches.find? (fun b => b.1 == chosen) = some (chosen, L') →
+      G' = updateG G senderEp L'
   /-- Trace is extended with the label (encoded as .string). -/
   trace_extended :
     let edge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }
@@ -147,7 +157,11 @@ structure BranchSpec (G G' : GEnv) (D D' : DEnv)
     let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
     ∃ rest, lookupD D edge = .string :: rest
   /-- Receiver's type is updated to chosen continuation. -/
-  type_updated : ∃ L', G' = updateG G receiverEp L'
+  type_updated :
+    ∀ branches L',
+      lookupG G receiverEp = some (.branch senderRole branches) →
+      branches.find? (fun b => b.1 == received) = some (received, L') →
+      G' = updateG G receiverEp L'
   /-- Trace head is consumed. -/
   trace_consumed :
     let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
@@ -175,7 +189,7 @@ def BranchFootprint (receiverEp : Endpoint) : Set SessionId :=
 structure OpenSpec (G G' : GEnv) (D D' : DEnv)
     (s : SessionId) (roles : List Role) where
   /-- Session ID is fresh. -/
-  fresh : ∀ ep, lookupG G ep = some _ → ep.sid ≠ s
+  fresh : ∀ ep, (lookupG G ep).isSome → ep.sid ≠ s
   /-- New session endpoints added. -/
   endpoints_added : ∀ r ∈ roles, (lookupG G' { sid := s, role := r }).isSome
   /-- Existing endpoints unchanged. -/
@@ -230,16 +244,18 @@ def CloseFootprint (ep : Endpoint) : Set SessionId :=
           Coherent G' D' -/
 structure TransferSpec (G G' : GEnv) (D D' : DEnv)
     (senderEp : Endpoint) (receiverRole : Role)
-    (delegatedSession : SessionId) (delegatedType : LocalType) where
+    (delegatedSession : SessionId) (delegatedRole : Role) where
   /-- Sender has send type with channel value. -/
   sender_type : ∃ L',
-    lookupG G senderEp = some (.send receiverRole (.chan delegatedSession delegatedType) L')
+    lookupG G senderEp = some (.send receiverRole (.chan delegatedSession delegatedRole) L')
   /-- Sender's type is updated to continuation. -/
-  type_updated : ∃ L', G' = updateG G senderEp L'
+  type_updated :
+    ∀ L', lookupG G senderEp = some (.send receiverRole (.chan delegatedSession delegatedRole) L') →
+      G' = updateG G senderEp L'
   /-- Trace is extended with the capability. -/
   trace_extended :
     let edge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }
-    D' = updateD D edge (lookupD D edge ++ [.chan delegatedSession delegatedType])
+    D' = updateD D edge (lookupD D edge ++ [.chan delegatedSession delegatedRole])
   /-- Other endpoints unchanged. -/
   frame_G : ∀ ep', ep' ≠ senderEp → lookupG G' ep' = lookupG G ep'
   /-- Other traces unchanged. -/
@@ -266,16 +282,18 @@ def TransferFootprint (senderEp : Endpoint) (delegatedSession : SessionId) : Set
           Coherent G' D' -/
 structure AcquireSpec (G G' : GEnv) (D D' : DEnv)
     (receiverEp : Endpoint) (senderRole : Role)
-    (delegatedSession : SessionId) (delegatedType : LocalType) where
+    (delegatedSession : SessionId) (delegatedRole : Role) where
   /-- Receiver has recv type with channel value. -/
   receiver_type : ∃ L',
-    lookupG G receiverEp = some (.recv senderRole (.chan delegatedSession delegatedType) L')
+    lookupG G receiverEp = some (.recv senderRole (.chan delegatedSession delegatedRole) L')
   /-- Buffer has capability at head. -/
   buffer_has_capability :
     let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
-    ∃ rest, lookupD D edge = .chan delegatedSession delegatedType :: rest
+    ∃ rest, lookupD D edge = .chan delegatedSession delegatedRole :: rest
   /-- Receiver's type is updated to continuation. -/
-  type_updated : ∃ L', G' = updateG G receiverEp L'
+  type_updated :
+    ∀ L', lookupG G receiverEp = some (.recv senderRole (.chan delegatedSession delegatedRole) L') →
+      G' = updateG G receiverEp L'
   /-- Delegation step occurred (uses delegation_preserves_coherent). -/
   delegation_applied :
     DelegationStep G G' D D' delegatedSession senderRole receiverEp.role
@@ -317,7 +335,7 @@ theorem SendSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   -- Apply Protocol-level preservation
   have hResult := Coherent_send_preserved G D senderEp receiverRole T L' hCoh hSenderType hRecvReady
   -- Need to show G' = updateG G senderEp L' and D' = updateD D edge (trace ++ [T])
-  obtain ⟨_, hGUpdate⟩ := hSpec.type_updated
+  have hGUpdate : G' = updateG G senderEp L' := hSpec.type_updated L' hSenderType
   rw [hGUpdate, hSpec.trace_extended]
   exact hResult
 
@@ -334,13 +352,13 @@ theorem RecvSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   obtain ⟨L', hRecvType⟩ := hSpec.receiver_type
   obtain ⟨rest, hBuffer⟩ := hSpec.buffer_has_data
   -- Construct the trace head evidence
-  let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
+  let edge : Edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
   have hTraceHead : (lookupD D edge).head? = some T := by
     simp only [edge, hBuffer, List.head?_cons]
   -- Apply Protocol-level preservation
   have hResult := Coherent_recv_preserved G D receiverEp senderRole T L' hCoh hRecvType hTraceHead
   -- The spec tells us G' and D' are the result of the update
-  obtain ⟨_, hGUpdate⟩ := hSpec.type_updated
+  have hGUpdate : G' = updateG G receiverEp L' := hSpec.type_updated L' hRecvType
   obtain ⟨rest', hTraceEq, hDUpdate⟩ := hSpec.trace_consumed
   -- Show rest = rest' (both come from the same buffer)
   have hRestEq : rest = rest' := by
@@ -349,9 +367,8 @@ theorem RecvSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     have h3 : T :: rest = T :: rest' := h1.trans h2.symm
     exact List.tail_eq_of_cons_eq h3
   rw [hGUpdate, hDUpdate, ← hRestEq]
-  -- Show (lookupD D edge).tail = rest
-  simp only [edge, hBuffer, List.tail_cons]
-  exact hResult
+  -- Align the trace tail with `rest`
+  simpa [edge, hBuffer, List.tail_cons] using hResult
 
 /-- Select preserves Coherence when SelectReady holds.
 
@@ -376,7 +393,7 @@ theorem SelectSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   have hResult := Coherent_select_preserved G D senderEp receiverRole branches chosen L'
     hCoh hSenderType hFind hTargetReady
   -- The spec tells us G' and D' are the result of the update
-  obtain ⟨_, hGUpdate⟩ := hSpec.type_updated
+  have hGUpdate : G' = updateG G senderEp L' := hSpec.type_updated branches L' hSenderType hFind
   rw [hGUpdate, hSpec.trace_extended]
   exact hResult
 
@@ -392,14 +409,14 @@ theorem BranchSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   obtain ⟨branches, L', hRecvType, hFind⟩ := hSpec.receiver_type
   obtain ⟨rest, hBuffer⟩ := hSpec.buffer_has_label
   -- Construct the trace head evidence
-  let edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
+  let edge : Edge := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }
   have hTraceHead : (lookupD D edge).head? = some .string := by
     simp only [edge, hBuffer, List.head?_cons]
   -- Apply Protocol-level preservation
   have hResult := Coherent_branch_preserved G D receiverEp senderRole branches received L'
     hCoh hRecvType hFind hTraceHead
   -- The spec tells us G' and D' are the result of the update
-  obtain ⟨_, hGUpdate⟩ := hSpec.type_updated
+  have hGUpdate : G' = updateG G receiverEp L' := hSpec.type_updated branches L' hRecvType hFind
   obtain ⟨rest', hTraceEq, hDUpdate⟩ := hSpec.trace_consumed
   -- Show rest = rest'
   have hRestEq : rest = rest' := by
@@ -408,8 +425,7 @@ theorem BranchSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     have h3 : ValType.string :: rest = ValType.string :: rest' := h1.trans h2.symm
     exact List.tail_eq_of_cons_eq h3
   rw [hGUpdate, hDUpdate, ← hRestEq]
-  simp only [edge, hBuffer, List.tail_cons]
-  exact hResult
+  simpa [edge, hBuffer, List.tail_cons] using hResult
 
 /-- Open preserves Coherence (new session is Coherent by construction).
 
@@ -426,18 +442,13 @@ theorem OpenSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
   by_cases hSid : e.sid = s
   · -- New session edge: trace is empty, so EdgeCoherent is trivial
     intro Lrecv hGrecv
-    -- The sender must exist (by ActiveEdge)
-    have hSenderActive := ActiveEdge_sender_exists hActive
     -- Trace is empty for new session edges
     have hTraceEmpty : lookupD D' e = [] := hSpec.traces_empty e hSid
+    -- Sender exists in G' (by ActiveEdge)
+    rcases (Option.isSome_iff_exists).1 hActive.1 with ⟨Lsender, hLsender⟩
     -- EdgeCoherent with empty trace: Consume L [] = some L
-    use Lrecv
-    constructor
-    · -- Sender exists in G'
-      obtain ⟨Lsender, hLsender⟩ := hSenderActive
-      exact ⟨Lsender, hLsender⟩
-    · -- Consume with empty trace succeeds
-      simp only [hTraceEmpty, Consume]
+    refine ⟨Lsender, hLsender, ?_⟩
+    simp [hTraceEmpty, Consume]
   · -- Old session edge: preserved by frame property
     -- G' agrees with G on old sessions
     have hGFrame : lookupG G' { sid := e.sid, role := e.receiver } =
@@ -456,7 +467,7 @@ theorem OpenSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     obtain ⟨Lsender, hLsender, hConsume⟩ := hCoh e hActiveOld Lrecv hGrecv
     use Lsender
     constructor
-    · rw [← hGFrameSender]; exact hLsender
+    · rw [hGFrameSender]; exact hLsender
     · rw [hDFrame]; exact hConsume
 
 /-- Close preserves Coherence (edges become inactive).
@@ -477,7 +488,13 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
     obtain ⟨hSid, hRole⟩ := hRecv
     have hEpRemoved : lookupG G' ep = none := hSpec.endpoint_removed
     have hRecvEp : { sid := e.sid, role := e.receiver : Endpoint } = ep := by
-      ext <;> simp [hSid, hRole]
+      cases ep with
+      | mk epSid epRole =>
+          cases e with
+          | mk sid sender receiver =>
+              cases hSid
+              cases hRole
+              rfl
     rw [hRecvEp] at hActive
     simp [hEpRemoved] at hActive
   · -- Edge doesn't have ep as receiver, preserved by frame
@@ -486,8 +503,11 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
         lookupG G { sid := e.sid, role := e.receiver } := by
       apply hSpec.frame_G
       intro hEq
-      have : e.sid = ep.sid ∧ e.receiver = ep.role := ⟨congrArg Endpoint.sid hEq, congrArg Endpoint.role hEq⟩
-      exact hRecv this
+      have hSid : e.sid = ep.sid := by
+        simpa using congrArg Endpoint.sid hEq
+      have hRole : e.receiver = ep.role := by
+        simpa using congrArg Endpoint.role hEq
+      exact (hRecv hSid) (by simpa using hRole)
     have hFrameSender : lookupG G' { sid := e.sid, role := e.sender } =
         lookupG G { sid := e.sid, role := e.sender } := by
       apply hSpec.frame_G
@@ -511,7 +531,7 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
     obtain ⟨Lsender, hLsender, hConsume⟩ := hCoh e hActiveOld Lrecv hGrecv
     use Lsender
     constructor
-    · rw [← hFrameSender]; exact hLsender
+    · rw [hFrameSender]; exact hLsender
     · exact hConsume
 
 /-- Acquire preserves Coherence (uses delegation_preserves_coherent).
@@ -520,8 +540,8 @@ theorem CloseSpec_preserves_Coherent {G G' : GEnv} {D : DEnv}
     preservation via the proved `delegation_preserves_coherent` theorem. -/
 theorem AcquireSpec_preserves_Coherent {G G' : GEnv} {D D' : DEnv}
     {receiverEp : Endpoint} {senderRole : Role}
-    {delegatedSession : SessionId} {delegatedType : LocalType}
-    (hSpec : AcquireSpec G G' D D' receiverEp senderRole delegatedSession delegatedType)
+    {delegatedSession : SessionId} {delegatedRole : Role}
+    (hSpec : AcquireSpec G G' D D' receiverEp senderRole delegatedSession delegatedRole)
     (hCoh : Coherent G D) :
     Coherent G' D' := by
   -- The spec includes a DelegationStep, which preserves coherence

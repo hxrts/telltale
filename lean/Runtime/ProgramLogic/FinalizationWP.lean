@@ -12,6 +12,9 @@ through WP rules once the Iris proofs are available.
 set_option autoImplicit false
 noncomputable section
 
+variable [Telltale.TelltaleIris]
+variable [GhostMapSlot FinalizationMode]
+
 /-! ## Finalization gating -/
 
 def finalization_required (γ : GhostName) (ft : FinalizationToken) : iProp :=

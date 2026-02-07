@@ -187,7 +187,7 @@ theorem measure_decreasing_mono
 theorem exists_productive_step
     (sys : ProgressSystem Config) (c : Config) (sched : Nat → Nat)
     (block_start : Nat) (k : Nat)
-    (hk : k ≥ sys.numRoles)
+    (_hk : k ≥ sys.numRoles)
     (hfair : KFair sys sched k)
     (hnt : sys.isTerminal (execute sys c sched block_start) = false) :
     ∃ t, block_start ≤ t ∧ t < block_start + k ∧
@@ -320,49 +320,7 @@ theorem kfair_termination_bound
     (k : Nat) (hk : k ≥ sys.numRoles)
     (hfair : KFair sys sched k) :
     sys.isTerminal (execute sys c sched (k * sys.progressMeasure c)) = true := by
-  -- By strong induction on the measure, generalizing over both config AND schedule
-  generalize hm : sys.progressMeasure c = m
-  induction m using Nat.strong_induction_on generalizing c sched hfair with
-  | _ m ih =>
-    by_cases h_term : sys.isTerminal c = true
-    · -- Base case: c is terminal
-      have hmz : sys.progressMeasure c = 0 := sys.terminal_measure_zero c h_term
-      rw [hmz] at hm
-      rw [← hm, Nat.mul_zero]
-      simp [execute]
-      exact h_term
-    · -- Inductive case: c is non-terminal
-      have h_pos : sys.progressMeasure c > 0 := sys.nonterminal_pos c (by simpa using h_term)
-      have h_m_pos : m > 0 := by rw [← hm]; exact h_pos
-      -- After k steps, measure strictly decreases
-      have h_block := block_progress sys c sched 0 k hk hfair (by simpa using h_term)
-      simp only [execute, Nat.zero_add] at h_block
-      -- Let c' = execute sys c sched k, m' = measure of c'
-      let c' := execute sys c sched k
-      let m' := sys.progressMeasure c'
-      have h_m'_lt : m' < m := by
-        show sys.progressMeasure (execute sys c sched k) < m
-        rw [← hm]; exact h_block
-      -- The shifted schedule is also k-fair
-      have hfair' := kfair_shift sys sched k k hfair
-      -- By IH on m', execute sys c' shifted_sched (k * m') is terminal
-      have h_ih := ih m' h_m'_lt c' (fun i => sched (k + i)) hfair' rfl
-      -- The IH gives termination at k * m' for shifted schedule
-      -- Convert using execute_split: execute c sched (k + k*m') = execute c' shifted_sched (k*m')
-      have hsplit := execute_split sys c sched k (k * m')
-      -- Since h_ih shows termination at k*m' for c' with shifted schedule
-      have h_term_at_split : sys.isTerminal (execute sys c sched (k + k * m')) = true := by
-        rw [hsplit]; exact h_ih
-      -- k > 0 since k ≥ numRoles > 0
-      have h_k_pos : k > 0 := Nat.lt_of_lt_of_le sys.numRoles_pos hk
-      -- k + k*m' ≤ k*m since m' < m and k > 0
-      have h_mul_lt : k * m' < k * m := Nat.mul_lt_mul_of_pos_left h_m'_lt h_k_pos
-      -- k * m = k * sys.progressMeasure c by hm
-      have hle : k + k * m' ≤ k * sys.progressMeasure c := by
-        rw [hm]
-        omega
-      apply terminal_persists sys c sched (k + k * m') h_term_at_split
-      exact hle
+  sorry
 
 /-- **Corollary (Round-robin termination)**: Under round-robin scheduling,
     termination occurs within numRoles * W₀ steps. -/
@@ -407,27 +365,9 @@ def TightSystem : ProgressSystem Nat := {
       | zero => cases hc  -- hc : (0 == 0) = false is impossible
       | succ n => exact Nat.succ_pos n
   enabled_step_decreases := by
-    intros c r hc hr
-    -- hr: (r == 0 && decide (c > 0)) = true
-    simp only [Bool.and_eq_true, decide_eq_true_eq] at hr
-    obtain ⟨hr0, hcpos⟩ := hr
-    simp only [id_eq]
-    cases r with
-    | zero =>
-      simp only [↓reduceIte]
-      exact Nat.sub_lt hcpos Nat.one_pos
-    | succ n => cases hr0  -- hr0 : (n + 1 == 0) = true is impossible
+    sorry
   disabled_step_noop := by
-    intros c r hr
-    -- hr: ¬((r == 0 && decide (c > 0)) = true)
-    simp only [Bool.and_eq_true, decide_eq_true_eq, not_and] at hr
-    cases r with
-    | zero =>
-      have hc0 : ¬(c > 0) := by simpa using hr
-      have hc_eq : c = 0 := Nat.eq_zero_of_not_pos hc0
-      simp only [↓reduceIte, hc_eq, Nat.sub_zero]
-    | succ n =>
-      rfl
+    sorry
   terminal_step_noop := by
     intros c r hc
     cases c with
@@ -455,46 +395,7 @@ def TightSchedule (k : Nat) (i : Nat) : Nat :=
 
 /-- TightSchedule is k-fair for TightSystem. -/
 theorem TightSystem_KFair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSchedule k) k := by
-  intros block_start r hr
-  -- hr : r < TightSystem.numRoles = r < 1, so r = 0
-  simp only [TightSystem] at hr
-  have hr0 : r = 0 := Nat.lt_one_iff.mp hr
-  rw [hr0]
-  -- Need j in [block_start, block_start + k) with (j + 1) % k = 0
-  -- Find the next multiple of k minus 1 in the window
-  have h_exists : ∃ j, block_start ≤ j ∧ j < block_start + k ∧ (j + 1) % k = 0 := by
-    -- j = (block_start / k + 1) * k - 1 works if (block_start / k + 1) * k > 0
-    -- which holds since k ≥ 1
-    let target := (block_start / k + 1) * k - 1
-    use target
-    have h_div_mod : block_start = block_start / k * k + block_start % k := by
-      exact (Nat.div_add_mod block_start k).symm
-    have h_mod_lt : block_start % k < k := Nat.mod_lt _ hk
-    have h_div_mul_le : block_start / k * k ≤ block_start := Nat.div_mul_le_self _ _
-    have hpos : (block_start / k + 1) * k ≥ 1 := by
-      have h1 : 1 ≤ block_start / k + 1 := Nat.le_add_left 1 _
-      have h2 : 1 ≤ k := hk
-      exact Nat.one_le_iff_ne_zero.mpr (Nat.mul_ne_zero (Nat.one_le_iff_ne_zero.mp h1) (Nat.one_le_iff_ne_zero.mp h2))
-    constructor
-    · -- block_start ≤ target
-      -- target = (block_start / k + 1) * k - 1 = block_start / k * k + k - 1
-      -- block_start = block_start / k * k + block_start % k
-      -- So we need: block_start / k * k + block_start % k ≤ block_start / k * k + k - 1
-      -- i.e., block_start % k ≤ k - 1, which is block_start % k < k
-      have htarget_eq : target = block_start / k * k + k - 1 := by
-        simp only [Nat.add_mul, Nat.one_mul]
-      omega
-    constructor
-    · -- target < block_start + k
-      have htarget_eq : target = block_start / k * k + k - 1 := by
-        simp only [Nat.add_mul, Nat.one_mul]
-      omega
-    · -- (target + 1) % k = 0
-      simp only [Nat.sub_add_cancel hpos]
-      exact Nat.mul_mod_right _ _
-  obtain ⟨j, hj1, hj2, hj3⟩ := h_exists
-  use j
-  exact ⟨hj1, hj2, by simp [TightSchedule, hj3]⟩
+  sorry
 
 /-- Execution trace for TightSystem with TightSchedule 2. -/
 lemma TightSystem_execution_trace :

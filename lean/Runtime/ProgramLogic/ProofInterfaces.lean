@@ -1,7 +1,6 @@
 import Runtime.VM.TypeClasses
 import Runtime.VM.DomainComposition
-import Runtime.Compat.Inv
-import Runtime.Compat.RA
+import Runtime.IrisBridge
 
 /-
 The Problem. Proof-only specifications (Iris pre/postconditions and namespace

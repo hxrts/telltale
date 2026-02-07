@@ -8,7 +8,12 @@ Six libraries organized by subject: types, coinductive theory, choreography,
 semantics, async protocol, and runtime.
 -/
 
-package telltale
+package telltale where
+  -- Temporarily silence linter noise from iris-lean dependencies.
+  moreLeanArgs := #[
+    "-Dlinter.unusedSectionVars=false",
+    "-Dlinter.unusedVariables=false"
+  ]
 
 -- Mathlib provides standard lemmas and automation for proofs.
 -- Pin to a mathlib tag that matches the Lean toolchain.

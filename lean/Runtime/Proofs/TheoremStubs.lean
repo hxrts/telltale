@@ -412,23 +412,5 @@ R.3: Cross-session diamond (disjoint footprints commute)
 Protocol-level proofs don't use VM theorems; VM proofs use Protocol theorems as lemmas.
 -/
 
-/-- Delegation step relation from the Protocol-level proof. -/
-abbrev DelegationStep := Runtime.Proofs.Delegation.DelegationStep
-
-/-- **Delegation preserves coherence.**
-
-    This is the key theorem that bridges Paper 3's Protocol-level delegation preservation
-    to the VM's instruction-level reasoning. It states:
-
-    If we have coherence before a delegation step (A delegates endpoint in session s to B),
-    then we have coherence after.
-
-    Proven in `Runtime.Proofs.Delegation`. -/
-theorem delegation_preserves_coherent :
-  ∀ G G' D D' s A B,
-    Coherent G D →
-    DelegationStep G G' D D' s A B →
-    Coherent G' D' := by
-  intro G G' D D' s A B hCoh hDeleg
-  exact Runtime.Proofs.Delegation.delegation_preserves_coherent
-    G G' D D' s A B hCoh hDeleg
+-- DelegationStep and delegation_preserves_coherent now live in
+-- Runtime.Proofs.Delegation (no stubs needed here).

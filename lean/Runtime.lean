@@ -1,4 +1,3 @@
-import Runtime.Compat
 import Runtime.VM.TypeClasses
 import Runtime.VM.SchedulerTypes
 import Runtime.VM.Violation
@@ -19,6 +18,7 @@ import Runtime.Adequacy.Adequacy
 import Runtime.Proofs.Concurrency
 import Runtime.VM.Monitor
 import Runtime.VM.DomainComposition
+import Runtime.IrisBridge
 
 /- 
 The Problem. Provide a single entry point that re-exports the runtime spec

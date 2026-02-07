@@ -1,5 +1,5 @@
 import Runtime.VM.Core
-import Runtime.Compat.Inv
+import Runtime.IrisBridge
 
 /-
 The Problem. The runtime needs a unified monitor that tracks session

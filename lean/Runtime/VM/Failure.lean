@@ -1,6 +1,6 @@
 import Runtime.VM.State
 import Runtime.VM.Scheduler
-import Runtime.Compat.Inv
+import Runtime.IrisBridge
 
 /-
 The Problem. The VM needs a failure model that is parametric over the

@@ -1,4 +1,6 @@
 import Runtime.Proofs.SessionLocal
+import Runtime.Resources.Arena
+import Runtime.VM.TypeClasses
 import Protocol.Typing.Progress
 
 /-!
@@ -169,10 +171,10 @@ theorem store_lookupTrace_eq_lookupD {store : SessionStore ν} {edge : Edge} :
     simp only [SessionStore.toDEnv, SessionStore.lookupTrace, List.foldl]
     by_cases h : hd.1 = edge.sid
     · -- Edge is in this session
-      simp [h, SessionStore.lookupTrace]
+      simp [h]
       sorry -- Need to show foldl accumulation preserves lookup
     · -- Edge is in another session
-      simp [h, SessionStore.lookupTrace]
+      simp [h]
       sorry -- Need ih and that hd doesn't affect this edge
 
 /-- Store lookups agree with environment projections for types. -/
@@ -208,8 +210,7 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
   -- 3. Apply HeadCoherent
   -- HeadCoherent says: for recv type, if trace non-empty, head = T
   have hLookupG : lookupG G ep = some (.recv source T L') := by
-    rw [← store_lookupType_eq_lookupG]
-    exact hRecvType
+    simpa [G, store_lookupType_eq_lookupG] using hRecvType
   have hLookupD : lookupD D edge = SessionStore.lookupTrace store edge := by
     exact store_lookupTrace_eq_lookupD
   -- HeadCoherent at this edge gives us the result
@@ -221,7 +222,7 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     This is how sends "enable" receives: the sent data appears at the
     head of the buffer with the correct type. -/
 theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
-    {ep : Endpoint} {target : Role} {T : ValType}
+    {ep : Endpoint} {target : Role} {T : ValType} {L' : LocalType}
     (hSend : SessionStore.updateType
                (SessionStore.updateTrace store
                  { sid := ep.sid, sender := ep.role, receiver := target }
@@ -273,13 +274,13 @@ theorem vm_progress {store : SessionStore ν}
 /-! ## Termination Under Fairness -/
 
 /-- A scheduler is fair if every continuously enabled instruction is eventually executed. -/
-def FairScheduler (sched : List (Nat × Nat)) : Prop :=
+def FairScheduler (_sched : List (Nat × Nat)) : Prop :=
   -- Placeholder: fair scheduler definition
   True
 
 /-- Lyapunov measure: total depth + buffer sizes.
     Decreases by at least 1 on each productive step. -/
-def vmMeasure (store : SessionStore ν) : Nat :=
+def vmMeasure (_store : SessionStore ν) : Nat :=
   -- Placeholder: sum of depths and buffer sizes
   0
 
@@ -290,10 +291,10 @@ def vmMeasure (store : SessionStore ν) : Nat :=
     2. Fair scheduler: enabled → eventually executed
     3. Lyapunov: each step decreases measure by ≥ 1
     4. Initial measure bounded → terminates in ≤ W₀ steps -/
-theorem vm_termination_under_fairness {store₀ : SessionStore ν}
+theorem vm_termination_under_fairness {store₀ : SessionStore ν} {sched : List (Nat × Nat)}
     (hWF : WellFormedVMState store₀)
     (hFair : FairScheduler sched) :
-    ∃ n store_final,
+    ∃ (n : Nat) (store_final : SessionStore ν),
       -- MultiStep store₀ sched n store_final ∧
       AllSessionsComplete store_final ∧
       n ≤ vmMeasure store₀ := by

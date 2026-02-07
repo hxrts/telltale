@@ -2,7 +2,7 @@ import Std
 import Protocol.Environments.Core
 import Runtime.VM.Core
 import Runtime.VM.TypeClasses
-import Runtime.Compat.RA
+import Runtime.IrisBridge
 
 /-!
 # Task 14: Buffer Resource Algebra

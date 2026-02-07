@@ -456,9 +456,13 @@ private theorem DisjointS_preserved_TypedStep_left
               obtain ⟨T'', hRight⟩ := hSub hL
               cases hPre with
               | recv_new hk' hG' hNoSh hNoOwnR hNoOwnL =>
-                  exact (by simpa [hNoOwnR] using hRight).elim
+                  have : False := by
+                    simpa [hNoOwnR] using hRight
+                  exact this.elim
               | recv_old hk' hG' hNoSh hNoOwnR hOwn =>
-                  exact (by simpa [hNoOwnR] using hRight).elim
+                  have : False := by
+                    simpa [hNoOwnR] using hRight
+                  exact this.elim
       have hDisj' : DisjointS Sframe (updateSEnv Sown.left x T) :=
         DisjointS_update_right (S₁:=Sframe) (S₂:=Sown.left) hDisj hNone
       simpa [hSout] using hDisj'
@@ -479,9 +483,13 @@ private theorem DisjointS_preserved_TypedStep_left
               obtain ⟨T'', hRight⟩ := hSub hL
               cases hPre with
               | assign_new hNoSh hNoOwnR hNoOwnL hvPre =>
-                  exact (by simpa [hNoOwnR] using hRight).elim
+                  have : False := by
+                    simpa [hNoOwnR] using hRight
+                  exact this.elim
               | assign_old hNoSh hNoOwnR hOwn hvPre =>
-                  exact (by simpa [hNoOwnR] using hRight).elim
+                  have : False := by
+                    simpa [hNoOwnR] using hRight
+                  exact this.elim
       have hDisj' : DisjointS Sframe (updateSEnv Sown.left x T) :=
         DisjointS_update_right (S₁:=Sframe) (S₂:=Sown.left) hDisj hNone
       simpa [hSout] using hDisj'
@@ -973,10 +981,10 @@ private theorem StoreTypedStrong_preserved_frame_left
               HasTypeProcPreOut_frame_G_right (Ssh:=Ssh0)
                 (Sown:={ right := Sown0.right ++ split.S2, left := split.S1 })
                 (G:=split.G1) (Gfr:=split.G2) hDisjG hP
-            simpa [split.hG] using hP'
+            simp only [← split.hG] at hP'
+            exact hP'
           have hStore'' :=
-            ih (G₂:=G₂) (S₂:=S₂) hStore'_ih (by
-              simpa [split.hG] using hP_full)
+            ih (G₂:=G₂) (S₂:=S₂) hStore'_ih hP_full
           have hSubS2 : SEnvDomSubset split.S2 (Sown0.right ++ split.S2) := by
             simpa using (SEnvDomSubset_append_right (S₁:=Sown0.right) (S₂:=split.S2))
           have hDisjS' : DisjointS split.S2 S₁0' :=
@@ -1038,10 +1046,10 @@ private theorem StoreTypedStrong_preserved_frame_left
               HasTypeProcPreOut_frame_G_left (Ssh:=Ssh0)
                 (Sown:={ right := Sown0.right ++ split.S1, left := split.S2 })
                 (Gfr:=split.G1) (G:=split.G2) hDisjG hQ
-            simpa [split.hG] using hQ'
+            simp only [← split.hG] at hQ'
+            exact hQ'
           have hStore''' :=
-            ih (G₂:=G₂) (S₂:=S₂) hStore''_ih (by
-              simpa [split.hG] using hQ_full)
+            ih (G₂:=G₂) (S₂:=S₂) hStore''_ih hQ_full
           simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore'''
   | par_skip_left =>
       exact hStore

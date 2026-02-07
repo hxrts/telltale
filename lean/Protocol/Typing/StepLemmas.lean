@@ -177,7 +177,13 @@ theorem Coherent_split_right {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
   have hTraceEq : lookupD (D₁ ++ D₂) e = lookupD D₂ e :=
     lookupD_append_right (D₁:=D₁) (D₂:=D₂) (e:=e) hD1none
   have hActive' : ActiveEdge (G₁ ++ G₂) e := by
-    simp [ActiveEdge, hGrecv']
+    have hSenderMerged : (lookupG (G₁ ++ G₂) { sid := e.sid, role := e.sender }).isSome = true := by
+      cases hActive with
+      | intro hSender _ =>
+          simpa [lookupG_append_right hG1none_sender] using hSender
+    have hRecvMerged : (lookupG (G₁ ++ G₂) { sid := e.sid, role := e.receiver }).isSome = true := by
+      simp [hGrecv']
+    exact ⟨hSenderMerged, hRecvMerged⟩
   have hCohEdge := hCoh e hActive' Lrecv hGrecv'
   rcases hCohEdge with ⟨Lsender, hGsenderMerged, hConsume⟩
   have hSenderEq := lookupG_append_right (G₁:=G₁) (G₂:=G₂) (e:={ sid := e.sid, role := e.sender }) hG1none_sender

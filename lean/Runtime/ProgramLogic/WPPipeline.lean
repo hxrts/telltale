@@ -1,5 +1,5 @@
 import Runtime.ProgramLogic.WPPair
-import Runtime.Compat.RA
+import Runtime.IrisBridge
 
 /- 
 The Problem. Composed WP rules like send pipelines currently duplicate the

@@ -2,9 +2,11 @@ import Iris.Instances.IProp.Instance
 import Iris.BaseLogic.Lib.Wsat
 import Iris.BaseLogic.Lib.FancyUpdates
 import Iris.BaseLogic.Lib.Invariants
+import Iris.BI.BigOp
 import Iris.BaseLogic.Lib.GhostVar
 import Iris.BaseLogic.Lib.GhostMap
 import Iris.BaseLogic.Lib.SavedProp
+import Iris.ProgramLogic.Language
 
 /-!
 # Telltale–Iris Bridge
@@ -130,6 +132,12 @@ noncomputable def «forall» {α : Type} (Φ : α → iProp) : iProp :=
   @Iris.BI.BIBase.«forall» _ _ α Φ
 
 end iProp
+
+/-! ## Big Separation over Maps -/
+
+noncomputable def big_sepM {K : Type _} {V : Type _} {M' : Type _ → Type _}
+    [Iris.Std.FiniteMap K M'] (Φ : K → V → iProp) (m : M' V) : iProp :=
+  Iris.BI.big_sepM (PROP := iProp) Φ m
 
 /-! ## Entailment Helpers -/
 
@@ -291,6 +299,46 @@ theorem inv_persistent (N : Namespace) (P : iProp) :
     iProp.entails (_root_.inv N P) (iProp.persistently (_root_.inv N P)) :=
   Iris.BaseLogic.inv_persistent (W := ti.W) N P
 
+/-! ## Cancelable Invariants (Compatibility Stubs) -/
+
+/-- Cancelable invariant token handle (placeholder). -/
+abbrev CancelToken := GhostName
+
+/-- Ownership predicate for a cancel token (placeholder). -/
+axiom cancel_token_own : CancelToken → iProp
+
+/-- Cancelable invariant (placeholder). -/
+axiom cinv : Namespace → CancelToken → iProp → iProp
+
+/-- Namespaces for cancelable invariants are disjoint (placeholder). -/
+axiom namespace_disjoint :
+  ∀ N₁ N₂ : Namespace, N₁ ≠ N₂ →
+    Mask.disjoint (namespace_to_mask N₁) (namespace_to_mask N₂)
+
+/-- Allocate a cancelable invariant (placeholder). -/
+axiom cinv_alloc :
+  ∀ (N : Namespace) (E : Mask) (P : iProp),
+    iProp.entails (iProp.later P)
+      (fupd E E (iProp.exist fun ct =>
+        iProp.sep (cinv N ct P) (cancel_token_own ct)))
+
+/-- Open a cancelable invariant (placeholder). -/
+axiom cinv_acc :
+  ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
+    Mask.subseteq (namespace_to_mask N) E →
+    iProp.entails (cinv N ct P)
+      (fupd E (Mask.diff E (namespace_to_mask N))
+        (iProp.sep (iProp.later P)
+          (iProp.wand (iProp.later P)
+            (fupd (Mask.diff E (namespace_to_mask N)) E iProp.emp))))
+
+/-- Cancel a cancelable invariant (placeholder). -/
+axiom cinv_cancel :
+  ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
+    Mask.subseteq (namespace_to_mask N) E →
+    iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
+      (fupd E (Mask.diff E (namespace_to_mask N)) (iProp.later P))
+
 /-! ## Saved Propositions -/
 
 noncomputable def saved_prop_own [SavedPropSlot] (γ : GhostName) (P : iProp) :
@@ -396,3 +444,28 @@ theorem ghost_map_delete {V : Type} [GhostMapSlot V]
       (_root_.bupd (ghost_map_auth γ (delete m k))) :=
   Iris.BaseLogic.ghost_map_delete (GF := ti.GF) (M := ti.M) (F := ti.F)
     (V := Iris.LeibnizO V) γ m k (Iris.LeibnizO.mk v)
+
+/-! ## Program Logic (Compatibility Stubs) -/
+
+namespace Iris
+
+/-- Placeholder state interpretation predicate. -/
+axiom state_interp (Λ : Iris.ProgramLogic.Language) (σ : Λ.state) : iProp
+
+/-- Placeholder weakest precondition. -/
+axiom wp (Λ : Iris.ProgramLogic.Language) (E : Mask) (e : Λ.expr)
+    (Φ : Λ.val → iProp) : iProp
+
+/-- Placeholder multi-step relation. -/
+axiom MultiStep' {Λ : Iris.ProgramLogic.Language} :
+  Λ.expr → Λ.state → Λ.expr → Λ.state → Prop
+
+/-- Placeholder invariance lemma for WP. -/
+axiom wp_invariance {Λ : Iris.ProgramLogic.Language} {e : Λ.expr} {σ : Λ.state}
+    {Φ : Λ.val → iProp} :
+  iProp.entails iProp.emp (iProp.wand (state_interp Λ σ) (wp Λ Mask.top e Φ)) →
+  ∀ e' σ',
+    MultiStep' (Λ:=Λ) e σ e' σ' →
+    iProp.entails iProp.emp (_root_.bupd (state_interp Λ σ'))
+
+end Iris
