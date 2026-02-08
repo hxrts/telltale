@@ -801,10 +801,212 @@ theorem IsRedirectedEdge_respects_renaming (ρ : SessionRenaming)
     have hBeqRen : (ρ.f e.sid == ρ.f s) = false := beq_eq_false_iff_ne.mpr hSidRen
     simp only [hBeq, hBeqRen, Bool.false_eq_true, ↓reduceIte]
 
-/-- DelegationStep is equivariant under session renaming.
-    If `hDeleg : DelegationStep G G' D D' s A B`, then applying session
-    renaming ρ to all environments and session IDs yields a valid
-    `DelegationStep (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D') (ρ.f s) A B`. -/
+/-- Helper: construct edge preimage when we know the session ID maps. -/
+private theorem edge_preimage_of_sid_eq (ρ : SessionRenaming) (e : Edge) (s : SessionId)
+    (hSid : e.sid = ρ.f s) :
+    e = renameEdge ρ { sid := s, sender := e.sender, receiver := e.receiver } := by
+  simp only [renameEdge]
+  cases e with
+  | mk sid sender receiver =>
+    simp only [Edge.mk.injEq, and_self, and_true]
+    simp only at hSid
+    exact hSid
+
+/-- Helper: if e.sid ≠ ρ.f s and e has a preimage e₀, then e₀.sid ≠ s. -/
+private theorem preimage_sid_ne (ρ : SessionRenaming) (e e₀ : Edge) (s : SessionId)
+    (hNeSid : e.sid ≠ ρ.f s) (hEeq : e = renameEdge ρ e₀) :
+    e₀.sid ≠ s := by
+  intro heq
+  have hContra : e.sid = ρ.f s := by
+    simp only [hEeq, renameEdge, heq]
+  exact hNeSid hContra
+
+/-- Helper: analogous preimage lemma for endpoints. -/
+private theorem endpoint_preimage_sid_ne (ρ : SessionRenaming) (ep ep' : Endpoint) (s : SessionId)
+    (hNeSid : ep.sid ≠ ρ.f s) (hEpEq : ep = renameEndpoint ρ ep') :
+    ep'.sid ≠ s := by
+  intro heq
+  have hContra : ep.sid = ρ.f s := by
+    simp only [hEpEq, renameEndpoint, heq]
+  exact hNeSid hContra
+
+/-! ### Modular proofs for DelegationStep_respects_renaming -/
+
+private theorem DelegationStep_A_lookup_renaming (ρ : SessionRenaming)
+    {G : GEnv} {s : SessionId} {A : Role} {A_type : LocalType}
+    (hLookup : lookupG G ⟨s, A⟩ = some A_type) :
+    lookupG (renameGEnv ρ G) ⟨ρ.f s, A⟩ = some (renameLocalType ρ A_type) := by
+  have hEq : ({ sid := ρ.f s, role := A } : Endpoint) = renameEndpoint ρ { sid := s, role := A } := by
+    simp only [renameEndpoint]
+  rw [hEq, lookupG_rename, hLookup]
+  simp only [Option.map_some]
+
+private theorem DelegationStep_A_removed_renaming (ρ : SessionRenaming)
+    {G' : GEnv} {s : SessionId} {A : Role}
+    (hRemoved : lookupG G' ⟨s, A⟩ = none) :
+    lookupG (renameGEnv ρ G') ⟨ρ.f s, A⟩ = none := by
+  have hEq : ({ sid := ρ.f s, role := A } : Endpoint) = renameEndpoint ρ { sid := s, role := A } := by
+    simp only [renameEndpoint]
+  rw [hEq, lookupG_rename, hRemoved]
+  simp only [Option.map_none]
+
+private theorem DelegationStep_B_added_renaming (ρ : SessionRenaming)
+    {G' : GEnv} {s : SessionId} {A B : Role} {A_type : LocalType}
+    (hAdded : lookupG G' ⟨s, B⟩ = some (renameLocalTypeRole s A B A_type)) :
+    lookupG (renameGEnv ρ G') ⟨ρ.f s, B⟩ =
+      some (renameLocalTypeRole (ρ.f s) A B (renameLocalType ρ A_type)) := by
+  have hEq : ({ sid := ρ.f s, role := B } : Endpoint) = renameEndpoint ρ { sid := s, role := B } := by
+    simp only [renameEndpoint]
+  rw [hEq, lookupG_rename, hAdded]
+  simp only [Option.map_some]
+  congr 1
+  exact renameLocalType_renameLocalTypeRole_comm ρ s A B A_type
+
+private theorem DelegationStep_other_roles_G_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {s : SessionId} {A B : Role}
+    (hOrig : ∀ ep, ep.sid = s → ep.role ≠ A → ep.role ≠ B →
+      lookupG G' ep = (lookupG G ep).map (renameLocalTypeRole s A B))
+    (ep : Endpoint) (hSid : ep.sid = ρ.f s) (hNeA : ep.role ≠ A) (hNeB : ep.role ≠ B) :
+    lookupG (renameGEnv ρ G') ep =
+      (lookupG (renameGEnv ρ G) ep).map (renameLocalTypeRole (ρ.f s) A B) := by
+  let ep' : Endpoint := { sid := s, role := ep.role }
+  have hEpEq : ep = renameEndpoint ρ ep' := by
+    simp only [renameEndpoint, ep']
+    cases ep with
+    | mk sid role =>
+      simp only [Endpoint.mk.injEq]
+      simp only at hSid
+      simp [hSid]
+  rw [hEpEq, lookupG_rename, lookupG_rename]
+  have hOther := hOrig ep' rfl hNeA hNeB
+  rw [hOther]
+  simp only [Option.map_map]
+  congr 1
+  funext L
+  exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
+
+private theorem DelegationStep_other_sessions_G_renaming (ρ : SessionRenaming)
+    {G G' : GEnv} {s : SessionId}
+    (hOrig : ∀ ep, ep.sid ≠ s → lookupG G' ep = lookupG G ep)
+    (ep : Endpoint) (hSid : ep.sid ≠ ρ.f s) :
+    lookupG (renameGEnv ρ G') ep = lookupG (renameGEnv ρ G) ep := by
+  cases hLookup : lookupG (renameGEnv ρ G) ep with
+  | none =>
+    cases hLookup' : lookupG (renameGEnv ρ G') ep with
+    | none => rfl
+    | some L' =>
+      obtain ⟨ep', _, hEpEq, _, hLookupG'⟩ := lookupG_rename_inv ρ G' ep L' hLookup'
+      have hSid' : ep'.sid ≠ s := endpoint_preimage_sid_ne ρ ep ep' s hSid hEpEq
+      have hOther := hOrig ep' hSid'
+      rw [hOther] at hLookupG'
+      have hContra : lookupG (renameGEnv ρ G) ep = (lookupG G ep').map (renameLocalType ρ) := by
+        rw [hEpEq, lookupG_rename]
+      rw [hLookupG'] at hContra
+      simp only [Option.map_some] at hContra
+      rw [hLookup] at hContra
+      exact Option.noConfusion hContra
+  | some L =>
+    obtain ⟨ep', _, hEpEq, hL, hLookupG⟩ := lookupG_rename_inv ρ G ep L hLookup
+    have hSid' : ep'.sid ≠ s := endpoint_preimage_sid_ne ρ ep ep' s hSid hEpEq
+    have hOther := hOrig ep' hSid'
+    have hResult : lookupG (renameGEnv ρ G') ep = (lookupG G' ep').map (renameLocalType ρ) := by
+      rw [hEpEq, lookupG_rename]
+    rw [hOther, hLookupG] at hResult
+    simp only [Option.map_some] at hResult
+    rw [hResult, hL]
+
+private theorem DelegationStep_other_sessions_D_renaming (ρ : SessionRenaming)
+    {D D' : DEnv} {s : SessionId}
+    (hOrig : ∀ e, e.sid ≠ s → lookupD D' e = lookupD D e)
+    (e : Edge) (hSid : e.sid ≠ ρ.f s) :
+    lookupD (renameDEnv ρ D') e = lookupD (renameDEnv ρ D) e := by
+  by_cases hEmpty : lookupD (renameDEnv ρ D) e = []
+  · by_cases hEmpty' : lookupD (renameDEnv ρ D') e = []
+    · simp only [hEmpty, hEmpty']
+    · obtain ⟨e₀, hEeq, hLookupD'⟩ := lookupD_rename_inv ρ D' e hEmpty'
+      have hSid' : e₀.sid ≠ s := preimage_sid_ne ρ e e₀ s hSid hEeq
+      have hOther := hOrig e₀ hSid'
+      have hContra : lookupD (renameDEnv ρ D) e = (lookupD D e₀).map (renameValType ρ) := by
+        rw [hEeq, lookupD_rename]
+      -- From hEmpty and hContra: (lookupD D e₀).map (renameValType ρ) = []
+      have hMapEmpty : (lookupD D e₀).map (renameValType ρ) = [] := by
+        rw [← hContra, hEmpty]
+      -- From hOther and hLookupD': lookupD (renameDEnv ρ D') e = (lookupD D e₀).map (renameValType ρ)
+      rw [hOther] at hLookupD'
+      -- So lookupD (renameDEnv ρ D') e = [], contradicting hEmpty'
+      have hD'Empty : lookupD (renameDEnv ρ D') e = [] := by
+        rw [hLookupD', hMapEmpty]
+      exact (hEmpty' hD'Empty).elim
+  · obtain ⟨e₀, hEeq, hLookupD⟩ := lookupD_rename_inv ρ D e hEmpty
+    have hSid' : e₀.sid ≠ s := preimage_sid_ne ρ e e₀ s hSid hEeq
+    have hOther := hOrig e₀ hSid'
+    have hResult : lookupD (renameDEnv ρ D') e = (lookupD D' e₀).map (renameValType ρ) := by
+      rw [hEeq, lookupD_rename]
+    rw [hOther] at hResult
+    rw [hLookupD, hResult]
+
+/-- Helper for trace_preserved when edge is NOT in the renamed session. -/
+private theorem DelegationStep_trace_preserved_other_session (ρ : SessionRenaming)
+    {D D' : DEnv} {s : SessionId} {A B : Role}
+    (hOrigTrace : ∀ e e', IsRedirectedEdge e e' s A B →
+      lookupD D' e' = (lookupD D e).map (renameValTypeRole s A B))
+    (e : Edge) (hSid : e.sid ≠ ρ.f s) :
+    lookupD (renameDEnv ρ D') e = (lookupD (renameDEnv ρ D) e).map (renameValTypeRole (ρ.f s) A B) := by
+  -- When e.sid ≠ ρ.f s, redirection is identity in the renamed space
+  by_cases hEmpty : lookupD (renameDEnv ρ D) e = []
+  · by_cases hEmpty' : lookupD (renameDEnv ρ D') e = []
+    · simp only [hEmpty, hEmpty', List.map_nil]
+    · obtain ⟨e₀, hEeq, _⟩ := lookupD_rename_inv ρ D' e hEmpty'
+      have hSid' : e₀.sid ≠ s := preimage_sid_ne ρ e e₀ s hSid hEeq
+      have hRedir₀ : IsRedirectedEdge e₀ e₀ s A B := by
+        simp only [IsRedirectedEdge, redirectEdge]
+        have hBeq : (e₀.sid == s) = false := beq_eq_false_iff_ne.mpr hSid'
+        simp only [hBeq, Bool.false_eq_true, ↓reduceIte]
+      have hOrig := hOrigTrace e₀ e₀ hRedir₀
+      rw [hEeq, lookupD_rename, lookupD_rename, hOrig]
+      simp only [List.map_map]
+      congr 1
+      funext T
+      exact renameValType_renameValTypeRole_comm ρ s A B T
+  · obtain ⟨e₀, hEeq, hLookupD⟩ := lookupD_rename_inv ρ D e hEmpty
+    have hSid' : e₀.sid ≠ s := preimage_sid_ne ρ e e₀ s hSid hEeq
+    have hRedir₀ : IsRedirectedEdge e₀ e₀ s A B := by
+      simp only [IsRedirectedEdge, redirectEdge]
+      have hBeq : (e₀.sid == s) = false := beq_eq_false_iff_ne.mpr hSid'
+      simp only [hBeq, Bool.false_eq_true, ↓reduceIte]
+    have hOrig := hOrigTrace e₀ e₀ hRedir₀
+    rw [hEeq, lookupD_rename, lookupD_rename, hOrig]
+    simp only [List.map_map]
+    congr 1
+    funext T
+    exact renameValType_renameValTypeRole_comm ρ s A B T
+
+/-- Helper for trace_preserved when edge IS in the renamed session. -/
+private theorem DelegationStep_trace_preserved_in_session (ρ : SessionRenaming)
+    {D D' : DEnv} {s : SessionId} {A B : Role}
+    (hOrigTrace : ∀ e e', IsRedirectedEdge e e' s A B →
+      lookupD D' e' = (lookupD D e).map (renameValTypeRole s A B))
+    (e e' : Edge) (hRedir : e' = redirectEdge e (ρ.f s) A B) (hSid : e.sid = ρ.f s) :
+    lookupD (renameDEnv ρ D') e' = (lookupD (renameDEnv ρ D) e).map (renameValTypeRole (ρ.f s) A B) := by
+  -- Construct preimages with sid = s
+  let e₀ : Edge := { sid := s, sender := e.sender, receiver := e.receiver }
+  have hEeq : e = renameEdge ρ e₀ := edge_preimage_of_sid_eq ρ e s hSid
+  have hE'sid : e'.sid = ρ.f s := by
+    simp only [hRedir, redirectEdge, hSid, beq_self_eq_true, ↓reduceIte]
+  let e₀' : Edge := { sid := s, sender := e'.sender, receiver := e'.receiver }
+  have hE'eq : e' = renameEdge ρ e₀' := edge_preimage_of_sid_eq ρ e' s hE'sid
+  -- Show IsRedirectedEdge e₀ e₀' s A B
+  have hRedir' : IsRedirectedEdge e₀ e₀' s A B := by
+    simp only [IsRedirectedEdge, redirectEdge, beq_self_eq_true, ↓reduceIte, e₀, e₀']
+    simp only [hRedir, redirectEdge, hSid, beq_self_eq_true, ↓reduceIte]
+  have hOrig := hOrigTrace e₀ e₀' hRedir'
+  rw [hEeq, hE'eq, lookupD_rename, lookupD_rename, hOrig]
+  simp only [List.map_map]
+  congr 1
+  funext T
+  exact renameValType_renameValTypeRole_comm ρ s A B T
+
+/-- DelegationStep is equivariant under session renaming. -/
 def DelegationStep_respects_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
     (hDeleg : DelegationStep G G' D D' s A B) :
@@ -812,67 +1014,22 @@ def DelegationStep_respects_renaming (ρ : SessionRenaming)
                    (ρ.f s) A B where
   wf := DelegationWF_respects_renaming ρ hDeleg.wf
   A_type := renameLocalType ρ hDeleg.A_type
-  A_lookup := by
-    -- Show: lookupG (renameGEnv ρ G) { sid := ρ.f s, role := A } = some (renameLocalType ρ A_type)
-    -- The endpoint { sid := ρ.f s, role := A } = renameEndpoint ρ { sid := s, role := A }
-    have hEq : ({ sid := ρ.f s, role := A } : Endpoint) = renameEndpoint ρ { sid := s, role := A } := by
-      simp only [renameEndpoint]
-    rw [hEq, lookupG_rename]
-    simp only [hDeleg.A_lookup, Option.map_some]
-  A_removed := by
-    -- Show: lookupG (renameGEnv ρ G') { sid := ρ.f s, role := A } = none
-    have hEq : ({ sid := ρ.f s, role := A } : Endpoint) = renameEndpoint ρ { sid := s, role := A } := by
-      simp only [renameEndpoint]
-    rw [hEq, lookupG_rename]
-    simp only [hDeleg.A_removed, Option.map_none]
-  B_added := by
-    -- Show: lookupG (renameGEnv ρ G') { sid := ρ.f s, role := B } = some (renamed type)
-    have hEq : ({ sid := ρ.f s, role := B } : Endpoint) = renameEndpoint ρ { sid := s, role := B } := by
-      simp only [renameEndpoint]
-    rw [hEq, lookupG_rename]
-    simp only [hDeleg.B_added, Option.map_some]
-    congr 1
-    exact renameLocalType_renameLocalTypeRole_comm ρ s A B hDeleg.A_type
-  other_roles_G := by
-    intro ep hSid hNeA hNeB
-    -- ep is in the renamed space with ep.sid = ρ.f s
-    -- The preimage is { sid := s, role := ep.role }
-    let ep' : Endpoint := { sid := s, role := ep.role }
-    have hEpEq : ep = renameEndpoint ρ ep' := by
-      simp only [renameEndpoint, ep']
-      cases ep with
-      | mk sid role =>
-        simp only [Endpoint.mk.injEq]
-        simp only at hSid
-        simp [hSid]
-    rw [hEpEq, lookupG_rename, lookupG_rename]
-    have hOther := hDeleg.other_roles_G ep' rfl hNeA hNeB
-    rw [hOther]
-    simp only [Option.map_map]
-    congr 1
-    funext L
-    exact renameLocalType_renameLocalTypeRole_comm ρ s A B L
-  other_sessions_G := by
-    intro ep hSid
-    -- For endpoints not in session ρ.f s, we need to show G and G' give the same lookup.
-    -- Case 1: ep is not in range of renameEndpoint ρ => both lookups are none
-    -- Case 2: ep = renameEndpoint ρ ep' for some ep' with ep'.sid ≠ s
-    --         => apply hDeleg.other_sessions_G ep'
-    -- This requires case analysis on whether ep is in the range of renaming.
-    sorry
+  A_lookup := DelegationStep_A_lookup_renaming ρ hDeleg.A_lookup
+  A_removed := DelegationStep_A_removed_renaming ρ hDeleg.A_removed
+  B_added := DelegationStep_B_added_renaming ρ hDeleg.B_added
+  other_roles_G := DelegationStep_other_roles_G_renaming ρ hDeleg.other_roles_G
+  other_sessions_G := DelegationStep_other_sessions_G_renaming ρ hDeleg.other_sessions_G
   trace_preserved := by
     intro e e' hRedir
-    -- The trace preservation property involves complex preimage reasoning.
-    -- We need to show that for edges e, e' in the renamed space satisfying
-    -- IsRedirectedEdge e e' (ρ.f s) A B, the buffer lookup relation holds.
-    -- This requires inverting the renaming to get original edges and applying
-    -- hDeleg.trace_preserved, then showing renaming commutes with the mapping.
-    sorry
-  other_sessions_D := by
-    intro e hSid
-    -- For edges not in the renamed session, the buffer should be unchanged.
-    -- Since e.sid ≠ ρ.f s, by injectivity any preimage has original session ≠ s,
-    -- so we can apply hDeleg.other_sessions_D.
-    sorry
+    simp only [IsRedirectedEdge] at hRedir
+    by_cases hSid : e.sid = ρ.f s
+    · exact DelegationStep_trace_preserved_in_session ρ hDeleg.trace_preserved e e' hRedir hSid
+    · have hE'eq : e' = e := by
+        simp only [hRedir, redirectEdge]
+        have hBeq : (e.sid == ρ.f s) = false := beq_eq_false_iff_ne.mpr hSid
+        simp only [hBeq, Bool.false_eq_true, ↓reduceIte]
+      rw [hE'eq]
+      exact DelegationStep_trace_preserved_other_session ρ hDeleg.trace_preserved e hSid
+  other_sessions_D := DelegationStep_other_sessions_D_renaming ρ hDeleg.other_sessions_D
 
 end
