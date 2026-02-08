@@ -36,7 +36,7 @@ structure Resource (ν : Type u) [VerificationModel ν] where
   logic : ResourceLogicRef ν -- Governing predicate reference.
   label : LabelRef ν -- Fungibility label.
   quantity : Nat -- Quantity within the kind.
-  value : ValueRef -- Payload value (opaque in V1).
+  value : ValueRef -- Payload value (abstract in V1).
   nonce : VerificationModel.Nonce ν -- Uniqueness seed.
   ckey : VerificationModel.CommitmentKey ν -- Commitment key for the resource.
   nullifierKey : VerificationModel.NullifierKey ν -- Nullifier key for spending.

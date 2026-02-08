@@ -1,6 +1,7 @@
 import SessionCoTypes.Coinductive.BisimDecidable.Core
 import SessionCoTypes.Coinductive.BisimDecidable.BisimAux
 import SessionCoTypes.Coinductive.BisimDecidable.Correctness
+import SessionCoTypes.Coinductive.BisimDecidable.Decidable
 
 /-!
 # Decidable Bisimulation for Regular Types

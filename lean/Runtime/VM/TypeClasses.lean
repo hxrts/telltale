@@ -12,15 +12,16 @@ universe u
 /-!
 # Domain Model Interfaces
 
-The five parametric interfaces that the VM is built on: `IdentityModel`, `GuardLayer`,
-`PersistenceModel`, `EffectModel`, and `VerificationModel`. Each is a typeclass that a
-concrete domain (e.g. Aura) instantiates. This file also defines the authenticated data
-structure interfaces (`AuthTree`, `AccumulatedSet`) and the `ScopeId` type used for
-scoped resource views.
+The VM is parameterized by six interfaces:
+`IdentityModel`, `GuardLayer`, `PersistenceModel`, `EffectRuntime`, `EffectSpec`,
+and `VerificationModel`.
 
-Everything here is pure specification with no proof imports. The rest of `Runtime/VM/`
-and `Runtime/Resources/` depend on these definitions. Domain-specific instances belong
-in `Runtime/Aura/` or equivalent modules, not here.
+`EffectRuntime` and `EffectSpec` are split intentionally:
+- `EffectRuntime` contains executable effect semantics (`EffectAction`, `EffectCtx`, `exec`)
+- `EffectSpec` contains typing-level effect obligations (`handlerType`)
+
+This file also defines authenticated data structure interfaces (`AuthTree`,
+`AccumulatedSet`) and `ScopeId` used for scoped resource views.
 -/
 
 /-! ## Shared protocol types -/
@@ -154,15 +155,18 @@ class PersistenceModel (π : Type u) where
   /-- Delta emitted on session close. -/
   closeDelta : SessionId → Delta
 
--- Effect interface with Iris pre/postconditions.
-class EffectModel (ε : Type u) where
+-- Runtime effect interface used by executable VM semantics.
+class EffectRuntime (ε : Type u) where
   /-- Effect actions and their mutable context. -/
   EffectAction : Type
   EffectCtx : Type
   /-- Execute an action in the effect context. -/
   exec : EffectAction → EffectCtx → EffectCtx
-  /-- Session type associated with an effect handler. -/
-  handlerType : EffectAction → LocalType
+
+-- Spec-only view of effects (typing obligations).
+class EffectSpec (ε : Type u) [EffectRuntime ε] where
+  /-- Typing-level handler signature. -/
+  handlerType : EffectRuntime.EffectAction ε → LocalType
 
 /-! ## Cryptography and authenticated structures -/
 

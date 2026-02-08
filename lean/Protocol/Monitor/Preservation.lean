@@ -51,7 +51,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Preservation Theorem -/
 
@@ -59,10 +59,204 @@ noncomputable section
 
 This is the key soundness theorem: if the monitor state is well-typed
 and we take a valid transition, the result is also well-typed. -/
-axiom MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v : Value)
+private theorem lin_valid_after_consume_produce
+    {G : GEnv} {Lin lin' : LinCtx} {e : Endpoint} {Lold Lnew : LocalType}
+    (hLinValid : ∀ e' S', (e', S') ∈ Lin → lookupG G e' = some S')
+    (hLinUnique : Lin.Pairwise (fun a b => a.1 ≠ b.1))
+    (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
+    ∀ e' S', (e', S') ∈ LinCtx.produceToken lin' e Lnew →
+      lookupG (updateG G e Lnew) e' = some S' := by
+  intro e' S' hMem
+  simp only [LinCtx.produceToken, List.mem_cons] at hMem
+  cases hMem with
+  | inl hHead =>
+      rcases Prod.mk.inj hHead with ⟨hE, hS⟩
+      subst hE
+      subst hS
+      simp
+  | inr hTail =>
+      have hOld : (e', S') ∈ Lin := mem_of_consumeToken Lin lin' e e' Lold S' hConsume hTail
+      have hLookupOld : lookupG G e' = some S' := hLinValid e' S' hOld
+      have hNe : e' ≠ e := by
+        intro hEq
+        have hMemE : (e, S') ∈ lin' := by
+          simpa [hEq] using hTail
+        exact consumeToken_not_mem Lin lin' e Lold hLinUnique hConsume S' hMemE
+      simpa [lookupG_update_neq G e e' Lnew hNe.symm] using hLookupOld
+
+private theorem lin_unique_after_consume_produce
+    {Lin lin' : LinCtx} {e : Endpoint} {Lold Lnew : LocalType}
+    (hLinUnique : Lin.Pairwise (fun a b => a.1 ≠ b.1))
+    (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
+    (LinCtx.produceToken lin' e Lnew).Pairwise (fun a b => a.1 ≠ b.1) := by
+  have hTailUnique : lin'.Pairwise (fun a b => a.1 ≠ b.1) :=
+    consumeToken_pairwise Lin lin' e Lold hLinUnique hConsume
+  have hNotIn : ∀ S', (e, S') ∉ lin' := by
+    intro S'
+    exact consumeToken_not_mem Lin lin' e Lold hLinUnique hConsume S'
+  exact produceToken_pairwise lin' e Lnew hTailUnique hNotIn
+
+private theorem endpoint_sid_fresh_of_consume
+    {Lin lin' : LinCtx} {e : Endpoint} {Lold : LocalType} {supply : SessionId}
+    (hFresh : ∀ e' S', (e', S') ∈ Lin → e'.sid < supply)
+    (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
+    e.sid < supply := by
+  have hIn : (e, Lold) ∈ Lin := consumeToken_endpoint_in_ctx Lin lin' e Lold hConsume
+  exact hFresh e Lold hIn
+
+private theorem lin_supply_fresh_after_consume_produce
+    {Lin lin' : LinCtx} {e : Endpoint} {Lold Lnew : LocalType} {supply : SessionId}
+    (hFresh : ∀ e' S', (e', S') ∈ Lin → e'.sid < supply)
+    (hConsume : LinCtx.consumeToken Lin e = some (lin', Lold)) :
+    ∀ e' S', (e', S') ∈ LinCtx.produceToken lin' e Lnew → e'.sid < supply := by
+  intro e' S' hMem
+  simp only [LinCtx.produceToken, List.mem_cons] at hMem
+  cases hMem with
+  | inl hHead =>
+      rcases Prod.mk.inj hHead with ⟨hE, _⟩
+      subst hE
+      exact endpoint_sid_fresh_of_consume hFresh hConsume
+  | inr hTail =>
+      exact consumeToken_preserves_supply_fresh Lin lin' e Lold supply hFresh hConsume e' S' hTail
+
+theorem MonStep_preserves_WTMon (ms ms' : MonitorState) (act : ProtoAction) (v : Value)
     (hStep : MonStep ms act v ms')
     (hWTc : WTMonComplete ms) :
-    WTMon ms'
+    WTMon ms' := by
+  rcases hWTc with ⟨hWT, _hRoleComplete⟩
+  rcases hWT with ⟨hCoh, hHead, hValid, hBT, hLinValid, hLinUnique, hSupplyFresh, hSupplyFreshG⟩
+  cases hStep
+  case send hG hRecvReady hConsume hv =>
+      rename_i e target T L lin'
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      · exact Coherent_send_preserved ms.G ms.D e target T L hCoh hG hRecvReady
+      · exact HeadCoherent_send_preserved ms.G ms.D e target T L hHead hCoh hG hRecvReady
+      ·
+        exact ValidLabels_send_preserved ms.G ms.D ms.bufs e target T L v
+          hValid hCoh hBT hG hRecvReady
+      · exact BuffersTyped_send_preserved ms.G ms.D ms.bufs e target T L v hBT hv hG
+      ·
+        intro e' S' hMem
+        exact lin_valid_after_consume_produce
+          (G:=ms.G) (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.send target T L) (Lnew:=L)
+          hLinValid hLinUnique hConsume e' S' hMem
+      ·
+        exact lin_unique_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.send target T L) (Lnew:=L) hLinUnique hConsume
+      ·
+        intro e' S' hMem
+        exact lin_supply_fresh_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.send target T L) (Lnew:=L) (supply:=ms.supply)
+          hSupplyFresh hConsume e' S' hMem
+      ·
+        have heFresh : e.sid < ms.supply :=
+          endpoint_sid_fresh_of_consume
+            (Lin:=ms.Lin) (lin':=lin') (e:=e)
+            (Lold:=.send target T L) (supply:=ms.supply) hSupplyFresh hConsume
+        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+  case recv hG hConsume hBuf hv =>
+      rename_i e source T L vs lin'
+      have hTrace :
+          (lookupD ms.D { sid := e.sid, sender := source, receiver := e.role }).head? = some T := by
+        exact trace_head_from_buffer hBuf hv (hBT { sid := e.sid, sender := source, receiver := e.role })
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      · exact Coherent_recv_preserved ms.G ms.D e source T L hCoh hG hTrace
+      · exact HeadCoherent_recv_preserved ms.G ms.D e source T L hHead hCoh hG hTrace
+      ·
+        exact ValidLabels_recv_preserved ms.G ms.D ms.bufs e source T L v vs
+          hValid hCoh hBT hBuf hv hG
+      · exact BuffersTyped_recv_preserved ms.G ms.D ms.bufs e source T L v vs hBT hBuf hv hG
+      ·
+        intro e' S' hMem
+        exact lin_valid_after_consume_produce
+          (G:=ms.G) (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.recv source T L) (Lnew:=L)
+          hLinValid hLinUnique hConsume e' S' hMem
+      ·
+        exact lin_unique_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.recv source T L) (Lnew:=L) hLinUnique hConsume
+      ·
+        intro e' S' hMem
+        exact lin_supply_fresh_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.recv source T L) (Lnew:=L) (supply:=ms.supply)
+          hSupplyFresh hConsume e' S' hMem
+      ·
+        have heFresh : e.sid < ms.supply :=
+          endpoint_sid_fresh_of_consume
+            (Lin:=ms.Lin) (lin':=lin') (e:=e)
+            (Lold:=.recv source T L) (supply:=ms.supply) hSupplyFresh hConsume
+        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+  case select hG hFind hRecvReady hConsume =>
+      rename_i e target bs ℓ L lin'
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      · exact Coherent_select_preserved ms.G ms.D e target bs ℓ L hCoh hG hFind hRecvReady
+      · exact HeadCoherent_select_preserved ms.G ms.D e target bs ℓ L hHead hCoh hG hFind hRecvReady
+      ·
+        exact ValidLabels_select_preserved ms.G ms.D ms.bufs e target bs ℓ L
+          hValid hCoh hBT hG hFind hRecvReady
+      · exact BuffersTyped_select_preserved ms.G ms.D ms.bufs e target bs ℓ L hBT hG hFind
+      ·
+        intro e' S' hMem
+        exact lin_valid_after_consume_produce
+          (G:=ms.G) (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.select target bs) (Lnew:=L)
+          hLinValid hLinUnique hConsume e' S' hMem
+      ·
+        exact lin_unique_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.select target bs) (Lnew:=L) hLinUnique hConsume
+      ·
+        intro e' S' hMem
+        exact lin_supply_fresh_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.select target bs) (Lnew:=L) (supply:=ms.supply)
+          hSupplyFresh hConsume e' S' hMem
+      ·
+        have heFresh : e.sid < ms.supply :=
+          endpoint_sid_fresh_of_consume
+            (Lin:=ms.Lin) (lin':=lin') (e:=e)
+            (Lold:=.select target bs) (supply:=ms.supply) hSupplyFresh hConsume
+        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
+  case branch hG hBuf hFind hConsume =>
+      rename_i e source bs ℓ L vs lin'
+      have hTrace :
+          (lookupD ms.D { sid := e.sid, sender := source, receiver := e.role }).head? = some .string := by
+        exact trace_head_from_buffer hBuf (HasTypeVal.string ℓ)
+          (hBT { sid := e.sid, sender := source, receiver := e.role })
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      · exact Coherent_branch_preserved ms.G ms.D e source bs ℓ L hCoh hG hFind hTrace
+      · exact HeadCoherent_branch_preserved ms.G ms.D e source bs ℓ L hHead hCoh hG hFind hTrace
+      ·
+        exact ValidLabels_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs
+          hValid hCoh hBT hG hFind hBuf
+      · exact BuffersTyped_branch_preserved ms.G ms.D ms.bufs e source bs ℓ L vs hBT hBuf hG hFind
+      ·
+        intro e' S' hMem
+        exact lin_valid_after_consume_produce
+          (G:=ms.G) (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.branch source bs) (Lnew:=L)
+          hLinValid hLinUnique hConsume e' S' hMem
+      ·
+        exact lin_unique_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.branch source bs) (Lnew:=L) hLinUnique hConsume
+      ·
+        intro e' S' hMem
+        exact lin_supply_fresh_after_consume_produce
+          (Lin:=ms.Lin) (lin':=lin') (e:=e)
+          (Lold:=.branch source bs) (Lnew:=L) (supply:=ms.supply)
+          hSupplyFresh hConsume e' S' hMem
+      ·
+        have heFresh : e.sid < ms.supply :=
+          endpoint_sid_fresh_of_consume
+            (Lin:=ms.Lin) (lin':=lin') (e:=e)
+            (Lold:=.branch source bs) (supply:=ms.supply) hSupplyFresh hConsume
+        exact updateG_preserves_supply_fresh ms.G e L ms.supply hSupplyFreshG heFresh
 
 theorem token_consumed_removed (ctx : LinCtx) (e : Endpoint) (ctx' : LinCtx) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
@@ -169,19 +363,64 @@ Returns updated monitor state with:
 - Endpoints added to G with initial types
 - Empty buffers/traces for all edges
 - Tokens for all endpoints in Lin -/
+private def newSessionEndpoints (sid : SessionId) (roles : RoleSet)
+    (localTypes : Role → LocalType) : GEnv :=
+  roles.map fun r => ({ sid := sid, role := r }, localTypes r)
+
+private def newSessionBuffers (sid : SessionId) (roles : RoleSet) : Buffers :=
+  (RoleSet.allEdges sid roles).map fun e => (e, [])
+
+private def newSessionLin (sid : SessionId) (roles : RoleSet)
+    (localTypes : Role → LocalType) : LinCtx :=
+  roles.map fun r => ({ sid := sid, role := r }, localTypes r)
+
+/-! ### Certified Session Initialization Requirement -/
+
+/-- Compile-time proof bundle required to call `MonitorState.newSession`.
+
+If Lean reports `NewSessionCert ...` is missing, provide:
+1. `roles_nodup`: no duplicate roles in the new session.
+2. `seed_wt`: a proof that the freshly initialized session state at `ms.supply`
+   is well-typed (`WTMon`). -/
+structure NewSessionCert (ms : MonitorState) (roles : RoleSet)
+    (localTypes : Role → LocalType) : Prop where
+  /-- No duplicate roles/endpoints in the newly created session. -/
+  roles_nodup : roles.Nodup
+  /-- Certified well-typedness for the new-session seed at fresh session id. -/
+  seed_wt :
+    WTMon
+      { G := newSessionEndpoints ms.supply roles localTypes
+        D := initDEnv ms.supply roles
+        bufs := newSessionBuffers ms.supply roles
+        Lin := newSessionLin ms.supply roles localTypes
+        supply := ms.supply + 1 }
+
+/--
+Named requirement used at `newSession` call sites.
+
+If this is missing, Lean emits an error mentioning
+`CertifiedDeploymentProofForNewSession ...`, making it explicit that callers
+must provide certified deployment evidence (role uniqueness + seed `WTMon`).
+-/
+abbrev CertifiedDeploymentProofForNewSession
+    (ms : MonitorState) (roles : RoleSet) (localTypes : Role → LocalType) : Prop :=
+  NewSessionCert ms roles localTypes
+
 def MonitorState.newSession (ms : MonitorState) (roles : RoleSet)
-    (localTypes : Role → LocalType) : MonitorState :=
+    (localTypes : Role → LocalType)
+    (_cert : CertifiedDeploymentProofForNewSession ms roles localTypes) : MonitorState :=
   let sid := ms.supply
-  let newEndpoints := roles.map fun r => ({ sid := sid, role := r }, localTypes r)
-  let newEdges := RoleSet.allEdges sid roles
+  let newEndpoints := newSessionEndpoints sid roles localTypes
+  let newBufs := newSessionBuffers sid roles
+  let newLin := newSessionLin sid roles localTypes
   { G := newEndpoints ++ ms.G
     D := initDEnv sid roles ++ ms.D
-    bufs := (newEdges.map fun e => (e, [])) ++ ms.bufs
-    Lin := (roles.map fun r => ({ sid := sid, role := r }, localTypes r)) ++ ms.Lin
+    bufs := newBufs ++ ms.bufs
+    Lin := newLin ++ ms.Lin
     supply := sid + 1 }
 
-/-- New session preserves well-typedness if local types are coherent projections. -/
-axiom newSession_preserves_WTMon (ms : MonitorState) (roles : RoleSet)
-    (localTypes : Role → LocalType)
-    (hWT : WTMon ms) :
-    WTMon (ms.newSession roles localTypes)
+/- NOTE:
+`MonitorState.newSession` is currently consumed through certified deployment
+paths (`DeployedProtocol.initMonitorState_wellTyped`), which provide explicit
+proof artifacts for initialization. A generic preservation theorem over
+arbitrary `roles/localTypes` is intentionally omitted here. -/

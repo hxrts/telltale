@@ -25,7 +25,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- Runtime values for MPST. -/
 inductive Value where

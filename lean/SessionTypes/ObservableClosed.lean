@@ -61,7 +61,7 @@ set_option synthInstance.maxSize 128
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
-noncomputable section
+section
 
 universe u
 

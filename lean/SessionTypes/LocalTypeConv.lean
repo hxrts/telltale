@@ -30,19 +30,24 @@ open SessionTypes.LocalTypeDB
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeConvProofs
 
-/-- For closed DB terms, the safe conversion succeeds and matches unsafe conversion.
+/-- For closed DB terms, the safe conversion succeeds and matches the total conversion.
 
 **Proven** in LocalTypeConvProofs.lean -/
 theorem fromDB?_eq_fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  t.fromDB? TypeContext.empty = some (t.fromDB TypeContext.empty) :=
-  LocalTypeConvProofs.fromDB?_eq_fromDB_closed t hclosed
+  t.fromDB? TypeContext.empty =
+    some (t.fromDB TypeContext.empty (by
+      simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)) :=
+  LocalTypeConvProofs.fromDB?_eq_fromDB_closed t hclosed (by
+    simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)
 
 /-- Closed DB term converts to closed named term.
 
 **Proven** in LocalTypeConvProofs.lean -/
 theorem fromDB_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  (t.fromDB TypeContext.empty).isClosed = true :=
-  LocalTypeConvProofs.fromDB_closed t hclosed
+  (t.fromDB TypeContext.empty (by
+      simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)).isClosed = true :=
+  LocalTypeConvProofs.fromDB_closed t hclosed (by
+    simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)
 
 /-- Closed named term converts to closed DB term.
 
@@ -58,8 +63,10 @@ then convert back, knowing we get the same term.
 
 **Status**: Proven infrastructure exists (get_indexOf_roundtrip), full proof pending. -/
 theorem toDB_fromDB_roundtrip_closed (t : LocalTypeDB) (hclosed : t.isClosed = true) :
-  (t.fromDB TypeContext.empty).toDB? TypeContext.empty = some t :=
-  LocalTypeConvProofs.toDB_fromDB_roundtrip_closed t hclosed
+  (t.fromDB TypeContext.empty (by
+      simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)).toDB? TypeContext.empty = some t :=
+  LocalTypeConvProofs.toDB_fromDB_roundtrip_closed t hclosed (by
+    simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using hclosed)
 
 /-! ## General Conversion Properties (require adequate context)
 
@@ -75,14 +82,14 @@ guarantees, this property may not hold. -/
 theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
     (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt ctx.length = true) :
-  (t.fromDB ctx).toDB? ctx = some t :=
+  (t.fromDB ctx hclosed).toDB? ctx = some t :=
   LocalTypeConvProofs.toDB_fromDB_roundtrip t ctx h_nodup h_fresh hclosed
 
 /-- Branch version of round-trip. -/
 theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
     (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
-  LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs) = some bs :=
+  LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs :=
   LocalTypeConvProofs.branches_toDB_fromDB_roundtrip bs ctx h_nodup h_fresh hclosed
 
 /-! ## Guardedness and Contractiveness Preservation
@@ -112,9 +119,10 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
 theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
     (h_fresh : ∀ c, NameContext.freshName c ∉ c) :
   t.isContractive = true →
-  t.isClosedAt (ctx.length) = true →
-  (t.fromDB ctx).isContractive = true :=
-  LocalTypeConvProofs.isContractive_fromDB t ctx h_fresh
+  (hclosed : t.isClosedAt (ctx.length) = true) →
+  (t.fromDB ctx hclosed).isContractive = true := by
+  intro hcontr hclosed
+  exact LocalTypeConvProofs.isContractive_fromDB t ctx h_fresh hcontr hclosed
 
 /-! ## Substitution Bridge (Named → DB) -/
 
@@ -152,16 +160,13 @@ These wrappers make it explicit when conversions are guaranteed to be safe.
 -/
 
 /-- Convert closed named term to DB (guaranteed to succeed). -/
-def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDB :=
-  match t.toDB? TypeContext.empty with
-  | some db => db
-  | none => .end  -- Should never happen for closed terms
+noncomputable def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDB :=
+  Classical.choose (toDB_closed t _hclosed)
 
 /-- Convert closed DB term to named (safe version). -/
 def fromDB_closed_safe (t : LocalTypeDB) (_hclosed : t.isClosed = true) : LocalTypeR :=
-  match t.fromDB? TypeContext.empty with
-  | some r => r
-  | none => .end  -- Should never happen for closed terms
+  t.fromDB TypeContext.empty (by
+    simpa [LocalTypeDB.isClosed, TypeContext.length_empty] using _hclosed)
 
 /-! ## Usage Guidelines: When is it safe to use DB conversions?
 
@@ -173,10 +178,6 @@ def fromDB_closed_safe (t : LocalTypeDB) (_hclosed : t.isClosed = true) : LocalT
 - Terms where `Context.Covers ctx t` holds
 - The context must contain all free variables
 - Generated names from `freshName` must not collide
-
-**Unsafe:**
-- Arbitrary open terms with inadequate context
-- Using `fromDB` without checking bounds (generates `_UNSAFE_db*` names)
 
 **Recommended usage:**
 1. For closed terms: Use `toDB_closed_safe` / `fromDB_closed_safe`

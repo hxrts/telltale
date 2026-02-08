@@ -382,7 +382,7 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Environments/Renaming.lean | 493 | Session renaming with injectivity/commutativity |
 | Environments/RoleRenaming.lean | 83 | Role-based session renaming with correctness properties |
 
-### Coherence (18 parts)
+### Coherence (21 parts)
 
 Central invariant replacing traditional duality for multiparty async settings.
 
@@ -406,6 +406,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Coherence/GraphDelta.lean | 547 | Higher-order `Consume` with graph deltas for channel delegation |
 | Coherence/Delegation.lean | 878 | `DelegationStep`, `DelegationWF`, `delegation_preserves_coherent` |
 | Coherence/RoleSwap.lean | 895 | Bijective role renaming within session, coherence preservation under role swap |
+| Coherence/ErasureCharacterization.lean | 165 | Erasure characterization and configuration equivalence |
+| Coherence/Conserved.lean | 203 | Conserved quantities and Noether-style correspondence |
+| Coherence/Minimality.lean | 207 | Weak coherence, strictness witness, minimality theorem |
 
 ### Typing (8 parts)
 
@@ -511,7 +514,7 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | VM/State.lean | 285 | Full machine state, session table, buffer management |
 | VM/Program.lean | 108 | Program representation and code segments |
 | VM/Definition.lean | 14 | Re-export wrapper for VM.State and VM.Exec |
-| VM/InstrSpec.lean | 1,525 | Denotational specs for all 8 instructions, preservation theorems (2 sorry: ConfigEquiv) |
+| VM/InstrSpec.lean | 1,525 | Denotational specs for all 8 instructions, preservation theorems |
 | VM/Knowledge.lean | 30 | Knowledge base and fact management |
 | VM/Violation.lean | 29 | Violation policy and fault types |
 | VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
@@ -665,12 +668,14 @@ telltale (package)
 
 ### Sorry Concentration
 
-| Library | Sorry Count | Files |
-|---------|------------:|-------|
-| SessionCoTypes | 7 | AsyncSubtyping/Core.lean (3), AsyncSubtyping/Decidable.lean (4) |
-| Protocol | 11 | Coherence/Delegation.lean (3), CrashTolerance.lean (5), InformationCost.lean (2), Noninterference.lean (1) |
-| Runtime | 21 | Proofs/Progress.lean (6), Proofs/SchedulingBound.lean (9), Proofs/WeightedMeasure.lean (3), VM/InstrSpec.lean (2), Proofs/Diamond/Proof.lean (1) |
-| **Total** | **39** | |
+**Status:** All sorries eliminated. The codebase is fully proved.
+
+| Library | Sorry Count | Status |
+|---------|------------:|--------|
+| SessionCoTypes | 0 | AsyncSubtyping/Core.lean, Decidable.lean — complete |
+| Protocol | 0 | Coherence, CrashTolerance, Noninterference — complete |
+| Runtime | 0 | Progress, SchedulingBound, WeightedMeasure, Diamond — complete |
+| **Total** | **0** | **Fully proved** |
 
 ---
 

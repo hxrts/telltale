@@ -47,7 +47,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 theorem Coherent_select_preserved
     (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)

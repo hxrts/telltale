@@ -24,39 +24,33 @@ noncomputable section
 
 theorem Coherent_causal_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
-    (hCoh : Coherent CausalDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G senderEp = some (.send receiverRole T L))
     (hRecvReady : ∀ Lrecv, lookupG G { sid := senderEp.sid, role := receiverRole } = some Lrecv →
       ∃ L', Consume senderEp.role Lrecv
               (lookupD D { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }) = some L' ∧
             (Consume senderEp.role L' [T]).isSome) :
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
-    Coherent CausalDelivery (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [CausalDelivery, CoherentFifo] using hCoh
-  have h := Coherent_send_preserved (G:=G) (D:=D) (senderEp:=senderEp)
-      (receiverRole:=receiverRole) (T:=T) (L:=L) hCoh' hG hRecvReady
-  simpa [CausalDelivery, CoherentFifo] using h
+    Coherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
+  exact Coherent_send_preserved (G:=G) (D:=D) (senderEp:=senderEp)
+    (receiverRole:=receiverRole) (T:=T) (L:=L) hCoh hG hRecvReady
 
 
 theorem Coherent_causal_recv_preserved
     (G : GEnv) (D : DEnv) (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
-    (hCoh : Coherent CausalDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G receiverEp = some (.recv senderRole T L))
     (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
-    Coherent CausalDelivery (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [CausalDelivery, CoherentFifo] using hCoh
-  have h := Coherent_recv_preserved (G:=G) (D:=D) (receiverEp:=receiverEp)
-      (senderRole:=senderRole) (T:=T) (L:=L) hCoh' hG hTrace
-  simpa [CausalDelivery, CoherentFifo] using h
+    Coherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
+  exact Coherent_recv_preserved (G:=G) (D:=D) (receiverEp:=receiverEp)
+    (senderRole:=senderRole) (T:=T) (L:=L) hCoh hG hTrace
 
 
 theorem Coherent_causal_select_preserved
     (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)
     (selectBranches : List (String × LocalType)) (ℓ : String) (L : LocalType)
-    (hCoh : Coherent CausalDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G selectorEp = some (.select targetRole selectBranches))
     (hFind : selectBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L))
     (hTargetReady : ∀ Lrecv, lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv →
@@ -64,66 +58,54 @@ theorem Coherent_causal_select_preserved
               (lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole }) = some L' ∧
             (Consume selectorEp.role L' [.string]).isSome) :
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
-    Coherent CausalDelivery (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [CausalDelivery, CoherentFifo] using hCoh
-  have h := Coherent_select_preserved (G:=G) (D:=D) (selectorEp:=selectorEp) (targetRole:=targetRole)
-      (bs:=selectBranches) (ℓ:=ℓ) (L:=L) hCoh' hG hFind hTargetReady
-  simpa [CausalDelivery, CoherentFifo] using h
+    Coherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
+  exact Coherent_select_preserved (G:=G) (D:=D) (selectorEp:=selectorEp) (targetRole:=targetRole)
+    (bs:=selectBranches) (ℓ:=ℓ) (L:=L) hCoh hG hFind hTargetReady
 
 
 theorem Coherent_causal_branch_preserved
     (G : GEnv) (D : DEnv) (brancherEp : Endpoint) (senderRole : Role)
     (branchOptions : List (String × LocalType)) (ℓ : String) (L : LocalType)
-    (hCoh : Coherent CausalDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G brancherEp = some (.branch senderRole branchOptions))
     (hFind : branchOptions.find? (fun b => b.1 == ℓ) = some (ℓ, L))
     (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
-    Coherent CausalDelivery (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [CausalDelivery, CoherentFifo] using hCoh
-  have h := Coherent_branch_preserved (G:=G) (D:=D) (brancherEp:=brancherEp)
-      (senderRole:=senderRole) (bs:=branchOptions) (ℓ:=ℓ) (L:=L) hCoh' hG hFind hTrace
-  simpa [CausalDelivery, CoherentFifo] using h
+    Coherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
+  exact Coherent_branch_preserved (G:=G) (D:=D) (brancherEp:=brancherEp)
+    (senderRole:=senderRole) (bs:=branchOptions) (ℓ:=ℓ) (L:=L) hCoh hG hFind hTrace
 
 /-! ## LossyDelivery -/
 
 theorem Coherent_lossy_send_preserved
     (G : GEnv) (D : DEnv) (senderEp : Endpoint) (receiverRole : Role) (T : ValType) (L : LocalType)
-    (hCoh : Coherent LossyDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G senderEp = some (.send receiverRole T L))
     (hRecvReady : ∀ Lrecv, lookupG G { sid := senderEp.sid, role := receiverRole } = some Lrecv →
       ∃ L', Consume senderEp.role Lrecv
               (lookupD D { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole }) = some L' ∧
             (Consume senderEp.role L' [T]).isSome) :
     let sendEdge := { sid := senderEp.sid, sender := senderEp.role, receiver := receiverRole : Edge }
-    Coherent LossyDelivery (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [LossyDelivery, CoherentFifo] using hCoh
-  have h := Coherent_send_preserved (G:=G) (D:=D) (senderEp:=senderEp)
-      (receiverRole:=receiverRole) (T:=T) (L:=L) hCoh' hG hRecvReady
-  simpa [LossyDelivery, CoherentFifo] using h
+    Coherent (updateG G senderEp L) (updateD D sendEdge (lookupD D sendEdge ++ [T])) := by
+  exact Coherent_send_preserved (G:=G) (D:=D) (senderEp:=senderEp)
+    (receiverRole:=receiverRole) (T:=T) (L:=L) hCoh hG hRecvReady
 
 
 theorem Coherent_lossy_recv_preserved
     (G : GEnv) (D : DEnv) (receiverEp : Endpoint) (senderRole : Role) (T : ValType) (L : LocalType)
-    (hCoh : Coherent LossyDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G receiverEp = some (.recv senderRole T L))
     (hTrace : (lookupD D { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role }).head? = some T) :
     let e := { sid := receiverEp.sid, sender := senderRole, receiver := receiverEp.role : Edge }
-    Coherent LossyDelivery (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [LossyDelivery, CoherentFifo] using hCoh
-  have h := Coherent_recv_preserved (G:=G) (D:=D) (receiverEp:=receiverEp)
-      (senderRole:=senderRole) (T:=T) (L:=L) hCoh' hG hTrace
-  simpa [LossyDelivery, CoherentFifo] using h
+    Coherent (updateG G receiverEp L) (updateD D e (lookupD D e).tail) := by
+  exact Coherent_recv_preserved (G:=G) (D:=D) (receiverEp:=receiverEp)
+    (senderRole:=senderRole) (T:=T) (L:=L) hCoh hG hTrace
 
 
 theorem Coherent_lossy_select_preserved
     (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)
     (selectBranches : List (String × LocalType)) (ℓ : String) (L : LocalType)
-    (hCoh : Coherent LossyDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G selectorEp = some (.select targetRole selectBranches))
     (hFind : selectBranches.find? (fun b => b.1 == ℓ) = some (ℓ, L))
     (hTargetReady : ∀ Lrecv, lookupG G { sid := selectorEp.sid, role := targetRole } = some Lrecv →
@@ -131,27 +113,21 @@ theorem Coherent_lossy_select_preserved
               (lookupD D { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole }) = some L' ∧
             (Consume selectorEp.role L' [.string]).isSome) :
     let selectEdge := { sid := selectorEp.sid, sender := selectorEp.role, receiver := targetRole : Edge }
-    Coherent LossyDelivery (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [LossyDelivery, CoherentFifo] using hCoh
-  have h := Coherent_select_preserved (G:=G) (D:=D) (selectorEp:=selectorEp) (targetRole:=targetRole)
-      (bs:=selectBranches) (ℓ:=ℓ) (L:=L) hCoh' hG hFind hTargetReady
-  simpa [LossyDelivery, CoherentFifo] using h
+    Coherent (updateG G selectorEp L) (updateD D selectEdge (lookupD D selectEdge ++ [.string])) := by
+  exact Coherent_select_preserved (G:=G) (D:=D) (selectorEp:=selectorEp) (targetRole:=targetRole)
+    (bs:=selectBranches) (ℓ:=ℓ) (L:=L) hCoh hG hFind hTargetReady
 
 
 theorem Coherent_lossy_branch_preserved
     (G : GEnv) (D : DEnv) (brancherEp : Endpoint) (senderRole : Role)
     (branchOptions : List (String × LocalType)) (ℓ : String) (L : LocalType)
-    (hCoh : Coherent LossyDelivery G D)
+    (hCoh : Coherent G D)
     (hG : lookupG G brancherEp = some (.branch senderRole branchOptions))
     (hFind : branchOptions.find? (fun b => b.1 == ℓ) = some (ℓ, L))
     (hTrace : (lookupD D { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role }).head? = some .string) :
     let branchEdge := { sid := brancherEp.sid, sender := senderRole, receiver := brancherEp.role : Edge }
-    Coherent LossyDelivery (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
-  have hCoh' : CoherentFifo G D := by
-    simpa [LossyDelivery, CoherentFifo] using hCoh
-  have h := Coherent_branch_preserved (G:=G) (D:=D) (brancherEp:=brancherEp)
-      (senderRole:=senderRole) (bs:=branchOptions) (ℓ:=ℓ) (L:=L) hCoh' hG hFind hTrace
-  simpa [LossyDelivery, CoherentFifo] using h
+    Coherent (updateG G brancherEp L) (updateD D branchEdge (lookupD D branchEdge).tail) := by
+  exact Coherent_branch_preserved (G:=G) (D:=D) (brancherEp:=brancherEp)
+    (senderRole:=senderRole) (bs:=branchOptions) (ℓ:=ℓ) (L:=L) hCoh hG hFind hTrace
 
 end

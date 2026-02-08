@@ -34,7 +34,7 @@ set_option linter.unnecessarySimpa false
 open scoped Classical
 open Batteries
 
-noncomputable section
+section
 
 /-! ### Global Compatibility (Coinductive) -/
 

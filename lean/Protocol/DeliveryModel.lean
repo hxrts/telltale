@@ -20,7 +20,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Delivery Model Interface -/
 
@@ -49,7 +49,7 @@ structure DeliveryModelLaws (M : DeliveryModel) : Prop where
         (M.consume from_ L ts).map (renameLocalType ρ)
 
 /-- Stronger laws mirroring FIFO-style Consume behavior. -/
-structure DeliveryModelLawsStrong (M : DeliveryModel) extends DeliveryModelLaws M : Prop where
+structure DeliveryModelLawsStrong (M : DeliveryModel) : Prop extends DeliveryModelLaws M where
   consume_non_recv_empty :
     ∀ {from_ : Role} {L : LocalType} {ts : List ValType} {L' : LocalType},
       (∀ r T L'', L ≠ .recv r T L'') →

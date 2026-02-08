@@ -7,7 +7,7 @@ Label predicates and merge algorithm for erasure.
 namespace Choreography.Projection.Erasure
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-noncomputable section
+section
 open Classical
 /-! ## Label Predicates -/
 

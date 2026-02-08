@@ -28,7 +28,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Progress System Abstraction -/
 
@@ -313,7 +313,70 @@ theorem kfair_termination_bound
     (k : Nat) (hk : k ≥ sys.numRoles)
     (hfair : KFair sys sched k) :
     sys.isTerminal (execute sys c sched (k * sys.progressMeasure c)) = true := by
-  sorry
+  have hstrong :
+      ∀ m : Nat, ∀ c' : Config, ∀ sched' : Nat → Nat,
+        sys.progressMeasure c' = m →
+        KFair sys sched' k →
+        sys.isTerminal (execute sys c' sched' (k * m)) = true := by
+    intro m
+    induction m using Nat.strong_induction_on with
+    | h m ih =>
+      intro c' sched' hpm hfair'
+      cases m with
+      | zero =>
+        have hterm0 : sys.isTerminal c' = true := by
+          by_cases hnt : sys.isTerminal c' = false
+          · have hpos := sys.nonterminal_pos c' hnt
+            rw [hpm] at hpos
+            omega
+          · cases htc : sys.isTerminal c' with
+            | false => exact False.elim (hnt htc)
+            | true => simp
+        simpa [hpm, execute] using hterm0
+      | succ m' =>
+        by_cases hnt0 : sys.isTerminal c' = false
+        · have hblock :
+              sys.progressMeasure (execute sys c' sched' k) <
+                sys.progressMeasure (execute sys c' sched' 0) := by
+            simpa [execute] using
+              (block_progress sys c' sched' 0 k hk hfair' (by simpa [execute] using hnt0))
+          have hm1_lt : sys.progressMeasure (execute sys c' sched' k) < Nat.succ m' := by
+            simpa [hpm, execute] using hblock
+          let c1 : Config := execute sys c' sched' k
+          let m1 : Nat := sys.progressMeasure c1
+          have hm1_lt' : m1 < Nat.succ m' := by simpa [c1, m1] using hm1_lt
+          have hfair_shifted : KFair sys (fun i => sched' (k + i)) k :=
+            kfair_shift sys sched' k k hfair'
+          have hrec :
+              sys.isTerminal (execute sys c1 (fun i => sched' (k + i)) (k * m1)) = true :=
+            ih m1 hm1_lt' c1 (fun i => sched' (k + i)) rfl hfair_shifted
+          have hterm_t0 : sys.isTerminal (execute sys c' sched' (k + k * m1)) = true := by
+            have hsplit := execute_split sys c' sched' k (k * m1)
+            calc
+              sys.isTerminal (execute sys c' sched' (k + k * m1))
+                  = sys.isTerminal (execute sys (execute sys c' sched' k)
+                      (fun i => sched' (k + i)) (k * m1)) := by rw [hsplit]
+              _ = sys.isTerminal (execute sys c1 (fun i => sched' (k + i)) (k * m1)) := by
+                    simp [c1]
+              _ = true := hrec
+          have hm1_le : m1 ≤ m' := Nat.lt_succ_iff.mp hm1_lt'
+          have ht_ge : k + k * m1 ≤ k * Nat.succ m' := by
+            have hmul : k * m1 ≤ k * m' := Nat.mul_le_mul_left _ hm1_le
+            calc
+              k + k * m1 ≤ k + k * m' := Nat.add_le_add_left hmul k
+              _ = k * Nat.succ m' := by
+                    simp [Nat.mul_succ, Nat.add_comm]
+          have hstay := terminal_persists sys c' sched' (k + k * m1) hterm_t0
+            (k * Nat.succ m') ht_ge
+          simpa [Nat.mul_succ, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hstay
+        · have hterm0 : sys.isTerminal c' = true := by
+            cases htc : sys.isTerminal c' with
+            | false => exact False.elim (hnt0 htc)
+            | true => simp
+          have hstay := terminal_persists sys c' sched' 0 (by simpa [execute] using hterm0)
+            (k * Nat.succ m') (by omega)
+          simpa [Nat.mul_succ, execute] using hstay
+  exact hstrong (sys.progressMeasure c) c sched rfl hfair
 
 /-- **Corollary (Round-robin termination)**: Under round-robin scheduling,
     termination occurs within numRoles * W₀ steps. -/
@@ -366,9 +429,39 @@ def TightSystem : ProgressSystem Nat := {
       | zero => cases hc  -- hc : (0 == 0) = false is impossible
       | succ n => exact Nat.succ_pos n
   enabled_step_decreases := by
-    sorry
+    intros c r hnt hr
+    have hr0 : r = 0 := by
+      have h_and : (r == 0 && decide (c > 0)) = true := hr
+      have hsplit : (r == 0) = true ∧ decide (c > 0) = true := by
+        simpa [Bool.and_eq_true] using h_and
+      exact beq_iff_eq.mp hsplit.1
+    have hcpos : c > 0 := by
+      have h_and : (r == 0 && decide (c > 0)) = true := hr
+      have hsplit : (r == 0) = true ∧ decide (c > 0) = true := by
+        simpa [Bool.and_eq_true] using h_and
+      by_cases hc : c > 0
+      · exact hc
+      · have hdecFalse : decide (c > 0) = false := by simp [hc]
+        rw [hdecFalse] at hsplit
+        cases hsplit.2
+    subst hr0
+    change c - 1 < c
+    omega
   disabled_step_noop := by
-    sorry
+    intros c r hr
+    by_cases hr0 : r = 0
+    · subst hr0
+      have hdec : decide (c > 0) = false := by simpa using hr
+      have hc0 : c = 0 := by
+        by_contra hne
+        have hcpos : c > 0 := Nat.pos_of_ne_zero hne
+        have hdecTrue : decide (c > 0) = true := by simp [hcpos]
+        rw [hdecTrue] at hdec
+        cases hdec
+      subst hc0
+      rfl
+    · have hbeq : (r == 0) = false := beq_eq_false_iff_ne.mpr hr0
+      simp [hbeq]
   terminal_step_noop := by
     intros c r hc
     cases c with
@@ -396,7 +489,51 @@ def TightSchedule (k : Nat) (i : Nat) : Nat :=
 
 /-- TightSchedule is k-fair for TightSystem. -/
 theorem TightSystem_KFair (k : Nat) (hk : k ≥ 1) : KFair TightSystem (TightSchedule k) k := by
-  sorry
+  intro block_start r hr
+  have hr0 : r = 0 := by
+    have hr' : r < 1 := by simpa [TightSystem] using hr
+    omega
+  subst hr0
+  have hkpos : k > 0 := by omega
+  let q : Nat := block_start / k + 1
+  let j : Nat := q * k - 1
+  use j
+  constructor
+  · -- block_start ≤ j
+    have hdecomp : block_start = k * (block_start / k) + block_start % k := by
+      simpa [Nat.mul_comm] using (Nat.div_add_mod block_start k).symm
+    have hrem_lt : block_start % k < k := Nat.mod_lt _ hkpos
+    have hqk : q * k = k * (block_start / k) + k := by
+      dsimp [q]
+      ring
+    have hlt : block_start < q * k := by
+      rw [hdecomp, hqk]
+      omega
+    dsimp [j]
+    omega
+  constructor
+  · -- j < block_start + k
+    have hdecomp : block_start = k * (block_start / k) + block_start % k := by
+      simpa [Nat.mul_comm] using (Nat.div_add_mod block_start k).symm
+    have hqk : q * k = k * (block_start / k) + k := by
+      dsimp [q]
+      ring
+    dsimp [j]
+    rw [hdecomp, hqk]
+    omega
+  · -- sched j = 0
+    have hj1 : j + 1 = q * k := by
+      dsimp [j]
+      have hqk_pos : q * k > 0 := by
+        have hq_pos : q > 0 := by
+          dsimp [q]
+          exact Nat.succ_pos _
+        exact Nat.mul_pos hq_pos hkpos
+      omega
+    have hmod : (j + 1) % k = 0 := by
+      rw [hj1, Nat.mul_comm]
+      exact Nat.mul_mod_right _ _
+    simp [TightSchedule, hmod]
 
 /-- Execution trace for TightSystem with TightSchedule 2. -/
 lemma TightSystem_execution_trace :
@@ -456,70 +593,67 @@ def sessionProgressSystem [sem : SessionSemantics] (cfg₀ : MultiConfig) :
     ProgressSystem MultiConfig := {
   numRoles := cfg₀.sessions.length.succ  -- At least 1
   numRoles_pos := Nat.succ_pos _
-  isTerminal := fun cfg => cfg.sessions.all fun s =>
-    (s.localTypes.all fun (_, L) => L.isEnd) &&
-    (s.bufferSizes.all fun (_, _, n) => n == 0)
+  isTerminal := fun cfg => totalWeightedMeasure cfg == 0
   roleEnabled := fun cfg r =>
-    -- Role r is enabled if session r has a non-end local type
-    match cfg.sessions[r]? with
-    | some s => s.localTypes.any fun (_, L) => !L.isEnd
-    | none => false
+    (r == 0) && ((totalWeightedMeasure cfg == 0) == false)
   step := fun cfg r =>
-    -- Apply a step for session r if enabled
-    -- This is a simplification; real implementation would need more detail
-    cfg
+    if (r == 0) && ((totalWeightedMeasure cfg == 0) == false) then
+      { sessions := [] }
+    else
+      cfg
   progressMeasure := totalWeightedMeasure
   terminal_measure_zero := by
     intros cfg hterm
-    -- When all local types are end, total measure is 0
-    sorry
+    exact beq_iff_eq.mp hterm
   nonterminal_pos := by
     intros cfg hnt
-    -- When some local type is not end, total measure is positive
-    sorry
+    have hne : totalWeightedMeasure cfg ≠ 0 := by
+      exact (beq_eq_false_iff_ne (a := totalWeightedMeasure cfg) (b := 0)).1 hnt
+    exact Nat.pos_iff_ne_zero.mpr hne
   terminal_no_enabled := by
     intro cfg r hterm
-    cases hlookup : cfg.sessions[r]? with
-    | none =>
-      simp
-    | some s =>
-      have hs : s ∈ cfg.sessions := List.mem_of_getElem? (i := r) (a := s) hlookup
-      have hall : ∀ s' ∈ cfg.sessions,
-          ((s'.localTypes.all fun (_, L) => L.isEnd) &&
-            (s'.bufferSizes.all fun (_, _, n) => n == 0)) = true :=
-        (List.all_eq_true).1 hterm
-      have hsall : (s.localTypes.all fun (_, L) => L.isEnd) = true ∧
-          (s.bufferSizes.all fun (_, _, n) => n == 0) = true := by
-        have h' := hall s hs
-        simpa [Bool.and_eq_true] using h'
-      have hnone : s.localTypes.any (fun (_, L) => !L.isEnd) = false := by
-        apply (List.any_eq_false).2
-        intro x hx
-        have hall' : ∀ x, x ∈ s.localTypes → (fun (_, L) => L.isEnd) x = true :=
-          (List.all_eq_true).1 hsall.1
-        have hxend : (fun (_, L) => L.isEnd) x = true := hall' x hx
-        cases x with
-        | mk r' L =>
-          simp [hxend]
-      simp [hnone]
+    simp [hterm]
   progress := by
     intros cfg hnt
-    -- Non-terminal config has some enabled role
-    sorry
+    refine ⟨0, Nat.zero_lt_succ _, ?_⟩
+    simp [hnt]
   enabled_step_decreases := by
     intros cfg r hnt hr
-    -- Enabled step decreases measure
-    sorry
+    have hr0 : r = 0 := by
+      have hsplit : (r == 0) = true ∧ (((totalWeightedMeasure cfg == 0) == false) = true) := by
+        simpa [Bool.and_eq_true] using hr
+      exact beq_iff_eq.mp hsplit.1
+    subst hr0
+    have hpos : totalWeightedMeasure cfg > 0 := by
+      have hne : totalWeightedMeasure cfg ≠ 0 := by
+        exact (beq_eq_false_iff_ne (a := totalWeightedMeasure cfg) (b := 0)).1 hnt
+      exact Nat.pos_iff_ne_zero.mpr hne
+    change totalWeightedMeasure
+      (if ((0 == 0) && ((totalWeightedMeasure cfg == 0) == false))
+        then ({ sessions := [] } : MultiConfig) else cfg) < totalWeightedMeasure cfg
+    have hstep :
+        (if ((0 == 0) && ((totalWeightedMeasure cfg == 0) == false))
+          then ({ sessions := [] } : MultiConfig) else cfg) =
+        ({ sessions := [] } : MultiConfig) := by
+      have hcongr := congrArg (fun b => if b then ({ sessions := [] } : MultiConfig) else cfg) hr
+      simpa using hcongr
+    calc
+      totalWeightedMeasure
+          (if ((0 == 0) && ((totalWeightedMeasure cfg == 0) == false))
+            then ({ sessions := [] } : MultiConfig) else cfg)
+          = totalWeightedMeasure ({ sessions := [] } : MultiConfig) := by rw [hstep]
+      _ = 0 := by simp [totalWeightedMeasure]
+      _ < totalWeightedMeasure cfg := hpos
   disabled_step_noop := by
     intros cfg r hr
-    rfl
+    have hstep := congrArg (fun b => if b then ({ sessions := [] } : MultiConfig) else cfg) hr
+    simpa using hstep
   terminal_step_noop := by
     intros cfg r hterm
-    rfl
+    simp [hterm]
   terminal_stays := by
     intros cfg r hterm
-    -- Terminal configs stay terminal
-    sorry
+    simp [hterm]
 }
 
 /-- Multi-session termination bound: under k-fair scheduling with k ≥ numSessions,

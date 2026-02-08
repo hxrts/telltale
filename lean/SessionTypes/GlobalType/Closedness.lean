@@ -559,17 +559,16 @@ def GlobalType.muHeight : GlobalType → Nat
   | .mu _ body => 1 + body.muHeight
   | _ => 0
 
-/-- Fully unfold a global type by iterating unfold until non-mu form. -/
-partial def GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
-  match g.muHeight with
-  | 0 => g
-  | _ => (g.unfold).fullUnfold
-
 /-- Fully unfold a global type by iterating `unfold` exactly `muHeight` times.
     This matches the Coq `full_unf` definition used in the reference proofs. -/
 def GlobalType.fullUnfoldIter (g : GlobalType) : GlobalType :=
   Nat.rec (motive := fun _ => GlobalType) g
     (fun _ acc => GlobalType.unfold acc) g.muHeight
+
+/-- Fully unfold a global type by iterating unfold until non-mu form.
+    Defined via `fullUnfoldIter` to ensure termination. -/
+abbrev GlobalType.fullUnfold (g : GlobalType) : GlobalType :=
+  g.fullUnfoldIter
 
 theorem GlobalType.muHeight_non_mu :
     ∀ g : GlobalType, (∀ (t : String) (body : GlobalType), g ≠ .mu t body) →

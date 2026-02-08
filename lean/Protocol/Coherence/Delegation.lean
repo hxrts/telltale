@@ -47,7 +47,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Well-Formedness Conditions -/
 
@@ -154,6 +154,10 @@ structure DelegationStep (G G' : GEnv) (D D' : DEnv) (s : SessionId) (A B : Role
 
   /-- Edges in other sessions are unchanged -/
   other_sessions_D : ∀ e, e.sid ≠ s → lookupD D' e = lookupD D e
+
+  /-- In session `s`, edges incident to the removed role `A` are emptied. -/
+  A_incident_empty :
+    ∀ e, e.sid = s → (e.sender = A ∨ e.receiver = A) → lookupD D' e = []
 
 /-! ## Role-Renaming for Consume (Delegation) -/
 
@@ -945,6 +949,22 @@ private theorem DelegationStep_other_sessions_D_renaming (ρ : SessionRenaming)
     rw [hOther] at hResult
     rw [hLookupD, hResult]
 
+private theorem DelegationStep_A_incident_empty_renaming (ρ : SessionRenaming)
+    {D' : DEnv} {s : SessionId} {A : Role}
+    (hOrig : ∀ e, e.sid = s → (e.sender = A ∨ e.receiver = A) → lookupD D' e = [])
+    (e : Edge) (hSid : e.sid = ρ.f s) (hInc : e.sender = A ∨ e.receiver = A) :
+    lookupD (renameDEnv ρ D') e = [] := by
+  let e₀ : Edge := { sid := s, sender := e.sender, receiver := e.receiver }
+  have hEeq : e = renameEdge ρ e₀ := by
+    simp only [renameEdge, e₀]
+    cases e with
+    | mk sid sender receiver =>
+      simp only [Edge.mk.injEq, and_self, and_true]
+      simpa using hSid
+  have hOrigEmpty : lookupD D' e₀ = [] := hOrig e₀ rfl hInc
+  rw [hEeq, lookupD_rename, hOrigEmpty]
+  simp
+
 /-- Helper for trace_preserved when edge is NOT in the renamed session. -/
 private theorem DelegationStep_trace_preserved_other_session (ρ : SessionRenaming)
     {D D' : DEnv} {s : SessionId} {A B : Role}
@@ -1031,5 +1051,8 @@ def DelegationStep_respects_renaming (ρ : SessionRenaming)
       rw [hE'eq]
       exact DelegationStep_trace_preserved_other_session ρ hDeleg.trace_preserved e hSid
   other_sessions_D := DelegationStep_other_sessions_D_renaming ρ hDeleg.other_sessions_D
+  A_incident_empty := by
+    intro e hSid hInc
+    exact DelegationStep_A_incident_empty_renaming ρ hDeleg.A_incident_empty e hSid hInc
 
 end

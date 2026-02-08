@@ -1,5 +1,6 @@
 import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Invariants.SessionInv
+import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.WPPair
 import Runtime.IrisBridge
 
@@ -33,7 +34,7 @@ noncomputable section
 
 universe u
 
-variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+variable {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
 variable [Telltale.TelltaleIris]
 variable [GhostMapSlot Unit]
 variable [GhostMapSlot Nat]
@@ -44,9 +45,19 @@ def wp_send (γn : GhostName) (sid : SessionId) (ct : CancelToken)
   -- Send requires the session invariant and endpoint ownership.
   iProp.sep (session_inv γn sid ct) (endpoint_frag γn e L)
 
+def wp_send_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+    (b : ResourceBundle γ ε) : iProp :=
+  -- Delegating send requires ordinary send resources plus a transferable bundle.
+  iProp.sep (wp_send γn sid ct b.endpoint b.localType) (bundle_owns γn b)
+
 def wp_recv : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (recvPair (γ:=γ) (ε:=ε))
+
+def wp_recv_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+    (b : ResourceBundle γ ε) : iProp :=
+  -- Delegating receive consumes from the session invariant and installs bundle ownership.
+  iProp.sep (session_inv γn sid ct) (bundle_owns γn b)
 
 def wp_offer : iProp :=
   -- WP rule derived from the generic pair rule.
@@ -72,7 +83,7 @@ def wp_release (layer : γ) : iProp :=
   -- Release WP: parameterized by the guard layer.
   wp_pair (releasePair (γ:=γ) (ε:=ε) layer)
 
-def wp_invoke (action : EffectModel.EffectAction ε) : iProp :=
+def wp_invoke (action : EffectRuntime.EffectAction ε) : iProp :=
   -- Invoke WP: parameterized by the effect action.
   wp_pair (invokePair (γ:=γ) (ε:=ε) action)
 

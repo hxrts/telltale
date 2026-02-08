@@ -35,7 +35,7 @@ universe u
     This is the correct notion of commutativity for concurrent steps:
     the trace is a multiset of ticked events, not an ordered sequence. -/
 def VMStateEqModTrace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -45,7 +45,7 @@ def VMStateEqModTrace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer �
   st1.obsTrace.Perm st2.obsTrace
 
 theorem VMStateEqModTrace.refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -54,7 +54,7 @@ theorem VMStateEqModTrace.refl {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
   ⟨Eq.refl _, List.Perm.refl _⟩
 
 theorem VMStateEqModTrace.of_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -81,7 +81,7 @@ theorem Array_set_set_comm {α : Type u} (a : Array α)
     lemma: when c1 ≠ c2, writing back c1's modified coroutine and c2's modified
     coroutine produces the same array regardless of order. -/
 theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -99,7 +99,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
 /-! ## updateCoro Preservation Lemmas -/
 
 @[simp] theorem updateCoro_programs {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -109,7 +109,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_config {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -119,7 +119,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_monitor {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -129,7 +129,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_clock {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -139,7 +139,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_sessions {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -149,7 +149,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_buffers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -159,7 +159,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_obsTrace {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -169,7 +169,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   unfold updateCoro; split <;> rfl
 
 @[simp] theorem updateCoro_coroutines_size {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -180,7 +180,7 @@ theorem updateCoro_comm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
 
 /-- updateCoro at c1 doesn't affect the coroutine entry at c2 ≠ c1. -/
 theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -198,7 +198,7 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
 /-! ## appendEvent Lemmas -/
 
 @[simp] theorem appendEvent_none {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -207,7 +207,7 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
   simp [appendEvent]
 
 @[simp] theorem appendEvent_internal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -218,7 +218,7 @@ theorem updateCoro_get_ne {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
 
 /-- appendEvent only modifies obsTrace — all other fields are preserved. -/
 theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -234,7 +234,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 @[simp] theorem appendEvent_preserves_coroutines {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -249,7 +249,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 @[simp] theorem appendEvent_preserves_programs {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -264,7 +264,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 @[simp] theorem appendEvent_preserves_config {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -279,7 +279,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 @[simp] theorem appendEvent_preserves_monitor {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -294,7 +294,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 @[simp] theorem appendEvent_preserves_sessions {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -309,7 +309,7 @@ theorem appendEvent_preserves_core {ι γ π ε ν : Type u} [IdentityModel ι] 
 
 @[simp] theorem appendEvent_preserves_buffers {ι γ π ε ν : Type u}
     [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

@@ -15,7 +15,7 @@ normalization lemmas, and finally derive per-session trace invariants.
 /-! ## Concurrency Invariance Proofs -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 
@@ -24,7 +24,7 @@ variable [Telltale.TelltaleIris]
 /-! ## Iris invariance helper -/
 
 theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
@@ -51,7 +51,7 @@ theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [Guard
 
 omit [Telltale.TelltaleIris] in
 private lemma schedRound_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -67,7 +67,7 @@ private lemma schedRound_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
 
 omit [Telltale.TelltaleIris] in
 private lemma runScheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -84,7 +84,7 @@ private lemma runScheduled_eq_one {ι γ π ε ν : Type u} [IdentityModel ι] [
 
 omit [Telltale.TelltaleIris] in
 private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -104,7 +104,7 @@ private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι
 
 omit [Telltale.TelltaleIris] in
 theorem per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -121,7 +121,7 @@ theorem per_session_trace_N_invariant {ι γ π ε ν : Type u} [IdentityModel �
 
 omit [Telltale.TelltaleIris] in
 theorem per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

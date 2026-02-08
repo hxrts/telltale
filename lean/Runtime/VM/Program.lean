@@ -40,26 +40,26 @@ def ProgramMeta.empty : ProgramMeta :=
 
 /-! ## Program images -/
 
-abbrev Bytecode (γ ε : Type u) [GuardLayer γ] [EffectModel ε] :=
+abbrev Bytecode (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] :=
   -- Bytecode is just an array of instructions.
   Array (Instr γ ε)
 
-structure Program (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure Program (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Bytecode and per-role entry points.
   code : Bytecode γ ε
   entryPoints : List (Role × PC)
   localTypes : List (Role × LocalType)
-  handlerTypes : List (EffectModel.EffectAction ε × LocalType)
+  handlerTypes : List (EffectRuntime.EffectAction ε × LocalType)
   metadata : ProgramMeta
 
-structure CodeImage (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure CodeImage (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Verified program image with global typing evidence.
   program : Program γ ε
   globalType : GlobalType
   wfBlind : Prop
   projectionCorrect : Prop
 
-structure UntrustedImage (γ ε ν : Type u) [GuardLayer γ] [EffectModel ε]
+structure UntrustedImage (γ ε ν : Type u) [GuardLayer γ] [EffectRuntime ε]
     [VerificationModel ν] where
   -- Unverified image pending projection/typing checks.
   program : Program γ ε
@@ -78,8 +78,8 @@ def programLocalTypes (roles : RoleSet) (types : Role → LocalType) :
 /-! ## Code image construction from LocalTypeR -/
 
 /-- Build a CodeImage by compiling LocalTypeR per role and concatenating the bytecode. -/
-def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
-    [Inhabited (EffectModel.EffectAction ε)]
+def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    [Inhabited (EffectRuntime.EffectAction ε)]
     (localTypes : List (Role × SessionTypes.LocalTypeR.LocalTypeR))
     (globalType : GlobalType) : CodeImage γ ε :=
   let step := fun (acc : List (Instr γ ε) × List (Role × PC)) (entry : Role × SessionTypes.LocalTypeR.LocalTypeR) =>
@@ -104,7 +104,7 @@ def regOf (v : Var) : Reg :=
   -- V1 register mapping: deterministic by variable name length.
   v.length
 
-def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (p : Process) : List (Instr γ ε) :=
   -- Compile a single process into a flat instruction list.
   match p with
@@ -123,7 +123,7 @@ def compileBlock {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
 /-- Compile a process into a program (stub). Deprecated. Use `compileLocalTypeR` or
 `CodeImage.fromLocalTypes` instead. -/
 @[deprecated "Use compileLocalTypeR / CodeImage.fromLocalTypes instead." (since := "2026-02-03")]
-def compile {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def compile {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (p : Process) (roles : RoleSet) (types : Role → LocalType)
     (chain : GuardChain γ) : Program γ ε :=
   -- V1 compiler: emit a single-process bytecode block and halt.

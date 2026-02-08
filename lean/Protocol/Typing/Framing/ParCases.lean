@@ -10,7 +10,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- Helper: align S-splits by length under a shared SEnv. -/
 private lemma par_split_S_eq

@@ -386,12 +386,14 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
 
-/-! ## Completeness (Optional) -/
+/-! ## Checker Completeness (Deferred) -/
 
 /-
 Completeness (EQ2C ⇒ bisim = true) is intentionally omitted in the paco-first approach.
 The decidable checker remains sound (bisim_sound), and coinductive proofs should use
 the EQ2CE/EQ2C erasure lemmas directly (see Roundtrip.lean).
+
+For a total decision interface, see `BisimDecidable/Decidable.lean`.
 -/
 
 /-! ## Connection to EQ2CE -/

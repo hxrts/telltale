@@ -7,7 +7,7 @@ import Protocol.Typing.Framing.GEnvFrameHelpers
 /-
 The Problem. Show that pre-out typing is stable under framing a disjoint GEnv
 on the left. This requires a constructive par case using the frame_left_par
-axiom and careful re-framing of owned environments.
+lemma and careful re-framing of owned environments.
 
 Solution Structure. Prove a dedicated par helper, then discharge each
 constructor case by rewriting lookups and using the IH where needed.
@@ -20,7 +20,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Pre-Out Framing (Left) -/
 

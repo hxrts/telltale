@@ -16,7 +16,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ### Left-Frame Step Cases -/
 /-- Helper: send case for the left-frame preservation lemma. -/

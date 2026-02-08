@@ -41,7 +41,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Interface Type
 
@@ -380,13 +380,13 @@ theorem mkInitBufs_lookup_mem (roles : RoleSet) (sid : SessionId)
       (edges.map fun e' => (e', ([] : Buffer))).lookup e = some buf → e ∈ edges := by
     intro edges
     induction edges with
-    | nil => simp [List.map, List.lookup]
+    | nil => simp [List.map]
     | cons hd tl ih =>
       simp only [List.map, List.lookup]
       intro hLookup
       by_cases heq : e == hd
       · exact List.mem_cons.mpr (Or.inl (eq_of_beq heq))
-      · simp only [heq, cond_false] at hLookup
+      · simp only [heq] at hLookup
         exact List.mem_cons.mpr (Or.inr (ih hLookup))
   exact this _ h
 

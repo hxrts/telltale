@@ -19,7 +19,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ### Pre-Update Typing Preservation -/
 

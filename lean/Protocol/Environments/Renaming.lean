@@ -22,7 +22,7 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
-noncomputable section
+section
 
 
 /-! ## Session Renaming Infrastructure -/

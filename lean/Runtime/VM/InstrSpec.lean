@@ -23,7 +23,7 @@ set_option relaxedAutoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Send Instruction -/
 
@@ -1242,13 +1242,83 @@ theorem OpenSpec_respects_ConfigEquiv
     {s : SessionId} {roles : List Role}
     (hEquiv : ConfigEquiv ⟨G₁, D₁⟩ ⟨G₂, D₂⟩)
     (hSpec₁ : OpenSpec G₁ G₁' D₁ D₁' s roles)
-    (hSpec₂ : OpenSpec G₂ G₂' D₂ D₂' (hEquiv.choose.fwd s) roles) :
+    (hSpec₂ : OpenSpec G₂ G₂' D₂ D₂' (hEquiv.choose.fwd s) roles)
+    (hNewRoles :
+      ∀ r, r ∈ roles →
+        ∃ L, lookupG G₁' { sid := s, role := r } = some L ∧
+          lookupG G₂' { sid := hEquiv.choose.fwd s, role := r } =
+            some (renameLocalType (hEquiv.choose.toRenaming) L))
+    (hNoExtra₁ : ∀ r, r ∉ roles → lookupG G₁' { sid := s, role := r } = none)
+    (hNoExtra₂ : ∀ r, r ∉ roles →
+      lookupG G₂' { sid := hEquiv.choose.fwd s, role := r } = none) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  -- OpenSpec is under-specified for ConfigEquiv preservation.
-  -- The specification doesn't constrain what types are assigned to new endpoints,
-  -- only that they exist. For ConfigEquiv to be preserved, we need additional
-  -- constraints relating the types in G₁' and G₂'.
-  sorry
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG, hD⟩ := hEquiv.choose_spec
+  refine ⟨σ, ?_, ?_⟩
+  · intro e
+    cases e with
+    | mk sid role =>
+      by_cases hSid : sid = s
+      · subst hSid
+        by_cases hIn : role ∈ roles
+        · rcases hNewRoles role hIn with ⟨L, hL₁, hL₂⟩
+          simpa [σ, ρ, renameEndpoint, hL₁, hL₂]
+        · have hNone₁ : lookupG G₁' { sid := sid, role := role } = none := hNoExtra₁ role hIn
+          have hNone₂ : lookupG G₂' { sid := σ.fwd sid, role := role } = none := hNoExtra₂ role hIn
+          simpa [σ, ρ, renameEndpoint, hNone₁, hNone₂]
+      · have hSidNe₂ : (renameEndpoint ρ { sid := sid, role := role }).sid ≠ σ.fwd s := by
+          change ρ.f sid ≠ ρ.f s
+          intro hEq
+          exact hSid (ρ.inj _ _ hEq)
+        have hFrame₁ : lookupG G₁' { sid := sid, role := role } = lookupG G₁ { sid := sid, role := role } :=
+          hSpec₁.frame_G { sid := sid, role := role } hSid
+        have hFrame₂ :
+            lookupG G₂' (renameEndpoint ρ { sid := sid, role := role }) =
+              lookupG G₂ (renameEndpoint ρ { sid := sid, role := role }) :=
+          hSpec₂.frame_G (renameEndpoint ρ { sid := sid, role := role }) hSidNe₂
+        calc
+          lookupG G₂' (renameEndpoint ρ { sid := sid, role := role })
+              = lookupG G₂ (renameEndpoint ρ { sid := sid, role := role }) := hFrame₂
+          _ = (lookupG G₁ { sid := sid, role := role }).map (renameLocalType ρ) :=
+                hG { sid := sid, role := role }
+          _ = (lookupG G₁' { sid := sid, role := role }).map (renameLocalType ρ) := by
+                rw [hFrame₁]
+  · intro e
+    cases e with
+    | mk sid sender receiver =>
+      by_cases hSid : sid = s
+      · subst hSid
+        have hEmpty₁ : lookupD D₁' { sid := sid, sender := sender, receiver := receiver } = [] :=
+          hSpec₁.traces_empty { sid := sid, sender := sender, receiver := receiver } rfl
+        have hEmpty₂ :
+            lookupD D₂' (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }) = [] := by
+          have hSidRen :
+              (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }).sid = σ.fwd sid := by
+            change ρ.f sid = σ.fwd sid
+            rfl
+          exact hSpec₂.traces_empty (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }) hSidRen
+        rw [hEmpty₁, hEmpty₂]
+        simp
+      · have hSidNe₂ : (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }).sid ≠ σ.fwd s := by
+          change ρ.f sid ≠ ρ.f s
+          intro hEq
+          exact hSid (ρ.inj _ _ hEq)
+        have hFrame₁ :
+            lookupD D₁' { sid := sid, sender := sender, receiver := receiver } =
+              lookupD D₁ { sid := sid, sender := sender, receiver := receiver } :=
+          hSpec₁.frame_D { sid := sid, sender := sender, receiver := receiver } hSid
+        have hFrame₂ :
+            lookupD D₂' (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }) =
+              lookupD D₂ (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }) :=
+          hSpec₂.frame_D (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }) hSidNe₂
+        calc
+          lookupD D₂' (renameEdge ρ { sid := sid, sender := sender, receiver := receiver })
+              = lookupD D₂ (renameEdge ρ { sid := sid, sender := sender, receiver := receiver }) := hFrame₂
+          _ = (lookupD D₁ { sid := sid, sender := sender, receiver := receiver }).map (renameValType ρ) :=
+                hD { sid := sid, sender := sender, receiver := receiver }
+          _ = (lookupD D₁' { sid := sid, sender := sender, receiver := receiver }).map (renameValType ρ) := by
+                rw [hFrame₁]
 
 /-- Close is equivariant under session renaming. -/
 theorem CloseSpec_respects_renaming (ρ : SessionRenaming)
@@ -1528,7 +1598,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
   delegation_applied :=
     DelegationStep_respects_renaming ρ hSpec.delegation_applied
 
-/-- Acquire respects ConfigEquiv. -/
+/-- Acquire respects `ConfigEquiv` constructively. -/
 theorem AcquireSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
     {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
@@ -1538,6 +1608,116 @@ theorem AcquireSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (hEquiv.choose.fwd delegatedSession) delegatedRole) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
-  sorry
+  let σ := hEquiv.choose
+  let ρ := σ.toRenaming
+  obtain ⟨hG, hD⟩ := hEquiv.choose_spec
+  let hDeleg₁ := hSpec₁.delegation_applied
+  let hDeleg₂ := hSpec₂.delegation_applied
+  have hATypeEq : hDeleg₂.A_type = renameLocalType ρ hDeleg₁.A_type := by
+    have hAlookup₂ : lookupG G₂ { sid := ρ.f delegatedSession, role := r } = some hDeleg₂.A_type := by
+      simpa [ρ] using hDeleg₂.A_lookup
+    have hLookupEq :
+        lookupG G₂ { sid := ρ.f delegatedSession, role := r } =
+          (lookupG G₁ { sid := delegatedSession, role := r }).map (renameLocalType ρ) := by
+      simpa [ρ] using hG { sid := delegatedSession, role := r }
+    have hLookupEq' : some hDeleg₂.A_type = (some hDeleg₁.A_type).map (renameLocalType ρ) := by
+      rw [← hAlookup₂, hLookupEq, hDeleg₁.A_lookup]
+    simpa using Option.some.inj hLookupEq'
+  refine ⟨σ, ?_, ?_⟩
+  · intro e
+    by_cases hSid : e.sid = delegatedSession
+    · by_cases hA : e.role = r
+      · have hA' : e = { sid := delegatedSession, role := r } := by
+          cases e
+          simp only [Endpoint.mk.injEq]
+          exact ⟨hSid, hA⟩
+        rw [hA']
+        simp only [renameEndpoint]
+        have hAremoved₂ : lookupG G₂' { sid := ρ.f delegatedSession, role := r } = none := by
+          simpa [ρ] using hDeleg₂.A_removed
+        rw [hDeleg₁.A_removed, hAremoved₂]
+        simp
+      · by_cases hB : e.role = ep.role
+        · have hB' : e = { sid := delegatedSession, role := ep.role } := by
+            cases e
+            simp only [Endpoint.mk.injEq]
+            exact ⟨hSid, hB⟩
+          rw [hB']
+          simp only [renameEndpoint]
+          have hBadded₂ :
+              lookupG G₂' { sid := ρ.f delegatedSession, role := ep.role } =
+                some (renameLocalTypeRole (ρ.f delegatedSession) r ep.role hDeleg₂.A_type) := by
+            simpa [ρ] using hDeleg₂.B_added
+          rw [hDeleg₁.B_added, hBadded₂]
+          simp only [Option.map_some]
+          rw [hATypeEq]
+          congr 1
+          exact (renameLocalType_renameLocalTypeRole_comm ρ delegatedSession r ep.role hDeleg₁.A_type).symm
+        · have hOther₁ := hDeleg₁.other_roles_G e hSid hA hB
+          have hSidRen : (renameEndpoint ρ e).sid = ρ.f delegatedSession := by
+            simp only [renameEndpoint, hSid]
+          have hOther₂ := hDeleg₂.other_roles_G (renameEndpoint ρ e) hSidRen hA hB
+          rw [hOther₁, hOther₂, hG]
+          simp only [Option.map_map]
+          congr 1
+          funext L
+          exact (renameLocalType_renameLocalTypeRole_comm ρ delegatedSession r ep.role L).symm
+    · have hSidRen : (renameEndpoint ρ e).sid ≠ ρ.f delegatedSession := by
+        simp only [renameEndpoint]
+        intro hEq
+        exact hSid (ρ.inj _ _ hEq)
+      rw [hDeleg₁.other_sessions_G e hSid, hDeleg₂.other_sessions_G (renameEndpoint ρ e) hSidRen]
+      exact hG e
+  · intro e
+    by_cases hSid : e.sid = delegatedSession
+    · by_cases hInc : e.sender = r ∨ e.receiver = r
+      · have hEmpty₁ : lookupD D₁' e = [] := hDeleg₁.A_incident_empty e hSid hInc
+        have hSidRen : (renameEdge ρ e).sid = ρ.f delegatedSession := by
+          simp only [renameEdge, hSid]
+        have hIncRen : (renameEdge ρ e).sender = r ∨ (renameEdge ρ e).receiver = r := by
+          simpa [renameEdge] using hInc
+        have hEmpty₂ : lookupD D₂' (renameEdge ρ e) = [] :=
+          hDeleg₂.A_incident_empty (renameEdge ρ e) hSidRen hIncRen
+        rw [hEmpty₁, hEmpty₂]
+        simp
+      · have hSenderNe : e.sender ≠ r := by
+          intro hEq
+          exact hInc (Or.inl hEq)
+        have hReceiverNe : e.receiver ≠ r := by
+          intro hEq
+          exact hInc (Or.inr hEq)
+        have hRedir₁ : IsRedirectedEdge e e delegatedSession r ep.role := by
+          rw [IsRedirectedEdge]
+          exact (redirectEdge_no_A e delegatedSession r ep.role hSid hSenderNe hReceiverNe).symm
+        have hD₁' :
+            lookupD D₁' e =
+              (lookupD D₁ e).map (renameValTypeRole delegatedSession r ep.role) :=
+          hDeleg₁.trace_preserved e e hRedir₁
+        have hSidRen : (renameEdge ρ e).sid = ρ.f delegatedSession := by
+          simp only [renameEdge, hSid]
+        have hSenderNeRen : (renameEdge ρ e).sender ≠ r := by
+          simpa [renameEdge] using hSenderNe
+        have hReceiverNeRen : (renameEdge ρ e).receiver ≠ r := by
+          simpa [renameEdge] using hReceiverNe
+        have hRedir₂ :
+            IsRedirectedEdge (renameEdge ρ e) (renameEdge ρ e) (ρ.f delegatedSession) r ep.role := by
+          rw [IsRedirectedEdge]
+          exact (redirectEdge_no_A (renameEdge ρ e) (ρ.f delegatedSession) r ep.role
+            hSidRen hSenderNeRen hReceiverNeRen).symm
+        have hD₂' :
+            lookupD D₂' (renameEdge ρ e) =
+              (lookupD D₂ (renameEdge ρ e)).map (renameValTypeRole (ρ.f delegatedSession) r ep.role) :=
+          hDeleg₂.trace_preserved (renameEdge ρ e) (renameEdge ρ e) hRedir₂
+        rw [hD₂', hD e, hD₁']
+        simp only [List.map_map]
+        congr 1
+        funext T
+        exact (renameValType_renameValTypeRole_comm ρ delegatedSession r ep.role T).symm
+    · have hSidRen : (renameEdge ρ e).sid ≠ ρ.f delegatedSession := by
+        simp only [renameEdge]
+        intro hEq
+        exact hSid (ρ.inj _ _ hEq)
+      rw [hDeleg₂.other_sessions_D (renameEdge ρ e) hSidRen, hDeleg₁.other_sessions_D e hSid]
+      exact hD e
 
 end

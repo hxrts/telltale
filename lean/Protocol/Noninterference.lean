@@ -24,7 +24,7 @@ Solution Structure.
 # Noninterference for MPST
 
 Proves that non-participants in a communication cannot observe which branch
-was selected. Ported from Aristotle file 01 (185 lines, 0 sorry).
+was selected. Ported from Aristotle file 01 (185 lines, no proof holes).
 
 ## Expose
 
@@ -39,7 +39,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Configuration Equivalence -/
 

@@ -35,7 +35,7 @@ def SessionVM.of_val (v : SessionVMVal) : Expr :=
   v.1
 
 def SessionVM.prim_step {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -55,7 +55,7 @@ def SessionVM.prim_step {ι γ π ε ν : Type}
       e' = { cid := e.cid, halted := halted' } ∧ σ' = σ1 ∧ efs = []
 
 def instLanguageSessionVM {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -88,7 +88,7 @@ def instLanguageSessionVM {ι γ π ε ν : Type}
 
 /-- `to_val` after `of_val` yields the halted expression. -/
 theorem to_of_val {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -101,7 +101,7 @@ theorem to_of_val {ι γ π ε ν : Type}
 
 /-- `of_val` simply flips the `halted` flag. -/
 theorem of_to_val {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

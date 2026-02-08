@@ -61,7 +61,7 @@ set_option autoImplicit false
 open scoped Classical
 open Batteries
 
-noncomputable section
+section
 
 /-! ## Compatibility Aliases -/
 
@@ -227,11 +227,27 @@ private theorem DConsistent_append {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
 private theorem DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
   simp [DConsistent, SessionsOfD_empty]
 
-private axiom OwnedDisjoint_preserved_TypedStep
+private theorem TypedStep_preserves_owned_right
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    Sown'.right = Sown.right := by
+  intro hTS
+  induction hTS <;> simp [OwnedEnv.updateLeft, *]
+
+private theorem OwnedDisjoint_preserved_TypedStep
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     OwnedDisjoint Sown →
-    OwnedDisjoint Sown'
+    OwnedDisjoint Sown' := by
+  intro hTS hPre hOwn
+  have hRightEq : Sown'.right = Sown.right := TypedStep_preserves_owned_right hTS
+  have hDom : SEnvDomSubset Sown.right Sown.right := by
+    intro x T hL
+    exact ⟨T, hL⟩
+  have hLeftDisj : DisjointS Sown.right Sown'.left :=
+    DisjointS_preserved_TypedStep_left (Sframe:=Sown.right) hTS hPre hOwn hDom
+  simpa [OwnedDisjoint, hRightEq] using hLeftDisj
 
 private theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D := by
   simpa using (DEnvUnion_empty_right D)
@@ -962,7 +978,7 @@ theorem preservation_typed
   have hCompat' : Compatible G' D' := Compatible_preserved hCompat hTS
   have hDisjS' : DisjointS Ssh Sown' :=
     DisjointS_preserved_TypedStep_right hTS hPre hDisjS
-  have hOwn' : OwnedDisjoint Sown' := OwnedDisjoint_preserved_TypedStep hTS hOwn
+  have hOwn' : OwnedDisjoint Sown' := OwnedDisjoint_preserved_TypedStep hTS hPre hOwn
   have hCons' : DConsistent G' D' := DConsistent_preserved hTS hCons
   have hStoreTyped : StoreTyped G (SEnvAll Ssh Sown) store := hStore.toStoreTyped
   obtain ⟨W', Δ', hPre'⟩ := HasTypeProcPreOut_preserved hStoreTyped hTS hPre

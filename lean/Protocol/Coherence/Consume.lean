@@ -47,7 +47,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Helper Lemmas for Edge Case Analysis -/
 
@@ -104,6 +104,51 @@ theorem Consume_end_nil (from_ : Role) : Consume from_ .end_ [] = some .end_ := 
 theorem Consume_recv_cons (from_ : Role) (T : ValType) (L : LocalType) (ts : List ValType) :
     Consume from_ (.recv from_ T L) (T :: ts) = Consume from_ L ts := by
   simp only [Consume, consumeOne, beq_self_eq_true, Bool.and_true, ↓reduceIte]
+
+/-- If consumeOne succeeds, the local type depth strictly decreases. -/
+theorem consumeOne_depth_lt {from_ : Role} {T : ValType} {L L' : LocalType}
+    (h : consumeOne from_ T L = some L') : L'.depth < L.depth := by
+  -- Only `.recv` can consume; all other cases are contradictions.
+  cases L with
+  | recv r T' L0 =>
+      -- consumeOne succeeds only if sender and type match.
+      by_cases hRole : from_ == r
+      · by_cases hType : T == T'
+        · -- Success case: L' = L0, so depth strictly decreases.
+          simp [consumeOne, hRole, hType] at h
+          cases h
+          simpa [LocalType.depth] using (LocalType.depth_advance_recv r T' L0)
+        · -- Mismatched type makes consumeOne fail.
+          simp [consumeOne, hRole, hType] at h
+      · -- Mismatched sender makes consumeOne fail.
+        simp [consumeOne, hRole] at h
+  | send _ _ _ | select _ _ | branch _ _ | end_ | var _ | mu _ =>
+      -- Non-recv types never consume.
+      simp [consumeOne] at h
+
+/-- Consuming a trace never exceeds the receiver's depth. -/
+theorem Consume_length_le_depth {from_ : Role} {L L' : LocalType} {ts : List ValType}
+    (h : Consume from_ L ts = some L') : ts.length ≤ L.depth := by
+  -- Induct on the trace to count consumed steps.
+  induction ts generalizing L with
+  | nil =>
+      -- Empty trace has length 0.
+      simp
+  | cons t ts ih =>
+      -- One consumeOne step followed by recursion on the tail.
+      cases hStep : consumeOne from_ t L with
+      | none =>
+          -- consumeOne fails, so Consume cannot succeed.
+          simp [Consume, hStep] at h
+      | some L1 =>
+          -- Use IH on the remaining trace, then add one step.
+          have hTail : Consume from_ L1 ts = some L' := by
+            simpa [Consume, hStep] using h
+          have hLen : ts.length ≤ L1.depth := ih hTail
+          have hLt : L1.depth < L.depth := consumeOne_depth_lt hStep
+          have hLe1 : ts.length + 1 ≤ L1.depth + 1 := Nat.succ_le_succ hLen
+          have hLe2 : L1.depth + 1 ≤ L.depth := Nat.succ_le_of_lt hLt
+          simpa [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using le_trans hLe1 hLe2
 
 /-- Consume associativity for append: consuming ts then [T] equals consuming ts ++ [T].
     This is the key lemma for send preservation - appending to trace end

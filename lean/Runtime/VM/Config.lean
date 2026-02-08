@@ -26,7 +26,7 @@ universe u
 
 /-! ## Cost model -/
 
-structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Cost per instruction, used for budgeting and bounds.
   stepCost : Instr γ ε → Nat
   -- Minimum cost for any non-halt instruction.
@@ -41,7 +41,7 @@ structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
 /-! ## VM configuration -/
 
 structure VMConfig (ι γ π ε ν : Type u)
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -64,7 +64,7 @@ structure VMConfig (ι γ π ε ν : Type u)
   maxSpeculationDepth : Nat := 16
 
 def deterministic_finalization_ok {ι γ π ε ν : Type u}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

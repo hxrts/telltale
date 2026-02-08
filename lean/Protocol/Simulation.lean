@@ -193,8 +193,8 @@ decreasing_by
   all_goals
     first
       | simpa using procSize_lt_seq_left _ _
-      | simpa using procSize_lt_par_left _ _
-      | simpa using procSize_lt_par_right _ _
+      | simpa using procSize_lt_par_left _ _ _ _
+      | simpa using procSize_lt_par_right _ _ _ _
 
 def stepDecide (C : Config) : Option Config :=
   stepDecideAux C.proc C
@@ -207,25 +207,27 @@ Stops early if:
 - The process terminates (becomes skip)
 - The configuration is stuck (stepDecide returns none)
 -/
-partial def runSteps (C : Config) (n : Nat) : Config :=
+def runSteps (C : Config) (n : Nat) : Config :=
   if n = 0 then C
   else if C.proc = .skip then C
   else
     match stepDecide C with
     | some C' => runSteps C' (n - 1)
     | none => C  -- Stuck
+termination_by n
 
 /-- Run steps and collect the trace.
 
 Returns a list of configurations from initial to final.
 -/
-partial def traceSteps (C : Config) (n : Nat) : List Config :=
+def traceSteps (C : Config) (n : Nat) : List Config :=
   if n = 0 then [C]
   else if C.proc = .skip then [C]
   else
     match stepDecide C with
     | some C' => C :: traceSteps C' (n - 1)
     | none => [C]
+termination_by n
 
 /-- Check if a configuration can step. -/
 def canStep (C : Config) : Bool :=

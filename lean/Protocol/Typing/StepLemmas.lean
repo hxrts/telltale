@@ -34,7 +34,7 @@ set_option maxHeartbeats 5000000
 
 open scoped Classical
 
-noncomputable section
+section
 
 theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →

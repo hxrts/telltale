@@ -47,7 +47,7 @@ unfolding.
 
 set_option autoImplicit false
 
-noncomputable section
+section
 
 /-! ## LocalType Progress Measure -/
 
@@ -163,7 +163,8 @@ theorem progressMeasure_advance_select (r : Role) (bs : List (Label × LocalType
 /-- Well-typed instruction steps do not increase the progress measure.
     This is the discrete analogue of Gibbs's `V_decreasing` property:
     the Lyapunov function is non-increasing along system trajectories. -/
-theorem progressMeasure_nonincreasing_wt {γ ε : Type} [GuardLayer γ] [EffectModel ε]
+theorem progressMeasure_nonincreasing_wt {γ ε : Type}
+    [GuardLayer γ] [EffectRuntime ε] [EffectSpec ε]
     (i : Instr γ ε) (sk : SessionKind γ) (L L' : LocalType)
     (h : WellTypedInstr i sk L L') :
     L'.progressMeasure ≤ L.progressMeasure := by
@@ -178,7 +179,7 @@ theorem progressMeasure_nonincreasing_wt {γ ε : Type} [GuardLayer γ] [EffectM
   | wt_acquire => exact le_refl _
   | wt_release => exact le_refl _
   | wt_invoke =>
-    show (LocalType.end_).progressMeasure ≤ (EffectModel.handlerType _).progressMeasure
+    show (LocalType.end_).progressMeasure ≤ (EffectSpec.handlerType _).progressMeasure
     simp [progressMeasure_end]
   | wt_open => exact le_refl _
   | wt_close => exact le_refl _
@@ -188,17 +189,17 @@ theorem progressMeasure_nonincreasing_wt {γ ε : Type} [GuardLayer γ] [EffectM
   | wt_noop => exact le_refl _
 
 /-- Communication steps strictly decrease the progress measure. -/
-theorem progressMeasure_decrease_of_wt_send {γ ε : Type} [GuardLayer γ] [EffectModel ε]
+theorem progressMeasure_decrease_of_wt_send {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
     (_sid : SessionId) (_chan _val : Reg) (r : Role) (T : ValType) (L' : LocalType) :
     L'.progressMeasure < (LocalType.send r T L').progressMeasure :=
   progressMeasure_advance_send r T L'
 
-theorem progressMeasure_decrease_of_wt_recv {γ ε : Type} [GuardLayer γ] [EffectModel ε]
+theorem progressMeasure_decrease_of_wt_recv {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
     (_sid : SessionId) (_chan _dst : Reg) (r : Role) (T : ValType) (L' : LocalType) :
     L'.progressMeasure < (LocalType.recv r T L').progressMeasure :=
   progressMeasure_advance_recv r T L'
 
-theorem progressMeasure_decrease_of_wt_offer {γ ε : Type} [GuardLayer γ] [EffectModel ε]
+theorem progressMeasure_decrease_of_wt_offer {γ ε : Type} [GuardLayer γ] [EffectRuntime ε]
     (_sid : SessionId) (_chan : Reg) (r : Role) (choices : List (Label × LocalType))
     (lbl : Label) (L' : LocalType) (hmem : (lbl, L') ∈ choices) :
     L'.progressMeasure < (LocalType.select r choices).progressMeasure :=
@@ -377,7 +378,7 @@ theorem lyapunov_conserved_under_balanced_delegation
     The measure function is parameterized externally to avoid self-referential
     structure fields (which would create invalid nested inductives in Lean 4). -/
 def VMAdmitsProgressMeasure {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -390,7 +391,7 @@ def VMAdmitsProgressMeasure {ι γ π ε ν : Type} [IdentityModel ι] [GuardLay
 
 /-- Helper: if the scheduler selects a coroutine, schedStep produces a result. -/
 theorem schedStep_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -410,7 +411,7 @@ theorem schedStep_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [G
     is ready and in the queue, the VM can take a step. -/
 def vm_deadlock_free_via_progress : Prop :=
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

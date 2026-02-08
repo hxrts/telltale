@@ -29,7 +29,7 @@ universe u
 /-! ## Helper bundles -/
 
 structure StepPack (ι γ π ε ν : Type u)
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -64,7 +64,7 @@ def edgeFrom (sender : Role) (ep : Endpoint) : Edge :=
   { sid := ep.sid, sender := sender, receiver := ep.role }
 
 def edgePartitioned {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (edge : Edge) : Bool :=
@@ -72,7 +72,7 @@ def edgePartitioned {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   st.partitionedEdges.any (fun e => decide (e = edge))
 
 def edgeCrashed {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (edge : Edge) : Bool :=
@@ -218,7 +218,7 @@ def defaultResourceState {ν : Type u} [VerificationModel ν] [AccumulatedSet ν
 /-! ## Persistence helpers -/
 
 def reconstructSession {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -272,7 +272,7 @@ def updateSessBuffers {ν : Type u} [VerificationModel ν]
         (sid', s) :: updateSessBuffers rest sid bufs
 
 def appendEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -288,7 +288,7 @@ def appendEvent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-! ## Register helpers -/
 
-def advancePc {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def advancePc {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) : CoroutineState γ ε :=
   -- Advance the program counter to the next instruction.
   { coro with pc := coro.pc + 1 }
@@ -304,7 +304,7 @@ def setReg (regs : RegFile) (r : Reg) (v : Value) : Option RegFile :=
   else
     none
 
-def owns {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def owns {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (c : CoroutineState γ ε) (ep : Endpoint) : Bool :=
   -- Check endpoint ownership for linear use.
   c.ownedEndpoints.any (fun e => e == ep)
@@ -326,13 +326,13 @@ def valTypeOf (v : Value) : ValType :=
 
 /-! ## Result helpers -/
 
-def mkRes {γ ε : Type u} [EffectModel ε] (status : ExecStatus γ)
+def mkRes {γ ε : Type u} [EffectRuntime ε] (status : ExecStatus γ)
     (event : Option (StepEvent ε)) : ExecResult γ ε :=
   -- Build an execution result.
   { status := status, event := event }
 
 def pack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -343,7 +343,7 @@ def pack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   { coro := coro, st := st, res := res }
 
 def faultPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -356,7 +356,7 @@ def faultPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   pack coro' st (mkRes (.faulted err) (some StepEvent.internal))
 
 def blockPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -368,7 +368,7 @@ def blockPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   pack coro' st (mkRes (.blocked reason) none)
 
 def continuePack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -380,7 +380,7 @@ def continuePack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   pack coro' st (mkRes .continue ev)
 
 def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -391,7 +391,7 @@ def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   pack coro' st (mkRes .halted none)
 
 def chargeCost {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -408,7 +408,7 @@ def chargeCost {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 /-! ## Coroutine updates -/
 
 def updateCoro {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

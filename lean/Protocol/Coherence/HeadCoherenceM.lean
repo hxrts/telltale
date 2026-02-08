@@ -15,7 +15,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- HeadCoherent, parameterized by a delivery model (currently ignored). -/
 def HeadCoherentM (_M : DeliveryModel) (G : GEnv) (D : DEnv) : Prop :=

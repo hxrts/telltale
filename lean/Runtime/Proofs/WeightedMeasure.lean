@@ -36,7 +36,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Session State Abstraction -/
 
@@ -368,7 +368,7 @@ private lemma find?_mem_aux {r : Role} {L : LocalType} (types : List (Role × Lo
     simp only [List.find?]
     by_cases hEq : hd.1 == r
     · -- Head matches
-      simp only [hEq, cond_true]
+      simp only [hEq]
       intro hL
       have hRole : hd.1 = r := beq_iff_eq.mp hEq
       have hType : hd.2 = L := Option.some.inj hL
@@ -376,7 +376,7 @@ private lemma find?_mem_aux {r : Role} {L : LocalType} (types : List (Role × Lo
       rw [hPair]
       exact List.Mem.head tl
     · -- Head doesn't match
-      simp only [hEq, cond_false]
+      simp only [hEq]
       intro hFind
       exact List.Mem.tail hd (ih hFind)
 
@@ -401,7 +401,7 @@ private lemma getBuffer_mem_aux {sender receiver : Role}
     simp only [List.find?]
     by_cases hEq : hd.1 == sender && hd.2.1 == receiver
     · -- Head matches
-      simp only [hEq, ite_true]
+      simp only [hEq]
       intro _
       simp only [Bool.and_eq_true, beq_iff_eq] at hEq
       have ⟨hSender, hRecv⟩ := hEq
@@ -412,7 +412,7 @@ private lemma getBuffer_mem_aux {sender receiver : Role}
         simp [hSender, hRecv]
       exact ⟨hd.2.2, by rw [heq]; exact List.Mem.head _, rfl⟩
     · -- Head doesn't match
-      simp only [hEq, ite_false]
+      simp only [hEq]
       intro hFind
       obtain ⟨n, hmem, heq⟩ := ih hFind
       exact ⟨n, List.Mem.tail _ hmem, heq⟩
@@ -592,9 +592,37 @@ lemma sumBuffers_incr_eq_of_entry
     (_hmem : (actor, partner, _n) ∈ s.bufferSizes)
     (_hunique : s.uniqueBuffers) :
     sumBuffers (s.incrBuffer actor partner) = sumBuffers s + 1 := by
-  -- The proof follows by induction on bufferSizes with uniqueness ensuring
-  -- exactly one entry is incremented. Deferred to avoid complex nested tuple handling.
-  sorry
+  -- Re-express buffer triples as key/value pairs keyed by (sender, receiver).
+  let pairs : List ((Role × Role) × Nat) :=
+    s.bufferSizes.map (fun (s', r', n) => ((s', r'), n))
+  have hunique_pairs : (pairs.map Prod.fst).Nodup := by
+    dsimp [pairs]
+    exact (bufferSizes_to_pairs s.bufferSizes).1 _hunique
+  have hkey_mem : (actor, partner) ∈ pairs.map Prod.fst := by
+    dsimp [pairs]
+    exact bufferSizes_key_mem_pairs s.bufferSizes actor partner _n _hmem
+  have hsum_pairs :
+      (pairs.map (fun (k, v) => if k == (actor, partner) then v + 1 else v)).foldl (· + ·) 0 =
+      (pairs.map Prod.snd).foldl (· + ·) 0 + 1 := by
+    simpa using (sum_incr_unique pairs (actor, partner) hunique_pairs hkey_mem)
+  -- Translate back to the triple-based buffer representation.
+  have hleft :
+      sumBuffers (s.incrBuffer actor partner) =
+        (pairs.map (fun (k, v) => if k == (actor, partner) then v + 1 else v)).foldl (· + ·) 0 := by
+    unfold sumBuffers SessionState.incrBuffer
+    simp only [pairs, List.map_map, Function.comp_def]
+    congr 1
+    apply List.map_congr_left
+    intro x hx
+    rcases x with ⟨s', r', n⟩
+    by_cases hsr : s' = actor ∧ r' = partner
+    · simp [hsr]
+    · simp [hsr]
+  have hright : sumBuffers s = (pairs.map Prod.snd).foldl (· + ·) 0 := by
+    unfold sumBuffers
+    simp [pairs, List.map_map, Function.comp_def]
+  rw [hleft, hright]
+  exact hsum_pairs
 
 /-- Sum of buffers after decrement equals old sum minus 1 when entry exists.
 
@@ -606,9 +634,38 @@ lemma sumBuffers_decr_eq_of_entry
     (_hunique : s.uniqueBuffers)
     (_hn : _n > 0) :
     sumBuffers (s.decrBuffer actor partner) + 1 = sumBuffers s := by
-  -- The proof follows by induction on bufferSizes with uniqueness ensuring
-  -- exactly one entry is decremented. Deferred to avoid complex nested tuple handling.
-  sorry
+  -- Re-express buffer triples as key/value pairs keyed by (sender, receiver).
+  let pairs : List ((Role × Role) × Nat) :=
+    s.bufferSizes.map (fun (s', r', n) => ((s', r'), n))
+  have hunique_pairs : (pairs.map Prod.fst).Nodup := by
+    dsimp [pairs]
+    exact (bufferSizes_to_pairs s.bufferSizes).1 _hunique
+  have hmem_pairs : ((partner, actor), _n) ∈ pairs := by
+    dsimp [pairs]
+    exact bufferSizes_mem_pairs s.bufferSizes partner actor _n _hmem
+  have hsum_pairs :
+      (pairs.map (fun (k, v) => if k == (partner, actor) then v - 1 else v)).foldl (· + ·) 0 + 1 =
+      (pairs.map Prod.snd).foldl (· + ·) 0 := by
+    simpa using (sum_decr_unique pairs (partner, actor) _n hunique_pairs hmem_pairs _hn)
+  -- Translate back to the triple-based buffer representation.
+  have hleft :
+      sumBuffers (s.decrBuffer actor partner) + 1 =
+        (pairs.map (fun (k, v) => if k == (partner, actor) then v - 1 else v)).foldl (· + ·) 0 + 1 := by
+    unfold sumBuffers SessionState.decrBuffer
+    simp only [pairs, List.map_map, Function.comp_def]
+    congr 1
+    congr 1
+    apply List.map_congr_left
+    intro x hx
+    rcases x with ⟨s', r', n⟩
+    by_cases hsr : s' = partner ∧ r' = actor
+    · simp [hsr]
+    · simp [hsr]
+  have hright : sumBuffers s = (pairs.map Prod.snd).foldl (· + ·) 0 := by
+    unfold sumBuffers
+    simp [pairs, List.map_map, Function.comp_def]
+  rw [hleft, hright]
+  exact hsum_pairs
 
 /-- Bound on buffer increment with uniqueness: sum increases by at most 1. -/
 lemma sumBuffers_incrBuffer_le (s : SessionState) (actor partner : Role)
@@ -832,6 +889,74 @@ theorem branch_step_decreases
 
 /-! ## Total Measure Decrease -/
 
+/-- Sum is monotone: pointwise ≤ implies sum ≤. -/
+private lemma sum_le_of_pointwise_le {α : Type*} (l : List α) (f g : α → Nat)
+    (hle : ∀ y ∈ l, f y ≤ g y) :
+    (l.map f).foldl (· + ·) 0 ≤ (l.map g).foldl (· + ·) 0 := by
+  induction l with
+  | nil => rfl
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
+    rw [foldl_add_shift (l := tl.map f) (n := f hd)]
+    rw [foldl_add_shift (l := tl.map g) (n := g hd)]
+    have h1 : f hd ≤ g hd := hle hd (by simp)
+    have h2 := ih (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
+    omega
+
+/-- Sum decreases when one element strictly decreases and others don't increase. -/
+private lemma sum_lt_of_one_lt {α : Type*} (l : List α) (f g : α → Nat)
+    (x : α) (hx : x ∈ l)
+    (hlt : f x < g x)
+    (hle : ∀ y ∈ l, f y ≤ g y) :
+    (l.map f).foldl (· + ·) 0 < (l.map g).foldl (· + ·) 0 := by
+  induction l with
+  | nil => simp at hx
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
+    rw [foldl_add_shift (l := tl.map f) (n := f hd)]
+    rw [foldl_add_shift (l := tl.map g) (n := g hd)]
+    simp only [List.mem_cons] at hx
+    rcases hx with rfl | htl
+    · -- x = hd: the strict decrease is at the head
+      have h2 := sum_le_of_pointwise_le tl f g
+        (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
+      omega
+    · -- x ∈ tl: use inductive hypothesis
+      have h1 : f hd ≤ g hd := hle hd (by simp)
+      have h2 := ih htl (fun y hy => hle y (List.mem_cons.mpr (Or.inr hy)))
+      omega
+
+/-- If a list has unique images under f and x, y are in the list with f x = f y, then x = y. -/
+private lemma eq_of_mem_of_eq_of_nodup_map {α β : Type*} [DecidableEq β]
+    (l : List α) (f : α → β) (x y : α)
+    (hx : x ∈ l) (hy : y ∈ l)
+    (hnodup : (l.map f).Nodup)
+    (heq : f x = f y) : x = y := by
+  induction l with
+  | nil => simp at hx
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.nodup_cons] at hnodup
+    obtain ⟨hnotmem, htl_nodup⟩ := hnodup
+    simp only [List.mem_cons] at hx hy
+    rcases hx with rfl | hx_tl
+    · -- x = hd
+      rcases hy with rfl | hy_tl
+      · rfl
+      · -- y ∈ tl, but f hd = f y, so f y ∈ tl.map f, contradicting hnotmem
+        exfalso
+        have hmem : f y ∈ tl.map f := List.mem_map_of_mem (f := f) hy_tl
+        rw [← heq] at hmem
+        exact hnotmem hmem
+    · -- x ∈ tl
+      rcases hy with rfl | hy_tl
+      · -- y = hd, x ∈ tl, f x = f hd
+        exfalso
+        have hmem : f x ∈ tl.map f := List.mem_map_of_mem (f := f) hx_tl
+        rw [heq] at hmem
+        exact hnotmem hmem
+      · -- Both in tail
+        exact ih hx_tl hy_tl htl_nodup
+
 /-- Any productive step decreases the total weighted measure. -/
 theorem total_measure_decreasing [sem : SessionSemantics]
     (cfg : MultiConfig) (step : SessionStep) (newType : LocalType)
@@ -845,8 +970,42 @@ theorem total_measure_decreasing [sem : SessionSemantics]
       weightedMeasure (sem.applySessionStep s_stepped step newType) <
         weightedMeasure s_stepped) :
     totalWeightedMeasure (sem.applyStep cfg step newType) < totalWeightedMeasure cfg := by
-  -- Step decreases session measure; total measure is sum over sessions
-  sorry
+  unfold totalWeightedMeasure
+  rw [sem.applyStep_map]
+  -- Define the stepped-session weighted measure function
+  let f := fun s : SessionState =>
+    weightedMeasure (if s.sid == step.sid then sem.applySessionStep s step newType else s)
+  let g := weightedMeasure
+  -- Rewrite the mapped sum using f
+  have hmap : (cfg.sessions.map (fun s =>
+      if s.sid == step.sid then sem.applySessionStep s step newType else s)).map weightedMeasure =
+      cfg.sessions.map f := by simp only [List.map_map]; rfl
+  rw [hmap]
+  -- Apply sum_lt_of_one_lt with s_stepped
+  apply sum_lt_of_one_lt cfg.sessions f g s_stepped hs
+  · -- f s_stepped < g s_stepped
+    simp only [f, g]
+    have heq : (s_stepped.sid == step.sid) = true := by
+      simp only [beq_iff_eq]
+      exact hsid
+    simp only [heq, ↓reduceIte]
+    exact hdecrease
+  · -- ∀ y ∈ cfg.sessions, f y ≤ g y
+    intro y hy
+    simp only [f, g]
+    by_cases heq : y.sid == step.sid
+    · -- y.sid = step.sid: y must equal s_stepped by uniqueness
+      simp only [heq, ↓reduceIte]
+      have hsid_eq : y.sid = step.sid := beq_iff_eq.mp heq
+      have hsid_s : s_stepped.sid = step.sid := hsid
+      have hsid_y : y.sid = s_stepped.sid := by simpa [hsid_s] using hsid_eq
+      have hsame : y = s_stepped := eq_of_mem_of_eq_of_nodup_map
+        cfg.sessions (·.sid) y s_stepped hy hs hunique_sids (by simpa using hsid_y)
+      rw [hsame]
+      exact Nat.le_of_lt hdecrease
+    · -- y.sid ≠ step.sid: measure unchanged
+      simp only [Bool.not_eq_true] at heq
+      simp only [heq, Bool.false_eq_true, ↓reduceIte, Nat.le_refl]
 
 /-! ## Productive Trace Bound -/
 
@@ -964,10 +1123,76 @@ theorem shared_participant_no_overhead_unique
   have hfilter_eq : (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid) =
       cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid) := by
     simp only [List.filter_filter, Bool.and_comm]
-  -- Use Perm.foldl_eq for sum invariance under permutation
-  unfold totalWeightedMeasure
-  -- Proof uses permutation invariance of foldl for addition.
-  -- The decomposition s1, s2, and rest is a permutation of cfg.sessions.
-  sorry
+  -- Decompose total measure by pulling s1, then s2, to the front.
+  have hsum1 :
+      totalWeightedMeasure cfg =
+        weightedMeasure s1 +
+          List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) := by
+    unfold totalWeightedMeasure
+    have hpermNat :
+        List.Perm (cfg.sessions.map weightedMeasure)
+          ((s1 :: cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) := by
+      exact hperm1.map weightedMeasure
+    have hsumEq :
+        (cfg.sessions.map weightedMeasure).foldl (· + ·) 0 =
+          ((s1 :: cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure).foldl (· + ·) 0 := by
+      rw [foldl_add_eq_sum, foldl_add_eq_sum]
+      exact hpermNat.sum_eq
+    calc
+      (cfg.sessions.map weightedMeasure).foldl (· + ·) 0
+          = ((s1 :: cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure).foldl (· + ·) 0 := hsumEq
+      _ = weightedMeasure s1 +
+            List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) := by
+            rw [List.map_cons, List.foldl_cons, Nat.zero_add]
+            rw [foldl_add_shift (l := (cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure)
+              (n := weightedMeasure s1)]
+  have hsum2 :
+      List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) =
+        weightedMeasure s2 +
+          List.foldl (· + ·) 0
+            ((((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure)) := by
+    have hpermNat :
+        List.Perm
+          ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure)
+          ((s2 :: (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure) := by
+      exact hperm2.map weightedMeasure
+    have hsumEq :
+        ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure).foldl (· + ·) 0 =
+          ((s2 :: (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure).foldl (· + ·) 0 := by
+      rw [foldl_add_eq_sum, foldl_add_eq_sum]
+      exact hpermNat.sum_eq
+    calc
+      ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure).foldl (· + ·) 0
+          = ((s2 :: (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure).foldl (· + ·) 0 := hsumEq
+      _ = weightedMeasure s2 +
+            List.foldl (· + ·) 0
+              ((((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure)) := by
+            rw [List.map_cons, List.foldl_cons, Nat.zero_add]
+            rw [foldl_add_shift
+              (l := ((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure)
+              (n := weightedMeasure s2)]
+  have htotal_eq :
+      totalWeightedMeasure cfg =
+        weightedMeasure s1 + weightedMeasure s2 +
+          List.foldl (· + ·) 0
+            ((cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid)).map weightedMeasure) := by
+    calc
+      totalWeightedMeasure cfg
+          = weightedMeasure s1 +
+              List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) := hsum1
+      _ = weightedMeasure s1 +
+            (weightedMeasure s2 +
+              List.foldl (· + ·) 0
+                ((((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure))) := by
+              rw [hsum2]
+      _ = weightedMeasure s1 + weightedMeasure s2 +
+            List.foldl (· + ·) 0
+              ((((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure)) := by
+              omega
+      _ = weightedMeasure s1 + weightedMeasure s2 +
+            List.foldl (· + ·) 0
+              ((cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid)).map weightedMeasure) := by
+              rw [hfilter_eq]
+  exact le_of_eq htotal_eq
 
 end

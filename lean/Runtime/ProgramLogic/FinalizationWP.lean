@@ -22,7 +22,7 @@ def finalization_required (γ : GhostName) (ft : FinalizationToken) : iProp :=
   finalization_token_own γ ft
 
 def finalization_config_ready {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

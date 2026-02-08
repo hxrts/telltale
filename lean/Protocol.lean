@@ -20,6 +20,7 @@ import Protocol.Examples
 import Protocol.Simulation
 import Protocol.Decidability
 import Protocol.Classical
+import Protocol.BufferBoundedness
 
 /-! # Protocol
 

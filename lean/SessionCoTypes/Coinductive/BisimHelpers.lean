@@ -32,9 +32,11 @@ open SessionTypes.LocalTypeR
 
 /-! ## Branch relation helpers (ofFn) -/
 
-lemma toCoindBranches_ofFn {n : Nat} (f : Fin n → (Label × LocalTypeR)) :
+lemma toCoindBranches_ofFn {n : Nat} (f : Fin n → BranchR) :
     toCoindBranches (List.ofFn f) =
-      List.ofFn (fun i => ((f i).1, toCoind (f i).2)) := by
+      List.ofFn (fun i =>
+        match f i with
+        | (label, _vt, t) => (label, toCoind t)) := by
   induction n with
   | zero =>
       simp [List.ofFn_zero, toCoindBranches]

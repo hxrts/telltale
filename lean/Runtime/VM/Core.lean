@@ -38,7 +38,7 @@ structure Expr where
 
 /-! ## Bytecode instructions -/
 
-inductive Instr (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+inductive Instr (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Bytecode instruction set.
   | send (chan val : Reg)
   | recv (chan dst : Reg)
@@ -46,7 +46,7 @@ inductive Instr (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
   | choose (chan : Reg) (table : List (Label × PC))
   | acquire (layer : γ) (dst : Reg)
   | release (layer : γ) (evidence : Reg)
-  | invoke (action : EffectModel.EffectAction ε)
+  | invoke (action : EffectRuntime.EffectAction ε)
   | open (roles : RoleSet) (localTypes : List (Role × LocalType))
       (handlers : List (Edge × HandlerId)) (dsts : List (Role × Reg))
   | close (session : Reg)

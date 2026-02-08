@@ -163,6 +163,11 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
             omega
           exact isBlind_substitute g t repl hg_blind hrepl hrepl_closed
         exact isBlindBranches_substitute_aux branches t repl hrepl hrepl_closed hblind_comm.2 hsize
+  | .delegate p q sid r cont =>
+      -- Delegate: blindness is preserved in the continuation.
+      simp only [GlobalType.substitute, isBlind]
+      have hcont : isBlind cont = true := isBlind_delegate_cont hg
+      exact isBlind_substitute cont t repl hcont hrepl hrepl_closed
 termination_by g
 
 /-- BranchesStep preserves isBlindBranches.

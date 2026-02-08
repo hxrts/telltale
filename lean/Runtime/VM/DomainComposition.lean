@@ -6,13 +6,13 @@ import Runtime.VM.TypeClasses
 Unit, sum, and product instances for all five domain interfaces, plus the bridge
 classes that connect them. This is the Lean counterpart of `runtime.md` §20.
 
-**Unit instances** (`GuardLayer Unit`, `EffectModel Unit`, `VerificationModel Unit`,
+**Unit instances** (`GuardLayer Unit`, `EffectRuntime Unit`, `VerificationModel Unit`,
 `AuthTree Unit`, `AccumulatedSet Unit`) provide trivial no-op implementations used
 as identity elements in composition and as defaults for testing.
 
 **Sum/product instances** let independent domain models be combined. Sum instances
 dispatch on the chosen side. Product instances run both components. This enables
-protocol federation: a VM configured with `EffectModel (ε₁ ⊕ ε₂)` can execute
+protocol federation: a VM configured with `EffectRuntime (ε₁ ⊕ ε₂)` can execute
 effects from either domain without either domain knowing about the other.
 
 **Bridge classes** (`IdentityGuardBridge`, `EffectGuardBridge`, `PersistenceEffectBridge`,
@@ -47,11 +47,14 @@ instance : GuardLayer Unit where
     | _ => none
   decEq := by infer_instance
 
-instance : EffectModel Unit where
+instance : EffectRuntime Unit where
   -- Unit effect model: no-op effects.
   EffectAction := Unit
   EffectCtx := Unit
   exec := fun _ _ => ()
+
+instance : EffectSpec Unit where
+  -- Unit effect typing: handlers are terminal.
   handlerType := fun _ => LocalType.end_
 
 instance : VerificationModel Unit where
@@ -167,32 +170,39 @@ instance instIdentityModelSum (ι₁ ι₂ : Type u)
   decEqP := sumDecEqP ι₁ ι₂
   decEqS := sumDecEqS ι₁ ι₂
 
-instance instEffectModelSum (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
-    EffectModel (Sum ε₁ ε₂) where
+instance instEffectRuntimeSum (ε₁ ε₂ : Type u) [EffectRuntime ε₁] [EffectRuntime ε₂] :
+    EffectRuntime (Sum ε₁ ε₂) where
   -- Sum effects dispatch to the corresponding component model.
-  EffectAction := Sum (EffectModel.EffectAction ε₁) (EffectModel.EffectAction ε₂)
-  EffectCtx := EffectModel.EffectCtx ε₁ × EffectModel.EffectCtx ε₂
+  EffectAction := Sum (EffectRuntime.EffectAction ε₁) (EffectRuntime.EffectAction ε₂)
+  EffectCtx := EffectRuntime.EffectCtx ε₁ × EffectRuntime.EffectCtx ε₂
   exec := fun a ctx =>
     match a, ctx with
-    | Sum.inl a1, (c1, c2) => (EffectModel.exec a1 c1, c2)
-    | Sum.inr a2, (c1, c2) => (c1, EffectModel.exec a2 c2)
-  handlerType := fun a =>
-    match a with
-    | Sum.inl a1 => EffectModel.handlerType a1
-    | Sum.inr a2 => EffectModel.handlerType a2
+    | Sum.inl a1, (c1, c2) => (EffectRuntime.exec a1 c1, c2)
+    | Sum.inr a2, (c1, c2) => (c1, EffectRuntime.exec a2 c2)
 
-instance instEffectModelProd (ε₁ ε₂ : Type u) [EffectModel ε₁] [EffectModel ε₂] :
-    EffectModel (ε₁ × ε₂) where
+instance instEffectSpecSum (ε₁ ε₂ : Type u)
+    [EffectRuntime ε₁] [EffectRuntime ε₂] [EffectSpec ε₁] [EffectSpec ε₂] :
+    EffectSpec (Sum ε₁ ε₂) where
+  -- Sum typing dispatches to the corresponding effect spec.
+  handlerType := fun a =>
+    match a with
+    | Sum.inl a1 => EffectSpec.handlerType a1
+    | Sum.inr a2 => EffectSpec.handlerType a2
+
+instance instEffectRuntimeProd (ε₁ ε₂ : Type u) [EffectRuntime ε₁] [EffectRuntime ε₂] :
+    EffectRuntime (ε₁ × ε₂) where
   -- Product effects run both components.
-  EffectAction := EffectModel.EffectAction ε₁ × EffectModel.EffectAction ε₂
-  EffectCtx := EffectModel.EffectCtx ε₁ × EffectModel.EffectCtx ε₂
+  EffectAction := EffectRuntime.EffectAction ε₁ × EffectRuntime.EffectAction ε₂
+  EffectCtx := EffectRuntime.EffectCtx ε₁ × EffectRuntime.EffectCtx ε₂
   exec := fun a ctx =>
     match a, ctx with
-    | (a1, a2), (c1, c2) => (EffectModel.exec a1 c1, EffectModel.exec a2 c2)
-  handlerType := fun a =>
-    -- Placeholder: product handler type is abstracted away for now.
-    match a with
-    | (_a1, _a2) => LocalType.end_
+    | (a1, a2), (c1, c2) => (EffectRuntime.exec a1 c1, EffectRuntime.exec a2 c2)
+
+instance instEffectSpecProd (ε₁ ε₂ : Type u)
+    [EffectRuntime ε₁] [EffectRuntime ε₂] [EffectSpec ε₁] [EffectSpec ε₂] :
+    EffectSpec (ε₁ × ε₂) where
+  -- V1 product handlers are conservatively typed as terminal.
+  handlerType := fun _ => LocalType.end_
 
 instance instGuardLayerProd (γ₁ γ₂ : Type u) [GuardLayer γ₁] [GuardLayer γ₂] :
     GuardLayer (γ₁ × γ₂) where
@@ -246,13 +256,13 @@ class IdentityGuardBridge (ι : Type u) (γ : Type u) [IdentityModel ι] [GuardL
   -- Map identities into guard resources.
   bridge : IdentityModel.ParticipantId ι → GuardLayer.Resource γ
 
-class EffectGuardBridge (ε : Type u) (γ : Type u) [EffectModel ε] [GuardLayer γ] where
+class EffectGuardBridge (ε : Type u) (γ : Type u) [EffectRuntime ε] [GuardLayer γ] where
   -- Map effect actions into guard resources.
-  bridge : EffectModel.EffectAction ε → GuardLayer.Resource γ
+  bridge : EffectRuntime.EffectAction ε → GuardLayer.Resource γ
 
-class PersistenceEffectBridge (π : Type u) (ε : Type u) [PersistenceModel π] [EffectModel ε] where
+class PersistenceEffectBridge (π : Type u) (ε : Type u) [PersistenceModel π] [EffectRuntime ε] where
   -- Map effects into persistence deltas.
-  bridge : EffectModel.EffectAction ε → PersistenceModel.Delta π
+  bridge : EffectRuntime.EffectAction ε → PersistenceModel.Delta π
 
 class IdentityPersistenceBridge (ι : Type u) (π : Type u) [IdentityModel ι] [PersistenceModel π] where
   -- Map identities into persistent state.
@@ -275,7 +285,7 @@ instance instIdentityGuardBridgeSum (ι₁ ι₂ γ : Type u)
     | Sum.inr p => IdentityGuardBridge.bridge (ι:=ι₂) p
 
 instance instEffectGuardBridgeSum (ε₁ ε₂ γ : Type u)
-    [EffectModel ε₁] [EffectModel ε₂] [GuardLayer γ]
+    [EffectRuntime ε₁] [EffectRuntime ε₂] [GuardLayer γ]
     [EffectGuardBridge ε₁ γ] [EffectGuardBridge ε₂ γ] :
     EffectGuardBridge (Sum ε₁ ε₂) γ where
   -- Lift effect-to-guard bridges over effect sums.
@@ -284,7 +294,7 @@ instance instEffectGuardBridgeSum (ε₁ ε₂ γ : Type u)
     | Sum.inr a => EffectGuardBridge.bridge (ε:=ε₂) a
 
 instance instPersistenceEffectBridgeSum (π ε₁ ε₂ : Type u)
-    [PersistenceModel π] [EffectModel ε₁] [EffectModel ε₂]
+    [PersistenceModel π] [EffectRuntime ε₁] [EffectRuntime ε₂]
     [PersistenceEffectBridge π ε₁] [PersistenceEffectBridge π ε₂] :
     PersistenceEffectBridge π (Sum ε₁ ε₂) where
   -- Lift effect-to-persistence bridges over effect sums.
@@ -313,14 +323,49 @@ instance instIdentityVerificationBridgeSum (ι₁ ι₂ ν : Type u)
 /-! ## Composition claims -/
 
 def effect_composition_safe : Prop :=
-  -- Placeholder: composition safety statement for effects.
-  True
+  -- Sum effects update only the selected component of effect context.
+  ∀ (ε₁ ε₂ : Type u) [EffectRuntime ε₁] [EffectRuntime ε₂]
+    (ctx : EffectRuntime.EffectCtx (Sum ε₁ ε₂))
+    (a₁ : EffectRuntime.EffectAction ε₁) (a₂ : EffectRuntime.EffectAction ε₂),
+      (EffectRuntime.exec (ε:=Sum ε₁ ε₂) (Sum.inl a₁) ctx).2 = ctx.2 ∧
+      (EffectRuntime.exec (ε:=Sum ε₁ ε₂) (Sum.inr a₂) ctx).1 = ctx.1
+
+theorem effect_composition_safe_holds : effect_composition_safe := by
+  intro ε₁ ε₂ _ _ ctx a₁ a₂
+  cases ctx
+  simp [EffectRuntime.exec]
+
 def composed_frame_rule : Prop :=
-  -- Placeholder: frame rule for composed models.
-  True
+  -- Sum identity-guard bridges preserve each component bridge.
+  ∀ (ι₁ ι₂ γ : Type u)
+    [IdentityModel ι₁] [IdentityModel ι₂] [GuardLayer γ]
+    [IdentityGuardBridge ι₁ γ] [IdentityGuardBridge ι₂ γ],
+      (∀ p, IdentityGuardBridge.bridge (ι:=Sum ι₁ ι₂) (γ:=γ) (Sum.inl p) =
+             IdentityGuardBridge.bridge (ι:=ι₁) (γ:=γ) p) ∧
+      (∀ p, IdentityGuardBridge.bridge (ι:=Sum ι₁ ι₂) (γ:=γ) (Sum.inr p) =
+             IdentityGuardBridge.bridge (ι:=ι₂) (γ:=γ) p)
+
+theorem composed_frame_rule_holds : composed_frame_rule := by
+  intro ι₁ ι₂ γ _ _ _ _ _
+  constructor <;> intro p <;> rfl
+
 def composed_persistence_commutation : Prop :=
-  -- Placeholder: persistence commutes with composed effects.
-  True
+  -- Sum persistence/effect bridges preserve each component bridge.
+  ∀ (π ε₁ ε₂ : Type u)
+    [PersistenceModel π] [EffectRuntime ε₁] [EffectRuntime ε₂]
+    [PersistenceEffectBridge π ε₁] [PersistenceEffectBridge π ε₂],
+      (∀ a, PersistenceEffectBridge.bridge (π:=π) (ε:=Sum ε₁ ε₂) (Sum.inl a) =
+             PersistenceEffectBridge.bridge (π:=π) (ε:=ε₁) a) ∧
+      (∀ a, PersistenceEffectBridge.bridge (π:=π) (ε:=Sum ε₁ ε₂) (Sum.inr a) =
+             PersistenceEffectBridge.bridge (π:=π) (ε:=ε₂) a)
+
+theorem composed_persistence_commutation_holds : composed_persistence_commutation := by
+  intro π ε₁ ε₂ _ _ _ _ _
+  constructor <;> intro a <;> rfl
+
 def protocol_federation : Prop :=
-  -- Placeholder: federation correctness statement.
-  True
+  -- Federation is justified by safe effect composition and bridge preservation.
+  effect_composition_safe.{u} ∧ composed_frame_rule.{u} ∧ composed_persistence_commutation.{u}
+
+theorem protocol_federation_holds : protocol_federation := by
+  exact ⟨effect_composition_safe_holds, composed_frame_rule_holds, composed_persistence_commutation_holds⟩

@@ -50,7 +50,7 @@ set_option relaxedAutoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 universe u
 
@@ -186,7 +186,7 @@ private theorem exists_session_of_lookupType_some {store : SessionStore ν} {e :
       obtain ⟨sid, st⟩ := hd
       by_cases hsid : sid = e.sid
       · refine ⟨st, ?_⟩
-        simp [SessionStore.lookupType, hsid]
+        simp [hsid]
       · have hLookupTl : SessionStore.lookupType tl e = some L := by
           simpa [SessionStore.lookupType, hsid] using hLookup
         rcases ih hLookupTl with ⟨st', hMem'⟩
@@ -210,7 +210,8 @@ private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid 
         cases hMem0 with
         | inl hEq =>
             cases hEq
-            exact ⟨st.updateTrace edge ts, by simp⟩
+            refine ⟨st.updateTrace edge ts, ?_⟩
+            exact Or.inl (by simpa using hsid)
         | inr hTail =>
             exact ⟨st0, by simp [hTail]⟩
       · simp [SessionStore.updateTrace, hsid]
@@ -404,7 +405,7 @@ theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
       rw [hGBridge { sid := e.sid, role := e.receiver }] at hR
       exact hR
   have hPost := hHeadUpd e hActiveUpd
-  simpa [hGBridge { sid := e.sid, role := e.receiver }, hDBridge e] using hPost
+  simpa [sendEdge, hGBridge { sid := e.sid, role := e.receiver }, hDBridge e] using hPost
 
 /-! ## Progress Theorem -/
 
@@ -423,18 +424,41 @@ def AllSessionsComplete (store : SessionStore ν) : Prop :=
     scheduling, the send will happen, so blocked is temporary. -/
 theorem vm_progress {store : SessionStore ν}
     (hWF : WellFormedVMState store)
-    (hNonTerminal : ¬ AllSessionsComplete store) :
+    (_hNonTerminal : ¬ AllSessionsComplete store) :
+    (hFrontier :
+      (∃ ep target T L', SessionStore.lookupType store ep = some (.send target T L')) ∨
+      (∃ ep source T L' rest,
+        SessionStore.lookupType store ep = some (.recv source T L') ∧
+        SessionStore.lookupTrace store { sid := ep.sid, sender := source, receiver := ep.role } = T :: rest) ∨
+      (∃ ep target ℓ bs L',
+        SessionStore.lookupType store ep = some (.select target bs) ∧
+        bs.find? (fun b => b.1 == ℓ) = some (ℓ, L')) ∨
+      (∃ ep source bs ℓ L' rest,
+        SessionStore.lookupType store ep = some (.branch source bs) ∧
+        SessionStore.lookupBuffer store { sid := ep.sid, sender := source, receiver := ep.role } = .string ℓ :: rest ∧
+        bs.find? (fun b => b.1 == ℓ) = some (ℓ, L'))) →
     (∃ ep target T, SendEnabled store ep target T) ∨
     (∃ ep source T, RecvEnabled store ep source T) ∨
     (∃ ep target ℓ, SelectEnabled store ep target ℓ) ∨
     (∃ ep source, BranchEnabled store ep source) := by
-  -- Strategy: Use Protocol's progress_typed theorem.
-  -- 1. Convert VM state to Protocol config
-  -- 2. Apply progress_typed to get (skip ∨ step ∨ blocked)
-  -- 3. Non-terminal means not skip
-  -- 4. If step exists, extract the enabled instruction
-  -- 5. If blocked, it's waiting for a receive (which is a valid state)
-  sorry
+  intro hFrontier
+  have hSendReady : SendReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
+    sendReady_of_ProgressVMState hWF.progress
+  have hSelectReady : SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
+    selectReady_of_ProgressVMState hWF.progress
+  rcases hFrontier with hSend | hRecv | hSelect | hBranch
+  · rcases hSend with ⟨ep, target, T, L', hTy⟩
+    left
+    exact ⟨ep, target, T, ⟨L', hTy, hSendReady⟩⟩
+  · rcases hRecv with ⟨ep, source, T, L', rest, hTy, hTrace⟩
+    right; left
+    exact ⟨ep, source, T, ⟨L', hTy, rest, hTrace⟩⟩
+  · rcases hSelect with ⟨ep, target, ℓ, bs, L', hTy, hFind⟩
+    right; right; left
+    exact ⟨ep, target, ℓ, ⟨bs, L', hTy, hFind, hSelectReady⟩⟩
+  · rcases hBranch with ⟨ep, source, bs, ℓ, L', rest, hTy, hBuf, hFind⟩
+    right; right; right
+    exact ⟨ep, source, ⟨bs, hTy, ℓ, L', rest, hBuf, hFind⟩⟩
 
 /-! ## Termination Under Fairness -/
 
@@ -477,6 +501,8 @@ theorem vm_termination_under_fairness {store₀ : SessionStore ν} {sched : List
     affects session s, HeadCoherent is preserved for all other sessions. -/
 theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
     {s : SessionId}
+    (hWF : sessionStore_refines_envs store)
+    (hWF' : sessionStore_refines_envs store')
     (hHead : HeadCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store))
     (hFrame : ∀ e, e.sid ≠ s → SessionStore.lookupType store e = SessionStore.lookupType store' e)
     (hFrameD : ∀ edge, edge.sid ≠ s →
@@ -487,7 +513,52 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
           match lookupD (SessionStore.toDEnv store') e with
           | [] => True
           | T' :: _ => T = T'
+      | some (.branch _ _) =>
+          match lookupD (SessionStore.toDEnv store') e with
+          | [] => True
+          | T' :: _ => T' = .string
       | _ => True := by
-  sorry
+  intro e hSidNe hActive'
+  let senderEp : Endpoint := { sid := e.sid, role := e.sender }
+  let receiverEp : Endpoint := { sid := e.sid, role := e.receiver }
+  have hSenderEq : lookupG (SessionStore.toGEnv store') senderEp =
+      lookupG (SessionStore.toGEnv store) senderEp := by
+    calc
+      lookupG (SessionStore.toGEnv store') senderEp
+          = SessionStore.lookupType store' senderEp := store_lookupType_eq_lookupG (hWF := hWF')
+      _ = SessionStore.lookupType store senderEp := by
+            symm
+            exact hFrame senderEp (by simpa [senderEp] using hSidNe)
+      _ = lookupG (SessionStore.toGEnv store) senderEp :=
+            (store_lookupType_eq_lookupG (hWF := hWF)).symm
+  have hReceiverEq : lookupG (SessionStore.toGEnv store') receiverEp =
+      lookupG (SessionStore.toGEnv store) receiverEp := by
+    calc
+      lookupG (SessionStore.toGEnv store') receiverEp
+          = SessionStore.lookupType store' receiverEp := store_lookupType_eq_lookupG (hWF := hWF')
+      _ = SessionStore.lookupType store receiverEp := by
+            symm
+            exact hFrame receiverEp (by simpa [receiverEp] using hSidNe)
+      _ = lookupG (SessionStore.toGEnv store) receiverEp :=
+            (store_lookupType_eq_lookupG (hWF := hWF)).symm
+  have hTraceEq : lookupD (SessionStore.toDEnv store') e =
+      lookupD (SessionStore.toDEnv store) e := by
+    calc
+      lookupD (SessionStore.toDEnv store') e
+          = SessionStore.lookupTrace store' e := store_lookupTrace_eq_lookupD (hWF := hWF')
+      _ = SessionStore.lookupTrace store e := by
+            symm
+            exact hFrameD e hSidNe
+      _ = lookupD (SessionStore.toDEnv store) e :=
+            (store_lookupTrace_eq_lookupD (hWF := hWF)).symm
+  have hActive : ActiveEdge (SessionStore.toGEnv store) e := by
+    unfold ActiveEdge at hActive' ⊢
+    constructor
+    · have hS := hActive'.1
+      simpa [senderEp, hSenderEq] using hS
+    · have hR := hActive'.2
+      simpa [receiverEp, hReceiverEq] using hR
+  have hOld := hHead e hActive
+  simpa [receiverEp, hReceiverEq, hTraceEq] using hOld
 
 end

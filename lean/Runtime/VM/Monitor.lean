@@ -48,7 +48,7 @@ def SessionKind.sid? {γ : Type u} : SessionKind γ → Option SessionId :=
   | .protocol sid => some sid
   | _ => none
 
-inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectModel ε] :
+inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] [EffectSpec ε] :
     Instr γ ε → SessionKind γ → LocalType → LocalType → Prop where
   | wt_send (sid : SessionId) (chan val : Reg) (r : Role)
       (T : ValType) (L' : LocalType) :
@@ -74,9 +74,9 @@ inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectModel ε] :
   | wt_release (chainId : GuardChainId) (layer : γ) (ev : Reg) (L : LocalType) :
       -- Guard release preserves the guard-session local type in V1.
       WellTypedInstr (.release layer ev) (.guard chainId layer) L L
-  | wt_invoke (action : EffectModel.EffectAction ε) (hsid : HandlerId) :
+  | wt_invoke (action : EffectRuntime.EffectAction ε) (hsid : HandlerId) :
       -- Handler session typing for invoke steps.
-      WellTypedInstr (.invoke action) (.handler hsid) (EffectModel.handlerType action) .end_
+      WellTypedInstr (.invoke action) (.handler hsid) (EffectSpec.handlerType action) .end_
   | wt_open (sid : SessionId) (roles : RoleSet) (types : List (Role × LocalType))
       (handlers : List (Edge × HandlerId)) (dsts : List (Role × Reg)) :
       -- Opening is well-typed at the boundary of a fresh session.
@@ -102,7 +102,7 @@ structure SessionMonitor (γ : Type u) where
   step : SessionKind γ → Option (SessionKind γ)
 
 /-- Check whether an instruction is pure control flow (no session interaction). -/
-def instrNeedsSession {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def instrNeedsSession {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (i : Instr γ ε) : Bool :=
   match i with
   | .loadImm _ _ | .mov _ _ | .jmp _ | .spawn _ _ | .yield | .halt => false
@@ -112,7 +112,7 @@ private def distinctLabels : List Label → Bool
   | [] => true
   | l :: ls => !ls.contains l && distinctLabels ls
 
-def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (_m : SessionMonitor γ) (_i : Instr γ ε) : Bool :=
   match _i with
   | .choose _ table =>
@@ -123,7 +123,7 @@ def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     roles.length == dsts.length
   | _ => true
 
-def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (m : SessionMonitor γ) : Prop :=
   -- Pure control flow instructions are always accepted by the monitor.
   ∀ (i : Instr γ ε), instrNeedsSession i = false → monitorAllows m i = true

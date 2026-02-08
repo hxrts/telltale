@@ -62,9 +62,9 @@ def knowledge_set_owns (γ : GhostName) (ks : List KnowledgeFact) : iProp :=
   -- Ownership of a list of knowledge facts.
   sepList (ks.map (fun k => knows γ k))
 
-def KnowledgeReachable (_k : KnowledgeFact) : Prop :=
-  -- Reachability predicate for knowledge flow (placeholder relation).
-  True
+def KnowledgeReachable (k : KnowledgeFact) : Prop :=
+  -- A fact is reachable when it carries non-empty payload knowledge.
+  k.fact.length > 0
 
 def knowledge_disjoint (ks1 ks2 : List KnowledgeFact) : Prop :=
   -- Disjointness of knowledge sets by element exclusion.
@@ -216,66 +216,91 @@ def guard_layer_owns {γ : Type u} [GuardLayer γ] (_layer : γ)
   iProp.emp
 
 /-- Effect-context ownership predicate (placeholder). -/
-def effect_ctx_owns {ε : Type u} [EffectModel ε] (_ctx : EffectModel.EffectCtx ε) : iProp :=
-  -- V1 treats effect context ownership as opaque.
+def effect_ctx_owns {ε : Type u} [EffectRuntime ε] (_ctx : EffectRuntime.EffectCtx ε) : iProp :=
+  -- V1 treats effect context ownership as abstract.
   iProp.emp
 
-structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   endpoint : Endpoint -- Endpoint being transferred.
   localType : LocalType -- Current local type at the endpoint.
   guardState : List (γ × GuardLayer.Resource γ) -- Guard resources for the endpoint.
-  effectSlice : EffectModel.EffectCtx ε -- Effect context slice.
+  effectSlice : EffectRuntime.EffectCtx ε -- Effect context slice.
   progressTokens : List (SessionId × Endpoint × Nat) -- Liveness tokens.
   knowledge : List KnowledgeFact -- Knowledge facts.
 
 variable [GhostMapSlot LocalType]
 
-def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+/-- Endpoint ownership fragment from SessionRA. -/
+def endpoint_owns (γn : GhostName) (e : Endpoint) (L : LocalType) : iProp :=
+  endpoint_frag γn e L
+
+/-- Endpoint ownership transfer/update law from the authoritative session map. -/
+def endpoint_owns_transfer : Prop :=
+  ∀ γ m e Lold Lnew,
+    iProp.entails
+      (iProp.sep (session_auth γ m) (endpoint_owns γ e Lold))
+      (bupd
+        (iProp.sep (session_auth γ (Iris.Std.insert m (encodeEndpoint e) (Iris.LeibnizO.mk Lnew)))
+          (endpoint_owns γ e Lnew)))
+
+theorem endpoint_owns_transfer_holds : endpoint_owns_transfer := by
+  intro γ m e Lold Lnew
+  simpa [endpoint_owns] using
+    (session_advance γ m e Lold Lnew)
+
+def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : iProp :=
   -- Bundle ownership is the separating conjunction of all components.
   let guardOwns := sepList (b.guardState.map (fun p => guard_layer_owns p.1 p.2))
   let progressOwns :=
     sepList (b.progressTokens.map (fun p => progress_token_own γn p.1 p.2.1 p.2.2))
   let knowledgeOwns := knowledge_set_owns γn b.knowledge
-  iProp.sep (endpoint_frag γn b.endpoint b.localType)
+  iProp.sep (endpoint_owns γn b.endpoint b.localType)
     (iProp.sep guardOwns (iProp.sep (effect_ctx_owns b.effectSlice)
       (iProp.sep progressOwns knowledgeOwns)))
 
-def transfer_bundle {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def transfer_bundle {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
   -- Transfer preserves ownership of the same bundle.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
 
-def bundle_complete {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
-    (_b : ResourceBundle γ ε) : Prop :=
-  -- Placeholder: bundle contains all required transfer resources.
-  True
+/-- Bundle progress token has internal sid/endpoint consistency and positive budget. -/
+def progress_token_well_formed (tok : SessionId × Endpoint × Nat) : Prop :=
+  tok.1 = tok.2.1.sid ∧ tok.2.2 > 0
 
-def transfer_bundle_preserves {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def bundle_complete {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (b : ResourceBundle γ ε) : Prop :=
+  -- A complete bundle contains a live endpoint and coherent token/knowledge slices.
+  b.localType ≠ LocalType.end_ ∧
+  (∀ tok ∈ b.progressTokens, progress_token_well_formed tok) ∧
+  (∃ n, n > 0 ∧ (b.endpoint.sid, b.endpoint, n) ∈ b.progressTokens) ∧
+  (∀ k ∈ b.knowledge, k.endpoint.sid = b.endpoint.sid)
+
+def transfer_bundle_preserves {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
   -- Placeholder: bundle transfer preserves invariants.
   transfer_bundle γn b
 
-def WellTypedTransfer {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def WellTypedTransfer {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (b : ResourceBundle γ ε) : Prop :=
-  -- Placeholder: non-empty endpoint transfer check.
-  b.localType ≠ LocalType.end_
+  -- Well-typed transfer requires a complete ownership bundle.
+  bundle_complete b
 
-def transfer_continuation_typed {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def transfer_continuation_typed {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (b : ResourceBundle γ ε) : Prop :=
-  -- Placeholder: continuation exists if transfer is well-typed.
-  WellTypedTransfer b
+  -- Transfer continuation is meaningful when transfer is well-typed and actionable.
+  WellTypedTransfer b ∧ LocalType.targetRole? b.localType ≠ none
 
-def transfer_source_loses {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def transfer_source_loses {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
   -- Placeholder: source loses ownership implies re-establishing bundle ownership elsewhere.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
 
-structure ResourceTree (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure ResourceTree (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   root : ResourceBundle γ ε -- Root bundle for the tree.
   children : List (ResourceTree γ ε) -- Nested bundle transfers.
 
-def higher_order_transfer_preserves {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+def higher_order_transfer_preserves {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (_t : ResourceTree γ ε) : Prop :=
   -- Placeholder: higher-order transfer preserves ownership.
   True

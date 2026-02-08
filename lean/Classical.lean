@@ -1,4 +1,5 @@
 import Classical.Transport
+import Classical.SpectralGapTermination
 
 /-!
 # Classical Theorem Transport Layer

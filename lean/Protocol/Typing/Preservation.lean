@@ -153,10 +153,32 @@ private lemma lookupSEnv_update_append_neq
         lookupSEnv_append_right hL
       simpa [hRight'] using hRight
 
-private axiom lookupSEnv_SEnvAll_update_neq
+private lemma lookupSEnv_SEnvAll_update_neq
     {Ssh Sown S₂ : SEnv} {x y : Var} {T : ValType} (hxy : y ≠ x) :
     lookupSEnv (SEnvAll Ssh (updateSEnv Sown x T ++ S₂)) y =
       lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y
+    := by
+  simp only [SEnvAll]
+  cases hSh : lookupSEnv Ssh y with
+  | some Ty =>
+      have hLeft :
+          lookupSEnv (Ssh ++ (updateSEnv Sown x T ++ S₂)) y = some Ty :=
+        lookupSEnv_append_left hSh
+      have hRight : lookupSEnv (Ssh ++ (Sown ++ S₂)) y = some Ty :=
+        lookupSEnv_append_left hSh
+      simpa [hLeft, hRight]
+  | none =>
+      have hLeft :
+          lookupSEnv (Ssh ++ (updateSEnv Sown x T ++ S₂)) y =
+            lookupSEnv (updateSEnv Sown x T ++ S₂) y :=
+        lookupSEnv_append_right hSh
+      have hRight :
+          lookupSEnv (Ssh ++ (Sown ++ S₂)) y = lookupSEnv (Sown ++ S₂) y :=
+        lookupSEnv_append_right hSh
+      have hUpd :
+          lookupSEnv (updateSEnv Sown x T ++ S₂) y = lookupSEnv (Sown ++ S₂) y :=
+        lookupSEnv_update_append_neq (S₁:=Sown) (S₂:=S₂) (x:=x) (y:=y) (T:=T) hxy
+      simpa [hRight] using hLeft.trans hUpd
 
 private lemma lookupSEnv_comm_of_disjoint {S₁ S₂ : SEnv} (hDisj : DisjointS S₁ S₂) :
     ∀ x, lookupSEnv (S₁ ++ S₂) x = lookupSEnv (S₂ ++ S₁) x := by
@@ -621,7 +643,7 @@ theorem DisjointS_preserved_TypedStep_right
     exact DisjointS_preserved_TypedStep_right_par_right
       (split:=split) (hSlen:=hSlen) (hGlen:=hGlen) (ih:=ih) (hPre:=hPre) hDisj
 
-private theorem DisjointS_preserved_TypedStep_left
+theorem DisjointS_preserved_TypedStep_left
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sframe Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
@@ -866,6 +888,53 @@ private theorem StoreTypedStrong_recv_update
         (x:=x) (v:=v) (T:=T) hStore.typeCorr hv
     simpa [SEnvAll, updateSEnv_append_left hNone] using hST
 
+/-- Updating only `Sown.left` under a fixed shared/right prefix is lookup-equivalent
+    to updating the full combined environment at `x`. -/
+private theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
+    {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {x : Var} {T : ValType}
+    (hNoSh : lookupSEnv Ssh x = none)
+    (hNoRight : lookupSEnv Sown.right x = none) :
+    ∀ y,
+      lookupSEnv (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) y =
+      lookupSEnv (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) y := by
+  intro y
+  by_cases hxy : y = x
+  · subst y
+    have hPrefixNone : lookupSEnv (Ssh ++ Sown.right) x = none := by
+      have hAppend := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.right) (x:=x) hNoSh
+      simpa [hNoRight] using hAppend
+    have hTarget : lookupSEnv (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) x = some T := by
+      have hRight :
+          lookupSEnv
+            ((Ssh ++ Sown.right) ++ (updateSEnv Sown.left x T ++ S₂)) x =
+          lookupSEnv (updateSEnv Sown.left x T ++ S₂) x :=
+        lookupSEnv_append_right (S₁:=Ssh ++ Sown.right) (S₂:=updateSEnv Sown.left x T ++ S₂)
+          (x:=x) hPrefixNone
+      have hUpd : lookupSEnv (updateSEnv Sown.left x T) x = some T := by
+        simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
+      have hInner : lookupSEnv (updateSEnv Sown.left x T ++ S₂) x = some T :=
+        lookupSEnv_append_left hUpd
+      simpa [SEnvAll, OwnedEnv.updateLeft, List.append_assoc, hInner] using hRight
+    have hUpdate : lookupSEnv (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) x = some T := by
+      simpa using (lookupSEnv_update_eq (env:=SEnvAll Ssh (Sown ++ S₂)) (x:=x) (T:=T))
+    exact hTarget.trans hUpdate.symm
+  · have hTargetBase :
+      lookupSEnv (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) y =
+        lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y := by
+      have hInner :
+          lookupSEnv (SEnvAll (Ssh ++ Sown.right) (updateSEnv Sown.left x T ++ S₂)) y =
+            lookupSEnv (SEnvAll (Ssh ++ Sown.right) (Sown.left ++ S₂)) y :=
+        lookupSEnv_SEnvAll_update_neq (Ssh:=Ssh ++ Sown.right) (Sown:=Sown.left) (S₂:=S₂)
+          (x:=x) (y:=y) (T:=T) hxy
+      simpa [SEnvAll, OwnedEnv.updateLeft, OwnedEnv.frameLeft, List.append_assoc] using hInner
+    have hUpdateNe :
+        lookupSEnv (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) y =
+          lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y := by
+      simpa using
+        (lookupSEnv_update_neq (env:=SEnvAll Ssh (Sown ++ S₂)) (x:=x) (y:=y) (T:=T)
+          (Ne.symm hxy))
+    exact hTargetBase.trans hUpdateNe.symm
+
 /-- Frame: send updates G on the left under a right context. -/
 private theorem StoreTypedStrong_frame_send
     {G G₂ : GEnv} {Ssh Sown S₂ : SEnv} {store : VarStore}
@@ -918,24 +987,91 @@ private theorem StoreTypedStrong_frame_branch
   simpa [hGrew] using hStore'
 
 /-- Frame: assignment updates S on the left under a right context. -/
-private axiom StoreTypedStrong_frame_assign
+private theorem StoreTypedStrong_frame_assign
     {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : VarStore}
     {x : Var} {v : Value} {T : ValType} :
     StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store →
     lookupSEnv Ssh x = none →
+    lookupSEnv Sown.right x = none →
     HasTypeVal G v T →
-    StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v)
+    StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v) := by
+  intro hStore hNoSh hNoRight hv
+  have hvFrame : HasTypeVal (G ++ G₂) v T := by
+    apply HasTypeVal_mono G (G ++ G₂) v T hv
+    intro e L hLookup
+    exact lookupG_append_left hLookup
+  have hStrongWhole :
+      StoreTypedStrong (G ++ G₂)
+        (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) (updateStr store x v) := by
+    refine ⟨?_, ?_⟩
+    · exact StoreTypedStrong_sameDomain_update
+        (S:=SEnvAll Ssh (Sown ++ S₂)) (store:=store) (x:=x) (T:=T) (v:=v)
+          hStore.sameDomain
+    · exact StoreTyped_assign_preserved
+        (G:=G ++ G₂) (S:=SEnvAll Ssh (Sown ++ S₂)) (store:=store)
+        (x:=x) (v:=v) (T:=T) hStore.typeCorr hvFrame
+  exact StoreTypedStrong_rewriteS
+    (G:=G ++ G₂)
+    (S:=updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T)
+    (S':=SEnvAll Ssh (Sown.updateLeft x T ++ S₂))
+    (store:=updateStr store x v)
+    (by
+      intro y
+      symm
+      exact lookupSEnv_updateLeft_frame_eq_updateSEnv
+        (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂) (x:=x) (T:=T) hNoSh hNoRight y)
+    hStrongWhole
 
 /-- Frame: receive updates S and G on the left under a right context. -/
-private axiom StoreTypedStrong_frame_recv
+private theorem StoreTypedStrong_frame_recv
     {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : VarStore}
     {e : Endpoint} {source : Role} {L : LocalType} {x : Var} {v : Value} {T : ValType} :
     StoreTypedStrong (G ++ G₂) (SEnvAll Ssh (Sown ++ S₂)) store →
     lookupSEnv Ssh x = none →
+    lookupSEnv Sown.right x = none →
     HasTypeVal G v T →
     lookupG G e = some (.recv source T L) →
     StoreTypedStrong (updateG G e L ++ G₂)
-      (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v)
+      (SEnvAll Ssh (Sown.updateLeft x T ++ S₂)) (updateStr store x v) := by
+  intro hStore hNoSh hNoRight hv hG
+  have hvFrame : HasTypeVal (G ++ G₂) v T := by
+    apply HasTypeVal_mono G (G ++ G₂) v T hv
+    intro ep Lt hLookup
+    exact lookupG_append_left hLookup
+  have hStrongWhole :
+      StoreTypedStrong (updateG (G ++ G₂) e L)
+        (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) (updateStr store x v) := by
+    refine ⟨?_, ?_⟩
+    · exact StoreTypedStrong_sameDomain_update
+        (S:=SEnvAll Ssh (Sown ++ S₂)) (store:=store) (x:=x) (T:=T) (v:=v)
+          hStore.sameDomain
+    · exact StoreTyped_recv_preserved
+        (G:=G ++ G₂) (S:=SEnvAll Ssh (Sown ++ S₂)) (store:=store)
+        (e:=e) (L:=L) (x:=x) (v:=v) (T:=T) hStore.typeCorr hvFrame
+  have hGrew :
+      updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
+    updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.recv source T L) (L':=L) hG
+  have hStrongG :
+      StoreTypedStrong (updateG G e L ++ G₂)
+        (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) (updateStr store x v) := by
+    exact StoreTypedStrong_rewriteG
+      (G:=updateG (G ++ G₂) e L)
+      (G':=updateG G e L ++ G₂)
+      (S:=updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T)
+      (store:=updateStr store x v)
+      (by intro ep; simpa [hGrew])
+      hStrongWhole
+  exact StoreTypedStrong_rewriteS
+    (G:=updateG G e L ++ G₂)
+    (S:=updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T)
+    (S':=SEnvAll Ssh (Sown.updateLeft x T ++ S₂))
+    (store:=updateStr store x v)
+    (by
+      intro y
+      symm
+      exact lookupSEnv_updateLeft_frame_eq_updateSEnv
+        (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂) (x:=x) (T:=T) hNoSh hNoRight y)
+    hStrongG
 
 /-- Store typing is preserved by a framed TypedStep. -/
 private theorem StoreTypedStrong_preserved_frame_left
@@ -964,17 +1100,17 @@ private theorem StoreTypedStrong_preserved_frame_left
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       cases hPre with
-      | recv_new hk hG' hNoSh hNoOwn =>
+      | recv_new hk hG' hNoSh hNoRight hNoLeft =>
           have hStore' :=
             StoreTypedStrong_frame_recv (G:=G) (G₂:=G₂) (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂)
               (store:=store) (e:=e) (source:=source) (L:=L) (x:=x) (v:=v) (T:=T)
-              hStore hNoSh hv hG
+              hStore hNoSh hNoRight hv hG
           simpa [hGout, hSout, hStoreOut] using hStore'
-      | recv_old hk hG' hNoSh hOwn =>
+      | recv_old hk hG' hNoSh hNoRight hOwn =>
           have hStore' :=
             StoreTypedStrong_frame_recv (G:=G) (G₂:=G₂) (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂)
               (store:=store) (e:=e) (source:=source) (L:=L) (x:=x) (v:=v) (T:=T)
-              hStore hNoSh hv hG
+              hStore hNoSh hNoRight hv hG
           simpa [hGout, hSout, hStoreOut] using hStore'
   | select =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
@@ -1005,15 +1141,15 @@ private theorem StoreTypedStrong_preserved_frame_left
   | assign =>
       rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       cases hPre with
-      | assign_new hNoSh hNoOwn hvPre =>
+      | assign_new hNoSh hNoRight hNoOwn hvPre =>
           have hStore' :=
             StoreTypedStrong_frame_assign (G:=G) (G₂:=G₂) (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂)
-              (store:=store) (x:=x) (v:=v) hStore hNoSh hv
+              (store:=store) (x:=x) (v:=v) hStore hNoSh hNoRight hv
           simpa [hSout, hStoreOut] using hStore'
-      | assign_old hNoSh hOwn hvPre =>
+      | assign_old hNoSh hNoRight hOwn hvPre =>
           have hStore' :=
             StoreTypedStrong_frame_assign (G:=G) (G₂:=G₂) (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂)
-              (store:=store) (x:=x) (v:=v) hStore hNoSh hv
+              (store:=store) (x:=x) (v:=v) hStore hNoSh hNoRight hv
           simpa [hSout, hStoreOut] using hStore'
   | seq_step hTS ih =>
       cases hPre with

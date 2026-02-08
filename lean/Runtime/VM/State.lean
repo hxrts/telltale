@@ -91,14 +91,14 @@ inductive CoroStatus (γ : Type u) where
   | speculating
   deriving Repr
 
-structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
+structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   -- Per-coroutine execution state.
   id : CoroutineId
   programId : Nat
   pc : PC
   regs : RegFile
   status : CoroStatus γ
-  effectCtx : EffectModel.EffectCtx ε
+  effectCtx : EffectRuntime.EffectCtx ε
   ownedEndpoints : List Endpoint
   progressTokens : List ProgressToken
   knowledgeSet : KnowledgeSet
@@ -107,7 +107,7 @@ structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectModel ε] where
 
 /-! ## Execution results and events -/
 
-inductive ObsEvent (ε : Type u) [EffectModel ε] where
+inductive ObsEvent (ε : Type u) [EffectRuntime ε] where
   -- Observable events emitted by VM execution.
   | sent (edge : Edge) (val : Value) (seqNo : Nat)
   | received (edge : Edge) (val : Value) (seqNo : Nat)
@@ -115,7 +115,7 @@ inductive ObsEvent (ε : Type u) [EffectModel ε] where
   | chose (edge : Edge) (label : Label)
   | acquired (layer : LayerId) (endpoint : Endpoint)
   | released (layer : LayerId) (endpoint : Endpoint)
-  | invoked (endpoint : Endpoint) (action : EffectModel.EffectAction ε)
+  | invoked (endpoint : Endpoint) (action : EffectRuntime.EffectAction ε)
   | opened (sid : SessionId) (roles : RoleSet)
   | closed (sid : SessionId)
   | epochAdvanced (sid : SessionId) (epoch : Nat)
@@ -126,12 +126,12 @@ inductive ObsEvent (ε : Type u) [EffectModel ε] where
   | tagged (fact : KnowledgeFact)
   | checked (target : Role) (permitted : Bool)
 
-structure TickedObsEvent (ε : Type u) [EffectModel ε] where
+structure TickedObsEvent (ε : Type u) [EffectRuntime ε] where
   -- Observable event paired with a global or session-local tick.
   tick : Nat
   event : ObsEvent ε
 
-inductive StepEvent (ε : Type u) [EffectModel ε] where
+inductive StepEvent (ε : Type u) [EffectRuntime ε] where
   -- Step events are either observable or internal.
   | obs (ev : ObsEvent ε)
   | internal
@@ -139,7 +139,7 @@ inductive StepEvent (ε : Type u) [EffectModel ε] where
 /-! ## Trace helpers -/
 
 /-- Extract a session id from an observable event when present. -/
-def obsSid? {ε : Type u} [EffectModel ε] : ObsEvent ε → Option SessionId
+def obsSid? {ε : Type u} [EffectRuntime ε] : ObsEvent ε → Option SessionId
   | .sent edge _ _ => some edge.sid
   | .received edge _ _ => some edge.sid
   | .offered edge _ => some edge.sid
@@ -158,7 +158,7 @@ def obsSid? {ε : Type u} [EffectModel ε] : ObsEvent ε → Option SessionId
   | .checked _ _ => none
 
 /-- Filter observable events by session id. -/
-def filterBySid {ε : Type u} [EffectModel ε] (sid : SessionId)
+def filterBySid {ε : Type u} [EffectRuntime ε] (sid : SessionId)
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
   trace.filter (fun ev => obsSid? ev.event = some sid)
 
@@ -180,7 +180,7 @@ private def setTick (sid : SessionId) (t : Nat) (ticks : List (SessionId × Nat)
   go ticks
 
 /-- Normalize a VM trace by assigning session-local ticks. -/
-def normalizeVmTrace {ε : Type u} [EffectModel ε]
+def normalizeVmTrace {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
   let step :=
     fun (acc : List (TickedObsEvent ε) × List (SessionId × Nat)) (ev : TickedObsEvent ε) =>
@@ -196,11 +196,11 @@ def normalizeVmTrace {ε : Type u} [EffectModel ε]
 
 namespace Runtime.VM
 
-abbrev normalizeTrace {ε : Type u} [EffectModel ε]
+abbrev normalizeTrace {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
   normalizeVmTrace trace
 
-abbrev strictTrace {ε : Type u} [EffectModel ε]
+abbrev strictTrace {ε : Type u} [EffectRuntime ε]
     (trace : List (TickedObsEvent ε)) : List (TickedObsEvent ε) :=
   trace
 
@@ -221,7 +221,7 @@ inductive ExecStatus (γ : Type u) where
   | aborted
   deriving Repr
 
-structure ExecResult (γ ε : Type u) [EffectModel ε] where
+structure ExecResult (γ ε : Type u) [EffectRuntime ε] where
   -- Execution result with optional observable event.
   status : ExecStatus γ
   event : Option (StepEvent ε)
@@ -242,7 +242,7 @@ structure SchedState (γ : Type u) where
 /-! ## VM state -/
 
 structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -272,7 +272,7 @@ structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
 
 /-- Well-formedness: coroutine PCs are in range and sessions are bounded. -/
 def WFVMState {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

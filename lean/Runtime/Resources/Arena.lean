@@ -906,13 +906,13 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
         have hFoldUpd :
             List.foldl (fun acc p => acc ++ p.snd.localTypes) (st.updateType e L).localTypes tl =
               (st.updateType e L).localTypes ++ SessionStore.toGEnv tl := by
-          simpa [SessionStore.toGEnv] using
-            (GEnv_foldl_append_comm (G := (st.updateType e L).localTypes) (store := tl))
+          unfold SessionStore.toGEnv
+          exact GEnv_foldl_append_comm (G := (st.updateType e L).localTypes) (store := tl)
         have hFoldOrig :
             List.foldl (fun acc p => acc ++ p.snd.localTypes) st.localTypes tl =
               st.localTypes ++ SessionStore.toGEnv tl := by
-          simpa [SessionStore.toGEnv] using
-            (GEnv_foldl_append_comm (G := st.localTypes) (store := tl))
+          unfold SessionStore.toGEnv
+          exact GEnv_foldl_append_comm (G := st.localTypes) (store := tl)
         simp only [List.nil_append]
         rw [hFoldUpd, hFoldOrig]
         simp only [SessionState.updateType]
@@ -926,8 +926,8 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
               (L := L)
               (lookupG_updateG_eq (env := st.localTypes) (e := e) (L := L))
           have hRight : lookupG (updateG (st.localTypes ++ SessionStore.toGEnv tl) e L) e' = some L := by
-            simpa [he'] using
-              (lookupG_updateG_eq (env := st.localTypes ++ SessionStore.toGEnv tl) (e := e) (L := L))
+            rw [he']
+            exact lookupG_updateG_eq (env := st.localTypes ++ SessionStore.toGEnv tl) (e := e) (L := L)
           exact hLeft.trans hRight.symm
         · have hR :
             lookupG (updateG (st.localTypes ++ SessionStore.toGEnv tl) e L) e' =
@@ -977,13 +977,13 @@ theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} 
         have hFoldLeft :
             List.foldl (fun acc p => acc ++ p.snd.localTypes) st.localTypes (SessionStore.updateType tl e L) =
               st.localTypes ++ SessionStore.toGEnv (SessionStore.updateType tl e L) := by
-          simpa [SessionStore.toGEnv] using
-            (GEnv_foldl_append_comm (G := st.localTypes) (store := SessionStore.updateType tl e L))
+          unfold SessionStore.toGEnv
+          exact GEnv_foldl_append_comm (G := st.localTypes) (store := SessionStore.updateType tl e L)
         have hFoldOrig :
             List.foldl (fun acc p => acc ++ p.snd.localTypes) st.localTypes tl =
               st.localTypes ++ SessionStore.toGEnv tl := by
-          simpa [SessionStore.toGEnv] using
-            (GEnv_foldl_append_comm (G := st.localTypes) (store := tl))
+          unfold SessionStore.toGEnv
+          exact GEnv_foldl_append_comm (G := st.localTypes) (store := tl)
         simp only [List.nil_append]
         rw [hFoldLeft, hFoldOrig]
         rw [updateG_append_right (G1 := st.localTypes) (G2 := SessionStore.toGEnv tl) (e := e) (L := L) hNotMemLeft]
@@ -1225,7 +1225,7 @@ private theorem updateType_preserves_session_consistency {store : SessionStore �
   intro sid st hIn
   induction store with
   | nil =>
-      simpa [SessionStore.updateType] using hIn
+      simp [SessionStore.updateType] at hIn
   | cons hd tl ih =>
       obtain ⟨sid', st'⟩ := hd
       by_cases hsid : sid' = e.sid
@@ -1264,7 +1264,7 @@ private theorem updateTrace_preserves_session_consistency {store : SessionStore 
   intro sid st hIn
   induction store with
   | nil =>
-      simpa [SessionStore.updateTrace] using hIn
+      simp [SessionStore.updateTrace] at hIn
   | cons hd tl ih =>
       obtain ⟨sid', st'⟩ := hd
       by_cases hsid : sid' = edge.sid
@@ -1317,7 +1317,8 @@ theorem SessionStore.updateType_preserves_WFSessionStore {store : SessionStore �
       have hLookup' : SessionStore.lookupType (store.updateType e L) e' = some L := by
         simpa [he] using (SessionStore.lookupType_updateType_eq (store := store) (e := e) (L := L) hMem)
       have hRight : lookupG (updateG (SessionStore.toGEnv store) e L) e' = some L := by
-        simpa [he] using (lookupG_updateG_eq (env := SessionStore.toGEnv store) (e := e) (L := L))
+        rw [he]
+        exact lookupG_updateG_eq (env := SessionStore.toGEnv store) (e := e) (L := L)
       rw [hLookup']
       exact hBridge.trans hRight
     · -- e' ≠ e: both sides unchanged

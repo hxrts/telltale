@@ -25,7 +25,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- Value types for MPST (same as binary, but with LocalType for channels). -/
 inductive ValType where

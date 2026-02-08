@@ -153,8 +153,13 @@ mutual
   termination_by sizeOf bs
   decreasing_by
     all_goals simp_wf
-    all_goals simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
-    all_goals omega
+    -- sizeOf hd.2.2 < 1 + sizeOf hd + sizeOf tl = sizeOf (hd :: tl)
+    case _ =>
+      -- Destructure hd : BranchR = Label × Option ValType × LocalTypeR
+      obtain ⟨label, vt, cont⟩ := hd
+      exact sizeOf_cont_lt_sizeOf_branches label vt cont tl
+    -- 0 < 1 + sizeOf hd is trivial
+    case _ => omega
 end
 
 /-- notBoundAt is preserved through unfolding. -/

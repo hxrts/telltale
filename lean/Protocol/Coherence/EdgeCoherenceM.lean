@@ -15,7 +15,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- Coherence for a single directed edge under a delivery model. -/
 def EdgeCoherent (M : DeliveryModel) (G : GEnv) (D : DEnv) (e : Edge) : Prop :=

@@ -13,6 +13,8 @@ import Protocol.Coherence.Unified
 import Protocol.Coherence.RoleSwap
 import Protocol.Coherence.Delegation
 import Protocol.Coherence.ErasureCharacterization
+import Protocol.Coherence.Conserved
+import Protocol.Coherence.Minimality
 
 /-!
 # MPST Coherence

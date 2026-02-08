@@ -15,9 +15,9 @@ noncomputable section
 universe u
 
 variable [Telltale.TelltaleIris]
-variable {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+variable {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
 
-def wp_send_pipeline (layer : γ) (action : EffectModel.EffectAction ε) : iProp :=
+def wp_send_pipeline (layer : γ) (action : EffectRuntime.EffectAction ε) : iProp :=
   -- Placeholder: acquire + invoke + send via chained wp_pair rules.
   iProp.sep
     (wp_pair (acquirePair (γ:=γ) (ε:=ε) layer))

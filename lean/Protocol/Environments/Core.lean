@@ -24,7 +24,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Variables -/
 
@@ -1198,6 +1198,25 @@ theorem lookupSEnv_update_neq (env : SEnv) (x y : Var) (T : ValType) (hne : x �
         · simp [hy]
         · have hy' : (y == hd.1) = false := beq_eq_false_iff_ne.mpr hy
           simp [hy', ih]
+
+/-- When x is already in S₁, updateSEnv finds and replaces it before reaching S₂. -/
+theorem updateSEnv_append_left_of_mem {S₁ S₂ : SEnv} {x : Var} {T : ValType}
+    (h : ∃ T', lookupSEnv S₁ x = some T') :
+    updateSEnv (S₁ ++ S₂) x T = updateSEnv S₁ x T ++ S₂ := by
+  induction S₁ with
+  | nil => obtain ⟨_, hT'⟩ := h; simp [lookupSEnv] at hT'
+  | cons hd tl ih =>
+      by_cases heq : x = hd.1
+      · -- Found at head: replace and we're done
+        simp only [updateSEnv, heq, ↓reduceIte, List.cons_append]
+      · -- Not at head: recurse
+        simp only [updateSEnv, heq, ↓reduceIte, List.cons_append]
+        obtain ⟨T', hT'⟩ := h
+        have hT'' : lookupSEnv tl x = some T' := by
+          simp only [lookupSEnv, List.lookup] at hT'
+          have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr heq
+          simpa [hne] using hT'
+        rw [ih ⟨T', hT''⟩]
 
 theorem lookupG_update_eq (env : GEnv) (e : Endpoint) (L : LocalType) :
     lookupG (updateG env e L) e = some L := by

@@ -7,7 +7,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- Sender endpoint associated with an edge. -/
 def senderEndpoint (e : Edge) : Endpoint :=

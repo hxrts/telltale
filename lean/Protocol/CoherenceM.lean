@@ -1,7 +1,6 @@
 import Protocol.DeliveryModel
 import Protocol.Coherence.Consume
 import Protocol.Coherence.EdgeCoherenceM
-import Protocol.Coherence.HeadCoherenceM
 
 /-!
 # MPST Coherence (Model-Parametric)

@@ -20,13 +20,13 @@ The key theorem `projectable_of_wellFormedBlind` shows that if a global type is:
 
 Then it is projectable (every role has a valid CProject witness).
 
-This eliminates the `projectable_of_closed_wellFormed` axiom by adding the
+This eliminates the `projectable_of_closed_wellFormed` assumption by adding the
 decidable `isBlind` check to the well-formedness predicate.
 
 ## Status
 
 This file contains the proof structure and supporting lemmas needed to
-eliminate the projectability axiom, including uniformity and comm-case analysis.
+eliminate the projectability assumption, including uniformity and comm-case analysis.
 -/
 
 namespace Choreography.Projection.Blind
@@ -468,45 +468,71 @@ theorem projectb_trans_of_noSelfComm_blind (g : GlobalType) (role : String)
         -- projectb matches this exact shape
         have htrans : Trans.trans (GlobalType.delegate p q sid r cont) p =
             .send q [(⟨"_delegate", .unit⟩, some (.chan sid r), Trans.trans cont p)] := by
+          -- Compute the candidate projection for the delegator.
           simp [Trans.trans]
-        have hpeq : (role == p) = true := beq_self_eq_true.mpr hp
-        simp only [hp, htrans, projectb, hpeq, beq_self_eq_true, ↓reduceIte]
-        exact hcont_proj
+        have hcont_proj' : projectb cont p (Trans.trans cont p) = true := by
+          -- Specialize the IH to the delegator role.
+          simpa [hp] using hcont_proj
+        -- Reduce projectb to the continuation goal.
+        calc
+          projectb (GlobalType.delegate p q sid r cont) role
+              (Trans.trans (GlobalType.delegate p q sid r cont) role)
+              = projectb (GlobalType.delegate p q sid r cont) p
+                  (Trans.trans (GlobalType.delegate p q sid r cont) p) := by
+                    simp [hp]
+          _ = projectb cont p (Trans.trans cont p) := by
+                simp [projectb, htrans, reduceBEq]
+          _ = true := hcont_proj'
       · by_cases hq : role = q
         · -- Delegatee case: role = q
           -- trans gives .recv p [(_delegate, some (.chan sid r), trans cont role)]
           -- projectb matches this exact shape
+          have hqp : q ≠ p := by
+            -- Non-participation on p follows from the outer case split.
+            intro hqp
+            apply hp
+            simp [hq, hqp]
+          have hpne : (q == p) = false := by
+            simpa [beq_eq_false_iff_ne, ne_eq] using hqp
           have htrans : Trans.trans (GlobalType.delegate p q sid r cont) q =
               .recv p [(⟨"_delegate", .unit⟩, some (.chan sid r), Trans.trans cont q)] := by
-            have hne : (q == p) = false := by
-              simp only [beq_eq_false_iff_ne, ne_eq]
-              intro heq
-              subst heq
-              exact hp rfl
-            simp [Trans.trans, hne]
-          have hqeq : (role == q) = true := beq_self_eq_true.mpr hq
-          have hpne : (role == p) = false := by
-            simp only [beq_eq_false_iff_ne, ne_eq]
-            exact hp
-          simp only [hq, htrans, projectb, hpne, Bool.false_eq_true, ↓reduceIte, hqeq,
-            beq_self_eq_true]
-          exact hcont_proj
+            -- Compute the candidate projection for the delegatee.
+            simp [Trans.trans, hpne]
+          have hcont_proj' : projectb cont q (Trans.trans cont q) = true := by
+            -- Specialize the IH to the delegatee role.
+            simpa [hq] using hcont_proj
+          have hrole_p' : (q == p) = false := by
+            -- Convert role inequality into BEq for the delegatee.
+            simpa [beq_eq_false_iff_ne, ne_eq] using hqp
+          -- Reduce projectb to the continuation goal.
+          calc
+          projectb (GlobalType.delegate p q sid r cont) role
+              (Trans.trans (GlobalType.delegate p q sid r cont) role)
+              = projectb (GlobalType.delegate p q sid r cont) q
+                  (Trans.trans (GlobalType.delegate p q sid r cont) q) := by
+                      simp [hq]
+          _ = projectb cont q (Trans.trans cont q) := by
+                  simp [projectb, htrans, hrole_p', reduceBEq]
+          _ = true := hcont_proj'
         · -- Non-participant case: role ≠ p, role ≠ q
           -- trans gives trans cont role, projectb does projectb cont role cand
+          have hpne : (role == p) = false := by
+            simpa [beq_eq_false_iff_ne, ne_eq] using hp
+          have hqne : (role == q) = false := by
+            simpa [beq_eq_false_iff_ne, ne_eq] using hq
           have htrans : Trans.trans (GlobalType.delegate p q sid r cont) role =
               Trans.trans cont role := by
-            have hpne : (role == p) = false := by
-              simp only [beq_eq_false_iff_ne, ne_eq]; exact hp
-            have hqne : (role == q) = false := by
-              simp only [beq_eq_false_iff_ne, ne_eq]; exact hq
+            -- Compute the candidate projection for a non-participant.
             simp [Trans.trans, hpne, hqne]
-          simp only [htrans, projectb]
-          have hpne : (role == p) = false := by
-            simp only [beq_eq_false_iff_ne, ne_eq]; exact hp
-          have hqne : (role == q) = false := by
-            simp only [beq_eq_false_iff_ne, ne_eq]; exact hq
-          simp only [hpne, Bool.false_eq_true, ↓reduceIte, hqne]
-          exact hcont_proj
+          -- Reduce projectb to the continuation goal.
+          calc
+            projectb (GlobalType.delegate p q sid r cont) role
+                (Trans.trans (GlobalType.delegate p q sid r cont) role)
+                = projectb cont role (Trans.trans cont role) := by
+                    -- Unfold only the LHS and pick the non-participant branch.
+                    conv_lhs => unfold Choreography.Projection.Projectb.projectb
+                    simp [hpne, hqne, htrans]
+            _ = true := hcont_proj
 termination_by g
 decreasing_by
   all_goals
@@ -537,7 +563,7 @@ theorem projectb_trans_of_wellFormedBlind (g : GlobalType) (role : String)
     projectb g role (Trans.trans g role) = true :=
   projectb_trans_of_noSelfComm_blind g role (noSelfComm_of_wellFormed g hwf) hblind
 
-/-- Projectable from WellFormedBlind: eliminates the axiom.
+/-- Projectable from WellFormedBlind: removes the extra postulate.
 
     If a global type is closed, well-formed, and blind, then it is projectable. -/
 theorem projectable_of_wellFormedBlind (g : GlobalType)

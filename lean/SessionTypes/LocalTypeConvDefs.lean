@@ -145,10 +145,9 @@ open SessionTypes
 
 /-! ## Safe Conversions with Option
 
-The previous `fromDB` was total but could generate synthetic variable names for
-out-of-bounds indices. We now provide both:
-- `fromDB?` - Safe version that returns `None` for out-of-bounds indices
-- `fromDB` - Unsafe version kept for backward compatibility (generates synthetic names)
+We provide two safe entry points:
+- `fromDB?` - returns `None` for out-of-bounds indices
+- `fromDB` - total, but requires a closedness proof (no unchecked names)
 -/
 
 mutual
@@ -180,30 +179,52 @@ mutual
 end
 
 mutual
-  /-- Unsafe conversion (backward compatibility): generates synthetic names for out-of-bounds indices.
-
-  **Warning**: This function is unsafe and should only be used when you can guarantee that all
-  indices are in bounds (e.g., for closed terms with empty context, or when the context is known
-  to be adequate). Prefer `fromDB?` for new code. -/
-  def fromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
-      SessionTypes.LocalTypeDB → LocalTypeR
-    | .end => LocalTypeR.end
-    | .var n =>
-        match SessionTypes.LocalTypeConv.NameContext.get? ctx n with
-        | some v => LocalTypeR.var v
-        | none => LocalTypeR.var ("_UNSAFE_db" ++ toString n)  -- Mark as unsafe
-    | .send p bs => LocalTypeR.send p (branchesFromDB ctx bs)
-    | .recv p bs => LocalTypeR.recv p (branchesFromDB ctx bs)
-    | .mu body =>
+  /-- Total conversion from DB to named terms, requiring closedness at the given depth. -/
+  noncomputable def fromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
+      (t : SessionTypes.LocalTypeDB) →
+      t.isClosedAt ctx.length = true →
+      LocalTypeR
+    | .end, _ => LocalTypeR.end
+    | .var n, hclosed =>
+        by
+          classical
+          -- Closedness ensures the index is in bounds.
+          have hlt : n < ctx.length := by
+            simpa [SessionTypes.LocalTypeDB.isClosedAt] using hclosed
+          have hsome : ∃ v, SessionTypes.NameOnlyContext.get? ctx n = some v :=
+            SessionTypes.NameOnlyContext.get?_lt (ctx := ctx) (i := n) hlt
+          exact LocalTypeR.var (Classical.choose hsome)
+    | .send p bs, hclosed =>
+        have hclosed' : isClosedAtBranches ctx.length bs = true := by
+          simpa [SessionTypes.LocalTypeDB.isClosedAt] using hclosed
+        LocalTypeR.send p (branchesFromDB ctx bs hclosed')
+    | .recv p bs, hclosed =>
+        have hclosed' : isClosedAtBranches ctx.length bs = true := by
+          simpa [SessionTypes.LocalTypeDB.isClosedAt] using hclosed
+        LocalTypeR.recv p (branchesFromDB ctx bs hclosed')
+    | .mu body, hclosed =>
         let fresh := SessionTypes.LocalTypeConv.NameContext.freshName ctx
-        LocalTypeR.mu fresh (body.fromDB (NameOnlyContext.cons fresh ctx))
+        have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
+          simpa [SessionTypes.LocalTypeDB.isClosedAt] using hclosed
+        have hclosed'' :
+            body.isClosedAt (NameOnlyContext.cons fresh ctx).length = true := by
+          simp [NameOnlyContext.cons_length, hclosed']
+        LocalTypeR.mu fresh (fromDB (NameOnlyContext.cons fresh ctx) body hclosed'')
   termination_by
     t => sizeOf t
 
-  def branchesFromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
-      List (Label × SessionTypes.LocalTypeDB) → List BranchR
-    | [] => []
-    | (l, t) :: rest => (l, none, t.fromDB ctx) :: branchesFromDB ctx rest
+  noncomputable def branchesFromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
+      (bs : List (Label × SessionTypes.LocalTypeDB)) →
+      isClosedAtBranches ctx.length bs = true →
+      List BranchR
+    | [], _ => []
+    | (l, t) :: rest, hclosed =>
+        have hclosed' :
+            t.isClosedAt ctx.length = true ∧
+            isClosedAtBranches ctx.length rest = true := by
+          simpa [isClosedAtBranches] using hclosed
+        (l, none, fromDB ctx t hclosed'.1) ::
+          branchesFromDB ctx rest hclosed'.2
   termination_by
     bs => sizeOf bs
 end

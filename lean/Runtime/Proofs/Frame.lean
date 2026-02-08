@@ -1,4 +1,6 @@
 import Runtime.Proofs.SessionLocal
+import Runtime.VM.InstrSpec
+import Runtime.VM.LoadChoreography
 
 /-!
 # Frame Rule and Cross-Session Diamond
@@ -41,7 +43,7 @@ set_option relaxedAutoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 universe u
 
@@ -112,27 +114,98 @@ theorem disjoint_sessions_independent {s₁ s₂ : SessionId}
   rw [VMCoherent_iff_forall_SessionCoherent] at hCoh
   exact ⟨hCoh s₁, hCoh s₂⟩
 
-/-! ## Placeholder for VM-Level Proofs
+/-! ## VM-Level Footprint and Frame Interfaces -/
 
-Once the Store name collision is resolved, the following will be connected:
+/-- Primary endpoint hint for a coroutine: use the first owned endpoint when present. -/
+def coroutinePrimaryEndpoint? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (coro : CoroutineState γ ε) : Option Endpoint :=
+  coro.ownedEndpoints.head?
 
-1. `instrFootprint : Instr → CoroutineState → Set SessionId`
-2. `instr_frame`: instructions preserve SessionCoherent for sessions outside footprint
-3. `cross_session_diamond_from_frame`: disjoint footprints commute
+/-- VM instruction footprint derived from `InstrSpec.instrFootprint`.
 
-The proofs will follow the same pattern as `session_local_op_preserves_other`:
-- Show each instruction type only modifies G/D for its footprint sessions
-- Apply the frame rule to get commutativity
--/
+For most instructions we use the coroutine's primary endpoint session.
+For `acquire`, we conservatively include a second session via `some ep.sid`
+to model footprint growth hooks at the interface level. -/
+def vmInstrFootprint {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (instr : Instr γ ε) (coro : CoroutineState γ ε) : Set SessionId :=
+  match coroutinePrimaryEndpoint? coro with
+  | none => (∅ : Set SessionId)
+  | some ep =>
+      match instr with
+      | .acquire _ _ => instrFootprint ep (some ep.sid)
+      | _ => instrFootprint ep none
 
-/-- Stub for VM-level instruction frame property.
-    TODO: Connect once Store collision is resolved. -/
-def vm_instr_frame_stub : Prop :=
-  True  -- Placeholder
+/-- Session coherence projected from VM state session store. -/
+def vmSessionCoherent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (s : SessionId) : Prop :=
+  SessionCoherent (SessionStore.toGEnv st.sessions) (SessionStore.toDEnv st.sessions) s
 
-/-- Stub for VM-level cross-session diamond.
-    TODO: Connect once Store collision is resolved. -/
-def vm_cross_session_diamond_stub : Prop :=
-  True  -- Placeholder
+/-- Abstract one-instruction VM step relation indexed by the decoded instruction. -/
+abbrev VMInstrStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] :=
+  VMState ι γ π ε ν → CoroutineId → Instr γ ε → VMState ι γ π ε ν → Prop
+
+/-- Frame contract: stepping an instruction preserves coherence for sessions
+outside that instruction's footprint. -/
+def instruction_frame {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (step : VMInstrStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) : Prop :=
+  ∀ {st st' : VMState ι γ π ε ν} {cid : CoroutineId}
+    {instr : Instr γ ε} {coro : CoroutineState γ ε} {s : SessionId},
+    st.coroutines[cid]? = some coro →
+    step st cid instr st' →
+    s ∉ vmInstrFootprint instr coro →
+    vmSessionCoherent st s →
+    vmSessionCoherent st' s
+
+/-- Cross-order frame consequence for two steps with disjoint ownership scopes:
+if a session is outside both instruction footprints, coherence for that session
+is preserved in both execution orders. -/
+theorem cross_session_diamond_from_frame {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    {step : VMInstrStep (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)}
+    (hFrame : instruction_frame (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) step)
+    {st st1 st2 st12 st21 : VMState ι γ π ε ν}
+    {c1 c2 : CoroutineId}
+    {i1 i2 : Instr γ ε}
+    {co1 co2 : CoroutineState γ ε}
+    (hCo1 : st.coroutines[c1]? = some co1)
+    (hCo2 : st.coroutines[c2]? = some co2)
+    (hStep1 : step st c1 i1 st1)
+    (hStep2 : step st c2 i2 st2)
+    (hCo2After1 : st1.coroutines[c2]? = some co2)
+    (hCo1After2 : st2.coroutines[c1]? = some co1)
+    (hStep2After1 : step st1 c2 i2 st12)
+    (hStep1After2 : step st2 c1 i1 st21)
+    (_hDisj : Disjoint (vmInstrFootprint i1 co1) (vmInstrFootprint i2 co2))
+    {s : SessionId}
+    (hOut1 : s ∉ vmInstrFootprint i1 co1)
+    (hOut2 : s ∉ vmInstrFootprint i2 co2)
+    (hCoh : vmSessionCoherent st s) :
+    vmSessionCoherent st12 s ∧ vmSessionCoherent st21 s := by
+  constructor
+  · have hCoh1 : vmSessionCoherent st1 s :=
+      hFrame hCo1 hStep1 hOut1 hCoh
+    exact hFrame hCo2After1 hStep2After1 hOut2 hCoh1
+  · have hCoh2 : vmSessionCoherent st2 s :=
+      hFrame hCo2 hStep2 hOut2 hCoh
+    exact hFrame hCo1After2 hStep1After2 hOut1 hCoh2
 
 end

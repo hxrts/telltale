@@ -33,7 +33,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Guarded Predicate -/
 

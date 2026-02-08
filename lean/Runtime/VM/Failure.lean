@@ -57,7 +57,7 @@ def ParticipantSurvives {ι : Type u} [IdentityModel ι]
 /-! ## Failure-aware step relation -/
 
 def crashSite {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -71,7 +71,7 @@ def crashSite {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     else { st with crashedSites := _site :: st.crashedSites }
 
 def disconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -82,7 +82,7 @@ def disconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   { st with partitionedEdges := added ++ st.partitionedEdges }
 
 def reconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -93,7 +93,7 @@ def reconnectEdges {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   { st with partitionedEdges := remaining }
 
 def closeSession {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -111,7 +111,7 @@ def closeSession {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   { st with sessions := closeStore st.sessions }
 
 inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -133,7 +133,7 @@ inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 /-! ## Recovery predicates -/
 
 def SessionCoherent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -143,7 +143,7 @@ def SessionCoherent {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   ∃ stSess, (_sid, stSess) ∈ _st.sessions ∧ stSess.phase ≠ .closed
 
 def FStarDrain {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -159,7 +159,7 @@ def FStarDrain {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     stSess.phase = .closed → stSess.buffers = [] ∧ stSess.traces = (∅ : DEnv))
 
 def Recoverable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -170,7 +170,7 @@ def Recoverable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   ∃ st', FStarDrain st st' ∧ SessionCoherent st' sid
 
 def SiteParticipates {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -181,7 +181,7 @@ def SiteParticipates {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   SessionCoherent _st _sid ∧ _site ∉ _st.crashedSites
 
 def Participates {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -192,7 +192,7 @@ def Participates {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   ∃ s ∈ IdentityModel.sites _p, SiteParticipates _st s _sid
 
 def CanResume {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -203,7 +203,7 @@ def CanResume {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   ParticipantSurvives _st.crashedSites _p ∧ Participates _st _p _sid
 
 def crash_nonparticipant_preserves {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -216,7 +216,7 @@ def crash_nonparticipant_preserves {ι γ π ε ν : Type u} [IdentityModel ι] 
     SessionCoherent (crashSite _st _site) _sid
 
 def participant_failover {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -227,7 +227,7 @@ def participant_failover {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
   ParticipantSurvives _st.crashedSites _p ∧ _site ∈ IdentityModel.sites _p
 
 def crash_close_safe {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

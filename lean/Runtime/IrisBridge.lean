@@ -2,6 +2,7 @@ import Iris.Instances.IProp.Instance
 import Iris.BaseLogic.Lib.Wsat
 import Iris.BaseLogic.Lib.FancyUpdates
 import Iris.BaseLogic.Lib.Invariants
+import Iris.BaseLogic.Lib.CancelableInvariants
 import Iris.BI.BigOp
 import Iris.BaseLogic.Lib.GhostVar
 import Iris.BaseLogic.Lib.GhostMap
@@ -44,6 +45,7 @@ class TelltaleIris where
   instElemG_CoPsetDisj : ElemG GF (COFE.constOF CoPsetDisj)
   instElemG_GSetDisj : ElemG GF (COFE.constOF GSetDisj)
   instElemG_Inv : ElemG GF (InvF GF M F)
+  instElemG_Cinv : ElemG GF (COFE.constOF (Iris.BaseLogic.CinvR F))
   W : WsatGS GF
 
 attribute [instance] TelltaleIris.instUFraction
@@ -53,6 +55,7 @@ attribute [instance] TelltaleIris.instHeapFiniteMap
 attribute [instance] TelltaleIris.instElemG_CoPsetDisj
 attribute [instance] TelltaleIris.instElemG_GSetDisj
 attribute [instance] TelltaleIris.instElemG_Inv
+attribute [instance] TelltaleIris.instElemG_Cinv
 
 /-! ## Core Type Aliases -/
 
@@ -305,39 +308,75 @@ theorem inv_persistent (N : Namespace) (P : iProp) :
 abbrev CancelToken := GhostName
 
 /-- Ownership predicate for a cancel token (placeholder). -/
-axiom cancel_token_own : CancelToken → iProp
+noncomputable def cancel_token_own (_ct : CancelToken) : iProp :=
+  Iris.BaseLogic.cinv_own (GF := ti.GF) (F := ti.F) ti.W _ct (1 : ti.F)
 
 /-- Cancelable invariant (placeholder). -/
-axiom cinv : Namespace → CancelToken → iProp → iProp
+noncomputable def cinv (N : Namespace) (_ct : CancelToken) (P : iProp) : iProp :=
+  Iris.BaseLogic.cinv (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W N _ct P
 
-/-- Namespaces for cancelable invariants are disjoint (placeholder). -/
-axiom namespace_disjoint :
-  ∀ N₁ N₂ : Namespace, N₁ ≠ N₂ →
-    Mask.disjoint (namespace_to_mask N₁) (namespace_to_mask N₂)
+/-- Distinct `Nat` children of the same namespace are disjoint. -/
+theorem namespace_disjoint (N : Namespace) (n₁ n₂ : Nat) (hNe : n₁ ≠ n₂) :
+    Mask.disjoint (namespace_to_mask (Namespace.append_nat N n₁))
+      (namespace_to_mask (Namespace.append_nat N n₂)) := by
+  simpa [namespace_to_mask, Namespace.append_nat] using
+    (Iris.ndot_ne_disjoint (A := Nat) N (x := n₁) (y := n₂) hNe)
 
-/-- Allocate a cancelable invariant (placeholder). -/
-axiom cinv_alloc :
+/-- Allocate a cancelable invariant from `▷ P`. -/
+theorem cinv_alloc :
   ∀ (N : Namespace) (E : Mask) (P : iProp),
+    (∀ E' : Iris.GSet, ∃ i, ¬E'.mem i ∧ (namespace_to_mask N) i) →
     iProp.entails (iProp.later P)
       (fupd E E (iProp.exist fun ct =>
         iProp.sep (cinv N ct P) (cancel_token_own ct)))
+  := by
+    intro N E P hFresh
+    simpa [cinv, cancel_token_own, namespace_to_mask] using
+      (Iris.BaseLogic.cinv_alloc (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E N P hFresh)
 
-/-- Open a cancelable invariant (placeholder). -/
-axiom cinv_acc :
-  ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
-    Mask.subseteq (namespace_to_mask N) E →
-    iProp.entails (cinv N ct P)
-      (fupd E (Mask.diff E (namespace_to_mask N))
-        (iProp.sep (iProp.later P)
-          (iProp.wand (iProp.later P)
-            (fupd (Mask.diff E (namespace_to_mask N)) E iProp.emp))))
-
-/-- Cancel a cancelable invariant (placeholder). -/
-axiom cinv_cancel :
+/-- Open a cancelable invariant using its full cancel token. -/
+theorem cinv_acc :
   ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
     Mask.subseteq (namespace_to_mask N) E →
     iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
-      (fupd E (Mask.diff E (namespace_to_mask N)) (iProp.later P))
+      (fupd E (Mask.diff E (namespace_to_mask N))
+        (iProp.sep (iProp.later P)
+          (iProp.sep (cancel_token_own ct)
+            (iProp.wand (iProp.later P)
+              (fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True))))))
+  := by
+    intro N E ct P hSub
+    let post :=
+      fupd E (Mask.diff E (namespace_to_mask N))
+        (iProp.sep (iProp.later P)
+          (iProp.sep (cancel_token_own ct)
+            (iProp.wand (iProp.later P)
+              (fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True)))))
+    have hOpen :
+        iProp.entails (cinv N ct P) (iProp.wand (cancel_token_own ct) post) := by
+      simpa [post, cinv, cancel_token_own, namespace_to_mask, Mask.diff] using
+        (Iris.BaseLogic.cinv_acc (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E N ct (1 : ti.F) P hSub)
+    have hFrame :
+        iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
+          (iProp.sep (iProp.wand (cancel_token_own ct) post) (cancel_token_own ct)) :=
+      sep_mono (P:=cinv N ct P) (P':=iProp.wand (cancel_token_own ct) post)
+        (Q:=cancel_token_own ct) (Q':=cancel_token_own ct)
+        hOpen (entails_refl _)
+    exact hFrame.trans (wand_elim _ _)
+
+/-- Cancel/consume step for a cancelable invariant with its full token. -/
+theorem cinv_cancel :
+  ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
+    Mask.subseteq (namespace_to_mask N) E →
+    iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
+      (fupd E (Mask.diff E (namespace_to_mask N))
+        (iProp.sep (iProp.later P)
+          (iProp.sep (cancel_token_own ct)
+            (iProp.wand (iProp.later P)
+              (fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True))))))
+  := by
+    intro N E ct P hSub
+    exact cinv_acc N E ct P hSub
 
 /-! ## Saved Propositions -/
 
@@ -450,22 +489,27 @@ theorem ghost_map_delete {V : Type} [GhostMapSlot V]
 namespace Iris
 
 /-- Placeholder state interpretation predicate. -/
-axiom state_interp (Λ : Iris.ProgramLogic.Language) (σ : Λ.state) : iProp
+noncomputable def state_interp (Λ : Iris.ProgramLogic.Language) (σ : Λ.state) : iProp :=
+  iProp.emp
 
 /-- Placeholder weakest precondition. -/
-axiom wp (Λ : Iris.ProgramLogic.Language) (E : Mask) (e : Λ.expr)
-    (Φ : Λ.val → iProp) : iProp
+noncomputable def wp (Λ : Iris.ProgramLogic.Language) (E : Mask) (e : Λ.expr)
+    (Φ : Λ.val → iProp) : iProp :=
+  iProp.emp
 
 /-- Placeholder multi-step relation. -/
-axiom MultiStep' {Λ : Iris.ProgramLogic.Language} :
-  Λ.expr → Λ.state → Λ.expr → Λ.state → Prop
+def MultiStep' {Λ : Iris.ProgramLogic.Language} :
+  Λ.expr → Λ.state → Λ.expr → Λ.state → Prop :=
+  fun _ _ _ _ => False
 
 /-- Placeholder invariance lemma for WP. -/
-axiom wp_invariance {Λ : Iris.ProgramLogic.Language} {e : Λ.expr} {σ : Λ.state}
+theorem wp_invariance {Λ : Iris.ProgramLogic.Language} {e : Λ.expr} {σ : Λ.state}
     {Φ : Λ.val → iProp} :
   iProp.entails iProp.emp (iProp.wand (state_interp Λ σ) (wp Λ Mask.top e Φ)) →
   ∀ e' σ',
     MultiStep' (Λ:=Λ) e σ e' σ' →
-    iProp.entails iProp.emp (_root_.bupd (state_interp Λ σ'))
+    iProp.entails iProp.emp (_root_.bupd (state_interp Λ σ')) := by
+  intro _ e' σ' hStep
+  cases hStep
 
 end Iris

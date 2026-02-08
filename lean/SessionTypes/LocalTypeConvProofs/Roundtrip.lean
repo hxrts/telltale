@@ -25,20 +25,22 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
     (hnodup : ctx.Nodup)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt ctx.length = true) :
-    (t.fromDB ctx).toDB? ctx = some t := by
+    (t.fromDB ctx hclosed).toDB? ctx = some t := by
   let P1 : LocalTypeDB → Prop :=
     fun t =>
       ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
-        t.isClosedAt ctx.length = true → (t.fromDB ctx).toDB? ctx = some t
+        (hclosed : t.isClosedAt ctx.length = true) →
+          (t.fromDB ctx hclosed).toDB? ctx = some t
   let P2 : List (Label × LocalTypeDB) → Prop :=
     fun bs =>
       ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
-        isClosedAtBranches ctx.length bs = true →
-          LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs) = some bs
+        (hclosed : isClosedAtBranches ctx.length bs = true) →
+          LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs
   let P3 : Label × LocalTypeDB → Prop :=
     fun b =>
       ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
-        b.2.isClosedAt ctx.length = true → (b.2.fromDB ctx).toDB? ctx = some b.2
+        (hclosed : b.2.isClosedAt ctx.length = true) →
+          (b.2.fromDB ctx hclosed).toDB? ctx = some b.2
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
@@ -49,9 +51,11 @@ theorem toDB_fromDB_roundtrip (t : LocalTypeDB) (ctx : NameContext)
         simpa [LocalTypeDB.isClosedAt] using hclosed
       obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
       have hidx : Context.indexOf ctx v = some n := get_indexOf_roundtrip ctx n v hnodup hget
-      simp only [LocalTypeDB.fromDB, LocalTypeR.toDB?, hget]
+      have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v :=
+        fromDB_var_of_get ctx n hclosed v hget
+      simp [hfrom, LocalTypeR.toDB?]
       rw [Context.indexOf_eq] at hidx
-      simp only [hidx, Option.map]
+      simp [hidx]
     · intro p bs hbs ctx hnodup hfreshAll hclosed
       have hclosed' : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
@@ -87,7 +91,7 @@ theorem branches_toDB_fromDB_roundtrip (bs : List (Label × LocalTypeDB)) (ctx :
     (hnodup : ctx.Nodup)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
-    LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs) = some bs := by
+    LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs := by
   induction bs with
   | nil => simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?]
   | cons hd tl ih =>
@@ -114,9 +118,11 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
           db.isGuarded (i + pref.length + 1) = true
   let P2 : List BranchR → Prop := fun _ => True
   let P3 : BranchR → Prop := fun _ => True
+  let P4 : Option ValType × LocalTypeR → Prop := fun _ => True
   have hrec : P1 t := by
-    refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
-      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    refine (LocalTypeR.LocalTypeR.rec
+      (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
     · intro pref ctx i db hidx hdb
       simp [LocalTypeR.toDB?] at hdb
       cases hdb
@@ -196,6 +202,8 @@ theorem isGuarded_toDB_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x 
       exact True.intro
     · intro _ _ _
       exact True.intro
+    · intro _ _ _
+      exact True.intro
   exact hrec pref ctx i db hidx hdb
 
 theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (db : LocalTypeDB) :
@@ -213,9 +221,11 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
           db.isGuarded i = true
   let P2 : List BranchR → Prop := fun _ => True
   let P3 : BranchR → Prop := fun _ => True
+  let P4 : Option ValType × LocalTypeR → Prop := fun _ => True
   have hrec : P1 t := by
-    refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
-      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    refine (LocalTypeR.LocalTypeR.rec
+      (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
     · intro ctx x i db hguard hidx hdb
       simp [LocalTypeR.toDB?] at hdb
       cases hdb
@@ -291,6 +301,8 @@ theorem isGuarded_toDB (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat) (
       exact True.intro
     · intro _ _ _
       exact True.intro
+    · intro _ _ _
+      exact True.intro
   exact hrec ctx x i db hguard hidx hdb
 
 theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
@@ -309,9 +321,13 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
   let P3 : BranchR → Prop :=
     fun b =>
       ∀ ctx db, b.2.2.isContractive = true → b.2.2.toDB? ctx = some db → db.isContractive = true
+  let P4 : Option ValType × LocalTypeR → Prop :=
+    fun b =>
+      ∀ ctx db, b.2.isContractive = true → b.2.toDB? ctx = some db → db.isContractive = true
   have hrec : P1 t := by
-    refine (LocalTypeR.LocalTypeR.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
-      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
+    refine (LocalTypeR.LocalTypeR.rec
+      (motive_1 := P1) (motive_2 := P2) (motive_3 := P3) (motive_4 := P4)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
     · intro ctx db hcontr hdb
       simp [LocalTypeR.toDB?] at hdb
       cases hdb
@@ -390,6 +406,8 @@ theorem isContractive_toDB (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
               simp [isContractiveBranches, ht, htl]
     · intro fst snd hsnd ctx db hcontr hdb
       exact hsnd ctx db hcontr hdb
+    · intro fst snd hsnd
+      exact hsnd
   exact hrec ctx db hcontr hdb
 
 /-! ## Contractiveness preservation for fromDB -/
@@ -399,15 +417,15 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
     (huniq : ∀ j, NameContext.get? ctx j = some v → j = i)
     (hclosed : t.isClosedAt ctx.length = true)
     (hguard : t.isGuarded i = true) :
-    (t.fromDB ctx).isGuarded v = true := by
+    (t.fromDB ctx hclosed).isGuarded v = true := by
   let P1 : LocalTypeDB → Prop :=
     fun t =>
       ∀ ctx i v,
         NameContext.get? ctx i = some v →
         (∀ j, NameContext.get? ctx j = some v → j = i) →
-        t.isClosedAt ctx.length = true →
+        (hclosed : t.isClosedAt ctx.length = true) →
         t.isGuarded i = true →
-          (t.fromDB ctx).isGuarded v = true
+          (t.fromDB ctx hclosed).isGuarded v = true
   let P2 : List (Label × LocalTypeDB) → Prop := fun _ => True
   let P3 : Label × LocalTypeDB → Prop := fun _ => True
   have hrec : P1 t := by
@@ -426,7 +444,9 @@ lemma isGuarded_fromDB_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : S
         intro hvw
         have hidx := huniq n (by simpa [hvw] using hgetn)
         exact hne hidx
-      simp [LocalTypeDB.fromDB, hgetn, LocalTypeR.isGuarded, hwne]
+      have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var w :=
+        fromDB_var_of_get ctx n hclosed w hgetn
+      simp [hfrom, LocalTypeR.isGuarded, hwne]
     · intro p bs hbs ctx i v hget huniq hclosed hguard
       simp [LocalTypeDB.fromDB, LocalTypeR.isGuarded]
     · intro p bs hbs ctx i v hget huniq hclosed hguard
@@ -469,7 +489,9 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
     (hclosed : t.isClosedAt (ctx.length + 1) = true)
     (hguard : t.isGuarded 0 = true) :
-    (t.fromDB (NameOnlyContext.cons (NameContext.freshName ctx) ctx)).isGuarded (NameContext.freshName ctx) = true := by
+    (t.fromDB (NameOnlyContext.cons (NameContext.freshName ctx) ctx) (by
+      simpa [NameOnlyContext.cons_length] using hclosed)).isGuarded
+        (NameContext.freshName ctx) = true := by
   let fresh := NameContext.freshName ctx
   let ctx' := NameOnlyContext.cons fresh ctx
   have hget : NameContext.get? ctx' 0 = some fresh := by
@@ -493,35 +515,34 @@ lemma isGuarded_fromDB_fresh (t : LocalTypeDB) (ctx : NameContext)
 theorem isContractive_fromDB (t : LocalTypeDB) (ctx : NameContext)
     (hfreshAll : ∀ c, NameContext.freshName c ∉ c) :
     t.isContractive = true →
-    t.isClosedAt (ctx.length) = true →
-    (t.fromDB ctx).isContractive = true := by
+    (hclosed : t.isClosedAt (ctx.length) = true) →
+    (t.fromDB ctx hclosed).isContractive = true := by
   intro hcontr hclosed
   let P1 : LocalTypeDB → Prop :=
     fun t =>
       ∀ ctx, (∀ c, NameContext.freshName c ∉ c) →
         t.isContractive = true →
-        t.isClosedAt ctx.length = true →
-          (t.fromDB ctx).isContractive = true
+        (hclosed : t.isClosedAt ctx.length = true) →
+          (t.fromDB ctx hclosed).isContractive = true
   let P2 : List (Label × LocalTypeDB) → Prop :=
     fun bs =>
       ∀ ctx, (∀ c, NameContext.freshName c ∉ c) →
         isContractiveBranches bs = true →
-        isClosedAtBranches ctx.length bs = true →
-          LocalTypeR.isContractiveBranches (LocalTypeDB.branchesFromDB ctx bs) = true
+        (hclosed : isClosedAtBranches ctx.length bs = true) →
+          LocalTypeR.isContractiveBranches (LocalTypeDB.branchesFromDB ctx bs hclosed) = true
   let P3 : Label × LocalTypeDB → Prop :=
     fun b =>
       ∀ ctx, (∀ c, NameContext.freshName c ∉ c) →
         b.2.isContractive = true →
-        b.2.isClosedAt ctx.length = true →
-          (b.2.fromDB ctx).isContractive = true
+        (hclosed : b.2.isClosedAt ctx.length = true) →
+          (b.2.fromDB ctx hclosed).isContractive = true
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
     · intro ctx hfreshAll hcontr hclosed
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
     · intro n ctx hfreshAll hcontr hclosed
-      cases hget : NameContext.get? ctx n <;>
-        simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hget]
+      simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
     · intro p bs hbs ctx hfreshAll hcontr hclosed
       have hbs_contr : isContractiveBranches bs = true := by
         simpa [LocalTypeDB.isContractive] using hcontr

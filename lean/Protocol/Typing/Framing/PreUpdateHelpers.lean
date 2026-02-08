@@ -15,7 +15,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ### Framed Pre-Update Helpers -/
 /-- Helper: align endpoints via store typing. -/

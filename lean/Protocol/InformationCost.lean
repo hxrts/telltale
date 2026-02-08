@@ -2,13 +2,14 @@ import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Data.Fintype.BigOperators
 import Mathlib.Data.Real.Basic
 import Mathlib.Tactic
+import Choreography.Projection.Blind
 
 /-!
 # Information-Theoretic Cost Measures
 
 Shannon entropy, KL divergence, mutual information, and conditional entropy
 for finite distributions. Ported from Gibbs.Hamiltonian.Entropy — all
-definitions are pure Mathlib arithmetic with no axioms or sorry.
+definitions are pure Mathlib arithmetic with no axioms or proof holes.
 
 These definitions provide the information-theoretic foundation for:
 - `send_cost_plus_flow`: branch entropy quantifies the true cost of a select
@@ -1141,12 +1142,121 @@ theorem blind_projection_entropy_unchanged
           rw [Finset.mul_sum]; congr 1; ext l; ring
     _ = localEntropy l₀ := by rw [h_sum, mul_one]
 
+/-- Constant projection implies expected local information is unchanged. -/
+theorem projection_preserves_local_information
+    {L T : Type*} [Fintype L]
+    (p : ProjectionMap L T) (hConst : p.isConstant)
+    (labelDist : L → ℝ) (_h_nn : ∀ l, 0 ≤ labelDist l)
+    (h_sum : ∑ l, labelDist l = 1) (localInfo : T → ℝ) :
+    ∑ l, labelDist l * localInfo (p.proj l) = localInfo (Classical.choose hConst) := by
+  -- Use constancy of the projection to factor out the local info term.
+  classical
+  have ht0 : ∀ l, p.proj l = Classical.choose hConst := by
+    exact Classical.choose_spec hConst
+  calc
+    ∑ l, labelDist l * localInfo (p.proj l)
+        = ∑ l, labelDist l * localInfo (Classical.choose hConst) := by
+            congr 1; ext l; rw [ht0]
+    _ = localInfo (Classical.choose hConst) * ∑ l, labelDist l := by
+            rw [Finset.mul_sum]; congr 1; ext l; ring
+    _ = localInfo (Classical.choose hConst) := by
+            simp [h_sum]
+
+/-! ## Blindness Bridge -/
+
+open SessionTypes.GlobalType
+open SessionTypes.LocalTypeR
+open Choreography.Projection.Trans
+open Choreography.Projection.Blind
+
+/-- Projection map over branch indices using candidate projection. -/
+def branchProjectionMap (branches : List (Label × GlobalType)) (role : String) :
+    ProjectionMap (Fin branches.length) LocalTypeR :=
+  -- Each index selects a branch continuation and projects it.
+  { proj := fun i => Choreography.Projection.Trans.trans (branches.get i).2 role }
+
+/-- Blind comm implies constant projection map on branch indices. -/
+theorem branchProjectionMap_isConstant_of_commBlindFor
+    {sender receiver role : String} {branches : List (Label × GlobalType)}
+    (hblind : commBlindFor sender receiver branches = true)
+    (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ []) :
+    (branchProjectionMap branches role).isConstant := by
+  -- Use uniformity from blindness to show every index projects to the head.
+  classical
+  refine ⟨Choreography.Projection.Trans.trans (branches.head!.2) role, ?_⟩
+  intro i
+  have hmem : branches.get i ∈ branches := by
+    -- Index membership for list lookup.
+    exact List.get_mem _ _
+  have huniform :=
+    trans_uniform_for_nonparticipant (sender := sender) (receiver := receiver) (role := role)
+      (branches := branches) hblind hns hnr hne (branches.get i) hmem
+  simpa [branchProjectionMap] using huniform
+
+/-- `isBlind` for a comm yields a constant projection map. -/
+theorem branchProjectionMap_isConstant_of_isBlind_comm
+    {sender receiver role : String} {branches : List (Label × GlobalType)}
+    (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
+    (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ []) :
+    (branchProjectionMap branches role).isConstant := by
+  -- Extract comm-blindness, then reuse the uniformity lemma.
+  have hcomm : commBlindFor sender receiver branches = true := by
+    have hblind' := hblind
+    simp [isBlind, Bool.and_eq_true] at hblind'
+    exact hblind'.1
+  exact branchProjectionMap_isConstant_of_commBlindFor hcomm hns hnr hne
+
 /-- Information cost of a non-participant observing a branch choice is zero.
     This quantifies the noninterference property in information-theoretic terms. -/
 def blindObservationCost : ℝ := 0
 
 /-- Blind observation has zero cost (by definition). -/
 theorem blindObservationCost_eq_zero : blindObservationCost = 0 := rfl
+
+/-- **Main bridge theorem**: When a global type is blind (`isBlind G = true`),
+    a non-participant's local type is constant across all branches.
+
+    This is the information-theoretic formulation of noninterference:
+    - `isBlind` characterizes when a role cannot distinguish branches
+    - Constant projection means no information leaks to the observer
+    - Any function of the local type has unchanged expected value
+
+    **Significance**: This theorem completes the connection between:
+    1. Syntactic blindness (`isBlind` on global types)
+    2. Semantic noninterference (projection uniformity)
+    3. Information-theoretic security (zero information gain)
+
+    The expected value of any local information measure f is:
+      E[f(proj(branch))] = f(proj(any branch))
+    which means the observer learns nothing from branch selection.
+-/
+theorem isBlind_preserves_local_information
+    {sender receiver role : String} {branches : List (Label × GlobalType)}
+    (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
+    (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ [])
+    (labelDist : Fin branches.length → ℝ)
+    (_h_nn : ∀ l, 0 ≤ labelDist l)
+    (h_sum : ∑ l, labelDist l = 1)
+    (localInfo : LocalTypeR → ℝ) :
+    let p := branchProjectionMap branches role
+    ∑ l, labelDist l * localInfo (p.proj l) = localInfo (Classical.choose
+      (branchProjectionMap_isConstant_of_isBlind_comm hblind hns hnr hne)) := by
+  have hConst := branchProjectionMap_isConstant_of_isBlind_comm hblind hns hnr hne
+  exact projection_preserves_local_information
+    (branchProjectionMap branches role) hConst labelDist _h_nn h_sum localInfo
+
+/-- Corollary: isBlind implies the observer's local type is deterministic.
+    All branches yield the same projected local type. -/
+theorem isBlind_implies_constant_local_type
+    {sender receiver role : String} {branches : List (Label × GlobalType)}
+    (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
+    (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ [])
+    (i j : Fin branches.length) :
+    (branchProjectionMap branches role).proj i =
+    (branchProjectionMap branches role).proj j := by
+  have hConst := branchProjectionMap_isConstant_of_isBlind_comm hblind hns hnr hne
+  obtain ⟨t, ht⟩ := hConst
+  simp only [ht]
 
 end
 

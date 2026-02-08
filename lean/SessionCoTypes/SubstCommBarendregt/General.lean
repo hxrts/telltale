@@ -91,7 +91,7 @@ mutual
         simp only [notBoundAtBranches] at hx_not_bound
         have ⟨hx_not_bound_cont, hx_not_bound_rest⟩ := Bool.and_eq_true_iff.mp hx_not_bound
         congr 1
-        · congr 1; congr 1; congr 1
+        · congr 1; congr 1
           exact subst_subst_comm_general cont x y rx ry ry' hxy hx_not_bound_cont hrx_closed hry_rel
         · exact subst_subst_comm_branches_general rest x y rx ry ry' hxy hx_not_bound_rest hrx_closed hry_rel
   termination_by sizeOf bs

@@ -15,7 +15,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! ## Linking Coherence Infrastructure -/
 
@@ -30,7 +30,9 @@ private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G
   intro hIn₂
   have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hIn₂⟩
   have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
-  have : s ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+  have : s ∈ (∅ : Set SessionId) := by
+    rw [← hEmpty]
+    exact hInter
   exact this.elim
 
 private theorem sid_not_in_left_of_right {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
@@ -437,7 +439,9 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
             have hSidIn₂ : e.sid ∈ SessionsOf p₂.initGEnv := session_of_lookupG hLookup₂
             have hInter : e.sid ∈ SessionsOf p₁.initGEnv ∩ SessionsOf p₂.initGEnv := ⟨hSidIn₁, hSidIn₂⟩
             have hEmpty : SessionsOf p₁.initGEnv ∩ SessionsOf p₂.initGEnv = (∅ : Set SessionId) := hDisjG
-            have : e.sid ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+            have : e.sid ∈ (∅ : Set SessionId) := by
+              rw [← hEmpty]
+              exact hInter
             exact this.elim)
   · -- supply_fresh (Lin)
     intro e S hMem
@@ -564,3 +568,51 @@ theorem flagship_composed_system_conservation
     delegation_within_composed_preserves_coherent
       G₁ G₁' G₂ D₁ D₁' D₂ s A B hDeleg hCoh₁ hCoh₂ hDisjG' hCons₁' hCons₂
   exact ⟨hPre, hPost⟩
+
+/-- Paper 3 story-level theorem: delegation in composed systems (deployed form).
+
+Given two deployed protocols that link coherently, if the left protocol performs
+an admissible delegation step and remains disjoint/consistent with the right
+protocol, then composed coherence is preserved before and after delegation. -/
+theorem delegation_in_composed_systems
+    (p₁ p₂ : DeployedProtocol)
+    (G₁' : GEnv) (D₁' : DEnv)
+    (s : SessionId) (A B : Role)
+    (hLink : LinkOKFull p₁ p₂)
+    (hDeleg : DelegationStep p₁.initGEnv G₁' p₁.initDEnv D₁' s A B)
+    (hDisjG' : DisjointG G₁' p₂.initGEnv)
+    (hCons₁' : DConsistent G₁' D₁') :
+    Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) ∧
+      Coherent (mergeGEnv G₁' p₂.initGEnv) (mergeDEnv D₁' p₂.initDEnv) := by
+  have hPre : Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) :=
+    LinkOKFull_coherent p₁ p₂ hLink
+  have hPost : Coherent (mergeGEnv G₁' p₂.initGEnv) (mergeDEnv D₁' p₂.initDEnv) :=
+    delegation_within_composed_preserves_coherent
+      p₁.initGEnv G₁' p₂.initGEnv p₁.initDEnv D₁' p₂.initDEnv s A B
+      hDeleg p₁.coherence_cert p₂.coherence_cert hDisjG' hCons₁' p₂.dConsistent_cert
+  exact ⟨hPre, hPost⟩
+
+/-- Consolidated Paper 3 story theorem:
+linking harmony plus delegation preservation in composed systems. -/
+theorem delegation_composition_story_complete
+    (p₁ p₂ : DeployedProtocol)
+    (G₁' : GEnv) (D₁' : DEnv)
+    (s : SessionId) (A B : Role)
+    (hLink : LinkOKFull p₁ p₂)
+    (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
+    (hWT₁ : WTMonComplete p₁.initMonitorState)
+    (hWT₂ : WTMonComplete p₂.initMonitorState)
+    (hDeleg : DelegationStep p₁.initGEnv G₁' p₁.initDEnv D₁' s A B)
+    (hDisjG' : DisjointG G₁' p₂.initGEnv)
+    (hCons₁' : DConsistent G₁' D₁') :
+    WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) ∧
+      Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) ∧
+      Coherent (mergeGEnv G₁' p₂.initGEnv) (mergeDEnv D₁' p₂.initDEnv) := by
+  have hHarmony :
+      WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) :=
+    link_harmony_through_link p₁ p₂ hLink hDisjG hWT₁ hWT₂
+  have hCoherentPair :
+      Coherent (mergeGEnv p₁.initGEnv p₂.initGEnv) (mergeDEnv p₁.initDEnv p₂.initDEnv) ∧
+        Coherent (mergeGEnv G₁' p₂.initGEnv) (mergeDEnv D₁' p₂.initDEnv) :=
+    delegation_in_composed_systems p₁ p₂ G₁' D₁' s A B hLink hDeleg hDisjG' hCons₁'
+  exact ⟨hHarmony, hCoherentPair.1, hCoherentPair.2⟩

@@ -8,7 +8,7 @@ set_option linter.unnecessarySimpa false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-! # Erasure Characterization and Delegation Envelope
 

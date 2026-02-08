@@ -23,7 +23,7 @@ private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
 
 /-- Existing session ids in a VM state. -/
 def existingSessionIds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -33,7 +33,7 @@ def existingSessionIds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
 
 /-- Two sessions have disjoint resources when they have distinct identifiers. -/
 def SessionDisjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -43,12 +43,12 @@ def SessionDisjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-- Load a choreography into a running VM, returning the updated state and session id. -/
 def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    [Inhabited (EffectModel.EffectCtx ε)]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
     (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
     VMState ι γ π ε ν × SessionId :=
   let sid := st.nextSessionId
@@ -106,23 +106,23 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
 /-! ## Disjointness lemma -/
 
 private lemma loadChoreography_snd {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    [Inhabited (EffectModel.EffectCtx ε)]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
     (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
     (loadChoreography st image).2 = st.nextSessionId := by
   simp [loadChoreography]
 
 theorem loadChoreography_disjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    [Inhabited (EffectModel.EffectCtx ε)]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
     (st : VMState ι γ π ε ν) (image : CodeImage γ ε)
     (_hwf : WFVMState st) :
     let (st', sid) := loadChoreography st image

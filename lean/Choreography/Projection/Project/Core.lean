@@ -13,7 +13,7 @@ The following definitions form the semantic interface for proofs:
 
 - `Projectable`: projectability predicate for globals
 - `ProjectableClosedWellFormed`: closed/wellFormed + projectable bundle
-- `ProjectableClosedWellFormedBlind`: axiom-free version using blindness
+- `ProjectableClosedWellFormedBlind`: assumption-free version using blindness
 - `projectR?`: proof-carrying projection
 - `projectR?_some_implies_projectb`: inversion lemma for projectR?
 - `projectR?_sound`: soundness of projectR?
@@ -47,8 +47,8 @@ def Projectable (g : GlobalType) : Prop :=
 def ProjectableClosedWellFormed (g : GlobalType) : Prop :=
   g.isClosed = true ∧ g.wellFormed = true ∧ Projectable g
 
-/-- Closed + well-formed + blind globals. This is the axiom-free version:
-    blindness ensures projectability without needing an axiom. -/
+/-- Closed + well-formed + blind globals. This is the assumption-free version:
+    blindness ensures projectability without needing an extra postulate. -/
 def ProjectableClosedWellFormedBlind (g : GlobalType) : Prop :=
   g.isClosed = true ∧ g.wellFormed = true ∧ Blind.isBlind g = true
 

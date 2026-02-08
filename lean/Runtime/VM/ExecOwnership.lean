@@ -25,21 +25,21 @@ universe u
 
 /-! ## Ownership and knowledge semantics -/
 
-private def splitTokens {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+private def splitTokens {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) (ep : Endpoint) : List ProgressToken × List ProgressToken :=
   -- Partition progress tokens by endpoint.
   let moved := coro.progressTokens.filter (fun t => decide (t.endpoint = ep))
   let kept := coro.progressTokens.filter (fun t => decide (t.endpoint ≠ ep))
   (moved, kept)
 
-private def splitKnowledge {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+private def splitKnowledge {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) (ep : Endpoint) : KnowledgeSet × KnowledgeSet :=
   -- Partition knowledge facts by endpoint.
   let moved := coro.knowledgeSet.filter (fun k => decide (k.endpoint = ep))
   let kept := coro.knowledgeSet.filter (fun k => decide (k.endpoint ≠ ep))
   (moved, kept)
 
-private def updateTargetCoro {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+private def updateTargetCoro {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coros : Array (CoroutineState γ ε)) (tid : Nat) (ep : Endpoint)
     (movedTokens : List ProgressToken) (movedFacts : KnowledgeSet) : Array (CoroutineState γ ε) :=
   -- Update the target coroutine when the index is in range.
@@ -54,7 +54,7 @@ private def updateTargetCoro {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
     coros
 
 private def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
@@ -81,7 +81,7 @@ private def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLa
     session store and buffers untouched. -/
 def transfer_preserves_coherent_prop : Prop :=
   ∀ {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -95,7 +95,7 @@ theorem transfer_preserves_coherent_proof : transfer_preserves_coherent_prop :=
   fun _st _coro _ep _tid _resources' => ⟨rfl, rfl⟩
 
 private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (tid : Nat) :
@@ -118,7 +118,7 @@ private def transferWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [G
 
 
 def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
@@ -134,7 +134,7 @@ def stepTransfer {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 
 def stepTag {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
@@ -156,7 +156,7 @@ def stepTag {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 
 def stepCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)

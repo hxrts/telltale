@@ -53,40 +53,40 @@ def GuardChain.proofWf {γ : Type u} [GuardLayer γ] [GuardLayerInv γ]
     (fun n₁ n₂ => Mask.disjoint (namespace_to_mask n₁) (namespace_to_mask n₂))
     (GuardChain.proofNamespaces chain)
 
-/-! ## Effect specifications -/
+/-! ## Effect proof specifications -/
 
-class EffectSpec (ε : Type u) [EffectModel ε] where
+class EffectProofSpec (ε : Type u) [EffectRuntime ε] where
   -- Pre- and post-conditions for effect actions (proof-only).
-  pre : EffectModel.EffectAction ε → EffectModel.EffectCtx ε → iProp
-  post : EffectModel.EffectAction ε → EffectModel.EffectCtx ε → iProp
+  pre : EffectRuntime.EffectAction ε → EffectRuntime.EffectCtx ε → iProp
+  post : EffectRuntime.EffectAction ε → EffectRuntime.EffectCtx ε → iProp
 
-instance instEffectSpecUnit : EffectSpec Unit where
+instance instEffectProofSpecUnit : EffectProofSpec Unit where
   -- Unit effects carry no proof obligations.
   pre := fun _ _ => iProp.emp
   post := fun _ _ => iProp.emp
 
-instance instEffectSpecSum (ε₁ ε₂ : Type u)
-    [EffectModel ε₁] [EffectModel ε₂]
-    [EffectSpec ε₁] [EffectSpec ε₂] : EffectSpec (Sum ε₁ ε₂) where
+instance instEffectProofSpecSum (ε₁ ε₂ : Type u)
+    [EffectRuntime ε₁] [EffectRuntime ε₂]
+    [EffectProofSpec ε₁] [EffectProofSpec ε₂] : EffectProofSpec (Sum ε₁ ε₂) where
   -- Sum effects dispatch to the corresponding proof spec.
   pre := fun a ctx =>
     match a, ctx with
-    | Sum.inl a1, (c1, _) => EffectSpec.pre a1 c1
-    | Sum.inr a2, (_, c2) => EffectSpec.pre a2 c2
+    | Sum.inl a1, (c1, _) => EffectProofSpec.pre a1 c1
+    | Sum.inr a2, (_, c2) => EffectProofSpec.pre a2 c2
   post := fun a ctx =>
     match a, ctx with
-    | Sum.inl a1, (c1, _) => EffectSpec.post a1 c1
-    | Sum.inr a2, (_, c2) => EffectSpec.post a2 c2
+    | Sum.inl a1, (c1, _) => EffectProofSpec.post a1 c1
+    | Sum.inr a2, (_, c2) => EffectProofSpec.post a2 c2
 
-instance instEffectSpecProd (ε₁ ε₂ : Type u)
-    [EffectModel ε₁] [EffectModel ε₂]
-    [EffectSpec ε₁] [EffectSpec ε₂] : EffectSpec (ε₁ × ε₂) where
+instance instEffectProofSpecProd (ε₁ ε₂ : Type u)
+    [EffectRuntime ε₁] [EffectRuntime ε₂]
+    [EffectProofSpec ε₁] [EffectProofSpec ε₂] : EffectProofSpec (ε₁ × ε₂) where
   -- Product effects compose proof obligations via separation.
   pre := fun a ctx =>
     match a, ctx with
     | (a1, a2), (c1, c2) =>
-        iProp.sep (EffectSpec.pre a1 c1) (EffectSpec.pre a2 c2)
+        iProp.sep (EffectProofSpec.pre a1 c1) (EffectProofSpec.pre a2 c2)
   post := fun a ctx =>
     match a, ctx with
     | (a1, a2), (c1, c2) =>
-        iProp.sep (EffectSpec.post a1 c1) (EffectSpec.post a2 c2)
+        iProp.sep (EffectProofSpec.post a1 c1) (EffectProofSpec.post a2 c2)

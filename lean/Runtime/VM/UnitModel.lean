@@ -69,15 +69,18 @@ instance : PersistenceModel UnitPersist where
   openDelta := fun _ => ()
   closeDelta := fun _ => ()
 
-instance : EffectModel UnitEffect where
+instance : EffectRuntime UnitEffect where
   -- Unit effect model for computable tests.
   EffectAction := Unit
   EffectCtx := Unit
   exec := fun _ _ => ()
+
+instance : EffectSpec UnitEffect where
+  -- Unit effect typing is terminal.
   handlerType := fun _ => LocalType.end_
 
-instance : Inhabited (EffectModel.EffectAction UnitEffect) := ⟨()⟩
-instance : Inhabited (EffectModel.EffectCtx UnitEffect) := ⟨()⟩
+instance : Inhabited (EffectRuntime.EffectAction UnitEffect) := ⟨()⟩
+instance : Inhabited (EffectRuntime.EffectCtx UnitEffect) := ⟨()⟩
 
 instance : VerificationModel UnitVerify where
   -- Unit verification model with unit-valued primitives.

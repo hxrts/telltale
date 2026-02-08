@@ -35,19 +35,19 @@ inductive LoadResult (ν : Type) [VerificationModel ν] where
   | verificationFailed (reason : String)
   | resourceExhausted
 
-def code_image_id {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
+def code_image_id {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
     [VerificationModel ν] (img : Program γ ε) : VerificationModel.Hash ν :=
   -- V1 content id uses a transparent hash of program metadata.
   VerificationModel.hash (ν:=ν) (.string img.metadata.name)
 
-def code_signature_check {γ ε ν : Type} [GuardLayer γ] [EffectModel ε]
+def code_signature_check {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
     [VerificationModel ν] (img : UntrustedImage γ ε ν) : Bool :=
   -- Verify the image signature against its content id.
   let payload : Data := .string img.program.metadata.name
   VerificationModel.verifySignature img.signer payload img.signature
 
 def loadTrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -61,7 +61,7 @@ def loadTrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     .ok (code_image_id (ν:=ν) img.program))
 
 def loadUntrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -78,7 +78,7 @@ def loadUntrusted {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     (st, .verificationFailed "signature failed")
 
 def SafeUpdate {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -88,7 +88,7 @@ def SafeUpdate {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
   (∀ r, Consume r current buffered = Consume r new_ buffered) ∧
   ReachesComm new_
 def hotSwap_preserves_coherent {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

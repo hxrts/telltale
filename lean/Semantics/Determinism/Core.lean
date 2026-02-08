@@ -550,7 +550,7 @@ private theorem counter_mem2 :
 private theorem counter_step1 : ConfigStep counter_c0 counter_c1 counter_act1 := by
   -- Step selecting label1.
   constructor
-  · native_decide
+  · decide
   constructor
   · simpa [counter_c0, counter_c1, counter_protocol, counter_act1] using
       (step.comm_head "A" "B" counter_branches counter_label1 (.var "X") counter_mem1)
@@ -559,7 +559,7 @@ private theorem counter_step1 : ConfigStep counter_c0 counter_c1 counter_act1 :=
 private theorem counter_step2 : ConfigStep counter_c0 counter_c2 counter_act2 := by
   -- Step selecting label2.
   constructor
-  · native_decide
+  · decide
   constructor
   · simpa [counter_c0, counter_c2, counter_protocol, counter_act2] using
       (step.comm_head "A" "B" counter_branches counter_label2 (.var "Y") counter_mem2)

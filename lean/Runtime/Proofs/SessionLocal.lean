@@ -50,7 +50,7 @@ set_option relaxedAutoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 universe u
 

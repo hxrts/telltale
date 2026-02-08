@@ -38,7 +38,7 @@ def cost_credit_consume (_n cost : CostCredit) : Prop :=
 /-! ## Configuration checks -/
 
 def cost_model_ok {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
@@ -49,7 +49,7 @@ def cost_model_ok {ι γ π ε ν : Type}
     (∀ i, i ≠ .halt → cfg.costModel.stepCost i ≥ cfg.costModel.minCost)
 
 def step_cost {ι γ π ε ν : Type}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectModel ε]
+    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]

@@ -13,7 +13,7 @@ into a destination register, and emits an `acquired` event.
 `GuardLayer.close` to update the resource, and emits a `released` event.
 
 `stepInvoke` executes an effect action: looks up the default handler, calls
-`EffectModel.exec` to update the effect context, applies the persistence delta
+`EffectRuntime.exec` to update the effect context, applies the persistence delta
 via `PersistenceEffectBridge.bridge`, and emits an `invoked` event.
 
 All three use `primaryEndpoint` (the first owned endpoint) as the representative
@@ -26,7 +26,7 @@ universe u
 
 /-! ## Guard and effect semantics -/
 
-private def primaryEndpoint {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
+private def primaryEndpoint {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) : Option Endpoint :=
   -- Choose a representative endpoint for observability.
   match coro.ownedEndpoints with
@@ -35,7 +35,7 @@ private def primaryEndpoint {γ ε : Type u} [GuardLayer γ] [EffectModel ε]
 
 
 def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
@@ -62,7 +62,7 @@ def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 
 def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
@@ -90,17 +90,17 @@ def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 
 def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
-    (action : EffectModel.EffectAction ε) : StepPack ι γ π ε ν :=
+    (action : EffectRuntime.EffectAction ε) : StepPack ι γ π ε ν :=
   -- Execute an effect action via the bound handler (placeholder response model).
   match SessionStore.defaultHandler st.sessions with
   | none =>
       faultPack st coro (.invokeFault "no handler bound") "no handler bound"
   | some _handlerId =>
-      let ctx' := EffectModel.exec action coro.effectCtx
+      let ctx' := EffectRuntime.exec action coro.effectCtx
       let delta := PersistenceEffectBridge.bridge (π:=π) (ε:=ε) action
       let persist' := PersistenceModel.apply st.persistent delta
       let st' := { st with persistent := persist' }

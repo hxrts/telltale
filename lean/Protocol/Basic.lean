@@ -18,7 +18,7 @@ set_option autoImplicit false
 
 open scoped Classical
 
-noncomputable section
+section
 
 /-- Session identifiers are natural numbers. -/
 abbrev SessionId := Nat

@@ -98,9 +98,15 @@ def session_ns_disjoint (sid₁ sid₂ : SessionId)
     (hNs : sessionNs sid₁ ≠ sessionNs sid₂) :
   Mask.disjoint (namespace_to_mask (sessionNs sid₁)) (namespace_to_mask (sessionNs sid₂)) :=
   -- Namespaces for distinct session ids are disjoint.
-  namespace_disjoint (sessionNs sid₁) (sessionNs sid₂) hNs
+  by
+    have hSid : sid₁ ≠ sid₂ := by
+      intro hEq
+      apply hNs
+      simp [sessionNs, hEq]
+    simpa [sessionNs] using namespace_disjoint Namespace.root sid₁ sid₂ hSid
 
 def session_inv_alloc (γ : GhostName) (sid : SessionId) (E : Mask) :
+  (∀ E' : Iris.GSet, ∃ i, ¬E'.mem i ∧ (namespace_to_mask (sessionNs sid)) i) →
   iProp.entails (iProp.later (session_inv_body γ sid))
     (fupd E E (iProp.exist fun ct => iProp.sep (session_inv γ sid ct) (cancel_token_own ct))) :=
   -- Allocate a fresh cancelable invariant for a session.
@@ -108,11 +114,12 @@ def session_inv_alloc (γ : GhostName) (sid : SessionId) (E : Mask) :
 
 def session_inv_open (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E : Mask)
     (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
-  iProp.entails (session_inv γ sid ct)
+  iProp.entails (iProp.sep (session_inv γ sid ct) (cancel_token_own ct))
     (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid)))
       (iProp.sep (iProp.later (session_inv_body γ sid))
-        (iProp.wand (iProp.later (session_inv_body γ sid))
-          (fupd (Mask.diff E (namespace_to_mask (sessionNs sid))) E iProp.emp)))) :=
+        (iProp.sep (cancel_token_own ct)
+          (iProp.wand (iProp.later (session_inv_body γ sid))
+            (fupd (Mask.diff E (namespace_to_mask (sessionNs sid))) E (iProp.pure True)))))) :=
   -- Open the session invariant under mask difference.
   cinv_acc (sessionNs sid) E ct (session_inv_body γ sid) hSub
 
@@ -120,7 +127,10 @@ def session_inv_close (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E :
     (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
   iProp.entails (iProp.sep (session_inv γ sid ct) (cancel_token_own ct))
     (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid)))
-      (iProp.later (session_inv_body γ sid))) :=
+      (iProp.sep (iProp.later (session_inv_body γ sid))
+        (iProp.sep (cancel_token_own ct)
+          (iProp.wand (iProp.later (session_inv_body γ sid))
+            (fupd (Mask.diff E (namespace_to_mask (sessionNs sid))) E (iProp.pure True)))))) :=
   -- Cancel the session invariant with the cancel token.
   cinv_cancel (sessionNs sid) E ct (session_inv_body γ sid) hSub
 
@@ -167,7 +177,7 @@ structure Participation (ι : Type) [IdentityModel ι] where
   site : IdentityModel.SiteId ι
 
 inductive LifecycleEvent (ι : Type) [IdentityModel ι]
-    (γ ε : Type) [GuardLayer γ] [EffectModel ε] where
+    (γ ε : Type) [GuardLayer γ] [EffectRuntime ε] where
   -- Session creation and membership changes.
   | open (sid : SessionId) (roles : RoleSet)
       (assignment : Role → IdentityModel.ParticipantId ι)
@@ -245,7 +255,7 @@ def close_empty (_sid : SessionId) : Prop :=
         stSess.buffers = [] ∧ stSess.traces = (∅ : DEnv)
 
 def close_makes_inaccessible {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectModel ε] [VerificationModel ν]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
