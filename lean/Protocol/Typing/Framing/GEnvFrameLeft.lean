@@ -2,6 +2,7 @@ import Protocol.Environments.Core
 import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
+import Protocol.Typing.Framing.GEnvFrameHelpers
 
 /-
 The Problem. Show that pre-out typing is stable under framing a disjoint GEnv
@@ -217,15 +218,12 @@ lemma HasTypeProcPreOut_frame_G_left
         intro i hi hip
         have hBody := hBodies i hi hip
         have hDisj' : DisjointG Gfr (updateG G e (bs.get ⟨i, hi⟩).2) := by
-          have hEq := SessionsOf_updateG_eq (G:=G) (e:=e)
-            (L:=(bs.get ⟨i, hi⟩).2) (L':=.branch p bs) hG
-          have hSub : SessionsOf (updateG G e (bs.get ⟨i, hi⟩).2) ⊆ SessionsOf G := by
-            intro s hs
-            rw [hEq] at hs
-            exact hs
-          have hDisj'' : DisjointG (updateG G e (bs.get ⟨i, hi⟩).2) Gfr :=
-            DisjointG_of_subset_left hSub (DisjointG_symm hDisj)
-          exact DisjointG_symm hDisj''
+          -- Use the shared update disjointness lemma and flip sides.
+          have hDisj'0 :
+              DisjointG (updateG G e (bs.get ⟨i, hi⟩).2) Gfr :=
+            disjointG_updateG_left (e:=e) (L:=(bs.get ⟨i, hi⟩).2) (L0:=.branch p bs)
+              hG (DisjointG_symm hDisj)
+          exact DisjointG_symm hDisj'0
         have hBody' := HasTypeProcPre_frame_G (G₁:=Gfr)
           (G₂:=updateG G e (bs.get ⟨i, hi⟩).2) hDisj' hBody
         have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e)
@@ -240,13 +238,10 @@ lemma HasTypeProcPreOut_frame_G_left
         -- Reframe the branch continuation through the left G-frame.
         intro lbl P L hFindP hFindB
         have hDisj' : DisjointG Gfr (updateG G e L) := by
-          have hEq := SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=.branch p bs) hG
-          have hSub : SessionsOf (updateG G e L) ⊆ SessionsOf G := by
-            intro s hs
-            simpa [hEq] using hs
-          have hDisj'' : DisjointG (updateG G e L) Gfr :=
-            DisjointG_of_subset_left hSub (DisjointG_symm hDisj)
-          exact DisjointG_symm hDisj''
+          -- Use the shared update disjointness lemma and flip sides.
+          have hDisj'0 : DisjointG (updateG G e L) Gfr :=
+            disjointG_updateG_left (e:=e) (L:=L) (L0:=.branch p bs) hG (DisjointG_symm hDisj)
+          exact DisjointG_symm hDisj'0
         have hOut' := ihOutLbl lbl P L hFindP hFindB hDisj'
         have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
         simpa [hUpd] using hOut'
@@ -265,18 +260,12 @@ lemma HasTypeProcPreOut_frame_G_left
   | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hS1 hS2 hP hQ ihP ihQ =>
       rename_i Sown G P Q Sfin Gfin W Δ S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
-      have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf G := by
-        intro s hs
-        simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
-      have hSubG2 : SessionsOf split.G2 ⊆ SessionsOf G := by
-        intro s hs
-        simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs
-      have hDisjGfrG1 : DisjointG Gfr split.G1 := by
-        have hDisj' : DisjointG split.G1 Gfr := DisjointG_of_subset_left hSubG1 (DisjointG_symm hDisj)
-        exact DisjointG_symm hDisj'
-      have hDisjGfrG2 : DisjointG Gfr split.G2 := by
-        have hDisj' : DisjointG split.G2 Gfr := DisjointG_of_subset_left hSubG2 (DisjointG_symm hDisj)
-        exact DisjointG_symm hDisj'
+      have hDisjG1fr : DisjointG split.G1 Gfr :=
+        (disjointG_split_frame_right (split:=split) (DisjointG_symm hDisj)).1
+      have hDisjG2fr : DisjointG split.G2 Gfr :=
+        (disjointG_split_frame_right (split:=split) (DisjointG_symm hDisj)).2
+      have hDisjGfrG1 : DisjointG Gfr split.G1 := DisjointG_symm hDisjG1fr
+      have hDisjGfrG2 : DisjointG Gfr split.G2 := DisjointG_symm hDisjG2fr
       have hP' := ihP hDisjGfrG1
       exact HasTypeProcPreOut_frame_G_left_par (Ssh:=Ssh) (Gfr:=Gfr) (split:=split)
         hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'

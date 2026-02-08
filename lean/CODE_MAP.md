@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-02-07
+**Last Updated:** 2026-02-08
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -384,7 +384,19 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Typing/Compatibility.lean | 992 | SEnv append/lookup lemmas |
 | Typing/MergeLemmas.lean | 327 | Additional environment lemmas |
 | Typing/StepLemmas.lean | 478 | `WTConfigN` well-typed configuration |
-| Typing/Framing.lean | 1,228 | Frame lemmas — 1 axiom |
+| Typing/Framing.lean | 13 | Framing entry point (re-exports) |
+| Typing/Framing/Lemmas.lean | 1,331 | Frame lemmas and core axioms |
+| Typing/Framing/FramedPreUpdate.lean | 308 | Pre-out preservation under G frames |
+| Typing/Framing/PreUpdateHelpers.lean | 293 | Alignment helpers for framed pre-update proofs |
+| Typing/Framing/LeftCases.lean | 266 | Left-frame step cases for pre-update |
+| Typing/Framing/RightCases.lean | 280 | Right-frame step cases for pre-update |
+| Typing/Framing/ParCases.lean | 683 | Par-case helpers for framed pre-update |
+| Typing/Framing/PreUpdatePreservation.lean | 409 | Lifting pre-update preservation to main theorems |
+| Typing/Framing/GEnvFrame.lean | 11 | GEnv framing re-exports |
+| Typing/Framing/GEnvFramePre.lean | 81 | Pre-typing right-frame lemma |
+| Typing/Framing/GEnvFrameHelpers.lean | 50 | Shared disjointness helpers |
+| Typing/Framing/GEnvFrameRight.lean | 202 | Pre-out right-frame lemma |
+| Typing/Framing/GEnvFrameLeft.lean | 280 | Pre-out left-frame lemma |
 | Typing/Preservation.lean | 2,137 | Preservation sub-lemmas (`Compatible`) — 1 axiom |
 | Typing/Progress.lean | 472 | DEnv union and environment append properties |
 

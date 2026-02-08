@@ -2,6 +2,7 @@ import Protocol.Environments.Core
 import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
+import Protocol.Typing.Framing.GEnvFrameHelpers
 import Protocol.Typing.Framing.GEnvFramePre
 
 /-
@@ -22,20 +23,6 @@ open scoped Classical
 noncomputable section
 
 /-! ## Pre-Out Framing (Right) -/
-
-/-- Helper: update preserves disjointness against a right frame. -/
-private lemma disjointG_updateG_left
-    {G Gfr : GEnv} {e : Endpoint} {L L0 : LocalType} :
-    lookupG G e = some L0 →
-    DisjointG G Gfr →
-    DisjointG (updateG G e L) Gfr := by
-  -- Use session-of subset after update to preserve disjointness.
-  intro hG hDisj
-  have hEq := SessionsOf_updateG_eq (G:=G) (e:=e) (L:=L) (L':=L0) hG
-  have hSub : SessionsOf (updateG G e L) ⊆ SessionsOf G := by
-    intro s hs
-    simpa [hEq] using hs
-  exact DisjointG_of_subset_left hSub hDisj
 
 /-- Helper: extend branch bodies under a right G-frame. -/
 private lemma frame_right_branch_bodies
@@ -82,21 +69,6 @@ private lemma frame_right_branch_out
   have hOut' := ihOutLbl lbl P L hFindP hFindB hDisj'
   have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e) (L:=.branch p bs) (L':=L) hG
   simpa [hUpd] using hOut'
-
-/-- Helper: split a right frame across a parallel split. -/
-private lemma disjointG_split_frame_right
-    {Sown : OwnedEnv} {G Gfr : GEnv} (split : ParSplit Sown.left G) :
-    DisjointG G Gfr →
-    DisjointG split.G1 Gfr ∧ DisjointG split.G2 Gfr := by
-  -- Push disjointness through session-of subsets of the split.
-  intro hDisj
-  have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf G := by
-    intro s hs
-    simpa [split.hG] using SessionsOf_append_left (G₂:=split.G2) hs
-  have hSubG2 : SessionsOf split.G2 ⊆ SessionsOf G := by
-    intro s hs
-    simpa [split.hG] using SessionsOf_append_right (G₁:=split.G1) hs
-  exact ⟨DisjointG_of_subset_left hSubG1 hDisj, DisjointG_of_subset_left hSubG2 hDisj⟩
 
 /-- Helper: par case for right-frame pre-out typing. -/
 private lemma frame_pre_out_right_par
