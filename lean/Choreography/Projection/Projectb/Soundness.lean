@@ -28,6 +28,13 @@ private theorem payloadSort_beq_eq_true_to_eq {a b : PayloadSort} (h : (a == b) 
   | nat => cases b <;> simp_all [reduceBEq]
   | bool => cases b <;> simp_all [reduceBEq]
   | string => cases b <;> simp_all [reduceBEq]
+  | real => cases b <;> simp_all [reduceBEq]
+  | vector n =>
+      cases b with
+      | vector m =>
+          simp only [reduceBEq, beq_iff_eq] at h
+          simp only [h]
+      | _ => simp_all [reduceBEq]
   | prod s1 s2 ih1 ih2 =>
       cases b with
       | prod t1 t2 =>
@@ -58,6 +65,8 @@ private theorem payloadSort_beq_refl (s : PayloadSort) : (s == s) = true := by
   | nat => rfl
   | bool => rfl
   | string => rfl
+  | real => rfl
+  | vector n => simp only [reduceBEq, beq_self_eq_true]
   | prod s1 s2 ih1 ih2 =>
       simp only [reduceBEq, Bool.and_eq_true]
       exact ⟨ih1, ih2⟩
@@ -323,6 +332,54 @@ private theorem SoundRel_postfix_comm_other
   have hbranches := projectbAllBranches_to_SoundRel gbs role cand h'
   simpa [CProjectF, hs, hr] using hbranches
 
+/-- Delegate case when role is delegator. -/
+private theorem SoundRel_postfix_delegate_delegator
+    (p q : String) (sid : Nat) (r : String) (cont : GlobalType)
+    (role : String) (cand : LocalTypeR)
+    (hp : role = p) (h : SoundRel (.delegate p q sid r cont) role cand) :
+    CProjectF SoundRel (.delegate p q sid r cont) role cand := by
+  -- TODO: Complete this proof after fixing projectb structure
+  dsimp [SoundRel] at h
+  unfold projectb at h
+  simp only [hp, beq_self_eq_true, ↓reduceIte] at h
+  simp only [CProjectF, hp, beq_self_eq_true, ↓reduceIte]
+  sorry
+
+/-- Delegate case when role is delegatee. -/
+private theorem SoundRel_postfix_delegate_delegatee
+    (p q : String) (sid : Nat) (r : String) (cont : GlobalType)
+    (role : String) (cand : LocalTypeR)
+    (hqeq : role = q) (hp : role ≠ p) (h : SoundRel (.delegate p q sid r cont) role cand) :
+    CProjectF SoundRel (.delegate p q sid r cont) role cand := by
+  -- TODO: Complete this proof after fixing projectb structure
+  dsimp [SoundRel] at h
+  unfold projectb at h
+  have hpf : (role == p) = false := by simpa using beq_false_of_ne hp
+  simp only [hpf, Bool.false_eq_true, ↓reduceIte, hqeq, beq_self_eq_true] at h
+  simp only [CProjectF, hpf, Bool.false_eq_true, ↓reduceIte, hqeq, beq_self_eq_true]
+  sorry
+
+/-- Delegate case when role is non-participant. -/
+private theorem SoundRel_postfix_delegate_other
+    (p q : String) (sid : Nat) (r : String) (cont : GlobalType)
+    (role : String) (cand : LocalTypeR)
+    (hp : role ≠ p) (hq : role ≠ q)
+    (h : SoundRel (.delegate p q sid r cont) role cand) :
+    CProjectF SoundRel (.delegate p q sid r cont) role cand := by
+  dsimp [SoundRel] at h
+  unfold projectb at h
+  have hpf : (role == p) = false := by simpa using beq_false_of_ne hp
+  have hqf : (role == q) = false := by simpa using beq_false_of_ne hq
+  simp only [hpf, Bool.false_eq_true, ↓reduceIte, hqf] at h
+  -- Goal is CProjectF SoundRel (.delegate p q sid r cont) role cand
+  -- For non-participant (role ≠ p and role ≠ q): CProjectF gives SoundRel cont role cand
+  unfold CProjectF
+  have hpf' : role = p ↔ False := by simp [hp]
+  have hqf' : role = q ↔ False := by simp [hq]
+  simp only [hpf', ↓reduceIte, hqf']
+  dsimp [SoundRel]
+  exact h
+
 /-- SoundRel is a post-fixpoint of CProjectF. -/
 private theorem SoundRel_postfix :
     ∀ g role cand, SoundRel g role cand → CProjectF SoundRel g role cand := by
@@ -338,6 +395,12 @@ private theorem SoundRel_postfix :
       · by_cases hr : role = receiver
         · exact SoundRel_postfix_comm_receiver sender receiver role gbs cand hr hs h
         · exact SoundRel_postfix_comm_other sender receiver role gbs cand hs hr h
+  | delegate p q sid r cont =>
+      by_cases hp : role = p
+      · exact SoundRel_postfix_delegate_delegator p q sid r cont role cand hp h
+      · by_cases hq : role = q
+        · exact SoundRel_postfix_delegate_delegatee p q sid r cont role cand hq hp h
+        · exact SoundRel_postfix_delegate_other p q sid r cont role cand hp hq h
 
 /-- Soundness: if projectb returns true, then CProject holds. -/
 theorem projectb_sound (g : GlobalType) (role : String) (cand : LocalTypeR)

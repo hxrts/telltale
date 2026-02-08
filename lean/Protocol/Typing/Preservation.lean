@@ -206,36 +206,6 @@ private lemma lookupSEnv_swap_left {S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S�
         simpa [List.append_assoc] using hB
       simpa [hA', hB']
 
-private lemma lookupSEnv_swap_left_prefix {Ssh S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S₁ S₂) :
-    ∀ x, lookupSEnv (SEnvAll Ssh ((S₁ ++ S₂) ++ S₃)) x =
-      lookupSEnv (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) x := by
-  intro x
-  cases hS : lookupSEnv Ssh x with
-  | some Ty =>
-      have hLeft :=
-        lookupSEnv_append_left (S₁:=Ssh) (S₂:=((S₁ ++ S₂) ++ S₃)) (x:=x) (T:=Ty) hS
-      have hRight :=
-        lookupSEnv_append_left (S₁:=Ssh) (S₂:=(S₂ ++ (S₁ ++ S₃))) (x:=x) (T:=Ty) hS
-      have hLeft' : lookupSEnv (Ssh ++ (S₁ ++ (S₂ ++ S₃))) x = some Ty := by
-        simpa [List.append_assoc] using hLeft
-      simpa [SEnvAll, hLeft', hRight]
-  | none =>
-      have hLeft :=
-        lookupSEnv_append_right (S₁:=Ssh) (S₂:=((S₁ ++ S₂) ++ S₃)) (x:=x) hS
-      have hRight :=
-        lookupSEnv_append_right (S₁:=Ssh) (S₂:=(S₂ ++ (S₁ ++ S₃))) (x:=x) hS
-      have hSwap :
-          lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv (S₂ ++ (S₁ ++ S₃)) x := by
-        have hSwap' := lookupSEnv_swap_left (S₁:=S₁) (S₂:=S₂) (S₃:=S₃) hDisj x
-        simpa [List.append_assoc] using hSwap'
-      have hLeft' :
-          lookupSEnv (Ssh ++ (S₁ ++ (S₂ ++ S₃))) x = lookupSEnv (S₁ ++ (S₂ ++ S₃)) x := by
-        simpa [List.append_assoc] using hLeft
-      have hSwap' :
-          lookupSEnv (S₁ ++ (S₂ ++ S₃)) x = lookupSEnv (S₂ ++ (S₁ ++ S₃)) x := by
-        simpa [List.append_assoc] using hSwap
-      simpa [SEnvAll, hLeft', hRight, hSwap']
-
 private lemma DisjointS_append_right {S₁ S₂ S₃ : SEnv} :
     DisjointS S₁ S₂ →
     DisjointS S₁ S₃ →
@@ -1195,24 +1165,6 @@ private theorem BuffersTyped_rewriteD
   · simpa [hEq e] using hLen
   · intro i hi
     simpa [hEq e] using hTyping i hi
-
-private lemma lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
-    {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
-    lookupG G₁ e = none := by
-  -- Use disjoint session IDs to rule out any left lookup.
-  by_cases hNone : lookupG G₁ e = none
-  · exact hNone
-  · cases hSome : lookupG G₁ e with
-    | none => exact (hNone hSome).elim
-    | some L₁ =>
-        have hSid₁ : e.sid ∈ SessionsOf G₁ := ⟨e, L₁, hSome, rfl⟩
-        have hSid₂ : e.sid ∈ SessionsOf G₂ := ⟨e, L, hLookup, rfl⟩
-        have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid₁, hSid₂⟩
-        have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
-        have : e.sid ∈ (∅ : Set SessionId) := by
-          have hInter' := hInter
-          simp [hEmpty] at hInter'
-        exact this.elim
 
 private lemma findD_update_eq (env : DEnv) (e : Edge) (ts : List ValType) :
     (updateD env e ts).find? e = some ts := by
@@ -2204,9 +2156,6 @@ private lemma SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
       simp [DEnv.find?, DEnv_map_find?_empty]
     cases hFind
   · intro h; cases h
-
-private lemma DisjointG_right_empty (G : GEnv) : DisjointG G [] := by
-  simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
 
 private lemma DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
   simp [DConsistent, SessionsOfD_empty]

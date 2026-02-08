@@ -65,11 +65,11 @@ abbrev projTrans := trans
 
 /-! ## Helper Lemmas for transBranches and membership -/
 
-/-- If `(label, cont) ∈ branches`, then `(label, trans cont role) ∈ transBranches branches role`. -/
+/-- If `(label, cont) ∈ branches`, then `(label, none, trans cont role) ∈ transBranches branches role`. -/
 theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
-    (label, trans cont role) ∈ transBranches branches role := by
+    (label, none, trans cont role) ∈ transBranches branches role := by
   -- Induct on the branch list and carry membership along.
   induction branches with
   | nil => cases hmem
@@ -123,9 +123,9 @@ private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
     This factored-out type helps with the mutual induction. -/
 abbrev SenderStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
   -- Either the sender exposes the branch continuation, or stays EQ2-equivalent.
-  (∃ bs cont, projTrans g act.sender = .send act.receiver bs ∧
-              (act.label, cont) ∈ bs ∧
-              EQ2 (projTrans g' act.sender) cont) ∨
+  (∃ bs lt, projTrans g act.sender = .send act.receiver bs ∧
+              (act.label, none, lt) ∈ bs ∧
+              EQ2 (projTrans g' act.sender) lt) ∨
   EQ2 (projTrans g' act.sender) (projTrans g act.sender)
 
 /-- After a global step, the sender's local type either:
@@ -187,9 +187,9 @@ theorem proj_trans_sender_step_v2 (g g' : GlobalType) (act : GlobalActionR)
 /-- Statement type for step projection (receiver). -/
 abbrev ReceiverStepResult (g : GlobalType) (act : GlobalActionR) (g' : GlobalType) : Prop :=
   -- Either the receiver exposes the branch continuation, or stays EQ2-equivalent.
-  (∃ bs cont, projTrans g act.receiver = .recv act.sender bs ∧
-              (act.label, cont) ∈ bs ∧
-              EQ2 (projTrans g' act.receiver) cont) ∨
+  (∃ bs lt, projTrans g act.receiver = .recv act.sender bs ∧
+              (act.label, none, lt) ∈ bs ∧
+              EQ2 (projTrans g' act.receiver) lt) ∨
   EQ2 (projTrans g' act.receiver) (projTrans g act.receiver)
 
 /-- After a global step, the receiver's local type either:

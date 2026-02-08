@@ -250,8 +250,28 @@ theorem sum_update_unique {α : Type} [DecidableEq α]
 
 lemma lookupType_mem {s : SessionState} {r : Role} {L : LocalType}
     (h : s.lookupType r = some L) : (r, L) ∈ s.localTypes := by
-  -- If lookup finds L, then (r, L) is in the list
-  sorry
+  -- Unfold lookupType to expose find?
+  unfold SessionState.lookupType at h
+  -- Case split on find? result
+  cases hFind : s.localTypes.find? (fun p => p.1 == r) with
+  | none =>
+    simp [hFind] at h
+  | some p =>
+    -- find? returned some p, so p ∈ s.localTypes
+    have hMem : p ∈ s.localTypes := List.find?_some hFind
+    -- Also, p.1 == r is true (the predicate holds)
+    have hPred : (fun p => p.1 == r) p = true := List.find?_some_spec hFind
+    simp at hPred
+    -- From h, we have p.2 = L
+    simp [hFind] at h
+    -- p = (p.1, p.2) = (r, L)
+    have hEq : p = (r, L) := by
+      cases p with
+      | mk fst snd =>
+        simp at hPred h
+        simp [hPred, h]
+    rw [← hEq]
+    exact hMem
 
 lemma getBuffer_mem_of_pos {s : SessionState} {sender receiver : Role}
     (hpos : s.getBuffer sender receiver > 0) :

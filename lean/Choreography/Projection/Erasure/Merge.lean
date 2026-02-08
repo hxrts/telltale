@@ -31,11 +31,11 @@ def appendMissing (bs2 bs1 : List BranchR) : List BranchR :=
 /-- Label subset predicate (Prop). -/
 def labelsSubset (bs1 bs2 : List BranchR) : Prop :=
   ∀ lbl, labelIn lbl bs1 → labelIn lbl bs2
-private theorem labelIn_head (lbl : Label) (vt : Option ValType) (t : LocalTypeR) (rest : List BranchR) :
+private theorem labelIn_head (lbl : Label) (vt : Option SessionTypes.ValType) (t : LocalTypeR) (rest : List BranchR) :
     labelIn lbl ((lbl, vt, t) :: rest) := by
   unfold labelIn lookupBranch
   simp
-theorem labelIn_tail_of_ne {lbl l : Label} {vt : Option ValType} {t : LocalTypeR}
+theorem labelIn_tail_of_ne {lbl l : Label} {vt : Option SessionTypes.ValType} {t : LocalTypeR}
     {rest : List BranchR} (h : l ≠ lbl) :
     labelIn lbl ((l, vt, t) :: rest) ↔ labelIn lbl rest := by
   cases rest with
@@ -270,7 +270,7 @@ mutual
         exact Nat.add_lt_add hlt1 hlt2
 end
 
-theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option ValType} {t1 : LocalTypeR}
+theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
     (h : mergeBranchesSend ((lbl, vt1, t1) :: rest) bs2 = some bs) :
     ∃ t2 t rest',
@@ -299,7 +299,7 @@ theorem mergeBranchesSend_eq_some {lbl : Label} {vt1 : Option ValType} {t1 : Loc
               · rfl
               · cases h; rfl
 
-theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option ValType} {t1 : LocalTypeR}
+theorem mergeBranchesRecv_eq_some {lbl : Label} {vt1 : Option SessionTypes.ValType} {t1 : LocalTypeR}
     {rest bs2 bs : List BranchR}
     (h : mergeBranchesRecv ((lbl, vt1, t1) :: rest) bs2 = some bs) :
     (lookupBranch lbl bs2 = none ∧

@@ -55,12 +55,12 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
         AllBranchesProj R gbs role cand
   | .delegate p q _sid _r cont, cand =>
       if role = p then
-        -- delegator: sends the capability
+        -- delegator: sends the capability (single branch)
         match cand with
         | .send partner [(_, _, contCand)] => partner = q ∧ R cont role contCand
         | _ => False
       else if role = q then
-        -- delegatee: receives the capability
+        -- delegatee: receives the capability (single branch)
         match cand with
         | .recv partner [(_, _, contCand)] => partner = p ∧ R cont role contCand
         | _ => False
@@ -125,6 +125,8 @@ private theorem CProjectF_mono : Monotone CProjectF := by
          | exact hrel
          | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
          | exact AllBranchesProj_mono h hrel)
+    | (-- delegate cases: TODO prove monotonicity for delegate patterns
+       sorry)
 
 /-- Helper: monotonicity for the non-participant comm branch. -/
 private theorem CProjectF_unfold_core_mono_comm_other

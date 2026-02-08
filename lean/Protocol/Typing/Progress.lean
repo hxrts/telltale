@@ -65,11 +65,6 @@ private lemma DisjointS_right_empty (S : SEnv) : DisjointS S (∅ : SEnv) := by
   have : lookupSEnv (∅ : SEnv) x = none := lookupSEnv_empty x
   cases hL2
 
-private lemma DisjointS_left_empty (S : SEnv) : DisjointS (∅ : SEnv) S := by
-  intro x T₁ T₂ hL1 hL2
-  have : lookupSEnv (∅ : SEnv) x = none := lookupSEnv_empty x
-  cases hL1
-
 private lemma SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
   ext s; constructor
   · intro h
@@ -108,9 +103,6 @@ private lemma channel_endpoint_eq_of_store
   have hEq : (Value.chan e') = (Value.chan e) := Option.some.inj hEqOpt
   cases hEq
   rfl
-
-private lemma DisjointG_right_empty (G : GEnv) : DisjointG G [] := by
-  simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
 
 private lemma DisjointG_left_empty (G : GEnv) : DisjointG [] G := by
   simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
@@ -196,41 +188,6 @@ private lemma lookupSEnv_swap_left {S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S�
       have hB' : lookupSEnv (S₂ ++ (S₁ ++ S₃)) x = lookupSEnv S₃ x := by
         simpa [List.append_assoc] using hB
       simpa [hA', hB']
-
-private lemma lookupSEnv_swap_left_prefix {Ssh S₁ S₂ S₃ : SEnv} (hDisj : DisjointS S₁ S₂) :
-    ∀ x, lookupSEnv (SEnvAll Ssh ((S₁ ++ S₂) ++ S₃)) x =
-      lookupSEnv (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) x := by
-  intro x
-  cases hS : lookupSEnv Ssh x with
-  | some Ty =>
-      have hLeft :=
-        lookupSEnv_append_left (S₁:=Ssh) (S₂:=((S₁ ++ S₂) ++ S₃)) (x:=x) (T:=Ty) hS
-      have hRight :=
-        lookupSEnv_append_left (S₁:=Ssh) (S₂:=(S₂ ++ (S₁ ++ S₃))) (x:=x) (T:=Ty) hS
-      have hLeft' : lookupSEnv (Ssh ++ (S₁ ++ (S₂ ++ S₃))) x = some Ty := by
-        simpa [List.append_assoc] using hLeft
-      simpa [SEnvAll, hLeft', hRight]
-  | none =>
-      have hLeft := lookupSEnv_append_right (S₁:=Ssh) (S₂:=((S₁ ++ S₂) ++ S₃)) (x:=x) hS
-      have hRight := lookupSEnv_append_right (S₁:=Ssh) (S₂:=(S₂ ++ (S₁ ++ S₃))) (x:=x) hS
-      have hLeft' : lookupSEnv ((S₁ ++ S₂) ++ S₃) x = lookupSEnv (S₂ ++ (S₁ ++ S₃)) x := by
-        simpa using (lookupSEnv_swap_left (S₁:=S₁) (S₂:=S₂) (S₃:=S₃) hDisj x)
-      have hLeft'' : lookupSEnv (Ssh ++ (S₁ ++ (S₂ ++ S₃))) x =
-          lookupSEnv ((S₁ ++ S₂) ++ S₃) x := by
-        simpa [List.append_assoc] using hLeft
-      have hRight'' : lookupSEnv (Ssh ++ (S₂ ++ (S₁ ++ S₃))) x =
-          lookupSEnv (S₂ ++ (S₁ ++ S₃)) x := by
-        simpa [List.append_assoc] using hRight
-      calc
-        lookupSEnv (SEnvAll Ssh ((S₁ ++ S₂) ++ S₃)) x
-            = lookupSEnv (Ssh ++ (S₁ ++ (S₂ ++ S₃))) x := by
-                simp [SEnvAll, List.append_assoc]
-        _ = lookupSEnv ((S₁ ++ S₂) ++ S₃) x := hLeft''
-        _ = lookupSEnv (S₂ ++ (S₁ ++ S₃)) x := hLeft'
-        _ = lookupSEnv (Ssh ++ (S₂ ++ (S₁ ++ S₃))) x := by
-                symm; exact hRight''
-        _ = lookupSEnv (SEnvAll Ssh (S₂ ++ (S₁ ++ S₃))) x := by
-                simp [SEnvAll]
 
 private lemma StoreTypedStrong_rewriteS {G : GEnv} {S S' : SEnv} {store : VarStore}
     (hEq : ∀ x, lookupSEnv S x = lookupSEnv S' x) :

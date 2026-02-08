@@ -195,26 +195,6 @@ private theorem Coherent_rewriteD
   refine ⟨Lsender, hGsender, ?_⟩
   simpa [hEq e] using hConsume
 
-private theorem DisjointG_append_right {G₁ G₂ G₃ : GEnv} :
-    DisjointG G₁ G₂ →
-    DisjointG G₁ G₃ →
-    DisjointG G₁ (G₂ ++ G₃) := by
-  intro hDisj12 hDisj13
-  apply Set.eq_empty_iff_forall_notMem.mpr
-  intro s hs
-  rcases hs with ⟨h1, h23⟩
-  have h23' : s ∈ SessionsOf G₂ ∪ SessionsOf G₃ :=
-    SessionsOf_append_subset (G₁:=G₂) (G₂:=G₃) h23
-  cases h23' with
-  | inl h2 =>
-      have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisj12
-      have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨h1, h2⟩
-      simp [hEmpty] at hInter
-  | inr h3 =>
-      have hEmpty : SessionsOf G₁ ∩ SessionsOf G₃ = (∅ : Set SessionId) := hDisj13
-      have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₃ := ⟨h1, h3⟩
-      simp [hEmpty] at hInter
-
 private theorem SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
   ext s; constructor
   · intro hs
@@ -222,9 +202,6 @@ private theorem SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
     cases hLookup
   · intro hs
     cases hs
-
-private theorem DisjointG_right_empty (G : GEnv) : DisjointG G [] := by
-  simp [DisjointG, GEnvDisjoint, SessionsOf_empty]
 
 private theorem SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
   ext s; constructor
@@ -258,20 +235,6 @@ private axiom OwnedDisjoint_preserved_TypedStep
 
 private theorem DEnv_append_empty_right (D : DEnv) : D ++ (∅ : DEnv) = D := by
   simpa using (DEnvUnion_empty_right D)
-
-private theorem lookupG_none_of_disjoint {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
-    {e : Endpoint} {L : LocalType} (hLookup : lookupG G₂ e = some L) :
-    lookupG G₁ e = none := by
-  by_cases hNone : lookupG G₁ e = none
-  · exact hNone
-  · cases hSome : lookupG G₁ e with
-    | none => exact (hNone hSome).elim
-    | some L₁ =>
-        have hSid₁ : e.sid ∈ SessionsOf G₁ := ⟨e, L₁, hSome, rfl⟩
-        have hSid₂ : e.sid ∈ SessionsOf G₂ := ⟨e, L, hLookup, rfl⟩
-        have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid₁, hSid₂⟩
-        have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
-        simp [hEmpty] at hInter
 
 private theorem BuffersTyped_mono {G G' : GEnv} {D : DEnv} {bufs : Buffers} :
     (∀ e L, lookupG G e = some L → lookupG G' e = some L) →

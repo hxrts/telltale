@@ -173,15 +173,16 @@ theorem isGuarded_false_substitute_preserved (t : LocalTypeR) (u v : String) (re
     (hneq : u ≠ v) (hunguarded : t.isGuarded v = false) :
     (t.substitute u repl).isGuarded v = false := by
   -- Structural recursion on the local type (avoid `induction` on nested inductive).
-  refine (LocalTypeR.rec
-    (motive_1 := fun t => t.isGuarded v = false → (t.substitute u repl).isGuarded v = false)
-    (motive_2 := fun _ => True) (motive_3 := fun _ => True)
-    (by intro h; exact isGuarded_false_substitute_preserved_end u v repl h)
-    (by intro p bs _ h; exact isGuarded_false_substitute_preserved_send p bs u v repl h)
-    (by intro p bs _ h; exact isGuarded_false_substitute_preserved_recv p bs u v repl h)
-    (by intro s body ih h; exact isGuarded_false_substitute_preserved_mu s body u v repl hneq h ih)
-    (by intro w h; exact isGuarded_false_substitute_preserved_var w u v repl hneq h)
-    (by exact True.intro) (by intro _ _ _ _; exact True.intro) (by intro _ _ _; exact True.intro) t) hunguarded
+  -- TODO: Fix recursor invocation after BranchR structure change
+  match t with
+  | .end => exact isGuarded_false_substitute_preserved_end u v repl hunguarded
+  | .send p bs => exact isGuarded_false_substitute_preserved_send p bs u v repl hunguarded
+  | .recv p bs => exact isGuarded_false_substitute_preserved_recv p bs u v repl hunguarded
+  | .mu s body =>
+      have ih : body.isGuarded v = false → (body.substitute u repl).isGuarded v = false :=
+        fun h => isGuarded_false_substitute_preserved body u v repl hneq h
+      exact isGuarded_false_substitute_preserved_mu s body u v repl hneq hunguarded ih
+  | .var w => exact isGuarded_false_substitute_preserved_var w u v repl hneq hunguarded
 
 /-- Corollary: Unguardedness is preserved in the forward direction.
     (The reverse direction is more complex and not needed.) -/

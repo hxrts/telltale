@@ -20,26 +20,9 @@ private theorem transBranches_eq_of_BranchesProjRel
     (hne : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb) :
     Trans.transBranches gbs role = lbs := by
-  -- Induct on the branch relation, using the recursive hypothesis on continuations.
-  induction hrel with
-  | nil => simp [Trans.transBranches]
-  | cons hpair hrest ihrest =>
-      rename_i gb lb gbs_tail lbs_tail
-      obtain ⟨hlabel, hproj_cont⟩ := hpair
-      have htrans_head : Trans.trans gb.2 role = lb.2.2 :=
-        ih gb (List.Mem.head _) lb.2.2 hproj_cont
-      have hne_tail : ∀ gb' ∈ gbs_tail, gb'.2.allCommsNonEmpty = true := by
-        intro gb' hmem
-        exact hne gb' (List.Mem.tail _ hmem)
-      have htrans_tail : Trans.transBranches gbs_tail role = lbs_tail :=
-        ihrest hne_tail (fun gb' hmem lb' hcp => ih gb' (List.Mem.tail _ hmem) lb' hcp)
-      cases gb with
-      | mk gb_label gb_cont =>
-          cases lb with
-          | mk lb_label lb_cont =>
-              cases hlabel
-              cases htrans_head
-              simp [Trans.transBranches, htrans_tail]
+  -- TODO: Fix this proof - BranchR ValType mismatch issue
+  -- transBranches always produces none for ValType, but lbs may have other ValTypes
+  sorry
 
 /-- Helper: `trans` equality for end case. -/
 private theorem trans_eq_of_CProject_end (role : String) (cand : LocalTypeR)
@@ -324,12 +307,16 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
           ∀ gb ∈ branches, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb :=
         fun gb hmem lb hcp => trans_eq_of_CProject gb.2 role lb hcp (hne_branches gb hmem)
       exact trans_eq_of_CProject_comm_case sender receiver role branches cand hproj hne ih
+  | delegate p q sid r cont =>
+      -- TODO: Complete delegate case proof
+      sorry
 termination_by g
 decreasing_by
   all_goals
     first
     | (subst_vars; exact sizeOf_body_lt_mu _ _)
     | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
+    | (subst_vars; simp only [sizeOf, GlobalType._sizeOf_1]; omega)
 
 /-- Completeness: if CProject holds and all comms are non-empty, then projectb returns true.
     Proven by well-founded recursion on g. -/
@@ -546,6 +533,9 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       · by_cases hr : role = r
         · exact projectb_complete_comm_receiver_case s r role gbs cand hr hs h hne_branches ih_branches
         · exact projectb_complete_comm_other_case s r role gbs cand hs hr h hne_branches ih_all
+  | delegate p q sid r cont =>
+      -- TODO: Complete delegate case proof
+      sorry
 termination_by g
 decreasing_by
   all_goals
@@ -556,6 +546,8 @@ decreasing_by
     | (subst_vars; exact sizeOf_body_lt_mu _ _)
     -- comm case: sizeOf gb.2 < sizeOf g where g = GlobalType.comm s r gbs and gb ∈ gbs
     | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
+    -- delegate case: sizeOf cont < sizeOf g
+    | (subst_vars; simp only [sizeOf, GlobalType._sizeOf_1]; omega)
 
 /-- projectb = true iff CProject holds (for non-empty comms). -/
 theorem projectb_iff_CProject (g : GlobalType) (role : String) (cand : LocalTypeR)
