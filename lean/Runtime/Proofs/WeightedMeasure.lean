@@ -886,8 +886,51 @@ lemma perm_cons_filter_sid
     (l : List SessionState) (s : SessionState)
     (hs : s ∈ l) (hunique : (l.map (·.sid)).Nodup) :
     List.Perm l (s :: (l.filter (fun t => t.sid != s.sid))) := by
-  -- Permutation follows from uniqueness of session IDs
-  sorry
+  -- Key insight: with unique sids, exactly one element has s.sid
+  -- The filter removes only that element, and we add s back at front
+  induction l with
+  | nil => simp at hs
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.nodup_cons] at hunique
+    obtain ⟨hnotmem, htl_nodup⟩ := hunique
+    by_cases heq : hd = s
+    · -- hd = s: s is at head, filter removes it, perm is id + cons
+      rw [heq]
+      simp only [List.filter_cons, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte]
+      -- Need to show filter preserves everything (nothing else has s.sid)
+      have hfilter : tl.filter (fun t => t.sid != s.sid) = tl := by
+        apply List.filter_eq_self.mpr
+        intro t ht
+        simp only [bne_iff_ne, ne_eq]
+        intro heq_sid
+        have hmem : s.sid ∈ tl.map (·.sid) := by
+          rw [← heq_sid]
+          exact List.mem_map_of_mem (f := (·.sid)) ht
+        have hsid_eq : hd.sid = s.sid := congrArg (·.sid) heq
+        rw [hsid_eq] at hnotmem
+        exact hnotmem hmem
+      rw [hfilter]
+    · -- hd ≠ s: s is in tail
+      have hs_tl : s ∈ tl := by
+        simp only [List.mem_cons] at hs
+        rcases hs with rfl | hmem
+        · exact absurd rfl heq
+        · exact hmem
+      have hperm_tl := ih hs_tl htl_nodup
+      simp only [List.filter_cons]
+      have hne_sid : (hd.sid != s.sid) = true := by
+        simp only [bne_iff_ne, ne_eq]
+        intro heq_sid
+        have hmem : hd.sid ∈ tl.map (·.sid) := by
+          rw [heq_sid]
+          exact List.mem_map_of_mem (f := (·.sid)) hs_tl
+        exact hnotmem hmem
+      simp only [hne_sid, ↓reduceIte]
+      -- Now: tl.Perm (s :: filter tl) → (hd :: tl).Perm (s :: hd :: filter tl)
+      have hswap : List.Perm (hd :: s :: tl.filter (fun t => t.sid != s.sid))
+                            (s :: hd :: tl.filter (fun t => t.sid != s.sid)) :=
+        List.Perm.swap s hd _
+      exact (List.Perm.cons hd hperm_tl).trans hswap
 
 /-- Measure additivity: the total measure is the sum of session measures.
     Shared participants do not introduce multiplicative overhead. -/
