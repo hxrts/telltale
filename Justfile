@@ -24,11 +24,11 @@ ci-dry-run:
 
 # Rust style guide lint check (comprehensive)
 lint:
-    ./scripts/lint-check.sh
+    ./scripts/check-lint.sh
 
 # Rust style guide lint check (quick - format + clippy only)
 lint-quick:
-    ./scripts/lint-check.sh --quick
+    ./scripts/check-lint.sh --quick
 
 # Check WASM compilation for choreography and core crates
 wasm-check:
@@ -123,6 +123,10 @@ serve: summary _gen-assets
     trap 'just _clean-assets' EXIT
     mdbook serve --open
     exit 1
+
+# Check Lean codebase for escape hatches (sorry, axiom, unsafe, partial, etc.)
+escape:
+    ./scripts/check-escape.sh
 
 # Test Lean installation
 lean-test:
