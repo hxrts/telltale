@@ -1,6 +1,8 @@
 import Protocol.Deployment.Merge
-import Protocol.Typing.Compatibility
+import Protocol.Typing.MergeLemmas
+import Protocol.Typing.StepLemmas
 import Protocol.Coherence.Renaming
+import Protocol.Coherence.Delegation
 
 /-! # Protocol.Deployment.Linking
 
@@ -15,138 +17,129 @@ open scoped Classical
 
 noncomputable section
 
-/-! ## Linking Coherence Infrastructure
+/-! ## Linking Coherence Infrastructure -/
 
-Reference: Aristotle file 18 (link_preserves_coherent_active)
--/
-
-/-- An endpoint's session is in the sessions of its GEnv. -/
+/-- An endpoint lookup witnesses membership of its session in `SessionsOf`. -/
 theorem session_of_lookupG {G : GEnv} {e : Endpoint} {L : LocalType}
     (h : lookupG G e = some L) : e.sid ∈ SessionsOf G :=
   ⟨e, L, h, rfl⟩
 
-/-- If sessions are disjoint and e has a lookup in G₁, then lookup in G₂ returns none. -/
-theorem lookupG_none_of_disjoint {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
-    (hDisj : DisjointG G₁ G₂)
-    (hG₁ : lookupG G₁ e = some L) :
-    lookupG G₂ e = none := by
-  by_contra hSome
-  cases hG₂ : lookupG G₂ e with
-  | none => exact hSome hG₂
-  | some L₂ =>
-    have hIn₁ : e.sid ∈ SessionsOf G₁ := session_of_lookupG hG₁
-    have hIn₂ : e.sid ∈ SessionsOf G₂ := session_of_lookupG hG₂
-    have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn₁, hIn₂⟩
-    simp only [DisjointG, GEnvDisjoint] at hDisj
-    rw [hDisj] at hInter
-    exact hInter.elim
+private theorem sid_not_in_right_of_left {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+    {s : SessionId} (hIn : s ∈ SessionsOf G₁) :
+    s ∉ SessionsOf G₂ := by
+  intro hIn₂
+  have hInter : s ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn, hIn₂⟩
+  have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = ∅ := hDisj
+  have : s ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+  exact this.elim
 
-/-- If sessions are disjoint and e has a lookup in G₂, then lookup in G₁ returns none. -/
-theorem lookupG_none_of_disjoint' {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType}
-    (hDisj : DisjointG G₁ G₂)
-    (hG₂ : lookupG G₂ e = some L) :
-    lookupG G₁ e = none := by
-  by_contra hSome
-  cases hG₁ : lookupG G₁ e with
-  | none => exact hSome hG₁
-  | some L₁ =>
-    have hIn₁ : e.sid ∈ SessionsOf G₁ := session_of_lookupG hG₁
-    have hIn₂ : e.sid ∈ SessionsOf G₂ := session_of_lookupG hG₂
-    have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn₁, hIn₂⟩
-    simp only [DisjointG, GEnvDisjoint] at hDisj
-    rw [hDisj] at hInter
-    exact hInter.elim
+private theorem sid_not_in_left_of_right {G₁ G₂ : GEnv} (hDisj : DisjointG G₁ G₂)
+    {s : SessionId} (hIn : s ∈ SessionsOf G₂) :
+    s ∉ SessionsOf G₁ := by
+  exact sid_not_in_right_of_left (G₁ := G₂) (G₂ := G₁) (DisjointG_symm hDisj) hIn
 
-/-- ActiveEdge in merged GEnv with disjoint sessions: both endpoints in G₁ or both in G₂. -/
-theorem ActiveEdge_mergeGEnv_split {G₁ G₂ : GEnv} {e : Edge}
+private theorem lookupD_none_of_notin_sessions {G : GEnv} {D : DEnv} {e : Edge}
+    (hCons : DConsistent G D) (hNot : e.sid ∉ SessionsOf G) :
+    D.find? e = none := by
+  by_contra hSome
+  cases hFind : D.find? e with
+  | none =>
+      exact hSome hFind
+  | some ts =>
+      have hSid : e.sid ∈ SessionsOfD D := ⟨e, ts, hFind, rfl⟩
+      exact hNot (hCons hSid)
+
+private theorem lookupBuf_none_of_notin_sessions {G : GEnv} {B : Buffers} {e : Edge}
+    (hCons : BConsistent G B) (hNot : e.sid ∉ SessionsOf G) :
+    B.lookup e = none := by
+  by_contra hSome
+  cases hFind : B.lookup e with
+  | none =>
+      exact hSome hFind
+  | some buf =>
+      exact hNot (hCons e buf hFind)
+
+private theorem BufferTyped_monoG {G G' : GEnv} {D : DEnv} {bufs : Buffers} {e : Edge} :
+    BufferTyped G D bufs e →
+    (∀ ep L, lookupG G ep = some L → lookupG G' ep = some L) →
+    BufferTyped G' D bufs e := by
+  intro hBT hMono
+  rcases hBT with ⟨hLen, hTy⟩
+  refine ⟨hLen, ?_⟩
+  intro i hi
+  exact HasTypeVal_mono G G' _ _ (hTy i hi) hMono
+
+private theorem HasTypeVal_lift_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
+    HasTypeVal G₁ v T →
+    HasTypeVal (mergeGEnv G₁ G₂) v T := by
+  intro hVal
+  refine HasTypeVal_mono G₁ (mergeGEnv G₁ G₂) v T hVal ?_
+  intro ep L hLookup
+  simpa [mergeGEnv] using
+    (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup)
+
+private theorem HasTypeVal_lift_right {G₁ G₂ : GEnv}
+    (hDisj : DisjointG G₁ G₂) {v : Value} {T : ValType} :
+    HasTypeVal G₂ v T →
+    HasTypeVal (mergeGEnv G₁ G₂) v T := by
+  intro hVal
+  refine HasTypeVal_mono G₂ (mergeGEnv G₁ G₂) v T hVal ?_
+  intro ep L hLookup
+  have hIn₂ : ep.sid ∈ SessionsOf G₂ := session_of_lookupG hLookup
+  have hNot₁ : ep.sid ∉ SessionsOf G₁ := sid_not_in_left_of_right hDisj hIn₂
+  have hNone₁ : lookupG G₁ ep = none := lookupG_none_of_not_session hNot₁
+  have hEq := lookupG_append_right (G₁ := G₁) (G₂ := G₂) (e := ep) hNone₁
+  simpa [mergeGEnv, hEq] using hLookup
+
+private theorem ActiveEdge_mergeGEnv_split {G₁ G₂ : GEnv} {e : Edge}
     (hDisj : DisjointG G₁ G₂)
     (hActive : ActiveEdge (mergeGEnv G₁ G₂) e) :
     ActiveEdge G₁ e ∨ ActiveEdge G₂ e := by
-  rcases hActive with ⟨hSender, hRecv⟩
-  -- Get the actual lookups from isSome
-  rcases Option.isSome_iff_exists.mp hSender with ⟨Ls, hLs⟩
-  rcases Option.isSome_iff_exists.mp hRecv with ⟨Lr, hLr⟩
-  -- Invert the merged lookups
-  cases MergeGEnv_inv hLs with
-  | inl hG₁s =>
-    -- Sender in G₁
-    left
-    have hG₂s_none : lookupG G₂ ⟨e.sid, e.sender⟩ = none :=
-      lookupG_none_of_disjoint hDisj hG₁s
-    -- Receiver must also be in G₁ (same session, disjoint)
-    cases MergeGEnv_inv hLr with
-    | inl hG₁r =>
-      exact ⟨Option.isSome_iff_exists.mpr ⟨_, hG₁s⟩, Option.isSome_iff_exists.mpr ⟨_, hG₁r⟩⟩
-    | inr hG₂r =>
-      -- Contradiction: sender in G₁, receiver in G₂, but same session
-      have hIn₁ : e.sid ∈ SessionsOf G₁ := session_of_lookupG hG₁s
-      have hIn₂ : e.sid ∈ SessionsOf G₂ := session_of_lookupG hG₂r.2
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn₁, hIn₂⟩
-      simp only [DisjointG, GEnvDisjoint] at hDisj
-      rw [hDisj] at hInter
-      exact hInter.elim
-  | inr hG₂s =>
-    -- Sender in G₂
-    right
-    have hG₁s_none := hG₂s.1
-    -- Receiver must also be in G₂ (same session, disjoint)
-    cases MergeGEnv_inv hLr with
-    | inl hG₁r =>
-      -- Contradiction: sender in G₂, receiver in G₁, but same session
-      have hIn₁ : e.sid ∈ SessionsOf G₁ := session_of_lookupG hG₁r
-      have hIn₂ : e.sid ∈ SessionsOf G₂ := session_of_lookupG hG₂s.2
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn₁, hIn₂⟩
-      simp only [DisjointG, GEnvDisjoint] at hDisj
-      rw [hDisj] at hInter
-      exact hInter.elim
-    | inr hG₂r =>
-      exact ⟨Option.isSome_iff_exists.mpr ⟨_, hG₂s.2⟩, Option.isSome_iff_exists.mpr ⟨_, hG₂r.2⟩⟩
+  rcases hActive with ⟨hSenderSome, hRecvSome⟩
+  rcases Option.isSome_iff_exists.mp hSenderSome with ⟨Lsender, hGsender⟩
+  rcases Option.isSome_iff_exists.mp hRecvSome with ⟨Lrecv, hGrecv⟩
+  have hRecvCases :=
+    lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.receiver }) (L := Lrecv)
+      (by simpa [mergeGEnv] using hGrecv)
+  cases hRecvCases with
+  | inl hRecvLeft =>
+      have hSidIn₁ : e.sid ∈ SessionsOf G₁ :=
+        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRecvLeft, rfl⟩
+      have hSidNotIn₂ : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisj hSidIn₁
+      have hSenderCases :=
+        lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.sender }) (L := Lsender)
+          (by simpa [mergeGEnv] using hGsender)
+      have hSenderLeft : lookupG G₁ { sid := e.sid, role := e.sender } = some Lsender := by
+        cases hSenderCases with
+        | inl h =>
+            exact h
+        | inr h =>
+            have hSidIn₂ : e.sid ∈ SessionsOf G₂ :=
+              ⟨{ sid := e.sid, role := e.sender }, Lsender, h.2, rfl⟩
+            exact (hSidNotIn₂ hSidIn₂).elim
+      left
+      exact ActiveEdge_of_endpoints hSenderLeft hRecvLeft
+  | inr hRecvRight =>
+      have hSidIn₂ : e.sid ∈ SessionsOf G₂ :=
+        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRecvRight.2, rfl⟩
+      have hSidNotIn₁ : e.sid ∉ SessionsOf G₁ := sid_not_in_left_of_right hDisj hSidIn₂
+      have hSenderCases :=
+        lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.sender }) (L := Lsender)
+          (by simpa [mergeGEnv] using hGsender)
+      have hSenderRight : lookupG G₂ { sid := e.sid, role := e.sender } = some Lsender := by
+        cases hSenderCases with
+        | inl h =>
+            have hSidIn₁ : e.sid ∈ SessionsOf G₁ :=
+              ⟨{ sid := e.sid, role := e.sender }, Lsender, h, rfl⟩
+            exact (hSidNotIn₁ hSidIn₁).elim
+        | inr h =>
+            exact h.2
+      right
+      exact ActiveEdge_of_endpoints hSenderRight hRecvRight.2
 
-/-- DEnv lookup in merged env when edge session not in G₂. -/
-theorem lookupD_mergeD_left {G₂ : GEnv} {D₁ D₂ : DEnv} {e : Edge}
-    (hCons₂ : DConsistent G₂ D₂)
-    (hNotIn : e.sid ∉ SessionsOf G₂) :
-    lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e := by
-  -- Edge session not in G₂ → edge not in D₂ (by DConsistent)
-  have hD₂_none : D₂.find? e = none := by
-    by_contra hSome
-    cases hFind : D₂.find? e with
-    | none => exact hSome hFind
-    | some ts =>
-      have hSid : e.sid ∈ SessionsOfD D₂ := ⟨e, ts, hFind, rfl⟩
-      have hSidG : e.sid ∈ SessionsOf G₂ := hCons₂ hSid
-      exact hNotIn hSidG
-  -- With D₂.find? e = none, merged lookup equals D₁ lookup
-  exact lookupD_append_left_of_right_none hD₂_none
+/-! ## Main Linking Coherence Theorem -/
 
-/-- DEnv lookup in merged env when edge session not in G₁. -/
-theorem lookupD_mergeD_right {G₁ : GEnv} {D₁ D₂ : DEnv} {e : Edge}
-    (hCons₁ : DConsistent G₁ D₁)
-    (hNotIn : e.sid ∉ SessionsOf G₁) :
-    lookupD (mergeDEnv D₁ D₂) e = lookupD D₂ e := by
-  -- Edge session not in G₁ → edge not in D₁ (by DConsistent)
-  have hD₁_none : D₁.find? e = none := by
-    by_contra hSome
-    cases hFind : D₁.find? e with
-    | none => exact hSome hFind
-    | some ts =>
-      have hSid : e.sid ∈ SessionsOfD D₁ := ⟨e, ts, hFind, rfl⟩
-      have hSidG : e.sid ∈ SessionsOf G₁ := hCons₁ hSid
-      exact hNotIn hSidG
-  -- With D₁.find? e = none, merged lookup equals D₂ lookup
-  exact lookupD_append_right hD₁_none
-
-/-! ## Main Linking Coherence Theorem
-
-Reference: Aristotle file 18 (link_preserves_coherent_active)
-
-This theorem proves that linking two coherent protocol configurations
-produces a coherent configuration, under session disjointness and
-DEnv consistency assumptions.
--/
-
-/-- Linking preserves coherence: if G₁, D₁ and G₂, D₂ are coherent
-    with disjoint sessions, then the merged environments are coherent. -/
+/-- Linking preserves coherence for disjoint session spaces. -/
 theorem link_preserves_coherent
     (G₁ G₂ : GEnv) (D₁ D₂ : DEnv)
     (hCoh₁ : Coherent G₁ D₁)
@@ -155,128 +148,341 @@ theorem link_preserves_coherent
     (hCons₁ : DConsistent G₁ D₁)
     (hCons₂ : DConsistent G₂ D₂) :
     Coherent (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) := by
-  intro e hActive
-  -- Split: both endpoints in G₁ or both in G₂
-  cases ActiveEdge_mergeGEnv_split hDisjG hActive with
-  | inl hActive₁ =>
-    -- Edge active in G₁: use Coherent G₁ D₁
-    have hCoh := hCoh₁ e hActive₁
-    -- EdgeCoherent G₁ D₁ e says: ∀ Lrecv, lookupG G₁ receiverEp = some Lrecv →
-    --   ∃ Lsender, lookupG G₁ senderEp = some Lsender ∧ (Consume ...).isSome
-    intro Lrecv hLrecv
-    -- Translate receiver lookup from merged to G₁
-    have hG₂_none : lookupG G₂ ⟨e.sid, e.receiver⟩ = none := by
-      rcases Option.isSome_iff_exists.mp hActive₁.2 with ⟨Lr, hLr⟩
-      exact lookupG_none_of_disjoint hDisj hLr
-    have hLrecv₁ : lookupG G₁ ⟨e.sid, e.receiver⟩ = some Lrecv := by
-      have h := MergeGEnv_inv hLrecv
-      cases h with
-      | inl h => exact h
-      | inr h => simp [h.1] at hG₂_none
-    -- Apply coherence from G₁
-    rcases hCoh Lrecv hLrecv₁ with ⟨Lsender, hLsender, hConsume⟩
-    -- Translate sender lookup to merged
-    have hLsender' : lookupG (mergeGEnv G₁ G₂) ⟨e.sid, e.sender⟩ = some Lsender :=
-      MergeGEnv_Left G₁ G₂ ⟨e.sid, e.sender⟩ Lsender hLsender
-    -- Translate DEnv lookup: edge session in G₁, so not in G₂ (disjoint)
-    have hNotIn₂ : e.sid ∉ SessionsOf G₂ := by
-      intro hIn₂
-      have hIn₁ : e.sid ∈ SessionsOf G₁ := session_of_lookupG hLrecv₁
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn₁, hIn₂⟩
-      simp only [DisjointG, GEnvDisjoint] at hDisjG
-      rw [hDisjG] at hInter
-      exact hInter.elim
-    have hLookupD : lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e :=
-      lookupD_mergeD_left hCons₂ hNotIn₂
-    -- Conclude
-    refine ⟨Lsender, hLsender', ?_⟩
-    rw [hLookupD]
-    exact hConsume
-  | inr hActive₂ =>
-    -- Edge active in G₂: symmetric case using Coherent G₂ D₂
-    have hCoh := hCoh₂ e hActive₂
-    intro Lrecv hLrecv
-    -- Translate receiver lookup from merged to G₂
-    have hG₁_none : lookupG G₁ ⟨e.sid, e.receiver⟩ = none := by
-      rcases Option.isSome_iff_exists.mp hActive₂.2 with ⟨Lr, hLr⟩
-      exact lookupG_none_of_disjoint' hDisjG hLr
-    have hLrecv₂ : lookupG G₂ ⟨e.sid, e.receiver⟩ = some Lrecv := by
-      have h := MergeGEnv_inv hLrecv
-      cases h with
-      | inl h => simp [h] at hG₁_none
-      | inr h => exact h.2
-    -- Apply coherence from G₂
-    rcases hCoh Lrecv hLrecv₂ with ⟨Lsender, hLsender, hConsume⟩
-    -- Translate sender lookup to merged
-    have hLsender' : lookupG (mergeGEnv G₁ G₂) ⟨e.sid, e.sender⟩ = some Lsender := by
-      have hG₁s_none : lookupG G₁ ⟨e.sid, e.sender⟩ = none :=
-        lookupG_none_of_disjoint' hDisjG hLsender
-      exact MergeGEnv_Right G₁ G₂ ⟨e.sid, e.sender⟩ hG₁s_none ▸ hLsender
-    -- Translate DEnv lookup: edge session in G₂, so not in G₁ (disjoint)
-    have hNotIn₁ : e.sid ∉ SessionsOf G₁ := by
-      intro hIn₁
-      have hIn₂ : e.sid ∈ SessionsOf G₂ := session_of_lookupG hLrecv₂
-      have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hIn₁, hIn₂⟩
-      simp only [DisjointG, GEnvDisjoint] at hDisjG
-      rw [hDisjG] at hInter
-      exact hInter.elim
-    have hLookupD : lookupD (mergeDEnv D₁ D₂) e = lookupD D₂ e :=
-      lookupD_mergeD_right hCons₁ hNotIn₁
-    -- Conclude
-    refine ⟨Lsender, hLsender', ?_⟩
-    rw [hLookupD]
-    exact hConsume
+  simpa [mergeGEnv, mergeDEnv] using
+    (Coherent_merge (G₁ := G₁) (G₂ := G₂) (D₁ := D₁) (D₂ := D₂)
+      hCoh₁ hCoh₂ hDisjG hCons₁ hCons₂)
 
 /-! ## Linking Theorems -/
 
-axiom mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffers)
+theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffers)
     (hTyped₁ : BuffersTyped G₁ D₁ B₁)
     (hTyped₂ : BuffersTyped G₂ D₂ B₂)
     (hDisjG : DisjointG G₁ G₂)
     (hConsD₂ : DConsistent G₂ D₂)
     (hConsB₁ : BConsistent G₁ B₁)
     (hDom₁ : BufsDom B₁ D₁) :
-    BuffersTyped (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂)
+    BuffersTyped (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂) := by
+  intro e
+  cases hFindD₁ : D₁.find? e with
+  | none =>
+      by_cases hFindB₁ : B₁.lookup e = none
+      · have hTraceEq : lookupD (mergeDEnv D₁ D₂) e = lookupD D₂ e := by
+          simpa [mergeDEnv] using
+            (lookupD_append_right (D₁ := D₁) (D₂ := D₂) (e := e) hFindD₁)
+        have hBufEq : lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₂ e := by
+          simp [lookupBuf, mergeBufs, List.lookup_append, hFindB₁]
+        have hBT₂ : BufferTyped G₂ D₂ B₂ e := hTyped₂ e
+        have hBT₂' : BufferTyped (mergeGEnv G₁ G₂) D₂ B₂ e :=
+          BufferTyped_monoG hBT₂ (by
+            intro ep L hLookup
+            have hIn₂ : ep.sid ∈ SessionsOf G₂ := session_of_lookupG hLookup
+            have hNot₁ : ep.sid ∉ SessionsOf G₁ := sid_not_in_left_of_right hDisjG hIn₂
+            have hNone₁ : lookupG G₁ ep = none := lookupG_none_of_not_session hNot₁
+            have hEq := lookupG_append_right (G₁ := G₁) (G₂ := G₂) (e := ep) hNone₁
+            simpa [mergeGEnv, hEq] using hLookup)
+        simpa [BufferTyped, hTraceEq, hBufEq] using hBT₂'
+      · cases hB₁ : B₁.lookup e with
+        | none =>
+            exact (hFindB₁ hB₁).elim
+        | some buf₁ =>
+            have hSidIn₁ : e.sid ∈ SessionsOf G₁ := hConsB₁ e buf₁ hB₁
+            have hNotIn₂ : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSidIn₁
+            have hFindD₂_none : D₂.find? e = none :=
+              lookupD_none_of_notin_sessions hConsD₂ hNotIn₂
+            have hTraceEq : lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e := by
+              simpa [mergeDEnv] using
+                (lookupD_append_left_of_right_none (D₁ := D₁) (D₂ := D₂) (e := e) hFindD₂_none)
+            have hBufEq : lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₁ e := by
+              simp [lookupBuf, mergeBufs, List.lookup_append, hB₁]
+            have hBT₁ : BufferTyped G₁ D₁ B₁ e := hTyped₁ e
+            have hBT₁' : BufferTyped (mergeGEnv G₁ G₂) D₁ B₁ e := by
+              exact BufferTyped_monoG hBT₁ (by
+                intro ep L hLookup
+                simpa [mergeGEnv] using
+                  (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
+            simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
+  | some ts₁ =>
+      have hB₁_not_none : B₁.lookup e ≠ none := by
+        intro hNone
+        have hD₁_none : D₁.find? e = none := hDom₁ e hNone
+        simp [hD₁_none] at hFindD₁
+      cases hB₁ : B₁.lookup e with
+      | none =>
+          exact (hB₁_not_none hB₁).elim
+      | some buf₁ =>
+          have hSidIn₁ : e.sid ∈ SessionsOf G₁ := hConsB₁ e buf₁ hB₁
+          have hNotIn₂ : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSidIn₁
+          have hFindD₂_none : D₂.find? e = none :=
+            lookupD_none_of_notin_sessions hConsD₂ hNotIn₂
+          have hTraceEq : lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e := by
+            simpa [mergeDEnv] using
+              (lookupD_append_left_of_right_none (D₁ := D₁) (D₂ := D₂) (e := e) hFindD₂_none)
+          have hBufEq : lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₁ e := by
+            simp [lookupBuf, mergeBufs, List.lookup_append, hB₁]
+          have hBT₁ : BufferTyped G₁ D₁ B₁ e := hTyped₁ e
+          have hBT₁' : BufferTyped (mergeGEnv G₁ G₂) D₁ B₁ e := by
+            exact BufferTyped_monoG hBT₁ (by
+              intro ep L hLookup
+              simpa [mergeGEnv] using
+                (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
+          simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
 
-axiom mergeLin_valid (G₁ G₂ : GEnv) (L₁ L₂ : LinCtx)
+theorem mergeLin_valid (G₁ G₂ : GEnv) (L₁ L₂ : LinCtx)
     (hValid₁ : ∀ e S, (e, S) ∈ L₁ → lookupG G₁ e = some S)
     (hValid₂ : ∀ e S, (e, S) ∈ L₂ → lookupG G₂ e = some S)
     (hDisjointG : DisjointG G₁ G₂) :
-    ∀ e S, (e, S) ∈ mergeLin L₁ L₂ → lookupG (mergeGEnv G₁ G₂) e = some S
+    ∀ e S, (e, S) ∈ mergeLin L₁ L₂ → lookupG (mergeGEnv G₁ G₂) e = some S := by
+  intro e S hMem
+  simp [mergeLin] at hMem
+  cases hMem with
+  | inl hIn₁ =>
+      have hLookup : lookupG G₁ e = some S := hValid₁ e S hIn₁
+      simpa [mergeGEnv] using
+        (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := e) (L := S) hLookup)
+  | inr hIn₂ =>
+      have hLookup₂ : lookupG G₂ e = some S := hValid₂ e S hIn₂
+      have hSidIn₂ : e.sid ∈ SessionsOf G₂ := session_of_lookupG hLookup₂
+      have hSidNotIn₁ : e.sid ∉ SessionsOf G₁ := sid_not_in_left_of_right hDisjointG hSidIn₂
+      have hLookup₁_none : lookupG G₁ e = none := lookupG_none_of_not_session hSidNotIn₁
+      have hEq := lookupG_append_right (G₁ := G₁) (G₂ := G₂) (e := e) hLookup₁_none
+      simpa [mergeGEnv, hEq] using hLookup₂
 
-axiom mergeLin_unique (L₁ L₂ : LinCtx)
+theorem mergeLin_unique (L₁ L₂ : LinCtx)
     (hUnique₁ : L₁.Pairwise (fun a b => a.1 ≠ b.1))
     (hUnique₂ : L₂.Pairwise (fun a b => a.1 ≠ b.1))
     (hDisjoint : ∀ e, (∃ S, (e, S) ∈ L₁) → ∀ S', (e, S') ∉ L₂) :
-    (mergeLin L₁ L₂).Pairwise (fun a b => a.1 ≠ b.1)
+    (mergeLin L₁ L₂).Pairwise (fun a b => a.1 ≠ b.1) := by
+  refine (List.pairwise_append.2 ?_)
+  refine ⟨hUnique₁, hUnique₂, ?_⟩
+  intro a ha b hb
+  by_contra hEq
+  have hb' : (a.1, b.2) ∈ L₂ := by simpa [hEq] using hb
+  have hNo : (a.1, b.2) ∉ L₂ := hDisjoint a.1 ⟨a.2, ha⟩ b.2
+  exact hNo hb'
 
-axiom link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
+private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
+    (hHead₁ : HeadCoherent G₁ D₁)
+    (hHead₂ : HeadCoherent G₂ D₂)
+    (hDisjG : DisjointG G₁ G₂)
+    (hCons₁ : DConsistent G₁ D₁)
+    (hCons₂ : DConsistent G₂ D₂) :
+    HeadCoherent (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) := by
+  intro e hActive
+  rcases hActive with ⟨hSenderSome, hRecvSome⟩
+  rcases (Option.isSome_iff_exists).1 hSenderSome with ⟨Lsender, hGsender⟩
+  rcases (Option.isSome_iff_exists).1 hRecvSome with ⟨Lrecv, hGrecv⟩
+  have hCases :=
+    lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.receiver }) (L := Lrecv)
+      (by simpa [mergeGEnv] using hGrecv)
+  cases hCases with
+  | inl hLeft =>
+      have hSid : e.sid ∈ SessionsOf G₁ :=
+        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hLeft, rfl⟩
+      have hSenderCases :=
+        lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.sender }) (L := Lsender)
+          (by simpa [mergeGEnv] using hGsender)
+      have hSenderLeft : lookupG G₁ { sid := e.sid, role := e.sender } = some Lsender := by
+        cases hSenderCases with
+        | inl h =>
+            exact h
+        | inr h =>
+            have hSidSender : e.sid ∈ SessionsOf G₂ :=
+              ⟨{ sid := e.sid, role := e.sender }, Lsender, h.2, rfl⟩
+            have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSid, hSidSender⟩
+            have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisjG
+            simp [hEmpty] at hInter
+      have hD2none : D₂.find? e = none := lookupD_none_of_disjointG hDisjG hCons₂ hSid
+      have hTraceEq : lookupD (mergeDEnv D₁ D₂) e = lookupD D₁ e := by
+        simpa [mergeDEnv] using
+          (lookupD_append_left_of_right_none (D₁ := D₁) (D₂ := D₂) (e := e) hD2none)
+      have hActiveLeft : ActiveEdge G₁ e := ActiveEdge_of_endpoints hSenderLeft hLeft
+      have hHeadLeft := hHead₁ e hActiveLeft
+      have hHeadLeft' :
+          match some Lrecv with
+          | some (.recv _ T _) =>
+              match lookupD D₁ e with
+              | [] => True
+              | T' :: _ => T = T'
+          | some (.branch _ _) =>
+              match lookupD D₁ e with
+              | [] => True
+              | T' :: _ => T' = .string
+          | _ => True := by
+        simpa [HeadCoherent, hLeft] using hHeadLeft
+      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
+  | inr hRight =>
+      have hSid : e.sid ∈ SessionsOf G₂ :=
+        ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRight.2, rfl⟩
+      have hSenderCases :=
+        lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.sender }) (L := Lsender)
+          (by simpa [mergeGEnv] using hGsender)
+      have hSenderRight : lookupG G₂ { sid := e.sid, role := e.sender } = some Lsender := by
+        cases hSenderCases with
+        | inl h =>
+            have hSidSender : e.sid ∈ SessionsOf G₁ :=
+              ⟨{ sid := e.sid, role := e.sender }, Lsender, h, rfl⟩
+            have hInter : e.sid ∈ SessionsOf G₁ ∩ SessionsOf G₂ := ⟨hSidSender, hSid⟩
+            have hEmpty : SessionsOf G₁ ∩ SessionsOf G₂ = (∅ : Set SessionId) := hDisjG
+            simp [hEmpty] at hInter
+        | inr h =>
+            exact h.2
+      have hD1none : D₁.find? e = none :=
+        lookupD_none_of_disjointG (G₁ := G₂) (G₂ := G₁) (D₂ := D₁) (DisjointG_symm hDisjG) hCons₁ hSid
+      have hTraceEq : lookupD (mergeDEnv D₁ D₂) e = lookupD D₂ e := by
+        simpa [mergeDEnv] using
+          (lookupD_append_right (D₁ := D₁) (D₂ := D₂) (e := e) hD1none)
+      have hActiveRight : ActiveEdge G₂ e := ActiveEdge_of_endpoints hSenderRight hRight.2
+      have hHeadRight := hHead₂ e hActiveRight
+      have hHeadRight' :
+          match some Lrecv with
+          | some (.recv _ T _) =>
+              match lookupD D₂ e with
+              | [] => True
+              | T' :: _ => T = T'
+          | some (.branch _ _) =>
+              match lookupD D₂ e with
+              | [] => True
+              | T' :: _ => T' = .string
+          | _ => True := by
+        simpa [HeadCoherent, hRight.2] using hHeadRight
+      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadRight'
+
+private theorem ValidLabels_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {B₁ B₂ : Buffers}
+    (hValid₁ : ValidLabels G₁ D₁ B₁)
+    (hValid₂ : ValidLabels G₂ D₂ B₂)
+    (hDisjG : DisjointG G₁ G₂)
+    (hConsB₁ : BConsistent G₁ B₁)
+    (hConsB₂ : BConsistent G₂ B₂) :
+    ValidLabels (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂) := by
+  intro e source bs hActive hBranch
+  have hActiveSplit : ActiveEdge G₁ e ∨ ActiveEdge G₂ e :=
+    ActiveEdge_mergeGEnv_split hDisjG hActive
+  have hCases :=
+    lookupG_append_inv (G₁ := G₁) (G₂ := G₂) (e := { sid := e.sid, role := e.receiver }) (L := .branch source bs)
+      (by simpa [mergeGEnv] using hBranch)
+  cases hCases with
+  | inl hLeft =>
+      have hSidIn₁ : e.sid ∈ SessionsOf G₁ :=
+        ⟨{ sid := e.sid, role := e.receiver }, .branch source bs, hLeft, rfl⟩
+      have hSidNotIn₂ : e.sid ∉ SessionsOf G₂ := sid_not_in_right_of_left hDisjG hSidIn₁
+      have hB₂none : B₂.lookup e = none := lookupBuf_none_of_notin_sessions hConsB₂ hSidNotIn₂
+      have hActive₁ : ActiveEdge G₁ e := by
+        cases hActiveSplit with
+        | inl hA₁ =>
+            exact hA₁
+        | inr hA₂ =>
+            rcases Option.isSome_iff_exists.mp hA₂.2 with ⟨Lrecv₂, hRecv₂⟩
+            have hSidIn₂ : e.sid ∈ SessionsOf G₂ :=
+              ⟨{ sid := e.sid, role := e.receiver }, Lrecv₂, hRecv₂, rfl⟩
+            exact (hSidNotIn₂ hSidIn₂).elim
+      have hBufEq : lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₁ e := by
+        simp [lookupBuf, mergeBufs, List.lookup_append, hB₂none]
+      simpa [ValidLabels, mergeGEnv, hBufEq] using hValid₁ e source bs hActive₁ hLeft
+  | inr hRight =>
+      have hSidIn₂ : e.sid ∈ SessionsOf G₂ :=
+        ⟨{ sid := e.sid, role := e.receiver }, .branch source bs, hRight.2, rfl⟩
+      have hSidNotIn₁ : e.sid ∉ SessionsOf G₁ := sid_not_in_left_of_right hDisjG hSidIn₂
+      have hB₁none : B₁.lookup e = none := lookupBuf_none_of_notin_sessions hConsB₁ hSidNotIn₁
+      have hActive₂ : ActiveEdge G₂ e := by
+        cases hActiveSplit with
+        | inl hA₁ =>
+            rcases Option.isSome_iff_exists.mp hA₁.2 with ⟨Lrecv₁, hRecv₁⟩
+            have hSidIn₁ : e.sid ∈ SessionsOf G₁ :=
+              ⟨{ sid := e.sid, role := e.receiver }, Lrecv₁, hRecv₁, rfl⟩
+            exact (hSidNotIn₁ hSidIn₁).elim
+        | inr hA₂ =>
+            exact hA₂
+      have hBufEq : lookupBuf (mergeBufs B₁ B₂) e = lookupBuf B₂ e := by
+        simp [lookupBuf, mergeBufs, List.lookup_append, hB₁none]
+      simpa [ValidLabels, mergeGEnv, hBufEq] using hValid₂ e source bs hActive₂ hRight.2
+
+theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
     (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
     (hWT₁ : WTMon p₁.initMonitorState)
     (hWT₂ : WTMon p₂.initMonitorState) :
-    WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState)
+    WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState) := by
+  constructor
+  · -- coherent
+    simpa [composeMonitorState] using LinkOKFull_coherent p₁ p₂ hLink
+  · -- headCoherent
+    simpa [composeMonitorState] using
+      HeadCoherent_merge hWT₁.headCoherent hWT₂.headCoherent hDisjG
+        p₁.dConsistent_cert p₂.dConsistent_cert
+  · -- validLabels
+    simpa [composeMonitorState] using
+      ValidLabels_merge hWT₁.validLabels hWT₂.validLabels hDisjG
+        p₁.bConsistent_cert p₂.bConsistent_cert
+  · -- buffers_typed
+    simpa [composeMonitorState] using
+      mergeBufs_typed p₁.initGEnv p₂.initGEnv p₁.initDEnv p₂.initDEnv
+        p₁.initBufs p₂.initBufs
+        hWT₁.buffers_typed hWT₂.buffers_typed
+        hDisjG p₂.dConsistent_cert p₁.bConsistent_cert p₁.bufsDom_cert
+  · -- lin_valid
+    intro e S hMem
+    simpa [composeMonitorState] using
+      mergeLin_valid p₁.initGEnv p₂.initGEnv p₁.initLin p₂.initLin
+        hWT₁.lin_valid hWT₂.lin_valid hDisjG e S hMem
+  · -- lin_unique
+    simpa [composeMonitorState] using
+      mergeLin_unique p₁.initLin p₂.initLin hWT₁.lin_unique hWT₂.lin_unique
+        (fun e hIn =>
+          by
+            intro S' hIn₂
+            rcases hIn with ⟨S, hIn₁⟩
+            have hLookup₁ : lookupG p₁.initGEnv e = some S := hWT₁.lin_valid e S hIn₁
+            have hLookup₂ : lookupG p₂.initGEnv e = some S' := hWT₂.lin_valid e S' hIn₂
+            have hSidIn₁ : e.sid ∈ SessionsOf p₁.initGEnv := session_of_lookupG hLookup₁
+            have hSidIn₂ : e.sid ∈ SessionsOf p₂.initGEnv := session_of_lookupG hLookup₂
+            have hInter : e.sid ∈ SessionsOf p₁.initGEnv ∩ SessionsOf p₂.initGEnv := ⟨hSidIn₁, hSidIn₂⟩
+            have hEmpty : SessionsOf p₁.initGEnv ∩ SessionsOf p₂.initGEnv = (∅ : Set SessionId) := hDisjG
+            have : e.sid ∈ (∅ : Set SessionId) := by simpa [hEmpty] using hInter
+            exact this.elim)
+  · -- supply_fresh (Lin)
+    intro e S hMem
+    have hMem' : (e, S) ∈ p₁.initMonitorState.Lin ++ p₂.initMonitorState.Lin := by
+      simpa [composeMonitorState, mergeLin] using hMem
+    cases List.mem_append.mp hMem' with
+    | inl hIn =>
+        exact Nat.lt_of_lt_of_le (hWT₁.supply_fresh e S hIn) (Nat.le_max_left _ _)
+    | inr hIn =>
+        exact Nat.lt_of_lt_of_le (hWT₂.supply_fresh e S hIn) (Nat.le_max_right _ _)
+  · -- supply_fresh_G
+    intro e S hMem
+    have hMem' : (e, S) ∈ p₁.initMonitorState.G ++ p₂.initMonitorState.G := by
+      simpa [composeMonitorState, mergeGEnv] using hMem
+    cases List.mem_append.mp hMem' with
+    | inl hIn =>
+        exact Nat.lt_of_lt_of_le (hWT₁.supply_fresh_G e S hIn) (Nat.le_max_left _ _)
+    | inr hIn =>
+        exact Nat.lt_of_lt_of_le (hWT₂.supply_fresh_G e S hIn) (Nat.le_max_right _ _)
 
-axiom link_preserves_WTMon (p₁ p₂ : DeployedProtocol)
+theorem link_preserves_WTMon (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
     (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
     (hWT₁ : WTMon p₁.initMonitorState)
     (hWT₂ : WTMon p₂.initMonitorState) :
-    WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState)
+    WTMon (composeMonitorState p₁.initMonitorState p₂.initMonitorState) :=
+  link_preserves_WTMon_full p₁ p₂ hLink hDisjG hWT₁ hWT₂
 
-axiom link_preserves_WTMon_complete (p₁ p₂ : DeployedProtocol)
+theorem link_preserves_WTMon_complete (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
     (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
     (hWT₁ : WTMonComplete p₁.initMonitorState)
     (hWT₂ : WTMonComplete p₂.initMonitorState) :
-    WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState)
+    WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) := by
+  refine ⟨link_preserves_WTMon_full p₁ p₂ hLink hDisjG hWT₁.1 hWT₂.1, ?_⟩
+  simpa [composeMonitorState] using
+    (RoleComplete_mergeGEnv p₁.initGEnv p₂.initGEnv hWT₁.2 hWT₂.2)
 
-axiom link_preserves_WTMon_complete_full (p₁ p₂ : DeployedProtocol)
+theorem link_preserves_WTMon_complete_full (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
     (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
     (hWT₁ : WTMonComplete p₁.initMonitorState)
     (hWT₂ : WTMonComplete p₂.initMonitorState) :
-    WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState)
+    WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) :=
+  link_preserves_WTMon_complete p₁ p₂ hLink hDisjG hWT₁ hWT₂
 
 theorem disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂) :
@@ -287,13 +493,49 @@ theorem disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
   have h := hDisj _ p₁.sessionId_in_interface
   simp only [Bool.not_eq_true'] at h
   rw [heq] at h
-  have h2 : p₂.interface.sessionIds.contains p₂.sessionId = true :=
-    List.contains_iff.mpr ⟨p₂.sessionId, p₂.sessionId_in_interface, beq_self_eq_true _⟩
+  have h2 : p₂.interface.sessionIds.contains p₂.sessionId = true := by
+    simpa [List.contains_iff_mem] using p₂.sessionId_in_interface
   simp_all
 
-axiom compose_deadlock_free (p₁ p₂ : DeployedProtocol)
+theorem compose_deadlock_free (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂)
     (hDF₁ : ∀ r, r ∈ p₁.roles → ReachesComm (p₁.localTypes r))
     (hDF₂ : ∀ r, r ∈ p₂.roles → ReachesComm (p₂.localTypes r)) :
     ∀ r, r ∈ p₁.roles ++ p₂.roles →
-      ReachesComm ((composeBundle (ProtocolBundle.fromDeployed p₁) (ProtocolBundle.fromDeployed p₂)).localTypes r)
+      ReachesComm ((composeBundle (ProtocolBundle.fromDeployed p₁) (ProtocolBundle.fromDeployed p₂)).localTypes r) := by
+  intro r hMem
+  have hCases : r ∈ p₁.roles ∨ r ∈ p₂.roles := by simpa [List.mem_append] using hMem
+  cases hCases with
+  | inl hIn₁ =>
+      simpa [composeBundle, ProtocolBundle.fromDeployed, List.elem_eq_mem, hIn₁] using hDF₁ r hIn₁
+  | inr hIn₂ =>
+      by_cases hIn₁ : r ∈ p₁.roles
+      · simpa [composeBundle, ProtocolBundle.fromDeployed, List.elem_eq_mem, hIn₁] using hDF₁ r hIn₁
+      · simpa [composeBundle, ProtocolBundle.fromDeployed, List.elem_eq_mem, hIn₁, hIn₂] using hDF₂ r hIn₂
+
+/-- Static compositional harmony: linking preserves complete monitor invariants. -/
+theorem link_harmony_through_link (p₁ p₂ : DeployedProtocol)
+    (hLink : LinkOKFull p₁ p₂)
+    (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
+    (hWT₁ : WTMonComplete p₁.initMonitorState)
+    (hWT₂ : WTMonComplete p₂.initMonitorState) :
+    WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) :=
+  link_preserves_WTMon_complete p₁ p₂ hLink hDisjG hWT₁ hWT₂
+
+/-- Delegation inside one component of a composed system preserves composed coherence.
+
+    Assumes delegation transforms the left component `(G₁,D₁)` into `(G₁',D₁')`
+    and post-delegation disjointness/consistency side conditions hold. -/
+theorem delegation_within_composed_preserves_coherent
+    (G₁ G₁' G₂ : GEnv) (D₁ D₁' D₂ : DEnv)
+    (s : SessionId) (A B : Role)
+    (hDeleg : DelegationStep G₁ G₁' D₁ D₁' s A B)
+    (hCoh₁ : Coherent G₁ D₁)
+    (hCoh₂ : Coherent G₂ D₂)
+    (hDisjG' : DisjointG G₁' G₂)
+    (hCons₁' : DConsistent G₁' D₁')
+    (hCons₂ : DConsistent G₂ D₂) :
+    Coherent (mergeGEnv G₁' G₂) (mergeDEnv D₁' D₂) := by
+  have hCoh₁' : Coherent G₁' D₁' :=
+    delegation_preserves_coherent G₁ G₁' D₁ D₁' s A B hCoh₁ hDeleg
+  exact link_preserves_coherent G₁' G₂ D₁' D₂ hCoh₁' hCoh₂ hDisjG' hCons₁' hCons₂

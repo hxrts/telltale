@@ -204,9 +204,12 @@ mutual
   def projectbBranches :
       List (Label × GlobalType) → String → List BranchR → Bool
     | [], _, [] => true
-    | (label, cont) :: rest, role, (label', _vt, cand) :: rest' =>
+    | (label, cont) :: rest, role, (label', vt, cand) :: rest' =>
         if label == label' then
-          projectb cont role cand && projectbBranches rest role rest'
+          if vt == none then
+            projectb cont role cand && projectbBranches rest role rest'
+          else
+            false
         else
           false
     | _, _, _ => false

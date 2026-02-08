@@ -24,7 +24,7 @@ abbrev ProjRel := GlobalType → String → LocalTypeR → Prop
 /-- Branch-wise projection relation for send/recv. -/
 def BranchesProjRel (R : ProjRel)
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR) : Prop :=
-  List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ R gb.2 role lb.2.2) gbs lbs
+  List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ lb.2.1 = none ∧ R gb.2 role lb.2.2) gbs lbs
 
 /-- All branches project to the same candidate (for non-participants). -/
 def AllBranchesProj (R : ProjRel)
@@ -110,7 +110,7 @@ private theorem BranchesProjRel_mono {R S : ProjRel}
   induction hrel with
   | nil => exact List.Forall₂.nil
   | cons hpair _ ih =>
-      exact List.Forall₂.cons ⟨hpair.1, h _ _ _ hpair.2⟩ ih
+      exact List.Forall₂.cons ⟨hpair.1, hpair.2.1, h _ _ _ hpair.2.2⟩ ih
 
 private theorem AllBranchesProj_mono {R S : ProjRel}
     (h : ∀ g r c, R g r c → S g r c) :
@@ -121,94 +121,100 @@ private theorem AllBranchesProj_mono {R S : ProjRel}
 private theorem CProjectF_mono : Monotone CProjectF := by
   intro R S h g role cand hrel
   cases g with
-  | end =>
+  | «end» =>
       cases cand <;> simpa [CProjectF] using hrel
   | var t =>
       cases cand <;> simpa [CProjectF] using hrel
   | mu t body =>
-      cases cand <;> simp [CProjectF] at hrel ⊢
-      obtain ⟨h1, h2, h3⟩ := hrel
-      exact ⟨h1, h _ _ _ h2, h3⟩
-  | comm sender receiver gbs =>
-      cases cand <;> simp [CProjectF] at hrel ⊢
-      · -- send case
-        split_ifs at hrel ⊢
-        all_goals
-          first
-          | exact hrel
-          | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
-          | exact AllBranchesProj_mono h hrel
-      · -- recv case
-        split_ifs at hrel ⊢
-        all_goals
-          first
-          | exact hrel
-          | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
-          | exact AllBranchesProj_mono h hrel
-      · -- other cand cases
-        split_ifs at hrel ⊢
-        all_goals
-          first
-          | exact hrel
-          | exact AllBranchesProj_mono h hrel
-  | delegate p q sid r cont =>
       cases cand with
-      | send partner lbs =>
+      | mu t' candBody =>
           simp [CProjectF] at hrel ⊢
-          split_ifs at hrel ⊢
-          · -- role = p
+          rcases hrel with ⟨hbody, hguard, ht⟩
+          exact ⟨h _ _ _ hbody, hguard, ht⟩
+      | «end» =>
+          simp [CProjectF] at hrel ⊢
+          rcases hrel with ⟨candBody, hbody, hguard⟩
+          exact ⟨candBody, h _ _ _ hbody, hguard⟩
+      | var _ =>
+          simp [CProjectF] at hrel
+      | send _ _ =>
+          simp [CProjectF] at hrel
+      | recv _ _ =>
+          simp [CProjectF] at hrel
+  | comm sender receiver gbs =>
+      by_cases hs : role = sender
+      · cases cand with
+        | send partner lbs =>
+            simp [CProjectF, hs] at hrel ⊢
+            rcases hrel with ⟨h1, h2⟩
+            exact ⟨h1, BranchesProjRel_mono h h2⟩
+        | _ =>
+            simp [CProjectF, hs] at hrel ⊢
+      · by_cases hr : role = receiver
+        · have hns : receiver ≠ sender := by
+            intro h
+            exact hs (hr.trans h)
+          cases cand with
+          | recv partner lbs =>
+              simp [CProjectF, hs, hr, hns] at hrel ⊢
+              rcases hrel with ⟨h1, h2⟩
+              exact ⟨h1, BranchesProjRel_mono h h2⟩
+          | _ =>
+              simp [CProjectF, hs, hr, hns] at hrel ⊢
+        · simp [CProjectF, hs, hr] at hrel ⊢
+          exact AllBranchesProj_mono h hrel
+  | delegate p q sid r cont =>
+      by_cases hp : role = p
+      · cases cand with
+        | send partner lbs =>
+            simp [CProjectF, hp] at hrel ⊢
             cases lbs with
             | nil => simpa using hrel
             | cons b bs =>
                 cases bs with
                 | nil =>
-                  cases b with
-                  | mk lbl vt contCand =>
-                      obtain ⟨h1, h2, h3, h4⟩ := hrel
-                      exact ⟨h1, h2, h3, h _ _ _ h4⟩
-                | cons b2 bs2 =>
+                    cases b with
+                    | mk lbl rest =>
+                        cases rest with
+                        | mk vt contCand =>
+                            have hrel' :
+                                partner = q ∧ lbl = ⟨"_delegate", .unit⟩ ∧
+                                  vt = some (.chan sid r) ∧ R cont p contCand := by
+                              simpa [and_left_comm, and_assoc] using hrel
+                            rcases hrel' with ⟨h1, h2, h3, h4⟩
+                            exact ⟨h1, h2, h3, h _ _ _ h4⟩
+                | cons _ _ =>
                     simpa using hrel
-          · -- role = q
-            exact hrel
-          · -- role ≠ p, role ≠ q
-            exact h _ _ _ hrel
-      | recv partner lbs =>
-          simp [CProjectF] at hrel ⊢
-          split_ifs at hrel ⊢
-          · -- role = p
-            exact hrel
-          · -- role = q
-            cases lbs with
-            | nil => simpa using hrel
-            | cons b bs =>
-                cases bs with
-                | nil =>
-                  cases b with
-                  | mk lbl vt contCand =>
-                      obtain ⟨h1, h2, h3, h4⟩ := hrel
-                      exact ⟨h1, h2, h3, h _ _ _ h4⟩
-                | cons b2 bs2 =>
-                    simpa using hrel
-          · -- role ≠ p, role ≠ q
-            exact h _ _ _ hrel
-      | end =>
-          simp [CProjectF] at hrel ⊢
-          split_ifs at hrel ⊢
-          · exact hrel
-          · exact hrel
-          · exact h _ _ _ hrel
-      | var t =>
-          simp [CProjectF] at hrel ⊢
-          split_ifs at hrel ⊢
-          · exact hrel
-          · exact hrel
-          · exact h _ _ _ hrel
-      | mu t body =>
-          simp [CProjectF] at hrel ⊢
-          split_ifs at hrel ⊢
-          · exact hrel
-          · exact hrel
-          · exact h _ _ _ hrel
+        | _ =>
+            simp [CProjectF, hp] at hrel ⊢
+      · by_cases hq : role = q
+        · have hnp : q ≠ p := by
+            intro hqp
+            exact hp (hq.trans hqp)
+          cases cand with
+          | recv partner lbs =>
+              simp [CProjectF, hp, hq, hnp] at hrel ⊢
+              cases lbs with
+              | nil => simpa using hrel
+              | cons b bs =>
+                  cases bs with
+                  | nil =>
+                      cases b with
+                      | mk lbl rest =>
+                          cases rest with
+                          | mk vt contCand =>
+                              have hrel' :
+                                  partner = p ∧ lbl = ⟨"_delegate", .unit⟩ ∧
+                                    vt = some (.chan sid r) ∧ R cont q contCand := by
+                                simpa [and_left_comm, and_assoc] using hrel
+                              rcases hrel' with ⟨h1, h2, h3, h4⟩
+                              exact ⟨h1, h2, h3, h _ _ _ h4⟩
+                  | cons _ _ =>
+                      simpa using hrel
+          | _ =>
+              simp [CProjectF, hp, hq, hnp] at hrel ⊢
+        · simp [CProjectF, hp, hq] at hrel ⊢
+          exact h _ _ _ hrel
 
 /-- Helper: monotonicity for the non-participant comm branch. -/
 private theorem CProjectF_unfold_core_mono_comm_other

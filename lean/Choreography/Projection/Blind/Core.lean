@@ -457,8 +457,56 @@ theorem projectb_trans_of_noSelfComm_blind (g : GlobalType) (role : String)
                   simp [hbs, hbr]
                   exact hproj_all'
   | .delegate p q sid r cont =>
-      -- TODO: Complete delegate case for projectb_trans_of_noSelfComm_blind
-      sorry
+      -- Delegate case: split on role participation
+      -- Extract noSelfComm and isBlind for continuation
+      have hnoself_cont : cont.noSelfComm = true := noSelfComm_delegate_cont hnoself
+      have hblind_cont : isBlind cont = true := hblind  -- isBlind delegates to continuation
+      have hcont_proj := projectb_trans_of_noSelfComm_blind cont role hnoself_cont hblind_cont
+      by_cases hp : role = p
+      · -- Delegator case: role = p
+        -- trans gives .send q [(_delegate, some (.chan sid r), trans cont role)]
+        -- projectb matches this exact shape
+        have htrans : Trans.trans (GlobalType.delegate p q sid r cont) p =
+            .send q [(⟨"_delegate", .unit⟩, some (.chan sid r), Trans.trans cont p)] := by
+          simp [Trans.trans]
+        have hpeq : (role == p) = true := beq_self_eq_true.mpr hp
+        simp only [hp, htrans, projectb, hpeq, beq_self_eq_true, ↓reduceIte]
+        exact hcont_proj
+      · by_cases hq : role = q
+        · -- Delegatee case: role = q
+          -- trans gives .recv p [(_delegate, some (.chan sid r), trans cont role)]
+          -- projectb matches this exact shape
+          have htrans : Trans.trans (GlobalType.delegate p q sid r cont) q =
+              .recv p [(⟨"_delegate", .unit⟩, some (.chan sid r), Trans.trans cont q)] := by
+            have hne : (q == p) = false := by
+              simp only [beq_eq_false_iff_ne, ne_eq]
+              intro heq
+              subst heq
+              exact hp rfl
+            simp [Trans.trans, hne]
+          have hqeq : (role == q) = true := beq_self_eq_true.mpr hq
+          have hpne : (role == p) = false := by
+            simp only [beq_eq_false_iff_ne, ne_eq]
+            exact hp
+          simp only [hq, htrans, projectb, hpne, Bool.false_eq_true, ↓reduceIte, hqeq,
+            beq_self_eq_true]
+          exact hcont_proj
+        · -- Non-participant case: role ≠ p, role ≠ q
+          -- trans gives trans cont role, projectb does projectb cont role cand
+          have htrans : Trans.trans (GlobalType.delegate p q sid r cont) role =
+              Trans.trans cont role := by
+            have hpne : (role == p) = false := by
+              simp only [beq_eq_false_iff_ne, ne_eq]; exact hp
+            have hqne : (role == q) = false := by
+              simp only [beq_eq_false_iff_ne, ne_eq]; exact hq
+            simp [Trans.trans, hpne, hqne]
+          simp only [htrans, projectb]
+          have hpne : (role == p) = false := by
+            simp only [beq_eq_false_iff_ne, ne_eq]; exact hp
+          have hqne : (role == q) = false := by
+            simp only [beq_eq_false_iff_ne, ne_eq]; exact hq
+          simp only [hpne, Bool.false_eq_true, ↓reduceIte, hqne]
+          exact hcont_proj
 termination_by g
 decreasing_by
   all_goals

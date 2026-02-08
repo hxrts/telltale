@@ -19,6 +19,7 @@ import Protocol.Deployment
 import Protocol.Examples
 import Protocol.Simulation
 import Protocol.Decidability
+import Protocol.Classical
 
 /-! # Protocol
 

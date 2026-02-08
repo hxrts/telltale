@@ -194,6 +194,93 @@ theorem delegation_recv_preserves_other_sessions
   -- Extract per-session coherence
   exact Coherent_implies_SessionCoherent hCoh'
 
+/-- Blindness for delegation at the session boundary:
+    endpoints in sessions other than the delegated one are unchanged. -/
+theorem delegation_blind_endpoint_lookup
+    {G G' : GEnv} {D D' : DEnv} {s sOther : SessionId} {A B : Role}
+    (hDeleg : DelegationStep G G' D D' s A B)
+    (hDiff : sOther ≠ s)
+    (ep : Endpoint) (hSid : ep.sid = sOther) :
+    lookupG G' ep = lookupG G ep := by
+  have hSidNe : ep.sid ≠ s := by
+    intro hEq
+    apply hDiff
+    calc
+      sOther = ep.sid := hSid.symm
+      _ = s := hEq
+  exact hDeleg.other_sessions_G ep hSidNe
+
+/-- Blindness for delegation at the session boundary:
+    traces in sessions other than the delegated one are unchanged. -/
+theorem delegation_blind_trace_lookup
+    {G G' : GEnv} {D D' : DEnv} {s sOther : SessionId} {A B : Role}
+    (hDeleg : DelegationStep G G' D D' s A B)
+    (hDiff : sOther ≠ s)
+    (e : Edge) (hSid : e.sid = sOther) :
+    lookupD D' e = lookupD D e := by
+  have hSidNe : e.sid ≠ s := by
+    intro hEq
+    apply hDiff
+    calc
+      sOther = e.sid := hSid.symm
+      _ = s := hEq
+  exact hDeleg.other_sessions_D e hSidNe
+
+/-- For non-delegated sessions, active-edge membership is unchanged by delegation. -/
+theorem delegation_blind_activeEdge_iff
+    {G G' : GEnv} {D D' : DEnv} {s sOther : SessionId} {A B : Role}
+    (hDeleg : DelegationStep G G' D D' s A B)
+    (hDiff : sOther ≠ s)
+    (e : Edge) (hSid : e.sid = sOther) :
+    ActiveEdge G' e ↔ ActiveEdge G e := by
+  constructor
+  · intro hActive
+    constructor
+    · have hLookup :=
+        delegation_blind_endpoint_lookup (hDeleg:=hDeleg) (hDiff:=hDiff)
+          (ep:=⟨e.sid, e.sender⟩) hSid
+      simpa [hLookup] using hActive.1
+    · have hLookup :=
+        delegation_blind_endpoint_lookup (hDeleg:=hDeleg) (hDiff:=hDiff)
+          (ep:=⟨e.sid, e.receiver⟩) hSid
+      simpa [hLookup] using hActive.2
+  · intro hActive
+    constructor
+    · have hLookup :=
+        delegation_blind_endpoint_lookup (hDeleg:=hDeleg) (hDiff:=hDiff)
+          (ep:=⟨e.sid, e.sender⟩) hSid
+      simpa [hLookup] using hActive.1
+    · have hLookup :=
+        delegation_blind_endpoint_lookup (hDeleg:=hDeleg) (hDiff:=hDiff)
+          (ep:=⟨e.sid, e.receiver⟩) hSid
+      simpa [hLookup] using hActive.2
+
+/-- Harmony split for delegation:
+    delegated session remains coherent and all other sessions are preserved. -/
+theorem delegation_harmony_split
+    {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
+    (hCoh : Coherent G D)
+    (hDeleg : DelegationStep G G' D D' s A B) :
+    SessionCoherent G' D' s ∧
+    (∀ sOther, sOther ≠ s → SessionCoherent G' D' sOther) := by
+  constructor
+  · exact Coherent_implies_SessionCoherent
+      (delegation_preserves_coherent G G' D D' s A B hCoh hDeleg)
+  · intro sOther hDiff
+    exact delegation_recv_preserves_other_sessions
+      (hCoh:=hCoh) (hDeleg:=hDeleg) (sOther:=sOther) hDiff
+
+/-- Role exchangeability after delegation:
+    once delegation is applied, any finite session-local role-swap sequence preserves coherence. -/
+theorem delegation_preserves_exchangeability
+    {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}
+    (pairs : List (Role × Role))
+    (hCoh : Coherent G D)
+    (hDeleg : DelegationStep G G' D D' s A B) :
+    Coherent (swapGEnvRoleList s pairs G') (swapDEnvRoleList s pairs D') := by
+  exact Coherent_exchangeable (s:=s) (pairs:=pairs) (G:=G') (D:=D')
+    (delegation_preserves_coherent G G' D D' s A B hCoh hDeleg)
+
 /-- Receiving a delegated endpoint preserves coherence and extends footprint safely.
 
     When coroutine C receives message containing `chan s L`:

@@ -81,6 +81,19 @@ def session_advance (γ : GhostName) (m : SessionMap)
         (endpoint_frag γ e L'))) :=
   ghost_map_update γ (encodeEndpoint e) L L' m
 
+/-- Delegation transfer as Iris ghost-map update.
+    This is the cross-layer ownership step used by delegation:
+    the receiver endpoint fragment changes from `Lold` to `Lnew` by
+    a single `ghost_map_update` on the authoritative session map. -/
+def delegation_ghost_map_update (γ : GhostName) (m : SessionMap)
+    (receiverEp : Endpoint) (Lold Lnew : LocalType) :
+    iProp.entails
+      (iProp.sep (session_auth γ m) (endpoint_frag γ receiverEp Lold))
+      (bupd (iProp.sep
+        (session_auth γ (insert m (encodeEndpoint receiverEp) (Iris.LeibnizO.mk Lnew)))
+        (endpoint_frag γ receiverEp Lnew))) :=
+  session_advance γ m receiverEp Lold Lnew
+
 /-- Endpoint fragments are transferable (trivially). -/
 def endpoint_transfer (γ : GhostName) (e : Endpoint) (L : LocalType) : Prop :=
   iProp.entails (endpoint_frag γ e L) (endpoint_frag γ e L)

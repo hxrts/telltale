@@ -1,4 +1,5 @@
 import SessionTypes.GlobalType.Core
+import SessionTypes.GlobalType.ValType
 import SessionTypes.GlobalType.Semantics
 import SessionTypes.GlobalType.WellFormedLemmas
 import SessionTypes.GlobalType.ProductivityLemmas

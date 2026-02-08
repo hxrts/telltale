@@ -1,4 +1,5 @@
 import Protocol.Coherence.EdgeCoherence
+import Protocol.Coherence.Delegation
 
 /-!
 # Subtype Replacement Preservation
@@ -223,6 +224,30 @@ inductive CoherenceTransform (C C' : GEnv × DEnv) : Prop where
       (∀ r : Role, RecvCompatible r L₁ L₂) →
       C' = (updateG C.1 ep L₂, C.2) →
       CoherenceTransform C C'
+  /-- Delegation step (higher-order endpoint transfer). -/
+  | delegate {s A B} :
+      DelegationStep C.1 C'.1 C.2 C'.2 s A B →
+      CoherenceTransform C C'
+
+/-- Unified coherence preservation for evolution + delegation.
+
+    This packages the shared transform story:
+    - evolution/type replacement uses the `Consume_mono` path (`RecvCompatible`)
+    - delegation uses the delegation preservation theorem. -/
+theorem CoherenceTransform_preserves_coherent
+    {G D G' D' : _}
+    (hCoh : Coherent G D)
+    (hT : CoherenceTransform (G, D) (G', D')) :
+    Coherent G' D' := by
+  cases hT with
+  | step hEq =>
+      cases hEq
+      simpa using hCoh
+  | replace hLookup hCompat hEq =>
+      cases hEq
+      simpa using Coherent_type_replacement (G:=G) (D:=D) hCoh hLookup hCompat
+  | delegate hDeleg =>
+      exact delegation_preserves_coherent _ _ _ _ _ _ _ hCoh hDeleg
 
 /-! ## Composition with Preservation and Liveness
 

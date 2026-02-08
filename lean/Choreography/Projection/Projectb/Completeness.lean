@@ -20,9 +20,9 @@ private theorem transBranches_eq_of_BranchesProjRel
     (hne : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true)
     (ih : ∀ gb ∈ gbs, ∀ lb, CProject gb.2 role lb → Trans.trans gb.2 role = lb) :
     Trans.transBranches gbs role = lbs := by
-  induction hrel generalizing hne ih with
+  induction hrel with
   | nil =>
-      rfl
+      simp [Trans.transBranches]
   | @cons ghd lhd gtl ltl hpair hrest ihrest =>
       obtain ⟨hlabel, hnone, hproj⟩ := hpair
       have hne_tail : ∀ gb ∈ gtl, gb.2.allCommsNonEmpty = true := by
@@ -349,12 +349,13 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
                             rcases hf with ⟨hpartner, hlbl, hvt, hcont⟩
                             have hne_cont : cont.allCommsNonEmpty = true := by
                               simpa [GlobalType.allCommsNonEmpty] using hne
-                            have hcont' : Trans.trans cont role = contCand :=
-                              trans_eq_of_CProject cont role contCand hcont hne_cont
+                            have hcont' : Trans.trans cont p = contCand :=
+                              trans_eq_of_CProject cont p contCand hcont hne_cont
                             subst hpartner
                             subst hlbl
                             subst hvt
-                            simp [Trans.trans, hp, hcont']
+                            simp [Trans.trans, hp]
+                            exact hcont'
                 | cons b2 bs2 =>
                     simp [CProjectF, hp] at hf
         | recv _ _ =>
@@ -366,12 +367,15 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
         | mu _ _ =>
             simp [CProjectF, hp] at hf
       · by_cases hq : role = q
-        · have hf := CProject_destruct hproj
+        · have hnp : q ≠ p := by
+            intro hqp
+            exact hp (hq.trans hqp)
+          have hf := CProject_destruct hproj
           cases cand with
           | recv partner lbs =>
               cases lbs with
               | nil =>
-                  simp [CProjectF, hp, hq] at hf
+                  simp [CProjectF, hq, hnp] at hf
               | cons b bs =>
                   cases bs with
                   | nil =>
@@ -379,26 +383,36 @@ theorem trans_eq_of_CProject (g : GlobalType) (role : String) (cand : LocalTypeR
                       | mk lbl rest =>
                           cases rest with
                           | mk vt contCand =>
-                              simp [CProjectF, hp, hq] at hf
-                              rcases hf with ⟨hpartner, hlbl, hvt, hcont⟩
+                              have hf' :
+                                  partner = p ∧ lbl = ⟨"_delegate", .unit⟩ ∧
+                                    vt = some (.chan sid r) ∧ CProject cont q contCand := by
+                                simpa [CProjectF, hq, hnp] using hf
+                              rcases hf' with ⟨hpartner, hlbl, hvt, hcont⟩
                               have hne_cont : cont.allCommsNonEmpty = true := by
                                 simpa [GlobalType.allCommsNonEmpty] using hne
-                              have hcont' : Trans.trans cont role = contCand :=
-                                trans_eq_of_CProject cont role contCand hcont hne_cont
+                              have hcont' : Trans.trans cont q = contCand :=
+                                trans_eq_of_CProject cont q contCand hcont hne_cont
                               subst hpartner
                               subst hlbl
                               subst hvt
-                              simp [Trans.trans, hp, hq, hcont']
+                              have hpeq : (role == partner) = false := by
+                                have : (q == partner) = false := beq_eq_false_iff_ne.mpr hnp
+                                simpa [hq] using this
+                              have hqeq : (role == q) = true := by
+                                simp [hq]
+                              have hcont'' : Trans.trans cont role = contCand := by
+                                simpa [hq] using hcont'
+                              simp [Trans.trans, hpeq, hqeq, hcont'']
                   | cons b2 bs2 =>
-                      simp [CProjectF, hp, hq] at hf
+                      simp [CProjectF, hq, hnp] at hf
           | send _ _ =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
           | «end» =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
           | var _ =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
           | mu _ _ =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
         · -- non-participant: follow continuation
           have hf := CProject_destruct hproj
           simp [CProjectF, hp, hq] at hf
@@ -649,12 +663,17 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
                         | mk vt contCand =>
                             simp [CProjectF, hp] at hf
                             rcases hf with ⟨hpartner, hlbl, hvt, hcont⟩
-                            have hproj_cont : projectb cont role contCand = true :=
-                              projectb_complete cont role contCand hcont hne_cont
+                            have hproj_cont : projectb cont role contCand = true := by
+                              simpa [hp] using
+                                (projectb_complete cont p contCand hcont hne_cont)
                             subst hpartner
                             subst hlbl
                             subst hvt
-                            simp [projectb, hp, hproj_cont]
+                            simp [projectb, hp]
+                            refine And.intro ?_ (And.intro ?_ ?_)
+                            · simp [reduceBEq]
+                            · simp [reduceBEq]
+                            · simpa [hp] using hproj_cont
                 | cons b2 bs2 =>
                     simp [CProjectF, hp] at hf
         | recv _ _ =>
@@ -666,12 +685,15 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
         | mu _ _ =>
             simp [CProjectF, hp] at hf
       · by_cases hq : role = q
-        · have hf := CProject_destruct h
+        · have hnp : q ≠ p := by
+            intro hqp
+            exact hp (hq.trans hqp)
+          have hf := CProject_destruct h
           cases cand with
           | recv partner lbs =>
               cases lbs with
               | nil =>
-                  simp [CProjectF, hp, hq] at hf
+                  simp [CProjectF, hq, hnp] at hf
               | cons b bs =>
                   cases bs with
                   | nil =>
@@ -679,29 +701,41 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
                       | mk lbl rest =>
                           cases rest with
                           | mk vt contCand =>
-                              simp [CProjectF, hp, hq] at hf
-                              rcases hf with ⟨hpartner, hlbl, hvt, hcont⟩
-                              have hproj_cont : projectb cont role contCand = true :=
-                                projectb_complete cont role contCand hcont hne_cont
+                              have hf' :
+                                  partner = p ∧ lbl = ⟨"_delegate", .unit⟩ ∧
+                                    vt = some (.chan sid r) ∧ CProject cont q contCand := by
+                                simpa [CProjectF, hq, hnp] using hf
+                              rcases hf' with ⟨hpartner, hlbl, hvt, hcont⟩
+                              have hproj_cont : projectb cont role contCand = true := by
+                                simpa [hq] using
+                                  (projectb_complete cont q contCand hcont hne_cont)
                               subst hpartner
                               subst hlbl
                               subst hvt
-                              simp [projectb, hp, hq, hproj_cont]
+                              simp [projectb, hq, hnp]
+                              refine And.intro ?_ (And.intro ?_ ?_)
+                              · simp [reduceBEq]
+                              · simp [reduceBEq]
+                              · simpa [hq] using hproj_cont
                   | cons b2 bs2 =>
-                      simp [CProjectF, hp, hq] at hf
+                      simp [CProjectF, hq, hnp] at hf
           | send _ _ =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
           | «end» =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
           | var _ =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
           | mu _ _ =>
-              simp [CProjectF, hp, hq] at hf
+              simp [CProjectF, hq, hnp] at hf
         · -- non-participant: follow continuation
           have hf := CProject_destruct h
           simp [CProjectF, hp, hq] at hf
-          simpa [projectb, hp, hq] using
-            (projectb_complete cont role cand hf hne_cont)
+          have hproj_cont : projectb cont role cand = true :=
+            projectb_complete cont role cand hf hne_cont
+          have hpeq : (role == p) = false := beq_eq_false_iff_ne.mpr hp
+          have hqeq : (role == q) = false := beq_eq_false_iff_ne.mpr hq
+          unfold projectb
+          simp [hpeq, hqeq, hproj_cont]
 termination_by g
 decreasing_by
   all_goals

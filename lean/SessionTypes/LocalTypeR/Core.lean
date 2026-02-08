@@ -56,6 +56,28 @@ abbrev BranchR := Label × Option ValType × LocalTypeR
 /-- Extract the continuation from a branch triple. -/
 def BranchR.cont : BranchR → LocalTypeR := fun (_, _, c) => c
 
+/-! ## Payload Erasure -/
+
+mutual
+  /-- Erase all value types from a local type (set branch payloads to `none`). -/
+  def LocalTypeR.eraseValTypes : LocalTypeR → LocalTypeR
+    | .end => .end
+    | .var t => .var t
+    | .mu t body => .mu t (LocalTypeR.eraseValTypes body)
+    | .send p bs => .send p (eraseBranchValTypes bs)
+    | .recv p bs => .recv p (eraseBranchValTypes bs)
+
+  /-- Erase all branch payload types. -/
+  def eraseBranchValTypes : List BranchR → List BranchR
+    | [] => []
+    | (label, vt, cont) :: rest =>
+        let vt' :=
+          match vt with
+          | some (.chan _ _) => vt
+          | _ => none
+        (label, vt', LocalTypeR.eraseValTypes cont) :: eraseBranchValTypes rest
+end
+
 mutual
   /-- Extract free type variables from a local type. -/
   def LocalTypeR.freeVars : LocalTypeR → List String
@@ -405,6 +427,24 @@ def LocalTypeR.isGuarded (v : String) : LocalTypeR → Bool
   | .send _ _ => true  -- Any occurrence of v in branches is guarded (inside comm)
   | .recv _ _ => true  -- Any occurrence of v in branches is guarded (inside comm)
   | .mu t body => if v == t then true else body.isGuarded v
+
+@[simp] theorem isGuarded_eraseValTypes :
+    ∀ (lt : LocalTypeR) (v : String),
+      (LocalTypeR.eraseValTypes lt).isGuarded v = lt.isGuarded v
+  | .end, _ => rfl
+  | .var _, _ => rfl
+  | .send _ _, _ => rfl
+  | .recv _ _, _ => rfl
+  | .mu t body, v => by
+      simp only [LocalTypeR.eraseValTypes, LocalTypeR.isGuarded]
+      split_ifs
+      · rfl
+      · exact isGuarded_eraseValTypes body v
+  termination_by lt _ => sizeOf lt
+  decreasing_by
+    simp_wf
+    simp only [sizeOf, LocalTypeR._sizeOf_1]
+    omega
 
 mutual
   /-- A local type is contractive if every mu-bound variable is guarded in its body.

@@ -313,6 +313,64 @@ structure SessionProgressMeasure where
   /-- Combined measure. -/
   total : Nat := typeMeasure + bufferMeasure
 
+namespace SessionProgressMeasure
+
+/-- Canonical Lyapunov value extracted from structural components. -/
+def lyapunov (m : SessionProgressMeasure) : Nat :=
+  m.typeMeasure + m.bufferMeasure
+
+/-- Composition of per-session measures is additive on each component. -/
+def compose (m₁ m₂ : SessionProgressMeasure) : SessionProgressMeasure where
+  typeMeasure := m₁.typeMeasure + m₂.typeMeasure
+  bufferMeasure := m₁.bufferMeasure + m₂.bufferMeasure
+
+@[simp] theorem lyapunov_compose (m₁ m₂ : SessionProgressMeasure) :
+    lyapunov (compose m₁ m₂) = lyapunov m₁ + lyapunov m₂ := by
+  simp [lyapunov, compose, Nat.add_left_comm, Nat.add_comm]
+
+end SessionProgressMeasure
+
+/-- System-level Lyapunov value: additive over composed session lists. -/
+def systemLyapunov (ms : List SessionProgressMeasure) : Nat :=
+  (ms.map SessionProgressMeasure.lyapunov).foldl (· + ·) 0
+
+private theorem foldl_add_shift (l : List Nat) (n : Nat) :
+    l.foldl (· + ·) n = n + l.foldl (· + ·) 0 := by
+  induction l generalizing n with
+  | nil =>
+    simp
+  | cons h t ih =>
+      simp only [List.foldl, Nat.zero_add]
+      have ih1 := ih (n + h)
+      have ih2 := ih h
+      calc
+        t.foldl (· + ·) (n + h) = (n + h) + t.foldl (· + ·) 0 := ih1
+        _ = n + (h + t.foldl (· + ·) 0) := by ring
+        _ = n + t.foldl (· + ·) h := by rw [← ih2]
+
+theorem systemLyapunov_append (ms₁ ms₂ : List SessionProgressMeasure) :
+    systemLyapunov (ms₁ ++ ms₂) = systemLyapunov ms₁ + systemLyapunov ms₂ := by
+  unfold systemLyapunov
+  rw [List.map_append, List.foldl_append]
+  simpa using foldl_add_shift (l := List.map SessionProgressMeasure.lyapunov ms₂)
+    (n := List.foldl (· + ·) 0 (List.map SessionProgressMeasure.lyapunov ms₁))
+
+/-- Delegation conservation principle (balanced transfer):
+    if type and buffer mass are redistributed but totals are preserved,
+    the combined Lyapunov value is preserved. -/
+theorem lyapunov_conserved_under_balanced_delegation
+    (mSender mRecv mSender' mRecv' : SessionProgressMeasure)
+    (hType :
+      mSender'.typeMeasure + mRecv'.typeMeasure =
+        mSender.typeMeasure + mRecv.typeMeasure)
+    (hBuf :
+      mSender'.bufferMeasure + mRecv'.bufferMeasure =
+        mSender.bufferMeasure + mRecv.bufferMeasure) :
+    SessionProgressMeasure.lyapunov mSender' + SessionProgressMeasure.lyapunov mRecv' =
+      SessionProgressMeasure.lyapunov mSender + SessionProgressMeasure.lyapunov mRecv := by
+  simp [SessionProgressMeasure.lyapunov] at hType hBuf ⊢
+  omega
+
 /-- A VM configuration admits a progress measure when each session's
     monitored types satisfy the nonincreasing property under well-typed steps.
 

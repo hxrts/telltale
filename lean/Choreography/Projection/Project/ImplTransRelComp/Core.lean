@@ -211,7 +211,7 @@ theorem branchesProjRel_to_branchesRel_CProjectTransRel
             · -- CProjectTransRel lCont (trans gCont role)
               have hwf_cont : gCont.wellFormed = true := by
                 exact hwf (gLabel, gCont) (by simp)
-              exact ⟨gCont, role, hpair.2, rfl, hwf_cont⟩
+              exact ⟨gCont, role, hpair.2.2, rfl, hwf_cont⟩
           · -- Tail relation
             have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
               intro gb' hmem

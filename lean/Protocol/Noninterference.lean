@@ -205,27 +205,195 @@ private theorem send_blind_D_unchanged {C : Config} {ep : Endpoint} {target : Ro
   simp only [Edge.mk.injEq] at heq
   exact hBlind.2 heq.2.2
 
-/-- Blind steps preserve configuration equivalence.
+/-- A role is blind to a send step if it's neither the sender nor the target. -/
+def BlindToSend (r : Role) (sender target : Role) : Prop :=
+  r ≠ sender ∧ r ≠ target
 
-    If role r is blind to a step (not sender or receiver), and two
-    configurations are equivalent from r's perspective before the step,
-    they remain equivalent after.
+/-- A role is blind to a recv step if it's neither the source nor the receiver. -/
+def BlindToRecv (r : Role) (source receiver : Role) : Prop :=
+  r ≠ source ∧ r ≠ receiver
 
-    **Proof strategy**: By step locality. Since r doesn't participate:
-    1. G at r's endpoint is unchanged (by G locality)
-    2. Buffers to r are unchanged (by buffer locality)
-    3. Traces to r are unchanged (by trace locality) -/
-theorem blind_step_preserves_CEquiv {C₁ C₂ C₁' C₂' : Config}
-    {s : SessionId} {r sender receiver : Role}
-    (hEquiv : C₁ ≈[s, r] C₂)
-    (hBlind : BlindTo r sender receiver)
-    (hStep₁ : StepBase C₁ C₁')
-    (hStep₂ : StepBase C₂ C₂') :
-    C₁' ≈[s, r] C₂' := by
-  -- The proof proceeds by case analysis on step type.
-  -- For each case, blindness ensures r is not involved,
-  -- so by locality, r's observable state is unchanged.
-  sorry -- Full proof requires completing locality lemmas
+/-- Send step preserves CEquiv for blind roles.
+    The observable state of a role r is unchanged if r is neither sender nor target. -/
+theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
+    {v : Value} {T : ValType} {L : LocalType}
+    {s : SessionId} {r : Role}
+    (hSid : ep.sid = s)
+    (hBlind : BlindToSend r ep.role target) :
+    C ≈[s, r] (sendStep C ep ⟨ep.sid, ep.role, target⟩ v T L) := by
+  unfold CEquiv
+  constructor
+  · -- G at r's endpoint unchanged
+    apply Eq.symm
+    apply send_G_locality
+    intro heq
+    have hr : r = ep.role := congrArg Endpoint.role heq
+    exact hBlind.1 hr
+  constructor
+  · -- Buffers to r unchanged
+    intro sender'
+    apply Eq.symm
+    apply send_buf_locality
+    intro heq
+    simp only [Edge.mk.injEq] at heq
+    subst hSid
+    exact hBlind.2 heq.2.2
+  · -- Traces to r unchanged
+    intro sender'
+    apply Eq.symm
+    apply send_D_locality
+    intro heq
+    simp only [Edge.mk.injEq] at heq
+    subst hSid
+    exact hBlind.2 heq.2.2
+
+/-- Recv step preserves CEquiv for blind roles. -/
+theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
+    {x : Var} {v : Value} {L : LocalType}
+    {s : SessionId} {r : Role}
+    (hSid : ep.sid = s)
+    (hBlind : BlindToRecv r source ep.role) :
+    C ≈[s, r] (recvStep C ep ⟨ep.sid, source, ep.role⟩ x v L) := by
+  unfold CEquiv
+  constructor
+  · -- G unchanged
+    apply Eq.symm
+    apply recv_G_locality
+    intro heq
+    have hr : r = ep.role := congrArg Endpoint.role heq
+    exact hBlind.2 hr
+  constructor
+  · -- Buffers unchanged
+    intro sender'
+    apply Eq.symm
+    apply recv_buf_locality
+    intro heq
+    simp only [Edge.mk.injEq] at heq
+    exact hBlind.2 heq.2.2
+  · -- Traces unchanged
+    intro sender'
+    apply Eq.symm
+    apply recv_D_locality
+    intro heq
+    simp only [Edge.mk.injEq] at heq
+    exact hBlind.2 heq.2.2
+
+/-- Main noninterference theorem: blind steps preserve observable equivalence.
+
+    If role r is blind to a step (not sender/source or receiver/target),
+    then r's observable state is unchanged.
+
+    **Proof strategy**: Case analysis on StepBase. For each communication step,
+    use the corresponding locality lemmas. Control-flow steps (seq, par, assign)
+    don't affect G, bufs, or D. -/
+theorem blind_step_preserves_CEquiv_single {C C' : Config}
+    {s : SessionId} {r : Role}
+    (hStep : StepBase C C')
+    (hBlindSend : ∀ ep target T L, lookupG C.G ep = some (.send target T L) →
+                  ep.sid = s → BlindToSend r ep.role target)
+    (hBlindSelect : ∀ ep target branches, lookupG C.G ep = some (.select target branches) →
+                    ep.sid = s → BlindToSend r ep.role target)
+    (hBlindRecv : ∀ ep source T L, lookupG C.G ep = some (.recv source T L) →
+                  ep.sid = s → BlindToRecv r source ep.role)
+    (hBlindBranch : ∀ ep source branches, lookupG C.G ep = some (.branch source branches) →
+                    ep.sid = s → BlindToRecv r source ep.role) :
+    C ≈[s, r] C' := by
+  cases hStep with
+  | @send _ k x e v target T L hProc hk hx hG =>
+    -- Send step: blind if r ≠ sender and r ≠ target
+    by_cases hsid : e.sid = s
+    · exact send_preserves_CEquiv hsid (hBlindSend e target T L hG hsid)
+    · -- Different session, trivially unchanged
+      unfold CEquiv
+      constructor
+      · apply Eq.symm; apply send_G_locality; intro heq
+        have : e.sid = s := congrArg Endpoint.sid heq.symm
+        exact hsid this
+      constructor <;> intro sender'
+      · apply Eq.symm; apply send_buf_locality; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+      · apply Eq.symm; apply send_D_locality; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+  | @recv _ k x e v source T L hProc hk hG hBuf =>
+    -- Recv step: blind if r ≠ source and r ≠ receiver
+    by_cases hsid : e.sid = s
+    · exact recv_preserves_CEquiv hsid (hBlindRecv e source T L hG hsid)
+    · unfold CEquiv
+      constructor
+      · apply Eq.symm; apply recv_G_locality; intro heq
+        have : e.sid = s := congrArg Endpoint.sid heq.symm
+        exact hsid this
+      constructor <;> intro sender'
+      · apply Eq.symm; apply recv_buf_locality; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+      · apply Eq.symm; apply recv_D_locality; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+  | @select _ k e ℓ target branches L hProc hk hG hFind =>
+    -- Select uses sendStep, so same as send
+    by_cases hsid : e.sid = s
+    · exact send_preserves_CEquiv hsid (hBlindSelect e target branches hG hsid)
+    · unfold CEquiv
+      constructor
+      · apply Eq.symm; apply send_G_locality; intro heq
+        have : e.sid = s := congrArg Endpoint.sid heq.symm
+        exact hsid this
+      constructor <;> intro sender'
+      · apply Eq.symm; apply send_buf_locality; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+      · apply Eq.symm; apply send_D_locality; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+  | @branch _ k e ℓ source procBranches typeBranches P L bufs' hProc hk hG hBuf hPFind hTFind hDq =>
+    -- Branch modifies G, bufs, D directly
+    by_cases hsid : e.sid = s
+    · have hb := hBlindBranch e source typeBranches hG hsid
+      unfold CEquiv
+      constructor
+      · -- G at r unchanged (r ≠ receiver)
+        apply lookupG_updateG_ne
+        intro heq
+        have hr : r = e.role := congrArg Endpoint.role heq
+        exact hb.2 hr
+      constructor
+      · -- Buffers to r unchanged (dequeueBuf only affects specific edge)
+        intro sender'
+        simp only [hDq]
+        apply lookupBuf_dequeueBuf_ne hDq
+        intro heq
+        simp only [Edge.mk.injEq] at heq
+        exact hb.2 heq.2.2
+      · -- Traces to r unchanged
+        intro sender'
+        apply lookupD_update_neq
+        intro heq
+        simp only [Edge.mk.injEq] at heq
+        exact hb.2 heq.2.2
+    · -- Different session
+      unfold CEquiv
+      constructor
+      · apply lookupG_updateG_ne; intro heq
+        have : e.sid = s := congrArg Endpoint.sid heq.symm
+        exact hsid this
+      constructor
+      · intro sender'; simp only [hDq]
+        apply lookupBuf_dequeueBuf_ne hDq; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+      · intro sender'; apply lookupD_update_neq; intro heq
+        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+  | newSession hProc =>
+    -- newSession adds new session with fresh ID, doesn't affect session s
+    exact CEquiv.refl _ s r
+  | assign hProc =>
+    -- assign only modifies store, not G/bufs/D
+    exact CEquiv.refl _ s r
+  | seq2 hProc =>
+    -- seq2 only modifies proc
+    exact CEquiv.refl _ s r
+  | par_skip_left hProc =>
+    -- par_skip_left only modifies proc
+    exact CEquiv.refl _ s r
+  | par_skip_right hProc =>
+    -- par_skip_right only modifies proc
+    exact CEquiv.refl _ s r
 
 /-! ## Coherence Connection -/
 

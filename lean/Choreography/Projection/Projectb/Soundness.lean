@@ -58,6 +58,57 @@ private theorem label_beq_eq_true_to_eq {a b : Label} (h : (a == b) = true) : a 
   have heq_s : s1 = s2 := payloadSort_beq_eq_true_to_eq hs
   simp only [heq_n, heq_s]
 
+/-- Helper: ValType BEq true implies equality (avoid LawfulBEq instance). -/
+private theorem valType_beq_eq_true_to_eq
+    {a b : SessionTypes.ValType} (h : (a == b) = true) : a = b := by
+  induction a generalizing b with
+  | unit => cases b <;> simp [reduceBEq] at h <;> simp [h]
+  | bool => cases b <;> simp [reduceBEq] at h <;> simp [h]
+  | nat => cases b <;> simp [reduceBEq] at h <;> simp [h]
+  | string => cases b <;> simp [reduceBEq] at h <;> simp [h]
+  | prod a1 a2 ih1 ih2 =>
+      cases b with
+      | prod b1 b2 =>
+          simp [reduceBEq, Bool.and_eq_true] at h
+          obtain ⟨h1, h2⟩ := h
+          have ha1 : a1 = b1 := ih1 h1
+          have ha2 : a2 = b2 := ih2 h2
+          simp [ha1, ha2]
+      | _ =>
+          simp [reduceBEq] at h
+  | chan sid r =>
+      cases b with
+      | chan sid' r' =>
+          simp [reduceBEq, Bool.and_eq_true] at h
+          obtain ⟨hsid, hr⟩ := h
+          have hsid' : sid = sid' := by simpa using hsid
+          have hr' : r = r' := by simpa using hr
+          simp [hsid', hr']
+      | _ =>
+          simp [reduceBEq] at h
+
+/-- Helper: Option ValType BEq true implies equality (avoid LawfulBEq instance). -/
+private theorem optionValType_beq_eq_true_to_eq
+    {a b : Option SessionTypes.ValType} (h : (a == b) = true) : a = b := by
+  cases a with
+  | none =>
+      cases b with
+      | none => rfl
+      | some _ =>
+          have hfalse : False := by
+            simpa using h
+          exact hfalse.elim
+  | some a =>
+      cases b with
+      | none =>
+          have hfalse : False := by
+            simpa using h
+          exact hfalse.elim
+      | some b =>
+          have h' : (a == b) = true := by simpa using h
+          have hab : a = b := valType_beq_eq_true_to_eq h'
+          simp [hab]
+
 /-- Helper: PayloadSort beq is reflexive. -/
 private theorem payloadSort_beq_refl (s : PayloadSort) : (s == s) = true := by
   induction s with
@@ -103,11 +154,20 @@ private theorem projectbBranches_to_SoundRel
           exact False.elim (Bool.false_ne_true h)
       | cons lhd ltl =>
           unfold projectbBranches at h
-          split_ifs at h with hlabel
-          -- Only one goal: hlabel = true (the false branch is eliminated since false = true is absurd)
+          split_ifs at h with hlabel hnone
+          -- Only one goal: both tests must succeed to get true.
           have ⟨hproj, hrest⟩ := bool_and_true h
           have hlabel' : ghd.1 = lhd.1 := label_beq_eq_true_to_eq hlabel
-          exact List.Forall₂.cons ⟨hlabel', hproj⟩ (ih ltl hrest)
+          have hnone' : lhd.2.1 = none := by
+            cases lhd with
+            | mk lbl rest =>
+                cases rest with
+                | mk vt cont =>
+                    cases vt with
+                    | none => rfl
+                    | some t =>
+                        cases (Bool.false_ne_true hnone)
+          exact List.Forall₂.cons ⟨hlabel', hnone', hproj⟩ (ih ltl hrest)
 
 /-- Helper: projectbAllBranches true implies AllBranchesProj SoundRel. -/
 private theorem projectbAllBranches_to_SoundRel
@@ -338,11 +398,15 @@ private theorem SoundRel_postfix_delegate_delegator
     (role : String) (cand : LocalTypeR)
     (hp : role = p) (h : SoundRel (.delegate p q sid r cont) role cand) :
     CProjectF SoundRel (.delegate p q sid r cont) role cand := by
+  have hpf : (role == p) = true := by
+    simpa [hp] using (beq_self_eq_true (a := p))
   cases cand with
   | send partner lbs =>
       cases lbs with
       | nil =>
-          simp [SoundRel, projectb, hp] at h
+          have hfalse : False := by
+            simpa [SoundRel, projectb, hp, hpf] using h
+          exact hfalse.elim
       | cons b bs =>
           cases bs with
           | nil =>
@@ -356,7 +420,7 @@ private theorem SoundRel_postfix_delegate_delegator
                               if vt == some (.chan sid r) then projectb cont role contCand else false
                             else false
                           else false) = true := by
-                        simpa [SoundRel, projectb, hp] using h
+                        simpa [SoundRel, projectb, hpf] using h
                       by_cases hpartner : (partner == q) = true
                       · have h'' := h'; simp [hpartner] at h''
                         by_cases hlbl : (lbl == ⟨"_delegate", .unit⟩) = true
@@ -367,10 +431,12 @@ private theorem SoundRel_postfix_delegate_delegator
                             have hpartner_eq : partner = q := string_beq_eq_true_to_eq hpartner
                             have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ :=
                               label_beq_eq_true_to_eq hlbl
-                            have hvt_eq : vt = some (.chan sid r) := by
-                              exact eq_of_beq hvt
+                            have hvt_eq : vt = some (.chan sid r) :=
+                              optionValType_beq_eq_true_to_eq hvt
                             have hcont' : SoundRel cont role contCand := hcont
-                            simp [CProjectF, hp, hpartner_eq, hlbl_eq, hvt_eq, hcont']
+                            have hcont'' : SoundRel cont p contCand := by
+                              simpa [hp] using hcont'
+                            simp [CProjectF, hp, hpartner_eq, hlbl_eq, hvt_eq, hcont'']
                           · have hfalse : False := by simp [hvt] at h'''
                             exact hfalse.elim
                         · have hfalse : False := by simp [hlbl] at h''
@@ -378,15 +444,35 @@ private theorem SoundRel_postfix_delegate_delegator
                       · have hfalse : False := by simp [hpartner] at h'
                         exact hfalse.elim
           | cons b2 bs2 =>
-              simp [SoundRel, projectb, hp] at h
+              have hfalse : False := by
+                dsimp [SoundRel] at h
+                unfold projectb at h
+                simpa [hp] using h
+              exact hfalse.elim
   | recv _ _ =>
-      simp [SoundRel, projectb, hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hp] using h
+      exact hfalse.elim
   | «end» =>
-      simp [SoundRel, projectb, hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hp] using h
+      exact hfalse.elim
   | var _ =>
-      simp [SoundRel, projectb, hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hp] using h
+      exact hfalse.elim
   | mu _ _ =>
-      simp [SoundRel, projectb, hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hp] using h
+      exact hfalse.elim
 
 /-- Delegate case when role is delegatee. -/
 private theorem SoundRel_postfix_delegate_delegatee
@@ -394,11 +480,15 @@ private theorem SoundRel_postfix_delegate_delegatee
     (role : String) (cand : LocalTypeR)
     (hqeq : role = q) (hp : role ≠ p) (h : SoundRel (.delegate p q sid r cont) role cand) :
     CProjectF SoundRel (.delegate p q sid r cont) role cand := by
+  have hqf : (role == q) = true := by
+    simpa [hqeq] using (beq_self_eq_true (a := q))
   cases cand with
   | recv partner lbs =>
       cases lbs with
       | nil =>
-          simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+          have hfalse : False := by
+            simpa [SoundRel, projectb, hqeq, hqf, beq_false_of_ne hp] using h
+          exact hfalse.elim
       | cons b bs =>
           cases bs with
           | nil =>
@@ -407,43 +497,64 @@ private theorem SoundRel_postfix_delegate_delegatee
                   cases rest with
                   | mk vt contCand =>
                       have hpf : (role == p) = false := by simpa using beq_false_of_ne hp
-                      have h' :
-                          (if partner == p then
-                            if lbl == ⟨"_delegate", .unit⟩ then
-                              if vt == some (.chan sid r) then projectb cont role contCand else false
-                            else false
-                          else false) = true := by
+                      have htmp :
+                          ¬ q = p ∧
+                            partner = p ∧
+                              (lbl == ⟨"_delegate", .unit⟩) = true ∧
+                                (vt == some (.chan sid r)) = true ∧
+                                  projectb cont role contCand = true := by
                         simpa [SoundRel, projectb, hpf, hqeq] using h
-                      by_cases hpartner : (partner == p) = true
-                      · have h'' := h'; simp [hpartner] at h''
-                        by_cases hlbl : (lbl == ⟨"_delegate", .unit⟩) = true
-                        · have h''' := h''; simp [hlbl] at h'''
-                          by_cases hvt : (vt == some (.chan sid r)) = true
-                          · have hcont : projectb cont role contCand = true := by
-                              simpa [hvt] using h'''
-                            have hpartner_eq : partner = p := string_beq_eq_true_to_eq hpartner
-                            have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ :=
-                              label_beq_eq_true_to_eq hlbl
-                            have hvt_eq : vt = some (.chan sid r) := by
-                              exact eq_of_beq hvt
-                            have hcont' : SoundRel cont role contCand := hcont
-                            simp [CProjectF, hqeq, hpf, hpartner_eq, hlbl_eq, hvt_eq, hcont']
-                          · have hfalse : False := by simp [hvt] at h'''
-                            exact hfalse.elim
-                        · have hfalse : False := by simp [hlbl] at h''
-                          exact hfalse.elim
-                      · have hfalse : False := by simp [hpartner] at h'
-                        exact hfalse.elim
+                      have h' :
+                          partner = p ∧
+                            (lbl == ⟨"_delegate", .unit⟩) = true ∧
+                              (vt == some (.chan sid r)) = true ∧
+                                projectb cont role contCand = true := htmp.2
+                      rcases h' with ⟨hpartner_eq, hlbl, hvt, hcont⟩
+                      have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ :=
+                        label_beq_eq_true_to_eq hlbl
+                      have hvt_eq : vt = some (.chan sid r) :=
+                        optionValType_beq_eq_true_to_eq hvt
+                      have hcont' : SoundRel cont role contCand := hcont
+                      have hcont'' : SoundRel cont q contCand := by
+                        simpa [hqeq] using hcont'
+                      have hqp : q ≠ p := by
+                        intro hqp
+                        exact hp (by simpa [hqeq] using hqp)
+                      subst hqeq
+                      simp [CProjectF, hqp, hpartner_eq, hlbl_eq, hvt_eq, hcont'']
           | cons b2 bs2 =>
-              simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+              have hfalse : False := by
+                dsimp [SoundRel] at h
+                unfold projectb at h
+                simpa [hqeq, beq_false_of_ne hp] using h
+              exact hfalse.elim
   | send _ _ =>
-      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+      have hqp : q ≠ p := by
+        intro hqp
+        exact hp (by simpa [hqeq] using hqp)
+      dsimp [SoundRel] at h
+      unfold projectb at h
+      by_cases hqp' : q = p
+      · exact (False.elim (hqp hqp'))
+      · simp [hqeq, hqp'] at h
   | «end» =>
-      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hqeq, beq_false_of_ne hp] using h
+      exact hfalse.elim
   | var _ =>
-      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hqeq, beq_false_of_ne hp] using h
+      exact hfalse.elim
   | mu _ _ =>
-      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+      have hfalse : False := by
+        dsimp [SoundRel] at h
+        unfold projectb at h
+        simpa [hqeq, beq_false_of_ne hp] using h
+      exact hfalse.elim
 
 /-- Delegate case when role is non-participant. -/
 private theorem SoundRel_postfix_delegate_other
@@ -506,11 +617,20 @@ theorem BranchesProjRel_to_projectbBranches
   induction hrel with
   | nil => simp only [projectbBranches]
   | @cons ghd lhd gtl ltl hpair hrest ihrest =>
-      obtain ⟨hlabel, hproj⟩ := hpair
+      obtain ⟨hlabel, hnone, hproj⟩ := hpair
       unfold projectbBranches
       -- hlabel : ghd.1 = lhd.1, so we need (ghd.1 == lhd.1) = true
       have hbeq : (ghd.1 == lhd.1) = true := eq_to_label_beq_eq_true hlabel
-      simp only [hbeq, ↓reduceIte, Bool.and_eq_true]
+      have hvt : (lhd.2.1 == none) = true := by
+        cases lhd with
+        | mk lbl rest =>
+            cases rest with
+            | mk vt cont =>
+                cases vt with
+                | none => rfl
+                | some t =>
+                    cases hnone
+      simp only [hbeq, hvt, ↓reduceIte, Bool.and_eq_true]
       constructor
       · exact ih ghd (List.Mem.head gtl) lhd.2.2 hproj
       · exact ihrest (fun gb hmem lb hcp => ih gb (List.Mem.tail ghd hmem) lb hcp)

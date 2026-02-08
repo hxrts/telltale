@@ -1,5 +1,6 @@
 import Choreography.Projection.Projectb.Checker
 import Choreography.Projection.Projectb.Coinductive
+import Choreography.Projection.Projectb.Typed
 import Choreography.Projection.Projectb.Soundness
 import Choreography.Projection.Projectb.Completeness
 

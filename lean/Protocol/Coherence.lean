@@ -11,6 +11,7 @@ import Protocol.Coherence.Renaming
 import Protocol.Coherence.ConfigEquiv
 import Protocol.Coherence.Unified
 import Protocol.Coherence.RoleSwap
+import Protocol.Coherence.Delegation
 
 /-!
 # MPST Coherence
