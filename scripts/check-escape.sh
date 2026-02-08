@@ -6,8 +6,8 @@
 # Returns results organized by type with file paths and line numbers.
 #
 # Escape hatches checked:
-#   Critical: sorry, sorryAx, axiom, lcProof
-#   High:     unsafe, partial, @[csimp]
+#   Critical: sorry, sorryAx, axiom, private axiom, lcProof, decreasing_by sorry
+#   High:     unsafe, partial def, @[csimp], unsafeCast, panic!, unreachable!
 #   Medium:   native_decide, implemented_by, extern, reduceBool, reduceNat
 #   Low:      opaque, noncomputable
 
@@ -88,13 +88,18 @@ main() {
     # Critical severity - these bypass proofs entirely
     search_pattern "\\bsorry\\b" "Admits goal without proof" "critical"
     search_pattern "sorryAx" "Sorry axiom (shows in #print axioms)" "critical"
-    search_pattern "\\baxiom\\b" "Introduces unproven assumption" "critical"
+    search_pattern "^[[:space:]]*axiom\\b" "Introduces unproven assumption" "critical"
+    search_pattern "^[[:space:]]*private[[:space:]]+axiom\\b" "Private axiom (hidden unproven assumption)" "critical"
     search_pattern "lcProof" "Low-level proof bypass (unsafe axiom)" "critical"
+    search_pattern "decreasing_by[[:space:]]+sorry" "Unproved termination" "critical"
 
     # High severity - these disable key checks
     search_pattern "\\bunsafe\\b" "Disables safety checks" "high"
-    search_pattern "\\bpartial\\b" "Disables termination checking" "high"
+    search_pattern "^[[:space:]]*partial[[:space:]]+def\\b" "Disables termination checking" "high"
     search_pattern "@\\[csimp\\]" "Can smuggle axioms into proofs" "high"
+    search_pattern "unsafeCast" "Unchecked type cast" "high"
+    search_pattern "\\bpanic!\\b" "Runtime crash (can mask bugs)" "high"
+    search_pattern "\\bunreachable!\\b" "Asserts unreachability" "high"
 
     # Medium severity - these use native code (depend on compiler correctness)
     search_pattern "native_decide" "Uses native code for decidability" "medium"

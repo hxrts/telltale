@@ -12,15 +12,16 @@ ci-dry-run:
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
+    # Benchmark target compilation checks
+    just bench-check
     just book
     # WASM compilation checks
     just wasm-check
     # Golden file equivalence tests (fast, no Lean required)
     just test-golden
-    # TODO: Re-enable once V2 runner is implemented
-    # just telltale-lean-check
-    # just telltale-lean-check-extended
-    # just telltale-lean-check-failing
+    just telltale-lean-check
+    just telltale-lean-check-extended
+    just telltale-lean-check-failing
 
 # Rust style guide lint check (comprehensive)
 lint:
@@ -34,6 +35,10 @@ lint-quick:
 wasm-check:
     cargo check --package telltale-choreography --target wasm32-unknown-unknown --features wasm
     cargo check --package telltale --target wasm32-unknown-unknown --features wasm
+
+# Check benchmark target compilation without running benchmarks
+bench-check:
+    cargo bench --workspace --no-run
 
 # Build WASM example with wasm-pack
 wasm-build:
