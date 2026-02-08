@@ -683,14 +683,14 @@ theorem SendSpec_respects_ConfigEquiv
       simp only [renameEdge]
       rw [hD₁', hD₂', lookupD_update_eq, lookupD_update_eq]
       -- Now show: (trace ++ [T]).map rename = (trace.map rename) ++ [rename T]
-      simp only [List.map_append, List.map_cons, List.map_nil, List.singleton_append]
+      simp only [List.map_append, List.map_cons, List.map_nil]
       -- Apply hTrace to match the trace lookups
       rw [hTrace]
     · -- Case: e' ≠ sendEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
         intro heq
         exact he (renameEdge_inj ρ e' sendEdge heq)
-      simp only [renameEndpoint, renameEdge] at hne₂
+      simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
@@ -824,7 +824,7 @@ theorem RecvSpec_respects_ConfigEquiv
     · -- Case: e' ≠ recvEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
         intro heq; exact he (renameEdge_inj ρ e' recvEdge heq)
-      simp only [renameEndpoint, renameEdge] at hne₂
+      simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
@@ -956,7 +956,7 @@ theorem SelectSpec_respects_ConfigEquiv
     · -- Case: e' ≠ sendEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
         intro heq; exact he (renameEdge_inj ρ e' sendEdge heq)
-      simp only [renameEndpoint, renameEdge] at hne₂
+      simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
@@ -1102,7 +1102,7 @@ theorem BranchSpec_respects_ConfigEquiv
     · -- Case: e' ≠ recvEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
         intro heq; exact he (renameEdge_inj ρ e' recvEdge heq)
-      simp only [renameEndpoint, renameEdge] at hne₂
+      simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
@@ -1447,7 +1447,7 @@ theorem TransferSpec_respects_ConfigEquiv
     · -- Case: e' ≠ sendEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
         intro heq; exact he (renameEdge_inj ρ e' sendEdge heq)
-      simp only [renameEndpoint, renameEdge] at hne₂
+      simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
 
@@ -1460,10 +1460,43 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
     {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
     (hSpec : AcquireSpec G G' D D' ep r delegatedSession delegatedRole) :
     AcquireSpec (renameGEnv ρ G) (renameGEnv ρ G') (renameDEnv ρ D) (renameDEnv ρ D')
-                (renameEndpoint ρ ep) r (ρ.f delegatedSession) delegatedRole := by
-  -- Construct the renamed AcquireSpec from the original.
-  -- This requires renaming infrastructure for DelegationStep.
-  sorry
+                (renameEndpoint ρ ep) r (ρ.f delegatedSession) delegatedRole where
+  receiver_type := by
+    obtain ⟨L', hLookup⟩ := hSpec.receiver_type
+    refine ⟨renameLocalType ρ L', ?_⟩
+    rw [lookupG_rename]
+    simp only [hLookup, Option.map_some, renameLocalType, renameValType]
+  buffer_has_capability := by
+    obtain ⟨rest, hLookup⟩ := hSpec.buffer_has_capability
+    refine ⟨rest.map (renameValType ρ), ?_⟩
+    rw [lookupD_rename]
+    simp only [renameEndpoint, renameEdge, hLookup, List.map_cons, renameValType]
+  type_updated := by
+    intro L' hLookup'
+    have hLookupOrig : lookupG G ep = some (.recv r (.chan delegatedSession delegatedRole) L') := by
+      rw [lookupG_rename] at hLookup'
+      simp only [renameEndpoint] at hLookup'
+      cases h : lookupG G ep with
+      | none => simp [h] at hLookup'
+      | some L =>
+        simp only [h, Option.map_some] at hLookup'
+        have hEq := Option.some.inj hLookup'
+        -- Need to show L = .recv r (.chan delegatedSession delegatedRole) L'
+        -- by inverting renameLocalType
+        simp only [renameLocalType] at hEq
+        cases L with
+        | recv r' T' L'' =>
+          simp only [renameLocalType] at hEq
+          have ⟨hr, hT, hL⟩ := LocalType.recv.inj hEq
+          simp only [renameValType] at hT
+          have hT' := ValType.chan.inj hT
+          have hSid := ρ.inj delegatedSession hT'.1.symm ▸ hT'.1
+          simp only [← hSid, ← hT'.2, ← renameLocalType_inj ρ hL, ← hr]
+        | _ => simp only [renameLocalType] at hEq
+    have hUpd := hSpec.type_updated L' hLookupOrig
+    rw [hUpd, updateG_rename]
+  delegation_applied :=
+    DelegationStep_respects_renaming ρ hSpec.delegation_applied
 
 /-- Acquire respects ConfigEquiv. -/
 theorem AcquireSpec_respects_ConfigEquiv

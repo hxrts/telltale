@@ -942,7 +942,48 @@ theorem shared_participant_no_overhead_unique
     totalWeightedMeasure cfg ≤ weightedMeasure s1 + weightedMeasure s2 +
       List.foldl (· + ·) 0
         ((cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid)).map weightedMeasure) := by
-  -- Total measure is additive over sessions; shared participants don't create overhead
-  sorry
+  -- The total measure is exactly equal to the decomposition, so ≤ holds
+  -- Key insight: with unique sids, s1 and s2 are distinct elements, and the
+  -- filter captures everything else. Sum is invariant under this decomposition.
+  have hne : s1.sid ≠ s2.sid := hshared.2.2
+  -- Pull s1 to front
+  have hperm1 := perm_cons_filter_sid cfg.sessions s1 hs1 hunique
+  -- The filtered list still contains s2 (since s2.sid ≠ s1.sid)
+  have hs2_in_filter : s2 ∈ cfg.sessions.filter (fun t => t.sid != s1.sid) := by
+    simp only [List.mem_filter, bne_iff_ne, ne_eq]
+    exact ⟨hs2, hne.symm⟩
+  -- Uniqueness of sids in the filtered list (sublist preserves nodup)
+  have hunique_filter : (cfg.sessions.filter (fun t => t.sid != s1.sid)).map (·.sid) |>.Nodup := by
+    have hsub : cfg.sessions.filter (fun t => t.sid != s1.sid) <+ cfg.sessions :=
+      List.filter_sublist _
+    exact List.Nodup.sublist (List.Sublist.map (·.sid) hsub) hunique
+  -- Pull s2 to front of filtered list
+  have hperm2 := perm_cons_filter_sid
+    (cfg.sessions.filter (fun t => t.sid != s1.sid)) s2 hs2_in_filter hunique_filter
+  -- The double filter is equivalent to filtering both conditions
+  have hfilter_eq : (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid) =
+      cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid) := by
+    simp only [List.filter_filter, Bool.and_comm]
+  -- Use Perm.foldl_eq for sum invariance under permutation
+  unfold totalWeightedMeasure
+  have hsum_perm1 : (cfg.sessions.map weightedMeasure).foldl (· + ·) 0 =
+      ((s1 :: cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure).foldl (· + ·) 0 := by
+    apply List.Perm.foldl_eq
+    · intro a b c; omega  -- associativity
+    · intro a b; omega    -- commutativity
+    · exact List.Perm.map weightedMeasure hperm1
+  rw [hsum_perm1]
+  simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
+  have hsum_perm2 : ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure).foldl (· + ·) 0 =
+      ((s2 :: (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure).foldl (· + ·) 0 := by
+    apply List.Perm.foldl_eq
+    · intro a b c; omega
+    · intro a b; omega
+    · exact List.Perm.map weightedMeasure hperm2
+  rw [foldl_add_shift, hsum_perm2]
+  simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
+  rw [foldl_add_shift, hfilter_eq]
+  -- Now we have: w(s1) + (w(s2) + sum filter) and need ≤ w(s1) + w(s2) + sum filter
+  omega
 
 end

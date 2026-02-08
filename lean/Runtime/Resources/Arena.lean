@@ -679,7 +679,7 @@ theorem SessionStore.updateType_preserves_consistent {store : SessionStore ν} {
           cases hst'' with
           | inl heq =>
             simp only [Prod.mk.injEq] at heq
-            exact absurd heq.1 hsid
+            exact absurd heq.1.symm hsid
           | inr hmem' => exact ⟨st'', hmem'⟩
         exact ih hTlCons hTlMem hmem
 
@@ -739,7 +739,7 @@ theorem SessionStore.updateTrace_preserves_consistent {store : SessionStore ν} 
           cases hst'' with
           | inl heq =>
             simp only [Prod.mk.injEq] at heq
-            exact absurd heq.1 hsid
+            exact absurd heq.1.symm hsid
           | inr hmem' => exact ⟨st'', hmem'⟩
         exact ih hTlCons hTlMem hmem
 

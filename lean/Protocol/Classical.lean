@@ -1,5 +1,7 @@
 import Protocol.Classical.Regime
 import Protocol.Classical.Framework
+import Protocol.Classical.TransportLedger
+import Protocol.Classical.Instantiation
 
 /-!
 # Protocol Classical Interface

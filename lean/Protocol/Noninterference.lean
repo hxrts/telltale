@@ -109,10 +109,12 @@ theorem recv_G_locality {C : Config} {ep : Endpoint} {edge : Edge}
     {x : Var} {v : Value} {L : LocalType}
     (ep' : Endpoint) (hne : ep' ≠ ep) :
     lookupG (recvStep C ep edge x v L).G ep' = lookupG C.G ep' := by
-  simp only [recvStep]
   cases hdq : dequeueBuf C.bufs edge with
-  | none => rfl
-  | some p => simp only [hdq]; exact lookupG_updateG_ne hne
+  | none =>
+    simp [recvStep, hdq]
+  | some p =>
+    simp [recvStep, hdq]
+    exact lookupG_updateG_ne hne
 
 /-! ## Step Locality: Buffers -/
 
@@ -131,10 +133,12 @@ theorem recv_buf_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     {x : Var} {v : Value} {L : LocalType}
     (hne : edge' ≠ edge) :
     lookupBuf (recvStep C ep edge x v L).bufs edge' = lookupBuf C.bufs edge' := by
-  simp only [recvStep]
   cases hdq : dequeueBuf C.bufs edge with
-  | none => rfl
-  | some p => simp only [hdq]; exact lookupBuf_dequeueBuf_ne hdq hne
+  | none =>
+    simp [recvStep, hdq]
+  | some p =>
+    simp [recvStep, hdq]
+    exact lookupBuf_dequeueBuf_ne hdq hne
 
 /-! ## Step Locality: Traces -/
 
@@ -153,11 +157,11 @@ theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     {x : Var} {v : Value} {L : LocalType}
     (hne : edge' ≠ edge) :
     lookupD (recvStep C ep edge x v L).D edge' = lookupD C.D edge' := by
-  simp only [recvStep]
   cases hdq : dequeueBuf C.bufs edge with
-  | none => rfl
+  | none =>
+    simp [recvStep, hdq]
   | some p =>
-    simp only [hdq]
+    simp [recvStep, hdq]
     exact lookupD_update_neq C.D edge edge' (lookupD C.D edge).tail hne.symm
 
 /-! ## Noninterference Theorem -/
@@ -251,7 +255,6 @@ theorem send_preserves_CEquiv {C : Config} {ep : Endpoint} {target : Role}
 theorem recv_preserves_CEquiv {C : Config} {ep : Endpoint} {source : Role}
     {x : Var} {v : Value} {L : LocalType}
     {s : SessionId} {r : Role}
-    (hSid : ep.sid = s)
     (hBlind : BlindToRecv r source ep.role) :
     C ≈[s, r] (recvStep C ep ⟨ep.sid, source, ep.role⟩ x v L) := by
   unfold CEquiv
@@ -296,7 +299,9 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
     (hBlindRecv : ∀ ep source T L, lookupG C.G ep = some (.recv source T L) →
                   ep.sid = s → BlindToRecv r source ep.role)
     (hBlindBranch : ∀ ep source branches, lookupG C.G ep = some (.branch source branches) →
-                    ep.sid = s → BlindToRecv r source ep.role) :
+                    ep.sid = s → BlindToRecv r source ep.role)
+    (hFreshBufs : ∀ sender receiver,
+      lookupBuf C.bufs ⟨C.nextSid, sender, receiver⟩ = []) :
     C ≈[s, r] C' := by
   cases hStep with
   | send hProc hk hx hG =>
@@ -318,7 +323,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
   | recv hProc hk hG hBuf =>
     rename_i k x e v source T L
     by_cases hsid : e.sid = s
-    · exact recv_preserves_CEquiv hsid (hBlindRecv e source T L hG hsid)
+    · exact recv_preserves_CEquiv (hBlindRecv e source T L hG hsid)
     · unfold CEquiv
       constructor
       · apply Eq.symm; apply recv_G_locality; intro heq
@@ -362,6 +367,7 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         apply lookupBuf_dequeueBuf_ne hDq
         intro heq
         simp only [Edge.mk.injEq] at heq
+        -- lookupBuf_dequeueBuf_ne has e' ≠ e, so heq.2.2 : r = e.role
         exact hb.2 heq.2.2
       · -- Traces to r unchanged
         intro sender'
@@ -369,7 +375,8 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         apply lookupD_update_neq
         intro heq
         simp only [Edge.mk.injEq] at heq
-        exact hb.2 heq.2.2
+        -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ... ∧ e.role = r
+        exact hb.2 heq.2.2.symm
     · -- Different session
       unfold CEquiv
       constructor
@@ -379,19 +386,60 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
       constructor
       · intro sender'; apply Eq.symm
         apply lookupBuf_dequeueBuf_ne hDq; intro heq
-        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+        -- lookupBuf_dequeueBuf_ne has e' ≠ e, so heq : s = e.sid ∧ ...
+        have hs : e.sid = s := (congrArg Edge.sid heq).symm
+        exact hsid hs
       · intro sender'; apply Eq.symm; apply lookupD_update_neq; intro heq
-        simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
+        -- lookupD_update_neq has e ≠ e', so heq : e.sid = s ∧ ...
+        have hs : e.sid = s := congrArg Edge.sid heq
+        exact hsid hs
   | newSession hProc =>
-    exact CEquiv.refl _ s r
+    -- newSessionStep creates a new session but doesn't change G or D.
+    -- Buffers change only for the new session (C.nextSid).
+    rename_i roles f P
+    unfold CEquiv
+    refine ⟨?_, ?_⟩
+    · -- G is unchanged
+      simp [newSessionStep]
+    · refine ⟨?_, ?_⟩
+      · -- Buffers: show that for session s, lookups are unchanged
+        intro sender'
+        by_cases hsid' : s = C.nextSid
+        · subst hsid'
+          have hFresh := hFreshBufs sender' r
+          by_cases hMem : ⟨C.nextSid, sender', r⟩ ∈ RoleSet.allEdges C.nextSid roles
+          · have hLookup :
+              (initBuffers C.nextSid roles).lookup ⟨C.nextSid, sender', r⟩ = some [] :=
+              initBuffers_lookup_mem C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
+            have hFresh' :
+                (List.lookup ⟨C.nextSid, sender', r⟩ C.bufs).getD [] = [] := by
+              simpa [lookupBuf] using hFresh
+            simpa [newSessionStep, lookupBuf, List.lookup_append, hLookup] using hFresh'
+          · have hLookup :
+              (initBuffers C.nextSid roles).lookup ⟨C.nextSid, sender', r⟩ = none :=
+              initBuffers_lookup_none_of_notin C.nextSid roles ⟨C.nextSid, sender', r⟩ hMem
+            simp [newSessionStep, lookupBuf, List.lookup_append, hLookup]
+        · have hne : (⟨s, sender', r⟩ : Edge).sid ≠ C.nextSid := by
+            simpa using hsid'
+          have hLookup :
+            (initBuffers C.nextSid roles).lookup ⟨s, sender', r⟩ = none :=
+            initBuffers_lookup_none C.nextSid roles ⟨s, sender', r⟩ hne
+          simp [newSessionStep, lookupBuf, List.lookup_append, hLookup]
+      · -- D is unchanged
+        intro _
+        simp [newSessionStep]
   | assign hProc =>
-    exact CEquiv.refl _ s r
+    unfold CEquiv
+    simp
   | seq2 hProc =>
-    exact CEquiv.refl _ s r
+    unfold CEquiv
+    simp
   | par_skip_left hProc =>
-    exact CEquiv.refl _ s r
+    unfold CEquiv
+    simp
   | par_skip_right hProc =>
-    exact CEquiv.refl _ s r
+    unfold CEquiv
+    simp
 
 /-! ## Coherence Connection -/
 
