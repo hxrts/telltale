@@ -244,47 +244,159 @@ theorem sum_update_unique {α : Type} [DecidableEq α]
     (l.map (fun (k, v) => if k == key then newVal else v)).foldl (· + ·) 0 + oldVal =
     (l.map Prod.snd).foldl (· + ·) 0 + newVal := by
   -- Unique key update changes sum by difference oldVal → newVal
-  sorry
+  induction l with
+  | nil => simp only [List.not_mem_nil] at hmem
+  | cons hd tl ih =>
+    simp only [List.map_cons, List.foldl_cons, Nat.zero_add]
+    rcases List.mem_cons.mp hmem with heq | htl
+    · -- hd = (key, oldVal)
+      subst heq
+      simp only [beq_self_eq_true, ↓reduceIte]
+      -- In tail, key doesn't appear (uniqueness)
+      have hnodup : (tl.map Prod.fst).Nodup := by
+        simp only [List.map_cons, List.nodup_cons] at hunique
+        exact hunique.2
+      have hnotIn : key ∉ tl.map Prod.fst := by
+        simp only [List.map_cons, List.nodup_cons] at hunique
+        exact hunique.1
+      -- Map on tail is identity for key
+      have htl_eq : tl.map (fun (k, v) => if k == key then newVal else v) = tl.map Prod.snd := by
+        apply List.map_congr_left
+        intro ⟨k', v'⟩ hmem'
+        simp only
+        have hne : k' ≠ key := by
+          intro heq
+          apply hnotIn
+          rw [← heq]
+          exact List.mem_map_of_mem (f := Prod.fst) hmem'
+        simp [beq_eq_false_iff_ne.mpr hne]
+      rw [htl_eq]
+      rw [foldl_add_shift (l := tl.map Prod.snd) (n := newVal)]
+      rw [foldl_add_shift (l := tl.map Prod.snd) (n := oldVal)]
+      omega
+    · -- key is in tail
+      have hnodup : (tl.map Prod.fst).Nodup := by
+        simp only [List.map_cons, List.nodup_cons] at hunique
+        exact hunique.2
+      have hne : hd.1 ≠ key := by
+        simp only [List.map_cons, List.nodup_cons] at hunique
+        intro heq
+        have hmemFst : key ∈ tl.map Prod.fst := List.mem_map_of_mem (f := Prod.fst) htl
+        rw [← heq] at hmemFst
+        exact hunique.1 hmemFst
+      have hcond : (hd.1 == key) = false := beq_eq_false_iff_ne.mpr hne
+      simp only [hcond, Bool.false_eq_true, ↓reduceIte]
+      have ih' := ih hnodup htl
+      -- ih': mapped_sum + oldVal = orig_sum + newVal
+      -- Goal: foldl hd.2 mapped + oldVal = foldl hd.2 orig + newVal
+      -- Apply foldl_add_shift to both sides
+      have hL : (tl.map (fun x => if x.1 == key then newVal else x.2)).foldl (· + ·) hd.2 =
+          hd.2 + (tl.map (fun x => if x.1 == key then newVal else x.2)).foldl (· + ·) 0 :=
+        foldl_add_shift _ hd.2
+      have hR : (tl.map Prod.snd).foldl (· + ·) hd.2 =
+          hd.2 + (tl.map Prod.snd).foldl (· + ·) 0 := foldl_add_shift _ hd.2
+      rw [hL, hR]
+      -- Goal: (hd.2 + mapped_sum) + oldVal = (hd.2 + orig_sum) + newVal
+      -- ih' says: mapped_sum + oldVal = orig_sum + newVal
+      -- Add hd.2 to both sides of ih'
+      calc hd.2 + (tl.map (fun x => if x.1 == key then newVal else x.2)).foldl (· + ·) 0 + oldVal
+          = hd.2 + ((tl.map (fun x => if x.1 == key then newVal else x.2)).foldl (· + ·) 0 + oldVal) := by ring
+        _ = hd.2 + ((tl.map Prod.snd).foldl (· + ·) 0 + newVal) := by rw [ih']
+        _ = hd.2 + (tl.map Prod.snd).foldl (· + ·) 0 + newVal := by ring
 
 /-! ## Lookup/Buffer Membership Helpers -/
 
+private lemma find?_mem_aux {r : Role} {L : LocalType} (types : List (Role × LocalType)) :
+    (match types.find? (fun p => p.1 == r) with
+      | some (_, L') => some L' | none => none) = some L → (r, L) ∈ types := by
+  induction types with
+  | nil =>
+    simp only [List.find?]
+    intro hContra
+    exact Option.noConfusion hContra
+  | cons hd tl ih =>
+    simp only [List.find?]
+    by_cases hEq : hd.1 == r
+    · -- Head matches
+      simp only [hEq, cond_true]
+      intro hL
+      have hRole : hd.1 = r := beq_iff_eq.mp hEq
+      have hType : hd.2 = L := Option.some.inj hL
+      have hPair : hd = (r, L) := Prod.ext hRole hType
+      rw [hPair]
+      exact List.Mem.head tl
+    · -- Head doesn't match
+      simp only [hEq, cond_false]
+      intro hFind
+      exact List.Mem.tail hd (ih hFind)
+
 lemma lookupType_mem {s : SessionState} {r : Role} {L : LocalType}
     (h : s.lookupType r = some L) : (r, L) ∈ s.localTypes := by
-  -- Unfold lookupType to expose find?
   unfold SessionState.lookupType at h
-  -- Case split on find? result
-  cases hFind : s.localTypes.find? (fun p => p.1 == r) with
-  | none =>
-    simp [hFind] at h
-  | some p =>
-    -- find? returned some p, so p ∈ s.localTypes
-    have hMem : p ∈ s.localTypes := List.find?_some hFind
-    -- Also, p.1 == r is true (the predicate holds)
-    have hPred : (fun p => p.1 == r) p = true := List.find?_some_spec hFind
-    simp at hPred
-    -- From h, we have p.2 = L
-    simp [hFind] at h
-    -- p = (p.1, p.2) = (r, L)
-    have hEq : p = (r, L) := by
-      cases p with
-      | mk fst snd =>
-        simp at hPred h
-        simp [hPred, h]
-    rw [← hEq]
-    exact hMem
+  exact find?_mem_aux s.localTypes h
+
+private lemma getBuffer_mem_aux {sender receiver : Role}
+    (bufs : List (Role × Role × Nat)) :
+    (match bufs.find? (fun x => x.1 == sender && x.2.1 == receiver) with
+      | some (_, _, n) => n | none => 0) > 0 →
+    ∃ n, (sender, receiver, n) ∈ bufs ∧
+      n = (match bufs.find? (fun x => x.1 == sender && x.2.1 == receiver) with
+        | some (_, _, n) => n | none => 0) := by
+  induction bufs with
+  | nil =>
+    simp only [List.find?, gt_iff_lt]
+    intro hContra
+    exact absurd hContra (Nat.not_lt_zero 0)
+  | cons hd tl ih =>
+    simp only [List.find?]
+    by_cases hEq : hd.1 == sender && hd.2.1 == receiver
+    · -- Head matches
+      simp only [hEq, ite_true]
+      intro _
+      simp only [Bool.and_eq_true, beq_iff_eq] at hEq
+      have ⟨hSender, hRecv⟩ := hEq
+      have heq : hd = (sender, receiver, hd.2.2) := by
+        cases hd with | mk fst snd =>
+        cases snd with | mk fst' snd' =>
+        simp only at hSender hRecv
+        simp [hSender, hRecv]
+      exact ⟨hd.2.2, by rw [heq]; exact List.Mem.head _, rfl⟩
+    · -- Head doesn't match
+      simp only [hEq, ite_false]
+      intro hFind
+      obtain ⟨n, hmem, heq⟩ := ih hFind
+      exact ⟨n, List.Mem.tail _ hmem, heq⟩
 
 lemma getBuffer_mem_of_pos {s : SessionState} {sender receiver : Role}
     (hpos : s.getBuffer sender receiver > 0) :
     ∃ n, (sender, receiver, n) ∈ s.bufferSizes ∧ n = s.getBuffer sender receiver := by
-  -- If getBuffer > 0, there must be a matching entry in bufferSizes
-  sorry
+  unfold SessionState.getBuffer at hpos ⊢
+  exact getBuffer_mem_aux s.bufferSizes hpos
 
 lemma sumBuffers_incr_eq_of_no_entry
     (s : SessionState) (actor partner : Role)
     (hmem : ¬ ∃ n, (actor, partner, n) ∈ s.bufferSizes) :
     sumBuffers (s.incrBuffer actor partner) = sumBuffers s := by
-  -- When no buffer entry exists, incrBuffer creates a new entry with value 1
-  sorry
+  -- When no buffer entry exists, incrBuffer maps to identity
+  unfold sumBuffers SessionState.incrBuffer
+  simp only
+  -- Show the mapped list equals the original
+  congr 1
+  simp only [List.map_map]
+  apply List.map_congr_left
+  intro ⟨s', r', n⟩ hmem'
+  simp only [Function.comp_apply]
+  -- Show the condition is false for all elements
+  by_cases hEq : s' == actor && r' == partner
+  · -- If condition is true, we have a contradiction
+    exfalso
+    simp only [Bool.and_eq_true, beq_iff_eq] at hEq
+    have ⟨hSender, hRecv⟩ := hEq
+    subst hSender hRecv
+    apply hmem
+    exact ⟨n, hmem'⟩
+  · -- Condition is false, so mapping is identity
+    simp [hEq]
 
 lemma sumDepths_updateType
     (s : SessionState) (actor : Role) (old new : LocalType)
@@ -292,7 +404,33 @@ lemma sumDepths_updateType
     (hunique : s.uniqueRoles) :
     sumDepths (s.updateType actor new) + old.depth = sumDepths s + new.depth := by
   -- updateType replaces old.depth with new.depth in the sum
-  sorry
+  unfold sumDepths SessionState.updateType
+  simp only
+  -- Transform to sum_update_unique form
+  have hmem := lookupType_mem hlookup
+  -- Create the mapped list of (Role, depth) pairs
+  have hdepthList : s.localTypes.map (fun (_, L) => L.depth) =
+      (s.localTypes.map (fun (r, L) => (r, L.depth))).map Prod.snd := by
+    simp only [List.map_map]
+    rfl
+  rw [hdepthList]
+  have hdepthList' : (s.localTypes.map fun (r, L) =>
+        if r == actor then (r, new) else (r, L)).map (fun (_, L) => L.depth) =
+      (s.localTypes.map (fun (r, L) => (r, L.depth))).map
+        (fun (k, v) => if k == actor then new.depth else v) := by
+    simp only [List.map_map, Function.comp_def]
+    apply List.map_congr_left
+    intro ⟨r, L⟩ _
+    simp only
+    split_ifs with h <;> rfl
+  rw [hdepthList']
+  -- Apply sum_update_unique
+  have hunique' : ((s.localTypes.map fun (r, L) => (r, L.depth)).map Prod.fst).Nodup := by
+    simp only [List.map_map, Function.comp_def]
+    exact hunique
+  have hmem' : (actor, old.depth) ∈ s.localTypes.map (fun (r, L) => (r, L.depth)) := by
+    exact List.mem_map_of_mem (f := fun (r, L) => (r, L.depth)) hmem
+  exact sum_update_unique _ actor old.depth new.depth hunique' hmem'
 
 /-- Send step decreases the weighted measure.
 

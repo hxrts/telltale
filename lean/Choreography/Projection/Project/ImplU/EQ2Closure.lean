@@ -41,7 +41,8 @@ theorem BranchesProjRel_lift_EQ2_U
     (hproj : BranchesProjRel CProjectU gbs role lbs0)
     (heq : BranchesRel EQ2 lbs0 lbs1)
     (hwf0 : ∀ lb ∈ lbs0, LocalTypeR.WellFormed lb.2.2)
-    (hwf1 : ∀ lb ∈ lbs1, LocalTypeR.WellFormed lb.2.2) :
+    (hwf1 : ∀ lb ∈ lbs1, LocalTypeR.WellFormed lb.2.2)
+    (hvt1 : ∀ lb ∈ lbs1, lb.2.1 = none) :
     BranchesProjRel CProjectUEQ2Rel gbs role lbs1 := by
   -- Lift each branch pointwise through EQ2, preserving well-formedness.
   induction hproj generalizing lbs1 with
@@ -54,8 +55,10 @@ theorem BranchesProjRel_lift_EQ2_U
           constructor
           · constructor
             · exact hpair.1.trans hpair'.1
-            · exact ⟨lb0.2.2, hpair.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
+            · exact hvt1 lb1 (by simp)
+            · exact ⟨lb0.2.2, hpair.2.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
           · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
+              (fun lb hmem => hvt1 lb (by simp [hmem]))
 
 private theorem EQ2_fullUnfold_end {e : LocalTypeR} (hWF : LocalTypeR.WellFormed e) :
     EQ2 .end e → e.fullUnfold = .end := by

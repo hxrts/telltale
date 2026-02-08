@@ -53,16 +53,24 @@ def CProjectF (R : ProjRel) : ProjRel := fun g role cand =>
         | _ => False
       else
         AllBranchesProj R gbs role cand
-  | .delegate p q _sid _r cont, cand =>
+  | .delegate p q sid r cont, cand =>
       if role = p then
         -- delegator: sends the capability (single branch)
         match cand with
-        | .send partner [(_, _, contCand)] => partner = q ∧ R cont role contCand
+        | .send partner [(lbl, vt, contCand)] =>
+            partner = q ∧
+              lbl = ⟨"_delegate", .unit⟩ ∧
+              vt = some (.chan sid r) ∧
+              R cont role contCand
         | _ => False
       else if role = q then
         -- delegatee: receives the capability (single branch)
         match cand with
-        | .recv partner [(_, _, contCand)] => partner = p ∧ R cont role contCand
+        | .recv partner [(lbl, vt, contCand)] =>
+            partner = p ∧
+              lbl = ⟨"_delegate", .unit⟩ ∧
+              vt = some (.chan sid r) ∧
+              R cont role contCand
         | _ => False
       else
         -- non-participant: follows continuation
@@ -112,21 +120,95 @@ private theorem AllBranchesProj_mono {R S : ProjRel}
 
 private theorem CProjectF_mono : Monotone CProjectF := by
   intro R S h g role cand hrel
-  cases g <;> cases cand <;> simp only [CProjectF] at hrel ⊢
-  all_goals
-    first
-    | exact hrel                                                -- trivial cases
-    | (obtain ⟨h1, h2, h3⟩ := hrel;                             -- mu case
-       exact ⟨h1, h _ _ _ h2, h3⟩)
-    | (-- comm cases with if-then-else structure
-       split_ifs at hrel ⊢
-       all_goals
-         first
-         | exact hrel
-         | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
-         | exact AllBranchesProj_mono h hrel)
-    | (-- delegate cases: TODO prove monotonicity for delegate patterns
-       sorry)
+  cases g with
+  | end =>
+      cases cand <;> simpa [CProjectF] using hrel
+  | var t =>
+      cases cand <;> simpa [CProjectF] using hrel
+  | mu t body =>
+      cases cand <;> simp [CProjectF] at hrel ⊢
+      obtain ⟨h1, h2, h3⟩ := hrel
+      exact ⟨h1, h _ _ _ h2, h3⟩
+  | comm sender receiver gbs =>
+      cases cand <;> simp [CProjectF] at hrel ⊢
+      · -- send case
+        split_ifs at hrel ⊢
+        all_goals
+          first
+          | exact hrel
+          | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
+          | exact AllBranchesProj_mono h hrel
+      · -- recv case
+        split_ifs at hrel ⊢
+        all_goals
+          first
+          | exact hrel
+          | (obtain ⟨h1, h2⟩ := hrel; exact ⟨h1, BranchesProjRel_mono h h2⟩)
+          | exact AllBranchesProj_mono h hrel
+      · -- other cand cases
+        split_ifs at hrel ⊢
+        all_goals
+          first
+          | exact hrel
+          | exact AllBranchesProj_mono h hrel
+  | delegate p q sid r cont =>
+      cases cand with
+      | send partner lbs =>
+          simp [CProjectF] at hrel ⊢
+          split_ifs at hrel ⊢
+          · -- role = p
+            cases lbs with
+            | nil => simpa using hrel
+            | cons b bs =>
+                cases bs with
+                | nil =>
+                  cases b with
+                  | mk lbl vt contCand =>
+                      obtain ⟨h1, h2, h3, h4⟩ := hrel
+                      exact ⟨h1, h2, h3, h _ _ _ h4⟩
+                | cons b2 bs2 =>
+                    simpa using hrel
+          · -- role = q
+            exact hrel
+          · -- role ≠ p, role ≠ q
+            exact h _ _ _ hrel
+      | recv partner lbs =>
+          simp [CProjectF] at hrel ⊢
+          split_ifs at hrel ⊢
+          · -- role = p
+            exact hrel
+          · -- role = q
+            cases lbs with
+            | nil => simpa using hrel
+            | cons b bs =>
+                cases bs with
+                | nil =>
+                  cases b with
+                  | mk lbl vt contCand =>
+                      obtain ⟨h1, h2, h3, h4⟩ := hrel
+                      exact ⟨h1, h2, h3, h _ _ _ h4⟩
+                | cons b2 bs2 =>
+                    simpa using hrel
+          · -- role ≠ p, role ≠ q
+            exact h _ _ _ hrel
+      | end =>
+          simp [CProjectF] at hrel ⊢
+          split_ifs at hrel ⊢
+          · exact hrel
+          · exact hrel
+          · exact h _ _ _ hrel
+      | var t =>
+          simp [CProjectF] at hrel ⊢
+          split_ifs at hrel ⊢
+          · exact hrel
+          · exact hrel
+          · exact h _ _ _ hrel
+      | mu t body =>
+          simp [CProjectF] at hrel ⊢
+          split_ifs at hrel ⊢
+          · exact hrel
+          · exact hrel
+          · exact h _ _ _ hrel
 
 /-- Helper: monotonicity for the non-participant comm branch. -/
 private theorem CProjectF_unfold_core_mono_comm_other

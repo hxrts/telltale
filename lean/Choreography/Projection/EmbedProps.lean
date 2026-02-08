@@ -139,7 +139,8 @@ theorem branches_embed_deterministic {lbs : List BranchR} {role : String}
                   cases gb1 with
                   | mk l1 g1 => cases gb2 with
                     | mk l2 g2 =>
-                        rcases hpair with ⟨hlabel1, hcont1⟩; rcases hpair2 with ⟨hlabel2, hcont2⟩
+                        rcases hpair with ⟨hlabel1, _hnone1, hcont1⟩
+                        rcases hpair2 with ⟨hlabel2, _hnone2, hcont2⟩
                         have hlabel : l1 = l2 := hlabel1.symm.trans hlabel2
                         have hcont : g1 = g2 := embed_deterministic hcont1 hcont2
                         have htail_eq := branches_embed_deterministic htail htail2
@@ -271,7 +272,7 @@ theorem branches_embed_project_roundtrip {lbs : List BranchR} {role : String}
                           | mk l2 t2 =>
                               have hlabel : l1 = l2 := by exact hpair.1.trans hpair2.1
                               cases hlabel
-                              have hcont_eq := embed_project_roundtrip hpair.2 hpair2.2
+                              have hcont_eq := embed_project_roundtrip hpair.2.2 hpair2.2.2
                               have htail_eq := branches_embed_project_roundtrip htail htail2
                               cases hcont_eq; simp [htail_eq]
 termination_by sizeOf lbs

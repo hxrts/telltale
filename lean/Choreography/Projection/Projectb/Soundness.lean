@@ -338,12 +338,55 @@ private theorem SoundRel_postfix_delegate_delegator
     (role : String) (cand : LocalTypeR)
     (hp : role = p) (h : SoundRel (.delegate p q sid r cont) role cand) :
     CProjectF SoundRel (.delegate p q sid r cont) role cand := by
-  -- TODO: Complete this proof after fixing projectb structure
-  dsimp [SoundRel] at h
-  unfold projectb at h
-  simp only [hp, beq_self_eq_true, ↓reduceIte] at h
-  simp only [CProjectF, hp, beq_self_eq_true, ↓reduceIte]
-  sorry
+  cases cand with
+  | send partner lbs =>
+      cases lbs with
+      | nil =>
+          simp [SoundRel, projectb, hp] at h
+      | cons b bs =>
+          cases bs with
+          | nil =>
+              cases b with
+              | mk lbl rest =>
+                  cases rest with
+                  | mk vt contCand =>
+                      have h' :
+                          (if partner == q then
+                            if lbl == ⟨"_delegate", .unit⟩ then
+                              if vt == some (.chan sid r) then projectb cont role contCand else false
+                            else false
+                          else false) = true := by
+                        simpa [SoundRel, projectb, hp] using h
+                      by_cases hpartner : (partner == q) = true
+                      · have h'' := h'; simp [hpartner] at h''
+                        by_cases hlbl : (lbl == ⟨"_delegate", .unit⟩) = true
+                        · have h''' := h''; simp [hlbl] at h'''
+                          by_cases hvt : (vt == some (.chan sid r)) = true
+                          · have hcont : projectb cont role contCand = true := by
+                              simpa [hvt] using h'''
+                            have hpartner_eq : partner = q := string_beq_eq_true_to_eq hpartner
+                            have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ :=
+                              label_beq_eq_true_to_eq hlbl
+                            have hvt_eq : vt = some (.chan sid r) := by
+                              exact eq_of_beq hvt
+                            have hcont' : SoundRel cont role contCand := hcont
+                            simp [CProjectF, hp, hpartner_eq, hlbl_eq, hvt_eq, hcont']
+                          · have hfalse : False := by simp [hvt] at h'''
+                            exact hfalse.elim
+                        · have hfalse : False := by simp [hlbl] at h''
+                          exact hfalse.elim
+                      · have hfalse : False := by simp [hpartner] at h'
+                        exact hfalse.elim
+          | cons b2 bs2 =>
+              simp [SoundRel, projectb, hp] at h
+  | recv _ _ =>
+      simp [SoundRel, projectb, hp] at h
+  | «end» =>
+      simp [SoundRel, projectb, hp] at h
+  | var _ =>
+      simp [SoundRel, projectb, hp] at h
+  | mu _ _ =>
+      simp [SoundRel, projectb, hp] at h
 
 /-- Delegate case when role is delegatee. -/
 private theorem SoundRel_postfix_delegate_delegatee
@@ -351,13 +394,56 @@ private theorem SoundRel_postfix_delegate_delegatee
     (role : String) (cand : LocalTypeR)
     (hqeq : role = q) (hp : role ≠ p) (h : SoundRel (.delegate p q sid r cont) role cand) :
     CProjectF SoundRel (.delegate p q sid r cont) role cand := by
-  -- TODO: Complete this proof after fixing projectb structure
-  dsimp [SoundRel] at h
-  unfold projectb at h
-  have hpf : (role == p) = false := by simpa using beq_false_of_ne hp
-  simp only [hpf, Bool.false_eq_true, ↓reduceIte, hqeq, beq_self_eq_true] at h
-  simp only [CProjectF, hpf, Bool.false_eq_true, ↓reduceIte, hqeq, beq_self_eq_true]
-  sorry
+  cases cand with
+  | recv partner lbs =>
+      cases lbs with
+      | nil =>
+          simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+      | cons b bs =>
+          cases bs with
+          | nil =>
+              cases b with
+              | mk lbl rest =>
+                  cases rest with
+                  | mk vt contCand =>
+                      have hpf : (role == p) = false := by simpa using beq_false_of_ne hp
+                      have h' :
+                          (if partner == p then
+                            if lbl == ⟨"_delegate", .unit⟩ then
+                              if vt == some (.chan sid r) then projectb cont role contCand else false
+                            else false
+                          else false) = true := by
+                        simpa [SoundRel, projectb, hpf, hqeq] using h
+                      by_cases hpartner : (partner == p) = true
+                      · have h'' := h'; simp [hpartner] at h''
+                        by_cases hlbl : (lbl == ⟨"_delegate", .unit⟩) = true
+                        · have h''' := h''; simp [hlbl] at h'''
+                          by_cases hvt : (vt == some (.chan sid r)) = true
+                          · have hcont : projectb cont role contCand = true := by
+                              simpa [hvt] using h'''
+                            have hpartner_eq : partner = p := string_beq_eq_true_to_eq hpartner
+                            have hlbl_eq : lbl = ⟨"_delegate", .unit⟩ :=
+                              label_beq_eq_true_to_eq hlbl
+                            have hvt_eq : vt = some (.chan sid r) := by
+                              exact eq_of_beq hvt
+                            have hcont' : SoundRel cont role contCand := hcont
+                            simp [CProjectF, hqeq, hpf, hpartner_eq, hlbl_eq, hvt_eq, hcont']
+                          · have hfalse : False := by simp [hvt] at h'''
+                            exact hfalse.elim
+                        · have hfalse : False := by simp [hlbl] at h''
+                          exact hfalse.elim
+                      · have hfalse : False := by simp [hpartner] at h'
+                        exact hfalse.elim
+          | cons b2 bs2 =>
+              simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+  | send _ _ =>
+      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+  | «end» =>
+      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+  | var _ =>
+      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
+  | mu _ _ =>
+      simp [SoundRel, projectb, hqeq, beq_false_of_ne hp] at h
 
 /-- Delegate case when role is non-participant. -/
 private theorem SoundRel_postfix_delegate_other

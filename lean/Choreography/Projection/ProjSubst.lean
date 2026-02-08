@@ -159,8 +159,17 @@ private theorem isGuarded_substitute_preserved_var
 theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = true) (hrepl : repl.isGuarded v = true) :
     (body.substitute t repl).isGuarded v = true := by
-  -- TODO: fix recursor usage after BranchR structure change
-  sorry
+  induction body with
+  | «end» =>
+      simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
+  | var w =>
+      exact isGuarded_substitute_preserved_var w t v repl hbody hrepl
+  | send p bs =>
+      simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
+  | recv p bs =>
+      simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
+  | mu s body ih =>
+      exact isGuarded_substitute_preserved_mu s body ih t v repl hbody hrepl
 
 /-- Helper: mu case for unguarded substitution. -/
 private theorem isGuarded_substitute_unguarded_mu
@@ -206,8 +215,17 @@ private theorem isGuarded_substitute_unguarded_var
 theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = false) (hneq : t ≠ v) :
     (body.substitute t repl).isGuarded v = false := by
-  -- TODO: fix recursor usage after BranchR structure change
-  sorry
+  induction body with
+  | «end» =>
+      simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
+  | var w =>
+      exact isGuarded_substitute_unguarded_var w t v repl hbody hneq
+  | send p bs =>
+      simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
+  | recv p bs =>
+      simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
+  | mu s body ih =>
+      exact isGuarded_substitute_unguarded_mu s body ih t v repl hbody hneq
 /-! ## Main Axiom: Projection-Substitution Commutation -/
 
 /- Projection commutes with global type substitution.

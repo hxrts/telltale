@@ -271,8 +271,7 @@ theorem part_of_all2_ind2 (role : String) (P : GlobalType → Prop)
     (h_comm_all : CommAll role P)
     (h_mu : ∀ t body, part_of_all2 role body → P body → P (.mu t body))
     (h_delegate : ∀ p q sid r cont, part_of_all2 role (.delegate p q sid r cont) →
-        (is_participant role p q ∨ (part_of_all2 role cont ∧ P cont)) → P (.delegate p q sid r cont) :=
-        fun _ _ _ _ _ _ _ => sorry) :
+        (is_participant role p q ∨ (part_of_all2 role cont ∧ P cont)) → P (.delegate p q sid r cont)) :
     ∀ g, part_of_all2 role g → P g := by
   intro g h
   match g with  -- structural recursion on g

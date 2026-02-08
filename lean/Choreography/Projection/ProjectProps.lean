@@ -77,9 +77,9 @@ private theorem branches_proj_deterministic_cons
     (lb2 : BranchR) (lbs2' : List BranchR)
     (gb : Label × GlobalType) (gbs' : List (Label × GlobalType))
     {role : String}
-    (hpair1 : gb.1 = lb1.1 ∧ CProject gb.2 role lb1.2.2)
+    (hpair1 : gb.1 = lb1.1 ∧ lb1.2.1 = none ∧ CProject gb.2 role lb1.2.2)
     (htail1 : BranchesProjRel CProject gbs' role lbs1')
-    (hpair2 : gb.1 = lb2.1 ∧ CProject gb.2 role lb2.2.2)
+    (hpair2 : gb.1 = lb2.1 ∧ lb2.2.1 = none ∧ CProject gb.2 role lb2.2.2)
     (htail2 : BranchesProjRel CProject gbs' role lbs2')
     (hwf : ∀ gb' ∈ (gb :: gbs'), gb'.2.wellFormed = true)
     (branches_det : ∀ {lbs1 lbs2}, BranchesProjRel CProject gbs' role lbs1 →
@@ -92,7 +92,8 @@ private theorem branches_proj_deterministic_cons
       | mk l1 t1 =>
           cases lb2 with
           | mk l2 t2 =>
-              rcases hpair1 with ⟨hlabel1, hcont1⟩; rcases hpair2 with ⟨hlabel2, hcont2⟩
+              rcases hpair1 with ⟨hlabel1, _hnone1, hcont1⟩
+              rcases hpair2 with ⟨hlabel2, _hnone2, hcont2⟩
               have hwf_head : gcont.wellFormed = true := hwf (l, gcont) (by simp)
               have hcont_eq : EQ2 t1.2 t2.2 := project_deterministic hcont1 hcont2 hwf_head
               have hlabel_eq : l1 = l2 := hlabel1.symm.trans hlabel2; cases hlabel_eq

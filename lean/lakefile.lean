@@ -51,6 +51,10 @@ lean_lib Protocol where
 lean_lib Runtime where
   globs := #[`Runtime.*]
 
+/-- Classical transport layer: imported theorem interfaces and discharged kernels. -/
+lean_lib ClassicalLayer where
+  globs := #[`Classical.*]
+
 /-- Linker args to silence macOS deployment target warnings for test executables. -/
 def macosLinkArgs : Array String :=
   -- Match the toolchain's minimum macOS version for system libraries.

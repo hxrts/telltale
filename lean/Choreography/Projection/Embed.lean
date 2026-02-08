@@ -47,7 +47,7 @@ abbrev EmbedRel := LocalTypeR → String → GlobalType → Prop
 Labels must match and each branch continuation must embed under R. -/
 def BranchesEmbedRel (R : EmbedRel)
     (lbs : List BranchR) (role : String) (gbs : List (Label × GlobalType)) : Prop :=
-  List.Forall₂ (fun lb gb => lb.1 = gb.1 ∧ R lb.2.2 role gb.2) lbs gbs
+  List.Forall₂ (fun lb gb => lb.1 = gb.1 ∧ lb.2.1 = none ∧ R lb.2.2 role gb.2) lbs gbs
 
 /-! ## One-Step Generator -/
 
@@ -82,7 +82,7 @@ private theorem BranchesEmbedRel_mono {R S : EmbedRel}
   induction hrel with
   | nil => exact List.Forall₂.nil
   | cons hpair _ ih =>
-      exact List.Forall₂.cons ⟨hpair.1, h _ _ _ hpair.2⟩ ih
+      exact List.Forall₂.cons ⟨hpair.1, hpair.2.1, h _ _ _ hpair.2.2⟩ ih
 
 /-- CEmbedF is monotone, enabling coinductive definition. -/
 private theorem CEmbedF_mono : Monotone CEmbedF := by
@@ -146,7 +146,7 @@ private theorem BranchesEmbedRel_to_Proj {lbs : List BranchR}
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hpair _ ih =>
-      exact List.Forall₂.cons ⟨hpair.1.symm, hpair.2⟩ ih
+      exact List.Forall₂.cons ⟨hpair.1.symm, hpair.2.1, hpair.2.2⟩ ih
 
 /-- Helper: embed implies project for end case. -/
 private theorem embed_implies_project_end {g : GlobalType} {role : String}
@@ -154,7 +154,7 @@ private theorem embed_implies_project_end {g : GlobalType} {role : String}
     CProjectF (fun g r e => CEmbed e r g) g role LocalTypeR.end := by
   cases g with
   | «end» => simp [CProjectF]
-  | var _ | mu _ _ | comm _ _ _ => simp [CEmbedF] at hF
+  | var _ | mu _ _ | comm _ _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
 /-- Helper: embed implies project for var case. -/
 private theorem embed_implies_project_var {t : String} {g : GlobalType} {role : String}
@@ -162,7 +162,7 @@ private theorem embed_implies_project_var {t : String} {g : GlobalType} {role : 
     CProjectF (fun g r e => CEmbed e r g) g role (LocalTypeR.var t) := by
   cases g with
   | var t' => simp [CEmbedF] at hF; exact hF.symm
-  | «end» | mu _ _ | comm _ _ _ => simp [CEmbedF] at hF
+  | «end» | mu _ _ | comm _ _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
 /-- Helper: embed implies project for mu case. -/
 private theorem embed_implies_project_mu {t : String} {body : LocalTypeR}
@@ -179,7 +179,7 @@ private theorem embed_implies_project_mu {t : String} {body : LocalTypeR}
       · left
         subst ht
         exact ⟨hcontr, rfl⟩
-  | «end» | var _ | comm _ _ _ => simp [CEmbedF] at hF
+  | «end» | var _ | comm _ _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
 /-- Helper: embed implies project for send case. -/
 private theorem embed_implies_project_send {receiver : String}
@@ -193,7 +193,7 @@ private theorem embed_implies_project_send {receiver : String}
       subst hrole
       simp [CProjectF]
       exact ⟨hrecv, BranchesEmbedRel_to_Proj hbr⟩
-  | «end» | var _ | mu _ _ => simp [CEmbedF] at hF
+  | «end» | var _ | mu _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
 /-- Helper: embed implies project for recv case. -/
 private theorem embed_implies_project_recv {sender : String}
@@ -208,7 +208,7 @@ private theorem embed_implies_project_recv {sender : String}
       have hneq' : role ≠ sender' := fun h => hneq h.symm
       simp [CProjectF, hneq']
       exact ⟨hsend, BranchesEmbedRel_to_Proj hbr⟩
-  | «end» | var _ | mu _ _ => simp [CEmbedF] at hF
+  | «end» | var _ | mu _ _ | delegate _ _ _ _ _ => simp [CEmbedF] at hF
 
 /-- Embedding implies projection (CEmbed ⊆ CProject with swapped arguments). -/
 theorem CEmbed_implies_CProject {e : LocalTypeR} {role : String} {g : GlobalType}

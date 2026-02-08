@@ -164,18 +164,30 @@ mutual
           | _ => false
         else
           projectbAllBranches branches role cand
-    | .delegate p q _sid _r cont, role, cand =>
+    | .delegate p q sid r cont, role, cand =>
         if role == p then
           -- delegator: must be send to q
           match cand with
-          | .send partner [(_, _, contCand)] =>
-              if partner == q then projectb cont role contCand else false
+          | .send partner [(lbl, vt, contCand)] =>
+              if partner == q then
+                if lbl == ⟨"_delegate", .unit⟩ then
+                  if vt == some (.chan sid r) then projectb cont role contCand else false
+                else
+                  false
+              else
+                false
           | _ => false
         else if role == q then
           -- delegatee: must be recv from p
           match cand with
-          | .recv partner [(_, _, contCand)] =>
-              if partner == p then projectb cont role contCand else false
+          | .recv partner [(lbl, vt, contCand)] =>
+              if partner == p then
+                if lbl == ⟨"_delegate", .unit⟩ then
+                  if vt == some (.chan sid r) then projectb cont role contCand else false
+                else
+                  false
+              else
+                false
           | _ => false
         else
           -- non-participant: follows continuation

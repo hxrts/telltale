@@ -130,7 +130,7 @@ private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
     {gLabel : Label} {gCont : GlobalType} {lLabel : Label} {lVt : Option ValType} {lCont : LocalTypeR}
     {gbs_tail : List (Label × GlobalType)} {lbs_tail : List BranchR}
     (role : String)
-    (hlab : gLabel = lLabel) (hproj : CProject gCont role lCont)
+    (hlab : gLabel = lLabel) (_hnone : lVt = none) (hproj : CProject gCont role lCont)
     (hwf : ∀ gb, gb ∈ (gLabel, gCont) :: gbs_tail → gb.2.wellFormed = true)
     (htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role)) :
     BranchesRel EQ2 ((lLabel, lVt, lCont) :: lbs_tail)
@@ -170,12 +170,12 @@ theorem BranchesProjRel_implies_BranchesRel_EQ2
       cases gb with
       | mk gLabel gCont =>
           obtain ⟨lLabel, lVt, lCont⟩ := lb
-          rcases hpair with ⟨hlab, hproj⟩
+          rcases hpair with ⟨hlab, hnone, hproj⟩
           have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
             intro gb' hmem'
             exact hwf gb' (List.mem_cons_of_mem _ hmem')
           have htail : BranchesRel EQ2 lbs_tail (transBranches gbs_tail role) := ih hwf_tail
-          exact BranchesProjRel_implies_BranchesRel_EQ2_cons role hlab hproj hwf htail
+          exact BranchesProjRel_implies_BranchesRel_EQ2_cons role hlab hnone hproj hwf htail
 
 /-- AllBranchesProj with trans gives EQ2.
 
