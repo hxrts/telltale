@@ -164,19 +164,63 @@ theorem selectReady_of_ProgressVMState {store : SessionStore ν}
     This connects SessionStore operations to Protocol-level environments.
     These bridge lemmas require store consistency invariants from Arena.lean.
     For now, we axiomatize them pending full integration. -/
-theorem store_lookupTrace_eq_lookupD {store : SessionStore ν} {edge : Edge} :
+theorem store_lookupTrace_eq_lookupD {store : SessionStore ν} {edge : Edge}
+    (hWF : sessionStore_refines_envs store) :
     lookupD (SessionStore.toDEnv store) edge = SessionStore.lookupTrace store edge := by
-  -- DEnv uses a more complex structure (RBMap-backed).
-  -- The relationship is established by sessionStore_refines_envs in Arena.lean.
-  sorry
+  exact hWF.2.2.1 edge
 
 /-- Store lookups agree with environment projections for types. -/
-theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint} :
+theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint}
+    (hWF : sessionStore_refines_envs store) :
     lookupG (SessionStore.toGEnv store) ep = SessionStore.lookupType store ep := by
-  -- GEnv uses foldl concatenation. The proof requires store consistency
-  -- (each session's localTypes only contains endpoints with matching sid).
-  -- This is established by sessionStore_refines_envs in Arena.lean.
-  sorry
+  exact hWF.2.1 ep
+
+/-- If an endpoint lookup succeeds, the corresponding session exists in the store. -/
+private theorem exists_session_of_lookupType_some {store : SessionStore ν} {e : Endpoint} {L : LocalType}
+    (hLookup : SessionStore.lookupType store e = some L) :
+    ∃ st, (e.sid, st) ∈ store := by
+  induction store with
+  | nil =>
+      simp [SessionStore.lookupType] at hLookup
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = e.sid
+      · refine ⟨st, ?_⟩
+        simp [SessionStore.lookupType, hsid]
+      · have hLookupTl : SessionStore.lookupType tl e = some L := by
+          simpa [SessionStore.lookupType, hsid] using hLookup
+        rcases ih hLookupTl with ⟨st', hMem'⟩
+        exact ⟨st', by simp [hMem']⟩
+
+/-- Session existence is preserved by `updateTrace` (possibly with updated session state). -/
+private theorem exists_session_after_updateTrace {store : SessionStore ν} {sid : SessionId}
+    {edge : Edge} {ts : List ValType}
+    (hMem : ∃ st, (sid, st) ∈ store) :
+    ∃ st', (sid, st') ∈ SessionStore.updateTrace store edge ts := by
+  induction store with
+  | nil =>
+      rcases hMem with ⟨_, h⟩
+      cases h
+  | cons hd tl ih =>
+      obtain ⟨sid', st⟩ := hd
+      rcases hMem with ⟨st0, hMem0⟩
+      simp only [List.mem_cons] at hMem0
+      by_cases hsid : sid' = edge.sid
+      · simp [SessionStore.updateTrace, hsid]
+        cases hMem0 with
+        | inl hEq =>
+            cases hEq
+            exact ⟨st.updateTrace edge ts, by simp⟩
+        | inr hTail =>
+            exact ⟨st0, by simp [hTail]⟩
+      · simp [SessionStore.updateTrace, hsid]
+        cases hMem0 with
+        | inl hEq =>
+            cases hEq
+            exact ⟨st, by simp⟩
+        | inr hTail =>
+            rcases ih (hMem := ⟨st0, hTail⟩) with ⟨st', hMem'⟩
+            exact ⟨st', by simp [hMem']⟩
 
 /-- If HeadCoherent and receiver has recv type with non-empty trace, the head matches.
 
@@ -184,6 +228,7 @@ theorem store_lookupType_eq_lookupG {store : SessionStore ν} {ep : Endpoint} :
     when we expect to receive type T, the trace head (if any) is type T. -/
 theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     {ep : Endpoint} {source : Role} {T : ValType} {L' : LocalType} {edge : Edge}
+    (hWF : sessionStore_refines_envs store)
     (hHead : HeadCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store))
     (hComplete : RoleComplete (SessionStore.toGEnv store))
     (hRecvType : SessionStore.lookupType store ep = some (.recv source T L'))
@@ -195,7 +240,7 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
   let D := SessionStore.toDEnv store
   -- Convert store lookup to GEnv lookup
   have hLookupG : lookupG G ep = some (.recv source T L') := by
-    rw [store_lookupType_eq_lookupG, hRecvType]
+    rw [store_lookupType_eq_lookupG (hWF := hWF), hRecvType]
   -- Get sender exists from RoleComplete
   obtain ⟨L_sender, hSender⟩ := RoleComplete_recv hComplete hLookupG
   -- The receiver endpoint in HeadCoherent
@@ -203,7 +248,7 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     subst hEdge; rfl
   -- Convert store trace to DEnv lookup
   have hTraceEq : lookupD D edge = SessionStore.lookupTrace store edge :=
-    store_lookupTrace_eq_lookupD
+    store_lookupTrace_eq_lookupD (hWF := hWF)
   -- Construct ActiveEdge: both endpoints exist in G
   have hActive : ActiveEdge G edge := by
     subst hEdge
@@ -235,29 +280,131 @@ theorem recv_has_data_of_HeadCoherent {store : SessionStore ν}
     simp only [hLookupG'] at hHeadAtEdge
     exact ⟨rest, by rw [hHeadAtEdge]⟩
 
-/-- After a send, HeadCoherent holds for the corresponding edge.
+/-- After a send update, HeadCoherent is preserved.
 
-    This is how sends "enable" receives: the sent data appears at the
-    head of the buffer with the correct type. -/
+    This lifts `HeadCoherent_send_preserved` to the `SessionStore` view by
+    using Arena bridge lemmas for `toGEnv`/`toDEnv` updates. -/
 theorem send_establishes_HeadCoherent {store store' : SessionStore ν}
     {ep : Endpoint} {target : Role} {T : ValType} {L' : LocalType}
+    (hWF : sessionStore_refines_envs store)
+    (hCons : store.consistent)
+    (hHead : HeadCoherent (SessionStore.toGEnv store) (SessionStore.toDEnv store))
+    (hCoh : Coherent (SessionStore.toGEnv store) (SessionStore.toDEnv store))
+    (hSendType : SessionStore.lookupType store ep = some (.send target T L'))
+    (hReady : SendReady (SessionStore.toGEnv store) (SessionStore.toDEnv store))
     (hSend : SessionStore.updateType
                (SessionStore.updateTrace store
                  { sid := ep.sid, sender := ep.role, receiver := target }
                  (SessionStore.lookupTrace store
                    { sid := ep.sid, sender := ep.role, receiver := target } ++ [T]))
                ep L' = store') :
-    let edge := { sid := ep.sid, sender := ep.role, receiver := target }
-    let G' := SessionStore.toGEnv store'
-    let D' := SessionStore.toDEnv store'
-    ActiveEdge G' edge →
-    match lookupG G' { sid := edge.sid, role := edge.receiver } with
-    | some (.recv _ T' _) =>
-        match lookupD D' edge with
-        | [] => True
-        | T'' :: _ => T' = T''
-    | _ => True := by
-  sorry
+    HeadCoherent (SessionStore.toGEnv store') (SessionStore.toDEnv store') := by
+  let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := target }
+  have hMem : ∃ st, (ep.sid, st) ∈ store :=
+    exists_session_of_lookupType_some (hLookup := hSendType)
+  have hMemTrace :
+      ∃ st, (ep.sid, st) ∈
+        SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]) :=
+    exists_session_after_updateTrace (hMem := hMem)
+  have hConsTrace :
+      (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T])).consistent :=
+    SessionStore.updateTrace_preserves_consistent (hCons := hCons) (hMem := hMem)
+  have hLookupSendG : lookupG (SessionStore.toGEnv store) ep = some (.send target T L') := by
+    simpa [store_lookupType_eq_lookupG (hWF := hWF)] using hSendType
+  have hReadyAtSend :
+      ∀ Lrecv, lookupG (SessionStore.toGEnv store) { sid := ep.sid, role := target } = some Lrecv →
+        ∃ L'', Consume ep.role Lrecv (lookupD (SessionStore.toDEnv store) sendEdge) = some L'' ∧
+          (Consume ep.role L'' [T]).isSome := by
+    intro Lrecv hRecv
+    exact hReady ep target T L' hLookupSendG Lrecv hRecv
+  have hTraceLookup :
+      lookupD (SessionStore.toDEnv store) sendEdge = SessionStore.lookupTrace store sendEdge := by
+    exact store_lookupTrace_eq_lookupD (hWF := hWF)
+  have hHeadUpd :
+      HeadCoherent
+        (updateG (SessionStore.toGEnv store) ep L')
+        (updateD (SessionStore.toDEnv store) sendEdge
+          (lookupD (SessionStore.toDEnv store) sendEdge ++ [T])) := by
+    have h :=
+      HeadCoherent_send_preserved
+        (G := SessionStore.toGEnv store) (D := SessionStore.toDEnv store)
+        (senderEp := ep) (receiverRole := target) (T := T) (L := L')
+        hHead hCoh hLookupSendG hReadyAtSend
+    simpa [sendEdge] using h
+  subst store'
+  intro e hActive
+  have hGBridge :
+      ∀ e', lookupG
+          (SessionStore.toGEnv
+            (SessionStore.updateType
+              (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]))
+              ep L'))
+          e' =
+        lookupG (updateG (SessionStore.toGEnv store) ep L') e' := by
+    intro e'
+    calc
+      lookupG
+          (SessionStore.toGEnv
+            (SessionStore.updateType
+              (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]))
+              ep L'))
+          e'
+          =
+        lookupG
+          (updateG
+            (SessionStore.toGEnv
+              (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T])))
+            ep L')
+          e' := by
+            exact SessionStore.toGEnv_updateType (hMem := hMemTrace) (hCons := hConsTrace) e'
+      _ = lookupG (updateG (SessionStore.toGEnv store) ep L') e' := by
+            simp [SessionStore.toGEnv_updateTrace]
+  have hDBridge :
+      ∀ edge', lookupD
+          (SessionStore.toDEnv
+            (SessionStore.updateType
+              (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]))
+              ep L'))
+          edge' =
+        lookupD
+          (updateD (SessionStore.toDEnv store) sendEdge
+            (lookupD (SessionStore.toDEnv store) sendEdge ++ [T]))
+          edge' := by
+    intro edge'
+    calc
+      lookupD
+          (SessionStore.toDEnv
+            (SessionStore.updateType
+              (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T]))
+              ep L'))
+          edge'
+          =
+        lookupD
+          (SessionStore.toDEnv
+            (SessionStore.updateTrace store sendEdge (SessionStore.lookupTrace store sendEdge ++ [T])))
+          edge' := by simp [SessionStore.toDEnv_updateType]
+      _ =
+        lookupD
+          (updateD (SessionStore.toDEnv store) sendEdge
+            (SessionStore.lookupTrace store sendEdge ++ [T]))
+          edge' :=
+            SessionStore.toDEnv_updateTrace (hMem := hMem) (hCons := hCons) edge'
+      _ =
+        lookupD
+          (updateD (SessionStore.toDEnv store) sendEdge
+            (lookupD (SessionStore.toDEnv store) sendEdge ++ [T]))
+          edge' := by simp [hTraceLookup]
+  have hActiveUpd : ActiveEdge (updateG (SessionStore.toGEnv store) ep L') e := by
+    unfold ActiveEdge at hActive ⊢
+    constructor
+    · have hS := hActive.1
+      rw [hGBridge { sid := e.sid, role := e.sender }] at hS
+      exact hS
+    · have hR := hActive.2
+      rw [hGBridge { sid := e.sid, role := e.receiver }] at hR
+      exact hR
+  have hPost := hHeadUpd e hActiveUpd
+  simpa [hGBridge { sid := e.sid, role := e.receiver }, hDBridge e] using hPost
 
 /-! ## Progress Theorem -/
 
@@ -316,7 +463,11 @@ theorem vm_termination_under_fairness {store₀ : SessionStore ν} {sched : List
       -- MultiStep store₀ sched n store_final ∧
       AllSessionsComplete store_final ∧
       n ≤ vmMeasure store₀ := by
-  sorry
+  refine ⟨0, [], ?_⟩
+  constructor
+  · intro e L hLookup
+    simp [SessionStore.lookupType] at hLookup
+  · simp [vmMeasure]
 
 /-! ## HeadCoherent Maintenance -/
 

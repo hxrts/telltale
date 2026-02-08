@@ -1,5 +1,6 @@
 import Protocol.Semantics
 import Protocol.Coherence
+import Protocol.Preservation
 
 /-
 The Problem. Prove that non-participants in a communication cannot observe
@@ -165,6 +166,14 @@ theorem recv_D_locality {C : Config} {ep : Endpoint} {edge edge' : Edge}
     exact lookupD_update_neq C.D edge edge' (lookupD C.D edge).tail hne.symm
 
 /-! ## Noninterference Theorem -/
+
+/-! ## CEquiv and Process Independence -/
+
+/-- Changing only the process does not affect CEquiv. -/
+private theorem CEquiv_ignore_proc {C C' : Config} {s : SessionId} {r : Role}
+    {P Q : Process} (h : { C with proc := P } ≈[s, r] C') :
+    C ≈[s, r] { C' with proc := Q } := by
+  simpa [CEquiv] using h
 
 /-- Helper: blind role's G is unchanged by send step. -/
 private theorem send_blind_G_unchanged {C : Config} {ep : Endpoint} {target : Role}
@@ -441,6 +450,40 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
     unfold CEquiv
     simp
 
+/-! ## Contextual Closure -/
+
+/-- Blind steps preserve CEquiv across the contextual Step relation. -/
+theorem blind_step_preserves_CEquiv {C C' : Config}
+    {s : SessionId} {r : Role}
+    (hStep : Step C C')
+    (hBlindSend : ∀ ep target T L, lookupG C.G ep = some (.send target T L) →
+                  ep.sid = s → BlindToSend r ep.role target)
+    (hBlindSelect : ∀ ep target branches, lookupG C.G ep = some (.select target branches) →
+                    ep.sid = s → BlindToSend r ep.role target)
+    (hBlindRecv : ∀ ep source T L, lookupG C.G ep = some (.recv source T L) →
+                  ep.sid = s → BlindToRecv r source ep.role)
+    (hBlindBranch : ∀ ep source branches, lookupG C.G ep = some (.branch source branches) →
+                    ep.sid = s → BlindToRecv r source ep.role)
+    (hFreshBufs : ∀ sender receiver,
+      lookupBuf C.bufs ⟨C.nextSid, sender, receiver⟩ = []) :
+    C ≈[s, r] C' := by
+  induction hStep with
+  | base hBase =>
+      exact blind_step_preserves_CEquiv_single hBase hBlindSend hBlindSelect
+        hBlindRecv hBlindBranch hFreshBufs
+  | seq_left hProc hSub ih =>
+      rename_i Cmid P Q
+      have h := ih hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
+      exact CEquiv_ignore_proc (C':=Cmid) (P:=P) (Q:=.seq Cmid.proc Q) h
+  | par_left hProc hSub ih =>
+      rename_i Cmid P Q nS nG nS' nG'
+      have h := ih hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
+      exact CEquiv_ignore_proc (C':=Cmid) (P:=P) (Q:=.par nS' nG' Cmid.proc Q) h
+  | par_right hProc hSub ih =>
+      rename_i Cmid P Q nS nG nS' nG'
+      have h := ih hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
+      exact CEquiv_ignore_proc (C':=Cmid) (P:=Q) (Q:=.par nS' nG' P Cmid.proc) h
+
 /-! ## Coherence Connection -/
 
 /-- CEquiv for all roles implies equal lookups.
@@ -462,6 +505,32 @@ theorem CEquiv_all_implies_lookup_eq {C₁ C₂ : Config}
     have h := hEquiv e.sid e.receiver
     exact h.2.2 e.sender
 
+/-! ## TypedStep Composition -/
+
+/-- Compose noninterference with subject reduction (TypedStep → Step). -/
+theorem blind_typed_step_preserves_CEquiv {n : SessionId}
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
+    {s : SessionId} {r : Role}
+    (hTS : TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P')
+    (hBlindSend : ∀ ep target T L, lookupG G ep = some (.send target T L) →
+      ep.sid = s → BlindToSend r ep.role target)
+    (hBlindSelect : ∀ ep target branches, lookupG G ep = some (.select target branches) →
+      ep.sid = s → BlindToSend r ep.role target)
+    (hBlindRecv : ∀ ep source T L, lookupG G ep = some (.recv source T L) →
+      ep.sid = s → BlindToRecv r source ep.role)
+    (hBlindBranch : ∀ ep source branches, lookupG G ep = some (.branch source branches) →
+      ep.sid = s → BlindToRecv r source ep.role)
+    (hFreshBufs : ∀ sender receiver,
+      lookupBuf bufs ⟨n, sender, receiver⟩ = []) :
+    { proc := P, store := store, bufs := bufs, G := G, D := D, nextSid := n } ≈[s, r]
+    { proc := P', store := store', bufs := bufs', G := G', D := D', nextSid := n } := by
+  let C : Config := { proc := P, store := store, bufs := bufs, G := G, D := D, nextSid := n }
+  let C' : Config := { proc := P', store := store', bufs := bufs', G := G', D := D', nextSid := n }
+  have hStep : Step C C' := subject_reduction (n:=n) hTS
+  simpa [C, C'] using
+    (blind_step_preserves_CEquiv (C:=C) (C':=C') hStep
+      hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs)
+
 end
 
 /-!
@@ -478,6 +547,6 @@ This module establishes noninterference for MPST:
 The proofs rely on the per-edge structure of MPST: since each edge is
 independent, steps on one edge cannot affect observations on unrelated edges.
 
-**Status**: Theorem statements complete. Locality lemma proofs require
-`updateG_ne`, `enqueueBuf_ne`, `updateD_ne` helper lemmas.
+**Status**: Main noninterference proofs complete. The newSession case uses a
+fresh-buffer assumption for the next session ID.
 -/

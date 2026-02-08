@@ -11,12 +11,13 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 3. [SessionCoTypes](#sessioncotypes)
 4. [Choreography](#choreography)
 5. [Semantics](#semantics)
-6. [Protocol](#protocol)
-7. [Runtime](#runtime)
-8. [Build Configuration](#build-configuration)
-9. [Axiom Inventory](#axiom-inventory)
-10. [Proof Strategies](#proof-strategies)
-11. [Quick Navigation Guide](#quick-navigation-guide)
+6. [Classical](#classical)
+7. [Protocol](#protocol)
+8. [Runtime](#runtime)
+9. [Build Configuration](#build-configuration)
+10. [Axiom Inventory](#axiom-inventory)
+11. [Proof Strategies](#proof-strategies)
+12. [Quick Navigation Guide](#quick-navigation-guide)
 
 ---
 
@@ -28,18 +29,20 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
-| SessionTypes   |    30 |  ~8,290 | Global/local type definitions, de Bruijn, participation    |
+| SessionTypes   |    31 |  ~8,290 | Global/local type definitions, de Bruijn, participation    |
 | SessionCoTypes |    66 | ~12,914 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    69 | ~16,251 | Projection, harmony, blindness, embedding, erasure         |
+| Choreography   |    70 | ~16,251 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
-| Protocol       |    55 | ~27,188 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |    62 | ~13,736 | VM, Iris backend via iris-lean, resource algebras, WP      |
-| **Total**      | **290** | **~80,550** |                                                      |
+| Classical      |    11 |  ~2,800 | Transported theorems (queueing, large deviations, mixing)  |
+| Protocol       |    74 | ~29,500 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |    62 | ~14,200 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| **Total**      | **322** | **~86,126** |                                                      |
 
 **Architectural Layers:**
 ```
-Layer 6: Runtime          → VM, iris-lean backend, resource algebras, WP, adequacy
-Layer 5: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
+Layer 7: Runtime          → VM, iris-lean backend, resource algebras, WP, adequacy
+Layer 6: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
+Layer 5: Classical        → Transported theorems from queueing/probability theory
 Layer 4: Semantics        → Operational semantics, typing judgments, determinism, deadlock freedom
 Layer 3: Choreography     → Projection, harmony, blindness, embedding, erasure
 Layer 2: SessionCoTypes   → Coinductive EQ2, bisimulation, duality, roundtrip bridge, async subtyping
@@ -329,6 +332,34 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 
 ---
 
+## Classical
+
+**Root Module:** `Classical.lean`
+**Description:** Transported theorems from queueing theory, probability, and stochastic processes. These results transfer classical probabilistic/ergodic analysis to the session-typed setting via the regime-instantiation framework.
+
+### Transport Framework
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Transport.lean | 250 | Transport framework for lifting classical results to protocol settings |
+
+### Transported Theorems
+
+| File | Lines | Description |
+|------|-------|-------------|
+| FosterLyapunovHarris.lean | 280 | Foster-Lyapunov-Harris theorem for positive recurrence |
+| MaxWeightBackpressure.lean | 240 | MaxWeight scheduling optimality and backpressure |
+| LargeDeviationPrinciple.lean | 220 | Large deviation bounds for rare events |
+| HeavyTrafficDiffusion.lean | 180 | Heavy traffic diffusion limits |
+| MixingTimeBounds.lean | 200 | Mixing time bounds for Markov chains |
+| FluidLimitStability.lean | 210 | Fluid limit stability analysis |
+| ConcentrationInequalities.lean | 280 | Concentration inequalities (Hoeffding, McDiarmid) |
+| LittlesLaw.lean | 150 | Little's law for queuing systems |
+| FunctionalCLT.lean | 220 | Functional central limit theorem |
+| PropagationOfChaos.lean | 280 | Mean-field limits and propagation of chaos |
+
+---
+
 ## Protocol
 
 **Root Module:** `Protocol.lean`
@@ -351,7 +382,7 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Environments/Renaming.lean | 493 | Session renaming with injectivity/commutativity |
 | Environments/RoleRenaming.lean | 83 | Role-based session renaming with correctness properties |
 
-### Coherence (17 parts)
+### Coherence (18 parts)
 
 Central invariant replacing traditional duality for multiparty async settings.
 
@@ -373,6 +404,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Coherence/PreservationDeliveryModels.lean | 157 | Parametrized preservation lemmas for different delivery models |
 | Coherence/SubtypeReplacement.lean | 492 | `RecvCompatible`, `Consume_mono`, `Coherent_type_replacement`, liveness preservation |
 | Coherence/GraphDelta.lean | 547 | Higher-order `Consume` with graph deltas for channel delegation |
+| Coherence/Delegation.lean | 878 | `DelegationStep`, `DelegationWF`, `delegation_preserves_coherent` |
 | Coherence/RoleSwap.lean | 895 | Bijective role renaming within session, coherence preservation under role swap |
 
 ### Typing (8 parts)
@@ -438,10 +470,21 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
 | CrashTolerance.lean | 225 | `CommGraph`, `CrashTolerant`, `Critical`, crash tolerance predicates |
-| Noninterference.lean | 264 | `CEquiv`, `BlindTo`, noninterference security properties |
+| Noninterference.lean | 552 | `CEquiv`, `BlindTo`, `blind_step_preserves_CEquiv` noninterference theorem |
 | DeliveryModel.lean | 214 | `DeliveryModel` typeclass, FIFO/causal/lossy instances |
 | CoherenceM.lean | 15 | Model-parametric coherence re-export wrapper |
 | InformationCost.lean | 1050 | `ProjectionMap`, entropy, mutual information, blind projection |
+
+### Classical Regime (4 parts)
+
+Protocol-specific instantiation of the classical transport framework.
+
+| File | Lines | Description |
+|------|-------|-------------|
+| Classical/Regime.lean | 74 | Classical regime definition, totality, determinism, exchangeability |
+| Classical/Framework.lean | 126 | TransportFramework, step induction, classical regime instantiation |
+| Classical/TransportLedger.lean | 88 | Ledger bookkeeping for transported theorem discharge planning |
+| Classical/Instantiation.lean | 474 | Protocol-facing instantiation (Foster-Lyapunov, MaxWeight, Mean-field) |
 
 ---
 
@@ -452,24 +495,11 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 ### Iris Bridge (iris-lean integration)
 
-Consolidated interface to iris-lean separation logic. **0 sorry** — ghost maps use `Positive` keys with encoding.
+Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` keys with encoding. Contains 10 axioms for WP/invariant rules.
 
 | File | Lines | Description |
 |------|------:|-------------|
 | IrisBridge.lean | 471 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
-
-### Compat Layer
-
-Thin adapters that re-export IrisBridge definitions for downstream modules.
-
-| File | Lines | Description |
-|------|------:|-------------|
-| Compat.lean | 13 | Single import point for all Iris compat modules |
-| Compat/RA.lean | 10 | Resource algebra compat |
-| Compat/Inv.lean | 10 | Invariant compat |
-| Compat/WP.lean | 10 | Weakest precondition compat |
-| Compat/SavedProp.lean | 10 | Saved proposition compat |
-| Compat/GenHeap.lean | 10 | Generalized heap compat |
 
 ### VM Core
 
@@ -481,7 +511,7 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | VM/State.lean | 285 | Full machine state, session table, buffer management |
 | VM/Program.lean | 108 | Program representation and code segments |
 | VM/Definition.lean | 14 | Re-export wrapper for VM.State and VM.Exec |
-| VM/InstrSpec.lean | 1,255 | Denotational specs for all 8 instructions, preservation theorems (0 sorry) |
+| VM/InstrSpec.lean | 1,525 | Denotational specs for all 8 instructions, preservation theorems (2 sorry: ConfigEquiv) |
 | VM/Knowledge.lean | 30 | Knowledge base and fact management |
 | VM/Violation.lean | 29 | Violation policy and fault types |
 | VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
@@ -517,7 +547,7 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | Resources/ResourceModel.lean | 179 | Resource model interface and profiles |
 | Resources/SessionRA.lean | 88 | Session resource algebra with auth/frag |
 | Resources/BufferRA.lean | 317 | Message buffer resource algebra with auth/frag |
-| Resources/Arena.lean | 914 | Memory arena with pointsto, allocation, and ownership tracking |
+| Resources/Arena.lean | 1,379 | Memory arena with pointsto, allocation, and ownership tracking |
 | Resources/ProfilesV1.lean | 42 | V1 resource profile definitions |
 
 ### Program Logic
@@ -560,10 +590,10 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
-| Proofs/Delegation.lean | 756 | `DelegationStep`, `DelegationWF`, `delegation_preserves_coherent` (fully proved) |
+| Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
 | Proofs/Progress.lean | 324 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
-| Proofs/WeightedMeasure.lean | 425 | Lyapunov measure infrastructure, step decrease theorems |
+| Proofs/WeightedMeasure.lean | 989 | Lyapunov measure infrastructure, step decrease theorems |
 | Proofs/SchedulingBound.lean | 536 | k-fair scheduler termination bounds, round-robin corollary |
 | Proofs/Diamond/Lemmas.lean | 364 | Cross-session diamond lemmas |
 | Proofs/Diamond/Proof.lean | 816 | Main diamond theorem proof |
@@ -583,7 +613,7 @@ Thin adapters that re-export IrisBridge definitions for downstream modules.
 
 ### lakefile.lean
 
-Six library targets with glob-based module discovery:
+Seven library targets with glob-based module discovery:
 
 ```
 telltale (package)
@@ -591,6 +621,7 @@ telltale (package)
 ├── SessionCoTypes   ← Coinductive EQ2, bisimulation, roundtrip
 ├── Choreography     ← Projection, harmony, blindness, erasure
 ├── Semantics        ← Operational semantics, typing, determinism
+├── Classical        ← Transported queueing/probability theorems
 ├── Protocol         ← Async MPST, coherence, preservation, monitoring
 └── Runtime          ← VM, Iris backend, WP, adequacy (default target)
 ```
@@ -601,19 +632,26 @@ telltale (package)
 
 ## Axiom Inventory
 
-### Protocol Library (9 axioms)
+### Protocol Library (20 axioms)
 
 | File | Count | Axioms |
 |------|------:|--------|
-| Deployment/Linking.lean | 6 | `mergeBufs_typed`, `link_preserves_WTMon` (4 variants), `compose_deadlock_free` |
+| Deployment/Linking.lean | 8 | `mergeBufs_typed`, `link_preserves_WTMon` (4 variants), `compose_deadlock_free`, `link_preserves_coherent_active` |
 | Monitor/Preservation.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
+| Typing/Framing/Lemmas.lean | 6 | Frame axioms (`HasTypeProcPre_frame_*`, etc.) |
+| Typing/Preservation.lean | 2 | `lookupSEnv_SEnvAll_update_neq`, `StoreTypedStrong_frame_*` |
 | Typing/Core.lean | 1 | `ParSplit.unique` |
+| Preservation.lean | 1 | `OwnedDisjoint_preserved_TypedStep` |
 
-**Retired this cycle:** `mergeLin_valid`, `mergeLin_unique`, `SessionsOf_subset`, `DisjointS_preserved`
+### Runtime Library (10 axioms)
 
-### Runtime Library (IrisBridge — 0 sorry)
+**IrisBridge.lean axioms** for iris-lean integration:
 
-**IrisBridge.lean now connects to iris-lean directly.** Ghost maps use `Positive` keys with application-level encoding via `Iris.Countable.encode`. The `GhostMapSlot V` typeclass registers value types.
+| File | Count | Axioms |
+|------|------:|--------|
+| IrisBridge.lean | 10 | `cancel_token_own`, `cinv`, `namespace_disjoint`, `cinv_alloc`, `cinv_acc`, `cinv_cancel`, `state_interp`, `wp`, `MultiStep'`, `wp_invariance` |
+
+**Ghost maps** use `Positive` keys with application-level encoding via `Iris.Countable.encode`. The `GhostMapSlot V` typeclass registers value types.
 
 | Category | Status | Description |
 |----------|:------:|-------------|
@@ -625,7 +663,14 @@ telltale (package)
 
 **Remaining downstream work:** polymorphic CMRA for `own`, Language instance for WP/adequacy, cancelable invariants need `CinvR` instance.
 
-**Sorries:** 0 across all libraries.
+### Sorry Concentration
+
+| Library | Sorry Count | Files |
+|---------|------------:|-------|
+| SessionCoTypes | 7 | AsyncSubtyping/Core.lean (3), AsyncSubtyping/Decidable.lean (4) |
+| Protocol | 11 | Coherence/Delegation.lean (3), CrashTolerance.lean (5), InformationCost.lean (2), Noninterference.lean (1) |
+| Runtime | 21 | Proofs/Progress.lean (6), Proofs/SchedulingBound.lean (9), Proofs/WeightedMeasure.lean (3), VM/InstrSpec.lean (2), Proofs/Diamond/Proof.lean (1) |
+| **Total** | **39** | |
 
 ---
 
@@ -679,10 +724,13 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Crash tolerance?** → Protocol/CrashTolerance.lean
 - **Noninterference?** → Protocol/Noninterference.lean
 - **Delivery models?** → Protocol/DeliveryModel.lean
+- **Classical transport framework?** → Classical/Transport.lean
+- **Foster-Lyapunov-Harris?** → Classical/FosterLyapunovHarris.lean
+- **Protocol-level classical instantiation?** → Protocol/Classical/Instantiation.lean
 - **Iris separation logic (iris-lean)?** → Runtime/IrisBridge.lean
 - **Ghost state?** → Runtime/ProgramLogic/GhostState.lean
 - **Session-local proofs?** → Runtime/Proofs/SessionLocal.lean, Runtime/Proofs/Frame.lean
-- **Delegation proofs?** → Runtime/Proofs/Delegation.lean
+- **Delegation proofs?** → Protocol/Coherence/Delegation.lean
 - **VM-level progress theorem?** → Runtime/Proofs/Progress.lean
 - **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean, Runtime/Proofs/WeightedMeasure.lean
 - **Scheduling bounds?** → Runtime/Proofs/SchedulingBound.lean

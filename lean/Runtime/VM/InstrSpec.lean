@@ -299,6 +299,16 @@ structure AcquireSpec (G G' : GEnv) (D D' : DEnv)
   delegation_applied :
     DelegationStep G G' D D' delegatedSession senderRole receiverEp.role
 
+/-- VM-level `recv` of a delegated endpoint corresponds to a Protocol-level
+    `DelegationStep` on the delegated session. -/
+def vm_recv_delegation_corresponds_protocol
+    {G G' : GEnv} {D D' : DEnv}
+    {receiverEp : Endpoint} {senderRole : Role}
+    {delegatedSession : SessionId} {delegatedRole : Role}
+    (hSpec : AcquireSpec G G' D D' receiverEp senderRole delegatedSession delegatedRole) :
+    DelegationStep G G' D D' delegatedSession senderRole receiverEp.role :=
+  hSpec.delegation_applied
+
 /-- Footprint for acquire: receiver's session (footprint grows after!). -/
 def AcquireFootprint (receiverEp : Endpoint) : Set SessionId :=
   {receiverEp.sid}
@@ -1469,32 +1479,52 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
   buffer_has_capability := by
     obtain ⟨rest, hLookup⟩ := hSpec.buffer_has_capability
     refine ⟨rest.map (renameValType ρ), ?_⟩
-    rw [lookupD_rename]
-    simp only [renameEndpoint, renameEdge, hLookup, List.map_cons, renameValType]
+    -- The edge in the renamed spec is { sid := (renameEndpoint ρ ep).sid, sender := r, receiver := (renameEndpoint ρ ep).role }
+    -- which equals renameEdge ρ { sid := ep.sid, sender := r, receiver := ep.role }
+    have hEdge : { sid := (renameEndpoint ρ ep).sid, sender := r, receiver := (renameEndpoint ρ ep).role } =
+                 renameEdge ρ { sid := ep.sid, sender := r, receiver := ep.role } := by
+      simp only [renameEndpoint, renameEdge]
+    rw [hEdge, lookupD_rename, hLookup]
+    simp only [List.map_cons, renameValType]
   type_updated := by
     intro L' hLookup'
-    have hLookupOrig : lookupG G ep = some (.recv r (.chan delegatedSession delegatedRole) L') := by
-      rw [lookupG_rename] at hLookup'
-      simp only [renameEndpoint] at hLookup'
-      cases h : lookupG G ep with
-      | none => simp [h] at hLookup'
-      | some L =>
-        simp only [h, Option.map_some] at hLookup'
-        have hEq := Option.some.inj hLookup'
-        -- Need to show L = .recv r (.chan delegatedSession delegatedRole) L'
-        -- by inverting renameLocalType
+    -- L' is the continuation in the renamed space
+    -- We need to find the original continuation and apply type_updated
+    rw [lookupG_rename] at hLookup'
+    cases hOrig : lookupG G ep with
+    | none => simp [hOrig] at hLookup'
+    | some Lorig =>
+      simp only [hOrig, Option.map_some] at hLookup'
+      have hEq := Option.some.inj hLookup'
+      -- Lorig should be .recv r (.chan delegatedSession delegatedRole) L'_orig
+      -- where L' = renameLocalType ρ L'_orig
+      cases Lorig with
+      | recv r' T' L'_orig =>
         simp only [renameLocalType] at hEq
-        cases L with
-        | recv r' T' L'' =>
-          simp only [renameLocalType] at hEq
-          have ⟨hr, hT, hL⟩ := LocalType.recv.inj hEq
+        have ⟨hr, hT, hL⟩ := LocalType.recv.inj hEq
+        -- T' must be a chan for hT to be valid
+        cases T' with
+        | chan sid role =>
           simp only [renameValType] at hT
           have hT' := ValType.chan.inj hT
-          have hSid := ρ.inj delegatedSession hT'.1.symm ▸ hT'.1
-          simp only [← hSid, ← hT'.2, ← renameLocalType_inj ρ hL, ← hr]
-        | _ => simp only [renameLocalType] at hEq
-    have hUpd := hSpec.type_updated L' hLookupOrig
-    rw [hUpd, updateG_rename]
+          have hSid := ρ.inj _ _ hT'.1.symm
+          -- Apply type_updated with the original L'_orig
+          have hLookupOrig : lookupG G ep = some (.recv r (.chan delegatedSession delegatedRole) L'_orig) := by
+            simp only [hOrig, ← hr, ← hSid, ← hT'.2]
+          have hUpd := hSpec.type_updated L'_orig hLookupOrig
+          rw [hUpd, renameGEnv_updateG]
+          simp only [← hL]
+        | unit => simp only [renameValType] at hT; nomatch hT
+        | bool => simp only [renameValType] at hT; nomatch hT
+        | nat => simp only [renameValType] at hT; nomatch hT
+        | string => simp only [renameValType] at hT; nomatch hT
+        | prod _ _ => simp only [renameValType] at hT; nomatch hT
+      | send _ _ _ => simp only [renameLocalType] at hEq; nomatch hEq
+      | select _ _ => simp only [renameLocalType] at hEq; nomatch hEq
+      | branch _ _ => simp only [renameLocalType] at hEq; nomatch hEq
+      | end_ => simp only [renameLocalType] at hEq; nomatch hEq
+      | var _ => simp only [renameLocalType] at hEq; nomatch hEq
+      | mu _ => simp only [renameLocalType] at hEq; nomatch hEq
   delegation_applied :=
     DelegationStep_respects_renaming ρ hSpec.delegation_applied
 

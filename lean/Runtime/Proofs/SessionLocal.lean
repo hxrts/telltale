@@ -144,6 +144,28 @@ theorem footprint_remove_preserves_native (fp : SessionFootprint) (s : SessionId
     (footprint_remove fp s).nativeSession = fp.nativeSession := by
   simp [footprint_remove]
 
+/-- Removing delegated session `s` clears `s` from delegated containment
+    whenever `s` is not the native session. -/
+theorem footprint_remove_clears_delegated
+    (fp : SessionFootprint) (s : SessionId)
+    (hNative : fp.nativeSession ≠ s) :
+    (footprint_remove fp s).contains s = false := by
+  have hNative' : s ≠ fp.nativeSession := by
+    intro hEq
+    exact hNative hEq.symm
+  simp [footprint_remove, SessionFootprint.contains, hNative']
+
+/-- Completing a delegated protocol shrinks the footprint:
+    native ownership is preserved and delegated session `s` is removed. -/
+theorem footprint_shrinks_on_delegation_completion
+    (fp : SessionFootprint) (s : SessionId)
+    (hNative : fp.nativeSession ≠ s) :
+    let fp' := footprint_remove fp s
+    fp'.nativeSession = fp.nativeSession ∧ fp'.contains s = false := by
+  constructor
+  · exact footprint_remove_preserves_native fp s
+  · exact footprint_remove_clears_delegated fp s hNative
+
 /-! ## Session Disjointness -/
 
 /-- Two sessions are disjoint if they share no edges.

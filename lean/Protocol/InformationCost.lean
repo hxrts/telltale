@@ -989,8 +989,105 @@ to the non-participant.
 structure ProjectionMap (L : Type*) (T : Type*) where
   /-- The projection function. -/
   proj : L → T
-  /-- Whether the projection is constant (for non-participants). -/
-  isConstant : Prop := ∃ t, ∀ l, proj l = t
+
+/-- Whether the projection is constant (for non-participants). -/
+def ProjectionMap.isConstant {L T : Type*} (p : ProjectionMap L T) : Prop :=
+  ∃ t, ∀ l, p.proj l = t
+
+private theorem sum_ite_eq_single {α : Type*} [Fintype α] [DecidableEq α]
+    {β : Type*} [AddCommMonoid β] (a0 : α) (c : β) :
+    (∑ a, if a0 = a then c else 0) = c := by
+  classical
+  have hsum' :=
+    Finset.sum_eq_single (s := (Finset.univ : Finset α))
+      (f := fun a => if a0 = a then c else 0) a0
+      (by
+        intro a _ hne
+        have hne' : a0 ≠ a := by exact Ne.symm hne
+        simp [hne'])
+      (by
+        intro hnot
+        exact (False.elim (hnot (by simp))))
+  have hsum :
+      Finset.sum (Finset.univ : Finset α) (fun a => if a0 = a then c else 0) =
+        if a0 = a0 then c else 0 := by
+    exact hsum'
+  calc
+    (∑ a, if a0 = a then c else 0) = if a0 = a0 then c else 0 := hsum
+    _ = c := by simp
+
+private theorem marginalFst_const_projection
+    {L T : Type*} [Fintype L] [Fintype T] [DecidableEq T]
+    (p : ProjectionMap L T) (hConst : p.isConstant) (labelDist : L → ℝ) :
+    marginalFst (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) =
+      labelDist := by
+  classical
+  obtain ⟨t0, ht0⟩ := hConst
+  funext l
+  have hsum := sum_ite_eq_single t0 (labelDist l)
+  calc
+    marginalFst (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) l =
+        ∑ t, if t0 = t then labelDist l else 0 := by
+      simp [marginalFst, ht0]
+    _ = labelDist l := hsum
+
+private theorem marginalSnd_const_projection
+    {L T : Type*} [Fintype L] [Fintype T] [DecidableEq T]
+    (p : ProjectionMap L T) (t0 : T) (ht0 : ∀ l, p.proj l = t0)
+    (labelDist : L → ℝ) (h_sum : ∑ l, labelDist l = 1) :
+    marginalSnd (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) =
+      fun t => if t0 = t then 1 else 0 := by
+  classical
+  funext t
+  by_cases ht : t0 = t
+  · subst ht
+    simp [marginalSnd, ht0, h_sum]
+  · simp [marginalSnd, ht0, ht]
+
+private theorem joint_eq_prod_marginals_const_projection
+    {L T : Type*} [Fintype L] [Fintype T] [DecidableEq T]
+    (p : ProjectionMap L T) (hConst : p.isConstant)
+    (labelDist : L → ℝ) (h_sum : ∑ l, labelDist l = 1) :
+    (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) =
+      fun ab =>
+        marginalFst (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) ab.1 *
+          marginalSnd (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) ab.2 := by
+  classical
+  obtain ⟨t0, ht0⟩ := hConst
+  have hfst := marginalFst_const_projection p ⟨t0, ht0⟩ labelDist
+  have hsnd := marginalSnd_const_projection p t0 ht0 labelDist h_sum
+  funext ab
+  cases ab with
+  | mk l t =>
+      have hfst_l : marginalFst (fun lt : L × T =>
+          if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) l = labelDist l := by
+        simpa using congrArg (fun f => f l) hfst
+      have hsnd_t : marginalSnd (fun lt : L × T =>
+          if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) t =
+          if t0 = t then 1 else 0 := by
+        simpa using congrArg (fun f => f t) hsnd
+      by_cases ht : t0 = t
+      · subst ht
+        have hfst_l' :
+            marginalFst (fun lt : L × T => if t0 = lt.2 then labelDist lt.1 else 0) l =
+              labelDist l := by
+          simpa [ht0] using hfst_l
+        have hsnd_t' :
+            marginalSnd (fun lt : L × T => if t0 = lt.2 then labelDist lt.1 else 0) t0 = 1 := by
+          have hsnd_t'' :
+              marginalSnd (fun lt : L × T => if t0 = lt.2 then labelDist lt.1 else 0) t0 =
+                if t0 = t0 then 1 else 0 := by
+            simpa [ht0] using hsnd_t
+          simpa using hsnd_t''
+        simp [ht0, hfst_l', hsnd_t']
+      · have hsnd_t' :
+            marginalSnd (fun lt : L × T => if t0 = lt.2 then labelDist lt.1 else 0) t = 0 := by
+          have hsnd_t'' :
+              marginalSnd (fun lt : L × T => if t0 = lt.2 then labelDist lt.1 else 0) t =
+                if t0 = t then 1 else 0 := by
+            simpa [ht0] using hsnd_t
+          simpa [ht] using hsnd_t''
+        simp [ht0, ht, hsnd_t']
 
 /-- When projection is constant, mutual information with the projected type is zero.
     This is the information-theoretic formulation of blindness. -/
@@ -999,9 +1096,23 @@ theorem mutualInfo_zero_of_constant_projection
     (p : ProjectionMap L T) (hConst : p.isConstant)
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1) :
     mutualInfo (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) = 0 := by
-  -- When projection is constant, the joint distribution concentrates on
-  -- a single T value, making X and T trivially independent.
-  sorry -- TODO: Detailed proof requires case analysis on constant target
+  classical
+  let pXY : L × T → ℝ := fun lt => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0
+  have h_nn' : ∀ ab, 0 ≤ pXY ab := by
+    intro ab
+    by_cases h : p.proj ab.1 = ab.2
+    · simp [pXY, h, h_nn]
+    · simp [pXY, h]
+  have hEq : (fun ab => marginalFst pXY ab.1 * marginalSnd pXY ab.2) = pXY := by
+    simpa [pXY] using
+      (joint_eq_prod_marginals_const_projection p hConst labelDist h_sum).symm
+  have hmi :
+      mutualInfo pXY =
+        klDivergence pXY (fun ab => marginalFst pXY ab.1 * marginalSnd pXY ab.2) :=
+    mutualInfo_eq_klDivergence pXY h_nn'
+  have hkl : klDivergence pXY (fun ab => marginalFst pXY ab.1 * marginalSnd pXY ab.2) = 0 := by
+    simpa [hEq] using (klDivergence_self_eq_zero pXY h_nn')
+  simpa [pXY] using hmi.trans hkl
 
 /-- Blind projection preserves local entropy.
 

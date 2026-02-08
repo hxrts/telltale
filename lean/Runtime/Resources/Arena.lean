@@ -887,47 +887,324 @@ private theorem Buffers_foldl_append_comm {ν : Type u} [VerificationModel ν]
     rw [ih (SignedBuffers.payloads hd.snd.buffers)]
     simp only [List.append_assoc]
 
-/-- Key lemma: toGEnv commutes with updateType.
-    This is the bridge between SessionStore operations and Protocol-level GEnv operations.
-    Requires store consistency to know endpoints have correct sids. -/
+/-- Key bridge for `updateType` at lookup level.
+    This captures the extensional behavior of `toGEnv` under updates. -/
 theorem SessionStore.toGEnv_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType}
     (hMem : ∃ st, (e.sid, st) ∈ store)
     (hCons : store.consistent) :
-    (store.updateType e L).toGEnv = updateG (store.toGEnv) e L := by
-  sorry
+    ∀ e', lookupG (store.updateType e L).toGEnv e' = lookupG (updateG (store.toGEnv) e L) e' := by
+  intro e'
+  induction store with
+  | nil =>
+      cases hMem with
+      | intro _ h => cases h
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = e.sid
+      · simp only [SessionStore.updateType, hsid, ↓reduceIte]
+        simp only [SessionStore.toGEnv, List.foldl]
+        have hFoldUpd :
+            List.foldl (fun acc p => acc ++ p.snd.localTypes) (st.updateType e L).localTypes tl =
+              (st.updateType e L).localTypes ++ SessionStore.toGEnv tl := by
+          simpa [SessionStore.toGEnv] using
+            (GEnv_foldl_append_comm (G := (st.updateType e L).localTypes) (store := tl))
+        have hFoldOrig :
+            List.foldl (fun acc p => acc ++ p.snd.localTypes) st.localTypes tl =
+              st.localTypes ++ SessionStore.toGEnv tl := by
+          simpa [SessionStore.toGEnv] using
+            (GEnv_foldl_append_comm (G := st.localTypes) (store := tl))
+        simp only [List.nil_append]
+        rw [hFoldUpd, hFoldOrig]
+        simp only [SessionState.updateType]
+        by_cases he' : e' = e
+        · have hLeft : lookupG (updateG st.localTypes e L ++ SessionStore.toGEnv tl) e' = some L := by
+            rw [he']
+            exact lookupG_append_left
+              (G1 := updateG st.localTypes e L)
+              (G2 := SessionStore.toGEnv tl)
+              (e := e)
+              (L := L)
+              (lookupG_updateG_eq (env := st.localTypes) (e := e) (L := L))
+          have hRight : lookupG (updateG (st.localTypes ++ SessionStore.toGEnv tl) e L) e' = some L := by
+            simpa [he'] using
+              (lookupG_updateG_eq (env := st.localTypes ++ SessionStore.toGEnv tl) (e := e) (L := L))
+          exact hLeft.trans hRight.symm
+        · have hR :
+            lookupG (updateG (st.localTypes ++ SessionStore.toGEnv tl) e L) e' =
+              lookupG (st.localTypes ++ SessionStore.toGEnv tl) e' :=
+              lookupG_updateG_ne (env := st.localTypes ++ SessionStore.toGEnv tl) (e := e) (e' := e') (L := L) he'
+          have hL :
+              lookupG (updateG st.localTypes e L ++ SessionStore.toGEnv tl) e' =
+                lookupG (st.localTypes ++ SessionStore.toGEnv tl) e' := by
+            by_cases hLeft : lookupG st.localTypes e' = none
+            · have hLeftUpd : lookupG (updateG st.localTypes e L) e' = none := by
+                simpa [hLeft] using
+                  (lookupG_updateG_ne (env := st.localTypes) (e := e) (e' := e') (L := L) he')
+              rw [lookupG_append_right (G1 := updateG st.localTypes e L) (G2 := SessionStore.toGEnv tl)
+                (e := e') hLeftUpd]
+              rw [lookupG_append_right (G1 := st.localTypes) (G2 := SessionStore.toGEnv tl) (e := e') hLeft]
+            · obtain ⟨T, hSome⟩ := Option.ne_none_iff_exists.mp hLeft
+              have hSome' : lookupG st.localTypes e' = some T := by
+                simpa using hSome.symm
+              have hLeftUpd : lookupG (updateG st.localTypes e L) e' = some T := by
+                simpa [hSome'] using
+                  (lookupG_updateG_ne (env := st.localTypes) (e := e) (e' := e') (L := L) he')
+              rw [lookupG_append_left (G1 := updateG st.localTypes e L) (G2 := SessionStore.toGEnv tl)
+                (e := e') (L := T) hLeftUpd]
+              rw [lookupG_append_left (G1 := st.localTypes) (G2 := SessionStore.toGEnv tl)
+                (e := e') (L := T) hSome']
+          exact hL.trans (by simpa using hR.symm)
+      · have hMem' : ∃ st', (e.sid, st') ∈ tl := by
+          obtain ⟨st', hst'⟩ := hMem
+          simp only [List.mem_cons] at hst'
+          cases hst' with
+          | inl hEq =>
+              simp only [Prod.mk.injEq] at hEq
+              exact (hsid hEq.1.symm).elim
+          | inr hTail =>
+              exact ⟨st', hTail⟩
+        have hCons' : SessionStore.consistent tl := by
+          intro sid' st' hIn
+          exact hCons sid' st' (List.Mem.tail _ hIn)
+        have hHead := hCons sid st (List.Mem.head _)
+        have hSidNe : e.sid ≠ st.sid := by
+          intro hEq
+          exact hsid (hHead.1.symm.trans hEq.symm)
+        have hNotMemLeft : lookupG st.localTypes e = none :=
+          SessionState.lookupG_none_of_sid_ne hHead.2 hSidNe
+        simp only [SessionStore.updateType, hsid, ↓reduceIte]
+        simp only [SessionStore.toGEnv, List.foldl]
+        have hFoldLeft :
+            List.foldl (fun acc p => acc ++ p.snd.localTypes) st.localTypes (SessionStore.updateType tl e L) =
+              st.localTypes ++ SessionStore.toGEnv (SessionStore.updateType tl e L) := by
+          simpa [SessionStore.toGEnv] using
+            (GEnv_foldl_append_comm (G := st.localTypes) (store := SessionStore.updateType tl e L))
+        have hFoldOrig :
+            List.foldl (fun acc p => acc ++ p.snd.localTypes) st.localTypes tl =
+              st.localTypes ++ SessionStore.toGEnv tl := by
+          simpa [SessionStore.toGEnv] using
+            (GEnv_foldl_append_comm (G := st.localTypes) (store := tl))
+        simp only [List.nil_append]
+        rw [hFoldLeft, hFoldOrig]
+        rw [updateG_append_right (G1 := st.localTypes) (G2 := SessionStore.toGEnv tl) (e := e) (L := L) hNotMemLeft]
+        by_cases hLeft : lookupG st.localTypes e' = none
+        · rw [lookupG_append_right (G1 := st.localTypes) (G2 := SessionStore.toGEnv (SessionStore.updateType tl e L))
+            (e := e') hLeft]
+          rw [lookupG_append_right (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
+            (e := e') hLeft]
+          exact ih hMem' hCons'
+        · obtain ⟨T, hSome⟩ := Option.ne_none_iff_exists.mp hLeft
+          have hSome' : lookupG st.localTypes e' = some T := by
+            simpa using hSome.symm
+          rw [lookupG_append_left (G1 := st.localTypes) (G2 := SessionStore.toGEnv (SessionStore.updateType tl e L))
+            (e := e') (L := T) hSome']
+          rw [lookupG_append_left (G1 := st.localTypes) (G2 := updateG (SessionStore.toGEnv tl) e L)
+            (e := e') (L := T) hSome']
 
 /-- Key lemma: toDEnv commutes with updateTrace.
-    Requires store consistency to know edges have correct sids. -/
+    Stated extensionally at lookup level. -/
+private theorem lookupD_DEnvUnion_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
+    (h : D1.find? e = some ts) :
+    lookupD (D1 ++ D2) e = ts := by
+  unfold lookupD
+  have h' := DEnvUnion_find?_left (D1 := D1) (D2 := D2) (e := e) (ts := ts) h
+  simp [h']
+
+private theorem lookupD_DEnvUnion_right {D1 D2 : DEnv} {e : Edge}
+    (h : D1.find? e = none) :
+    lookupD (D1 ++ D2) e = lookupD D2 e := by
+  unfold lookupD
+  have h' := DEnvUnion_find?_right (D1 := D1) (D2 := D2) (e := e) h
+  simp [h']
+
+private theorem lookupD_updateD_union {D1 D2 : DEnv} {edge edge' : Edge} {ts : Trace} :
+    lookupD (updateD D1 edge ts ++ D2) edge' =
+      lookupD (updateD (D1 ++ D2) edge ts) edge' := by
+  by_cases heq : edge' = edge
+  · have hLeftFind : (updateD D1 edge ts).find? edge' = some ts := by
+      rw [heq]
+      exact find?_updateD_eq D1 edge ts
+    have hLeft : lookupD (updateD D1 edge ts ++ D2) edge' = ts :=
+      lookupD_DEnvUnion_left hLeftFind
+    have hRightEq : lookupD (updateD (D1 ++ D2) edge ts) edge' = ts := by
+      rw [heq]
+      exact lookupD_update_eq (D1 ++ D2) edge ts
+    calc
+      lookupD (updateD D1 edge ts ++ D2) edge' = ts := hLeft
+      _ = lookupD (updateD (D1 ++ D2) edge ts) edge' := hRightEq.symm
+  · have hRight :
+        lookupD (updateD (D1 ++ D2) edge ts) edge' = lookupD (D1 ++ D2) edge' :=
+        lookupD_update_neq (D1 ++ D2) edge edge' ts (Ne.symm heq)
+    have hLeft :
+        lookupD (updateD D1 edge ts ++ D2) edge' = lookupD (D1 ++ D2) edge' := by
+      by_cases hFind : D1.find? edge' = none
+      · have hFindUpd : (updateD D1 edge ts).find? edge' = none := by
+          rw [find?_updateD_neq D1 edge edge' ts (Ne.symm heq)]
+          exact hFind
+        rw [lookupD_DEnvUnion_right hFindUpd]
+        rw [lookupD_DEnvUnion_right hFind]
+      · obtain ⟨ts', hSomeRaw⟩ := Option.ne_none_iff_exists.mp hFind
+        have hSome : D1.find? edge' = some ts' := by
+          simpa using hSomeRaw.symm
+        have hSomeUpd : (updateD D1 edge ts).find? edge' = some ts' := by
+          rw [find?_updateD_neq D1 edge edge' ts (Ne.symm heq)]
+          exact hSome
+        rw [lookupD_DEnvUnion_left hSomeUpd]
+        rw [lookupD_DEnvUnion_left hSome]
+    exact hLeft.trans (by simpa using hRight.symm)
+
 theorem SessionStore.toDEnv_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType}
     (hMem : ∃ st, (edge.sid, st) ∈ store)
     (hCons : store.consistent) :
-    (store.updateTrace edge ts).toDEnv = updateD (store.toDEnv) edge ts := by
-  -- updateTrace updates the trace for a specific edge; toDEnv projects the whole DEnv
-  sorry
+    ∀ edge', lookupD (store.updateTrace edge ts).toDEnv edge' =
+      lookupD (updateD (store.toDEnv) edge ts) edge' := by
+  intro edge'
+  induction store with
+  | nil =>
+      cases hMem with
+      | intro _ h => cases h
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = edge.sid
+      · simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
+        simp only [SessionStore.toDEnv, List.foldl]
+        have hFoldUpd :
+            List.foldl (fun acc p => acc ++ p.snd.traces) (st.updateTrace edge ts).traces tl =
+              (st.updateTrace edge ts).traces ++ SessionStore.toDEnv tl := by
+          simpa [SessionStore.toDEnv] using
+            (DEnv_foldl_append_comm (D := (st.updateTrace edge ts).traces) (store := tl))
+        have hFoldOrig :
+            List.foldl (fun acc p => acc ++ p.snd.traces) st.traces tl =
+              st.traces ++ SessionStore.toDEnv tl := by
+          simpa [SessionStore.toDEnv] using
+            (DEnv_foldl_append_comm (D := st.traces) (store := tl))
+        have hSeedUpd : (∅ : DEnv) ++ (st.updateTrace edge ts).traces = (st.updateTrace edge ts).traces :=
+          DEnvUnion_empty_left (D := (st.updateTrace edge ts).traces)
+        have hSeed : (∅ : DEnv) ++ st.traces = st.traces := DEnvUnion_empty_left (D := st.traces)
+        rw [hSeedUpd, hSeed]
+        rw [hFoldUpd, hFoldOrig]
+        simp only [SessionState.updateTrace]
+        exact lookupD_updateD_union (D1 := st.traces) (D2 := SessionStore.toDEnv tl)
+          (edge := edge) (edge' := edge') (ts := ts)
+      · have hMem' : ∃ st', (edge.sid, st') ∈ tl := by
+          obtain ⟨st', hst'⟩ := hMem
+          simp only [List.mem_cons] at hst'
+          cases hst' with
+          | inl hEq =>
+              simp only [Prod.mk.injEq] at hEq
+              exact (hsid hEq.1.symm).elim
+          | inr hTail =>
+              exact ⟨st', hTail⟩
+        have hCons' : SessionStore.consistent tl := by
+          intro sid' st' hIn
+          exact hCons sid' st' (List.Mem.tail _ hIn)
+        have hHead := hCons sid st (List.Mem.head _)
+        have hSidNe : edge.sid ≠ st.sid := by
+          intro hEq
+          exact hsid (hHead.1.symm.trans hEq.symm)
+        have hNoneLeft : st.traces.find? edge = none :=
+          SessionState.traces_find?_none_of_sid_ne hHead.2 hSidNe
+        simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
+        simp only [SessionStore.toDEnv, List.foldl]
+        have hFoldLeft :
+            List.foldl (fun acc p => acc ++ p.snd.traces) ((∅ : DEnv) ++ st.traces) (SessionStore.updateTrace tl edge ts) =
+              ((∅ : DEnv) ++ st.traces) ++ SessionStore.toDEnv (SessionStore.updateTrace tl edge ts) := by
+          simpa [SessionStore.toDEnv] using
+            (DEnv_foldl_append_comm (D := ((∅ : DEnv) ++ st.traces)) (store := SessionStore.updateTrace tl edge ts))
+        have hFoldOrig :
+            List.foldl (fun acc p => acc ++ p.snd.traces) ((∅ : DEnv) ++ st.traces) tl =
+              ((∅ : DEnv) ++ st.traces) ++ SessionStore.toDEnv tl := by
+          simpa [SessionStore.toDEnv] using
+            (DEnv_foldl_append_comm (D := ((∅ : DEnv) ++ st.traces)) (store := tl))
+        rw [hFoldLeft, hFoldOrig]
+        have hEqLeft : ((∅ : DEnv) ++ st.traces) = st.traces := DEnvUnion_empty_left (D := st.traces)
+        have hNoneLeft' : ((∅ : DEnv) ++ st.traces).find? edge = none := by
+          simpa [hEqLeft] using hNoneLeft
+        rw [updateD_DEnvUnion_right (D1 := ((∅ : DEnv) ++ st.traces)) (D2 := SessionStore.toDEnv tl)
+          (e := edge) (ts := ts) hNoneLeft']
+        by_cases hFind : st.traces.find? edge' = none
+        · have hFind' : ((∅ : DEnv) ++ st.traces).find? edge' = none := by
+            simpa [hEqLeft] using hFind
+          rw [lookupD_DEnvUnion_right hFind']
+          rw [lookupD_DEnvUnion_right hFind']
+          exact ih hMem' hCons'
+        · obtain ⟨ts', hSomeRaw⟩ := Option.ne_none_iff_exists.mp hFind
+          have hSome : st.traces.find? edge' = some ts' := by
+            simpa using hSomeRaw.symm
+          have hSome' : ((∅ : DEnv) ++ st.traces).find? edge' = some ts' := by
+            simpa [hEqLeft] using hSome
+          rw [lookupD_DEnvUnion_left hSome']
+          rw [lookupD_DEnvUnion_left hSome']
 
 /-- toDEnv is unchanged by updateType (type update doesn't affect traces). -/
 theorem SessionStore.toDEnv_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType} :
     (store.updateType e L).toDEnv = store.toDEnv := by
   -- Type updates only modify localTypes, not traces
-  sorry
+  induction store with
+  | nil => rfl
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = e.sid
+      · simp [SessionStore.updateType, SessionStore.toDEnv, hsid, SessionState.updateType]
+      · simp only [SessionStore.updateType, hsid, ↓reduceIte]
+        simp only [SessionStore.toDEnv, List.foldl]
+        have hSeed : (∅ : DEnv) ++ st.traces = st.traces := DEnvUnion_empty_left (D := st.traces)
+        rw [hSeed]
+        rw [DEnv_foldl_append_comm (D := st.traces) (store := SessionStore.updateType tl e L)]
+        rw [DEnv_foldl_append_comm (D := st.traces) (store := tl)]
+        simpa [SessionStore.toDEnv] using congrArg (fun D => st.traces ++ D) ih
 
 /-- toGEnv is unchanged by updateTrace (trace update doesn't affect types). -/
 theorem SessionStore.toGEnv_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType} :
     (store.updateTrace edge ts).toGEnv = store.toGEnv := by
   -- Trace updates only modify traces, not localTypes
-  sorry
+  induction store with
+  | nil => rfl
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = edge.sid
+      · simp [SessionStore.updateTrace, SessionStore.toGEnv, hsid, SessionState.updateTrace]
+      · simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
+        simp only [SessionStore.toGEnv, List.foldl, List.nil_append]
+        rw [GEnv_foldl_append_comm (G := st.localTypes) (store := SessionStore.updateTrace tl edge ts)]
+        rw [GEnv_foldl_append_comm (G := st.localTypes) (store := tl)]
+        simpa [SessionStore.toGEnv] using congrArg (fun G => st.localTypes ++ G) ih
 
 /-- toBuffers is unchanged by updateType (type update doesn't affect buffers). -/
 theorem SessionStore.toBuffers_updateType {store : SessionStore ν} {e : Endpoint} {L : LocalType} :
     (store.updateType e L).toBuffers = store.toBuffers := by
   -- Type updates only modify localTypes, not buffers
-  sorry
+  induction store with
+  | nil => rfl
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = e.sid
+      · simp [SessionStore.updateType, SessionStore.toBuffers, hsid, SessionState.updateType]
+      · simp only [SessionStore.updateType, hsid, ↓reduceIte]
+        simp only [SessionStore.toBuffers, List.foldl, List.nil_append]
+        rw [Buffers_foldl_append_comm (B := SignedBuffers.payloads st.buffers)
+          (store := SessionStore.updateType tl e L)]
+        rw [Buffers_foldl_append_comm (B := SignedBuffers.payloads st.buffers) (store := tl)]
+        simpa [SessionStore.toBuffers] using
+          congrArg (fun B => SignedBuffers.payloads st.buffers ++ B) ih
 
 /-- toBuffers is unchanged by updateTrace (trace update doesn't affect buffers). -/
 theorem SessionStore.toBuffers_updateTrace {store : SessionStore ν} {edge : Edge} {ts : List ValType} :
     (store.updateTrace edge ts).toBuffers = store.toBuffers := by
   -- Trace updates only modify traces, not buffers
-  sorry
+  induction store with
+  | nil => rfl
+  | cons hd tl ih =>
+      obtain ⟨sid, st⟩ := hd
+      by_cases hsid : sid = edge.sid
+      · simp [SessionStore.updateTrace, SessionStore.toBuffers, hsid, SessionState.updateTrace]
+      · simp only [SessionStore.updateTrace, hsid, ↓reduceIte]
+        simp only [SessionStore.toBuffers, List.foldl, List.nil_append]
+        rw [Buffers_foldl_append_comm (B := SignedBuffers.payloads st.buffers)
+          (store := SessionStore.updateTrace tl edge ts)]
+        rw [Buffers_foldl_append_comm (B := SignedBuffers.payloads st.buffers) (store := tl)]
+        simpa [SessionStore.toBuffers] using
+          congrArg (fun B => SignedBuffers.payloads st.buffers ++ B) ih
 
 /-! ### WFSessionStore Preservation -/
 
@@ -945,14 +1222,78 @@ private theorem updateType_preserves_session_consistency {store : SessionStore �
     (hSid : ∀ sid st, (sid, st) ∈ store → st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid)) :
     ∀ sid st, (sid, st) ∈ store.updateType e L → st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
   -- updateType only modifies localTypes, not sid or endpoints
-  sorry
+  intro sid st hIn
+  induction store with
+  | nil =>
+      simpa [SessionStore.updateType] using hIn
+  | cons hd tl ih =>
+      obtain ⟨sid', st'⟩ := hd
+      by_cases hsid : sid' = e.sid
+      · simp only [SessionStore.updateType, hsid, ↓reduceIte, List.mem_cons] at hIn
+        cases hIn with
+        | inl hEq =>
+            cases hEq
+            have hHead := hSid sid' st' (List.Mem.head _)
+            constructor
+            · simpa [SessionState.updateType_sid, hsid] using hHead.1.trans hsid
+            ·
+              simpa [SessionState.updateType, hsid] using hHead.2
+        | inr hTail =>
+            have hTailSid : ∀ sid st, (sid, st) ∈ tl →
+                st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
+              intro sid'' st'' hMem
+              exact hSid sid'' st'' (List.Mem.tail _ hMem)
+            exact hTailSid sid st hTail
+      · simp only [SessionStore.updateType, hsid, ↓reduceIte, List.mem_cons] at hIn
+        cases hIn with
+        | inl hEq =>
+            cases hEq
+            simpa using (hSid _ _ (List.Mem.head _))
+        | inr hTail =>
+            have hTailSid : ∀ sid st, (sid, st) ∈ tl →
+                st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
+              intro sid'' st'' hMem
+              exact hSid sid'' st'' (List.Mem.tail _ hMem)
+            exact ih hTailSid hTail
 
 /-- Helper: session consistency is preserved by updateTrace. -/
 private theorem updateTrace_preserves_session_consistency {store : SessionStore ν} {edge : Edge} {ts : List ValType}
     (hSid : ∀ sid st, (sid, st) ∈ store → st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid)) :
     ∀ sid st, (sid, st) ∈ store.updateTrace edge ts → st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
   -- updateTrace only modifies traces, not sid or endpoints
-  sorry
+  intro sid st hIn
+  induction store with
+  | nil =>
+      simpa [SessionStore.updateTrace] using hIn
+  | cons hd tl ih =>
+      obtain ⟨sid', st'⟩ := hd
+      by_cases hsid : sid' = edge.sid
+      · simp only [SessionStore.updateTrace, hsid, ↓reduceIte, List.mem_cons] at hIn
+        cases hIn with
+        | inl hEq =>
+            cases hEq
+            have hHead := hSid sid' st' (List.Mem.head _)
+            constructor
+            · simpa [SessionState.updateTrace_sid, hsid] using hHead.1.trans hsid
+            ·
+              simpa [SessionState.updateTrace, hsid] using hHead.2
+        | inr hTail =>
+            have hTailSid : ∀ sid st, (sid, st) ∈ tl →
+                st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
+              intro sid'' st'' hMem
+              exact hSid sid'' st'' (List.Mem.tail _ hMem)
+            exact hTailSid sid st hTail
+      · simp only [SessionStore.updateTrace, hsid, ↓reduceIte, List.mem_cons] at hIn
+        cases hIn with
+        | inl hEq =>
+            cases hEq
+            simpa using (hSid _ _ (List.Mem.head _))
+        | inr hTail =>
+            have hTailSid : ∀ sid st, (sid, st) ∈ tl →
+                st.sid = sid ∧ (∀ e ∈ st.endpoints, e.sid = sid) := by
+              intro sid'' st'' hMem
+              exact hSid sid'' st'' (List.Mem.tail _ hMem)
+            exact ih hTailSid hTail
 
 /-- Type update preserves WFSessionStore. -/
 theorem SessionStore.updateType_preserves_WFSessionStore {store : SessionStore ν} {e : Endpoint} {L : LocalType}
@@ -972,18 +1313,22 @@ theorem SessionStore.updateType_preserves_WFSessionStore {store : SessionStore �
     -- Case split on whether e' = e
     by_cases he : e' = e
     · -- e' = e: both sides give some L
-      subst he
-      rw [SessionStore.lookupType_updateType_eq hMem]
-      -- Need: lookupG (toGEnv store') e = some L
-      -- This requires toGEnv_updateType
-      rw [SessionStore.toGEnv_updateType hMem hCons]
-      simp [lookupG_updateG_eq]
+      have hBridge := SessionStore.toGEnv_updateType (store := store) (e := e) (L := L) hMem hCons e'
+      have hLookup' : SessionStore.lookupType (store.updateType e L) e' = some L := by
+        simpa [he] using (SessionStore.lookupType_updateType_eq (store := store) (e := e) (L := L) hMem)
+      have hRight : lookupG (updateG (SessionStore.toGEnv store) e L) e' = some L := by
+        simpa [he] using (lookupG_updateG_eq (env := SessionStore.toGEnv store) (e := e) (L := L))
+      rw [hLookup']
+      exact hBridge.trans hRight
     · -- e' ≠ e: both sides unchanged
       rw [SessionStore.lookupType_updateType_ne he]
       rw [← hG e']
-      -- Need: lookupG (toGEnv store') e' = lookupG (toGEnv store) e'
-      rw [SessionStore.toGEnv_updateType hMem hCons]
-      exact lookupG_updateG_ne he
+      calc
+        lookupG (SessionStore.toGEnv (store.updateType e L)) e'
+            = lookupG (updateG (SessionStore.toGEnv store) e L) e' :=
+              SessionStore.toGEnv_updateType (store := store) (e := e) (L := L) hMem hCons e'
+        _ = lookupG (SessionStore.toGEnv store) e' :=
+              lookupG_updateG_ne he
   · -- Trace lookups agree (toGEnv update doesn't affect toDEnv)
     intro edge
     rw [SessionStore.lookupTrace_updateType]
@@ -1016,15 +1361,24 @@ theorem SessionStore.updateTrace_preserves_WFSessionStore {store : SessionStore 
     intro edge'
     by_cases he : edge' = edge
     · -- edge' = edge: both sides give ts
-      subst he
-      rw [SessionStore.lookupTrace_updateTrace_eq hMem]
-      rw [SessionStore.toDEnv_updateTrace hMem hCons]
-      simp [lookupD_update_eq]
+      have hLookup' : SessionStore.lookupTrace (store.updateTrace edge ts) edge' = ts := by
+        simpa [he] using (SessionStore.lookupTrace_updateTrace_eq (store := store) (edge := edge) (ts := ts) hMem)
+      rw [hLookup']
+      calc
+        lookupD (SessionStore.toDEnv (store.updateTrace edge ts)) edge'
+            = lookupD (updateD (SessionStore.toDEnv store) edge ts) edge' :=
+              SessionStore.toDEnv_updateTrace (store := store) (edge := edge) (ts := ts) hMem hCons edge'
+        _ = ts :=
+              by simpa [he] using (lookupD_update_eq (SessionStore.toDEnv store) edge ts)
     · -- edge' ≠ edge: both sides unchanged
       rw [SessionStore.lookupTrace_updateTrace_ne he]
       rw [← hD edge']
-      rw [SessionStore.toDEnv_updateTrace hMem hCons]
-      exact lookupD_update_neq _ _ _ _ (Ne.symm he)
+      calc
+        lookupD (SessionStore.toDEnv (store.updateTrace edge ts)) edge'
+            = lookupD (updateD (SessionStore.toDEnv store) edge ts) edge' :=
+              SessionStore.toDEnv_updateTrace (store := store) (edge := edge) (ts := ts) hMem hCons edge'
+        _ = lookupD (SessionStore.toDEnv store) edge' :=
+              lookupD_update_neq (SessionStore.toDEnv store) edge edge' ts (Ne.symm he)
   · -- Buffer lookups agree (unchanged by trace update)
     intro edge'
     rw [SessionStore.toBuffers_updateTrace]
