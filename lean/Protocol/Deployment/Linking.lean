@@ -539,3 +539,28 @@ theorem delegation_within_composed_preserves_coherent
   have hCoh₁' : Coherent G₁' D₁' :=
     delegation_preserves_coherent G₁ G₁' D₁ D₁' s A B hCoh₁ hDeleg
   exact link_preserves_coherent G₁' G₂ D₁' D₂ hCoh₁' hCoh₂ hDisjG' hCons₁' hCons₂
+
+/-- Flagship composed-system conservation theorem.
+
+If two components compose coherently before delegation, and one component performs
+an admissible delegation step, then the composed system remains coherent after
+delegation as well. This packages pre/post composed coherence in one statement. -/
+theorem flagship_composed_system_conservation
+    (G₁ G₁' G₂ : GEnv) (D₁ D₁' D₂ : DEnv)
+    (s : SessionId) (A B : Role)
+    (hDeleg : DelegationStep G₁ G₁' D₁ D₁' s A B)
+    (hCoh₁ : Coherent G₁ D₁)
+    (hCoh₂ : Coherent G₂ D₂)
+    (hDisjG : DisjointG G₁ G₂)
+    (hDisjG' : DisjointG G₁' G₂)
+    (hCons₁ : DConsistent G₁ D₁)
+    (hCons₁' : DConsistent G₁' D₁')
+    (hCons₂ : DConsistent G₂ D₂) :
+    Coherent (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) ∧
+      Coherent (mergeGEnv G₁' G₂) (mergeDEnv D₁' D₂) := by
+  have hPre : Coherent (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) :=
+    link_preserves_coherent G₁ G₂ D₁ D₂ hCoh₁ hCoh₂ hDisjG hCons₁ hCons₂
+  have hPost : Coherent (mergeGEnv G₁' G₂) (mergeDEnv D₁' D₂) :=
+    delegation_within_composed_preserves_coherent
+      G₁ G₁' G₂ D₁ D₁' D₂ s A B hDeleg hCoh₁ hCoh₂ hDisjG' hCons₁' hCons₂
+  exact ⟨hPre, hPost⟩

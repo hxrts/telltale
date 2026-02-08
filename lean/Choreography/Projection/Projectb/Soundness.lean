@@ -6,6 +6,10 @@ open SessionTypes.LocalTypeR
 open SessionTypes.Participation
 open SessionCoTypes.CoinductiveRel
 
+set_option linter.unnecessarySimpa false
+set_option linter.unusedSimpArgs false
+set_option linter.unnecessarySeqFocus false
+
 /-! # Choreography.Projection.Projectb.Soundness
 
 Soundness and completeness of `projectb` with respect to `CProject`.
@@ -62,10 +66,30 @@ private theorem label_beq_eq_true_to_eq {a b : Label} (h : (a == b) = true) : a 
 private theorem valType_beq_eq_true_to_eq
     {a b : SessionTypes.ValType} (h : (a == b) = true) : a = b := by
   induction a generalizing b with
-  | unit => cases b <;> simp [reduceBEq] at h <;> simp [h]
-  | bool => cases b <;> simp [reduceBEq] at h <;> simp [h]
-  | nat => cases b <;> simp [reduceBEq] at h <;> simp [h]
-  | string => cases b <;> simp [reduceBEq] at h <;> simp [h]
+  | unit =>
+      cases b with
+      | unit => rfl
+      | _ =>
+          have : False := by simpa [reduceBEq] using h
+          exact this.elim
+  | bool =>
+      cases b with
+      | bool => rfl
+      | _ =>
+          have : False := by simpa [reduceBEq] using h
+          exact this.elim
+  | nat =>
+      cases b with
+      | nat => rfl
+      | _ =>
+          have : False := by simpa [reduceBEq] using h
+          exact this.elim
+  | string =>
+      cases b with
+      | string => rfl
+      | _ =>
+          have : False := by simpa [reduceBEq] using h
+          exact this.elim
   | prod a1 a2 ih1 ih2 =>
       cases b with
       | prod b1 b2 =>

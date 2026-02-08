@@ -211,7 +211,7 @@ mutual
         cases hp : role == p with
         | true =>
             -- Sender case: send is contractive
-            simp only [hp, ↓reduceIte, LocalTypeR.isContractive, isContractiveBranches, Bool.and_true]
+            simp only [↓reduceIte, LocalTypeR.isContractive, isContractiveBranches, Bool.and_true]
             unfold participatesAllBranches at hpart
             simp only [is_participant, hp, Bool.true_or, Bool.true_and, Bool.not_true, Bool.false_and,
               Bool.or_false] at hpart
@@ -220,15 +220,15 @@ mutual
             cases hq : role == q with
             | true =>
                 -- Receiver case: recv is contractive
-                simp only [hp, Bool.false_eq_true, ↓reduceIte, hq, LocalTypeR.isContractive,
+                simp only [Bool.false_eq_true, ↓reduceIte, LocalTypeR.isContractive,
                   isContractiveBranches, Bool.and_true]
                 unfold participatesAllBranches at hpart
-                simp only [is_participant, hp, Bool.false_or, hq, Bool.true_or, Bool.true_and,
+                simp only [is_participant, hp, Bool.false_or, hq, Bool.true_and,
                   Bool.not_true, Bool.false_and, Bool.or_false] at hpart
                 exact trans_isContractive_of_participatesAllBranches cont role hpart
             | false =>
                 -- Other role: follow continuation
-                simp only [hp, Bool.false_eq_true, ↓reduceIte, hq]
+                simp only [Bool.false_eq_true, ↓reduceIte]
                 unfold participatesAllBranches at hpart
                 simp only [is_participant, hp, Bool.false_or, hq, Bool.false_and, Bool.false_or] at hpart
                 exact trans_isContractive_of_participatesAllBranches cont role hpart

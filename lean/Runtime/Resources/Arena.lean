@@ -611,19 +611,137 @@ theorem SessionState.updateTrace_preserves_consistent {st : SessionState ν} {ed
         simp [hEq, hnone]
       exact hCons.2 edge' hOrig
 
+/-- SessionState.updateType preserves sid field. -/
+@[simp] theorem SessionState.updateType_sid {st : SessionState ν} {e : Endpoint} {L : LocalType} :
+    (st.updateType e L).sid = st.sid := rfl
+
+/-- SessionState.updateTrace preserves sid field. -/
+@[simp] theorem SessionState.updateTrace_sid {st : SessionState ν} {edge : Edge} {ts : List ValType} :
+    (st.updateTrace edge ts).sid = st.sid := rfl
+
 /-- SessionStore.updateType preserves store consistency. -/
 theorem SessionStore.updateType_preserves_consistent {store : SessionStore ν} {e : Endpoint} {L : LocalType}
     (hCons : store.consistent)
     (hMem : ∃ st, (e.sid, st) ∈ store) :
     (store.updateType e L).consistent := by
-  sorry
+  intro sid st hMemUpdated
+  induction store with
+  | nil => simp [SessionStore.updateType] at hMemUpdated
+  | cons hd tl ih =>
+    obtain ⟨sid', st'⟩ := hd
+    simp only [SessionStore.updateType] at hMemUpdated
+    by_cases hsid : sid' = e.sid
+    · -- Found the session to update
+      simp only [hsid, ↓reduceIte] at hMemUpdated
+      -- After simp: hMemUpdated : (sid, st) ∈ (e.sid, st'.updateType e L) :: updateType tl e L
+      simp only [List.mem_cons] at hMemUpdated
+      cases hMemUpdated with
+      | inl heq =>
+        -- head case: (sid, st) = (e.sid, st'.updateType e L)
+        simp only [Prod.mk.injEq] at heq
+        obtain ⟨hsid_eq, hst_eq⟩ := heq
+        have hOrigCons := hCons sid' st' (List.Mem.head _)
+        constructor
+        · -- st.sid = sid
+          rw [hst_eq, hsid_eq]
+          simp [hOrigCons.1, hsid]
+        · -- st.consistent
+          rw [hst_eq]
+          have hSidEq : e.sid = st'.sid := by
+            rw [← hsid]
+            exact hOrigCons.1.symm
+          exact SessionState.updateType_preserves_consistent hOrigCons.2 hSidEq
+      | inr hmem =>
+        -- tail case: (sid, st) ∈ tl
+        have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>
+          hCons sid'' st'' (List.Mem.tail _ h)
+        exact hTlCons sid st hmem
+    · -- Not the session to update
+      simp only [hsid, ↓reduceIte] at hMemUpdated
+      -- After simp: hMemUpdated : (sid, st) ∈ (sid', st') :: updateType tl e L
+      simp only [List.mem_cons] at hMemUpdated
+      cases hMemUpdated with
+      | inl heq =>
+        -- head case: (sid, st) = (sid', st')
+        simp only [Prod.mk.injEq] at heq
+        obtain ⟨hsid_eq, hst_eq⟩ := heq
+        have hOrigCons := hCons sid' st' (List.Mem.head _)
+        constructor
+        · rw [hst_eq, hsid_eq]; exact hOrigCons.1
+        · rw [hst_eq]; exact hOrigCons.2
+      | inr hmem =>
+        -- tail case: recurse
+        have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>
+          hCons sid'' st'' (List.Mem.tail _ h)
+        have hTlMem : ∃ st, (e.sid, st) ∈ tl := by
+          obtain ⟨st'', hst''⟩ := hMem
+          simp only [List.mem_cons] at hst''
+          cases hst'' with
+          | inl heq =>
+            simp only [Prod.mk.injEq] at heq
+            exact absurd heq.1 hsid
+          | inr hmem' => exact ⟨st'', hmem'⟩
+        exact ih hTlCons hTlMem hmem
 
 /-- SessionStore.updateTrace preserves store consistency. -/
 theorem SessionStore.updateTrace_preserves_consistent {store : SessionStore ν} {edge : Edge} {ts : List ValType}
     (hCons : store.consistent)
     (hMem : ∃ st, (edge.sid, st) ∈ store) :
     (store.updateTrace edge ts).consistent := by
-  sorry
+  intro sid st hMemUpdated
+  induction store with
+  | nil => simp [SessionStore.updateTrace] at hMemUpdated
+  | cons hd tl ih =>
+    obtain ⟨sid', st'⟩ := hd
+    simp only [SessionStore.updateTrace] at hMemUpdated
+    by_cases hsid : sid' = edge.sid
+    · -- Found the session to update
+      simp only [hsid, ↓reduceIte] at hMemUpdated
+      simp only [List.mem_cons] at hMemUpdated
+      cases hMemUpdated with
+      | inl heq =>
+        -- head case
+        simp only [Prod.mk.injEq] at heq
+        obtain ⟨hsid_eq, hst_eq⟩ := heq
+        have hOrigCons := hCons sid' st' (List.Mem.head _)
+        constructor
+        · rw [hst_eq, hsid_eq]
+          simp [hOrigCons.1, hsid]
+        · rw [hst_eq]
+          have hSidEq : edge.sid = st'.sid := by
+            rw [← hsid]
+            exact hOrigCons.1.symm
+          exact SessionState.updateTrace_preserves_consistent hOrigCons.2 hSidEq
+      | inr hmem =>
+        -- tail case
+        have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>
+          hCons sid'' st'' (List.Mem.tail _ h)
+        exact hTlCons sid st hmem
+    · -- Not the session to update
+      simp only [hsid, ↓reduceIte] at hMemUpdated
+      simp only [List.mem_cons] at hMemUpdated
+      cases hMemUpdated with
+      | inl heq =>
+        -- head case
+        simp only [Prod.mk.injEq] at heq
+        obtain ⟨hsid_eq, hst_eq⟩ := heq
+        have hOrigCons := hCons sid' st' (List.Mem.head _)
+        constructor
+        · rw [hst_eq, hsid_eq]; exact hOrigCons.1
+        · rw [hst_eq]; exact hOrigCons.2
+      | inr hmem =>
+        -- tail case
+        have hTlCons : SessionStore.consistent tl := fun sid'' st'' h =>
+          hCons sid'' st'' (List.Mem.tail _ h)
+        have hTlMem : ∃ st, (edge.sid, st) ∈ tl := by
+          obtain ⟨st'', hst''⟩ := hMem
+          simp only [List.mem_cons] at hst''
+          cases hst'' with
+          | inl heq =>
+            simp only [Prod.mk.injEq] at heq
+            exact absurd heq.1 hsid
+          | inr hmem' => exact ⟨st'', hmem'⟩
+        exact ih hTlCons hTlMem hmem
 
 /-! ### toGEnv/toDEnv under updates -/
 

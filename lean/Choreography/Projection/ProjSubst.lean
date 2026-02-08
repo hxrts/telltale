@@ -159,7 +159,7 @@ private theorem isGuarded_substitute_preserved_var
 theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = true) (hrepl : repl.isGuarded v = true) :
     (body.substitute t repl).isGuarded v = true := by
-  induction body with
+  cases body with
   | «end» =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | var w =>
@@ -168,8 +168,10 @@ theorem isGuarded_substitute_preserved (body : LocalTypeR) (t v : String) (repl 
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | recv p bs =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
-  | mu s body ih =>
-      exact isGuarded_substitute_preserved_mu s body ih t v repl hbody hrepl
+  | mu s body =>
+      exact isGuarded_substitute_preserved_mu s body
+        (fun t' v' repl' hb hr => isGuarded_substitute_preserved body t' v' repl' hb hr)
+        t v repl hbody hrepl
 
 /-- Helper: mu case for unguarded substitution. -/
 private theorem isGuarded_substitute_unguarded_mu
@@ -215,7 +217,7 @@ private theorem isGuarded_substitute_unguarded_var
 theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl : LocalTypeR)
     (hbody : body.isGuarded v = false) (hneq : t ≠ v) :
     (body.substitute t repl).isGuarded v = false := by
-  induction body with
+  cases body with
   | «end» =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | var w =>
@@ -224,8 +226,10 @@ theorem isGuarded_substitute_unguarded (body : LocalTypeR) (t v : String) (repl 
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
   | recv p bs =>
       simpa [LocalTypeR.substitute, LocalTypeR.isGuarded] using hbody
-  | mu s body ih =>
-      exact isGuarded_substitute_unguarded_mu s body ih t v repl hbody hneq
+  | mu s body =>
+      exact isGuarded_substitute_unguarded_mu s body
+        (fun t' v' repl' hb hne => isGuarded_substitute_unguarded body t' v' repl' hb hne)
+        t v repl hbody hneq
 /-! ## Main Axiom: Projection-Substitution Commutation -/
 
 /- Projection commutes with global type substitution.

@@ -6,6 +6,9 @@ open SessionTypes.LocalTypeR
 open SessionTypes.Participation
 open SessionCoTypes.CoinductiveRel
 
+set_option linter.unnecessarySimpa false
+set_option linter.unusedSimpArgs false
+
 /-! # Choreography.Projection.Projectb.Coinductive
 
 Coinductive CProject relation, constructor lemmas, and reflection lemmas connecting
@@ -156,11 +159,11 @@ private theorem CProjectF_mono : Monotone CProjectF := by
             exact hs (hr.trans h)
           cases cand with
           | recv partner lbs =>
-              simp [CProjectF, hs, hr, hns] at hrel ⊢
+              simp [CProjectF, hr, hns] at hrel ⊢
               rcases hrel with ⟨h1, h2⟩
               exact ⟨h1, BranchesProjRel_mono h h2⟩
           | _ =>
-              simp [CProjectF, hs, hr, hns] at hrel ⊢
+              simp [CProjectF, hr, hns] at hrel ⊢
         · simp [CProjectF, hs, hr] at hrel ⊢
           exact AllBranchesProj_mono h hrel
   | delegate p q sid r cont =>
@@ -193,7 +196,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
             exact hp (hq.trans hqp)
           cases cand with
           | recv partner lbs =>
-              simp [CProjectF, hp, hq, hnp] at hrel ⊢
+              simp [CProjectF, hq, hnp] at hrel ⊢
               cases lbs with
               | nil => simpa using hrel
               | cons b bs =>
@@ -212,7 +215,7 @@ private theorem CProjectF_mono : Monotone CProjectF := by
                   | cons _ _ =>
                       simpa using hrel
           | _ =>
-              simp [CProjectF, hp, hq, hnp] at hrel ⊢
+              simp [CProjectF, hq, hnp] at hrel ⊢
         · simp [CProjectF, hp, hq] at hrel ⊢
           exact h _ _ _ hrel
 

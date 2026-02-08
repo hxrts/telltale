@@ -8,6 +8,9 @@ open SessionTypes.LocalTypeR
 open SessionTypes.Participation
 open SessionCoTypes.CoinductiveRel
 
+set_option linter.unnecessarySimpa false
+set_option linter.unusedSimpArgs false
+
 /-! # Choreography.Projection.Projectb.Typed
 
 Typed projection relation: enriches branch payloads using `PayloadSort.toValType?`.
@@ -121,11 +124,11 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
             exact hs (hr.trans h)
           cases cand with
           | recv partner lbs =>
-              simp [CProjectF_typed, hs, hr, hns] at hrel ⊢
+              simp [CProjectF_typed, hr, hns] at hrel ⊢
               rcases hrel with ⟨h1, h2⟩
               exact ⟨h1, BranchesProjRelTyped_mono h h2⟩
           | _ =>
-              simp [CProjectF_typed, hs, hr, hns] at hrel ⊢
+              simp [CProjectF_typed, hr, hns] at hrel ⊢
         · simp [CProjectF_typed, hs, hr] at hrel ⊢
           exact AllBranchesProj_mono h hrel
   | delegate p q sid r cont =>
@@ -134,7 +137,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
         | send partner lbs =>
             simp [CProjectF_typed, hp] at hrel ⊢
             cases lbs with
-            | nil => simpa using hrel
+            | nil => exact hrel
             | cons b bs =>
                 cases bs with
                 | nil =>
@@ -149,7 +152,7 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
                             rcases hrel' with ⟨h1, h2, h3, h4⟩
                             exact ⟨h1, h2, h3, h _ _ _ h4⟩
                 | cons _ _ =>
-                    simpa using hrel
+                    exact hrel
         | _ =>
             simp [CProjectF_typed, hp] at hrel ⊢
       · by_cases hq : role = q
@@ -158,9 +161,9 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
             exact hp (hq.trans hqp)
           cases cand with
           | recv partner lbs =>
-              simp [CProjectF_typed, hp, hq, hnp] at hrel ⊢
+              simp [CProjectF_typed, hq, hnp] at hrel ⊢
               cases lbs with
-              | nil => simpa using hrel
+              | nil => exact hrel
               | cons b bs =>
                   cases bs with
                   | nil =>
@@ -175,9 +178,9 @@ private theorem CProjectF_typed_mono : Monotone CProjectF_typed := by
                               rcases hrel' with ⟨h1, h2, h3, h4⟩
                               exact ⟨h1, h2, h3, h _ _ _ h4⟩
                   | cons _ _ =>
-                      simpa using hrel
+                      exact hrel
           | _ =>
-              simp [CProjectF_typed, hp, hq, hnp] at hrel ⊢
+              simp [CProjectF_typed, hq, hnp] at hrel ⊢
         · simp [CProjectF_typed, hp, hq] at hrel ⊢
           exact h _ _ _ hrel
 
@@ -249,54 +252,56 @@ private theorem EraseRel_postfix :
   | mu t body =>
       cases cand' with
       | mu t' candBody =>
-          simp [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes] at hdes ⊢
+          simp [CProjectF_typed] at hdes
           rcases hdes with ⟨hbody, hguard, ht⟩
           subst ht
           refine ⟨LocalTypeR.eraseValTypes candBody, ⟨candBody, hbody, rfl⟩, ?_⟩
           left
           exact ⟨by simpa using hguard, rfl⟩
       | «end» =>
-          simp [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes] at hdes ⊢
+          simp [CProjectF_typed] at hdes
           rcases hdes with ⟨candBody, hbody, hguard⟩
           refine ⟨LocalTypeR.eraseValTypes candBody, ⟨candBody, hbody, rfl⟩, ?_⟩
           right
           exact ⟨by simpa using hguard, rfl⟩
       | var _ =>
-          simp [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes] at hdes
+          simp [CProjectF_typed] at hdes
       | send _ _ =>
-          simp [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes] at hdes
+          simp [CProjectF_typed] at hdes
       | recv _ _ =>
-          simp [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes] at hdes
+          simp [CProjectF_typed] at hdes
   | comm sender receiver gbs =>
       by_cases hs : role = sender
       · cases cand' with
         | send partner lbs =>
             simp [CProjectF_typed, hs] at hdes
             rcases hdes with ⟨hpartner, hbranches⟩
+            have hbranches_role : BranchesProjRelTyped CProjectTyped gbs role lbs := by
+              simpa [hs] using hbranches
             have hbranches' :
                 BranchesProjRel EraseRel gbs role (eraseBranchValTypes lbs) :=
-              BranchesProjRelTyped_to_erase hbranches
+              BranchesProjRelTyped_to_erase hbranches_role
             simpa [CProjectF, hs, LocalTypeR.eraseValTypes] using
               And.intro hpartner hbranches'
         | _ =>
             simp [CProjectF_typed, hs] at hdes
-            simpa [CProjectF, hs, LocalTypeR.eraseValTypes] using hdes
       · by_cases hr : role = receiver
         · have hns : receiver ≠ sender := by
             intro h
             exact hs (hr.trans h)
           cases cand' with
           | recv partner lbs =>
-              simp [CProjectF_typed, hs, hr, hns] at hdes
+              simp [CProjectF_typed, hr, hns] at hdes
               rcases hdes with ⟨hpartner, hbranches⟩
+              have hbranches_role : BranchesProjRelTyped CProjectTyped gbs role lbs := by
+                simpa [hr] using hbranches
               have hbranches' :
                   BranchesProjRel EraseRel gbs role (eraseBranchValTypes lbs) :=
-                BranchesProjRelTyped_to_erase hbranches
+                BranchesProjRelTyped_to_erase hbranches_role
               simpa [CProjectF, hs, hr, hns, LocalTypeR.eraseValTypes] using
                 And.intro hpartner hbranches'
           | _ =>
-              simp [CProjectF_typed, hs, hr, hns] at hdes
-              simpa [CProjectF, hs, hr, hns, LocalTypeR.eraseValTypes] using hdes
+              simp [CProjectF_typed, hr, hns] at hdes
         · simp [CProjectF_typed, hs, hr] at hdes
           have hbranches' :
               AllBranchesProj EraseRel gbs role (LocalTypeR.eraseValTypes cand') :=
@@ -320,7 +325,7 @@ private theorem EraseRel_postfix :
                             have hrel' :
                                 partner = q ∧ lbl = ⟨"_delegate", .unit⟩ ∧
                                   vt = some (.chan sid r) ∧ CProjectTyped cont role contCand := by
-                              simpa [and_left_comm, and_assoc] using hdes
+                              simpa [hp, and_left_comm, and_assoc] using hdes
                             rcases hrel' with ⟨h1, h2, h3, h4⟩
                             have h4' : EraseRel cont role (LocalTypeR.eraseValTypes contCand) :=
                               ⟨contCand, h4, rfl⟩
@@ -331,14 +336,13 @@ private theorem EraseRel_postfix :
                     simpa [CProjectF, hp, LocalTypeR.eraseValTypes] using hdes
         | _ =>
             simp [CProjectF_typed, hp] at hdes
-            simpa [CProjectF, hp, LocalTypeR.eraseValTypes] using hdes
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
             exact hp (hq.trans hqp)
           cases cand' with
           | recv partner lbs =>
-              simp [CProjectF_typed, hp, hq, hnp] at hdes
+              simp [CProjectF_typed, hq, hnp] at hdes
               cases lbs with
               | nil =>
                   simpa [CProjectF, hp, hq, hnp, LocalTypeR.eraseValTypes] using hdes
@@ -352,7 +356,7 @@ private theorem EraseRel_postfix :
                               have hrel' :
                                   partner = p ∧ lbl = ⟨"_delegate", .unit⟩ ∧
                                     vt = some (.chan sid r) ∧ CProjectTyped cont role contCand := by
-                                simpa [and_left_comm, and_assoc] using hdes
+                                simpa [hq, and_left_comm, and_assoc] using hdes
                               rcases hrel' with ⟨h1, h2, h3, h4⟩
                               have h4' : EraseRel cont role (LocalTypeR.eraseValTypes contCand) :=
                                 ⟨contCand, h4, rfl⟩
@@ -363,9 +367,9 @@ private theorem EraseRel_postfix :
                       simpa [CProjectF, hp, hq, hnp, LocalTypeR.eraseValTypes] using hdes
           | _ =>
               have hfalse : False := by
-                simpa [CProjectF_typed, hp, hq, hnp] using hdes
+                simpa [CProjectF_typed, hq, hnp] using hdes
               simpa [CProjectF, hp, hq, hnp, LocalTypeR.eraseValTypes] using hfalse
-        · simp [CProjectF_typed, CProjectF, LocalTypeR.eraseValTypes, hp, hq] at hdes ⊢
+        · simp [CProjectF_typed, CProjectF, hp, hq] at hdes ⊢
           exact ⟨_, hdes, rfl⟩
 
 /-- Typed projection implies erased projection on the payload-erased candidate. -/

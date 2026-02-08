@@ -299,8 +299,9 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
                     ep.sid = s → BlindToRecv r source ep.role) :
     C ≈[s, r] C' := by
   cases hStep with
-  | @send _ k x e v target T L hProc hk hx hG =>
-    -- Send step: blind if r ≠ sender and r ≠ target
+  | send hProc hk hx hG =>
+    -- Send step: extract endpoint from store lookup
+    rename_i k x e v target T L
     by_cases hsid : e.sid = s
     · exact send_preserves_CEquiv hsid (hBlindSend e target T L hG hsid)
     · -- Different session, trivially unchanged
@@ -314,8 +315,8 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
       · apply Eq.symm; apply send_D_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-  | @recv _ k x e v source T L hProc hk hG hBuf =>
-    -- Recv step: blind if r ≠ source and r ≠ receiver
+  | recv hProc hk hG hBuf =>
+    rename_i k x e v source T L
     by_cases hsid : e.sid = s
     · exact recv_preserves_CEquiv hsid (hBlindRecv e source T L hG hsid)
     · unfold CEquiv
@@ -328,8 +329,8 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
       · apply Eq.symm; apply recv_D_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-  | @select _ k e ℓ target branches L hProc hk hG hFind =>
-    -- Select uses sendStep, so same as send
+  | select hProc hk hG hFind =>
+    rename_i k e ℓ target branches L
     by_cases hsid : e.sid = s
     · exact send_preserves_CEquiv hsid (hBlindSelect e target branches hG hsid)
     · unfold CEquiv
@@ -342,13 +343,14 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
       · apply Eq.symm; apply send_D_locality; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-  | @branch _ k e ℓ source procBranches typeBranches P L bufs' hProc hk hG hBuf hPFind hTFind hDq =>
-    -- Branch modifies G, bufs, D directly
+  | branch hProc hk hG hBuf hPFind hTFind hDq =>
+    rename_i k e ℓ source procBranches typeBranches P L bufs'
     by_cases hsid : e.sid = s
     · have hb := hBlindBranch e source typeBranches hG hsid
       unfold CEquiv
       constructor
       · -- G at r unchanged (r ≠ receiver)
+        apply Eq.symm
         apply lookupG_updateG_ne
         intro heq
         have hr : r = e.role := congrArg Endpoint.role heq
@@ -356,13 +358,14 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
       constructor
       · -- Buffers to r unchanged (dequeueBuf only affects specific edge)
         intro sender'
-        simp only [hDq]
+        apply Eq.symm
         apply lookupBuf_dequeueBuf_ne hDq
         intro heq
         simp only [Edge.mk.injEq] at heq
         exact hb.2 heq.2.2
       · -- Traces to r unchanged
         intro sender'
+        apply Eq.symm
         apply lookupD_update_neq
         intro heq
         simp only [Edge.mk.injEq] at heq
@@ -370,29 +373,24 @@ theorem blind_step_preserves_CEquiv_single {C C' : Config}
     · -- Different session
       unfold CEquiv
       constructor
-      · apply lookupG_updateG_ne; intro heq
+      · apply Eq.symm; apply lookupG_updateG_ne; intro heq
         have : e.sid = s := congrArg Endpoint.sid heq.symm
         exact hsid this
       constructor
-      · intro sender'; simp only [hDq]
+      · intro sender'; apply Eq.symm
         apply lookupBuf_dequeueBuf_ne hDq; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
-      · intro sender'; apply lookupD_update_neq; intro heq
+      · intro sender'; apply Eq.symm; apply lookupD_update_neq; intro heq
         simp only [Edge.mk.injEq] at heq; exact hsid heq.1.symm
   | newSession hProc =>
-    -- newSession adds new session with fresh ID, doesn't affect session s
     exact CEquiv.refl _ s r
   | assign hProc =>
-    -- assign only modifies store, not G/bufs/D
     exact CEquiv.refl _ s r
   | seq2 hProc =>
-    -- seq2 only modifies proc
     exact CEquiv.refl _ s r
   | par_skip_left hProc =>
-    -- par_skip_left only modifies proc
     exact CEquiv.refl _ s r
   | par_skip_right hProc =>
-    -- par_skip_right only modifies proc
     exact CEquiv.refl _ s r
 
 /-! ## Coherence Connection -/
