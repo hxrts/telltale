@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-02-08
+**Last Updated:** 2026-02-09
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -12,19 +12,20 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 4. [Choreography](#choreography)
 5. [Semantics](#semantics)
 6. [Classical](#classical)
-7. [Protocol](#protocol)
-8. [Runtime](#runtime)
-9. [Build Configuration](#build-configuration)
-10. [Axiom Inventory](#axiom-inventory)
-11. [Proof Strategies](#proof-strategies)
-12. [Quick Navigation Guide](#quick-navigation-guide)
+7. [Distributed](#distributed)
+8. [Protocol](#protocol)
+9. [Runtime](#runtime)
+10. [Build Configuration](#build-configuration)
+11. [Axiom Inventory](#axiom-inventory)
+12. [Proof Strategies](#proof-strategies)
+13. [Quick Navigation Guide](#quick-navigation-guide)
 
 ---
 
 ## Overview
 
 **Toolchain:** Lean 4 v4.26.0
-**Build:** Lake with 6 library targets
+**Build:** Lake with 8 library targets
 **Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
 
 | Library        | Files | Lines   | Focus                                                      |
@@ -34,14 +35,16 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Choreography   |    70 | ~16,251 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    11 |  ~2,800 | Transported theorems (queueing, large deviations, mixing)  |
+| Distributed    |    12 |  ~1,500 | Distributed assumptions, validation, FLP/CAP theorem packaging|
 | Protocol       |    74 | ~29,500 | Async buffered MPST, coherence, preservation, monitoring   |
 | Runtime        |    62 | ~14,200 | VM, Iris backend via iris-lean, resource algebras, WP      |
 | **Total**      | **322** | **~86,126** |                                                      |
 
 **Architectural Layers:**
 ```
-Layer 7: Runtime          → VM, iris-lean backend, resource algebras, WP, adequacy
-Layer 6: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
+Layer 8: Runtime          → VM, iris-lean backend, resource algebras, WP, adequacy
+Layer 7: Protocol         → Async MPST, coherence, typing, preservation, monitoring, deployment
+Layer 6: Distributed      → Distributed assumptions, validation, FLP/CAP theorem packaging
 Layer 5: Classical        → Transported theorems from queueing/probability theory
 Layer 4: Semantics        → Operational semantics, typing judgments, determinism, deadlock freedom
 Layer 3: Choreography     → Projection, harmony, blindness, embedding, erasure
@@ -335,28 +338,79 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 ## Classical
 
 **Root Module:** `Classical.lean`
-**Description:** Transported theorems from queueing theory, probability, and stochastic processes. These results transfer classical probabilistic/ergodic analysis to the session-typed setting via the regime-instantiation framework.
+**Description:** Transported theorems from queueing theory, probability, and stochastic processes, organized into family kernels and a layered transport API.
 
-### Transport Framework
+### Families
 
-| File | Lines | Description |
-|------|-------|-------------|
-| Transport.lean | 250 | Transport framework for lifting classical results to protocol settings |
+| File | Description |
+|------|-------------|
+| Families/FosterLyapunovHarris.lean | Foster-Lyapunov-Harris theorem for stability/recurrence |
+| Families/MaxWeightBackpressure.lean | MaxWeight scheduling optimality and backpressure |
+| Families/LargeDeviationPrinciple.lean | Large deviation bounds for rare events |
+| Families/HeavyTrafficDiffusion.lean | Heavy traffic diffusion limits |
+| Families/MixingTimeBounds.lean | Mixing-time bounds for Markov chains |
+| Families/FluidLimitStability.lean | Fluid-limit stability analysis |
+| Families/ConcentrationInequalities.lean | Concentration inequalities |
+| Families/LittlesLaw.lean | Little's law identities |
+| Families/FunctionalCLT.lean | Functional central limit theorem |
+| Families/PropagationOfChaos.lean | Mean-field limits and propagation of chaos |
+| Families/SpectralGapTermination.lean | Spectral-gap / Cheeger / hitting-time interfaces |
 
-### Transported Theorems
+### Transport Layers
 
-| File | Lines | Description |
-|------|-------|-------------|
-| FosterLyapunovHarris.lean | 280 | Foster-Lyapunov-Harris theorem for positive recurrence |
-| MaxWeightBackpressure.lean | 240 | MaxWeight scheduling optimality and backpressure |
-| LargeDeviationPrinciple.lean | 220 | Large deviation bounds for rare events |
-| HeavyTrafficDiffusion.lean | 180 | Heavy traffic diffusion limits |
-| MixingTimeBounds.lean | 200 | Mixing time bounds for Markov chains |
-| FluidLimitStability.lean | 210 | Fluid limit stability analysis |
-| ConcentrationInequalities.lean | 280 | Concentration inequalities (Hoeffding, McDiarmid) |
-| LittlesLaw.lean | 150 | Little's law for queuing systems |
-| FunctionalCLT.lean | 220 | Functional central limit theorem |
-| PropagationOfChaos.lean | 280 | Mean-field limits and propagation of chaos |
+| File | Description |
+|------|-------------|
+| Transport/Context.lean | Shared transport context |
+| Transport/Contracts.lean | Input/Conclusion contracts per theorem family |
+| Transport/Theorems.lean | Facade theorem wrappers |
+| Transport/API.lean | Stable transport facade import |
+
+---
+
+## Distributed
+
+**Root Module:** `Distributed.lean`
+**Description:** Family-oriented distributed characterization with a transport layer for validation and family usage.
+
+### Model
+
+| File | Description |
+|------|-------------|
+| Model/Assumptions.lean | Base distributed assumptions and assumption-check functions |
+| Model/Types.lean | Protocol-space model types and protocol spec |
+| Model/Classifier.lean | BFT/Nakamoto/Hybrid classification predicates |
+
+### Families
+
+| File | Description |
+|------|-------------|
+| Families/FLP.lean | FLP assumptions, premises, and auto-derived lower-bound/impossibility packaging |
+| Families/CAP.lean | CAP assumptions, premises, and auto-derived impossibility packaging |
+| Families/QuorumGeometry.lean | Quorum-intersection safety family: no-conflict commits, fork exclusion, safe finality |
+| Families/PartialSynchrony.lean | Partial-synchrony liveness family: eventual decision and bounded post-GST termination |
+| Families/Responsiveness.lean | Responsiveness family: optimistic post-GST latency bound independent of timeout |
+| Families/Nakamoto.lean | Nakamoto security family: probabilistic safety, settlement-depth finality, churn-liveness |
+| Families/Reconfiguration.lean | Reconfiguration safety family: no split-brain, safe handoff, liveness preservation |
+| Families/AtomicBroadcast.lean | Atomic-broadcast family: total-order consistency, log-prefix compatibility, consensus bridge |
+| Families/AccountableSafety.lean | Accountable-safety family: safety-or-evidence theorem with slashable fault evidence |
+| Families/FailureDetectors.lean | Failure-detector family: detector-class solvability/impossibility boundary forms |
+| Families/DataAvailability.lean | Data-availability family: k-of-n availability/retrievability under sampling and withholding bounds |
+| Families/Coordination.lean | Coordination family: CALM-style monotonicity characterization of coordination necessity |
+
+### Transport
+
+| File | Description |
+|------|-------------|
+| Transport/Context.lean | Transported-family eligibility context and assumption atoms |
+| Transport/Contracts.lean | Validation summary contracts |
+| Transport/Theorems.lean | High-level validation/combination APIs |
+| Transport/API.lean | Transport facade import |
+
+### Facade
+
+| File | Description |
+|------|-------------|
+| Distributed.lean | Distributed root facade import |
 
 ---
 
@@ -588,18 +642,26 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | File | Lines | Description |
 |------|------:|-------------|
 | Adequacy/Adequacy.lean | 168 | Adequacy theorem connecting WP to execution |
-| Proofs/TheoremStubs.lean | 416 | Top-level theorem statements |
+| Proofs/RuntimeTheorems.lean | 465 | Runtime theorem facade unifying proof exports |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness stubs (nonempty, ends with halt/jmp) |
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
 | Proofs/Progress.lean | 324 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
+| Proofs/ProgressApi.lean | 181 | Bundle-oriented liveness API and optional progress hypothesis surface |
+| Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle for VM theorem derivation |
+| Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
+| Proofs/Adapters/Distributed.lean | 447 | Invariant-space adapters for distributed profiles (FLP/CAP, quorum-geometry, partial-synchrony, responsiveness, Nakamoto, reconfiguration, atomic-broadcast, accountable-safety, failure-detectors, data-availability, coordination) |
+| Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
+| Proofs/TheoremPack.lean | 499 | Unified VM theorem pack and theorem inventory summary |
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
+| Proofs/VMPotential.lean | 266 | VM potential integration and transported Foster bridge |
 | Proofs/WeightedMeasure.lean | 989 | Lyapunov measure infrastructure, step decrease theorems |
 | Proofs/SchedulingBound.lean | 536 | k-fair scheduler termination bounds, round-robin corollary |
-| Proofs/Diamond/Lemmas.lean | 364 | Cross-session diamond lemmas |
-| Proofs/Diamond/Proof.lean | 816 | Main diamond theorem proof |
+| Proofs/Diamond.lean | 468 | Cross-session diamond lemmas and main confluence theorem |
+| Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end VM examples: profile attachment auto-materializes distributed theorem artifacts |
+| Proofs/Examples/InvariantBundle.lean | 74 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
 
 ### Examples and Tests
 
@@ -616,7 +678,7 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 
 ### lakefile.lean
 
-Seven library targets with glob-based module discovery:
+Eight library targets with glob-based module discovery:
 
 ```
 telltale (package)
@@ -624,7 +686,8 @@ telltale (package)
 ├── SessionCoTypes   ← Coinductive EQ2, bisimulation, roundtrip
 ├── Choreography     ← Projection, harmony, blindness, erasure
 ├── Semantics        ← Operational semantics, typing, determinism
-├── Classical        ← Transported queueing/probability theorems
+├── ClassicalLayer   ← Transported queueing/probability theorem families + transport API
+├── Distributed      ← Distributed theorem families (FLP/CAP, quorum safety, liveness, ordering, DA, coordination)
 ├── Protocol         ← Async MPST, coherence, preservation, monitoring
 └── Runtime          ← VM, Iris backend, WP, adequacy (default target)
 ```

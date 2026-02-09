@@ -1,5 +1,5 @@
-import Runtime.VM.Config
-import Runtime.VM.DomainComposition
+import Runtime.VM.Model.Config
+import Runtime.VM.Composition.DomainComposition
 import Runtime.Resources.BufferRA
 
 /-

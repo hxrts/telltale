@@ -1,6 +1,7 @@
 import Runtime.Proofs.Lyapunov
-import Runtime.VM.Failure
-import Classical.Transport
+import Runtime.VM.Runtime.Failure
+import Classical.Transport.API
+import Runtime.Proofs.InvariantSpace
 
 /-!
 # VM Lyapunov Potential Integration
@@ -70,24 +71,6 @@ def vmPotential {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : Nat :=
   vmWorkMeasure st + vmCreditBank st
-
-inductive TopologyChange {ι : Type u} [IdentityModel ι] where
-  | crash (site : IdentityModel.SiteId ι)
-  | partition (edges : List Edge)
-  | heal (edges : List Edge)
-
-def applyTopologyChange {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
-    (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) :
-    VMState ι γ π ε ν :=
-  match tc with
-  | .crash site => crashSite st site
-  | .partition edges => disconnectEdges st edges
-  | .heal edges => reconnectEdges st edges
 
 theorem vmWorkMeasure_applyTopologyChange_eq {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -219,12 +202,13 @@ def vmFosterCtx {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (step : VMState ι γ π ε ν → VMState ι γ π ε ν) :
+    (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
+    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
     Classical.Transport.TransportCtx (VMState ι γ π ε ν) :=
   { step := step
-    coherent := fun _ => True
-    harmony := True
-    finiteState := True }
+    coherent := w.coherent
+    harmony := w.harmony
+    finiteState := w.finiteState }
 
 def vmFosterInput {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -233,8 +217,9 @@ def vmFosterInput {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
-    (h : VMFosterAssumptions step) :
-    Classical.Transport.FosterInput (VMState ι γ π ε ν) (vmFosterCtx step) :=
+    (h : VMFosterAssumptions step)
+    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
+    Classical.Transport.FosterInput (VMState ι γ π ε ν) (vmFosterCtx step w) :=
   { system := VMDriftSystem step h
     step_agrees := rfl }
 
@@ -245,9 +230,10 @@ theorem vm_transported_fosterLyapunov {ι γ π ε ν : Type u} [IdentityModel �
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
-    (h : VMFosterAssumptions step) :
-    Classical.Transport.FosterConclusion (vmFosterInput step h) := by
-  exact Classical.Transport.transported_fosterLyapunov (input := vmFosterInput step h)
+    (h : VMFosterAssumptions step)
+    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
+    Classical.Transport.FosterConclusion (vmFosterInput step h w) := by
+  exact Classical.Transport.transported_fosterLyapunov (input := vmFosterInput step h w)
 
 theorem r7_vm_potential_integration {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -256,7 +242,8 @@ theorem r7_vm_potential_integration {ι γ π ε ν : Type u} [IdentityModel ι]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (step : VMState ι γ π ε ν → VMState ι γ π ε ν)
-    (h : VMFosterAssumptions step) :
+    (h : VMFosterAssumptions step)
+    (w : Runtime.Proofs.ClassicalTransportWitness (VMState ι γ π ε ν)) :
     ∀ st n, vmPotential ((step^[n]) st) ≤ vmPotential st := by
   intro st n
-  exact vm_transported_fosterLyapunov step h st n
+  exact vm_transported_fosterLyapunov step h w st n

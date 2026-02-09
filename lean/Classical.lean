@@ -1,5 +1,5 @@
-import Classical.Transport
-import Classical.SpectralGapTermination
+import Classical.Transport.API
+import Classical.Families.SpectralGapTermination
 
 /-!
 # Classical Theorem Transport Layer
@@ -43,7 +43,8 @@ import Classical
 
 ## See Also
 
-- `Classical.Transport.API` for Input/Conclusion type definitions
-- `Classical.Transport.Results` for the transported theorem statements
-- Individual theorem modules for mathematical background and proofs
+- `Classical.Transport.Context` for transport context definitions
+- `Classical.Transport.Contracts` for Input/Conclusion contracts
+- `Classical.Transport.Theorems` for transported theorem statements
+- Individual family modules under `Classical.Families.*` for background results
 -/

@@ -1,4 +1,4 @@
-import Runtime.VM.Definition
+import Runtime.VM.API
 import Runtime.IrisBridge
 
 /-!

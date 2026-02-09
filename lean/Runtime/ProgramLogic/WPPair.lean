@@ -1,4 +1,4 @@
-import Runtime.VM.Core
+import Runtime.VM.Model.Core
 import Runtime.IrisBridge
 
 /- 
@@ -48,9 +48,9 @@ def sendPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ 
   -- Pair wrapper for `send`.
   mkPair (.send 0 0)
 
-def recvPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
-  -- Pair wrapper for `recv`.
-  mkPair (.recv 0 0)
+def receivePair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
+  -- Pair wrapper for `receive`.
+  mkPair (.receive 0 0)
 
 def offerPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
   -- Pair wrapper for `offer`.
@@ -107,17 +107,17 @@ def abortPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ
   -- Pair wrapper for `abort`.
   mkPair .abort
 
-def loadImmPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
-  -- Pair wrapper for `loadImm`.
-  mkPair (.loadImm 0 .unit)
+def setPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
+  -- Pair wrapper for `set`.
+  mkPair (.set 0 .unit)
 
-def movPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
-  -- Pair wrapper for `mov`.
-  mkPair (.mov 0 0)
+def movePair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
+  -- Pair wrapper for `move`.
+  mkPair (.move 0 0)
 
-def jmpPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
-  -- Pair wrapper for `jmp`.
-  mkPair (.jmp 0)
+def jumpPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
+  -- Pair wrapper for `jump`.
+  mkPair (.jump 0)
 
 def spawnPair {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] : InstrPair γ ε :=
   -- Pair wrapper for `spawn`.

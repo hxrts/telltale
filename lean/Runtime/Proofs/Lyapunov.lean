@@ -1,4 +1,5 @@
-import Runtime.VM.Scheduler
+import Runtime.VM.Runtime.Scheduler
+import Runtime.Proofs.VM.Scheduler
 
 -- Note: Protocol.DeadlockFreedom is not imported here because it transitively
 -- depends on Protocol.Typing.Framing which has pre-existing build errors.
@@ -171,7 +172,7 @@ theorem progressMeasure_nonincreasing_wt {γ ε : Type}
   cases h with
   | wt_send _ _ _ r T L' =>
     exact Nat.le_of_lt (progressMeasure_advance_send r T L')
-  | wt_recv _ _ _ r T L' =>
+  | wt_receive _ _ _ r T L' =>
     exact Nat.le_of_lt (progressMeasure_advance_recv r T L')
   | wt_offer _ _ r choices lbl L' hmem =>
     exact Nat.le_of_lt (progressMeasure_advance_select r choices lbl L' hmem)

@@ -1,6 +1,6 @@
 import Runtime.Examples.SimpleProtocol
-import Runtime.VM.RunScheduled
-import Runtime.VM.LoadChoreography
+import Runtime.VM.Runtime.Runner
+import Runtime.VM.Runtime.Loader
 import SessionTypes.LocalTypeR
 import SessionTypes.GlobalType
 

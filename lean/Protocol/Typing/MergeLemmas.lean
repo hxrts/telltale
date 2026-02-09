@@ -324,12 +324,12 @@ theorem SessionsOf_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' st
       exact ih
   | seq_skip =>
       simp
-  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG
       intro s hs
       have hIn : s ∈ SessionsOf G := ih hs
       simpa [split.hG] using hIn
-  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG
       intro s hs
       have hIn : s ∈ SessionsOf G := ih hs

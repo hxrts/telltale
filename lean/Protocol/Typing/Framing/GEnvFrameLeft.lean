@@ -24,6 +24,68 @@ section
 
 /-! ## Pre-Out Framing (Left) -/
 
+/-- Erasing a binding cannot introduce new domain elements. -/
+private lemma eraseSEnv_domsubset {S : SEnv} {x : Var} :
+    SEnvDomSubset (eraseSEnv S x) S := by
+  intro y T hLookup
+  induction S with
+  | nil =>
+      simp [eraseSEnv, lookupSEnv] at hLookup
+  | cons hd tl ih =>
+      cases hd with
+      | mk z U =>
+          by_cases hzx : x = z
+          · subst hzx
+            simp [eraseSEnv] at hLookup
+            obtain ⟨T', hT'⟩ := ih hLookup
+            by_cases hyx : y = x
+            · subst hyx
+              exact ⟨U, by simp [lookupSEnv, List.lookup]⟩
+            · have hbeq : (y == x) = false := by
+                exact beq_eq_false_iff_ne.mpr hyx
+              exact ⟨T', by simpa [lookupSEnv, List.lookup, hbeq] using hT'⟩
+          · by_cases hyz : y = z
+            · subst hyz
+              exact ⟨U, by simp [lookupSEnv, List.lookup]⟩
+            · have hbeq : (y == z) = false := by
+                exact beq_eq_false_iff_ne.mpr hyz
+              simp [eraseSEnv, hzx, lookupSEnv, List.lookup, hbeq] at hLookup
+              obtain ⟨T', hT'⟩ := ih hLookup
+              exact ⟨T', by simpa [lookupSEnv, List.lookup, hbeq] using hT'⟩
+
+/-- Pre-out typing only preserves or erases right-owned bindings. -/
+private lemma HasTypeProcPreOut_right_domsubset
+    {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {P : Process}
+    {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
+    SEnvDomSubset Sfin.right Sown.right := by
+  intro h
+  induction h with
+  | skip =>
+      exact SEnvDomSubset_refl
+  | send =>
+      exact SEnvDomSubset_refl
+  | recv_new _ _ _ _ =>
+      simpa [OwnedEnv.updateLeft] using
+        (eraseSEnv_domsubset : SEnvDomSubset (eraseSEnv _ _) _)
+  | recv_old _ _ _ _ =>
+      simpa [OwnedEnv.updateLeft] using
+        (eraseSEnv_domsubset : SEnvDomSubset (eraseSEnv _ _) _)
+  | select =>
+      exact SEnvDomSubset_refl
+  | branch _ _ _ _ _ _ _ hDom hRight _ =>
+      simpa [hRight] using (SEnvDomSubset_refl : SEnvDomSubset _ _)
+  | seq hP hQ ihP ihQ =>
+      exact SEnvDomSubset_trans ihQ ihP
+  | par _ _ hSfin _ _ _ _ _ _ _ _ _ _ _ _ =>
+      simpa [hSfin] using (SEnvDomSubset_refl : SEnvDomSubset _ _)
+  | assign_new _ _ _ =>
+      simpa [OwnedEnv.updateLeft] using
+        (eraseSEnv_domsubset : SEnvDomSubset (eraseSEnv _ _) _)
+  | assign_old _ _ _ =>
+      simpa [OwnedEnv.updateLeft] using
+        (eraseSEnv_domsubset : SEnvDomSubset (eraseSEnv _ _) _)
+
 /-- Helper: reframe the left-par pre-out typing across an empty right frame. -/
 private lemma frame_left_par_reframe
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr Gleft Gleft' G₂ G₂' : GEnv} {P Q : Process}
@@ -41,21 +103,22 @@ private lemma frame_left_par_reframe
   have hP0 :=
     HasTypeProcPreOut_reframe_right
       (R:=Sown.right ++ S₂) (R':=(∅ : SEnv)) (L:=S₁) (L':=S₁')
-      (G:=Gfr ++ Gleft) (P:=P) hP
+      (G:=Gfr ++ Gleft) (P:=P)
+      (DisjointS_left_empty S₁) (DisjointS_left_empty S₁') hP
   have hQ0 :=
     HasTypeProcPreOut_reframe_right
       (R:=Sown.right ++ S₁) (R':=(∅ : SEnv)) (L:=S₂) (L':=S₂')
-      (G:=G₂) (P:=Q) hQ
+      (G:=G₂) (P:=Q)
+      (DisjointS_left_empty S₂) (DisjointS_left_empty S₂') hQ
   exact ⟨hP0, hQ0⟩
 
 /-- Helper: assemble the par case with empty right frame. -/
 private lemma frame_left_par_apply
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process} {nS nG : Nat}
     {Sfin : OwnedEnv} {Gfin : GEnv} {Wfin : Footprint} {Δfin : DeltaSEnv}
-    {S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
+    {S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
     (split : ParSplit Sown.left G) :
     split.S1.length = nS →
-    split.G1.length = nG →
     Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
     Gfin = (G₁' ++ G₂') →
     Wfin = (W₁ ++ W₂) →
@@ -67,18 +130,16 @@ private lemma frame_left_par_apply
     DisjointS S₁' S₂' →
     DisjointW W₁ W₂ →
     DisjointS Δ₁ Δ₂ →
-    S₁ = split.S1 →
-    S₂ = split.S2 →
-    HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := S₁ } (Gfr ++ split.G1) P
+    HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := split.S1 } (Gfr ++ split.G1) P
       { right := (∅ : SEnv), left := S₁' } (Gfr ++ G₁') W₁ Δ₁ →
-    HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := S₂ } split.G2 Q
+    HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := split.S2 } split.G2 Q
       { right := (∅ : SEnv), left := S₂' } G₂' W₂ Δ₂ →
     DisjointG Gfr G →
     HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := Sown.left } (Gfr ++ G)
       (.par nS nG P Q) { right := (∅ : SEnv), left := S₁' ++ S₂' } (Gfr ++ Gfin) Wfin Δfin := by
   -- Use frame_left_par with empty right frame to build the par judgment.
-  intro hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-    hDisjW hDisjΔ hS1 hS2 hP hQ hDisjGfrG
+  intro hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+    hDisjW hDisjΔ hP hQ hDisjGfrG
   have hDisjEmpty_left : DisjointS (∅ : SEnv) Sown.left := by
     exact DisjointS_left_empty Sown.left
   have hDisjEmpty_fin : DisjointS (∅ : SEnv) (S₁' ++ S₂') := by
@@ -91,34 +152,35 @@ private lemma frame_left_par_apply
         { right := (∅ : SEnv), left := S₁' } (Gfr ++ G₁') W₁ Δ₁ := by
     -- Disjointness is trivial with empty frame, so reuse hP.
     intro _ _ _
-    simpa [hS1] using hP
+    exact hP
   exact frame_left_par (split:=split)
-    (hSfin:=rfl) (hGfin:=hGfin) (hW:=hW) (hΔ:=hΔ)
+    (hSlen:=hSlen) (hSfin:=rfl) (hGfin:=hGfin) (hW:=hW) (hΔ:=hΔ)
     hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
-    (by simpa [hS2] using hQ) hDisjEmpty_left hDisjEmpty_fin hDisjGfrG ihP
+    hQ hDisjEmpty_left hDisjEmpty_fin hDisjGfrG ihP
 
 /-- Helper: restore the right-owned frame after a par step. -/
 private lemma frame_left_par_restore
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process} {nS nG : Nat}
     {S₁' S₂' : SEnv} {Gfin : GEnv} {Wfin : Footprint} {Δfin : DeltaSEnv} :
+    DisjointS Sown.right Sown.left →
+    DisjointS Sown.right (S₁' ++ S₂') →
     HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := Sown.left } (Gfr ++ G)
       (.par nS nG P Q) { right := (∅ : SEnv), left := S₁' ++ S₂' } (Gfr ++ Gfin) Wfin Δfin →
     HasTypeProcPreOut Ssh { right := Sown.right, left := Sown.left } (Gfr ++ G)
       (.par nS nG P Q) { right := Sown.right, left := S₁' ++ S₂' } (Gfr ++ Gfin) Wfin Δfin := by
   -- Reintroduce the right-owned frame via reframe_right.
-  intro hPar0
+  intro hDisjIn hDisjOut hPar0
   exact HasTypeProcPreOut_reframe_right
     (R:=(∅ : SEnv)) (R':=Sown.right) (L:=Sown.left) (L':=S₁' ++ S₂')
-    (G:=Gfr ++ G) (P:=.par nS nG P Q) hPar0
+    (G:=Gfr ++ G) (P:=.par nS nG P Q) hDisjIn hDisjOut hPar0
 
 /-- Frame on the left: par (constructive). -/
 private lemma HasTypeProcPreOut_frame_G_left_par
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process} {nS nG : Nat}
     {Sfin : OwnedEnv} {Gfin : GEnv} {Wfin : Footprint} {Δfin : DeltaSEnv}
-    {S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
+    {S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
     (split : ParSplit Sown.left G) :
     split.S1.length = nS →
-    split.G1.length = nG →
     Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
     Gfin = (G₁' ++ G₂') →
     Wfin = (W₁ ++ W₂) →
@@ -128,30 +190,31 @@ private lemma HasTypeProcPreOut_frame_G_left_par
     DisjointS S₁' split.S2 →
     DisjointS split.S1 S₂' →
     DisjointS S₁' S₂' →
+    DisjointS Sown.right Sown.left →
+    DisjointS Sown.right (S₁' ++ S₂') →
     DisjointW W₁ W₂ →
     DisjointS Δ₁ Δ₂ →
-    S₁ = split.S1 →
-    S₂ = split.S2 →
-    HasTypeProcPreOut Ssh { right := Sown.right ++ S₂, left := S₁ } (Gfr ++ split.G1) P
-      { right := Sown.right ++ S₂, left := S₁' } (Gfr ++ G₁') W₁ Δ₁ →
-    HasTypeProcPreOut Ssh { right := Sown.right ++ S₁, left := S₂ } split.G2 Q
-      { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ →
+    HasTypeProcPreOut Ssh { right := Sown.right ++ split.S2, left := split.S1 } (Gfr ++ split.G1) P
+      { right := Sown.right ++ split.S2, left := S₁' } (Gfr ++ G₁') W₁ Δ₁ →
+    HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } split.G2 Q
+      { right := Sown.right ++ split.S1, left := S₂' } G₂' W₂ Δ₂ →
     DisjointG Gfr split.G1 →
     DisjointG Gfr split.G2 →
     HasTypeProcPreOut Ssh Sown (Gfr ++ G) (.par nS nG P Q) Sfin (Gfr ++ Gfin) Wfin Δfin := by
   -- Strip right frame, use frame_left_par, then restore the right frame.
-  intro hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-    hDisjW hDisjΔ hS1 hS2 hP hQ hDisjGfrG1 hDisjGfrG2
+  intro hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+    hDisjRightIn hDisjRightOut hDisjW hDisjΔ hP hQ hDisjGfrG1 hDisjGfrG2
   have hDisjGfrG : DisjointG Gfr G := by
     have hDisjGfrG' : DisjointG Gfr (split.G1 ++ split.G2) :=
       DisjointG_append_right (G₁:=Gfr) (G₂:=split.G1) (G₃:=split.G2) hDisjGfrG1 hDisjGfrG2
     simpa [split.hG] using hDisjGfrG'
   obtain ⟨hP0, hQ0⟩ := frame_left_par_reframe (Sown:=Sown) (Gfr:=Gfr) hP hQ
   have hPar0 :=
-    frame_left_par_apply (split:=split)
-      hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-      hDisjW hDisjΔ hS1 hS2 hP0 hQ0 hDisjGfrG
-  have hPar1 := frame_left_par_restore (Sown:=Sown) (Gfr:=Gfr) (G:=G) hPar0
+    frame_left_par_apply (split:=split) (nG:=nG)
+      hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP0 hQ0 hDisjGfrG
+  have hPar1 := frame_left_par_restore (Sown:=Sown) (Gfr:=Gfr) (G:=G)
+    hDisjRightIn hDisjRightOut hPar0
   simpa [hSfin] using hPar1
 
 /-- Frame a disjoint GEnv on the left of pre-out typing. -/
@@ -159,10 +222,12 @@ lemma HasTypeProcPreOut_frame_G_left
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
     DisjointG Gfr G →
+    DisjointS Sown.right Sown.left →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
+    DisjointS Sown.right Sfin.left →
     HasTypeProcPreOut Ssh Sown (Gfr ++ G) P Sfin (Gfr ++ Gfin) W Δ := by
   -- Dispatch by constructor, extending lookups and updates across the frame.
-  intro hDisj h
+  intro hDisj hDisjRightIn h hDisjRightOut
   induction h with
   | skip =>
       rename_i Sown G
@@ -176,7 +241,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
         (HasTypeProcPreOut.send (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hx)
-  | recv_new hk hG hNoSh hNoOwnR hNoOwnL =>
+  | recv_new hk hG hNoSh hNoOwnL =>
       rename_i Sown G k x e p T L
       have hNone := lookupG_none_of_disjoint hDisj hG
       have hG' := lookupG_append_right (G₁:=Gfr) (G₂:=G) (e:=e) hNone
@@ -184,8 +249,8 @@ lemma HasTypeProcPreOut_frame_G_left
         simpa [hG] using hG'
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
-        (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hNoSh hNoOwnR hNoOwnL)
-  | recv_old hk hG hNoSh hNoOwnR hOwn =>
+        (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hNoSh hNoOwnL)
+  | recv_old hk hG hNoSh hOwn =>
       rename_i Sown G k x e p T L T'
       have hNone := lookupG_none_of_disjoint hDisj hG
       have hG' := lookupG_append_right (G₁:=Gfr) (G₂:=G) (e:=e) hNone
@@ -193,7 +258,7 @@ lemma HasTypeProcPreOut_frame_G_left
         simpa [hG] using hG'
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
-        (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hNoSh hNoOwnR hOwn)
+        (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hNoSh hOwn)
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -203,7 +268,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
         (HasTypeProcPreOut.select (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hbs)
-  | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom ihOutLbl =>
+  | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight ihOutLbl =>
       rename_i Sown G k procs e p bs Sfin Gfin W Δ
       have hNone := lookupG_none_of_disjoint hDisj hG
       have hG' := lookupG_append_right (G₁:=Gfr) (G₂:=G) (e:=e) hNone
@@ -242,7 +307,8 @@ lemma HasTypeProcPreOut_frame_G_left
           have hDisj'0 : DisjointG (updateG G e L) Gfr :=
             disjointG_updateG_left (e:=e) (L:=L) (L0:=.branch p bs) hG (DisjointG_symm hDisj)
           exact DisjointG_symm hDisj'0
-        have hOut' := ihOutLbl lbl P L hFindP hFindB hDisj'
+        have hOut' := ihOutLbl lbl P L hFindP hFindB hDisj' hDisjRightIn
+          (by simpa [hRight] using hDisjRightOut)
         have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
         simpa [hUpd] using hOut'
       have hSess' : SessionsOf (Gfr ++ Gfin) ⊆ SessionsOf (Gfr ++ G) := by
@@ -254,35 +320,62 @@ lemma HasTypeProcPreOut_frame_G_left
         | inr hsR =>
             exact SessionsOf_append_right (G₁:=Gfr) (hSess hsR)
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G)
-        hk hG'' hLen hLabels hBodies' hOutLbl' hSess' hDom
+        hk hG'' hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
-      have hP' := ihP hDisj
+      have hDomQ : SEnvDomSubset S₁.left S₂.left := HasTypeProcPreOut_domsubset hQ
+      have hDisjRightMid : DisjointS Sown.right S₁.left :=
+        DisjointS_of_domsubset_right hDomQ hDisjRightOut
+      have hP' := ihP hDisj hDisjRightIn hDisjRightMid
+      have hSubRightMid : SEnvDomSubset S₁.right Sown.right :=
+        HasTypeProcPreOut_right_domsubset hP
+      have hDisjMidIn : DisjointS S₁.right S₁.left :=
+        DisjointS_of_domsubset_left hSubRightMid hDisjRightMid
+      have hDisjMidOut : DisjointS S₁.right S₂.left :=
+        DisjointS_of_domsubset_left hSubRightMid hDisjRightOut
       have hSubG1 : SessionsOf G₁ ⊆ SessionsOf G :=
         SessionsOf_subset_of_HasTypeProcPreOut hP
       have hDisjG1fr : DisjointG Gfr G₁ := by
         have hDisj' : DisjointG G₁ Gfr := DisjointG_of_subset_left hSubG1 (DisjointG_symm hDisj)
         exact DisjointG_symm hDisj'
-      have hQ' := ihQ hDisjG1fr
+      have hQ' := ihQ hDisjG1fr hDisjMidIn hDisjMidOut
       exact HasTypeProcPreOut.seq hP' hQ'
-  | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-      hDisjW hDisjΔ hS1 hS2 hP hQ ihP ihQ =>
-      rename_i Sown G P Q Sfin Gfin W Δ S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ ihP ihQ =>
+      rename_i Sown G P Q Sfin Gfin W Δ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
       have hDisjG1fr : DisjointG split.G1 Gfr :=
         (disjointG_split_frame_right (split:=split) (DisjointG_symm hDisj)).1
       have hDisjG2fr : DisjointG split.G2 Gfr :=
         (disjointG_split_frame_right (split:=split) (DisjointG_symm hDisj)).2
       have hDisjGfrG1 : DisjointG Gfr split.G1 := DisjointG_symm hDisjG1fr
       have hDisjGfrG2 : DisjointG Gfr split.G2 := DisjointG_symm hDisjG2fr
-      have hP' := ihP hDisjGfrG1
+      have hDisjRightS1 : DisjointS Sown.right split.S1 := by
+        have hSubS1 : SEnvDomSubset split.S1 Sown.left := by
+          simpa [split.hS] using (SEnvDomSubset_append_left (S₁:=split.S1) (S₂:=split.S2))
+        exact DisjointS_of_domsubset_right hSubS1 hDisjRightIn
+      have hDisjRightS2 : DisjointS Sown.right split.S2 := by
+        have hSubS2 : SEnvDomSubset split.S2 Sown.left := by
+          simpa [split.hS] using (SEnvDomSubset_append_right (S₁:=split.S1) (S₂:=split.S2))
+        exact DisjointS_of_domsubset_right hSubS2 hDisjRightIn
+      have hDisjRightOut' : DisjointS Sown.right (S₁' ++ S₂') := by
+        simpa [hSfin] using hDisjRightOut
+      have hDisjRightS1' : DisjointS Sown.right S₁' := by
+        have hSubS1' : SEnvDomSubset S₁' (S₁' ++ S₂') := by
+          simpa using (SEnvDomSubset_append_left (S₁:=S₁') (S₂:=S₂'))
+        exact DisjointS_of_domsubset_right hSubS1' hDisjRightOut'
+      have hDisjPIn : DisjointS (Sown.right ++ split.S2) split.S1 :=
+        DisjointS_append_left hDisjRightS1 (DisjointS_symm hDisjS)
+      have hDisjPOut : DisjointS (Sown.right ++ split.S2) S₁' :=
+        DisjointS_append_left hDisjRightS1' (DisjointS_symm hDisjS_left)
+      have hP' := ihP hDisjGfrG1 hDisjPIn hDisjPOut
       exact HasTypeProcPreOut_frame_G_left_par (Ssh:=Ssh) (Gfr:=Gfr) (split:=split)
-        hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-        hDisjW hDisjΔ hS1 hS2 hP' hQ hDisjGfrG1 hDisjGfrG2
-  | assign_new hNoSh hNoOwnR hNoOwnL hv =>
+        hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+        hDisjRightIn hDisjRightOut' hDisjW hDisjΔ hP' hQ hDisjGfrG1 hDisjGfrG2
+  | assign_new hNoSh hNoOwnL hv =>
       rename_i Sown G x v T
       have hv' := HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv
-      exact HasTypeProcPreOut.assign_new hNoSh hNoOwnR hNoOwnL hv'
-  | assign_old hNoSh hNoOwnR hOwn hv =>
+      exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL hv'
+  | assign_old hNoSh hOwn hv =>
       rename_i Sown G x v T T'
       have hv' := HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv
-      exact HasTypeProcPreOut.assign_old hNoSh hNoOwnR hOwn hv'
+      exact HasTypeProcPreOut.assign_old hNoSh hOwn hv'

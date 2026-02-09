@@ -1,5 +1,5 @@
 import Runtime.ProgramLogic.GhostState
-import Runtime.VM.Config
+import Runtime.VM.Model.Config
 
 /- 
 The Problem. Finalization-sensitive steps (close and invoke) must be gated

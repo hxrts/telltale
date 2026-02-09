@@ -1,6 +1,6 @@
 import Runtime.Proofs.SessionLocal
 import Runtime.Resources.Arena
-import Runtime.VM.TypeClasses
+import Runtime.VM.Model.TypeClasses
 import Protocol.Typing.Progress
 import Runtime.Proofs.Lyapunov
 

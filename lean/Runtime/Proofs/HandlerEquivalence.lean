@@ -1,5 +1,5 @@
-import Runtime.Transport.Transport
-import Runtime.VM.State
+import Runtime.Transport
+import Runtime.VM.Model.State
 
 /-!
 # Handler Equivalence

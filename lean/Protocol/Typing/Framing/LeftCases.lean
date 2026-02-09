@@ -104,7 +104,7 @@ lemma preserved_sub_left_frame_branch
   -- Reduce to the branch pre-out rule and rewrite the left update.
   intro hStore hEq hEq' hk hG hFindP hFindT hGout hPre
   cases hPre with
-  | branch hk' hG' hLen hLabels hPreAll hPost hSess hDom =>
+  | branch hk' hG' hLen hLabels hPreAll hPost hSess hDom hRight =>
       rename_i e' p' bs'
       have hEqE : e = e' :=
         endpoint_eq_of_store_visible hStore hk hk'

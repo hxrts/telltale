@@ -1,5 +1,5 @@
 import Protocol.Coherence
-import Runtime.VM.Failure
+import Runtime.VM.Runtime.Failure
 
 /-
 The Problem. Determine the exact set of participants that can crash while

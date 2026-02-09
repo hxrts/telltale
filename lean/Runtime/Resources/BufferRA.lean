@@ -1,7 +1,7 @@
 import Std
 import Protocol.Environments.Core
-import Runtime.VM.Core
-import Runtime.VM.TypeClasses
+import Runtime.VM.Model.Core
+import Runtime.VM.Model.TypeClasses
 import Runtime.IrisBridge
 
 /-!

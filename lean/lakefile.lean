@@ -55,9 +55,9 @@ lean_lib Runtime where
 lean_lib ClassicalLayer where
   globs := #[`Classical.*]
 
-/-- Consensus hypothesis validation and protocol-space classification. -/
-lean_lib Consensus where
-  globs := #[`Consensus.*]
+/-- Distributed hypothesis validation and protocol-space classification. -/
+lean_lib Distributed where
+  globs := #[`Distributed.*]
 
 /-- Linker args to silence macOS deployment target warnings for test executables. -/
 def macosLinkArgs : Array String :=

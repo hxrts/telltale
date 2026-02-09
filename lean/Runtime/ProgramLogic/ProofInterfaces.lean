@@ -1,5 +1,5 @@
-import Runtime.VM.TypeClasses
-import Runtime.VM.DomainComposition
+import Runtime.VM.Model.TypeClasses
+import Runtime.VM.Composition.DomainComposition
 import Runtime.IrisBridge
 
 /-

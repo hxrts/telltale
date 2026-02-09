@@ -1,14 +1,14 @@
 import Protocol.Environments.Core
 import Batteries.Data.RBMap
 import Batteries.Data.RBMap.Lemmas
-import Runtime.VM.TypeClasses
-import Runtime.VM.Core
+import Runtime.VM.Model.TypeClasses
+import Runtime.VM.Model.Core
 import Runtime.Resources.BufferRA
 
 /-!
-# Task 15: Arena and Session Store
+# Arena and Session Store
 
-Physical backing model for session state from iris_runtime_2.md §5.3–5.5.
+Physical backing model for session state.
 
 ## Definitions
 

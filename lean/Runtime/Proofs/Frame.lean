@@ -1,6 +1,6 @@
 import Runtime.Proofs.SessionLocal
-import Runtime.VM.InstrSpec
-import Runtime.VM.LoadChoreography
+import Runtime.VM.Semantics.InstrSpec
+import Runtime.VM.Runtime.Loader
 
 /-!
 # Frame Rule and Cross-Session Diamond
@@ -34,8 +34,6 @@ Once resolved, the proofs here connect to VM execution via:
 - Each instruction has a footprint (set of sessions it can affect)
 - `instr_frame`: instruction i preserves SessionCoherent s when s ∉ footprint(i)
 - `cross_session_diamond`: disjoint footprints → commutativity
-
-See `work/vm_instructions.md` for the full specification.
 -/
 
 set_option autoImplicit false

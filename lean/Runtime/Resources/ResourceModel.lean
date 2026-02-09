@@ -1,4 +1,4 @@
-import Runtime.VM.TypeClasses
+import Runtime.VM.Model.TypeClasses
 
 /-
 The Problem. The runtime needs a lightweight resource model for V1 that

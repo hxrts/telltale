@@ -252,6 +252,16 @@ theorem inversion_branch {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {pr
   | branch hk hG hLen hLabels hBodies =>
       exact ⟨_, _, _, hk, hG, hLen, hLabels, hBodies⟩
 
+/-- `HasTypeProcPre` is insensitive to the right par index `nG`. -/
+theorem HasTypeProcPre_par_nG_irrel
+    {Ssh Sown G P Q nS nG nG'} :
+    HasTypeProcPre Ssh Sown G (.par nS nG P Q) →
+    HasTypeProcPre Ssh Sown G (.par nS nG' P Q) := by
+  intro h
+  cases h with
+  | par hDisjS hSplit hP hQ =>
+      exact HasTypeProcPre.par hDisjS hSplit hP hQ
+
 /-! ## Linear Resource Transition Typing
 
 **Core Judgment**: `TypedStep G D Ssh Sown C C' G' D' Sown'`
@@ -329,6 +339,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
         HasTypeProcPreOut Ssh Sown (updateG G e L) P S' G' W Δ) →
       SessionsOf G' ⊆ SessionsOf G →
       SEnvDomSubset Sown.left S'.left →
+      S'.right = Sown.right →
       HasTypeProcPreOut Ssh Sown G (.branch k procs) S' G' W Δ
 
   /-- Sequential composition: compose post environments. -/
@@ -339,9 +350,8 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
 
   /-- Parallel composition with disjoint resources (explicit split witness). -/
   | par {Ssh Sown G P Q Sfin Gfin Wfin Δfin
-         S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG} (split : ParSplit Sown.left G) :
+         S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG} (split : ParSplit Sown.left G) :
       split.S1.length = nS →
-      split.G1.length = nG →
       Sfin = { right := Sown.right, left := S₁' ++ S₂' } →
       Gfin = (G₁' ++ G₂') →
       Wfin = (W₁ ++ W₂) →
@@ -353,12 +363,10 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
       DisjointS S₁' S₂' →
       DisjointW W₁ W₂ →
       DisjointS Δ₁ Δ₂ →
-      S₁ = split.S1 →
-      S₂ = split.S2 →
-      HasTypeProcPreOut Ssh { right := Sown.right ++ S₂, left := S₁ } split.G1 P
-        { right := Sown.right ++ S₂, left := S₁' } G₁' W₁ Δ₁ →
-      HasTypeProcPreOut Ssh { right := Sown.right ++ S₁, left := S₂ } split.G2 Q
-        { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ →
+      HasTypeProcPreOut Ssh { right := Sown.right ++ split.S2, left := split.S1 } split.G1 P
+        { right := Sown.right ++ split.S2, left := S₁' } G₁' W₁ Δ₁ →
+      HasTypeProcPreOut Ssh { right := Sown.right ++ split.S1, left := split.S2 } split.G2 Q
+        { right := Sown.right ++ split.S1, left := S₂' } G₂' W₂ Δ₂ →
       HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin
 
   /-- Assignment updates S with x's type. -/
@@ -378,6 +386,27 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
 
 
 /-! ### Inversion Helpers for Pre-Out Typing -/
+
+/-- Frame-invariant witness for par split alignment at S-length `nS`. -/
+structure ParWitness (S : SEnv) (G : GEnv) (nS : Nat) where
+  split : ParSplit S G
+  hSlen : split.S1.length = nS
+
+/-- Any split of the same owned-left environment at the same `nS` has the same S components. -/
+theorem ParSplit.sides_eq_of_witness
+    {S : SEnv} {G : GEnv} {nS : Nat}
+    (split : ParSplit S G) (pw : ParWitness S G nS)
+    (hSlen : split.S1.length = nS) :
+    split.S1 = pw.split.S1 ∧ split.S2 = pw.split.S2 := by
+  have hSlenEq : split.S1.length = pw.split.S1.length := by
+    calc
+      split.S1.length = nS := hSlen
+      _ = pw.split.S1.length := pw.hSlen.symm
+  have hSeq : split.S1 ++ split.S2 = pw.split.S1 ++ pw.split.S2 := by
+    calc
+      split.S1 ++ split.S2 = S := by simpa [split.hS]
+      _ = pw.split.S1 ++ pw.split.S2 := by simpa [pw.split.hS]
+  exact ⟨List.append_inj_left hSeq hSlenEq, List.append_inj_right hSeq hSlenEq⟩
 
 /-- Inversion for parallel pre-out typing with explicit environment splits. -/
 theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
@@ -403,17 +432,56 @@ theorem HasTypeProcPreOut_par_inv {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
         { right := Sown.right ++ S₁, left := S₂' } G₂' W₂ Δ₂ := by
   intro h
   cases h with
-  | par split _ _ hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ
-      hS1 hS2 hP hQ =>
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW
+      hDisjΔ hP hQ =>
       cases split with
       | mk S₁ S₂ G₁ G₂ hS hG =>
-          refine ⟨S₁, S₂, G₁, G₂, _, _, _, _, _, _, _, _, ?_, hG, ?_, ?_, hGfin, hW, hΔ,
+          refine ⟨S₁, S₂, G₁, G₂, _, _, _, _, _, _, _, _, hS, hG, ?_, ?_, hGfin, hW, hΔ,
             hDisjG, hDisjS, hDisjS_left, hDisjS_right, hDisjS', hDisjW, hDisjΔ, ?_, ?_⟩
-          · simpa [hS] using hS1
           · simpa [hSfin] using rfl
           · simpa [hSfin] using rfl
-          · simpa [hS1, hS2] using hP
-          · simpa [hS1, hS2] using hQ
+          · simpa using hP
+          · simpa using hQ
+
+/-- Witness-oriented inversion for parallel pre-out typing. -/
+theorem HasTypeProcPreOut_par_inv_witness {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG} :
+    HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
+    ∃ pw : ParWitness Sown.left G nS, ∃ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂,
+      Sfin = { right := Sown.right, left := S₁' ++ S₂' } ∧
+      Gfin = (G₁' ++ G₂') ∧
+      Wfin = (W₁ ++ W₂) ∧
+      Δfin = (Δ₁ ++ Δ₂) ∧
+      DisjointG pw.split.G1 pw.split.G2 ∧
+      DisjointS pw.split.S1 pw.split.S2 ∧
+      DisjointS S₁' pw.split.S2 ∧
+      DisjointS pw.split.S1 S₂' ∧
+      DisjointS S₁' S₂' ∧
+      DisjointW W₁ W₂ ∧
+      DisjointS Δ₁ Δ₂ ∧
+      HasTypeProcPreOut Ssh { right := Sown.right ++ pw.split.S2, left := pw.split.S1 } pw.split.G1 P
+        { right := Sown.right ++ pw.split.S2, left := S₁' } G₁' W₁ Δ₁ ∧
+      HasTypeProcPreOut Ssh { right := Sown.right ++ pw.split.S1, left := pw.split.S2 } pw.split.G2 Q
+        { right := Sown.right ++ pw.split.S1, left := S₂' } G₂' W₂ Δ₂ := by
+  intro h
+  cases h with
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ =>
+      rename_i S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂
+      exact ⟨⟨split, hSlen⟩, S₁', S₂', G₁', G₂', W₁, W₂, Δ₁, Δ₂,
+        hSfin, hGfin, hW, hΔ, hDisjG, hDisjS, hDisjS_left,
+        hDisjS_right, hDisjS', hDisjW, hDisjΔ, hP, hQ⟩
+
+/-- `HasTypeProcPreOut` is insensitive to the right par index `nG`. -/
+theorem HasTypeProcPreOut_par_nG_irrel
+    {Ssh Sown G P Q Sfin Gfin Wfin Δfin nS nG nG'} :
+    HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin Wfin Δfin →
+    HasTypeProcPreOut Ssh Sown G (.par nS nG' P Q) Sfin Gfin Wfin Δfin := by
+  intro h
+  cases h with
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ =>
+      exact HasTypeProcPreOut.par split hSlen hSfin hGfin hW hΔ
+        hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP hQ
 
 -- NOTE: We do not provide a general "forgetful" lemma from HasTypeProcPreOut to
 -- HasTypeProcPre, because seq/par pre-out typing does not imply pre-typing for
@@ -543,7 +611,6 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
   | par_left {Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG}
       (split : ParSplit Sown.left G) :
       split.S1.length = nS →
-      split.G1.length = nG →
       -- Left process transitions with its resources
       TypedStep G (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S2, left := split.S1 } store bufs P
                 (G₁' ++ split.G2) (D₁' ++ D₂)
@@ -557,12 +624,11 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       -- Combined transition
       TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
                 (G₁' ++ split.G2) (D₁' ++ D₂) { right := Sown.right, left := S₁' ++ split.S2 }
-                store' bufs' (.par S₁'.length G₁'.length P' Q)
+                store' bufs' (.par S₁'.length nG P' Q)
 
   | par_right {Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂' D₂' S₂' nS nG}
       (split : ParSplit Sown.left G) :
       split.S1.length = nS →
-      split.G1.length = nG →
       -- Right process transitions with its resources
       TypedStep G (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S1, left := split.S2 } store bufs Q
                 (split.G1 ++ G₂') (D₁ ++ D₂')
@@ -576,7 +642,7 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       -- Combined transition
       TypedStep G (D₁ ++ D₂) Ssh Sown store bufs (.par nS nG P Q)
                 (split.G1 ++ G₂') (D₁ ++ D₂') { right := Sown.right, left := split.S1 ++ S₂' }
-                store' bufs' (.par split.S1.length split.G1.length P Q')
+                store' bufs' (.par split.S1.length nG P Q')
 
   | par_skip_left {G D Ssh Sown store bufs Q nS nG} :
       -- Skip elimination from parallel
@@ -587,6 +653,59 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       -- Skip elimination from parallel
       TypedStep G D Ssh Sown store bufs (.par nS nG P .skip)
                 G D Sown store bufs P
+
+/-- Inversion view for `TypedStep` on parallel processes. -/
+theorem TypedStep_par_inv
+    {G D Ssh Sown store bufs P Q nS nG G' D' Sown' store' bufs' P'} :
+    TypedStep G D Ssh Sown store bufs (.par nS nG P Q) G' D' Sown' store' bufs' P' →
+      (∃ pw : ParWitness Sown.left G nS, ∃ D₁ D₂ G₁' D₁' S₁' Pleft',
+        D = D₁ ++ D₂ ∧
+        TypedStep G (D₁ ++ D₂) Ssh { right := Sown.right ++ pw.split.S2, left := pw.split.S1 } store bufs P
+          (G₁' ++ pw.split.G2) (D₁' ++ D₂) { right := Sown.right ++ pw.split.S2, left := S₁' } store' bufs' Pleft' ∧
+        DisjointG pw.split.G1 pw.split.G2 ∧
+        DisjointD D₁ D₂ ∧
+        DisjointS pw.split.S1 pw.split.S2 ∧
+        G' = G₁' ++ pw.split.G2 ∧
+        D' = D₁' ++ D₂ ∧
+        Sown' = { right := Sown.right, left := S₁' ++ pw.split.S2 } ∧
+        P' = .par S₁'.length nG Pleft' Q)
+      ∨
+      (∃ pw : ParWitness Sown.left G nS, ∃ D₁ D₂ G₂' D₂' S₂' Qright',
+        D = D₁ ++ D₂ ∧
+        TypedStep G (D₁ ++ D₂) Ssh { right := Sown.right ++ pw.split.S1, left := pw.split.S2 } store bufs Q
+          (pw.split.G1 ++ G₂') (D₁ ++ D₂') { right := Sown.right ++ pw.split.S1, left := S₂' } store' bufs' Qright' ∧
+        DisjointG pw.split.G1 pw.split.G2 ∧
+        DisjointD D₁ D₂ ∧
+        DisjointS pw.split.S1 pw.split.S2 ∧
+        G' = pw.split.G1 ++ G₂' ∧
+        D' = D₁ ++ D₂' ∧
+        Sown' = { right := Sown.right, left := pw.split.S1 ++ S₂' } ∧
+        P' = .par pw.split.S1.length nG P Qright')
+      ∨
+      (P = .skip ∧ G' = G ∧ D' = D ∧ Sown' = Sown ∧ store' = store ∧ bufs' = bufs ∧ P' = Q)
+      ∨
+      (Q = .skip ∧ G' = G ∧ D' = D ∧ Sown' = Sown ∧ store' = store ∧ bufs' = bufs ∧ P' = P) := by
+  intro hTS
+  cases hTS with
+  | par_left split hSlen hInner hDisjG hDisjD hDisjS =>
+      left
+      exact ⟨⟨split, hSlen⟩, _, _, _, _, _, _, rfl, hInner, hDisjG, hDisjD, hDisjS,
+        rfl, rfl, rfl, rfl⟩
+  | par_right split hSlen hInner hDisjG hDisjD hDisjS =>
+      right
+      left
+      exact ⟨⟨split, hSlen⟩, _, _, _, _, _, _, rfl, hInner, hDisjG, hDisjD, hDisjS,
+        rfl, rfl, rfl, rfl⟩
+  | par_skip_left =>
+      right
+      right
+      left
+      exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  | par_skip_right =>
+      right
+      right
+      right
+      exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 
 end

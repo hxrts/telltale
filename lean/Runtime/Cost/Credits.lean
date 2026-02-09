@@ -1,4 +1,4 @@
-import Runtime.VM.Config
+import Runtime.VM.Model.Config
 import Runtime.IrisBridge
 
 /- 

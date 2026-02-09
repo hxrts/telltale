@@ -107,7 +107,7 @@ def LocalTypeR.WellFormed (G : GEnv) (D : DEnv) (Ssh : SEnv) (Sown : OwnedEnv)
   DisjointS Ssh (OwnedEnv.all Sown) ∧
   OwnedDisjoint Sown ∧
   DConsistent G D ∧
-  ∃ S' G' W Δ, HasTypeProcPreOut Ssh Sown G P S' G' W Δ
+  ∃ S' G' W Δ, HasTypeProcPreOut Ssh Sown G P S' G' W Δ ∧ DisjointS Sown.right S'.left
 
 /-- Complete well-formedness: core invariants plus role-completeness of GEnv. -/
 def WellFormedComplete (G : GEnv) (D : DEnv) (Ssh : SEnv) (Sown : OwnedEnv)
@@ -886,34 +886,32 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
       exact SEnvDomSubset_update_left
   | select =>
       exact SEnvDomSubset_refl
-  | branch _ _ _ _ _ _ _ hDom =>
+  | branch _ _ _ _ _ _ _ hDom _ =>
       exact hDom
   | seq hP hQ ihP ihQ =>
       exact SEnvDomSubset_trans ihP ihQ
-  | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-      hDisjW hDisjΔ hS1 hS2 hP hQ ihP ihQ =>
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ ihP ihQ =>
       -- Show dom subset for the left portion of the owned env.
-      rename_i S₁ S₂ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
+      rename_i S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
       intro x T hLookup
       have hLookupS : lookupSEnv (split.S1 ++ split.S2) x = some T := by
-        simpa [split.hS, hS1, hS2] using hLookup
+        simpa [split.hS] using hLookup
       by_cases hLeftNone : lookupSEnv split.S1 x = none
       · have hRight : lookupSEnv split.S2 x = some T := by
           have hEq := lookupSEnv_append_right (S₁:=split.S1) (S₂:=split.S2) (x:=x) hLeftNone
           simpa [hEq] using hLookupS
-        have hRight' : lookupSEnv S₂ x = some T := by
-          simpa [hS2] using hRight
-        obtain ⟨T', hRight''⟩ := ihQ hRight'
+        obtain ⟨T', hRight'⟩ := ihQ hRight
         have hLeftNone' : lookupSEnv S₁' x = none := by
           by_cases hSome : lookupSEnv S₁' x = none
           · exact hSome
           · cases hSome' : lookupSEnv S₁' x with
             | none => exact (hSome hSome').elim
             | some T₁ =>
-                exact (hDisjS' x T₁ T' hSome' hRight'').elim
+                exact (hDisjS' x T₁ T' hSome' hRight').elim
         have hEq := lookupSEnv_append_right (S₁:=S₁') (S₂:=S₂') (x:=x) hLeftNone'
         have hAppend : lookupSEnv (S₁' ++ S₂') x = some T' := by
-          simpa [hEq] using hRight''
+          simpa [hEq] using hRight'
         exact ⟨T', by simpa [hSfin] using hAppend⟩
       · cases hLeftSome : lookupSEnv split.S1 x with
         | none => exact (hLeftNone hLeftSome).elim
@@ -925,8 +923,8 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
               have : some T₁ = some T := by
                 simpa [hLeftAppend] using hLookupS
               exact Option.some.inj this
-            have hLeftSome' : lookupSEnv S₁ x = some T := by
-              simpa [hS1, hEqT] using hLeftSome
+            have hLeftSome' : lookupSEnv split.S1 x = some T := by
+              simpa [hEqT] using hLeftSome
             obtain ⟨T', hLeft'⟩ := ihP hLeftSome'
             have hAppend := lookupSEnv_append_left (S₁:=S₁') (S₂:=S₂') hLeft'
             exact ⟨T', by simpa [hSfin] using hAppend⟩

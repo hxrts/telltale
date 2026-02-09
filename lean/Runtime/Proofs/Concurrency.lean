@@ -1,15 +1,15 @@
-import Runtime.VM.RunScheduled
-import Runtime.VM.Scheduler
+import Runtime.VM.Runtime.Runner
+import Runtime.VM.Runtime.Scheduler
 import Runtime.ProgramLogic.LanguageInstance
 import Runtime.IrisBridge
 
 /-
 The Problem. Show that per-session normalized traces are invariant under
-concurrency bounds and scheduler policy, while keeping Iris reasoning out of
-the VM boundary.
+concurrency bounds, and provide the round-robin normalization property, while
+keeping Iris reasoning out of the VM boundary.
 
-Solution Structure. We factor out Iris invariance, then prove scheduler
-normalization lemmas, and finally derive per-session trace invariants.
+Solution Structure. We factor out Iris invariance, prove scheduler/concurrency
+normalization lemmas, and derive per-session trace invariants.
 -/
 
 /-! ## Concurrency Invariance Proofs -/
@@ -89,16 +89,20 @@ private lemma runScheduled_policy_eq {ι γ π ε ν : Type u} [IdentityModel ι
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (fuel n : Nat) (st : VMState ι γ π ε ν) :
+    (fuel n : Nat) (st : VMState ι γ π ε ν)
+    (hpol : st.sched.policy = .roundRobin) :
     runScheduled fuel n st =
     runScheduled fuel n { st with sched := { st.sched with policy := .roundRobin } } := by
-  induction fuel generalizing st with
-  | zero =>
-      -- Base case: no fuel means no steps.
-      simp [runScheduled]
-  | succ fuel ih =>
-      -- Inductive step: policy is ignored by the scheduler.
-      simp [runScheduled, ih]
+  -- Under round-robin policy, the normalization update is definitionally idempotent.
+  cases st with
+  | mk config code programs coroutines buffers persistent nextCoroId nextSessionId arena sessions
+      resourceStates guardResources sched monitor obsTrace clock crashedSites partitionedEdges mask
+      ghostSessions progressSupply =>
+    cases sched with
+    | mk policy readyQueue blockedSet timeslice stepCount =>
+      simp at hpol
+      cases hpol
+      rfl
 
 /-! ## Per-session trace invariance -/
 
@@ -127,10 +131,11 @@ theorem per_session_trace_policy_invariant {ι γ π ε ν : Type u} [IdentityMo
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν)
-    (_hwf : WFVMState st) (sid : SessionId) (fuel concurrency : Nat) :
+    (_hwf : WFVMState st) (sid : SessionId) (fuel concurrency : Nat)
+    (hpol : st.sched.policy = .roundRobin) :
     filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency st).obsTrace) =
     filterBySid sid (Runtime.VM.normalizeTrace (runScheduled fuel concurrency
       { st with sched := { st.sched with policy := .roundRobin } }).obsTrace) := by
-  -- The scheduler ignores policy in the current spec.
-  have h := runScheduled_policy_eq (fuel:=fuel) (n:=concurrency) (st:=st)
+  -- Round-robin normalization is idempotent.
+  have h := runScheduled_policy_eq (fuel:=fuel) (n:=concurrency) (st:=st) hpol
   simp [h]

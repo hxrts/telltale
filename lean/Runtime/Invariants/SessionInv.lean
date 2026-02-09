@@ -2,7 +2,7 @@ import Protocol.Environments.Core
 import Protocol.Coherence.Consume
 import Runtime.Resources.SessionRA
 import Runtime.ProgramLogic.GhostState
-import Runtime.VM.State
+import Runtime.VM.Model.State
 import Runtime.IrisBridge
 
 /-
@@ -60,9 +60,9 @@ def head_coherent (sid : SessionId) (G : SessionMap) (D : DEnv) : iProp :=
   -- Head coherence matches the full consume condition in V1.
   session_coherent sid G D
 
-def knowledge_fact (sid : SessionId) (e : Endpoint) : KnowledgeFact :=
+def knowledge_fact (sid : SessionId) (e : Endpoint) : Knowledge :=
   -- Stable per-endpoint fact tag for knowledge ownership.
-  { endpoint := e, fact := toString sid ++ ":" ++ e.role }
+  { endpoint := e, payload := toString sid ++ ":" ++ e.role }
 
 def knowledge_inv (γ : GhostName) (sid : SessionId) (e : Endpoint) : iProp :=
   -- Endpoint-specific knowledge invariant.

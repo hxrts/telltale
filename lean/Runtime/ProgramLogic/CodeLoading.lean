@@ -1,6 +1,6 @@
 import Protocol.Coherence.Consume
 import Protocol.DeadlockFreedom
-import Runtime.VM.Definition
+import Runtime.VM.API
 import Runtime.Invariants.SessionInv
 import Runtime.IrisBridge
 

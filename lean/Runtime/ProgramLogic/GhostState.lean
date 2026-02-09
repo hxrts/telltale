@@ -1,5 +1,5 @@
 import Runtime.Resources.SessionRA
-import Runtime.VM.Knowledge
+import Runtime.VM.Model.Knowledge
 import Runtime.IrisBridge
 
 /- 
@@ -43,30 +43,30 @@ def sepList (ps : List iProp) : iProp :=
 /-! ## Knowledge RA -/
 
 /-- Stub: ghost map for knowledge facts.
-    Actual implementation needs GhostMapSlot and encoding for KnowledgeFact. -/
+    Actual implementation needs GhostMapSlot and encoding for Knowledge. -/
 abbrev KnowledgeRA := List (Positive × Unit)
 
 /-- Encode a knowledge fact to Positive for ghost map key. -/
-def encodeKnowledgeFact (k : KnowledgeFact) : Positive :=
+def encodeKnowledge (k : Knowledge) : Positive :=
   [Iris.Countable.encode k.endpoint.sid,
    Iris.Countable.encode k.endpoint.role,
-   Iris.Countable.encode k.fact]
+   Iris.Countable.encode k.payload]
 
 variable [GhostMapSlot Unit]
 
-def knows (γ : GhostName) (k : KnowledgeFact) : iProp :=
+def knows (γ : GhostName) (k : Knowledge) : iProp :=
   -- Ownership of a single knowledge fact.
-  ghost_map_elem γ (encodeKnowledgeFact k) ()
+  ghost_map_elem γ (encodeKnowledge k) ()
 
-def knowledge_set_owns (γ : GhostName) (ks : List KnowledgeFact) : iProp :=
+def knowledge_set_owns (γ : GhostName) (ks : List Knowledge) : iProp :=
   -- Ownership of a list of knowledge facts.
   sepList (ks.map (fun k => knows γ k))
 
-def KnowledgeReachable (k : KnowledgeFact) : Prop :=
+def KnowledgeReachable (k : Knowledge) : Prop :=
   -- A fact is reachable when it carries non-empty payload knowledge.
-  k.fact.length > 0
+  k.payload.length > 0
 
-def knowledge_disjoint (ks1 ks2 : List KnowledgeFact) : Prop :=
+def knowledge_disjoint (ks1 ks2 : List Knowledge) : Prop :=
   -- Disjointness of knowledge sets by element exclusion.
   ∀ x, x ∈ ks1 → x ∈ ks2 → False
 
@@ -78,9 +78,9 @@ def knowledge_separation : Prop :=
 
 def send_transfers_knowledge : Prop :=
   -- Sending creates receiver knowledge in addition to sender knowledge.
-  ∀ γ sender receiver fact,
-    let kSender : KnowledgeFact := { endpoint := sender, fact := fact }
-    let kReceiver : KnowledgeFact := { endpoint := receiver, fact := fact }
+  ∀ γ sender receiver payload,
+    let kSender : Knowledge := { endpoint := sender, payload := payload }
+    let kReceiver : Knowledge := { endpoint := receiver, payload := payload }
     iProp.entails (knows γ kSender)
       (iProp.sep (knows γ kSender) (knows γ kReceiver))
 
@@ -226,7 +226,7 @@ structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] whe
   guardState : List (γ × GuardLayer.Resource γ) -- Guard resources for the endpoint.
   effectSlice : EffectRuntime.EffectCtx ε -- Effect context slice.
   progressTokens : List (SessionId × Endpoint × Nat) -- Liveness tokens.
-  knowledge : List KnowledgeFact -- Knowledge facts.
+  knowledge : List Knowledge -- Knowledge facts.
 
 variable [GhostMapSlot LocalType]
 

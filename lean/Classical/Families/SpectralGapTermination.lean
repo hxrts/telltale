@@ -24,7 +24,7 @@ def transitionMatrix (mc : MarkovChain State) : Matrix State State ℝ :=
   Matrix.of mc.transition
 
 /-- Transition matrix cast to `ℂ` for spectral analysis. -/
-def transitionMatrixC (mc : MarkovChain State) : Matrix State State ℂ :=
+noncomputable def transitionMatrixC (mc : MarkovChain State) : Matrix State State ℂ :=
   (transitionMatrix mc).map (algebraMap ℝ ℂ)
 
 /-- Absolute values of nontrivial eigenvalues (`λ ≠ 1`). -/
@@ -32,11 +32,11 @@ def nontrivialEigenvalueModuli (mc : MarkovChain State) : Set ℝ :=
   { r | ∃ z ∈ spectrum ℂ (transitionMatrixC mc), z ≠ (1 : ℂ) ∧ r = ‖z‖ }
 
 /-- Second-largest eigenvalue in absolute value (real-valued by construction). -/
-def secondLargestEigenvalue (mc : MarkovChain State) : ℝ :=
+noncomputable def secondLargestEigenvalue (mc : MarkovChain State) : ℝ :=
   sSup (nontrivialEigenvalueModuli mc)
 
 /-- Spectral gap `γ = 1 - |λ₂|`. -/
-def spectralGap (mc : MarkovChain State) : ℝ :=
+noncomputable def spectralGap (mc : MarkovChain State) : ℝ :=
   1 - secondLargestEigenvalue mc
 
 /-- Side condition certifying the spectral gap is nonnegative. -/

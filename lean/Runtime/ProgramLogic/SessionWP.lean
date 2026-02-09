@@ -19,12 +19,12 @@ Weakest precondition rules for each bytecode instruction from iris_runtime_2.md 
 
 ## Rules
 
-- `wp_send`, `wp_recv`, `wp_offer`, `wp_choose`
+- `wp_send`, `wp_receive`, `wp_offer`, `wp_choose`
 - `wp_open`, `wp_close`
 - `wp_acquire`, `wp_release`
 - `wp_invoke`, `wp_fork`, `wp_join`, `wp_abort`
 - `wp_transfer`, `wp_tag`, `wp_check`
-- `wp_loadImm`, `wp_mov`, `wp_jmp`, `wp_spawn`, `wp_yield`, `wp_halt`
+- `wp_set`, `wp_move`, `wp_jump`, `wp_spawn`, `wp_yield`, `wp_halt`
 
 Dependencies: Task 12, Task 16, Shim.Invariants + Shim.WeakestPre.
 -/
@@ -50,11 +50,11 @@ def wp_send_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
   -- Delegating send requires ordinary send resources plus a transferable bundle.
   iProp.sep (wp_send γn sid ct b.endpoint b.localType) (bundle_owns γn b)
 
-def wp_recv : iProp :=
+def wp_receive : iProp :=
   -- WP rule derived from the generic pair rule.
-  wp_pair (recvPair (γ:=γ) (ε:=ε))
+  wp_pair (receivePair (γ:=γ) (ε:=ε))
 
-def wp_recv_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+def wp_receive_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
     (b : ResourceBundle γ ε) : iProp :=
   -- Delegating receive consumes from the session invariant and installs bundle ownership.
   iProp.sep (session_inv γn sid ct) (bundle_owns γn b)
@@ -111,17 +111,17 @@ def wp_check : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (checkPair (γ:=γ) (ε:=ε))
 
-def wp_loadImm : iProp :=
+def wp_set : iProp :=
   -- WP rule derived from the generic pair rule.
-  wp_pair (loadImmPair (γ:=γ) (ε:=ε))
+  wp_pair (setPair (γ:=γ) (ε:=ε))
 
-def wp_mov : iProp :=
+def wp_move : iProp :=
   -- WP rule derived from the generic pair rule.
-  wp_pair (movPair (γ:=γ) (ε:=ε))
+  wp_pair (movePair (γ:=γ) (ε:=ε))
 
-def wp_jmp : iProp :=
+def wp_jump : iProp :=
   -- WP rule derived from the generic pair rule.
-  wp_pair (jmpPair (γ:=γ) (ε:=ε))
+  wp_pair (jumpPair (γ:=γ) (ε:=ε))
 
 def wp_spawn : iProp :=
   -- WP rule derived from the generic pair rule.

@@ -73,29 +73,186 @@ private lemma SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
   · intro h
     cases h
 
+private lemma lookupSEnv_erase_eq
+    {S : SEnv} {x : Var} :
+    lookupSEnv (eraseSEnv S x) x = none := by
+  induction S with
+  | nil =>
+      simp [eraseSEnv, lookupSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y Ty =>
+          by_cases hxy : x = y
+          · subst hxy
+            simpa [eraseSEnv] using ih
+          · have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
+            simpa [eraseSEnv, hxy, lookupSEnv, List.lookup, hbeq] using ih
+
+private lemma lookupSEnv_erase_ne
+    {S : SEnv} {x y : Var} (hxy : y ≠ x) :
+    lookupSEnv (eraseSEnv S x) y = lookupSEnv S y := by
+  induction S generalizing x y with
+  | nil =>
+      simp [eraseSEnv, lookupSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk z Tz =>
+          by_cases hxz : x = z
+          · subst hxz
+            have hyx : y ≠ x := by simpa using hxy
+            have hbeq : (y == x) = false := beq_eq_false_iff_ne.mpr hyx
+            simpa [eraseSEnv, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hyx)
+          · by_cases hyz : y = z
+            · subst hyz
+              simp [eraseSEnv, hxz, lookupSEnv, List.lookup]
+            · have hbeq : (y == z) = false := beq_eq_false_iff_ne.mpr hyz
+              simpa [eraseSEnv, hxz, lookupSEnv, List.lookup, hbeq] using (ih (x:=x) (y:=y) hxy)
+
+private lemma SEnvDomSubset_erase
+    {S : SEnv} {x : Var} :
+    SEnvDomSubset (eraseSEnv S x) S := by
+  intro y Ty hErase
+  by_cases hxy : y = x
+  · subst hxy
+    have hNone : lookupSEnv (eraseSEnv S y) y = none := lookupSEnv_erase_eq (S:=S) (x:=y)
+    have : (some Ty : Option ValType) = none := by simpa [hNone] using hErase
+    cases this
+  · have hEq : lookupSEnv (eraseSEnv S x) y = lookupSEnv S y :=
+      lookupSEnv_erase_ne (S:=S) (x:=x) (y:=y) hxy
+    exact ⟨Ty, by simpa [hEq] using hErase⟩
+
+private lemma SEnvDomSubset_updateLeft_right
+    {Sown : OwnedEnv} {x : Var} {T : ValType} :
+    SEnvDomSubset (OwnedEnv.updateLeft Sown x T).right Sown.right := by
+  simpa [OwnedEnv.updateLeft] using (SEnvDomSubset_erase (S:=Sown.right) (x:=x))
+
+private theorem HasTypeProcPreOut_right_domsubset
+    {Ssh Sown G P Sfin Gfin W Δ} :
+    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
+    SEnvDomSubset Sfin.right Sown.right := by
+  intro h
+  induction h with
+  | skip =>
+      exact SEnvDomSubset_refl
+  | send =>
+      exact SEnvDomSubset_refl
+  | recv_new _ _ _ _ =>
+      simpa using (SEnvDomSubset_updateLeft_right (Sown:=_) (x:=_) (T:=_))
+  | recv_old _ _ _ _ =>
+      simpa using (SEnvDomSubset_updateLeft_right (Sown:=_) (x:=_) (T:=_))
+  | select =>
+      exact SEnvDomSubset_refl
+  | branch _ _ _ _ _ _ _ _ hRight =>
+      intro x T hLookup
+      exact ⟨T, by simpa [hRight] using hLookup⟩
+  | seq hP hQ ihP ihQ =>
+      exact SEnvDomSubset_trans ihQ ihP
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ ihP ihQ =>
+      intro x T hLookup
+      exact ⟨T, by simpa [hSfin] using hLookup⟩
+  | assign_new _ _ _ =>
+      simpa using (SEnvDomSubset_updateLeft_right (Sown:=_) (x:=_) (T:=_))
+  | assign_old _ _ _ =>
+      simpa using (SEnvDomSubset_updateLeft_right (Sown:=_) (x:=_) (T:=_))
+
 private lemma TypedStep_preserves_right
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
+    SEnvDomSubset Sown.right Sfin.right →
     Sown'.right = Sown.right := by
-  intro hStep hPre
+  intro hStep hPre hSubRight
   induction hStep generalizing Sfin Gfin W Δ with
   | recv =>
+      rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+        hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
       cases hPre with
-      | recv_new _ _ _ hNoRight _ =>
-          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
-      | recv_old _ _ _ hNoRight _ =>
-          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+      | recv_new hk' hG' hNoSh hNoOwnL =>
+          have hNoOwnR : lookupSEnv Sown.right x = none := by
+            by_cases hNone : lookupSEnv Sown.right x = none
+            · exact hNone
+            · cases hOwn : lookupSEnv Sown.right x with
+              | none =>
+                  exact (hNone hOwn).elim
+              | some Tx =>
+                  obtain ⟨Tfin, hInFin⟩ := hSubRight hOwn
+                  have hNoneErase : lookupSEnv (eraseSEnv Sown.right x) x = none :=
+                    lookupSEnv_erase_eq (S:=Sown.right) (x:=x)
+                  have : (some Tfin : Option ValType) = none := by
+                    simpa [OwnedEnv.updateLeft, hNoneErase] using hInFin
+                  cases this
+          have hErase : eraseSEnv Sown.right x = Sown.right :=
+            eraseSEnv_of_lookup_none hNoOwnR
+          have hRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
+            simpa [OwnedEnv.updateLeft, hErase]
+          simpa [hSout] using hRightEq
+      | recv_old hk' hG' hNoSh hOwn =>
+          have hNoOwnR : lookupSEnv Sown.right x = none := by
+            by_cases hNone : lookupSEnv Sown.right x = none
+            · exact hNone
+            · cases hOwnR : lookupSEnv Sown.right x with
+              | none =>
+                  exact (hNone hOwnR).elim
+              | some Tx =>
+                  obtain ⟨Tfin, hInFin⟩ := hSubRight hOwnR
+                  have hNoneErase : lookupSEnv (eraseSEnv Sown.right x) x = none :=
+                    lookupSEnv_erase_eq (S:=Sown.right) (x:=x)
+                  have : (some Tfin : Option ValType) = none := by
+                    simpa [OwnedEnv.updateLeft, hNoneErase] using hInFin
+                  cases this
+          have hErase : eraseSEnv Sown.right x = Sown.right :=
+            eraseSEnv_of_lookup_none hNoOwnR
+          have hRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
+            simpa [OwnedEnv.updateLeft, hErase]
+          simpa [hSout] using hRightEq
   | assign =>
+      rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       cases hPre with
-      | assign_new _ hNoRight _ _ =>
-          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
-      | assign_old _ hNoRight _ _ =>
-          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+      | assign_new hNoSh hNoOwnL hv' =>
+          have hNoOwnR : lookupSEnv Sown.right x = none := by
+            by_cases hNone : lookupSEnv Sown.right x = none
+            · exact hNone
+            · cases hOwnR : lookupSEnv Sown.right x with
+              | none =>
+                  exact (hNone hOwnR).elim
+              | some Tx =>
+                  obtain ⟨Tfin, hInFin⟩ := hSubRight hOwnR
+                  have hNoneErase : lookupSEnv (eraseSEnv Sown.right x) x = none :=
+                    lookupSEnv_erase_eq (S:=Sown.right) (x:=x)
+                  have : (some Tfin : Option ValType) = none := by
+                    simpa [OwnedEnv.updateLeft, hNoneErase] using hInFin
+                  cases this
+          have hErase : eraseSEnv Sown.right x = Sown.right :=
+            eraseSEnv_of_lookup_none hNoOwnR
+          have hRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
+            simpa [OwnedEnv.updateLeft, hErase]
+          simpa [hSout] using hRightEq
+      | assign_old hNoSh hOwn hv' =>
+          have hNoOwnR : lookupSEnv Sown.right x = none := by
+            by_cases hNone : lookupSEnv Sown.right x = none
+            · exact hNone
+            · cases hOwnR : lookupSEnv Sown.right x with
+              | none =>
+                  exact (hNone hOwnR).elim
+              | some Tx =>
+                  obtain ⟨Tfin, hInFin⟩ := hSubRight hOwnR
+                  have hNoneErase : lookupSEnv (eraseSEnv Sown.right x) x = none :=
+                    lookupSEnv_erase_eq (S:=Sown.right) (x:=x)
+                  have : (some Tfin : Option ValType) = none := by
+                    simpa [OwnedEnv.updateLeft, hNoneErase] using hInFin
+                  cases this
+          have hErase : eraseSEnv Sown.right x = Sown.right :=
+            eraseSEnv_of_lookup_none hNoOwnR
+          have hRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
+            simpa [OwnedEnv.updateLeft, hErase]
+          simpa [hSout] using hRightEq
   | seq_step _ ih =>
       cases hPre with
-      | seq hP _ =>
-          exact ih hP
+      | seq hP hQ =>
+          have hSubQ := HasTypeProcPreOut_right_domsubset hQ
+          have hSubP := SEnvDomSubset_trans hSubRight hSubQ
+          exact ih hP hSubP
   | _ =>
       rfl
 
@@ -433,8 +590,8 @@ private lemma HasTypeProcPreOut_recv_inv
       lookupG G e = some (.recv p T L) := by
   intro h
   cases h with
-  | recv_new hk hG hNoSh hNoRight hNoOwnL => exact ⟨_, _, _, _, hk, hG⟩
-  | recv_old hk hG hNoSh hNoRight hOwn => exact ⟨_, _, _, _, hk, hG⟩
+  | recv_new hk hG hNoSh hNoOwnL => exact ⟨_, _, _, _, hk, hG⟩
+  | recv_old hk hG hNoSh hOwn => exact ⟨_, _, _, _, hk, hG⟩
 
 private lemma HasTypeProcPreOut_select_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l : Label}
@@ -456,7 +613,7 @@ private lemma HasTypeProcPreOut_branch_inv
       lookupG G e = some (.branch p bs) := by
   intro h
   cases h with
-  | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom => exact ⟨_, _, _, hk, hG⟩
+  | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight => exact ⟨_, _, _, hk, hG⟩
 
 private lemma updateG_full_eq_updateG_mid
     {Gfull Gleft Gmid Gright : GEnv} {e : Endpoint} {L L' : LocalType} {G' : GEnv} :
@@ -629,11 +786,11 @@ private lemma TypedStep_preserves_frames
       | seq hP hQ =>
           refine ⟨Gmid, ?_⟩
           simpa [List.append_assoc, hGfull]
-  | par_left splitFull hSlen' hGlen' hStepP hDisjGfull hDisjD hDisjSfull ih =>
+  | par_left splitFull hSlen' hStepP hDisjGfull hDisjD hDisjSfull ih =>
       rename_i Ssh Sown store bufs store' bufs' P P' Q Gfull D₁ D₂ G₁' D₁' S₁' nS nG
       cases hOut with
-      | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-          hDisjW hDisjΔ hS1 hS2 hP hQ =>
+      | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+          hDisjW hDisjΔ hP hQ =>
           rename_i S1out S2out S1out' S2out' G1out G2out W1out W2out Δ1out Δ2out
           have hSeq : splitFull.S1 ++ splitFull.S2 = split.S1 ++ split.S2 := by
             rw [← splitFull.hS, ← split.hS]
@@ -711,7 +868,7 @@ private lemma TypedStep_preserves_frames
           have hP' :
               HasTypeProcPreOut Ssh { right := Sown.right ++ splitFull.S2, left := splitFull.S1 } split.G1 P
                 { right := Sown.right ++ splitFull.S2, left := S1out' } G1out W1out Δ1out := by
-            simpa [hS1, hS2, hS1Eq, hS2Eq] using hP
+            simpa [hS1Eq, hS2Eq] using hP
           have hStepP' :
               TypedStep (Gleft ++ split.G1 ++ (split.G2 ++ Gright))
                 (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S2, left := split.S1 }
@@ -744,11 +901,11 @@ private lemma TypedStep_preserves_frames
             ⟨Gmid', hShape⟩
           refine ⟨Gmid' ++ split.G2, ?_⟩
           simp [hShape, List.append_assoc]
-  | par_right splitFull hSlen' hGlen' hStepQ hDisjGfull hDisjD hDisjSfull ih =>
+  | par_right splitFull hSlen' hStepQ hDisjGfull hDisjD hDisjSfull ih =>
       rename_i Ssh Sown store bufs store' bufs' P Q Q' Gfull D₁ D₂ G₂' D₂' S₂' nS nG
       cases hOut with
-      | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-          hDisjW hDisjΔ hS1 hS2 hP hQ =>
+      | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+          hDisjW hDisjΔ hP hQ =>
           rename_i S1out S2out S1out' S2out' G1out G2out W1out W2out Δ1out Δ2out
           have hSeq : splitFull.S1 ++ splitFull.S2 = split.S1 ++ split.S2 := by
             rw [← splitFull.hS, ← split.hS]
@@ -818,7 +975,7 @@ private lemma TypedStep_preserves_frames
           have hQ' :
               HasTypeProcPreOut Ssh { right := Sown.right ++ splitFull.S1, left := splitFull.S2 } split.G2 Q
                 { right := Sown.right ++ splitFull.S1, left := S2out' } G2out W2out Δ2out := by
-            simpa [hS1, hS2, hS1Eq, hS2Eq] using hQ
+            simpa [hS1Eq, hS2Eq] using hQ
           have hStepQ' :
               TypedStep ((Gleft ++ split.G1) ++ split.G2 ++ Gright)
                 (D₁ ++ D₂) Ssh { right := Sown.right ++ split.S1, left := split.S2 }
@@ -854,13 +1011,13 @@ private lemma TypedStep_preserves_frames
   | par_skip_left =>
       rename_i Gfull D Ssh Sown store bufs Q nS nG
       cases hOut with
-      | par _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+      | par _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
           refine ⟨Gmid, ?_⟩
           simpa [List.append_assoc] using hGfull
   | par_skip_right =>
       rename_i Gfull D Ssh Sown store bufs P nS nG
       cases hOut with
-      | par _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+      | par _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
           refine ⟨Gmid, ?_⟩
           simpa [List.append_assoc] using hGfull
 
@@ -900,7 +1057,7 @@ private lemma progress_recv
     BlockedProc store bufs (.recv k x) := by
   intro hOut hStore hDisjShAll hOwnDisj hBufs hHead hComplete
   cases hOut with
-  | recv_new hk hG hNoSh hNoRight hNoOwnL =>
+  | recv_new hk hG hNoSh hNoOwnL =>
       rename_i e p T L
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
       have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
@@ -941,7 +1098,7 @@ private lemma progress_recv
               have hTraceHead : (lookupD D recvEdge).head? = some T := by
                 simp [hTrace, hEq]
               exact ⟨_, _, _, _, _, _, TypedStep.recv hkStr hG rfl hBuf hv hTraceHead rfl rfl rfl rfl rfl⟩
-  | recv_old hk hG hNoSh hNoRight hOwn =>
+  | recv_old hk hG hNoSh hOwn =>
       rename_i e p T L T'
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
       have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
@@ -1017,7 +1174,7 @@ private lemma progress_branch
     BlockedProc store bufs (.branch k procs) := by
   intro hOut hStore hDisjShAll hOwnDisj hBufs hHead hValid hComplete
   cases hOut with
-  | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom =>
+  | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight =>
       rename_i e p bs
       obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_visible_lookup hStore hDisjShAll hOwnDisj hk
       have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
@@ -1102,9 +1259,9 @@ private lemma progress_assign
       G' D' Sown' store' bufs' P' := by
   intro hOut
   cases hOut with
-  | assign_new hNoSh hNoRight hNoOwnL hv =>
+  | assign_new hNoSh hNoOwnL hv =>
       exact ⟨_, _, _, _, _, _, TypedStep.assign hv rfl rfl⟩
-  | assign_old hNoSh hNoRight hOwn hv =>
+  | assign_old hNoSh hOwn hv =>
       exact ⟨_, _, _, _, _, _, TypedStep.assign hv rfl rfl⟩
 
 private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
@@ -1112,6 +1269,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
     StoreTypedStrong G (SEnvAll Ssh Sown) store →
     DisjointS Ssh (Sown : SEnv) →
     OwnedDisjoint Sown →
+    DisjointS Sown.right Sfin.left →
     BuffersTyped G D bufs →
     Coherent G D →
     HeadCoherent G D →
@@ -1124,7 +1282,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
       (∃ G' D' Sown' store' bufs' P', TypedStep G D Ssh Sown store bufs P
         G' D' Sown' store' bufs' P') ∨
       BlockedProc store bufs P := by
-  intro hOut hStore hDisjShAll hOwnDisj hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
+  intro hOut hStore hDisjShAll hOwnDisj hDisjRightFin hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
   cases P with
   | skip =>
       left; rfl
@@ -1151,8 +1309,11 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
   | seq P Q =>
       cases hOut with
       | seq hP hQ =>
+          have hDomQ := HasTypeProcPreOut_domsubset hQ
+          have hDisjRightMid := DisjointS_of_domsubset_right hDomQ hDisjRightFin
           have hProgP :=
-            progress_typed_aux hP hStore hDisjShAll hOwnDisj hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
+            progress_typed_aux hP hStore hDisjShAll hOwnDisj hDisjRightMid
+              hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
           cases hProgP with
           | inl hSkip =>
               right; left
@@ -1169,10 +1330,9 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                   simpa [BlockedProc] using hBlocked
   | par nS nG P Q =>
       cases hOut with
-      | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-          hDisjW hDisjΔ hS1 hS2 hP hQ =>
-          cases hS1
-          cases hS2
+      | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+          hDisjW hDisjΔ hP hQ =>
+          rename_i S₁_fin S₂_fin G₁_fin G₂_fin W₁_fin W₂_fin Δ₁_fin Δ₂_fin
           -- Store typing for left and right processes.
           have hStoreBase :
               StoreTypedStrong G (SEnvAll (Ssh ++ Sown.right) ((split.S1 ++ split.S2) ++ (∅ : SEnv))) store := by
@@ -1203,6 +1363,14 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           have hOwnR :
               OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
             OwnedDisjoint_sub_right (Sown:=Sown) (split:=split) hOwnDisj hDisjS
+          have hDisjRightFin' : DisjointS Sown.right (S₁_fin ++ S₂_fin) := by
+            simpa [hSfin] using hDisjRightFin
+          have hDisjRightS1' : DisjointS Sown.right S₁_fin := DisjointS_split_left hDisjRightFin'
+          have hDisjRightS2' : DisjointS Sown.right S₂_fin := DisjointS_split_right hDisjRightFin'
+          have hDisjOutP : DisjointS (Sown.right ++ split.S2) S₁_fin :=
+            DisjointS_append_left hDisjRightS1' (DisjointS_symm hDisjS_left)
+          have hDisjOutQ : DisjointS (Sown.right ++ split.S1) S₂_fin :=
+            DisjointS_append_left hDisjRightS2' hDisjS_right
 
           -- Frame pre-out typing to full G.
           have hP_full :=
@@ -1212,12 +1380,13 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
           have hQ_full :=
             HasTypeProcPreOut_frame_G_left (Ssh:=Ssh)
               (Sown:={ right := Sown.right ++ split.S1, left := split.S2 })
-              (Gfr:=split.G1) (G:=split.G2) hDisjG hQ
+              (Gfr:=split.G1) (G:=split.G2) hDisjG hOwnR hQ hDisjOutQ
           simp only [← split.hG] at hP_full hQ_full
 
           -- Progress on left process.
           have hProgP :=
-            progress_typed_aux hP_full hStoreL hDisjShL hOwnL hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
+            progress_typed_aux hP_full hStoreL hDisjShL hOwnL hDisjOutP
+              hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
           cases hProgP with
           | inl hSkipP =>
               right; left
@@ -1240,6 +1409,9 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                   rcases hGshape with ⟨G₁', hGshape⟩
                   have hRightEq : S'.right = Sown.right ++ split.S2 :=
                     TypedStep_preserves_right hStep hP_full
+                      (by
+                        intro x T hLookup
+                        exact ⟨T, by simpa using hLookup⟩)
                   have hStep' :
                       TypedStep G (D ++ (∅ : DEnv)) Ssh { right := Sown.right ++ split.S2, left := split.S1 }
                         store bufs P
@@ -1256,15 +1428,16 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                   right; left
                   refine ⟨G₁' ++ split.G2, D' ++ (∅ : DEnv),
                       { right := Sown.right, left := S'.left ++ split.S2 },
-                      store', bufs', .par S'.left.length G₁'.length P' Q, ?_⟩
+                      store', bufs', .par S'.left.length nG P' Q, ?_⟩
                   simpa [List.append_assoc, DEnv_append_empty_right] using
                     (TypedStep.par_left (split:=split) (D₁:=D) (D₂:=∅) (G₁':=G₁') (D₁':=D') (S₁':=S'.left)
                       (P:=P) (Q:=Q)
-                      hSlen hGlen hStep' hDisjG (DisjointD_right_empty D) hDisjS)
+                      hSlen hStep' hDisjG (DisjointD_right_empty D) hDisjS)
               | inr hBlockedP =>
                   -- Progress on right process.
                   have hProgQ :=
-                    progress_typed_aux hQ_full hStoreR hDisjShR hOwnR hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
+                    progress_typed_aux hQ_full hStoreR hDisjShR hOwnR hDisjOutQ
+                      hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
                   cases hProgQ with
                   | inl hSkipQ =>
                       right; left
@@ -1287,6 +1460,9 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                           rcases hGshape with ⟨G₂', hGshape⟩
                           have hRightEq : S'.right = Sown.right ++ split.S1 :=
                             TypedStep_preserves_right hStep hQ_full
+                              (by
+                                intro x T hLookup
+                                exact ⟨T, by simpa using hLookup⟩)
                           have hStep' :
                               TypedStep G ((∅ : DEnv) ++ D) Ssh { right := Sown.right ++ split.S1, left := split.S2 }
                                 store bufs Q
@@ -1303,11 +1479,11 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                           right; left
                           refine ⟨split.G1 ++ G₂', (∅ : DEnv) ++ D',
                               { right := Sown.right, left := split.S1 ++ S'.left },
-                              store', bufs', .par split.S1.length split.G1.length P Q', ?_⟩
+                              store', bufs', .par split.S1.length nG P Q', ?_⟩
                           simpa [List.append_assoc, DEnv_append_empty_left] using
                             (TypedStep.par_right (split:=split) (D₁:=∅) (D₂:=D) (G₂':=G₂') (D₂':=D') (S₂':=S'.left)
                               (P:=P) (Q:=Q)
-                              hSlen hGlen hStep' hDisjG (DisjointD_left_empty D) hDisjS)
+                              hSlen hStep' hDisjG (DisjointD_left_empty D) hDisjS)
                       | inr hBlockedQ =>
                           right; right
                           exact And.intro (by simpa using hBlockedP) (by simpa using hBlockedQ)
@@ -1335,10 +1511,11 @@ theorem progress_typed {G D Ssh Sown store bufs P} :
   rcases hWF with ⟨hWF, hComplete⟩
   unfold LocalTypeR.WellFormed at hWF
   obtain ⟨hStore, hBufs, hCoh, hHead, hValid, hCompat, hDisjS, hCons, hDCons, hPreOut⟩ := hWF
-  obtain ⟨Sfin, Gfin, Wfin, Δfin, hOut⟩ := hPreOut
+  obtain ⟨Sfin, Gfin, Wfin, Δfin, hOut, hDisjRightFin⟩ := hPreOut
   have hReady : SendReady G D := Compatible_to_SendReady hCompat
   have hSelectReady : SelectReady G D := Compatible_to_SelectReady hCompat
-  exact progress_typed_aux hOut hStore hDisjS hCons hBufs hCoh hHead hValid hComplete hReady hSelectReady hDCons
+  exact progress_typed_aux hOut hStore hDisjS hCons hDisjRightFin
+    hBufs hCoh hHead hValid hComplete hReady hSelectReady hDCons
 
 /-! ### Convenience Wrapper -/
 

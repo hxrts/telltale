@@ -1,4 +1,4 @@
-import Runtime.VM.CompileLocalTypeR
+import Runtime.VM.Model.CompileLocalTypeR
 
 /-!
 # CompileLocalTypeR Correctness Stubs
@@ -27,7 +27,7 @@ private theorem ensureTerminal_nonempty {γ ε : Type u} [GuardLayer γ] [Effect
 private theorem ensureTerminal_last_halt_or_jmp {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (code : List (Instr γ ε)) :
     let code' := ensureTerminal (γ:=γ) (ε:=ε) code
-    code'.getLast? = some .halt ∨ ∃ pc, code'.getLast? = some (.jmp pc) := by
+    code'.getLast? = some .halt ∨ ∃ pc, code'.getLast? = some (.jump pc) := by
   cases h : code.getLast? <;> simp [h, ensureTerminal]
   case some instr =>
     cases instr <;> simp [h]
@@ -45,7 +45,7 @@ theorem compile_ends_halt_or_jmp {γ ε : Type u} [GuardLayer γ] [EffectRuntime
     [Inhabited (EffectRuntime.EffectAction ε)]
     (lt : LocalTypeR) :
     let code := compileLocalTypeR (γ:=γ) (ε:=ε) lt
-    code.getLast? = some .halt ∨ ∃ pc, code.getLast? = some (.jmp pc) := by
+    code.getLast? = some .halt ∨ ∃ pc, code.getLast? = some (.jump pc) := by
   classical
   simpa [compileLocalTypeR] using
     (ensureTerminal_last_halt_or_jmp (γ:=γ) (ε:=ε)

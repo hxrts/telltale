@@ -1,5 +1,5 @@
 import Protocol.Classical.Instantiation
-import Classical.SpectralGapTermination
+import Classical.Families.SpectralGapTermination
 
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false

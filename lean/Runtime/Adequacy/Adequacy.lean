@@ -1,7 +1,7 @@
 import Runtime.ProgramLogic.LanguageInstance
-import Runtime.VM.Program
-import Runtime.VM.State
-import Runtime.VM.Violation
+import Runtime.VM.Model.Program
+import Runtime.VM.Model.State
+import Runtime.VM.Model.Violation
 import Runtime.ProgramLogic.SessionWP
 import Runtime.IrisBridge
 

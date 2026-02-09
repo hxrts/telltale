@@ -1,4 +1,4 @@
-import Runtime.VM.TypeClasses
+import Runtime.VM.Model.TypeClasses
 import Runtime.IrisBridge
 
 /-!

@@ -1,12 +1,12 @@
-import Runtime.VM.Program
-import Runtime.VM.Exec
-import Runtime.VM.ExecHelpers
-import Runtime.VM.UnitModel
-import Runtime.VM.Monitor
+import Runtime.VM.Model.Program
+import Runtime.VM.Semantics.Exec
+import Runtime.VM.Semantics.ExecHelpers
+import Runtime.VM.Model.UnitModel
+import Runtime.VM.Runtime.Monitor
 
 /-
 The Problem. Provide a concrete, runnable VM example that exercises
-session opening, send/recv, and offer/choose in a single coroutine.
+session opening, send/receive, and offer/choose in a single coroutine.
 
 Solution Structure. Define a tiny two-role protocol, instantiate a
 computable test model, and assemble a minimal VM state for tests.
@@ -50,9 +50,9 @@ def exampleDsts : List (Role × Reg) :=
 def exampleCode : List (Instr UnitGuard UnitEffect) :=
   -- Bytecode for a single coroutine running both endpoints.
   [ Instr.open exampleRoles exampleLocalTypes (exampleHandlers 0) exampleDsts
-  , Instr.loadImm 2 (.nat 7)
+  , Instr.set 2 (.nat 7)
   , Instr.send 0 2
-  , Instr.recv 1 3
+  , Instr.receive 1 3
   , Instr.offer 0 "ok"
   , Instr.choose 1 [("ok", 6)]
   , Instr.halt

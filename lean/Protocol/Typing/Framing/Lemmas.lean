@@ -669,8 +669,8 @@ theorem SessionsOf_subset_of_HasTypeProcPreOut
   | seq hP hQ ihP ihQ =>
       intro s hs
       exact ihP (ihQ hs)
-  | par split hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
-      hDisjW hDisjΔ hS1 hS2 hP hQ ihP ihQ =>
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ ihP ihQ =>
       intro s hs
       cases hGfin
       have hs' := SessionsOf_append_subset hs
@@ -825,7 +825,7 @@ private theorem frame_left_recv_new
   have hLeft : lookupSEnv S₂ x = none := hSown
   simpa [OwnedEnv.updateLeft, hErase, hUpdG] using
     (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:={ right := S₁, left := S₂ })
-      (G:=G₁ ++ G₂) hk' hG' hSsh hRight hLeft)
+      (G:=G₁ ++ G₂) hk' hG' hSsh hLeft)
 
 /-- Left framing for recv_old. -/
 private theorem frame_left_recv_old
@@ -854,7 +854,7 @@ private theorem frame_left_recv_old
   have hLeft : lookupSEnv S₂ x = some T' := hSown
   simpa [OwnedEnv.updateLeft, hErase, hUpdG] using
     (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:={ right := S₁, left := S₂ })
-      (G:=G₁ ++ G₂) hk' hG' hSsh hRight hLeft)
+      (G:=G₁ ++ G₂) hk' hG' hSsh hLeft)
 
 /-- Left framing for select. -/
 private theorem frame_left_select
@@ -970,7 +970,7 @@ private theorem frame_left_branch
         exact SessionsOf_append_left (G₂:=G₂) hsL
     | inr hsR =>
         exact SessionsOf_append_right (G₁:=G₁) (hSess hsR)
-  exact HasTypeProcPreOut.branch hk' hG' hLen hLbl hProcs' hOut' hSess' hDom
+  exact HasTypeProcPreOut.branch hk' hG' hLen hLbl hProcs' hOut' hSess' hDom rfl
 
 /-- Left framing for assign_new. -/
 private theorem frame_left_assign_new
@@ -993,7 +993,7 @@ private theorem frame_left_assign_new
   have hLeft : lookupSEnv S₂ x = none := hSown
   simpa [OwnedEnv.updateLeft, hErase] using
     (HasTypeProcPreOut.assign_new (Ssh:=Ssh) (Sown:={ right := S₁, left := S₂ })
-      (G:=G₁ ++ G₂) hSsh hRight hLeft hv')
+      (G:=G₁ ++ G₂) hSsh hLeft hv')
 
 /-- Left framing for assign_old. -/
 private theorem frame_left_assign_old
@@ -1014,13 +1014,194 @@ private theorem frame_left_assign_old
   have hLeft : lookupSEnv S₂ x = some T' := hSown
   simpa [OwnedEnv.updateLeft, hErase] using
     (HasTypeProcPreOut.assign_old (Ssh:=Ssh) (Sown:={ right := S₁, left := S₂ })
-      (G:=G₁ ++ G₂) hSsh hRight hLeft hv')
+      (G:=G₁ ++ G₂) hSsh hLeft hv')
+
+private theorem HasTypeProcPreOut_reframe_right_general
+    {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {P : Process}
+    {Sfin : OwnedEnv} {G' : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    HasTypeProcPreOut Ssh Sown G P Sfin G' W Δ →
+    ∀ {R' : SEnv},
+      DisjointS R' Sown.left →
+      DisjointS R' Sfin.left →
+      HasTypeProcPreOut Ssh { right := R', left := Sown.left } G P
+        { right := R', left := Sfin.left } G' W Δ := by
+  intro h
+  induction h with
+  | skip =>
+      intro R' hDisjIn hDisjOut
+      exact HasTypeProcPreOut.skip
+  | send hk hG hx =>
+      rename_i Sown G k x e q T L
+      intro R' hDisjIn hDisjOut
+      have hk' :
+          lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) k =
+            some (.chan e.sid e.role) := by
+        simpa [SEnvVisible] using hk
+      have hx' :
+          lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) x = some T := by
+        simpa [SEnvVisible] using hx
+      exact HasTypeProcPreOut.send hk' hG hx'
+  | recv_new hk hG hNoSh hNoOwnL =>
+      rename_i Sown G k x e p T L
+      intro R' hDisjIn hDisjOut
+      have hk' :
+          lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) k =
+            some (.chan e.sid e.role) := by
+        simpa [SEnvVisible] using hk
+      have hDisjOut' : DisjointS R' (updateSEnv Sown.left x T) := by
+        simpa [OwnedEnv.updateLeft] using hDisjOut
+      have hxOut : lookupSEnv (updateSEnv Sown.left x T) x = some T := by
+        simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
+      have hNoOwnR' : lookupSEnv R' x = none :=
+        lookupSEnv_none_of_disjoint_left hDisjOut' hxOut
+      have hErase : eraseSEnv R' x = R' := eraseSEnv_of_lookup_none hNoOwnR'
+      simpa [OwnedEnv.updateLeft, hErase] using
+        (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:={ right := R', left := Sown.left })
+          (G:=G) hk' hG hNoSh hNoOwnL)
+  | recv_old hk hG hNoSh hOwn =>
+      rename_i Sown G k x e p T L T'
+      intro R' hDisjIn hDisjOut
+      have hk' :
+          lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) k =
+            some (.chan e.sid e.role) := by
+        simpa [SEnvVisible] using hk
+      have hDisjOut' : DisjointS R' (updateSEnv Sown.left x T) := by
+        simpa [OwnedEnv.updateLeft] using hDisjOut
+      have hxOut : lookupSEnv (updateSEnv Sown.left x T) x = some T := by
+        simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
+      have hNoOwnR' : lookupSEnv R' x = none :=
+        lookupSEnv_none_of_disjoint_left hDisjOut' hxOut
+      have hErase : eraseSEnv R' x = R' := eraseSEnv_of_lookup_none hNoOwnR'
+      simpa [OwnedEnv.updateLeft, hErase] using
+        (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:={ right := R', left := Sown.left })
+          (G:=G) hk' hG hNoSh hOwn)
+  | select hk hG hFind =>
+      rename_i Sown G k l e q bs L
+      intro R' hDisjIn hDisjOut
+      have hk' :
+          lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) k =
+            some (.chan e.sid e.role) := by
+        simpa [SEnvVisible] using hk
+      exact HasTypeProcPreOut.select hk' hG hFind
+  | branch hk hG hLen hLbl hPre hOutLbl hSess hDom hRight ihOutLbl =>
+      rename_i Sown G k procs e p bs S' G' W Δ
+      intro R' hDisjIn hDisjOut
+      have hk' :
+          lookupSEnv (SEnvVisible Ssh { right := R', left := Sown.left }) k =
+            some (.chan e.sid e.role) := by
+        simpa [SEnvVisible] using hk
+      have hOutLbl' :
+          ∀ lbl P Lx,
+            procs.find? (fun b => b.1 == lbl) = some (lbl, P) →
+            bs.find? (fun b => b.1 == lbl) = some (lbl, Lx) →
+            HasTypeProcPreOut Ssh { right := R', left := Sown.left } (updateG G e Lx) P
+              { right := R', left := S'.left } G' W Δ := by
+        intro lbl P Lx hFindP hFindB
+        exact ihOutLbl lbl P Lx hFindP hFindB (R':=R') hDisjIn hDisjOut
+      have hPre' :
+          ∀ j (hj : j < bs.length) (hjp : j < procs.length),
+            HasTypeProcPre Ssh { right := R', left := Sown.left }
+              (updateG G e (bs.get ⟨j, hj⟩).2)
+              (procs.get ⟨j, hjp⟩).2 := by
+        intro j hj hjp
+        exact HasTypeProcPre_reframe_right
+          (Sown:=Sown) (Sown':={ right := R', left := Sown.left }) rfl
+          (hPre j hj hjp)
+      exact HasTypeProcPreOut.branch hk' hG hLen hLbl hPre' hOutLbl' hSess hDom rfl
+  | seq hP hQ ihP ihQ =>
+      rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
+      intro R' hDisjIn hDisjOut
+      have hDomQ : SEnvDomSubset S₁.left S₂.left := HasTypeProcPreOut_domsubset hQ
+      have hDisjMid : DisjointS R' S₁.left :=
+        DisjointS_of_domsubset_right hDomQ hDisjOut
+      exact HasTypeProcPreOut.seq
+        (ihP (R':=R') hDisjIn hDisjMid)
+        (ihQ (R':=R') hDisjMid hDisjOut)
+  | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
+      hDisjW hDisjΔ hP hQ ihP ihQ =>
+      rename_i Sown G P Q Sfin Gfin Wfin Δfin S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
+      intro R' hDisjIn hDisjOut
+      have hDisjInSplit : DisjointS R' (split.S1 ++ split.S2) := by
+        simpa [split.hS] using hDisjIn
+      have hDisjIn1 : DisjointS R' split.S1 := DisjointS_of_append_left hDisjInSplit
+      have hDisjIn2 : DisjointS R' split.S2 := DisjointS_of_append_right hDisjInSplit
+      have hDisjOutSplit : DisjointS R' (S₁' ++ S₂') := by
+        simpa [hSfin] using hDisjOut
+      have hDisjOut1 : DisjointS R' S₁' := DisjointS_of_append_left hDisjOutSplit
+      have hDisjOut2 : DisjointS R' S₂' := DisjointS_of_append_right hDisjOutSplit
+      have hDisjInP : DisjointS (R' ++ split.S2) split.S1 :=
+        DisjointS_append_left hDisjIn1 (DisjointS_symm hDisjS)
+      have hDisjOutP : DisjointS (R' ++ split.S2) S₁' :=
+        DisjointS_append_left hDisjOut1 (DisjointS_symm hDisjS_left)
+      have hDisjInQ : DisjointS (R' ++ split.S1) split.S2 :=
+        DisjointS_append_left hDisjIn2 hDisjS
+      have hDisjOutQ : DisjointS (R' ++ split.S1) S₂' :=
+        DisjointS_append_left hDisjOut2 hDisjS_right
+      have hP' :
+          HasTypeProcPreOut Ssh { right := R' ++ split.S2, left := split.S1 } split.G1 P
+            { right := R' ++ split.S2, left := S₁' } G₁' W₁ Δ₁ :=
+        ihP (R':=R' ++ split.S2) hDisjInP hDisjOutP
+      have hQ' :
+          HasTypeProcPreOut Ssh { right := R' ++ split.S1, left := split.S2 } split.G2 Q
+            { right := R' ++ split.S1, left := S₂' } G₂' W₂ Δ₂ :=
+        ihQ (R':=R' ++ split.S1) hDisjInQ hDisjOutQ
+      have hPar' :
+          HasTypeProcPreOut Ssh { right := R', left := Sown.left } G (.par nS nG P Q)
+            { right := R', left := S₁' ++ S₂' } (G₁' ++ G₂') (W₁ ++ W₂) (Δ₁ ++ Δ₂) :=
+        HasTypeProcPreOut.par split hSlen rfl rfl rfl rfl
+          hDisjG hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP' hQ'
+      simpa [hSfin, hGfin, hW, hΔ] using hPar'
+  | assign_new hNoSh hNoOwnL hv =>
+      rename_i Sown G x v T
+      intro R' hDisjIn hDisjOut
+      have hDisjOut' : DisjointS R' (updateSEnv Sown.left x T) := by
+        simpa [OwnedEnv.updateLeft] using hDisjOut
+      have hxOut : lookupSEnv (updateSEnv Sown.left x T) x = some T := by
+        simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
+      have hNoOwnR' : lookupSEnv R' x = none :=
+        lookupSEnv_none_of_disjoint_left hDisjOut' hxOut
+      have hErase : eraseSEnv R' x = R' := eraseSEnv_of_lookup_none hNoOwnR'
+      have hNoOwnL' : lookupSEnv ({ right := R', left := Sown.left } : OwnedEnv).left x = none := by
+        simpa using hNoOwnL
+      simpa [OwnedEnv.updateLeft, hErase] using
+        (HasTypeProcPreOut.assign_new (Ssh:=Ssh) (Sown:={ right := R', left := Sown.left })
+          (G:=G) hNoSh hNoOwnL' hv)
+  | assign_old hNoSh hOwn hv =>
+      rename_i Sown G x v T T'
+      intro R' hDisjIn hDisjOut
+      have hDisjOut' : DisjointS R' (updateSEnv Sown.left x T) := by
+        simpa [OwnedEnv.updateLeft] using hDisjOut
+      have hxOut : lookupSEnv (updateSEnv Sown.left x T) x = some T := by
+        simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
+      have hNoOwnR' : lookupSEnv R' x = none :=
+        lookupSEnv_none_of_disjoint_left hDisjOut' hxOut
+      have hErase : eraseSEnv R' x = R' := eraseSEnv_of_lookup_none hNoOwnR'
+      have hOwn' : lookupSEnv ({ right := R', left := Sown.left } : OwnedEnv).left x = some T' := by
+        simpa using hOwn
+      simpa [OwnedEnv.updateLeft, hErase] using
+        (HasTypeProcPreOut.assign_old (Ssh:=Ssh) (Sown:={ right := R', left := Sown.left })
+          (G:=G) hNoSh hOwn' hv)
+
+theorem HasTypeProcPreOut_reframe_right
+    {Ssh R R' L : SEnv} {G : GEnv} {P : Process}
+    {L' : SEnv} {G' : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    DisjointS R' L →
+    DisjointS R' L' →
+    HasTypeProcPreOut Ssh { right := R, left := L } G P { right := R, left := L' } G' W Δ →
+    HasTypeProcPreOut Ssh { right := R', left := L } G P { right := R', left := L' } G' W Δ := by
+  intro hDisjIn hDisjOut h
+  simpa using
+    (HasTypeProcPreOut_reframe_right_general
+      (Ssh:=Ssh) (Sown:={ right := R, left := L }) (G:=G) (P:=P)
+      (Sfin:={ right := R, left := L' }) (G':=G') (W:=W) (Δ:=Δ)
+      h (R':=R') hDisjIn hDisjOut)
 
 /-- Left framing for par: frame only the left component. -/
-axiom frame_left_par
+theorem frame_left_par
     {Ssh S₁ S₂ : SEnv} {G₁ G₂ : GEnv} {P Q : Process} {nS nG : Nat}
     {Sfin Gfin Wfin Δfin S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂}
     (split : ParSplit S₂ G₂)
+    (hSlen : split.S1.length = nS)
     (hSfin : Sfin = S₁' ++ S₂')
     (hGfin : Gfin = G₁' ++ G₂')
     (hW : Wfin = W₁ ++ W₂)
@@ -1040,33 +1221,86 @@ axiom frame_left_par
       HasTypeProcPreOut Ssh { right := S₁, left := split.S1 } (G₁ ++ split.G1) P
         { right := S₁, left := S₁' } (G₁ ++ G₁') W₁ Δ₁) :
     HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (G₁ ++ G₂) (.par nS nG P Q)
-      { right := S₁, left := Sfin } (G₁ ++ Gfin) Wfin Δfin
-
-
-
-axiom HasTypeProcPreOut_par_skip_left
-    {Ssh Sown G Q Sfin Gfin Wfin Δfin nS nG} :
-    HasTypeProcPreOut Ssh Sown G (.par nS nG .skip Q) Sfin Gfin Wfin Δfin →
-    HasTypeProcPreOut Ssh Sown G Q Sfin Gfin Wfin Δfin
-
-axiom HasTypeProcPreOut_par_skip_right
-    {Ssh Sown G P Sfin Gfin Wfin Δfin nS nG} :
-    HasTypeProcPreOut Ssh Sown G (.par nS nG P .skip) Sfin Gfin Wfin Δfin →
-    HasTypeProcPreOut Ssh Sown G P Sfin Gfin Wfin Δfin
-
-axiom HasTypeProcPreOut_reframe_right
-    {Ssh R R' L : SEnv} {G : GEnv} {P : Process}
-    {L' : SEnv} {G' : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
-    HasTypeProcPreOut Ssh { right := R, left := L } G P { right := R, left := L' } G' W Δ →
-    HasTypeProcPreOut Ssh { right := R', left := L } G P { right := R', left := L' } G' W Δ
+      { right := S₁, left := Sfin } (G₁ ++ Gfin) Wfin Δfin := by
+  have hSubSplit1 : SEnvDomSubset split.S1 S₂ := by
+    simpa [split.hS] using (SEnvDomSubset_append_left (S₁:=split.S1) (S₂:=split.S2))
+  have hSubSplit2 : SEnvDomSubset split.S2 S₂ := by
+    simpa [split.hS] using (SEnvDomSubset_append_right (S₁:=split.S1) (S₂:=split.S2))
+  have hSubSfin1 : SEnvDomSubset S₁' Sfin := by
+    simpa [hSfin] using (SEnvDomSubset_append_left (S₁:=S₁') (S₂:=S₂'))
+  have hSubSfin2 : SEnvDomSubset S₂' Sfin := by
+    simpa [hSfin] using (SEnvDomSubset_append_right (S₁:=S₁') (S₂:=S₂'))
+  have hDisjS_frame_1 : DisjointS S₁ split.S1 :=
+    DisjointS_of_domsubset_right hSubSplit1 hDisjS_frame
+  have hDisjS_frame_2 : DisjointS S₁ split.S2 :=
+    DisjointS_of_domsubset_right hSubSplit2 hDisjS_frame
+  have hDisjS_frame_1' : DisjointS S₁ S₁' :=
+    DisjointS_of_domsubset_right hSubSfin1 hDisjS_frame'
+  have hDisjS_frame_2' : DisjointS S₁ S₂' :=
+    DisjointS_of_domsubset_right hSubSfin2 hDisjS_frame'
+  have hSubG1 : SessionsOf split.G1 ⊆ SessionsOf G₂ := by
+    simpa [split.hG] using (SessionsOf_append_left (G₁:=split.G1) (G₂:=split.G2))
+  have hSubG2 : SessionsOf split.G2 ⊆ SessionsOf G₂ := by
+    simpa [split.hG] using (SessionsOf_append_right (G₁:=split.G1) (G₂:=split.G2))
+  have hDisjGsym : DisjointG G₂ G₁ := DisjointG_symm hDisjG_frame
+  have hDisjG_frame_1 : DisjointG G₁ split.G1 := by
+    exact DisjointG_symm (DisjointG_of_subset_left hSubG1 hDisjGsym)
+  have hDisjG_frame_2 : DisjointG G₁ split.G2 := by
+    exact DisjointG_symm (DisjointG_of_subset_left hSubG2 hDisjGsym)
+  have hP0 :
+      HasTypeProcPreOut Ssh { right := S₁, left := split.S1 } (G₁ ++ split.G1) P
+        { right := S₁, left := S₁' } (G₁ ++ G₁') W₁ Δ₁ :=
+    ihP hDisjS_frame_1 hDisjS_frame_1' hDisjG_frame_1
+  have hDisjInP : DisjointS (S₁ ++ split.S2) split.S1 :=
+    DisjointS_append_left hDisjS_frame_1 (DisjointS_symm hDisjS)
+  have hDisjOutP : DisjointS (S₁ ++ split.S2) S₁' :=
+    DisjointS_append_left hDisjS_frame_1' (DisjointS_symm hDisjS_left)
+  have hP :
+      HasTypeProcPreOut Ssh { right := S₁ ++ split.S2, left := split.S1 } (G₁ ++ split.G1) P
+        { right := S₁ ++ split.S2, left := S₁' } (G₁ ++ G₁') W₁ Δ₁ :=
+    HasTypeProcPreOut_reframe_right
+      (R:=S₁) (R':=S₁ ++ split.S2) (L:=split.S1) (L':=S₁')
+      (G:=G₁ ++ split.G1) (P:=P) hDisjInP hDisjOutP hP0
+  have hQ0 :
+      HasTypeProcPreOut Ssh { right := (∅ : SEnv), left := split.S2 } split.G2 Q
+        { right := (∅ : SEnv), left := S₂' } G₂' W₂ Δ₂ := by
+    simpa using hQ
+  have hDisjInQ : DisjointS (S₁ ++ split.S1) split.S2 :=
+    DisjointS_append_left hDisjS_frame_2 hDisjS
+  have hDisjOutQ : DisjointS (S₁ ++ split.S1) S₂' :=
+    DisjointS_append_left hDisjS_frame_2' hDisjS_right
+  have hQ' :
+      HasTypeProcPreOut Ssh { right := S₁ ++ split.S1, left := split.S2 } split.G2 Q
+        { right := S₁ ++ split.S1, left := S₂' } G₂' W₂ Δ₂ :=
+    HasTypeProcPreOut_reframe_right
+      (R:=(∅ : SEnv)) (R':=S₁ ++ split.S1) (L:=split.S2) (L':=S₂')
+      (G:=split.G2) (P:=Q) hDisjInQ hDisjOutQ hQ0
+  have hDisjG_out : DisjointG (G₁ ++ split.G1) split.G2 :=
+    DisjointG_append_left hDisjG_frame_2 hDisjG
+  let splitOut : ParSplit S₂ (G₁ ++ G₂) :=
+    { S1 := split.S1
+      S2 := split.S2
+      G1 := G₁ ++ split.G1
+      G2 := split.G2
+      hS := split.hS
+      hG := by simpa [List.append_assoc, split.hG] }
+  have hPar :
+      HasTypeProcPreOut Ssh { right := S₁, left := S₂ } (G₁ ++ G₂) (.par nS nG P Q)
+        { right := S₁, left := S₁' ++ S₂' } ((G₁ ++ G₁') ++ G₂') (W₁ ++ W₂) (Δ₁ ++ Δ₂) :=
+    HasTypeProcPreOut.par splitOut hSlen rfl rfl rfl rfl
+      hDisjG_out hDisjS hDisjS_left hDisjS_right hDisjS' hDisjW hDisjΔ hP hQ'
+  simpa [hSfin, hGfin, hW, hΔ, List.append_assoc] using hPar
 
 /-!
   Full-G step rule: preserve pre-out typing when stepping in the middle of a G-frame.
-  This is used to align par-splits under left/right framing.
+  This is kept as an explicit proposition so downstream proofs can thread it
+  as a hypothesis while the constructive proof is being migrated.
 -/
-axiom HasTypeProcPreOut_preserved_sub_middle_frame
-    {Gstore Gleft Gmid Gright G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
+def HasTypeProcPreOut_preserved_sub_middle_frame_spec : Prop :=
+  ∀ {Gstore Gleft Gmid Gright G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ},
     StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointS Ssh (Sown : SEnv) →
+    OwnedDisjoint Sown →
     DisjointG Gleft Gmid →
     DisjointG Gleft Gright →
     DisjointG Gmid Gright →
@@ -1077,6 +1311,40 @@ axiom HasTypeProcPreOut_preserved_sub_middle_frame
       SessionsOf Gmid' ⊆ SessionsOf Gmid ∧
       HasTypeProcPreOut Ssh Sown' Gmid' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ
+
+/-- Lift a visible lookup (`Ssh ++ Sown.left`) into `SEnvAll` under owned disjointness. -/
+lemma lookupSEnv_all_of_visible_owned
+    {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType} :
+    OwnedDisjoint Sown →
+    lookupSEnv (SEnvVisible Ssh Sown) x = some T →
+    lookupSEnv (SEnvAll Ssh Sown) x = some T := by
+  intro hOwn hVis
+  simpa [SEnvVisible] using
+    (lookupSEnv_all_frame_prefix_ofLeft
+      (Ssh:=Ssh) (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=T)
+      hOwn (by simpa [SEnvVisible] using hVis))
+
+/-- Align channel endpoints from `StoreTyped` and a visible channel typing fact. -/
+lemma endpoint_eq_of_store_visible_all
+    {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
+    {k : Var} {e e' : Endpoint} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    OwnedDisjoint Sown →
+    lookupStr store k = some (.chan e) →
+    lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e'.sid e'.role) →
+    e = e' := by
+  intro hStore hOwn hkStore hkVis
+  have hkAll : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
+    lookupSEnv_all_of_visible_owned (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+      (T:=.chan e'.sid e'.role) hOwn hkVis
+  have hChanTy : HasTypeVal Gstore (.chan e) (.chan e'.sid e'.role) :=
+    hStore k (.chan e) (.chan e'.sid e'.role) hkStore hkAll
+  have hValEq : (Value.chan e) = Value.chan ⟨e'.sid, e'.role⟩ := by
+    simpa using (HasTypeVal_chan_inv hChanTy)
+  cases e
+  cases e'
+  cases hValEq
+  rfl
 
 private lemma length_updateG_hit {G : GEnv} {e : Endpoint} {L L' : LocalType} :
     lookupG G e = some L →
@@ -1196,6 +1464,206 @@ lemma append_right_eq_of_eq {α : Type} {l r1 r2 : List α} (h : l ++ r1 = l ++ 
   simp [List.length_append] at hLen
   exact List.append_inj_right h rfl
 
+/-- Updating an endpoint known to live in the middle segment preserves outer frames. -/
+lemma updateG_append_middle_hit
+    {Gleft Gmid Gright : GEnv} {e : Endpoint} {L0 L : LocalType} :
+    lookupG Gleft e = none →
+    lookupG Gmid e = some L0 →
+    updateG (Gleft ++ Gmid ++ Gright) e L =
+      Gleft ++ updateG Gmid e L ++ Gright := by
+  intro hNoneLeft hSomeMid
+  have hOut :
+      updateG (Gleft ++ (Gmid ++ Gright)) e L =
+        Gleft ++ updateG (Gmid ++ Gright) e L :=
+    updateG_append_left (G₁:=Gleft) (G₂:=Gmid ++ Gright) (e:=e) (L:=L) hNoneLeft
+  have hMid :
+      updateG (Gmid ++ Gright) e L = updateG Gmid e L ++ Gright :=
+    updateG_append_left_hit (G₁:=Gmid) (G₂:=Gright) (e:=e) (L:=L0) (L':=L) hSomeMid
+  calc
+    updateG (Gleft ++ Gmid ++ Gright) e L
+        = updateG (Gleft ++ (Gmid ++ Gright)) e L := by simp [List.append_assoc]
+    _ = Gleft ++ updateG (Gmid ++ Gright) e L := hOut
+    _ = Gleft ++ (updateG Gmid e L ++ Gright) := by simp [hMid]
+    _ = Gleft ++ updateG Gmid e L ++ Gright := by simp [List.append_assoc]
+
+/-- Extract the middle segment from an updated three-way append. -/
+lemma updateG_append_middle_cancel
+    {Gleft Gmid Gright Gmid' : GEnv} {e : Endpoint} {L0 L : LocalType} :
+    lookupG Gleft e = none →
+    lookupG Gmid e = some L0 →
+    updateG (Gleft ++ Gmid ++ Gright) e L = Gleft ++ Gmid' ++ Gright →
+    Gmid' = updateG Gmid e L := by
+  intro hNoneLeft hSomeMid hEq
+  have hUpd := updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+    (e:=e) (L0:=L0) (L:=L) hNoneLeft hSomeMid
+  have hEq' : Gleft ++ (Gmid' ++ Gright) = Gleft ++ (updateG Gmid e L ++ Gright) := by
+    calc
+      Gleft ++ (Gmid' ++ Gright) = Gleft ++ Gmid' ++ Gright := by simp [List.append_assoc]
+      _ = updateG (Gleft ++ Gmid ++ Gright) e L := hEq.symm
+      _ = Gleft ++ updateG Gmid e L ++ Gright := hUpd
+      _ = Gleft ++ (updateG Gmid e L ++ Gright) := by simp [List.append_assoc]
+  have hCancelLeft : Gmid' ++ Gright = updateG Gmid e L ++ Gright := by
+    exact append_right_eq_of_eq hEq'
+  exact append_left_eq_of_eq hCancelLeft
+
+/-- Session set of a middle update remains within the original middle segment. -/
+lemma SessionsOf_subset_middle_update
+    {Gmid : GEnv} {e : Endpoint} {L0 L : LocalType} :
+    lookupG Gmid e = some L0 →
+    SessionsOf (updateG Gmid e L) ⊆ SessionsOf Gmid := by
+  intro hSome s hs
+  have hEqSess :
+      SessionsOf (updateG Gmid e L) = SessionsOf Gmid :=
+    SessionsOf_updateG_eq (G:=Gmid) (e:=e) (L:=L) (L':=L0) hSome
+  simpa [hEqSess] using hs
+
+/-- Lift a middle-segment lookup into the full framed environment. -/
+lemma lookupG_middle_to_full
+    {Gleft Gmid Gright : GEnv} {e : Endpoint} {L0 : LocalType} :
+    lookupG Gleft e = none →
+    lookupG Gmid e = some L0 →
+    lookupG (Gleft ++ Gmid ++ Gright) e = some L0 := by
+  intro hNoneLeft hSomeMid
+  have hStep :
+      lookupG (Gleft ++ Gmid) e = some L0 := by
+    exact lookupG_append_right (G₁:=Gleft) (G₂:=Gmid) (e:=e) hNoneLeft |>.trans hSomeMid
+  exact lookupG_append_left (G₁:=Gleft ++ Gmid) (G₂:=Gright) (e:=e) hStep
+
+/-- A lookup in the middle segment is absent from any disjoint right frame. -/
+lemma lookupG_middle_none_right
+    {Gmid Gright : GEnv} {e : Endpoint} {L0 : LocalType} :
+    DisjointG Gmid Gright →
+    lookupG Gmid e = some L0 →
+    lookupG Gright e = none := by
+  intro hDisj hSomeMid
+  exact lookupG_none_of_disjoint (G₁:=Gright) (G₂:=Gmid) (DisjointG_symm hDisj) hSomeMid
+
+/-- Package middle update output as a framed decomposition witness. -/
+lemma updateG_middle_witness
+    {Gleft Gmid Gright G' : GEnv} {e : Endpoint} {L0 L : LocalType} :
+    lookupG Gleft e = none →
+    lookupG Gmid e = some L0 →
+    G' = updateG (Gleft ++ Gmid ++ Gright) e L →
+    ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright ∧ Gmid' = updateG Gmid e L := by
+  intro hNoneLeft hSomeMid hG'
+  refine ⟨updateG Gmid e L, ?_, rfl⟩
+  calc
+    G' = updateG (Gleft ++ Gmid ++ Gright) e L := hG'
+    _ = Gleft ++ updateG Gmid e L ++ Gright :=
+      updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+        (e:=e) (L0:=L0) (L:=L) hNoneLeft hSomeMid
+
+/-- Recover the stepped endpoint lookup in the middle segment for a pre-out send judgment. -/
+private lemma middle_send_lookup_of_pre
+    {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
+    {store : VarStore} {k x : Var} {e : Endpoint}
+    {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    OwnedDisjoint Sown →
+    lookupStr store k = some (.chan e) →
+    HasTypeProcPreOut Ssh Sown Gmid (.send k x) Sfin Gfin W Δ →
+    ∃ q T L, lookupG Gmid e = some (.send q T L) := by
+  intro hStore hOwn hkStore hPre
+  cases hPre with
+  | send hkMid hGmid hxMid =>
+      rename_i eMid q T L
+      have hEqE : e = eMid :=
+        endpoint_eq_of_store_visible_all
+          (Gstore:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
+      exact ⟨q, T, L, by simpa [hEqE] using hGmid⟩
+
+/-- Recover the stepped endpoint lookup in the middle segment for a pre-out recv judgment. -/
+private lemma middle_recv_lookup_of_pre
+    {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
+    {store : VarStore} {k x : Var} {e : Endpoint}
+    {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    OwnedDisjoint Sown →
+    lookupStr store k = some (.chan e) →
+    HasTypeProcPreOut Ssh Sown Gmid (.recv k x) Sfin Gfin W Δ →
+    ∃ p T L, lookupG Gmid e = some (.recv p T L) := by
+  intro hStore hOwn hkStore hPre
+  cases hPre with
+  | recv_new hkMid hGmid hNoSh hNoOwnL =>
+      rename_i eMid p T L
+      have hEqE : e = eMid :=
+        endpoint_eq_of_store_visible_all
+          (Gstore:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
+      exact ⟨p, T, L, by simpa [hEqE] using hGmid⟩
+  | recv_old hkMid hGmid hNoSh hOwnL =>
+      rename_i eMid p T L T'
+      have hEqE : e = eMid :=
+        endpoint_eq_of_store_visible_all
+          (Gstore:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
+      exact ⟨p, T, L, by simpa [hEqE] using hGmid⟩
+
+/-- Recover the stepped endpoint lookup in the middle segment for a pre-out select judgment. -/
+private lemma middle_select_lookup_of_pre
+    {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
+    {store : VarStore} {k : Var} {ℓ : Label} {e : Endpoint}
+    {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    OwnedDisjoint Sown →
+    lookupStr store k = some (.chan e) →
+    HasTypeProcPreOut Ssh Sown Gmid (.select k ℓ) Sfin Gfin W Δ →
+    ∃ q bs, lookupG Gmid e = some (.select q bs) := by
+  intro hStore hOwn hkStore hPre
+  cases hPre with
+  | select hkMid hGmid hFind =>
+      rename_i eMid q bs L
+      have hEqE : e = eMid :=
+        endpoint_eq_of_store_visible_all
+          (Gstore:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
+      exact ⟨q, bs, by simpa [hEqE] using hGmid⟩
+
+/-- Recover the stepped endpoint lookup in the middle segment for a pre-out branch judgment. -/
+private lemma middle_branch_lookup_of_pre
+    {Gstore : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {Gmid : GEnv}
+    {store : VarStore} {k : Var} {procs : List (Label × Process)} {e : Endpoint}
+    {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
+    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    OwnedDisjoint Sown →
+    lookupStr store k = some (.chan e) →
+    HasTypeProcPreOut Ssh Sown Gmid (.branch k procs) Sfin Gfin W Δ →
+    ∃ p bs, lookupG Gmid e = some (.branch p bs) := by
+  intro hStore hOwn hkStore hPre
+  cases hPre with
+  | branch hkMid hGmid hLen hLbl hBodies hOut hSess hDom hRight =>
+      rename_i eMid p bs
+      have hEqE : e = eMid :=
+        endpoint_eq_of_store_visible_all
+          (Gstore:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          (k:=k) (e:=e) (e':=eMid) hStore hOwn hkStore hkMid
+      exact ⟨p, bs, by simpa [hEqE] using hGmid⟩
+
+/-- Decompose a middle `send` update inside a three-way framed global environment. -/
+private lemma middle_send_update_decompose
+    {Gleft Gmid Gright G G' : GEnv} {e : Endpoint}
+    {q target : Role} {Tmid T : ValType} {Lmid L : LocalType} :
+    DisjointG Gleft Gmid →
+    G = Gleft ++ Gmid ++ Gright →
+    lookupG Gmid e = some (.send q Tmid Lmid) →
+    G' = updateG G e L →
+    ∃ Gmid', G' = Gleft ++ Gmid' ++ Gright ∧
+      SessionsOf Gmid' ⊆ SessionsOf Gmid ∧
+      Gmid' = updateG Gmid e L := by
+  intro hDisjLM hEq hMid hUpd
+  have hNoneLeft : lookupG Gleft e = none :=
+    lookupG_none_of_disjoint (G₁:=Gleft) (G₂:=Gmid) hDisjLM hMid
+  refine ⟨updateG Gmid e L, ?_, ?_, rfl⟩
+  · calc
+      G' = updateG G e L := hUpd
+      _ = updateG (Gleft ++ Gmid ++ Gright) e L := by simpa [hEq]
+      _ = Gleft ++ updateG Gmid e L ++ Gright :=
+        updateG_append_middle_hit (Gleft:=Gleft) (Gmid:=Gmid) (Gright:=Gright)
+          (e:=e) (L0:=.send q Tmid Lmid) (L:=L) hNoneLeft hMid
+  · exact SessionsOf_subset_middle_update (Gmid:=Gmid) (e:=e)
+      (L0:=.send q Tmid Lmid) (L:=L) hMid
+
 theorem SessionsOf_subset_of_TypedStep_left_frame
     {G₁ G₂ G G' D Ssh Sown store bufs P G₁' D' Sown' store' bufs' P'} :
     DisjointG G₁ G₂ →
@@ -1247,10 +1715,10 @@ theorem SessionsOf_subset_of_TypedStep_left_frame
         hEq'.symm.trans hEq
       have hG₁' : G₁' = G₁ := append_left_eq_of_eq hEqG
       simpa [hG₁'] using hs
-  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       -- Right frame unchanged; reuse IH on the inner step.
       exact ih hEq hEq'
-  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih hEq hEq'
   | par_skip_left =>
       intro s hs
@@ -1316,9 +1784,9 @@ theorem SessionsOf_subset_of_TypedStep_right_frame
         hEq'.symm.trans hEq
       have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
       simpa [hG₂'] using hs
-  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih hEq hEq'
-  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih hEq hEq'
   | par_skip_left =>
       intro s hs

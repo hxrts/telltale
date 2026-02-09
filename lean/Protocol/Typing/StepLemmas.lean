@@ -111,9 +111,9 @@ theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' s
       exact ih
   | seq_skip =>
       simp
-  | par_left split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih
-  | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
+  | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       exact ih
   | par_skip_left =>
       simp
