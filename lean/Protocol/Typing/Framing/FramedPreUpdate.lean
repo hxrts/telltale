@@ -32,6 +32,8 @@ section
 theorem HasTypeProcPreOut_preserved_sub_left_frame
     {Gstore G₁ G₂ G G' D Ssh Sown store bufs P G₁' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointS Ssh (Sown : SEnv) →
+    OwnedDisjoint Sown →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁' ++ G₂ →
@@ -39,64 +41,76 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
     HasTypeProcPreOut Ssh Sown G₁ P Sfin Gfin W Δ →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₁' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro hStore hDisj hEq hEq' hTS hPre
+  intro hStore hDisjShAll hOwnDisj hDisj hEq hEq' hTS hPre
   induction hTS generalizing Sfin Gfin W Δ G₁ G₂ G₁' with
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the send case.
       exact preserved_sub_left_frame_send (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (target:=target) (T:=T) (L:=L)
         (G₁':=G₁')
-        hStore hEq hEq' hk hG hGout hPre
+        hStoreVis hEq hEq' hk hG hGout hPre
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       cases hPre with
-      | recv_new hk' hG' hSsh hSownR hSownL =>
+      | recv_new hk' hG' hSsh hSownL =>
           -- Dispatch to the recv-new helper.
           exact preserved_sub_left_frame_recv_new (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
             (G₁':=G₁') (Sown':=Sown')
-            hStore hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
-      | recv_old hk' hG' hSsh hSownR hSownL =>
+            hStoreVis hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
+      | recv_old hk' hG' hSsh hSownL =>
           -- Dispatch to the recv-old helper.
           exact preserved_sub_left_frame_recv_old (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
             (G₁':=G₁') (Sown':=Sown')
-            hStore hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
+            hStoreVis hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the select case.
       exact preserved_sub_left_frame_select (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (ℓ:=ℓ) (e:=e) (target:=target) (bs:=bs) (L:=L)
         (G₁':=G₁')
-        hStore hEq hEq' hk hG hFind hGout hPre
+        hStoreVis hEq hEq' hk hG hFind hGout hPre
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the branch case.
       exact preserved_sub_left_frame_branch (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (procs:=procs) (e:=e) (source:=source) (bs:=bs)
         (ℓ:=ℓ) (P:=P) (L:=L) (G₁':=G₁')
-        hStore hEq hEq' hk hG hFindP hFindT hGout hPre
+        hStoreVis hEq hEq' hk hG hFindP hFindT hGout hPre
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T_step Sown' store'
       cases hPre with
-      | assign_new hSsh hSownR hSownL hv' =>
+      | assign_new hSsh hSownL hv' =>
           -- Use the dedicated helper for the assign-new case.
           exact preserved_sub_left_frame_assign_new (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
             (G₁':=G₁')
-            hEq hEq' hv hSout rfl rfl hSsh hSownR hSownL hv'
-      | assign_old hSsh hSownR hSownL hv' =>
+            hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
+      | assign_old hSsh hSownL hv' =>
           -- Use the dedicated helper for the assign-old case.
           exact preserved_sub_left_frame_assign_old (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
             (G₁':=G₁')
-            hEq hEq' hv hSout rfl rfl hSsh hSownR hSownL hv'
+            hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
   | seq_step hTS ih =>
       cases hPre with
       | seq hP hQ =>
           rename_i W₁ W₂ Δ₁ Δ₂
-          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisj hEq hEq' hP
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisjShAll hOwnDisj hDisj hEq hEq' hP
           refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
           · exact HasTypeProcPreOut.seq hP' hQ
           · exact FootprintSubset_append_left hSubW
@@ -120,15 +134,35 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
         simpa [SEnvAll, split.hS, List.append_assoc] using hStore
       have hStoreL : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store :=
         store_typed_left_swap (Ssh:=Ssh) (Sown:=Sown) (S1:=split.S1) (S2:=split.S2) hStore' hDisjS
+      have hDisjShRight : DisjointS Ssh Sown.right := DisjointS_owned_right_pu hDisjShAll
+      have hDisjShSplit : DisjointS Ssh split.S1 ∧ DisjointS Ssh split.S2 :=
+        DisjointS_split_from_owned_left_pu (Sown:=Sown) (split:=split) hDisjShAll
+      have hDisjShAll_inner :
+          DisjointS Ssh ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
+        DisjointS_owned_repack_pu hDisjShRight hDisjShSplit.1 hDisjShSplit.2
+      have hOwnDisj_inner :
+          OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
+        OwnedDisjoint_sub_left_pu (Sown:=Sown) (split:=split) hOwnDisj hDisjS
       exact preserved_sub_left_frame_par_left
-        (split:=split) hStoreL hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS ih hPre
+        (split:=split) hStoreL hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS
+        hDisjShAll_inner hOwnDisj_inner ih hPre
   | par_right split hSlen hGlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂_step D₂_step S₂_step nS nG
       have hStoreR :
           StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
         simpa [SEnvAll, split.hS, List.append_assoc] using hStore
+      have hDisjShRight : DisjointS Ssh Sown.right := DisjointS_owned_right_pu hDisjShAll
+      have hDisjShSplit : DisjointS Ssh split.S1 ∧ DisjointS Ssh split.S2 :=
+        DisjointS_split_from_owned_left_pu (Sown:=Sown) (split:=split) hDisjShAll
+      have hDisjShAll_inner :
+          DisjointS Ssh ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
+        DisjointS_owned_repack_pu hDisjShRight hDisjShSplit.2 hDisjShSplit.1
+      have hOwnDisj_inner :
+          OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
+        OwnedDisjoint_sub_right_pu (Sown:=Sown) (split:=split) hOwnDisj hDisjS
       exact preserved_sub_left_frame_par_right
-        (split:=split) hStoreR hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS ih hPre
+        (split:=split) hStoreR hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS
+        hDisjShAll_inner hOwnDisj_inner ih hPre
 
   | par_skip_left =>
       have hQ := HasTypeProcPreOut_par_skip_left hPre
@@ -151,6 +185,8 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
 theorem HasTypeProcPreOut_preserved_sub_right_frame
     {Gstore G₁ G₂ G G' D Ssh Sown store bufs P G₂' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointS Ssh (Sown : SEnv) →
+    OwnedDisjoint Sown →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
@@ -158,64 +194,76 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
     HasTypeProcPreOut Ssh Sown G₂ P Sfin Gfin W Δ →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro hStore hDisj hEq hEq' hTS hPre
+  intro hStore hDisjShAll hOwnDisj hDisj hEq hEq' hTS hPre
   induction hTS generalizing Sfin Gfin W Δ G₁ G₂ G₂' with
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the send case.
       exact preserved_sub_right_frame_send (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (target:=target) (T:=T) (L:=L)
         (G₂':=G₂')
-        hStore hDisj hEq hEq' hk hG hGout hPre
+        hStoreVis hDisj hEq hEq' hk hG hGout hPre
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       cases hPre with
-      | recv_new hk' hG' hSsh hSownR hSownL =>
+      | recv_new hk' hG' hSsh hSownL =>
           -- Use the dedicated helper for the recv-new case.
           exact preserved_sub_right_frame_recv_new (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
             (G₂':=G₂') (Sown':=Sown')
-            hStore hDisj hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
-      | recv_old hk' hG' hSsh hSownR hSownL =>
+            hStoreVis hDisj hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
+      | recv_old hk' hG' hSsh hSownL =>
           -- Use the dedicated helper for the recv-old case.
           exact preserved_sub_right_frame_recv_old (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
             (G₂':=G₂') (Sown':=Sown')
-            hStore hDisj hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
+            hStoreVis hDisj hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the select case.
       exact preserved_sub_right_frame_select (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (ℓ:=ℓ) (e:=e) (target:=target) (bs:=bs) (L:=L)
         (G₂':=G₂')
-        hStore hDisj hEq hEq' hk hG hFind hGout hPre
+        hStoreVis hDisj hEq hEq' hk hG hFind hGout hPre
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      have hStoreVis : StoreTypedVisible Gstore Ssh Sown store :=
+        StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+          hStore hDisjShAll hOwnDisj
       -- Use the dedicated helper for the branch case.
       exact preserved_sub_right_frame_branch (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
         (Ssh:=Ssh) (Sown:=Sown) (k:=k) (procs:=procs) (e:=e) (source:=source) (bs:=bs)
         (ℓ:=ℓ) (P:=P) (L:=L) (G₂':=G₂')
-        hStore hDisj hEq hEq' hk hG hFindP hFindT hGout hPre
+        hStoreVis hDisj hEq hEq' hk hG hFindP hFindT hGout hPre
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T_step Sown' store'
       cases hPre with
-      | assign_new hSsh hSownR hSownL hv' =>
+      | assign_new hSsh hSownL hv' =>
           -- Use the dedicated helper for the assign-new case.
           exact preserved_sub_right_frame_assign_new (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
             (G₂':=G₂')
-            hDisj hEq hEq' hv hSout rfl rfl hSsh hSownR hSownL hv'
-      | assign_old hSsh hSownR hSownL hv' =>
+            hDisj hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
+      | assign_old hSsh hSownL hv' =>
           -- Use the dedicated helper for the assign-old case.
           exact preserved_sub_right_frame_assign_old (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
             (G₂':=G₂')
-            hDisj hEq hEq' hv hSout rfl rfl hSsh hSownR hSownL hv'
+            hDisj hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
   | seq_step hTS ih =>
       cases hPre with
       | seq hP hQ =>
           rename_i W₁ W₂ Δ₁ Δ₂
-          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisj hEq hEq' hP
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisjShAll hOwnDisj hDisj hEq hEq' hP
           refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
           · exact HasTypeProcPreOut.seq hP' hQ
           · exact FootprintSubset_append_left hSubW

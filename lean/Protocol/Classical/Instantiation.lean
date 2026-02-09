@@ -381,7 +381,7 @@ structure ProtocolFunctionalCLTModel where
   N_ne_zero : N ≠ 0
 
 /-- Scaled process for protocol trajectories. -/
-noncomputable def protocolScaledProcess (m : ProtocolFunctionalCLTModel) : Real :=
+def protocolScaledProcess (m : ProtocolFunctionalCLTModel) : Real :=
   Classical.FunctionalCLT.scaledProcess (fun _ => m.c) m.c m.N m.t
 
 /-- Instantiate `FunctionalCLTInput` from protocol model quantities. -/
@@ -404,7 +404,7 @@ structure ProtocolMeanFieldModel where
   x : Fin n → Real
 
 /-- Empirical mean over session states. -/
-noncomputable def protocolEmpiricalMean (m : ProtocolMeanFieldModel) : Real :=
+def protocolEmpiricalMean (m : ProtocolMeanFieldModel) : Real :=
   Classical.PropagationOfChaos.empiricalMean m.x
 
 /-- Sessions are exchangeable (permutation invariance of empirical mean). -/

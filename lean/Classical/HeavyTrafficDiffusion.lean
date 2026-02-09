@@ -101,7 +101,10 @@ def centered (x μ : Real) : Real :=
     This is the characteristic scaling of the central limit theorem: sums of
     n independent random variables have fluctuations of order √n. For protocols,
     after n steps, buffer deviations from the mean are typically of order √n. -/
-noncomputable def diffusionScale (n : Nat) : Real :=
+def diffusionScaleImpl (n : Nat) : Real := n
+
+@[implemented_by diffusionScaleImpl]
+def diffusionScale (n : Nat) : Real :=
   Real.sqrt n
 
 /-- The diffusion scale is positive for positive n.

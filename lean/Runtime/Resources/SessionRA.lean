@@ -19,7 +19,7 @@ Dependencies: IrisBridge, GhostMapSlot LocalType instance.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 open Iris.Std
 

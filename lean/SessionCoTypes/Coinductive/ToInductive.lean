@@ -66,14 +66,14 @@ lemma length_le_maxLen {avoid : Finset String} {x : String} (hs : x ∈ avoid) :
   simpa [maxLen] using Finset.le_sup (s := avoid.image String.length) (f := id) hx
 
 /-- Base name prefix derived from a node's index in the reachable set. -/
-noncomputable def baseName (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
+def baseName (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
   match indexOf t all.toList with
   | some i => "s" ++ toString i
   | none   => "sunknown"
 
 /-- Generate a fresh name for a state that doesn't clash with any existing name.
     Works by appending a suffix longer than any existing name. -/
-noncomputable def nameFor (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
+def nameFor (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
   let base := baseName t all
   let avoid := namesIn all
   let suffixLen := maxLen avoid + 1
@@ -108,7 +108,7 @@ lemma nameFor_not_mem_namesIn (t : LocalTypeC) (all : Finset LocalTypeC) :
     - If current node is visited, emit a variable reference (back-edge)
     - Otherwise, recurse into children with current added to visited
     - Wrap in mu if a recursive reference was generated -/
-noncomputable def toInductiveAux (root : LocalTypeC) (all visited : Finset LocalTypeC)
+def toInductiveAux (root : LocalTypeC) (all visited : Finset LocalTypeC)
     (current : LocalTypeC)
     (h_closed : IsClosedSet all)
     (h_visited : visited ⊆ all) (h_current : current ∈ all) : LocalTypeR :=
@@ -163,7 +163,7 @@ decreasing_by
 /-! ## Entry Point -/
 
 /-- Convert a regular coinductive local type to its inductive representation. -/
-noncomputable def toInductive (t : LocalTypeC) (h : Regular t) : LocalTypeR :=
+def toInductive (t : LocalTypeC) (h : Regular t) : LocalTypeR :=
   let all := Set.Finite.toFinset h
   toInductiveAux t all ∅ t (reachable_is_closed_set t h)
     (Finset.empty_subset _)

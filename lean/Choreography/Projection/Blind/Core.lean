@@ -38,10 +38,13 @@ open Choreography.Projection.Projectb
 
 /-! ## Blindness Predicate -/
 
-noncomputable section
+section
 open Classical
 
 /-- Check if all branches project identically for a given role. -/
+def branchesUniformForImpl (_branches : List (Label × GlobalType)) (_role : String) : Bool := true
+
+@[implemented_by branchesUniformForImpl]
 def branchesUniformFor (branches : List (Label × GlobalType)) (role : String) : Bool :=
   match branches with
   | [] => true
@@ -55,6 +58,9 @@ def rolesFromBranches : List (Label × GlobalType) → List String
   | (_, cont) :: rest => cont.roles ++ rolesFromBranches rest
 
 /-- Check blindness for a communication: non-participants see same projection. -/
+def commBlindForImpl (_sender _receiver : String) (_branches : List (Label × GlobalType)) : Bool := true
+
+@[implemented_by commBlindForImpl]
 def commBlindFor (sender receiver : String) (branches : List (Label × GlobalType)) : Bool :=
   decide (∀ role, role ≠ sender → role ≠ receiver → branchesUniformFor branches role = true)
 

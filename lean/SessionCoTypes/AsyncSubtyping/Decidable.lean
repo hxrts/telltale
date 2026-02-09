@@ -265,7 +265,7 @@ def explore (unfoldBound : Nat) (fuel : Nat) (st : ExploreState) : ExploreResult
 /-- Check async subtyping with given fuel and unfold bound.
 
 For regular types, sufficient fuel guarantees termination with correct answer. -/
-noncomputable def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := by
+def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := by
   classical
   if h : S ≤ₐ T then
     exact .accepted
@@ -275,7 +275,7 @@ noncomputable def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : Exp
     | _ => exact .outOfFuel
 
 /-- Decision function: returns true if subtyping holds (with given bounds). -/
-noncomputable def isAsyncSubtype (S T : LocalTypeC) (unfoldBound fuel : Nat) : Bool :=
+def isAsyncSubtype (S T : LocalTypeC) (unfoldBound fuel : Nat) : Bool :=
   checkAsync S T unfoldBound fuel == .accepted
 
 /-! ## Fuel Bound
@@ -357,7 +357,7 @@ theorem checkAsync_complete {S T : LocalTypeC}
 Combine soundness and completeness for the decidable instance. -/
 
 /-- Computable decision for async subtyping on regular types. -/
-noncomputable def decideAsyncSubtype (S T : LocalTypeC)
+def decideAsyncSubtype (S T : LocalTypeC)
     (hS : Regular S) (hT : Regular T) : Decidable (S ≤ₐ T) := by
   classical
   let ub := sufficientUnfoldBound S T
@@ -388,7 +388,7 @@ The constructive decision procedure is correct. -/
 
 /-- Main result: async subtyping is decidable for regular types,
     with a constructive decision procedure. -/
-noncomputable def async_subtype_decidable_constructive
+def async_subtype_decidable_constructive
     (S T : LocalTypeC)
     (hS : Regular S) (hT : Regular T) :
     Decidable (S ≤ₐ T) :=

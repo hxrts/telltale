@@ -34,7 +34,7 @@ Dependencies: Task 12, Task 19, Shim.WeakestPre.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 
@@ -110,7 +110,7 @@ def FIFOConsistent {ε : Type u} [EffectRuntime ε]
   -- Receive order respects send order for each edge.
   ∀ e v1 v2, SendBeforeObs trace e v1 v2 → RecvBeforeObs trace e v1 v2
 
-noncomputable def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]

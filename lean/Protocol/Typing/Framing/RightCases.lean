@@ -22,7 +22,7 @@ section
 /-- Helper: send case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_send
     {Gstore G₁ G₂ G G' Ssh Sown store k x e target T L G₂' Sfin Gfin W Δ} :
-    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    StoreTypedVisible Gstore Ssh Sown store →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
@@ -37,7 +37,8 @@ lemma preserved_sub_right_frame_send
   cases hPre with
   | send hk' hG' hx' =>
       rename_i e' q' T' L'
-      have hEqE : e = e' := endpoint_eq_of_store hStore hk hk'
+      have hEqE : e = e' :=
+        endpoint_eq_of_store_visible hStore hk hk'
       have hG₂e : lookupG G₂ e = some (.send q' T' L') := by
         simpa [hEqE] using hG'
       have hL : L' = L :=
@@ -57,7 +58,7 @@ lemma preserved_sub_right_frame_send
 lemma preserved_sub_right_frame_recv_new
     {Gstore G₁ G₂ G G' Ssh Sown store k x e source T L G₂' Sown' Sfin Gfin W Δ}
     {e' : Endpoint} {p' : Role} {T' : ValType} {L' : LocalType} :
-    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    StoreTypedVisible Gstore Ssh Sown store →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
@@ -67,13 +68,14 @@ lemma preserved_sub_right_frame_recv_new
     Sown' = OwnedEnv.updateLeft Sown x T →
     Sfin = OwnedEnv.updateLeft Sown x T' →
     Gfin = updateG G₂ e' L' →
-    lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) →
+    lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e'.sid e'.role) →
     lookupG G₂ e' = some (.recv p' T' L') →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   -- Use the recv-new pre-out premises and rewrite the right update.
   intro hStore hDisj hEq hEq' hk hG hGout hSout hSfin hGfin hk' hG'
-  have hEqE : e = e' := endpoint_eq_of_store hStore hk hk'
+  have hEqE : e = e' :=
+    endpoint_eq_of_store_visible hStore hk hk'
   have hG₂e : lookupG G₂ e = some (.recv p' T' L') := by
     simpa [hEqE] using hG'
   have hTL : T' = T ∧ L' = L :=
@@ -93,7 +95,7 @@ lemma preserved_sub_right_frame_recv_new
 lemma preserved_sub_right_frame_recv_old
     {Gstore G₁ G₂ G G' Ssh Sown store k x e source T L G₂' Sown' Sfin Gfin W Δ}
     {e' : Endpoint} {p' : Role} {T' : ValType} {L' : LocalType} :
-    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    StoreTypedVisible Gstore Ssh Sown store →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
@@ -103,13 +105,14 @@ lemma preserved_sub_right_frame_recv_old
     Sown' = OwnedEnv.updateLeft Sown x T →
     Sfin = OwnedEnv.updateLeft Sown x T' →
     Gfin = updateG G₂ e' L' →
-    lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) →
+    lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e'.sid e'.role) →
     lookupG G₂ e' = some (.recv p' T' L') →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   -- Use the recv-old pre-out premises and rewrite the right update.
   intro hStore hDisj hEq hEq' hk hG hGout hSout hSfin hGfin hk' hG'
-  have hEqE : e = e' := endpoint_eq_of_store hStore hk hk'
+  have hEqE : e = e' :=
+    endpoint_eq_of_store_visible hStore hk hk'
   have hG₂e : lookupG G₂ e = some (.recv p' T' L') := by
     simpa [hEqE] using hG'
   have hTL : T' = T ∧ L' = L :=
@@ -128,7 +131,7 @@ lemma preserved_sub_right_frame_recv_old
 /-- Helper: select case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_select
     {Gstore G₁ G₂ G G' Ssh Sown store k ℓ e target bs L G₂' Sfin Gfin W Δ} :
-    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    StoreTypedVisible Gstore Ssh Sown store →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
@@ -144,7 +147,8 @@ lemma preserved_sub_right_frame_select
   cases hPre with
   | select hk' hG' hFind' =>
       rename_i e' q' bs' L'
-      have hEqE : e = e' := endpoint_eq_of_store hStore hk hk'
+      have hEqE : e = e' :=
+        endpoint_eq_of_store_visible hStore hk hk'
       have hG₂e : lookupG G₂ e = some (.select q' bs') := by
         simpa [hEqE] using hG'
       have hBs : bs' = bs :=
@@ -164,7 +168,7 @@ lemma preserved_sub_right_frame_select
 /-- Helper: branch case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_branch
     {Gstore G₁ G₂ G G' Ssh Sown store k procs e source bs ℓ P L G₂' Sfin Gfin W Δ} :
-    StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    StoreTypedVisible Gstore Ssh Sown store →
     DisjointG G₁ G₂ →
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
@@ -179,9 +183,10 @@ lemma preserved_sub_right_frame_branch
   -- Reduce to the branch pre-out rule and rewrite the right update.
   intro hStore hDisj hEq hEq' hk hG hFindP hFindT hGout hPre
   cases hPre with
-  | branch hk' hG' hLen hLabels hPreAll hPost hDom =>
+  | branch hk' hG' hLen hLabels hPreAll hPost hSess hDom =>
       rename_i e' p' bs'
-      have hEqE : e = e' := endpoint_eq_of_store hStore hk hk'
+      have hEqE : e = e' :=
+        endpoint_eq_of_store_visible hStore hk hk'
       have hG₂e : lookupG G₂ e = some (.branch p' bs') := by
         simpa [hEqE] using hG'
       have hBs : bs' = bs :=
@@ -207,13 +212,12 @@ lemma preserved_sub_right_frame_assign_new
     Sfin = OwnedEnv.updateLeft Sown x T_pre →
     Gfin = G₂ →
     lookupSEnv Ssh x = none →
-    lookupSEnv Sown.right x = none →
     lookupSEnv Sown.left x = none →
     HasTypeVal G₂ v T_pre →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   -- Use typing uniqueness to align the assigned type and cancel the frame.
-  intro hDisj hEq hEq' hv hSout hSfin hGfin hSsh hSownR hSownL hv'
+  intro hDisj hEq hEq' hv hSout hSfin hGfin hSsh hSownL hv'
   have hv'' : HasTypeVal G v T_pre := by
     -- Strengthen the typing to the framed global environment.
     refine HasTypeVal_mono G₂ G v T_pre hv' ?_
@@ -248,13 +252,12 @@ lemma preserved_sub_right_frame_assign_old
     Sfin = OwnedEnv.updateLeft Sown x T_pre →
     Gfin = G₂ →
     lookupSEnv Ssh x = none →
-    lookupSEnv Sown.right x = none →
     lookupSEnv Sown.left x = some T_old →
     HasTypeVal G₂ v T_pre →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' .skip Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
   -- Use typing uniqueness to align the assigned type and cancel the frame.
-  intro hDisj hEq hEq' hv hSout hSfin hGfin hSsh hSownR hSownL hv'
+  intro hDisj hEq hEq' hv hSout hSfin hGfin hSsh hSownL hv'
   have hv'' : HasTypeVal G v T_pre := by
     -- Strengthen the typing to the framed global environment.
     refine HasTypeVal_mono G₂ G v T_pre hv' ?_
@@ -277,4 +280,3 @@ lemma preserved_sub_right_frame_assign_old
       (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown.updateLeft x T_step) (G:=G₂))
   · intro x hx; cases hx
   · intro x T hx; cases hx
-

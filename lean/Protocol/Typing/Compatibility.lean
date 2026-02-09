@@ -886,7 +886,7 @@ theorem HasTypeProcPreOut_domsubset {Ssh Sown G P Sown' G' W Δ} :
       exact SEnvDomSubset_update_left
   | select =>
       exact SEnvDomSubset_refl
-  | branch _ _ _ _ _ _ hDom =>
+  | branch _ _ _ _ _ _ _ hDom =>
       exact hDom
   | seq hP hQ ihP ihQ =>
       exact SEnvDomSubset_trans ihP ihQ

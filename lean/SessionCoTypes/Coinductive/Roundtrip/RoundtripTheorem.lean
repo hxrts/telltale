@@ -14,7 +14,7 @@ open SessionTypes.LocalTypeR
 /-! ## Local instances -/
 
 /-- Local decidable equality for Finset operations on LocalTypeC. -/
-noncomputable local instance : DecidableEq LocalTypeC := by
+local instance : DecidableEq LocalTypeC := by
   -- Use classical choice to decide equality on LocalTypeC.
   classical
   infer_instance

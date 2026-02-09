@@ -13,7 +13,7 @@ namespace SessionCoTypes.Coinductive
 /-! ## Decidable Bisimulation Definitions -/
 
 /-- Local decidable equality for visited membership. -/
-noncomputable local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
+local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
   -- Use classical choice to decide equality on pairs.
   classical
   infer_instance
@@ -37,7 +37,7 @@ def bisimAll (bisimFn : LocalTypeC × LocalTypeC → Bool)
     - `p`: Current pair to check
 
     Returns `true` if the pair is bisimilar (or already visited). -/
-noncomputable def bisimAux (fuel : Nat) (bound : Nat)
+def bisimAux (fuel : Nat) (bound : Nat)
     (visited : Finset (LocalTypeC × LocalTypeC))
     (p : LocalTypeC × LocalTypeC) : Bool :=
   match fuel with

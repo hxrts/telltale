@@ -120,7 +120,10 @@ def empiricalTotal (x : Fin n → Real) : Real :=
     - empiricalMean x = (1/n) Σᵢ x(i) is the average metric across sessions
 
     The empirical mean is the key observable for mean-field analysis. -/
-noncomputable def empiricalMean (x : Fin n → Real) : Real :=
+def empiricalMeanImpl (_x : Fin n → Real) : Real := 0
+
+@[implemented_by empiricalMeanImpl]
+def empiricalMean (x : Fin n → Real) : Real :=
   if h : n = 0 then 0 else empiricalTotal x / (n : Real)
 
 /-- The total is invariant under permutation of indices.

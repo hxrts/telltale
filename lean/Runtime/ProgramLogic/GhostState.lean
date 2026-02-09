@@ -27,7 +27,7 @@ Dependencies: Task 13, Compat.RA + Compat.Inv + Compat.SavedProp.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 

@@ -180,7 +180,7 @@ end
 
 mutual
   /-- Total conversion from DB to named terms, requiring closedness at the given depth. -/
-  noncomputable def fromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
+  def fromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
       (t : SessionTypes.LocalTypeDB) →
       t.isClosedAt ctx.length = true →
       LocalTypeR
@@ -213,7 +213,7 @@ mutual
   termination_by
     t => sizeOf t
 
-  noncomputable def branchesFromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
+  def branchesFromDB (ctx : SessionTypes.LocalTypeConv.NameContext) :
       (bs : List (Label × SessionTypes.LocalTypeDB)) →
       isClosedAtBranches ctx.length bs = true →
       List BranchR

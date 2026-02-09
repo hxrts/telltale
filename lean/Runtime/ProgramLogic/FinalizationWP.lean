@@ -10,7 +10,7 @@ through WP rules once the Iris proofs are available.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 variable [Telltale.TelltaleIris]
 variable [GhostMapSlot FinalizationMode]

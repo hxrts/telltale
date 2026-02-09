@@ -981,7 +981,7 @@ theorem preservation_typed
   have hOwn' : OwnedDisjoint Sown' := OwnedDisjoint_preserved_TypedStep hTS hPre hOwn
   have hCons' : DConsistent G' D' := DConsistent_preserved hTS hCons
   have hStoreTyped : StoreTyped G (SEnvAll Ssh Sown) store := hStore.toStoreTyped
-  obtain ⟨W', Δ', hPre'⟩ := HasTypeProcPreOut_preserved hStoreTyped hTS hPre
+  obtain ⟨W', Δ', hPre'⟩ := HasTypeProcPreOut_preserved hStoreTyped hDisjS hOwn hTS hPre
   refine ⟨hStore', hBT', hCoh', hHead', hValid', hCompat', hDisjS', hOwn', hCons', ?_⟩
   exact ⟨Sfin, Gfin, W', Δ', hPre'⟩
 
@@ -1044,10 +1044,14 @@ theorem progress_send {C : Config} {Ssh Sown : SEnv} {k x : Var}
     (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store) :
     ∃ C', Step C C' := by
   rcases inversion_send hProc with ⟨e, q, T, L, hk, hG, hx⟩
-  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
+  have hkAll : lookupSEnv (SEnvAll Ssh (Sown : OwnedEnv)) k = some (.chan e.sid e.role) := by
+    simpa [SEnvVisible_ofLeft] using hk
+  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hkAll
   have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
   subst hkChan
-  obtain ⟨v, hxStr, _hv⟩ := store_lookup_of_senv_lookup hStore hx
+  have hxAll : lookupSEnv (SEnvAll Ssh (Sown : OwnedEnv)) x = some T := by
+    simpa [SEnvVisible_ofLeft] using hx
+  obtain ⟨v, hxStr, _hv⟩ := store_lookup_of_senv_lookup hStore hxAll
   let sendEdge : Edge := { sid := e.sid, sender := e.role, receiver := q }
   refine ⟨sendStep C e sendEdge v T L, Step.base ?_⟩
   exact StepBase.send hEq hkStr hxStr hG
@@ -1059,7 +1063,9 @@ theorem progress_recv {C : Config} {Ssh Sown : SEnv} {k x : Var}
     (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store) :
     (∃ C', Step C C') ∨ BlockedRecv C := by
   rcases inversion_recv hProc with ⟨e, p, T, L, hk, hG, _hNoSh⟩
-  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
+  have hkAll : lookupSEnv (SEnvAll Ssh (Sown : OwnedEnv)) k = some (.chan e.sid e.role) := by
+    simpa [SEnvVisible_ofLeft] using hk
+  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hkAll
   have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
   subst hkChan
   set recvEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }
@@ -1084,7 +1090,9 @@ theorem progress_select {C : Config} {Ssh Sown : SEnv} {k : Var} {l : Label}
     (hStore : StoreTypedStrong C.G (SEnvAll Ssh Sown) C.store) :
     ∃ C', Step C C' := by
   rcases inversion_select hProc with ⟨e, q, bs, L, hk, hG, hFind⟩
-  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
+  have hkAll : lookupSEnv (SEnvAll Ssh (Sown : OwnedEnv)) k = some (.chan e.sid e.role) := by
+    simpa [SEnvVisible_ofLeft] using hk
+  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hkAll
   have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
   subst hkChan
   let selectEdge : Edge := { sid := e.sid, sender := e.role, receiver := q }
@@ -1102,7 +1110,9 @@ theorem progress_branch {C : Config} {Ssh Sown : SEnv} {k : Var} {procs : List (
     (hComplete : RoleComplete C.G) :
     (∃ C', Step C C') ∨ BlockedRecv C := by
   rcases inversion_branch hProc with ⟨e, p, bs, hk, hG, hLen, hLabels, hBodies⟩
-  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hk
+  have hkAll : lookupSEnv (SEnvAll Ssh (Sown : OwnedEnv)) k = some (.chan e.sid e.role) := by
+    simpa [SEnvVisible_ofLeft] using hk
+  obtain ⟨vk, hkStr, hkTyped⟩ := store_lookup_of_senv_lookup hStore hkAll
   have hkChan : vk = .chan e := HasTypeVal_chan_inv hkTyped
   subst hkChan
   set branchEdge : Edge := { sid := e.sid, sender := p, receiver := e.role }

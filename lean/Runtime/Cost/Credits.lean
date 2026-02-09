@@ -10,7 +10,7 @@ that can later be refined with real Iris proofs.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 variable [Telltale.TelltaleIris]
 variable [GhostVarSlot Nat]

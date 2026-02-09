@@ -510,6 +510,78 @@ theorem lookupSEnv_none_of_disjoint_left {S₁ S₂ : SEnv} {x : Var} {T : ValTy
 def SEnvAll (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
   Ssh ++ Sown.right ++ Sown.left
 
+/-! ### Gauge-Invariant View
+
+`Sown.right` is a frame/gauge component. Typing obligations that should be
+invariant under quotienting read variables through the visible view below. -/
+/-- Right-gauge equivalence for owned environments.
+    Two owned environments are gauge-equivalent when they agree on the local
+    left component; the right component is treated as framing gauge. -/
+def RightGaugeEq (S₁ S₂ : OwnedEnv) : Prop :=
+  S₁.left = S₂.left
+
+/-- Right-gauge equivalence is reflexive. -/
+theorem RightGaugeEq_refl (S : OwnedEnv) : RightGaugeEq S S := by
+  rfl
+
+/-- Right-gauge equivalence is symmetric. -/
+theorem RightGaugeEq_symm {S₁ S₂ : OwnedEnv} :
+    RightGaugeEq S₁ S₂ → RightGaugeEq S₂ S₁ := by
+  intro h
+  simpa [RightGaugeEq] using h.symm
+
+/-- Right-gauge equivalence is transitive. -/
+theorem RightGaugeEq_trans {S₁ S₂ S₃ : OwnedEnv} :
+    RightGaugeEq S₁ S₂ → RightGaugeEq S₂ S₃ → RightGaugeEq S₁ S₃ := by
+  intro h12 h23
+  simpa [RightGaugeEq] using h12.trans h23
+
+/-- Visible variable environment for typing obligations (shared + local left). -/
+def SEnvVisible (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
+  Ssh ++ Sown.left
+
+/-- Store typing through the visible variable view (`Ssh ++ Sown.left`). -/
+def StoreTypedVisible (G : GEnv) (Ssh : SEnv) (Sown : OwnedEnv) (store : VarStore) : Prop :=
+  StoreTyped G (SEnvVisible Ssh Sown) store
+
+/-- Strong store typing with domain control on the full env and type
+    correspondence on the visible view. -/
+structure StoreTypedStrongVisible (G : GEnv) (Ssh : SEnv) (Sown : OwnedEnv)
+    (store : VarStore) : Prop where
+  /-- Keep same-domain over the full environment used by runtime invariants. -/
+  sameDomainAll : ∀ x, (lookupSEnv (SEnvAll Ssh Sown) x).isSome ↔ (lookupStr store x).isSome
+  /-- Type correspondence is only required for visible variables. -/
+  typeCorrVisible : StoreTypedVisible G Ssh Sown store
+
+/-- Forget the strong visible structure to plain visible store typing. -/
+theorem StoreTypedStrongVisible.toStoreTypedVisible
+    {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
+    (h : StoreTypedStrongVisible G Ssh Sown store) :
+    StoreTypedVisible G Ssh Sown store :=
+  h.typeCorrVisible
+
+@[simp] theorem SEnvVisible_reframe_right
+    (Ssh R R' L : SEnv) :
+    SEnvVisible Ssh { right := R, left := L } =
+      SEnvVisible Ssh { right := R', left := L } := by
+  simp [SEnvVisible]
+
+theorem SEnvVisible_congr_rightGauge {Ssh : SEnv} {S₁ S₂ : OwnedEnv} :
+    RightGaugeEq S₁ S₂ →
+    SEnvVisible Ssh S₁ = SEnvVisible Ssh S₂ := by
+  intro h
+  simpa [RightGaugeEq, SEnvVisible, h]
+
+@[simp] theorem lookupSEnv_SEnvVisible_reframe_right
+    (Ssh R R' L : SEnv) (x : Var) :
+    lookupSEnv (SEnvVisible Ssh { right := R, left := L }) x =
+      lookupSEnv (SEnvVisible Ssh { right := R', left := L }) x := by
+  simp [SEnvVisible]
+
+@[simp] theorem SEnvVisible_ofLeft (Ssh S : SEnv) :
+    SEnvVisible Ssh (S : OwnedEnv) = Ssh ++ S := by
+  simp [SEnvVisible]
+
 @[simp] theorem SEnvAll_ofLeft (Ssh S : SEnv) :
     SEnvAll Ssh (S : OwnedEnv) = Ssh ++ S := by
   simp [SEnvAll]

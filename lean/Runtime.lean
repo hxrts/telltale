@@ -16,6 +16,7 @@ import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
 import Runtime.Proofs.Concurrency
+import Runtime.Proofs.ProgressApi
 import Runtime.VM.Monitor
 import Runtime.VM.DomainComposition
 import Runtime.IrisBridge

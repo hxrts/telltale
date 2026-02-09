@@ -46,7 +46,11 @@ mutual
             match vt with
             | some t => .send partner (valTypeRToValType t) (localTypeRToLocalTypeAux ctx cont)
             | none => .select partner [(lbl.name, localTypeRToLocalTypeAux ctx cont)]
-        | _ => .select partner (localTypeRBranchesToChoices ctx branches)
+        | (lbl₁, _vt₁, cont₁) :: (lbl₂, _vt₂, cont₂) :: rest =>
+            .select partner
+              ((lbl₁.name, localTypeRToLocalTypeAux ctx cont₁) ::
+               (lbl₂.name, localTypeRToLocalTypeAux ctx cont₂) ::
+               localTypeRBranchesToChoices ctx rest)
     | .recv partner branches =>
         match branches with
         | [] => .end_
@@ -54,21 +58,31 @@ mutual
             match vt with
             | some t => .recv partner (valTypeRToValType t) (localTypeRToLocalTypeAux ctx cont)
             | none => .branch partner [(lbl.name, localTypeRToLocalTypeAux ctx cont)]
-        | _ => .branch partner (localTypeRBranchesToChoices ctx branches)
+        | (lbl₁, _vt₁, cont₁) :: (lbl₂, _vt₂, cont₂) :: rest =>
+            .branch partner
+              ((lbl₁.name, localTypeRToLocalTypeAux ctx cont₁) ::
+               (lbl₂.name, localTypeRToLocalTypeAux ctx cont₂) ::
+               localTypeRBranchesToChoices ctx rest)
     | .mu v body => .mu (localTypeRToLocalTypeAux (v :: ctx) body)
     | .var v => .var (findVarIdx ctx v)
+  termination_by
+    lt => sizeOf lt
+  decreasing_by
+    all_goals
+      simp
+      try omega
 
   /-- Convert LocalTypeR branch lists to LocalType branch lists. -/
   def localTypeRBranchesToChoices (ctx : List String) : List BranchR → List (String × LocalType)
     | [] => []
     | (lbl, _vt, cont) :: rest =>
         (lbl.name, localTypeRToLocalTypeAux ctx cont) :: localTypeRBranchesToChoices ctx rest
-
   termination_by
-    localTypeRToLocalTypeAux _ lt => sizeOf lt
-    localTypeRBranchesToChoices _ bs => sizeOf bs
+    bs => sizeOf bs
   decreasing_by
-    all_goals simp_wf
+    all_goals
+      simp
+      try omega
 end
 
 /-- Public LocalTypeR → LocalType conversion. -/
@@ -107,11 +121,17 @@ mutual
         | (_, _vt, cont) :: [] =>
             let code := code ++ [Instr.recv (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
             compileInner defaultAction cont code loopTargets
-        | _ =>
+        | (lbl₁, _vt₁, cont₁) :: (lbl₂, _vt₂, cont₂) :: rest =>
             let placeholderPc := code.length
             let code := code ++ [Instr.choose (γ:=γ) (ε:=ε) 0 ([] : List (String × PC))]
+            let startPc₁ := code.length
+            let (code, loopTargets) := compileInner defaultAction cont₁ code loopTargets
+            let table := [(lbl₁.name, startPc₁)]
+            let startPc₂ := code.length
+            let (code, loopTargets) := compileInner defaultAction cont₂ code loopTargets
+            let table := table ++ [(lbl₂.name, startPc₂)]
             let (code, table, loopTargets) :=
-              compileRecvBranchesAux defaultAction branches code ([] : List (String × PC)) loopTargets
+              compileRecvBranchesAux defaultAction rest code table loopTargets
             let code : List (Instr γ ε) :=
               listSet code placeholderPc (Instr.choose (γ:=γ) (ε:=ε) 0 table)
             (code, loopTargets)
@@ -123,6 +143,12 @@ mutual
         match loopTargets.find? (fun p => p.fst == v) with
         | some (_, target) => (code ++ [Instr.jmp (γ:=γ) (ε:=ε) target], loopTargets)
         | none => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
+  termination_by
+    sizeOf t
+  decreasing_by
+    all_goals
+      simp
+      try omega
 
   def compileRecvBranchesAux {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       [Inhabited (EffectRuntime.EffectAction ε)]
@@ -138,12 +164,12 @@ mutual
         let startPc := accCode.length
         let (accCode', loopTargets') := compileInner defaultAction cont accCode loopTargets
         compileRecvBranchesAux defaultAction rest accCode' (table ++ [(lbl.name, startPc)]) loopTargets'
-
   termination_by
-    compileInner _ t _ _ => sizeOf t
-    compileRecvBranchesAux _ branches _ _ _ => sizeOf branches
+    sizeOf branches
   decreasing_by
-    all_goals simp_wf
+    all_goals
+      simp
+      try omega
 end
 
 /-- Compile LocalTypeR into bytecode instructions. -/

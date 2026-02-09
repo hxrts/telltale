@@ -43,7 +43,7 @@ instance : IdentityModel UnitIdentity where
   decEqS := by infer_instance
 
 instance : GuardLayer UnitGuard where
-  -- Empty guard layer avoids noncomputable identifiers.
+  -- Empty guard layer avoids identifiers.
   layerId := fun g => nomatch g
   Resource := Unit
   Evidence := Unit

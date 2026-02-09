@@ -35,7 +35,7 @@ set_option linter.unnecessarySimpa false
 open scoped Classical
 open Batteries
 
-noncomputable section
+section
 
 /-! ## Preservation Theorems -/
 
@@ -405,21 +405,6 @@ private lemma HasTypeProcPreOut_frame_G_left_par
       (Sown:={ right := Sown.right ++ split.S1, left := split.S2 })
       (G:=split.G2) (Gfr:=split.G1) hDisjG hQ
   simpa [split.hG] using hQ'
-
-/-- Dom-subset into the right frame implies absence when the right frame is empty. -/
-private lemma lookupSEnv_none_of_domsubset_right
-    {Sframe Sright : SEnv} {x : Var}
-    (hSub : SEnvDomSubset Sframe Sright)
-    (hNo : lookupSEnv Sright x = none) :
-    lookupSEnv Sframe x = none := by
-  -- Otherwise dom-subset places x in Sright, contradicting hNo.
-  by_cases hNone : lookupSEnv Sframe x = none
-  · exact hNone
-  · cases hL : lookupSEnv Sframe x with
-    | none => exact (hNone hL).elim
-    | some T =>
-        obtain ⟨T', hRight⟩ := hSub hL
-        simpa [hNo] using hRight
 
 /-- Recv preserves disjointness between shared and owned envs. -/
 private lemma DisjointS_preserved_TypedStep_right_recv

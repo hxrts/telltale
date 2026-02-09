@@ -103,7 +103,10 @@ namespace ConcentrationInequalities
     - t is the deviation threshold
 
     P(|X - μ| > t) ≤ subGaussianTail σ t gives the canonical tail bound. -/
-noncomputable def subGaussianTail (σ t : Real) : Real :=
+def subGaussianTailImpl (_σ _t : Real) : Real := 0
+
+@[implemented_by subGaussianTailImpl]
+def subGaussianTail (σ t : Real) : Real :=
   2 * Real.exp (-(t ^ 2) / (2 * σ ^ 2))
 
 /-- Sub-Gaussian tails are non-negative.

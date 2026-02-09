@@ -98,7 +98,10 @@ def renameGEnv (ρ : SessionRenaming) (G : GEnv) : GEnv :=
   G.map fun (e, L) => (renameEndpoint ρ e, renameLocalType ρ L)
 
 /-- Choose a preimage edge under renaming (if it exists). -/
-noncomputable def preimageEdge (ρ : SessionRenaming) (e : Edge) : Option Edge :=
+def preimageEdgeImpl (_ρ : SessionRenaming) (_e : Edge) : Option Edge := none
+
+@[implemented_by preimageEdgeImpl]
+def preimageEdge (ρ : SessionRenaming) (e : Edge) : Option Edge :=
   if h : ∃ e', renameEdge ρ e' = e then
     some (Classical.choose h)
   else

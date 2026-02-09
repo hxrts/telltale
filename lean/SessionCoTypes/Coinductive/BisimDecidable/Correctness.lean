@@ -13,7 +13,7 @@ namespace SessionCoTypes.Coinductive
 /-! ## Reachable Pairs -/
 
 /-- Local decidable equality for visited membership. -/
-noncomputable local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
+local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
   -- Use classical choice to decide equality on pairs.
   classical
   infer_instance
@@ -29,14 +29,14 @@ lemma reachablePairs_finite {a b : LocalTypeC} (ha : Regular a) (hb : Regular b)
   exact Set.Finite.subset hprod (fun ⟨x, y⟩ ⟨hx, hy⟩ => ⟨hx, hy⟩)
 
 /-- Convert finite reachable pairs to Finset. -/
-noncomputable def reachablePairsFinset (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) :
+def reachablePairsFinset (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) :
     Finset (LocalTypeC × LocalTypeC) :=
   (reachablePairs_finite ha hb).toFinset
 
 /-! ## Measure for Termination -/
 
 /-- The measure: size of unvisited pairs from the reachable set. -/
-noncomputable def pairMeasure (all : Finset (LocalTypeC × LocalTypeC))
+def pairMeasure (all : Finset (LocalTypeC × LocalTypeC))
     (visited : Finset (LocalTypeC × LocalTypeC)) : Nat :=
   all.card - visited.card
 
@@ -59,11 +59,11 @@ lemma pairMeasure_lt {all visited : Finset (LocalTypeC × LocalTypeC)}
 /-! ## Bisimulation Functions -/
 
 /-- Compute sufficient fuel for bisim based on reachable pairs. -/
-noncomputable def bisimFuel (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Nat :=
+def bisimFuel (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Nat :=
   (reachablePairsFinset a b ha hb).card + 1
 
 /-- Main bisimulation check for regular types. -/
-noncomputable def bisim (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) (bound : Nat) : Bool :=
+def bisim (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) (bound : Nat) : Bool :=
   bisimAux (bisimFuel a b ha hb) bound ∅ (a, b)
 
 /-! ## Soundness via Paco Coinduction -/
@@ -283,7 +283,7 @@ theorem bisim_sound {a b : LocalTypeC} {ha : Regular a} {hb : Regular b} {bound 
 /-! ## Maximum Unfolding Depth -/
 
 /-- Maximum mu-nesting depth for a regular type (upper bound on unfoldings needed). -/
-noncomputable def maxUnfoldDepth (t : LocalTypeC) : Nat := by
+def maxUnfoldDepth (t : LocalTypeC) : Nat := by
   -- Use classical choice to decide observability for the bounded unfolding depth.
   classical
   exact if hobs : ObservableC t then

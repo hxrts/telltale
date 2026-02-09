@@ -148,28 +148,28 @@ inductive HasTypeProcPre : SEnv → OwnedEnv → GEnv → Process → Prop where
 
   /-- Send: channel k points to endpoint e, e has send type, payload x has correct type. -/
   | send {Ssh Sown G k x e q T L} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.send q T L) →
-      lookupSEnv (SEnvAll Ssh Sown) x = some T →
+      lookupSEnv (SEnvVisible Ssh Sown) x = some T →
       HasTypeProcPre Ssh Sown G (.send k x)
 
   /-- Recv: channel k points to endpoint e, e has recv type. -/
   | recv {Ssh Sown G k x e p T L} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.recv p T L) →
       lookupSEnv Ssh x = none →
       HasTypeProcPre Ssh Sown G (.recv k x)
 
   /-- Select: channel k points to endpoint e, e has select type with label l. -/
   | select {Ssh Sown G k l e q bs L} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.select q bs) →
       bs.find? (fun b => b.1 == l) = some (l, L) →
       HasTypeProcPre Ssh Sown G (.select k l)
 
   /-- Branch: channel k points to endpoint e, e has branch type, all branches typed. -/
   | branch {Ssh Sown G k procs e p bs} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.branch p bs) →
       bs.length = procs.length →
       (∀ i (hi : i < bs.length) (hip : i < procs.length),
@@ -208,9 +208,9 @@ Reference: `work/effects/008.lean:274-300` -/
 theorem inversion_send {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     (h : HasTypeProcPre Ssh Sown G (.send k x)) :
     ∃ e q T L,
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) ∧
       lookupG G e = some (.send q T L) ∧
-      lookupSEnv (SEnvAll Ssh Sown) x = some T := by
+      lookupSEnv (SEnvVisible Ssh Sown) x = some T := by
   cases h with
   | send hk hG hx => exact ⟨_, _, _, _, hk, hG, hx⟩
 
@@ -219,7 +219,7 @@ theorem inversion_send {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
 theorem inversion_recv {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
     (h : HasTypeProcPre Ssh Sown G (.recv k x)) :
     ∃ e p T L,
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) ∧
       lookupG G e = some (.recv p T L) ∧
       lookupSEnv Ssh x = none := by
   cases h with
@@ -230,7 +230,7 @@ theorem inversion_recv {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
 theorem inversion_select {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l : Label}
     (h : HasTypeProcPre Ssh Sown G (.select k l)) :
     ∃ e q bs L,
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) ∧
       lookupG G e = some (.select q bs) ∧
       bs.find? (fun b => b.1 == l) = some (l, L) := by
   cases h with
@@ -241,7 +241,7 @@ theorem inversion_select {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {l 
 theorem inversion_branch {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k : Var} {procs : List (Label × Process)}
     (h : HasTypeProcPre Ssh Sown G (.branch k procs)) :
     ∃ e p bs,
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) ∧
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) ∧
       lookupG G e = some (.branch p bs) ∧
       bs.length = procs.length ∧
       (∀ i (hi : i < bs.length) (hip : i < procs.length),
@@ -285,40 +285,38 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
 
   /-- Send advances the sender's local type. -/
   | send {Ssh Sown G k x e q T L} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.send q T L) →
-      lookupSEnv (SEnvAll Ssh Sown) x = some T →
+      lookupSEnv (SEnvVisible Ssh Sown) x = some T →
       HasTypeProcPreOut Ssh Sown G (.send k x) Sown (updateG G e L) [] ∅
 
   /-- Recv advances the receiver's local type and extends S for x. -/
   | recv_new {Ssh Sown G k x e p T L} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.recv p T L) →
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown.right x = none →
       lookupSEnv Sown.left x = none →
       HasTypeProcPreOut Ssh Sown G (.recv k x)
         (OwnedEnv.updateLeft Sown x T) (updateG G e L) [x] (updateSEnv ∅ x T)
 
   | recv_old {Ssh Sown G k x e p T L T'} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.recv p T L) →
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown.right x = none →
       lookupSEnv Sown.left x = some T' →
       HasTypeProcPreOut Ssh Sown G (.recv k x)
         (OwnedEnv.updateLeft Sown x T) (updateG G e L) [x] ∅
 
   /-- Select advances the sender's local type. -/
   | select {Ssh Sown G k l e q bs L} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.select q bs) →
       bs.find? (fun b => b.1 == l) = some (l, L) →
       HasTypeProcPreOut Ssh Sown G (.select k l) Sown (updateG G e L) [] ∅
 
   /-- Branch: all branches are pre-typed; post environments follow the runtime label. -/
   | branch {Ssh Sown G k procs e p bs S' G' W Δ} :
-      lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e.sid e.role) →
+      lookupSEnv (SEnvVisible Ssh Sown) k = some (.chan e.sid e.role) →
       lookupG G e = some (.branch p bs) →
       bs.length = procs.length →
       (∀ j (hj : j < bs.length) (hjp : j < procs.length),
@@ -329,6 +327,7 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
         procs.find? (fun b => b.1 == lbl) = some (lbl, P) →
         bs.find? (fun b => b.1 == lbl) = some (lbl, L) →
         HasTypeProcPreOut Ssh Sown (updateG G e L) P S' G' W Δ) →
+      SessionsOf G' ⊆ SessionsOf G →
       SEnvDomSubset Sown.left S'.left →
       HasTypeProcPreOut Ssh Sown G (.branch k procs) S' G' W Δ
 
@@ -365,7 +364,6 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
   /-- Assignment updates S with x's type. -/
   | assign_new {Ssh Sown G x v T} :
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown.right x = none →
       lookupSEnv Sown.left x = none →
       HasTypeVal G v T →
       HasTypeProcPreOut Ssh Sown G (.assign x v)
@@ -373,7 +371,6 @@ inductive HasTypeProcPreOut : SEnv → OwnedEnv → GEnv → Process → OwnedEn
 
   | assign_old {Ssh Sown G x v T T'} :
       lookupSEnv Ssh x = none →
-      lookupSEnv Sown.right x = none →
       lookupSEnv Sown.left x = some T' →
       HasTypeVal G v T →
       HasTypeProcPreOut Ssh Sown G (.assign x v)

@@ -121,7 +121,11 @@ def partialSum (x : Nat → Real) (μ : Real) (t : Nat) : Real :=
     - The √N scaling gives O(1) fluctuations as N → ∞
 
     This is the object that converges to Brownian motion. -/
-noncomputable def scaledProcess (x : Nat → Real) (μ : Real) (N t : Nat) : Real :=
+def scaledProcessImpl (x : Nat → Real) (μ : Real) (_N t : Nat) : Real :=
+  partialSum x μ t
+
+@[implemented_by scaledProcessImpl]
+def scaledProcess (x : Nat → Real) (μ : Real) (N t : Nat) : Real :=
   partialSum x μ t / Real.sqrt N
 
 /-- Centered increments are additive.

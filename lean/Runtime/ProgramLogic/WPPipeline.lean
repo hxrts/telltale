@@ -10,7 +10,7 @@ leaving the algebraic proof structure to future refinement.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 

@@ -34,7 +34,7 @@ Dependencies: Task 13, Shim.Invariants + Shim.SavedProp.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 variable [Telltale.TelltaleIris]
 variable [GhostMapSlot Unit]

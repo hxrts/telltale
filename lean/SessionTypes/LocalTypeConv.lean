@@ -160,7 +160,7 @@ These wrappers make it explicit when conversions are guaranteed to be safe.
 -/
 
 /-- Convert closed named term to DB (guaranteed to succeed). -/
-noncomputable def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDB :=
+def toDB_closed_safe (t : LocalTypeR) (_hclosed : t.isClosed = true) : LocalTypeDB :=
   Classical.choose (toDB_closed t _hclosed)
 
 /-- Convert closed DB term to named (safe version). -/

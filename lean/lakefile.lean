@@ -55,6 +55,10 @@ lean_lib Runtime where
 lean_lib ClassicalLayer where
   globs := #[`Classical.*]
 
+/-- Consensus hypothesis validation and protocol-space classification. -/
+lean_lib Consensus where
+  globs := #[`Consensus.*]
+
 /-- Linker args to silence macOS deployment target warnings for test executables. -/
 def macosLinkArgs : Array String :=
   -- Match the toolchain's minimum macOS version for system libraries.

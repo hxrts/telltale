@@ -28,19 +28,22 @@ section
 private theorem HasTypeProcPreOut_preserved_sub
     {Gstore G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     StoreTyped Gstore (SEnvAll Ssh Sown) store →
+    DisjointS Ssh (Sown : SEnv) →
+    OwnedDisjoint Sown →
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro hStore hTS hPre
+  intro hStore hDisjShAll hOwnDisj hTS hPre
   induction hTS generalizing Sfin Gfin W Δ with
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       cases hPre with
       | send hk' hG' hx' =>
           rename_i e' q' T' L'
-          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
-            simpa using hk'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
+            lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+              (T:=.chan e'.sid e'.role) hDisjShAll hOwnDisj hk'
           have hGPre : lookupG G e' = some (.send q' T' L') := by
             simpa using hG'
           -- Align endpoints via store typing.
@@ -70,10 +73,11 @@ private theorem HasTypeProcPreOut_preserved_sub
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       cases hPre with
-      | recv_new hk' hG' hSsh hSownR hSownL =>
+      | recv_new hk' hG' hSsh hSownL =>
           rename_i e' p' T' L'
-          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
-            simpa using hk'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
+            lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+              (T:=.chan e'.sid e'.role) hDisjShAll hOwnDisj hk'
           have hGPre : lookupG G e' = some (.recv p' T' L') := by
             simpa using hG'
           -- Align endpoints via store typing.
@@ -104,10 +108,11 @@ private theorem HasTypeProcPreOut_preserved_sub
               (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G e L))
           · intro x hx; cases hx
           · intro x T hx; cases hx
-      | recv_old hk' hG' hSsh hSownR hSownL =>
+      | recv_old hk' hG' hSsh hSownL =>
           rename_i e' p' T' L' Told
-          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
-            simpa using hk'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
+            lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+              (T:=.chan e'.sid e'.role) hDisjShAll hOwnDisj hk'
           have hGPre : lookupG G e' = some (.recv p' T' L') := by
             simpa using hG'
           -- Align endpoints via store typing.
@@ -143,8 +148,9 @@ private theorem HasTypeProcPreOut_preserved_sub
       cases hPre with
       | select hk' hG' hFind' =>
           rename_i e' q' bs' L'
-          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
-            simpa using hk'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
+            lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+              (T:=.chan e'.sid e'.role) hDisjShAll hOwnDisj hk'
           have hGPre : lookupG G e' = some (.select q' bs') := by
             simpa using hG'
           -- Align endpoints via store typing.
@@ -181,10 +187,11 @@ private theorem HasTypeProcPreOut_preserved_sub
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       cases hPre with
-      | branch hk' hG' hLen hLabels hPreAll hPost hDom =>
+      | branch hk' hG' hLen hLabels hPreAll hPost hSess hDom =>
           rename_i e' p' bs'
-          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) := by
-            simpa using hk'
+          have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
+            lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
+              (T:=.chan e'.sid e'.role) hDisjShAll hOwnDisj hk'
           have hGPre : lookupG G e' = some (.branch p' bs') := by
             simpa using hG'
           -- Align endpoints via store typing.
@@ -215,7 +222,7 @@ private theorem HasTypeProcPreOut_preserved_sub
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T Sown' store'
       cases hPre with
-      | assign_new hSsh hSownR hSownL hv' =>
+      | assign_new hSsh hSownL hv' =>
           have hT := HasTypeVal_unique hv' hv
           cases hT
           refine ⟨[], ∅, ?_, ?_, ?_⟩
@@ -224,7 +231,7 @@ private theorem HasTypeProcPreOut_preserved_sub
               (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=G))
           · intro x hx; cases hx
           · intro x T hx; cases hx
-      | assign_old hSsh hSownR hSownL hv' =>
+      | assign_old hSsh hSownL hv' =>
           have hT := HasTypeVal_unique hv' hv
           cases hT
           refine ⟨[], ∅, ?_, ?_, ?_⟩
@@ -237,7 +244,7 @@ private theorem HasTypeProcPreOut_preserved_sub
       cases hPre with
       | seq hP hQ =>
           rename_i W₁ W₂ Δ₁ Δ₂
-          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hP
+          obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ := ih hStore hDisjShAll hOwnDisj hP
           refine ⟨W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, ?_, ?_⟩
           · exact HasTypeProcPreOut.seq hP' hQ
           · exact FootprintSubset_append_left hSubW
@@ -272,6 +279,15 @@ private theorem HasTypeProcPreOut_preserved_sub
           simpa [hSwap'] using hLookup'
         exact hStore' x v T hStoreX (by
           simpa [SEnvAll, List.append_assoc] using hLookup'')
+      have hDisjShRight : DisjointS Ssh Sown.right := DisjointS_owned_right_pu hDisjShAll
+      have hDisjShSplit : DisjointS Ssh split.S1 ∧ DisjointS Ssh split.S2 :=
+        DisjointS_split_from_owned_left_pu (Sown:=Sown) (split:=split) hDisjShAll
+      have hDisjShAll_inner :
+          DisjointS Ssh ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
+        DisjointS_owned_repack_pu hDisjShRight hDisjShSplit.1 hDisjShSplit.2
+      have hOwnDisj_inner :
+          OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
+        OwnedDisjoint_sub_left_pu (Sown:=Sown) (split:=split) hOwnDisj hDisjS
       cases hPre with
       | par split' hSlenPre hGlenPre hSfin hGfin hW hΔ
             hDisjG' hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
@@ -296,7 +312,7 @@ private theorem HasTypeProcPreOut_preserved_sub
             simpa [split.hG] using hTS
           obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ :=
             HasTypeProcPreOut_preserved_sub_left_frame
-              (Gstore:=Gstore) hStoreL hDisjG rfl rfl hTS' hP
+              (Gstore:=Gstore) hStoreL hDisjShAll_inner hOwnDisj_inner hDisjG rfl rfl hTS' hP
           let splitOut : ParSplit (S₁_step ++ split.S2) (G₁_step ++ split.G2) :=
             { S1 := S₁_step, S2 := split.S2, G1 := G₁_step, G2 := split.G2, hS := rfl, hG := rfl }
           have hSubG_step : SessionsOf G₁_step ⊆ SessionsOf split.G1 :=
@@ -331,6 +347,15 @@ private theorem HasTypeProcPreOut_preserved_sub
       rename_i Ssh Sown store bufs store' bufs' P Q Q' G D₁ D₂ G₂_step D₂_step S₂_step nS nG
       have hStoreR : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store := by
         simpa [SEnvAll, split.hS, List.append_assoc] using hStore
+      have hDisjShRight : DisjointS Ssh Sown.right := DisjointS_owned_right_pu hDisjShAll
+      have hDisjShSplit : DisjointS Ssh split.S1 ∧ DisjointS Ssh split.S2 :=
+        DisjointS_split_from_owned_left_pu (Sown:=Sown) (split:=split) hDisjShAll
+      have hDisjShAll_inner :
+          DisjointS Ssh ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
+        DisjointS_owned_repack_pu hDisjShRight hDisjShSplit.2 hDisjShSplit.1
+      have hOwnDisj_inner :
+          OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
+        OwnedDisjoint_sub_right_pu (Sown:=Sown) (split:=split) hOwnDisj hDisjS
       cases hPre with
       | par split' hSlenPre hGlenPre hSfin hGfin hW hΔ
             hDisjG' hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
@@ -355,7 +380,7 @@ private theorem HasTypeProcPreOut_preserved_sub
             simpa [split.hG] using hTS
           obtain ⟨W₂', Δ₂', hQ', hSubW, hSubΔ⟩ :=
             HasTypeProcPreOut_preserved_sub_right_frame
-              (Gstore:=Gstore) hStoreR hDisjG rfl rfl hTS' hQ
+              (Gstore:=Gstore) hStoreR hDisjShAll_inner hOwnDisj_inner hDisjG rfl rfl hTS' hQ
           let splitOut : ParSplit (split.S1 ++ S₂_step) (split.G1 ++ G₂_step) :=
             { S1 := split.S1, S2 := S₂_step, G1 := split.G1, G2 := G₂_step, hS := rfl, hG := rfl }
           have hSubG_step : SessionsOf G₂_step ⊆ SessionsOf split.G2 :=
@@ -398,11 +423,13 @@ private theorem HasTypeProcPreOut_preserved_sub
 theorem HasTypeProcPreOut_preserved
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     StoreTyped G (SEnvAll Ssh Sown) store →
+    DisjointS Ssh (Sown : SEnv) →
+    OwnedDisjoint Sown →
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
     HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G' P' Sfin Gfin W' Δ' := by
-  intro hStore hTS hPre
-  obtain ⟨W', Δ', hPre', _, _⟩ := HasTypeProcPreOut_preserved_sub hStore hTS hPre
+  intro hStore hDisjShAll hOwnDisj hTS hPre
+  obtain ⟨W', Δ', hPre', _, _⟩ := HasTypeProcPreOut_preserved_sub hStore hDisjShAll hOwnDisj hTS hPre
   exact ⟨W', Δ', hPre'⟩
 
 

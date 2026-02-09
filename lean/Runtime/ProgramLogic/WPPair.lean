@@ -10,7 +10,7 @@ Solution Structure. Introduce an `InstrPair` abstraction and a generic
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 

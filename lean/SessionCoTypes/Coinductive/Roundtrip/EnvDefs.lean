@@ -10,7 +10,7 @@ Stub definitions (nameOf, envOf), environment containment helpers, and toInducti
 namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-noncomputable local instance : DecidableEq LocalTypeC := by
+local instance : DecidableEq LocalTypeC := by
   classical
   infer_instance
 /-! ## Stub Definitions (Work in Progress)
@@ -20,7 +20,7 @@ in this file. The placeholders below serve as notes for the public API.
 -/
 
 /-- Name assigned to a coinductive node in a finite system. -/
-noncomputable def nameOf (c : LocalTypeC) (all : Finset LocalTypeC) : String :=
+def nameOf (c : LocalTypeC) (all : Finset LocalTypeC) : String :=
   match head c with
   | .mu x => x
   | _     => nameFor c all
@@ -130,7 +130,7 @@ lemma envOf_resolves_of_backedge {all visited : Finset LocalTypeC}
 /-! ## toInductive body helper -/
 
 /-- Canonical unfold body for toInductiveAux. -/
-noncomputable def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
+def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
     (current : LocalTypeC)
     (h_closed : IsClosedSet all)
     (h_visited : visited ⊆ all) (h_current : current ∈ all) : LocalTypeR :=

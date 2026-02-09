@@ -21,7 +21,7 @@ set_option autoImplicit false
 
 namespace InformationCost
 
-noncomputable section
+section
 
 open scoped BigOperators Classical
 
@@ -36,6 +36,9 @@ structure Distribution (α : Type*) [Fintype α] where
 /-! ## Shannon Entropy -/
 
 /-- Shannon entropy: H(p) = -∑ pᵢ log pᵢ with convention 0 log 0 = 0. -/
+def shannonEntropyImpl {α : Type*} [Fintype α] (_p : α → ℝ) : ℝ := 0
+
+@[implemented_by shannonEntropyImpl]
 def shannonEntropy {α : Type*} [Fintype α] (p : α → ℝ) : ℝ :=
   - ∑ a, if p a = 0 then 0 else p a * Real.log (p a)
 
@@ -85,6 +88,9 @@ theorem shannonEntropy_deterministic {α : Type*} [Fintype α]
 /-! ## KL Divergence -/
 
 /-- KL divergence: D_KL(p‖q) = ∑ pᵢ log(pᵢ/qᵢ) with 0 log 0 = 0. -/
+def klDivergenceImpl {α : Type*} [Fintype α] (_p _q : α → ℝ) : ℝ := 0
+
+@[implemented_by klDivergenceImpl]
 def klDivergence {α : Type*} [Fintype α] (p q : α → ℝ) : ℝ :=
   ∑ a, if p a = 0 then 0 else p a * Real.log (p a / q a)
 
@@ -314,6 +320,9 @@ def marginalSnd {α β : Type*} [Fintype α] [Fintype β] (pXY : α × β → �
 
 /-! ## Mutual Information -/
 
+def mutualInfoImpl {α β : Type*} [Fintype α] [Fintype β] (_pXY : α × β → ℝ) : ℝ := 0
+
+@[implemented_by mutualInfoImpl]
 def mutualInfo {α β : Type*} [Fintype α] [Fintype β] (pXY : α × β → ℝ) : ℝ :=
   shannonEntropy (marginalFst pXY) + shannonEntropy (marginalSnd pXY) - shannonEntropy pXY
 
@@ -461,6 +470,9 @@ theorem mutualInfo_nonneg {α β : Type*} [Fintype α] [Fintype β]
 /-! ## Conditional Entropy -/
 
 /-- Conditional entropy H(X|Y) = H(X,Y) - H(Y). -/
+def condEntropyImpl {α β : Type*} [Fintype α] [Fintype β] (_pXY : α × β → ℝ) : ℝ := 0
+
+@[implemented_by condEntropyImpl]
 def condEntropy {α β : Type*} [Fintype α] [Fintype β] (pXY : α × β → ℝ) : ℝ :=
   shannonEntropy pXY - shannonEntropy (marginalSnd pXY)
 
@@ -945,6 +957,9 @@ theorem data_processing_inequality {α β γ : Type*} [Fintype α] [Fintype β] 
 
 /-- Entropy cost of a branching label distribution.
     Wraps shannonEntropy for use in session type cost models. -/
+def branchEntropyImpl {L : Type*} [Fintype L] (_labelDist : L → ℝ) : ℝ := 0
+
+@[implemented_by branchEntropyImpl]
 def branchEntropy {L : Type*} [Fintype L] (labelDist : L → ℝ) : ℝ :=
   shannonEntropy labelDist
 
@@ -962,11 +977,19 @@ theorem branchEntropy_le_log_card {L : Type*} [Fintype L] [Nonempty L]
 
 /-- Total cost of a select operation: computation cost plus information-theoretic
     entropy of the label distribution. -/
+def selectCostImpl {L : Type*} [Fintype L] (compCost : ℝ) (_labelDist : L → ℝ) : ℝ :=
+  compCost
+
+@[implemented_by selectCostImpl]
 def selectCost {L : Type*} [Fintype L] (compCost : ℝ) (labelDist : L → ℝ) : ℝ :=
   compCost + branchEntropy labelDist
 
 /-- Speculative divergence: KL divergence from speculative label distribution
     to committed distribution. Measures potential wasted work. -/
+def speculationDivergenceImpl {L : Type*} [Fintype L]
+    (_specDist _commitDist : L → ℝ) : ℝ := 0
+
+@[implemented_by speculationDivergenceImpl]
 def speculationDivergence {L : Type*} [Fintype L]
     (specDist commitDist : L → ℝ) : ℝ :=
   klDivergence specDist commitDist

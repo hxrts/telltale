@@ -7,7 +7,7 @@ Merge soundness helpers and proofs for erasure.
 namespace Choreography.Projection.Erasure
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-noncomputable section
+section
 open Classical
 /-! ## Merge Soundness Helpers -/
 

@@ -11,7 +11,7 @@ models with Iris predicates and namespace bookkeeping.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 

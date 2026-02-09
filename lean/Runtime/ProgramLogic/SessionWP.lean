@@ -30,7 +30,7 @@ Dependencies: Task 12, Task 16, Shim.Invariants + Shim.WeakestPre.
 -/
 
 set_option autoImplicit false
-noncomputable section
+section
 
 universe u
 

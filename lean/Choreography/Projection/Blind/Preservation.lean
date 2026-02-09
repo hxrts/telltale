@@ -12,7 +12,7 @@ open SessionTypes.LocalTypeR
 open Choreography.Projection.Trans
 open Choreography.Projection.Projectb
 
-noncomputable section
+section
 open Classical
 
 /-! ## Step Preservation Helpers -/

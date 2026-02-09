@@ -459,6 +459,8 @@ private lemma par_left_after_ih
     (ih :
       ∀ {G₁ G₂ G₁' : GEnv} {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv},
         StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store →
+          DisjointS Ssh (({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) : SEnv) →
+          OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) →
           DisjointG G₁ G₂ →
             G = G₁ ++ G₂ →
               G₁_step ++ split.G2 = G₁' ++ G₂ →
@@ -467,6 +469,8 @@ private lemma par_left_after_ih
                     HasTypeProcPreOut Ssh { right := Sown.right ++ split.S2, left := S₁_step } G₁' P' Sfin Gfin W' Δ' ∧
                       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ) →
     (hStoreL : StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store) →
+    (hDisjShAll_inner : DisjointS Ssh (({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) : SEnv)) →
+    (hOwnDisj_inner : OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv)) →
     (hDisjG_inner : DisjointG split_pre.G1 (split_pre.G2 ++ G₂)) →
     (hEq_inner : G = split_pre.G1 ++ (split_pre.G2 ++ G₂)) →
     (hEq'_inner : G₁_step ++ split.G2 = G₁_step ++ (split_pre.G2 ++ G₂)) →
@@ -479,9 +483,9 @@ private lemma par_left_after_ih
       { right := Sown.right ++ split.S2, left := S₁_fin } G₁_fin W₁' Δ₁' ∧
       FootprintSubset W₁' W₁ ∧ SEnvDomSubset Δ₁' Δ₁ ∧
       DisjointG G₁_step split_pre.G2 := by
-  intro ih hStoreL hDisjG_inner hEq_inner hEq'_inner hP0 hDisjG' hTS
+  intro ih hStoreL hDisjShAll_inner hOwnDisj_inner hDisjG_inner hEq_inner hEq'_inner hP0 hDisjG' hTS
   obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ⟩ :=
-    ih hStoreL hDisjG_inner hEq_inner hEq'_inner hP0
+    ih hStoreL hDisjShAll_inner hOwnDisj_inner hDisjG_inner hEq_inner hEq'_inner hP0
   have hSubG_step : SessionsOf G₁_step ⊆ SessionsOf split_pre.G1 :=
     SessionsOf_subset_of_TypedStep_left_frame hDisjG_inner hEq_inner hEq'_inner hTS
   have hDisjGOut : DisjointG G₁_step split_pre.G2 :=
@@ -540,8 +544,12 @@ lemma preserved_sub_left_frame_par_left
       (G₁_step ++ split.G2) (D₁_step ++ D₂) { right := Sown.right ++ split.S2, left := S₁_step } store' bufs' P' →
     DisjointG split.G1 split.G2 →
     DisjointS split.S1 split.S2 →
+    DisjointS Ssh (({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) : SEnv) →
+    OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) →
     (∀ {G₁ G₂ G₁' : GEnv} {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv},
       StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S2, left := split.S1 }) store →
+        DisjointS Ssh (({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) : SEnv) →
+        OwnedDisjoint ({ right := Sown.right ++ split.S2, left := split.S1 } : OwnedEnv) →
         DisjointG G₁ G₂ →
           G = G₁ ++ G₂ →
             G₁_step ++ split.G2 = G₁' ++ G₂ →
@@ -554,7 +562,7 @@ lemma preserved_sub_left_frame_par_left
       HasTypeProcPreOut Ssh { right := Sown.right, left := S₁_step ++ split.S2 } G₁'
         (.par S₁_step.length G₁_step.length P' Q) Sfin Gfin W' Δ' ∧
         FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro split hStoreL hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS ih hPre
+  intro split hStoreL hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS hDisjShAll_inner hOwnDisj_inner ih hPre
   cases hPre with
   | par split_pre hSlenPre hGlenPre hSfin hGfin hW hΔ
       hDisjG' hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>
@@ -568,7 +576,8 @@ lemma preserved_sub_left_frame_par_left
         par_left_reframe_P_in (Sown:=Sown) (split:=split) (split_pre:=split_pre) (P:=P) (S₁_fin:=S₁_fin)
           (G₁_fin:=G₁_fin) (W₁:=W₁) (Δ₁:=Δ₁) hP hS1eq hS2eq
       obtain ⟨W₁', Δ₁', hP', hSubW, hSubΔ, hDisjGOut⟩ :=
-        par_left_after_ih (ih:=ih) (hStoreL:=hStoreL) (hDisjG_inner:=hDisjG_inner)
+        par_left_after_ih (ih:=ih) (hStoreL:=hStoreL) (hDisjShAll_inner:=hDisjShAll_inner)
+          (hOwnDisj_inner:=hOwnDisj_inner) (hDisjG_inner:=hDisjG_inner)
           (hEq_inner:=hEq_inner) (hEq'_inner:=hEq'_inner) (hP0:=hP0) (hDisjG':=hDisjG') (hTS:=hTS)
       have hP'' :
           HasTypeProcPreOut Ssh { right := Sown.right ++ split_pre.S2, left := S₁_step } G₁_step P'
@@ -615,8 +624,12 @@ lemma preserved_sub_left_frame_par_right
       (split.G1 ++ G₂_step) (D₁ ++ D₂_step) { right := Sown.right ++ split.S1, left := S₂_step } store' bufs' Q' →
     DisjointG split.G1 split.G2 →
     DisjointS split.S1 split.S2 →
+    DisjointS Ssh (({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) : SEnv) →
+    OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) →
     (∀ {G₁ G₂ G₁' : GEnv} {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv},
       StoreTyped Gstore (SEnvAll Ssh { right := Sown.right ++ split.S1, left := split.S2 }) store →
+        DisjointS Ssh (({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) : SEnv) →
+        OwnedDisjoint ({ right := Sown.right ++ split.S1, left := split.S2 } : OwnedEnv) →
         DisjointG G₁ G₂ →
           G = G₁ ++ G₂ →
             split.G1 ++ G₂_step = G₁' ++ G₂ →
@@ -629,7 +642,7 @@ lemma preserved_sub_left_frame_par_right
       HasTypeProcPreOut Ssh { right := Sown.right, left := split.S1 ++ S₂_step } G₁'
         (.par split.S1.length split.G1.length P Q') Sfin Gfin W' Δ' ∧
         FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro split hStoreR hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS ih hPre
+  intro split hStoreR hDisj hEq hEq' hSlen hGlen hTS hDisjG hDisjS hDisjShAll_inner hOwnDisj_inner ih hPre
   cases hPre with
   | par split_pre hSlenPre hGlenPre hSfin hGfin hW hΔ
       hDisjG_pre hDisjS' hDisjS_left hDisjS_right hDisjS'' hDisjW hDisjΔ hS1 hS2 hP hQ =>

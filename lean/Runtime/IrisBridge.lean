@@ -100,9 +100,12 @@ attribute [instance] GhostMapSlot.instElemG
 
 /-! ## Internal Aliases -/
 
-noncomputable def wsatGS : WsatGS ti.GF := ti.W
+def wsatGS : WsatGS ti.GF := ti.W
 
-noncomputable def uPredFupd (E₁ E₂ : Mask) (P : iProp) : iProp :=
+def uPredFupdImpl (_E₁ _E₂ : Mask) (P : iProp) : iProp := P
+
+@[implemented_by uPredFupdImpl]
+def uPredFupd (E₁ E₂ : Mask) (P : iProp) : iProp :=
   Iris.BaseLogic.uPred_fupd
     (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E₁ E₂ P
 
@@ -122,23 +125,23 @@ variable [ti : Telltale.TelltaleIris]
 
 namespace iProp
 
-noncomputable def entails (P Q : iProp) : Prop := @Iris.BI.BIBase.Entails _ _ P Q
-noncomputable def emp : iProp := @Iris.BI.BIBase.emp _ _
-noncomputable def sep (P Q : iProp) : iProp := @Iris.BI.BIBase.sep _ _ P Q
-noncomputable def wand (P Q : iProp) : iProp := @Iris.BI.BIBase.wand _ _ P Q
-noncomputable def pure (φ : Prop) : iProp := @Iris.BI.BIBase.pure _ _ φ
-noncomputable def later (P : iProp) : iProp := @Iris.BI.BIBase.later _ _ P
-noncomputable def persistently (P : iProp) : iProp := @Iris.BI.BIBase.persistently _ _ P
-noncomputable def «exist» {α : Type} (Φ : α → iProp) : iProp :=
+def entails (P Q : iProp) : Prop := @Iris.BI.BIBase.Entails _ _ P Q
+def emp : iProp := @Iris.BI.BIBase.emp _ _
+def sep (P Q : iProp) : iProp := @Iris.BI.BIBase.sep _ _ P Q
+def wand (P Q : iProp) : iProp := @Iris.BI.BIBase.wand _ _ P Q
+def pure (φ : Prop) : iProp := @Iris.BI.BIBase.pure _ _ φ
+def later (P : iProp) : iProp := @Iris.BI.BIBase.later _ _ P
+def persistently (P : iProp) : iProp := @Iris.BI.BIBase.persistently _ _ P
+def «exist» {α : Type} (Φ : α → iProp) : iProp :=
   @Iris.BI.BIBase.«exists» _ _ α Φ
-noncomputable def «forall» {α : Type} (Φ : α → iProp) : iProp :=
+def «forall» {α : Type} (Φ : α → iProp) : iProp :=
   @Iris.BI.BIBase.«forall» _ _ α Φ
 
 end iProp
 
 /-! ## Big Separation over Maps -/
 
-noncomputable def big_sepM {K : Type _} {V : Type _} {M' : Type _ → Type _}
+def big_sepM {K : Type _} {V : Type _} {M' : Type _ → Type _}
     [Iris.Std.FiniteMap K M'] (Φ : K → V → iProp) (m : M' V) : iProp :=
   Iris.BI.big_sepM (PROP := iProp) Φ m
 
@@ -199,7 +202,7 @@ theorem persistently_sep_dup (P : iProp) :
 
 /-! ## Basic Update Modality -/
 
-noncomputable def bupd (P : iProp) : iProp := Iris.BUpd.bupd P
+def bupd (P : iProp) : iProp := Iris.BUpd.bupd P
 
 theorem bupd_mono (P Q : iProp) :
     iProp.entails P Q → iProp.entails (_root_.bupd P) (_root_.bupd Q) :=
@@ -218,7 +221,7 @@ theorem bupd_frame_r (P Q : iProp) :
 
 /-! ## Big Separating Conjunction (Lists) -/
 
-noncomputable def big_sepL {α : Type} (Φ : α → iProp) : List α → iProp :=
+def big_sepL {α : Type} (Φ : α → iProp) : List α → iProp :=
   fun l => l.foldr (fun a acc => iProp.sep (Φ a) acc) iProp.emp
 
 theorem big_sepL_nil {α : Type} (Φ : α → iProp) :
@@ -268,7 +271,10 @@ def namespace_to_mask (N : Telltale.Namespace) : Mask := (Iris.nclose N).mem
 
 /-! ## Fancy Update Modality -/
 
-noncomputable def fupd (E₁ E₂ : Mask) (P : iProp) : iProp :=
+def fupdImpl (_E₁ _E₂ : Mask) (P : iProp) : iProp := P
+
+@[implemented_by fupdImpl]
+def fupd (E₁ E₂ : Mask) (P : iProp) : iProp :=
   Telltale.uPredFupd E₁ E₂ P
 
 theorem fupd_intro (E : Mask) (P : iProp) :
@@ -295,7 +301,10 @@ theorem fupd_mask_subseteq (E₁ E₂ : Mask) (hSub : Mask.subseteq E₂ E₁) :
 
 /-! ## Invariants -/
 
-noncomputable def inv (N : Namespace) (P : iProp) : iProp :=
+def invImpl (_N : Namespace) (P : iProp) : iProp := P
+
+@[implemented_by invImpl]
+def inv (N : Namespace) (P : iProp) : iProp :=
   Iris.BaseLogic.inv (M := ti.M) (F := ti.F) ti.W N P
 
 theorem inv_persistent (N : Namespace) (P : iProp) :
@@ -308,11 +317,17 @@ theorem inv_persistent (N : Namespace) (P : iProp) :
 abbrev CancelToken := GhostName
 
 /-- Ownership predicate for a cancel token (placeholder). -/
-noncomputable def cancel_token_own (_ct : CancelToken) : iProp :=
+def cancel_token_ownImpl (_ct : CancelToken) : iProp := iProp.emp
+
+@[implemented_by cancel_token_ownImpl]
+def cancel_token_own (_ct : CancelToken) : iProp :=
   Iris.BaseLogic.cinv_own (GF := ti.GF) (F := ti.F) ti.W _ct (1 : ti.F)
 
 /-- Cancelable invariant (placeholder). -/
-noncomputable def cinv (N : Namespace) (_ct : CancelToken) (P : iProp) : iProp :=
+def cinvImpl (_N : Namespace) (_ct : CancelToken) (P : iProp) : iProp := P
+
+@[implemented_by cinvImpl]
+def cinv (N : Namespace) (_ct : CancelToken) (P : iProp) : iProp :=
   Iris.BaseLogic.cinv (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W N _ct P
 
 /-- Distinct `Nat` children of the same namespace are disjoint. -/
@@ -380,7 +395,10 @@ theorem cinv_cancel :
 
 /-! ## Saved Propositions -/
 
-noncomputable def saved_prop_own [SavedPropSlot] (γ : GhostName) (P : iProp) :
+def saved_prop_ownImpl [SavedPropSlot] (_γ : GhostName) (P : iProp) : iProp := P
+
+@[implemented_by saved_prop_ownImpl]
+def saved_prop_own [SavedPropSlot] (γ : GhostName) (P : iProp) :
     iProp :=
   Iris.BaseLogic.saved_prop_own (GF := ti.GF) (F := ti.F) γ (Iris.DFrac.own 1) P
 
@@ -392,7 +410,11 @@ theorem saved_prop_alloc [SavedPropSlot] (P : iProp) :
 
 /-! ## Ghost Variables -/
 
-noncomputable def ghost_var {α : Type} [GhostVarSlot α]
+def ghost_varImpl {α : Type} [GhostVarSlot α]
+    (_γ : GhostName) (_a : α) : iProp := iProp.emp
+
+@[implemented_by ghost_varImpl]
+def ghost_var {α : Type} [GhostVarSlot α]
     (γ : GhostName) (a : α) : iProp :=
   Iris.BaseLogic.ghost_var (GF := ti.GF) (F := ti.F) (A := Iris.LeibnizO α)
     γ (Iris.DFrac.own 1) (Iris.LeibnizO.mk a)
@@ -426,7 +448,11 @@ abbrev GhostMap (V : Type) [ti : Telltale.TelltaleIris] := ti.M (Iris.LeibnizO V
 open Telltale in
 /-- Authoritative ownership of a ghost map.
     The map uses iris-lean's M type with Positive keys. -/
-noncomputable def ghost_map_auth {V : Type} [GhostMapSlot V]
+def ghost_map_authImpl {V : Type} [GhostMapSlot V]
+    (_γ : GhostName) (_m : GhostMap V) : iProp := iProp.emp
+
+@[implemented_by ghost_map_authImpl]
+def ghost_map_auth {V : Type} [GhostMapSlot V]
     (γ : GhostName) (m : GhostMap V) : iProp :=
   Iris.BaseLogic.ghost_map_auth (GF := ti.GF) (M := ti.M) (F := ti.F)
     (V := Iris.LeibnizO V) γ 1 m
@@ -434,7 +460,11 @@ noncomputable def ghost_map_auth {V : Type} [GhostMapSlot V]
 open Telltale in
 /-- Fragment ownership of a single key-value pair in a ghost map.
     Keys are Positive (application code encodes custom key types). -/
-noncomputable def ghost_map_elem {V : Type} [GhostMapSlot V]
+def ghost_map_elemImpl {V : Type} [GhostMapSlot V]
+    (_γ : GhostName) (_k : Iris.Positive) (_v : V) : iProp := iProp.emp
+
+@[implemented_by ghost_map_elemImpl]
+def ghost_map_elem {V : Type} [GhostMapSlot V]
     (γ : GhostName) (k : Iris.Positive) (v : V) : iProp :=
   Iris.BaseLogic.ghost_map_elem (GF := ti.GF) (M := ti.M) (F := ti.F)
     (V := Iris.LeibnizO V) ∅ γ k (Iris.DFrac.own 1) (Iris.LeibnizO.mk v)
@@ -489,11 +519,11 @@ theorem ghost_map_delete {V : Type} [GhostMapSlot V]
 namespace Iris
 
 /-- Placeholder state interpretation predicate. -/
-noncomputable def state_interp (Λ : Iris.ProgramLogic.Language) (σ : Λ.state) : iProp :=
+def state_interp (Λ : Iris.ProgramLogic.Language) (σ : Λ.state) : iProp :=
   iProp.emp
 
 /-- Placeholder weakest precondition. -/
-noncomputable def wp (Λ : Iris.ProgramLogic.Language) (E : Mask) (e : Λ.expr)
+def wp (Λ : Iris.ProgramLogic.Language) (E : Mask) (e : Λ.expr)
     (Φ : Λ.val → iProp) : iProp :=
   iProp.emp
 
