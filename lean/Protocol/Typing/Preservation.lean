@@ -275,7 +275,8 @@ private lemma DisjointS_update_right {S₁ S₂ : SEnv} {x : Var} {T : ValType}
 
 private lemma DisjointS_updateLeft {S₁ : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
     (hDisj : DisjointS S₁ (Sown : SEnv))
-    (hNone : lookupSEnv S₁ x = none) :
+    (hNone : lookupSEnv S₁ x = none)
+    (hNoRight : lookupSEnv Sown.right x = none) :
     DisjointS S₁ (OwnedEnv.updateLeft Sown x T) := by
   have hRight : DisjointS S₁ Sown.right := DisjointS_owned_right hDisj
   have hLeft : DisjointS S₁ Sown.left := DisjointS_owned_left hDisj
@@ -283,7 +284,8 @@ private lemma DisjointS_updateLeft {S₁ : SEnv} {Sown : OwnedEnv} {x : Var} {T 
     DisjointS_update_right (S₁:=S₁) (S₂:=Sown.left) hLeft hNone
   have hAll : DisjointS S₁ (Sown.right ++ updateSEnv Sown.left x T) :=
     DisjointS_append_right hRight hLeft'
-  simpa using hAll
+  have hErase : eraseSEnv Sown.right x = Sown.right := eraseSEnv_of_lookup_none hNoRight
+  simpa [OwnedEnv.updateLeft, hErase] using hAll
 
 /-- ParSplit uniqueness from matching left sizes. -/
 private lemma ParSplit_eq_of_lengths {S : SEnv} {G : GEnv}
@@ -416,10 +418,10 @@ private lemma DisjointS_preserved_TypedStep_right_recv
   -- Both recv cases update the owned-left, with x absent from shared env.
   intro hPre hDisj
   cases hPre with
-  | recv_new _ _ hNoSh _ _ =>
-      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh
-  | recv_old _ _ hNoSh _ _ =>
-      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh
+  | recv_new _ _ hNoSh hNoRight _ =>
+      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh hNoRight
+  | recv_old _ _ hNoSh hNoRight _ =>
+      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh hNoRight
 
 /-- Assignment preserves disjointness between shared and owned envs. -/
 private lemma DisjointS_preserved_TypedStep_right_assign
@@ -431,10 +433,10 @@ private lemma DisjointS_preserved_TypedStep_right_assign
   -- Both assign cases update the owned-left, with x absent from shared env.
   intro hPre hDisj
   cases hPre with
-  | assign_new hNoSh _ _ _ =>
-      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh
-  | assign_old hNoSh _ _ _ =>
-      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh
+  | assign_new hNoSh hNoRight _ _ =>
+      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh hNoRight
+  | assign_old hNoSh hNoRight _ _ =>
+      exact DisjointS_updateLeft (S₁:=Ssh) (Sown:=Sown) (x:=x) (T:=T) hDisj hNoSh hNoRight
 
 /-- Par-left step preserves disjointness on the owned env. -/
 private lemma DisjointS_preserved_TypedStep_right_par_left
@@ -899,7 +901,8 @@ private theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
         simpa using (lookupSEnv_update_eq (env:=Sown.left) (x:=x) (T:=T))
       have hInner : lookupSEnv (updateSEnv Sown.left x T ++ S₂) x = some T :=
         lookupSEnv_append_left hUpd
-      simpa [SEnvAll, OwnedEnv.updateLeft, List.append_assoc, hInner] using hRight
+      have hErase : eraseSEnv Sown.right x = Sown.right := eraseSEnv_of_lookup_none hNoRight
+      simpa [SEnvAll, OwnedEnv.updateLeft, hErase, List.append_assoc, hInner] using hRight
     have hUpdate : lookupSEnv (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) x = some T := by
       simpa using (lookupSEnv_update_eq (env:=SEnvAll Ssh (Sown ++ S₂)) (x:=x) (T:=T))
     exact hTarget.trans hUpdate.symm
@@ -911,7 +914,8 @@ private theorem lookupSEnv_updateLeft_frame_eq_updateSEnv
             lookupSEnv (SEnvAll (Ssh ++ Sown.right) (Sown.left ++ S₂)) y :=
         lookupSEnv_SEnvAll_update_neq (Ssh:=Ssh ++ Sown.right) (Sown:=Sown.left) (S₂:=S₂)
           (x:=x) (y:=y) (T:=T) hxy
-      simpa [SEnvAll, OwnedEnv.updateLeft, OwnedEnv.frameLeft, List.append_assoc] using hInner
+      have hErase : eraseSEnv Sown.right x = Sown.right := eraseSEnv_of_lookup_none hNoRight
+      simpa [SEnvAll, OwnedEnv.updateLeft, hErase, OwnedEnv.frameLeft, List.append_assoc] using hInner
     have hUpdateNe :
         lookupSEnv (updateSEnv (SEnvAll Ssh (Sown ++ S₂)) x T) y =
           lookupSEnv (SEnvAll Ssh (Sown ++ S₂)) y := by

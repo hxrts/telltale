@@ -68,6 +68,31 @@ def updateSEnv (env : SEnv) (x : Var) (T : ValType) : SEnv :=
     if x = y then (x, T) :: rest
     else (y, U) :: updateSEnv rest x T
 
+/-- Remove all bindings for a variable from SEnv. -/
+def eraseSEnv (env : SEnv) (x : Var) : SEnv :=
+  match env with
+  | [] => []
+  | (y, T) :: rest =>
+    if x = y then eraseSEnv rest x
+    else (y, T) :: eraseSEnv rest x
+
+theorem eraseSEnv_of_lookup_none {env : SEnv} {x : Var}
+    (hNone : lookupSEnv env x = none) :
+    eraseSEnv env x = env := by
+  induction env with
+  | nil =>
+      simp [eraseSEnv]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y T =>
+          by_cases hxy : x = y
+          · subst hxy
+            simp [lookupSEnv] at hNone
+          · have htl : lookupSEnv tl x = none := by
+              have hbeq : (x == y) = false := beq_eq_false_iff_ne.mpr hxy
+              simpa [lookupSEnv, List.lookup, hbeq] using hNone
+            simp [eraseSEnv, hxy, ih htl]
+
 @[simp] theorem lookupSEnv_empty (x : Var) : lookupSEnv (∅ : SEnv) x = none := by
   rfl
 
@@ -115,7 +140,7 @@ def lookupLeft (S : OwnedEnv) (x : Var) : Option ValType :=
 
 /-- Update only the left (local) portion. -/
 def updateLeft (S : OwnedEnv) (x : Var) (T : ValType) : OwnedEnv :=
-  { right := S.right, left := updateSEnv S.left x T }
+  { right := eraseSEnv S.right x, left := updateSEnv S.left x T }
 
 /-- Add a frame to the right portion (low priority within right). -/
 def frameRight (Sframe : SEnv) (S : OwnedEnv) : OwnedEnv :=

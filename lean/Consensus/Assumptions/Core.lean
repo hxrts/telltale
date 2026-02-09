@@ -22,6 +22,11 @@ inductive Hypothesis where
   | apBiased
   | byzantineFaultModel
   | crashFaultOnly
+  | evidencePrimitiveConsistent
+  | conflictExclusionPrimitiveConsistent
+  | finalizationWitnessPrimitiveConsistent
+  | witnessMonotonicityConsistent
+  | certificateDerivedConsistent
   | finalityModeConsistent
   | quorumIntersectionWitnessed
   | timingAuthCompatible
@@ -48,34 +53,65 @@ structure ValidationResult where
 
 /-- Internal helper: finality-mode coherence with certificate mode. -/
 def finalityModeConsistentCheck (p : ProtocolSpec) : Bool :=
-  match p.certificate with
-  | .quorum => p.deterministicFinality && !p.probabilisticFinality
-  | .work => p.probabilisticFinality && !p.deterministicFinality
-  | .hybrid => p.probabilisticFinality && p.deterministicFinality
+  match inferredCertificate? p with
+  | none => false
+  | some .quorum => p.deterministicFinality && !p.probabilisticFinality
+  | some .work => p.probabilisticFinality && !p.deterministicFinality
+  | some .hybrid => p.probabilisticFinality && p.deterministicFinality
+
+/-- Internal helper: primitive evidence selection is one coherent family. -/
+def evidencePrimitiveConsistentCheck (p : ProtocolSpec) : Bool :=
+  intersectionPrimitive p || additivePrimitive p || coupledPrimitive p
+
+/-- Internal helper: conflict-exclusion law matches evidence accumulation. -/
+def conflictExclusionPrimitiveConsistentCheck (p : ProtocolSpec) : Bool :=
+  match p.evidenceAccumulation with
+  | .intersection => p.conflictExclusionLaw = .quorumIntersection
+  | .additiveWeight => p.conflictExclusionLaw = .weightDominance
+  | .coupled => p.conflictExclusionLaw = .coupledRule
+
+/-- Internal helper: finalization witness rule matches evidence accumulation. -/
+def finalizationWitnessPrimitiveConsistentCheck (p : ProtocolSpec) : Bool :=
+  match p.evidenceAccumulation with
+  | .intersection => p.finalizationWitnessRule = .thresholdCertificate
+  | .additiveWeight => p.finalizationWitnessRule = .confirmationDepth
+  | .coupled => p.finalizationWitnessRule = .coupledWitness
+
+/-- Internal helper: witness monotonicity is coherent with evidence regime. -/
+def witnessMonotonicityConsistentCheck (p : ProtocolSpec) : Bool :=
+  match p.evidenceAccumulation with
+  | .intersection => p.witnessMonotonicity
+  | .additiveWeight => !p.witnessMonotonicity
+  | .coupled => p.witnessMonotonicity
+
+/-- Internal helper: coarse certificate tag agrees with primitive model. -/
+def certificateDerivedConsistentCheck (p : ProtocolSpec) : Bool :=
+  Consensus.certificateDerivedConsistent p
 
 /-- Internal helper: quorum intersection assumptions are explicit and plausible. -/
 def quorumIntersectionWitnessedCheck (p : ProtocolSpec) : Bool :=
-  match p.certificate with
-  | .work => false
-  | .quorum | .hybrid =>
+  if additivePrimitive p then
+    false
+  else
+    (intersectionPrimitive p || coupledPrimitive p) &&
       p.quorumIntersectionWitnessed && quorumSane p && bftThresholdOk p
 
 /-- Internal helper: timing/auth model is explicitly declared and compatible. -/
 def timingAuthCompatibleCheck (p : ProtocolSpec) : Bool :=
-  match p.certificate with
-  | .work => p.timingAuthContractDeclared
-  | .quorum | .hybrid =>
-      p.timingAuthContractDeclared &&
-      p.authentication ≠ .none &&
-      bftThresholdOk p
+  if additivePrimitive p then
+    p.timingAuthContractDeclared
+  else
+    p.timingAuthContractDeclared &&
+    p.authentication ≠ .none &&
+    bftThresholdOk p
 
 /-- Internal helper: CAP policy aligns with certificate pressure. -/
 def capPressureConsistentCheck (p : ProtocolSpec) : Bool :=
-  match p.certificate, p.partitionPolicy with
-  | .quorum, .livenessFirst => false
-  | .work, .safetyFirst => false
-  | .hybrid, .adaptive => true
-  | .hybrid, _ => true
+  match inferredCertificate? p, p.partitionPolicy with
+  | some .quorum, .livenessFirst => false
+  | some .work, .safetyFirst => false
+  | some .hybrid, .adaptive => true
+  | some .hybrid, _ => true
   | _, _ => true
 
 /-- Internal helper: if responsive path is claimed, preconditions must hold. -/
@@ -83,7 +119,7 @@ def responsivePreconditionsCheck (p : ProtocolSpec) : Bool :=
   if !p.responsivePath then
     true
   else
-    (p.certificate = .quorum || p.certificate = .hybrid) &&
+    (intersectionPrimitive p || coupledPrimitive p) &&
     (p.timing = .sync || p.timing = .partialSync) &&
     p.authentication = .signatures &&
     p.faultModel = .byzantine &&
@@ -92,18 +128,14 @@ def responsivePreconditionsCheck (p : ProtocolSpec) : Bool :=
 /-- Internal helper: adversarial-budget check across count and weight regimes. -/
 def adversarialBudgetBoundedCheck (p : ProtocolSpec) : Bool :=
   let countOk :=
-    match p.certificate with
-    | .work => true
-    | .quorum | .hybrid => bftThresholdOk p
+    if additivePrimitive p then true else bftThresholdOk p
   let weightOk :=
-    match p.certificate with
-    | .quorum => true
-    | .work | .hybrid => p.adversarialWeightPermille < 500
+    if intersectionPrimitive p then true else p.adversarialWeightPermille < 500
   basicWellFormed p && countOk && weightOk
 
 /-- Internal helper: hybrid finalized-prefix/available-prefix invariant status. -/
 def hybridFrontInvariantCheck (p : ProtocolSpec) : Bool :=
-  if p.certificate = .hybrid then
+  if coupledPrimitive p then
     p.hybridFrontInvariantHolds
   else
     true
@@ -119,6 +151,7 @@ def classicalTransportEligibleCheck (p : ProtocolSpec) : Bool :=
 /-- Built-in core hypothesis set (general-purpose). -/
 def coreHypotheses : List Hypothesis :=
   [ .soundConsensus
+  , .certificateDerivedConsistent
   , .finalityModeConsistent
   , .adversarialBudgetBounded
   ]
@@ -154,7 +187,12 @@ def hybridHypotheses : List Hypothesis :=
 
 /-- Hypotheses for the consensus-stat-mech characterization layer. -/
 def characterizationHypotheses : List Hypothesis :=
-  [ .logicalTimeSemanticsDeclared
+  [ .evidencePrimitiveConsistent
+  , .conflictExclusionPrimitiveConsistent
+  , .finalizationWitnessPrimitiveConsistent
+  , .witnessMonotonicityConsistent
+  , .certificateDerivedConsistent
+  , .logicalTimeSemanticsDeclared
   , .orderParameterDeclared
   , .phaseBoundaryModelDeclared
   , .interactiveDistanceDeclared
@@ -177,12 +215,12 @@ def validateHypothesis (p : ProtocolSpec) (h : Hypothesis) : ValidationResult :=
   | .bftSpace =>
       { hypothesis := h
       , passed := inBFTSpace p
-      , detail := "BFT space check: Byzantine faults, quorum-style certificate, authentication, and threshold constraints."
+      , detail := "BFT space check: intersection-style evidence primitive, Byzantine faults, authentication, and threshold constraints."
       }
   | .nakamotoSpace =>
       { hypothesis := h
       , passed := inNakamotoSpace p
-      , detail := "Nakamoto space check: work certificate, probabilistic finality, and adversarial weight below 50%."
+      , detail := "Nakamoto space check: additive-weight evidence primitive, probabilistic finality, and adversarial weight below 50%."
       }
   | .hybridSpace =>
       { hypothesis := h
@@ -224,10 +262,35 @@ def validateHypothesis (p : ProtocolSpec) (h : Hypothesis) : ValidationResult :=
       , passed := p.faultModel = .crash
       , detail := "Crash-only fault model assumption."
       }
+  | .evidencePrimitiveConsistent =>
+      { hypothesis := h
+      , passed := evidencePrimitiveConsistentCheck p
+      , detail := "Evidence primitive profile is coherent (intersection, additive-weight, or coupled)."
+      }
+  | .conflictExclusionPrimitiveConsistent =>
+      { hypothesis := h
+      , passed := conflictExclusionPrimitiveConsistentCheck p
+      , detail := "Conflict-exclusion law is consistent with declared evidence-accumulation primitive."
+      }
+  | .finalizationWitnessPrimitiveConsistent =>
+      { hypothesis := h
+      , passed := finalizationWitnessPrimitiveConsistentCheck p
+      , detail := "Finalization witness rule is consistent with declared evidence-accumulation primitive."
+      }
+  | .witnessMonotonicityConsistent =>
+      { hypothesis := h
+      , passed := witnessMonotonicityConsistentCheck p
+      , detail := "Witness monotonicity is consistent with the declared evidence regime."
+      }
+  | .certificateDerivedConsistent =>
+      { hypothesis := h
+      , passed := certificateDerivedConsistentCheck p
+      , detail := "Coarse certificate tag is consistent with primitive evidence assumptions."
+      }
   | .finalityModeConsistent =>
       { hypothesis := h
       , passed := finalityModeConsistentCheck p
-      , detail := "Certificate/finality mode consistency (quorum=deterministic, work=probabilistic, hybrid=both)."
+      , detail := "Derived evidence mode and finality mode are consistent (intersection=deterministic, additive=probabilistic, coupled=both)."
       }
   | .quorumIntersectionWitnessed =>
       { hypothesis := h
@@ -242,7 +305,7 @@ def validateHypothesis (p : ProtocolSpec) (h : Hypothesis) : ValidationResult :=
   | .capPressureConsistent =>
       { hypothesis := h
       , passed := capPressureConsistentCheck p
-      , detail := "CAP policy is consistent with certificate-driven partition pressure."
+      , detail := "CAP policy is consistent with evidence-driven partition pressure."
       }
   | .responsivePreconditions =>
       { hypothesis := h
@@ -316,4 +379,3 @@ def runValidation (p : ProtocolSpec) (hs : List Hypothesis) :
   (space, results, allPassed results)
 
 end Consensus
-

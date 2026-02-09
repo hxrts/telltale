@@ -73,7 +73,7 @@ private theorem HasTypeProcPreOut_preserved_sub
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
       cases hPre with
-      | recv_new hk' hG' hSsh hSownL =>
+      | recv_new hk' hG' hSsh hSownR hSownL =>
           rename_i e' p' T' L'
           have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
             lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
@@ -108,7 +108,7 @@ private theorem HasTypeProcPreOut_preserved_sub
               (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=updateG G e L))
           · intro x hx; cases hx
           · intro x T hx; cases hx
-      | recv_old hk' hG' hSsh hSownL =>
+      | recv_old hk' hG' hSsh hSownR hSownL =>
           rename_i e' p' T' L' Told
           have hkPre : lookupSEnv (SEnvAll Ssh Sown) k = some (.chan e'.sid e'.role) :=
             lookupSEnv_all_of_visible (Ssh:=Ssh) (Sown:=Sown) (x:=k)
@@ -222,7 +222,7 @@ private theorem HasTypeProcPreOut_preserved_sub
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T Sown' store'
       cases hPre with
-      | assign_new hSsh hSownL hv' =>
+      | assign_new hSsh hSownR hSownL hv' =>
           have hT := HasTypeVal_unique hv' hv
           cases hT
           refine ⟨[], ∅, ?_, ?_, ?_⟩
@@ -231,7 +231,7 @@ private theorem HasTypeProcPreOut_preserved_sub
               (Ssh:=Ssh) (Sown:=Sown.updateLeft x T) (G:=G))
           · intro x hx; cases hx
           · intro x T hx; cases hx
-      | assign_old hSsh hSownL hv' =>
+      | assign_old hSsh hSownR hSownL hv' =>
           have hT := HasTypeVal_unique hv' hv
           cases hT
           refine ⟨[], ∅, ?_, ?_, ?_⟩

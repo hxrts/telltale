@@ -74,17 +74,30 @@ private lemma SessionsOf_empty : SessionsOf ([] : GEnv) = ∅ := by
     cases h
 
 private lemma TypedStep_preserves_right
-    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     Sown'.right = Sown.right := by
-  intro hStep
-  induction hStep with
+  intro hStep hPre
+  induction hStep generalizing Sfin Gfin W Δ with
   | recv =>
-      simp [OwnedEnv.updateLeft, *]
+      cases hPre with
+      | recv_new _ _ _ hNoRight _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+      | recv_old _ _ _ hNoRight _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
   | assign =>
-      simp [OwnedEnv.updateLeft, *]
-  | seq_step _ ih => exact ih
-  | _ => rfl
+      cases hPre with
+      | assign_new _ hNoRight _ _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+      | assign_old _ hNoRight _ _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+  | seq_step _ ih =>
+      cases hPre with
+      | seq hP _ =>
+          exact ih hP
+  | _ =>
+      rfl
 
 private lemma channel_endpoint_eq_of_store
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
@@ -205,9 +218,12 @@ private lemma store_lookup_of_visible_lookup
     (hOwnDisj : OwnedDisjoint Sown)
     (hVis : lookupSEnv (Ssh ++ Sown.left) x = some T) :
     ∃ v, lookupStr store x = some v ∧ HasTypeVal G v T := by
-  have hAll : lookupSEnv (SEnvAll Ssh Sown) x = some T :=
-    lookupSEnv_all_of_visible_prog hDisjShAll hOwnDisj hVis
-  exact store_lookup_of_senv_lookup hStore hAll
+  have hStoreVis : StoreTypedStrongVisible G Ssh Sown store :=
+    StoreTypedStrongVisible_of_allStrong (G:=G) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
+      hStore hDisjShAll hOwnDisj
+  simpa [SEnvVisible] using
+    (store_lookup_of_visible_lookup_strongVisible (G:=G) (Ssh:=Ssh) (Sown:=Sown)
+      (store:=store) (x:=x) (T:=T) hStoreVis hVis)
 
 private lemma DisjointS_append_right {S₁ S₂ S₃ : SEnv} :
     DisjointS S₁ S₂ →
@@ -1223,7 +1239,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                     simpa [List.append_assoc] using hShape
                   rcases hGshape with ⟨G₁', hGshape⟩
                   have hRightEq : S'.right = Sown.right ++ split.S2 :=
-                    TypedStep_preserves_right hStep
+                    TypedStep_preserves_right hStep hP_full
                   have hStep' :
                       TypedStep G (D ++ (∅ : DEnv)) Ssh { right := Sown.right ++ split.S2, left := split.S1 }
                         store bufs P
@@ -1270,7 +1286,7 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                             simpa [List.append_assoc] using hShape
                           rcases hGshape with ⟨G₂', hGshape⟩
                           have hRightEq : S'.right = Sown.right ++ split.S1 :=
-                            TypedStep_preserves_right hStep
+                            TypedStep_preserves_right hStep hQ_full
                           have hStep' :
                               TypedStep G ((∅ : DEnv) ++ D) Ssh { right := Sown.right ++ split.S1, left := split.S2 }
                                 store bufs Q

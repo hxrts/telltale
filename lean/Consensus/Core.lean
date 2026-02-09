@@ -4,6 +4,10 @@ import Consensus.Hypotheses
 import Consensus.ClassicalValidation
 import Consensus.Certified
 import Consensus.Api
+import Consensus.FLP.Hypotheses
+import Consensus.FLP.Api
+import Consensus.CAP.Hypotheses
+import Consensus.CAP.Api
 
 set_option autoImplicit false
 

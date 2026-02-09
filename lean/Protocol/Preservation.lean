@@ -228,11 +228,30 @@ private theorem DConsistent_empty (G : GEnv) : DConsistent G (∅ : DEnv) := by
   simp [DConsistent, SessionsOfD_empty]
 
 private theorem TypedStep_preserves_owned_right
-    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
+    {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    HasTypeProcPreOut Ssh Sown G P Sfin Gfin W Δ →
     Sown'.right = Sown.right := by
-  intro hTS
-  induction hTS <;> simp [OwnedEnv.updateLeft, *]
+  intro hTS hPre
+  induction hTS generalizing Sfin Gfin W Δ with
+  | recv =>
+      cases hPre with
+      | recv_new _ _ _ hNoRight _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+      | recv_old _ _ _ hNoRight _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+  | assign =>
+      cases hPre with
+      | assign_new _ hNoRight _ _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+      | assign_old _ hNoRight _ _ =>
+          simpa [OwnedEnv.updateLeft, eraseSEnv_of_lookup_none hNoRight, *]
+  | seq_step _ ih =>
+      cases hPre with
+      | seq hP _ =>
+          exact ih hP
+  | _ =>
+      rfl
 
 private theorem OwnedDisjoint_preserved_TypedStep
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
@@ -241,7 +260,7 @@ private theorem OwnedDisjoint_preserved_TypedStep
     OwnedDisjoint Sown →
     OwnedDisjoint Sown' := by
   intro hTS hPre hOwn
-  have hRightEq : Sown'.right = Sown.right := TypedStep_preserves_owned_right hTS
+  have hRightEq : Sown'.right = Sown.right := TypedStep_preserves_owned_right hTS hPre
   have hDom : SEnvDomSubset Sown.right Sown.right := by
     intro x T hL
     exact ⟨T, hL⟩

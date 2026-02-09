@@ -536,6 +536,10 @@ theorem RightGaugeEq_trans {S₁ S₂ S₃ : OwnedEnv} :
   intro h12 h23
   simpa [RightGaugeEq] using h12.trans h23
 
+@[simp] theorem RightGaugeEq_iff_left_eq {S₁ S₂ : OwnedEnv} :
+    RightGaugeEq S₁ S₂ ↔ S₁.left = S₂.left := by
+  rfl
+
 /-- Visible variable environment for typing obligations (shared + local left). -/
 def SEnvVisible (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
   Ssh ++ Sown.left
@@ -543,6 +547,12 @@ def SEnvVisible (Ssh : SEnv) (Sown : OwnedEnv) : SEnv :=
 /-- Store typing through the visible variable view (`Ssh ++ Sown.left`). -/
 def StoreTypedVisible (G : GEnv) (Ssh : SEnv) (Sown : OwnedEnv) (store : VarStore) : Prop :=
   StoreTyped G (SEnvVisible Ssh Sown) store
+
+@[simp] theorem StoreTypedVisible_reframe_right
+    (G : GEnv) (Ssh R R' L : SEnv) (store : VarStore) :
+    StoreTypedVisible G Ssh { right := R, left := L } store ↔
+      StoreTypedVisible G Ssh { right := R', left := L } store := by
+  simp [StoreTypedVisible, SEnvVisible]
 
 /-- Strong store typing with domain control on the full env and type
     correspondence on the visible view. -/
@@ -560,11 +570,77 @@ theorem StoreTypedStrongVisible.toStoreTypedVisible
     StoreTypedVisible G Ssh Sown store :=
   h.typeCorrVisible
 
+/-- Visible bindings are domain-included in the full environment (`shared ++ right ++ left`). -/
+theorem SEnvDomSubset_visible_all {Ssh : SEnv} {Sown : OwnedEnv} :
+    SEnvDomSubset (SEnvVisible Ssh Sown) (SEnvAll Ssh Sown) := by
+  intro x T hVis
+  cases hSh : lookupSEnv Ssh x with
+  | some Tsh =>
+      have hAllSh : lookupSEnv (SEnvAll Ssh Sown) x = some Tsh := by
+        have hLeft :=
+          lookupSEnv_append_left (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) (T:=Tsh) hSh
+        simpa [SEnvAll, List.append_assoc] using hLeft
+      exact ⟨Tsh, hAllSh⟩
+  | none =>
+      have hLeft : lookupSEnv Sown.left x = some T := by
+        have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
+        simpa [SEnvVisible, hEq] using hVis
+      cases hR : lookupSEnv Sown.right x with
+      | some Tr =>
+          have hOwn : lookupSEnv (Sown.right ++ Sown.left) x = some Tr :=
+            lookupSEnv_append_left (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tr) hR
+          have hAll : lookupSEnv (SEnvAll Ssh Sown) x = some Tr := by
+            have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
+            simpa [SEnvAll, List.append_assoc, hEq] using hOwn
+          exact ⟨Tr, hAll⟩
+      | none =>
+          have hOwn : lookupSEnv (Sown.right ++ Sown.left) x = some T := by
+            have hEqR := lookupSEnv_append_right (S₁:=Sown.right) (S₂:=Sown.left) (x:=x) hR
+            simpa [hEqR] using hLeft
+          have hAll : lookupSEnv (SEnvAll Ssh Sown) x = some T := by
+            have hEq := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.right ++ Sown.left) (x:=x) hSh
+            simpa [SEnvAll, List.append_assoc, hEq] using hOwn
+          exact ⟨T, hAll⟩
+
+/-- Strong-visible store typing gives runtime lookup for any visible static lookup. -/
+theorem store_lookup_of_visible_lookup_strongVisible
+    {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore} {x : Var} {T : ValType}
+    (hStore : StoreTypedStrongVisible G Ssh Sown store)
+    (hVis : lookupSEnv (SEnvVisible Ssh Sown) x = some T) :
+    ∃ v, lookupStr store x = some v ∧ HasTypeVal G v T := by
+  have hSub : SEnvDomSubset (SEnvVisible Ssh Sown) (SEnvAll Ssh Sown) :=
+    SEnvDomSubset_visible_all (Ssh:=Ssh) (Sown:=Sown)
+  obtain ⟨T', hAll⟩ := hSub hVis
+  have hInStore : (lookupStr store x).isSome := by
+    have hDom := hStore.sameDomainAll x
+    exact (hDom.mp (by simpa [hAll]))
+  obtain ⟨v, hv⟩ := Option.isSome_iff_exists.mp hInStore
+  exact ⟨v, hv, hStore.typeCorrVisible x v T hv hVis⟩
+
 @[simp] theorem SEnvVisible_reframe_right
     (Ssh R R' L : SEnv) :
     SEnvVisible Ssh { right := R, left := L } =
       SEnvVisible Ssh { right := R', left := L } := by
   simp [SEnvVisible]
+
+theorem SEnvVisible_updateLeft_of_shared_none
+    {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
+    (hNoSh : lookupSEnv Ssh x = none) :
+    SEnvVisible Ssh (Sown.updateLeft x T) =
+      updateSEnv (SEnvVisible Ssh Sown) x T := by
+  -- Rewrite update through an Ssh prefix where x is known absent.
+  induction Ssh with
+  | nil =>
+      simp [SEnvVisible, OwnedEnv.updateLeft]
+  | cons hd tl ih =>
+      cases hd with
+      | mk y U =>
+          by_cases hxy : x = y
+          · subst hxy
+            simp [lookupSEnv] at hNoSh
+          · have hNoTl : lookupSEnv tl x = none := by
+              simpa [lookupSEnv, hxy] using hNoSh
+            simpa [SEnvVisible, OwnedEnv.updateLeft, updateSEnv, hxy] using ih hNoTl
 
 theorem SEnvVisible_congr_rightGauge {Ssh : SEnv} {S₁ S₂ : OwnedEnv} :
     RightGaugeEq S₁ S₂ →

@@ -59,13 +59,13 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
         StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
           hStore hDisjShAll hOwnDisj
       cases hPre with
-      | recv_new hk' hG' hSsh hSownL =>
+      | recv_new hk' hG' hSsh hSownR hSownL =>
           -- Dispatch to the recv-new helper.
           exact preserved_sub_left_frame_recv_new (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
             (G₁':=G₁') (Sown':=Sown')
             hStoreVis hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
-      | recv_old hk' hG' hSsh hSownL =>
+      | recv_old hk' hG' hSsh hSownR hSownL =>
           -- Dispatch to the recv-old helper.
           exact preserved_sub_left_frame_recv_old (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
@@ -94,13 +94,13 @@ theorem HasTypeProcPreOut_preserved_sub_left_frame
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T_step Sown' store'
       cases hPre with
-      | assign_new hSsh hSownL hv' =>
+      | assign_new hSsh hSownR hSownL hv' =>
           -- Use the dedicated helper for the assign-new case.
           exact preserved_sub_left_frame_assign_new (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
             (G₁':=G₁')
             hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
-      | assign_old hSsh hSownL hv' =>
+      | assign_old hSsh hSownR hSownL hv' =>
           -- Use the dedicated helper for the assign-old case.
           exact preserved_sub_left_frame_assign_old (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
@@ -212,13 +212,13 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
         StoreTypedVisible_of_all (G:=Gstore) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
           hStore hDisjShAll hOwnDisj
       cases hPre with
-      | recv_new hk' hG' hSsh hSownL =>
+      | recv_new hk' hG' hSsh hSownR hSownL =>
           -- Use the dedicated helper for the recv-new case.
           exact preserved_sub_right_frame_recv_new (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
             (G₂':=G₂') (Sown':=Sown')
             hStoreVis hDisj hEq hEq' hk hG hGout hSout rfl rfl hk' hG'
-      | recv_old hk' hG' hSsh hSownL =>
+      | recv_old hk' hG' hSsh hSownR hSownL =>
           -- Use the dedicated helper for the recv-old case.
           exact preserved_sub_right_frame_recv_old (G₁:=G₁) (G₂:=G₂) (G:=G) (G':=G')
             (Ssh:=Ssh) (Sown:=Sown) (k:=k) (x:=x) (e:=e) (source:=source) (T:=T) (L:=L)
@@ -247,13 +247,13 @@ theorem HasTypeProcPreOut_preserved_sub_right_frame
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v T_step Sown' store'
       cases hPre with
-      | assign_new hSsh hSownL hv' =>
+      | assign_new hSsh hSownR hSownL hv' =>
           -- Use the dedicated helper for the assign-new case.
           exact preserved_sub_right_frame_assign_new (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')
             (G₂':=G₂')
             hDisj hEq hEq' hv hSout rfl rfl hSsh hSownL hv'
-      | assign_old hSsh hSownL hv' =>
+      | assign_old hSsh hSownR hSownL hv' =>
           -- Use the dedicated helper for the assign-old case.
           exact preserved_sub_right_frame_assign_old (G₁:=G₁) (G₂:=G₂) (G:=G)
             (Ssh:=Ssh) (Sown:=Sown) (x:=x) (v:=v) (T_step:=T_step) (Sown':=Sown')

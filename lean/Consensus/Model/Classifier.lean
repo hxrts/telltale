@@ -15,6 +15,43 @@ def basicWellFormed (p : ProtocolSpec) : Bool :=
   p.f < p.n &&
   p.adversarialWeightPermille <= 1000
 
+/-- Primitive evidence profile for intersection-dominant safety witnesses. -/
+def intersectionPrimitive (p : ProtocolSpec) : Bool :=
+  p.evidenceAccumulation = .intersection &&
+  p.conflictExclusionLaw = .quorumIntersection &&
+  p.finalizationWitnessRule = .thresholdCertificate &&
+  p.witnessMonotonicity
+
+/-- Primitive evidence profile for additive-weight safety witnesses. -/
+def additivePrimitive (p : ProtocolSpec) : Bool :=
+  p.evidenceAccumulation = .additiveWeight &&
+  p.conflictExclusionLaw = .weightDominance &&
+  p.finalizationWitnessRule = .confirmationDepth &&
+  !p.witnessMonotonicity
+
+/-- Primitive evidence profile for coupled safety witnesses. -/
+def coupledPrimitive (p : ProtocolSpec) : Bool :=
+  p.evidenceAccumulation = .coupled &&
+  p.conflictExclusionLaw = .coupledRule &&
+  p.finalizationWitnessRule = .coupledWitness
+
+/-- Infer the coarse certificate tag from fundamental evidence primitives. -/
+def inferredCertificate? (p : ProtocolSpec) : Option CertificateModel :=
+  if coupledPrimitive p then
+    some .hybrid
+  else if intersectionPrimitive p then
+    some .quorum
+  else if additivePrimitive p then
+    some .work
+  else
+    none
+
+/-- Coarse certificate tag agrees with primitive evidence assumptions. -/
+def certificateDerivedConsistent (p : ProtocolSpec) : Bool :=
+  match inferredCertificate? p with
+  | some c => p.certificate = c
+  | none => false
+
 /-- Quorum sanity check for quorum-style certificates. -/
 def quorumSane (p : ProtocolSpec) : Bool :=
   p.quorumSize <= p.n && p.quorumSize > p.n / 2
@@ -31,8 +68,8 @@ def bftThresholdOk (p : ProtocolSpec) : Bool :=
 /-- Heuristic classifier for BFT protocol space. -/
 def inBFTSpace (p : ProtocolSpec) : Bool :=
   basicWellFormed p &&
+  intersectionPrimitive p &&
   p.faultModel = .byzantine &&
-  (p.certificate = .quorum || p.certificate = .hybrid) &&
   p.authentication ≠ .none &&
   bftThresholdOk p &&
   quorumSane p
@@ -40,7 +77,7 @@ def inBFTSpace (p : ProtocolSpec) : Bool :=
 /-- Heuristic classifier for Nakamoto-style protocol space. -/
 def inNakamotoSpace (p : ProtocolSpec) : Bool :=
   basicWellFormed p &&
-  p.certificate = .work &&
+  additivePrimitive p &&
   p.faultModel = .byzantine &&
   p.probabilisticFinality &&
   p.adversarialWeightPermille < 500
@@ -48,7 +85,7 @@ def inNakamotoSpace (p : ProtocolSpec) : Bool :=
 /-- Heuristic classifier for coupled hybrid protocols. -/
 def inHybridSpace (p : ProtocolSpec) : Bool :=
   basicWellFormed p &&
-  p.certificate = .hybrid &&
+  coupledPrimitive p &&
   p.faultModel = .byzantine &&
   p.authentication = .signatures &&
   p.probabilisticFinality &&
@@ -60,6 +97,7 @@ def inHybridSpace (p : ProtocolSpec) : Bool :=
 /-- Coarse soundness predicate at the model-validation level. -/
 def isSoundConsensus (p : ProtocolSpec) : Bool :=
   basicWellFormed p &&
+  certificateDerivedConsistent p &&
   (inBFTSpace p || inNakamotoSpace p || inHybridSpace p)
 
 /-- Classify a protocol spec into one of the built-in spaces. -/

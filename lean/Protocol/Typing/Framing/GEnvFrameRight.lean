@@ -150,20 +150,20 @@ lemma HasTypeProcPreOut_frame_G_right
         (L:=.send q T L) (L':=L) hG
       simpa [hUpd] using
         (HasTypeProcPreOut.send (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr) hk hG' hx)
-  | recv_new hk hG hNoSh hNoOwnL =>
+  | recv_new hk hG hNoSh hNoOwnR hNoOwnL =>
       rename_i Sown G k x e p T L
       have hG' := lookupG_append_left (G₂:=Gfr) hG
       have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
         (L:=.recv p T L) (L':=L) hG
       simpa [hUpd] using
-        (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr) hk hG' hNoSh hNoOwnL)
-  | recv_old hk hG hNoSh hOwn =>
+        (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr) hk hG' hNoSh hNoOwnR hNoOwnL)
+  | recv_old hk hG hNoSh hNoOwnR hOwn =>
       rename_i Sown G k x e p T L T'
       have hG' := lookupG_append_left (G₂:=Gfr) hG
       have hUpd := updateG_append_left_hit (G₁:=G) (G₂:=Gfr) (e:=e)
         (L:=.recv p T L) (L':=L) hG
       simpa [hUpd] using
-        (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr) hk hG' hNoSh hOwn)
+        (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:=Sown) (G:=G ++ Gfr) hk hG' hNoSh hNoOwnR hOwn)
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
       have hG' := lookupG_append_left (G₂:=Gfr) hG
@@ -200,11 +200,11 @@ lemma HasTypeProcPreOut_frame_G_right
       exact frame_pre_out_right_par (split:=split)
         hDisj hSlen hGlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
         hDisjW hDisjΔ hS1 hS2 hP hQ ihQ
-  | assign_new hNoSh hNoOwnL hv =>
+  | assign_new hNoSh hNoOwnR hNoOwnL hv =>
       rename_i Sown G x v T
       have hv' := HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv
-      exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL hv'
-  | assign_old hNoSh hOwn hv =>
+      exact HasTypeProcPreOut.assign_new hNoSh hNoOwnR hNoOwnL hv'
+  | assign_old hNoSh hNoOwnR hOwn hv =>
       rename_i Sown G x v T T'
       have hv' := HasTypeVal_frame_right (G₁:=G) (G₂:=Gfr) hv
-      exact HasTypeProcPreOut.assign_old hNoSh hOwn hv'
+      exact HasTypeProcPreOut.assign_old hNoSh hNoOwnR hOwn hv'

@@ -21,6 +21,27 @@ inductive CertificateModel where
   | hybrid
   deriving Repr, DecidableEq, Inhabited
 
+/-- Primitive evidence accumulation regime. -/
+inductive EvidenceAccumulationModel where
+  | intersection
+  | additiveWeight
+  | coupled
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Primitive conflict-exclusion law for incompatible decisions. -/
+inductive ConflictExclusionLaw where
+  | quorumIntersection
+  | weightDominance
+  | coupledRule
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Primitive finalization witness rule. -/
+inductive FinalizationWitnessRule where
+  | thresholdCertificate
+  | confirmationDepth
+  | coupledWitness
+  deriving Repr, DecidableEq, Inhabited
+
 /-- Fault model for the protocol participants. -/
 inductive FaultModel where
   | crash
@@ -54,6 +75,12 @@ structure ProtocolSpec where
   /-- Fault budget used by the protocol model. -/
   f : Nat
   timing : TimingModel
+  evidenceAccumulation : EvidenceAccumulationModel
+  conflictExclusionLaw : ConflictExclusionLaw
+  finalizationWitnessRule : FinalizationWitnessRule
+  /-- Whether finality witnesses are monotone under allowed extensions. -/
+  witnessMonotonicity : Bool := false
+  /-- Coarse/derived presentation-layer certificate tag. -/
   certificate : CertificateModel
   /-- Quorum threshold (used for quorum/hybrid checks). -/
   quorumSize : Nat := 0
@@ -102,4 +129,3 @@ inductive ProtocolSpace where
   deriving Repr, DecidableEq, Inhabited
 
 end Consensus
-
