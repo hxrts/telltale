@@ -1,13 +1,14 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Deterministic LocalTypeR trace corpus tests.
 
 use std::collections::BTreeMap;
 
 use telltale_types::{GlobalType, Label, LocalTypeR};
+use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
 use telltale_vm::loader::CodeImage;
 use telltale_vm::trace::normalize_trace;
 use telltale_vm::vm::{ObsEvent, VMConfig, VM};
-use telltale_vm::coroutine::Value;
 
 struct NoOpHandler;
 
@@ -85,14 +86,26 @@ fn test_trace_corpus_send_recv() {
                 to,
                 label,
                 ..
-            } => Some((*tick, "sent".into(), from.clone(), to.clone(), label.clone())),
+            } => Some((
+                *tick,
+                "sent".into(),
+                from.clone(),
+                to.clone(),
+                label.clone(),
+            )),
             ObsEvent::Received {
                 tick,
                 from,
                 to,
                 label,
                 ..
-            } => Some((*tick, "recv".into(), from.clone(), to.clone(), label.clone())),
+            } => Some((
+                *tick,
+                "recv".into(),
+                from.clone(),
+                to.clone(),
+                label.clone(),
+            )),
             _ => None,
         })
         .collect();

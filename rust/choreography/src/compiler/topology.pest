@@ -9,7 +9,7 @@ topology = {
 }
 
 topology_body = {
-    topology_mode? ~ topology_mappings ~ role_constraints_block? ~ topology_constraints?
+    topology_mode? ~ topology_mappings ~ role_constraints_block? ~ channel_capacities_block? ~ topology_constraints?
 }
 
 // Topology mode declaration
@@ -77,6 +77,11 @@ pinned_constraint = { "pinned" ~ ":" ~ ident ~ "->" ~ location ~ ";"? }
 region_constraint = { "region" ~ ":" ~ ident ~ "->" ~ ident ~ ";"? }
 
 role_list_inline = { ident ~ ("," ~ ident)+ }
+
+// Channel capacity block (bits)
+channel_capacities_block = { "channel_capacities" ~ "{" ~ channel_capacity_decl* ~ "}" }
+
+channel_capacity_decl = { ident ~ "->" ~ ident ~ ":" ~ integer ~ ";"? }
 
 // Basic tokens
 ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }

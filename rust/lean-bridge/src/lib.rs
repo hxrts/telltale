@@ -53,6 +53,9 @@
 
 pub mod export;
 pub mod import;
+pub mod invariants;
+pub mod schema;
+pub mod vm_export;
 pub mod vm_trace;
 
 #[cfg(feature = "runner")]
@@ -72,7 +75,29 @@ pub mod test_utils;
 
 pub use export::{global_to_json, local_to_json};
 pub use import::{json_to_global, json_to_local, ImportError};
-pub use vm_trace::{partition_by_session, NormalizedEvent, SessionTrace};
+pub use invariants::{
+    export_protocol_bundle, AvailabilityLevel, CAPConfig, ClassicalClaims, ConcentrationConfig,
+    ConsistencyLevel, DistributedClaims, FLPConfig, FaultModel, FluidConfig, FosterConfig,
+    FunctionalCLTConfig, HeavyTrafficConfig, InvariantClaims, LDPConfig, LittlesLawConfig,
+    LivenessConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
+    PartialSynchronyConfig, PartitionModel, ProtocolBundle, QuorumGeometryConfig, QuorumSystemKind,
+    ReconfigurationConfig, ResponsivenessConfig, SchedulerKind, TimingModel,
+    PROTOCOL_BUNDLE_SCHEMA_VERSION,
+};
+pub use schema::{
+    default_schema_version, ensure_supported_schema_version, is_supported_schema_version,
+    LEAN_BRIDGE_SCHEMA_VERSION,
+};
+pub use vm_export::{
+    coroutine_to_json, endpoint_to_json, event_to_json, obs_event_to_json, sessions_to_json,
+    status_to_json, vm_state_from_json, vm_state_to_json, CompatibilityMeta, CoroutineState,
+    EndpointRef, SessionView, TickedObsEvent, VMState, VM_STATE_SCHEMA_VERSION,
+};
+pub use vm_trace::{
+    event_session, normalize_vm_trace, partition_by_session, traces_equivalent, EffectTraceEvent,
+    NormalizedEvent, OutputConditionTraceEvent, ReplayTraceBundle, SessionTrace,
+    TopologyPerturbationEvent, TopologyPerturbationKind,
+};
 
 #[cfg(feature = "runner")]
 pub use equivalence::{
@@ -81,12 +106,14 @@ pub use equivalence::{
 };
 
 #[cfg(feature = "runner")]
-pub use runner::{
-    ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,
-};
+pub use runner::{ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult};
 
 #[cfg(feature = "runner")]
-pub use vm_runner::{VmRunInput, VmRunOutput, VmRunner, VmRunnerError, VmSessionStatus, VmTraceEvent};
+pub use vm_runner::{
+    compute_trace_diff, ComparisonResult, InvariantVerificationResult, LeanStructuredError,
+    TraceValidation, VmRunInput, VmRunOutput, VmRunner, VmRunnerError, VmSessionStatus,
+    VmStepState, VmTraceEvent,
+};
 
 #[cfg(feature = "runner")]
 pub use validate::{ValidationResult, Validator};

@@ -10,9 +10,9 @@
 //!
 //! # Error Code Format
 //!
-//! Error codes follow the format `CXXX` where:
+//! Error codes follow the format `C###` where:
 //! - `C` is the category (R=Role, M=Message, S=Syntax, P=Protocol)
-//! - `XXX` is a numeric identifier
+//! - `###` is a three-digit numeric identifier (001-999)
 //!
 //! # Example
 //!

@@ -24,7 +24,12 @@ pub fn obs_session(ev: &ObsEvent) -> Option<SessionId> {
         | ObsEvent::Aborted { session, .. }
         | ObsEvent::Tagged { session, .. }
         | ObsEvent::Checked { session, .. } => Some(*session),
-        ObsEvent::Halted { .. } | ObsEvent::Invoked { .. } | ObsEvent::Faulted { .. } => None,
+        ObsEvent::Offered { edge, .. } | ObsEvent::Chose { edge, .. } => Some(edge.sid),
+        ObsEvent::EpochAdvanced { sid, .. } => Some(*sid),
+        ObsEvent::Halted { .. }
+        | ObsEvent::Invoked { .. }
+        | ObsEvent::Faulted { .. }
+        | ObsEvent::OutputConditionChecked { .. } => None,
     }
 }
 
@@ -33,6 +38,7 @@ pub fn obs_session(ev: &ObsEvent) -> Option<SessionId> {
 pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
     match ev {
         ObsEvent::Sent {
+            edge,
             session,
             from,
             to,
@@ -40,12 +46,14 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             ..
         } => ObsEvent::Sent {
             tick,
+            edge: edge.clone(),
             session: *session,
             from: from.clone(),
             to: to.clone(),
             label: label.clone(),
         },
         ObsEvent::Received {
+            edge,
             session,
             from,
             to,
@@ -53,9 +61,20 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             ..
         } => ObsEvent::Received {
             tick,
+            edge: edge.clone(),
             session: *session,
             from: from.clone(),
             to: to.clone(),
+            label: label.clone(),
+        },
+        ObsEvent::Offered { edge, label, .. } => ObsEvent::Offered {
+            tick,
+            edge: edge.clone(),
+            label: label.clone(),
+        },
+        ObsEvent::Chose { edge, label, .. } => ObsEvent::Chose {
+            tick,
+            edge: edge.clone(),
             label: label.clone(),
         },
         ObsEvent::Opened { session, roles, .. } => ObsEvent::Opened {
@@ -67,6 +86,11 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             tick,
             session: *session,
         },
+        ObsEvent::EpochAdvanced { sid, epoch, .. } => ObsEvent::EpochAdvanced {
+            tick,
+            sid: *sid,
+            epoch: *epoch,
+        },
         ObsEvent::Halted { coro_id, .. } => ObsEvent::Halted {
             tick,
             coro_id: *coro_id,
@@ -77,7 +101,10 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             role: role.clone(),
         },
         ObsEvent::Acquired {
-            session, role, layer, ..
+            session,
+            role,
+            layer,
+            ..
         } => ObsEvent::Acquired {
             tick,
             session: *session,
@@ -85,7 +112,10 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             layer: layer.clone(),
         },
         ObsEvent::Released {
-            session, role, layer, ..
+            session,
+            role,
+            layer,
+            ..
         } => ObsEvent::Released {
             tick,
             session: *session,
@@ -93,7 +123,11 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             layer: layer.clone(),
         },
         ObsEvent::Transferred {
-            session, role, from, to, ..
+            session,
+            role,
+            from,
+            to,
+            ..
         } => ObsEvent::Transferred {
             tick,
             session: *session,
@@ -101,9 +135,7 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             from: *from,
             to: *to,
         },
-        ObsEvent::Forked {
-            session, ghost, ..
-        } => ObsEvent::Forked {
+        ObsEvent::Forked { session, ghost, .. } => ObsEvent::Forked {
             tick,
             session: *session,
             ghost: *ghost,
@@ -116,7 +148,12 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             tick,
             session: *session,
         },
-        ObsEvent::Tagged { session, role, fact, .. } => ObsEvent::Tagged {
+        ObsEvent::Tagged {
+            session,
+            role,
+            fact,
+            ..
+        } => ObsEvent::Tagged {
             tick,
             session: *session,
             role: role.clone(),
@@ -139,6 +176,19 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
             tick,
             coro_id: *coro_id,
             fault: fault.clone(),
+        },
+        ObsEvent::OutputConditionChecked {
+            predicate_ref,
+            witness_ref,
+            output_digest,
+            passed,
+            ..
+        } => ObsEvent::OutputConditionChecked {
+            tick,
+            predicate_ref: predicate_ref.clone(),
+            witness_ref: witness_ref.clone(),
+            output_digest: output_digest.clone(),
+            passed: *passed,
         },
     }
 }
@@ -165,4 +215,45 @@ pub fn normalize_trace(trace: &[ObsEvent]) -> Vec<ObsEvent> {
 #[must_use]
 pub fn strict_trace(trace: &[ObsEvent]) -> Vec<ObsEvent> {
     trace.to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::Edge;
+
+    #[test]
+    fn normalize_trace_memory_is_bounded_at_10k_events() {
+        let mut trace = Vec::with_capacity(10_000);
+        for i in 0..10_000usize {
+            let sid = i % 32;
+            let tick = i as u64;
+            if i % 2 == 0 {
+                trace.push(ObsEvent::Sent {
+                    tick,
+                    edge: Edge::new(sid, "A", "B"),
+                    session: sid,
+                    from: "A".to_string(),
+                    to: "B".to_string(),
+                    label: "m".to_string(),
+                });
+            } else {
+                trace.push(ObsEvent::Received {
+                    tick,
+                    edge: Edge::new(sid, "B", "A"),
+                    session: sid,
+                    from: "B".to_string(),
+                    to: "A".to_string(),
+                    label: "m".to_string(),
+                });
+            }
+        }
+
+        let normalized = normalize_trace(&trace);
+        assert_eq!(normalized.len(), trace.len());
+        assert!(
+            normalized.capacity() <= trace.len() + 1,
+            "normalize_trace should allocate O(n) space without capacity blow-up"
+        );
+    }
 }

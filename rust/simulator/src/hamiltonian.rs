@@ -175,7 +175,7 @@ impl EffectHandler for HamiltonianHandler {
 
         // Use own force computation (from received peer position).
         // The received_force is the peer's force on itself, not on us.
-        let _ = received_force;
+        let _unused_peer_force = received_force;
         let force = self.force(vals[0], peer_pos);
 
         // Leapfrog integration:

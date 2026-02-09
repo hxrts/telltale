@@ -6,6 +6,9 @@
 // This example demonstrates a negotiation protocol between a buyer, seller, and broker.
 // The broker facilitates the negotiation by coordinating offers and acceptances.
 
+/// Maximum price the buyer will accept in this demo scenario.
+const BUYER_ACCEPT_PRICE_MAX: u32 = 1200;
+
 use serde::{Deserialize, Serialize};
 use telltale_choreography::effects::{
     handlers::telltale::{SimpleChannel, TelltaleEndpoint, TelltaleHandler},
@@ -166,8 +169,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Buyer makes choice: accept or reject
         println!("\nPhase 5: Buyer makes decision");
 
-        // For demo purposes, buyer accepts if price <= 1200
-        let decision = if price <= 1200 {
+        // For demo purposes, buyer accepts if price is at or below threshold
+        let decision = if price <= BUYER_ACCEPT_PRICE_MAX {
             println!("  Buyer decides to ACCEPT");
             NegotiationLabel::Accept
         } else {

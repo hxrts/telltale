@@ -1,6 +1,10 @@
 //! TCP transport implementation.
 
 use crate::config::TcpTransportConfig;
+
+/// Maximum length for role names in the TCP protocol handshake.
+/// Role names exceeding this limit are rejected to prevent denial-of-service attacks.
+const ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
 use telltale_choreography::topology::{Message, TransportError, TransportResult};
@@ -111,6 +115,7 @@ impl TcpTransport {
         let buffer_size = self.config.buffer_size;
 
         tokio::spawn(async move {
+            // Forever loop: runs until shutdown signal received via shutdown_rx
             loop {
                 tokio::select! {
                     accept_result = listener.accept() => {
@@ -155,6 +160,7 @@ impl TcpTransport {
         let mut attempts = 0;
         let mut delay = retry.initial_delay;
 
+        // BOUND: exits on success or when attempts >= retry.max_attempts
         loop {
             match TcpStream::connect(addr).await {
                 Ok(mut stream) => {
@@ -217,7 +223,7 @@ async fn handle_connection(
     stream.read_exact(&mut len_buf).await?;
     let len = u32::from_be_bytes(len_buf) as usize;
 
-    if len > 1024 {
+    if len > ROLE_NAME_LEN_MAX_BYTES {
         return Err(TcpTransportError::InvalidMessage(
             "Role name too long".to_string(),
         ));
@@ -230,7 +236,7 @@ async fn handle_connection(
 
     debug!(peer = %peer_role, local = local_role, "Identified peer");
 
-    // Read messages in a loop
+    // Forever loop: reads messages until connection closed (EOF) or error
     loop {
         let mut len_buf = [0u8; 4];
         match stream.read_exact(&mut len_buf).await {
@@ -353,9 +359,9 @@ impl Transport for TcpTransport {
     async fn close(&self) -> TransportTcpResult<()> {
         *self.state.write().await = TransportState::ShuttingDown;
 
-        // Send shutdown signal
+        // Send shutdown signal - ignore failure since receiver may be dropped during shutdown
         if let Some(tx) = self.shutdown_tx.lock().await.take() {
-            let _ = tx.send(()).await;
+            drop(tx.send(()).await);
         }
 
         // Close all connections

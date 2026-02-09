@@ -33,6 +33,25 @@ impl ValidationResult {
     }
 }
 
+/// Subtyping decision from a checker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubtypingDecision {
+    /// The type is a subtype.
+    IsSubtype,
+    /// The type is not a subtype.
+    NotSubtype,
+}
+
+impl From<bool> for SubtypingDecision {
+    fn from(b: bool) -> Self {
+        if b {
+            SubtypingDecision::IsSubtype
+        } else {
+            SubtypingDecision::NotSubtype
+        }
+    }
+}
+
 /// Errors during validation.
 #[derive(Debug, Error)]
 pub enum ValidateError {
@@ -119,12 +138,16 @@ impl Validator {
     }
 
     /// Compare Rust subtyping result with Lean result.
-    pub fn compare_subtyping(&self, rust_result: bool, lean_result: bool) -> ValidationResult {
+    pub fn compare_subtyping(
+        &self,
+        rust_result: SubtypingDecision,
+        lean_result: SubtypingDecision,
+    ) -> ValidationResult {
         if rust_result == lean_result {
             ValidationResult::Valid
         } else {
             ValidationResult::Invalid(format!(
-                "Subtyping mismatch: Rust={}, Lean={}",
+                "Subtyping mismatch: Rust={:?}, Lean={:?}",
                 rust_result, lean_result
             ))
         }
@@ -316,14 +339,16 @@ mod tests {
     #[test]
     fn test_compare_subtyping_match() {
         let validator = Validator::new();
-        let result = validator.compare_subtyping(true, true);
+        let result =
+            validator.compare_subtyping(SubtypingDecision::IsSubtype, SubtypingDecision::IsSubtype);
         assert!(result.is_valid());
     }
 
     #[test]
     fn test_compare_subtyping_mismatch() {
         let validator = Validator::new();
-        let result = validator.compare_subtyping(true, false);
+        let result = validator
+            .compare_subtyping(SubtypingDecision::IsSubtype, SubtypingDecision::NotSubtype);
         assert!(result.is_invalid());
     }
 

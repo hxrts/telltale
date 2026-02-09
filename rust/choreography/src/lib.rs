@@ -76,6 +76,7 @@ pub use simulation::{
 
 // Re-export macros from telltale-macros
 pub use telltale_macros::choreography;
+pub use telltale_types::{ChannelCapacity, MessageLenBytes, QueueCapacity};
 
 // High-level API functions for extension-aware compilation
 

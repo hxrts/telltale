@@ -268,23 +268,25 @@ async fn run_with_recording() {
 
     // Run coordinator
     let coordinator_prog = coordinator_program();
-    let _ = run_program(
+    run_program(
         &mut coordinator_handler,
         &mut endpoint,
         coordinator_prog,
         "Coordinator",
     )
-    .await;
+    .await
+    .expect("coordinator program execution");
 
     // Run participant
     let participant_prog = participant_program(Role::Coordinator);
-    let _ = run_program(
+    run_program(
         &mut participant_handler,
         &mut endpoint,
         participant_prog,
         "Participant1",
     )
-    .await;
+    .await
+    .expect("participant program execution");
 
     // Display recorded events
     println!("\n  Coordinator events:");

@@ -1,7 +1,7 @@
 //! Compile `LocalTypeR` to bytecode.
 //!
 //! Trivial compiler: each send/recv in the local type becomes a bytecode
-//! instruction. Mu generates a loop target, Var generates a Jmp back.
+//! instruction. Mu generates a loop target, Var generates a Jump back.
 
 use std::collections::HashMap;
 
@@ -39,18 +39,18 @@ fn compile_inner(lt: &LocalTypeR, instrs: &mut Vec<Instr>, loop_targets: &mut Ha
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
-                compile_choice_branches(branches, instrs, loop_targets);
+                compile_send_choice_branches(branches, instrs, loop_targets);
             }
         }
         LocalTypeR::Recv { branches, .. } => {
             if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
-                    instrs.push(Instr::Recv { chan: 0, dst: 1 });
+                    instrs.push(Instr::Receive { chan: 0, dst: 1 });
                     instrs.push(Instr::Invoke { action: 0, dst: 0 });
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
-                compile_choice_branches(branches, instrs, loop_targets);
+                compile_recv_choice_branches(branches, instrs, loop_targets);
             }
         }
         LocalTypeR::Mu { var, body } => {
@@ -60,7 +60,7 @@ fn compile_inner(lt: &LocalTypeR, instrs: &mut Vec<Instr>, loop_targets: &mut Ha
         }
         LocalTypeR::Var(name) => {
             if let Some(&target) = loop_targets.get(name) {
-                instrs.push(Instr::Jmp { target });
+                instrs.push(Instr::Jump { target });
             } else {
                 // Unbound variable — halt.
                 instrs.push(Instr::Halt);
@@ -72,8 +72,8 @@ fn compile_inner(lt: &LocalTypeR, instrs: &mut Vec<Instr>, loop_targets: &mut Ha
     }
 }
 
-/// Compile multi-branch choice: emit Offer with jump table, then each branch's code.
-fn compile_choice_branches(
+/// Compile multi-branch send choice: deterministically offer first label.
+fn compile_send_choice_branches(
     branches: &[(
         telltale_types::Label,
         Option<telltale_types::ValType>,
@@ -82,9 +82,28 @@ fn compile_choice_branches(
     instrs: &mut Vec<Instr>,
     loop_targets: &mut HashMap<String, PC>,
 ) {
-    // Reserve slot for the Offer instruction (will be patched).
+    if let Some((label, _vt, cont)) = branches.first() {
+        instrs.push(Instr::Offer {
+            chan: 0,
+            label: label.name.clone(),
+        });
+        compile_inner(cont, instrs, loop_targets);
+    }
+}
+
+/// Compile multi-branch receive choice: emit Choose with jump table, then each branch's code.
+fn compile_recv_choice_branches(
+    branches: &[(
+        telltale_types::Label,
+        Option<telltale_types::ValType>,
+        LocalTypeR,
+    )],
+    instrs: &mut Vec<Instr>,
+    loop_targets: &mut HashMap<String, PC>,
+) {
+    // Reserve slot for the Choose instruction (will be patched).
     let placeholder_idx = instrs.len();
-    instrs.push(Instr::Offer {
+    instrs.push(Instr::Choose {
         chan: 0,
         table: vec![],
     });
@@ -97,8 +116,8 @@ fn compile_choice_branches(
         compile_inner(cont, instrs, loop_targets);
     }
 
-    // Patch the Offer instruction with the completed table.
-    instrs[placeholder_idx] = Instr::Offer { chan: 0, table };
+    // Patch the Choose instruction with the completed table.
+    instrs[placeholder_idx] = Instr::Choose { chan: 0, table };
 }
 
 #[cfg(test)]
@@ -140,7 +159,7 @@ mod tests {
             vec![
                 Instr::Send { chan: 0, val: 1 },
                 Instr::Invoke { action: 0, dst: 0 },
-                Instr::Jmp { target: 0 },
+                Instr::Jump { target: 0 },
             ]
         );
     }
@@ -169,9 +188,9 @@ mod tests {
             vec![
                 Instr::Send { chan: 0, val: 1 },
                 Instr::Invoke { action: 0, dst: 0 },
-                Instr::Recv { chan: 0, dst: 1 },
+                Instr::Receive { chan: 0, dst: 1 },
                 Instr::Invoke { action: 0, dst: 0 },
-                Instr::Jmp { target: 0 },
+                Instr::Jump { target: 0 },
             ]
         );
     }

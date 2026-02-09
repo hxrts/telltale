@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepRecord {
     /// Simulation step index.
-    pub step: usize,
+    pub step: u64,
     /// Role name.
     pub role: String,
     /// State vector after this step.

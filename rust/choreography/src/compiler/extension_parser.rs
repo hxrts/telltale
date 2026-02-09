@@ -32,17 +32,26 @@ impl ExtensionParser {
     /// Note: Grammar extensions are fully supported and registered with the grammar composer.
     /// Statement parsers are accepted but not currently stored. Extension parsing passes
     /// through the standard parser - full extension statement dispatch is a planned feature.
-    pub fn register_extension<G, P>(&mut self, grammar_ext: G, _statement_parser: P)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the grammar extension cannot be registered.
+    pub fn register_extension<G, P>(
+        &mut self,
+        grammar_ext: G,
+        _statement_parser: P,
+    ) -> Result<(), crate::extensions::ParseError>
     where
         G: crate::extensions::GrammarExtension + 'static,
         P: StatementParser + 'static,
     {
         // Register grammar extension (this also registers the grammar rules for rule mapping)
-        self.grammar_composer.register_extension(grammar_ext);
+        self.grammar_composer.register_extension(grammar_ext)?;
 
         // Statement parser registration is accepted but not stored.
         // Full extension statement dispatch will require extending GrammarComposer
         // to track parsers alongside grammar rules.
+        Ok(())
     }
 
     /// Parse a choreography string with extension support (optimized)
@@ -151,14 +160,18 @@ impl ExtensionParserBuilder {
         }
     }
 
-    pub fn with_extension<G, P>(mut self, grammar_ext: G, statement_parser: P) -> Self
+    pub fn with_extension<G, P>(
+        mut self,
+        grammar_ext: G,
+        statement_parser: P,
+    ) -> Result<Self, crate::extensions::ParseError>
     where
         G: crate::extensions::GrammarExtension + 'static,
         P: StatementParser + 'static,
     {
         self.parser
-            .register_extension(grammar_ext, statement_parser);
-        self
+            .register_extension(grammar_ext, statement_parser)?;
+        Ok(self)
     }
 
     pub fn build(self) -> ExtensionParser {
@@ -237,7 +250,9 @@ mod tests {
     #[test]
     fn test_extension_registration() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let stats = parser.extension_stats();
         assert_eq!(stats.grammar_extensions, 1);
@@ -248,6 +263,7 @@ mod tests {
     fn test_builder_pattern() {
         let parser = ExtensionParserBuilder::new()
             .with_extension(TestGrammarExtension, TestStatementParser)
+            .expect("test extension should register")
             .build();
 
         assert!(parser.can_handle_statement("test_stmt"));
@@ -266,7 +282,9 @@ mod tests {
     #[test]
     fn test_composed_grammar_generation() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let result = parser.get_composed_grammar();
         assert!(result.is_ok(), "Should generate composed grammar");

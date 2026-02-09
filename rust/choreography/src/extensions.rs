@@ -209,9 +209,15 @@ impl ExtensionRegistry {
         self.register_grammar(extension)
     }
 
-    /// Register a grammar extension (legacy method for compatibility)
+    /// Register a grammar extension (legacy method for compatibility).
+    ///
+    /// This method silently ignores registration errors (e.g., priority conflicts)
+    /// for backward compatibility with code that didn't check results.
+    /// Prefer `register_grammar()` which returns errors.
+    #[deprecated(since = "0.2.0", note = "use register_grammar() instead")]
     pub fn register_grammar_legacy<T: GrammarExtension + 'static>(&mut self, extension: T) {
-        let _ = self.register_grammar(extension);
+        // Intentionally ignoring error: legacy API contract doesn't report failures
+        drop(self.register_grammar(extension));
     }
 
     /// Register a statement parser
@@ -365,7 +371,9 @@ impl ExtensionRegistry {
         let mut registry = Self::new();
 
         // Register timeout extension
-        registry.register_grammar_legacy(timeout::TimeoutGrammarExtension);
+        registry
+            .register_grammar(timeout::TimeoutGrammarExtension)
+            .expect("builtin timeout extension should register successfully");
         registry.register_parser(timeout::TimeoutStatementParser, "timeout".to_string());
 
         registry
@@ -592,7 +600,9 @@ mod tests {
         let mut registry = ExtensionRegistry::new();
 
         // Register extension
-        let _ = registry.register_grammar(MockGrammarExtension);
+        registry
+            .register_grammar(MockGrammarExtension)
+            .expect("extension registration should succeed");
 
         // Test rule mapping
         assert!(registry.can_handle("timeout_stmt"));
@@ -674,9 +684,13 @@ mod tests {
         let mut registry = ExtensionRegistry::new();
 
         // Register lower priority first
-        let _ = registry.register_grammar(TestExt2);
+        registry
+            .register_grammar(TestExt2)
+            .expect("lower priority extension should register");
         // Register higher priority second (should override)
-        let _ = registry.register_grammar(TestExt1);
+        registry
+            .register_grammar(TestExt1)
+            .expect("higher priority extension should override");
 
         let conflicts = registry.get_detailed_conflicts();
         assert!(!conflicts.is_empty());
@@ -689,7 +703,9 @@ mod tests {
         let mut registry = ExtensionRegistry::new();
 
         // Register an extension with version
-        let _ = registry.register_grammar_with_version(MockGrammarExtension, "1.0.0".to_string());
+        registry
+            .register_grammar_with_version(MockGrammarExtension, "1.0.0".to_string())
+            .expect("versioned extension should register");
 
         // Test documentation generation
         let docs = registry.generate_docs();

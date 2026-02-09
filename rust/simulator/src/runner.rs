@@ -43,7 +43,7 @@ fn record_all_roles(vm: &VM, coro_info: &CoroInfo, step: usize, trace: &mut Trac
     for (coro_id, role) in coro_info {
         if let Some(coro) = vm.coroutine(*coro_id) {
             trace.record(StepRecord {
-                step,
+                step: step as u64,
                 role: role.clone(),
                 state: registers_to_f64s(&coro.regs),
             });
@@ -325,7 +325,7 @@ pub fn run_with_scenario(
         .map(|(_, role)| local_types.get(role).map(active_per_role).unwrap_or(0))
         .unwrap_or(0);
 
-    let max_vm_rounds = scenario.steps * num_roles * 10;
+    let max_vm_rounds = scenario.steps * (num_roles as u64) * 10;
     let mut prev_trace_len = 0;
     let mut invoke_count: usize = 0;
     let mut active_count: usize = 0;
@@ -366,7 +366,7 @@ pub fn run_with_scenario(
     }
 
     for _ in 0..max_vm_rounds {
-        if step_idx >= scenario.steps {
+        if step_idx as u64 >= scenario.steps {
             break;
         }
 
@@ -384,7 +384,7 @@ pub fn run_with_scenario(
                     .map_err(|e| e.to_string())
             });
             vm.set_paused_roles(&net.inner().crashed_roles());
-            match vm.step_round(net, scenario.concurrency) {
+            match vm.step_round(net, scenario.concurrency as usize) {
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
@@ -397,7 +397,7 @@ pub fn run_with_scenario(
                     .map_err(|e| e.to_string())
             });
             vm.set_paused_roles(&fault.crashed_roles());
-            match vm.step_round(fault, scenario.concurrency) {
+            match vm.step_round(fault, scenario.concurrency as usize) {
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("vm error: {e}")),
@@ -413,13 +413,13 @@ pub fn run_with_scenario(
 
         invoke_count += new_invokes;
 
-        while invoke_count >= num_roles && step_idx < scenario.steps {
+        while invoke_count >= num_roles && (step_idx as u64) < scenario.steps {
             invoke_count -= num_roles;
             record_all_roles(&vm, &coro_info, step_idx, &mut trace);
             step_idx += 1;
             active_count += 1;
 
-            if active_count >= apr && step_idx < scenario.steps {
+            if active_count >= apr && (step_idx as u64) < scenario.steps {
                 active_count = 0;
                 record_all_roles(&vm, &coro_info, step_idx, &mut trace);
                 step_idx += 1;
@@ -442,7 +442,7 @@ pub fn run_with_scenario(
         record_all_roles(
             &vm,
             &coro_info,
-            scenario.steps.saturating_sub(1),
+            scenario.steps.saturating_sub(1) as usize,
             &mut trace,
         );
     }

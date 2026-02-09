@@ -173,10 +173,17 @@ impl OperationHints {
         }
     }
 
-    /// Builder: set parallel execution.
+    /// Builder: enable parallel execution.
     #[must_use]
-    pub fn set_parallel(mut self, parallel: bool) -> Self {
-        self.parallel = parallel;
+    pub fn with_parallel(mut self) -> Self {
+        self.parallel = true;
+        self
+    }
+
+    /// Builder: disable parallel execution (sequential).
+    #[must_use]
+    pub fn sequential(mut self) -> Self {
+        self.parallel = false;
         self
     }
 
@@ -187,10 +194,17 @@ impl OperationHints {
         self
     }
 
-    /// Builder: set ordered execution.
+    /// Builder: enable ordered execution.
     #[must_use]
-    pub fn set_ordered(mut self, ordered: bool) -> Self {
-        self.ordered = ordered;
+    pub fn with_ordered(mut self) -> Self {
+        self.ordered = true;
+        self
+    }
+
+    /// Builder: disable ordered execution.
+    #[must_use]
+    pub fn unordered(mut self) -> Self {
+        self.ordered = false;
         self
     }
 
@@ -589,7 +603,7 @@ mod tests {
 
         hints.insert(
             path.clone(),
-            OperationHints::with_min_responses(3).set_parallel(true),
+            OperationHints::with_min_responses(3).with_parallel(),
         );
 
         assert!(hints.is_parallel(&path));

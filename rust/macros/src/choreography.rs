@@ -165,7 +165,7 @@ impl Parse for ProtocolDef {
                 let _: Token![:] = content.parse()?;
             }
 
-            // Parse comma-separated role names.
+            // BOUND: consumes input tokens, exits when semicolon or end-of-input reached
             loop {
                 let role_name: Ident = content.parse()?;
                 roles.push(RoleDef {

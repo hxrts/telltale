@@ -182,10 +182,10 @@ impl ExtensionDiscovery {
             if let Some(package) = self.discovered_extensions.get(&ext_name) {
                 // Clone the extension (this requires extensions to be cloneable or
                 // we need a different approach for ownership)
-                registry.register_grammar_legacy(ClonableExtensionWrapper::new(
+                registry.register_grammar(ClonableExtensionWrapper::new(
                     &*package.extension,
                     &package.metadata,
-                ));
+                ))?;
 
                 // Add dependencies to registry
                 for dep in &package.metadata.dependencies {

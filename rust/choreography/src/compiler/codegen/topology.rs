@@ -3,7 +3,7 @@
 //! Generates topology-aware protocol handlers that support local testing
 //! and distributed deployment configurations.
 
-use crate::ast::{Choreography, LocalType, Role};
+use crate::ast::{Branch, Choreography, LocalType, Protocol, Role};
 use crate::topology::{Location, Topology, TopologyConstraint, TopologyMode};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
@@ -17,6 +17,13 @@ pub struct InlineTopology {
     pub name: String,
     /// The topology configuration
     pub topology: Topology,
+}
+
+#[derive(Debug, Clone)]
+struct BranchRequirementSpec {
+    sender: String,
+    receiver: String,
+    label_count: u32,
 }
 
 /// Generate topology-aware protocol handlers
@@ -39,8 +46,11 @@ pub fn generate_topology_integration(
     // Generate handler method
     let handler_method = generate_handler_method();
 
+    // Collect branch requirements for capacity checking
+    let branch_requirements = collect_branch_requirements(&choreography.protocol);
+
     // Generate with_topology method
-    let with_topology_method = generate_with_topology_method(&role_name_strs);
+    let with_topology_method = generate_with_topology_method(&role_name_strs, &branch_requirements);
 
     // Generate topology constants
     let topology_constants = generate_topology_constants(inline_topologies, &role_name_strs);
@@ -50,16 +60,85 @@ pub fn generate_topology_integration(
         pub mod topology {
             use super::*;
             use ::telltale_choreography::topology::{
-                Location, Topology, TopologyBuilder, TopologyHandler, TopologyMode,
+                BranchRequirement, Location, Topology, TopologyBuilder, TopologyHandler,
+                TopologyMode,
             };
             use ::telltale_choreography::{
-                Datacenter, Namespace, Region, RoleName, TopologyEndpoint,
+                ChannelCapacity, Datacenter, Namespace, Region, RoleName, TopologyEndpoint,
             };
 
             #handler_method
             #with_topology_method
             #topology_constants
         }
+    }
+}
+
+fn collect_branch_requirements(protocol: &Protocol) -> Vec<BranchRequirementSpec> {
+    let mut requirements = Vec::new();
+    collect_branch_requirements_from_protocol(protocol, &mut requirements);
+    requirements
+}
+
+fn collect_branch_requirements_from_protocol(
+    protocol: &Protocol,
+    requirements: &mut Vec<BranchRequirementSpec>,
+) {
+    match protocol {
+        Protocol::Choice { branches, .. } => {
+            let label_count = u32::try_from(branches.len()).unwrap_or(u32::MAX);
+            for branch in branches {
+                collect_branch_requirement_from_branch(branch, label_count, requirements);
+                collect_branch_requirements_from_protocol(&branch.protocol, requirements);
+            }
+        }
+        Protocol::Send { continuation, .. } => {
+            collect_branch_requirements_from_protocol(continuation, requirements);
+        }
+        Protocol::Broadcast { continuation, .. } => {
+            collect_branch_requirements_from_protocol(continuation, requirements);
+        }
+        Protocol::Loop { body, .. } => {
+            collect_branch_requirements_from_protocol(body, requirements);
+        }
+        Protocol::Parallel { protocols } => {
+            for p in protocols {
+                collect_branch_requirements_from_protocol(p, requirements);
+            }
+        }
+        Protocol::Rec { body, .. } => {
+            collect_branch_requirements_from_protocol(body, requirements);
+        }
+        Protocol::Extension { continuation, .. } => {
+            collect_branch_requirements_from_protocol(continuation, requirements);
+        }
+        Protocol::Var(_) | Protocol::End => {}
+    }
+}
+
+fn collect_branch_requirement_from_branch(
+    branch: &Branch,
+    label_count: u32,
+    requirements: &mut Vec<BranchRequirementSpec>,
+) {
+    match &branch.protocol {
+        Protocol::Send { from, to, .. } => {
+            requirements.push(BranchRequirementSpec {
+                sender: from.name().to_string(),
+                receiver: to.name().to_string(),
+                label_count,
+            });
+        }
+        Protocol::Broadcast { from, to_all, .. } => {
+            for to in to_all {
+                requirements.push(BranchRequirementSpec {
+                    sender: from.name().to_string(),
+                    receiver: to.name().to_string(),
+                    label_count,
+                });
+            }
+        }
+        _ => {}
     }
 }
 
@@ -87,10 +166,29 @@ fn generate_handler_method() -> TokenStream {
 }
 
 /// Generate the `with_topology(topo, role)` method
-fn generate_with_topology_method(role_names: &[String]) -> TokenStream {
+fn generate_with_topology_method(
+    role_names: &[String],
+    branch_requirements: &[BranchRequirementSpec],
+) -> TokenStream {
     let role_name_literals: Vec<TokenStream> = role_names
         .iter()
         .map(|role| quote! { RoleName::from_static(#role) })
+        .collect();
+
+    let branch_requirement_literals: Vec<TokenStream> = branch_requirements
+        .iter()
+        .map(|req| {
+            let sender = &req.sender;
+            let receiver = &req.receiver;
+            let label_count = req.label_count;
+            quote! {
+                BranchRequirement::new(
+                    RoleName::from_static(#sender),
+                    RoleName::from_static(#receiver),
+                    #label_count
+                )
+            }
+        })
         .collect();
 
     quote! {
@@ -122,9 +220,10 @@ fn generate_with_topology_method(role_names: &[String]) -> TokenStream {
             role: Role,
         ) -> Result<TopologyHandler, String> {
             let roles = [#(#role_name_literals),*];
+            let branch_requirements: &[BranchRequirement] = &[#(#branch_requirement_literals),*];
 
             // Validate topology against protocol roles
-            let validation = topology.validate(&roles);
+            let validation = topology.validate_with_branches(&roles, &branch_requirements);
             if !validation.is_valid() {
                 return Err(format!("Topology validation failed: {:?}", validation));
             }
@@ -277,6 +376,20 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
         builder_calls.push(constraint_call);
     }
 
+    // Add channel capacities
+    for ((sender, receiver), capacity) in &topology.channel_capacities {
+        let sender_literal = sender.as_str();
+        let receiver_literal = receiver.as_str();
+        let capacity_value = capacity.get();
+        builder_calls.push(quote! {
+            .channel_capacity(
+                RoleName::from_static(#sender_literal),
+                RoleName::from_static(#receiver_literal),
+                ChannelCapacity::new(#capacity_value)
+            )
+        });
+    }
+
     if builder_calls.is_empty() {
         quote! {
             TopologyBuilder::new().build()
@@ -409,12 +522,12 @@ mod tests {
 
     #[test]
     fn test_generate_with_topology_method() {
-        let tokens = generate_with_topology_method(&["Alice".to_string(), "Bob".to_string()]);
+        let tokens = generate_with_topology_method(&["Alice".to_string(), "Bob".to_string()], &[]);
         let code = tokens.to_string();
 
         assert!(code.contains("pub fn with_topology"));
         assert!(code.contains("TopologyHandler :: new"));
-        assert!(code.contains("topology . validate"));
+        assert!(code.contains("topology . validate_with_branches"));
     }
 
     #[test]

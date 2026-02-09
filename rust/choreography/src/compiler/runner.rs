@@ -744,7 +744,7 @@ pub(crate) fn generate_runner_body(
                 }
                 Some(crate::ast::Condition::YieldWhen(condition)) => {
                     quote! {
-                        // Yield-when loop
+                        // Yield-when loop - INVARIANT: always breaks after one iteration
                         loop {
                             #loop_body
                             // Check yield condition
@@ -992,16 +992,11 @@ pub fn generate_output_types(roles: &[Role]) -> TokenStream {
             let name = role.name();
             let output_name = format_ident!("{}Output", name);
 
-            // TODO(output-fields): Output structs should contain fields for:
-            // - Final values of received messages
-            // - Computed results from protocol execution
-            // - Choice paths taken (for protocols with branching)
-            // Currently empty - users get no data back from protocol execution.
             quote! {
                 /// Output from running the #name role
                 #[derive(Debug, Default)]
                 pub struct #output_name {
-                    // Fields will be added based on protocol structure
+                    // Intentionally empty in V1: runners report success/failure via `Result`.
                 }
             }
         })

@@ -81,8 +81,7 @@ pub trait EndpointResolver: Send + Sync {
     /// returns `true`, meaning callers should attempt resolution and
     /// handle errors. Implementations may override this to provide
     /// a fast check without performing the full resolution.
-    fn can_resolve(&self, role: &RoleName) -> bool {
-        let _ = role;
+    fn can_resolve(&self, _role: &RoleName) -> bool {
         true
     }
 }

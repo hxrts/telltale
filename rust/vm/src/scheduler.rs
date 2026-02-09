@@ -10,6 +10,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::coroutine::BlockReason;
 
+fn default_timeslice() -> usize {
+    1
+}
+
+/// Priority policy family for serialization-safe prioritized scheduling.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PriorityPolicy {
+    /// Fixed static priorities keyed by coroutine id.
+    FixedMap(BTreeMap<usize, usize>),
+    /// Favor older entries in the ready queue.
+    Aging,
+    /// Favor coroutines with progress tokens.
+    TokenWeighted,
+}
+
 /// Scheduling policy.
 ///
 /// All policies are observationally equivalent per the `schedule_confluence`
@@ -22,8 +37,23 @@ pub enum SchedPolicy {
     Cooperative,
     /// Basic multi-coroutine round-robin.
     RoundRobin,
+    /// Priority scheduling without function pointers.
+    Priority(PriorityPolicy),
     /// Prefer coroutines holding progress tokens (starvation freedom).
     ProgressAware,
+}
+
+/// Step outcome used by scheduler bookkeeping.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StepUpdate {
+    /// Coroutine should remain runnable.
+    Ready,
+    /// Coroutine yielded and remains runnable.
+    Yielded,
+    /// Coroutine blocked for a reason.
+    Blocked(BlockReason),
+    /// Coroutine is done/faulted and removed from queues.
+    Done,
 }
 
 /// Scheduler state.
@@ -32,8 +62,13 @@ pub struct Scheduler {
     policy: SchedPolicy,
     ready_queue: VecDeque<usize>,
     blocked_set: BTreeMap<usize, BlockReason>,
+    #[serde(default = "default_timeslice")]
+    timeslice: usize,
     step_count: usize,
 }
+
+/// Lean-aligned scheduler state alias.
+pub type SchedState = Scheduler;
 
 impl Scheduler {
     /// Create a scheduler with the given policy.
@@ -43,6 +78,7 @@ impl Scheduler {
             policy,
             ready_queue: VecDeque::new(),
             blocked_set: BTreeMap::new(),
+            timeslice: default_timeslice(),
             step_count: 0,
         }
     }
@@ -75,17 +111,7 @@ impl Scheduler {
 
     /// Pick the next coroutine to execute, or `None` if none are ready.
     pub fn schedule(&mut self) -> Option<usize> {
-        self.step_count += 1;
-        match &self.policy {
-            SchedPolicy::Cooperative | SchedPolicy::RoundRobin => {
-                // Round-robin: take from front, put at back after execution.
-                self.ready_queue.pop_front()
-            }
-            SchedPolicy::ProgressAware => {
-                // Fallback: no progress hints provided.
-                self.ready_queue.pop_front()
-            }
-        }
+        self.schedule_with(|_| false)
     }
 
     /// Pick the next coroutine using a progress predicate.
@@ -94,18 +120,35 @@ impl Scheduler {
         F: Fn(usize) -> bool,
     {
         self.step_count += 1;
-        match &self.policy {
+        let policy = self.policy.clone();
+        match policy {
+            SchedPolicy::Priority(priority) => {
+                self.pick_priority_candidate(&priority, has_progress)
+            }
             SchedPolicy::ProgressAware => {
-                if let Some(pos) = self
-                    .ready_queue
-                    .iter()
-                    .position(|id| has_progress(*id))
-                {
+                if let Some(pos) = self.ready_queue.iter().position(|id| has_progress(*id)) {
                     return self.ready_queue.remove(pos);
                 }
                 self.ready_queue.pop_front()
             }
             SchedPolicy::Cooperative | SchedPolicy::RoundRobin => self.ready_queue.pop_front(),
+        }
+    }
+
+    /// Lean-aligned scheduler pick entrypoint.
+    pub fn pick_runnable<F>(&mut self, has_progress: F) -> Option<usize>
+    where
+        F: Fn(usize) -> bool,
+    {
+        self.schedule_with(has_progress)
+    }
+
+    /// Lean-aligned scheduler state transition helper.
+    pub fn update_after_step(&mut self, coro_id: usize, update: StepUpdate) {
+        match update {
+            StepUpdate::Ready | StepUpdate::Yielded => self.reschedule(coro_id),
+            StepUpdate::Blocked(reason) => self.mark_blocked(coro_id, reason),
+            StepUpdate::Done => self.mark_done(coro_id),
         }
     }
 
@@ -118,6 +161,12 @@ impl Scheduler {
     #[must_use]
     pub fn ready_count(&self) -> usize {
         self.ready_queue.len()
+    }
+
+    /// Snapshot of the current global ready queue order.
+    #[must_use]
+    pub fn ready_snapshot(&self) -> Vec<usize> {
+        self.ready_queue.iter().copied().collect()
     }
 
     /// Number of blocked coroutines.
@@ -144,6 +193,12 @@ impl Scheduler {
         &self.policy
     }
 
+    /// Configured timeslice.
+    #[must_use]
+    pub fn timeslice(&self) -> usize {
+        self.timeslice
+    }
+
     /// Get the block reason for a coroutine, if blocked.
     #[must_use]
     pub fn block_reason(&self, coro_id: usize) -> Option<&BlockReason> {
@@ -155,12 +210,52 @@ impl Scheduler {
     pub fn blocked_ids(&self) -> Vec<usize> {
         self.blocked_set.keys().copied().collect()
     }
+
+    /// Snapshot of blocked coroutine reasons.
+    #[must_use]
+    pub fn blocked_snapshot(&self) -> BTreeMap<usize, BlockReason> {
+        self.blocked_set.clone()
+    }
+
+    fn pick_priority_candidate<F>(
+        &mut self,
+        policy: &PriorityPolicy,
+        has_progress: F,
+    ) -> Option<usize>
+    where
+        F: Fn(usize) -> bool,
+    {
+        let mut best: Option<(usize, usize)> = None;
+        for (pos, id) in self.ready_queue.iter().copied().enumerate() {
+            let score = match policy {
+                PriorityPolicy::FixedMap(priorities) => priorities.get(&id).copied().unwrap_or(0),
+                PriorityPolicy::Aging => self.ready_queue.len().saturating_sub(pos),
+                PriorityPolicy::TokenWeighted => {
+                    let progress = usize::from(has_progress(id));
+                    progress * self.ready_queue.len().saturating_add(1)
+                        + self.ready_queue.len().saturating_sub(pos)
+                }
+            };
+            let replace = match best {
+                None => true,
+                Some((best_pos, best_score)) => {
+                    score > best_score || (score == best_score && pos < best_pos)
+                }
+            };
+            if replace {
+                best = Some((pos, score));
+            }
+        }
+        let pos = best.map(|(pos, _)| pos)?;
+        self.ready_queue.remove(pos)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::instr::Endpoint;
+    use crate::session::Edge;
 
     #[test]
     fn test_round_robin() {
@@ -185,7 +280,8 @@ mod tests {
         sched.mark_blocked(
             0,
             BlockReason::RecvWait {
-                endpoint: Endpoint {
+                edge: Edge::new(0, "B", "A"),
+                token: Endpoint {
                     sid: 0,
                     role: "A".into(),
                 },
@@ -197,5 +293,48 @@ mod tests {
         sched.unblock(0);
         assert_eq!(sched.ready_count(), 2);
         assert_eq!(sched.blocked_count(), 0);
+    }
+
+    #[test]
+    fn test_progress_aware_tie_break_uses_ready_queue_order() {
+        let mut sched = Scheduler::new(SchedPolicy::ProgressAware);
+        sched.add_ready(3);
+        sched.add_ready(1);
+        sched.add_ready(2);
+
+        assert_eq!(sched.schedule_with(|id| id % 2 == 1), Some(3));
+        sched.reschedule(3);
+        assert_eq!(sched.schedule_with(|id| id % 2 == 1), Some(1));
+    }
+
+    #[test]
+    fn test_priority_fixed_map_prefers_higher_weight() {
+        let mut priorities = BTreeMap::new();
+        priorities.insert(1, 10);
+        priorities.insert(2, 20);
+        priorities.insert(3, 5);
+        let mut sched = Scheduler::new(SchedPolicy::Priority(PriorityPolicy::FixedMap(priorities)));
+        sched.add_ready(1);
+        sched.add_ready(2);
+        sched.add_ready(3);
+        assert_eq!(sched.schedule(), Some(2));
+    }
+
+    #[test]
+    fn test_update_after_step_routes_blocked_to_blocked_set() {
+        let mut sched = Scheduler::new(SchedPolicy::RoundRobin);
+        sched.add_ready(7);
+        sched.update_after_step(
+            7,
+            StepUpdate::Blocked(BlockReason::InvokeWait {
+                handler: "default".to_string(),
+            }),
+        );
+        assert_eq!(sched.ready_count(), 0);
+        assert_eq!(sched.blocked_count(), 1);
+        assert!(matches!(
+            sched.block_reason(7),
+            Some(BlockReason::InvokeWait { .. })
+        ));
     }
 }

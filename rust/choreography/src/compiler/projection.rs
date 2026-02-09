@@ -787,7 +787,7 @@ fn merge_labeled_local_types(
             },
             LocalType::Receive {
                 from: from2,
-                message: msg2,
+                message: _msg2,
                 continuation: cont2,
             },
         ) if from1 == from2 => {
@@ -812,7 +812,7 @@ fn merge_labeled_local_types(
         (
             LocalType::Receive {
                 from: from1,
-                message: msg1,
+                message: _msg1,
                 continuation: cont1,
             },
             LocalType::Branch {

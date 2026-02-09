@@ -80,7 +80,7 @@ fn assert_traces_equal(lean_trace: &Trace, rust_trace: &Trace, tolerance: f64) {
     );
 
     // Index by (step, role) to handle different HashMap iteration orders.
-    let lean_map: HashMap<(usize, &str), &[f64]> = lean_trace
+    let lean_map: HashMap<(u64, &str), &[f64]> = lean_trace
         .records
         .iter()
         .map(|r| ((r.step, r.role.as_str()), r.state.as_slice()))

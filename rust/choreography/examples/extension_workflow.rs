@@ -215,99 +215,107 @@ impl WorkflowHandler {
 
         // Register capability validation
         let caps = capabilities.clone();
-        let _ = registry.register::<ValidateCapability, _>(move |_ep, ext| {
-            let caps = caps.clone();
-            Box::pin(async move {
-                let validate = ext.as_any().downcast_ref::<ValidateCapability>().ok_or(
-                    ExtensionError::TypeMismatch {
-                        expected: "ValidateCapability",
-                        actual: ext.type_name(),
-                    },
-                )?;
+        registry
+            .register::<ValidateCapability, _>(move |_ep, ext| {
+                let caps = caps.clone();
+                Box::pin(async move {
+                    let validate = ext.as_any().downcast_ref::<ValidateCapability>().ok_or(
+                        ExtensionError::TypeMismatch {
+                            expected: "ValidateCapability",
+                            actual: ext.type_name(),
+                        },
+                    )?;
 
-                if !caps.contains(&validate.capability) {
-                    return Err(ExtensionError::ExecutionFailed {
-                        type_name: "ValidateCapability",
-                        error: format!("Missing capability: {}", validate.capability),
-                    });
-                }
+                    if !caps.contains(&validate.capability) {
+                        return Err(ExtensionError::ExecutionFailed {
+                            type_name: "ValidateCapability",
+                            error: format!("Missing capability: {}", validate.capability),
+                        });
+                    }
 
-                println!(
-                    "[{:?}] Validated capability: {}",
-                    validate.role, validate.capability
-                );
-                Ok(())
+                    println!(
+                        "[{:?}] Validated capability: {}",
+                        validate.role, validate.capability
+                    );
+                    Ok(())
+                })
             })
-        });
+            .expect("ValidateCapability handler registration");
 
         // Register flow cost tracking
         let budget_ref = budget.clone();
-        let _ = registry.register::<ChargeFlowCost, _>(move |_ep, ext| {
-            let budget = budget_ref.clone();
-            Box::pin(async move {
-                let cost = ext.as_any().downcast_ref::<ChargeFlowCost>().ok_or(
-                    ExtensionError::TypeMismatch {
-                        expected: "ChargeFlowCost",
-                        actual: ext.type_name(),
-                    },
-                )?;
+        registry
+            .register::<ChargeFlowCost, _>(move |_ep, ext| {
+                let budget = budget_ref.clone();
+                Box::pin(async move {
+                    let cost = ext.as_any().downcast_ref::<ChargeFlowCost>().ok_or(
+                        ExtensionError::TypeMismatch {
+                            expected: "ChargeFlowCost",
+                            actual: ext.type_name(),
+                        },
+                    )?;
 
-                let mut budget_lock = budget.lock().unwrap();
-                if *budget_lock < cost.cost {
-                    return Err(ExtensionError::ExecutionFailed {
-                        type_name: "ChargeFlowCost",
-                        error: format!("Insufficient budget: {} < {}", *budget_lock, cost.cost),
-                    });
-                }
+                    let mut budget_lock = budget.lock().unwrap();
+                    if *budget_lock < cost.cost {
+                        return Err(ExtensionError::ExecutionFailed {
+                            type_name: "ChargeFlowCost",
+                            error: format!("Insufficient budget: {} < {}", *budget_lock, cost.cost),
+                        });
+                    }
 
-                *budget_lock -= cost.cost;
-                println!(
-                    "[{:?}] Charged {} units (remaining: {})",
-                    cost.role, cost.cost, *budget_lock
-                );
-                Ok(())
+                    *budget_lock -= cost.cost;
+                    println!(
+                        "[{:?}] Charged {} units (remaining: {})",
+                        cost.role, cost.cost, *budget_lock
+                    );
+                    Ok(())
+                })
             })
-        });
+            .expect("ChargeFlowCost handler registration");
 
         // Register logging
-        let _ = registry.register::<LogEvent, _>(|_ep, ext| {
-            Box::pin(async move {
-                let log = ext.as_any().downcast_ref::<LogEvent>().ok_or(
-                    ExtensionError::TypeMismatch {
-                        expected: "LogEvent",
-                        actual: ext.type_name(),
-                    },
-                )?;
+        registry
+            .register::<LogEvent, _>(|_ep, ext| {
+                Box::pin(async move {
+                    let log = ext.as_any().downcast_ref::<LogEvent>().ok_or(
+                        ExtensionError::TypeMismatch {
+                            expected: "LogEvent",
+                            actual: ext.type_name(),
+                        },
+                    )?;
 
-                match log.level {
-                    LogLevel::Info => println!("[INFO] {}", log.message),
-                    LogLevel::Warn => println!("[WARN] {}", log.message),
-                    LogLevel::Error => println!("[ERROR] {}", log.message),
-                }
-                Ok(())
+                    match log.level {
+                        LogLevel::Info => println!("[INFO] {}", log.message),
+                        LogLevel::Warn => println!("[WARN] {}", log.message),
+                        LogLevel::Error => println!("[ERROR] {}", log.message),
+                    }
+                    Ok(())
+                })
             })
-        });
+            .expect("LogEvent handler registration");
 
         // Register metrics
         let metrics_ref = metrics.clone();
-        let _ = registry.register::<RecordMetric, _>(move |_ep, ext| {
-            let metrics = metrics_ref.clone();
-            Box::pin(async move {
-                let metric = ext.as_any().downcast_ref::<RecordMetric>().ok_or(
-                    ExtensionError::TypeMismatch {
-                        expected: "RecordMetric",
-                        actual: ext.type_name(),
-                    },
-                )?;
+        registry
+            .register::<RecordMetric, _>(move |_ep, ext| {
+                let metrics = metrics_ref.clone();
+                Box::pin(async move {
+                    let metric = ext.as_any().downcast_ref::<RecordMetric>().ok_or(
+                        ExtensionError::TypeMismatch {
+                            expected: "RecordMetric",
+                            actual: ext.type_name(),
+                        },
+                    )?;
 
-                metrics
-                    .lock()
-                    .unwrap()
-                    .push((metric.metric.clone(), metric.value));
-                println!("Metric: {} = {}", metric.metric, metric.value);
-                Ok(())
+                    metrics
+                        .lock()
+                        .unwrap()
+                        .push((metric.metric.clone(), metric.value));
+                    println!("Metric: {} = {}", metric.metric, metric.value);
+                    Ok(())
+                })
             })
-        });
+            .expect("RecordMetric handler registration");
 
         Self {
             role,

@@ -20,10 +20,10 @@ pub struct Scenario {
     /// Role names participating in the protocol.
     pub roles: Vec<String>,
     /// Number of simulation steps.
-    pub steps: usize,
+    pub steps: u64,
     /// Scheduler concurrency level.
     #[serde(default = "default_concurrency")]
-    pub concurrency: usize,
+    pub concurrency: u64,
     /// Deterministic seed for simulation middleware.
     #[serde(default = "default_seed")]
     pub seed: u64,
@@ -176,7 +176,7 @@ pub enum FaultActionSpec {
     /// Delay messages by N ticks.
     MessageDelay {
         /// Number of ticks to delay message delivery.
-        ticks: usize,
+        ticks: u64,
     },
     /// Corrupt message payload with given probability.
     MessageCorruption {
@@ -188,14 +188,14 @@ pub enum FaultActionSpec {
         /// The role to crash.
         role: String,
         /// Duration in ticks before recovery. None means permanent.
-        duration: Option<usize>,
+        duration: Option<u64>,
     },
     /// Partition roles into disconnected groups.
     NetworkPartition {
         /// Groups of roles that can communicate within but not across.
         groups: Vec<Vec<String>>,
         /// Duration in ticks before partition heals.
-        duration: usize,
+        duration: u64,
     },
 }
 
@@ -220,14 +220,14 @@ pub struct LivenessSpec {
     /// Predicate expression that must become true within bound.
     pub goal: String,
     /// Maximum steps to reach goal after precondition.
-    pub bound: usize,
+    pub bound: u64,
 }
 
 fn default_seed() -> u64 {
     0
 }
 
-fn default_concurrency() -> usize {
+fn default_concurrency() -> u64 {
     1
 }
 
@@ -292,7 +292,7 @@ impl Scenario {
                 name: liv.name.clone(),
                 precondition: pre,
                 goal,
-                bound: liv.bound,
+                bound: liv.bound as usize,
             });
         }
         Ok(Some(PropertyMonitor::new(props)))
@@ -336,17 +336,19 @@ impl FaultActionSpec {
             FaultActionSpec::MessageDrop { probability } => Fault::MessageDrop {
                 probability: *probability,
             },
-            FaultActionSpec::MessageDelay { ticks } => Fault::MessageDelay { ticks: *ticks },
+            FaultActionSpec::MessageDelay { ticks } => Fault::MessageDelay {
+                ticks: *ticks as usize,
+            },
             FaultActionSpec::MessageCorruption { probability } => Fault::MessageCorruption {
                 probability: *probability,
             },
             FaultActionSpec::NodeCrash { role, duration } => Fault::NodeCrash {
                 role: role.clone(),
-                duration: *duration,
+                duration: duration.map(|d| d as usize),
             },
             FaultActionSpec::NetworkPartition { groups, duration } => Fault::NetworkPartition {
                 groups: groups.clone(),
-                duration: *duration,
+                duration: *duration as usize,
             },
         }
     }

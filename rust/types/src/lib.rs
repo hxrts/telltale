@@ -30,6 +30,7 @@ mod label;
 mod local;
 pub mod merge;
 mod role;
+pub mod units;
 mod val_type;
 
 pub use action::{Action, LocalAction};
@@ -41,4 +42,9 @@ pub use label::Label;
 pub use local::LocalTypeR;
 pub use merge::{can_merge, merge, merge_all, MergeError, MergeResult};
 pub use role::{Role, RoleSet};
+pub use units::{
+    ChannelCapacity, LoopCount, MessageLenBytes, QueueCapacity, RoleIndex, StoreCapacity,
+    MAX_CHANNEL_CAPACITY_BITS, MAX_LOOP_COUNT, MAX_MESSAGE_LEN_BYTES, MAX_QUEUE_CAPACITY,
+    MAX_ROLE_INDEX, MAX_STORE_CAPACITY,
+};
 pub use val_type::ValType;

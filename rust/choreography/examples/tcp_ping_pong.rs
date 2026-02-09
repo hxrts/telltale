@@ -114,6 +114,7 @@ impl TcpTransport {
 
         // Spawn accept loop
         tokio::spawn(async move {
+            // Forever loop: exits via shutdown_rx signal
             loop {
                 tokio::select! {
                     accept_result = listener.accept() => {
@@ -163,6 +164,7 @@ impl TcpTransport {
         let max_attempts = 5;
         let mut delay = std::time::Duration::from_millis(100);
 
+        // BOUND: exits on success or when attempts >= max_attempts (5)
         loop {
             match TcpStream::connect(addr).await {
                 Ok(mut stream) => {
@@ -225,7 +227,7 @@ async fn handle_incoming_connection(
 
     println!("[{}] Identified peer as: {}", local_role, peer_role);
 
-    // Now read messages in a loop
+    // Forever loop: reads messages until connection closed (EOF) or error
     loop {
         // Read message length
         let mut len_buf = [0u8; 4];
@@ -296,9 +298,9 @@ impl Transport for TcpTransport {
     }
 
     async fn close(&self) -> TransportResult<()> {
-        // Send shutdown signal
+        // Send shutdown signal - ignore send failure since receiver may already be dropped
         if let Some(shutdown) = self.shutdown.lock().await.take() {
-            let _ = shutdown.send(());
+            drop(shutdown.send(()));
         }
 
         // Close all outgoing connections

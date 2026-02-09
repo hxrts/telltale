@@ -28,6 +28,7 @@ fn punctuated_prepend<T, P: Default>(left: &mut Punctuated<T, P>, mut right: Pun
 
 /// Unwraps grouped or parenthesized types to get the inner type.
 fn unroll_type(mut ty: &mut Type) -> &mut Type {
+    // BOUND: unwraps at most O(AST depth) levels, exits on non-Group/Paren type
     loop {
         ty = match ty {
             Type::Group(ty) => ty.elem.as_mut(),

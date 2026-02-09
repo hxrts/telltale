@@ -293,9 +293,9 @@ mod tests {
         // Zone IDs are platform-specific, so we just check it doesn't crash
         std::env::remove_var("IPV6F_BOB_ENDPOINT");
 
-        // The result may succeed or fail depending on zone ID support
-        // The important thing is it doesn't panic
-        let _ = result;
+        // The result may succeed or fail depending on zone ID support.
+        // The important thing is it doesn't panic - drop the result explicitly.
+        drop(result);
     }
 
     #[tokio::test]

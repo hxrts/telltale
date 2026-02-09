@@ -7,7 +7,8 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use telltale_types::LocalTypeR;
+use serde_json::Value as JsonValue;
+use telltale_types::{LocalTypeR, ValType};
 
 use crate::buffer::{BoundedBuffer, BufferConfig};
 use crate::coroutine::Value;
@@ -16,13 +17,56 @@ use crate::instr::Endpoint;
 /// Session identifier. Each session gets a unique ID within the VM.
 pub type SessionId = usize;
 
+/// Handler identifier for edge-bound runtime dispatch.
+pub type HandlerId = String;
+
 /// Edge between two roles in a session (directed: sender → receiver).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Edge {
+    /// Session scope for this edge.
+    pub sid: SessionId,
     /// Sender role name.
-    pub from: String,
+    pub sender: String,
     /// Receiver role name.
-    pub to: String,
+    pub receiver: String,
+}
+
+impl Edge {
+    /// Construct a sid-qualified edge.
+    #[must_use]
+    pub fn new(sid: SessionId, sender: impl Into<String>, receiver: impl Into<String>) -> Self {
+        Self {
+            sid,
+            sender: sender.into(),
+            receiver: receiver.into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct EdgeJson {
+    sid: Option<SessionId>,
+    sender: String,
+    receiver: String,
+}
+
+/// Decode an edge from JSON.
+///
+/// # Errors
+///
+/// Returns an error when fields are missing.
+pub fn decode_edge_json(
+    value: &JsonValue,
+    session_hint: Option<SessionId>,
+) -> Result<Edge, String> {
+    let raw: EdgeJson =
+        serde_json::from_value(value.clone()).map_err(|e| format!("invalid edge json: {e}"))?;
+
+    let sid = raw
+        .sid
+        .or(session_hint)
+        .ok_or_else(|| "missing sid in edge json".to_string())?;
+    Ok(Edge::new(sid, raw.sender, raw.receiver))
 }
 
 /// Session status.
@@ -68,6 +112,10 @@ pub struct SessionState {
     pub local_types: BTreeMap<Endpoint, TypeEntry>,
     /// Message buffers keyed by directed edge.
     pub buffers: BTreeMap<Edge, BoundedBuffer>,
+    /// Optional handler binding per edge.
+    pub edge_handlers: BTreeMap<Edge, HandlerId>,
+    /// Coherence trace by edge.
+    pub edge_traces: BTreeMap<Edge, Vec<ValType>>,
     /// Current status.
     pub status: SessionStatus,
     /// Epoch counter for draining.
@@ -88,10 +136,7 @@ impl SessionState {
         to: &str,
         val: Value,
     ) -> Result<crate::buffer::EnqueueResult, String> {
-        let edge = Edge {
-            from: from.to_string(),
-            to: to.to_string(),
-        };
+        let edge = Edge::new(self.sid, from, to);
         let buf = self
             .buffers
             .get_mut(&edge)
@@ -101,20 +146,14 @@ impl SessionState {
 
     /// Receive a value destined for a role from a specific sender.
     pub fn recv(&mut self, from: &str, to: &str) -> Option<Value> {
-        let edge = Edge {
-            from: from.to_string(),
-            to: to.to_string(),
-        };
+        let edge = Edge::new(self.sid, from, to);
         self.buffers.get_mut(&edge).and_then(|buf| buf.dequeue())
     }
 
     /// Check if there is a message available on an edge.
     #[must_use]
     pub fn has_message(&self, from: &str, to: &str) -> bool {
-        let edge = Edge {
-            from: from.to_string(),
-            to: to.to_string(),
-        };
+        let edge = Edge::new(self.sid, from, to);
         self.buffers.get(&edge).is_some_and(|buf| !buf.is_empty())
     }
 }
@@ -136,18 +175,16 @@ impl SessionStore {
         Self::default()
     }
 
-    /// Open a new session with the given roles, buffer config, and initial local types.
+    /// Open a new session with an externally supplied session id.
     ///
-    /// Returns the session ID. Endpoints are constructed as `Endpoint { sid, role }`.
-    pub fn open(
+    /// This is used by VM state machines that own `next_session_id`.
+    pub fn open_with_sid(
         &mut self,
+        sid: SessionId,
         roles: Vec<String>,
         buffer_config: &BufferConfig,
         initial_types: &BTreeMap<String, LocalTypeR>,
     ) -> SessionId {
-        let sid = self.next_id;
-        self.next_id += 1;
-
         // Build per-endpoint local types with initial unfolding.
         let mut local_types = BTreeMap::new();
         for role in &roles {
@@ -171,10 +208,7 @@ impl SessionStore {
         for from in &roles {
             for to in &roles {
                 if from != to {
-                    let edge = Edge {
-                        from: from.clone(),
-                        to: to.clone(),
-                    };
+                    let edge = Edge::new(sid, from.clone(), to.clone());
                     buffers.insert(edge, BoundedBuffer::new(buffer_config));
                 }
             }
@@ -185,12 +219,34 @@ impl SessionStore {
             roles,
             local_types,
             buffers,
+            edge_handlers: BTreeMap::new(),
+            edge_traces: BTreeMap::new(),
             status: SessionStatus::Active,
             epoch: 0,
         };
 
         self.sessions.insert(sid, state);
+        self.next_id = self.next_id.max(sid.saturating_add(1));
         sid
+    }
+
+    /// Open a new session with the given roles, buffer config, and initial local types.
+    ///
+    /// Returns the session ID. Endpoints are constructed as `Endpoint { sid, role }`.
+    pub fn open(
+        &mut self,
+        roles: Vec<String>,
+        buffer_config: &BufferConfig,
+        initial_types: &BTreeMap<String, LocalTypeR>,
+    ) -> SessionId {
+        let sid = self.next_id;
+        self.open_with_sid(sid, roles, buffer_config, initial_types)
+    }
+
+    /// Next session identifier that will be allocated by `open`.
+    #[must_use]
+    pub fn next_session_id(&self) -> SessionId {
+        self.next_id
     }
 
     // ---- Type state methods (match Lean SessionStore.lookupType / updateType) ----
@@ -274,6 +330,7 @@ impl SessionStore {
         } else {
             session.status = SessionStatus::Closed;
         }
+        session.epoch = session.epoch.saturating_add(1);
         Ok(())
     }
 
@@ -290,6 +347,36 @@ impl SessionStore {
     #[must_use]
     pub fn session_ids(&self) -> Vec<SessionId> {
         self.sessions.keys().copied().collect()
+    }
+
+    /// Lookup edge-bound handler id.
+    #[must_use]
+    pub fn lookup_handler(&self, edge: &Edge) -> Option<&HandlerId> {
+        self.sessions.get(&edge.sid)?.edge_handlers.get(edge)
+    }
+
+    /// Update edge-bound handler id.
+    pub fn update_handler(&mut self, edge: &Edge, handler: HandlerId) {
+        if let Some(session) = self.sessions.get_mut(&edge.sid) {
+            session.edge_handlers.insert(edge.clone(), handler);
+        }
+    }
+
+    /// Lookup coherence trace for an edge.
+    #[must_use]
+    pub fn lookup_trace(&self, edge: &Edge) -> Option<&[ValType]> {
+        self.sessions
+            .get(&edge.sid)?
+            .edge_traces
+            .get(edge)
+            .map(Vec::as_slice)
+    }
+
+    /// Update coherence trace for an edge.
+    pub fn update_trace(&mut self, edge: &Edge, trace: Vec<ValType>) {
+        if let Some(session) = self.sessions.get_mut(&edge.sid) {
+            session.edge_traces.insert(edge.clone(), trace);
+        }
     }
 }
 
@@ -339,6 +426,7 @@ pub fn unfold_if_var_with_scope(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use telltale_types::Label;
 
     fn default_types() -> BTreeMap<String, LocalTypeR> {
@@ -441,7 +529,7 @@ mod tests {
         );
 
         let session = store.get_mut(sid).unwrap();
-        let _ = session.send("A", "B", Value::Int(42)).unwrap();
+        session.send("A", "B", Value::Int(42)).unwrap();
         assert!(session.has_message("A", "B"));
         assert!(!session.has_message("B", "A"));
 
@@ -491,5 +579,82 @@ mod tests {
 
         store.remove_type(&ep_a);
         assert!(store.lookup_type(&ep_a).is_none());
+    }
+
+    #[test]
+    fn test_cross_session_role_name_edge_collision_regression() {
+        let mut store = SessionStore::new();
+        let sid1 = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+        let sid2 = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+
+        let e1 = Edge::new(sid1, "A", "B");
+        let e2 = Edge::new(sid2, "A", "B");
+        assert_ne!(e1, e2, "edges from distinct sessions must not collide");
+        assert!(store
+            .get(sid1)
+            .expect("sid1 exists")
+            .buffers
+            .contains_key(&e1));
+        assert!(store
+            .get(sid2)
+            .expect("sid2 exists")
+            .buffers
+            .contains_key(&e2));
+    }
+
+    #[test]
+    fn test_edge_handler_and_trace_bindings() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        );
+        let edge = Edge::new(sid, "A", "B");
+
+        assert!(store.lookup_handler(&edge).is_none());
+        store.update_handler(&edge, "handler/send".to_string());
+        assert_eq!(
+            store.lookup_handler(&edge).map(String::as_str),
+            Some("handler/send")
+        );
+
+        assert!(store.lookup_trace(&edge).is_none());
+        store.update_trace(&edge, vec![ValType::Nat]);
+        assert_eq!(store.lookup_trace(&edge), Some([ValType::Nat].as_slice()));
+    }
+
+    #[test]
+    fn test_decode_edge_json_requires_sid_sender_receiver() {
+        let sid_qualified = json!({
+            "sid": 7,
+            "sender": "A",
+            "receiver": "B"
+        });
+        let e = decode_edge_json(&sid_qualified, None).expect("decode sid-qualified edge");
+        assert_eq!(e, Edge::new(7, "A", "B"));
+
+        let no_sid = json!({
+            "sender": "A",
+            "receiver": "B"
+        });
+        let e2 = decode_edge_json(&no_sid, Some(11)).expect("decode edge with sid hint");
+        assert_eq!(e2, Edge::new(11, "A", "B"));
+
+        let legacy = json!({
+            "from": "A",
+            "to": "B",
+            "sid": 11
+        });
+        let err = decode_edge_json(&legacy, None).expect_err("legacy edge shape must be rejected");
+        assert!(err.contains("invalid edge json"), "unexpected error: {err}");
     }
 }

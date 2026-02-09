@@ -6,6 +6,7 @@ use super::{Location, RoleFamilyConstraint, Topology, TopologyConstraint, Topolo
 use crate::identifiers::{
     Datacenter, Endpoint as TopologyEndpoint, IdentifierError, Namespace, Region, RoleName,
 };
+use crate::ChannelCapacity;
 use pest::Parser;
 use pest_derive::Parser;
 use thiserror::Error;
@@ -28,6 +29,9 @@ pub enum TopologyParseError {
 
     #[error("Invalid constraint: {0}")]
     InvalidConstraint(String),
+
+    #[error("Invalid capacity: {0}")]
+    InvalidCapacity(String),
 
     #[error("Invalid identifier: {0}")]
     InvalidIdentifier(IdentifierError),
@@ -109,6 +113,16 @@ fn parse_topology_body(pair: pest::iterators::Pair<Rule>) -> Result<Topology, To
                 for constraint in inner.into_inner() {
                     if constraint.as_rule() == Rule::constraint_decl {
                         topology.constraints.push(parse_constraint(constraint)?);
+                    }
+                }
+            }
+            Rule::channel_capacities_block => {
+                for decl in inner.into_inner() {
+                    if decl.as_rule() == Rule::channel_capacity_decl {
+                        let (sender, receiver, capacity) = parse_channel_capacity_decl(decl)?;
+                        topology
+                            .channel_capacities
+                            .insert((sender, receiver), capacity);
                     }
                 }
             }
@@ -309,6 +323,32 @@ fn parse_constraint(
     }
 }
 
+fn parse_channel_capacity_decl(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<(RoleName, RoleName, ChannelCapacity), TopologyParseError> {
+    let mut inner = pair.into_inner();
+    let sender = inner
+        .next()
+        .map(|p| RoleName::new(p.as_str()))
+        .transpose()?
+        .ok_or_else(|| TopologyParseError::InvalidConstraint("missing sender".to_string()))?;
+    let receiver = inner
+        .next()
+        .map(|p| RoleName::new(p.as_str()))
+        .transpose()?
+        .ok_or_else(|| TopologyParseError::InvalidConstraint("missing receiver".to_string()))?;
+    let capacity = inner
+        .next()
+        .ok_or_else(|| TopologyParseError::InvalidConstraint("missing capacity".to_string()))?
+        .as_str()
+        .parse::<u32>()
+        .map_err(|e| TopologyParseError::InvalidCapacity(e.to_string()))?;
+    let capacity = ChannelCapacity::try_new(capacity)
+        .map_err(|e| TopologyParseError::InvalidCapacity(e.to_string()))?;
+
+    Ok((sender, receiver, capacity))
+}
+
 fn parse_role_constraint_decl(
     pair: pest::iterators::Pair<Rule>,
 ) -> Result<(String, RoleFamilyConstraint), TopologyParseError> {
@@ -436,6 +476,25 @@ mod tests {
         let result = parse_topology(input).unwrap();
         assert_eq!(result.name, "Prod");
         assert_eq!(result.topology.constraints.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_channel_capacities() {
+        let input = r#"
+            topology Capacity for Protocol {
+                Alice: local
+                Bob: local
+
+                channel_capacities {
+                    Alice -> Bob: 4
+                }
+            }
+        "#;
+
+        let result = parse_topology(input).unwrap();
+        let key = (RoleName::from_static("Alice"), RoleName::from_static("Bob"));
+        let capacity = result.topology.channel_capacities.get(&key).copied();
+        assert_eq!(capacity, Some(ChannelCapacity::new(4)));
     }
 
     #[test]

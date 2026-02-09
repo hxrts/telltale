@@ -3,9 +3,12 @@
 //! Matches the Lean `BoundedBuffer` from `runtime.md §6`.
 //! Ring buffer with configurable mode and backpressure policy.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::coroutine::Value;
+use crate::session::Edge;
 
 /// Buffer delivery mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +80,45 @@ pub enum EnqueueResult {
     Dropped,
     /// Buffer full and policy is Error.
     Full,
+}
+
+/// Signed value payload used by authenticated transport layers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SignedValue<V> {
+    /// The application payload.
+    pub payload: Value,
+    /// The signature/proof attached to the payload.
+    pub signature: V,
+}
+
+/// Signed FIFO for a single edge.
+pub type SignedBuffer<V> = Vec<SignedValue<V>>;
+
+/// Signed buffers indexed by sid-qualified edge.
+pub type SignedBuffers<V> = BTreeMap<Edge, SignedBuffer<V>>;
+
+/// Result of signed enqueue attempts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SignedEnqueueResult {
+    /// Value was enqueued successfully.
+    Ok,
+    /// Buffer is full; sender should block.
+    Blocked,
+    /// Value was dropped per policy.
+    Dropped,
+    /// Error path for failed enqueue.
+    Error(String),
+}
+
+impl From<EnqueueResult> for SignedEnqueueResult {
+    fn from(value: EnqueueResult) -> Self {
+        match value {
+            EnqueueResult::Ok => Self::Ok,
+            EnqueueResult::WouldBlock => Self::Blocked,
+            EnqueueResult::Dropped => Self::Dropped,
+            EnqueueResult::Full => Self::Error("buffer full".to_string()),
+        }
+    }
 }
 
 impl BoundedBuffer {
@@ -284,5 +326,38 @@ mod tests {
         buf.enqueue(Value::Int(2));
         assert!(matches!(buf.enqueue(Value::Int(3)), EnqueueResult::Ok));
         assert_eq!(buf.len(), 3);
+    }
+
+    #[test]
+    fn test_signed_buffer_alias_and_enqueue_result_mapping() {
+        let edge = Edge::new(7usize, "A", "B");
+        let signed = SignedValue {
+            payload: Value::Int(9),
+            signature: vec![0_u8, 1_u8],
+        };
+        let mut buffers: SignedBuffers<Vec<u8>> = BTreeMap::new();
+        buffers.entry(edge).or_default().push(signed.clone());
+        assert_eq!(buffers.values().next().map(Vec::len), Some(1));
+        assert_eq!(
+            buffers.values().next().and_then(|v| v.first()),
+            Some(&signed)
+        );
+
+        assert_eq!(
+            SignedEnqueueResult::from(EnqueueResult::Ok),
+            SignedEnqueueResult::Ok
+        );
+        assert_eq!(
+            SignedEnqueueResult::from(EnqueueResult::WouldBlock),
+            SignedEnqueueResult::Blocked
+        );
+        assert_eq!(
+            SignedEnqueueResult::from(EnqueueResult::Dropped),
+            SignedEnqueueResult::Dropped
+        );
+        assert!(matches!(
+            SignedEnqueueResult::from(EnqueueResult::Full),
+            SignedEnqueueResult::Error(_)
+        ));
     }
 }

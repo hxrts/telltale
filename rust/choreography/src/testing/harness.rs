@@ -49,15 +49,27 @@ impl TestConfig {
         self
     }
 
-    /// Enable or disable message tracing.
-    pub fn trace_messages(mut self, enabled: bool) -> Self {
-        self.trace_messages = enabled;
+    /// Enable message tracing.
+    pub fn with_message_tracing(mut self) -> Self {
+        self.trace_messages = true;
         self
     }
 
-    /// Enable or disable phase tracing.
-    pub fn trace_phases(mut self, enabled: bool) -> Self {
-        self.trace_phases = enabled;
+    /// Disable message tracing.
+    pub fn without_message_tracing(mut self) -> Self {
+        self.trace_messages = false;
+        self
+    }
+
+    /// Enable phase tracing.
+    pub fn with_phase_tracing(mut self) -> Self {
+        self.trace_phases = true;
+        self
+    }
+
+    /// Disable phase tracing.
+    pub fn without_phase_tracing(mut self) -> Self {
+        self.trace_phases = false;
         self
     }
 
@@ -67,9 +79,15 @@ impl TestConfig {
         self
     }
 
-    /// Enable or disable fail-fast mode.
-    pub fn fail_fast(mut self, enabled: bool) -> Self {
-        self.fail_fast = enabled;
+    /// Enable fail-fast mode (stop on first error).
+    pub fn with_fail_fast(mut self) -> Self {
+        self.fail_fast = true;
+        self
+    }
+
+    /// Disable fail-fast mode (continue after errors).
+    pub fn without_fail_fast(mut self) -> Self {
+        self.fail_fast = false;
         self
     }
 }
@@ -516,9 +534,9 @@ mod tests {
     fn test_config_builder() {
         let config = TestConfig::new()
             .timeout(Duration::from_secs(60))
-            .trace_messages(false)
+            .without_message_tracing()
             .max_messages(100)
-            .fail_fast(true);
+            .with_fail_fast();
 
         assert_eq!(config.timeout, Duration::from_secs(60));
         assert!(!config.trace_messages);

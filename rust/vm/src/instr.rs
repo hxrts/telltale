@@ -41,27 +41,25 @@ pub enum Instr {
         val: Reg,
     },
     /// Receive from channel in `chan` register, store in `dst` register.
-    Recv {
+    Receive {
         /// Channel register.
         chan: Reg,
         /// Destination register for the received value.
         dst: Reg,
     },
-    /// Offer a label on channel (external choice — wait for peer to choose).
+    /// Offer a label on channel.
     Offer {
-        /// Channel register.
-        chan: Reg,
-        /// Label-to-PC jump table.
-        table: Vec<(String, PC)>,
-    },
-    /// Choose a label on channel (internal choice — select a branch).
-    Choose {
         /// Channel register.
         chan: Reg,
         /// Label to select.
         label: String,
-        /// Jump target after selection.
-        target: PC,
+    },
+    /// Choose from a branch table using a received label.
+    Choose {
+        /// Channel register.
+        chan: Reg,
+        /// Label-to-PC jump table.
+        table: Vec<(String, PC)>,
     },
 
     // -- Session lifecycle --
@@ -140,24 +138,31 @@ pub enum Instr {
     },
 
     // -- Control --
-    /// Load an immediate value into a register.
-    LoadImm {
+    /// Set a register to an immediate value.
+    Set {
         /// Destination register.
         dst: Reg,
         /// Immediate value to load.
         val: ImmValue,
     },
     /// Copy register src to dst.
-    Mov {
+    Move {
         /// Destination register.
         dst: Reg,
         /// Source register.
         src: Reg,
     },
     /// Unconditional jump.
-    Jmp {
+    Jump {
         /// Target program counter.
         target: PC,
+    },
+    /// Spawn a new coroutine at target PC with argument registers.
+    Spawn {
+        /// Target program counter for the spawned coroutine.
+        target: PC,
+        /// Registers to copy into the spawned coroutine argument area.
+        args: Vec<Reg>,
     },
     /// Yield execution to the scheduler.
     Yield,

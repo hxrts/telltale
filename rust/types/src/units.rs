@@ -11,6 +11,8 @@ pub const MAX_LOOP_COUNT: u32 = 1_000_000;
 pub const MAX_MESSAGE_LEN_BYTES: u32 = 16 * 1024 * 1024;
 /// Maximum queue capacity (entries).
 pub const MAX_QUEUE_CAPACITY: u32 = 65_536;
+/// Maximum channel capacity (bits).
+pub const MAX_CHANNEL_CAPACITY_BITS: u32 = 1_024;
 /// Maximum content store capacity (entries).
 pub const MAX_STORE_CAPACITY: u32 = 1_000_000;
 
@@ -58,7 +60,7 @@ macro_rules! define_count {
             }
 
             pub fn try_new(value: u32) -> Result<Self, CountError> {
-                if value < Self::MIN || value > Self::MAX {
+                if !(Self::MIN..=Self::MAX).contains(&value) {
                     return Err(CountError {
                         kind: stringify!($name),
                         value: value as u64,
@@ -135,15 +137,36 @@ macro_rules! define_count {
     };
 }
 
-define_count!(RoleIndex, "Index for a role instance (0-based).", min = 0, max = MAX_ROLE_INDEX);
-define_count!(LoopCount, "Count of loop iterations (bounded).", min = 0, max = MAX_LOOP_COUNT);
+define_count!(
+    RoleIndex,
+    "Index for a role instance (0-based).",
+    min = 0,
+    max = MAX_ROLE_INDEX
+);
+define_count!(
+    LoopCount,
+    "Count of loop iterations (bounded).",
+    min = 0,
+    max = MAX_LOOP_COUNT
+);
 define_count!(
     MessageLenBytes,
     "On-wire message length in bytes.",
     min = 0,
     max = MAX_MESSAGE_LEN_BYTES
 );
-define_count!(QueueCapacity, "Queue capacity (entries).", min = 1, max = MAX_QUEUE_CAPACITY);
+define_count!(
+    QueueCapacity,
+    "Queue capacity (entries).",
+    min = 1,
+    max = MAX_QUEUE_CAPACITY
+);
+define_count!(
+    ChannelCapacity,
+    "Channel capacity (bits).",
+    min = 0,
+    max = MAX_CHANNEL_CAPACITY_BITS
+);
 define_count!(
     StoreCapacity,
     "Content store capacity (entries).",

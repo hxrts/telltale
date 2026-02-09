@@ -11,7 +11,9 @@ use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 /// Skip test if the validator binary is not available.
 fn require_projection_runner() -> LeanRunner {
     if !LeanRunner::is_projection_available() {
-        eprintln!("SKIP: telltale_validator not found, run `cd lean && lake build telltale_validator`");
+        eprintln!(
+            "SKIP: telltale_validator not found, run `cd lean && lake build telltale_validator`"
+        );
         std::process::exit(0);
     }
     LeanRunner::for_projection().expect("validator should be available")

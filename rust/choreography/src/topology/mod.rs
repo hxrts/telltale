@@ -34,6 +34,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
+use crate::ChannelCapacity;
 
 /// Location specifies where a role is deployed.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -70,6 +71,41 @@ pub enum TopologyConstraint {
     Pinned(RoleName, Location),
     /// A role must be in a specific region/zone
     Region(RoleName, Region),
+}
+
+/// Branching requirement for capacity checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BranchRequirement {
+    /// Role that selects the branch.
+    pub sender: RoleName,
+    /// Role that must distinguish the branch.
+    pub receiver: RoleName,
+    /// Number of branch labels.
+    pub label_count: u32,
+}
+
+impl BranchRequirement {
+    /// Create a new branching requirement.
+    pub fn new(sender: RoleName, receiver: RoleName, label_count: u32) -> Self {
+        Self {
+            sender,
+            receiver,
+            label_count,
+        }
+    }
+
+    /// Minimum capacity (in bits) required to distinguish `label_count` labels.
+    #[must_use]
+    pub fn required_capacity_bits(&self) -> u32 {
+        min_capacity_bits(self.label_count)
+    }
+}
+
+fn min_capacity_bits(label_count: u32) -> u32 {
+    if label_count <= 1 {
+        return 0;
+    }
+    32 - (label_count - 1).leading_zeros()
 }
 
 impl fmt::Display for TopologyConstraint {
@@ -182,6 +218,8 @@ pub struct Topology {
     pub mode: Option<TopologyMode>,
     /// Role → Location mapping
     pub locations: BTreeMap<RoleName, Location>,
+    /// Directed edge capacities (sender, receiver) → capacity (bits)
+    pub channel_capacities: BTreeMap<(RoleName, RoleName), ChannelCapacity>,
     /// Deployment constraints
     pub constraints: Vec<TopologyConstraint>,
     /// Role family instance count constraints
@@ -219,6 +257,17 @@ impl Topology {
         self
     }
 
+    /// Add a channel capacity to the topology.
+    pub fn with_channel_capacity(
+        mut self,
+        sender: RoleName,
+        receiver: RoleName,
+        capacity: ChannelCapacity,
+    ) -> Self {
+        self.channel_capacities.insert((sender, receiver), capacity);
+        self
+    }
+
     /// Get the location for a role.
     pub fn get_location(&self, role: &RoleName) -> Result<Location, TopologyError> {
         match &self.mode {
@@ -244,11 +293,28 @@ impl Topology {
         self.locations.keys().collect()
     }
 
+    /// Look up channel capacity between two roles.
+    pub fn channel_capacity(
+        &self,
+        sender: &RoleName,
+        receiver: &RoleName,
+    ) -> Option<ChannelCapacity> {
+        self.channel_capacities
+            .get(&(sender.clone(), receiver.clone()))
+            .copied()
+    }
+
     /// Check if topology is valid for a set of choreography roles.
     /// All referenced roles must exist in the choreography.
     pub fn valid_for_roles(&self, choreo_roles: &[RoleName]) -> bool {
         // All topology roles must be in choreography
         let topo_roles_ok = self.locations.keys().all(|r| choreo_roles.contains(r));
+
+        // All capacity roles must be in choreography
+        let capacity_roles_ok = self
+            .channel_capacities
+            .keys()
+            .all(|(s, r)| choreo_roles.contains(s) && choreo_roles.contains(r));
 
         // All constraint roles must be in choreography
         let constraints_ok = self.constraints.iter().all(|c| match c {
@@ -260,7 +326,7 @@ impl Topology {
             }
         });
 
-        topo_roles_ok && constraints_ok
+        topo_roles_ok && capacity_roles_ok && constraints_ok
     }
 
     /// Validate a topology against choreography roles
@@ -269,6 +335,16 @@ impl Topology {
         for role in self.locations.keys() {
             if !choreo_roles.contains(role) {
                 return TopologyValidation::UnknownRole(role.clone());
+            }
+        }
+
+        // Check all capacity roles exist
+        for (sender, receiver) in self.channel_capacities.keys() {
+            if !choreo_roles.contains(sender) {
+                return TopologyValidation::UnknownRole(sender.clone());
+            }
+            if !choreo_roles.contains(receiver) {
+                return TopologyValidation::UnknownRole(receiver.clone());
             }
         }
 
@@ -287,6 +363,41 @@ impl Topology {
                     if !choreo_roles.contains(r) {
                         return TopologyValidation::UnknownRole(r.clone());
                     }
+                }
+            }
+        }
+
+        TopologyValidation::Valid
+    }
+
+    /// Validate topology and channel capacities against branching requirements.
+    ///
+    /// Capacity checks are only enforced for edges explicitly configured with
+    /// a channel capacity. Missing capacities are treated as unconstrained.
+    pub fn validate_with_branches(
+        &self,
+        choreo_roles: &[RoleName],
+        branches: &[BranchRequirement],
+    ) -> TopologyValidation {
+        let base = self.validate(choreo_roles);
+        if !base.is_valid() {
+            return base;
+        }
+
+        for branch in branches {
+            let required_bits = branch.required_capacity_bits();
+            if required_bits == 0 {
+                continue;
+            }
+            if let Some(available) = self.channel_capacity(&branch.sender, &branch.receiver) {
+                let available_bits = available.get();
+                if available_bits < required_bits {
+                    return TopologyValidation::InsufficientCapacity {
+                        sender: branch.sender.clone(),
+                        receiver: branch.receiver.clone(),
+                        required_bits,
+                        available_bits,
+                    };
                 }
             }
         }
@@ -370,6 +481,13 @@ pub enum TopologyValidation {
     UnknownRole(RoleName),
     /// A constraint is violated (with reason)
     ConstraintViolation(TopologyConstraint, String),
+    /// Channel capacity is insufficient for a branching requirement
+    InsufficientCapacity {
+        sender: RoleName,
+        receiver: RoleName,
+        required_bits: u32,
+        available_bits: u32,
+    },
 }
 
 /// Errors that can occur when querying topology data.
@@ -439,6 +557,19 @@ impl TopologyBuilder {
     /// Add a role at a specific location
     pub fn role(mut self, role: RoleName, location: Location) -> Self {
         self.topology.locations.insert(role, location);
+        self
+    }
+
+    /// Add a directed channel capacity between two roles.
+    pub fn channel_capacity(
+        mut self,
+        sender: RoleName,
+        receiver: RoleName,
+        capacity: ChannelCapacity,
+    ) -> Self {
+        self.topology
+            .channel_capacities
+            .insert((sender, receiver), capacity);
         self
     }
 
@@ -533,6 +664,60 @@ mod tests {
 
         let limited_roles = vec![RoleName::from_static("Alice")];
         assert!(!topology.validate(&limited_roles).is_valid());
+    }
+
+    #[test]
+    fn test_topology_capacity_validation() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .channel_capacity(
+                RoleName::from_static("Alice"),
+                RoleName::from_static("Bob"),
+                ChannelCapacity::new(1),
+            )
+            .build();
+
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
+        let branches = vec![BranchRequirement::new(
+            RoleName::from_static("Alice"),
+            RoleName::from_static("Bob"),
+            3,
+        )];
+
+        match topology.validate_with_branches(&roles, &branches) {
+            TopologyValidation::InsufficientCapacity {
+                sender,
+                receiver,
+                required_bits,
+                available_bits,
+            } => {
+                assert_eq!(sender, RoleName::from_static("Alice"));
+                assert_eq!(receiver, RoleName::from_static("Bob"));
+                assert_eq!(required_bits, 2);
+                assert_eq!(available_bits, 1);
+            }
+            _ => panic!("Expected InsufficientCapacity"),
+        }
+    }
+
+    #[test]
+    fn test_topology_capacity_unconstrained() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .build();
+
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
+        let branches = vec![BranchRequirement::new(
+            RoleName::from_static("Alice"),
+            RoleName::from_static("Bob"),
+            4,
+        )];
+
+        assert!(topology
+            .validate_with_branches(&roles, &branches)
+            .is_valid());
     }
 
     #[test]

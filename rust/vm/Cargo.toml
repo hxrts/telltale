@@ -28,15 +28,17 @@ thiserror = { workspace = true }
 rayon = { version = "1", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { workspace = true }
+getrandom = { workspace = true, features = ["js"] }
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
 telltale-theory = { path = "../theory", version = "0.9.1" }
 telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
-proptest = { workspace = true }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest = { workspace = true }
 
 [lints]
 workspace = true

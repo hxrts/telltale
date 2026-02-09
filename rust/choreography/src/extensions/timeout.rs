@@ -217,10 +217,17 @@ impl ProtocolExtension for TimeoutProtocol {
     }
 }
 
-/// Convenience function to register the timeout extension
-pub fn register_timeout_extension(registry: &mut ExtensionRegistry) {
-    let _ = registry.register_grammar(TimeoutGrammarExtension);
+/// Convenience function to register the timeout extension.
+///
+/// # Errors
+///
+/// Returns an error if there's a priority conflict with an existing extension.
+pub fn register_timeout_extension(
+    registry: &mut ExtensionRegistry,
+) -> Result<(), crate::extensions::ParseError> {
+    registry.register_grammar(TimeoutGrammarExtension)?;
     registry.register_parser(TimeoutStatementParser, "timeout".to_string());
+    Ok(())
 }
 
 /// Extend LocalType to support timeout
@@ -296,7 +303,7 @@ mod tests {
     #[test]
     fn test_extension_registration() {
         let mut registry = ExtensionRegistry::new();
-        register_timeout_extension(&mut registry);
+        register_timeout_extension(&mut registry).expect("extension should register");
 
         assert!(registry.can_handle("timeout_stmt"));
     }

@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Structure-aware fuzz tests for VM protocols.
 #![allow(
     clippy::cast_possible_wrap,

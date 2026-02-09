@@ -86,6 +86,9 @@ pub enum EquivalenceError {
 /// Result of an equivalence check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EquivalenceResult {
+    /// Schema version for this payload.
+    #[serde(default = "crate::schema::default_schema_version")]
+    pub schema_version: String,
     /// Whether the Rust output matches the expected output.
     pub equivalent: bool,
 
@@ -106,6 +109,7 @@ impl EquivalenceResult {
     /// Create a successful (equivalent) result.
     pub fn success(role: impl Into<String>, output: Value) -> Self {
         Self {
+            schema_version: crate::schema::default_schema_version(),
             equivalent: true,
             rust_output: output.clone(),
             expected_output: output,
@@ -122,6 +126,7 @@ impl EquivalenceResult {
         diff: String,
     ) -> Self {
         Self {
+            schema_version: crate::schema::default_schema_version(),
             equivalent: false,
             rust_output,
             expected_output,
@@ -134,6 +139,9 @@ impl EquivalenceResult {
 /// A bundle of golden files for a single test case.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoldenBundle {
+    /// Schema version for this payload.
+    #[serde(default = "crate::schema::default_schema_version")]
+    pub schema_version: String,
     /// The input GlobalType.
     pub input: Value,
 
@@ -147,6 +155,9 @@ pub struct GoldenBundle {
 /// Coherence check results from Lean.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoherenceBundle {
+    /// Schema version for this payload.
+    #[serde(default = "crate::schema::default_schema_version")]
+    pub schema_version: String,
     pub linear: bool,
     pub size: bool,
     pub action: bool,
@@ -240,12 +251,9 @@ impl EquivalenceChecker {
                     let obj = item.as_object().ok_or_else(|| {
                         EquivalenceError::ParseError("Expected projection object".into())
                     })?;
-                    let role = obj
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            EquivalenceError::ParseError("Expected role string".into())
-                        })?;
+                    let role = obj.get("role").and_then(|v| v.as_str()).ok_or_else(|| {
+                        EquivalenceError::ParseError("Expected role string".into())
+                    })?;
                     let local_type = obj
                         .get("local_type")
                         .or_else(|| obj.get("localType"))
@@ -321,6 +329,7 @@ impl EquivalenceChecker {
         }
 
         Ok(GoldenBundle {
+            schema_version: crate::schema::default_schema_version(),
             input,
             projections,
             coherence: None,
@@ -423,7 +432,6 @@ impl EquivalenceChecker {
         let projections = Self::parse_projections_map(&lean_output)?;
 
         for (role, expected) in projections {
-
             // Compute Rust projection
             let rust_local = project(global, &role)?;
             let rust_output = local_to_json(&rust_local);
@@ -467,6 +475,7 @@ impl EquivalenceChecker {
         let projections = Self::parse_projections_map(&lean_output)?;
 
         Ok(GoldenBundle {
+            schema_version: crate::schema::default_schema_version(),
             input: global_json,
             projections,
             coherence: None,
@@ -541,7 +550,6 @@ impl EquivalenceChecker {
                 };
 
                 for (role, fresh) in projections {
-
                     let golden_path = entry.path().join(format!("{}.expected.json", role));
                     if !golden_path.exists() {
                         drifted.push(format!("{}:{} (missing)", test_name, role));

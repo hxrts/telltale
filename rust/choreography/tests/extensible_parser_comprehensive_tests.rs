@@ -306,7 +306,9 @@ mod grammar_composition_tests {
     fn test_grammar_composer_builder_pattern() {
         let composer = GrammarComposerBuilder::new()
             .with_extension(TestGrammarExtension)
+            .expect("test extension should register")
             .with_extension(HighPriorityExtension)
+            .expect("priority extension should register")
             .build();
 
         assert_eq!(composer.extension_count(), 2);
@@ -367,6 +369,7 @@ mod extension_parser_tests {
     fn test_extension_parser_builder() {
         let parser = ExtensionParserBuilder::new()
             .with_extension(TestGrammarExtension, TestStatementParser)
+            .expect("test extension should register")
             .build();
 
         assert!(parser.can_handle_statement("test_stmt"));

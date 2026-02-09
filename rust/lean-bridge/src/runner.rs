@@ -54,6 +54,9 @@ pub enum LeanRunnerError {
 /// Choreography input for the VM runner.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChoreographyJson {
+    /// Schema version for this payload.
+    #[serde(default = "crate::schema::default_schema_version")]
+    pub schema_version: String,
     /// Global type JSON (Lean-compatible).
     pub global_type: Value,
     /// Role list.
@@ -386,12 +389,9 @@ impl LeanRunner {
                     let obj = item.as_object().ok_or_else(|| {
                         LeanRunnerError::ParseError("invalid projection entry".to_string())
                     })?;
-                    let role = obj
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            LeanRunnerError::ParseError("missing role in projection".to_string())
-                        })?;
+                    let role = obj.get("role").and_then(|v| v.as_str()).ok_or_else(|| {
+                        LeanRunnerError::ParseError("missing role in projection".to_string())
+                    })?;
                     let local = obj
                         .get("local_type")
                         .or_else(|| obj.get("localType"))
@@ -446,6 +446,7 @@ impl LeanRunner {
         })?;
 
         let input = serde_json::json!({
+            "schema_version": crate::schema::default_schema_version(),
             "choreographies": choreographies,
             "concurrency": concurrency,
             "max_steps": max_steps

@@ -30,11 +30,19 @@ impl GrammarComposer {
         }
     }
 
-    /// Register an extension with the grammar composer
-    pub fn register_extension<T: GrammarExtension + 'static>(&mut self, extension: T) {
-        let _ = self.extension_registry.register_grammar(extension);
-        // Invalidate cache when extensions change
+    /// Register an extension with the grammar composer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there's a priority conflict with an existing extension.
+    pub fn register_extension<T: GrammarExtension + 'static>(
+        &mut self,
+        extension: T,
+    ) -> Result<(), crate::extensions::ParseError> {
+        let result = self.extension_registry.register_grammar(extension);
+        // Invalidate cache when extensions change (even on failure for consistency)
         self.invalidate_cache();
+        result
     }
 
     /// Invalidate the cached grammar and force recomputation
@@ -411,9 +419,12 @@ impl GrammarComposerBuilder {
         }
     }
 
-    pub fn with_extension<T: GrammarExtension + 'static>(mut self, extension: T) -> Self {
-        self.composer.register_extension(extension);
-        self
+    pub fn with_extension<T: GrammarExtension + 'static>(
+        mut self,
+        extension: T,
+    ) -> Result<Self, crate::extensions::ParseError> {
+        self.composer.register_extension(extension)?;
+        Ok(self)
     }
 
     pub fn build(self) -> GrammarComposer {
@@ -460,7 +471,9 @@ mod tests {
     #[test]
     fn test_extension_registration() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestExtension);
+        composer
+            .register_extension(TestExtension)
+            .expect("extension should register");
         assert_eq!(composer.extension_count(), 1);
         assert!(composer.has_extension_rule("timeout_stmt"));
     }
@@ -468,7 +481,9 @@ mod tests {
     #[test]
     fn test_grammar_composition() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestExtension);
+        composer
+            .register_extension(TestExtension)
+            .expect("extension should register");
 
         let result = composer.compose();
         assert!(result.is_ok(), "Grammar composition should succeed");
@@ -482,7 +497,9 @@ mod tests {
     #[test]
     fn test_grammar_caching() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestExtension);
+        composer
+            .register_extension(TestExtension)
+            .expect("extension should register");
 
         // First composition
         let start = std::time::Instant::now();
@@ -512,6 +529,7 @@ mod tests {
     fn test_builder_pattern() {
         let composer = GrammarComposerBuilder::new()
             .with_extension(TestExtension)
+            .expect("test extension should register")
             .build();
 
         assert_eq!(composer.extension_count(), 1);

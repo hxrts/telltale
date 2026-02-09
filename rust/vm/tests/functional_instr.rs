@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Per-instruction functional tests for the VM.
 #![allow(
     clippy::approx_constant,
@@ -356,12 +357,12 @@ fn test_recv_type_mismatch() {
     let mut programs = BTreeMap::new();
     programs.insert(
         "A".to_string(),
-        vec![Instr::Recv { chan: 0, dst: 1 }, Instr::Halt],
+        vec![Instr::Receive { chan: 0, dst: 1 }, Instr::Halt],
     );
     // Give B a Recv instruction, but B has Send type → mismatch.
     programs.insert(
         "B".to_string(),
-        vec![Instr::Recv { chan: 0, dst: 1 }, Instr::Halt],
+        vec![Instr::Receive { chan: 0, dst: 1 }, Instr::Halt],
     );
 
     let image = CodeImage {
@@ -425,7 +426,7 @@ fn test_choose_success() {
 
 #[test]
 fn test_choose_unknown_label() {
-    // A tries to Choose "unknown" which is not in the type branches.
+    // A offers "unknown" which is not in the send-type branches.
     let mut local_types = BTreeMap::new();
     local_types.insert(
         "A".to_string(),
@@ -461,10 +462,9 @@ fn test_choose_unknown_label() {
     programs.insert(
         "A".to_string(),
         vec![
-            Instr::Choose {
+            Instr::Offer {
                 chan: 0,
                 label: "unknown".into(),
-                target: 1,
             },
             Instr::Halt,
         ],
@@ -472,7 +472,7 @@ fn test_choose_unknown_label() {
     programs.insert(
         "B".to_string(),
         vec![
-            Instr::Offer {
+            Instr::Choose {
                 chan: 0,
                 table: vec![("yes".into(), 1), ("no".into(), 2)],
             },
@@ -503,24 +503,24 @@ fn test_choose_unknown_label() {
 
 #[test]
 fn test_choose_type_not_send() {
-    // A has Recv type but Choose instruction.
+    // A has Send type but Choose instruction.
     let mut local_types = BTreeMap::new();
     local_types.insert(
         "A".to_string(),
-        LocalTypeR::Recv {
+        LocalTypeR::Send {
             partner: "B".into(),
             branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
         },
     );
     local_types.insert(
         "B".to_string(),
-        LocalTypeR::Send {
+        LocalTypeR::Recv {
             partner: "A".into(),
             branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
         },
     );
 
-    let global = GlobalType::send("B", "A", Label::new("msg"), GlobalType::End);
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
     let mut programs = BTreeMap::new();
     programs.insert(
@@ -528,8 +528,7 @@ fn test_choose_type_not_send() {
         vec![
             Instr::Choose {
                 chan: 0,
-                label: "msg".into(),
-                target: 1,
+                table: vec![("msg".into(), 1)],
             },
             Instr::Halt,
         ],
@@ -585,7 +584,7 @@ fn test_offer_recv_mode_success() {
 
 #[test]
 fn test_offer_recv_mode_blocks() {
-    // B Offer before A Choose → B blocks until A sends label.
+    // B Choose before A Offer → B blocks until A sends label.
     let image = helpers::choice_image("A", "B", &["go"]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).unwrap();
@@ -602,7 +601,7 @@ fn test_offer_recv_mode_blocks() {
 
 #[test]
 fn test_offer_unknown_label_in_table() {
-    // Offer receives a label not in the jump table.
+    // Choose receives a label not in the jump table.
     let mut local_types = BTreeMap::new();
     local_types.insert(
         "A".to_string(),
@@ -638,19 +637,18 @@ fn test_offer_unknown_label_in_table() {
     programs.insert(
         "A".to_string(),
         vec![
-            Instr::Choose {
+            Instr::Offer {
                 chan: 0,
                 label: "yes".into(),
-                target: 1,
             },
             Instr::Halt,
         ],
     );
-    // B's Offer table is missing "yes".
+    // B's Choose table is missing "yes".
     programs.insert(
         "B".to_string(),
         vec![
-            Instr::Offer {
+            Instr::Choose {
                 chan: 0,
                 table: vec![("no".into(), 1)],
             },
@@ -694,7 +692,7 @@ fn test_offer_wrong_type() {
         vec![
             Instr::Offer {
                 chan: 0,
-                table: vec![("x".into(), 1)],
+                label: "x".into(),
             },
             Instr::Halt,
         ],
@@ -756,7 +754,7 @@ fn test_close_empty_buffers() {
     programs.insert(
         "B".to_string(),
         vec![
-            Instr::Recv { chan: 0, dst: 1 },
+            Instr::Receive { chan: 0, dst: 1 },
             Instr::Close { session: 0 },
             Instr::Halt,
         ],
@@ -862,23 +860,23 @@ fn test_invoke_handler_error() {
 fn test_loadimm_all_types() {
     // Create a program that loads various immediates then halts.
     let program = vec![
-        Instr::LoadImm {
+        Instr::Set {
             dst: 1,
             val: ImmValue::Unit,
         },
-        Instr::LoadImm {
+        Instr::Set {
             dst: 2,
             val: ImmValue::Int(42),
         },
-        Instr::LoadImm {
+        Instr::Set {
             dst: 3,
             val: ImmValue::Real(3.14),
         },
-        Instr::LoadImm {
+        Instr::Set {
             dst: 4,
             val: ImmValue::Bool(true),
         },
-        Instr::LoadImm {
+        Instr::Set {
             dst: 5,
             val: ImmValue::Str("hello".into()),
         },
@@ -914,11 +912,11 @@ fn test_loadimm_all_types() {
 #[test]
 fn test_mov_copies_register() {
     let program = vec![
-        Instr::LoadImm {
+        Instr::Set {
             dst: 1,
             val: ImmValue::Int(99),
         },
-        Instr::Mov { dst: 2, src: 1 },
+        Instr::Move { dst: 2, src: 1 },
         Instr::Halt,
     ];
 
@@ -948,8 +946,8 @@ fn test_mov_copies_register() {
 fn test_jmp_sets_pc() {
     // Jmp to Halt at index 2, skipping LoadImm at index 1.
     let program = vec![
-        Instr::Jmp { target: 2 },
-        Instr::LoadImm {
+        Instr::Jump { target: 2 },
+        Instr::Set {
             dst: 1,
             val: ImmValue::Int(999),
         },
@@ -983,7 +981,7 @@ fn test_jmp_sets_pc() {
 fn test_yield_advances_pc_and_reschedules() {
     let program = vec![
         Instr::Yield,
-        Instr::LoadImm {
+        Instr::Set {
             dst: 1,
             val: ImmValue::Int(7),
         },

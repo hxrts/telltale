@@ -139,14 +139,26 @@ fn normalized_pairs(trace: &[ObsEvent]) -> Vec<(u64, String, String, String, Str
                 to,
                 label,
                 ..
-            } => Some((*tick, "sent".into(), from.clone(), to.clone(), label.clone())),
+            } => Some((
+                *tick,
+                "sent".into(),
+                from.clone(),
+                to.clone(),
+                label.clone(),
+            )),
             ObsEvent::Received {
                 tick,
                 from,
                 to,
                 label,
                 ..
-            } => Some((*tick, "recv".into(), from.clone(), to.clone(), label.clone())),
+            } => Some((
+                *tick,
+                "recv".into(),
+                from.clone(),
+                to.clone(),
+                label.clone(),
+            )),
             _ => None,
         })
         .collect()
@@ -163,9 +175,13 @@ fn per_session(trace: &[ObsEvent], sid: usize) -> Vec<(u64, String, String, Stri
                 to,
                 label,
                 ..
-            } if *session == sid => {
-                Some((*tick, "sent".into(), from.clone(), to.clone(), label.clone()))
-            }
+            } if *session == sid => Some((
+                *tick,
+                "sent".into(),
+                from.clone(),
+                to.clone(),
+                label.clone(),
+            )),
             ObsEvent::Received {
                 tick,
                 session,
@@ -173,9 +189,13 @@ fn per_session(trace: &[ObsEvent], sid: usize) -> Vec<(u64, String, String, Stri
                 to,
                 label,
                 ..
-            } if *session == sid => {
-                Some((*tick, "recv".into(), from.clone(), to.clone(), label.clone()))
-            }
+            } if *session == sid => Some((
+                *tick,
+                "recv".into(),
+                from.clone(),
+                to.clone(),
+                label.clone(),
+            )),
             _ => None,
         })
         .collect()
@@ -205,8 +225,14 @@ fn test_distributed_two_site() {
 
     let trace_a = sim.handler().site_trace("site_A").expect("site A trace");
     let trace_b = sim.handler().site_trace("site_B").expect("site B trace");
-    assert!(!normalized_pairs(&trace_a).is_empty(), "site A should emit events");
-    assert!(!normalized_pairs(&trace_b).is_empty(), "site B should emit events");
+    assert!(
+        !normalized_pairs(&trace_a).is_empty(),
+        "site A should emit events"
+    );
+    assert!(
+        !normalized_pairs(&trace_b).is_empty(),
+        "site B should emit events"
+    );
 }
 
 #[test]

@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Property-based invariant tests for VM conformance.
 #![allow(
     clippy::cast_possible_wrap,
@@ -209,7 +210,7 @@ fn prop_compile_ends_with_halt_or_jmp() {
                 }
                 let last = program.last().unwrap();
                 assert!(
-                    matches!(last, Instr::Halt | Instr::Jmp { .. }),
+                    matches!(last, Instr::Halt | Instr::Jump { .. }),
                     "program should end with Halt or Jmp, got {last:?}"
                 );
             }

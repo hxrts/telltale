@@ -74,8 +74,11 @@ fn main() -> Result<()> {
     )
     .with_context(|| format!("Failed to write {}", config.choreography_out.display()))?;
 
-    fs::write(&config.program_out, serde_json::to_string_pretty(&program_json)?)
-        .with_context(|| format!("Failed to write {}", config.program_out.display()))?;
+    fs::write(
+        &config.program_out,
+        serde_json::to_string_pretty(&program_json)?,
+    )
+    .with_context(|| format!("Failed to write {}", config.program_out.display()))?;
 
     Ok(())
 }

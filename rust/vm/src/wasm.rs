@@ -8,10 +8,11 @@ use wasm_bindgen::prelude::*;
 use telltale_types::{GlobalType, LocalTypeR};
 
 use crate::coroutine::Value;
+use crate::driver::WasmCooperativeDriver;
 use crate::effect::EffectHandler;
 use crate::loader::CodeImage;
 use crate::trace::{normalize_trace, strict_trace};
-use crate::vm::{ObsEvent, StepResult, VMConfig, VM};
+use crate::vm::{ObsEvent, StepResult, VMConfig};
 
 #[derive(Debug, Deserialize)]
 struct WasmChoreoSpec {
@@ -64,7 +65,7 @@ impl EffectHandler for NoOpHandler {
 /// Wasm wrapper for the VM.
 #[wasm_bindgen]
 pub struct WasmVM {
-    inner: VM,
+    inner: WasmCooperativeDriver,
 }
 
 #[wasm_bindgen]
@@ -73,7 +74,7 @@ impl WasmVM {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmVM {
         WasmVM {
-            inner: VM::new(VMConfig::default()),
+            inner: WasmCooperativeDriver::new(VMConfig::default()),
         }
     }
 
@@ -108,7 +109,7 @@ impl WasmVM {
     pub fn run(&mut self, max_rounds: usize, n: usize) -> Result<(), JsValue> {
         let handler = NoOpHandler;
         self.inner
-            .run_concurrent(&handler, max_rounds, n)
+            .run(&handler, max_rounds, n)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 

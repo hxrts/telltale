@@ -48,6 +48,7 @@ fn demo_annotation_extension() -> Result<(), Box<dyn std::error::Error>> {
     // Create a custom extension for priority annotations
     let parser = ExtensionParserBuilder::new()
         .with_extension(PriorityGrammarExtension, PriorityStatementParser)
+        .expect("priority extension should register")
         .build();
 
     // Test parsing a choreography with priority annotations
@@ -77,7 +78,9 @@ fn demo_extension_composition() -> Result<(), Box<dyn std::error::Error>> {
     // Create a parser with multiple extensions
     let mut parser = ExtensionParserBuilder::new()
         .with_extension(PriorityGrammarExtension, PriorityStatementParser)
+        .expect("priority extension should register")
         .with_extension(LoggingGrammarExtension, LoggingStatementParser)
+        .expect("logging extension should register")
         .build();
 
     let stats = parser.extension_stats();
@@ -385,7 +388,9 @@ mod tests {
     fn test_extension_parser_builder() {
         let parser = ExtensionParserBuilder::new()
             .with_extension(PriorityGrammarExtension, PriorityStatementParser)
+            .expect("priority extension should register")
             .with_extension(LoggingGrammarExtension, LoggingStatementParser)
+            .expect("logging extension should register")
             .build();
 
         assert!(parser.can_handle_statement("priority_stmt"));

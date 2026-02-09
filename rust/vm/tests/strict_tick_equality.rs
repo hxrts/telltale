@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Strict tick equality regression tests.
 
 #[allow(dead_code, unreachable_pub)]

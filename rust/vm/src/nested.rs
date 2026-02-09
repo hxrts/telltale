@@ -50,6 +50,10 @@ impl NestedVMHandler {
     }
 
     /// Get a copy of the inner VM trace for a site.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the site VM mutex is poisoned.
     #[must_use]
     pub fn site_trace(&self, name: &str) -> Option<Vec<ObsEvent>> {
         self.sites.get(name).map(|site| {
@@ -62,6 +66,10 @@ impl NestedVMHandler {
     }
 
     /// Check whether all coroutines in a site VM are terminal.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the site VM mutex is poisoned.
     #[must_use]
     pub fn site_all_done(&self, name: &str) -> Option<bool> {
         self.sites

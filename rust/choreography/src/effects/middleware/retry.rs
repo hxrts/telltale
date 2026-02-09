@@ -47,6 +47,7 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Retry<H> {
         msg: &M,
     ) -> ChoreoResult<()> {
         let mut retries = 0;
+        // BOUND: exits on success or when retries >= max_retries
         loop {
             match self.inner.send(ep, to, msg).await {
                 Ok(()) => return Ok(()),

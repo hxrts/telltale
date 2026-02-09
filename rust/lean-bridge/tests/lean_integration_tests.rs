@@ -145,7 +145,11 @@ fn test_three_party_ring() {
         let result = runner
             .validate(&global_to_json(&global), &program)
             .unwrap_or_else(|_| panic!("Validation should succeed for role {}", role));
-        assert!(result.success, "Role {} failed validation: {:?}", role, result);
+        assert!(
+            result.success,
+            "Role {} failed validation: {:?}",
+            role, result
+        );
     }
 }
 
@@ -161,7 +165,10 @@ fn test_choice_sender_projection() {
     let global = GlobalType::comm(
         "A",
         "B",
-        vec![(Label::new("accept"), GlobalType::End), (Label::new("reject"), GlobalType::End)],
+        vec![
+            (Label::new("accept"), GlobalType::End),
+            (Label::new("reject"), GlobalType::End),
+        ],
     );
 
     let program_a = build_program_json(
@@ -180,7 +187,11 @@ fn test_choice_sender_projection() {
         .validate(&global_to_json(&global), &program_a)
         .expect("Validation should succeed");
 
-    assert!(result.success, "Choice sender validation failed: {:?}", result);
+    assert!(
+        result.success,
+        "Choice sender validation failed: {:?}",
+        result
+    );
 }
 
 #[test]
@@ -190,7 +201,10 @@ fn test_choice_receiver_projection() {
     let global = GlobalType::comm(
         "A",
         "B",
-        vec![(Label::new("accept"), GlobalType::End), (Label::new("reject"), GlobalType::End)],
+        vec![
+            (Label::new("accept"), GlobalType::End),
+            (Label::new("reject"), GlobalType::End),
+        ],
     );
 
     let program_b = build_program_json(
@@ -209,7 +223,11 @@ fn test_choice_receiver_projection() {
         .validate(&global_to_json(&global), &program_b)
         .expect("Validation should succeed");
 
-    assert!(result.success, "Choice receiver validation failed: {:?}", result);
+    assert!(
+        result.success,
+        "Choice receiver validation failed: {:?}",
+        result
+    );
 }
 
 // ============================================================================

@@ -16,14 +16,14 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let mut checkpoint_path: Option<PathBuf> = None;
     let mut scenario_path: Option<PathBuf> = None;
-    let mut rounds: Option<usize> = None;
+    let mut rounds: Option<u64> = None;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--checkpoint" => checkpoint_path = args.next().map(PathBuf::from),
             "--scenario" => scenario_path = args.next().map(PathBuf::from),
             "--rounds" => {
-                rounds = args.next().and_then(|s| s.parse::<usize>().ok());
+                rounds = args.next().and_then(|s| s.parse::<u64>().ok());
             }
             _ => {}
         }
@@ -77,7 +77,7 @@ fn main() {
                     .map_err(|e| e.to_string())
             });
             vm.set_paused_roles(&net.inner().crashed_roles());
-            match vm.step_round(net, scenario.concurrency) {
+            match vm.step_round(net, scenario.concurrency as usize) {
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Ok(StepResult::Continue) => {}
                 Err(e) => fatal(&format!("vm error: {e}")),
@@ -90,7 +90,7 @@ fn main() {
                     .map_err(|e| e.to_string())
             });
             vm.set_paused_roles(&fault.crashed_roles());
-            match vm.step_round(fault, scenario.concurrency) {
+            match vm.step_round(fault, scenario.concurrency as usize) {
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Ok(StepResult::Continue) => {}
                 Err(e) => fatal(&format!("vm error: {e}")),

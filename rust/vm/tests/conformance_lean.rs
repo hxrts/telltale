@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Named Lean theorem conformance tests.
 #![allow(clippy::needless_collect, clippy::let_underscore_must_use)]
 //!
@@ -550,11 +551,14 @@ fn test_lean_wf_pc_bounds() {
         for coro_id in 0..10 {
             if let Some(coro) = vm.coroutine(coro_id) {
                 if coro.status == CoroStatus::Ready {
+                    let program_len = vm
+                        .coroutine_program_len(coro.id)
+                        .expect("ready coroutine must reference a valid program");
                     assert!(
-                        coro.pc < coro.program.len(),
+                        coro.pc < program_len,
                         "PC {} out of bounds for program len {}",
                         coro.pc,
-                        coro.program.len()
+                        program_len
                     );
                 }
             }

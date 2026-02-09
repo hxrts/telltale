@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Unknown opcode rejection tests.
 
 use telltale_vm::instr::Instr;

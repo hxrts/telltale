@@ -56,7 +56,7 @@ pub struct HamiltonianParams {
     /// Particle mass.
     pub mass: f64,
     /// Number of spatial dimensions per particle (1 for this 2-body case).
-    pub dimensions: usize,
+    pub dimensions: u32,
     /// Initial positions for each role (length = number of roles).
     pub initial_positions: Vec<f64>,
     /// Initial momenta for each role (length = number of roles).
@@ -78,7 +78,7 @@ pub struct ContinuumFieldParams {
     /// Kernel coupling strength K. Controls diffusion rate between sites.
     pub coupling: f64,
     /// Number of field components per site (1 for scalar field).
-    pub components: usize,
+    pub components: u32,
     /// Initial field values per role (length = number of roles).
     pub initial_fields: Vec<f64>,
     /// Integration step size.

@@ -44,34 +44,68 @@
 //! while vm.step(&handler)? {}
 //! ```
 
+pub mod architecture;
 pub mod backend;
 pub mod buffer;
 pub mod clock;
 pub mod compiler;
+pub mod composition;
 pub mod coroutine;
+pub mod determinism;
+pub mod driver;
 pub mod effect;
+pub mod exec;
+pub mod exec_api;
 pub mod instr;
+pub mod intern;
+pub mod kernel;
 pub mod loader;
 pub mod nested;
+pub mod output_condition;
 pub mod scheduler;
 pub mod session;
-pub mod trace;
 #[cfg(feature = "multi-thread")]
 pub mod threaded;
+pub mod trace;
 pub mod vm;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
+pub use architecture::{
+    EngineOwnership, EngineRole, CANONICAL_ENGINE, CROSS_TARGET_CONTRACT, ENGINE_OWNERSHIP,
+    EQUIVALENCE_SURFACES,
+};
 pub use backend::VMBackend;
 pub use clock::SimClock;
-pub use coroutine::{CoroStatus, Coroutine, Value};
+pub use composition::{
+    ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
+    MemoryUsage, ProtocolBundle, SchedulerCapability, TheoremPackCapabilities,
+};
+pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
+pub use determinism::DeterminismMode;
+pub use driver::NativeSingleThreadDriver;
+#[cfg(feature = "multi-thread")]
+pub use driver::NativeThreadedDriver;
+pub use effect::{
+    EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
+    TopologyPerturbation,
+};
+pub use exec_api::{ExecResult, ExecStatus, StepEvent, StepPack};
 pub use instr::Instr;
+pub use intern::{StringId, SymbolTable};
+pub use kernel::VMKernel;
 pub use nested::NestedVMHandler;
-pub use scheduler::{SchedPolicy, Scheduler};
-pub use session::{SessionId, SessionStore};
+pub use output_condition::{
+    verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
+    OutputConditionPolicy,
+};
+pub use scheduler::{PriorityPolicy, SchedPolicy, SchedState, Scheduler, StepUpdate};
+pub use session::{decode_edge_json, Edge, HandlerId, SessionId, SessionStore};
+#[cfg(feature = "multi-thread")]
+pub use threaded::{
+    ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
+};
 pub use trace::{normalize_trace, obs_session, strict_trace, with_tick};
+pub use vm::{MonitorMode, Program, SchedStepDebug, VMConfig, VMState, VM};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;
-#[cfg(feature = "multi-thread")]
-pub use threaded::ThreadedVM;
-pub use vm::{VMConfig, VM};
