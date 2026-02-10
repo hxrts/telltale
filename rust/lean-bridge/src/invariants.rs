@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use telltale_types::{GlobalType, LocalTypeR};
+use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 
 use crate::export::{global_to_json, local_to_json};
 
@@ -115,7 +115,7 @@ pub struct ResponsivenessConfig {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NakamotoConfig {
-    pub honest_fraction: f64,
+    pub honest_fraction: FixedQ32,
     pub finality_depth: usize,
 }
 
@@ -153,7 +153,7 @@ pub struct FosterConfig {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MaxWeightConfig {
     pub enabled: bool,
-    pub slack: Option<f64>,
+    pub slack: Option<FixedQ32>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

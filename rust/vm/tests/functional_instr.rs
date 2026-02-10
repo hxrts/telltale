@@ -12,7 +12,7 @@ mod helpers;
 use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
-use telltale_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::{CoroStatus, Fault, Value};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr};
@@ -870,7 +870,7 @@ fn test_loadimm_all_types() {
         },
         Instr::Set {
             dst: 3,
-            val: ImmValue::Real(3.14),
+            val: ImmValue::Real(FixedQ32::from_ratio(314, 100).expect("3.14")),
         },
         Instr::Set {
             dst: 4,
@@ -904,7 +904,10 @@ fn test_loadimm_all_types() {
     let coro = vm.coroutine(0).unwrap();
     assert_eq!(coro.regs[1], Value::Unit);
     assert_eq!(coro.regs[2], Value::Int(42));
-    assert_eq!(coro.regs[3], Value::Real(3.14));
+    assert_eq!(
+        coro.regs[3],
+        Value::Real(FixedQ32::from_ratio(314, 100).expect("3.14"))
+    );
     assert_eq!(coro.regs[4], Value::Bool(true));
     assert_eq!(coro.regs[5], Value::Str("hello".into()));
 }

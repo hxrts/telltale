@@ -1,10 +1,11 @@
 //! Deterministic RNG for simulation middleware.
 //!
-//! Lives in the simulator, not the VM — the VM core has no randomness.
+//! Lives in the simulator, not the VM. The VM core has no randomness.
 
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::time::Duration;
+use telltale_types::FixedQ32;
 
 /// Deterministic RNG for simulation middleware.
 pub struct SimRng {
@@ -30,31 +31,40 @@ impl SimRng {
         Self::new(seed)
     }
 
-    /// Sample a uniform f64 in [0, 1).
-    pub fn sample_f64(&mut self) -> f64 {
-        self.inner.gen::<f64>()
+    /// Sample a uniform FixedQ32 in [0, 1).
+    pub fn sample_f64(&mut self) -> FixedQ32 {
+        // Generate a u32 for the fractional part, giving uniform distribution in [0, 1).
+        let frac_bits = self.inner.next_u32() as i64;
+        FixedQ32::from_bits(frac_bits)
     }
 
     /// Sample a duration with symmetric relative variance around `base`.
     ///
     /// `variance` is a fraction of `base` (e.g., 0.1 gives +/-10% jitter).
     #[must_use]
-    pub fn sample_duration(&mut self, base: Duration, variance: f64) -> Duration {
-        if variance <= 0.0 || !variance.is_finite() {
+    pub fn sample_duration(&mut self, base: Duration, variance: FixedQ32) -> Duration {
+        let zero = FixedQ32::zero();
+        if variance <= zero || !variance.is_finite() {
             return base;
         }
-        let base_secs = base.as_secs_f64();
-        let delta = base_secs * variance;
-        let jitter = (self.sample_f64() * 2.0 - 1.0) * delta;
-        let secs = (base_secs + jitter).max(0.0);
-        Duration::from_secs_f64(secs)
+        // Convert to fixed-point math
+        let base_nanos = base.as_nanos() as i64;
+        let base_fp = FixedQ32::try_from_i64(base_nanos).unwrap_or_else(|_| FixedQ32::zero());
+        let two = FixedQ32::from_ratio(2, 1).expect("2 must be representable");
+        let delta = base_fp * variance;
+        let jitter = (self.sample_f64() * two - FixedQ32::one()) * delta;
+        let result = (base_fp + jitter).max(zero);
+        let nanos = result.to_i64_round().unwrap_or(0).max(0) as u64;
+        Duration::from_nanos(nanos)
     }
 
     /// Return true with the given probability in [0, 1].
-    pub fn should_trigger(&mut self, probability: f64) -> bool {
-        if probability <= 0.0 {
+    pub fn should_trigger(&mut self, probability: FixedQ32) -> bool {
+        let zero = FixedQ32::zero();
+        let one = FixedQ32::one();
+        if probability <= zero {
             false
-        } else if probability >= 1.0 {
+        } else if probability >= one {
             true
         } else {
             self.sample_f64() < probability
@@ -84,7 +94,7 @@ mod tests {
     #[test]
     fn test_should_trigger_bounds() {
         let mut rng = SimRng::new(7);
-        assert!(!rng.should_trigger(0.0));
-        assert!(rng.should_trigger(1.0));
+        assert!(!rng.should_trigger(FixedQ32::zero()));
+        assert!(rng.should_trigger(FixedQ32::one()));
     }
 }

@@ -3,7 +3,7 @@
 //! Session-local normalization reassigns ticks based on per-session
 //! event counts. Global ticks are preserved for non-session events.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::session::SessionId;
 use crate::vm::ObsEvent;
@@ -197,7 +197,7 @@ pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
 /// Normalize a trace by assigning session-local ticks.
 #[must_use]
 pub fn normalize_trace(trace: &[ObsEvent]) -> Vec<ObsEvent> {
-    let mut counters: HashMap<SessionId, u64> = HashMap::new();
+    let mut counters: BTreeMap<SessionId, u64> = BTreeMap::new();
     let mut out = Vec::with_capacity(trace.len());
     for ev in trace {
         if let Some(session) = obs_session(ev) {

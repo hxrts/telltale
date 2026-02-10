@@ -3,6 +3,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
+use telltale_types::FixedQ32;
 
 use telltale_vm::buffer::EnqueueResult;
 use telltale_vm::coroutine::Value;
@@ -17,9 +18,9 @@ pub struct NetworkConfig {
     /// Base message latency.
     pub base_latency: Duration,
     /// Relative variance for latency sampling.
-    pub latency_variance: f64,
+    pub latency_variance: FixedQ32,
     /// Probability of dropping each message.
-    pub loss_probability: f64,
+    pub loss_probability: FixedQ32,
     /// Network partition definitions.
     pub partitions: Vec<Partition>,
 }
@@ -28,8 +29,8 @@ impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
             base_latency: Duration::from_millis(0),
-            latency_variance: 0.0,
-            loss_probability: 0.0,
+            latency_variance: FixedQ32::zero(),
+            loss_probability: FixedQ32::zero(),
             partitions: Vec::new(),
         }
     }

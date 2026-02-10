@@ -11,7 +11,7 @@
 #![allow(clippy::expect_used)]
 
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use telltale_choreography::effects::LabelId;
@@ -25,6 +25,7 @@ use telltale_choreography::simulation::{
     transport::{FaultyTransport, InMemoryTransport, SimulatedTransport, TransportError},
 };
 use telltale_choreography::RoleName;
+use telltale_types::FixedQ32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum TestLabel {
@@ -646,13 +647,16 @@ fn test_seeded_rng_next_bool() {
 
 #[test]
 fn test_seeded_rng_next_f64_range() {
+    use telltale_types::FixedQ32;
     let mut rng = SeededRng::new(42);
 
+    let zero = FixedQ32::zero();
+    let one = FixedQ32::one();
     for _ in 0..1000 {
         let f = rng.next_f64();
         assert!(
-            (0.0..1.0).contains(&f),
-            "f64 should be in [0, 1), got {}",
+            f >= zero && f < one,
+            "FixedQ32 should be in [0, 1), got {}",
             f
         );
     }
@@ -726,7 +730,7 @@ fn make_envelope(from: &'static str, to: &'static str, msg_type: &str) -> Protoc
 
 #[test]
 fn test_in_memory_transport_send_recv() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     client.set_role(RoleName::from_static("Client"));
@@ -745,7 +749,7 @@ fn test_in_memory_transport_send_recv() {
 
 #[test]
 fn test_in_memory_transport_fifo_ordering() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     client.set_role(RoleName::from_static("Client"));
@@ -788,7 +792,7 @@ fn test_in_memory_transport_no_message() {
 
 #[test]
 fn test_in_memory_transport_peek() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     client.set_role(RoleName::from_static("Client"));
@@ -815,7 +819,7 @@ fn test_in_memory_transport_peek() {
 
 #[test]
 fn test_in_memory_transport_multiple_recipients() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut alice = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     alice.set_role(RoleName::from_static("Alice"));
@@ -860,7 +864,7 @@ fn test_in_memory_transport_multiple_recipients() {
 
 #[test]
 fn test_in_memory_transport_pending_count() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     client.set_role(RoleName::from_static("Client"));
@@ -884,7 +888,7 @@ fn test_in_memory_transport_pending_count() {
 fn test_in_memory_transport_thread_safe() {
     use std::thread;
 
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut handles = vec![];
 
@@ -929,12 +933,12 @@ fn test_in_memory_transport_thread_safe() {
 
 #[test]
 fn test_faulty_transport_zero_drop_rate() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     inner.set_role(RoleName::from_static("Client"));
 
     let mut faulty = FaultyTransport::new(inner)
-        .with_drop_rate(0.0)
+        .with_drop_rate(FixedQ32::zero())
         .with_seed(12345);
 
     // 0% drop rate should deliver all messages
@@ -965,12 +969,12 @@ fn test_faulty_transport_zero_drop_rate() {
 
 #[test]
 fn test_faulty_transport_full_drop_rate() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     inner.set_role(RoleName::from_static("Client"));
 
     let mut faulty = FaultyTransport::new(inner)
-        .with_drop_rate(1.0)
+        .with_drop_rate(FixedQ32::one())
         .with_seed(12345);
 
     // 100% drop rate should drop all messages
@@ -997,8 +1001,8 @@ fn test_faulty_transport_full_drop_rate() {
 #[test]
 fn test_faulty_transport_deterministic_dropping() {
     // Same seed should produce same drop pattern
-    let queues1 = Arc::new(Mutex::new(HashMap::new()));
-    let queues2 = Arc::new(Mutex::new(HashMap::new()));
+    let queues1 = Arc::new(Mutex::new(BTreeMap::new()));
+    let queues2 = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut inner1 = InMemoryTransport::with_shared_queues(Arc::clone(&queues1));
     inner1.set_role(RoleName::from_static("Client"));
@@ -1006,10 +1010,10 @@ fn test_faulty_transport_deterministic_dropping() {
     inner2.set_role(RoleName::from_static("Client"));
 
     let mut faulty1 = FaultyTransport::new(inner1)
-        .with_drop_rate(0.5)
+        .with_drop_rate(FixedQ32::half())
         .with_seed(42);
     let mut faulty2 = FaultyTransport::new(inner2)
-        .with_drop_rate(0.5)
+        .with_drop_rate(FixedQ32::half())
         .with_seed(42);
 
     for i in 0u8..100 {
@@ -1050,8 +1054,8 @@ fn test_faulty_transport_deterministic_dropping() {
 
 #[test]
 fn test_faulty_transport_different_seeds_different_drops() {
-    let queues1 = Arc::new(Mutex::new(HashMap::new()));
-    let queues2 = Arc::new(Mutex::new(HashMap::new()));
+    let queues1 = Arc::new(Mutex::new(BTreeMap::new()));
+    let queues2 = Arc::new(Mutex::new(BTreeMap::new()));
 
     let mut inner1 = InMemoryTransport::with_shared_queues(Arc::clone(&queues1));
     inner1.set_role(RoleName::from_static("Client"));
@@ -1059,10 +1063,10 @@ fn test_faulty_transport_different_seeds_different_drops() {
     inner2.set_role(RoleName::from_static("Client"));
 
     let mut faulty1 = FaultyTransport::new(inner1)
-        .with_drop_rate(0.5)
+        .with_drop_rate(FixedQ32::half())
         .with_seed(111);
     let mut faulty2 = FaultyTransport::new(inner2)
-        .with_drop_rate(0.5)
+        .with_drop_rate(FixedQ32::half())
         .with_seed(222);
 
     for i in 0u8..100 {
@@ -1103,12 +1107,12 @@ fn test_faulty_transport_different_seeds_different_drops() {
 
 #[test]
 fn test_faulty_transport_partial_drop_rate() {
-    let queues = Arc::new(Mutex::new(HashMap::new()));
+    let queues = Arc::new(Mutex::new(BTreeMap::new()));
     let mut inner = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
     inner.set_role(RoleName::from_static("Client"));
 
     let mut faulty = FaultyTransport::new(inner)
-        .with_drop_rate(0.3)
+        .with_drop_rate(FixedQ32::from_ratio(3, 10).expect("0.3"))
         .with_seed(12345);
 
     let send_count = 1000;
@@ -1136,8 +1140,13 @@ fn test_faulty_transport_partial_drop_rate() {
 
     // With 30% drop rate, expect roughly 70% to arrive
     // Allow for statistical variation (60-80% range)
-    let expected_min = (send_count as f64 * 0.6) as i32;
-    let expected_max = (send_count as f64 * 0.8) as i32;
+    let send_fp = FixedQ32::try_from_usize(send_count as usize).expect("send_count fits");
+    let expected_min = (send_fp * FixedQ32::from_ratio(6, 10).expect("0.6"))
+        .to_i64_round()
+        .unwrap() as i32;
+    let expected_max = (send_fp * FixedQ32::from_ratio(8, 10).expect("0.8"))
+        .to_i64_round()
+        .unwrap() as i32;
     assert!(
         recv_count >= expected_min && recv_count <= expected_max,
         "Expected {}-{} messages, got {}",

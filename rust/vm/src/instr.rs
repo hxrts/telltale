@@ -4,6 +4,7 @@
 //! Registers are `u16` indices, PC is `usize`.
 
 use serde::{Deserialize, Serialize};
+use telltale_types::FixedQ32;
 
 use crate::session::SessionId;
 
@@ -178,7 +179,7 @@ pub enum ImmValue {
     /// Integer value.
     Int(i64),
     /// Real number value.
-    Real(f64),
+    Real(FixedQ32),
     /// Boolean value.
     Bool(bool),
     /// String value.

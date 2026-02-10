@@ -12,6 +12,7 @@ readme = "README.md"
 
 [dependencies]
 telltale-choreography = { version = "0.9.1", path = "../choreography" }
+telltale-types = { version = "0.9.1", path = "../types" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt-multi-thread"] }
 thiserror = "1"

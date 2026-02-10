@@ -6,6 +6,7 @@
 
 use crate::material::MeanFieldParams;
 use crate::value_conv::{registers_to_f64s, write_f64s};
+use telltale_types::FixedQ32;
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
 
@@ -87,15 +88,17 @@ impl EffectHandler for IsingHandler {
         vals[1] -= drift * dt;
 
         // Clamp to simplex (numerical safety).
+        let zero = FixedQ32::zero();
+        let one = FixedQ32::one();
         for x in vals.iter_mut() {
-            *x = x.clamp(0.0, 1.0);
+            *x = (*x).clamp(zero, one);
         }
 
         // Renormalize to ensure exact simplex membership.
-        let sum: f64 = vals.iter().sum();
-        if sum > 0.0 {
+        let sum: FixedQ32 = vals.iter().sum();
+        if sum > zero {
             for x in vals.iter_mut() {
-                *x /= sum;
+                *x = *x / sum;
             }
         }
 
@@ -110,45 +113,65 @@ mod tests {
     use crate::material::MeanFieldParams;
     use crate::value_conv::{registers_to_f64s, write_f64s};
 
-    fn test_params(beta: f64) -> MeanFieldParams {
+    fn test_params(beta: FixedQ32) -> MeanFieldParams {
         MeanFieldParams {
             beta,
             species: vec!["up".into(), "down".into()],
-            initial_state: vec![0.6, 0.4],
-            step_size: 0.01,
+            initial_state: vec![
+                FixedQ32::from_ratio(6, 10).expect("0.6"),
+                FixedQ32::from_ratio(4, 10).expect("0.4"),
+            ],
+            step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
         }
     }
 
     #[test]
     fn test_ising_step_preserves_simplex() {
-        let handler = IsingHandler::new(test_params(0.5));
+        let handler = IsingHandler::new(test_params(FixedQ32::half()));
         let mut state = vec![Value::Unit, Value::Unit];
-        write_f64s(&mut state, &[0.6, 0.4]);
+        write_f64s(
+            &mut state,
+            &[
+                FixedQ32::from_ratio(6, 10).expect("0.6"),
+                FixedQ32::from_ratio(4, 10).expect("0.4"),
+            ],
+        );
 
         for _ in 0..1000 {
             handler.step("A", &mut state).unwrap();
         }
 
         let vals = registers_to_f64s(&state);
-        let sum: f64 = vals.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-10, "sum should be 1.0, got {sum}");
-        assert!(vals.iter().all(|&x| x >= 0.0), "all non-negative");
+        let sum: FixedQ32 = vals.iter().sum();
+        let one = FixedQ32::one();
+        let eps = FixedQ32::from_ratio(1, 1_000_000_000).expect("epsilon");
+        assert!((sum - one).abs() < eps, "sum should be 1.0, got {sum}");
+        let zero = FixedQ32::zero();
+        assert!(vals.iter().all(|&x| x >= zero), "all non-negative");
     }
 
     #[test]
     fn test_ising_subcritical_converges_to_half() {
         // beta < 1: unique fixed point at m=0 (x_up = x_down = 0.5).
-        let handler = IsingHandler::new(test_params(0.5));
+        let handler = IsingHandler::new(test_params(FixedQ32::half()));
         let mut state = vec![Value::Unit, Value::Unit];
-        write_f64s(&mut state, &[0.7, 0.3]);
+        write_f64s(
+            &mut state,
+            &[
+                FixedQ32::from_ratio(7, 10).expect("0.7"),
+                FixedQ32::from_ratio(3, 10).expect("0.3"),
+            ],
+        );
 
         for _ in 0..10000 {
             handler.step("A", &mut state).unwrap();
         }
 
         let vals = registers_to_f64s(&state);
+        let half = FixedQ32::half();
+        let eps = FixedQ32::from_ratio(1, 10000).expect("1e-4");
         assert!(
-            (vals[0] - 0.5).abs() < 1e-4,
+            (vals[0] - half).abs() < eps,
             "subcritical should converge to 0.5, got {}",
             vals[0]
         );
@@ -156,12 +179,14 @@ mod tests {
 
     #[test]
     fn test_ising_send_returns_state() {
-        let handler = IsingHandler::new(test_params(1.5));
+        let handler = IsingHandler::new(test_params(FixedQ32::from_ratio(3, 2).expect("1.5")));
         let mut state = vec![Value::Unit, Value::Unit];
-        write_f64s(&mut state, &[0.6, 0.4]);
+        let v06 = FixedQ32::from_ratio(6, 10).expect("0.6");
+        let v04 = FixedQ32::from_ratio(4, 10).expect("0.4");
+        write_f64s(&mut state, &[v06, v04]);
         let payload = handler
             .handle_send("A", "B", "concentration", &state)
             .unwrap();
-        assert_eq!(payload, Value::Vec(vec![0.6, 0.4]));
+        assert_eq!(payload, Value::Vec(vec![v06, v04]));
     }
 }

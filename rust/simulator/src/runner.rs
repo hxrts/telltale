@@ -3,7 +3,8 @@
 //! Wraps `telltale-vm` to execute choreographies through the bytecode VM,
 //! producing simulator traces via the canonical runtime.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+use telltale_types::FixedQ32;
 
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::effect::EffectHandler;
@@ -51,8 +52,12 @@ fn record_all_roles(vm: &VM, coro_info: &CoroInfo, step: usize, trace: &mut Trac
     }
 }
 
-/// Initialize coroutine registers from f64 state vectors.
-fn init_coro_regs(vm: &mut VM, coro_info: &CoroInfo, initial_states: &HashMap<String, Vec<f64>>) {
+/// Initialize coroutine registers from FixedQ32 state vectors.
+fn init_coro_regs(
+    vm: &mut VM,
+    coro_info: &CoroInfo,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+) {
     for (coro_id, role) in coro_info {
         if let Some(init) = initial_states.get(role) {
             if let Some(coro) = vm.coroutine_mut(*coro_id) {
@@ -74,7 +79,7 @@ pub struct ChoreographySpec {
     /// Global type.
     pub global_type: GlobalType,
     /// Initial state vectors per role.
-    pub initial_states: HashMap<String, Vec<f64>>,
+    pub initial_states: BTreeMap<String, Vec<FixedQ32>>,
 }
 
 /// Run multiple choreographies concurrently on a single VM instance.
@@ -110,7 +115,7 @@ pub fn run_concurrent(
     }
 
     // Coroutine ID → session index.
-    let mut coro_to_session: HashMap<usize, usize> = HashMap::new();
+    let mut coro_to_session: BTreeMap<usize, usize> = BTreeMap::new();
     for (session_idx, (_sid, coro_info, _)) in session_infos.iter().enumerate() {
         for (coro_id, _) in coro_info {
             coro_to_session.insert(*coro_id, session_idx);
@@ -209,7 +214,7 @@ pub fn run_concurrent(
 pub fn run(
     local_types: &BTreeMap<String, LocalTypeR>,
     global_type: &GlobalType,
-    initial_states: &HashMap<String, Vec<f64>>,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
     steps: usize,
     handler: &dyn EffectHandler,
 ) -> Result<Trace, String> {
@@ -303,7 +308,7 @@ pub struct ScenarioResult {
 pub fn run_with_scenario(
     local_types: &BTreeMap<String, LocalTypeR>,
     global_type: &GlobalType,
-    initial_states: &HashMap<String, Vec<f64>>,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
     scenario: &Scenario,
     handler: &dyn EffectHandler,
 ) -> Result<ScenarioResult, String> {

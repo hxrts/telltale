@@ -1,7 +1,7 @@
 //! String interning for hot runtime paths.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Stable identifier for interned runtime strings.
 pub type StringId = u32;
@@ -10,7 +10,7 @@ pub type StringId = u32;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SymbolTable {
     symbols: Vec<String>,
-    index: HashMap<String, StringId>,
+    index: BTreeMap<String, StringId>,
 }
 
 impl SymbolTable {

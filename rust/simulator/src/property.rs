@@ -1,6 +1,7 @@
 //! Online property monitoring for simulation runs.
 
 use std::collections::{BTreeMap, VecDeque};
+use telltale_types::FixedQ32;
 
 use telltale_types::LocalTypeR;
 use telltale_vm::coroutine::{CoroStatus, Coroutine};
@@ -11,7 +12,10 @@ use telltale_vm::vm::ObsEvent;
 
 use crate::value_conv::registers_to_f64s;
 
-const TOLERANCE: f64 = 1e-8;
+/// Tolerance for fixed-point comparisons (approximately 1e-8).
+fn tolerance() -> FixedQ32 {
+    FixedQ32::from_ratio(1, 100_000_000).expect("tolerance must be representable")
+}
 
 /// Property check context (read-only).
 pub struct PropertyContext<'a> {
@@ -96,7 +100,7 @@ pub enum Predicate {
         /// Comparison operator.
         op: CmpOp,
         /// Right-hand side value.
-        rhs: f64,
+        rhs: FixedQ32,
     },
 }
 
@@ -149,7 +153,7 @@ impl Predicate {
                     CmpOp::Lte => dist <= *rhs,
                     CmpOp::Gt => dist > *rhs,
                     CmpOp::Gte => dist >= *rhs,
-                    CmpOp::Eq => (dist - *rhs).abs() < TOLERANCE,
+                    CmpOp::Eq => (dist - *rhs).abs() < tolerance(),
                 }
             }
         }
@@ -192,7 +196,7 @@ pub fn parse_predicate(s: &str) -> Result<Predicate, String> {
             }
             if lhs == "distance_to_equilibrium" {
                 let rhs = rhs
-                    .parse::<f64>()
+                    .parse::<FixedQ32>()
                     .map_err(|_| format!("invalid numeric literal: {rhs}"))?;
                 return Ok(Predicate::DistanceToEquilibriumCmp { op, rhs });
             }
@@ -491,35 +495,38 @@ fn check_no_faults(ctx: &PropertyContext<'_>) -> bool {
 }
 
 fn check_simplex(ctx: &PropertyContext<'_>) -> bool {
+    let one = FixedQ32::one();
+    let tol = tolerance();
+    let neg_tol = -tol;
     for coro in ctx.coroutines {
         let vals = registers_to_f64s(&coro.regs);
         if vals.is_empty() {
             continue;
         }
-        let sum: f64 = vals.iter().sum();
-        if (sum - 1.0).abs() > TOLERANCE {
+        let sum: FixedQ32 = vals.iter().sum();
+        if (sum - one).abs() > tol {
             return false;
         }
-        if vals.iter().any(|v| *v < -TOLERANCE) {
+        if vals.iter().any(|v| *v < neg_tol) {
             return false;
         }
     }
     true
 }
 
-fn distance_to_equilibrium(ctx: &PropertyContext<'_>) -> Option<f64> {
-    let mut max_dist: Option<f64> = None;
+fn distance_to_equilibrium(ctx: &PropertyContext<'_>) -> Option<FixedQ32> {
+    let mut max_dist: Option<FixedQ32> = None;
     for coro in ctx.coroutines {
         let vals = registers_to_f64s(&coro.regs);
         if vals.is_empty() {
             continue;
         }
-        let n = vals.len() as f64;
-        let target = 1.0 / n;
+        let n = FixedQ32::try_from_usize(vals.len()).unwrap_or(FixedQ32::one());
+        let target = FixedQ32::one() / n;
         let dist = vals
             .iter()
-            .map(|v| (v - target).powi(2))
-            .sum::<f64>()
+            .map(|v| (*v - target).powi(2))
+            .sum::<FixedQ32>()
             .sqrt();
         max_dist = Some(max_dist.map_or(dist, |m| m.max(dist)));
     }

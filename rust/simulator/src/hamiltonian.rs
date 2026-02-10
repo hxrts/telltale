@@ -8,8 +8,9 @@
 //! cycle: A→B:pos, B→A:pos, A→B:force, B→A:force. Integration happens
 //! once per full cycle (every 4 scheduler ticks).
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
+use telltale_types::FixedQ32;
 
 use crate::material::HamiltonianParams;
 use crate::value_conv::{registers_to_f64s, value_to_f64, write_f64s};
@@ -28,11 +29,11 @@ use telltale_vm::effect::EffectHandler;
 pub struct HamiltonianHandler {
     params: HamiltonianParams,
     /// Per-role: received peer position.
-    peer_positions: Mutex<HashMap<String, f64>>,
+    peer_positions: Mutex<BTreeMap<String, FixedQ32>>,
     /// Per-role: received peer force.
-    peer_forces: Mutex<HashMap<String, f64>>,
+    peer_forces: Mutex<BTreeMap<String, FixedQ32>>,
     /// Tick counter per role to track protocol phase.
-    tick_count: Mutex<HashMap<String, usize>>,
+    tick_count: Mutex<BTreeMap<String, usize>>,
 }
 
 impl HamiltonianHandler {
@@ -41,9 +42,9 @@ impl HamiltonianHandler {
     pub fn new(params: HamiltonianParams) -> Self {
         Self {
             params,
-            peer_positions: Mutex::new(HashMap::new()),
-            peer_forces: Mutex::new(HashMap::new()),
-            tick_count: Mutex::new(HashMap::new()),
+            peer_positions: Mutex::new(BTreeMap::new()),
+            peer_forces: Mutex::new(BTreeMap::new()),
+            tick_count: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -51,7 +52,7 @@ impl HamiltonianHandler {
     ///
     /// For harmonic potential V = k/2 * (q_A - q_B)^2:
     ///   F = -dV/dq = -k * (q_self - q_peer)
-    fn force(&self, my_position: f64, peer_position: f64) -> f64 {
+    fn force(&self, my_position: FixedQ32, peer_position: FixedQ32) -> FixedQ32 {
         -self.params.spring_constant * (my_position - peer_position)
     }
 }
@@ -78,8 +79,8 @@ impl EffectHandler for HamiltonianHandler {
                     .expect("hamiltonian handler lock poisoned")
                     .get(role)
                     .copied()
-                    .unwrap_or(0.0);
-                let my_pos = vals.first().copied().unwrap_or(0.0);
+                    .unwrap_or_else(FixedQ32::zero);
+                let my_pos = vals.first().copied().unwrap_or_else(FixedQ32::zero);
                 let f = self.force(my_pos, peer_pos);
                 Ok(Value::Real(f))
             }
@@ -162,7 +163,7 @@ impl EffectHandler for HamiltonianHandler {
             .expect("hamiltonian handler lock poisoned")
             .get(role)
             .copied()
-            .unwrap_or(0.0);
+            .unwrap_or_else(FixedQ32::zero);
 
         // Get peer position for own force computation.
         let peer_pos = self
@@ -171,22 +172,23 @@ impl EffectHandler for HamiltonianHandler {
             .expect("hamiltonian handler lock poisoned")
             .get(role)
             .copied()
-            .unwrap_or(0.0);
+            .unwrap_or_else(FixedQ32::zero);
 
         // Use own force computation (from received peer position).
         // The received_force is the peer's force on itself, not on us.
         let _unused_peer_force = received_force;
         let force = self.force(vals[0], peer_pos);
 
+        let two = FixedQ32::from_ratio(2, 1).expect("2 must be representable");
         // Leapfrog integration:
         // 1. Half-kick: p += F * dt/2
-        vals[1] += force * dt / 2.0;
+        vals[1] = vals[1] + force * dt / two;
         // 2. Drift: q += p/m * dt
-        vals[0] += vals[1] / mass * dt;
+        vals[0] = vals[0] + vals[1] / mass * dt;
         // 3. Half-kick with new force: p += F(new_q) * dt/2
         let peer_pos_for_new = peer_pos; // peer position hasn't changed this tick
         let new_force = self.force(vals[0], peer_pos_for_new);
-        vals[1] += new_force * dt / 2.0;
+        vals[1] = vals[1] + new_force * dt / two;
 
         write_f64s(state, &vals);
         Ok(())
@@ -201,12 +203,12 @@ mod tests {
 
     fn test_params() -> HamiltonianParams {
         HamiltonianParams {
-            spring_constant: 1.0,
-            mass: 1.0,
+            spring_constant: FixedQ32::one(),
+            mass: FixedQ32::one(),
             dimensions: 1,
-            initial_positions: vec![1.0, -1.0],
-            initial_momenta: vec![0.0, 0.0],
-            step_size: 0.01,
+            initial_positions: vec![FixedQ32::one(), -FixedQ32::one()],
+            initial_momenta: vec![FixedQ32::zero(), FixedQ32::zero()],
+            step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
         }
     }
 
@@ -214,8 +216,11 @@ mod tests {
     fn test_force_harmonic() {
         let handler = HamiltonianHandler::new(test_params());
         // F = -k * (q_A - q_B) = -1.0 * (1.0 - (-1.0)) = -2.0
-        let f = handler.force(1.0, -1.0);
-        assert!((f - (-2.0)).abs() < 1e-10);
+        let one = FixedQ32::one();
+        let f = handler.force(one, -one);
+        let expected = -FixedQ32::from_ratio(2, 1).expect("2");
+        let tol = FixedQ32::from_ratio(1, 1_000_000_000).expect("tolerance");
+        assert!((f - expected).abs() < tol);
     }
 
     #[test]
@@ -228,20 +233,21 @@ mod tests {
             .peer_positions
             .lock()
             .expect("hamiltonian handler lock poisoned")
-            .insert("A".to_string(), -1.0);
+            .insert("A".to_string(), -FixedQ32::one());
         handler
             .peer_forces
             .lock()
             .expect("hamiltonian handler lock poisoned")
-            .insert("A".to_string(), 0.0);
+            .insert("A".to_string(), FixedQ32::zero());
 
         let mut state_a = vec![Value::Unit, Value::Unit];
-        write_f64s(&mut state_a, &[1.0, 0.0]);
-        let peer_pos = -1.0_f64;
+        write_f64s(&mut state_a, &[FixedQ32::one(), FixedQ32::zero()]);
+        let peer_pos = -FixedQ32::one();
+        let two = FixedQ32::from_ratio(2, 1).expect("2");
 
-        let ke = |s: &[f64]| -> f64 { s[1] * s[1] / (2.0 * params.mass) };
-        let pe = |s: &[f64]| -> f64 {
-            params.spring_constant / 2.0 * (s[0] - peer_pos) * (s[0] - peer_pos)
+        let ke = |s: &[FixedQ32]| -> FixedQ32 { s[1] * s[1] / (two * params.mass) };
+        let pe = |s: &[FixedQ32]| -> FixedQ32 {
+            params.spring_constant / two * (s[0] - peer_pos) * (s[0] - peer_pos)
         };
         let initial_vals = registers_to_f64s(&state_a);
         let initial_energy = ke(&initial_vals) + pe(&initial_vals);
@@ -255,8 +261,9 @@ mod tests {
         let final_energy = ke(&final_vals) + pe(&final_vals);
 
         let relative_error = (final_energy - initial_energy).abs() / initial_energy;
+        let threshold = FixedQ32::from_ratio(1, 100).expect("0.01");
         assert!(
-            relative_error < 0.01,
+            relative_error < threshold,
             "energy drift too large: initial={initial_energy}, final={final_energy}, relative_error={relative_error}"
         );
     }

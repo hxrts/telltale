@@ -7,8 +7,9 @@
 //! Protocol: same 2-role send/recv structure as Ising (exchange field values).
 //! State vector per role: `[field_value]`.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
+use telltale_types::FixedQ32;
 
 use crate::material::ContinuumFieldParams;
 use crate::value_conv::{registers_to_f64s, value_to_f64, write_f64s};
@@ -28,9 +29,9 @@ use telltale_vm::effect::EffectHandler;
 pub struct ContinuumFieldHandler {
     params: ContinuumFieldParams,
     /// Per-role: received peer field value.
-    peer_fields: Mutex<HashMap<String, f64>>,
+    peer_fields: Mutex<BTreeMap<String, FixedQ32>>,
     /// Tick counter per role (2-tick cycle: send then recv).
-    tick_count: Mutex<HashMap<String, usize>>,
+    tick_count: Mutex<BTreeMap<String, usize>>,
 }
 
 impl ContinuumFieldHandler {
@@ -39,8 +40,8 @@ impl ContinuumFieldHandler {
     pub fn new(params: ContinuumFieldParams) -> Self {
         Self {
             params,
-            peer_fields: Mutex::new(HashMap::new()),
-            tick_count: Mutex::new(HashMap::new()),
+            peer_fields: Mutex::new(BTreeMap::new()),
+            tick_count: Mutex::new(BTreeMap::new()),
         }
     }
 }
@@ -139,10 +140,10 @@ mod tests {
 
     fn test_params() -> ContinuumFieldParams {
         ContinuumFieldParams {
-            coupling: 1.0,
+            coupling: FixedQ32::one(),
             components: 1,
-            initial_fields: vec![1.0, 0.0],
-            step_size: 0.01,
+            initial_fields: vec![FixedQ32::one(), FixedQ32::zero()],
+            step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
         }
     }
 
@@ -152,8 +153,8 @@ mod tests {
 
         let mut state_a = vec![Value::Unit, Value::Unit];
         let mut state_b = vec![Value::Unit, Value::Unit];
-        write_f64s(&mut state_a, &[1.0]);
-        write_f64s(&mut state_b, &[0.0]);
+        write_f64s(&mut state_a, &[FixedQ32::one()]);
+        write_f64s(&mut state_b, &[FixedQ32::zero()]);
         let initial_total = registers_to_f64s(&state_a)[0] + registers_to_f64s(&state_b)[0];
 
         for _ in 0..1000 {
@@ -175,8 +176,10 @@ mod tests {
         }
 
         let final_total = registers_to_f64s(&state_a)[0] + registers_to_f64s(&state_b)[0];
+        // Allow for some fixed-point rounding error accumulation over 1000 iterations
+        let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
         assert!(
-            (final_total - initial_total).abs() < 1e-10,
+            (final_total - initial_total).abs() < eps,
             "total field should be conserved: initial={initial_total}, final={final_total}"
         );
     }
@@ -187,8 +190,8 @@ mod tests {
 
         let mut state_a = vec![Value::Unit, Value::Unit];
         let mut state_b = vec![Value::Unit, Value::Unit];
-        write_f64s(&mut state_a, &[1.0]);
-        write_f64s(&mut state_b, &[0.0]);
+        write_f64s(&mut state_a, &[FixedQ32::one()]);
+        write_f64s(&mut state_b, &[FixedQ32::zero()]);
 
         for _ in 0..10000 {
             // Tick 0: A→B send, B recv.
@@ -211,13 +214,15 @@ mod tests {
         // Should converge to equal field values (average = 0.5).
         let vals_a = registers_to_f64s(&state_a);
         let vals_b = registers_to_f64s(&state_b);
+        let half = FixedQ32::half();
+        let eps = FixedQ32::from_ratio(1, 10000).expect("1e-4");
         assert!(
-            (vals_a[0] - 0.5).abs() < 1e-4,
+            (vals_a[0] - half).abs() < eps,
             "A should converge to 0.5, got {}",
             vals_a[0]
         );
         assert!(
-            (vals_b[0] - 0.5).abs() < 1e-4,
+            (vals_b[0] - half).abs() < eps,
             "B should converge to 0.5, got {}",
             vals_b[0]
         );

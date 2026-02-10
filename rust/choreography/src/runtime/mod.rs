@@ -33,6 +33,7 @@
 //! ```
 
 pub mod adapter;
+pub mod clock;
 pub mod spawn;
 pub mod sync;
 pub mod test_adapter;
@@ -42,5 +43,6 @@ pub use adapter::{
     ChoiceLabel, ChoreographicAdapter, ChoreographicAdapterExt, ExecutionMetadata, Message,
     ProtocolContext, ProtocolOutput,
 };
+pub use clock::{SystemClock, SystemRng};
 pub use spawn::{spawn, spawn_local, AsyncRuntime};
 pub use test_adapter::TestAdapter;

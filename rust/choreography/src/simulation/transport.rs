@@ -5,14 +5,16 @@
 
 use async_trait::async_trait;
 use parking_lot::Mutex;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
+use telltale_types::FixedQ32;
 
 use super::envelope::ProtocolEnvelope;
 use crate::identifiers::RoleName;
 
 /// Type alias for the message queue storage shared between transports.
-type MessageQueues = Arc<Mutex<HashMap<(RoleName, RoleName), VecDeque<ProtocolEnvelope>>>>;
+/// Uses BTreeMap for deterministic iteration order in simulation.
+type MessageQueues = Arc<Mutex<BTreeMap<(RoleName, RoleName), VecDeque<ProtocolEnvelope>>>>;
 
 /// Errors that can occur during transport operations.
 #[derive(Debug, thiserror::Error)]
@@ -104,7 +106,7 @@ impl InMemoryTransport {
     pub fn new() -> Self {
         Self {
             role: None,
-            queues: Arc::new(Mutex::new(HashMap::new())),
+            queues: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -229,7 +231,7 @@ impl AsyncSimulatedTransport for InMemoryTransport {
 pub struct FaultyTransport<T> {
     inner: T,
     /// Drop probability (0.0 to 1.0).
-    drop_rate: f64,
+    drop_rate: FixedQ32,
     /// Whether to delay messages.
     delay: bool,
     /// Random seed for reproducibility.
@@ -243,7 +245,7 @@ impl<T> FaultyTransport<T> {
     pub fn new(inner: T) -> Self {
         Self {
             inner,
-            drop_rate: 0.0,
+            drop_rate: FixedQ32::zero(),
             delay: false,
             seed: 12345,
             rng_state: 12345,
@@ -251,8 +253,8 @@ impl<T> FaultyTransport<T> {
     }
 
     /// Set the message drop rate (0.0 to 1.0).
-    pub fn with_drop_rate(mut self, rate: f64) -> Self {
-        self.drop_rate = rate.clamp(0.0, 1.0);
+    pub fn with_drop_rate(mut self, rate: FixedQ32) -> Self {
+        self.drop_rate = rate.clamp(FixedQ32::zero(), FixedQ32::one());
         self
     }
 
@@ -270,12 +272,15 @@ impl<T> FaultyTransport<T> {
     }
 
     /// Get a random float between 0 and 1.
-    fn random_float(&mut self) -> f64 {
+    fn random_float(&mut self) -> FixedQ32 {
         // Simple xorshift for reproducibility
         self.rng_state ^= self.rng_state << 13;
         self.rng_state ^= self.rng_state >> 7;
         self.rng_state ^= self.rng_state << 17;
-        (self.rng_state as f64) / (u64::MAX as f64)
+        // FixedQ32 is Q32.32: value = bits / 2^32
+        // Take upper 32 bits as fractional part to get value in [0, 1)
+        let frac_bits = (self.rng_state >> 32) as i64;
+        FixedQ32::from_bits(frac_bits)
     }
 
     /// Check if message should be dropped.
@@ -323,7 +328,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_transport() {
-        let queues = Arc::new(Mutex::new(HashMap::new()));
+        let queues = Arc::new(Mutex::new(BTreeMap::new()));
 
         let mut client = InMemoryTransport::with_shared_queues(Arc::clone(&queues));
         client.set_role(RoleName::from_static("Client"));
@@ -358,7 +363,7 @@ mod tests {
     fn test_faulty_transport_drops() {
         let inner = InMemoryTransport::new();
         let mut faulty = FaultyTransport::new(inner)
-            .with_drop_rate(1.0) // Always drop
+            .with_drop_rate(FixedQ32::one()) // Always drop
             .with_seed(42);
 
         faulty.inner.set_role(RoleName::from_static("Client"));

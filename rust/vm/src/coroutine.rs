@@ -4,7 +4,7 @@
 //! register file, and status. Matches the Lean `Coroutine` structure.
 
 use serde::{Deserialize, Serialize};
-use telltale_types::ValType;
+use telltale_types::{FixedQ32, ValType};
 
 use crate::instr::{Endpoint, PC};
 use crate::session::{Edge, HandlerId, SessionId};
@@ -40,13 +40,13 @@ pub enum Value {
     /// Integer.
     Int(i64),
     /// Floating-point.
-    Real(f64),
+    Real(FixedQ32),
     /// Boolean.
     Bool(bool),
     /// String.
     Str(String),
     /// Vector of floats (for physical state vectors).
-    Vec(Vec<f64>),
+    Vec(Vec<FixedQ32>),
     /// Label name (for choice/offer).
     Label(String),
     /// JSON value (for interop with effect handlers).

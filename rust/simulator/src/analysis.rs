@@ -4,9 +4,12 @@
 //! equilibrium decreases), and simplex invariance (all non-negative).
 
 use crate::trace::Trace;
+use telltale_types::FixedQ32;
 
-/// Tolerance for floating-point comparisons.
-const TOLERANCE: f64 = 1e-8;
+/// Tolerance for fixed-point comparisons (approximately 1e-8).
+fn tolerance() -> FixedQ32 {
+    FixedQ32::from_ratio(1, 100_000_000).expect("tolerance must be representable")
+}
 
 /// Result of running validation checks on a trace.
 #[derive(Debug)]
@@ -31,9 +34,11 @@ pub struct CheckResult {
 /// Validate that probability sums equal 1 at every step for every role.
 #[must_use]
 pub fn check_conservation(trace: &Trace) -> CheckResult {
+    let one = FixedQ32::one();
+    let tol = tolerance();
     for record in &trace.records {
-        let sum: f64 = record.state.iter().sum();
-        if (sum - 1.0).abs() > TOLERANCE {
+        let sum: FixedQ32 = record.state.iter().sum();
+        if (sum - one).abs() > tol {
             return CheckResult {
                 name: "conservation".into(),
                 passed: false,
@@ -54,9 +59,10 @@ pub fn check_conservation(trace: &Trace) -> CheckResult {
 /// Validate that all concentrations are non-negative at every step.
 #[must_use]
 pub fn check_simplex(trace: &Trace) -> CheckResult {
+    let neg_tol = -tolerance();
     for record in &trace.records {
         for (i, &x) in record.state.iter().enumerate() {
-            if x < -TOLERANCE {
+            if x < neg_tol {
                 return CheckResult {
                     name: "simplex".into(),
                     passed: false,
@@ -79,7 +85,7 @@ pub fn check_simplex(trace: &Trace) -> CheckResult {
 ///
 /// The equilibrium for subcritical mean-field Ising (`beta < 1`) is `[0.5, 0.5]`.
 #[must_use]
-pub fn check_convergence(trace: &Trace, role: &str, equilibrium: &[f64]) -> CheckResult {
+pub fn check_convergence(trace: &Trace, role: &str, equilibrium: &[FixedQ32]) -> CheckResult {
     let records = trace.records_for_role(role);
     if records.len() < 2 {
         return CheckResult {
@@ -89,12 +95,12 @@ pub fn check_convergence(trace: &Trace, role: &str, equilibrium: &[f64]) -> Chec
         };
     }
 
-    let distance = |state: &[f64]| -> f64 {
+    let distance = |state: &[FixedQ32]| -> FixedQ32 {
         state
             .iter()
             .zip(equilibrium.iter())
-            .map(|(a, b)| (a - b).powi(2))
-            .sum::<f64>()
+            .map(|(a, b)| (*a - *b).powi(2))
+            .sum::<FixedQ32>()
             .sqrt()
     };
 
@@ -125,8 +131,8 @@ pub fn check_convergence(trace: &Trace, role: &str, equilibrium: &[f64]) -> Chec
 pub fn check_energy_conservation(
     trace: &Trace,
     roles: &[&str],
-    mass: f64,
-    spring_constant: f64,
+    mass: FixedQ32,
+    spring_constant: FixedQ32,
 ) -> CheckResult {
     if roles.len() != 2 {
         return CheckResult {
@@ -147,24 +153,27 @@ pub fn check_energy_conservation(
         };
     }
 
-    let energy = |a: &[f64], b: &[f64]| -> f64 {
-        let ke = a[1].powi(2) / (2.0 * mass) + b[1].powi(2) / (2.0 * mass);
-        let pe = spring_constant / 2.0 * (a[0] - b[0]).powi(2);
+    let two = FixedQ32::from_ratio(2, 1).expect("2 must be representable");
+    let energy = |a: &[FixedQ32], b: &[FixedQ32]| -> FixedQ32 {
+        let ke = a[1].powi(2) / (two * mass) + b[1].powi(2) / (two * mass);
+        let pe = spring_constant / two * (a[0] - b[0]).powi(2);
         ke + pe
     };
 
     let initial_e = energy(&records_a[0].state, &records_b[0].state);
-    let mut max_drift: f64 = 0.0;
+    let mut max_drift = FixedQ32::zero();
+    let epsilon = FixedQ32::from_ratio(1, 1_000_000_000_000).unwrap_or(FixedQ32::one());
 
     for (ra, rb) in records_a.iter().zip(records_b.iter()) {
         let e = energy(&ra.state, &rb.state);
-        let drift = (e - initial_e).abs() / initial_e.max(1e-15);
+        let drift = (e - initial_e).abs() / initial_e.max(epsilon);
         max_drift = max_drift.max(drift);
     }
 
     // Tolerance accounts for communication-lag-induced drift in distributed
     // Hamiltonian simulations where roles exchange positions asynchronously.
-    if max_drift < 0.15 {
+    let drift_tolerance = FixedQ32::from_ratio(15, 100).expect("0.15 must be representable");
+    if max_drift < drift_tolerance {
         CheckResult {
             name: "energy_conservation".into(),
             passed: true,
@@ -181,7 +190,7 @@ pub fn check_energy_conservation(
 
 /// Run all standard validation checks on a trace.
 #[must_use]
-pub fn validate(trace: &Trace, roles: &[&str], equilibrium: &[f64]) -> ValidationResult {
+pub fn validate(trace: &Trace, roles: &[&str], equilibrium: &[FixedQ32]) -> ValidationResult {
     let mut checks = vec![check_conservation(trace), check_simplex(trace)];
 
     for role in roles {

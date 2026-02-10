@@ -7,15 +7,36 @@ use crate::config::TcpTransportConfig;
 const ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
-use telltale_choreography::topology::{Message, TransportError, TransportResult};
-use telltale_choreography::{MessageLenBytes, QueueCapacity, RoleName, Transport};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use telltale_choreography::topology::{Message, TransportError, TransportResult};
+use telltale_choreography::{MessageLenBytes, QueueCapacity, RoleName, Transport};
+use telltale_types::FixedQ32;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, error, info, instrument, warn};
+
+fn scale_duration_by_fixed(duration: Duration, factor: FixedQ32) -> Duration {
+    if factor <= FixedQ32::zero() {
+        return duration;
+    }
+
+    let duration_nanos = duration.as_nanos();
+    let factor_bits = factor.to_bits() as u128;
+    let scaled = duration_nanos
+        .saturating_mul(factor_bits)
+        .checked_shr(FixedQ32::FRACTIONAL_BITS)
+        .unwrap_or(0);
+    let nanos = if duration_nanos > 0 && scaled == 0 {
+        1
+    } else {
+        scaled
+    };
+    let nanos = u64::try_from(nanos).unwrap_or(u64::MAX);
+    Duration::from_nanos(nanos)
+}
 
 /// TCP transport state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,7 +215,7 @@ impl TcpTransport {
                     );
                     tokio::time::sleep(delay).await;
                     delay = std::cmp::min(
-                        Duration::from_secs_f64(delay.as_secs_f64() * retry.backoff_multiplier),
+                        scale_duration_by_fixed(delay, retry.backoff_multiplier),
                         retry.max_delay,
                     );
                 }
@@ -279,21 +300,23 @@ impl Transport for TcpTransport {
         let role_str = to_role.as_str();
         let stream = {
             let outgoing = self.outgoing.read().await;
-            outgoing.get(role_str).cloned().ok_or_else(|| {
-                TransportError::UnknownRole {
+            outgoing
+                .get(role_str)
+                .cloned()
+                .ok_or_else(|| TransportError::UnknownRole {
                     role: to_role.clone(),
-                }
-            })?
+                })?
         };
 
         let mut stream = stream.lock().await;
         let bytes = message.as_bytes();
 
         // Write length prefix
-        let len = MessageLenBytes::try_from(bytes.len()).map_err(|e| TransportError::SendFailed {
-            role: to_role.clone(),
-            reason: e.to_string(),
-        })?;
+        let len =
+            MessageLenBytes::try_from(bytes.len()).map_err(|e| TransportError::SendFailed {
+                role: to_role.clone(),
+                reason: e.to_string(),
+            })?;
         stream
             .write_all(&len.get().to_be_bytes())
             .await
@@ -303,16 +326,20 @@ impl Transport for TcpTransport {
             })?;
 
         // Write payload
-        stream.write_all(bytes).await.map_err(|e| {
-            TransportError::SendFailed {
+        stream
+            .write_all(bytes)
+            .await
+            .map_err(|e| TransportError::SendFailed {
                 role: to_role.clone(),
                 reason: e.to_string(),
-            }
-        })?;
-        stream.flush().await.map_err(|e| TransportError::SendFailed {
-            role: to_role.clone(),
-            reason: e.to_string(),
-        })?;
+            })?;
+        stream
+            .flush()
+            .await
+            .map_err(|e| TransportError::SendFailed {
+                role: to_role.clone(),
+                reason: e.to_string(),
+            })?;
 
         debug!(msg_len = bytes.len(), "Message sent");
         Ok(())
@@ -324,11 +351,11 @@ impl Transport for TcpTransport {
         let role_key = role_str.to_string();
         let mut receiver = {
             let mut incoming = self.incoming.lock().await;
-            incoming.remove(&role_key).ok_or_else(|| {
-                TransportError::UnknownRole {
+            incoming
+                .remove(&role_key)
+                .ok_or_else(|| TransportError::UnknownRole {
                     role: from_role.clone(),
-                }
-            })?
+                })?
         };
 
         let msg = receiver.recv().await;
@@ -407,8 +434,7 @@ mod tests {
     #[tokio::test]
     async fn test_transport_ipv6_lifecycle() {
         // Test that transport can bind to IPv6 loopback
-        let config = TcpTransportConfig::new("Alice", "[::1]:0")
-            .with_peer("Bob", "[::1]:9999");
+        let config = TcpTransportConfig::new("Alice", "[::1]:0").with_peer("Bob", "[::1]:9999");
 
         let transport = TcpTransport::new(config);
         assert_eq!(transport.role(), "Alice");
@@ -443,7 +469,13 @@ mod tests {
 
         assert!(config.peers.contains_key("Bob"));
         assert_eq!(config.peers.get("Bob"), Some(&"[::1]:8080".to_string()));
-        assert_eq!(config.peers.get("Carol"), Some(&"[2001:db8::1]:9000".to_string()));
-        assert_eq!(config.peers.get("Dave"), Some(&"[fe80::1]:3000".to_string()));
+        assert_eq!(
+            config.peers.get("Carol"),
+            Some(&"[2001:db8::1]:9000".to_string())
+        );
+        assert_eq!(
+            config.peers.get("Dave"),
+            Some(&"[fe80::1]:3000".to_string())
+        );
     }
 }

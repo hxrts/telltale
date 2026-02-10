@@ -298,8 +298,8 @@ impl Transport for TcpTransport {
     }
 
     async fn close(&self) -> TransportResult<()> {
-        // Send shutdown signal - ignore send failure since receiver may already be dropped
         if let Some(shutdown) = self.shutdown.lock().await.take() {
+            // Ignore send failure: receiver may already be dropped during shutdown
             let _ = shutdown.send(());
         }
 

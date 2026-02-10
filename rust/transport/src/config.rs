@@ -1,8 +1,9 @@
 //! Configuration for TCP transport.
 
-use telltale_choreography::QueueCapacity;
 use std::collections::HashMap;
 use std::time::Duration;
+use telltale_choreography::QueueCapacity;
+use telltale_types::FixedQ32;
 
 /// Configuration for a TCP transport instance.
 #[derive(Debug, Clone)]
@@ -29,7 +30,7 @@ pub struct RetryConfig {
     /// Maximum delay between retries.
     pub max_delay: Duration,
     /// Multiplier for exponential backoff.
-    pub backoff_multiplier: f64,
+    pub backoff_multiplier: FixedQ32,
 }
 
 impl Default for RetryConfig {
@@ -38,7 +39,8 @@ impl Default for RetryConfig {
             max_attempts: 5,
             initial_delay: Duration::from_millis(100),
             max_delay: Duration::from_secs(10),
-            backoff_multiplier: 2.0,
+            backoff_multiplier: FixedQ32::from_ratio(2, 1)
+                .expect("retry backoff multiplier default must be representable"),
         }
     }
 }

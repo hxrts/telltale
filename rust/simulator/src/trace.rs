@@ -3,6 +3,7 @@
 //! Records per-role state snapshots at each simulation step.
 
 use serde::{Deserialize, Serialize};
+use telltale_types::FixedQ32;
 
 /// A single step record for one role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,7 +13,7 @@ pub struct StepRecord {
     /// Role name.
     pub role: String,
     /// State vector after this step.
-    pub state: Vec<f64>,
+    pub state: Vec<FixedQ32>,
 }
 
 /// Collected trace from a simulation run.
@@ -42,7 +43,7 @@ impl Trace {
 
     /// Get the final state for a role.
     #[must_use]
-    pub fn final_state(&self, role: &str) -> Option<&[f64]> {
+    pub fn final_state(&self, role: &str) -> Option<&[FixedQ32]> {
         self.records
             .iter()
             .rev()

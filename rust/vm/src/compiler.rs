@@ -3,7 +3,7 @@
 //! Trivial compiler: each send/recv in the local type becomes a bytecode
 //! instruction. Mu generates a loop target, Var generates a Jump back.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use telltale_types::LocalTypeR;
 
@@ -24,12 +24,16 @@ use crate::instr::{Instr, PC};
 #[must_use]
 pub fn compile(local_type: &LocalTypeR) -> Vec<Instr> {
     let mut instrs = Vec::new();
-    let mut loop_targets: HashMap<String, PC> = HashMap::new();
+    let mut loop_targets: BTreeMap<String, PC> = BTreeMap::new();
     compile_inner(local_type, &mut instrs, &mut loop_targets);
     instrs
 }
 
-fn compile_inner(lt: &LocalTypeR, instrs: &mut Vec<Instr>, loop_targets: &mut HashMap<String, PC>) {
+fn compile_inner(
+    lt: &LocalTypeR,
+    instrs: &mut Vec<Instr>,
+    loop_targets: &mut BTreeMap<String, PC>,
+) {
     match lt {
         LocalTypeR::Send { branches, .. } => {
             if branches.len() == 1 {
@@ -80,7 +84,7 @@ fn compile_send_choice_branches(
         LocalTypeR,
     )],
     instrs: &mut Vec<Instr>,
-    loop_targets: &mut HashMap<String, PC>,
+    loop_targets: &mut BTreeMap<String, PC>,
 ) {
     if let Some((label, _vt, cont)) = branches.first() {
         instrs.push(Instr::Offer {
@@ -99,7 +103,7 @@ fn compile_recv_choice_branches(
         LocalTypeR,
     )],
     instrs: &mut Vec<Instr>,
-    loop_targets: &mut HashMap<String, PC>,
+    loop_targets: &mut BTreeMap<String, PC>,
 ) {
     // Reserve slot for the Choose instruction (will be patched).
     let placeholder_idx = instrs.len();

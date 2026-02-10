@@ -26,7 +26,7 @@ pub mod tracing;
 // Re-export runtime adapter types
 pub use runtime::{
     ChoiceLabel, ChoreographicAdapter, ChoreographicAdapterExt, Message, ProtocolContext,
-    ProtocolOutput,
+    ProtocolOutput, SystemClock, SystemRng,
 };
 
 // Re-export typed identifiers
@@ -71,7 +71,7 @@ pub use heap::{
 pub use simulation::{
     BlockedOn, Checkpoint, Clock, InMemoryTransport, MockClock, NullObserver, ProtocolEnvelope,
     ProtocolObserver, ProtocolStateMachine, RecordingObserver, Rng, SeededRng, SimulatedTransport,
-    StepInput, StepOutput, SystemClock,
+    StepInput, StepOutput, WallClock,
 };
 
 // Re-export macros from telltale-macros

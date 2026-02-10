@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 use telltale_types::LocalTypeR;
 
@@ -497,7 +497,7 @@ pub struct VM<P = ()> {
     next_coro_id: usize,
     next_session_id: SessionId,
     paused_roles: BTreeSet<String>,
-    guard_resources: HashMap<String, Value>,
+    guard_resources: BTreeMap<String, Value>,
     effect_trace: Vec<EffectTraceEntry>,
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,
@@ -515,7 +515,7 @@ impl VM {
     pub fn new(config: VMConfig) -> Self {
         let tick_duration = config.tick_duration;
         let sched = Scheduler::new(config.sched_policy.clone());
-        let mut guard_resources = HashMap::new();
+        let mut guard_resources = BTreeMap::new();
         for layer in &config.guard_layers {
             guard_resources.insert(layer.id.clone(), Value::Unit);
         }

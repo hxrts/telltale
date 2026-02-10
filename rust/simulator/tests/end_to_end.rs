@@ -1,6 +1,7 @@
 //! End-to-end integration test: GlobalType → Lean projection → simulation → analysis.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+use telltale_types::FixedQ32;
 
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::import::json_to_local;
@@ -54,10 +55,13 @@ fn test_mean_field_ising_end_to_end() {
 
     // 3. Set up simulator.
     let params = MeanFieldParams {
-        beta: 0.5, // subcritical: converges to [0.5, 0.5]
+        beta: FixedQ32::half(), // subcritical: converges to [0.5, 0.5]
         species: vec!["up".into(), "down".into()],
-        initial_state: vec![0.6, 0.4],
-        step_size: 0.01,
+        initial_state: vec![
+            FixedQ32::from_ratio(6, 10).expect("0.6"),
+            FixedQ32::from_ratio(4, 10).expect("0.4"),
+        ],
+        step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
     };
 
     let handler = IsingHandler::new(params.clone());
@@ -66,7 +70,7 @@ fn test_mean_field_ising_end_to_end() {
     local_types.insert("A".to_string(), a_local);
     local_types.insert("B".to_string(), b_local);
 
-    let mut initial_states = HashMap::new();
+    let mut initial_states = BTreeMap::new();
     initial_states.insert("A".to_string(), params.initial_state.clone());
     initial_states.insert("B".to_string(), params.initial_state.clone());
 
@@ -75,7 +79,7 @@ fn test_mean_field_ising_end_to_end() {
         runner::run(&local_types, &g, &initial_states, 100, &handler).expect("simulation succeeds");
 
     // 5. Validate.
-    let equilibrium = [0.5, 0.5];
+    let equilibrium = [FixedQ32::half(), FixedQ32::half()];
     let result = analysis::validate(&trace, &["A", "B"], &equilibrium);
 
     for check in &result.checks {
@@ -128,12 +132,12 @@ fn test_hamiltonian_2body_end_to_end() {
 
     // 3. Set up simulator.
     let params = HamiltonianParams {
-        spring_constant: 1.0,
-        mass: 1.0,
+        spring_constant: FixedQ32::one(),
+        mass: FixedQ32::one(),
         dimensions: 1,
-        initial_positions: vec![1.0, -1.0],
-        initial_momenta: vec![0.0, 0.0],
-        step_size: 0.01,
+        initial_positions: vec![FixedQ32::one(), FixedQ32::neg_one()],
+        initial_momenta: vec![FixedQ32::zero(), FixedQ32::zero()],
+        step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
     };
 
     let handler = HamiltonianHandler::new(params.clone());
@@ -143,7 +147,7 @@ fn test_hamiltonian_2body_end_to_end() {
     local_types.insert("B".to_string(), b_local);
 
     // State per role: [position, momentum]
-    let mut initial_states = HashMap::new();
+    let mut initial_states = BTreeMap::new();
     initial_states.insert(
         "A".to_string(),
         vec![params.initial_positions[0], params.initial_momenta[0]],

@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
+use telltale_types::FixedQ32;
 
 use crate::fault::{Fault, FaultSchedule, ScheduledFault, Trigger};
 use crate::material::MaterialParams;
@@ -84,10 +85,10 @@ pub struct NetworkSpec {
     pub base_latency_ms: u64,
     /// Relative latency variance.
     #[serde(default)]
-    pub latency_variance: f64,
+    pub latency_variance: FixedQ32,
     /// Loss probability per message.
     #[serde(default)]
-    pub loss_probability: f64,
+    pub loss_probability: FixedQ32,
     /// Optional static partitions.
     #[serde(default)]
     pub partitions: Vec<PartitionSpec>,
@@ -148,7 +149,7 @@ pub struct TriggerSpec {
     pub after_step: Option<u64>,
     /// Activate randomly with the given probability each tick.
     #[serde(default)]
-    pub random: Option<f64>,
+    pub random: Option<FixedQ32>,
     /// Activate when a specific event occurs.
     #[serde(default)]
     pub on_event: Option<OnEventSpec>,
@@ -171,7 +172,7 @@ pub enum FaultActionSpec {
     /// Drop messages with given probability.
     MessageDrop {
         /// Probability of dropping each message (0.0 to 1.0).
-        probability: f64,
+        probability: FixedQ32,
     },
     /// Delay messages by N ticks.
     MessageDelay {
@@ -181,7 +182,7 @@ pub enum FaultActionSpec {
     /// Corrupt message payload with given probability.
     MessageCorruption {
         /// Probability of corrupting each message (0.0 to 1.0).
-        probability: f64,
+        probability: FixedQ32,
     },
     /// Crash a role (stop executing its coroutines).
     NodeCrash {
@@ -420,6 +421,7 @@ mod tests {
 
     #[test]
     fn test_parse_mean_field_scenario() {
+        // Note: FixedQ32 values must be quoted strings in TOML for deterministic parsing
         let toml = r#"
             name = "mean_field_ising"
             roles = ["A", "B"]
@@ -430,10 +432,10 @@ mod tests {
             layer = "mean_field"
 
             [material.params]
-            beta = 1.5
+            beta = "1.5"
             species = ["up", "down"]
-            initial_state = [0.6, 0.4]
-            step_size = 0.01
+            initial_state = ["0.6", "0.4"]
+            step_size = "0.01"
 
             [output]
             format = "jsonl"
@@ -446,7 +448,9 @@ mod tests {
         assert_eq!(scenario.seed, 42);
         match &scenario.material {
             MaterialParams::MeanField(mf) => {
-                assert!((mf.beta - 1.5).abs() < f64::EPSILON);
+                let expected = FixedQ32::from_ratio(3, 2).expect("1.5");
+                let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
+                assert!((mf.beta - expected).abs() < eps);
             }
             _ => panic!("expected MeanField"),
         }
@@ -454,6 +458,7 @@ mod tests {
 
     #[test]
     fn test_default_seed_when_missing() {
+        // Note: FixedQ32 values must be quoted strings in TOML for deterministic parsing
         let toml = r#"
             name = "default_seed"
             roles = ["A", "B"]
@@ -463,10 +468,10 @@ mod tests {
             layer = "mean_field"
 
             [material.params]
-            beta = 1.0
+            beta = "1.0"
             species = ["up", "down"]
-            initial_state = [0.5, 0.5]
-            step_size = 0.01
+            initial_state = ["0.5", "0.5"]
+            step_size = "0.01"
         "#;
 
         let scenario = Scenario::parse(toml).expect("parse scenario");

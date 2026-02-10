@@ -4,6 +4,7 @@
 //! both Lean and Rust projection paths, verifying identical traces.
 
 use std::collections::{BTreeMap, HashMap};
+use telltale_types::FixedQ32;
 
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::import::json_to_local;
@@ -64,7 +65,7 @@ fn project_rust(g: &GlobalType, roles: &[&str]) -> BTreeMap<String, LocalTypeR> 
 fn run_sim(
     global: &GlobalType,
     projections: &BTreeMap<String, LocalTypeR>,
-    initial_states: &HashMap<String, Vec<f64>>,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
     steps: usize,
     handler: &dyn EffectHandler,
 ) -> Trace {
@@ -72,7 +73,7 @@ fn run_sim(
 }
 
 /// Assert two traces are identical within tolerance (comparing by step+role key).
-fn assert_traces_equal(lean_trace: &Trace, rust_trace: &Trace, tolerance: f64) {
+fn assert_traces_equal(lean_trace: &Trace, rust_trace: &Trace, tolerance: FixedQ32) {
     assert_eq!(
         lean_trace.records.len(),
         rust_trace.records.len(),
@@ -80,7 +81,7 @@ fn assert_traces_equal(lean_trace: &Trace, rust_trace: &Trace, tolerance: f64) {
     );
 
     // Index by (step, role) to handle different HashMap iteration orders.
-    let lean_map: HashMap<(u64, &str), &[f64]> = lean_trace
+    let lean_map: HashMap<(u64, &str), &[FixedQ32]> = lean_trace
         .records
         .iter()
         .map(|r| ((r.step, r.role.as_str()), r.state.as_slice()))
@@ -94,7 +95,7 @@ fn assert_traces_equal(lean_trace: &Trace, rust_trace: &Trace, tolerance: f64) {
         assert_eq!(lean_state.len(), r.state.len(), "state length mismatch");
         for (i, (lv, rv)) in lean_state.iter().zip(r.state.iter()).enumerate() {
             assert!(
-                (lv - rv).abs() < tolerance,
+                (*lv - *rv).abs() < tolerance,
                 "step {} role {} state[{i}]: lean={lv}, rust={rv}",
                 r.step,
                 r.role,
@@ -126,10 +127,13 @@ fn ising_global_type() -> GlobalType {
 
 fn ising_params() -> MeanFieldParams {
     MeanFieldParams {
-        beta: 0.5,
+        beta: FixedQ32::half(),
         species: vec!["up".into(), "down".into()],
-        initial_state: vec![0.6, 0.4],
-        step_size: 0.01,
+        initial_state: vec![
+            FixedQ32::from_ratio(6, 10).expect("0.6"),
+            FixedQ32::from_ratio(4, 10).expect("0.4"),
+        ],
+        step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
     }
 }
 
@@ -140,7 +144,7 @@ fn test_ising_lean_vs_rust_identical_traces() {
     let params = ising_params();
     let handler = IsingHandler::new(params.clone());
 
-    let mut initial_states = HashMap::new();
+    let mut initial_states = BTreeMap::new();
     initial_states.insert("A".to_string(), params.initial_state.clone());
     initial_states.insert("B".to_string(), params.initial_state.clone());
 
@@ -150,10 +154,11 @@ fn test_ising_lean_vs_rust_identical_traces() {
     let lean_trace = run_sim(&g, &lean_projs, &initial_states, 100, &handler);
     let rust_trace = run_sim(&g, &rust_projs, &initial_states, 100, &handler);
 
-    assert_traces_equal(&lean_trace, &rust_trace, 1e-12);
+    let tolerance = FixedQ32::from_ratio(1, 1_000_000_000_000i64).expect("1e-12");
+    assert_traces_equal(&lean_trace, &rust_trace, tolerance);
 
     // Validate both traces pass analysis checks.
-    let eq = [0.5, 0.5];
+    let eq = [FixedQ32::half(), FixedQ32::half()];
     let lean_result = analysis::validate(&lean_trace, &["A", "B"], &eq);
     let rust_result = analysis::validate(&rust_trace, &["A", "B"], &eq);
     assert!(
@@ -199,12 +204,12 @@ fn hamiltonian_global_type() -> GlobalType {
 
 fn hamiltonian_params() -> HamiltonianParams {
     HamiltonianParams {
-        spring_constant: 1.0,
-        mass: 1.0,
+        spring_constant: FixedQ32::one(),
+        mass: FixedQ32::one(),
         dimensions: 1,
-        initial_positions: vec![1.0, -1.0],
-        initial_momenta: vec![0.0, 0.0],
-        step_size: 0.01,
+        initial_positions: vec![FixedQ32::one(), FixedQ32::neg_one()],
+        initial_momenta: vec![FixedQ32::zero(), FixedQ32::zero()],
+        step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
     }
 }
 
@@ -214,7 +219,7 @@ fn test_hamiltonian_lean_vs_rust_identical_traces() {
     let g = hamiltonian_global_type();
     let params = hamiltonian_params();
 
-    let mut initial_states = HashMap::new();
+    let mut initial_states = BTreeMap::new();
     initial_states.insert(
         "A".to_string(),
         vec![params.initial_positions[0], params.initial_momenta[0]],
@@ -234,7 +239,8 @@ fn test_hamiltonian_lean_vs_rust_identical_traces() {
     let lean_trace = run_sim(&g, &lean_projs, &initial_states, 100, &lean_handler);
     let rust_trace = run_sim(&g, &rust_projs, &initial_states, 100, &rust_handler);
 
-    assert_traces_equal(&lean_trace, &rust_trace, 1e-12);
+    let tolerance = FixedQ32::from_ratio(1, 1_000_000_000_000i64).expect("1e-12");
+    assert_traces_equal(&lean_trace, &rust_trace, tolerance);
 
     // Validate energy conservation on both traces.
     let lean_energy = analysis::check_energy_conservation(

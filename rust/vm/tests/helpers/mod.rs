@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use proptest::prelude::*;
-use telltale_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;
@@ -334,8 +334,9 @@ pub fn value_strategy() -> impl Strategy<Value = Value> {
     prop_oneof![
         Just(Value::Unit),
         any::<i64>().prop_map(Value::Int),
-        any::<f64>()
-            .prop_filter("finite", |f| f.is_finite())
+        // FixedQ32 has 32 integer bits, so restrict i64 range to fit
+        (-2_147_483_648_i64..2_147_483_647_i64)
+            .prop_map(|i| FixedQ32::try_from_i64(i).expect("i32-range i64 should map to FixedQ32"))
             .prop_map(Value::Real),
         any::<bool>().prop_map(Value::Bool),
         Just(Value::Label("msg".into())),

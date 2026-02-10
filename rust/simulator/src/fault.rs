@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 use std::sync::Mutex;
+use telltale_types::FixedQ32;
 
 use serde_json::Value as JsonValue;
 use telltale_vm::buffer::EnqueueResult;
@@ -18,7 +19,7 @@ pub enum Fault {
     /// Drop messages with given probability.
     MessageDrop {
         /// Probability of dropping each message (0.0 to 1.0).
-        probability: f64,
+        probability: FixedQ32,
     },
     /// Delay messages by N ticks.
     MessageDelay {
@@ -28,7 +29,7 @@ pub enum Fault {
     /// Corrupt message payload with given probability.
     MessageCorruption {
         /// Probability of corrupting each message (0.0 to 1.0).
-        probability: f64,
+        probability: FixedQ32,
     },
     /// Crash a role (stop executing its coroutines) for optional duration.
     NodeCrash {
@@ -56,7 +57,7 @@ pub enum Trigger {
     /// Activate after a specific number of steps.
     AfterStep(u64),
     /// Activate randomly with the given probability each tick.
-    Random(f64),
+    Random(FixedQ32),
     /// Activate when a specific event occurs.
     OnEvent {
         /// The event kind to match (e.g., "sent", "received").
@@ -143,14 +144,16 @@ impl FaultState {
         self.crashed_roles.contains(role)
     }
 
-    fn message_drop_probability(&self) -> f64 {
-        let mut p_not = 1.0;
+    fn message_drop_probability(&self) -> FixedQ32 {
+        let one = FixedQ32::one();
+        let zero = FixedQ32::zero();
+        let mut p_not = one;
         for fault in &self.active {
             if let Fault::MessageDrop { probability } = &fault.fault {
-                p_not *= 1.0 - probability.clamp(0.0, 1.0);
+                p_not = p_not * (one - (*probability).clamp(zero, one));
             }
         }
-        1.0 - p_not
+        one - p_not
     }
 
     fn message_delay_ticks(&self) -> Option<usize> {
@@ -163,14 +166,16 @@ impl FaultState {
         delay
     }
 
-    fn message_corruption_probability(&self) -> f64 {
-        let mut p_not = 1.0;
+    fn message_corruption_probability(&self) -> FixedQ32 {
+        let one = FixedQ32::one();
+        let zero = FixedQ32::zero();
+        let mut p_not = one;
         for fault in &self.active {
             if let Fault::MessageCorruption { probability } = &fault.fault {
-                p_not *= 1.0 - probability.clamp(0.0, 1.0);
+                p_not = p_not * (one - (*probability).clamp(zero, one));
             }
         }
-        1.0 - p_not
+        one - p_not
     }
 
     fn partitioned(&self, from: &str, to: &str) -> bool {
@@ -361,13 +366,14 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
             return Ok(SendDecision::Drop);
         }
         let drop_p = state.message_drop_probability();
-        if drop_p > 0.0 && state.rng.should_trigger(drop_p) {
+        let zero = FixedQ32::zero();
+        if drop_p > zero && state.rng.should_trigger(drop_p) {
             return Ok(SendDecision::Drop);
         }
 
         let mut payload = payload;
         let corrupt_p = state.message_corruption_probability();
-        if corrupt_p > 0.0 && state.rng.should_trigger(corrupt_p) {
+        if corrupt_p > zero && state.rng.should_trigger(corrupt_p) {
             payload = corrupt_value(payload);
         }
 

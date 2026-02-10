@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock, TryLockError};
 
@@ -126,7 +126,7 @@ pub struct ThreadedVM {
     pool: ThreadPool,
     workers: usize,
     lane_count: usize,
-    guard_resources: Arc<Mutex<HashMap<String, Value>>>,
+    guard_resources: Arc<Mutex<BTreeMap<String, Value>>>,
     effect_trace: Vec<EffectTraceEntry>,
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,
@@ -356,7 +356,7 @@ impl ThreadedVM {
             .expect("thread pool build failed");
         let tick_duration = config.tick_duration;
         let scheduler = Scheduler::new(config.sched_policy.clone());
-        let mut guard_resources = HashMap::new();
+        let mut guard_resources = BTreeMap::new();
         for layer in &config.guard_layers {
             guard_resources.insert(layer.id.clone(), Value::Unit);
         }
@@ -1319,7 +1319,7 @@ fn exec_instr(
     store: &ThreadedSessionStore,
     programs: &[Vec<Instr>],
     config: &VMConfig,
-    guard_resources: &Arc<Mutex<HashMap<String, Value>>>,
+    guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<(StepPack, Option<OutputConditionHint>), Fault> {
@@ -1804,7 +1804,7 @@ fn step_acquire(
     layer: &str,
     dst: u16,
     config: &VMConfig,
-    guard_resources: &Arc<Mutex<HashMap<String, Value>>>,
+    guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
@@ -1860,7 +1860,7 @@ fn step_release(
     layer: &str,
     evidence: u16,
     config: &VMConfig,
-    guard_resources: &Arc<Mutex<HashMap<String, Value>>>,
+    guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {

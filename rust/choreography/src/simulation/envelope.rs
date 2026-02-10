@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::effects::RoleId;
 use crate::identifiers::RoleName;
+use crate::simulation::clock::WallClock;
 
 /// A protocol message envelope containing metadata and payload.
 ///
@@ -108,6 +109,12 @@ impl ProtocolEnvelope {
 }
 
 /// Builder for creating protocol envelopes.
+///
+/// # Determinism
+///
+/// By default, envelopes are created with `timestamp_ns = 0` for deterministic
+/// simulation. Use `timestamp()` to set an explicit timestamp, or
+/// `timestamp_now()` for production use with real wall-clock time.
 #[derive(Debug, Default)]
 pub struct EnvelopeBuilder {
     protocol: Option<String>,
@@ -117,6 +124,7 @@ pub struct EnvelopeBuilder {
     to_index: Option<u32>,
     message_type: Option<String>,
     sequence: u64,
+    timestamp_ns: Option<u64>,
     correlation_id: Option<String>,
     payload: Vec<u8>,
 }
@@ -187,6 +195,27 @@ impl EnvelopeBuilder {
         self
     }
 
+    /// Set an explicit timestamp (nanoseconds since epoch).
+    ///
+    /// For deterministic simulation, use controlled timestamps (or leave unset
+    /// to default to 0). For production contexts with real timestamps, use
+    /// `SystemClock::timestamp_ns()` from the runtime module.
+    #[must_use]
+    pub fn timestamp(mut self, timestamp_ns: u64) -> Self {
+        self.timestamp_ns = Some(timestamp_ns);
+        self
+    }
+
+    /// Set timestamp from an injected wall-clock source.
+    ///
+    /// Use this instead of reading host time directly to keep determinism under
+    /// explicit control in simulations/replays.
+    #[must_use]
+    pub fn timestamp_from<C: WallClock>(mut self, clock: &C) -> Self {
+        self.timestamp_ns = Some(clock.now_unix_ns());
+        self
+    }
+
     /// Set the correlation ID.
     #[must_use]
     pub fn correlation_id(mut self, id: impl Into<String>) -> Self {
@@ -223,10 +252,9 @@ impl EnvelopeBuilder {
             .message_type
             .ok_or(EnvelopeError::MissingField(EnvelopeField::MessageType))?;
 
-        let timestamp_ns = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
+        // Default to 0 for deterministic simulation; use timestamp() or timestamp_now()
+        // to set an explicit value.
+        let timestamp_ns = self.timestamp_ns.unwrap_or(0);
 
         Ok(ProtocolEnvelope {
             protocol,

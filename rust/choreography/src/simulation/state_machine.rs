@@ -161,8 +161,8 @@ pub struct Checkpoint {
     pub state_data: Vec<u8>,
     /// Sequence number at checkpoint time.
     pub sequence: u64,
-    /// Additional metadata.
-    pub metadata: std::collections::HashMap<String, String>,
+    /// Additional metadata (BTreeMap for deterministic iteration order).
+    pub metadata: std::collections::BTreeMap<String, String>,
 }
 
 impl Checkpoint {
@@ -174,7 +174,7 @@ impl Checkpoint {
             state_id: state_id.into(),
             state_data: Vec::new(),
             sequence: 0,
-            metadata: std::collections::HashMap::new(),
+            metadata: std::collections::BTreeMap::new(),
         }
     }
 

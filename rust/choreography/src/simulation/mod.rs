@@ -51,7 +51,7 @@ pub mod state_machine;
 pub mod transport;
 
 // Re-export main types
-pub use clock::{Clock, MockClock, Rng, SeededRng, SystemClock};
+pub use clock::{Clock, MockClock, Rng, SeededRng, WallClock};
 pub use envelope::ProtocolEnvelope;
 pub use observer::{NullObserver, ProtocolObserver, RecordingObserver};
 pub use state_machine::{BlockedOn, Checkpoint, ProtocolStateMachine, StepInput, StepOutput};

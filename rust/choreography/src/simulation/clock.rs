@@ -1,89 +1,80 @@
-//! Clock and RNG traits for deterministic execution
+//! Clock and RNG traits for deterministic simulation.
 //!
-//! These traits allow protocol execution to be fully deterministic
-//! by injecting time and randomness sources.
+//! This module provides injected time and randomness primitives for replayable
+//! simulation contexts. Production code can use runtime implementations that
+//! satisfy these traits but source values from host APIs.
 
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
-/// Trait for time operations in protocol execution.
+use telltale_types::FixedQ32;
+
+/// Trait for monotonic time in protocol execution.
 ///
-/// Implementations can provide real system time or simulated time
-/// for deterministic replay and testing.
+/// `now()` is measured as a monotonic offset from an injected epoch.
 pub trait Clock: Send + Sync {
-    /// Get the current instant.
-    fn now(&self) -> Instant;
+    /// Get the current monotonic offset.
+    fn now(&self) -> Duration;
 
     /// Sleep for a duration.
     ///
-    /// In simulation mode, this may advance simulated time instantly.
+    /// In simulation mode this may advance simulated time immediately.
     fn sleep(&self, duration: Duration) -> impl std::future::Future<Output = ()> + Send;
 
-    /// Get elapsed time since a previous instant.
-    fn elapsed(&self, since: Instant) -> Duration {
-        self.now().duration_since(since)
+    /// Get elapsed time since a previous monotonic point.
+    fn elapsed(&self, since: Duration) -> Duration {
+        self.now().saturating_sub(since)
     }
 }
 
-/// System clock using real time.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SystemClock;
-
-impl Clock for SystemClock {
-    fn now(&self) -> Instant {
-        Instant::now()
-    }
-
-    async fn sleep(&self, duration: Duration) {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            tokio::time::sleep(duration).await;
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            wasm_timer::Delay::new(duration).await.ok();
-        }
-    }
+/// Trait for wall-clock timestamps used in metadata (for example envelope time).
+pub trait WallClock: Send + Sync {
+    /// Current wall-clock timestamp in nanoseconds since Unix epoch.
+    fn now_unix_ns(&self) -> u64;
 }
 
-/// Mock clock for testing with controllable time.
+/// Mock monotonic and wall clock for deterministic testing.
+///
+/// Time is represented as a controllable nanosecond counter. No host clock
+/// calls are used.
 #[derive(Debug)]
 pub struct MockClock {
-    /// The simulated current time as an offset from the start instant.
-    offset: std::sync::atomic::AtomicU64,
-    /// The start instant (real time when MockClock was created).
-    start: Instant,
+    /// Current simulated offset in nanoseconds.
+    offset_ns: AtomicU64,
 }
 
 impl MockClock {
-    /// Create a new mock clock starting at the current instant.
+    /// Create a new mock clock at offset zero.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            offset: std::sync::atomic::AtomicU64::new(0),
-            start: Instant::now(),
+            offset_ns: AtomicU64::new(0),
         }
     }
 
     /// Advance the clock by a duration.
     pub fn advance(&self, duration: Duration) {
-        self.offset.fetch_add(
-            duration.as_nanos() as u64,
-            std::sync::atomic::Ordering::SeqCst,
-        );
+        let delta = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        // Ignore result: fetch_update always succeeds when closure returns Some
+        match self
+            .offset_ns
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                Some(current.saturating_add(delta))
+            }) {
+            Ok(_) | Err(_) => {}
+        }
     }
 
-    /// Set the clock to a specific offset from start.
+    /// Set the clock to a specific offset from epoch.
     pub fn set_offset(&self, offset: Duration) {
-        self.offset.store(
-            offset.as_nanos() as u64,
-            std::sync::atomic::Ordering::SeqCst,
-        );
+        let offset_ns = u64::try_from(offset.as_nanos()).unwrap_or(u64::MAX);
+        self.offset_ns.store(offset_ns, Ordering::SeqCst);
     }
 
     /// Get the current offset.
     #[must_use]
     pub fn offset(&self) -> Duration {
-        Duration::from_nanos(self.offset.load(std::sync::atomic::Ordering::SeqCst))
+        Duration::from_nanos(self.offset_ns.load(Ordering::SeqCst))
     }
 }
 
@@ -94,22 +85,25 @@ impl Default for MockClock {
 }
 
 impl Clock for MockClock {
-    fn now(&self) -> Instant {
-        // Return start + offset
-        // Note: We can't actually create arbitrary Instants, so we use a workaround
-        self.start + self.offset()
+    fn now(&self) -> Duration {
+        self.offset()
     }
 
     async fn sleep(&self, duration: Duration) {
-        // In mock mode, we just advance time instantly
         self.advance(duration);
+    }
+}
+
+impl WallClock for MockClock {
+    fn now_unix_ns(&self) -> u64 {
+        self.offset_ns.load(Ordering::SeqCst)
     }
 }
 
 /// Trait for random number generation in protocol execution.
 ///
-/// Implementations can provide real randomness or seeded/deterministic
-/// values for reproducible testing.
+/// Implementations can provide deterministic seeded values for reproducible
+/// testing or host entropy in runtime contexts.
 pub trait Rng: Send {
     /// Generate a random u64.
     fn next_u64(&mut self) -> u64;
@@ -124,29 +118,33 @@ pub trait Rng: Send {
         self.next_u64() & 1 == 1
     }
 
-    /// Generate a random f64 in [0, 1).
-    fn next_f64(&mut self) -> f64 {
-        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
+    /// Generate a random fixed-point value in [0, 1).
+    fn next_f64(&mut self) -> FixedQ32 {
+        // FixedQ32 is Q32.32: value = bits / 2^32
+        // Take upper 32 bits as fractional part to get value in [0, 1)
+        let frac_bits = (self.next_u64() >> 32) as i64;
+        FixedQ32::from_bits(frac_bits)
     }
 
     /// Choose a random element from a slice.
     fn choose<'a, T>(&mut self, slice: &'a [T]) -> Option<&'a T> {
         if slice.is_empty() {
-            None
-        } else {
-            Some(&slice[self.next_u64() as usize % slice.len()])
+            return None;
         }
+        let len = u64::try_from(slice.len()).ok()?;
+        let idx = self.next_u64() % len;
+        slice.get(usize::try_from(idx).ok()?)
     }
 
     /// Generate a random duration between min and max.
     fn duration_between(&mut self, min: Duration, max: Duration) -> Duration {
-        let min_nanos = min.as_nanos() as u64;
-        let max_nanos = max.as_nanos() as u64;
-        if max_nanos <= min_nanos {
+        let min_ns = u64::try_from(min.as_nanos()).unwrap_or(u64::MAX);
+        let max_ns = u64::try_from(max.as_nanos()).unwrap_or(u64::MAX);
+        if max_ns <= min_ns {
             return min;
         }
-        let range = max_nanos - min_nanos;
-        Duration::from_nanos(min_nanos + (self.next_u64() % range))
+        let range = max_ns - min_ns;
+        Duration::from_nanos(min_ns + (self.next_u64() % range))
     }
 }
 
@@ -159,24 +157,14 @@ pub struct SeededRng {
 }
 
 impl SeededRng {
-    /// Create a new seeded RNG.
+    /// Create a new seeded RNG with an explicit seed.
+    ///
+    /// For deterministic simulation, always use explicit seeds.
     #[must_use]
     pub fn new(seed: u64) -> Self {
-        // Ensure non-zero state
         Self {
             state: if seed == 0 { 1 } else { seed },
         }
-    }
-
-    /// Create from current time (non-deterministic).
-    #[must_use]
-    pub fn from_time() -> Self {
-        Self::new(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos() as u64,
-        )
     }
 
     /// Get the current state (can be used to save/restore).
@@ -193,28 +181,10 @@ impl SeededRng {
 
 impl Rng for SeededRng {
     fn next_u64(&mut self) -> u64 {
-        // xorshift64
         self.state ^= self.state << 13;
         self.state ^= self.state >> 7;
         self.state ^= self.state << 17;
         self.state
-    }
-}
-
-/// System RNG using thread_rng (non-deterministic).
-#[derive(Debug, Default)]
-pub struct SystemRng;
-
-impl Rng for SystemRng {
-    fn next_u64(&mut self) -> u64 {
-        // Use a simple hash of current time + memory address for randomness
-        // In production, you'd want to use rand crate
-        let ptr = self as *mut Self as u64;
-        let time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
-        ptr.wrapping_mul(time).wrapping_add(0x517cc1b727220a95)
     }
 }
 
@@ -236,8 +206,6 @@ mod tests {
     fn test_seeded_rng_different_seeds() {
         let mut rng1 = SeededRng::new(12345);
         let mut rng2 = SeededRng::new(54321);
-
-        // Different seeds should produce different sequences
         assert_ne!(rng1.next_u64(), rng2.next_u64());
     }
 
@@ -254,13 +222,20 @@ mod tests {
     }
 
     #[test]
+    fn test_mock_wall_clock() {
+        let clock = MockClock::new();
+        assert_eq!(clock.now_unix_ns(), 0);
+        clock.advance(Duration::from_millis(2));
+        assert_eq!(clock.now_unix_ns(), 2_000_000);
+    }
+
+    #[test]
     fn test_rng_choose() {
         let mut rng = SeededRng::new(42);
         let items = vec![1, 2, 3, 4, 5];
-
         let chosen = rng.choose(&items);
         assert!(chosen.is_some());
-        assert!(items.contains(chosen.unwrap()));
+        assert!(items.contains(chosen.expect("must choose an element")));
     }
 
     #[test]
