@@ -17,6 +17,7 @@ NC='\033[0m'
 
 errors=0
 warnings=0
+summary_lines=""
 
 DETERMINISM_RUNTIME_SCOPE=(
   "${RUST_DIR}/vm/src"
@@ -64,15 +65,18 @@ print_hits() {
 
   if [[ "${count}" == "0" ]]; then
     echo -e "${GREEN}OK${NC}  ${title}"
+    summary_lines+=$'OK\t'"${title}"$'\t0\n'
     return
   fi
 
   if [[ "${severity}" == "error" ]]; then
     errors=$((errors + count))
     echo -e "${RED}VIOLATION${NC}  ${title} (${count})"
+    summary_lines+=$'ERROR\t'"${title}"$'\t'"${count}"$'\n'
   else
     warnings=$((warnings + count))
     echo -e "${YELLOW}WARNING${NC}  ${title} (${count})"
+    summary_lines+=$'WARN\t'"${title}"$'\t'"${count}"$'\n'
   fi
 
   if [[ -n "${recommendation}" ]]; then
@@ -396,11 +400,25 @@ thread_nondet_hits="$(scan_scope_hits 'std::thread::spawn\(|std::thread::sleep\(
 print_hits "error" "direct thread scheduling/timer calls in deterministic VM/simulation scope" "${thread_nondet_hits}" "Model scheduling and timers as explicit scheduler/effect inputs so replay behavior is controlled and cross-target equivalent."
 
 echo ""
-echo -e "Errors:   ${RED}${errors}${NC}"
-echo -e "Warnings: ${YELLOW}${warnings}${NC}"
+print_section "Summary"
+
+echo "Errors:   ${errors}"
+echo "Warnings: ${warnings}"
+echo ""
+printf "%-8s %-7s %s\n" "Severity" "Count" "Check"
+printf "%-8s %-7s %s\n" "--------" "-----" "-----"
+printf '%s' "${summary_lines}" | awk -F '\t' '{ printf "%-8s %-7s %s\n", $1, $3, $2 }'
+echo ""
 
 if [[ "${errors}" -gt 0 ]]; then
+  echo -e "${RED}Rust architecture/style check failed:${NC} ${errors} error(s), ${warnings} warning(s)."
   exit 1
+fi
+
+if [[ "${warnings}" -gt 0 ]]; then
+  echo -e "${YELLOW}Rust architecture/style check passed with warnings:${NC} ${warnings} warning(s)."
+else
+  echo -e "${GREEN}Rust architecture/style check passed.${NC}"
 fi
 
 exit 0

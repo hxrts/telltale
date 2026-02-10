@@ -32,8 +32,12 @@ lint-quick:
     ./scripts/check-lint.sh --quick
 
 # Rust architecture/style-guide pattern checker
-check-arch:
-    ./scripts/check-arch.sh
+check-arch-rust:
+    ./scripts/check-arch-rust.sh
+
+# Lean architecture/style-guide pattern checker
+check-arch-lean:
+    ./scripts/check-arch-lean.sh
 
 # Check WASM compilation for choreography and core crates
 wasm-check:
@@ -238,6 +242,7 @@ verify-protocols:
 verify-track-b:
     just verify-protocols
     just verify-cross-target-matrix
+    just vm-strict-conformance
 
 # Full Lean build gate for nightly/scheduled validation.
 verify-lean-full: lean-init
@@ -269,3 +274,7 @@ verify-properties:
 # Generate normalized traces for bridge-level VM correspondence fixtures.
 generate-test-traces:
     cargo test -p telltale-lean-bridge --test vm_correspondence_tests -- --nocapture
+
+# Strict Lean-core VM conformance lane (cooperative + threaded backends).
+vm-strict-conformance:
+    ./scripts/vm-strict-conformance.sh
