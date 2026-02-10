@@ -10,9 +10,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use telltale_types::{LocalTypeR, ValType};
 
-use crate::buffer::{BoundedBuffer, BufferConfig};
+use crate::buffer::{BoundedBuffer, BufferConfig, SignedBuffer, SignedValue};
 use crate::coroutine::Value;
 use crate::instr::Endpoint;
+use crate::verification::{
+    signValue, signing_key_for_endpoint, verifySignedValue, verifying_key_for_endpoint, AuthTree,
+    DefaultVerificationModel, Hash, HashTag, Signature, VerificationModel,
+};
 
 /// Session identifier. Each session gets a unique ID within the VM.
 pub type SessionId = usize;
@@ -111,7 +115,11 @@ pub struct SessionState {
     /// Matches Lean `localTypes : List (Endpoint × LocalType)`.
     pub local_types: BTreeMap<Endpoint, TypeEntry>,
     /// Message buffers keyed by directed edge.
-    pub buffers: BTreeMap<Edge, BoundedBuffer>,
+    pub buffers: BTreeMap<Edge, SignedBuffer<Signature>>,
+    /// Per-edge authenticated leaves for Merkle-auth tracking.
+    pub auth_leaves: BTreeMap<Edge, Vec<Hash>>,
+    /// Per-edge Merkle roots for signed-buffer history.
+    pub auth_roots: BTreeMap<Edge, Hash>,
     /// Optional handler binding per edge.
     pub edge_handlers: BTreeMap<Edge, HandlerId>,
     /// Coherence trace by edge.
@@ -123,6 +131,38 @@ pub struct SessionState {
 }
 
 impl SessionState {
+    fn update_auth_tree(&mut self, edge: &Edge, signed: &SignedValue<Signature>) {
+        let bytes = serde_json::to_vec(signed).unwrap_or_default();
+        let leaf = DefaultVerificationModel::hash(HashTag::MerkleLeaf, &bytes);
+        let leaves = self.auth_leaves.entry(edge.clone()).or_default();
+        leaves.push(leaf);
+        let tree = AuthTree::new(leaves.clone());
+        self.auth_roots.insert(edge.clone(), tree.root());
+    }
+
+    /// Send a signed value from one role to another.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no buffer exists for the given edge.
+    pub fn send_signed(
+        &mut self,
+        from: &str,
+        to: &str,
+        signed: SignedValue<Signature>,
+    ) -> Result<crate::buffer::EnqueueResult, String> {
+        let edge = Edge::new(self.sid, from, to);
+        let buf = self
+            .buffers
+            .get_mut(&edge)
+            .ok_or_else(|| format!("no buffer for edge {from} → {to}"))?;
+        let result = buf.enqueue(signed.clone());
+        if matches!(result, crate::buffer::EnqueueResult::Ok) {
+            self.update_auth_tree(&edge, &signed);
+        }
+        Ok(result)
+    }
+
     /// Send a value from one role to another.
     ///
     /// Returns the enqueue result from the buffer.
@@ -136,18 +176,53 @@ impl SessionState {
         to: &str,
         val: Value,
     ) -> Result<crate::buffer::EnqueueResult, String> {
+        let signer = signing_key_for_endpoint(&Endpoint {
+            sid: self.sid,
+            role: from.to_string(),
+        });
+        let signature = signValue(&val, &signer);
+        self.send_signed(
+            from,
+            to,
+            SignedValue {
+                payload: val,
+                signature,
+            },
+        )
+    }
+
+    /// Receive a signed value destined for a role from a specific sender.
+    pub fn recv_signed(&mut self, from: &str, to: &str) -> Option<SignedValue<Signature>> {
         let edge = Edge::new(self.sid, from, to);
-        let buf = self
-            .buffers
-            .get_mut(&edge)
-            .ok_or_else(|| format!("no buffer for edge {from} → {to}"))?;
-        Ok(buf.enqueue(val))
+        self.buffers.get_mut(&edge).and_then(|buf| buf.dequeue())
+    }
+
+    /// Receive and verify a value destined for a role from a specific sender.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signature verification fails.
+    pub fn recv_verified(&mut self, from: &str, to: &str) -> Result<Option<Value>, String> {
+        let sender = Endpoint {
+            sid: self.sid,
+            role: from.to_string(),
+        };
+        let verifying = verifying_key_for_endpoint(&sender);
+        let signed = self.recv_signed(from, to);
+        let Some(signed) = signed else {
+            return Ok(None);
+        };
+        if !verifySignedValue(&signed.payload, &signed.signature, &verifying) {
+            return Err(format!(
+                "signature verification failed on edge {from} -> {to}"
+            ));
+        }
+        Ok(Some(signed.payload))
     }
 
     /// Receive a value destined for a role from a specific sender.
     pub fn recv(&mut self, from: &str, to: &str) -> Option<Value> {
-        let edge = Edge::new(self.sid, from, to);
-        self.buffers.get_mut(&edge).and_then(|buf| buf.dequeue())
+        self.recv_verified(from, to).ok().flatten()
     }
 
     /// Check if there is a message available on an edge.
@@ -219,6 +294,8 @@ impl SessionStore {
             roles,
             local_types,
             buffers,
+            auth_leaves: BTreeMap::new(),
+            auth_roots: BTreeMap::new(),
             edge_handlers: BTreeMap::new(),
             edge_traces: BTreeMap::new(),
             status: SessionStatus::Active,
@@ -311,6 +388,11 @@ impl SessionStore {
     /// Get a mutable reference to a session.
     pub fn get_mut(&mut self, sid: SessionId) -> Option<&mut SessionState> {
         self.sessions.get_mut(&sid)
+    }
+
+    /// Iterate over all sessions.
+    pub fn iter(&self) -> impl Iterator<Item = &SessionState> {
+        self.sessions.values()
     }
 
     /// Close a session.

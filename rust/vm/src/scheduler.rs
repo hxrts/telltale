@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::coroutine::BlockReason;
 
+/// Scheduler lane identifier.
+pub type LaneId = usize;
+
 fn default_timeslice() -> usize {
     1
 }
@@ -56,12 +59,37 @@ pub enum StepUpdate {
     Done,
 }
 
+/// Cross-lane capability-transfer record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrossLaneHandoff {
+    /// Source coroutine id.
+    pub from_coro: usize,
+    /// Destination coroutine id.
+    pub to_coro: usize,
+    /// Source lane.
+    pub from_lane: LaneId,
+    /// Destination lane.
+    pub to_lane: LaneId,
+    /// Scheduler step where the handoff was emitted.
+    pub step: usize,
+    /// Free-form reason tag.
+    pub reason: String,
+}
+
 /// Scheduler state.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Scheduler {
     policy: SchedPolicy,
     ready_queue: VecDeque<usize>,
     blocked_set: BTreeMap<usize, BlockReason>,
+    #[serde(default)]
+    lane_of: BTreeMap<usize, LaneId>,
+    #[serde(default)]
+    lane_queues: BTreeMap<LaneId, VecDeque<usize>>,
+    #[serde(default)]
+    lane_blocked: BTreeMap<LaneId, BTreeMap<usize, BlockReason>>,
+    #[serde(default)]
+    cross_lane_handoffs: Vec<CrossLaneHandoff>,
     #[serde(default = "default_timeslice")]
     timeslice: usize,
     step_count: usize,
@@ -74,38 +102,115 @@ impl Scheduler {
     /// Create a scheduler with the given policy.
     #[must_use]
     pub fn new(policy: SchedPolicy) -> Self {
+        let mut lane_queues = BTreeMap::new();
+        lane_queues.insert(0, VecDeque::new());
+        let mut lane_blocked = BTreeMap::new();
+        lane_blocked.insert(0, BTreeMap::new());
         Self {
             policy,
             ready_queue: VecDeque::new(),
             blocked_set: BTreeMap::new(),
+            lane_of: BTreeMap::new(),
+            lane_queues,
+            lane_blocked,
+            cross_lane_handoffs: Vec::new(),
             timeslice: default_timeslice(),
             step_count: 0,
         }
     }
 
+    fn lane_for_or_default(&self, coro_id: usize) -> LaneId {
+        self.lane_of.get(&coro_id).copied().unwrap_or(0)
+    }
+
+    fn lane_queue_push(&mut self, lane: LaneId, coro_id: usize) {
+        let queue = self.lane_queues.entry(lane).or_default();
+        if !queue.contains(&coro_id) {
+            queue.push_back(coro_id);
+        }
+    }
+
+    fn lane_queue_remove(&mut self, lane: LaneId, coro_id: usize) {
+        if let Some(queue) = self.lane_queues.get_mut(&lane) {
+            queue.retain(|id| *id != coro_id);
+        }
+    }
+
+    fn lane_queue_pop_front(&mut self, lane: LaneId) -> Option<usize> {
+        self.lane_queues
+            .get_mut(&lane)
+            .and_then(VecDeque::pop_front)
+    }
+
+    fn remove_from_global_ready(&mut self, coro_id: usize) {
+        self.ready_queue.retain(|id| *id != coro_id);
+    }
+
+    fn next_lane_with_ready(&self) -> Option<LaneId> {
+        let lanes: Vec<LaneId> = self.lane_queues.keys().copied().collect();
+        if lanes.is_empty() {
+            return None;
+        }
+        let start = self.step_count % lanes.len();
+        for offset in 0..lanes.len() {
+            let lane = lanes[(start + offset) % lanes.len()];
+            if self
+                .lane_queues
+                .get(&lane)
+                .is_some_and(|queue| !queue.is_empty())
+            {
+                return Some(lane);
+            }
+        }
+        None
+    }
+
     /// Register a coroutine as ready.
     pub fn add_ready(&mut self, coro_id: usize) {
+        let lane = self.lane_for_or_default(coro_id);
+        self.lane_of.entry(coro_id).or_insert(lane);
         if !self.ready_queue.contains(&coro_id) {
             self.ready_queue.push_back(coro_id);
+        }
+        self.lane_queue_push(lane, coro_id);
+        if let Some(blocked) = self.lane_blocked.get_mut(&lane) {
+            blocked.remove(&coro_id);
         }
     }
 
     /// Mark a coroutine as blocked.
     pub fn mark_blocked(&mut self, coro_id: usize, reason: BlockReason) {
-        self.ready_queue.retain(|&id| id != coro_id);
+        let reason_for_lane = reason.clone();
+        self.remove_from_global_ready(coro_id);
         self.blocked_set.insert(coro_id, reason);
+        let lane = self.lane_for_or_default(coro_id);
+        self.lane_queue_remove(lane, coro_id);
+        self.lane_blocked
+            .entry(lane)
+            .or_default()
+            .insert(coro_id, reason_for_lane);
     }
 
     /// Mark a coroutine as done (remove from all queues).
     pub fn mark_done(&mut self, coro_id: usize) {
-        self.ready_queue.retain(|&id| id != coro_id);
+        self.remove_from_global_ready(coro_id);
         self.blocked_set.remove(&coro_id);
+        let lane = self.lane_for_or_default(coro_id);
+        self.lane_queue_remove(lane, coro_id);
+        if let Some(blocked) = self.lane_blocked.get_mut(&lane) {
+            blocked.remove(&coro_id);
+        }
     }
 
     /// Unblock a coroutine (move from blocked to ready).
     pub fn unblock(&mut self, coro_id: usize) {
         if self.blocked_set.remove(&coro_id).is_some() {
             self.ready_queue.push_back(coro_id);
+            let lane = self.lane_for_or_default(coro_id);
+            self.lane_queue_push(lane, coro_id);
+            if let Some(blocked) = self.lane_blocked.get_mut(&lane) {
+                blocked.remove(&coro_id);
+            }
         }
     }
 
@@ -120,18 +225,32 @@ impl Scheduler {
         F: Fn(usize) -> bool,
     {
         self.step_count += 1;
+        let lane = self.next_lane_with_ready()?;
         let policy = self.policy.clone();
-        match policy {
+        let picked = match policy {
             SchedPolicy::Priority(priority) => {
-                self.pick_priority_candidate(&priority, has_progress)
+                self.pick_priority_candidate_in_lane(lane, &priority, has_progress)
             }
             SchedPolicy::ProgressAware => {
-                if let Some(pos) = self.ready_queue.iter().position(|id| has_progress(*id)) {
-                    return self.ready_queue.remove(pos);
+                if let Some(pos) = self
+                    .lane_queues
+                    .get(&lane)
+                    .and_then(|queue| queue.iter().position(|id| has_progress(*id)))
+                {
+                    self.lane_queues
+                        .get_mut(&lane)
+                        .and_then(|queue| queue.remove(pos))
+                } else {
+                    self.lane_queue_pop_front(lane)
                 }
-                self.ready_queue.pop_front()
             }
-            SchedPolicy::Cooperative | SchedPolicy::RoundRobin => self.ready_queue.pop_front(),
+            SchedPolicy::Cooperative | SchedPolicy::RoundRobin => self.lane_queue_pop_front(lane),
+        };
+        if let Some(coro_id) = picked {
+            self.remove_from_global_ready(coro_id);
+            Some(coro_id)
+        } else {
+            None
         }
     }
 
@@ -155,6 +274,8 @@ impl Scheduler {
     /// Re-enqueue a coroutine that yielded or completed an instruction.
     pub fn reschedule(&mut self, coro_id: usize) {
         self.ready_queue.push_back(coro_id);
+        let lane = self.lane_for_or_default(coro_id);
+        self.lane_queue_push(lane, coro_id);
     }
 
     /// Number of ready coroutines.
@@ -217,23 +338,24 @@ impl Scheduler {
         self.blocked_set.clone()
     }
 
-    fn pick_priority_candidate<F>(
+    fn pick_priority_candidate_in_lane<F>(
         &mut self,
+        lane: LaneId,
         policy: &PriorityPolicy,
         has_progress: F,
     ) -> Option<usize>
     where
         F: Fn(usize) -> bool,
     {
+        let queue = self.lane_queues.get(&lane)?;
         let mut best: Option<(usize, usize)> = None;
-        for (pos, id) in self.ready_queue.iter().copied().enumerate() {
+        for (pos, id) in queue.iter().copied().enumerate() {
             let score = match policy {
                 PriorityPolicy::FixedMap(priorities) => priorities.get(&id).copied().unwrap_or(0),
-                PriorityPolicy::Aging => self.ready_queue.len().saturating_sub(pos),
+                PriorityPolicy::Aging => queue.len().saturating_sub(pos),
                 PriorityPolicy::TokenWeighted => {
                     let progress = usize::from(has_progress(id));
-                    progress * self.ready_queue.len().saturating_add(1)
-                        + self.ready_queue.len().saturating_sub(pos)
+                    progress * queue.len().saturating_add(1) + queue.len().saturating_sub(pos)
                 }
             };
             let replace = match best {
@@ -247,7 +369,78 @@ impl Scheduler {
             }
         }
         let pos = best.map(|(pos, _)| pos)?;
-        self.ready_queue.remove(pos)
+        self.lane_queues
+            .get_mut(&lane)
+            .and_then(|lane_queue| lane_queue.remove(pos))
+    }
+
+    /// Assign a coroutine to a specific lane.
+    pub fn assign_lane(&mut self, coro_id: usize, lane: LaneId) {
+        let prior_lane = self.lane_of.insert(coro_id, lane).unwrap_or(0);
+        if prior_lane != lane {
+            self.lane_queue_remove(prior_lane, coro_id);
+            if let Some(reason) = self.blocked_set.get(&coro_id).cloned() {
+                self.lane_blocked
+                    .entry(prior_lane)
+                    .or_default()
+                    .remove(&coro_id);
+                self.lane_blocked
+                    .entry(lane)
+                    .or_default()
+                    .insert(coro_id, reason);
+            }
+        }
+        if self.ready_queue.contains(&coro_id) {
+            self.lane_queue_push(lane, coro_id);
+        }
+    }
+
+    /// Lane assignment for a coroutine.
+    #[must_use]
+    pub fn lane_of(&self, coro_id: usize) -> Option<LaneId> {
+        self.lane_of.get(&coro_id).copied()
+    }
+
+    /// Snapshot of per-lane ready queues.
+    #[must_use]
+    pub fn lane_queues_snapshot(&self) -> BTreeMap<LaneId, Vec<usize>> {
+        self.lane_queues
+            .iter()
+            .map(|(lane, queue)| (*lane, queue.iter().copied().collect()))
+            .collect()
+    }
+
+    /// Snapshot of per-lane blocked coroutines.
+    #[must_use]
+    pub fn lane_blocked_snapshot(&self) -> BTreeMap<LaneId, BTreeMap<usize, BlockReason>> {
+        self.lane_blocked.clone()
+    }
+
+    /// Record a cross-lane handoff.
+    pub fn record_cross_lane_handoff(
+        &mut self,
+        from_coro: usize,
+        to_coro: usize,
+        reason: impl Into<String>,
+    ) {
+        let from_lane = self.lane_for_or_default(from_coro);
+        let to_lane = self.lane_for_or_default(to_coro);
+        if from_lane != to_lane {
+            self.cross_lane_handoffs.push(CrossLaneHandoff {
+                from_coro,
+                to_coro,
+                from_lane,
+                to_lane,
+                step: self.step_count,
+                reason: reason.into(),
+            });
+        }
+    }
+
+    /// Cross-lane handoff log.
+    #[must_use]
+    pub fn cross_lane_handoffs(&self) -> &[CrossLaneHandoff] {
+        &self.cross_lane_handoffs
     }
 }
 

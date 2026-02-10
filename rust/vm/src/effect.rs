@@ -18,6 +18,18 @@ use serde_json::Value as JsonValue;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
+
+/// Message corruption flavor for topology perturbations.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum CorruptionType {
+    /// Flip bits in payload bytes.
+    BitFlip,
+    /// Truncate payload bytes.
+    Truncation,
+    /// Replace payload with unit/default value.
+    PayloadErase,
+}
 
 /// Topology perturbation event carried in effect traces.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -41,6 +53,22 @@ pub enum TopologyPerturbation {
         /// Destination endpoint/site.
         to: String,
     },
+    /// Corruption event for one directed link.
+    Corrupt {
+        /// Source endpoint/site.
+        from: String,
+        /// Destination endpoint/site.
+        to: String,
+        /// Corruption strategy.
+        corruption: CorruptionType,
+    },
+    /// Timeout event for one site.
+    Timeout {
+        /// Timed-out site identifier.
+        site: String,
+        /// Timeout duration.
+        duration: Duration,
+    },
 }
 
 impl TopologyPerturbation {
@@ -62,6 +90,7 @@ impl TopologyPerturbation {
                 partitioned_edges.remove(&(from.clone(), to.clone()));
                 partitioned_edges.remove(&(to.clone(), from.clone()));
             }
+            Self::Corrupt { .. } | Self::Timeout { .. } => {}
         }
     }
 }

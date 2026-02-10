@@ -153,6 +153,13 @@ pub enum Fault {
         /// Edge whose signature check failed.
         edge: Edge,
     },
+    /// Verification backend rejected a signed payload/proof.
+    VerificationFailed {
+        /// Edge whose verification failed.
+        edge: Edge,
+        /// Failure reason.
+        message: String,
+    },
     /// Effect handler error.
     InvokeFault {
         /// Error message from the handler.
@@ -226,6 +233,11 @@ impl std::fmt::Display for Fault {
             Self::InvalidSignature { edge } => write!(
                 f,
                 "invalid signature on edge {}:{}→{}",
+                edge.sid, edge.sender, edge.receiver
+            ),
+            Self::VerificationFailed { edge, message } => write!(
+                f,
+                "verification failed on edge {}:{}→{}: {message}",
                 edge.sid, edge.sender, edge.receiver
             ),
             Self::InvokeFault { message } => write!(f, "invoke fault: {message}"),

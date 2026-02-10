@@ -58,8 +58,8 @@ impl Default for BufferConfig {
 
 /// Bounded ring buffer for inter-role message passing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BoundedBuffer {
-    data: Vec<Option<Value>>,
+pub struct BoundedBuffer<T = Value> {
+    data: Vec<Option<T>>,
     head: usize,
     tail: usize,
     capacity: usize,
@@ -92,10 +92,17 @@ pub struct SignedValue<V> {
 }
 
 /// Signed FIFO for a single edge.
-pub type SignedBuffer<V> = Vec<SignedValue<V>>;
+pub type SignedBuffer<V> = BoundedBuffer<SignedValue<V>>;
 
 /// Signed buffers indexed by sid-qualified edge.
 pub type SignedBuffers<V> = BTreeMap<Edge, SignedBuffer<V>>;
+
+/// Signed dequeue failure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SignedDequeueError {
+    /// Signature verification failed for the dequeued payload.
+    VerificationFailed,
+}
 
 /// Result of signed enqueue attempts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,13 +128,53 @@ impl From<EnqueueResult> for SignedEnqueueResult {
     }
 }
 
-impl BoundedBuffer {
+/// Enqueue one signed payload into per-edge signed buffers.
+pub fn signed_enqueue<V>(
+    buffers: &mut SignedBuffers<V>,
+    edge: Edge,
+    payload: Value,
+    signature: V,
+) -> SignedEnqueueResult {
+    let queue = buffers
+        .entry(edge)
+        .or_insert_with(|| BoundedBuffer::new(&BufferConfig::default()));
+    queue.enqueue(SignedValue { payload, signature }).into()
+}
+
+/// Dequeue and verify one signed payload.
+///
+/// The verifier is provided by the caller so this buffer module stays
+/// independent from any specific verification backend.
+pub fn signed_dequeue_verified<V, F>(
+    buffers: &mut SignedBuffers<V>,
+    edge: &Edge,
+    verifier: F,
+) -> Result<Option<Value>, SignedDequeueError>
+where
+    F: Fn(&Value, &V) -> bool,
+{
+    let Some(queue) = buffers.get_mut(edge) else {
+        return Ok(None);
+    };
+    let Some(signed) = queue.dequeue() else {
+        return Ok(None);
+    };
+    if verifier(&signed.payload, &signed.signature) {
+        Ok(Some(signed.payload))
+    } else {
+        Err(SignedDequeueError::VerificationFailed)
+    }
+}
+
+impl<T> BoundedBuffer<T> {
     /// Create a new buffer with the given configuration.
     #[must_use]
     pub fn new(config: &BufferConfig) -> Self {
         let capacity = config.initial_capacity.max(1);
+        let mut data = Vec::with_capacity(capacity);
+        data.resize_with(capacity, || None);
         Self {
-            data: vec![None; capacity],
+            data,
             head: 0,
             tail: 0,
             capacity,
@@ -139,7 +186,7 @@ impl BoundedBuffer {
     }
 
     /// Try to enqueue a value.
-    pub fn enqueue(&mut self, v: Value) -> EnqueueResult {
+    pub fn enqueue(&mut self, v: T) -> EnqueueResult {
         match self.mode {
             BufferMode::LatestValue => {
                 // Overwrite the single slot.
@@ -172,7 +219,7 @@ impl BoundedBuffer {
     }
 
     /// Dequeue a value, if available.
-    pub fn dequeue(&mut self) -> Option<Value> {
+    pub fn dequeue(&mut self) -> Option<T> {
         match self.mode {
             BufferMode::LatestValue => {
                 if self.count > 0 {
@@ -212,6 +259,12 @@ impl BoundedBuffer {
         self.count
     }
 
+    /// Buffer capacity.
+    #[must_use]
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     /// Current epoch.
     #[must_use]
     pub fn epoch(&self) -> usize {
@@ -223,7 +276,7 @@ impl BoundedBuffer {
         self.epoch += 1;
     }
 
-    fn enqueue_fifo(&mut self, v: Value) {
+    fn enqueue_fifo(&mut self, v: T) {
         self.data[self.tail] = Some(v);
         self.tail = (self.tail + 1) % self.capacity;
         self.count += 1;
@@ -231,7 +284,8 @@ impl BoundedBuffer {
 
     fn grow(&mut self) {
         let new_cap = self.capacity * 2;
-        let mut new_data = vec![None; new_cap];
+        let mut new_data = Vec::with_capacity(new_cap);
+        new_data.resize_with(new_cap, || None);
 
         // Copy existing elements in order.
         for (i, slot) in new_data.iter_mut().enumerate().take(self.count) {
@@ -336,11 +390,19 @@ mod tests {
             signature: vec![0_u8, 1_u8],
         };
         let mut buffers: SignedBuffers<Vec<u8>> = BTreeMap::new();
-        buffers.entry(edge).or_default().push(signed.clone());
-        assert_eq!(buffers.values().next().map(Vec::len), Some(1));
         assert_eq!(
-            buffers.values().next().and_then(|v| v.first()),
-            Some(&signed)
+            signed_enqueue(
+                &mut buffers,
+                edge.clone(),
+                signed.payload.clone(),
+                signed.signature.clone(),
+            ),
+            SignedEnqueueResult::Ok
+        );
+        assert_eq!(buffers.get(&edge).map(BoundedBuffer::len), Some(1));
+        assert_eq!(
+            buffers.get_mut(&edge).and_then(BoundedBuffer::dequeue),
+            Some(signed)
         );
 
         assert_eq!(
@@ -359,5 +421,26 @@ mod tests {
             SignedEnqueueResult::from(EnqueueResult::Full),
             SignedEnqueueResult::Error(_)
         ));
+    }
+
+    #[test]
+    fn test_signed_dequeue_verified_success() {
+        let edge = Edge::new(11usize, "A", "B");
+        let mut buffers: SignedBuffers<Vec<u8>> = BTreeMap::new();
+        let _ = signed_enqueue(&mut buffers, edge.clone(), Value::Nat(5), vec![1, 2, 3]);
+        let out = signed_dequeue_verified(&mut buffers, &edge, |payload, signature| {
+            *payload == Value::Nat(5) && signature == &vec![1, 2, 3]
+        })
+        .expect("signature must verify");
+        assert_eq!(out, Some(Value::Nat(5)));
+    }
+
+    #[test]
+    fn test_signed_dequeue_verified_failure() {
+        let edge = Edge::new(12usize, "A", "B");
+        let mut buffers: SignedBuffers<Vec<u8>> = BTreeMap::new();
+        let _ = signed_enqueue(&mut buffers, edge.clone(), Value::Nat(5), vec![1, 2, 3]);
+        let result = signed_dequeue_verified(&mut buffers, &edge, |_payload, _signature| false);
+        assert_eq!(result, Err(SignedDequeueError::VerificationFailed));
     }
 }

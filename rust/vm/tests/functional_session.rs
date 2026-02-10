@@ -198,7 +198,7 @@ fn test_latest_value_dequeue_clears() {
 
 #[test]
 fn test_buffer_empty_dequeue_none() {
-    let mut buf = BoundedBuffer::new(&BufferConfig::default());
+    let mut buf: BoundedBuffer<Value> = BoundedBuffer::new(&BufferConfig::default());
     assert_eq!(buf.dequeue(), None);
 }
 

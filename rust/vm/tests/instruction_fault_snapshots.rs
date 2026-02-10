@@ -19,6 +19,7 @@ fn fault_name(fault: &Fault) -> &'static str {
         Fault::UnknownLabel { .. } => "unknown_label",
         Fault::ChannelClosed { .. } => "channel_closed",
         Fault::InvalidSignature { .. } => "invalid_signature",
+        Fault::VerificationFailed { .. } => "verification_failed",
         Fault::InvokeFault { .. } => "invoke_fault",
         Fault::AcquireFault { .. } => "acquire_fault",
         Fault::TransferFault { .. } => "transfer_fault",

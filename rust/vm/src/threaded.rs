@@ -2160,11 +2160,12 @@ fn step_check(
             })
         }
     };
-    let known = coro
+    let known_fact = coro
         .knowledge_set
         .iter()
-        .any(|k| k.endpoint == endpoint && k.fact == fact);
-    let permitted = known && config.flow_policy.allows(&target_role);
+        .find(|k| k.endpoint == endpoint && k.fact == fact);
+    let permitted =
+        known_fact.is_some_and(|k| config.flow_policy.allows_knowledge(k, &target_role));
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePcWriteReg {
             reg: dst,

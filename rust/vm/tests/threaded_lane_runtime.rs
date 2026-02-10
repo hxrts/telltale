@@ -1,3 +1,4 @@
+#![doc = "Threaded lane runtime tests: partitioning, handoff, and progress."]
 #![cfg(not(target_arch = "wasm32"))]
 #![cfg(feature = "multi-thread")]
 //! Threaded lane runtime tests: partitioning, handoff, and progress.

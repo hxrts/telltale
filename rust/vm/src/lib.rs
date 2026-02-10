@@ -46,6 +46,7 @@
 
 pub mod architecture;
 pub mod backend;
+pub mod bridge;
 pub mod buffer;
 pub mod clock;
 pub mod compiler;
@@ -56,17 +57,21 @@ pub mod driver;
 pub mod effect;
 pub mod exec;
 pub mod exec_api;
+pub mod guard;
+pub mod identity;
 pub mod instr;
 pub mod intern;
 pub mod kernel;
 pub mod loader;
 pub mod nested;
 pub mod output_condition;
+pub mod persistence;
 pub mod scheduler;
 pub mod session;
 #[cfg(feature = "multi-thread")]
 pub mod threaded;
 pub mod trace;
+pub mod verification;
 pub mod vm;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
@@ -76,6 +81,10 @@ pub use architecture::{
     EQUIVALENCE_SURFACES,
 };
 pub use backend::VMBackend;
+pub use bridge::{
+    EffectGuardBridge, IdentityGuardBridge, IdentityPersistenceBridge, IdentityVerificationBridge,
+    PersistenceEffectBridge,
+};
 pub use clock::SimClock;
 pub use composition::{
     ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
@@ -87,10 +96,12 @@ pub use driver::NativeSingleThreadDriver;
 #[cfg(feature = "multi-thread")]
 pub use driver::NativeThreadedDriver;
 pub use effect::{
-    EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
+    CorruptionType, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
     TopologyPerturbation,
 };
 pub use exec_api::{ExecResult, ExecStatus, StepEvent, StepPack};
+pub use guard::{GuardLayer, InMemoryGuardLayer, LayerId};
+pub use identity::{IdentityModel, ParticipantId, SiteId as IdentitySiteId, StaticIdentityModel};
 pub use instr::Instr;
 pub use intern::{StringId, SymbolTable};
 pub use kernel::VMKernel;
@@ -99,13 +110,22 @@ pub use output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
 };
-pub use scheduler::{PriorityPolicy, SchedPolicy, SchedState, Scheduler, StepUpdate};
+pub use persistence::{NoopPersistence, PersistenceModel};
+pub use scheduler::{
+    CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,
+    Scheduler, StepUpdate,
+};
 pub use session::{decode_edge_json, Edge, HandlerId, SessionId, SessionStore};
 #[cfg(feature = "multi-thread")]
 pub use threaded::{
     ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
 };
 pub use trace::{normalize_trace, obs_session, strict_trace, with_tick};
+pub use verification::{
+    signValue, sign_value, verifySignedValue, verify_signed_value, AuthProof, AuthTree, Commitment,
+    DefaultVerificationModel, Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel,
+    VerifyingKey,
+};
 pub use vm::{MonitorMode, Program, SchedStepDebug, VMConfig, VMState, VM};
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WasmVM;

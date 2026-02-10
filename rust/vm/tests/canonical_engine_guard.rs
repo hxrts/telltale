@@ -4,11 +4,14 @@
 #[allow(dead_code, unreachable_pub)]
 mod helpers;
 
+#[cfg(feature = "multi-thread")]
 use helpers::{simple_send_recv_image, PassthroughHandler};
 use telltale_vm::architecture::{EngineRole, CANONICAL_ENGINE, ENGINE_OWNERSHIP};
 #[cfg(feature = "multi-thread")]
 use telltale_vm::threaded::ThreadedVM;
+#[cfg(feature = "multi-thread")]
 use telltale_vm::trace::{normalize_trace, with_tick};
+#[cfg(feature = "multi-thread")]
 use telltale_vm::vm::{VMConfig, VM};
 
 #[test]
@@ -65,6 +68,7 @@ fn threaded_adapter_observably_matches_canonical_engine_on_smoke_protocol() {
     );
 }
 
+#[cfg(feature = "multi-thread")]
 fn canonicalize_event(event: &telltale_vm::vm::ObsEvent) -> telltale_vm::vm::ObsEvent {
     match event {
         telltale_vm::vm::ObsEvent::OutputConditionChecked {
