@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 // Property-based tests for choreography analysis
 //
 // Tests critical invariants for static analysis:

@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use telltale_choreography::effects::LabelId;
-use telltale_choreography::simulation::{
+use telltale_choreography::testing::{
     clock::{Clock, MockClock, Rng, SeededRng},
     envelope::ProtocolEnvelope,
     observer::{NullObserver, ProtocolEvent, ProtocolObserver, RecordingObserver},
@@ -483,10 +483,10 @@ fn test_checkpoint_protocol_mismatch() {
 #[test]
 fn test_mock_clock_initial_state() {
     let clock = MockClock::new();
-    let offset = clock.offset();
+    let now = clock.now();
 
     // Clock should start at zero offset
-    assert_eq!(offset.as_nanos(), 0);
+    assert_eq!(now.as_nanos(), 0);
 }
 
 #[test]
@@ -494,10 +494,10 @@ fn test_mock_clock_advance() {
     let clock = MockClock::new();
 
     clock.advance(Duration::from_secs(10));
-    assert_eq!(clock.offset().as_secs(), 10);
+    assert_eq!(clock.now().as_secs(), 10);
 
     clock.advance(Duration::from_millis(500));
-    assert_eq!(clock.offset().as_millis(), 10500);
+    assert_eq!(clock.now().as_millis(), 10500);
 }
 
 #[test]
@@ -505,23 +505,23 @@ fn test_mock_clock_set_offset() {
     let clock = MockClock::new();
 
     clock.set_offset(Duration::from_secs(100));
-    assert_eq!(clock.offset().as_secs(), 100);
+    assert_eq!(clock.now().as_secs(), 100);
 
     // Can go backwards
     clock.set_offset(Duration::from_secs(50));
-    assert_eq!(clock.offset().as_secs(), 50);
+    assert_eq!(clock.now().as_secs(), 50);
 }
 
 #[test]
 fn test_mock_clock_determinism_across_instances() {
-    // Two mock clocks with same operations should have same offset
+    // Two mock clocks with same operations should have same time
     let clock1 = MockClock::new();
     let clock2 = MockClock::new();
 
     clock1.advance(Duration::from_secs(100));
     clock2.advance(Duration::from_secs(100));
 
-    assert_eq!(clock1.offset(), clock2.offset());
+    assert_eq!(clock1.now(), clock2.now());
 }
 
 #[test]
@@ -544,7 +544,7 @@ fn test_mock_clock_thread_safe() {
     }
 
     // Total should be 0+10+20+...+90 = 450ms
-    assert_eq!(clock.offset().as_millis(), 450);
+    assert_eq!(clock.now().as_millis(), 450);
 }
 
 #[test]
@@ -646,14 +646,13 @@ fn test_seeded_rng_next_bool() {
 }
 
 #[test]
-fn test_seeded_rng_next_f64_range() {
-    use telltale_types::FixedQ32;
+fn test_seeded_rng_next_fixed_range() {
     let mut rng = SeededRng::new(42);
 
     let zero = FixedQ32::zero();
     let one = FixedQ32::one();
     for _ in 0..1000 {
-        let f = rng.next_f64();
+        let f = rng.next_fixed();
         assert!(
             f >= zero && f < one,
             "FixedQ32 should be in [0, 1), got {}",

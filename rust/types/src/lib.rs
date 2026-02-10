@@ -25,6 +25,7 @@ pub mod content_id;
 pub mod content_store;
 pub mod contentable;
 pub mod de_bruijn;
+pub mod effects;
 pub mod fixed_q32;
 mod global;
 mod label;

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::effects::RoleId;
 use crate::identifiers::RoleName;
-use crate::simulation::clock::WallClock;
+use crate::testing::clock::WallClock;
 
 /// A protocol message envelope containing metadata and payload.
 ///

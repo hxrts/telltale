@@ -48,6 +48,9 @@ pub type ScopeId = usize;
 /// Lean-aligned program representation.
 pub type Program = Vec<Instr>;
 
+/// Branch list type used in local types.
+type BranchList = Vec<(telltale_types::Label, Option<telltale_types::ValType>, LocalTypeR)>;
+
 /// Lean-aligned resource-state placeholder for runtime state alignment.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct ResourceState;
@@ -1086,6 +1089,23 @@ impl VM {
         }
     }
 
+    /// Extract partner and branches from a Recv local type.
+    fn expect_recv_type(
+        local_type: &LocalTypeR,
+        role: &str,
+    ) -> Result<(String, BranchList), Fault> {
+        match local_type {
+            LocalTypeR::Recv {
+                partner, branches, ..
+            } => Ok((partner.clone(), branches.clone())),
+            other => Err(Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: Choose expects Recv, got {other:?}"),
+            }),
+        }
+    }
+
     fn monitor_precheck(
         &self,
         ep: &Endpoint,
@@ -1954,18 +1974,7 @@ impl VM {
             })?
             .clone();
 
-        let (partner, branches) = match &local_type {
-            LocalTypeR::Recv {
-                partner, branches, ..
-            } => (partner.clone(), branches.clone()),
-            other => {
-                return Err(Fault::TypeViolation {
-                    expected: telltale_types::ValType::Unit,
-                    actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: Choose expects Recv, got {other:?}"),
-                })
-            }
-        };
+        let (partner, branches) = Self::expect_recv_type(&local_type, role)?;
 
         let session = self.sessions.get(sid).ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
@@ -3359,7 +3368,8 @@ mod tests {
             .progress_tokens
             .push(ProgressToken::for_endpoint(ep_a.clone()));
         vm.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a.clone());
-        vm.coroutines[a_idx].regs[3] = Value::Nat(vm.coroutines[b_idx].id as u64);
+        vm.coroutines[a_idx].regs[3] =
+            Value::Nat(u64::try_from(vm.coroutines[b_idx].id).expect("coroutine id fits in u64"));
 
         let a_program_id = vm.coroutines[a_idx].program_id;
         vm.programs[a_program_id] = vec![

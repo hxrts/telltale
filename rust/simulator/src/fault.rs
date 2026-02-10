@@ -149,7 +149,7 @@ impl FaultState {
         let mut p_not = one;
         for fault in &self.active {
             if let Fault::MessageDrop { probability } = &fault.fault {
-                p_not = p_not * (one - (*probability).clamp(zero, one));
+                p_not *= one - (*probability).clamp(zero, one);
             }
         }
         one - p_not
@@ -171,7 +171,7 @@ impl FaultState {
         let mut p_not = one;
         for fault in &self.active {
             if let Fault::MessageCorruption { probability } = &fault.fault {
-                p_not = p_not * (one - (*probability).clamp(zero, one));
+                p_not *= one - (*probability).clamp(zero, one);
             }
         }
         one - p_not

@@ -1,7 +1,11 @@
-#![cfg(not(target_arch = "wasm32"))]
 //! Deterministic LocalTypeR trace corpus tests.
+//!
+//! These tests run on both native and WASM targets using wasm_bindgen_test's
+//! `unsupported = test` fallback.
 
 use std::collections::BTreeMap;
+
+use wasm_bindgen_test::wasm_bindgen_test;
 
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Value;
@@ -52,7 +56,7 @@ impl EffectHandler for NoOpHandler {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn test_trace_corpus_send_recv() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let mut locals = BTreeMap::new();

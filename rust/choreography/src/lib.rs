@@ -18,7 +18,6 @@ pub mod extensions;
 pub mod heap;
 pub mod identifiers;
 pub mod runtime;
-pub mod simulation;
 pub mod testing;
 pub mod topology;
 pub mod tracing;
@@ -67,11 +66,12 @@ pub use heap::{
     Message as HeapMessage, MessagePayload, ProofStep, Resource, ResourceId,
 };
 
-// Re-export simulation types for protocol testing
-pub use simulation::{
-    BlockedOn, Checkpoint, Clock, InMemoryTransport, MockClock, NullObserver, ProtocolEnvelope,
-    ProtocolObserver, ProtocolStateMachine, RecordingObserver, Rng, SeededRng, SimulatedTransport,
-    StepInput, StepOutput, WallClock,
+// Re-export testing types for protocol testing
+pub use testing::{
+    AsyncClock, BlockedOn, Checkpoint, Clock, InMemoryTransport, MockClock, NullObserver,
+    ProtocolEnvelope, ProtocolObserver, ProtocolStateMachine, ProtocolTest, ProtocolTestBuilder,
+    RecordingObserver, Rng, RoleBinding, SeededRng, SimulatedTransport, StepInput, StepOutput,
+    TestConfig, TestResult, WallClock,
 };
 
 // Re-export macros from telltale-macros

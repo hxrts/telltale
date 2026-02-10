@@ -5,7 +5,7 @@
 
 use crate::effects::ChoreographyError;
 use crate::runtime::ChoreographicAdapter;
-use crate::simulation::RecordingObserver;
+use crate::testing::RecordingObserver;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -440,7 +440,7 @@ impl ProtocolTest {
         let observer = self.observer.lock().unwrap();
         for event in observer.events() {
             match event {
-                crate::simulation::observer::ProtocolEvent::Send {
+                crate::testing::observer::ProtocolEvent::Send {
                     from,
                     to,
                     msg_type,
@@ -456,7 +456,7 @@ impl ProtocolTest {
                         });
                     }
                 }
-                crate::simulation::observer::ProtocolEvent::PhaseStart {
+                crate::testing::observer::ProtocolEvent::PhaseStart {
                     protocol,
                     role,
                     phase,
@@ -465,7 +465,7 @@ impl ProtocolTest {
                     let key = (protocol.clone(), role.clone(), phase.clone());
                     phase_start_times.insert(key, std::time::Instant::now());
                 }
-                crate::simulation::observer::ProtocolEvent::PhaseEnd {
+                crate::testing::observer::ProtocolEvent::PhaseEnd {
                     protocol,
                     role,
                     phase,

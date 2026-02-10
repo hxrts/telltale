@@ -2,11 +2,11 @@
 //!
 //! These implementations use real system time and entropy sources.
 //! For deterministic simulation and testing, use the mock implementations
-//! in the `simulation` module instead.
+//! in the `testing` module instead.
 
 use std::time::{Duration, Instant};
 
-use crate::simulation::clock::{Clock, Rng, WallClock};
+use crate::testing::clock::{AsyncClock, Clock, Rng, WallClock};
 
 /// System clock using real time.
 ///
@@ -35,6 +35,12 @@ impl Clock for SystemClock {
         START.get_or_init(Instant::now).elapsed()
     }
 
+    fn advance(&self, _duration: Duration) {
+        // Real clock cannot be advanced; this is a no-op
+    }
+}
+
+impl AsyncClock for SystemClock {
     async fn sleep(&self, duration: Duration) {
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -89,5 +95,17 @@ impl Rng for SystemRng {
         self.state ^= self.state >> 7;
         self.state ^= self.state << 17;
         self.state
+    }
+
+    fn fork(&mut self) -> Self {
+        // Fork by mixing current state with time-based entropy
+        let fork_seed = self.next_u64()
+            ^ std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64;
+        Self {
+            state: if fork_seed == 0 { 1 } else { fork_seed },
+        }
     }
 }

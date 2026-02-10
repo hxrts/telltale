@@ -1,25 +1,62 @@
-//! Test harness for choreographic protocols
+//! Testing utilities for choreographic protocols
 //!
-//! This module provides a fluent API for testing protocol execution,
-//! making it easy to set up multi-role tests and verify protocol behavior.
+//! This module provides building blocks for protocol testing, simulation,
+//! and integration with external simulators like aura-simulator.
 //!
-//! # Example
+//! # Overview
 //!
-//! ```ignore
-//! use telltale_choreography::testing::*;
+//! The testing module provides:
 //!
-//! let result = ProtocolTest::builder("AuraConsensus")
-//!     .bind_role("Coordinator", coordinator_adapter)
-//!     .bind_roles("Witness", &[w1, w2, w3])
-//!     .with_params(ConsensusParams { threshold: 2 })
-//!     .expect_phases(&["broadcast_execute", "collect_commits"])
-//!     .run()
-//!     .await?;
+//! - **Deterministic execution**: `Clock` and `Rng` traits for reproducible runs
+//! - **State machines**: `ProtocolStateMachine` for step-by-step execution
+//! - **Transport abstraction**: `SimulatedTransport` for custom message delivery
+//! - **Event observation**: `ProtocolObserver` for monitoring protocol execution
+//! - **Message envelopes**: `ProtocolEnvelope` for structured message passing
 //!
-//! assert!(result.completed_successfully());
-//! assert_eq!(result.phase_count(), 2);
+//! # Architecture
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────┐
+//! │                    Simulator / Test Harness                  │
+//! └─────────────────────────────────────────────────────────────┘
+//!                              │
+//!           ┌──────────────────┼──────────────────┐
+//!           │                  │                  │
+//!           ▼                  ▼                  ▼
+//!    ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+//!    │   Clock     │   │    Rng      │   │  Observer   │
+//!    │   Trait     │   │    Trait    │   │    Trait    │
+//!    └─────────────┘   └─────────────┘   └─────────────┘
+//!                              │
+//!                              ▼
+//!    ┌─────────────────────────────────────────────────────────┐
+//!    │              ProtocolStateMachine                        │
+//!    │  blocked_on() -> BlockedOn                               │
+//!    │  step(input) -> StepOutput                               │
+//!    │  checkpoint() / restore()                                │
+//!    └─────────────────────────────────────────────────────────┘
+//!                              │
+//!                              ▼
+//!    ┌─────────────────────────────────────────────────────────┐
+//!    │              SimulatedTransport                          │
+//!    │  send(to, envelope) -> Result                           │
+//!    │  recv(from) -> Result<Envelope>                         │
+//!    └─────────────────────────────────────────────────────────┘
 //! ```
 
+pub mod clock;
+pub mod envelope;
 pub mod harness;
+pub mod observer;
+pub mod state_machine;
+pub mod transport;
 
+// Re-export main types
+pub use clock::{AsyncClock, Clock, MockClock, Rng, SeededRng, WallClock};
+pub use envelope::ProtocolEnvelope;
 pub use harness::{ProtocolTest, ProtocolTestBuilder, RoleBinding, TestConfig, TestResult};
+pub use observer::{NullObserver, ProtocolObserver, RecordingObserver};
+pub use state_machine::{BlockedOn, Checkpoint, ProtocolStateMachine, StepInput, StepOutput};
+pub use transport::{
+    AsyncSimulatedTransport, InMemoryTransport, SimulatedTransport, TransportError,
+};

@@ -1,8 +1,9 @@
-#![cfg(not(target_arch = "wasm32"))]
 //! Guardrail: VM kernel modules must not call host nondeterministic APIs directly.
 //!
 //! Nondeterminism is required to flow through `EffectHandler` so cross-target
 //! replay and determinism-mode checks remain meaningful.
+
+use wasm_bindgen_test::wasm_bindgen_test;
 
 const FORBIDDEN_PATTERNS: &[&str] = &[
     "SystemTime::now(",
@@ -68,7 +69,7 @@ const FORBIDDEN_TOPOLOGY_MUTATORS: &[&str] = &[
 // ingress point for topology effects flowing through the handler.
 const TOPOLOGY_CHECK_EXCLUDES: &[&str] = &["src/vm.rs"];
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn vm_kernel_has_no_direct_nondeterministic_calls() {
     let mut violations = Vec::new();
     for (path, src) in KERNEL_SOURCES {
@@ -86,7 +87,7 @@ fn vm_kernel_has_no_direct_nondeterministic_calls() {
     );
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn vm_kernel_has_no_direct_topology_mutation_paths() {
     let mut violations = Vec::new();
     for (path, src) in KERNEL_SOURCES {

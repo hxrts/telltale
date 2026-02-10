@@ -1,12 +1,13 @@
-#![cfg(not(target_arch = "wasm32"))]
 //! Serialization/schema conformance for strict Lean value surface.
 
 use std::collections::BTreeSet;
 
+use wasm_bindgen_test::wasm_bindgen_test;
+
 use telltale_vm::coroutine::Value;
 use telltale_vm::instr::{Endpoint, ImmValue};
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn lean_value_variants_roundtrip() {
     let values = vec![
         Value::Unit,
@@ -27,7 +28,7 @@ fn lean_value_variants_roundtrip() {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn lean_immediate_variants_roundtrip() {
     let values = vec![
         ImmValue::Unit,
@@ -43,7 +44,7 @@ fn lean_immediate_variants_roundtrip() {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn value_schema_tag_set_is_strictly_lean() {
     let samples = vec![
         Value::Unit,
@@ -76,7 +77,7 @@ fn value_schema_tag_set_is_strictly_lean() {
     assert_eq!(tags, expected);
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn legacy_value_schema_tags_are_rejected() {
     for json in [
         r#"{"Int":1}"#,

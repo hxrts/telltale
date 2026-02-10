@@ -13,5 +13,8 @@ pub use single_thread::NativeSingleThreadDriver;
 #[cfg(feature = "multi-thread")]
 pub use threaded::NativeThreadedDriver;
 
+/// Cooperative driver for WebAssembly targets.
+///
+/// Uses the single-threaded driver since WASM lacks native threading support.
 #[cfg(target_arch = "wasm32")]
 pub type WasmCooperativeDriver = NativeSingleThreadDriver;

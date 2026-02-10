@@ -98,7 +98,7 @@ impl EffectHandler for IsingHandler {
         let sum: FixedQ32 = vals.iter().sum();
         if sum > zero {
             for x in vals.iter_mut() {
-                *x = *x / sum;
+                *x /= sum;
             }
         }
 

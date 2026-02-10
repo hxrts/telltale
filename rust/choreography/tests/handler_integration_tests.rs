@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Integration tests for handlers, interpreter, and middleware.
 //!
 //! Verifies:

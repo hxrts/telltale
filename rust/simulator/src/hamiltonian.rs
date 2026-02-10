@@ -197,13 +197,13 @@ impl EffectHandler for HamiltonianHandler {
         let two = FixedQ32::from_ratio(2, 1).expect("2 must be representable");
         // Leapfrog integration:
         // 1. Half-kick: p += F * dt/2
-        vals[1] = vals[1] + force * dt / two;
+        vals[1] += force * dt / two;
         // 2. Drift: q += p/m * dt
         vals[0] = vals[0] + vals[1] / mass * dt;
         // 3. Half-kick with new force: p += F(new_q) * dt/2
         let peer_pos_for_new = peer_pos; // peer position hasn't changed this tick
         let new_force = self.force(vals[0], peer_pos_for_new);
-        vals[1] = vals[1] + new_force * dt / two;
+        vals[1] += new_force * dt / two;
 
         write_f64s(state, &vals);
         Ok(())

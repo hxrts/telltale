@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Tests for InMemoryHandler correctness.
 //!
 //! Verifies core invariants:

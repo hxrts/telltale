@@ -1,9 +1,10 @@
-#![cfg(not(target_arch = "wasm32"))]
 //! Guardrail: commit-owned VM state must be mutated only in `commit_pack`.
 //!
 //! This check is intentionally source-based. It protects the canonical VM
 //! execution structure from accidental regressions where per-instruction step
 //! functions directly mutate session type state, trace, or control-state fields.
+
+use wasm_bindgen_test::wasm_bindgen_test;
 
 fn between<'a>(src: &'a str, start: &str, end: &str) -> &'a str {
     let start_idx = src.find(start).expect("start marker must exist");
@@ -19,7 +20,7 @@ fn span(src: &str, start: &str, end: &str) -> (usize, usize) {
     (start_idx, end_idx)
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn canonical_step_section_does_not_mutate_commit_owned_state() {
     let src = include_str!("../src/vm.rs");
     let step_section = between(
@@ -53,7 +54,7 @@ fn canonical_step_section_does_not_mutate_commit_owned_state() {
     );
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_contains_commit_owned_mutation_sites() {
     let src = include_str!("../src/vm.rs");
     let commit_section = between(src, "fn commit_pack(", "\n}\n\n#[cfg(test)]");
@@ -80,7 +81,7 @@ fn commit_pack_contains_commit_owned_mutation_sites() {
     );
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_is_only_owner_of_type_state_mutations() {
     let src = include_str!("../src/vm.rs");
     let (commit_start, commit_end) = span(src, "fn commit_pack(", "\n}\n\n#[cfg(test)]");

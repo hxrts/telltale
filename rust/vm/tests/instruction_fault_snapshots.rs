@@ -1,7 +1,6 @@
 #![cfg(not(target_arch = "wasm32"))]
 //! Fault-shape snapshots for instruction families.
 
-use assert_matches::assert_matches;
 use std::collections::BTreeMap;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
@@ -51,223 +50,211 @@ fn single_role_end_image(program: Vec<Instr>) -> CodeImage {
     }
 }
 
+/// Run a CodeImage and expect a fault, returning its name.
+fn expect_fault(image: &CodeImage, config: VMConfig, max_steps: usize) -> &'static str {
+    let mut vm = VM::new(config);
+    vm.load_choreography(image).expect("load");
+    let result = vm.run(&PassthroughHandler, max_steps);
+    match result {
+        Err(VMError::Fault { fault, .. }) => fault_name(&fault),
+        other => panic!("expected fault, got {other:?}"),
+    }
+}
+
+fn case_send_type_mismatch() -> (&'static str, CodeImage) {
+    let image = CodeImage {
+        programs: {
+            let mut m = BTreeMap::new();
+            m.insert("A".to_string(), vec![Instr::Send { chan: 0, val: 1 }]);
+            m.insert("B".to_string(), vec![Instr::Halt]);
+            m
+        },
+        global_type: GlobalType::send("B", "A", Label::new("m"), GlobalType::End),
+        local_types: {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "A".to_string(),
+                LocalTypeR::Recv {
+                    partner: "B".to_string(),
+                    branches: vec![(Label::new("m"), None, LocalTypeR::End)],
+                },
+            );
+            m.insert(
+                "B".to_string(),
+                LocalTypeR::Send {
+                    partner: "A".to_string(),
+                    branches: vec![(Label::new("m"), None, LocalTypeR::End)],
+                },
+            );
+            m
+        },
+    };
+    ("send/type_mismatch", image)
+}
+
+fn case_close_non_endpoint() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 0,
+            val: ImmValue::Nat(1),
+        },
+        Instr::Close { session: 0 },
+    ]);
+    ("close/non_endpoint", image)
+}
+
+fn case_invoke_dst_oob() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![Instr::Invoke { action: 0, dst: 99 }]);
+    ("invoke/dst_oob", image)
+}
+
+fn case_transfer_non_nat_target() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Str("x".to_string()),
+        },
+        Instr::Transfer {
+            endpoint: 0,
+            target: 1,
+            bundle: 0,
+        },
+    ]);
+    ("transfer/non_nat_target", image)
+}
+
+fn case_check_malformed_knowledge() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Nat(1),
+        },
+        Instr::Set {
+            dst: 2,
+            val: ImmValue::Str("Observer".to_string()),
+        },
+        Instr::Check {
+            knowledge: 1,
+            target: 2,
+            dst: 3,
+        },
+    ]);
+    ("check/malformed_knowledge", image)
+}
+
+fn case_fork_non_nat_ghost() -> (&'static str, CodeImage) {
+    let image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Str("ghost".to_string()),
+        },
+        Instr::Fork { ghost: 1 },
+    ]);
+    ("fork/non_nat_ghost", image)
+}
+
+fn case_choose_unknown_label() -> (&'static str, CodeImage) {
+    let image = CodeImage {
+        programs: {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "A".to_string(),
+                vec![
+                    Instr::Offer {
+                        chan: 0,
+                        label: "yes".to_string(),
+                    },
+                    Instr::Halt,
+                ],
+            );
+            m.insert(
+                "B".to_string(),
+                vec![
+                    Instr::Choose {
+                        chan: 0,
+                        table: vec![("no".to_string(), 1)],
+                    },
+                    Instr::Halt,
+                ],
+            );
+            m
+        },
+        global_type: GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (Label::new("yes"), GlobalType::End),
+                (Label::new("no"), GlobalType::End),
+            ],
+        ),
+        local_types: {
+            let mut m = BTreeMap::new();
+            m.insert(
+                "A".to_string(),
+                LocalTypeR::send_choice(
+                    "B",
+                    vec![
+                        (Label::new("yes"), None, LocalTypeR::End),
+                        (Label::new("no"), None, LocalTypeR::End),
+                    ],
+                ),
+            );
+            m.insert(
+                "B".to_string(),
+                LocalTypeR::recv_choice(
+                    "A",
+                    vec![
+                        (Label::new("yes"), None, LocalTypeR::End),
+                        (Label::new("no"), None, LocalTypeR::End),
+                    ],
+                ),
+            );
+            m
+        },
+    };
+    ("choose/unknown_label", image)
+}
+
 #[test]
 fn snapshot_fault_tags_for_core_instruction_families() {
     let mut observed = Vec::new();
-    let handler = PassthroughHandler;
+    let default_config = VMConfig::default();
 
-    // send: instruction/type mismatch
-    {
-        let image = CodeImage {
-            programs: {
-                let mut m = BTreeMap::new();
-                m.insert("A".to_string(), vec![Instr::Send { chan: 0, val: 1 }]);
-                m.insert("B".to_string(), vec![Instr::Halt]);
-                m
-            },
-            global_type: GlobalType::send("B", "A", Label::new("m"), GlobalType::End),
-            local_types: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "A".to_string(),
-                    LocalTypeR::Recv {
-                        partner: "B".to_string(),
-                        branches: vec![(Label::new("m"), None, LocalTypeR::End)],
-                    },
-                );
-                m.insert(
-                    "B".to_string(),
-                    LocalTypeR::Send {
-                        partner: "A".to_string(),
-                        branches: vec![(Label::new("m"), None, LocalTypeR::End)],
-                    },
-                );
-                m
-            },
-        };
-        let mut vm = VM::new(VMConfig::default());
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 8);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("send/type_mismatch", fault_name(&fault)));
+    // Test cases with default config
+    let default_cases = [
+        case_send_type_mismatch(),
+        case_close_non_endpoint(),
+        case_invoke_dst_oob(),
+        case_transfer_non_nat_target(),
+        case_check_malformed_knowledge(),
+        case_choose_unknown_label(),
+    ];
+
+    for (name, image) in &default_cases {
+        let steps = if *name == "choose/unknown_label" { 16 } else { 8 };
+        observed.push((*name, expect_fault(image, default_config.clone(), steps)));
     }
 
-    // close: endpoint register required
-    {
-        let image = single_role_end_image(vec![
-            Instr::Set {
-                dst: 0,
-                val: ImmValue::Nat(1),
-            },
-            Instr::Close { session: 0 },
-        ]);
-        let mut vm = VM::new(VMConfig::default());
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 8);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("close/non_endpoint", fault_name(&fault)));
-    }
+    // Fork case needs speculation enabled
+    let (fork_name, fork_image) = case_fork_non_nat_ghost();
+    let spec_config = VMConfig {
+        speculation_enabled: true,
+        ..VMConfig::default()
+    };
+    observed.push((fork_name, expect_fault(&fork_image, spec_config, 8)));
 
-    // invoke: destination register bounds check
-    {
-        let image = single_role_end_image(vec![Instr::Invoke { action: 0, dst: 99 }]);
-        let mut vm = VM::new(VMConfig::default());
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 8);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("invoke/dst_oob", fault_name(&fault)));
-    }
-
-    // transfer: target must be Nat coroutine id
-    {
-        let image = single_role_end_image(vec![
-            Instr::Set {
-                dst: 1,
-                val: ImmValue::Str("x".to_string()),
-            },
-            Instr::Transfer {
-                endpoint: 0,
-                target: 1,
-                bundle: 0,
-            },
-        ]);
-        let mut vm = VM::new(VMConfig::default());
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 8);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("transfer/non_nat_target", fault_name(&fault)));
-    }
-
-    // check: malformed knowledge fact shape
-    {
-        let image = single_role_end_image(vec![
-            Instr::Set {
-                dst: 1,
-                val: ImmValue::Nat(1),
-            },
-            Instr::Set {
-                dst: 2,
-                val: ImmValue::Str("Observer".to_string()),
-            },
-            Instr::Check {
-                knowledge: 1,
-                target: 2,
-                dst: 3,
-            },
-        ]);
-        let mut vm = VM::new(VMConfig::default());
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 8);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("check/malformed_knowledge", fault_name(&fault)));
-    }
-
-    // fork: ghost sid must be Nat and speculation must be enabled.
-    {
-        let image = single_role_end_image(vec![
-            Instr::Set {
-                dst: 1,
-                val: ImmValue::Str("ghost".to_string()),
-            },
-            Instr::Fork { ghost: 1 },
-        ]);
-        let mut vm = VM::new(VMConfig {
-            speculation_enabled: true,
-            ..VMConfig::default()
-        });
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 8);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("fork/non_nat_ghost", fault_name(&fault)));
-    }
-
-    // choose: missing table mapping for received branch.
-    {
-        let image = CodeImage {
-            programs: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "A".to_string(),
-                    vec![
-                        Instr::Offer {
-                            chan: 0,
-                            label: "yes".to_string(),
-                        },
-                        Instr::Halt,
-                    ],
-                );
-                m.insert(
-                    "B".to_string(),
-                    vec![
-                        Instr::Choose {
-                            chan: 0,
-                            table: vec![("no".to_string(), 1)],
-                        },
-                        Instr::Halt,
-                    ],
-                );
-                m
-            },
-            global_type: GlobalType::comm(
-                "A",
-                "B",
-                vec![
-                    (Label::new("yes"), GlobalType::End),
-                    (Label::new("no"), GlobalType::End),
-                ],
-            ),
-            local_types: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "A".to_string(),
-                    LocalTypeR::send_choice(
-                        "B",
-                        vec![
-                            (Label::new("yes"), None, LocalTypeR::End),
-                            (Label::new("no"), None, LocalTypeR::End),
-                        ],
-                    ),
-                );
-                m.insert(
-                    "B".to_string(),
-                    LocalTypeR::recv_choice(
-                        "A",
-                        vec![
-                            (Label::new("yes"), None, LocalTypeR::End),
-                            (Label::new("no"), None, LocalTypeR::End),
-                        ],
-                    ),
-                );
-                m
-            },
-        };
-        let mut vm = VM::new(VMConfig::default());
-        vm.load_choreography(&image).expect("load");
-        let result = vm.run(&handler, 16);
-        let fault = match result {
-            Err(VMError::Fault { fault, .. }) => fault,
-            other => panic!("expected fault, got {other:?}"),
-        };
-        observed.push(("choose/unknown_label", fault_name(&fault)));
-    }
+    // Sort by case name to match expected order
+    observed.sort_by_key(|(name, _)| *name);
+    observed.sort_by_key(|(name, _)| match *name {
+        "send/type_mismatch" => 0,
+        "close/non_endpoint" => 1,
+        "invoke/dst_oob" => 2,
+        "transfer/non_nat_target" => 3,
+        "check/malformed_knowledge" => 4,
+        "fork/non_nat_ghost" => 5,
+        "choose/unknown_label" => 6,
+        _ => 99,
+    });
 
     let expected = vec![
         ("send/type_mismatch", "type_violation"),
@@ -283,10 +270,10 @@ fn snapshot_fault_tags_for_core_instruction_families() {
 
 #[test]
 fn snapshot_fault_api_shape_is_vm_fault_wrapper() {
+    use assert_matches::assert_matches;
     let image = single_role_end_image(vec![Instr::Invoke { action: 0, dst: 99 }]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).expect("load");
     let result = vm.run(&PassthroughHandler, 8);
     assert_matches!(result, Err(VMError::Fault { .. }));
 }
-

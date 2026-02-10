@@ -11,7 +11,9 @@ pub(crate) fn values_to_f64s(values: &[Value]) -> Vec<FixedQ32> {
         .iter()
         .filter_map(|v| match v {
             Value::Q32(r) => Some(*r),
-            Value::Nat(n) => FixedQ32::try_from_i64(*n as i64).ok(),
+            Value::Nat(n) => i64::try_from(*n)
+                .ok()
+                .and_then(|i| FixedQ32::try_from_i64(i).ok()),
             _ => None,
         })
         .collect()
@@ -55,9 +57,11 @@ pub(crate) fn value_to_f64(value: &Value) -> Result<FixedQ32, String> {
             .first()
             .copied()
             .ok_or_else(|| "empty vector payload".into()),
-        Value::Nat(n) => {
-            FixedQ32::try_from_i64(*n as i64).map_err(|e| format!("nat conversion error: {e}"))
-        }
+        Value::Nat(n) => i64::try_from(*n)
+            .map_err(|e| format!("nat overflow: {e}"))
+            .and_then(|i| {
+                FixedQ32::try_from_i64(i).map_err(|e| format!("nat conversion error: {e}"))
+            }),
         other => Err(format!("unsupported payload: {other:?}")),
     }
 }
