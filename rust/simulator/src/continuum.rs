@@ -58,7 +58,7 @@ impl EffectHandler for ContinuumFieldHandler {
         if vals.is_empty() {
             return Err("continuum field expects at least 1 field component".into());
         }
-        Ok(Value::Real(vals[0]))
+        Ok(Value::Q32(vals[0]))
     }
 
     fn handle_recv(

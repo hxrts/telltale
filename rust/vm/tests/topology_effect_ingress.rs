@@ -34,7 +34,7 @@ impl EffectHandler for TopologyBurstHandler {
         label: &str,
         _state: &[Value],
     ) -> Result<Value, String> {
-        Ok(Value::Label(label.to_string()))
+        Ok(Value::Str(label.to_string()))
     }
 
     fn send_decision(

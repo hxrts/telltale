@@ -10,9 +10,11 @@ pub(crate) fn step_invoke(
     vm: &mut VM,
     coro_idx: usize,
     role: &str,
+    action: u16,
+    dst: u16,
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
-    vm.step_invoke(coro_idx, role, handler)
+    vm.step_invoke(coro_idx, role, action, dst, handler)
 }
 
 #[allow(clippy::too_many_arguments)]

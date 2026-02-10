@@ -49,7 +49,7 @@ fn test_session_active_to_draining() {
 
     // Put a message in the buffer.
     let session = store.get_mut(sid).unwrap();
-    let _ = session.send("A", "B", Value::Int(1)).unwrap();
+    let _ = session.send("A", "B", Value::Nat(1)).unwrap();
 
     // Close with pending messages → Draining.
     store.close(sid).unwrap();
@@ -115,9 +115,9 @@ fn test_fifo_block() {
         policy: BackpressurePolicy::Block,
     };
     let mut buf = BoundedBuffer::new(&config);
-    buf.enqueue(Value::Int(1));
-    buf.enqueue(Value::Int(2));
-    assert_matches!(buf.enqueue(Value::Int(3)), EnqueueResult::WouldBlock);
+    buf.enqueue(Value::Nat(1));
+    buf.enqueue(Value::Nat(2));
+    assert_matches!(buf.enqueue(Value::Nat(3)), EnqueueResult::WouldBlock);
 }
 
 #[test]
@@ -128,12 +128,12 @@ fn test_fifo_drop() {
         policy: BackpressurePolicy::Drop,
     };
     let mut buf = BoundedBuffer::new(&config);
-    buf.enqueue(Value::Int(1));
-    buf.enqueue(Value::Int(2));
-    assert_matches!(buf.enqueue(Value::Int(3)), EnqueueResult::Dropped);
+    buf.enqueue(Value::Nat(1));
+    buf.enqueue(Value::Nat(2));
+    assert_matches!(buf.enqueue(Value::Nat(3)), EnqueueResult::Dropped);
     // First two values still intact.
-    assert_eq!(buf.dequeue(), Some(Value::Int(1)));
-    assert_eq!(buf.dequeue(), Some(Value::Int(2)));
+    assert_eq!(buf.dequeue(), Some(Value::Nat(1)));
+    assert_eq!(buf.dequeue(), Some(Value::Nat(2)));
 }
 
 #[test]
@@ -144,9 +144,9 @@ fn test_fifo_error() {
         policy: BackpressurePolicy::Error,
     };
     let mut buf = BoundedBuffer::new(&config);
-    buf.enqueue(Value::Int(1));
-    buf.enqueue(Value::Int(2));
-    assert_matches!(buf.enqueue(Value::Int(3)), EnqueueResult::Full);
+    buf.enqueue(Value::Nat(1));
+    buf.enqueue(Value::Nat(2));
+    assert_matches!(buf.enqueue(Value::Nat(3)), EnqueueResult::Full);
 }
 
 #[test]
@@ -157,14 +157,14 @@ fn test_fifo_resize() {
         policy: BackpressurePolicy::Resize { max_capacity: 8 },
     };
     let mut buf = BoundedBuffer::new(&config);
-    buf.enqueue(Value::Int(1));
-    buf.enqueue(Value::Int(2));
-    assert_matches!(buf.enqueue(Value::Int(3)), EnqueueResult::Ok);
+    buf.enqueue(Value::Nat(1));
+    buf.enqueue(Value::Nat(2));
+    assert_matches!(buf.enqueue(Value::Nat(3)), EnqueueResult::Ok);
     assert_eq!(buf.len(), 3);
     // FIFO order preserved.
-    assert_eq!(buf.dequeue(), Some(Value::Int(1)));
-    assert_eq!(buf.dequeue(), Some(Value::Int(2)));
-    assert_eq!(buf.dequeue(), Some(Value::Int(3)));
+    assert_eq!(buf.dequeue(), Some(Value::Nat(1)));
+    assert_eq!(buf.dequeue(), Some(Value::Nat(2)));
+    assert_eq!(buf.dequeue(), Some(Value::Nat(3)));
 }
 
 #[test]
@@ -175,10 +175,10 @@ fn test_latest_value_overwrites() {
         policy: BackpressurePolicy::Block,
     };
     let mut buf = BoundedBuffer::new(&config);
-    buf.enqueue(Value::Int(1));
-    buf.enqueue(Value::Int(2));
-    buf.enqueue(Value::Int(3));
-    assert_eq!(buf.dequeue(), Some(Value::Int(3)));
+    buf.enqueue(Value::Nat(1));
+    buf.enqueue(Value::Nat(2));
+    buf.enqueue(Value::Nat(3));
+    assert_eq!(buf.dequeue(), Some(Value::Nat(3)));
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn test_latest_value_dequeue_clears() {
         policy: BackpressurePolicy::Block,
     };
     let mut buf = BoundedBuffer::new(&config);
-    buf.enqueue(Value::Int(1));
+    buf.enqueue(Value::Nat(1));
     assert_eq!(buf.len(), 1);
     buf.dequeue();
     assert_eq!(buf.len(), 0);
@@ -212,17 +212,17 @@ fn test_buffer_resize_preserves_order() {
     let mut buf = BoundedBuffer::new(&config);
 
     // Partially fill and dequeue to offset head.
-    buf.enqueue(Value::Int(0));
+    buf.enqueue(Value::Nat(0));
     buf.dequeue();
 
     // Fill beyond initial capacity.
     for i in 1..=5 {
-        buf.enqueue(Value::Int(i));
+        buf.enqueue(Value::Nat(i));
     }
 
     // Verify FIFO.
     for i in 1..=5 {
-        assert_eq!(buf.dequeue(), Some(Value::Int(i)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(i)));
     }
 }
 
@@ -281,7 +281,7 @@ fn test_two_sessions_independent_buffers() {
     store
         .get_mut(sid1)
         .unwrap()
-        .send("A", "B", Value::Int(1))
+        .send("A", "B", Value::Nat(1))
         .unwrap();
 
     // Session 2 should not see the message.

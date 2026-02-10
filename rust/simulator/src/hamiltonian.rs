@@ -15,7 +15,8 @@ use telltale_types::FixedQ32;
 use crate::material::HamiltonianParams;
 use crate::value_conv::{registers_to_f64s, value_to_f64, write_f64s};
 use telltale_vm::coroutine::Value;
-use telltale_vm::effect::EffectHandler;
+use telltale_vm::effect::{EffectHandler, SendDecision};
+use telltale_vm::session::SessionId;
 
 /// Effect handler for Hamiltonian 2-body dynamics.
 ///
@@ -70,7 +71,7 @@ impl EffectHandler for HamiltonianHandler {
             "position" => vals
                 .first()
                 .copied()
-                .map(Value::Real)
+                .map(Value::Q32)
                 .ok_or_else(|| "missing position state".into()),
             "force" => {
                 let peer_pos = self
@@ -82,10 +83,24 @@ impl EffectHandler for HamiltonianHandler {
                     .unwrap_or_else(FixedQ32::zero);
                 let my_pos = vals.first().copied().unwrap_or_else(FixedQ32::zero);
                 let f = self.force(my_pos, peer_pos);
-                Ok(Value::Real(f))
+                Ok(Value::Q32(f))
             }
             other => Err(format!("unknown label: {other}")),
         }
+    }
+
+    fn send_decision(
+        &self,
+        _sid: SessionId,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[Value],
+        _payload: Option<Value>,
+    ) -> Result<SendDecision, String> {
+        // Always compute payload via handle_send, ignoring any passed-in payload
+        self.handle_send(role, partner, label, state)
+            .map(SendDecision::Deliver)
     }
 
     fn handle_recv(

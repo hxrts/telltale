@@ -2,54 +2,48 @@
 
 use crate::coroutine::Fault;
 use crate::effect::EffectHandler;
-use crate::instr::Endpoint;
-use crate::session::SessionId;
 use crate::vm::{StepPack, VM};
 
 pub(crate) fn step_send(
     vm: &mut VM,
     coro_idx: usize,
-    ep: &Endpoint,
     role: &str,
-    sid: SessionId,
+    chan: u16,
     val_reg: u16,
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
-    vm.step_send(coro_idx, ep, role, sid, val_reg, handler)
+    vm.step_send(coro_idx, role, chan, val_reg, handler)
 }
 
 pub(crate) fn step_receive(
     vm: &mut VM,
     coro_idx: usize,
-    ep: &Endpoint,
     role: &str,
-    sid: SessionId,
+    chan: u16,
     dst: u16,
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
-    vm.step_recv(coro_idx, ep, role, sid, dst, handler)
+    vm.step_recv(coro_idx, role, chan, dst, handler)
 }
 
 pub(crate) fn step_offer(
     vm: &mut VM,
     coro_idx: usize,
-    ep: &Endpoint,
     role: &str,
-    sid: SessionId,
+    chan: u16,
     label: &str,
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
-    vm.step_offer(coro_idx, ep, role, sid, label, handler)
+    vm.step_offer(coro_idx, role, chan, label, handler)
 }
 
 pub(crate) fn step_choose(
     vm: &mut VM,
     coro_idx: usize,
-    ep: &Endpoint,
     role: &str,
-    sid: SessionId,
+    chan: u16,
     table: &[(String, usize)],
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
-    vm.step_choose(coro_idx, ep, role, sid, table, handler)
+    vm.step_choose(coro_idx, role, chan, table, handler)
 }

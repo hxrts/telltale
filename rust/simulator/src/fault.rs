@@ -4,7 +4,6 @@ use std::collections::BTreeSet;
 use std::sync::Mutex;
 use telltale_types::FixedQ32;
 
-use serde_json::Value as JsonValue;
 use telltale_vm::buffer::EnqueueResult;
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::{EffectHandler, SendDecision};
@@ -488,27 +487,18 @@ fn fault_expiry(tick: u64, fault: &Fault, scheduled: Option<usize>) -> Option<u6
 
 fn corrupt_value(val: Value) -> Value {
     match val {
+        Value::Unit => Value::Unit,
+        Value::Nat(n) => Value::Nat(n.wrapping_add(1)),
         Value::Bool(b) => Value::Bool(!b),
-        Value::Int(i) => Value::Int(-i),
-        Value::Real(r) => Value::Real(-r),
         Value::Str(s) => Value::Str(format!("corrupt:{s}")),
-        Value::Vec(mut v) => {
+        Value::Prod(a, b) => Value::Prod(Box::new(corrupt_value(*a)), b),
+        Value::Endpoint(_) => val,
+        Value::Q32(r) => Value::Q32(-r),
+        Value::Q32Vec(mut v) => {
             if let Some(first) = v.first_mut() {
                 *first = -*first;
             }
-            Value::Vec(v)
+            Value::Q32Vec(v)
         }
-        Value::Label(l) => Value::Label(format!("corrupt_{l}")),
-        Value::Json(mut j) => {
-            if let Some(n) = j.as_f64() {
-                j = JsonValue::from(-n);
-            } else {
-                j = JsonValue::String("corrupt".into());
-            }
-            Value::Json(j)
-        }
-        Value::Endpoint(_) => val,
-        Value::Knowledge { .. } => val,
-        Value::Unit => Value::Unit,
     }
 }

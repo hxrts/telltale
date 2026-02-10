@@ -239,11 +239,11 @@ fn prop_buffer_fifo_order() {
         let mut buf = BoundedBuffer::new(&config);
 
         for i in 0..n {
-            buf.enqueue(Value::Int(i as i64));
+            buf.enqueue(Value::Nat(i as u64));
         }
 
         for i in 0..n {
-            assert_eq!(buf.dequeue(), Some(Value::Int(i as i64)));
+            assert_eq!(buf.dequeue(), Some(Value::Nat(i as u64)));
         }
     }
 }
@@ -281,7 +281,7 @@ fn prop_buffer_count_invariant() {
         let mut buf = BoundedBuffer::new(&config);
 
         for i in 0..k {
-            buf.enqueue(Value::Int(i as i64));
+            buf.enqueue(Value::Nat(i as u64));
         }
         for _ in 0..j {
             buf.dequeue();
@@ -308,10 +308,10 @@ fn prop_buffer_latest_value_overwrites() {
         let mut buf = BoundedBuffer::new(&config);
 
         for i in 0..n {
-            buf.enqueue(Value::Int(i as i64));
+            buf.enqueue(Value::Nat(i as u64));
         }
 
-        assert_eq!(buf.dequeue(), Some(Value::Int((n - 1) as i64)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat((n - 1) as u64)));
     }
 }
 

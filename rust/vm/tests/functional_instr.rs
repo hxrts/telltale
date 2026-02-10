@@ -12,7 +12,7 @@ mod helpers;
 use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
-use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
+use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_vm::coroutine::{CoroStatus, Fault, Value};
 use telltale_vm::instr::{Endpoint, ImmValue, Instr};
@@ -156,7 +156,7 @@ fn test_send_buffer_full_error() {
 
     // Pre-fill the buffer so the next send fails.
     let session = vm.sessions_mut().get_mut(sid).unwrap();
-    let _ = session.send("A", "B", Value::Int(99));
+    let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
     let result = vm.run(&handler, 100);
@@ -203,7 +203,7 @@ fn test_send_buffer_full_block() {
 
     // Pre-fill the buffer.
     let session = vm.sessions_mut().get_mut(sid).unwrap();
-    let _ = session.send("A", "B", Value::Int(99));
+    let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
     // Step: A should try to send and block.
@@ -260,7 +260,7 @@ fn test_send_buffer_full_drop() {
 
     // Pre-fill.
     let session = vm.sessions_mut().get_mut(sid).unwrap();
-    let _ = session.send("A", "B", Value::Int(99));
+    let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
     // Should not fault — message dropped, type advances.
@@ -866,11 +866,11 @@ fn test_loadimm_all_types() {
         },
         Instr::Set {
             dst: 2,
-            val: ImmValue::Int(42),
+            val: ImmValue::Nat(42),
         },
         Instr::Set {
             dst: 3,
-            val: ImmValue::Real(FixedQ32::from_ratio(314, 100).expect("3.14")),
+            val: ImmValue::Nat(314),
         },
         Instr::Set {
             dst: 4,
@@ -903,11 +903,8 @@ fn test_loadimm_all_types() {
 
     let coro = vm.coroutine(0).unwrap();
     assert_eq!(coro.regs[1], Value::Unit);
-    assert_eq!(coro.regs[2], Value::Int(42));
-    assert_eq!(
-        coro.regs[3],
-        Value::Real(FixedQ32::from_ratio(314, 100).expect("3.14"))
-    );
+    assert_eq!(coro.regs[2], Value::Nat(42));
+    assert_eq!(coro.regs[3], Value::Nat(314));
     assert_eq!(coro.regs[4], Value::Bool(true));
     assert_eq!(coro.regs[5], Value::Str("hello".into()));
 }
@@ -917,7 +914,7 @@ fn test_mov_copies_register() {
     let program = vec![
         Instr::Set {
             dst: 1,
-            val: ImmValue::Int(99),
+            val: ImmValue::Nat(99),
         },
         Instr::Move { dst: 2, src: 1 },
         Instr::Halt,
@@ -942,7 +939,7 @@ fn test_mov_copies_register() {
     vm.run(&handler, 100).unwrap();
 
     let coro = vm.coroutine(0).unwrap();
-    assert_eq!(coro.regs[2], Value::Int(99));
+    assert_eq!(coro.regs[2], Value::Nat(99));
 }
 
 #[test]
@@ -952,7 +949,7 @@ fn test_jmp_sets_pc() {
         Instr::Jump { target: 2 },
         Instr::Set {
             dst: 1,
-            val: ImmValue::Int(999),
+            val: ImmValue::Nat(999),
         },
         Instr::Halt,
     ];
@@ -986,7 +983,7 @@ fn test_yield_advances_pc_and_reschedules() {
         Instr::Yield,
         Instr::Set {
             dst: 1,
-            val: ImmValue::Int(7),
+            val: ImmValue::Nat(7),
         },
         Instr::Halt,
     ];
@@ -1010,7 +1007,7 @@ fn test_yield_advances_pc_and_reschedules() {
     vm.run(&handler, 100).unwrap();
 
     let coro = vm.coroutine(0).unwrap();
-    assert_eq!(coro.regs[1], Value::Int(7));
+    assert_eq!(coro.regs[1], Value::Nat(7));
     assert_matches!(coro.status, CoroStatus::Done);
 }
 

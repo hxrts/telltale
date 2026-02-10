@@ -922,7 +922,7 @@ mod tests {
             _label: &str,
             _state: &[Value],
         ) -> Result<Value, String> {
-            Ok(Value::Int(1))
+            Ok(Value::Nat(1))
         }
 
         #[allow(clippy::as_conversions, clippy::cast_possible_wrap)]
@@ -937,9 +937,7 @@ mod tests {
         ) -> Result<SendDecision, String> {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed);
             if idx % 2 == 0 {
-                Ok(SendDecision::Deliver(
-                    payload.unwrap_or(Value::Int(idx as i64)),
-                ))
+                Ok(SendDecision::Deliver(payload.unwrap_or(Value::Nat(idx as u64))))
             } else {
                 Ok(SendDecision::Drop)
             }
@@ -980,20 +978,20 @@ mod tests {
         let recorder = RecordingEffectHandler::new(&base);
 
         let first = recorder
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Int(7)))
+            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(7)))
             .expect("first decision");
         let second = recorder
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Int(8)))
+            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(8)))
             .expect("second decision");
         assert!(matches!(first, SendDecision::Deliver(_)));
         assert!(matches!(second, SendDecision::Drop));
 
         let replay = ReplayEffectHandler::new(recorder.effect_trace());
         let replay_first = replay
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Int(0)))
+            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(0)))
             .expect("replay first decision");
         let replay_second = replay
-            .send_decision(0, "A", "B", "m", &[], Some(Value::Int(0)))
+            .send_decision(0, "A", "B", "m", &[], Some(Value::Nat(0)))
             .expect("replay second decision");
         assert!(matches!(replay_first, SendDecision::Deliver(_)));
         assert!(matches!(replay_second, SendDecision::Drop));

@@ -28,7 +28,7 @@ impl EffectHandler for DeterministicHandler {
         label: &str,
         _state: &[Value],
     ) -> Result<Value, String> {
-        Ok(Value::Label(label.to_string()))
+        Ok(Value::Str(label.to_string()))
     }
 
     fn send_decision(
@@ -85,7 +85,7 @@ impl EffectHandler for FlakySendHandler {
         _label: &str,
         _state: &[Value],
     ) -> Result<Value, String> {
-        Ok(Value::Int(1))
+        Ok(Value::Nat(1))
     }
 
     fn send_decision(
@@ -99,7 +99,7 @@ impl EffectHandler for FlakySendHandler {
     ) -> Result<SendDecision, String> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
         if idx % 2 == 0 {
-            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Int(1))))
+            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Nat(1))))
         } else {
             Ok(SendDecision::Drop)
         }

@@ -18,7 +18,7 @@ use telltale_types::LocalTypeR;
 
 use crate::buffer::{BufferConfig, EnqueueResult, SignedBuffers};
 use crate::clock::SimClock;
-use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, Value};
+use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::determinism::DeterminismMode;
 use crate::effect::{
     EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision, TopologyPerturbation,
@@ -85,6 +85,33 @@ pub enum MonitorMode {
     SessionTypePrecheck,
 }
 
+/// Information-flow policy used by epistemic `check`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum FlowPolicy {
+    /// Permit all facts to all roles.
+    #[default]
+    AllowAll,
+    /// Deny all flows.
+    DenyAll,
+    /// Permit only listed roles.
+    AllowRoles(BTreeSet<String>),
+    /// Deny listed roles.
+    DenyRoles(BTreeSet<String>),
+}
+
+impl FlowPolicy {
+    /// Check whether knowledge flow to `target_role` is permitted.
+    #[must_use]
+    pub fn allows(&self, target_role: &str) -> bool {
+        match self {
+            Self::AllowAll => true,
+            Self::DenyAll => false,
+            Self::AllowRoles(roles) => roles.contains(target_role),
+            Self::DenyRoles(roles) => !roles.contains(target_role),
+        }
+    }
+}
+
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMConfig {
@@ -111,6 +138,9 @@ pub struct VMConfig {
     /// Monitor mode for pre-dispatch type checks.
     #[serde(default)]
     pub monitor_mode: MonitorMode,
+    /// Flow policy for epistemic knowledge checks.
+    #[serde(default)]
+    pub flow_policy: FlowPolicy,
     /// Deterministic cost charged for each instruction dispatch.
     #[serde(default = "default_instruction_cost")]
     pub instruction_cost: usize,
@@ -133,6 +163,7 @@ impl Default for VMConfig {
             determinism_mode: DeterminismMode::Full,
             output_condition_policy: OutputConditionPolicy::AllowAll,
             monitor_mode: MonitorMode::SessionTypePrecheck,
+            flow_policy: FlowPolicy::AllowAll,
             instruction_cost: 1,
             initial_cost_budget: usize::MAX,
         }
@@ -608,7 +639,10 @@ impl VM {
                 self.config.num_registers,
                 self.config.initial_cost_budget,
             );
-            coro.owned_endpoints.push(ep);
+            coro.owned_endpoints.push(ep.clone());
+            if !coro.regs.is_empty() {
+                coro.regs[0] = Value::Endpoint(ep);
+            }
 
             self.sched.add_ready(coro_id);
             self.coroutines.push(coro);
@@ -1001,6 +1035,57 @@ impl VM {
         self.coroutines[coro_idx].regs[usize::from(reg)].clone()
     }
 
+    fn read_reg_checked(&self, coro_idx: usize, reg: u16) -> Result<Value, Fault> {
+        self.coroutines[coro_idx]
+            .regs
+            .get(usize::from(reg))
+            .cloned()
+            .ok_or(Fault::OutOfRegisters)
+    }
+
+    fn endpoint_from_reg(&self, coro_idx: usize, reg: u16) -> Result<Endpoint, Fault> {
+        match self.read_reg_checked(coro_idx, reg)? {
+            Value::Endpoint(ep) => Ok(ep),
+            other => Err(Fault::TypeViolation {
+                expected: telltale_types::ValType::Chan {
+                    sid: 0,
+                    role: String::new(),
+                },
+                actual: Self::val_type_of(&other),
+                message: "expected endpoint register".to_string(),
+            }),
+        }
+    }
+
+    fn decode_fact(value: Value) -> Option<(Endpoint, String)> {
+        match value {
+            Value::Prod(left, right) => match (*left, *right) {
+                (Value::Endpoint(endpoint), Value::Str(fact)) => Some((endpoint, fact)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn val_type_of(value: &Value) -> telltale_types::ValType {
+        use telltale_types::ValType;
+        match value {
+            Value::Unit => ValType::Unit,
+            Value::Nat(_) => ValType::Nat,
+            Value::Bool(_) => ValType::Bool,
+            Value::Str(_) => ValType::String,
+            Value::Prod(left, right) => {
+                ValType::Prod(Box::new(Self::val_type_of(left)), Box::new(Self::val_type_of(right)))
+            }
+            Value::Endpoint(ep) => ValType::Chan {
+                sid: ep.sid,
+                role: ep.role.clone(),
+            },
+            // Q32/Q32Vec are simulation-only values; map to Nat for typing purposes
+            Value::Q32(_) | Value::Q32Vec(_) => ValType::Nat,
+        }
+    }
+
     fn monitor_precheck(
         &self,
         ep: &Endpoint,
@@ -1133,7 +1218,8 @@ impl VM {
             if let Some(BlockReason::RecvWait { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
                     let has_msg = session.roles.iter().any(|sender| {
-                        sender != &token.role && session.has_message(sender, &token.role)
+                        sender != &token.endpoint.role
+                            && session.has_message(sender, &token.endpoint.role)
                     });
                     if has_msg {
                         self.sched.unblock(coro_id);
@@ -1155,12 +1241,17 @@ impl VM {
         handler: &dyn EffectHandler,
     ) -> Result<ExecOutcome, Fault> {
         let idx = self.coro_index(coro_id);
-        let coro = &self.coroutines[idx];
-        let pc = coro.pc;
-        let sid = coro.session_id;
+        let pc = self.coroutines[idx].pc;
+        let sid = self.coroutines[idx].session_id;
+        let role = self.coroutines[idx].role.clone();
+        let fallback_ep = self.coroutines[idx]
+            .owned_endpoints
+            .first()
+            .cloned()
+            .ok_or(Fault::PcOutOfBounds)?;
         let program = self
             .programs
-            .get(coro.program_id)
+            .get(self.coroutines[idx].program_id)
             .ok_or(Fault::PcOutOfBounds)?;
 
         // 1. Fetch.
@@ -1168,19 +1259,25 @@ impl VM {
             return Err(Fault::PcOutOfBounds);
         }
         let instr = program[pc].clone();
-        let ep = coro
-            .owned_endpoints
-            .first()
-            .cloned()
-            .ok_or(Fault::PcOutOfBounds)?;
-        let role = coro.role.clone();
+        let monitor_ep = match &instr {
+            Instr::Send { chan, .. }
+            | Instr::Receive { chan, .. }
+            | Instr::Offer { chan, .. }
+            | Instr::Choose { chan, .. } => {
+                self.endpoint_from_reg(idx, *chan).unwrap_or_else(|_| fallback_ep.clone())
+            }
+            Instr::Close { session } => self
+                .endpoint_from_reg(idx, *session)
+                .unwrap_or_else(|_| fallback_ep.clone()),
+            _ => fallback_ep.clone(),
+        };
 
         // 1.5 Monitor precheck and deterministic cost charge.
-        self.monitor_precheck(&ep, &role, &instr)?;
+        self.monitor_precheck(&monitor_ep, &role, &instr)?;
         self.charge_instruction_cost(idx)?;
 
         // 2. Dispatch to per-instruction step function.
-        let pack = exec::step_instr(self, idx, &ep, &role, sid, instr, handler)?;
+        let pack = exec::step_instr(self, idx, &monitor_ep, &role, sid, instr, handler)?;
 
         let output_hint = if pack.events.is_empty() {
             None
@@ -1198,16 +1295,23 @@ impl VM {
     pub(crate) fn step_send(
         &mut self,
         coro_idx: usize,
-        ep: &Endpoint,
         role: &str,
-        sid: SessionId,
-        _val_reg: u16,
+        chan: u16,
+        val_reg: u16,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
+        let ep = self.endpoint_from_reg(coro_idx, chan)?;
+        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
+            return Err(Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            });
+        }
+        let sid = ep.sid;
+
         // Type lookup — instruction owns this.
         let local_type = self
             .sessions
-            .lookup_type(ep)
+            .lookup_type(&ep)
             .ok_or_else(|| Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
@@ -1241,8 +1345,16 @@ impl VM {
 
         // Compute payload/decision via handler.
         let coro = &self.coroutines[coro_idx];
+        let send_payload = self.read_reg_checked(coro_idx, val_reg)?;
         let decision = handler
-            .send_decision(sid, role, &partner, &label.name, &coro.regs, None)
+            .send_decision(
+                sid,
+                role,
+                &partner,
+                &label.name,
+                &coro.regs,
+                Some(send_payload.clone()),
+            )
             .map_err(|e| Fault::InvokeFault { message: e })?;
 
         // Enqueue into buffer (if delivered).
@@ -1279,8 +1391,8 @@ impl VM {
         }
 
         // Success: resolve continuation and advance type.
-        let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
-        let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
+        let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
+        let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
@@ -1300,16 +1412,23 @@ impl VM {
     pub(crate) fn step_recv(
         &mut self,
         coro_idx: usize,
-        ep: &Endpoint,
         role: &str,
-        sid: SessionId,
+        chan: u16,
         dst_reg: u16,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
+        let ep = self.endpoint_from_reg(coro_idx, chan)?;
+        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
+            return Err(Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            });
+        }
+        let sid = ep.sid;
+
         // Type lookup.
         let local_type = self
             .sessions
-            .lookup_type(ep)
+            .lookup_type(&ep)
             .ok_or_else(|| Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
@@ -1349,7 +1468,7 @@ impl VM {
             return Ok(StepPack {
                 coro_update: CoroUpdate::Block(BlockReason::RecvWait {
                     edge: Edge::new(sid, partner.clone(), role.to_string()),
-                    token: ep.clone(),
+                    token: ProgressToken::for_endpoint(ep.clone()),
                 }),
                 type_update: None,
                 events: vec![],
@@ -1376,8 +1495,8 @@ impl VM {
             .map_err(|e| Fault::InvokeFault { message: e })?;
 
         // Resolve continuation and advance type.
-        let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
-        let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
+        let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
+        let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst_reg, val },
@@ -1413,15 +1532,28 @@ impl VM {
         &mut self,
         coro_idx: usize,
         role: &str,
+        action: u16,
+        dst: u16,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
+        let _action = self.read_reg_checked(coro_idx, action)?;
+        if usize::from(dst) >= self.coroutines[coro_idx].regs.len() {
+            return Err(Fault::OutOfRegisters);
+        }
+        let invoke_out = match self.read_reg_checked(coro_idx, dst)? {
+            Value::Endpoint(ep) => Value::Endpoint(ep),
+            _ => Value::Bool(true),
+        };
         let coro_id = self.coroutines[coro_idx].id;
         handler
             .step(role, &mut self.coroutines[coro_idx].regs)
             .map_err(|e| Fault::InvokeFault { message: e })?;
 
         Ok(StepPack {
-            coro_update: CoroUpdate::AdvancePc,
+            coro_update: CoroUpdate::AdvancePcWriteReg {
+                reg: dst,
+                val: invoke_out,
+            },
             type_update: None,
             events: vec![ObsEvent::Invoked {
                 tick: self.clock.tick,
@@ -1558,16 +1690,16 @@ impl VM {
             .ok_or(Fault::OutOfRegisters)?
             .clone();
         let ghost_sid = match ghost_val {
-            Value::Int(v) if v >= 0 => usize::try_from(v).map_err(|_| Fault::TypeViolation {
-                expected: telltale_types::ValType::Unit,
-                actual: telltale_types::ValType::Unit,
+            Value::Nat(v) => usize::try_from(v).map_err(|_| Fault::TypeViolation {
+                expected: telltale_types::ValType::Nat,
+                actual: telltale_types::ValType::Nat,
                 message: format!("{role}: fork ghost id out of range"),
             })?,
             _ => {
                 return Err(Fault::TypeViolation {
-                    expected: telltale_types::ValType::Unit,
+                    expected: telltale_types::ValType::Nat,
                     actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: fork expects integer ghost id"),
+                    message: format!("{role}: fork expects nat ghost id"),
                 })
             }
         };
@@ -1642,18 +1774,13 @@ impl VM {
                 })
             }
         };
-        let target_val = self.coroutines[coro_idx]
-            .regs
-            .get(usize::from(target))
-            .ok_or(Fault::OutOfRegisters)?
-            .clone();
-        let target_id = match target_val {
-            Value::Int(v) if v >= 0 => usize::try_from(v).map_err(|_| Fault::TransferFault {
+        let target_id = match self.read_reg_checked(coro_idx, target)? {
+            Value::Nat(v) => usize::try_from(v).map_err(|_| Fault::TransferFault {
                 message: format!("{role}: target id out of range"),
             })?,
             _ => {
                 return Err(Fault::TransferFault {
-                    message: format!("{role}: transfer expects target coroutine id"),
+                    message: format!("{role}: transfer expects nat target coroutine id"),
                 })
             }
         };
@@ -1674,6 +1801,17 @@ impl VM {
             .owned_endpoints
             .retain(|e| e != &ep);
         self.coroutines[target_idx].owned_endpoints.push(ep.clone());
+
+        let mut moved_tokens = Vec::new();
+        self.coroutines[coro_idx].progress_tokens.retain(|token| {
+            if token.endpoint == ep {
+                moved_tokens.push(token.clone());
+                false
+            } else {
+                true
+            }
+        });
+        self.coroutines[target_idx].progress_tokens.extend(moved_tokens);
 
         let mut moved = Vec::new();
         self.coroutines[coro_idx].knowledge_set.retain(|fact| {
@@ -1712,14 +1850,10 @@ impl VM {
             .get(usize::from(fact_reg))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let (endpoint, fact) = match fact_val {
-            Value::Knowledge { endpoint, fact } => (endpoint, fact),
-            _ => {
-                return Err(Fault::TransferFault {
-                    message: format!("{role}: tag expects knowledge value"),
-                })
-            }
-        };
+        let (endpoint, fact) =
+            Self::decode_fact(fact_val).ok_or_else(|| Fault::TransferFault {
+                message: format!("{role}: tag expects (endpoint, string) fact"),
+            })?;
         self.coroutines[coro_idx]
             .knowledge_set
             .push(crate::coroutine::KnowledgeFact {
@@ -1755,14 +1889,10 @@ impl VM {
             .get(usize::from(knowledge))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let (endpoint, fact) = match know_val {
-            Value::Knowledge { endpoint, fact } => (endpoint, fact),
-            _ => {
-                return Err(Fault::TransferFault {
-                    message: format!("{role}: check expects knowledge value"),
-                })
-            }
-        };
+        let (endpoint, fact) =
+            Self::decode_fact(know_val).ok_or_else(|| Fault::TransferFault {
+                message: format!("{role}: check expects (endpoint, string) fact"),
+            })?;
         let target_val = self.coroutines[coro_idx]
             .regs
             .get(usize::from(target))
@@ -1776,10 +1906,11 @@ impl VM {
                 })
             }
         };
-        let permitted = self.coroutines[coro_idx]
+        let known = self.coroutines[coro_idx]
             .knowledge_set
             .iter()
             .any(|k| k.endpoint == endpoint && k.fact == fact);
+        let permitted = known && self.config.flow_policy.allows(&target_role);
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePcWriteReg {
                 reg: dst,
@@ -1800,15 +1931,22 @@ impl VM {
     pub(crate) fn step_choose(
         &mut self,
         coro_idx: usize,
-        ep: &Endpoint,
         role: &str,
-        sid: SessionId,
+        chan: u16,
         table: &[(String, PC)],
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
+        let ep = self.endpoint_from_reg(coro_idx, chan)?;
+        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
+            return Err(Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            });
+        }
+        let sid = ep.sid;
+
         let local_type = self
             .sessions
-            .lookup_type(ep)
+            .lookup_type(&ep)
             .ok_or_else(|| Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
@@ -1834,10 +1972,10 @@ impl VM {
         })?;
         if !session.has_message(&partner, role) {
             return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::RecvWait {
-                    edge: Edge::new(sid, partner.clone(), role.to_string()),
-                    token: ep.clone(),
-                }),
+                    coro_update: CoroUpdate::Block(BlockReason::RecvWait {
+                        edge: Edge::new(sid, partner.clone(), role.to_string()),
+                        token: ProgressToken::for_endpoint(ep.clone()),
+                    }),
                 type_update: None,
                 events: vec![],
             });
@@ -1850,12 +1988,12 @@ impl VM {
                 endpoint: ep.clone(),
             })?;
         let label = match &val {
-            Value::Label(l) => l.clone(),
+            Value::Str(l) => l.clone(),
             _ => {
                 return Err(Fault::TypeViolation {
-                    expected: telltale_types::ValType::Unit,
+                    expected: telltale_types::ValType::String,
                     actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: Choose expected Label value, got {val:?}"),
+                    message: format!("{role}: Choose expected String label, got {val:?}"),
                 });
             }
         };
@@ -1886,8 +2024,8 @@ impl VM {
             )
             .map_err(|e| Fault::InvokeFault { message: e })?;
 
-        let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
-        let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
+        let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
+        let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
 
         Ok(StepPack {
             coro_update: CoroUpdate::SetPc(target_pc),
@@ -1914,15 +2052,22 @@ impl VM {
     pub(crate) fn step_offer(
         &mut self,
         coro_idx: usize,
-        ep: &Endpoint,
         role: &str,
-        sid: SessionId,
+        chan: u16,
         label: &str,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
+        let ep = self.endpoint_from_reg(coro_idx, chan)?;
+        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
+            return Err(Fault::ChannelClosed {
+                endpoint: ep.clone(),
+            });
+        }
+        let sid = ep.sid;
+
         let local_type = self
             .sessions
-            .lookup_type(ep)
+            .lookup_type(&ep)
             .ok_or_else(|| Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
@@ -1952,7 +2097,7 @@ impl VM {
                         &partner,
                         label,
                         &self.coroutines[coro_idx].regs,
-                        Some(Value::Label(label.to_string())),
+                        Some(Value::Str(label.to_string())),
                     )
                     .map_err(|e| Fault::InvokeFault { message: e })?;
                 let session = self
@@ -1986,8 +2131,8 @@ impl VM {
                     EnqueueResult::Dropped => {}
                 }
 
-                let original = self.sessions.original_type(ep).unwrap_or(&LocalTypeR::End);
-                let (_resolved, type_update) = resolve_type_update(&continuation, original, ep);
+                let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
+                let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
 
                 Ok(StepPack {
                     coro_update: CoroUpdate::AdvancePc,
@@ -2018,7 +2163,14 @@ impl VM {
     }
 
     /// Close: close session, remove type entry.
-    pub(crate) fn step_close(&mut self, ep: &Endpoint, sid: SessionId) -> Result<StepPack, Fault> {
+    pub(crate) fn step_close(&mut self, coro_idx: usize, session: u16) -> Result<StepPack, Fault> {
+        let ep = self.endpoint_from_reg(coro_idx, session)?;
+        if !self.coroutines[coro_idx].owned_endpoints.contains(&ep) {
+            return Err(Fault::CloseFault {
+                message: "endpoint not owned".to_string(),
+            });
+        }
+        let sid = ep.sid;
         self.sessions
             .close(sid)
             .map_err(|e| Fault::CloseFault { message: e })?;
@@ -2026,7 +2178,7 @@ impl VM {
 
         Ok(StepPack {
             coro_update: CoroUpdate::AdvancePc,
-            type_update: Some((ep.clone(), TypeUpdate::Remove)),
+            type_update: Some((ep, TypeUpdate::Remove)),
             events: vec![
                 ObsEvent::Closed {
                     tick: self.clock.tick,
@@ -2045,7 +2197,7 @@ impl VM {
     pub(crate) fn step_open(
         &mut self,
         coro_idx: usize,
-        role: &str,
+        _role: &str,
         roles: &[String],
         endpoints: &[(String, u16)],
     ) -> Result<StepPack, Fault> {
@@ -2055,23 +2207,28 @@ impl VM {
             &std::collections::BTreeMap::new(),
         );
 
-        let mut coro_update = CoroUpdate::AdvancePc;
-        if let Some((_, reg)) = endpoints.iter().find(|(r, _)| r == role) {
+        for (_, reg) in endpoints {
             if usize::from(*reg) >= self.coroutines[coro_idx].regs.len() {
                 return Err(Fault::OutOfRegisters);
             }
-            let ep = Endpoint {
-                sid,
-                role: role.to_string(),
-            };
-            coro_update = CoroUpdate::AdvancePcWriteReg {
-                reg: *reg,
-                val: Value::Endpoint(ep),
-            };
+        }
+
+        {
+            let coro = &mut self.coroutines[coro_idx];
+            for (endpoint_role, reg) in endpoints {
+                let ep = Endpoint {
+                    sid,
+                    role: endpoint_role.clone(),
+                };
+                coro.regs[usize::from(*reg)] = Value::Endpoint(ep.clone());
+                if !coro.owned_endpoints.contains(&ep) {
+                    coro.owned_endpoints.push(ep);
+                }
+            }
         }
 
         Ok(StepPack {
-            coro_update,
+            coro_update: CoroUpdate::AdvancePc,
             type_update: None,
             events: vec![ObsEvent::Opened {
                 tick: self.clock.tick,
@@ -2318,7 +2475,7 @@ mod tests {
     use super::*;
     use crate::instr::Instr;
     use crate::loader::CodeImage;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use telltale_types::{GlobalType, Label, LocalTypeR};
 
     /// Trivial handler that passes values through.
@@ -2332,7 +2489,7 @@ mod tests {
             _label: &str,
             _state: &[Value],
         ) -> Result<Value, String> {
-            Ok(Value::Int(42))
+            Ok(Value::Nat(42))
         }
 
         fn handle_recv(
@@ -2375,6 +2532,18 @@ mod tests {
             _label: &str,
             _state: &[Value],
         ) -> Result<Value, String> {
+            Err("send failed".to_string())
+        }
+
+        fn send_decision(
+            &self,
+            _sid: SessionId,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+            _payload: Option<Value>,
+        ) -> Result<SendDecision, String> {
             Err("send failed".to_string())
         }
 
@@ -3160,6 +3329,107 @@ mod tests {
             .collect();
         assert!(kinds.contains(&"send_decision"));
         assert!(kinds.contains(&"handle_recv"));
+    }
+
+    #[test]
+    fn test_transfer_moves_progress_tokens_with_endpoint() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig::default());
+        let sid = vm.load_choreography(&image).unwrap();
+
+        let a_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "A")
+            .expect("A coroutine exists");
+        let b_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "B")
+            .expect("B coroutine exists");
+
+        let ep_a = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+        vm.coroutines[a_idx]
+            .progress_tokens
+            .push(ProgressToken::for_endpoint(ep_a.clone()));
+        vm.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a.clone());
+        vm.coroutines[a_idx].regs[3] = Value::Nat(vm.coroutines[b_idx].id as u64);
+
+        let a_program_id = vm.coroutines[a_idx].program_id;
+        vm.programs[a_program_id] = vec![
+            Instr::Transfer {
+                endpoint: 2,
+                target: 3,
+                bundle: 0,
+            },
+            Instr::Halt,
+        ];
+
+        let handler = PassthroughHandler;
+        // Intentionally discard StepResult: we only care that the step executes without panic
+        let _ = vm.step(&handler).expect("transfer step should succeed");
+
+        assert!(vm.coroutines[a_idx].progress_tokens.is_empty());
+        assert!(vm.coroutines[b_idx]
+            .progress_tokens
+            .iter()
+            .any(|t| t.sid == sid && t.endpoint == ep_a));
+    }
+
+    #[test]
+    fn test_check_applies_flow_policy() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut denied_roles = BTreeSet::new();
+        denied_roles.insert("Observer".to_string());
+        let mut vm = VM::new(VMConfig {
+            flow_policy: FlowPolicy::DenyRoles(denied_roles),
+            ..VMConfig::default()
+        });
+        let sid = vm.load_choreography(&image).unwrap();
+
+        let a_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "A")
+            .expect("A coroutine exists");
+        let ep_a = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+
+        vm.coroutines[a_idx].knowledge_set.push(crate::coroutine::KnowledgeFact {
+            endpoint: ep_a.clone(),
+            fact: "secret".to_string(),
+        });
+        vm.coroutines[a_idx].regs[2] = Value::Prod(
+            Box::new(Value::Endpoint(ep_a)),
+            Box::new(Value::Str("secret".to_string())),
+        );
+        vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
+
+        let a_program_id = vm.coroutines[a_idx].program_id;
+        vm.programs[a_program_id] = vec![
+            Instr::Check {
+                knowledge: 2,
+                target: 3,
+                dst: 4,
+            },
+            Instr::Halt,
+        ];
+
+        let handler = PassthroughHandler;
+        // Intentionally discard StepResult: we only care that the step executes without panic
+        let _ = vm.step(&handler).expect("check step should succeed");
+        assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(false));
     }
 
     #[test]

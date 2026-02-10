@@ -253,11 +253,11 @@ mod tests {
     #[test]
     fn test_fifo_basic() {
         let mut buf = BoundedBuffer::new(&BufferConfig::default());
-        buf.enqueue(Value::Int(1));
-        buf.enqueue(Value::Int(2));
+        buf.enqueue(Value::Nat(1));
+        buf.enqueue(Value::Nat(2));
         assert_eq!(buf.len(), 2);
-        assert_eq!(buf.dequeue(), Some(Value::Int(1)));
-        assert_eq!(buf.dequeue(), Some(Value::Int(2)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(1)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(2)));
         assert!(buf.is_empty());
     }
 
@@ -269,15 +269,15 @@ mod tests {
         };
         let mut buf = BoundedBuffer::new(&config);
 
-        buf.enqueue(Value::Int(1));
-        buf.enqueue(Value::Int(2));
+        buf.enqueue(Value::Nat(1));
+        buf.enqueue(Value::Nat(2));
         buf.dequeue(); // remove 1
-        buf.enqueue(Value::Int(3));
-        buf.enqueue(Value::Int(4));
+        buf.enqueue(Value::Nat(3));
+        buf.enqueue(Value::Nat(4));
 
-        assert_eq!(buf.dequeue(), Some(Value::Int(2)));
-        assert_eq!(buf.dequeue(), Some(Value::Int(3)));
-        assert_eq!(buf.dequeue(), Some(Value::Int(4)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(2)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(3)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(4)));
         assert!(buf.is_empty());
     }
 
@@ -290,11 +290,11 @@ mod tests {
         };
         let mut buf = BoundedBuffer::new(&config);
 
-        buf.enqueue(Value::Int(1));
-        buf.enqueue(Value::Int(2));
-        buf.enqueue(Value::Int(3));
+        buf.enqueue(Value::Nat(1));
+        buf.enqueue(Value::Nat(2));
+        buf.enqueue(Value::Nat(3));
 
-        assert_eq!(buf.dequeue(), Some(Value::Int(3)));
+        assert_eq!(buf.dequeue(), Some(Value::Nat(3)));
         assert!(buf.is_empty());
     }
 
@@ -306,10 +306,10 @@ mod tests {
             ..Default::default()
         };
         let mut buf = BoundedBuffer::new(&config);
-        buf.enqueue(Value::Int(1));
-        buf.enqueue(Value::Int(2));
+        buf.enqueue(Value::Nat(1));
+        buf.enqueue(Value::Nat(2));
         assert!(matches!(
-            buf.enqueue(Value::Int(3)),
+            buf.enqueue(Value::Nat(3)),
             EnqueueResult::WouldBlock
         ));
     }
@@ -322,9 +322,9 @@ mod tests {
             ..Default::default()
         };
         let mut buf = BoundedBuffer::new(&config);
-        buf.enqueue(Value::Int(1));
-        buf.enqueue(Value::Int(2));
-        assert!(matches!(buf.enqueue(Value::Int(3)), EnqueueResult::Ok));
+        buf.enqueue(Value::Nat(1));
+        buf.enqueue(Value::Nat(2));
+        assert!(matches!(buf.enqueue(Value::Nat(3)), EnqueueResult::Ok));
         assert_eq!(buf.len(), 3);
     }
 
@@ -332,7 +332,7 @@ mod tests {
     fn test_signed_buffer_alias_and_enqueue_result_mapping() {
         let edge = Edge::new(7usize, "A", "B");
         let signed = SignedValue {
-            payload: Value::Int(9),
+            payload: Value::Nat(9),
             signature: vec![0_u8, 1_u8],
         };
         let mut buffers: SignedBuffers<Vec<u8>> = BTreeMap::new();

@@ -10,8 +10,8 @@ pub(crate) fn values_to_f64s(values: &[Value]) -> Vec<FixedQ32> {
     values
         .iter()
         .filter_map(|v| match v {
-            Value::Real(r) => Some(*r),
-            Value::Int(i) => FixedQ32::try_from_i64(*i).ok(),
+            Value::Q32(r) => Some(*r),
+            Value::Nat(n) => FixedQ32::try_from_i64(*n as i64).ok(),
             _ => None,
         })
         .collect()
@@ -27,7 +27,7 @@ pub(crate) fn registers_to_f64s(values: &[Value]) -> Vec<FixedQ32> {
 
 /// Convert numeric state values into VM register values.
 pub(crate) fn f64s_to_values(state: &[FixedQ32]) -> Vec<Value> {
-    state.iter().copied().map(Value::Real).collect()
+    state.iter().copied().map(Value::Q32).collect()
 }
 
 /// Overwrite the numeric portion of a register file with new state values.
@@ -40,9 +40,9 @@ pub(crate) fn write_f64s(state: &mut Vec<Value>, values: &[FixedQ32]) {
     for (i, &v) in values.iter().enumerate() {
         let idx = i + 2;
         if idx < state.len() {
-            state[idx] = Value::Real(v);
+            state[idx] = Value::Q32(v);
         } else {
-            state.push(Value::Real(v));
+            state.push(Value::Q32(v));
         }
     }
 }
@@ -50,18 +50,14 @@ pub(crate) fn write_f64s(state: &mut Vec<Value>, values: &[FixedQ32]) {
 /// Convert a payload value to a scalar FixedQ32.
 pub(crate) fn value_to_f64(value: &Value) -> Result<FixedQ32, String> {
     match value {
-        Value::Real(r) => Ok(*r),
-        Value::Int(i) => {
-            FixedQ32::try_from_i64(*i).map_err(|e| format!("int conversion error: {e}"))
-        }
-        Value::Vec(v) => v
+        Value::Q32(r) => Ok(*r),
+        Value::Q32Vec(v) => v
             .first()
             .copied()
             .ok_or_else(|| "empty vector payload".into()),
-        Value::Json(v) => v
-            .as_f64()
-            .map(FixedQ32::from)
-            .ok_or_else(|| "non-numeric json payload".into()),
+        Value::Nat(n) => {
+            FixedQ32::try_from_i64(*n as i64).map_err(|e| format!("nat conversion error: {e}"))
+        }
         other => Err(format!("unsupported payload: {other:?}")),
     }
 }

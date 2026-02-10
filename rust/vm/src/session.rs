@@ -529,12 +529,12 @@ mod tests {
         );
 
         let session = store.get_mut(sid).unwrap();
-        session.send("A", "B", Value::Int(42)).unwrap();
+        session.send("A", "B", Value::Nat(42)).unwrap();
         assert!(session.has_message("A", "B"));
         assert!(!session.has_message("B", "A"));
 
         let val = session.recv("A", "B");
-        assert_eq!(val, Some(Value::Int(42)));
+        assert_eq!(val, Some(Value::Nat(42)));
     }
 
     #[test]
@@ -556,7 +556,7 @@ mod tests {
         store
             .get_mut(sid1)
             .unwrap()
-            .send("A", "B", Value::Int(1))
+            .send("A", "B", Value::Nat(1))
             .unwrap();
         assert!(!store.get(sid2).unwrap().has_message("A", "B"));
     }

@@ -254,6 +254,7 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coroutine::ProgressToken;
     use crate::instr::Endpoint;
     use crate::session::Edge;
 
@@ -281,10 +282,10 @@ mod tests {
             0,
             BlockReason::RecvWait {
                 edge: Edge::new(0, "B", "A"),
-                token: Endpoint {
+                token: ProgressToken::for_endpoint(Endpoint {
                     sid: 0,
                     role: "A".into(),
-                },
+                }),
             },
         );
         assert_eq!(sched.ready_count(), 1);

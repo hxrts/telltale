@@ -25,19 +25,17 @@ pub(crate) fn step_instr(
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
     match instr {
-        Instr::Send { val, .. } => comm::step_send(vm, coro_idx, ep, role, sid, val, handler),
-        Instr::Receive { dst, .. } => comm::step_receive(vm, coro_idx, ep, role, sid, dst, handler),
-        Instr::Offer { label, .. } => {
-            comm::step_offer(vm, coro_idx, ep, role, sid, &label, handler)
-        }
-        Instr::Choose { table, .. } => {
-            comm::step_choose(vm, coro_idx, ep, role, sid, &table, handler)
+        Instr::Send { chan, val } => comm::step_send(vm, coro_idx, role, chan, val, handler),
+        Instr::Receive { chan, dst } => comm::step_receive(vm, coro_idx, role, chan, dst, handler),
+        Instr::Offer { chan, label } => comm::step_offer(vm, coro_idx, role, chan, &label, handler),
+        Instr::Choose { chan, table } => {
+            comm::step_choose(vm, coro_idx, role, chan, &table, handler)
         }
         Instr::Open { roles, endpoints } => {
             session::step_open(vm, coro_idx, role, &roles, &endpoints)
         }
-        Instr::Close { .. } => session::step_close(vm, ep, sid),
-        Instr::Invoke { .. } => guard_effect::step_invoke(vm, coro_idx, role, handler),
+        Instr::Close { session } => session::step_close(vm, coro_idx, session),
+        Instr::Invoke { action, dst } => guard_effect::step_invoke(vm, coro_idx, role, action, dst, handler),
         Instr::Acquire { layer, dst } => {
             guard_effect::step_acquire(vm, coro_idx, ep, role, sid, &layer, dst, handler)
         }

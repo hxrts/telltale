@@ -132,21 +132,21 @@ fn fuzz_random_buffer_operations() {
             policy: BackpressurePolicy::Block,
         };
         let mut buf = BoundedBuffer::new(&config);
-        let mut expected: Vec<i64> = Vec::new();
-        let mut next_val = 0i64;
+        let mut expected: Vec<u64> = Vec::new();
+        let mut next_val = 0u64;
 
         for _ in 0..n {
             let op_tree = op_strategy.new_tree(&mut runner).unwrap();
             let enqueue = op_tree.current();
 
             if enqueue {
-                buf.enqueue(Value::Int(next_val));
+                buf.enqueue(Value::Nat(next_val));
                 expected.push(next_val);
                 next_val += 1;
             } else if !expected.is_empty() {
                 let val = buf.dequeue();
                 let exp = expected.remove(0);
-                assert_eq!(val, Some(Value::Int(exp)));
+                assert_eq!(val, Some(Value::Nat(exp)));
             }
 
             assert_eq!(buf.len(), expected.len());

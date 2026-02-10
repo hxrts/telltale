@@ -77,7 +77,7 @@ fn transfer_image() -> CodeImage {
             Instr::Invoke { action: 0, dst: 0 },
             Instr::Set {
                 dst: 1,
-                val: ImmValue::Int(1),
+                val: ImmValue::Nat(1),
             },
             Instr::Transfer {
                 endpoint: 0,

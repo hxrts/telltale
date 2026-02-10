@@ -32,7 +32,7 @@ impl EffectHandler for IsingHandler {
         state: &[Value],
     ) -> Result<Value, String> {
         // Send current concentrations as the payload.
-        Ok(Value::Vec(registers_to_f64s(state)))
+        Ok(Value::Q32Vec(registers_to_f64s(state)))
     }
 
     fn handle_recv(
@@ -187,6 +187,6 @@ mod tests {
         let payload = handler
             .handle_send("A", "B", "concentration", &state)
             .unwrap();
-        assert_eq!(payload, Value::Vec(vec![v06, v04]));
+        assert_eq!(payload, Value::Q32Vec(vec![v06, v04]));
     }
 }

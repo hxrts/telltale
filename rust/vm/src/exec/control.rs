@@ -10,8 +10,7 @@ use crate::vm::{CoroUpdate, StepPack, VM};
 pub(crate) fn step_set(dst: u16, val: ImmValue) -> StepPack {
     let value = match val {
         ImmValue::Unit => Value::Unit,
-        ImmValue::Int(i) => Value::Int(i),
-        ImmValue::Real(r) => Value::Real(r),
+        ImmValue::Nat(n) => Value::Nat(n),
         ImmValue::Bool(b) => Value::Bool(b),
         ImmValue::Str(s) => Value::Str(s),
     };

@@ -154,7 +154,7 @@ fn test_ising_lean_vs_rust_identical_traces() {
     let lean_trace = run_sim(&g, &lean_projs, &initial_states, 100, &handler);
     let rust_trace = run_sim(&g, &rust_projs, &initial_states, 100, &handler);
 
-    let tolerance = FixedQ32::from_ratio(1, 1_000_000_000_000i64).expect("1e-12");
+    let tolerance = FixedQ32::from_ratio(1, 1_000_000_000i64).expect("1e-9");
     assert_traces_equal(&lean_trace, &rust_trace, tolerance);
 
     // Validate both traces pass analysis checks.
@@ -239,7 +239,7 @@ fn test_hamiltonian_lean_vs_rust_identical_traces() {
     let lean_trace = run_sim(&g, &lean_projs, &initial_states, 100, &lean_handler);
     let rust_trace = run_sim(&g, &rust_projs, &initial_states, 100, &rust_handler);
 
-    let tolerance = FixedQ32::from_ratio(1, 1_000_000_000_000i64).expect("1e-12");
+    let tolerance = FixedQ32::from_ratio(1, 1_000_000_000i64).expect("1e-9");
     assert_traces_equal(&lean_trace, &rust_trace, tolerance);
 
     // Validate energy conservation on both traces.

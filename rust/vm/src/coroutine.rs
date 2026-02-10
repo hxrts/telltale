@@ -17,7 +17,24 @@ fn default_cost_budget() -> usize {
 pub type RegFile = Vec<Value>;
 
 /// Progress-token representation aligned with the Lean VM model.
-pub type ProgressToken = Endpoint;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgressToken {
+    /// Session this token is scoped to.
+    pub sid: SessionId,
+    /// Endpoint this token authorizes progress for.
+    pub endpoint: Endpoint,
+}
+
+impl ProgressToken {
+    /// Construct a token from an endpoint.
+    #[must_use]
+    pub fn for_endpoint(endpoint: Endpoint) -> Self {
+        Self {
+            sid: endpoint.sid,
+            endpoint,
+        }
+    }
+}
 
 /// Effect-context placeholder aligned with the Lean VM model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,29 +54,20 @@ impl<E> Default for EffectCtx<E> {
 pub enum Value {
     /// Unit / no value.
     Unit,
-    /// Integer.
-    Int(i64),
-    /// Floating-point.
-    Real(FixedQ32),
+    /// Natural number (Lean-compatible).
+    Nat(u64),
     /// Boolean.
     Bool(bool),
     /// String.
     Str(String),
-    /// Vector of floats (for physical state vectors).
-    Vec(Vec<FixedQ32>),
-    /// Label name (for choice/offer).
-    Label(String),
-    /// JSON value (for interop with effect handlers).
-    Json(serde_json::Value),
+    /// Product pair value (Lean-compatible).
+    Prod(Box<Value>, Box<Value>),
     /// Endpoint reference for ownership and guard operations.
     Endpoint(Endpoint),
-    /// Knowledge fact used by tag/check.
-    Knowledge {
-        /// Endpoint referenced by the fact.
-        endpoint: Endpoint,
-        /// Fact payload.
-        fact: String,
-    },
+    /// Fixed-point Q32.32 number for deterministic simulation.
+    Q32(FixedQ32),
+    /// Vector of fixed-point Q32.32 numbers for deterministic simulation.
+    Q32Vec(Vec<FixedQ32>),
 }
 
 /// Coroutine execution status.
