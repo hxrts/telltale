@@ -7,6 +7,8 @@ CProjectU EQ2 closure: CProjectUEQ2Rel and postfix cases for end, var, mu.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

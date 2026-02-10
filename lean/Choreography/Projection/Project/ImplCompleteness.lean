@@ -114,7 +114,7 @@ but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction lemma
 3. Modify CProjectF to accept mu-wrapped candidates (major change)
 4. Prove auxiliary lemmas showing EQ2 preserves "canonical forms" for each constructor
 
-We now proceed without this EQ2-closed projection scaffold and rely on the
+We now proceed without this EQ2-closed projection setup and rely on the
 `trans_eq_of_CProject` path for constructing `trans` projections. -/
 
 /-- CProject implies EQ2 between the candidate and `trans` (wrapper lemma). -/

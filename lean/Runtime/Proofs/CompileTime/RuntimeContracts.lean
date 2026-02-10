@@ -3,7 +3,7 @@ import Runtime.VM.Runtime.Scheduler
 
 set_option autoImplicit false
 
-/-! # Runtime.Proofs.RuntimeContracts
+/-! # Runtime.Proofs.CompileTime.RuntimeContracts
 
 Lean-facing runtime contract surface for proof-carrying VM admission and
 capability gating. This module packages the contract classes referenced by the
@@ -39,8 +39,6 @@ requires scheduler evidence plus theorem-pack evidence in one proof space. -/
 structure ProtocolAdmissionContract (store₀ : SessionStore ν) where
   proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀
   proofPack : VMProtocolProofPack (proofSpace := proofSpace)
-  linkingCertified : Prop := True
-  theoremPackCertified : Prop := True
 
 /-- Proof-guided concurrency contract: runtime may step coroutines in parallel
 only when a proof-level eligibility predicate certifies the pair. -/
@@ -48,7 +46,7 @@ structure ProofGuidedConcurrencyContract (st₀ : VMState ι γ π ε ν) where
   eligible : CoroutineId → CoroutineId → Prop
   symmetric : ∀ a b, eligible a b → eligible b a
   irreflexive : ∀ a, ¬ eligible a a
-  frameGuarded : ∀ a b, eligible a b → True
+  frameGuarded : ∀ a b, eligible a b → a ≠ b
 
 /-- Scheduler profile contract: runtime policy selection is backed by a certified
 scheduler bundle and profile extraction theorem. -/
@@ -91,9 +89,9 @@ def TheoremPackCapabilityContract.ofProofSpace
     {store₀ : SessionStore ν} {State : Type}
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) :
     TheoremPackCapabilityContract space :=
-  let pack := buildVMTheoremPack (space := space)
+  let pack := Runtime.Proofs.TheoremPackAPI.mk (space := space)
   { theoremPack := pack
-  , capabilityInventory := theoremInventory (space := space) pack
+  , capabilityInventory := Runtime.Proofs.TheoremPackAPI.capabilities (space := space) pack
   }
 
 end

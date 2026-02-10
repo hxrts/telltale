@@ -67,6 +67,13 @@ guarantees that every coherent protocol execution eventually terminates.
 - See also `Protocol/Coherence/Lyapunov.lean` for the session-types instantiation.
 -/
 
+/-
+The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
+Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+-/
+
+/-! ## Core Development -/
+
 namespace Classical
 namespace FosterLyapunovHarris
 
@@ -111,7 +118,7 @@ theorem iterate_nonincrease (s : α) :
 /-- When V > 0, every step makes strict progress.
 
     For protocols: a coherent configuration with pending work (non-empty buffers or
-    incomplete types) can always take a step that reduces the progress measure. -/
+    nonterminal types) can always take a step that reduces the progress measure. -/
 theorem strictly_decreases_on_pos (s : α) (hpos : S.V s ≠ 0) :
     S.V (S.step s) < S.V s :=
   S.strict_on_pos s hpos

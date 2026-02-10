@@ -19,10 +19,8 @@ import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Classical
 import Runtime.Proofs.Adapters.Distributed
-import Runtime.Proofs.DeterminismApi
-import Runtime.Proofs.TheoremPack
+import Runtime.Proofs.TheoremPack.API
 import Runtime.Proofs.SchedulerTheoremPack
-import Runtime.Proofs.RuntimeContracts
 import IrisExtractionInstance
 
 /- 

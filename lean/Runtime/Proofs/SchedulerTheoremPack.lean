@@ -1,7 +1,9 @@
 import Runtime.Proofs.SchedulerApi
-import Runtime.Proofs.TheoremPack
+import Runtime.Proofs.TheoremPack.API
 
 set_option autoImplicit false
+
+/-! ## Core Development -/
 
 namespace Runtime
 namespace Proofs
@@ -131,7 +133,7 @@ def buildVMProtocolProofPack
     (proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     VMProtocolProofPack (proofSpace := proofSpace) :=
   { scheduler := buildVMSchedulerArtifact proofSpace.scheduler
-  , theorems := buildVMTheoremPack (space := proofSpace.profiles)
+  , theorems := Runtime.Proofs.TheoremPackAPI.mk (space := proofSpace.profiles)
   }
 
 /-- Compact inventory for the combined proof pack. -/
@@ -148,7 +150,7 @@ def protocolProofInventory
   , ("scheduler_starvation_free", true)
   , ("scheduler_cooperative_refinement", true)
   , ("scheduler_cooperative_normalization", pack.scheduler.cooperative?.isSome)
-  ] ++ theoremInventory (space := proofSpace.profiles) pack.theorems
+  ] ++ Runtime.Proofs.TheoremPackAPI.capabilities (space := proofSpace.profiles) pack.theorems
 
 /-- Iris scheduler invariance extracted from protocol proof-space scheduler evidence. -/
 theorem scheduler_irisInvariant_from_protocolSpace [Telltale.TelltaleIris]

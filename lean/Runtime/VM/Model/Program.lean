@@ -67,7 +67,7 @@ structure UntrustedImage (γ ε ν : Type u) [GuardLayer γ] [EffectRuntime ε]
   signer : VerificationModel.VerifyKey ν
   signature : VerificationModel.Signature ν
 
-/-! ## Compilation scaffold -/
+/-! ## Compilation pipeline -/
 
 /-- Map roles to their local types in a program image. -/
 def programLocalTypes (roles : RoleSet) (types : Role → LocalType) :

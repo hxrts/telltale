@@ -1,6 +1,19 @@
 import Classical
 import Protocol.Classical.Regime
 
+/- 
+The Problem. The protocol layer needs a reusable bridge from coherence-step
+evolution to the generic classical transport theorems.
+
+Solution Structure. Package protocol evolution as a transport framework and
+prove adapters that instantiate the shared classical-regime interfaces.
+-/
+
+/-! # Protocol.Classical.Framework
+
+Protocol-facing transport framework wrappers for classical-regime results.
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -9,6 +22,8 @@ set_option linter.unnecessarySimpa false
 open scoped Classical
 
 section
+
+/-! ## Core Development -/
 
 namespace ProtocolClassical
 
@@ -82,7 +97,6 @@ abbrev MeanFieldInput := Classical.Transport.MeanFieldInput
 abbrev HeavyTrafficInput := Classical.Transport.HeavyTrafficInput
 abbrev MixingInput := Classical.Transport.MixingInput
 abbrev FluidInput := Classical.Transport.FluidInput
-abbrev ConcentrationInput := Classical.Transport.ConcentrationInput
 abbrev LittlesLawInput := Classical.Transport.LittlesLawInput
 abbrev FunctionalCLTInput := Classical.Transport.FunctionalCLTInput
 
@@ -111,7 +125,7 @@ theorem transport_fluidLimit (input : FluidInput) :
     Classical.Transport.FluidConclusion input :=
   Classical.Transport.transported_fluidLimit input
 
-theorem transport_concentration (input : ConcentrationInput) :
+theorem transport_concentration (input : Classical.Transport.ConcentrationInput) :
     Classical.Transport.ConcentrationConclusion input :=
   Classical.Transport.transported_concentration input
 

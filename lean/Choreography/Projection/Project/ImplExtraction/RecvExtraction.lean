@@ -7,6 +7,8 @@ Recv extraction and mu-intermediate composition for observable structure.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

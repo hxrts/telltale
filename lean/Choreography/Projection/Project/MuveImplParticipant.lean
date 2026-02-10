@@ -5,6 +5,8 @@ import Choreography.Projection.Project.MuveImplNonPart
 Participant projection classification and part_of2_or_end theorem.
 -/
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

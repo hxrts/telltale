@@ -7,6 +7,8 @@ Send and recv constructor agreement with matching branches.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

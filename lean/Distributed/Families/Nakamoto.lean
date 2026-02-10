@@ -8,6 +8,13 @@ Reusable Nakamoto-style assumptions and theorem forms:
 - liveness under admissible churn.
 -/
 
+/-
+The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
+Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+-/
+
+/-! ## Core Development -/
+
 namespace Distributed
 namespace Nakamoto
 

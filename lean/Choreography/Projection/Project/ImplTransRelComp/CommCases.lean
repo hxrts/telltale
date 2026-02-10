@@ -7,6 +7,8 @@ Comm-level postfix cases for CProjectTransRel.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

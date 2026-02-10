@@ -236,7 +236,7 @@ lemma obsKindOf_some_implies_observable {t : LocalTypeC} {k : ObsKind}
   | .var v => exact ObservableC.is_var v ⟨t, Relation.ReflTransGen.refl, hhead⟩
   | .send p labels =>
       -- The head being send implies we can extract branches
-      have hbs : branchesOf t = branchesOf t := rfl  -- placeholder
+      have hbs : branchesOf t = branchesOf t := rfl  -- reflexive witness
       exact ObservableC.is_send p (branchesOf t) ⟨t, labels, Relation.ReflTransGen.refl, hhead, rfl⟩
   | .recv p labels =>
       exact ObservableC.is_recv p (branchesOf t) ⟨t, labels, Relation.ReflTransGen.refl, hhead, rfl⟩

@@ -1,8 +1,15 @@
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
-import Choreography.Projection.Trans
 import Choreography.Projection.ProjSubst
 import SessionCoTypes.EQ2
+
+/- 
+The Problem. Harmony proofs need mu-unfold equivalences that line up projected
+substitution with coinductive local-type equality.
+
+Solution Structure. Derive the crossed unfold lemmas from `proj_subst`, then
+prove guardedness/substitution helper lemmas used to discharge mismatched cases.
+-/
 
 /-! # Mu-Unfold Lemmas for Harmony
 

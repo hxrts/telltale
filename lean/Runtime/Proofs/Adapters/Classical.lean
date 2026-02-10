@@ -9,6 +9,8 @@ Adapters from invariant-space classical hypotheses to transported theorem
 artifacts.
 -/
 
+/-! ## Core Development -/
+
 namespace Runtime
 namespace Proofs
 namespace Adapters

@@ -7,7 +7,7 @@ import SessionCoTypes.Coinductive.ToInductive
 import SessionCoTypes.Coinductive.ToCoindInjectivity
 import SessionCoTypes.Coinductive.WellFormed
 import SessionTypes.LocalTypeR
-import Choreography.Projection.Trans
+import Choreography.Projection.Project
 
 set_option linter.dupNamespace false
 

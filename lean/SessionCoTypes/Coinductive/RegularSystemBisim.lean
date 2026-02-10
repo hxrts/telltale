@@ -22,6 +22,8 @@ Solution Structure.
 4. RegularBisim_isBisimulation: proof that this is a valid bisimulation
 -/
 
+/-! ## Core Development -/
+
 namespace SessionCoTypes.Coinductive
 
 open Classical

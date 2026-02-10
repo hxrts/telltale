@@ -7,6 +7,8 @@ Constructor agreement for end, var, and send/recv structural extraction.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

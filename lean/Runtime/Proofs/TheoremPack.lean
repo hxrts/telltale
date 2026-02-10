@@ -1,7 +1,7 @@
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Distributed
 import Runtime.Proofs.Adapters.Classical
-import Runtime.Proofs.DeterminismApi
+import Runtime.Proofs.CompileTime.DeterminismApi
 
 set_option autoImplicit false
 
@@ -10,6 +10,8 @@ set_option autoImplicit false
 One-shot theorem packaging from a VM invariant space carrying distributed and
 classical optional profiles.
 -/
+
+/-! ## Core Development -/
 
 namespace Runtime
 namespace Proofs
@@ -60,13 +62,30 @@ def VMInvariantSpaceWithProfiles.withClassicalProfiles
     VMInvariantSpaceWithProfiles store₀ State :=
   { space with classical := classical }
 
+/-- Generic distributed-profile updater used by profile-specific setters. -/
+private def VMInvariantSpaceWithProfiles.updateDistributedProfiles
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (update : Adapters.DistributedProfiles → Adapters.DistributedProfiles) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  { space with distributed := update space.distributed }
+
+/-- Generic classical-profile updater used by profile-specific setters. -/
+private def VMInvariantSpaceWithProfiles.updateClassicalProfiles
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (update : Adapters.ClassicalProfiles State → Adapters.ClassicalProfiles State) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  { space with classical := update space.classical }
+
 /-- Attach an FLP distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withFLP
     {store₀ : SessionStore ν} {State : Type v}
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FLPProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with flp? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with flp? := some p })
 
 /-- Attach a CAP distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withCAP
@@ -74,7 +93,8 @@ def VMInvariantSpaceWithProfiles.withCAP
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.CAPProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with cap? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with cap? := some p })
 
 /-- Attach a quorum-geometry distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withQuorumGeometry
@@ -82,7 +102,8 @@ def VMInvariantSpaceWithProfiles.withQuorumGeometry
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.QuorumGeometryProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with quorumGeometry? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with quorumGeometry? := some p })
 
 /-- Attach a partial-synchrony distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withPartialSynchrony
@@ -90,7 +111,8 @@ def VMInvariantSpaceWithProfiles.withPartialSynchrony
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.PartialSynchronyProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with partialSynchrony? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with partialSynchrony? := some p })
 
 /-- Attach a responsiveness distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withResponsiveness
@@ -98,7 +120,8 @@ def VMInvariantSpaceWithProfiles.withResponsiveness
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ResponsivenessProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with responsiveness? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with responsiveness? := some p })
 
 /-- Attach a Nakamoto distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withNakamoto
@@ -106,7 +129,8 @@ def VMInvariantSpaceWithProfiles.withNakamoto
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.NakamotoProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with nakamoto? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with nakamoto? := some p })
 
 /-- Attach a reconfiguration distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withReconfiguration
@@ -114,7 +138,8 @@ def VMInvariantSpaceWithProfiles.withReconfiguration
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ReconfigurationProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with reconfiguration? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with reconfiguration? := some p })
 
 /-- Attach an atomic-broadcast distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withAtomicBroadcast
@@ -122,7 +147,8 @@ def VMInvariantSpaceWithProfiles.withAtomicBroadcast
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.AtomicBroadcastProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with atomicBroadcast? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with atomicBroadcast? := some p })
 
 /-- Attach an accountable-safety distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withAccountableSafety
@@ -130,7 +156,8 @@ def VMInvariantSpaceWithProfiles.withAccountableSafety
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.AccountableSafetyProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with accountableSafety? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with accountableSafety? := some p })
 
 /-- Attach a failure-detector distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withFailureDetectors
@@ -138,7 +165,8 @@ def VMInvariantSpaceWithProfiles.withFailureDetectors
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FailureDetectorsProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with failureDetectors? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with failureDetectors? := some p })
 
 /-- Attach a data-availability distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withDataAvailability
@@ -146,7 +174,8 @@ def VMInvariantSpaceWithProfiles.withDataAvailability
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.DataAvailabilityProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with dataAvailability? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with dataAvailability? := some p })
 
 /-- Attach a coordination distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withCoordination
@@ -154,7 +183,8 @@ def VMInvariantSpaceWithProfiles.withCoordination
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.CoordinationProfile) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with distributed := { space.distributed with coordination? := some p } }
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with coordination? := some p })
 
 /-- Attach a Foster profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withFoster
@@ -162,7 +192,8 @@ def VMInvariantSpaceWithProfiles.withFoster
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FosterProfile State) :
     VMInvariantSpaceWithProfiles store₀ State :=
-  { space with classical := { space.classical with foster? := some p } }
+  VMInvariantSpaceWithProfiles.updateClassicalProfiles space
+    (fun classical => { classical with foster? := some p })
 
 /-- Packaged FLP lower-bound artifact. -/
 structure FLPLowerBoundArtifact where

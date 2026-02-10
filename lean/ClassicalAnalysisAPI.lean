@@ -11,9 +11,31 @@ Solution Structure.
 2. Define compact law interfaces (`Laws`, `AnalysisLaws`).
 3. Re-export operations and laws through stable wrappers.
 4. Keep concrete realizations in `ClassicalAnalysisInstance`.
+
+## Trust Boundary
+
+This file and `ClassicalAnalysisInstance.lean` form the explicit trust boundary
+for all noncomputable real-analysis assumptions in the project. A reviewer can:
+1. Verify the laws stated here match standard information theory
+2. Check `ClassicalAnalysisInstance` proves each law from Mathlib
+3. Run `lake build` to confirm type-correctness
+4. Run `just escape` to confirm no escapes outside this boundary
 -/
 
 /-! # ClassicalAnalysisAPI
+
+Abstract interface for information-theoretic and real-analysis operations.
+
+## Primary References
+
+- **Shannon (1948)**: "A Mathematical Theory of Communication." Bell System
+  Technical Journal. Introduces Shannon entropy H(X) = -∑ p(x) log p(x).
+
+- **Kullback & Leibler (1951)**: "On Information and Sufficiency." Annals of
+  Mathematical Statistics. Introduces KL divergence D(P‖Q) = ∑ p(x) log(p(x)/q(x)).
+
+- **Cover & Thomas (2006)**: "Elements of Information Theory" (2nd ed.).
+  Standard textbook; theorem numbers referenced below.
 
 ## Expose
 
@@ -93,31 +115,83 @@ def mutualInfo {α : Type*} {β : Type*} [Fintype α] [Fintype β]
 
 end Operations
 
-/-! ## Entropy Laws -/
+/-! ## Entropy Laws
 
-/-- Shannon entropy nonnegativity law. -/
+The following laws are the core information-theoretic properties required by
+downstream modules. Each corresponds to a standard theorem in information theory.
+-/
+
+/-- Shannon entropy nonnegativity law.
+
+**Statement**: H(X) ≥ 0 for any discrete random variable X.
+
+**Intuition**: Each term p(x) log p(x) is nonpositive on [0,1] (since log p ≤ 0
+when p ≤ 1), so negating the sum yields a nonnegative quantity.
+
+**Reference**: Shannon (1948) §6; Cover & Thomas Theorem 2.1.1. -/
 abbrev ShannonEntropyNonneg (M : Model) : Prop :=
   ∀ {α : Type*} [Fintype α], (d : Distribution α) →
     0 ≤ @Model.shannonEntropy M α _ d.pmf
 
-/-- Shannon entropy cardinality upper bound law. -/
+/-- Shannon entropy cardinality upper bound law.
+
+**Statement**: H(X) ≤ log|X| with equality iff X is uniformly distributed.
+
+**Intuition**: Entropy measures uncertainty. Maximum uncertainty occurs when all
+outcomes are equally likely. The uniform distribution achieves log|X| bits.
+Formally, this follows from D(P‖U) ≥ 0 where U is uniform.
+
+**Reference**: Cover & Thomas Theorem 2.6.4. -/
 abbrev ShannonEntropyLeLogCard (M : Model) : Prop :=
   ∀ {α : Type*} [Fintype α] [Nonempty α], (d : Distribution α) →
     @Model.shannonEntropy M α _ d.pmf ≤ Real.log (Fintype.card α)
 
-/-- KL nonnegativity law (Gibbs inequality). -/
+/-- KL divergence nonnegativity law (Gibbs' inequality).
+
+**Statement**: D(P‖Q) ≥ 0 for distributions P, Q with P absolutely continuous
+w.r.t. Q.
+
+**Intuition**: KL divergence measures the "extra bits" needed to encode samples
+from P using a code optimized for Q. You can never do better than the optimal
+code for P, so the overhead is nonnegative.
+
+**Proof sketch**: Apply Jensen's inequality to the convex function -log:
+  D(P‖Q) = E_P[-log(Q/P)] ≥ -log(E_P[Q/P]) = -log(1) = 0
+
+**Reference**: Kullback & Leibler (1951); Cover & Thomas Theorem 2.6.3. -/
 abbrev KlDivergenceNonneg (M : Model) : Prop :=
   ∀ {α : Type*} [Fintype α], (p q : Distribution α) →
     (∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) →
     0 ≤ @Model.klDivergence M α _ p.pmf q.pmf
 
-/-- Zero-KL characterization law. -/
+/-- KL divergence zero characterization law.
+
+**Statement**: D(P‖Q) = 0 if and only if P = Q (almost everywhere).
+
+**Intuition**: Zero divergence means P and Q are indistinguishable from an
+information-theoretic perspective. Strict convexity of -log implies Jensen's
+inequality is tight only when the argument is constant a.e., forcing P = Q.
+
+**Reference**: Cover & Thomas Theorem 2.6.3 (equality condition). -/
 abbrev KlDivergenceEqZeroIff (M : Model) : Prop :=
   ∀ {α : Type*} [Fintype α], (p q : Distribution α) →
     (∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) →
     (@Model.klDivergence M α _ p.pmf q.pmf = 0 ↔ p.pmf = q.pmf)
 
-/-- Erasure implies zero mutual information law. -/
+/-- Erasure implies zero mutual information law.
+
+**Statement**: If the observation channel is constant (all labels map to the
+same output), then I(Label; Observation) = 0.
+
+**Intuition**: Mutual information I(X;Y) = H(Y) - H(Y|X) measures how much
+knowing X reduces uncertainty about Y. If Y is deterministically fixed
+regardless of X, then H(Y) = H(Y|X) = 0, so I(X;Y) = 0.
+
+**Application**: This law is central to the blindness property in choreographic
+projection. When a non-participant role's observation function is constant
+across all branches, they learn nothing about which branch was taken.
+
+**Reference**: Cover & Thomas §2.8 (data processing inequality, extreme case). -/
 abbrev MutualInfoZeroOfErasure (M : Model) : Prop :=
   ∀ {L O : Type} [Fintype L] [Fintype O] [DecidableEq O],
     (labelDist : L → ℝ) →
@@ -183,23 +257,42 @@ theorem mutualInfo_zero_of_erasure {L O : Type}
 
 end Laws
 
-/-! ## Extended Analysis Operations -/
+/-! ## Extended Analysis Operations
 
-/-- Neutral operations for real/complex-analysis touchpoints. -/
+These operations support concentration inequalities and spectral analysis of
+Markov chains, used for quantitative protocol guarantees (mixing times,
+convergence rates).
+-/
+
+/-- Extended operations for real/complex-analysis touchpoints.
+
+These support:
+- **Concentration bounds**: `exponentialTail` for sub-Gaussian tails
+- **CLT scaling**: `fluctuationScale` = √n for normalized sums
+- **Ergodic averages**: `finiteAverage`, `normalizedCumulative`
+- **Spectral analysis**: transition matrix spectrum for mixing time bounds -/
 class AnalysisModel where
+  /-- Exponential tail bound 2·exp(-t²/2σ²) for sub-Gaussian concentration. -/
   exponentialTail : ℝ → ℝ → ℝ
+  /-- Fluctuation scale √n for CLT normalization. -/
   fluctuationScale : Nat → ℝ
+  /-- Arithmetic mean of a finite family. -/
   finiteAverage : {n : Nat} → (Fin n → ℝ) → ℝ
+  /-- Normalized cumulative sum (∑ᵢ₌₀ᵗ (xᵢ - μ)) / √N. -/
   normalizedCumulative : (Nat → ℝ) → ℝ → Nat → Nat → ℝ
+  /-- Lift real transition kernel to complex matrix for spectral analysis. -/
   transitionMatrixComplex :
     {State : Type*} → [Fintype State] → [DecidableEq State] →
       (State → State → ℝ) → Matrix State State ℂ
+  /-- Moduli of non-trivial eigenvalues (excluding the Perron eigenvalue 1). -/
   nontrivialSpectrumModuli :
     {State : Type*} → [Fintype State] → [DecidableEq State] →
       (State → State → ℝ) → Set ℝ
+  /-- Second-largest eigenvalue modulus (determines mixing rate). -/
   secondSpectrumValue :
     {State : Type*} → [Fintype State] → [DecidableEq State] →
       (State → State → ℝ) → ℝ
+  /-- Spectral gap 1 - λ₂ (larger gap = faster mixing). -/
   spectralGapValue :
     {State : Type*} → [Fintype State] → [DecidableEq State] →
       (State → State → ℝ) → ℝ
@@ -246,28 +339,46 @@ def spectralGapValue {State : Type*} [Fintype State] [DecidableEq State]
 
 end AnalysisOperations
 
-/-! ## Extended Analysis Laws -/
+/-! ## Extended Analysis Laws
 
-/-- Minimal laws required by downstream users of `AnalysisModel`. -/
+Laws for the extended analysis interface. These ensure the concrete
+implementations behave as expected for concentration and spectral arguments.
+-/
+
+/-- Laws for `AnalysisModel` ensuring semantic correctness.
+
+These laws capture:
+- Basic properties of exponential/Gaussian tails
+- √n scaling for CLT normalization
+- Permutation invariance of averages (exchangeability)
+- Spectral gap definition consistency -/
 class AnalysisLaws extends AnalysisModel where
+  /-- Exponential tails are nonnegative (probability bound). -/
   exponentialTail_nonneg :
     ∀ (σ t : ℝ), 0 ≤ toAnalysisModel.exponentialTail σ t
+  /-- At zero threshold, tail probability is 2 (two-sided bound covers all). -/
   exponentialTail_zero :
     ∀ (σ : ℝ), toAnalysisModel.exponentialTail σ 0 = 2
+  /-- Fluctuation scale is positive for positive sample size. -/
   fluctuationScale_pos :
     ∀ {n : Nat}, 0 < n → 0 < toAnalysisModel.fluctuationScale n
+  /-- Fluctuation scale squared equals sample size (√n property). -/
   fluctuationScale_sq :
     ∀ (n : Nat), (toAnalysisModel.fluctuationScale n) ^ 2 = n
+  /-- Finite averages are permutation-invariant (exchangeability). -/
   finiteAverage_perm :
     ∀ {n : Nat}, (σ : Equiv.Perm (Fin n)) → (x : Fin n → ℝ) →
       toAnalysisModel.finiteAverage (fun i => x (σ i)) =
       toAnalysisModel.finiteAverage x
+  /-- Average of a constant family is that constant. -/
   finiteAverage_const :
     ∀ {n : Nat}, (c : ℝ) → n ≠ 0 →
       toAnalysisModel.finiteAverage (fun _ : Fin n => c) = c
+  /-- Centered constant sequence has zero cumulative fluctuation. -/
   normalizedCumulative_const_zero :
     ∀ (c : ℝ) (N t : Nat), N ≠ 0 →
       toAnalysisModel.normalizedCumulative (fun _ => c) c N t = 0
+  /-- Spectral gap is 1 minus the second eigenvalue modulus. -/
   spectral_gap_eq :
     ∀ {State : Type*} [Fintype State] [DecidableEq State]
       (kernel : State → State → ℝ),

@@ -1,11 +1,6 @@
 import Runtime.VM.Runtime.Scheduler
 import Runtime.Proofs.VM.Scheduler
-
--- Note: Protocol.DeadlockFreedom is not imported here because it transitively
--- depends on Protocol.Typing.Framing which has pre-existing build errors.
--- Instead, we define a local copy of reachesCommDecide (7-line function on
--- LocalType) and reference the canonical version in the docstring.
--- TODO: fix rotocol.Typing.Framing and wire this back in
+import Protocol.DeadlockFreedom
 
 /-!
 # Progress Measure for Session Type Liveness
@@ -97,30 +92,19 @@ theorem progressMeasure_branch_pos (r : Role) (bs : List (Label × LocalType)) :
     0 < (LocalType.branch r bs).progressMeasure := by
   simp [LocalType.progressMeasure]
 
-/-- Local copy of `Protocol.DeadlockFreedom.reachesCommDecide`.
-    Checks whether a local type can reach a communication action. -/
-def reachesCommDecide' : LocalType → Bool
-  | .send _ _ _ => true
-  | .recv _ _ _ => true
-  | .select _ bs => !bs.isEmpty
-  | .branch _ bs => !bs.isEmpty
-  | .end_ => false
-  | .var _ => false
-  | .mu L => reachesCommDecide' L
-
 /-- Positive progress measure from the decidable reachability checker.
     Types that can reach communication have positive measure. -/
 theorem progressMeasure_pos_of_decide :
-    ∀ (L : LocalType), reachesCommDecide' L = true → 0 < L.progressMeasure
+    ∀ (L : LocalType), reachesCommDecide L = true → 0 < L.progressMeasure
   | .send r T L', _ => progressMeasure_send_pos r T L'
   | .recv r T L', _ => progressMeasure_recv_pos r T L'
   | .select r bs, _ => progressMeasure_select_pos r bs
   | .branch r bs, _ => progressMeasure_branch_pos r bs
-  | .end_, h => by simp [reachesCommDecide'] at h
-  | .var _, h => by simp [reachesCommDecide'] at h
+  | .end_, h => by simp [reachesCommDecide] at h
+  | .var _, h => by simp [reachesCommDecide] at h
   | .mu L', h => by
       simp only [LocalType.progressMeasure]
-      exact progressMeasure_pos_of_decide L' (by simp [reachesCommDecide'] at h; exact h)
+      exact progressMeasure_pos_of_decide L' (by simp [reachesCommDecide] at h; exact h)
 
 /-! ### Decrease under communication -/
 

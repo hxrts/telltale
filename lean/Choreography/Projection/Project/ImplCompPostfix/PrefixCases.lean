@@ -7,6 +7,8 @@ Prefix postfix cases dispatching on left constructor.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

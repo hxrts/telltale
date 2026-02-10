@@ -7,6 +7,8 @@ Suffix postfix cases and final CProjectTransRelComp_postfix theorem.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

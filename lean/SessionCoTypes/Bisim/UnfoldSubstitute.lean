@@ -8,6 +8,8 @@ Proves unfold_substitute_EQ2_via_Bisim: unfolding and substituting commute up to
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace SessionCoTypes.Bisim
 open SessionTypes.LocalTypeR
 open SessionTypes.GlobalType

@@ -16,7 +16,6 @@ import Protocol.Monitor
 import Protocol.Spatial
 import Protocol.Determinism
 import Protocol.Deployment
-import Protocol.Examples
 import Protocol.Simulation
 import Protocol.Decidability
 import Protocol.Classical

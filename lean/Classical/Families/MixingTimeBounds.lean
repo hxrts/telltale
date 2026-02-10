@@ -81,6 +81,13 @@ acts like a contractive map, ensuring the mixing rate ρ < 1.
 - See also `Runtime/Proofs/SchedulingChain.lean` for protocol mixing analysis.
 -/
 
+/-
+The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
+Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+-/
+
+/-! ## Core Development -/
+
 namespace Classical
 namespace MixingTimeBounds
 

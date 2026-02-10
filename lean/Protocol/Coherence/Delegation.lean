@@ -757,7 +757,7 @@ theorem delegation_preserves_coherent :
     exact coherent_case_other_session (G:=G) (G':=G') (D:=D) (D':=D')
       (s:=s) (A:=A) (B:=B) (e:=e) hCoh hDeleg hSid hActive
 
-/-- Delegation-specific wrapper for the unified preservation skeleton:
+/-- Delegation-specific wrapper for the unified preservation framework:
     delegation steps preserve `Coherent`. -/
 theorem delegation_preserves_coherent_unified
     {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role}

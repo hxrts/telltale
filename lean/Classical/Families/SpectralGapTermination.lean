@@ -1,6 +1,12 @@
 import Mathlib
 import ClassicalAnalysisAPI
 
+/-! # Classical.Families.SpectralGapTermination
+
+Spectral-gap assumptions and reusable termination-rate lemmas for finite-state
+Markov chains.
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
@@ -8,6 +14,13 @@ set_option autoImplicit false
 open scoped BigOperators
 
 section
+
+/-
+The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
+Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+-/
+
+/-! ## Core Development -/
 
 namespace Classical
 namespace SpectralGapTermination

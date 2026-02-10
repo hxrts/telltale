@@ -1,5 +1,7 @@
 import Choreography.Projection.Projectb.Soundness
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Projectb
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

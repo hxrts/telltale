@@ -3,6 +3,8 @@ import Runtime.Proofs.Concurrency
 
 set_option autoImplicit false
 
+/-! ## Core Development -/
+
 namespace Runtime
 namespace Proofs
 

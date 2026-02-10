@@ -79,6 +79,13 @@ buffer sizes and type depths.
 - See also `Runtime/Proofs/SchedulingBound.lean` for protocol tail bounds.
 -/
 
+/-
+The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
+Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+-/
+
+/-! ## Core Development -/
+
 namespace Classical
 namespace LargeDeviationPrinciple
 
@@ -95,7 +102,7 @@ def exponentialEnvelope (C ρ : Real) (n : Nat) : Real :=
 
 /-- The envelope decreases with each step when ρ ≤ 1.
 
-    For protocols: as time passes, the probability of being incomplete
+    For protocols: as time passes, the probability of not yet being done
     decreases exponentially. This is the quantitative version of liveness. -/
 theorem envelope_step_mono (C ρ : Real) (n : Nat)
     (hC : 0 ≤ C) (hρ₀ : 0 ≤ ρ) (hρ₁ : ρ ≤ 1) :
@@ -124,8 +131,8 @@ structure LDPWitness (p : Nat → Real) where
 
 /-- One-step tightening: the bound at step n+1 is at most the bound at step n.
 
-    For protocols: if we know P(incomplete at step n+1) ≤ C · ρⁿ⁺¹,
-    then we also know P(incomplete at step n+1) ≤ C · ρⁿ (a weaker bound).
+    For protocols: if we know P(not done at step n+1) ≤ C · ρⁿ⁺¹,
+    then we also know P(not done at step n+1) ≤ C · ρⁿ (a weaker bound).
     This allows trading precision for simpler calculations. -/
 theorem one_step_tightening {p : Nat → Real}
     (h : LDPWitness p) (n : Nat) :

@@ -1,6 +1,6 @@
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
-import Choreography.Projection.Trans
+import Choreography.Projection.Project
 import SessionCoTypes.EQ2
 
 /- 
@@ -26,7 +26,7 @@ This module proves that projection commutes appropriately with global stepping.
 
 ## Note on Reformulation
 
-The original placeholder lemma for sender steps required:
+The original draft lemma for sender steps required:
 ```
 projTrans g act.sender = .send act.receiver [(act.label, cont)]
 ```

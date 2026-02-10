@@ -197,7 +197,7 @@ theorem Coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
 
 /-! ## Unified Preservation Integration
 
-Subtype replacement is one of three preservation theorems in the unified skeleton
+Subtype replacement is one of three preservation theorems in the unified framework
 (see Protocol/Coherence/Unified.lean). The three are:
 
 1. **Protocol step preservation** (Preservation.lean): TypedStep preserves Coherent

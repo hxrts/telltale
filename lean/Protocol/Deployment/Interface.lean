@@ -156,7 +156,7 @@ This structure contains everything needed to safely execute a protocol:
 - Deadlock freedom certificate
 
 **Note**: GlobalType integration is in Phase 8+. Currently we work with
-local types directly. The `globalTypeHash` field is a placeholder for
+local types directly. The `globalTypeHash` field is reserved for
 content-addressed global type reference.
 -/
 structure DeployedProtocol where

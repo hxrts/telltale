@@ -1,7 +1,7 @@
 import SessionTypes.LocalTypeR
 import SessionCoTypes.EQ2
 import SessionCoTypes.EQ2Props
-import Choreography.Projection.Trans
+import Choreography.Projection.Project
 
 /-! # Full Unfolding for LocalTypeR
 

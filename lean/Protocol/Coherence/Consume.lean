@@ -1,5 +1,13 @@
 import Protocol.Environments
 
+/- 
+The Problem. Coherence proofs repeatedly need a precise operational account of
+how buffered traces advance local endpoint types.
+
+Solution Structure. Define `Consume`/`consumeOne`, then prove inversion and
+preservation lemmas used by send/recv/select/branch coherence arguments.
+-/
+
 /-!
 # MPST Coherence
 

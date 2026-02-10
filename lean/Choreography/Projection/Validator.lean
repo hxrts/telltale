@@ -11,6 +11,8 @@ CLI validator for Lean projection results.
 
 set_option autoImplicit false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Validator
 
 open Lean (Json)

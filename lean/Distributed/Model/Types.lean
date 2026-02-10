@@ -5,6 +5,8 @@ set_option autoImplicit false
 Core types for consensus model validation.
 -/
 
+/-! ## Core Development -/
+
 namespace Distributed
 
 /-- Timing assumptions for protocol execution. -/

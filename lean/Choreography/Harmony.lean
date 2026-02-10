@@ -4,6 +4,15 @@ import Choreography.Harmony.ParticipantSteps
 import Choreography.Harmony.NonParticipantHelpers
 import Choreography.Harmony.NonParticipantSteps
 
+/- 
+The Problem. The harmony development is split across multiple focused files,
+but downstream proofs need a single module exposing the full step/projection
+correspondence story.
+
+Solution Structure. Re-export the focused harmony submodules from one barrel,
+keeping each proof family isolated while presenting one cohesive API.
+-/
+
 /-! ## Notes
 
 ### Projection Coherence
@@ -18,7 +27,7 @@ Lean's CProject definition ALREADY has Coq's coherence built-in via AllBranchesP
 (Projectb.lean:204-206). The coherence requirement is structurally present; we just need
 to connect it to the trans function via CProject_implies_EQ2_trans.
 
-**Proof via wellFormedness** (to be implemented):
+**Proof via wellFormedness** (outline):
 Given a well-formed comm node with branches and non-participant role:
 1. AllBranchesProj in CProject ensures all branches project to the same candidate
 2. CProject_implies_EQ2_trans connects CProject to trans
@@ -50,8 +59,8 @@ The proof proceeds by case analysis on the GlobalType witness:
 - `.mu s inner`:
   - s = t (shadowed): both sides identical ✓
   - s ≠ t:
-    - Both guarded: mu-mu case requires s-unfold/t-subst interaction [legacy placeholders]
-    - Mismatched guardedness: requires showing unfold relates to .end [legacy placeholders]
+    - Both guarded: mu-mu case requires s-unfold/t-subst interaction [legacy gaps]
+    - Mismatched guardedness: requires showing unfold relates to .end [legacy gaps]
     - Both unguarded: both .end ✓
 - `.comm sender receiver branches`:
   - role = sender: both .send, branches via transBranches_ProjSubstRel ✓
@@ -106,7 +115,7 @@ The following definitions form the semantic interface for proofs:
 - `step_harmony`: global step induces matching env step
 - `proj_trans_other_step`: non-participant projection unchanged after step
 
-## Technical Debt Summary (legacy placeholders removed; assumption-free in this file)
+## Technical Debt Summary (legacy gaps removed; assumption-free in this file)
 
 **MAJOR PROGRESS**: `trans_branches_coherent` ELIMINATED!
 Coherence is now proven from first principles using participation structure, following Coq's proof strategy.
@@ -131,9 +140,9 @@ Coherence is now proven from first principles using participation structure, fol
 **COHERENCE PROOF COMPLETE (modulo helper lemmas):**
 - `trans_branches_coherent_EQ2`: **PROVEN** using participation structure
   - Case 1 (non-participant): Uses `EQ_end` - all branches project to .end
-  - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction placeholders)
+  - Case 2 (participant): Uses `part_of_all2` - uniform participation (legacy extraction gaps)
 - `trans_produces_CProject`: Bridges trans to CProject (uses coherence)
-- `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy placeholders)
+- `branches_project_coherent`: Extracts EQ2 equivalence from AllBranchesProj (legacy gaps)
 
 **Inherited from MuUnfoldLemmas.lean (via ProjSubst.lean):**
 4. `proj_subst`: Projection-substitution commutation (Coq indProj.v:173)

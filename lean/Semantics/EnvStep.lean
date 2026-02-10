@@ -1,7 +1,7 @@
 import SessionCoTypes.Quotient
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
-import Choreography.Projection.Trans
+import Choreography.Projection.Project
 
 set_option linter.dupNamespace false
 

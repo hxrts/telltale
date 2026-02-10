@@ -2,7 +2,7 @@ import Mathlib.Data.Fintype.BigOperators
 import Mathlib.Data.Real.Basic
 import Mathlib.Tactic
 import ClassicalAnalysisAPI
-import Choreography.Projection.Blind
+import Choreography.Projection.Project
 
 /-!
 # Information-Theoretic Cost Measures

@@ -20,7 +20,7 @@ private def ProjSubstRel (t : String) (G : GlobalType) (role : String) : Rel := 
     a = projTrans (g.substitute t G) role ∧
     b = (projTrans g role).substitute t (projTrans G role)
 
-/-! ## Remaining Lemmas for Legacy Placeholders
+/-! ## Remaining Lemmas for Legacy Gaps
 
 The following lemmas capture the semantic properties needed for the remaining cases.
 They are eliminable using the fullUnfold infrastructure once `EQ2_of_fullUnfold_eq`

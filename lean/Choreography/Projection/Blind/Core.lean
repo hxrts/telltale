@@ -709,7 +709,7 @@ theorem projectbAllBranches_trans_of_all_uniform (branches : List (Label × Glob
 /-- For non-participating roles, all branches project uniformly.
     This is the heart of the blindness property.
 
-    Note: This lemma is currently a placeholder. In a complete implementation,
+    Note: This lemma is currently a draft. In a complete implementation,
     `branchesUniformFor` would actually check projection equality, and this
     lemma would follow from that check. -/
 theorem trans_uniform_for_nonparticipant

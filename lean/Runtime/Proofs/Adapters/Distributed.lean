@@ -19,6 +19,8 @@ set_option autoImplicit false
 Distributed impossibility/lower-bound profiles attached to VM invariant spaces.
 -/
 
+/-! ## Core Development -/
+
 namespace Runtime
 namespace Proofs
 namespace Adapters

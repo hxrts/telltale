@@ -1,6 +1,14 @@
 import Mathlib
 import Init.Data.Order.Ord
 
+/- 
+The Problem. Protocol development requires a compact set of shared identifiers
+and edge/endpoint operations that all coherence and typing modules can reuse.
+
+Solution Structure. Define session/role primitives, endpoint/edge records, and
+basic structural lemmas/instances in one foundational module.
+-/
+
 /-!
 # MPST Basic Definitions
 
@@ -35,6 +43,8 @@ structure Endpoint where
   sid : SessionId
   role : Role
   deriving Repr, DecidableEq, Hashable
+
+/-! ## Core Development -/
 
 namespace Endpoint
 

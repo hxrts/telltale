@@ -3,6 +3,7 @@ import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
 import Protocol.Typing.Framing.GEnvFrameHelpers
+import Protocol.Typing.Framing.GEnvFrameParCore
 
 /-
 The Problem. Show that pre-out typing is stable under framing a disjoint GEnv
@@ -393,5 +394,5 @@ lemma HasTypeProcPreOut_frame_G_left_par_nG_irrel
     DisjointS Sown.right Sfin.left →
     HasTypeProcPreOut Ssh Sown (Gfr ++ G) (.par nS nG' P Q) Sfin (Gfr ++ Gfin) W Δ := by
   intro hDisj hDisjRightIn hPar hDisjRightOut
-  exact HasTypeProcPreOut_par_nG_irrel
+  exact frame_par_nG_irrel_core
     (HasTypeProcPreOut_frame_G_left hDisj hDisjRightIn hPar hDisjRightOut)

@@ -7,6 +7,8 @@ CProjectU EQ2 closure: comm case postfix and final CProjectU_EQ2 theorem.
 
 set_option linter.unnecessarySimpa false
 
+/-! ## Core Development -/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

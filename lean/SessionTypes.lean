@@ -8,7 +8,6 @@ import SessionTypes.Participation
 import SessionTypes.TypeContext
 
 import SessionTypes.ObservableClosed
-import SessionTypes.LocalTypeDBExamples
 
 /-! # SessionTypes
 

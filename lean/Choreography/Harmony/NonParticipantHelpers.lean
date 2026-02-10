@@ -1,5 +1,13 @@
 import Choreography.Harmony.ParticipantSteps
-import Choreography.Projection.Blind
+import Choreography.Projection.Project
+
+/- 
+The Problem. Non-participant preservation proofs involve repeated mu/branch
+reasoning that obscures the main participant-step arguments.
+
+Solution Structure. Isolate mu/branch helper lemmas and branch-step motives in
+this module so `ParticipantSteps` and `NonParticipantSteps` stay focused.
+-/
 
 /-! # Choreography.Harmony.NonParticipantHelpers
 
@@ -7,7 +15,7 @@ Mu/branch-specific helpers for non-participant step preservation.
 -/
 
 namespace Choreography.Harmony
-/-! ### Non-participant mu/branch helpers
+/-! ## Non-Participant Mu/Branch Helpers
 
 This file isolates the mu/branch-specific helpers for non-participant step preservation,
 keeping ParticipantSteps under the 600-line cap.

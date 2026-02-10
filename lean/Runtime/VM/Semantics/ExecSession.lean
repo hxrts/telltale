@@ -180,7 +180,7 @@ private def openWithTriples {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
   if st.config.spatialOk roles = false then
     faultPack st coro (.specFault "spatial requirements failed") "spatial requirements failed"
   else if !handlersCoverEdges sid roles handlers then
-    faultPack st coro (.specFault "handler bindings incomplete") "handler bindings incomplete"
+    faultPack st coro (.specFault "handler bindings missing") "handler bindings missing"
   else
     match writeEndpoints coro.regs sid pairs with
     | none => faultPack st coro .outOfRegisters "bad dst reg"

@@ -23,7 +23,7 @@ proven theorems across several categories:
 - **Cost metering**: Credit soundness, budget bounds, information-theoretic costs
 - **Aura placeholders**: Future work for capability-based instantiation
 
-Most theorems are fully proven; items marked "Placeholder" are `True` stubs
+Most theorems are fully proven. TODO: items marked "Placeholder" are `True` stubs
 for future Aura-specific instantiation work.
 -/
 
@@ -110,18 +110,6 @@ def transfer_preserves_coherent : Prop :=
 theorem transfer_preserves_coherent_holds : transfer_preserves_coherent :=
   transfer_preserves_coherent_proof.{0}
 
--- Placeholder: guard layers compose via accessors (future Aura work)
-def guard_chain_compose : Prop := True
-
--- Placeholder: aborting a guard layer restores invariants (future Aura work)
-def guard_abort_restores : Prop := True
-
--- Placeholder: adding a guard layer preserves existing proofs (future Aura work)
-def guard_hot_swap : Prop := True
-
--- Placeholder: doEffect composes via wp_bind (future Aura work)
-def wp_doEffect : Prop := True
-
 /-! ## Multi-Session Diamond
 
 The cross-session diamond property: executing coroutines on disjoint sessions
@@ -163,9 +151,6 @@ theorem wp_frame_load {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
 by
   intro _
   simp [WPExisting]
-
--- Placeholder: per-session WP composes under disjoint resources (future work)
-def wp_frame_concurrent : Prop := True
 
 /-! ## Handler and Effect Polymorphism
 
@@ -419,17 +404,11 @@ theorem cost_speculation_bounded_holds [EntropyAPI.Laws] : cost_speculation_boun
     · intro L _ p q habs
       exact speculationDivergence_eq_zero_iff p q habs
 
-/-! ## Aura Instantiation Placeholders
+/-! ## Aura Instantiation Baselines
 
-Future work: capability-based Aura instantiation theorems.
-These are `True` placeholders for the theorem registry.
+This section keeps concrete baseline facts used by the compile-time registry
+until full Aura-specific theorems are introduced.
 -/
-
--- Aura: no send without prior capability acquire
-def charge_before_send : Prop := True
-
--- Aura: persistence operations are idempotent
-def journal_idempotent : Prop := True
 
 def facts_monotone : Prop :=
   -- Knowledges are monotone under append.
@@ -438,45 +417,6 @@ def facts_monotone : Prop :=
 
 theorem facts_monotone_holds : facts_monotone :=
   fun _ _ _ h => List.mem_append.mpr (Or.inl h)
-
--- Aura: capability refinement is monotone
-def caps_monotone : Prop := True
-
--- Aura: different contexts share no mutable state
-def context_isolation : Prop := True
-
--- Aura: epoch advance safely drains stale messages
-def epoch_drain_safe : Prop := True
-
--- Aura: effects satisfy their WP specifications
-def wp_aura_invoke : Prop := True
-
--- Aura: send pipeline derivable from WP composition
-def wp_aura_send_pipeline : Prop := True
-
--- Aura: guard layer hot swap preserves existing proofs
-def aura_guard_hot_swap : Prop := True
-
--- Aura: consensus handler satisfies TransportSpec
-def consensus_handler_refines : Prop := True
-
--- Aura: direct handler satisfies TransportSpec
-def direct_handler_refines : Prop := True
-
--- Aura: facts in context C do not leak outside
-def aura_non_leakage : Prop := True
-
--- Aura: speculative consensus join matches actual BFT result
-def optimistic_consensus_sound : Prop := True
-
--- Aura: transfer instruction moves capability tokens
-def transfer_with_caps : Prop := True
-
--- Aura: send requires both cost credits and flow resources
-def aura_send_dual_resource : Prop := True
-
--- Aura: session cost budget derivable from capability evaluation
-def aura_cost_budget_from_caps : Prop := True
 
 /-! ## Aura Typeclass Resolution -/
 

@@ -2,7 +2,7 @@ import Runtime.VM.API
 
 set_option autoImplicit false
 
-/-! # Runtime.Proofs.DeterminismApi
+/-! # Runtime.Proofs.CompileTime.DeterminismApi
 
 Lean-facing determinism contract API for VM runtime/profile gating.
 -/
@@ -31,14 +31,14 @@ inductive VMDeterminismProfile where
 /-- Reusable hypothesis bundle for determinism-oriented theorems. -/
 structure VMDeterminismHypotheses
     (st₀ : VMState ι γ π ε ν) where
-  fullDeterminism : Prop := True
-  fullDeterminismProof : fullDeterminism := by trivial
-  moduloEffectTrace : Prop := True
-  moduloEffectTraceProof : moduloEffectTrace := by trivial
-  moduloCommutativity : Prop := True
-  moduloCommutativityProof : moduloCommutativity := by trivial
-  replayDeterminism : Prop := True
-  replayDeterminismProof : replayDeterminism := by trivial
+  fullDeterminism : Prop
+  fullDeterminismProof : fullDeterminism
+  moduloEffectTrace : Prop
+  moduloEffectTraceProof : moduloEffectTrace
+  moduloCommutativity : Prop
+  moduloCommutativityProof : moduloCommutativity
+  replayDeterminism : Prop
+  replayDeterminismProof : replayDeterminism
 
 /-- Artifact inventory derived from determinism hypotheses. -/
 structure VMDeterminismArtifacts where

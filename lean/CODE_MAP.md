@@ -1,6 +1,8 @@
 # Lean Verification Code Map
 
+<!-- GENERATED_METRICS:BEGIN -->
 **Last Updated:** 2026-02-10
+<!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -28,17 +30,19 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 **Build:** Lake with 8 library targets
 **Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
 
+<!-- GENERATED_OVERVIEW_TABLE:BEGIN -->
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
-| SessionTypes   |    31 |  ~8,572 | Global/local type definitions, de Bruijn, participation    |
-| SessionCoTypes |    67 | ~14,963 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    70 | ~17,552 | Projection, harmony, blindness, embedding, erasure         |
-| Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
-| Classical      |    15 |  ~2,019 | Transported theorems (queueing, large deviations, mixing)  |
-| Distributed    |    19 |  ~3,509 | Distributed assumptions, validation, FLP/CAP theorem packaging|
-| Protocol       |    78 | ~37,474 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |    87 | ~19,179 | VM, Iris backend via iris-lean, resource algebras, WP      |
-| **Total**      | **375** | **~105,439** |                                                      |
+| SessionTypes   |    31 |   8,432 | Global/local type definitions, de Bruijn, participation    |
+| SessionCoTypes |    68 |  15,012 | Coinductive EQ2, bisimulation, duality, async subtyping    |
+| Choreography   |    68 |  17,690 | Projection, harmony, blindness, embedding, erasure         |
+| Semantics      |     9 |   2,183 | Operational semantics, determinism, deadlock freedom       |
+| Classical      |    16 |   2,165 | Transported theorems (queueing, large deviations, mixing)  |
+| Distributed    |    20 |   3,621 | Distributed assumptions, validation, FLP/CAP theorem packaging |
+| Protocol       |    81 |  36,705 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |    82 |  17,958 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| **Total**      | **375** | **103,766** |                                                            |
+<!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
 ```

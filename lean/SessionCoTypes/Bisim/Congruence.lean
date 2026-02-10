@@ -122,7 +122,8 @@ open SessionCoTypes.SubstCommBarendregt in
 
     This is used for the shadowed case in substitute_preserves_CanSend/CanRecv. -/
 theorem map_substitute_eq_self_of_not_free {bs : List BranchR} {var : String} {repl : LocalTypeR}
-    (hnot_free : ∀ (l : Label) (_vt : Option ValType) (c : LocalTypeR), (l, _vt, c) ∈ bs → isFreeIn var c = false) :
+    (hnot_free : ∀ (l : Label) (_vt : Option SessionTypes.ValType) (c : LocalTypeR),
+      (l, _vt, c) ∈ bs → isFreeIn var c = false) :
     bs.map (fun b => (b.1, b.2.1, b.2.2.substitute var repl)) = bs := by
   induction bs with
   | nil => rfl
@@ -131,7 +132,12 @@ theorem map_substitute_eq_self_of_not_free {bs : List BranchR} {var : String} {r
     obtain ⟨l, vt, c⟩ := hd
     have hnot_free_c : isFreeIn var c = false := hnot_free l vt c (List.Mem.head _)
     have hc_eq : c.substitute var repl = c := substitute_not_free c var repl hnot_free_c
-    have htl_eq := ih (fun l' vt' c' hmem => hnot_free l' vt' c' (List.Mem.tail _ hmem))
+    have htail_free :
+        ∀ (l' : Label) (_vt' : Option SessionTypes.ValType) (c' : LocalTypeR),
+          (l', _vt', c') ∈ tl → isFreeIn var c' = false := by
+      intro l' vt' c' hmem
+      exact hnot_free l' vt' c' (List.Mem.tail _ hmem)
+    have htl_eq := ih htail_free
     simp only [hc_eq, htl_eq]
 
 /-! ### Substitution Commutativity (EQ2 version)

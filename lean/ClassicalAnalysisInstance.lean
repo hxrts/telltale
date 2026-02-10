@@ -9,9 +9,27 @@ Solution Structure.
 1. Define concrete entropy/KL/mutual-information operations.
 2. Prove the API law obligations for those operations.
 3. Package them into `realLaws` and `realAnalysisLaws`.
+
+## Trust Boundary
+
+This file provides the concrete noncomputable realizations of the abstract
+`ClassicalAnalysisAPI` interface. Together with `ClassicalAnalysisAPI.lean`,
+it forms the explicit trust boundary for real-analysis assumptions.
+
+**Why noncomputable?** Real.log is defined via limits/integrals in Mathlib's
+classical real analysis. Computing logarithms to arbitrary precision requires
+infinite operations, so the kernel cannot evaluate these terms. The laws
+themselves are fully proved — noncomputability only means we cannot *execute*
+entropy calculations within Lean, but we can still *reason* about them.
+
+**Audit note**: All laws are proved from Mathlib foundations. No axioms or
+open proof gaps in this file. Run `lake build` and `just escape`
+to verify.
 -/
 
 /-! # ClassicalAnalysisInstance
+
+Concrete real-valued realizations of the `ClassicalAnalysisAPI` interface.
 
 ## Expose
 
@@ -24,6 +42,13 @@ Concrete realizations consumed by downstream modules:
 
 Everything in this file is an implementation detail except those exported
 instances and definitions.
+
+## Mathematical References
+
+All implementations follow standard definitions from Cover & Thomas (2006):
+- Shannon entropy: Definition 2.1, H(X) = -∑ p(x) log p(x)
+- KL divergence: Definition 2.23, D(P‖Q) = ∑ p(x) log(p(x)/q(x))
+- Mutual information: Definition 2.24, I(X;Y) = D(P_{XY} ‖ P_X × P_Y)
 -/
 
 set_option autoImplicit false
@@ -36,31 +61,67 @@ noncomputable section
 
 namespace RealConcrete
 
-/-! ## Core Information Operations -/
+/-! ## Core Information Operations
 
-/-- Shannon entropy with the 0*log 0 convention. -/
+Standard definitions following Cover & Thomas (2006). The 0·log(0) = 0
+convention is used throughout, consistent with the limit lim_{x→0⁺} x log x = 0.
+-/
+
+/-- Shannon entropy with the 0·log(0) = 0 convention.
+
+H(X) = -∑ₓ p(x) log p(x)
+
+The negative sign ensures H ≥ 0 since log p(x) ≤ 0 for p(x) ∈ [0,1].
+
+**Reference**: Cover & Thomas Definition 2.1. -/
 def shannonEntropy {α : Type*} [Fintype α] (p : α → ℝ) : ℝ :=
   - ∑ a, if p a = 0 then 0 else p a * Real.log (p a)
 
-/-- KL divergence with the 0*log 0 convention. -/
+/-- KL divergence (relative entropy) with the 0·log(0) = 0 convention.
+
+D(P‖Q) = ∑ₓ p(x) log(p(x)/q(x))
+
+Measures the expected log-likelihood ratio, or equivalently, the extra bits
+needed to encode samples from P using a code optimized for Q.
+
+**Reference**: Cover & Thomas Definition 2.23; Kullback & Leibler (1951). -/
 def klDivergence {α : Type*} [Fintype α] (p q : α → ℝ) : ℝ :=
   ∑ a, if p a = 0 then 0 else p a * Real.log (p a / q a)
 
-/-- First marginal of a finite joint distribution. -/
+/-- First marginal: P_X(x) = ∑_y P_{XY}(x,y). -/
 def marginalFst {α β : Type*} [Fintype α] [Fintype β] (pXY : α × β → ℝ) : α → ℝ :=
   fun a => ∑ b, pXY (a, b)
 
-/-- Second marginal of a finite joint distribution. -/
+/-- Second marginal: P_Y(y) = ∑_x P_{XY}(x,y). -/
 def marginalSnd {α β : Type*} [Fintype α] [Fintype β] (pXY : α × β → ℝ) : β → ℝ :=
   fun b => ∑ a, pXY (a, b)
 
-/-- Mutual information defined as KL divergence to product of marginals. -/
+/-- Mutual information as KL divergence from joint to product of marginals.
+
+I(X;Y) = D(P_{XY} ‖ P_X × P_Y) = ∑_{x,y} p(x,y) log(p(x,y) / (p(x)p(y)))
+
+Measures the information shared between X and Y. Equivalently:
+I(X;Y) = H(X) + H(Y) - H(X,Y) = H(X) - H(X|Y) = H(Y) - H(Y|X)
+
+**Reference**: Cover & Thomas Definition 2.24. -/
 def mutualInfo {α β : Type*} [Fintype α] [Fintype β] (pXY : α × β → ℝ) : ℝ :=
   klDivergence pXY (fun ab => marginalFst pXY ab.1 * marginalSnd pXY ab.2)
 
-/-! ## KL and Entropy Laws -/
+/-! ## KL and Entropy Laws
 
-/-- Shannon entropy is nonnegative for distributions. -/
+Proofs of the information-theoretic laws from `ClassicalAnalysisAPI`. Each
+proof follows the standard argument from Cover & Thomas (2006).
+-/
+
+/-- Shannon entropy is nonnegative for distributions.
+
+**Proof strategy**: Each term p(a)·log(p(a)) is nonpositive on [0,1] because:
+- When p(a) = 0: the term is 0 by convention
+- When 0 < p(a) ≤ 1: log(p(a)) ≤ 0, so p(a)·log(p(a)) ≤ 0
+
+Negating the sum of nonpositive terms yields a nonnegative result.
+
+**Reference**: Cover & Thomas Theorem 2.1.1. -/
 theorem shannonEntropy_nonneg {α : Type*} [Fintype α]
     (p : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
     0 ≤ shannonEntropy p := by
@@ -89,7 +150,15 @@ theorem shannonEntropy_nonneg {α : Type*} [Fintype α]
       (Finset.sum_nonpos (s := (Finset.univ : Finset α)) (fun a _ => hterm a))
   linarith
 
-/-- KL divergence is nonnegative (Gibbs inequality). -/
+/-- KL divergence is nonnegative (Gibbs' inequality).
+
+**Proof strategy**: Use the fundamental inequality log(x) ≤ x - 1 (with
+equality iff x = 1). Apply this to q(a)/p(a) for each a, multiply by -p(a),
+then sum over a:
+
+  ∑ₐ p(a) log(p(a)/q(a)) ≥ ∑ₐ p(a)(1 - q(a)/p(a)) = ∑ₐ(p(a) - q(a)) = 1 - 1 = 0
+
+**Reference**: Cover & Thomas Theorem 2.6.3; Kullback & Leibler (1951). -/
 theorem klDivergence_nonneg {α : Type*} [Fintype α]
     (p q : α → ℝ)
     (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1)
@@ -280,7 +349,15 @@ theorem klDivergence_eq_zero_iff {α : Type*} [Fintype α]
     subst heq
     exact klDivergence_self_eq_zero p hp_nn
 
-/-! ## Erasure Law -/
+/-! ## Erasure Law
+
+The erasure law states that constant observation channels carry zero information.
+This is the information-theoretic foundation for the **blindness property** in
+choreographic projection: non-participant roles learn nothing about branch choices.
+
+**Key insight**: When P(O|L) = δ_{o₀} for all L (deterministic constant output),
+the joint distribution P_{LO} factors as P_L × P_O, so I(L;O) = D(P_{LO} ‖ P_L × P_O) = 0.
+-/
 
 /-- Helper: summing a Kronecker-delta-like finite family picks the single value. -/
 private theorem sum_ite_eq_single {α : Type*} [Fintype α] [DecidableEq α]

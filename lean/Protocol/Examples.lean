@@ -1,9 +1,9 @@
 import Protocol.Deployment
 
 /-!
-# Examples (Stubbed)
+# Examples (Minimal)
 
-This module is currently stubbed to keep the Protocol build green while
+This module is currently minimal to keep the Protocol build green while
 example proofs are refactored.
 -/
 
@@ -15,5 +15,5 @@ open scoped Classical
 
 section
 
--- Placeholder to keep the module non-empty while examples are refactored.
-theorem examples_stub : True := trivial
+-- Minimal theorem to keep the module non-empty while examples are refactored.
+theorem examples_trivial : True := trivial

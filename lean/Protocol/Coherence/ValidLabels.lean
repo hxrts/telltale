@@ -638,7 +638,6 @@ def initSession (sid : SessionId) (roles : RoleSet) (localTypes : Role → Local
 
 /-- Initialized session environments are coherent (when types are projections). -/
 theorem initSession_coherent (sid : SessionId) (roles : RoleSet) (localTypes : Role → LocalType)
-    (_hProj : True)  -- Placeholder for "localTypes are valid projections"
     (hSenders :
       ∀ (e : Edge) (Lrecv : LocalType),
         lookupG (roles.map fun r => ({ sid := sid, role := r }, localTypes r))

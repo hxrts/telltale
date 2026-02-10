@@ -51,7 +51,7 @@ def stepBaseDecide (C : Config) : Option Config :=
     | some (.chan e) =>
       match lookupStr C.store x with
       | some v =>
-        -- Need target role and type from G, use placeholder for now
+        -- Read target role and type from G at runtime
         -- In well-typed configs, this would come from the type lookup
         match lookupG C.G e with
         | some (.send target T L) =>

@@ -7,6 +7,8 @@ set_option autoImplicit false
 Core consensus assumption family and assumption-validation routines.
 -/
 
+/-! ## Core Development -/
+
 namespace Distributed
 
 /-- Built-in assumptions supported by the validator. -/

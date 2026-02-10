@@ -13,6 +13,8 @@ Concrete protocol-facing instantiations of the transported theorem API:
 - Appendix D: Foster-Lyapunov, MaxWeight, Mixing, Mean-field
 -/
 
+/-! ## Core Development -/
+
 namespace ProtocolClassical
 
 /-- Coherence-projected state space used for 3.9.1 transport instantiation.

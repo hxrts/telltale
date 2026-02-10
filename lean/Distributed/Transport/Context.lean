@@ -11,6 +11,8 @@ it tracks family-level eligibility labels only. Cross-family proof composition
 is performed in Runtime/VM proof layers.
 -/
 
+/-! ## Core Development -/
+
 namespace Distributed
 
 /-- Classical theorem families available through the transport layer. -/

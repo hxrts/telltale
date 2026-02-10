@@ -3,6 +3,14 @@ import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Preservation
 import Protocol.Coherence.SelectPreservation
 
+/- 
+The Problem. Core coherence-preservation lemmas are proved once for the FIFO
+model, but downstream delivery-model APIs need named causal/lossy variants.
+
+Solution Structure. Repackage the FIFO preservation lemmas as model-specific
+wrappers for `CausalDelivery` and `LossyDelivery`.
+-/
+
 /-!
 # Coherence Preservation for Additional Delivery Models
 
