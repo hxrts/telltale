@@ -6,7 +6,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{VMConfig, VM, VMError};
+use telltale_vm::vm::{VMConfig, VMError, VM};
 
 #[allow(dead_code, unreachable_pub)]
 mod helpers;
@@ -231,7 +231,11 @@ fn snapshot_fault_tags_for_core_instruction_families() {
     ];
 
     for (name, image) in &default_cases {
-        let steps = if *name == "choose/unknown_label" { 16 } else { 8 };
+        let steps = if *name == "choose/unknown_label" {
+            16
+        } else {
+            8
+        };
         observed.push((*name, expect_fault(image, default_config.clone(), steps)));
     }
 

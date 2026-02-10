@@ -937,7 +937,9 @@ mod tests {
         ) -> Result<SendDecision, String> {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed);
             if idx % 2 == 0 {
-                Ok(SendDecision::Deliver(payload.unwrap_or(Value::Nat(idx as u64))))
+                Ok(SendDecision::Deliver(
+                    payload.unwrap_or(Value::Nat(idx as u64)),
+                ))
             } else {
                 Ok(SendDecision::Drop)
             }

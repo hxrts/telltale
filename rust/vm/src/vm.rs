@@ -49,7 +49,11 @@ pub type ScopeId = usize;
 pub type Program = Vec<Instr>;
 
 /// Branch list type used in local types.
-type BranchList = Vec<(telltale_types::Label, Option<telltale_types::ValType>, LocalTypeR)>;
+type BranchList = Vec<(
+    telltale_types::Label,
+    Option<telltale_types::ValType>,
+    LocalTypeR,
+)>;
 
 /// Lean-aligned resource-state placeholder for runtime state alignment.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
@@ -1077,9 +1081,10 @@ impl VM {
             Value::Nat(_) => ValType::Nat,
             Value::Bool(_) => ValType::Bool,
             Value::Str(_) => ValType::String,
-            Value::Prod(left, right) => {
-                ValType::Prod(Box::new(Self::val_type_of(left)), Box::new(Self::val_type_of(right)))
-            }
+            Value::Prod(left, right) => ValType::Prod(
+                Box::new(Self::val_type_of(left)),
+                Box::new(Self::val_type_of(right)),
+            ),
             Value::Endpoint(ep) => ValType::Chan {
                 sid: ep.sid,
                 role: ep.role.clone(),
@@ -1283,9 +1288,9 @@ impl VM {
             Instr::Send { chan, .. }
             | Instr::Receive { chan, .. }
             | Instr::Offer { chan, .. }
-            | Instr::Choose { chan, .. } => {
-                self.endpoint_from_reg(idx, *chan).unwrap_or_else(|_| fallback_ep.clone())
-            }
+            | Instr::Choose { chan, .. } => self
+                .endpoint_from_reg(idx, *chan)
+                .unwrap_or_else(|_| fallback_ep.clone()),
             Instr::Close { session } => self
                 .endpoint_from_reg(idx, *session)
                 .unwrap_or_else(|_| fallback_ep.clone()),
@@ -1831,7 +1836,9 @@ impl VM {
                 true
             }
         });
-        self.coroutines[target_idx].progress_tokens.extend(moved_tokens);
+        self.coroutines[target_idx]
+            .progress_tokens
+            .extend(moved_tokens);
 
         let mut moved = Vec::new();
         self.coroutines[coro_idx].knowledge_set.retain(|fact| {
@@ -1870,10 +1877,9 @@ impl VM {
             .get(usize::from(fact_reg))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let (endpoint, fact) =
-            Self::decode_fact(fact_val).ok_or_else(|| Fault::TransferFault {
-                message: format!("{role}: tag expects (endpoint, string) fact"),
-            })?;
+        let (endpoint, fact) = Self::decode_fact(fact_val).ok_or_else(|| Fault::TransferFault {
+            message: format!("{role}: tag expects (endpoint, string) fact"),
+        })?;
         self.coroutines[coro_idx]
             .knowledge_set
             .push(crate::coroutine::KnowledgeFact {
@@ -1909,10 +1915,9 @@ impl VM {
             .get(usize::from(knowledge))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let (endpoint, fact) =
-            Self::decode_fact(know_val).ok_or_else(|| Fault::TransferFault {
-                message: format!("{role}: check expects (endpoint, string) fact"),
-            })?;
+        let (endpoint, fact) = Self::decode_fact(know_val).ok_or_else(|| Fault::TransferFault {
+            message: format!("{role}: check expects (endpoint, string) fact"),
+        })?;
         let target_val = self.coroutines[coro_idx]
             .regs
             .get(usize::from(target))
@@ -1981,10 +1986,10 @@ impl VM {
         })?;
         if !session.has_message(&partner, role) {
             return Ok(StepPack {
-                    coro_update: CoroUpdate::Block(BlockReason::RecvWait {
-                        edge: Edge::new(sid, partner.clone(), role.to_string()),
-                        token: ProgressToken::for_endpoint(ep.clone()),
-                    }),
+                coro_update: CoroUpdate::Block(BlockReason::RecvWait {
+                    edge: Edge::new(sid, partner.clone(), role.to_string()),
+                    token: ProgressToken::for_endpoint(ep.clone()),
+                }),
                 type_update: None,
                 events: vec![],
             });
@@ -3416,10 +3421,12 @@ mod tests {
             role: "A".to_string(),
         };
 
-        vm.coroutines[a_idx].knowledge_set.push(crate::coroutine::KnowledgeFact {
-            endpoint: ep_a.clone(),
-            fact: "secret".to_string(),
-        });
+        vm.coroutines[a_idx]
+            .knowledge_set
+            .push(crate::coroutine::KnowledgeFact {
+                endpoint: ep_a.clone(),
+                fact: "secret".to_string(),
+            });
         vm.coroutines[a_idx].regs[2] = Value::Prod(
             Box::new(Value::Endpoint(ep_a)),
             Box::new(Value::Str("secret".to_string())),

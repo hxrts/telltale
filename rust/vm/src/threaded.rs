@@ -1681,9 +1681,9 @@ fn step_send(
             });
         }
         EnqueueResult::Full => {
-                return Err(Fault::BufferFull {
-                    endpoint: ep.clone(),
-                });
+            return Err(Fault::BufferFull {
+                endpoint: ep.clone(),
+            });
         }
         EnqueueResult::Dropped => {}
     }
@@ -1761,11 +1761,11 @@ fn step_recv(
         .clone();
 
     if !session.has_message(&partner, role) {
-            return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::RecvWait {
-                    edge: Edge::new(sid, partner.clone(), role.to_string()),
-                    token: ProgressToken::for_endpoint(ep.clone()),
-                }),
+        return Ok(StepPack {
+            coro_update: CoroUpdate::Block(BlockReason::RecvWait {
+                edge: Edge::new(sid, partner.clone(), role.to_string()),
+                token: ProgressToken::for_endpoint(ep.clone()),
+            }),
             type_update: None,
             events: vec![],
         });
@@ -2224,11 +2224,11 @@ fn step_choose(
     };
 
     if !session.has_message(&partner, role) {
-            return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::RecvWait {
-                    edge: Edge::new(sid, partner.clone(), role.to_string()),
-                    token: ProgressToken::for_endpoint(ep.clone()),
-                }),
+        return Ok(StepPack {
+            coro_update: CoroUpdate::Block(BlockReason::RecvWait {
+                edge: Edge::new(sid, partner.clone(), role.to_string()),
+                token: ProgressToken::for_endpoint(ep.clone()),
+            }),
             type_update: None,
             events: vec![],
         });

@@ -24,24 +24,24 @@ fn canonical_comm_trace(vm: &VM) -> Vec<Vec<CommEvent>> {
                 to,
                 label,
                 ..
-            } => per_session.entry(session).or_default().push((
-                "sent".to_string(),
-                from,
-                to,
-                label,
-            )),
+            } => {
+                per_session
+                    .entry(session)
+                    .or_default()
+                    .push(("sent".to_string(), from, to, label))
+            }
             ObsEvent::Received {
                 session,
                 from,
                 to,
                 label,
                 ..
-            } => per_session.entry(session).or_default().push((
-                "recv".to_string(),
-                from,
-                to,
-                label,
-            )),
+            } => {
+                per_session
+                    .entry(session)
+                    .or_default()
+                    .push(("recv".to_string(), from, to, label))
+            }
             _ => {}
         }
     }
@@ -82,4 +82,3 @@ fn scheduler_policies_preserve_normalized_comm_observations() {
         );
     }
 }
-

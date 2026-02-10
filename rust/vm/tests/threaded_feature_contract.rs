@@ -17,4 +17,3 @@ fn strict_conformance_env_requires_multi_thread_feature() {
 fn threaded_feature_lane_is_active() {
     assert!(cfg!(feature = "multi-thread"));
 }
-

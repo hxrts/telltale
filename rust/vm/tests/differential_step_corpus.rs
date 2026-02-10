@@ -164,7 +164,11 @@ fn threaded_matches_cooperative_step_corpus_send_recv() {
         coop_events, threaded_events,
         "threaded backend diverged in event sequence"
     );
-    assert_eq!(coop.first(), threaded.first(), "first-step transition mismatch");
+    assert_eq!(
+        coop.first(),
+        threaded.first(),
+        "first-step transition mismatch"
+    );
     assert_eq!(
         coop.last().map(|s| s.result),
         Some("all_done"),

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{VMConfig, VM, VMError};
+use telltale_vm::vm::{VMConfig, VMError, VM};
 
 #[allow(dead_code, unreachable_pub)]
 mod helpers;
@@ -54,10 +54,7 @@ fn mutated_programs_are_deterministically_rejected() {
 
     // Mutate channel operand out of register bounds.
     let mut chan_oob = base_image();
-    chan_oob
-        .programs
-        .get_mut("A")
-        .expect("A program")[0] = Instr::Send { chan: 99, val: 1 };
+    chan_oob.programs.get_mut("A").expect("A program")[0] = Instr::Send { chan: 99, val: 1 };
     cases.push(("send_chan_oob", chan_oob, "out_of_registers"));
 
     // Mutate endpoint register to a non-endpoint before receive.
@@ -73,7 +70,11 @@ fn mutated_programs_are_deterministically_rejected() {
             Instr::Halt,
         ],
     );
-    cases.push(("receive_non_endpoint_chan", recv_wrong_chan, "type_violation"));
+    cases.push((
+        "receive_non_endpoint_chan",
+        recv_wrong_chan,
+        "type_violation",
+    ));
 
     // Mutate close to use a non-endpoint register value.
     let close_non_endpoint = single_role_end_image(vec![
@@ -97,7 +98,11 @@ fn mutated_programs_are_deterministically_rejected() {
             bundle: 0,
         },
     ]);
-    cases.push(("transfer_non_nat_target", transfer_non_nat, "transfer_fault"));
+    cases.push((
+        "transfer_non_nat_target",
+        transfer_non_nat,
+        "transfer_fault",
+    ));
 
     // Mutate check knowledge payload to malformed shape.
     let malformed_check = single_role_end_image(vec![
@@ -139,4 +144,3 @@ fn mutated_programs_are_deterministically_rejected() {
     ];
     assert_eq!(observed, expected);
 }
-

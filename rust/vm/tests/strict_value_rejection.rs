@@ -7,7 +7,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::{Fault, Value};
 use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
-use telltale_vm::vm::{VMConfig, VM, VMError};
+use telltale_vm::vm::{VMConfig, VMError, VM};
 
 #[allow(dead_code, unreachable_pub)]
 mod helpers;
@@ -153,4 +153,3 @@ fn tag_rejects_non_fact_shape() {
         })
     );
 }
-

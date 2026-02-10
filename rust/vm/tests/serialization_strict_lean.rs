@@ -14,7 +14,10 @@ fn lean_value_variants_roundtrip() {
         Value::Nat(7),
         Value::Bool(true),
         Value::Str("hello".to_string()),
-        Value::Prod(Box::new(Value::Nat(1)), Box::new(Value::Str("x".to_string()))),
+        Value::Prod(
+            Box::new(Value::Nat(1)),
+            Box::new(Value::Str("x".to_string())),
+        ),
         Value::Endpoint(Endpoint {
             sid: 3,
             role: "A".to_string(),

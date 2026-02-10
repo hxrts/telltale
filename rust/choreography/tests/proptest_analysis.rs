@@ -6,7 +6,6 @@
 // 2. Role participation is accurately tracked
 // 3. Deadlock detection is consistent
 // 4. Warnings are valid and actionable
-
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
