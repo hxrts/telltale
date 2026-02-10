@@ -14,6 +14,17 @@ These specs are the Rust-portable VM layer. Proof theorems live in
 `Runtime.Proofs.VM.InstrSpec`.
 -/
 
+/-
+The Problem. VM instructions must be specified in terms of Protocol-level environment
+updates (GEnv, DEnv) to enable coherence preservation proofs. Each instruction needs
+a clear contract specifying preconditions, postconditions, and footprint.
+
+Solution Structure. For each instruction type (send, recv, select, branch, acquire),
+defines a `*Spec` structure with: sender/receiver type conditions, update equations
+for G'/D', frame conditions for unchanged entries, and footprint (affected sessions).
+The specs are used by `Runtime.Proofs.VM.InstrSpec` to prove preservation theorems.
+-/
+
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 

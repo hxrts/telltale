@@ -1,5 +1,16 @@
 import Mathlib.Data.List.Basic
 
+/-
+The Problem. Multiple context types (for named↔de Bruijn conversion, substitution environments)
+share the same list-based structure but were defined separately, leading to duplicated lemmas
+and awkward conversions between representations.
+
+Solution Structure. Defines parametric `TypeContext V T` with generic lookup/extend operations.
+`NameOnlyContext` specializes for name-only contexts with fresh name generation. Provides
+`indexOf`, `get?`, `Nodup` predicates with comprehensive lemmas. Coercion instances enable
+seamless conversion between `List String` and `NameOnlyContext`.
+-/
+
 /-!
 # Unified Context Infrastructure
 

@@ -20,6 +20,17 @@ single basic block followed by `halt`. A real compiler would produce optimized b
 with proper register allocation and branch targets.
 -/
 
+/-
+The Problem. The VM needs a program representation that bundles bytecode with type
+information, entry points, and verification evidence. The loading pipeline must
+distinguish trusted (verified) from untrusted (pending verification) code.
+
+Solution Structure. Defines `Program` with bytecode, entry points per role, local
+types, and metadata. `CodeImage` adds global type and well-formedness evidence.
+`UntrustedImage` represents unverified code. The `compile` stub translates Process
+ASTs to bytecode for testing, with a real compiler to be integrated later.
+-/
+
 set_option autoImplicit false
 
 universe u

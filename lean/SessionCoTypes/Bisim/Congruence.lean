@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.EQ2ToBisim
 Proves duality is compatible and establishes substitution compatibility under Barendregt conditions.
 -/
 
+/-
+The Problem. Bisim must be a congruence: if a ≈ b, then f(a) ≈ f(b) for operations
+like duality and substitution. This requires showing these operations preserve
+BisimF structure, which is non-trivial for recursive types.
+
+Solution Structure. Defines `Compatible` for functions that preserve BisimF, and
+`RelImage` for lifting relations through functions. Proves duality is compatible
+by showing it preserves membership predicates. Substitution compatibility requires
+Barendregt conditions (no variable capture) and is proved via `Compatible`.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

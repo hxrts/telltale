@@ -15,6 +15,17 @@ import Choreography.Projection.Trans
 Reads JSON from stdin, loads choreographies, runs the VM, and prints trace JSON.
 -/
 
+/-
+The Problem. Testing the VM pipeline requires an executable entry point that can
+load choreographies from JSON, run them through the VM, and produce observable
+output for verification against expected traces.
+
+Solution Structure. Defines `emptyState` with unit implementations for all domain
+parameters, `emptyArena` and `emptyMonitor` for initialization. Reads JSON from
+stdin, parses choreographies, loads them into the VM, executes until termination,
+and prints the resulting trace as JSON for external validation.
+-/
+
 set_option autoImplicit false
 
 open Lean (Json)

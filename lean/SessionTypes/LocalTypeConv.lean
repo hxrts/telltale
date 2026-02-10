@@ -15,6 +15,17 @@ General roundtrip/contractiveness results require explicit assumptions about con
 adequacy (e.g., `Nodup` and a fresh-name predicate).
 -/
 
+/-
+The Problem. Session types exist in two representations: named variables (LocalTypeR)
+for user-facing syntax and de Bruijn indices (LocalTypeDB) for substitution-safe
+manipulation. We need conversions that preserve meaning and round-trip correctly.
+
+Solution Structure. Defines `toDB` converting named to de Bruijn using a type context,
+and `fromDB` converting back. Proves round-trip correctness for closed terms:
+`fromDB (toDB t) = t` and `toDB (fromDB t) = t`. Also proves property preservation:
+closedness, guardedness, and contractiveness are preserved by conversions.
+-/
+
 
 
 /-! ## Safe Conversion Properties for Closed Terms

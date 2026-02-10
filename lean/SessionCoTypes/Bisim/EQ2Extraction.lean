@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.ObservableFromEQ2
 FullUnfold-based extraction lemmas and EQ2_transfer_observable theorem.
 -/
 
+/-
+The Problem. When reasoning about EQ2, we often know that a type's fullUnfold
+has no leading mu (from closed+contractive hypotheses). We need lemmas that
+extract observable predicates (UnfoldsToEnd, etc.) from EQ2 under this condition.
+
+Solution Structure. Proves extraction lemmas like `EQ2.end_right_implies_UnfoldsToEnd_of_fullUnfold_nonmu`:
+when fullUnfold has muHeight=0 and EQ2 .end x holds, then UnfoldsToEnd x. Similar
+lemmas for var, send, recv. The `EQ2_transfer_observable` theorem transfers
+observable predicates between EQ2-related types.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

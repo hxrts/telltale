@@ -9,6 +9,18 @@ import Choreography.Projection.Trans
 CLI validator for Lean projection results.
 -/
 
+/-
+The Problem. The Rust lean-bridge exports choreography and program JSON files,
+but we need Lean-side validation that projection produces the expected local types.
+This enables cross-language verification of projection correctness.
+
+Solution Structure. We implement:
+1. JSON parsing for choreography and program exports
+2. `localTypeREq`: structural equality checker for local types
+3. `validate`: compares Lean-computed projection against Rust-exported expectation
+4. CLI main function for integration with the verification pipeline
+-/
+
 set_option autoImplicit false
 
 /-! ## Core Development -/

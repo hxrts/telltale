@@ -1,8 +1,7 @@
 import Mathlib
 import ClassicalAnalysisAPI
 
-/-!
-# Functional Central Limit Theorem
+/-! # Functional Central Limit Theorem
 
 This module provides the mathematical foundation for path-level convergence
 in session-typed distributed systems. The functional CLT (also known as

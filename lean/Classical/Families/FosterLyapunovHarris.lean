@@ -1,7 +1,6 @@
 import Mathlib
 
-/-!
-# Foster-Lyapunov-Harris Stability Theory
+/-! # Foster-Lyapunov-Harris Stability Theory
 
 This module provides the mathematical foundation for proving liveness in session-typed
 distributed systems. The Foster-Lyapunov method originates from the theory of Markov

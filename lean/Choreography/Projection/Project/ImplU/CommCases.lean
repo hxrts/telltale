@@ -5,6 +5,11 @@ import Choreography.Projection.Project.ImplU.EQ2Closure
 CProjectU EQ2 closure: comm case postfix and final CProjectU_EQ2 theorem.
 -/
 
+/-
+The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
+Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
+-/
+
 set_option linter.unnecessarySimpa false
 
 /-! ## Core Development -/

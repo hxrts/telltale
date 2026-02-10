@@ -12,6 +12,17 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-
+The Problem. Session types need a readable representation with named variables for user-facing
+code and debugging. The core type must support substitution, unfolding, duality, and well-formedness
+predicates (closedness, guardedness, contractiveness) for protocol verification.
+
+Solution Structure. Defines `LocalTypeR` with named string variables: end, var, send/recv with
+labeled branches, and mu for recursion. Provides `substitute`, `unfold`, and `dual` operations.
+Defines `isFreeIn`, `isGuarded`, `isContractive`, and `WellFormed` predicates. Size lemmas
+enable structural termination proofs.
+-/
+
 /-! # SessionTypes.LocalTypeR
 
 Recursive local types for the V2 development.

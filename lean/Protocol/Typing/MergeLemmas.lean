@@ -5,6 +5,16 @@ import Protocol.Typing.Compatibility
 Merge lemmas and branch processing for typing.
 -/
 
+/-
+The Problem. Typing for merged environments (used in parallel composition and
+linking) requires lemmas about disjoint lookups and session isolation.
+
+Solution Structure. We prove:
+1. `lookupG_none_of_disjoint`: disjoint GEnvs have non-overlapping lookups
+2. `sid_not_in_right_of_left`: session isolation across splits
+3. Branch processing helpers for branch/select typing
+-/
+
 /-! ## Merge Lemmas -/
 
 /-- DisjointG: endpoints from the right are absent on the left. -/

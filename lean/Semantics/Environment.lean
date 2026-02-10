@@ -25,6 +25,17 @@ The following definitions form the semantic interface for proofs:
 - `FairEnv` - Fairness predicate for liveness
 -/
 
+/-
+The Problem. MPST execution requires an environment model that captures message
+delivery, timeouts, and nondeterministic scheduling while enabling fairness
+reasoning for liveness proofs.
+
+Solution Structure. Defines `MsgQueue` as FIFO per sender-receiver pair, `Channel`
+for identifying queues, `EnvConfig` for full environment state (queues + timeouts),
+`EnvAction` for environment choices (deliver, timeout, drop), and `EnvConfigStep`
+for the transition relation. `FairEnv` captures fairness for liveness proofs.
+-/
+
 namespace Semantics.Environment
 
 open SessionTypes.GlobalType (Label)

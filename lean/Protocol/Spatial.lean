@@ -5,7 +5,21 @@ import Protocol.Environments
 
 This module defines spatial requirements, topologies, and the satisfaction judgment
 that determines whether a deployment topology satisfies a protocol's spatial needs.
+-/
 
+/-
+The Problem. Protocols may have spatial constraints (co-location, separation,
+region requirements). We need a type system that captures these constraints
+and a satisfaction judgment for deployment topologies.
+
+Solution Structure. We define:
+1. `SpatialReq`: requirement language (coloc, sep, atomic, conj)
+2. `Topology`: deployment topology (role → site assignment)
+3. `Satisfies`: satisfaction judgment `topo ⊨ R`
+4. `SpatialLe`: subtyping preorder with monotonicity theorem
+-/
+
+/-!
 ## Design Principles
 
 - Spatial requirements are structural, not dynamic

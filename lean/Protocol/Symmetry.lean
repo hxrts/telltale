@@ -3,8 +3,22 @@ import Protocol.Coherence.RoleSwap
 /-!
 # Protocol Symmetry and Conservation Laws
 
-This module establishes symmetry properties for MPST configurations:
+This module establishes symmetry properties for MPST configurations.
+-/
 
+/-
+The Problem. Protocol behavior should be invariant under relabeling of roles
+and message labels. We need to formalize this symmetry and prove equivariance
+(renamed configs take renamed steps).
+
+Solution Structure. We prove:
+1. Protocol renaming: injective maps on roles/labels
+2. Forward equivariance: σ(step(C)) = step(σ(C))
+3. Inverse steps: if σ(C) steps to D, then C steps to C'' where D = σ(C'')
+Combined, these yield bisimulation (Noether-style conservation).
+-/
+
+/-!
 1. **Protocol Renaming**: Injective maps on roles and labels
 2. **Equivariance**: Renamed configs take renamed steps
 3. **Inverse Steps**: If σ(C) steps to D, then C steps to C'' where D = σ(C'')

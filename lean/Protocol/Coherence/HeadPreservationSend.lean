@@ -1,10 +1,28 @@
 import Protocol.Coherence.EdgeCoherence
 
+/-! # Protocol.Coherence.HeadPreservationSend
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
-# MPST Coherence
+# MPST Coherence: Send Head Preservation
 
-This module defines the coherence invariant for multiparty session types.
+This module proves head preservation for send (value transmission) steps.
+-/
 
+/-
+The Problem. When a role sends a value, the trace grows with the value type.
+We must show that edge coherence is preserved: the receiver can still consume
+the extended trace using its recv type.
+
+Solution Structure. We prove head preservation by:
+1. Showing the sent type matches the receiver's expected recv type
+2. Proving Consume succeeds on the extended trace via `Consume_append`
+3. Handling the 3-way edge case split (updated, related, unrelated)
+-/
+
+/-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 

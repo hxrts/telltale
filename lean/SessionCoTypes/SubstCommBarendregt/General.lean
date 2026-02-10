@@ -5,6 +5,17 @@ import SessionCoTypes.SubstCommBarendregt.Predicates
 Proves `subst_subst_comm_general` and corollaries `subst_mu_comm`, `unfold_subst_eq_subst_unfold`.
 -/
 
+/-
+The Problem. Substitutions don't commute in general due to variable capture. We
+need a generalized commutation lemma with precise conditions: variables differ,
+first variable not bound, replacement closed, and a pre-substitution relationship.
+
+Solution Structure. Proves `subst_subst_comm_general`: (e.substitute x rx).substitute y ry
+equals (e.substitute y ry').substitute x rx when ry = ry'.substitute x rx, x ≠ y,
+notBoundAt x e, and rx is closed. Derives `subst_mu_comm` and `unfold_subst_eq_subst_unfold`
+as corollaries for mu-specific cases.
+-/
+
 namespace SessionCoTypes.SubstCommBarendregt
 open SessionTypes.LocalTypeR
 open SessionTypes.GlobalType

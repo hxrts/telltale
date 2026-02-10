@@ -36,6 +36,17 @@ Once resolved, the proofs here connect to VM execution via:
 - `cross_session_diamond`: disjoint footprints → commutativity
 -/
 
+/-
+The Problem. Session-typed protocols involve multiple sessions that may execute
+concurrently. We need to ensure operations on one session do not invalidate
+invariants for other sessions (frame rule), which enables proving commutativity.
+
+Solution Structure. Builds on SessionLocal.lean's `session_local_op_preserves_other`
+to establish the frame rule: operations affecting session s preserve coherence for
+s' ≠ s. Then derives the diamond property by showing two operations with disjoint
+footprints commute via two applications of the frame rule.
+-/
+
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 

@@ -5,6 +5,11 @@ import Choreography.Harmony.StepHarmony
 Substitution commutation: projection commutes with substitution via paco coinduction.
 -/
 
+/-
+The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
+Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
+-/
+
 namespace Choreography.Harmony
 /-! ## Substitution Commutation -/
 

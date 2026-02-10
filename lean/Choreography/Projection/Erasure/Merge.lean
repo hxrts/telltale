@@ -4,6 +4,17 @@ import Choreography.Projection.Erasure.Core
 
 Label predicates and merge algorithm for erasure.
 -/
+
+/-
+The Problem. When merging local types from different branches, we need to
+handle label sets that may differ. The merge must produce a type that is
+a valid supertype of both inputs while preserving projectability.
+
+Solution Structure. We define:
+1. Label predicates (`labelIn`, `labelsSubset`, `sameLabels`) for branch comparison
+2. `appendMissing` to combine branch lists with different labels
+3. Soundness theorems showing the predicates match their boolean implementations
+-/
 namespace Choreography.Projection.Erasure
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

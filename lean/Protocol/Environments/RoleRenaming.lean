@@ -9,6 +9,18 @@ session s, all local types in session s must have A renamed to B, and endpoints
 in session s are redirected from A to B.
 -/
 
+/-
+The Problem. Delegation transfers a channel endpoint from role A to role B.
+Afterwards, B acts as A within that session. We need renaming infrastructure
+that updates local types and environments to reflect this role change.
+
+Solution Structure. We define:
+1. `renameRole`: simple role substitution (A → B)
+2. `renameValTypeRole/LocalTypeRole`: lifting to value/local types
+3. `renameEndpointRole/EdgeRole`: lifting to endpoints and edges
+4. Composition with session renaming for full linking support
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false

@@ -5,6 +5,11 @@ import Choreography.Projection.Project.ImplExtraction.ObservableExtraction
 Recv extraction and mu-intermediate composition for observable structure.
 -/
 
+/-
+The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
+Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
+-/
+
 set_option linter.unnecessarySimpa false
 
 /-! ## Core Development -/

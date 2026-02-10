@@ -1,5 +1,16 @@
 import SessionTypes.Participation.Core
 
+/-
+The Problem. Participation must be preserved under substitution and unfolding for projection
+proofs that traverse mu types. Additionally, a decidable `participates` function enables
+efficient classification of roles as participants or non-participants.
+
+Solution Structure. Proves `part_of2_substitute` showing participation is preserved through
+variable substitution. `part_of2_unfold` and `part_of2_fullUnfoldIter` extend this to mu-unfolding.
+Defines `participates` as a Boolean function with mutual recursion over global types and branches.
+`part_of2_iff_participates` establishes equivalence with the inductive predicate.
+-/
+
 /-! # Participation Extra
 
 Participation and substitution/unfolding lemmas, decidable `participates` function.

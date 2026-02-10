@@ -1,10 +1,27 @@
 import Protocol.Coherence.EdgeCoherence
 
+/-! # Protocol.Coherence.Renaming
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
-# MPST Coherence
+# MPST Coherence: Renaming
 
-This module defines the coherence invariant for multiparty session types.
+This module proves coherence is preserved under session/role renaming.
+-/
 
+/-
+The Problem. Session composition and linking require renaming session IDs and
+potentially roles. We must show coherence is stable under these renamings.
+
+Solution Structure. We prove:
+1. `renameCoherent`: session renaming preserves coherence
+2. Lifting lemmas for GEnv/DEnv renaming
+3. Composition with the Conserved quantities view
+-/
+
+/-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 

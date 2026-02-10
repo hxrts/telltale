@@ -6,6 +6,17 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-
+The Problem. Reasoning about closedness and free variables across substitution operations
+requires environment abstractions. Different proof contexts need different environment
+representations (name-only for conversion, type-carrying for substitution).
+
+Solution Structure. Defines `Env` as binding lists with `Env.apply` for sequential substitution.
+`ClosedUnder` captures when all free variables are bound. `sigmaOfVars` builds canonical
+environments mapping variables to `.end`. `ActiveEnv` provides a fixed abstraction point.
+Proves `freeVars_substitute_subset` and `freeVars_unfold_subset` for closedness propagation.
+-/
+
 /-! # SessionTypes.LocalTypeR.Environments
 
 Environment application, active variables, closedness, and free-variable substitution properties.

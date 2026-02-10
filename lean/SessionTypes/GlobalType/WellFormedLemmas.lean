@@ -8,6 +8,17 @@ Well-formedness preservation under mu-unfolding (allVarsBound, allCommsNonEmpty,
 noSelfComm, isProductive monotonicity).
 -/
 
+/-
+The Problem. Mu-unfolding transforms `mu t body` to `body.substitute t (mu t body)`.
+Well-formedness must be preserved by this transformation, requiring lemmas for
+each component (allVarsBound, allCommsNonEmpty, noSelfComm, isProductive).
+
+Solution Structure. Proves monotonicity lemmas for each predicate with respect
+to the bound/unguarded variable list. `allVarsBound_mono` shows adding variables
+preserves boundedness. Similar lemmas for comms and self-comm. The combined
+preservation theorem shows unfolding a well-formed mu-type yields a well-formed body.
+-/
+
 namespace SessionTypes.GlobalType
 /-! ## Well-formedness Preservation under Mu-Unfolding
 

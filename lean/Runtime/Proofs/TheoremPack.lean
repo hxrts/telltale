@@ -11,6 +11,17 @@ One-shot theorem packaging from a VM invariant space carrying distributed and
 classical optional profiles.
 -/
 
+/-
+The Problem. Users need a single entry point to obtain all applicable runtime
+theorems for a given VM state, including optional distributed impossibility
+results and classical analysis bounds.
+
+Solution Structure. Defines `VMInvariantSpaceWithProfiles` combining distributed
+and classical profiles. Provides projection functions to view the space as
+distributed-only or classical-only. The packaging functions generate theorem
+bundles from the combined invariant space in one shot.
+-/
+
 /-! ## Core Development -/
 
 namespace Runtime

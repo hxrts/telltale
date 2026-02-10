@@ -3,9 +3,20 @@ import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
 
+/-! # Typing Framing: Pre-Update Helpers
+
+Shared helper lemmas for framed pre-update preservation.
+-/
+
 /-
-Shared helper lemmas for framed pre-update preservation. These provide alignment
-facts for endpoints, local types, labels, and framed updates.
+The Problem. Framed pre-update preservation requires many small alignment facts:
+visible lookups must match full lookups, endpoints must align across splits,
+and framed updates must preserve invariants.
+
+Solution Structure. We provide helper lemmas:
+1. `lookupSEnv_all_of_visible`: bridge visible to full lookup
+2. Endpoint alignment across shared/owned splits
+3. Framed update preservation under disjointness
 -/
 
 set_option linter.mathlibStandardSet false
@@ -17,7 +28,7 @@ open scoped Classical
 
 section
 
-/-! ### Framed Pre-Update Helpers -/
+/-! ## Framed Pre-Update Helpers -/
 /-- Bridge visible lookup (`Ssh ++ Sown.left`) to full lookup (`SEnvAll`) under
     shared/owned disjointness and owned right/left disjointness. -/
 lemma lookupSEnv_all_of_visible
@@ -255,7 +266,7 @@ lemma updateG_left_of_step
       simpa [hEq, hEq'] using hGout.symm
     _ = updateG G₁ e L ++ G₂ := by simpa [hUpd]
 
-/-! ### Left-Frame Helpers (Step Cases) -/
+/-! ## Left-Frame Helpers (Step Cases) -/
 
 /-- Helper: align the local type in a send step under a right frame. -/
 lemma send_localtype_eq
@@ -295,7 +306,7 @@ lemma recv_types_eq
   cases Option.some.inj this
   exact ⟨rfl, rfl⟩
 
-/-! ### Left-Frame Alignment Helpers -/
+/-! ## Left-Frame Alignment Helpers -/
 
 /-- Helper: align the branches in a select step under a right frame. -/
 lemma select_branches_eq
@@ -360,7 +371,7 @@ lemma branch_find_eq
   intro hBs hFind
   simpa [hBs] using hFind
 
-/-! ### Right-Frame Alignment Helpers -/
+/-! ## Right-Frame Alignment Helpers -/
 
 /-- Helper: align the local type in a send step under a left frame. -/
 lemma send_localtype_eq_right

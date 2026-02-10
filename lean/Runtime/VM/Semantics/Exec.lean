@@ -20,6 +20,17 @@ and an `ExecResult` indicating whether the coroutine continued, yielded, blocked
 halted, faulted, or triggered a structural change (spawn, transfer, fork, join, abort).
 -/
 
+/-
+The Problem. The scheduler needs a single entry point for executing one instruction
+that handles all the setup (lookup, status check, fetch, monitor, cost) and teardown
+(commit, event emission) uniformly across all instruction types.
+
+Solution Structure. The `execInstr` function implements the 7-stage pipeline: lookup,
+status check, fetch, monitor, cost charge, dispatch via `stepInstr`, and commit.
+`commitPack` writes back coroutine state and appends observable events. Returns
+`ExecResult` encoding continuation, yield, block, halt, fault, or structural changes.
+-/
+
 set_option autoImplicit false
 
 universe u

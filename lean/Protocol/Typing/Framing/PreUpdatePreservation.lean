@@ -21,7 +21,7 @@ open scoped Classical
 
 section
 
-/-! ### Pre-Update Typing Preservation -/
+/-! ## Pre-Update Typing Preservation -/
 
 private lemma length_updateG_preserved_pu
     {G : GEnv} {e : Endpoint} {L L' : LocalType} :

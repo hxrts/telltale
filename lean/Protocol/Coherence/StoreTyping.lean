@@ -1,10 +1,28 @@
 import Protocol.Coherence.EdgeCoherence
 
+/-! # Protocol.Coherence.StoreTyping
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
-# MPST Coherence
+# MPST Coherence: Store Typing
 
-This module defines the coherence invariant for multiparty session types.
+This module defines typing for the global store (GEnv) and trace store (DEnv).
+-/
 
+/-
+The Problem. The typing judgment for configurations involves both the GEnv (local
+types per endpoint) and DEnv (traces per edge). We need well-definedness criteria
+for these stores that connect to coherence.
+
+Solution Structure. We define:
+1. Store well-formedness predicates for GEnv and DEnv
+2. Connection between store typing and EdgeCoherent
+3. Helper lemmas for store updates preserving well-formedness
+-/
+
+/-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 

@@ -9,6 +9,17 @@ Adapters from invariant-space classical hypotheses to transported theorem
 artifacts.
 -/
 
+/-
+The Problem. Classical analysis theorems (Foster-Lyapunov stability, MaxWeight
+scheduling, large deviations) exist in the Mathematical Physics library but need
+to be instantiated with VM-specific invariant spaces and step functions to yield
+runtime guarantees.
+
+Solution Structure. Provides profile wrappers (FosterProfile, MaxWeightProfile,
+LDPProfile) that bundle transport contexts with inputs, then adapters that convert
+classical witnesses from the invariant space into the required transport format.
+-/
+
 /-! ## Core Development -/
 
 namespace Runtime

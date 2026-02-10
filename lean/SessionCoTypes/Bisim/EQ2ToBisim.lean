@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.EQ2Extraction
 Converts EQ2 to Bisim under well-formedness and proves EQ2 transitivity via Bisim detour.
 -/
 
+/-
+The Problem. EQ2 transitivity is hard to prove directly because the intermediate
+witness can have arbitrary constructor structure. We can detour through Bisim,
+which doesn't require constructor matching, but need to convert EQ2 to Bisim.
+
+Solution Structure. Proves `EQ2.toBisim_of_wellFormed` converting EQ2 to Bisim
+for well-formed types. Then `Bisim_refl` shows Bisim is reflexive via EQ2.
+EQ2 transitivity follows: convert both EQ2 relations to Bisim, use Bisim.trans,
+then convert back.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

@@ -26,7 +26,7 @@ open scoped Classical
 
 section
 
-/-! ### Framed Pre-Update Preservation -/
+/-! ## Framed Pre-Update Preservation -/
 
 /-- Specialize middle-frame preservation to the left-frame goal shape. -/
 private lemma preserved_sub_left_frame_via_middle

@@ -7,6 +7,11 @@ Participant projection classification and part_of2_or_end theorem.
 
 /-! ## Core Development -/
 
+/-
+The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
+Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
+-/
+
 namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType

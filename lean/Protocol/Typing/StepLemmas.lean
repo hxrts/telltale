@@ -1,10 +1,22 @@
 import Protocol.Typing.Compatibility
 
+/-! # MPST Process Typing: Step Lemmas
+
+Core step lemmas for preservation proofs.
+-/
+
+/-
+The Problem. Preservation proofs require lemmas about how TypedStep affects
+environments (session sets, GEnv, DEnv). These provide the building blocks
+for the main preservation theorem.
+
+Solution Structure. We prove:
+1. `SessionsOfD_subset_of_TypedStep`: session set inclusion after steps
+2. Environment update lemmas for each step kind
+3. Coherence connection lemmas for the full preservation
+-/
+
 /-!
-# MPST Process Typing
-
-This module defines the typing rules for MPST processes.
-
 ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
@@ -35,6 +47,8 @@ set_option maxHeartbeats 5000000
 open scoped Classical
 
 section
+
+/-! ## Core Step Lemmas -/
 
 theorem SessionsOfD_subset_of_TypedStep {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →

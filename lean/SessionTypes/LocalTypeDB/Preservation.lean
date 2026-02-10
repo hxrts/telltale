@@ -2,6 +2,17 @@ import SessionTypes.LocalTypeDB.Core
 
 set_option linter.unusedSimpArgs false
 
+/-
+The Problem. Operations on de Bruijn types (lift, subst, unfold) must preserve closedness
+and contractiveness invariants. Without these preservation theorems, we cannot ensure that
+derived types remain well-formed after transformation.
+
+Solution Structure. Proves `isClosedAt_lift` and `isClosedAt_subst` showing closedness
+is preserved. For guardedness, proves `isGuarded_lift_lt/ge` and `isGuarded_subst_lt`
+handling index relationships. `isContractive_subst` and `isContractive_unfold` show
+contractiveness is preserved, culminating in `isContractive_fullUnfold` for full mu-unfolding.
+-/
+
 /-! # LocalTypeDB Preservation
 
 Closedness and contractiveness preservation for lift, subst, unfold on de Bruijn local types.

@@ -1,8 +1,7 @@
 import Mathlib
 import ClassicalAnalysisAPI
 
-/-!
-# Heavy Traffic Diffusion Limits
+/-! # Heavy Traffic Diffusion Limits
 
 This module provides the mathematical foundation for analyzing session-typed
 systems under high load. Heavy traffic theory studies systems operating near

@@ -1,10 +1,22 @@
 import Protocol.Coherence.EdgeCoherence
 
+/-! # MPST Coherence: Select Head Preservation
+
+This module proves head preservation for select (internal choice) steps.
+-/
+
+/-
+The Problem. When a role makes an internal choice (select), the trace grows with
+a label. We must show that edge coherence is preserved: the receiver can still
+consume the extended trace using its branch type.
+
+Solution Structure. We prove head preservation by:
+1. Showing the selected label matches a branch in the receiver's type
+2. Proving Consume succeeds on the extended trace
+3. Handling the 3-way edge case split (updated, related, unrelated)
+-/
+
 /-!
-# MPST Coherence
-
-This module defines the coherence invariant for multiparty session types.
-
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 
@@ -48,6 +60,8 @@ set_option linter.unnecessarySimpa false
 open scoped Classical
 
 section
+
+/-! ## Core Development -/
 
 theorem HeadCoherent_select_preserved
     (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)

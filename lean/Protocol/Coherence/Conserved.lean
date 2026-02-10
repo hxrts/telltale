@@ -1,11 +1,24 @@
 import Protocol.Coherence.ConfigEquiv
 
-/-!
+/-! # Protocol.Coherence.Conserved
+
 Conserved-quantity packaging for the quotient view of coherence:
 - snapshot of per-edge buffers / per-session participants / edge type-trace triples
 - equivalence theorem: `ConfigEquiv ↔ SameConservedQuantities`
 - Noether-style statement: symmetry actions preserve coherence
 - erasure/projection/resource helper definitions
+-/
+
+/-
+The Problem. Coherence is defined operationally via Consume, but we want a
+"conserved quantities" view for quotient/symmetry reasoning. Two configurations
+should be equivalent if they have the same edge profiles.
+
+Solution Structure. We define:
+1. `EdgeTypeTrace`: per-edge snapshot of sender/receiver types and trace
+2. `ConservedQuantities`: full profile of buffers, participants, and edge triples
+3. Equivalence theorem: `ConfigEquiv ↔ SameConservedQuantities`
+4. Noether-style corollary: symmetry actions preserve coherence
 -/
 
 set_option linter.mathlibStandardSet false
@@ -15,6 +28,8 @@ set_option autoImplicit false
 open scoped Classical
 
 section
+
+/-! ## Core Development -/
 
 /-- Edge-local type/trace snapshot used in conserved profiles. -/
 structure EdgeTypeTrace where

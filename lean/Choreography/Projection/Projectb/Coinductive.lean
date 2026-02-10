@@ -15,6 +15,18 @@ Coinductive CProject relation, constructor lemmas, and reflection lemmas connect
 `projectb` to `CProject`.
 -/
 
+/-
+The Problem. Projection must handle recursive global types, which requires a
+coinductive definition. The boolean checker `projectb` is executable but we need
+a relational specification `CProject` for reasoning about projection properties.
+
+Solution Structure. We define:
+1. `CProjectF`: one-step generator for the projection relation
+2. `CProject`: greatest fixed point of CProjectF (coinductive relation)
+3. Constructor lemmas for building CProject witnesses
+4. Reflection lemmas connecting `projectb = true` to `CProject`
+-/
+
 /-! ## CProject Coinductive Relation
 
 CProject is defined as the greatest fixed point of CProjectF, which captures

@@ -1,7 +1,6 @@
 import Mathlib
 
-/-!
-# MaxWeight Backpressure Scheduling
+/-! # MaxWeight Backpressure Scheduling
 
 This module provides the mathematical foundation for throughput-optimal scheduling
 in session-typed distributed systems. The MaxWeight algorithm originates from

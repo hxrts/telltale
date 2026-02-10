@@ -8,6 +8,17 @@ Closedness predicates, free-variable subset lemmas, closedness preservation,
 and GlobalType unfolding definitions.
 -/
 
+/-
+The Problem. Global types with free type variables can't be projected or executed.
+We need a closedness predicate and lemmas showing closedness is preserved by
+operations like substitution and mu-unfolding.
+
+Solution Structure. Defines `GlobalType.isClosed` checking if freeVars is empty.
+Proves `allVarsBound_implies_freeVars_subset` via mutual recursion on type/branches.
+Derives closedness preservation for substitution and unfolding. Provides
+GlobalType unfolding definitions for mu-types.
+-/
+
 namespace SessionTypes.GlobalType
 /-! ## Closedness Predicate (Coq-style)
 

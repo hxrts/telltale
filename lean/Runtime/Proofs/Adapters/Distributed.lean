@@ -19,6 +19,18 @@ set_option autoImplicit false
 Distributed impossibility/lower-bound profiles attached to VM invariant spaces.
 -/
 
+/-
+The Problem. Distributed computing impossibility results (FLP, CAP) and protocol
+families (quorum-geometry, partial-synchrony, Nakamoto consensus) need to be
+connected to the VM invariant space so that when designing protocols we can identify
+which constraints apply.
+
+Solution Structure. Provides profile wrappers for each distributed computing family
+(FLPProfile, CAPProfile, QuorumGeometryProfile, etc.) and attachment functions that
+link these profiles to specific invariant spaces, enabling impossibility checking
+during protocol verification.
+-/
+
 /-! ## Core Development -/
 
 namespace Runtime

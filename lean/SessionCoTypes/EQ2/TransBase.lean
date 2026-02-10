@@ -6,6 +6,17 @@ Transitivity helpers for EQ2 when the intermediate term is a base constructor
 (.end or .var v).
 -/
 
+/-
+The Problem. Full EQ2 transitivity requires the Bisim detour (proven in EQ2Props.lean),
+but simpler cases where the intermediate term is `.end` or `.var v` can be proven
+directly by coinduction on specialized relations.
+
+Solution Structure. Defines `EndRel` pairing terms EQ2-related to `.end`. Proves
+`EndRel_postfix` showing it's a post-fixpoint of EQ2F. Similarly for `VarRel`.
+`EQ2_trans_via_end` and `EQ2_trans_via_var` use these to prove transitivity when
+the middle term is a base constructor, avoiding the full Bisim machinery.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unusedTactic false
 

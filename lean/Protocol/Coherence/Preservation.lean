@@ -1,11 +1,29 @@
 import Protocol.Coherence.StoreTyping
 import Protocol.Coherence.Unified
 
+/-! # Protocol.Coherence.Preservation
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
-# MPST Coherence
+# MPST Coherence: Preservation
 
-This module defines the coherence invariant for multiparty session types.
+This module proves coherence preservation under all protocol steps.
+-/
 
+/-
+The Problem. Coherence must be preserved by every step (send, recv, select, branch,
+open, close, delegation). This is the main preservation theorem for MPST.
+
+Solution Structure. We combine the per-step preservation lemmas:
+1. Head preservation lemmas for send/recv/select/branch
+2. Session management (open/close) preservation
+3. Delegation preservation via `DelegationEnvelope`
+4. Main theorem: `Coherent_step_preserved`
+-/
+
+/-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 

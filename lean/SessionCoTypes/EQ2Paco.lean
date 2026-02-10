@@ -33,6 +33,17 @@ theorem my_eq2_proof : EQ2 a b := by
 ```
 -/
 
+/-
+The Problem. Standard coinduction for EQ2 is limited: we can't accumulate
+hypotheses or use up-to techniques. Paco (parametrized coinduction) provides
+these features but requires connecting EQ2 to its framework.
+
+Solution Structure. Wraps EQ2F as `EQ2FMono : Paco.MonoRel`. Proves `EQ2_eq_paco_bot`
+showing EQ2 equals the paco greatest fixed point. Provides `EQ2_paco_coind` for
+parametrized coinduction and `EQ2_paco_coind_acc` for coinduction with accumulated
+hypotheses. Enables transitivity via accumulation and compatible closures.
+-/
+
 namespace SessionCoTypes.EQ2Paco
 
 open SessionCoTypes.EQ2

@@ -1,5 +1,10 @@
 import Protocol.Coherence.Renaming
 
+/-! # Protocol.Coherence.ConfigEquiv
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-
 The Problem. We need a quotient-style equivalence for coherence configurations
 that identifies states differing only by a renaming of session identifiers.

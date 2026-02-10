@@ -9,6 +9,17 @@ This module reuses the existing `LocalTypeR.dual` definition and adds
 preservation properties needed to reduce send/recv duplication.
 -/
 
+/-
+The Problem. Session types have duality: send becomes recv and vice versa. Many
+proofs for send have symmetric recv cases. We need duality lemmas that allow
+proving one direction and deriving the other via duality.
+
+Solution Structure. Proves `dual_involutive` (duality is its own inverse),
+`muHeight_dual` (duality preserves mu-height), `unfold_dual` (duality commutes
+with unfolding), and `fullUnfold_dual` (duality commutes with full unfolding).
+These enable reducing send/recv case duplication in proofs.
+-/
+
 namespace SessionTypes.LocalTypeR
 
 open SessionTypes.GlobalType

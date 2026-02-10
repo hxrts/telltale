@@ -13,6 +13,17 @@ open SessionCoTypes.CoinductiveRel
 `trans_eq_of_CProject` and full completeness of `projectb`.
 -/
 
+/-
+The Problem. We need to show that `projectb` is complete: if CProject holds for
+some candidate, then `projectb` returns that candidate. This ensures the checker
+finds all valid projections, not just some of them.
+
+Solution Structure. The proof proceeds by coinduction on CProject:
+1. `trans_eq_of_CProject`: CProject implies trans computes the candidate
+2. Case analysis on global type constructors (end, var, mu, comm)
+3. Branch helpers for send/recv cases with Forall₂ induction
+-/
+
 /-! ### trans Branch Helper -/
 
 /-- Helper: compute `transBranches` from a BranchesProjRel witness. -/

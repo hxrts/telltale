@@ -22,6 +22,18 @@ Every `Exec*.lean` file imports this module. The helpers are intentionally small
 pure so that the per-instruction semantics files stay focused on control flow.
 -/
 
+/-
+The Problem. Per-instruction step functions share common operations: buffer access,
+register manipulation, cost charging, result construction. Duplicating this code
+would make instructions hard to maintain and test.
+
+Solution Structure. Extracts shared operations into categorized helpers. `StepPack`
+bundles updated coroutine/state/result. Buffer helpers handle signed enqueue/dequeue.
+Register helpers provide safe read/write with PC advancement. Result helpers construct
+`StepPack` for continue/fault/block/halt outcomes. Coroutine updates write back to
+the VM state array.
+-/
+
 set_option autoImplicit false
 
 universe u

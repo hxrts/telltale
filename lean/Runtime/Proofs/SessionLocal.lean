@@ -45,6 +45,17 @@ the Iris import collision. VM-level integration requires resolving the Store
 name collision between Protocol.Environments.Core and Iris.Std.Heap.
 -/
 
+/-
+The Problem. Global coherence is defined over all edges, but we need local
+reasoning: operations on session s should not affect coherence of session s'.
+This requires decomposing coherence as a separating conjunction over sessions.
+
+Solution Structure. Defines `SessionCoherent s` restricting coherence to edges
+within session s. Proves `VMCoherent_iff_forall_SessionCoherent` showing global
+coherence = conjunction of per-session coherence. The key lemma
+`session_local_op_preserves_other` establishes the frame property.
+-/
+
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 

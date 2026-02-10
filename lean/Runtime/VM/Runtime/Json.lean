@@ -3,15 +3,27 @@ import Runtime.VM.Model.UnitModel
 import Runtime.VM.Model.State
 import Protocol.Values
 
-/-!
-# VM JSON Serialization
+/-! # VM JSON Serialization
 
 Serialize runtime values and observable trace events for the VM runner.
+-/
+
+/-
+The Problem. The VM runner needs to output execution traces in a format that can
+be consumed by external tools for testing and debugging. JSON is the natural choice
+for cross-language interoperability.
+
+Solution Structure. Provides `valueToJson` for serializing runtime `Value` types,
+`edgeToJson` for session edges, and `obsEventToJson` for observable trace events.
+Each encoder produces well-formed JSON objects with explicit kind tags for
+discriminating variants. Used by the VM runner to print execution traces.
 -/
 
 set_option autoImplicit false
 
 open Lean (Json)
+
+/-! ## JSON Encoders -/
 
 /-- Serialize a runtime Value to JSON. -/
 def valueToJson : Value → Json

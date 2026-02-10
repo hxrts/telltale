@@ -1,7 +1,6 @@
 import Mathlib
 
-/-!
-# Mixing Time Bounds
+/-! # Mixing Time Bounds
 
 This module provides the mathematical foundation for convergence rate analysis
 in session-typed distributed systems. Mixing time theory characterizes how

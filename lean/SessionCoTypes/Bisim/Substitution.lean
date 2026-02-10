@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.Congruence
 Proves substitute_compatible_barendregt and EQ2_substitute_via_Bisim.
 -/
 
+/-
+The Problem. Substitution must preserve Bisim/EQ2: if a ≈ b then a[x:=t] ≈ b[x:=t].
+The Barendregt convention (bound variables are fresh) is needed to avoid capture,
+making the proof non-trivial for recursive types.
+
+Solution Structure. Uses `RelImage` lifting and the `Compatible` framework from
+Congruence.lean. Proves `WellFormed_substitute` preserving well-formedness, then
+`substitute_compatible_barendregt` showing substitution is Compatible under the
+Barendregt condition. `EQ2_substitute_via_Bisim` transfers the result to EQ2.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

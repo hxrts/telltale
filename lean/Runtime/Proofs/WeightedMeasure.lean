@@ -30,6 +30,17 @@ This measure strictly decreases under every productive step:
 - `total_productive_steps_bounded`: At most W₀ productive steps
 -/
 
+/-
+The Problem. To bound protocol execution time, we need a Lyapunov-like measure
+that strictly decreases on every communication step. The challenge is finding
+weights that work for both send (adds to buffer) and recv (removes from buffer).
+
+Solution Structure. Uses weighted measure W = 2 * Σ depth(L) + Σ buffer_size(e).
+The factor of 2 ensures sends still decrease (depth -2, buffer +1 = net -1) while
+receives decrease more (depth -2, buffer -1 = net -3). Proves each step type
+decreases W, yielding bounded termination via W₀ productive steps.
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false

@@ -1,7 +1,6 @@
 import Mathlib
 
-/-!
-# Fluid Limit Stability
+/-! # Fluid Limit Stability
 
 This module provides the mathematical foundation for stability analysis of
 large-scale session-typed systems via fluid approximations. Fluid limits

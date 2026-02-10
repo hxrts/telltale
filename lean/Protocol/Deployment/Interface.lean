@@ -10,7 +10,21 @@ import Protocol.Typing.Core
 This module defines the structure for a deployed protocol: a bundle containing
 the protocol specification, projected local types, initial monitor state, and
 all required certificates for safe execution.
+-/
 
+/-
+The Problem. Deploying a protocol requires bundling the specification with proofs
+of well-formedness, monitor state, and interface declarations for composition.
+We need a structured artifact that runtime and composition layers can consume.
+
+Solution Structure. We define:
+1. `InterfaceType`: exports/imports for protocol composition
+2. `DeployedProtocol`: full bundle with all certificates
+3. `ProtocolBundle`: lightweight runtime bundle
+4. Composition interface for linking deployed protocols
+-/
+
+/-!
 ## Overview
 
 A **deployed protocol** is the artifact produced when a developer:

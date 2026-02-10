@@ -3,6 +3,22 @@ import Runtime.Proofs.Concurrency
 
 set_option autoImplicit false
 
+/-!
+# Scheduler API
+
+API types and definitions for scheduler reasoning in the VM runtime.
+-/
+
+/-
+The Problem. Different scheduling policies (round-robin, cooperative, priority,
+progress-aware) have different properties. We need a uniform interface for
+reasoning about scheduler behavior and connecting to Iris separation logic proofs.
+
+Solution Structure. Defines `SchedulerPolicyProfile` for classifying policies,
+`schedulerPolicyProfileOf` for converting concrete policies, and
+`SchedulerIrisInvariant` for connecting scheduler state to Iris state interpretation.
+-/
+
 /-! ## Core Development -/
 
 namespace Runtime

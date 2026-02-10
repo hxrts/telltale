@@ -8,7 +8,22 @@ import Mathlib
 # Buffer Boundedness and Phase Transition
 
 This module formalizes the critical buffer size theorem for multiparty session types.
+-/
 
+/-
+The Problem. Asynchronous multiparty session types use unbounded buffers in theory,
+but practical implementations need bounded buffers. We must characterize when
+bounded-buffer execution is equivalent to unbounded.
+
+Solution Structure. We prove:
+1. Critical buffer size B_c exists for any well-typed configuration
+2. For B ≥ B_c: bounded execution equals unbounded (no spurious deadlocks)
+3. For B < B_c: deadlocking executions exist
+4. B_c is computable for finite-state protocols
+The key insight is that coherence implies bounded buffer growth.
+-/
+
+/-!
 ## Key Results
 
 1. **Critical Buffer Size**: For any well-typed initial configuration C₀, there exists a

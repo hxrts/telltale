@@ -5,6 +5,17 @@ import SessionCoTypes.SubstCommBarendregt.SubstRel
 Proves `SubstRel_postfix_standard` and `EQ2_substitute_barendregt`.
 -/
 
+/-
+The Problem. The main theorem `EQ2_substitute_barendregt` requires showing SubstRel
+is a post-fixpoint of EQ2F. This involves case analysis on all type constructors
+with careful handling of the mu case under Barendregt conditions.
+
+Solution Structure. Proves `BranchesRel_substitute` lifting branch relations through
+substitution. `SubstRel_postfix_standard` handles case analysis on EQ2F, using
+`bne_of_notBoundAt_mu` for mu cases. The main theorem `EQ2_substitute_barendregt`
+follows by coinduction using SubstRel as the witness relation.
+-/
+
 namespace SessionCoTypes.SubstCommBarendregt
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2

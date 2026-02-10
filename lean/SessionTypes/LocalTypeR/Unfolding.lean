@@ -6,6 +6,17 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-
+The Problem. Recursive types need iterative unfolding to reach observable form (send/recv/end).
+The number of unfold steps depends on nesting depth. Guardedness determines whether variables
+appear at head position or inside communications.
+
+Solution Structure. Defines `muHeight` counting nested mus at head. `fullUnfold` iterates
+`unfold` muHeight-many times (Coq's `full_eunf` pattern). Proves `fullUnfold_mu` relating
+mu-unfolding to body substitution. `isFreeIn_mem_freeVars` and `isGuarded_of_closed` connect
+membership predicates. Closed types have all variables guarded (vacuously).
+-/
+
 /-! # SessionTypes.LocalTypeR.Unfolding
 
 Full unfolding, guardedness/contractiveness properties, and contractive types reaching observable form.

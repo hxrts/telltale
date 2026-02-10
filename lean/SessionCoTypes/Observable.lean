@@ -23,6 +23,17 @@ This file is extracted from Bisim.lean to avoid circular dependencies:
 
 -/
 
+/-
+The Problem. Bisimulation proofs need predicates capturing observable behavior
+after mu-unfolding, analogous to ITree's `Terminates` and `CanDo`. These must be
+defined separately to avoid circular dependencies between Bisim.lean and Project.lean.
+
+Solution Structure. Defines `UnfoldsToEnd` and `UnfoldsToVar` for termination,
+`CanSend` and `CanRecv` for action capability. Each predicate is inductive with
+a base case and a mu-unfolding case. Provides exclusivity lemmas (e.g., UnfoldsToEnd
+excludes CanSend) and an Observable classification sum type.
+-/
+
 namespace SessionCoTypes.Observable
 
 open SessionTypes.LocalTypeR

@@ -7,6 +7,17 @@ set_option linter.dupNamespace false
 Decidable bisimulation definitions and helpers connecting `bisimAll` to `BranchesRelC`.
 -/
 
+/-
+The Problem. Bisimilarity is coinductively defined but we need a decidable
+algorithm for runtime type checking. The algorithm must handle cycles (recursive
+types) without diverging while being sound with respect to the coinductive definition.
+
+Solution Structure. Defines `bisimAux` with fuel (recursion bound), unfolding bound,
+and visited set for cycle detection. Returns true if pair is bisimilar or already
+visited (cycle = bisimilar by coinduction). `bisimAll` checks all pairs in a list.
+Helpers connect the algorithm to `BranchesRelC` for branch-wise checking.
+-/
+
 open Classical
 
 namespace SessionCoTypes.Coinductive

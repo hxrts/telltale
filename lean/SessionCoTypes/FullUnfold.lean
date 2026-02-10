@@ -31,6 +31,17 @@ without explicit coinduction.
 - Coq: `emu_height`, `eunf`, `full_eunf`, `full_eunf_subst` in `coLocal.v`
 -/
 
+/-
+The Problem. Direct coinductive proofs for substitution commutation are complex.
+An alternative is iterative unfolding with a termination measure, allowing
+equational reasoning without explicit coinduction.
+
+Solution Structure. Defines `muHeight` counting nested mu constructors as a
+termination measure. `singleUnfold` performs one mu-substitution step. `fullUnfold`
+iterates singleUnfold height-many times. Proves `fullUnfold_mu_subst` connecting
+unfolding of mu to unfolding of its body, enabling EQ2 via structural equality.
+-/
+
 namespace SessionCoTypes.FullUnfold
 
 open SessionTypes.LocalTypeR

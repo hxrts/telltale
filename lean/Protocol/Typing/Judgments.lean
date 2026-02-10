@@ -1,10 +1,23 @@
 import Protocol.Typing.Core
 
 /-!
-# MPST Process Typing
+# MPST Process Typing: Judgments
 
-This module defines the typing rules for MPST processes.
+This module defines advanced typing judgments including parallel split witnesses.
+-/
 
+/-
+The Problem. Parallel composition typing requires splitting contexts, but we
+need explicit witnesses that can be transported in framed proofs. The naive
+approach couples split identity to index bookkeeping.
+
+Solution Structure. We define:
+1. `ParSplit`: explicit split witness for parallel composition
+2. `ParWitness`: witness-oriented inversion for par typing
+3. `*_par_nG_irrel` lemmas for extensional treatment of the right index
+-/
+
+/-!
 Par typing uses an explicit split witness (`ParSplit`) and witness-oriented
 inversion (`ParWitness`) so framed proofs can transport split identity without
 depending on ambient right-index bookkeeping. The right par index `nG` is

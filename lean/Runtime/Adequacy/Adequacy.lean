@@ -13,8 +13,7 @@ Solution Structure. Provide trace/event types and placeholder adequacy
 statements that will be refined by later proofs.
 -/
 
-/-!
-# Task 22: Observable Trace Infrastructure and VM Adequacy
+/-! # Task 22: Observable Trace Infrastructure and VM Adequacy
 
 Observable events, trace properties, and the capstone adequacy theorem
 from iris_runtime_2.md §11.
@@ -35,6 +34,8 @@ Dependencies: Task 12, Task 19, Shim.WeakestPre.
 
 set_option autoImplicit false
 section
+
+/-! ## Core Adequacy Definitions -/
 
 universe u
 

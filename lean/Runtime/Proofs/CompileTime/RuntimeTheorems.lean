@@ -27,6 +27,18 @@ Most theorems are fully proven. TODO: items marked "Placeholder" are `True` stub
 for future Aura-specific instantiation work.
 -/
 
+/-
+The Problem. The VM runtime layer has many correctness properties spread across
+different modules (refinement, deadlock freedom, diamond, handlers, cost). Users
+need a single entry point to access proven guarantees without navigating the proof
+structure.
+
+Solution Structure. Collects theorem statements into categories, providing types
+and instantiation functions for each. Refinement stack theorems establish behavioral
+equivalences between abstraction layers. Core VM theorems cover deadlock freedom
+and progress. Multi-session theorems prove the diamond property for disjoint sessions.
+-/
+
 set_option autoImplicit false
 section
 

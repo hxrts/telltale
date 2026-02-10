@@ -22,6 +22,17 @@ terminates within k * W₀ steps, where W₀ is the initial progress measure.
 - `bound_is_tight`: The k * W₀ bound is tight
 -/
 
+/-
+The Problem. We need concrete termination bounds for scheduled protocol execution
+to guarantee protocols complete in bounded time, enabling practical timeouts and
+resource allocation. The bound must account for arbitrary k-fair scheduling.
+
+Solution Structure. Defines `ProgressSystem` abstracting configurations with roles,
+steps, and progress measures. Proves `measure_nonincreasing` (steps don't increase
+measure) and `block_progress` (k steps strictly decrease when non-terminal). The
+main theorem `kfair_termination_bound` shows k * W₀ steps suffice, with tightness.
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false

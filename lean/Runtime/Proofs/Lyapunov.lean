@@ -41,6 +41,18 @@ unfolding.
   giving deadlock freedom and bounded termination from a single measure.
 -/
 
+/-
+The Problem. Proving liveness (deadlock freedom, eventual termination) for
+session-typed systems requires showing that progress is always possible. This
+is analogous to stability arguments in dynamical systems but in a discrete setting.
+
+Solution Structure. Adapts Lyapunov stability theory to session types: defines
+a progress measure (ℕ-valued function on configurations) that equals zero at
+protocol completion and strictly decreases on communication steps. The well-
+foundedness of ℕ yields termination. Key lemmas connect instruction execution
+to measure decrease/non-increase.
+-/
+
 set_option autoImplicit false
 
 section

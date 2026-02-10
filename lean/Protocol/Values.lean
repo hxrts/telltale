@@ -4,6 +4,21 @@ import Protocol.LocalType
 # MPST Runtime Values
 
 This module defines the runtime values for multiparty session types.
+-/
+
+/-
+The Problem. We need a value representation that supports base types, products,
+and channel endpoints. For proof-carrying runtime, we also need linear capability
+tokens that the monitor can track.
+
+Solution Structure. We define:
+1. `Value`: runtime values (unit, bool, nat, string, prod, chan)
+2. Capability tokens (`tok e S`): linear, unforgeable endpoint capabilities
+3. `LinCtx`: linear context tracking active tokens
+4. Helper functions for value typing and comparison
+-/
+
+/-!
 Values include base types (unit, bool, nat, string), products, and
 channel endpoints that carry session identifiers and role names.
 

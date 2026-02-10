@@ -1,13 +1,32 @@
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Delegation
 
+/-! # Protocol.Coherence.SubtypeReplacement
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
 # Subtype Replacement Preservation
 
 This module proves that replacing local types with subtypes preserves coherence.
 This is a key lemma for session type soundness: if a participant's type evolves
 to a subtype, the overall protocol remains coherent.
+-/
 
+/-
+The Problem. Async subtyping allows replacing a local type with a subtype, but
+we need to show this preserves coherence. The challenge is that Consume behavior
+must be compatible between the old and new types.
+
+Solution Structure. We prove:
+1. `RecvCompatible`: predicate for types with matching receive patterns
+2. `Consume_mono`: compatible types consume the same message sequences
+3. `Coherent_type_replacement`: main theorem — subtype replacement preserves coherence
+The key insight is that coherence depends on Consume succeeding for buffered messages.
+-/
+
+/-!
 ## Key Definitions
 
 - `RecvCompatible`: Two types accept the same receive patterns

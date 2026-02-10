@@ -26,6 +26,18 @@ This is the Lean specification of state that will be reimplemented in Rust. The
 `WFVMState` predicate captures basic well-formedness (PC bounds, session id validity).
 -/
 
+/-
+The Problem. The VM executes multiple concurrent coroutines, each with its own
+registers, program counter, owned endpoints, and cost budget. We need a state
+representation that captures all runtime information for execution, scheduling,
+monitoring, and failure handling.
+
+Solution Structure. Defines `CoroutineState` for per-coroutine state (registers, PC,
+endpoints, knowledge set, speculation). `VMState` aggregates coroutines with global
+state: configuration, loaded programs, session store, scheduler state, failure model.
+`WFVMState` predicate captures well-formedness invariants (PC bounds, session validity).
+-/
+
 set_option autoImplicit false
 
 universe u

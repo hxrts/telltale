@@ -5,6 +5,17 @@ import Semantics.Determinism.Core
 Diamond property for independent actions and the determinism Claims bundle.
 -/
 
+/-
+The Problem. Independent actions (different sender-receiver pairs) should commute:
+performing act₁ then act₂ should yield the same state as act₂ then act₁. This
+diamond property is essential for reasoning about concurrent protocol execution.
+
+Solution Structure. Defines `IndependentActions` for disjoint role pairs. Proves
+`independent_not_both_head` showing independent actions can't conflict on the same
+edge. The diamond property follows: independent actions can be reordered without
+changing the final state. `Claims` bundles all determinism properties.
+-/
+
 namespace Semantics.Determinism
 open SessionTypes.GlobalType
 open Semantics.Environment

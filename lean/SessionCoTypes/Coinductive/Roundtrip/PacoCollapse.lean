@@ -8,6 +8,17 @@ set_option linter.dupNamespace false
 Mu-aware paco collapse under productivity and sourced erasure versions.
 -/
 
+/-
+The Problem. The mu-aware paco equality EQ2C_mu_paco allows unfolding on either
+side, but we need to show it collapses to standard EQ2C_paco for productive types
+(where every mu is eventually unfolded to an observable).
+
+Solution Structure. Proves helper lemmas connecting children and branches via
+`mem_childrenOf_of_mem_branchesOf`. Shows paco collapse under productivity: if
+types are productive, mu-aware equality equals standard equality. Provides
+"sourced" erasure versions tracking the origin of unfolding steps.
+-/
+
 namespace SessionCoTypes.Coinductive
 /-! ## μ-aware paco collapse (productivity assumption) -/
 

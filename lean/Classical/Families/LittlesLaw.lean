@@ -1,7 +1,6 @@
 import Mathlib
 
-/-!
-# Little's Law
+/-! # Little's Law
 
 This module provides the mathematical foundation for relating queue length,
 arrival rate, and waiting time in session-typed distributed systems. Little's

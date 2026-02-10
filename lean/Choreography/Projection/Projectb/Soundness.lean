@@ -15,6 +15,17 @@ set_option linter.unnecessarySeqFocus false
 Soundness and completeness of `projectb` with respect to `CProject`.
 -/
 
+/-
+The Problem. The boolean checker `projectb` must be proven sound: when it returns
+true for a candidate, that candidate must satisfy the CProject relation. This
+ensures the checker only accepts valid projections.
+
+Solution Structure. We prove soundness by structural induction on global types:
+1. Helper lemmas for BEq-to-Prop conversions (String, PayloadSort, Label)
+2. Case analysis matching `projectb` and `CProjectF` structure
+3. Branch helpers for send/recv with Forall₂ witnesses
+-/
+
 /-! ## Soundness and Completeness
 
 These theorems establish the correspondence between the boolean checker `projectb`

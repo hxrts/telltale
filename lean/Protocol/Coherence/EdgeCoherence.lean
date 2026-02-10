@@ -1,10 +1,29 @@
 import Protocol.Coherence.Consume
 
+/-! # Protocol.Coherence.EdgeCoherence
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
 # MPST Coherence
 
 This module defines the coherence invariant for multiparty session types.
+-/
 
+/-
+The Problem. In MPST, multiple roles communicate via directed edges with asynchronous
+buffers. We need an invariant that captures "all edges are in sync" without requiring
+global re-derivation from a common ancestor type.
+
+Solution Structure. We define edge-local coherence via the Consume function:
+1. `Consume`: models how a local type evolves as buffered messages arrive
+2. `EdgeCoherent`: per-edge check that sender/receiver types align with buffer
+3. `Coherent`: all active edges are edge-coherent
+4. 3-way case split for preservation: updated edge, related edge, unrelated edge
+-/
+
+/-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 

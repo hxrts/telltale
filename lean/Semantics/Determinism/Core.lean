@@ -46,6 +46,17 @@ The following definitions form the semantic interface for proofs:
 This module uses placeholder definitions until Project.lean builds.
 -/
 
+/-
+The Problem. Protocol semantics must be deterministic given an action to ensure
+predictable execution, enable testing, and support formal reasoning. We need to
+prove that same-action transitions yield unique successor configurations.
+
+Solution Structure. Proves determinism at three levels: global type (step g g₁ act
+and step g g₂ act implies g₁ = g₂), environment (EnvConfigStep determinism), and
+full configuration (combining both). Non-determinism is localized to action selection;
+once an action is fixed, the result is unique.
+-/
+
 namespace Semantics.Determinism
 
 open SessionTypes.GlobalType

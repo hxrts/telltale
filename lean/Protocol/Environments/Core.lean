@@ -6,8 +6,23 @@ import Batteries.Data.RBMap.Lemmas
 /-!
 # MPST Environments
 
-This module defines the runtime environments for multiparty session types:
+This module defines the runtime environments for multiparty session types.
+-/
 
+/-
+The Problem. MPST execution requires tracking local types per endpoint, value
+stores, in-flight message traces, and message buffers. These environments must
+support efficient lookup and update with clear semantics.
+
+Solution Structure. We define:
+1. `VarStore/SEnv`: variable stores and type environments
+2. `GEnv`: session environment (endpoint → local type)
+3. `DEnv`: delayed type environment (edge → trace)
+4. `Buffers`: per-edge FIFO message buffers
+The key insight is that buffers/traces are keyed by directed edges, not endpoints.
+-/
+
+/-!
 - `Store`: Variable store mapping variables to runtime values
 - `SEnv`: Type environment mapping variables to value types
 - `GEnv`: Session environment mapping endpoints to local types

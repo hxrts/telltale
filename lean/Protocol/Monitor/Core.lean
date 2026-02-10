@@ -4,7 +4,21 @@ import Protocol.Coherence
 # MPST Verified Monitor
 
 This module implements the proof-carrying runtime monitor for MPST.
+-/
 
+/-
+The Problem. Untrusted code must interact with the session type system safely.
+We need a runtime monitor that validates actions, maintains invariants, and
+provides a safe interface for protocol execution.
+
+Solution Structure. We define:
+1. `MonitorState`: runtime state (GEnv, DEnv, buffers, linear context, supply)
+2. `MonStep`: judgment for valid monitor transitions
+3. `MonStep_preserves_WTMon`: preservation theorem
+4. Capability token interface for untrusted code interaction
+-/
+
+/-!
 ## Overview
 
 The monitor is the trusted component that:

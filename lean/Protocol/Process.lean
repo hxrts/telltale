@@ -4,7 +4,21 @@ import Protocol.Coherence
 # MPST Process Language
 
 This module defines the process language for multiparty session types.
+-/
 
+/-
+The Problem. We need a process calculus for MPST that supports multiparty
+communication, session creation, and composition. The process language must
+be expressive enough to encode real protocols while supporting typing.
+
+Solution Structure. We define:
+1. `Process`: inductive type with send/recv/select/branch/newSession/seq/par
+2. Channel operations are role-aware (target role is in the type)
+3. `newSession` creates sessions with role bindings
+4. Structural congruence for parallel composition
+-/
+
+/-!
 The process language is similar to the binary session types language,
 but operations are multiparty-aware:
 - `send k x`: send value in x through channel k (target role is in the type)

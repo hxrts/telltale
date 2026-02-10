@@ -6,6 +6,17 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-
+The Problem. Well-formedness (closed + contractive) must be preserved through unfold and
+fullUnfold operations to maintain invariants during protocol verification. Branch well-formedness
+propagates to/from enclosing send/recv types.
+
+Solution Structure. `WellFormed.unfold` and `WellFormed.fullUnfold` prove preservation using
+substitution lemmas from Substitution.lean. `branches_of_send/recv` extract branch well-formedness.
+`WellFormed_send/recv` reconstruct type well-formedness from branches. `unguarded_unfolds_to_var`
+(vacuous for closed types) shows the connection between guardedness and observable behavior.
+-/
+
 /-! # SessionTypes.LocalTypeR.WellFormedness
 
 Well-formedness preservation (unfold, fullUnfold, branches) and unguarded variable theorem.

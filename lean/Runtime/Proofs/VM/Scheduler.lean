@@ -2,7 +2,27 @@ import Runtime.VM.Runtime.Scheduler
 
 set_option autoImplicit false
 
+/-!
+# VM Scheduler Properties
+
+Proofs of scheduler correctness properties: confluence, cooperative refinement,
+and helper lemmas for queue operations.
+-/
+
+/-
+The Problem. The VM scheduler must satisfy confluence (order of ready coroutines
+doesn't affect reachable states) and cooperative scheduling must refine concurrent
+semantics. These properties underpin deterministic execution guarantees.
+
+Solution Structure. Proves `schedule_confluence_holds` showing the scheduler is
+confluent, and `cooperative_refines_concurrent_holds` showing cooperative mode
+refines round-robin. Helper lemmas for queue operations (takeOut, bestCandidate)
+support the main proofs.
+-/
+
 universe u
+
+/-! ## Scheduler Properties -/
 
 theorem schedule_confluence_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

@@ -7,6 +7,17 @@ set_option linter.dupNamespace false
 Stub definitions (nameOf, envOf), environment containment helpers, and toInductiveBody.
 -/
 
+/-
+The Problem. Converting from coinductive to inductive types requires generating
+fresh names and tracking them in an environment. We need definitions for naming
+nodes and building environments, plus containment helpers for correctness proofs.
+
+Solution Structure. Defines `nameOf` assigning names to coinductive nodes (using
+existing mu-binder names or generating fresh ones). `envOf` builds an environment
+from a finite system of nodes. `EnvOfSub` and helpers prove containment properties
+needed for round-trip correctness. `toInductiveBody` handles the body conversion.
+-/
+
 namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

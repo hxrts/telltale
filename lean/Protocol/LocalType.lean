@@ -10,7 +10,21 @@ import Protocol.Basic
 Local types describe the communication protocol from a single participant's
 perspective. Unlike binary session types, actions are directed to/from
 specific roles.
+-/
 
+/-
+The Problem. We need a representation of local session types that supports
+directed communication (to/from specific roles), recursion, and value/channel
+types. The representation must support decidable equality and efficient matching.
+
+Solution Structure. We define:
+1. `ValType`: value types including channel endpoints
+2. `LocalType`: the local type grammar with send/recv/select/branch/mu/end
+3. Helper functions for branch lookup, unfolding, and type traversal
+The key insight is that actions are directed to specific roles, not just "dual".
+-/
+
+/-!
 - `!r(T).L` - send value of type T to role r, continue as L
 - `?r(T).L` - receive value of type T from role r, continue as L
 - `⊕r{ℓᵢ: Lᵢ}` - select: send label ℓᵢ to role r, continue as Lᵢ

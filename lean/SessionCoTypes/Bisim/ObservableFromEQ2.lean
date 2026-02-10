@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.EQ2Equivalence
 Extracts observable behavior from EQ2 proofs under closedness/contractiveness.
 -/
 
+/-
+The Problem. Converting EQ2 to Bisim requires extracting observable behavior
+(UnfoldsToEnd, CanSend, etc.) from EQ2 proofs. This is only valid for contractive
+types where mu-bound variables are guarded by communication.
+
+Solution Structure. Defines `EQ2Extraction` interface for extracting observables.
+Provides contractive-only extraction (fully proven), unconditional extraction
+(for legacy compatibility), and hybrid default. The layered design isolates the
+contractive requirement so it doesn't leak into downstream proofs.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

@@ -1,10 +1,21 @@
 import Protocol.Typing.Preservation
 
+/-! # MPST Process Typing: Progress
+
+This module proves progress for the process typing judgment.
+-/
+
+/-
+The Problem. We need progress: well-typed processes either terminate (skip)
+or can take a step. Combined with preservation, this yields type safety.
+
+Solution Structure. We prove progress by:
+1. Case analysis on the process (skip is done, others can step)
+2. Using buffer contents to show sends/recvs can proceed
+3. Handling parallel composition via context splitting
+-/
+
 /-!
-# MPST Process Typing
-
-This module defines the typing rules for MPST processes.
-
 ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
@@ -35,7 +46,7 @@ open scoped Classical
 
 section
 
-/-! ### Progress Helpers -/
+/-! ## Progress Helpers -/
 
 private theorem findLabel_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
     (h : xs.find? (fun b => b.1 == lbl) = some (lbl', v)) : lbl' = lbl := by
@@ -310,7 +321,7 @@ private lemma SEnv_append_empty_right (S : SEnv) : S ++ (∅ : SEnv) = S := by
 private lemma SEnv_append_empty_left (S : SEnv) : (∅ : SEnv) ++ S = S := by
   simpa using (List.nil_append S)
 
-/-! ### Store Typing Rearrangements (Local Helpers) -/
+/-! ## Store Typing Rearrangements (Local Helpers) -/
 
 private lemma lookupSEnv_all_of_visible_prog
     {Ssh : SEnv} {Sown : OwnedEnv} {x : Var} {T : ValType}
@@ -568,7 +579,7 @@ private lemma StoreTypedStrong_swap_S_left_prefix
     exact lookupSEnv_swap_left_prefix (Ssh:=Ssh) (S₁:=S₁) (S₂:=S₂) (S₃:=S₃) hDisj x
   · exact hStore
 
-/-! ### GEnv Framing for Pre-Out Typing -/
+/-! ## GEnv Framing for Pre-Out Typing -/
 
 private lemma HasTypeProcPreOut_send_inv
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {k x : Var}
@@ -1575,7 +1586,7 @@ theorem progress_typed {G D Ssh Sown store bufs P} :
   exact progress_typed_aux hOut hStore hDisjS hCons hDisjRightFin
     hBufs hCoh hHead hValid hComplete hReady hSelectReady hDCons
 
-/-! ### Convenience Wrapper -/
+/-! ## Convenience Wrapper -/
 
 /-- Progress with explicit RoleComplete (keeps the old WellFormed ergonomics). -/
 theorem progress_typed_with_rolecomplete {G D Ssh Sown store bufs P} :

@@ -5,6 +5,17 @@ import Choreography.Projection.Blind.Core
 Step-preservation helper lemmas for blindness.
 -/
 
+/-
+The Problem. When a global type takes a step (e.g., comm_head selecting a branch,
+or mu_unfold substituting), we need blindness to be preserved. Without this,
+the projectability guarantee from blindness would not extend through execution.
+
+Solution Structure. We prove preservation lemmas for each step kind:
+1. `isBlind_step_comm_head`: stepping into a branch preserves blindness
+2. `isBlind_substitute`: substitution (for mu-unfolding) preserves blindness
+The key insight is that substitution is uniform across branches.
+-/
+
 namespace Choreography.Projection.Blind
 
 open SessionTypes.GlobalType

@@ -1,8 +1,7 @@
 import Mathlib
 import ClassicalAnalysisAPI
 
-/-!
-# Concentration Inequalities
+/-! # Concentration Inequalities
 
 This module provides the mathematical foundation for tail probability bounds
 on deviations from expected behavior in session-typed distributed systems.

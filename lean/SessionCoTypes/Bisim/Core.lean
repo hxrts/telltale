@@ -46,6 +46,18 @@ The following definitions form the semantic interface for proofs:
 - hxrts/QpfTypes fork: https://github.com/hxrts/QpfTypes (commit f9e16e9)
 -/
 
+/-
+The Problem. Standard coinduction for EQ2 fails on transitivity because EQ2F
+requires matching on LocalTypeR constructors, but mu-unfolding creates asymmetric
+cases. The intermediate witness in transitivity can have arbitrary structure that
+can't be case-analyzed.
+
+Solution Structure. Defines membership predicates (`UnfoldsToEnd`, `UnfoldsToVar`,
+`CanSend`, `CanRecv`) capturing observable behavior after unfolding. `BisimF`
+uses these predicates instead of constructor matching, enabling transitivity
+proofs where the intermediate element's constructor doesn't matter.
+-/
+
 namespace SessionCoTypes.Bisim
 
 open SessionTypes.GlobalType

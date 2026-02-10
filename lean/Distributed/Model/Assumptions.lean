@@ -7,6 +7,18 @@ set_option autoImplicit false
 Core consensus assumption family and assumption-validation routines.
 -/
 
+/-
+The Problem. Distributed systems proofs depend on assumptions (timing, fault model,
+consensus properties) that must be explicitly stated and validated. Ad-hoc assumption
+handling leads to unsound theorem application.
+
+Solution Structure. We define:
+1. `Assumption`: enumeration of all supported distributed assumptions
+2. `AssumptionResult`: validation result with witness/counterexample
+3. Validation routines that check protocol configurations against required assumptions
+This enables assumption-aware theorem transport from the Classical layer.
+-/
+
 /-! ## Core Development -/
 
 namespace Distributed

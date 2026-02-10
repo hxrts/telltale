@@ -7,6 +7,17 @@ set_option linter.dupNamespace false
 isProductive preservation under substitution and wellFormed_mu_unfold theorem.
 -/
 
+/-
+The Problem. Well-formed global types must be productive (every path eventually
+reaches a communication). Productivity must be preserved when unfolding mu-types
+via substitution, which requires careful reasoning about the unguarded variable set.
+
+Solution Structure. Proves `isProductive_cons_dedup` and `isProductive_swap` for
+manipulating the unguarded list. Shows productivity is preserved under substitution
+via mutual recursion. The main theorem `wellFormed_mu_unfold` combines all preservation
+lemmas (allVarsBound, allCommsNonEmpty, noSelfComm, isProductive) for mu-unfolding.
+-/
+
 /-! ## Core Development -/
 
 namespace SessionTypes.GlobalType

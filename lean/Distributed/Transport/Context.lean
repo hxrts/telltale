@@ -11,6 +11,18 @@ it tracks family-level eligibility labels only. Cross-family proof composition
 is performed in Runtime/VM proof layers.
 -/
 
+/-
+The Problem. Classical theorem families (Foster-Lyapunov, large deviations, mixing times)
+require specific assumptions to apply. We need to check whether a protocol configuration
+satisfies the preconditions for each family.
+
+Solution Structure. We define:
+1. `ClassicalProperty`: enumeration of transportable theorem families
+2. `ClassicalAssumption`: atoms required by each family
+3. Profile-checking functions that validate family eligibility
+This enables safe theorem transport with explicit assumption tracking.
+-/
+
 /-! ## Core Development -/
 
 namespace Distributed

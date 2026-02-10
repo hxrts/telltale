@@ -6,6 +6,17 @@ Connects membership predicates with fullUnfold and proves fullUnfold reflects
 observable behavior for well-formed types.
 -/
 
+/-
+The Problem. Membership predicates (UnfoldsToEnd, CanSend, etc.) describe behavior
+after unfolding. We need to connect these to `fullUnfold` (iterative unfolding to
+fixed point) to use them in proofs about type structure.
+
+Solution Structure. Proves negative lemmas showing non-contractive types like
+`.mu t (.var t)` don't satisfy unfolding predicates (they cycle forever). For
+well-formed (closed+contractive) types, proves fullUnfold reflects observables:
+if fullUnfold reaches a constructor, the original satisfies the membership predicate.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

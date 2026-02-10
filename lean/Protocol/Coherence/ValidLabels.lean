@@ -2,11 +2,29 @@ import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Preservation
 import Protocol.Coherence.SelectPreservation
 
+/-! # Protocol.Coherence.ValidLabels
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
-# MPST Coherence
+# MPST Coherence: Valid Labels
 
-This module defines the coherence invariant for multiparty session types.
+This module proves label validity properties for branch/select coherence.
+-/
 
+/-
+The Problem. When a role selects a label, the receiver must have that label in its
+branch type. We need to track which labels are valid at each point and prove
+preservation under protocol steps.
+
+Solution Structure. We define:
+1. Label validity predicates for branch/select types
+2. Preservation lemmas: valid labels remain valid after steps
+3. Connection to head preservation for select/branch coherence
+-/
+
+/-!
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 

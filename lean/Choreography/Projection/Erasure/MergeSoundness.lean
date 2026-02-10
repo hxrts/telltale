@@ -4,6 +4,17 @@ import Choreography.Projection.Erasure.Merge
 
 Merge soundness helpers and proofs for erasure.
 -/
+
+/-
+The Problem. The `merge` function computes a common supertype of two local types,
+but we need to prove it produces a valid `Erases` witness. This connects the
+algorithmic merge to the semantic erasure relation.
+
+Solution Structure. We prove soundness by structural induction:
+1. `mergeBranchesSend_sound`: branch merging preserves label subsets and erasure
+2. `merge_sound`: the main merge function produces valid Erases witnesses
+The key insight is that merge only succeeds when the types are compatible.
+-/
 namespace Choreography.Projection.Erasure
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

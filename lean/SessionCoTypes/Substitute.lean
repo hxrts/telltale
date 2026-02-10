@@ -47,6 +47,17 @@ When unfolding `(mu t body).substitute var repl`, we need to show that:
 This is the **substitution commutation lemma**. It holds syntactically when:
 - `t ≠ var` (the binder name differs from the substituted variable), AND
 - `t ∉ freeVars(repl)` (the **Barendregt convention**)
+-/
+
+/-
+The Problem. EQ2 (equi-recursive equality) must be preserved under substitution for
+typing proofs: if a ≈ b then a[x:=t] ≈ b[x:=t]. The mu case is complex because
+substitution interacts with mu-unfolding.
+
+Solution Structure. Defines SubstRel pairing terms related by EQ2 with their
+substitutions. Shows SubstRel is a post-fixpoint of EQ2F via case analysis. The
+mu case uses the Barendregt convention (binder fresh in replacement) to establish
+substitution commutation. EQ2_substitute follows by coinduction on SubstRel.
 
 The freshness condition ensures that `repl` doesn't accidentally capture `t`.
 

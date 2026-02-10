@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.UnfoldingLemmas
 Defines BisimF functor and proves Bisim is an equivalence relation.
 -/
 
+/-
+The Problem. Proving Bisim is an equivalence relation requires showing reflexivity,
+symmetry, and transitivity. The functor `BisimF` must support these proofs while
+handling mu-unfolding correctly via membership predicates.
+
+Solution Structure. Defines `BisimF` using membership predicates (`UnfoldsToEnd`,
+`CanSend`, etc.) instead of constructor matching. Proves reflexivity by case
+analysis on observables, symmetry by flipping the relation, and transitivity by
+leveraging that BisimF doesn't require matching intermediate constructors.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

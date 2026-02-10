@@ -11,8 +11,7 @@ over session kinds. Failure semantics live in a separate module to avoid
 cyclic dependencies on VM state.
 -/
 
-/-!
-# Task 23: Unified Monitor
+/-! # Task 23: Unified Monitor
 
 Monitor consistency across session kinds
 from iris_runtime_2.md §14.
@@ -34,6 +33,8 @@ Dependencies: Task 19, Shim.Invariants.
 set_option autoImplicit false
 
 universe u
+
+/-! ## Core Monitor Model -/
 
 inductive SessionKind (γ : Type u) where
   -- The source kind of a monitored session action.

@@ -46,6 +46,17 @@ eventually happen, establishing HeadCoherent for pending receives.
 See `work/vm_instructions.md` for the full specification.
 -/
 
+/-
+The Problem. The Protocol-level progress theorem operates on abstract configurations.
+We need to lift this to concrete VM states with coroutines, scheduler state, and
+instruction-level execution while preserving the progress guarantee.
+
+Solution Structure. Defines VM-level invariants (CoherentVMState, ProgressVMState)
+that imply Protocol-level conditions. Provides enablement predicates for each
+instruction type (SendEnabled, RecvEnabled, etc.). Conversion lemmas bridge VM and
+Protocol views, allowing the Protocol progress result to be lifted via `vm_progress`.
+-/
+
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 

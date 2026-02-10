@@ -1,7 +1,6 @@
 import Mathlib
 
-/-!
-# Large Deviation Principle
+/-! # Large Deviation Principle
 
 This module provides the mathematical foundation for tail probability bounds in
 session-typed distributed systems. Large deviation theory characterizes the

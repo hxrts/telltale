@@ -4,7 +4,21 @@ import Protocol.DeadlockFreedom
 # MPST Determinism
 
 This module provides determinism theorems for the Protocol MPST semantics.
+-/
 
+/-
+The Problem. We need to prove that MPST execution is deterministic: given the
+same action context, a configuration transitions to a unique next configuration.
+This is essential for predictable execution and reasoning about protocol behavior.
+
+Solution Structure. We prove:
+1. `uniqueBranchLabels`: branch labels must be distinct
+2. `stepBase_det`: base step determinism (same process → same result)
+3. `IndependentActions`: predicate for actions on disjoint sessions
+4. `diamond_independent`: independent actions commute (diamond property)
+-/
+
+/-!
 ## Overview
 
 Determinism states that given the same action context, a configuration transitions

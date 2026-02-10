@@ -7,6 +7,18 @@ import Protocol.Coherence.Renaming
 Environment merging, role completeness, and protocol bundle composition.
 -/
 
+/-
+The Problem. Composing protocols requires merging their environments (GEnv, DEnv,
+Buffers, LinCtx) while maintaining invariants. We need merge operations that
+preserve lookups and support disjointness reasoning.
+
+Solution Structure. We define:
+1. `mergeGEnv/DEnv/Bufs/Lin`: disjoint union merge operations
+2. Disjointness predicates and lemmas
+3. Role completeness for checking all roles are implemented
+4. Bundle composition for combining ProtocolBundle artifacts
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false

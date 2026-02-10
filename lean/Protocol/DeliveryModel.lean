@@ -7,10 +7,18 @@ import Protocol.Coherence.Consume
 This module introduces a minimal abstraction layer for delivery models without
 changing existing FIFO semantics. The goal is to allow new delivery models
 (causal, lossy, etc.) to be defined while keeping the current code unchanged.
+-/
 
-We provide:
-- `fifo`: the current FIFO semantics, defined to be the existing `Consume`.
-- `DeliveryModelLaws`: minimal algebraic laws used by coherence proofs.
+/-
+The Problem. The coherence proofs assume FIFO delivery, but we want to support
+alternative delivery models (causal, lossy) without rewriting the proofs. We need
+an abstraction that captures the essential laws used by coherence.
+
+Solution Structure. We define:
+1. `DeliveryModel`: abstraction over consume function
+2. `DeliveryModelLaws`: minimal algebraic laws (nil, append, cons)
+3. `fifo`: the current FIFO semantics as the default model
+Coherence proofs are parameterized by the model laws.
 -/
 
 set_option linter.mathlibStandardSet false

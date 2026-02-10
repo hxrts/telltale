@@ -13,6 +13,17 @@ set_option linter.dupNamespace false
 Mu-aware paco equality step and bounded unfolding helpers.
 -/
 
+/-
+The Problem. Standard EQ2C requires observable steps on both sides simultaneously.
+When one side has a mu-wrapping, we need to unfold it first. The mu-aware variant
+allows unfolding on either side before requiring an observable match.
+
+Solution Structure. Defines `EQ2C_mu_step` generator that either takes an observable
+step or unfolds mu on either side. `EQ2C_mu_paco` is the greatest fixed point.
+Proves `EQ2C_paco_le_mu` showing observable-step EQ2C is contained in mu-aware EQ2C.
+The converse `EQ2C_mu_paco_eq_paco` shows they coincide for observable types.
+-/
+
 namespace SessionCoTypes.Coinductive
 
 /-- One-step mu-aware generator: either take an observable step, or unfold μ on either side. -/

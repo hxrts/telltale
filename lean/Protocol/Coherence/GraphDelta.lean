@@ -2,24 +2,25 @@ import Protocol.Environments
 import Protocol.Coherence.Consume
 import Protocol.Coherence.EdgeCoherence
 
+/-! # Protocol.Coherence.GraphDelta
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
 # Higher-Order Consume with Graph Deltas
 
 This module defines a higher-order `Consume` function for multiparty session types
 that handles channel delegation by producing graph deltas.
 
-## The Problem
-
-First-order `Consume` (in `Consume.lean`) only handles base types. When a channel
-endpoint is delegated (passed as a message), the receiver gains communication edges
-in the delegated session. We need a function that:
-
+The Problem. First-order `Consume` (in `Consume.lean`) only handles base types.
+When a channel endpoint is delegated (passed as a message), the receiver gains
+communication edges in the delegated session. We need a function that:
 1. Tracks which edges are added/removed during consumption
 2. Agrees with first-order `Consume` when no channels are involved
 3. Produces realizable deltas given well-formed session environments
 
-## Solution Structure
-
+Solution Structure. We define:
 - `GraphDelta`: Records added/removed edges, forms a monoid under composition
 - `consumeOneHO`: Single-step consume, produces delta when consuming channel types
 - `ConsumeHO`: Full trace consume, composes deltas from each step

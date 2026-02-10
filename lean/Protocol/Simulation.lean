@@ -4,7 +4,21 @@ import Protocol.Semantics
 # MPST Simulation
 
 This module provides executable simulation for MPST protocols.
+-/
 
+/-
+The Problem. We need an executable step function for testing and debugging
+protocols. The semantics is relational, so we need a decidable version
+that attempts to find a valid step.
+
+Solution Structure. We define:
+1. `stepDecide`: attempt one step, returning `some C'` or `none`
+2. `runSteps`: execute multiple steps until stuck or limit
+3. `traceSteps`: execute and collect the full trace
+Non-determinism in parallel composition is resolved by left-first.
+-/
+
+/-!
 ## Overview
 
 The `stepDecide` function implements a decidable step function that

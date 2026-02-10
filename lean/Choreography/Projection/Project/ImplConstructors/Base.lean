@@ -5,6 +5,11 @@ import Choreography.Projection.Project.ImplBase
 Constructor agreement for end, var, and send/recv structural extraction.
 -/
 
+/-
+The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
+Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
+-/
+
 set_option linter.unnecessarySimpa false
 
 /-! ## Core Development -/

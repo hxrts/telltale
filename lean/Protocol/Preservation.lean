@@ -8,7 +8,20 @@ import Batteries.Data.RBMap.Lemmas
 
 This module contains the preservation (subject reduction) theorem for MPST:
 if a well-typed configuration takes a step, the result is also well-typed.
+-/
 
+/-
+The Problem. We need subject reduction: well-typed configurations remain
+well-typed after stepping. This is the core safety theorem for MPST.
+
+Solution Structure. We prove preservation by case analysis on step kind:
+1. Send: use `Coherent_send_preserved` + `BuffersTyped_enqueue`
+2. Recv: use `Coherent_recv_preserved` + buffer dequeue lemma
+3. Select/Branch: similar to send/recv for labels
+4. NewSession: use freshness invariants (`SupplyInv_newSession`)
+-/
+
+/-!
 **UPDATE (2026-01-15)**: This module now imports Protocol.Typing which defines
 TypedStep - the linear resource transition typing judgment that resolves the
 design issues that blocked the original preservation theorems below.

@@ -6,6 +6,17 @@ import SessionTypes.LocalTypeR
 Defines `isFreeIn`, `notBoundAt`, and related substitution helper lemmas.
 -/
 
+/-
+The Problem. Substitution commutation requires the Barendregt convention: bound
+variables must be fresh. We need predicates to check free variable occurrence
+and binder freshness, plus helpers showing these are preserved by operations.
+
+Solution Structure. Defines `isFreeIn` checking if a variable appears free in a
+type, and `notBoundAt` checking if a variable is not used as a binder. Mutual
+recursion handles branches. Proves duality preservation and substitution helpers
+like `substitute_not_free` (substituting into a term where the variable isn't free).
+-/
+
 namespace SessionCoTypes.SubstCommBarendregt
 
 open SessionCoTypes.EQ2

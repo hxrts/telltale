@@ -5,6 +5,18 @@ import SessionCoTypes.Bisim.Substitution
 Proves unfold_substitute_EQ2_via_Bisim: unfolding and substituting commute up to EQ2.
 -/
 
+/-
+The Problem. Unfolding and substituting don't commute exactly, but we need them
+to commute up to EQ2: (t.substitute var repl).unfold ≈ (t.unfold).substitute var repl.
+This is essential for reasoning about recursive type unfolding.
+
+Solution Structure. Defines `SubstUnfoldRel` as a witness relation pairing
+corresponding terms. For non-mu types, unfold is identity so the relation reduces
+to Bisim. For mu types, uses the mu unfolding equation. `SubstUnfoldClosure`
+extends the relation with Bisim for reflexive cases. Proves both sides satisfy
+BisimF, yielding the commutation lemma.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

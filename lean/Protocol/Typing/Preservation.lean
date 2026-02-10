@@ -2,10 +2,22 @@ import Protocol.Typing.Framing
 import Batteries.Data.RBMap.Lemmas
 
 /-!
-# MPST Process Typing
+# MPST Process Typing: Preservation
 
-This module defines the typing rules for MPST processes.
+This module proves typing preservation under steps.
+-/
 
+/-
+The Problem. We need subject reduction for the process typing judgment:
+if `⊢ P` and P steps to P', then `⊢ P'`. This is the core safety theorem.
+
+Solution Structure. We prove preservation by:
+1. Case analysis on the typing derivation (skip, seq, par, send, etc.)
+2. Using the framing lemmas for parallel composition
+3. Combining with coherence preservation for the full invariant
+-/
+
+/-!
 ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D

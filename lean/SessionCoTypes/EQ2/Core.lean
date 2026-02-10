@@ -27,6 +27,18 @@ The following definitions form the semantic interface for proofs:
 - `EQ2_coind`: coinduction principle
 -/
 
+/-
+The Problem. Recursive session types need an equality that identifies types
+differing only in their recursion structure (equi-recursive equality). The
+standard equality is too strict; we need the greatest fixed point of a
+one-step equality functor.
+
+Solution Structure. Defines `EQ2F` as the one-step generator matching constructors
+and requiring relation R on continuations. `EQ2` is the greatest fixed point.
+Proves reflexivity by structural induction, symmetry by swapping, and provides
+unfolding lemmas (EQ2_unfold_left/right) allowing mu-unwrapping.
+-/
+
 namespace SessionCoTypes.EQ2
 
 open SessionTypes.GlobalType

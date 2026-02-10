@@ -15,6 +15,11 @@ a local type that is EQ2-equivalent to `.end`.
 `EQ2 (lt.substitute v .end) .end`.
 -/
 
+/-
+The Problem. State the projection/harmony lemma objective and the exact invariant boundary it preserves.
+Solution Structure. Introduce local helper lemmas first, then discharge the main theorem by case analysis over the operational/projection relation.
+-/
+
 namespace Choreography.Harmony.SubstEndUnguarded
 
 open SessionTypes.LocalTypeR (LocalTypeR BranchR substituteBranches substitute_send substitute_recv substitute_end)

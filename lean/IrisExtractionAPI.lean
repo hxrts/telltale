@@ -13,7 +13,21 @@ import Iris.ProgramLogic.Language
 # IrisExtractionAPI
 
 Logical API for Iris separation logic infrastructure.
+-/
 
+/-
+The Problem. Iris separation logic provides ghost state for reasoning about
+concurrent programs, but this ghost state has no runtime representation. We need
+a clean API that downstream modules can use without importing the full Iris machinery.
+
+Solution Structure. We define:
+1. Type aliases (`iProp`, `GhostName`, `Mask`, `Namespace`) hiding Iris internals
+2. Parameter bundles (`TelltaleIris`) collecting all infrastructure
+3. Slot types for ghost variables, saved propositions, and ghost maps
+The companion `IrisExtractionInstance` provides runtime erasure.
+-/
+
+/-!
 ## Trust Boundary
 
 This file and `IrisExtractionInstance.lean` form the **Iris extraction boundary**.

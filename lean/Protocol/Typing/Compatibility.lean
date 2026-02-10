@@ -1,10 +1,23 @@
 import Protocol.Typing.Judgments
 
 /-!
-# MPST Process Typing
+# MPST Process Typing: Compatibility
 
-This module defines the typing rules for MPST processes.
+This module defines compatibility predicates for process typing.
+-/
 
+/-
+The Problem. Process typing requires compatibility checks between local types,
+contexts, and actions. We need coinductive compatibility for recursive types
+and split-context reasoning for parallel composition.
+
+Solution Structure. We define:
+1. Coinductive compatibility for local type pairs
+2. Context splitting for parallel composition
+3. Compatibility lemmas used by the typing judgment
+-/
+
+/-!
 ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D

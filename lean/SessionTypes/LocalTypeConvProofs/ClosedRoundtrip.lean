@@ -8,6 +8,17 @@ set_option synthInstance.maxSize 128
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
+/-
+The Problem. Converting between named and de Bruijn representations must be correct:
+fromDB should invert toDB for closed terms. Proving this requires showing that conversion
+preserves closedness and that roundtrips produce the original term.
+
+Solution Structure. Proves `fromDB?_eq_fromDB_all_ctx` showing the partial and total fromDB
+agree on closed terms. `freeVars_fromDB_subset_ctx` shows closedness is preserved. The
+roundtrip theorems `toDB_fromDB_roundtrip_generated` and `toDB_fromDB_roundtrip_closed`
+prove that fromDB then toDB recovers the original de Bruijn term.
+-/
+
 /-! # SessionTypes.LocalTypeConvProofs.ClosedRoundtrip
 
 fromDB?/fromDB correctness, closedness preservation, toDB? for closed terms, and roundtrip proofs.

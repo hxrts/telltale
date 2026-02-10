@@ -20,6 +20,17 @@ Ghost state for bounded buffers and refinement chain from iris_runtime_2.md §6.
 Dependencies: Shim.ResourceAlgebra.
 -/
 
+/-
+The Problem. Buffers in the VM have multiple backing implementations (shared memory,
+reliable transport, unreliable transport with acks) and bounded capacities. We need
+ghost state to track buffer ownership and a refinement chain connecting implementations.
+
+Solution Structure. Defines `BoundedBuffer` with capacity limits and `BufferBacking`
+variants for different transport modes. `BufferRA` provides ghost state ownership.
+Proves refinement chain: `bounded_refines_unbounded`, `shared_refines_reliable`,
+`reliable_refines_unreliable` connecting implementations to the abstract buffer model.
+-/
+
 set_option autoImplicit false
 
 /-! ## Buffer backings -/

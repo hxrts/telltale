@@ -20,24 +20,22 @@ import SessionTypes.LocalTypeR
 set_option linter.dupNamespace false
 
 /-!
-The Problem. The key correctness property for the inductive-coinductive bridge
+The key correctness property for the inductive-coinductive bridge
 is that round-tripping preserves equivalence: toCoind(toInductive(t)) ≅ t.
 This ensures we can convert freely between representations without losing
 semantic meaning.
+-/
 
-The difficulty is that toInductive introduces fresh mu-binders and variable
-names that don't exist in the original coinductive type. We need to prove
-that these are equivalent under EQ2C (equi-recursive type equality).
+/-
+The Problem. Round-tripping through inductive-coinductive conversions must preserve
+equivalence: toCoind(toInductive(t)) ≅ t. The difficulty is that toInductive
+introduces fresh mu-binders and variable names not in the original type.
 
-Module Organization.
-- ToCoindInjectivity.lean: injectivity of toCoind (complete)
-- RoundtripHelpers.lean: structural helper lemmas (complete)
-- BisimHelpers.lean: bisimulation construction lemmas (complete)
-- EQ2CEnv/EQ2CMu.lean: environment resolution + mu-aware paco machinery
-
-This file now contains the round-trip erasure proofs and the public API.
-Remaining placeholders (nameOf/envOf + round-trip statements) are tracked here
-until the full round-trip proof is completed.
+Solution Structure. Module organization: ToCoindInjectivity.lean proves injectivity
+of toCoind, RoundtripHelpers.lean provides structural helpers, BisimHelpers.lean
+has bisimulation construction lemmas, EQ2CEnv/EQ2CMu.lean provides environment
+resolution and mu-aware paco machinery. This file contains round-trip erasure
+proofs and the public API.
 -/
 
 namespace SessionCoTypes.Coinductive

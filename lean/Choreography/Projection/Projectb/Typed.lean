@@ -19,6 +19,18 @@ This is a refinement of projection that checks payload typing on comm branches
 while preserving the dedicated delegation payload typing.
 -/
 
+/-
+The Problem. Basic projection ignores payload types, but runtime execution requires
+type-safe message passing. We need a typed projection that verifies payload sorts
+convert to valid value types.
+
+Solution Structure. We define:
+1. `BranchesProjRelTyped`: branch relation with payload type checking
+2. `CProjectF_typed`: one-step generator with typed payloads
+3. Monotonicity lemmas for coinductive reasoning
+The key insight is that `PayloadSort.toValType?` bridges choreography sorts to session types.
+-/
+
 /-- Branch-wise typed projection relation for send/recv. -/
 def BranchesProjRelTyped (R : ProjRel)
     (gbs : List (Label × GlobalType)) (role : String) (lbs : List BranchR) : Prop :=

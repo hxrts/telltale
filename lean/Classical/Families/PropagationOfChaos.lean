@@ -1,8 +1,7 @@
 import Mathlib
 import ClassicalAnalysisAPI
 
-/-!
-# Propagation of Chaos and Mean-Field Limits
+/-! # Propagation of Chaos and Mean-Field Limits
 
 This module provides the mathematical foundation for analyzing large-scale
 session-typed systems where many participants interact. The "propagation of

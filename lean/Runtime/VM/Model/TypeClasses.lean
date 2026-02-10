@@ -24,6 +24,18 @@ This file also defines authenticated data structure interfaces (`AuthTree`,
 `AccumulatedSet`) and `ScopeId` used for scoped resource views.
 -/
 
+/-
+The Problem. The VM needs to be instantiable with different identity, guard,
+persistence, effect, and verification implementations. These form a system of
+interacting domain models with cross-cutting obligations (bridges).
+
+Solution Structure. Defines six typeclasses: `IdentityModel` for participant/site
+identity, `GuardLayer` for access control, `PersistenceModel` for durable storage,
+`EffectRuntime`/`EffectSpec` for effects, `VerificationModel` for proofs. Bridge
+classes capture cross-model contracts. `AuthTree` and `AccumulatedSet` provide
+authenticated data structure interfaces.
+-/
+
 /-! ## Shared protocol types -/
 
 abbrev GlobalType := SessionTypes.GlobalType.GlobalType

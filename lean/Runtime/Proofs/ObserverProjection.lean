@@ -9,6 +9,18 @@ VM-level observer projection plus noninterference and information-theoretic
 bridge lemmas for coroutine-local views.
 -/
 
+/-
+The Problem. Individual coroutines should only observe session state relevant to
+their owned endpoints, enabling noninterference arguments and information-theoretic
+bounds on what each participant can learn.
+
+Solution Structure. Defines `CoroutineView` as the projection of VM state visible
+to a single coroutine: local types, incoming traces, incoming buffers, progress
+tokens, and knowledge set. Provides `coroutineProjection` and `coroutineView`
+functions with noninterference lemmas showing unrelated operations don't affect
+views.
+-/
+
 set_option autoImplicit false
 
 section

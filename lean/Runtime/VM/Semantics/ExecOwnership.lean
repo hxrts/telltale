@@ -19,6 +19,17 @@ a boolean result to a destination register. Together these implement the epistem
 separation logic instructions from `runtime.md` §16.
 -/
 
+/-
+The Problem. Session endpoints can be dynamically transferred between coroutines,
+requiring migration of associated metadata (progress tokens, knowledge facts).
+Knowledge tracking enables epistemic reasoning about information flow.
+
+Solution Structure. `stepTransfer` partitions tokens and knowledge by endpoint,
+moves them to the target coroutine, and emits a `transferred` event. `stepTag`
+records knowledge facts, and `stepCheck` queries them with flow policy checks.
+Helpers `splitTokens`, `splitKnowledge`, and `updateTargetCoro` factor the logic.
+-/
+
 set_option autoImplicit false
 
 universe u

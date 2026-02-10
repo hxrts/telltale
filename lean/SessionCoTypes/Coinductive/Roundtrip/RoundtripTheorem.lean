@@ -7,6 +7,17 @@ set_option linter.dupNamespace false
 Main coinductive round-trip theorem `toCoind_toInductive_eq2ce`.
 -/
 
+/-
+The Problem. The central correctness theorem for inductive-coinductive conversion
+is that round-tripping preserves equivalence: toCoind(toInductive(t)) ≅ t for
+regular types t. This requires constructing a bisimulation through the conversion.
+
+Solution Structure. Defines witness relation R pairing converted terms with originals.
+The relation tracks visited nodes to handle back-edges correctly. Proves hpost showing
+R is a post-fixpoint of EQ2CE_step by case analysis on wrap vs body and visited vs
+unvisited nodes. The theorem follows by paco coinduction.
+-/
+
 namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

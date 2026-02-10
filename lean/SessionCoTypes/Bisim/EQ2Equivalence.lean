@@ -5,6 +5,17 @@ import SessionCoTypes.Bisim.Bisimulation
 Proves Bisim implies EQ2 and establishes EQ2 incompatibility lemmas.
 -/
 
+/-
+The Problem. The Bisim relation is designed for easier proofs, but we need to
+connect it back to EQ2 (the standard coinductive equality). We must prove
+Bisim ↔ EQ2 to transfer properties between formulations.
+
+Solution Structure. Proves `BranchesRelBisim_to_BranchesRel` and its inverse
+for converting branch relations. Then shows Bisim implies EQ2 by translating
+membership predicates to EQ2F structure. The reverse follows from EQ2's
+observable characterization. This enables deriving EQ2_trans from Bisim.trans.
+-/
+
 set_option linter.dupNamespace false
 set_option linter.unnecessarySimpa false
 

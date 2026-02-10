@@ -6,27 +6,19 @@ import Choreography.Projection.ProjSubst
 # Choreography.Projection.Blind
 
 Blindness predicate for V2 projection.
+-/
 
-The Problem: Define a "blindness" predicate that captures when non-participants
+/-
+The Problem. Define a "blindness" predicate that captures when non-participants
 see the same projection in all branches of a choice. This bridges the gap between
 structural well-formedness and projectability.
 
-## Overview
-
-The key theorem `projectable_of_wellFormedBlind` shows that if a global type is:
-1. Closed (no free variables)
-2. Well-formed (contractive, non-empty comms, no self-comm, productive)
-3. Blind (non-participants see same projection in all branches)
-
-Then it is projectable (every role has a valid CProject witness).
-
-This eliminates the `projectable_of_closed_wellFormed` assumption by adding the
-decidable `isBlind` check to the well-formedness predicate.
-
-## Status
-
-This file contains the proof structure and supporting lemmas needed to
-eliminate the projectability assumption, including uniformity and comm-case analysis.
+Solution Structure. The key theorem `projectable_of_wellFormedBlind` shows that
+if a global type is: (1) closed, (2) well-formed, and (3) blind, then it is
+projectable. The proof proceeds by:
+1. Defining `isBlind` as a decidable predicate on global types
+2. Proving uniformity: blindness implies all branches project identically for non-participants
+3. Case analysis on comm constructors to build CProject witnesses
 -/
 
 namespace Choreography.Projection.Blind

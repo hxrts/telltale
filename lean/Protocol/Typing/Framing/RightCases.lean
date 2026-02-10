@@ -4,9 +4,19 @@ import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
 import Protocol.Typing.Framing.PreUpdateHelpers
 
+/-! # Typing Framing: Right Cases
+
+Right-frame step cases for pre-out preservation.
+-/
+
 /-
-Right-frame step cases for pre-out preservation. These lemmas discharge each
-TypedStep constructor when the right side of G is preserved.
+The Problem. The right-frame case handles steps that affect the right portion
+of a split environment. We need case lemmas symmetric to the left-frame cases.
+
+Solution Structure. We prove case lemmas for each TypedStep constructor:
+1. `preserved_sub_right_frame_send`: send case
+2. Similar lemmas for recv, select, branch, newSession
+Each shows that the right frame is preserved after the step.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -18,7 +28,7 @@ open scoped Classical
 
 section
 
-/-! ### Right-Frame Step Cases -/
+/-! ## Right-Frame Step Cases -/
 /-- Helper: send case for the right-frame preservation lemma. -/
 lemma preserved_sub_right_frame_send
     {Gstore G₁ G₂ G G' Ssh Sown store k x e target T L G₂' Sfin Gfin W Δ} :

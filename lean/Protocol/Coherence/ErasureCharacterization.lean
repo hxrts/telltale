@@ -19,6 +19,19 @@ This module packages the Phase 7 core statements around erasure and delegation:
 3. Delegation sufficiency and local necessity wrappers
 -/
 
+/-
+The Problem. Delegation (passing a channel endpoint to another role) requires
+verifying side conditions for coherence preservation. We need a clean interface
+that bundles these conditions for downstream theorems.
+
+Solution Structure. We define:
+1. `DelegationEnvelope`: side-condition bundle (coherent + well-formed delegation)
+2. `delegation_envelope_preserves_coherent`: envelope sufficiency theorem
+3. Connection to erasure characterization via `ConfigEquiv`
+-/
+
+/-! ## Core Development -/
+
 /-- Side-condition envelope used by delegation/harmony theorems. -/
 structure DelegationEnvelope
     (G : GEnv) (D : DEnv) (s : SessionId) (A B : Role) : Prop where

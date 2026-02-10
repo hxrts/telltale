@@ -20,6 +20,18 @@ transaction, applies the close persistence delta, removes the endpoint from the
 coroutine's owned set, and emits `epochAdvanced` and `closed` events.
 -/
 
+/-
+The Problem. Sessions have a lifecycle (opening → active → closing → closed) that
+requires coordinated initialization of endpoints, handlers, buffers, and resources.
+Open and close must validate preconditions and update multiple state components
+atomically.
+
+Solution Structure. `stepOpen` validates spatial requirements and handler coverage,
+allocates endpoints, initializes session state, and emits `opened`. `stepClose`
+advances epoch, clears state, marks phase as closed, and emits `closed`. Helpers
+`zipOpenArgs`, `writeEndpoints`, and handler checkers factor the validation logic.
+-/
+
 set_option autoImplicit false
 
 universe u

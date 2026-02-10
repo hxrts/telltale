@@ -2,6 +2,17 @@ import SessionTypes.LocalTypeDB
 import SessionTypes.LocalTypeConv
 import SessionTypes.LocalTypeRDBBridge
 
+/-
+The Problem. Demonstrating how to use the de Bruijn infrastructure for proofs that
+require clean substitution reasoning. Users need concrete examples of contractiveness
+preservation, unfold preservation, and iterated unfolding using the DB representation.
+
+Solution Structure. Provides worked examples for substitution preservation (`isContractive_subst`),
+unfold preservation (`isContractive_unfold`), iterated unfolds (`isContractive_iter_unfold`),
+and bridge theorems connecting de Bruijn proofs back to named variables. Shows direct DB
+construction and nested mu handling.
+-/
+
 /-! # Examples: Using De Bruijn Proofs
 
 This file demonstrates how to use the de Bruijn infrastructure for proofs

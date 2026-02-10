@@ -6,6 +6,16 @@ set_option linter.dupNamespace false
 
 set_option linter.unnecessarySimpa false
 
+/-
+The Problem. Session types need two representations: named variables (LocalTypeR) for
+readability and de Bruijn indices (LocalTypeDB) for clean substitution proofs. Converting
+between them requires tracking variable bindings and ensuring closedness is preserved.
+
+Solution Structure. Defines `Context` for name→index lookup during toDB? and `NameContext`
+for index→name lookup during fromDB?. Provides `toDB?` converting named types to de Bruijn
+with closedness guarantees, and `fromDB`/`fromDB?` converting back with fresh name generation.
+-/
+
 /-! # SessionTypes.LocalTypeConvDefs
 
 Definitions for conversions between named variables (LocalTypeR) and de Bruijn indices (LocalTypeDB).

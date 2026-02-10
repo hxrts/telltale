@@ -1,5 +1,10 @@
 import Protocol.Coherence.ErasureCharacterization
 
+/-! # Protocol.Coherence.Minimality
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-
 The Problem. Show that Coherence is a minimal invariant: any weakening that
 ignores some active edges admits well-typed but incoherent states.

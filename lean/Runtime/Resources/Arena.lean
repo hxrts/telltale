@@ -23,6 +23,17 @@ Physical backing model for session state.
 Dependencies: Task 10, Shim.ResourceAlgebra.
 -/
 
+/-
+The Problem. The VM needs a concrete memory model for session state that supports
+efficient allocation, typed access, and refinement proofs connecting to the abstract
+Protocol environments (GEnv, DEnv).
+
+Solution Structure. Defines `Arena` as a contiguous memory region with typed `Slot`
+entries (value, localType, buffer, free). `SessionStore` maps session IDs to per-
+session state. Proves `sessionStore_refines_envs` connecting concrete storage to
+abstract environments and `arena_lookup_typed` for type-safe access.
+-/
+
 set_option autoImplicit false
 
 universe u

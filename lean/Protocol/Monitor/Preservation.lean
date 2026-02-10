@@ -5,10 +5,24 @@ import Protocol.Typing.Core
 import Protocol.Typing.Compatibility
 
 /-!
-# MPST Verified Monitor
+# MPST Monitor Preservation
 
-This module implements the proof-carrying runtime monitor for MPST.
+This module proves preservation for the verified monitor.
+-/
 
+/-
+The Problem. The monitor must maintain well-typedness after every transition.
+We need to prove that `MonStep` preserves `WTMon`, connecting the runtime
+monitor to the metatheory.
+
+Solution Structure. We prove:
+1. `MonStep_preserves_coherent`: coherence preserved by monitor steps
+2. `MonStep_preserves_WTMon`: full well-typedness preservation
+3. Connection to TypedStep for soundness
+The proof uses the coherence preservation lemmas from Protocol.Coherence.
+-/
+
+/-!
 ## Overview
 
 The monitor is the trusted component that:

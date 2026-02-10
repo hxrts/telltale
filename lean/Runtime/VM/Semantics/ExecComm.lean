@@ -16,6 +16,18 @@ Recv/choose verify the sender's signature, consume a progress token, and dequeue
 the buffer. All four update the session store's local type and trace on success.
 -/
 
+/-
+The Problem. The four communication instructions (send, recv, offer, choose) share a
+complex pipeline: operand decoding, ownership checks, type lookup, edge validation,
+handler lookup, buffer operations, transport spec checks, and state updates. Each
+stage can fail with different fault types.
+
+Solution Structure. Decomposes each instruction into a pipeline of private helpers.
+`sendUpdateSessions`/`sendCommit`/`sendAfterEnqueue` handle send stages. Similar
+helpers exist for recv, offer, choose. Each helper is small enough to test independently.
+Final stage updates session store (type, trace, buffers) and emits observable events.
+-/
+
 set_option autoImplicit false
 
 universe u

@@ -12,11 +12,24 @@ Bundle-oriented liveness API mirroring the consensus validation style:
 - theorem wrappers from bundled evidence
 -/
 
+/-
+The Problem. Users need a clean API for accessing VM liveness guarantees without
+navigating internal proof structure. The consensus validation pattern (required
+assumptions, optional hypotheses, validation summaries) provides a proven template.
+
+Solution Structure. Defines `HypothesisWitness` for carrying proofs as evidence,
+`ProgressFrontier` and `ProgressEnabled` predicates for instruction enablement,
+and `ProgressHypothesis` for optional initial-state assumptions. Provides theorem
+wrappers that discharge obligations from bundled evidence.
+-/
+
 section
 
 universe u
 
 variable {ν : Type u} [VerificationModel ν]
+
+/-! ## Core Liveness API -/
 
 /-- Type-level wrapper for carrying a proof as optional evidence. -/
 structure HypothesisWitness (P : Prop) : Type where

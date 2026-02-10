@@ -17,6 +17,17 @@ This module provides:
 - VM-level instantiation of transported Foster-Lyapunov (3.9.1)
 -/
 
+/-
+The Problem. The abstract Lyapunov/progress measure theory needs to be instantiated
+at the VM level with concrete definitions (credit banks, potential functions) that
+connect to the quantitative liveness bounds from the mathematical physics transport.
+
+Solution Structure. Defines `totalTypeDepth` and `totalTraceLoad` measuring VM state
+complexity, then `vmWorkMeasure` combining them as `2 * Σ depth + Σ trace-length`.
+Proves topology-change nonincrease and productive-step decrease lemmas, bridging to
+the Paper 2 work measure and Foster-Lyapunov transport.
+-/
+
 set_option autoImplicit false
 
 section

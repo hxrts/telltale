@@ -5,6 +5,19 @@ set_option autoImplicit false
 Core types for consensus model validation.
 -/
 
+/-
+The Problem. Consensus protocols vary along multiple dimensions (timing, certificates,
+fault models, finality), and we need a systematic way to classify and validate
+protocol configurations.
+
+Solution Structure. We define core type families:
+1. `TimingModel`: sync, partial-sync, async
+2. `CertificateModel`: quorum, work, hybrid
+3. `FaultModel`: crash vs byzantine
+4. Evidence/finalization models for finality reasoning
+These types form the vocabulary for assumption validation.
+-/
+
 /-! ## Core Development -/
 
 namespace Distributed

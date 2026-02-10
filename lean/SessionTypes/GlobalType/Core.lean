@@ -24,6 +24,18 @@ The following definitions form the semantic interface for proofs:
 - `step`: global async step relation
 -/
 
+/-
+The Problem. Global types describe protocols from a bird's-eye view: who
+communicates with whom, in what order, with what choices. We need a syntax
+definition with supporting operations (roles, freeVars, substitute) and
+semantic relations (canStep, step).
+
+Solution Structure. Defines `PayloadSort` for message payloads and `Label` for
+message names. `GlobalType` is an inductive type with end, var, comm, mu, and
+delegate constructors. Operations extract roles and free variables. `canStep`
+and `step` define the asynchronous semantics with asyncronous message passing.
+-/
+
 namespace SessionTypes.GlobalType
 
 /-! ## Core Syntax -/

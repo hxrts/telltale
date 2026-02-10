@@ -1,5 +1,10 @@
 import Protocol.Environments
 
+/-! # Protocol.Coherence.Consume
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /- 
 The Problem. Coherence proofs repeatedly need a precise operational account of
 how buffered traces advance local endpoint types.

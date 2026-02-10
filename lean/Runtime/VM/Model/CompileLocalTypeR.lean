@@ -4,11 +4,22 @@ import Runtime.VM.Model.TypeClasses
 import SessionTypes.LocalTypeR
 import Protocol.LocalType
 
-/-!
-# Compile LocalTypeR to VM Bytecode
+/-! # Compile LocalTypeR to VM Bytecode
 
 Compiler from SessionTypes.LocalTypeR into Runtime VM instructions, plus a
 LocalTypeR → LocalType conversion helper for building program images.
+-/
+
+/-
+The Problem. Session types are defined in `SessionTypes.LocalTypeR` using named
+recursion, but the VM works with `LocalType` using de Bruijn indices. We need
+a compiler that performs this translation while preserving semantics.
+
+Solution Structure. Defines `localTypeRToLocalType` converting named recursion to
+de Bruijn indices by tracking a context of bound names. Helper `valTypeRToValType`
+converts value types. The mutual recursion handles continuation types correctly,
+enabling `Protocol.LocalType` values to be generated from high-level session type
+definitions.
 -/
 
 set_option autoImplicit false
@@ -16,6 +27,8 @@ set_option autoImplicit false
 universe u
 
 open SessionTypes.LocalTypeR
+
+/-! ## Core Conversion and Compilation -/
 
 /-- LocalType is inhabited for partial conversions. -/
 instance : Inhabited LocalType := ⟨.end_⟩

@@ -12,13 +12,17 @@ mu-unfolding.
 The difficulty is that mu-unfolding on one side of an EQ2C relation requires
 constructing a new bisimulation that accounts for the unfolding step. Similarly,
 congruence for send/recv requires lifting branch-wise EQ2C to the full type.
+-/
 
-Solution Structure.
-1. Base cases: EQ2C_end and EQ2C_var establish reflexivity at terminals
-2. EQ2C_mkVar_left/right_unfolds extract the unfolding witness from EQ2C
-3. EQ2C_send and EQ2C_recv give congruence for communication types
-4. EQ2C_unfold_left/right allow mu-wrapping on either side
-5. ObservableRelC_mu_left/right lift observable relations through mu
+/-
+The Problem. EQ2C is defined abstractly via existentially quantified bisimulation,
+but proofs need concrete lemmas for constructors (end, var, send, recv, mu) and
+unfolding. Constructing bisimulations that account for unfolding is non-trivial.
+
+Solution Structure. Base cases (EQ2C_end, EQ2C_var) establish reflexivity at terminals.
+EQ2C_mkVar_left/right_unfolds extract unfolding witnesses. EQ2C_send/recv give
+congruence for communication. EQ2C_unfold_left/right allow mu-wrapping on either
+side. ObservableRelC_mu_left/right lift observable relations through mu.
 -/
 
 namespace SessionCoTypes.Coinductive

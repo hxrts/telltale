@@ -1,12 +1,29 @@
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Environments.RoleRenaming
 
+/-! # Protocol.Coherence.RoleSwap
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /-!
 # Role Swap Renaming (Session-Local)
 
 Defines a bijective (swap) role renaming inside a fixed session and proves
 that coherence is preserved under this renaming. This is the minimal
 role-abstraction lemma: any finite role permutation can be built from swaps.
+-/
+
+/-
+The Problem. Protocol composition may require roles to be renamed. We need to
+show coherence is stable under role permutations, but general permutations are
+complex. Swaps are simpler and compose to form any permutation.
+
+Solution Structure. We prove:
+1. `swapRole`: bijective swap of two roles A ↔ B
+2. `swapRole_involutive`: swap is its own inverse
+3. Lifting lemmas for endpoints, edges, value types
+4. `swapCoherent`: coherence preserved under role swap
 -/
 
 set_option linter.mathlibStandardSet false

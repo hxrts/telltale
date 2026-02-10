@@ -38,6 +38,17 @@ and possibly session-local state. With distinct coroutine IDs and disjoint sessi
 these modifications commute.
 -/
 
+/-
+The Problem. Concurrent execution of coroutines on different sessions must be
+shown to commute to ensure deterministic behavior regardless of scheduling order.
+Naive case analysis over instruction pairs would require 21+ cases.
+
+Solution Structure. Uses the frame rule: session-local operations only affect their
+footprint, and disjoint footprints imply commutativity. Defines `VMStateEqModTrace`
+for state equivalence modulo trace ordering, proves `updateCoro_comm` for array
+operations, then derives the diamond property from the frame rule.
+-/
+
 set_option autoImplicit false
 set_option linter.unusedVariables false
 

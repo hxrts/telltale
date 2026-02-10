@@ -37,6 +37,17 @@ following the approach in the Coq reference implementation (subject_reduction/th
 - `bisim_sound`: Soundness theorem
 -/
 
+/-
+The Problem. Bisimilarity is a coinductive relation, but we need a decidable
+algorithm for runtime type checking. For regular types (finite reachable set),
+the algorithm must terminate while being sound with respect to EQ2C.
+
+Solution Structure. Uses two-phase approach: Phase 1 defines `bisim` with visited
+set for cycle detection and decreasing measure (unvisited pairs). Phase 2 proves
+`bisim_sound` showing true output implies EQ2C. Key helpers include `fullUnfoldN`
+for bounded unfolding and `observableMatch` for comparing observable structure.
+-/
+
 namespace SessionCoTypes.Coinductive
 
 open Classical

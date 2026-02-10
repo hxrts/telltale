@@ -6,6 +6,18 @@ Contractiveness preservation for projection: `trans_isContractive_of_participate
 and `trans_wellFormed_of_wellFormed`.
 -/
 
+/-
+The Problem. Projected local types must be contractive (no immediate self-reference
+like `mu x. x`). This is required for coinductive well-definedness and ensures
+protocols make progress.
+
+Solution Structure. We prove contractiveness preservation:
+1. Size-of lemmas for termination of recursive proofs
+2. `trans_isContractive_of_participatesAllBranches`: participation in all branches
+   ensures the projection is contractive
+3. `trans_wellFormed_of_wellFormed`: well-formedness lifts through projection
+-/
+
 namespace Choreography.Projection.Trans
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

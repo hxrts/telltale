@@ -7,6 +7,16 @@ set_option linter.dupNamespace false
 Reachable pairs, termination measure, soundness, and completeness.
 -/
 
+/-
+The Problem. The decidable bisim algorithm must be proven correct: it should return
+true if and only if types are bisimilar. Termination requires a decreasing measure.
+
+Solution Structure. Defines `ReachablePairs` as the product of reachable sets (finite
+for regular types). `pairMeasure` counts unvisited pairs, proven to decrease when
+visiting a new pair. Soundness shows `bisim = true` implies EQ2C by constructing
+a bisimulation. Completeness shows EQ2C implies `bisim = true`.
+-/
+
 open Classical
 
 namespace SessionCoTypes.Coinductive

@@ -6,6 +6,17 @@ set_option linter.unnecessarySimpa false
 set_option linter.unnecessarySeqFocus false
 set_option linter.unusedVariables false
 
+/-
+The Problem. Substitution must preserve closedness, guardedness, and contractiveness for
+well-formedness to propagate through unfolding. The mu case is delicate: substituting into
+a mu body requires the replacement to be closed to avoid introducing unguarded variables.
+
+Solution Structure. Proves `substitute_not_free` for idempotence when variable not present.
+`muHeight_substitute_guarded` shows mu-height doesn't increase under guarded substitution.
+`isGuarded_substitute` and `isContractive_substitute` prove preservation with closed replacements.
+`iterate_unfold_bounded_contractive` shows contractive types reach observable form.
+-/
+
 /-! # SessionTypes.LocalTypeR.Substitution
 
 Closed types and substitution, muHeight properties, guardedness and contractiveness preservation.

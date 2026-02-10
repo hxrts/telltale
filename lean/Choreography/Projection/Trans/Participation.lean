@@ -6,6 +6,18 @@ First-branch and all-branch participation predicates and guardedness of projecti
 under participation.
 -/
 
+/-
+The Problem. The `trans` projection function follows specific paths through branches,
+but the standard `participates` predicate is existential over all branches. This
+mismatch breaks contractiveness proofs.
+
+Solution Structure. We define path-aware participation predicates:
+1. `participatesFirstBranch`: follows the same path as `trans` (first branch for non-direct)
+2. `participatesAllBranches`: requires participation in ALL branches (stronger)
+3. Implication lemmas connecting these to standard participation
+The key insight is matching the predicate's branch traversal to `trans`'s behavior.
+-/
+
 namespace Choreography.Projection.Trans
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR

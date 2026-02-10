@@ -2,10 +2,23 @@ import Protocol.Process
 import Protocol.Coherence
 
 /-!
-# MPST Process Typing
+# MPST Process Typing: Core
 
-This module defines the typing rules for MPST processes.
+This module defines the core typing judgment for MPST processes.
+-/
 
+/-
+The Problem. We need a typing judgment that ensures processes respect their
+local types, handle linear resources correctly, and compose safely in parallel.
+
+Solution Structure. We define:
+1. `HasTypeProcN`: process typing judgment with session bound
+2. `WTConfigN`: well-typed configuration judgment
+3. Typing rules for each process constructor (skip, seq, par, send, recv, etc.)
+4. Linear context management for channel resources
+-/
+
+/-!
 ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D

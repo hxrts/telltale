@@ -22,6 +22,17 @@ automatically lift bridges over sums so that composed domains inherit their
 component bridges.
 -/
 
+/-
+The Problem. The VM is parameterized over five domain interfaces (identity, guard,
+persistence, effect, verification). We need composition operators to combine
+independent domain implementations while preserving their contracts.
+
+Solution Structure. Provides unit instances as identity elements, sum instances for
+coproduct composition (dispatch on tag), and product instances for parallel execution.
+Bridge classes define cross-model obligations. Composition instances automatically
+lift bridges over sums, enabling protocol federation across domains.
+-/
+
 set_option autoImplicit false
 
 universe u

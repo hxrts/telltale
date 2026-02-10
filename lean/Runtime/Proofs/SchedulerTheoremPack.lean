@@ -3,6 +3,23 @@ import Runtime.Proofs.TheoremPack.API
 
 set_option autoImplicit false
 
+/-!
+# Scheduler Theorem Pack
+
+Packaged scheduler artifacts and policy-specific theorem bundles.
+-/
+
+/-
+The Problem. Scheduler correctness proofs involve multiple properties (confluence,
+starvation freedom, refinement) that depend on the specific scheduling policy.
+Users need packaged artifacts that bundle these properties for each policy type.
+
+Solution Structure. Defines policy-specific artifact structures (RoundRobinPolicyArtifact,
+CooperativePolicyArtifact, etc.) with their characteristic properties. The
+`VMSchedulerArtifact` bundles all scheduler theorems for a given initial state
+with optional policy-specific extensions.
+-/
+
 /-! ## Core Development -/
 
 namespace Runtime

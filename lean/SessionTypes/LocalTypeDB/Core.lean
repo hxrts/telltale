@@ -5,6 +5,17 @@ import SessionTypes.GlobalType
 
 set_option linter.unusedSimpArgs false
 
+/-
+The Problem. Named variable representations require complex variable capture avoidance
+during substitution. De Bruijn indices eliminate this by encoding binding depth numerically,
+making substitution purely structural but requiring lifting operations.
+
+Solution Structure. Defines `LocalTypeDB` with natural number indices where `mu` binds index 0.
+Provides `lift` to shift indices above a cutoff and `subst` for capture-avoiding substitution.
+`unfold` substitutes a mu into its body. Closedness (`isClosedAt`), guardedness (`isGuarded`),
+and contractiveness (`isContractive`) predicates enable well-formedness reasoning.
+-/
+
 /-! # SessionTypes.LocalTypeDB
 
 De Bruijn indexed local types for clean substitution proofs.

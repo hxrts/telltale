@@ -4,9 +4,20 @@ import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
 import Protocol.Typing.Framing.PreUpdateHelpers
 
+/-! # Typing Framing: Left Cases
+
+Left-frame step cases for pre-out preservation.
+-/
+
 /-
-Left-frame step cases for pre-out preservation. These lemmas discharge each
-TypedStep constructor when the left side of G is preserved.
+The Problem. When proving preservation, we need to show that framed typing
+contexts are maintained after steps. The left-frame case handles steps
+that affect only the left portion of a split environment.
+
+Solution Structure. We prove case lemmas for each TypedStep constructor:
+1. `preserved_sub_left_frame_send`: send case
+2. Similar lemmas for recv, select, branch, newSession
+Each shows that the left frame is preserved after the step.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -18,7 +29,7 @@ open scoped Classical
 
 section
 
-/-! ### Left-Frame Step Cases -/
+/-! ## Left-Frame Step Cases -/
 /-- Helper: send case for the left-frame preservation lemma. -/
 lemma preserved_sub_left_frame_send
     {Gstore G₁ G₂ G G' Ssh Sown store k x e target T L G₁' Sfin Gfin W Δ} :

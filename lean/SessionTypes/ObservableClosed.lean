@@ -1,5 +1,17 @@
 import Mathlib
 
+/-
+The Problem. Closed recursive types (session types, process calculi) must eventually exhibit
+observable behavior (end, send, recv). Proving this requires a termination argument that
+mu-unfolding reaches a non-mu form. The ITree-style MvQPF infrastructure provides the
+categorical framework for this coinductive reasoning.
+
+Solution Structure. Defines MvQPF infrastructure (ITreeTypeVec, ITreeMvFunctor, ITreeMvPFunctor,
+ITreeMvQPF) for parametric coinduction. HeadT/ChildT encode the ITree base functor. ProdF and
+PrjF provide product and projection functors with MvQPF instances. This enables weak bisimulation
+and observable behavior proofs for closed types.
+-/
+
 /-! # SessionTypes.ObservableClosed
 
 ## Problem: Observable Behavior of Closed Recursive Types

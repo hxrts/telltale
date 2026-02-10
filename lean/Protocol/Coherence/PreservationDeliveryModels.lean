@@ -3,6 +3,11 @@ import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.Preservation
 import Protocol.Coherence.SelectPreservation
 
+/-! # Protocol.Coherence.PreservationDeliveryModels
+
+Coherence lemmas and invariants for session-environment evolution.
+-/
+
 /- 
 The Problem. Core coherence-preservation lemmas are proved once for the FIFO
 model, but downstream delivery-model APIs need named causal/lossy variants.

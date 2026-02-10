@@ -12,8 +12,7 @@ Solution Structure. Delegate each WP rule to the generic `wp_pair`
 combinator and expose the derived rules as the public API.
 -/
 
-/-!
-# Task 19: Session WP Rules
+/-! # Task 19: Session WP Rules
 
 Weakest precondition rules for each bytecode instruction from iris_runtime_2.md §7.
 
@@ -31,6 +30,8 @@ Dependencies: Task 12, Task 16, Shim.Invariants + Shim.WeakestPre.
 
 set_option autoImplicit false
 section
+
+/-! ## Core WP Rules -/
 
 universe u
 

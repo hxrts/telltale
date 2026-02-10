@@ -7,6 +7,18 @@ set_option linter.dupNamespace false
 Actions, step semantics, wellFormed predicate, and canStep-implies-step theorems.
 -/
 
+/-
+The Problem. Global types need operational semantics defining how protocols evolve
+through communication steps. The semantics must handle asynchrony (actions can be
+delayed past unrelated communications) and recursion (mu-unfolding).
+
+Solution Structure. Defines `GlobalType.wellFormed` combining allVarsBound,
+allCommsNonEmpty, noSelfComm, and isProductive. `GlobalActionR` represents actions
+with sender, receiver, and label. `canStep` is an inductive predicate for enabledness
+with cases for immediate communication, async permutation, and mu-unfolding.
+`BranchesStep` handles branch-wise stepping.
+-/
+
 namespace SessionTypes.GlobalType
 /-! ## Actions and Step Semantics -/
 

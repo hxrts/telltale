@@ -6,7 +6,21 @@ import Protocol.Preservation
 # MPST Deadlock Freedom
 
 This module provides deadlock freedom infrastructure for MPST.
+-/
 
+/-
+The Problem. Well-typed protocols should not deadlock, but proving this requires
+careful definitions of "done" vs "stuck" and fairness assumptions for message
+delivery.
+
+Solution Structure. We define:
+1. `ReachesComm`: local type can reach a communication action
+2. `Done`/`CanProgress`/`Stuck`: configuration state predicates
+3. Fairness assumption: buffered messages are eventually delivered
+4. `deadlock_freedom`: well-typed configurations don't get stuck
+-/
+
+/-!
 ## Key Definitions
 
 - `ReachesComm`: Predicate indicating a local type can reach a communication action

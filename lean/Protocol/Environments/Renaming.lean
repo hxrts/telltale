@@ -3,18 +3,20 @@ import Protocol.Values
 import Protocol.Environments.Core
 
 /-!
-# MPST Environments
+# MPST Environments: Session Renaming
 
-This module defines the runtime environments for multiparty session types:
+This module provides session renaming infrastructure for environment composition.
+-/
 
-- `Store`: Variable store mapping variables to runtime values
-- `SEnv`: Type environment mapping variables to value types
-- `GEnv`: Session environment mapping endpoints to local types
-- `DEnv`: Delayed type environment for in-flight message traces per directed edge
-- `Buffers`: Per-edge FIFO message buffers keyed by (sid, from, to)
+/-
+The Problem. Protocol composition and linking may require renaming session IDs
+to avoid conflicts. We need a principled way to rename sessions that preserves
+all environment invariants.
 
-The key difference from binary session types is that buffers and type traces
-are keyed by **directed edges** `(sid, from, to)` rather than endpoints.
+Solution Structure. We define:
+1. `SessionRenaming`: bijective session ID renaming with inverse
+2. `renameValType/LocalType/GEnv/DEnv`: lifting through all structures
+3. Preservation lemmas: renaming preserves lookups and coherence
 -/
 
 set_option linter.mathlibStandardSet false

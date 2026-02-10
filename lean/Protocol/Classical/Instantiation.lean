@@ -13,6 +13,18 @@ Concrete protocol-facing instantiations of the transported theorem API:
 - Appendix D: Foster-Lyapunov, MaxWeight, Mixing, Mean-field
 -/
 
+/-
+The Problem. Classical queueing theory results (Foster-Lyapunov, large deviations)
+apply to session-typed protocols, but we need concrete instantiations that connect
+coherence and progress measures to the abstract transport API.
+
+Solution Structure. We define:
+1. `WTConfigNState`: coherence-projected state space (erasure-level image)
+2. `protocolV`: progress measure from type depth + buffer length + send potential
+3. `FosterLivenessAssumptions`: side conditions for Foster transport
+4. Concrete theorem instantiations for each classical family
+-/
+
 /-! ## Core Development -/
 
 namespace ProtocolClassical

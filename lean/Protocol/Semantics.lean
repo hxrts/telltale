@@ -4,7 +4,21 @@ import Protocol.Typing
 # MPST Operational Semantics
 
 This module defines the operational semantics for MPST processes.
+-/
 
+/-
+The Problem. We need an operational semantics for MPST that is asynchronous
+(messages buffered in transit) and supports the directed edge model (each
+sender-receiver pair has its own FIFO buffer).
+
+Solution Structure. We define:
+1. `StepBase`: head reductions (send/recv/select/branch/newSession/assign)
+2. `Step`: contextual closure (seq left, par left/right)
+3. Buffer operations: send enqueues, recv dequeues
+4. Edge-directed message passing with FIFO ordering
+-/
+
+/-!
 ## Step Relations
 
 - `StepBase`: Head reductions (send, recv, select, branch, newSession, assign)

@@ -8,6 +8,18 @@ set_option synthInstance.maxSize 128
 set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
+/-
+The Problem. The conversion roundtrip proof for arbitrary contexts (not just empty/closed)
+requires showing that guardedness and contractiveness are preserved across conversions.
+This is essential for verifying that well-formed named types convert to well-formed de Bruijn
+types and vice versa.
+
+Solution Structure. Proves `toDB_fromDB_roundtrip` for arbitrary nodup contexts with fresh
+name generation. `isGuarded_toDB` shows that guardedness in named representation implies
+guardedness in de Bruijn. `isContractive_toDB` and `isContractive_fromDB` prove that
+contractiveness is preserved in both directions, enabling well-formedness preservation.
+-/
+
 /-! # SessionTypes.LocalTypeConvProofs.Roundtrip
 
 General roundtrip with adequate context, and guardedness/contractiveness preservation across conversions.

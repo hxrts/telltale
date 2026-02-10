@@ -4,7 +4,22 @@ import IrisExtractionAPI
 # IrisExtractionInstance
 
 Concrete Iris extraction boundary with runtime erasure mappings.
+-/
 
+/-
+The Problem. Iris ghost state (invariants, fancy updates, ghost variables) is
+proof-only and must be erased at runtime. Without explicit erasure, compiled code
+would fail to typecheck or execute nonsensical operations.
+
+Solution Structure. We use `@[implemented_by]` to map logical definitions to trivial
+runtime implementations:
+1. Fancy updates → identity (mask changes are proof-only)
+2. Invariants → their content (no runtime bookkeeping)
+3. Ghost ownership → `emp` (ghost state doesn't exist at runtime)
+This is sound because Iris adequacy connects logical correctness to operational behavior.
+-/
+
+/-!
 ## Trust Boundary
 
 This file is the **Iris extraction trust boundary**. It contains:

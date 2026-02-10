@@ -8,6 +8,23 @@ import Protocol.Coherence.Delegation
 set_option autoImplicit false
 set_option relaxedAutoImplicit false
 
+/-!
+# VM Instruction Specification Proofs
+
+Preservation theorems connecting VM instruction specs to Protocol-level coherence.
+-/
+
+/-
+The Problem. VM instructions (send, recv, select, branch, delegate) must preserve
+the Protocol coherence invariant. Each instruction has a spec defining pre/post
+conditions that need to be connected to the coherence preservation theorems.
+
+Solution Structure. For each instruction type, defines a preservation theorem
+(e.g., `SendSpec_preserves_Coherent`) that extracts preconditions from the spec
+and applies the corresponding Protocol-level preservation lemma. Uses SendReady,
+buffer head evidence, and label matching to satisfy preconditions.
+-/
+
 open scoped Classical
 
 section

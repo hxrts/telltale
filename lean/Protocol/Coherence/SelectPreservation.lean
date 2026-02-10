@@ -1,10 +1,21 @@
 import Protocol.Coherence.StoreTyping
 
+/-! # MPST Coherence: Select Preservation
+
+This module proves coherence preservation for select (internal choice) steps.
+-/
+
+/-
+The Problem. When a role makes an internal choice, both its local type and the
+trace change. We must show edge coherence is preserved for all affected edges.
+
+Solution Structure. We prove select preservation via:
+1. Head preservation: receiver's branch type accepts the new label
+2. Continuation coherence: remaining protocol stays coherent
+3. 3-way edge case analysis for unaffected edges
+-/
+
 /-!
-# MPST Coherence
-
-This module defines the coherence invariant for multiparty session types.
-
 In binary session types, coherence states that after consuming in-flight messages,
 dual endpoints have dual types. In MPST, this generalizes to:
 
@@ -48,6 +59,8 @@ set_option linter.unnecessarySimpa false
 open scoped Classical
 
 section
+
+/-! ## Core Development -/
 
 theorem Coherent_select_preserved
     (G : GEnv) (D : DEnv) (selectorEp : Endpoint) (targetRole : Role)

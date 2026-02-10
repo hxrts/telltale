@@ -8,6 +8,17 @@ import Runtime.Resources.BufferRA
 Minimal computable instances for the VM domain interfaces.
 -/
 
+/-
+The Problem. Testing the VM requires concrete implementations of all domain
+interfaces, but full implementations are complex. We need minimal computable
+instances that satisfy the interface contracts without introducing complexity.
+
+Solution Structure. Defines marker types (`UnitIdentity`, `UnitGuard`, etc.) with
+trivial typeclass instances. Each instance provides no-op implementations: single
+site per participant, empty guard layer, no persistence, no effects, no verification.
+These enable running the VM in tests without domain-specific behavior.
+-/
+
 set_option autoImplicit false
 
 /-! ## Unit model instances -/

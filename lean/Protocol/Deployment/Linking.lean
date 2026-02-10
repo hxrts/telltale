@@ -9,6 +9,18 @@ import Protocol.Coherence.Delegation
 Linking theorems and composition preservation results.
 -/
 
+/-
+The Problem. When composing two deployed protocols, we must prove that the
+combined system preserves coherence. This requires showing that disjoint
+sessions don't interfere and merged environments remain well-typed.
+
+Solution Structure. We prove:
+1. Session disjointness lemmas for merged environments
+2. Lookup preservation: lookups in merged env find the right component
+3. Coherence preservation: merged configurations are coherent
+4. Linking theorem: compatible protocols compose safely
+-/
+
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
 set_option autoImplicit false

@@ -4,6 +4,17 @@ import SessionTypes.LocalTypeConvDefs
 
 set_option linter.mathlibStandardSet false
 
+/-
+The Problem. Conversion proofs between named and de Bruijn representations require many
+small lemmas about list indexing, name lookup, string/nat injection, and context generation.
+These utilities are needed across multiple conversion proof files.
+
+Solution Structure. Provides `indexOf` helpers for context lookup with membership and
+uniqueness properties. String/Nat injection lemmas enable fresh name proofs. `GeneratedContext`
+characterizes contexts built by successive freshName calls, proving they're duplicate-free
+and that fresh names are truly fresh (not already in the context).
+-/
+
 /-! # SessionTypes.LocalTypeConvProofs.Helpers
 
 Basic helpers for indexOf, get?, string/nat injectivity, and generated context properties.
