@@ -1,0 +1,8 @@
+lean/Runtime/VM/Model/Program.lean:132:/-- Compile a process into a program (stub). Deprecated. Use `compileLocalTypeR` or
+lean/Runtime/VM/Model/Program.lean:16:The `compile` function is a V1 stub that translates a `Process` (from `Protocol.Process`)
+lean/Runtime/VM/Model/Program.lean:28:`UntrustedImage` represents unverified code. The `compile` stub translates Process
+lean/Runtime/VM/Model/Program.lean:45:/-- Default metadata for stub programs. -/
+lean/Runtime/VM/Model/State.lean:22:and placeholder fields for ghost sessions and progress supply.
+lean/Runtime/VM/Model/State.lean:243:abbrev BlockedSet (γ : Type u) := List (CoroutineId × BlockReason γ) -- Blocked map stub.
+lean/Runtime/VM/Model/State.lean:55:  -- Minimal speculation metadata (placeholder for section 17).
+lean/Runtime/VM/Semantics/ExecGuardEffect.lean:98:  -- Execute an effect action via the bound handler (placeholder response model).

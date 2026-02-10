@@ -43,7 +43,7 @@ private def outputConditionClaimOfEvent {ε : Type u} [EffectRuntime ε]
       some
         { predicateRef := "vm.observable_output"
         , witnessRef := none
-        , outputDigest := .unit }
+        , outputDigest := "vm.output_digest.unspecified" }
 
 private def appendOutputConditionCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -84,7 +84,11 @@ def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (st : VMState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε)
     (instr : Instr γ ε) : VMState ι γ π ε ν × ExecResult γ ε :=
   -- Enforce monitor typing and cost budget before execution.
-  if monitorAllows st.monitor instr then
+  let monitorPasses :=
+    match st.config.monitorMode with
+    | .off => true
+    | .sessionTypePrecheck => monitorAllows st.monitor instr
+  if monitorPasses then
     match chargeCost st.config coro instr with
     | none =>
         let pack' := faultPack st coro .outOfCredits "out of credits"

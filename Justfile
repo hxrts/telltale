@@ -14,6 +14,8 @@ ci-dry-run:
     cargo test --workspace --all-targets --all-features
     just check-arch
     just check-arch-lean
+    just check-vm-placeholders
+    just check-parity-ledger
     just check-lean-metrics
     # Benchmark target compilation checks
     just bench-check
@@ -41,6 +43,14 @@ check-arch-rust:
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     ./scripts/check-arch-lean.sh
+
+# Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
+check-vm-placeholders:
+    ./scripts/check-vm-placeholders.sh
+
+# Lean/Rust VM parity-contract + deviation-ledger checks
+check-parity-ledger:
+    ./scripts/check-parity-ledger.sh
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:

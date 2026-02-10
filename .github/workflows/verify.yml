@@ -26,6 +26,16 @@ jobs:
           mkdir -p artifacts
           just check-arch-lean | tee artifacts/check-arch-lean.log
 
+      - name: Run executable VM placeholder baseline checks
+        run: |
+          mkdir -p artifacts
+          just check-vm-placeholders | tee artifacts/check-vm-placeholders.log
+
+      - name: Run VM parity contract checks
+        run: |
+          mkdir -p artifacts
+          just check-parity-ledger | tee artifacts/check-parity-ledger.log
+
       - name: Build targeted Lean VM modules
         run: just verify-lean-vm-targets
 
@@ -64,6 +74,16 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-arch-lean | tee artifacts/check-arch-lean.log
+
+      - name: Run executable VM placeholder baseline checks
+        run: |
+          mkdir -p artifacts
+          just check-vm-placeholders | tee artifacts/check-vm-placeholders.log
+
+      - name: Run VM parity contract checks
+        run: |
+          mkdir -p artifacts
+          just check-parity-ledger | tee artifacts/check-parity-ledger.log
 
       - name: Setup Lean
         uses: leanprover/lean4-action@v1

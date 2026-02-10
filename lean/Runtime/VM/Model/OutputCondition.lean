@@ -19,7 +19,7 @@ structure OutputConditionClaim where
   -- Optional witness payload reference (hidden in V1).
   witnessRef : Option String := none
   -- Opaque digest/summary of the candidate output.
-  outputDigest : Value := .unit
+  outputDigest : String := ""
   deriving Repr, DecidableEq
 
 structure OutputConditionCheck where
@@ -37,7 +37,7 @@ inductive OutputConditionPolicy where
   -- Reject every claim.
   | denyAll
   -- Accept only predicates in the allow-list.
-  | allowList (predicates : List String)
+  | predicateAllowList (predicates : List String)
   deriving Repr, DecidableEq
 
 def OutputConditionPolicy.accepts (p : OutputConditionPolicy) (claim : OutputConditionClaim) : Bool :=
@@ -45,7 +45,7 @@ def OutputConditionPolicy.accepts (p : OutputConditionPolicy) (claim : OutputCon
   | .disabled => true
   | .allowAll => true
   | .denyAll => false
-  | .allowList preds => preds.contains claim.predicateRef
+  | .predicateAllowList preds => preds.contains claim.predicateRef
 
 structure OutputConditionConfig where
   -- Policy-level gate.

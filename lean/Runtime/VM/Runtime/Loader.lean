@@ -19,7 +19,7 @@ private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
     (fun acc r1 => acc ++ roles.map (fun r2 => { sid := sid, sender := r1, receiver := r2 }))
     []
 
-/-! ## Session disjointness (stubs) -/
+/-! ## Session disjointness (executable checks) -/
 
 /-- Existing session ids in a VM state. -/
 def existingSessionIds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -41,6 +41,31 @@ def SessionDisjoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (_st : VMState ι γ π ε ν) (sid1 sid2 : SessionId) : Prop :=
   sid1 ≠ sid2
 
+/-- Executable session-id availability check for loader admission. -/
+def sessionIdAvailable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (sid : SessionId) : Bool :=
+  !(existingSessionIds st).contains sid
+
+/-- Deterministically choose a fresh session id even if state ids are non-canonical. -/
+def nextFreshSessionId {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) : SessionId :=
+  let sid := st.nextSessionId
+  if sessionIdAvailable st sid then
+    sid
+  else
+    let maxSeen := (existingSessionIds st).foldl Nat.max sid
+    maxSeen + 1
+
 /-- Load a choreography into a running VM, returning the updated state and session id. -/
 def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -51,7 +76,7 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     [Inhabited (EffectRuntime.EffectCtx ε)]
     (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
     VMState ι γ π ε ν × SessionId :=
-  let sid := st.nextSessionId
+  let sid := nextFreshSessionId st
   let programId := st.programs.size
   let programs' := st.programs.push image.program
   let roles := image.program.entryPoints.map (fun p => p.fst)

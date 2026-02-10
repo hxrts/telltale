@@ -154,12 +154,12 @@ def stepCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   match readReg coro.regs knowledge with
   | some (.prod (.chan ep) (.string s)) =>
       let fact := { endpoint := ep, payload := s }
-      let permitted := st.config.flowPolicy.allowed fact
       let tgtRole : Role :=
         match readReg coro.regs target with
         | some (.string r) => r
         | _ => ""
-      let ok := permitted tgtRole && coro.knowledgeSet.any (fun k => k == fact)
+      let permitted := st.config.flowPolicy.allowsKnowledge fact tgtRole
+      let ok := permitted && coro.knowledgeSet.any (fun k => k == fact)
       match setReg coro.regs dst (.bool ok) with
       | none => faultPack st coro .outOfRegisters "bad dst reg"
       | some regs' =>

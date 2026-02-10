@@ -3,24 +3,10 @@ import Choreography.Projection.Projectb
 import SessionTypes.Participation
 
 /-
-The Problem. Prove that embedding and projection are inverses and that embedding is
-deterministic. Given a local type e and a global type g, we want to establish:
-1. If e embeds into both g1 and g2, then g1 = g2 (determinism)
-2. If e embeds into g and g projects to e', then e = e' (roundtrip)
-3. If g projects to e and e embeds into g', then g = g' (roundtrip)
-
-The difficulty is that these operations are defined by mutual recursion with branch
-processing, requiring simultaneous induction on types and branch lists. The roundtrip
-properties require careful case analysis to show that CEmbed and CProject are structural
-inverses at each constructor level.
-
-Solution Structure. The proof is organized in three main sections:
-1. Determinism: mutual induction proves embed_deterministic and branches_embed_deterministic
-2. Roundtrip (embed → project): mutual induction proves embed_project_roundtrip
-3. Existence: localType_has_embed shows any well-formed local type can be embedded
-
-The well-formedness conditions (role ≠ partner in communications) prevent pathological
-cases where a role sends to itself, ensuring the embedding is always possible.
+The Problem. Establish determinism and roundtrip laws for `CEmbed`/`CProject`.
+Solution Structure. Use mutual induction over local types and branch lists for
+determinism/roundtrip, then derive embedding existence for well-formed local
+types under the usual self-communication exclusions.
 -/
 
 /-! # Choreography.Projection.EmbedProps

@@ -219,6 +219,8 @@ impl ThreadedSessionStore {
             roles,
             local_types,
             buffers,
+            auth_leaves: BTreeMap::new(),
+            auth_roots: BTreeMap::new(),
             edge_handlers: BTreeMap::new(),
             edge_traces: BTreeMap::new(),
             status: SessionStatus::Active,
@@ -349,6 +351,7 @@ impl ThreadedVM {
     /// Panics if the thread pool cannot be created.
     #[must_use]
     pub fn with_workers(config: VMConfig, workers: usize) -> Self {
+        config.assert_invariants();
         let worker_count = workers.max(1);
         let pool = ThreadPoolBuilder::new()
             .num_threads(worker_count)
@@ -2475,4 +2478,95 @@ fn step_open(
             roles: roles.to_vec(),
         }],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::coroutine::KnowledgeFact;
+    use crate::vm::{FlowPolicy, FlowPredicate};
+    use std::collections::BTreeSet;
+
+    fn evaluate_check(policy: FlowPolicy, known_fact: &str, query_fact: &str, target: &str) -> bool {
+        let mut coro = Coroutine::new(0, 0, 1, "A".to_string(), 8, usize::MAX);
+        let ep = Endpoint {
+            sid: 1,
+            role: "A".to_string(),
+        };
+        coro.knowledge_set.push(crate::coroutine::KnowledgeFact {
+            endpoint: ep.clone(),
+            fact: known_fact.to_string(),
+        });
+        coro.regs[2] = Value::Prod(
+            Box::new(Value::Endpoint(ep)),
+            Box::new(Value::Str(query_fact.to_string())),
+        );
+        coro.regs[3] = Value::Str(target.to_string());
+
+        let cfg = VMConfig {
+            flow_policy: policy,
+            ..VMConfig::default()
+        };
+        let pack = step_check(&mut coro, &cfg, "A", 2, 3, 4, 0).expect("check should execute");
+        match pack.coro_update {
+            CoroUpdate::AdvancePcWriteReg { val, .. } => matches!(val, Value::Bool(true)),
+            _ => panic!("unexpected check update"),
+        }
+    }
+
+    #[test]
+    fn flow_policy_variant_matrix_for_threaded_check() {
+        let mut allow_roles = BTreeSet::new();
+        allow_roles.insert("Observer".to_string());
+
+        let mut deny_roles = BTreeSet::new();
+        deny_roles.insert("Observer".to_string());
+
+        assert!(evaluate_check(
+            FlowPolicy::AllowAll,
+            "secret",
+            "secret",
+            "Observer"
+        ));
+        assert!(!evaluate_check(
+            FlowPolicy::DenyAll,
+            "secret",
+            "secret",
+            "Observer"
+        ));
+        assert!(evaluate_check(
+            FlowPolicy::AllowRoles(allow_roles),
+            "secret",
+            "secret",
+            "Observer"
+        ));
+        assert!(!evaluate_check(
+            FlowPolicy::DenyRoles(deny_roles),
+            "secret",
+            "secret",
+            "Observer"
+        ));
+        assert!(evaluate_check(
+            FlowPolicy::PredicateExpr(FlowPredicate::FactContains("secret".to_string())),
+            "top_secret",
+            "top_secret",
+            "Observer"
+        ));
+        assert!(evaluate_check(
+            FlowPolicy::predicate(|knowledge: &KnowledgeFact, target: &str| {
+                knowledge.fact.contains("secret") && target == "Observer"
+            }),
+            "top_secret",
+            "top_secret",
+            "Observer"
+        ));
+        let mut allow_only_observer = BTreeSet::new();
+        allow_only_observer.insert("Observer".to_string());
+        assert!(!evaluate_check(
+            FlowPolicy::AllowRoles(allow_only_observer),
+            "secret",
+            "secret",
+            "Blocked"
+        ));
+    }
 }

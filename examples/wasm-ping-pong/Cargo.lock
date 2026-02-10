@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "aho-corasick"
-version = "1.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -38,6 +29,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "az"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be5eb007b7cacc6c660343e96f650fedf4b5a77512399eb952ca6642cf8d13f7"
 
 [[package]]
 name = "base64"
@@ -82,6 +79,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
+name = "bytemuck"
+version = "1.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
+
+[[package]]
 name = "bytes"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -121,6 +124,12 @@ checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crunchy"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crypto-common"
@@ -163,6 +172,18 @@ name = "find-msvc-tools"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52051878f80a721bb68ebfbc930e07b65ba72f2da88968ea5c06fd6ca3d3a127"
+
+[[package]]
+name = "fixed"
+version = "1.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c566da967934c6c7ee0458a9773de9b2a685bd2ce26a3b28ddfc740e640182f5"
+dependencies = [
+ "az",
+ "bytemuck",
+ "half",
+ "typenum",
+]
 
 [[package]]
 name = "futures"
@@ -286,6 +307,17 @@ dependencies = [
  "libc",
  "r-efi",
  "wasip2",
+]
+
+[[package]]
+name = "half"
+version = "2.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
+dependencies = [
+ "cfg-if",
+ "crunchy",
+ "zerocopy",
 ]
 
 [[package]]
@@ -547,125 +579,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex"
-version = "1.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843bc0191f75f3e22651ae5f1e72939ab2f72a4bc30fa80a066bd66edefc24d4"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-automata",
- "regex-syntax",
-]
-
-[[package]]
-name = "regex-automata"
-version = "0.4.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5276caf25ac86c8d810222b3dbb938e512c55c6831a10f3e6ed1c93b84041f1c"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-syntax",
-]
-
-[[package]]
-name = "regex-syntax"
-version = "0.8.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
-
-[[package]]
-name = "telltale"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64",
- "bincode",
- "futures",
- "getrandom 0.2.16",
- "hex",
- "proc-macro2",
- "quote",
- "telltale-macros",
- "telltale-types",
- "serde",
- "syn",
- "thiserror",
- "time",
- "tokio",
- "tracing",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-timer",
-]
-
-[[package]]
-name = "telltale-choreography"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "base64",
- "bincode",
- "futures",
- "getrandom 0.2.16",
- "hex",
- "lazy_static",
- "pest",
- "pest_derive",
- "proc-macro2",
- "quote",
- "regex",
- "telltale",
- "telltale-macros",
- "telltale-theory",
- "telltale-types",
- "serde",
- "sha2",
- "syn",
- "thiserror",
- "time",
- "tokio",
- "toml",
- "tracing",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-timer",
-]
-
-[[package]]
-name = "telltale-macros"
-version = "0.7.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "telltale-theory"
-version = "0.7.0"
-dependencies = [
- "telltale-types",
- "thiserror",
-]
-
-[[package]]
-name = "telltale-types"
-version = "0.7.0"
-dependencies = [
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
-]
-
-[[package]]
 name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -804,6 +717,96 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "telltale"
+version = "0.9.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "bincode",
+ "futures",
+ "getrandom 0.2.16",
+ "hex",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn",
+ "telltale-macros",
+ "telltale-types",
+ "thiserror",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-timer",
+]
+
+[[package]]
+name = "telltale-choreography"
+version = "0.9.1"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "async-trait",
+ "base64",
+ "bincode",
+ "futures",
+ "getrandom 0.2.16",
+ "hex",
+ "parking_lot 0.12.5",
+ "pest",
+ "pest_derive",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "sha2",
+ "syn",
+ "telltale",
+ "telltale-macros",
+ "telltale-theory",
+ "telltale-types",
+ "thiserror",
+ "time",
+ "tokio",
+ "toml",
+ "tracing",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-timer",
+]
+
+[[package]]
+name = "telltale-macros"
+version = "0.9.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "telltale-theory"
+version = "0.9.1"
+dependencies = [
+ "telltale-types",
+ "thiserror",
+]
+
+[[package]]
+name = "telltale-types"
+version = "0.9.1"
+dependencies = [
+ "fixed",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]
@@ -1137,9 +1140,9 @@ dependencies = [
  "console_error_panic_hook",
  "futures",
  "getrandom 0.2.16",
+ "serde",
  "telltale",
  "telltale-choreography",
- "serde",
  "tracing",
  "tracing-wasm",
  "wasm-bindgen",
@@ -1306,6 +1309,26 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "zerocopy"
+version = "0.8.39"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db6d35d663eadb6c932438e763b262fe1a70987f9ae936e60158176d710cae4a"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.39"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4122cd3169e94605190e77839c9a40d40ed048d305bfdc146e7df40ab0f3e517"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "zmij"

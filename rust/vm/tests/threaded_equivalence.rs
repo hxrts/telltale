@@ -13,10 +13,11 @@ use helpers::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
 use telltale_vm::coroutine::Value;
+use telltale_vm::coroutine::Fault;
 use telltale_vm::determinism::{replay_consistent, DeterminismMode};
 use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision};
 use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM};
+use telltale_vm::vm::{ObsEvent, VMConfig, VM, VMError};
 use telltale_vm::OutputConditionPolicy;
 
 type Normalized = (String, String, String, String);
@@ -213,6 +214,129 @@ fn test_output_condition_outcomes_match_across_drivers() {
         .collect();
 
     assert_eq!(coop_checks, threaded_checks);
+}
+
+#[test]
+fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
+    let image = simple_send_recv_image("A", "B", "msg");
+    let handler = PassthroughHandler;
+
+    let deny_cfg = VMConfig {
+        output_condition_policy: OutputConditionPolicy::DenyAll,
+        ..VMConfig::default()
+    };
+
+    let mut coop = VM::new(deny_cfg.clone());
+    coop.load_choreography(&image).expect("load image");
+    let coop_err = coop.run(&handler, 50).expect_err("cooperative run should fault");
+
+    let mut threaded = ThreadedVM::with_workers(deny_cfg, 2);
+    threaded.load_choreography(&image).expect("load image");
+    let threaded_err = threaded
+        .run(&handler, 50)
+        .expect_err("threaded run should fault");
+
+    let extract_output_condition_fault = |err: VMError| match err {
+        VMError::Fault {
+            fault: Fault::OutputConditionFault { predicate_ref },
+            ..
+        } => predicate_ref,
+        other => panic!("expected output-condition fault, got {other:?}"),
+    };
+
+    let coop_predicate = extract_output_condition_fault(coop_err);
+    let threaded_predicate = extract_output_condition_fault(threaded_err);
+    assert_eq!(coop_predicate, threaded_predicate);
+    assert_eq!(coop_predicate, "vm.observable_output");
+
+    let coop_checks: Vec<(String, bool)> = coop
+        .output_condition_checks()
+        .iter()
+        .map(|c| (c.meta.predicate_ref.clone(), c.passed))
+        .collect();
+    let threaded_checks: Vec<(String, bool)> = threaded
+        .output_condition_checks()
+        .iter()
+        .map(|c| (c.meta.predicate_ref.clone(), c.passed))
+        .collect();
+    assert_eq!(coop_checks, threaded_checks);
+    assert!(coop_checks.iter().all(|(_, passed)| !passed));
+
+    let coop_trace_checks: Vec<(String, bool)> = coop
+        .trace()
+        .iter()
+        .filter_map(|ev| match ev {
+            ObsEvent::OutputConditionChecked {
+                predicate_ref,
+                passed,
+                ..
+            } => Some((predicate_ref.clone(), *passed)),
+            _ => None,
+        })
+        .collect();
+    let threaded_trace_checks: Vec<(String, bool)> = threaded
+        .trace()
+        .iter()
+        .filter_map(|ev| match ev {
+            ObsEvent::OutputConditionChecked {
+                predicate_ref,
+                passed,
+                ..
+            } => Some((predicate_ref.clone(), *passed)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(coop_trace_checks, threaded_trace_checks);
+    assert!(coop_trace_checks.iter().all(|(_, passed)| !passed));
+}
+
+#[test]
+fn test_output_condition_commit_pass_artifacts_match_across_drivers() {
+    let image = simple_send_recv_image("A", "B", "msg");
+    let handler = PassthroughHandler;
+
+    let allow_cfg = VMConfig {
+        output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
+            "vm.observable_output".to_string(),
+        ]),
+        ..VMConfig::default()
+    };
+
+    let mut coop = VM::new(allow_cfg.clone());
+    coop.load_choreography(&image).expect("load image");
+    coop.run(&handler, 50).expect("cooperative run");
+
+    let mut threaded = ThreadedVM::with_workers(allow_cfg, 2);
+    threaded.load_choreography(&image).expect("load image");
+    threaded.run(&handler, 50).expect("threaded run");
+
+    let coop_trace_checks: Vec<(String, bool)> = coop
+        .trace()
+        .iter()
+        .filter_map(|ev| match ev {
+            ObsEvent::OutputConditionChecked {
+                predicate_ref,
+                passed,
+                ..
+            } => Some((predicate_ref.clone(), *passed)),
+            _ => None,
+        })
+        .collect();
+    let threaded_trace_checks: Vec<(String, bool)> = threaded
+        .trace()
+        .iter()
+        .filter_map(|ev| match ev {
+            ObsEvent::OutputConditionChecked {
+                predicate_ref,
+                passed,
+                ..
+            } => Some((predicate_ref.clone(), *passed)),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(coop_trace_checks, threaded_trace_checks);
+    assert!(coop_trace_checks.iter().all(|(_, passed)| *passed));
 }
 
 #[test]

@@ -35,6 +35,7 @@ wasm-bindgen = { workspace = true }
 telltale-theory = { path = "../theory", version = "0.9.1" }
 telltale-lean-bridge = { path = "../lean-bridge", version = "0.9.1" }
 assert_matches = { workspace = true }
+serde_yaml = { workspace = true }
 wasm-bindgen-test = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

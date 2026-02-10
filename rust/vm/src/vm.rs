@@ -52,6 +52,10 @@ fn default_initial_cost_budget() -> usize {
     usize::MAX
 }
 
+fn default_config_schema_version() -> u32 {
+    1
+}
+
 /// Lean-aligned scope identifier placeholder.
 pub type ScopeId = usize;
 
@@ -487,6 +491,9 @@ impl FlowPredicate {
 /// VM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VMConfig {
+    /// Migration-safe config schema version.
+    #[serde(default = "default_config_schema_version")]
+    pub config_schema_version: u32,
     /// Scheduling policy.
     pub sched_policy: SchedPolicy,
     /// Default buffer configuration for new sessions.
@@ -524,6 +531,7 @@ pub struct VMConfig {
 impl Default for VMConfig {
     fn default() -> Self {
         Self {
+            config_schema_version: default_config_schema_version(),
             sched_policy: SchedPolicy::Cooperative,
             buffer_config: BufferConfig::default(),
             max_sessions: 256,
@@ -539,6 +547,24 @@ impl Default for VMConfig {
             instruction_cost: 1,
             initial_cost_budget: usize::MAX,
         }
+    }
+}
+
+impl VMConfig {
+    /// Assert VM configuration invariants required for safe state initialization.
+    ///
+    /// # Panics
+    ///
+    /// Panics when a required invariant is violated.
+    pub fn assert_invariants(&self) {
+        assert!(
+            self.config_schema_version >= 1,
+            "config_schema_version must be >= 1"
+        );
+        assert!(self.max_sessions > 0, "max_sessions must be > 0");
+        assert!(self.max_coroutines > 0, "max_coroutines must be > 0");
+        assert!(self.num_registers > 0, "num_registers must be > 0");
+        assert!(self.instruction_cost > 0, "instruction_cost must be > 0");
     }
 }
 
@@ -974,6 +1000,7 @@ impl VM {
     /// Create a new VM with the given configuration.
     #[must_use]
     pub fn new(config: VMConfig) -> Self {
+        config.assert_invariants();
         let tick_duration = config.tick_duration;
         let sched = Scheduler::new(config.sched_policy.clone());
         let mut guard_resources = BTreeMap::new();
@@ -1451,6 +1478,12 @@ impl VM {
     /// Runtime well-formedness predicate used by debug assertions.
     pub fn wf_vm_state(&self) -> Result<(), String> {
         for coro in &self.coroutines {
+            if self.sessions.get(coro.session_id).is_none() {
+                return Err(format!(
+                    "coroutine {} references missing session {}",
+                    coro.id, coro.session_id
+                ));
+            }
             let Some(program) = self.programs.get(coro.program_id) else {
                 return Err(format!("missing program for coroutine {}", coro.id));
             };
@@ -1474,9 +1507,39 @@ impl VM {
                     ));
                 }
             }
+            for token in &coro.progress_tokens {
+                let Some(session) = self.sessions.get(token.sid) else {
+                    return Err(format!(
+                        "progress token missing session {} for coroutine {}",
+                        token.sid, coro.id
+                    ));
+                };
+                if !session.roles.iter().any(|role| role == &token.endpoint.role) {
+                    return Err(format!(
+                        "progress token role not in session {}:{}",
+                        token.sid, token.endpoint.role
+                    ));
+                }
+            }
+            for fact in &coro.knowledge_set {
+                let Some(session) = self.sessions.get(fact.endpoint.sid) else {
+                    return Err(format!(
+                        "knowledge fact missing session {}:{}",
+                        fact.endpoint.sid, fact.endpoint.role
+                    ));
+                };
+                if !session.roles.iter().any(|role| role == &fact.endpoint.role) {
+                    return Err(format!(
+                        "knowledge fact role not in session {}:{}",
+                        fact.endpoint.sid, fact.endpoint.role
+                    ));
+                }
+            }
         }
 
+        let mut active_sids = BTreeSet::new();
         for session in self.sessions.iter() {
+            active_sids.insert(session.sid);
             for ep in session.local_types.keys() {
                 if ep.sid != session.sid {
                     return Err(format!("local type sid mismatch for role {}", ep.role));
@@ -1489,6 +1552,17 @@ impl VM {
                 if buffer.len() > buffer.capacity() {
                     return Err("buffer length exceeds capacity".to_string());
                 }
+            }
+        }
+
+        for sid in self.monitor.session_kinds.keys() {
+            if !active_sids.contains(sid) {
+                return Err(format!("monitor tracks unknown session {sid}"));
+            }
+        }
+        for sid in &active_sids {
+            if !self.monitor.session_kinds.contains_key(sid) {
+                return Err(format!("monitor missing kind for active session {sid}"));
             }
         }
 
@@ -4376,6 +4450,120 @@ mod tests {
         assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(true));
     }
 
+    fn run_check_with_flow_policy(
+        policy: FlowPolicy,
+        target_role: &str,
+        known_fact: &str,
+        query_fact: &str,
+        insert_fact: bool,
+    ) -> bool {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+
+        let mut vm = VM::new(VMConfig {
+            flow_policy: policy,
+            ..VMConfig::default()
+        });
+        let sid = vm.load_choreography(&image).expect("load choreography");
+        let a_idx = vm
+            .coroutines
+            .iter()
+            .position(|c| c.role == "A")
+            .expect("A coroutine exists");
+        let ep_a = Endpoint {
+            sid,
+            role: "A".to_string(),
+        };
+
+        if insert_fact {
+            vm.coroutines[a_idx].knowledge_set.push(KnowledgeFact {
+                endpoint: ep_a.clone(),
+                fact: known_fact.to_string(),
+            });
+        }
+        vm.coroutines[a_idx].regs[2] = Value::Prod(
+            Box::new(Value::Endpoint(ep_a)),
+            Box::new(Value::Str(query_fact.to_string())),
+        );
+        vm.coroutines[a_idx].regs[3] = Value::Str(target_role.to_string());
+
+        let a_program_id = vm.coroutines[a_idx].program_id;
+        vm.programs[a_program_id] = vec![
+            Instr::Check {
+                knowledge: 2,
+                target: 3,
+                dst: 4,
+            },
+            Instr::Halt,
+        ];
+
+        let handler = PassthroughHandler;
+        let _ = vm.step(&handler).expect("check step should execute");
+        matches!(vm.coroutines[a_idx].regs[4], Value::Bool(true))
+    }
+
+    #[test]
+    fn test_check_flow_policy_variant_matrix() {
+        let mut allow_roles = BTreeSet::new();
+        allow_roles.insert("Observer".to_string());
+
+        let mut deny_roles = BTreeSet::new();
+        deny_roles.insert("Observer".to_string());
+
+        assert!(run_check_with_flow_policy(
+            FlowPolicy::AllowAll,
+            "Observer",
+            "secret",
+            "secret",
+            true
+        ));
+        assert!(!run_check_with_flow_policy(
+            FlowPolicy::DenyAll,
+            "Observer",
+            "secret",
+            "secret",
+            true
+        ));
+        assert!(run_check_with_flow_policy(
+            FlowPolicy::AllowRoles(allow_roles),
+            "Observer",
+            "secret",
+            "secret",
+            true
+        ));
+        assert!(!run_check_with_flow_policy(
+            FlowPolicy::DenyRoles(deny_roles),
+            "Observer",
+            "secret",
+            "secret",
+            true
+        ));
+        assert!(run_check_with_flow_policy(
+            FlowPolicy::PredicateExpr(FlowPredicate::FactContains("secret".to_string())),
+            "Observer",
+            "top_secret",
+            "top_secret",
+            true
+        ));
+        assert!(run_check_with_flow_policy(
+            FlowPolicy::predicate(|knowledge: &KnowledgeFact, target: &str| {
+                knowledge.fact.contains("secret") && target == "Observer"
+            }),
+            "Observer",
+            "top_secret",
+            "top_secret",
+            true
+        ));
+        assert!(!run_check_with_flow_policy(
+            FlowPolicy::AllowAll,
+            "Observer",
+            "secret",
+            "secret",
+            false
+        ));
+    }
+
     #[test]
     fn test_timeout_event_blocks_scheduling() {
         let image = CodeImage {
@@ -4451,5 +4639,35 @@ mod tests {
         ] {
             assert!(obj.contains_key(key), "missing VM state field: {key}");
         }
+    }
+
+    #[test]
+    fn wf_vm_state_rejects_dangling_coroutine_session_reference() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+        let mut vm = VM::new(VMConfig::default());
+        vm.load_choreography(&image).expect("load choreography");
+
+        vm.coroutines[0].session_id = usize::MAX - 1;
+        let err = vm
+            .wf_vm_state()
+            .expect_err("dangling session reference should fail wf check");
+        assert!(err.contains("references missing session"));
+    }
+
+    #[test]
+    fn wf_vm_state_rejects_monitor_missing_kind_for_session() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+        let mut vm = VM::new(VMConfig::default());
+        let sid = vm.load_choreography(&image).expect("load choreography");
+
+        vm.monitor.remove_kind(sid);
+        let err = vm
+            .wf_vm_state()
+            .expect_err("missing monitor kind should fail wf check");
+        assert!(err.contains("monitor missing kind for active session"));
     }
 }

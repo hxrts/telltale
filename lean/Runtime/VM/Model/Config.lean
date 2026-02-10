@@ -5,6 +5,7 @@ import Runtime.VM.Model.Knowledge
 import Runtime.Resources.ResourceModel
 import Runtime.VM.Model.SchedulerTypes
 import Runtime.VM.Model.Violation
+import Runtime.VM.Runtime.Monitor
 import Runtime.VM.Composition.DomainComposition
 import Runtime.Resources.BufferRA
 
@@ -47,16 +48,19 @@ structure VMConfig (ι γ π ε ν : Type u)
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] where
+  -- Migration-safe config schema version.
+  configVersion : Nat := 1
   -- VM configuration fields for policies and hooks.
   bufferConfig : Edge → BufferConfig
-  schedPolicy : SchedPolicy
+  schedPolicy : SchedPolicy := .cooperative
   violationPolicy : ViolationPolicy
-  flowPolicy : FlowPolicy
+  flowPolicy : FlowPolicy := .allowAll
   spatialOk : RoleSet → Bool
   transportOk : HandlerId → SignedBuffers ν → Bool
   complianceProof : Resource ν → ComplianceProof ν
-  maxCoroutines : Nat
-  maxSessions : Nat
+  maxCoroutines : Nat := 1024
+  maxSessions : Nat := 256
+  monitorMode : MonitorMode := .sessionTypePrecheck
   guardChain : GuardChain γ
   guardChainWf : GuardChain.wf guardChain
   roleSigningKey : Role → VerificationModel.SigningKey ν

@@ -165,7 +165,7 @@ def unitGuardChain : GuardChain UnitGuard :=
 def unitCostModel : CostModel UnitGuard UnitEffect :=
   { stepCost := fun _ => 1
   , minCost := 1
-  , defaultBudget := 50
+  , defaultBudget := 18446744073709551615
   , hMinCost := by intro _ _; exact Nat.le_refl 1
   , hMinPos := by exact Nat.le_refl 1 }
 
@@ -173,18 +173,19 @@ def unitBufferConfig : BufferConfig :=
   { mode := .fifo, initialCapacity := 16, policy := .block }
 
 def unitFlowPolicy : FlowPolicy :=
-  { allowed := fun _ _ => true }
+  .allowAll
 
 def unitConfig : VMConfig UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { bufferConfig := fun _ => unitBufferConfig
-  , schedPolicy := .roundRobin
+  , schedPolicy := .cooperative
   , violationPolicy := { allow := fun _ => false }
   , flowPolicy := unitFlowPolicy
   , spatialOk := fun _ => true
   , transportOk := fun _ _ => true
   , complianceProof := fun _ => ((), ())
-  , maxCoroutines := 8
-  , maxSessions := 4
+  , maxCoroutines := 1024
+  , maxSessions := 256
+  , monitorMode := .sessionTypePrecheck
   , guardChain := unitGuardChain
   , guardChainWf := by
       simp [GuardChain.wf, GuardChain.layerIds, unitGuardChain]

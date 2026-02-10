@@ -102,6 +102,14 @@ structure SessionMonitor (γ : Type u) where
   -- Monitor transition per session kind.
   step : SessionKind γ → Option (SessionKind γ)
 
+/-- Monitor precheck mode aligned with Rust VM config. -/
+inductive MonitorMode where
+  -- Disable monitor precheck.
+  | off
+  -- Run session-type precheck before instruction stepping.
+  | sessionTypePrecheck
+  deriving Repr, DecidableEq
+
 /-- Check whether an instruction is pure control flow (no session interaction). -/
 def instrNeedsSession {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (i : Instr γ ε) : Bool :=
