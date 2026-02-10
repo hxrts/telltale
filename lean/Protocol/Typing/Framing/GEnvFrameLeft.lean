@@ -11,6 +11,8 @@ lemma and careful re-framing of owned environments.
 
 Solution Structure. Prove a dedicated par helper, then discharge each
 constructor case by rewriting lookups and using the IH where needed.
+This module also exposes a regression lemma showing framed par proofs are
+independent of the ambient right index `nG`.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -379,3 +381,17 @@ lemma HasTypeProcPreOut_frame_G_left
       rename_i Sown G x v T T'
       have hv' := HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv
       exact HasTypeProcPreOut.assign_old hNoSh hOwn hv'
+
+/-- Regression lemma: left G-framing is independent of the ambient par `nG` index. -/
+lemma HasTypeProcPreOut_frame_G_left_par_nG_irrel
+    {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process}
+    {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv}
+    {nS nG nG' : Nat} :
+    DisjointG Gfr G →
+    DisjointS Sown.right Sown.left →
+    HasTypeProcPreOut Ssh Sown G (.par nS nG P Q) Sfin Gfin W Δ →
+    DisjointS Sown.right Sfin.left →
+    HasTypeProcPreOut Ssh Sown (Gfr ++ G) (.par nS nG' P Q) Sfin (Gfr ++ Gfin) W Δ := by
+  intro hDisj hDisjRightIn hPar hDisjRightOut
+  exact HasTypeProcPreOut_par_nG_irrel
+    (HasTypeProcPreOut_frame_G_left hDisj hDisjRightIn hPar hDisjRightOut)

@@ -5,6 +5,11 @@ import Protocol.Typing.Core
 
 This module defines the typing rules for MPST processes.
 
+Par typing uses an explicit split witness (`ParSplit`) and witness-oriented
+inversion (`ParWitness`) so framed proofs can transport split identity without
+depending on ambient right-index bookkeeping. The right par index `nG` is
+treated extensionally via `*_par_nG_irrel` lemmas.
+
 ## Key Judgments
 
 - `HasTypeProcN n S G D P`: Process P is well-typed under environments S, G, D
@@ -644,13 +649,19 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
                 (split.G1 ++ G₂') (D₁ ++ D₂') { right := Sown.right, left := split.S1 ++ S₂' }
                 store' bufs' (.par split.S1.length nG P Q')
 
-  | par_skip_left {G D Ssh Sown store bufs Q nS nG} :
-      -- Skip elimination from parallel
+  | par_skip_left {G D Ssh Sown store bufs Q nS nG}
+      (split : ParSplit Sown.left G) :
+      split.S1.length = nS →
+      split.S1 = [] →
+      -- Skip elimination from parallel (left side carries no owned-left bindings).
       TypedStep G D Ssh Sown store bufs (.par nS nG .skip Q)
                 G D Sown store bufs Q
 
-  | par_skip_right {G D Ssh Sown store bufs P nS nG} :
-      -- Skip elimination from parallel
+  | par_skip_right {G D Ssh Sown store bufs P nS nG}
+      (split : ParSplit Sown.left G) :
+      split.S1.length = nS →
+      split.S2 = [] →
+      -- Skip elimination from parallel (right side carries no owned-left bindings).
       TypedStep G D Ssh Sown store bufs (.par nS nG P .skip)
                 G D Sown store bufs P
 

@@ -1,6 +1,6 @@
 # Lean Verification Code Map
 
-**Last Updated:** 2026-02-09
+**Last Updated:** 2026-02-10
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
 
@@ -468,26 +468,36 @@ Central invariant replacing traditional duality for multiparty async settings.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Typing/Core.lean | 651 | Disjointness, splitting (`ParSplit`), `DConsistent` — 1 axiom |
-| Typing/Judgments.lean | 567 | `HasTypeProcN` judgment |
+| Typing/Core.lean | 651 | Disjointness, splitting (`ParSplit`), `DConsistent` |
+| Typing/Judgments.lean | 567 | `HasTypeProcN` / `HasTypeProcPreOut` / `TypedStep`, plus `ParWitness` inversion and par-index irrelevance |
 | Typing/Compatibility.lean | 992 | SEnv append/lookup lemmas |
 | Typing/MergeLemmas.lean | 327 | Additional environment lemmas |
 | Typing/StepLemmas.lean | 478 | `WTConfigN` well-typed configuration |
 | Typing/Framing.lean | 13 | Framing entry point (re-exports) |
-| Typing/Framing/Lemmas.lean | 1,331 | Frame lemmas and core axioms |
+| Typing/Framing/Lemmas.lean | 1,331 | Constructive frame lemmas (including middle-frame preservation; no framing axioms) |
 | Typing/Framing/FramedPreUpdate.lean | 308 | Pre-out preservation under G frames |
 | Typing/Framing/PreUpdateHelpers.lean | 293 | Alignment helpers for framed pre-update proofs |
 | Typing/Framing/LeftCases.lean | 266 | Left-frame step cases for pre-update |
 | Typing/Framing/RightCases.lean | 280 | Right-frame step cases for pre-update |
-| Typing/Framing/ParCases.lean | 683 | Par-case helpers for framed pre-update |
 | Typing/Framing/PreUpdatePreservation.lean | 409 | Lifting pre-update preservation to main theorems |
 | Typing/Framing/GEnvFrame.lean | 11 | GEnv framing re-exports |
 | Typing/Framing/GEnvFramePre.lean | 81 | Pre-typing right-frame lemma |
 | Typing/Framing/GEnvFrameHelpers.lean | 50 | Shared disjointness helpers |
-| Typing/Framing/GEnvFrameRight.lean | 202 | Pre-out right-frame lemma |
-| Typing/Framing/GEnvFrameLeft.lean | 280 | Pre-out left-frame lemma |
-| Typing/Preservation.lean | 2,137 | Preservation sub-lemmas (`Compatible`) — 1 axiom |
+| Typing/Framing/GEnvFrameRight.lean | 202 | Pre-out right-frame lemma + framed par `nG` irrelevance regression lemma |
+| Typing/Framing/GEnvFrameLeft.lean | 280 | Pre-out left-frame lemma + framed par `nG` irrelevance regression lemma |
+| Typing/Preservation.lean | 2,137 | Constructive preservation sub-lemmas (`Compatible`) |
 | Typing/Progress.lean | 472 | DEnv union and environment append properties |
+
+### Par Witness / Quotient View (Typing Layer)
+
+- `Typing/Judgments.lean` now encodes par split identity via `ParWitness` (split + left-length witness).
+- Inversion APIs are witness-oriented: `HasTypeProcPreOut_par_inv_witness`, `TypedStep_par_inv`.
+- Ambient par index on the right (`nG`) is quotient-style/irrelevant at typing level:
+  - `HasTypeProcPre_par_nG_irrel`
+  - `HasTypeProcPreOut_par_nG_irrel`
+- Framed regression lemmas make this explicit at transport boundaries:
+  - `HasTypeProcPreOut_frame_G_right_par_nG_irrel` (`Typing/Framing/GEnvFrameRight.lean`)
+  - `HasTypeProcPreOut_frame_G_left_par_nG_irrel` (`Typing/Framing/GEnvFrameLeft.lean`)
 
 ### Operational Semantics
 
@@ -698,36 +708,9 @@ telltale (package)
 
 ## Axiom Inventory
 
-### Protocol Library (20 axioms)
+### Global Status
 
-| File | Count | Axioms |
-|------|------:|--------|
-| Deployment/Linking.lean | 8 | `mergeBufs_typed`, `link_preserves_WTMon` (4 variants), `compose_deadlock_free`, `link_preserves_coherent_active` |
-| Monitor/Preservation.lean | 2 | `MonStep_preserves_WTMon`, `newSession_preserves_WTMon` |
-| Typing/Framing/Lemmas.lean | 6 | Frame axioms (`HasTypeProcPre_frame_*`, etc.) |
-| Typing/Preservation.lean | 2 | `lookupSEnv_SEnvAll_update_neq`, `StoreTypedStrong_frame_*` |
-| Typing/Core.lean | 1 | `ParSplit.unique` |
-| Preservation.lean | 1 | `OwnedDisjoint_preserved_TypedStep` |
-
-### Runtime Library (10 axioms)
-
-**IrisBridge.lean axioms** for iris-lean integration:
-
-| File | Count | Axioms |
-|------|------:|--------|
-| IrisBridge.lean | 10 | `cancel_token_own`, `cinv`, `namespace_disjoint`, `cinv_alloc`, `cinv_acc`, `cinv_cancel`, `state_interp`, `wp`, `MultiStep'`, `wp_invariance` |
-
-**Ghost maps** use `Positive` keys with application-level encoding via `Iris.Countable.encode`. The `GhostMapSlot V` typeclass registers value types.
-
-| Category | Status | Description |
-|----------|:------:|-------------|
-| Sep logic connectives | Done | `iProp.sep`, `iProp.wand`, `iProp.pure`, etc. via iris-lean |
-| Ghost variables | Done | `ghost_var`, `ghost_var_alloc`, `ghost_var_agree`, `ghost_var_update` |
-| Ghost maps | Done | `ghost_map_auth`, `ghost_map_elem`, `ghost_map_alloc`, `ghost_map_lookup`, `ghost_map_insert`, `ghost_map_update`, `ghost_map_delete` |
-| Invariants | Done | `inv`, `fupd`, `Mask`, `Namespace` via iris-lean |
-| Saved props | Done | `saved_prop_own`, `saved_prop_alloc`, `saved_prop_agree` |
-
-**Remaining downstream work:** polymorphic CMRA for `own`, Language instance for WP/adequacy, cancelable invariants need `CinvR` instance.
+`rg -n "^axiom " -g'*.lean'` returns no results. The repository is currently axiom-free.
 
 ### Sorry Concentration
 

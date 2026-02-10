@@ -57,7 +57,7 @@ def BlockedProc (store : VarStore) (bufs : Buffers) : Process → Prop
   | .seq P _ =>
       BlockedProc store bufs P
   | .par _ _ P Q =>
-      BlockedProc store bufs P ∧ BlockedProc store bufs Q
+      (P = .skip ∨ BlockedProc store bufs P) ∧ (Q = .skip ∨ BlockedProc store bufs Q)
   | _ => False
 
 private lemma DisjointS_right_empty (S : SEnv) : DisjointS S (∅ : SEnv) := by
@@ -1389,9 +1389,63 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
               hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
           cases hProgP with
           | inl hSkipP =>
-              right; left
               subst hSkipP
-              exact ⟨_, _, _, store, bufs, Q, TypedStep.par_skip_left⟩
+              by_cases hS1Nil : split.S1 = []
+              · right; left
+                exact ⟨_, _, _, store, bufs, Q, TypedStep.par_skip_left split hSlen hS1Nil⟩
+              · -- Left skip cannot be eliminated; rely on right progress.
+                have hProgQ :=
+                  progress_typed_aux hQ_full hStoreR hDisjShR hOwnR hDisjOutQ
+                    hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
+                cases hProgQ with
+                | inl hSkipQ =>
+                    right; right
+                    subst hSkipQ
+                    exact And.intro (Or.inl rfl) (Or.inl rfl)
+                | inr hRestQ =>
+                    cases hRestQ with
+                    | inl hStepQ =>
+                        rcases hStepQ with ⟨G', D', S', store', bufs', Q', hStep⟩
+                        -- derive shape G' = split.G1 ++ G₂' from hStep.
+                        have hGshape : ∃ G₂', G' = split.G1 ++ G₂' := by
+                          have hShape :=
+                            TypedStep_preserves_frames (Gleft:=split.G1) (Gmid:=split.G2) (Gright:=[])
+                              (by simpa [split.hG])
+                              hDisjG (DisjointG_right_empty split.G1) (DisjointG_right_empty split.G2)
+                              hStoreR hDisjShR hOwnR hQ hStep
+                          rcases hShape with ⟨G₂', hShape⟩
+                          refine ⟨G₂', ?_⟩
+                          simpa [List.append_assoc] using hShape
+                        rcases hGshape with ⟨G₂', hGshape⟩
+                        have hRightEq : S'.right = Sown.right ++ split.S1 :=
+                          TypedStep_preserves_right hStep hQ_full
+                            (by
+                              intro x T hLookup
+                              exact ⟨T, by simpa using hLookup⟩)
+                        have hStep' :
+                            TypedStep G ((∅ : DEnv) ++ D) Ssh { right := Sown.right ++ split.S1, left := split.S2 }
+                              store bufs Q
+                              (split.G1 ++ G₂') ((∅ : DEnv) ++ D')
+                              { right := Sown.right ++ split.S1, left := S'.left }
+                              store' bufs' Q' := by
+                          cases hGshape
+                          cases S' with
+                          | mk right left =>
+                              have hRightEq' : right = Sown.right ++ split.S1 := by
+                                simpa using hRightEq
+                              cases hRightEq'
+                              simpa [DEnv_append_empty_left] using hStep
+                        right; left
+                        refine ⟨split.G1 ++ G₂', (∅ : DEnv) ++ D',
+                            { right := Sown.right, left := split.S1 ++ S'.left },
+                            store', bufs', .par split.S1.length nG .skip Q', ?_⟩
+                        simpa [List.append_assoc, DEnv_append_empty_left] using
+                          (TypedStep.par_right (split:=split) (D₁:=∅) (D₂:=D) (G₂':=G₂') (D₂':=D') (S₂':=S'.left)
+                            (P:=.skip) (Q:=Q)
+                            hSlen hStep' hDisjG (DisjointD_left_empty D) hDisjS)
+                    | inr hBlockedQ =>
+                        right; right
+                        exact And.intro (Or.inl rfl) (Or.inr (by simpa using hBlockedQ))
           | inr hRestP =>
               cases hRestP with
               | inl hStepP =>
@@ -1440,9 +1494,12 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                       hBufs hCoh hHead hValid hComplete hReady hSelectReady hCons
                   cases hProgQ with
                   | inl hSkipQ =>
-                      right; left
                       subst hSkipQ
-                      exact ⟨_, _, _, store, bufs, P, TypedStep.par_skip_right⟩
+                      by_cases hS2Nil : split.S2 = []
+                      · right; left
+                        exact ⟨_, _, _, store, bufs, P, TypedStep.par_skip_right split hSlen hS2Nil⟩
+                      · right; right
+                        exact And.intro (Or.inr (by simpa using hBlockedP)) (Or.inl rfl)
                   | inr hRestQ =>
                       cases hRestQ with
                       | inl hStepQ =>
@@ -1486,7 +1543,8 @@ private theorem progress_typed_aux {G D Ssh Sown store bufs P Sfin Gfin W Δ} :
                               hSlen hStep' hDisjG (DisjointD_left_empty D) hDisjS)
                       | inr hBlockedQ =>
                           right; right
-                          exact And.intro (by simpa using hBlockedP) (by simpa using hBlockedQ)
+                          exact And.intro (Or.inr (by simpa using hBlockedP))
+                            (Or.inr (by simpa using hBlockedQ))
   | newSession roles f P =>
       cases hOut
   | assign x v =>

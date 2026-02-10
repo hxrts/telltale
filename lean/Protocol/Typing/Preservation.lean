@@ -96,9 +96,9 @@ theorem typed_step_preserves_coherence {G D Ssh Sown store bufs P G' D' Sown' st
     have hCohMerged : Coherent G (D₁ ++ D₂) := by
       simpa [split.hG] using hCoh
     exact typed_step_preserves_coherence hTS hCohMerged
-  | .par_skip_left, hCoh =>
+  | .par_skip_left _ _ _, hCoh =>
     hCoh
-  | .par_skip_right, hCoh =>
+  | .par_skip_right _ _ _, hCoh =>
     hCoh
 
 /-! ## StoreTypedStrong Preservation -/
