@@ -12,6 +12,9 @@ ci-dry-run:
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
+    just check-arch
+    just check-arch-lean
+    just check-lean-metrics
     # Benchmark target compilation checks
     just bench-check
     just book
@@ -38,6 +41,18 @@ check-arch-rust:
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     ./scripts/check-arch-lean.sh
+
+# Refresh generated Lean metrics in docs
+sync-lean-metrics:
+    ./scripts/sync-lean-metrics.sh
+
+# Verify generated Lean metrics are fresh
+check-lean-metrics:
+    ./scripts/sync-lean-metrics.sh --check
+
+# Generate Lean style conformance baseline report
+lean-style-baseline:
+    ./scripts/gen-lean-style-baseline.sh
 
 # Check WASM compilation for choreography and core crates
 wasm-check:

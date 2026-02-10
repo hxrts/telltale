@@ -140,13 +140,31 @@ print_hits "error" "No bare axiom declarations" "${axiom_hits}" \
 print_section "Lean Style-Guide Conformance (First-Pass Heuristics)"
 
 placeholder_hits="$(scan_rg '\bProp\s*:=\s*True\b')"
-print_hits "warning" "No Prop := True placeholder contracts in production paths" "${placeholder_hits}" \
-  "Replace placeholder contracts with real predicates/theorems or move them under explicit Experimental modules."
+print_hits "error" "No Prop := True placeholder contracts in production paths" "${placeholder_hits}" \
+  "Replace placeholder contracts with real predicates/theorems or move them to explicitly excluded experimental paths."
 
 root_import_hits="$(rg -n --pcre2 '^(import .*\b(MutualTest|LocalTypeDBExamples|Examples|Tests)\b)' \
   "${LEAN_DIR}/SessionTypes.lean" "${LEAN_DIR}/Choreography.lean" "${LEAN_DIR}/Protocol.lean" "${LEAN_DIR}/Runtime.lean" 2>/dev/null || true)"
-print_hits "warning" "Root facades avoid debug/example/test imports" "${root_import_hits}" \
+print_hits "error" "Root facades avoid debug/example/test imports" "${root_import_hits}" \
   "Keep root facade imports restricted to production API modules."
+
+legacy_projection_import_hits="$(
+  rg -n --pcre2 '^import[[:space:]]+Choreography\.Projection\.(Trans|Projectb|ProjectProps|Embed|EmbedProps|Erasure|Regression)\b' \
+    "${LEAN_DIR}" -g '*.lean' -g '!.lake/**' -g '!**/.lake/**' -g '!target/**' -g '!**/target/**' |
+    rg -v '/Choreography/Projection/' |
+    rg -v '/Runtime/Tests/' || true
+)"
+print_hits "error" "No deprecated legacy projection imports in production modules" "${legacy_projection_import_hits}" \
+  "Import canonical Choreography.Projection.Project (or dedicated non-legacy modules) from production files."
+
+legacy_theorempack_import_hits="$(
+  rg -n --pcre2 '^import[[:space:]]+Runtime\.Proofs\.TheoremPack$' \
+    "${LEAN_DIR}" -g '*.lean' -g '!.lake/**' -g '!**/.lake/**' -g '!target/**' -g '!**/target/**' |
+    rg -v '/Runtime/Proofs/Examples/' |
+    rg -v '/Runtime/Proofs/TheoremPack/Artifacts\.lean:' || true
+)"
+print_hits "error" "No direct Runtime.Proofs.TheoremPack imports outside migration shims/examples" "${legacy_theorempack_import_hits}" \
+  "Use Runtime.Proofs.TheoremPack.API (or builder/artifact layers) instead of importing the monolithic theorem-pack module."
 
 long_file_hits="$(collect_file_metric_hits file_length 500)"
 print_hits "warning" "Files stay within style-guide length target (<= 500 lines)" "${long_file_hits}" \

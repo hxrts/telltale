@@ -21,6 +21,11 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
+      - name: Run Lean architecture/style checks
+        run: |
+          mkdir -p artifacts
+          just check-arch-lean | tee artifacts/check-arch-lean.log
+
       - name: Build targeted Lean VM modules
         run: just verify-lean-vm-targets
 
@@ -54,6 +59,11 @@ jobs:
 
       - name: Install just
         run: cargo install just --locked
+
+      - name: Run Lean architecture/style checks
+        run: |
+          mkdir -p artifacts
+          just check-arch-lean | tee artifacts/check-arch-lean.log
 
       - name: Setup Lean
         uses: leanprover/lean4-action@v1

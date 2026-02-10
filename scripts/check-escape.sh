@@ -31,9 +31,6 @@ print_header() {
     echo -e "${BOLD}${BLUE}═══════════════════════════════════════════════════════════════${NC}"
     echo -e "${BOLD}${BLUE}  Lean4 Escape Hatch Report${NC}"
     echo -e "${BOLD}${BLUE}═══════════════════════════════════════════════════════════════${NC}"
-    echo "  Scanning: ${LEAN_ROOT}"
-    echo "  Date: $(date)"
-    echo -e "${BOLD}${BLUE}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
