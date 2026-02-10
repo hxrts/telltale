@@ -35,6 +35,7 @@ pub fn obs_session(ev: &ObsEvent) -> Option<SessionId> {
 
 /// Clone an event with a new tick value.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn with_tick(ev: &ObsEvent, tick: u64) -> ObsEvent {
     match ev {
         ObsEvent::Sent {
@@ -223,6 +224,7 @@ mod tests {
     use crate::session::Edge;
 
     #[test]
+    #[allow(clippy::as_conversions)]
     fn normalize_trace_memory_is_bounded_at_10k_events() {
         let mut trace = Vec::with_capacity(10_000);
         for i in 0..10_000usize {

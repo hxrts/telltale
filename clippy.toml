@@ -15,7 +15,11 @@ type-complexity-threshold = 250
 too-many-lines-threshold = 100
 
 # Maximum arguments per function (style guide: prefer options structs)
-too-many-arguments-threshold = 7
+# VM step functions intentionally have many parameters for explicit context
+too-many-arguments-threshold = 10
+
+# MSRV for compatibility
+msrv = "1.75.0"
 
 # Disallow certain types in public APIs
 # Uncomment when ready to enforce:

@@ -300,7 +300,7 @@ impl Transport for TcpTransport {
     async fn close(&self) -> TransportResult<()> {
         // Send shutdown signal - ignore send failure since receiver may already be dropped
         if let Some(shutdown) = self.shutdown.lock().await.take() {
-            drop(shutdown.send(()));
+            let _ = shutdown.send(());
         }
 
         // Close all outgoing connections

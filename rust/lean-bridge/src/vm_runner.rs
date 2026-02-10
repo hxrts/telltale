@@ -521,7 +521,10 @@ fn parse_structured_errors(response: &Value) -> Vec<LeanStructuredError> {
 }
 
 /// Helper to build a VM runner input from JSON values.
-#[must_use]
+///
+/// # Errors
+///
+/// Returns an error if any choreography value cannot be parsed.
 pub fn vm_input_from_values(
     choreographies: Vec<Value>,
     concurrency: u64,

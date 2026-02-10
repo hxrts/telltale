@@ -110,7 +110,7 @@ impl EffectHandler for FlakySendHandler {
         payload: Option<Value>,
     ) -> Result<SendDecision, String> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
-        if idx.is_multiple_of(2) {
+        if idx % 2 == 0 {
             Ok(SendDecision::Deliver(payload.unwrap_or(Value::Int(1))))
         } else {
             Ok(SendDecision::Drop)

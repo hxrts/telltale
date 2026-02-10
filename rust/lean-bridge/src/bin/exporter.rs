@@ -40,12 +40,8 @@ fn main() -> Result<()> {
 
     let choreography = parse_choreography_str(&source)?;
 
-    let global = choreography_to_global(&choreography).map_err(|e| {
-        anyhow!(
-            "Failed to convert choreography to GlobalType: {}",
-            e.to_string()
-        )
-    })?;
+    let global = choreography_to_global(&choreography)
+        .map_err(|e| anyhow!("Failed to convert choreography to GlobalType: {}", e))?;
 
     let global_json = global_to_json(&global);
 
@@ -56,12 +52,8 @@ fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("Unknown role {}", config.role))?;
 
     let local_type = project(&choreography, role)?;
-    let local_r = local_to_local_r(&local_type).map_err(|e| {
-        anyhow!(
-            "Failed to convert local type to LocalTypeR: {}",
-            e.to_string()
-        )
-    })?;
+    let local_r = local_to_local_r(&local_type)
+        .map_err(|e| anyhow!("Failed to convert local type to LocalTypeR: {}", e))?;
 
     let program_json = json!({
         "role": role.name().to_string(),

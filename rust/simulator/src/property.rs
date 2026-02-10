@@ -433,7 +433,7 @@ impl PropertyMonitor {
                         tracking.precondition_tick = Some(ctx.tick);
                         tracking.steps_since_precondition = 0;
                     }
-                    if let Some(_) = tracking.precondition_tick {
+                    if tracking.precondition_tick.is_some() {
                         if goal.eval(ctx) {
                             tracking.precondition_tick = None;
                             tracking.steps_since_precondition = 0;

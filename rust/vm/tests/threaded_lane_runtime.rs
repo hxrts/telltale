@@ -8,7 +8,6 @@ mod helpers;
 use std::collections::BTreeMap;
 
 use helpers::simple_send_recv_image;
-use serde_json;
 use telltale_types::{GlobalType, LocalTypeR};
 use telltale_vm::coroutine::Value;
 use telltale_vm::effect::EffectHandler;

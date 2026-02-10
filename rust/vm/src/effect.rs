@@ -925,6 +925,7 @@ mod tests {
             Ok(Value::Int(1))
         }
 
+        #[allow(clippy::as_conversions, clippy::cast_possible_wrap)]
         fn send_decision(
             &self,
             _sid: SessionId,
@@ -935,7 +936,7 @@ mod tests {
             payload: Option<Value>,
         ) -> Result<SendDecision, String> {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed);
-            if idx.is_multiple_of(2) {
+            if idx % 2 == 0 {
                 Ok(SendDecision::Deliver(
                     payload.unwrap_or(Value::Int(idx as i64)),
                 ))

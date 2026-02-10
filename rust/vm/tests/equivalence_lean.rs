@@ -1,6 +1,10 @@
 #![cfg(not(target_arch = "wasm32"))]
 //! Cross-language equivalence tests: Rust VM vs Lean VM runner.
-#![allow(clippy::needless_collect)]
+#![allow(
+    clippy::needless_collect,
+    clippy::as_conversions,
+    clippy::cast_possible_truncation
+)]
 
 #[allow(dead_code, unreachable_pub)]
 mod helpers;

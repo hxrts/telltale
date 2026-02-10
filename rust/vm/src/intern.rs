@@ -38,8 +38,10 @@ impl SymbolTable {
 
     /// Resolve an id to a string, if present.
     #[must_use]
+    #[allow(clippy::as_conversions)]
     pub fn resolve(&self, id: StringId) -> Option<&str> {
-        self.symbols.get(usize::from(id)).map(String::as_str)
+        // u32 -> usize is always safe on 32-bit or larger platforms
+        self.symbols.get(id as usize).map(String::as_str)
     }
 
     /// Number of interned symbols.

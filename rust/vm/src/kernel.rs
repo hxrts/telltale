@@ -44,7 +44,7 @@ impl VMKernel {
     {
         let attempts = scheduler.ready_count();
         for _ in 0..attempts {
-            let id = scheduler.pick_runnable(&has_progress)?;
+            let id = scheduler.pick_runnable(has_progress)?;
             if is_eligible(id) {
                 return Some(id);
             }

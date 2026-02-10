@@ -175,7 +175,9 @@ mod grammar_composition_tests {
     #[test]
     fn test_basic_grammar_composition() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestGrammarExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
 
         let result = composer.compose();
         assert!(result.is_ok(), "Grammar composition should succeed");
@@ -189,8 +191,12 @@ mod grammar_composition_tests {
     #[test]
     fn test_multiple_extension_composition() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestGrammarExtension);
-        composer.register_extension(HighPriorityExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
+        composer
+            .register_extension(HighPriorityExtension)
+            .expect("extension should register");
 
         let result = composer.compose();
         assert!(
@@ -207,7 +213,9 @@ mod grammar_composition_tests {
     #[test]
     fn test_grammar_composition_caching() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestGrammarExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
 
         // First composition
         let start = Instant::now();
@@ -239,7 +247,9 @@ mod grammar_composition_tests {
         let result1 = composer.compose().unwrap();
 
         // Add extension (should invalidate cache)
-        composer.register_extension(TestGrammarExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
         let result2 = composer.compose().unwrap();
 
         // Results should be different
@@ -251,8 +261,12 @@ mod grammar_composition_tests {
     #[test]
     fn test_extension_priority_ordering() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestGrammarExtension); // Priority 100
-        composer.register_extension(HighPriorityExtension); // Priority 500
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register"); // Priority 100
+        composer
+            .register_extension(HighPriorityExtension)
+            .expect("extension should register"); // Priority 500
 
         let result = composer.compose().unwrap();
 
@@ -272,7 +286,9 @@ mod grammar_composition_tests {
     #[test]
     fn test_extension_rule_detection() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestGrammarExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
 
         assert!(composer.has_extension_rule("test_stmt"));
         assert!(composer.has_extension_rule("simple_test"));
@@ -282,7 +298,9 @@ mod grammar_composition_tests {
     #[test]
     fn test_composed_grammar_validation() {
         let mut composer = GrammarComposer::new();
-        composer.register_extension(TestGrammarExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
 
         let composed = composer.compose().unwrap();
 
@@ -336,7 +354,9 @@ mod extension_parser_tests {
     #[test]
     fn test_extension_registration() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let stats = parser.extension_stats();
         assert_eq!(stats.grammar_extensions, 1);
@@ -380,7 +400,9 @@ mod extension_parser_tests {
     #[test]
     fn test_composed_grammar_generation() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let result = parser.get_composed_grammar();
         assert!(result.is_ok(), "Should generate composed grammar");
@@ -399,7 +421,9 @@ mod extension_parser_tests {
     #[test]
     fn test_extension_parser_performance() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let input = r#"
             protocol LargeProtocol = {
@@ -649,7 +673,9 @@ mod standard_syntax_tests {
     #[test]
     fn test_extension_parser_with_standard_choreographies() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let standard_choreographies = [
             r#"
@@ -691,14 +717,18 @@ mod standard_syntax_tests {
         let mut composer = GrammarComposer::new();
         assert_eq!(composer.extension_count(), 0);
 
-        composer.register_extension(TestGrammarExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
         assert_eq!(composer.extension_count(), 1);
 
         let _grammar = composer.compose().unwrap();
 
         // ExtensionParser
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let _stats = parser.extension_stats();
         assert!(parser.can_handle_statement("test_stmt"));
@@ -757,7 +787,9 @@ mod error_handling_tests {
     #[test]
     fn test_extension_parser_error_handling() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let invalid_input = "protocol Test = { invalid syntax }";
         let result = parser.parse_with_extensions(invalid_input);
@@ -778,12 +810,21 @@ mod error_handling_tests {
         let result = composer.compose();
         assert!(result.is_ok(), "Empty composer should still work");
 
-        // Multiple registrations of same extension
-        composer.register_extension(TestGrammarExtension);
-        composer.register_extension(TestGrammarExtension);
+        // Multiple registrations of same extension: second should fail with PriorityConflict
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("first extension should register");
+        let dup_result = composer.register_extension(TestGrammarExtension);
+        assert!(
+            dup_result.is_err(),
+            "duplicate extension registration should be rejected"
+        );
 
         let result = composer.compose();
-        assert!(result.is_ok(), "Multiple registrations should be handled");
+        assert!(
+            result.is_ok(),
+            "composition should succeed after valid registration"
+        );
 
         // Extension count should reflect actual registrations
         assert!(composer.extension_count() > 0);
@@ -876,7 +917,9 @@ mod error_handling_tests {
     #[test]
     fn test_extension_parser_buffer_reuse() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let test_input = r#"
             protocol BufferTest = {
@@ -906,8 +949,12 @@ mod performance_tests {
         let mut composer = GrammarComposer::new();
 
         // Add multiple extensions
-        composer.register_extension(TestGrammarExtension);
-        composer.register_extension(HighPriorityExtension);
+        composer
+            .register_extension(TestGrammarExtension)
+            .expect("extension should register");
+        composer
+            .register_extension(HighPriorityExtension)
+            .expect("extension should register");
 
         // Measure first composition
         let start = Instant::now();
@@ -931,7 +978,9 @@ mod performance_tests {
     #[test]
     fn test_extension_parser_memory_efficiency() {
         let mut parser = ExtensionParser::new();
-        parser.register_extension(TestGrammarExtension, TestStatementParser);
+        parser
+            .register_extension(TestGrammarExtension, TestStatementParser)
+            .expect("extension should register");
 
         let medium_choreo = r#"
             protocol MemoryTest = {
@@ -955,7 +1004,8 @@ mod performance_tests {
 
         let composer = Arc::new(Mutex::new({
             let mut c = GrammarComposer::new();
-            c.register_extension(TestGrammarExtension);
+            c.register_extension(TestGrammarExtension)
+                .expect("extension should register");
             c
         }));
 

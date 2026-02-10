@@ -452,6 +452,7 @@ impl ThreadedVM {
     /// # Errors
     ///
     /// Returns a `VMError` if any coroutine faults.
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
@@ -523,7 +524,7 @@ impl ThreadedVM {
                             &pick.session,
                             pack,
                             output_hint,
-                            handler.handler_identity(),
+                            &handler.handler_identity(),
                         ) {
                             Ok(outcome) => match outcome {
                                 ExecOutcome::Continue => {
@@ -904,13 +905,14 @@ impl ThreadedVM {
         Ok(picks)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn commit_pack(
         &mut self,
         coro: &Arc<Mutex<Coroutine>>,
         session: &Arc<Mutex<SessionState>>,
         pack: StepPack,
         output_hint: Option<OutputConditionHint>,
-        handler_identity: String,
+        handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
         if !pack.events.is_empty() {
             let digest = format!("events:{}:tick:{}", pack.events.len(), self.clock.tick);
@@ -956,7 +958,7 @@ impl ThreadedVM {
                         "label": label,
                     }),
                     outputs: json!({"committed": true}),
-                    handler_identity: handler_identity.clone(),
+                    handler_identity: handler_identity.to_string(),
                     ordering_key: self.clock.tick,
                     topology: None,
                 }),
@@ -976,7 +978,7 @@ impl ThreadedVM {
                         "label": label,
                     }),
                     outputs: json!({"committed": true}),
-                    handler_identity: handler_identity.clone(),
+                    handler_identity: handler_identity.to_string(),
                     ordering_key: self.clock.tick,
                     topology: None,
                 }),
@@ -988,7 +990,7 @@ impl ThreadedVM {
                         "role": role,
                     }),
                     outputs: json!({"ok": true}),
-                    handler_identity: handler_identity.clone(),
+                    handler_identity: handler_identity.to_string(),
                     ordering_key: self.clock.tick,
                     topology: None,
                 }),
@@ -1006,7 +1008,7 @@ impl ThreadedVM {
                         "layer": layer,
                     }),
                     outputs: json!({"granted": true}),
-                    handler_identity: handler_identity.clone(),
+                    handler_identity: handler_identity.to_string(),
                     ordering_key: self.clock.tick,
                     topology: None,
                 }),
@@ -1024,7 +1026,7 @@ impl ThreadedVM {
                         "layer": layer,
                     }),
                     outputs: json!({"ok": true}),
-                    handler_identity: handler_identity.clone(),
+                    handler_identity: handler_identity.to_string(),
                     ordering_key: self.clock.tick,
                     topology: None,
                 }),
@@ -1310,6 +1312,7 @@ fn move_endpoint_bundle(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn exec_instr(
     coro: &Arc<Mutex<Coroutine>>,
     session: &Arc<Mutex<SessionState>>,
@@ -1559,6 +1562,7 @@ fn monitor_precheck(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn step_send(
     coro: &mut Coroutine,
     session: &mut SessionState,
@@ -1653,6 +1657,7 @@ fn step_send(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn step_recv(
     coro: &mut Coroutine,
     session: &mut SessionState,
@@ -1790,6 +1795,7 @@ fn guard_active(config: &VMConfig, layer: &str) -> Result<(), Fault> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn step_acquire(
     coro: &mut Coroutine,
     ep: &Endpoint,
@@ -1845,6 +1851,7 @@ fn step_acquire(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn step_release(
     coro: &mut Coroutine,
     ep: &Endpoint,
@@ -1912,7 +1919,11 @@ fn step_fork(
         .ok_or(Fault::OutOfRegisters)?
         .clone();
     let ghost_sid = match ghost_val {
-        Value::Int(v) if v >= 0 => v as usize,
+        Value::Int(v) if v >= 0 => usize::try_from(v).map_err(|_| Fault::TypeViolation {
+            expected: telltale_types::ValType::Unit,
+            actual: telltale_types::ValType::Unit,
+            message: format!("{role}: fork ghost id out of range"),
+        })?,
         _ => {
             return Err(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -1981,7 +1992,9 @@ fn step_transfer(
         .ok_or(Fault::OutOfRegisters)?
         .clone();
     let target_id = match target_val {
-        Value::Int(v) if v >= 0 => v as usize,
+        Value::Int(v) if v >= 0 => usize::try_from(v).map_err(|_| Fault::TransferFault {
+            message: format!("{role}: target id out of range"),
+        })?,
         _ => {
             return Err(Fault::TransferFault {
                 message: format!("{role}: transfer expects target coroutine id"),
@@ -2100,6 +2113,7 @@ fn step_check(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn step_choose(
     coro: &mut Coroutine,
     session: &mut SessionState,
@@ -2209,6 +2223,7 @@ fn step_choose(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn step_offer(
     session: &mut SessionState,
     ep: &Endpoint,

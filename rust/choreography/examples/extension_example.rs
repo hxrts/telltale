@@ -31,7 +31,8 @@ fn demo_timeout_extension() -> Result<(), Box<dyn std::error::Error>> {
 
     // Register the built-in timeout extension
     let mut registry = ExtensionRegistry::new();
-    telltale_choreography::extensions::timeout::register_timeout_extension(&mut registry);
+    telltale_choreography::extensions::timeout::register_timeout_extension(&mut registry)
+        .expect("timeout extension should register");
 
     println!("Timeout extension registered");
     println!(

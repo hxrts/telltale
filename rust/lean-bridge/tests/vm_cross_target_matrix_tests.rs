@@ -98,7 +98,7 @@ impl EffectHandler for FlakySendHandler {
         payload: Option<Value>,
     ) -> Result<SendDecision, String> {
         let idx = self.counter.fetch_add(1, Ordering::Relaxed);
-        if idx.is_multiple_of(2) {
+        if idx % 2 == 0 {
             Ok(SendDecision::Deliver(payload.unwrap_or(Value::Int(1))))
         } else {
             Ok(SendDecision::Drop)
@@ -231,9 +231,10 @@ fn classify_mismatch(
 ) -> &'static str {
     if left_effect_signature != right_effect_signature {
         "effect_policy_difference"
-    } else if dimension.starts_with("effect_trace") {
-        "kernel_logic_difference"
     } else {
+        // Both effect_trace and other dimensions default to kernel logic difference
+        // when effect signatures match.
+        let _ = dimension; // Mark as intentionally unused after signature check
         "kernel_logic_difference"
     }
 }

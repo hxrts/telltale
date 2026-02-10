@@ -1,5 +1,7 @@
 //! Replay a simulation run from a checkpoint.
 
+#![allow(clippy::as_conversions, clippy::cast_possible_truncation)]
+
 use std::path::PathBuf;
 
 use telltale_simulator::fault::FaultInjector;

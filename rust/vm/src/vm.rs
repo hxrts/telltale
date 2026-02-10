@@ -1448,6 +1448,7 @@ impl VM {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn step_acquire(
         &mut self,
         coro_idx: usize,
@@ -1498,6 +1499,7 @@ impl VM {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn step_release(
         &mut self,
         coro_idx: usize,
@@ -1556,13 +1558,11 @@ impl VM {
             .ok_or(Fault::OutOfRegisters)?
             .clone();
         let ghost_sid = match ghost_val {
-            Value::Int(v) if v >= 0 => {
-                usize::try_from(v).map_err(|_| Fault::TypeViolation {
-                    expected: telltale_types::ValType::Unit,
-                    actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: fork ghost id out of range"),
-                })?
-            }
+            Value::Int(v) if v >= 0 => usize::try_from(v).map_err(|_| Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: fork ghost id out of range"),
+            })?,
             _ => {
                 return Err(Fault::TypeViolation {
                     expected: telltale_types::ValType::Unit,
@@ -2082,6 +2082,7 @@ impl VM {
     }
 
     /// Commit a `StepPack` atomically: apply coroutine update, type update, events.
+    #[allow(clippy::too_many_lines)]
     fn commit_pack(
         &mut self,
         coro_idx: usize,

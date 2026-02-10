@@ -63,12 +63,12 @@ fn project_rust(g: &GlobalType, roles: &[&str]) -> BTreeMap<String, LocalTypeR> 
 /// Run a simulation and return the trace.
 fn run_sim(
     global: &GlobalType,
-    projections: BTreeMap<String, LocalTypeR>,
+    projections: &BTreeMap<String, LocalTypeR>,
     initial_states: &HashMap<String, Vec<f64>>,
     steps: usize,
     handler: &dyn EffectHandler,
 ) -> Trace {
-    runner::run(&projections, global, initial_states, steps, handler).expect("simulation succeeds")
+    runner::run(projections, global, initial_states, steps, handler).expect("simulation succeeds")
 }
 
 /// Assert two traces are identical within tolerance (comparing by step+role key).
@@ -147,8 +147,8 @@ fn test_ising_lean_vs_rust_identical_traces() {
     let lean_projs = project_lean(&runner, &g, &["A", "B"]);
     let rust_projs = project_rust(&g, &["A", "B"]);
 
-    let lean_trace = run_sim(&g, lean_projs, &initial_states, 100, &handler);
-    let rust_trace = run_sim(&g, rust_projs, &initial_states, 100, &handler);
+    let lean_trace = run_sim(&g, &lean_projs, &initial_states, 100, &handler);
+    let rust_trace = run_sim(&g, &rust_projs, &initial_states, 100, &handler);
 
     assert_traces_equal(&lean_trace, &rust_trace, 1e-12);
 
@@ -231,8 +231,8 @@ fn test_hamiltonian_lean_vs_rust_identical_traces() {
     let lean_handler = HamiltonianHandler::new(params.clone());
     let rust_handler = HamiltonianHandler::new(params.clone());
 
-    let lean_trace = run_sim(&g, lean_projs, &initial_states, 100, &lean_handler);
-    let rust_trace = run_sim(&g, rust_projs, &initial_states, 100, &rust_handler);
+    let lean_trace = run_sim(&g, &lean_projs, &initial_states, 100, &lean_handler);
+    let rust_trace = run_sim(&g, &rust_projs, &initial_states, 100, &rust_handler);
 
     assert_traces_equal(&lean_trace, &rust_trace, 1e-12);
 
