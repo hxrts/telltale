@@ -8,8 +8,7 @@ import Runtime.VM.Runtime.Monitor
 import Runtime.Resources.Arena
 import Runtime.Resources.ResourceModel
 
-/-!
-# VM Runtime State
+/-! # VM Runtime State
 
 The mutable state of a running VM instance. Defines per-coroutine state (`CoroutineState`
 with registers, program counter, owned endpoints, progress tokens, knowledge set, cost
@@ -23,8 +22,7 @@ monitor, the observable trace, failure model state (crashed sites, partitioned e
 and placeholder fields for ghost sessions and progress supply.
 
 This is the Lean specification of state that will be reimplemented in Rust. The
-`WFVMState` predicate captures basic well-formedness (PC bounds, session id validity).
--/
+`WFVMState` predicate captures basic well-formedness (PC bounds, session id validity). -/
 
 /-
 The Problem. The VM executes multiple concurrent coroutines, each with its own

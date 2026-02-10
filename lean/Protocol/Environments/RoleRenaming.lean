@@ -1,13 +1,11 @@
 import Protocol.Environments.Renaming
 
-/-!
-# Role Renaming (Session-Local)
+/-! # Role Renaming (Session-Local)
 
 Infrastructure for renaming roles inside a fixed session. This is used by the
 delegation preservation proof: when role A delegates its endpoint to role B in
 session s, all local types in session s must have A renamed to B, and endpoints
-in session s are redirected from A to B.
--/
+in session s are redirected from A to B. -/
 
 /-
 The Problem. Delegation transfers a channel endpoint from role A to role B.

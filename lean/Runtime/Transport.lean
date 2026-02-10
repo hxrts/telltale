@@ -11,8 +11,7 @@ serialization format with roundtrip property, and expose refinement
 stubs for handler-backed transports.
 -/
 
-/-!
-# Transport Abstraction
+/-! # Transport Abstraction
 
 Transport interface, specification, and refinement from iris_runtime_2.md §8.
 
@@ -23,8 +22,7 @@ Transport interface, specification, and refinement from iris_runtime_2.md §8.
 - `serialize` / `deserialize`
 - `serialize_roundtrip`
 - `transport_refines_buffers`
-- `InMemoryTransport` — reference implementation
--/
+- `InMemoryTransport` — reference implementation -/
 
 set_option autoImplicit false
 

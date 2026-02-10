@@ -1,10 +1,8 @@
 import Protocol.Semantics
 
-/-!
-# MPST Simulation
+/-! # MPST Simulation
 
-This module provides executable simulation for MPST protocols.
--/
+This module provides executable simulation for MPST protocols. -/
 
 /-
 The Problem. We need an executable step function for testing and debugging

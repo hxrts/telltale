@@ -2,12 +2,10 @@ import Runtime.Proofs.VMPotential
 import Runtime.Resources.Arena
 import ClassicalAnalysisAPI
 
-/-!
-# VM Observer/Projection Bridge
+/-! # VM Observer/Projection Bridge
 
 VM-level observer projection plus noninterference and information-theoretic
-bridge lemmas for coroutine-local views.
--/
+bridge lemmas for coroutine-local views. -/
 
 /-
 The Problem. Individual coroutines should only observe session state relevant to

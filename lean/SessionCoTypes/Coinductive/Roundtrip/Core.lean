@@ -19,12 +19,9 @@ import SessionTypes.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-!
-The key correctness property for the inductive-coinductive bridge
-is that round-tripping preserves equivalence: toCoind(toInductive(t)) ≅ t.
-This ensures we can convert freely between representations without losing
-semantic meaning.
--/
+/-! # Round-Trip Correctness
+
+Proof that toCoind(toInductive(t)) ≅ t for inductive-coinductive bridge. -/
 
 /-
 The Problem. Round-tripping through inductive-coinductive conversions must preserve

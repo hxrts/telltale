@@ -4,15 +4,9 @@ import SessionCoTypes.Coinductive.WellFormed
 
 set_option linter.dupNamespace false
 
-/-!
-EQ2C is defined as an existentially quantified bisimulation, but practical
-proofs need lemmas showing how EQ2C interacts with smart constructors and
-mu-unfolding.
+/-! # EQ2C Properties
 
-The difficulty is that mu-unfolding on one side of an EQ2C relation requires
-constructing a new bisimulation that accounts for the unfolding step. Similarly,
-congruence for send/recv requires lifting branch-wise EQ2C to the full type.
--/
+Lemmas for EQ2C interaction with constructors and mu-unfolding. -/
 
 /-
 The Problem. EQ2C is defined abstractly via existentially quantified bisimulation,

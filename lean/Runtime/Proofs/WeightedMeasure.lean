@@ -1,8 +1,7 @@
 import Protocol.LocalType
 import Protocol.Semantics
 
-/-!
-# Weighted Liveness Measure for Session Types
+/-! # Weighted Liveness Measure for Session Types
 
 Defines the weighted progress measure for async multiparty session types:
 
@@ -27,7 +26,7 @@ This measure strictly decreases under every productive step:
 - `select_step_decreases`: Select decreases W by at least 1
 - `branch_step_decreases`: Branch decreases W by at least 3
 - `total_measure_decreasing`: Any productive step decreases total W
-- `total_productive_steps_bounded`: At most W₀ productive steps
+- `total_productive_steps_bounded`: At most W₀ productive steps -/
 -/
 
 /-

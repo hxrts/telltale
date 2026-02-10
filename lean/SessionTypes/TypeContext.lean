@@ -11,8 +11,7 @@ Solution Structure. Defines parametric `TypeContext V T` with generic lookup/ext
 seamless conversion between `List String` and `NameOnlyContext`.
 -/
 
-/-!
-# Unified Context Infrastructure
+/-! # Unified Context Infrastructure
 
 This module provides a parametric `TypeContext` structure that unifies the various
 context types used throughout Telltale:
@@ -21,8 +20,7 @@ context types used throughout Telltale:
 - `Env` (substitution environments)
 
 The key insight is that all these contexts share the same list-based structure
-with lookup/extend operations, differing only in their variable and value types.
--/
+with lookup/extend operations, differing only in their variable and value types. -/
 
 namespace SessionTypes
 

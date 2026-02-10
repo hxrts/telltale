@@ -1,10 +1,8 @@
 import Protocol.Coherence
 
-/-!
-# MPST Process Language
+/-! # MPST Process Language
 
-This module defines the process language for multiparty session types.
--/
+This module defines the process language for multiparty session types. -/
 
 /-
 The Problem. We need a process calculus for MPST that supports multiparty

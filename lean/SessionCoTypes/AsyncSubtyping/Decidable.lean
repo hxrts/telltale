@@ -15,8 +15,7 @@ Solution Structure.
 4. Prove completeness: if relation holds, algorithm accepts with enough fuel
 -/
 
-/-!
-# Decidable Async Subtyping Algorithm
+/-! # Decidable Async Subtyping Algorithm
 
 Constructive decision procedure for async subtyping on regular session types.
 
@@ -40,8 +39,7 @@ Worklist exploration with visited set:
 ## Main Results
 
 - `checkAsync_sound` : Acceptance implies AsyncSubtypeRel
-- `checkAsync_complete` : AsyncSubtypeRel implies acceptance (with enough fuel)
--/
+- `checkAsync_complete` : AsyncSubtypeRel implies acceptance (with enough fuel) -/
 
 set_option linter.dupNamespace false
 

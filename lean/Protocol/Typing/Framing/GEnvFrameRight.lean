@@ -6,6 +6,10 @@ import Protocol.Typing.Framing.GEnvFrameHelpers
 import Protocol.Typing.Framing.GEnvFramePre
 import Protocol.Typing.Framing.GEnvFrameParCore
 
+/-! # MPST GEnv Frame Right
+
+Pre-out typing stability under right GEnv framing. -/
+
 /-
 The Problem. Show that pre-out typing is stable under framing a disjoint GEnv
 on the right. This lets us extend global environments after a step.

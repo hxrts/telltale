@@ -4,21 +4,18 @@ import SessionCoTypes.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-!
+/-! # Coinductive Duality
+
+Corecursive duality for coinductive session types, swapping send and recv. -/
+
+/-
 The Problem. Session type duality swaps send and recv. For coinductive types,
-we need a corecursive definition of duality and a proof that it's involutive
+we need a corecursive definition of duality and a proof that it is involutive
 (dual(dual(t)) = t).
 
-The difficulty is that coinductive proofs require bisimulation: we must show
-that dual(dual(t)) and t have the same head and their children are related
-by the same relation, recursively forever.
-
-Solution Structure.
-1. Define dualHead: swap send/recv in the head tag
-2. Define dualStep: one-step coalgebra for duality
-3. Define dualC: the corecursive dual operation
-4. Prove helper lemmas about dest of dualC for each constructor
-5. Prove dualC_involutive via bisimulation
+Solution Structure. Defines dualHead to swap send/recv in tags, dualStep as
+the one-step coalgebra, and dualC as the corecursive dual operation. Proves
+destructor lemmas for each constructor case and dualC_involutive via bisimulation.
 -/
 
 namespace SessionCoTypes.Coinductive

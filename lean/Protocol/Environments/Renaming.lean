@@ -2,11 +2,9 @@ import Protocol.LocalType
 import Protocol.Values
 import Protocol.Environments.Core
 
-/-!
-# MPST Environments: Session Renaming
+/-! # MPST Environments: Session Renaming
 
-This module provides session renaming infrastructure for environment composition.
--/
+This module provides session renaming infrastructure for environment composition. -/
 
 /-
 The Problem. Protocol composition and linking may require renaming session IDs

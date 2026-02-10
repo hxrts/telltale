@@ -20,8 +20,7 @@ Solution Structure.
 5. Lift to traces: blind roles see deterministic traces
 -/
 
-/-!
-# Noninterference for MPST
+/-! # Noninterference for MPST
 
 Proves that non-participants in a communication cannot observe which branch
 was selected. Ported from Aristotle file 01 (185 lines, no proof holes).
@@ -30,8 +29,7 @@ was selected. Ported from Aristotle file 01 (185 lines, no proof holes).
 
 - `CEquiv` : configuration equivalence for a role
 - `BlindTo` : role is neither sender nor receiver
-- `blind_step_preserves_CEquiv` : the main noninterference theorem
--/
+- `blind_step_preserves_CEquiv` : the main noninterference theorem -/
 
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false

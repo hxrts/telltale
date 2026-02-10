@@ -2,8 +2,7 @@ import Protocol.Environments.Core
 import Runtime.Resources.ResourceModel
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Communication Instruction Semantics
+/-! # Communication Instruction Semantics
 
 Step functions for the four communication instructions: `send`, `receive`, `offer`, `choose`.
 Each is decomposed into a pipeline of private helpers (operand decoding → ownership check →
@@ -13,8 +12,7 @@ testable.
 
 Send/offer sign outgoing values with the role's signing key before enqueueing.
 Recv/choose verify the sender's signature, consume a progress token, and dequeue from
-the buffer. All four update the session store's local type and trace on success.
--/
+the buffer. All four update the session store's local type and trace on success. -/
 
 /-
 The Problem. The four communication instructions (send, recv, offer, choose) share a

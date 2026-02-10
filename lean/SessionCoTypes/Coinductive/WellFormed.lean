@@ -6,21 +6,9 @@ import SessionTypes.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-!
-The Problem. WellFormedC (closed + observable) is the key property for working
-with coinductive types. We need preservation lemmas showing that:
-1. Smart constructors produce well-formed types
-2. The toCoind embedding preserves observability
+/-! # Well-Formed Coinductive Types
 
-The difficulty is that closedness and observability interact: a mu-wrapper
-preserves both if its body has both, but var creates open types.
-
-Solution Structure.
-1. Prove observability for each smart constructor
-2. Prove closedness preservation for mkMu
-3. Combine into wellFormed_mkEnd and wellFormed_mkMu
-4. Prove observable_toCoind by structural induction
--/
+Preservation lemmas for WellFormedC (closed + observable) property. -/
 
 namespace SessionCoTypes.Coinductive
 

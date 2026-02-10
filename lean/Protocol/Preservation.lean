@@ -3,12 +3,10 @@ import Protocol.Typing
 import Protocol.Coherence
 import Batteries.Data.RBMap.Lemmas
 
-/-!
-# MPST Preservation Theorem
+/-! # MPST Preservation Theorem
 
 This module contains the preservation (subject reduction) theorem for MPST:
-if a well-typed configuration takes a step, the result is also well-typed.
--/
+if a well-typed configuration takes a step, the result is also well-typed. -/
 
 /-
 The Problem. We need subject reduction: well-typed configurations remain

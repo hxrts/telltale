@@ -1,6 +1,10 @@
 import Runtime.VM.API
 import Runtime.VM.Model.SchedulerTypes
 
+/-! # Scheduler Model
+
+Queue-based scheduler with policy-guided selection and blocked bookkeeping. -/
+
 /-
 The Problem. The runtime needs a scheduler model that can be referenced by the
 VM without pulling in proof-level dependencies.

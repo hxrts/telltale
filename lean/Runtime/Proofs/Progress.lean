@@ -4,8 +4,7 @@ import Runtime.VM.Model.TypeClasses
 import Protocol.Typing.Progress
 import Runtime.Proofs.Lyapunov
 
-/-!
-# VM-Level Progress Theorem
+/-! # VM-Level Progress Theorem
 
 This module lifts the Protocol-level progress theorem to the VM level. It defines
 the predicates and lemmas needed to ensure that well-typed programs make progress
@@ -27,7 +26,7 @@ under fair scheduling.
 
 ## Proof Strategy
 
-The Protocol-level `progress_typed` theorem (Protocol/Typing/Progress.lean) already
+The Protocol-level `progress_typed` theorem (Protocol/Typing/Progress.lean) already -/
 proves progress for `WellFormedComplete` configurations. This module:
 
 1. Defines VM-level predicates that imply Protocol-level conditions

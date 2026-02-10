@@ -5,6 +5,10 @@ import Protocol.Typing.Framing.Lemmas
 import Protocol.Typing.Framing.GEnvFrameHelpers
 import Protocol.Typing.Framing.GEnvFrameParCore
 
+/-! # MPST GEnv Frame Left
+
+Pre-out typing stability under left GEnv framing. -/
+
 /-
 The Problem. Show that pre-out typing is stable under framing a disjoint GEnv
 on the left. This requires a constructive par case using the frame_left_par

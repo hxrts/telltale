@@ -6,18 +6,18 @@ import SessionTypes.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-!
-The Problem. The toCoind embedding from inductive to coinductive types should be
-injective: distinct inductive types should map to distinct coinductive types.
+/-! # toCoind Injectivity
+
+Proof that toCoind embedding is injective for round-trip correctness. -/
+
+/-
+The Problem. The toCoind embedding from inductive to coinductive types should
+be injective: distinct inductive types map to distinct coinductive types.
 This is essential for round-trip correctness.
 
-The difficulty is that the proof requires mutual induction over both LocalTypeR
-and branch lists, with careful handling of each constructor case.
-
-Solution Structure.
-1. toCoind_injective: main injectivity theorem by case analysis
-2. toCoindBranches_injective: branch list injectivity (mutually recursive)
-3. Indexing lemmas for toCoindBranches (length, get)
+Solution Structure. Proves toCoind_injective by case analysis over constructors,
+toCoindBranches_injective for branch list injectivity (mutually recursive),
+and indexing lemmas for toCoindBranches (length, get).
 -/
 
 namespace SessionCoTypes.Coinductive

@@ -1,7 +1,6 @@
 import Protocol.Coherence.Delegation
 
-/-!
-# Instruction Denotational Specifications
+/-! # Instruction Denotational Specifications
 
 This module defines denotational instruction specs for VM operations in terms of
 Protocol-level GEnv and DEnv updates. Each instruction has:
@@ -11,8 +10,7 @@ Protocol-level GEnv and DEnv updates. Each instruction has:
 3. **Delegation bridge hook** — `acquire` carries a `DelegationStep` witness
 
 These specs are the Rust-portable VM layer. Proof theorems live in
-`Runtime.Proofs.VM.InstrSpec`.
--/
+`Runtime.Proofs.VM.InstrSpec`. -/
 
 /-
 The Problem. VM instructions must be specified in terms of Protocol-level environment

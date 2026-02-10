@@ -3,23 +3,19 @@ import SessionTypes.GlobalType
 
 set_option linter.dupNamespace false
 
-/-!
+/-! # Coinductive Local Types
+
+Coinductive representation of session types via polynomial functors. -/
+
+/-
 The Problem. Session types in Lean are naturally inductive, but some operations
 (like bisimulation and coinductive equivalence) require an infinite/coinductive
-representation. We need a coinductive local type that can represent potentially
-infinite session type trees while still supporting pattern matching on heads.
+representation supporting pattern matching on heads.
 
-The difficulty is that Lean's M-types (coinductive types via polynomial functors)
-don't directly support the same syntax as inductive types. We need smart constructors
-and lemmas to make the coinductive type usable.
-
-Solution Structure.
-1. Define LocalTypeHead as the finite set of constructor tags
-2. Define LocalTypeChild as the number of children for each tag
-3. Build the polynomial functor LocalTypeF and its M-type LocalTypeC
-4. Provide smart constructors (mkEnd, mkVar, mkMu, mkSend, mkRecv)
-5. Prove simp lemmas for head extraction and children access
-6. Prove injectivity and distinctness lemmas for case analysis
+Solution Structure. Defines LocalTypeHead as constructor tags, LocalTypeChild for
+children counts, builds the polynomial functor LocalTypeF and its M-type LocalTypeC.
+Provides smart constructors (mkEnd, mkVar, mkMu, mkSend, mkRecv) with simp lemmas
+for head extraction, children access, injectivity, and distinctness.
 -/
 
 namespace SessionCoTypes.Coinductive

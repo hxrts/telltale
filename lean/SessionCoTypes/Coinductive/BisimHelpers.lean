@@ -8,20 +8,18 @@ import SessionTypes.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-!
+/-! # Bisimulation Helpers
+
+Helper lemmas for constructing EQ2C bisimulation proofs from head equality. -/
+
+/-
 The Problem. EQ2C bisimulation proofs require constructing bisimulation relations
 from head equality. When two coinductive types have matching heads, we need to
 show they are EQ2C-equivalent by building appropriate witness relations.
 
-The difficulty is that each head case (end, var, send, recv) requires a different
-bisimulation construction, and we need to handle environment-aware EQ2CE as well.
-
-Solution Structure.
-1. Branch relation helpers for ofFn lists
-2. Observable lemmas: head determines observability
-3. EQ2C head lemmas: matching heads implies EQ2C
-4. Mu eta: reconstruct mu nodes from dest
-5. EQ2CE → EQ2C erasure lemmas
+Solution Structure. Branch relation helpers for ofFn lists, observable lemmas
+showing head determines observability, EQ2C head lemmas for matching heads,
+mu eta reconstruction, and EQ2CE to EQ2C erasure lemmas.
 -/
 
 namespace SessionCoTypes.Coinductive

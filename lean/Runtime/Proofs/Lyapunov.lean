@@ -2,8 +2,7 @@ import Runtime.VM.Runtime.Scheduler
 import Runtime.Proofs.VM.Scheduler
 import Protocol.DeadlockFreedom
 
-/-!
-# Progress Measure for Session Type Liveness
+/-! # Progress Measure for Session Type Liveness
 
 Adapts the Lyapunov stability technique from Gibbs (Hamiltonian/Stability.lean,
 MeanField/Stability.lean) to prove liveness properties for session-typed systems.
@@ -27,7 +26,7 @@ unfolding.
 | `V_decreasing`       | `step_nonincreasing`           |
 | `V_to_zero`          | `productive_step_decreasing`   |
 | `HasDerivAt`         | `step s = some s'`             |
-| `energy_dissipation` | communication consumes measure |
+| `energy_dissipation` | communication consumes measure | -/
 
 ## Key Results
 

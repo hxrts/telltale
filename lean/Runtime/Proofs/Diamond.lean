@@ -3,8 +3,7 @@ import Runtime.Proofs.Frame
 import Runtime.VM.Runtime.Loader
 import Batteries.Data.List.Perm
 
-/-!
-# Cross-Session Diamond Property
+/-! # Cross-Session Diamond Property
 
 Proves that executing two coroutines on disjoint sessions in either order yields
 VM states that are equivalent modulo trace ordering (`VMStateEqModTrace`).
@@ -26,7 +25,7 @@ The proof uses the frame rule from `Runtime.Proofs.Frame`:
    - `disjoint_ops_preserve_unrelated`: third sessions are unaffected by either operation
 
 This replaces the previous instruction-group approach (Groups A/B/C with 21 cases)
-with a uniform reasoning principle.
+with a uniform reasoning principle. -/
 
 ## Infrastructure Lemmas
 

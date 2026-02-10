@@ -1,7 +1,11 @@
 import Runtime.VM.Model.Core
 import IrisExtractionInstance
 
-/- 
+/-! # Instruction Pair Abstraction for WP Rules
+
+Generic acquire/interact/release shape for instruction weakest preconditions. -/
+
+/-
 The Problem. Many instruction WP rules share the same acquire/interact/release
 shape, but the proofs are duplicated across each concrete instruction.
 

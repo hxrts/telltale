@@ -1,11 +1,9 @@
 import Protocol.Process
 import Protocol.Coherence
 
-/-!
-# MPST Process Typing: Core
+/-! # MPST Process Typing: Core
 
-This module defines the core typing judgment for MPST processes.
--/
+This module defines the core typing judgment for MPST processes. -/
 
 /-
 The Problem. We need a typing judgment that ensures processes respect their

@@ -1,8 +1,7 @@
 import Runtime.Resources.ResourceModel
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Ownership and Knowledge Instruction Semantics
+/-! # Ownership and Knowledge Instruction Semantics
 
 Step functions for `transfer`, `tag`, and `check`.
 
@@ -16,8 +15,7 @@ protocol continuation transfer described in `runtime.md` §19.
 set and emits a `tagged` event. `stepCheck` queries whether a fact exists in the
 knowledge set and whether the flow policy permits it to reach a target role, writing
 a boolean result to a destination register. Together these implement the epistemic
-separation logic instructions from `runtime.md` §16.
--/
+separation logic instructions from `runtime.md` §16. -/
 
 /-
 The Problem. Session endpoints can be dynamically transferred between coroutines,

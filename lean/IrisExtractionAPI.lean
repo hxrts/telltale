@@ -9,11 +9,9 @@ import Iris.BaseLogic.Lib.GhostMap
 import Iris.BaseLogic.Lib.SavedProp
 import Iris.ProgramLogic.Language
 
-/-!
-# IrisExtractionAPI
+/-! # IrisExtractionAPI
 
-Logical API for Iris separation logic infrastructure.
--/
+Logical API for Iris separation logic infrastructure. -/
 
 /-
 The Problem. Iris separation logic provides ghost state for reasoning about

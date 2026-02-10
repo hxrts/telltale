@@ -17,8 +17,7 @@ Solution Structure.
 4. Derive the exact crash-set characterization
 -/
 
-/-!
-# Crash Tolerance for MPST
+/-! # Crash Tolerance for MPST
 
 Characterizes exactly which participants can crash while still allowing
 protocol completion. Ported from Aristotle files 03, 04, 04b, 04c.
@@ -28,8 +27,7 @@ protocol completion. Ported from Aristotle files 03, 04, 04b, 04c.
 - `ResidualGraph` : communication graph after removing crashed participants
 - `CrashTolerant` : protocol can complete despite given crash set
 - `MaxCrashSet` : largest set of participants that can crash
-- `crash_tolerance_iff` : exact characterization theorem
--/
+- `crash_tolerance_iff` : exact characterization theorem -/
 
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false

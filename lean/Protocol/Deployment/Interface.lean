@@ -4,13 +4,11 @@ import Protocol.Spatial
 import Protocol.Determinism
 import Protocol.Typing.Core
 
-/-!
-# MPST Deployed Protocol Bundle
+/-! # MPST Deployed Protocol Bundle
 
 This module defines the structure for a deployed protocol: a bundle containing
 the protocol specification, projected local types, initial monitor state, and
-all required certificates for safe execution.
--/
+all required certificates for safe execution. -/
 
 /-
 The Problem. Deploying a protocol requires bundling the specification with proofs

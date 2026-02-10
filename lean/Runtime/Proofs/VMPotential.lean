@@ -3,8 +3,7 @@ import Runtime.VM.Runtime.Failure
 import Classical.Transport.API
 import Runtime.Proofs.InvariantSpace
 
-/-!
-# VM Lyapunov Potential Integration
+/-! # VM Lyapunov Potential Integration
 
 Runtime-level potential used to connect VM execution to Paper 2's quantitative
 liveness story.
@@ -14,8 +13,7 @@ This module provides:
 - topology-change nonincrease lemmas
 - productive-step work decrease lemma
 - explicit bridge to Paper 2 work measure
-- VM-level instantiation of transported Foster-Lyapunov (3.9.1)
--/
+- VM-level instantiation of transported Foster-Lyapunov (3.9.1) -/
 
 /-
 The Problem. The abstract Lyapunov/progress measure theory needs to be instantiated

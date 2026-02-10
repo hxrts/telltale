@@ -3,11 +3,9 @@ import Protocol.Values
 import Batteries.Data.RBMap
 import Batteries.Data.RBMap.Lemmas
 
-/-!
-# MPST Environments
+/-! # MPST Environments
 
-This module defines the runtime environments for multiparty session types.
--/
+This module defines the runtime environments for multiparty session types. -/
 
 /-
 The Problem. MPST execution requires tracking local types per endpoint, value

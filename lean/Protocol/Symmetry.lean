@@ -1,10 +1,8 @@
 import Protocol.Coherence.RoleSwap
 
-/-!
-# Protocol Symmetry and Conservation Laws
+/-! # Protocol Symmetry and Conservation Laws
 
-This module establishes symmetry properties for MPST configurations.
--/
+This module establishes symmetry properties for MPST configurations. -/
 
 /-
 The Problem. Protocol behavior should be invariant under relabeling of roles

@@ -4,22 +4,19 @@ import SessionCoTypes.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-!
+/-! # EQ2C Bisimulation
+
+Equi-recursive equality relation for coinductive session types via bisimulation. -/
+
+/-
 The Problem. Coinductive types can have different structural representations
 that are semantically equivalent. In particular, mu-unfolding should be silent:
 `mu x. T` should equal `T[x := mu x. T]`. We need an equi-recursive equality
 relation EQ2C that captures this.
 
-The difficulty is defining a relation that:
-1. Allows mu-unfolding on either side (ObservableRelC)
-2. Is a proper bisimulation (matches observable heads, relates children)
-3. Forms an equivalence relation
-
-Solution Structure.
-1. BranchesRelC: pointwise relation on branch lists
-2. ObservableRelC: one-step observable equality (after mu-unfolding)
-3. EQ2CStep: the bisimulation step function
-4. EQ2C: greatest fixpoint of EQ2CStep (using Paco-style iteration)
+Solution Structure. Defines BranchesRelC for pointwise relation on branch lists,
+ObservableRelC for one-step observable equality after mu-unfolding, EQ2CStep as
+the bisimulation step function, and EQ2C as greatest fixpoint via Paco-style iteration.
 -/
 
 namespace SessionCoTypes.Coinductive

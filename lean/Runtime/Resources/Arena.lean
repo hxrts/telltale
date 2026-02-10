@@ -5,8 +5,7 @@ import Runtime.VM.Model.TypeClasses
 import Runtime.VM.Model.Core
 import Runtime.Resources.BufferRA
 
-/-!
-# Arena and Session Store
+/-! # Arena and Session Store
 
 Physical backing model for session state.
 
@@ -20,8 +19,7 @@ Physical backing model for session state.
 - `sessionStore_refines_envs`
 - `arena_lookup_typed`
 
-Dependencies: Task 10, Shim.ResourceAlgebra.
--/
+Dependencies: Task 10, Shim.ResourceAlgebra. -/
 
 /-
 The Problem. The VM needs a concrete memory model for session state that supports

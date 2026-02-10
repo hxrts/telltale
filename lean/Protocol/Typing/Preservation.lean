@@ -1,11 +1,9 @@
 import Protocol.Typing.Framing
 import Batteries.Data.RBMap.Lemmas
 
-/-!
-# MPST Process Typing: Preservation
+/-! # MPST Process Typing: Preservation
 
-This module proves typing preservation under steps.
--/
+This module proves typing preservation under steps. -/
 
 /-
 The Problem. We need subject reduction for the process typing judgment:

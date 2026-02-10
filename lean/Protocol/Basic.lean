@@ -9,16 +9,14 @@ Solution Structure. Define session/role primitives, endpoint/edge records, and
 basic structural lemmas/instances in one foundational module.
 -/
 
-/-!
-# MPST Basic Definitions
+/-! # MPST Basic Definitions
 
 This module defines the foundational types for multiparty session types:
 - `SessionId`: unique identifier for a session instance
 - `Role`: participant identifier within a session
 - `Endpoint`: a (SessionId × Role) pair representing a participant's view
 - `Label`: branch/select labels for choice
-- `Edge`: directed communication edge (sender, receiver) within a session
--/
+- `Edge`: directed communication edge (sender, receiver) within a session -/
 
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false

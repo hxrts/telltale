@@ -1,10 +1,8 @@
 import Protocol.Typing.Judgments
 
-/-!
-# MPST Process Typing: Compatibility
+/-! # MPST Process Typing: Compatibility
 
-This module defines compatibility predicates for process typing.
--/
+This module defines compatibility predicates for process typing. -/
 
 /-
 The Problem. Process typing requires compatibility checks between local types,

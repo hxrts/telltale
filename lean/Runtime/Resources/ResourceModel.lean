@@ -1,5 +1,9 @@
 import Runtime.VM.Model.TypeClasses
 
+/-! # Resource Model
+
+Lightweight resource model for V1 tracking committed resources and nullifiers. -/
+
 /-
 The Problem. The runtime needs a lightweight resource model for V1 that
 tracks committed resources and nullifiers without committing to SMT or ZK.

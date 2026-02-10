@@ -2,8 +2,7 @@ import Runtime.Proofs.Delegation
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.RoleSwap
 
-/-!
-# Session-Local State for Protocol Coherence
+/-! # Session-Local State for Protocol Coherence
 
 This module defines per-session slicing of Protocol state and proves that coherence
 decomposes as a separating conjunction over sessions. This is the foundation for
@@ -26,7 +25,7 @@ The insight is that Coherence is defined per-edge, and edges are session-local.
 Therefore:
 1. Global coherence = conjunction of per-edge coherence
 2. Per-edge coherence only involves one session
-3. Hence global coherence = conjunction over sessions of per-session coherence
+3. Hence global coherence = conjunction over sessions of per-session coherence -/
 
 This decomposition enables the frame rule: an instruction that only affects
 session `s` preserves `SessionCoherent s'` for all `s' ≠ s`.

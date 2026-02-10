@@ -10,8 +10,7 @@ import Runtime.Proofs.Delegation
 import Runtime.Proofs.Diamond
 import ClassicalAnalysisAPI
 
-/-!
-# Runtime Theorems
+/-! # Runtime Theorems
 
 Core theorem statements and proofs for the VM runtime layer. This module collects
 proven theorems across several categories:
@@ -24,8 +23,7 @@ proven theorems across several categories:
 - **Aura placeholders**: Future work for capability-based instantiation
 
 Most theorems are fully proven. TODO: items marked "Placeholder" are `True` stubs
-for future Aura-specific instantiation work.
--/
+for future Aura-specific instantiation work. -/
 
 /-
 The Problem. The VM runtime layer has many correctness properties spread across

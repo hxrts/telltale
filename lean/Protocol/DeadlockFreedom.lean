@@ -2,11 +2,9 @@ import Protocol.Semantics
 import Protocol.Typing
 import Protocol.Preservation
 
-/-!
-# MPST Deadlock Freedom
+/-! # MPST Deadlock Freedom
 
-This module provides deadlock freedom infrastructure for MPST.
--/
+This module provides deadlock freedom infrastructure for MPST. -/
 
 /-
 The Problem. Well-typed protocols should not deadlock, but proving this requires

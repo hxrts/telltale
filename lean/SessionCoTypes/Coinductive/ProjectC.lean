@@ -7,21 +7,19 @@ import SessionCoTypes.CoinductiveRel
 
 set_option linter.dupNamespace false
 
-/-!
+/-! # Coinductive Projection
+
+Projection from global to local types as a greatest fixed point. -/
+
+/-
 The Problem. Projection extracts a local type for a role from a global protocol.
 For coinductive types, projection must be defined as a greatest fixed point to
 handle infinite/recursive protocols correctly.
 
-The difficulty is that both global and local types can unfold through mu nodes,
-so the projection relation must be stable under unfolding on both sides. The
-standard approach is to allow finite unfolding before matching the head shape.
-
-Solution Structure.
-1. UnfoldsG/UnfoldsToG define global type unfolding (mu substitution)
-2. BranchesProjRelC aligns branches with label equality
-3. ProjectC_step is the one-step generator allowing finite unfolding
-4. ProjectC is the greatest fixed point via CoinductiveRel
-5. ProjectC_unfoldG/unfoldC show stability under mu-unfolding
+Solution Structure. Defines UnfoldsG/UnfoldsToG for global type unfolding,
+BranchesProjRelC for branch alignment with label equality, ProjectC_step as
+one-step generator allowing finite unfolding, and ProjectC as greatest fixed
+point via CoinductiveRel. Proves stability under mu-unfolding.
 -/
 
 namespace SessionCoTypes.Coinductive

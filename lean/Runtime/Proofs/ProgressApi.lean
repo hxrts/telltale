@@ -2,15 +2,13 @@ import Runtime.Proofs.Progress
 
 set_option autoImplicit false
 
-/-!
-# VM Liveness API
+/-! # VM Liveness API
 
 Bundle-oriented liveness API mirroring the consensus validation style:
 - required assumptions (well-formedness, termination model, fairness witness)
 - optional progress hypothesis
 - hypothesis validation summaries
-- theorem wrappers from bundled evidence
--/
+- theorem wrappers from bundled evidence -/
 
 /-
 The Problem. Users need a clean API for accessing VM liveness guarantees without

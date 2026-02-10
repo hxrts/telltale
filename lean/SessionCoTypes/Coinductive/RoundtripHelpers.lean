@@ -11,23 +11,18 @@ import Choreography.Projection.Project
 
 set_option linter.dupNamespace false
 
-/-!
+/-! # Round-Trip Helpers
+
+Structural lemmas for toCoind supporting round-trip correctness proofs. -/
+
+/-
 The Problem. Round-trip correctness requires structural lemmas about toCoind:
-1. Children of toCoind images are themselves toCoind images
-2. Size bounds for recursive descent termination
-3. Visited set invariants for cycle detection
-4. childRel witnesses for specific constructor cases
-5. Free variable hygiene (names stay in scope)
+children of toCoind images are themselves toCoind images, size bounds for
+recursive descent termination, visited set invariants for cycle detection.
 
-These lemmas support the toInductiveAux termination proof and round-trip theorems.
-
-Solution Structure.
-1. childRel_toCoind: children of toCoind images
-2. Size bounds for branches in send/recv
-3. childRel_toCoind_size: combined child + size bound
-4. VisitedLt: visited set invariant for termination
-5. childRel constructors: mu, send, recv specific witnesses
-6. Free variable lemmas: freeVars stay within namesIn
+Solution Structure. Proves childRel_toCoind for children of toCoind images,
+size bounds for branches in send/recv, childRel_toCoind_size combining bounds,
+VisitedLt for visited set invariant, and free variable hygiene lemmas.
 -/
 
 namespace SessionCoTypes.Coinductive

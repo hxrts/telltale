@@ -2,8 +2,7 @@ import Protocol.Environments.Core
 import Runtime.Resources.ResourceModel
 import Runtime.VM.Semantics.ExecHelpers
 
-/-!
-# Session Lifecycle Semantics
+/-! # Session Lifecycle Semantics
 
 Step functions for `open` and `close`, plus private helpers for argument alignment,
 endpoint installation, handler coverage checking, and resource/transaction construction.
@@ -17,8 +16,7 @@ applies a persistence delta, and emits an `opened` event.
 `stepClose` tears down a session endpoint: advances the epoch, clears buffers and
 traces, marks the session phase as closed, consumes the session resource via a
 transaction, applies the close persistence delta, removes the endpoint from the
-coroutine's owned set, and emits `epochAdvanced` and `closed` events.
--/
+coroutine's owned set, and emits `epochAdvanced` and `closed` events. -/
 
 /-
 The Problem. Sessions have a lifecycle (opening → active → closing → closed) that

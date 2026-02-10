@@ -2,11 +2,9 @@ import Choreography.Projection.Trans
 import Choreography.Projection.Projectb
 import Choreography.Projection.ProjSubst
 
-/-!
-# Choreography.Projection.Blind
+/-! # Choreography.Projection.Blind
 
-Blindness predicate for V2 projection.
--/
+Blindness predicate for V2 projection. -/
 
 /-
 The Problem. Define a "blindness" predicate that captures when non-participants

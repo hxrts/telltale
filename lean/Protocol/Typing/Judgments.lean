@@ -1,10 +1,8 @@
 import Protocol.Typing.Core
 
-/-!
-# MPST Process Typing: Judgments
+/-! # MPST Process Typing: Judgments
 
-This module defines advanced typing judgments including parallel split witnesses.
--/
+This module defines advanced typing judgments including parallel split witnesses. -/
 
 /-
 The Problem. Parallel composition typing requires splitting contexts, but we

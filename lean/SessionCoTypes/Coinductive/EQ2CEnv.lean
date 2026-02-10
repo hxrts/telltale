@@ -7,22 +7,18 @@ import SessionCoTypes.Coinductive.Observable
 
 set_option linter.dupNamespace false
 
-/-!
-The Problem. EQ2C relates coinductive types directly, but cannot handle finite
-syntax with explicit variable nodes that represent back-edges. When converting
-between inductive and coinductive representations, variables name cycles.
+/-! # Environment-Aware EQ2C
 
-The difficulty is that these variables must be interpreted through an environment
-that tracks what each name refers to. EQ2CE (environment-aware EQ2C) uses paco
-(parametrized coinduction) to handle this, allowing the relation to unfold mu
-nodes while recording bindings for later variable resolution.
+EQ2CE bisimulation with environment tracking for variable resolution. -/
 
-Solution Structure.
-1. Define Env and EnvPair to track name-to-node mappings
-2. EnvResolves ensures environment respects EQ2C at back-edges
-3. EQ2CE_step gives one-step bisimulation with environment threading
-4. EQ2CE is the paco greatest fixed point of EQ2CE_step
-5. EQ2CE_coind provides the coinduction principle
+/-
+The Problem. EQ2C relates coinductive types directly but cannot handle finite
+syntax with explicit variable nodes that represent back-edges. Variables must
+be interpreted through an environment tracking what each name refers to.
+
+Solution Structure. Defines Env and EnvPair for name-to-node mappings, EnvResolves
+ensuring environment respects EQ2C at back-edges, EQ2CE_step for one-step bisimulation
+with environment threading, and EQ2CE as the paco greatest fixed point.
 -/
 
 namespace SessionCoTypes.Coinductive

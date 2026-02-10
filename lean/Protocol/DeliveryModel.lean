@@ -1,13 +1,11 @@
 import Protocol.Environments
 import Protocol.Coherence.Consume
 
-/-!
-# Delivery Models
+/-! # Delivery Models
 
 This module introduces a minimal abstraction layer for delivery models without
 changing existing FIFO semantics. The goal is to allow new delivery models
-(causal, lossy, etc.) to be defined while keeping the current code unchanged.
--/
+(causal, lossy, etc.) to be defined while keeping the current code unchanged. -/
 
 /-
 The Problem. The coherence proofs assume FIFO delivery, but we want to support

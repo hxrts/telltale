@@ -2,8 +2,7 @@ import Runtime.Proofs.SessionLocal
 import Runtime.VM.Semantics.InstrSpec
 import Runtime.VM.Runtime.Loader
 
-/-!
-# Frame Rule and Cross-Session Diamond
+/-! # Frame Rule and Cross-Session Diamond
 
 This module establishes the frame rule for Protocol-level operations and
 derives the cross-session diamond property as a consequence.
@@ -27,7 +26,7 @@ The proof proceeds in two steps:
 
 ## VM Integration
 
-The VM-level instruction footprint and diamond proofs require resolving the
+The VM-level instruction footprint and diamond proofs require resolving the -/
 Store name collision between Protocol.Environments.Core and Iris.Std.Heap.
 Once resolved, the proofs here connect to VM execution via:
 

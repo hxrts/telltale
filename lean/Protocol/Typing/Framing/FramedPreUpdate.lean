@@ -8,6 +8,10 @@ import Protocol.Typing.Framing.RightCases
 import Protocol.Typing.Framing.GEnvFrameLeft
 import Protocol.Typing.Framing.GEnvFrameRight
 
+/-! # MPST Framed Pre-Update Preservation
+
+Stability of pre-out typing under single steps with G-frame on the right. -/
+
 /-
 The Problem. Show that pre-out typing is stable under a single step when the
 global environment is framed on the right. This isolates how G-frames flow

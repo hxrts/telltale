@@ -1,10 +1,8 @@
 import IrisExtractionAPI
 
-/-!
-# IrisExtractionInstance
+/-! # IrisExtractionInstance
 
-Concrete Iris extraction boundary with runtime erasure mappings.
--/
+Concrete Iris extraction boundary with runtime erasure mappings. -/
 
 /-
 The Problem. Iris ghost state (invariants, fancy updates, ghost variables) is

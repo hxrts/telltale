@@ -3,22 +3,19 @@ import SessionCoTypes.Coinductive.LocalTypeC
 
 set_option linter.dupNamespace false
 
-/-!
-The Problem. Coinductive local types (LocalTypeC) are infinite trees built
-from a polynomial functor. Unlike inductive types, we cannot pattern match
-on their structure directly. To reason about them, we need a notion of
-"observability" - what the type looks like after finitely many mu-unfoldings.
+/-! # Observable Coinductive Types
 
-The difficulty is that mu nodes can be nested arbitrarily deep. A type like
-`mu x. mu y. send p [l: end]` requires two unfoldings before we see the send.
-We need a relation that captures "after some finite unfolding, the head is H".
+Observability predicates for coinductive session types via mu-unfolding. -/
 
-Solution Structure.
-1. Define one-step unfolding (UnfoldsC) for mu nodes
-2. Take reflexive-transitive closure to get finite unfolding (UnfoldsToC)
-3. Define observable predicates: UnfoldsToEndC, UnfoldsToVarC, CanSendC, CanRecvC
-4. Combine into ObservableC - the type has some observable head
-5. Define ClosedC (no free variables) and WellFormedC (closed + observable)
+/-
+The Problem. Coinductive local types are infinite trees where we cannot pattern
+match directly. We need a notion of observability capturing what the type looks
+like after finitely many mu-unfoldings.
+
+Solution Structure. Defines one-step unfolding (UnfoldsC) for mu nodes, takes
+reflexive-transitive closure (UnfoldsToC), defines observable predicates
+(UnfoldsToEndC, UnfoldsToVarC, CanSendC, CanRecvC), combines into ObservableC,
+and defines ClosedC (no free variables) and WellFormedC (closed + observable).
 -/
 
 namespace SessionCoTypes.Coinductive

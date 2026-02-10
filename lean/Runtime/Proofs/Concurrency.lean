@@ -3,6 +3,10 @@ import Runtime.VM.Runtime.Scheduler
 import Runtime.ProgramLogic.LanguageInstance
 import IrisExtractionInstance
 
+/-! # Concurrency Invariance Proofs
+
+Per-session normalized trace invariance and round-robin normalization. -/
+
 /-
 The Problem. Show that per-session normalized traces are invariant under
 concurrency bounds, and provide the round-robin normalization property, while

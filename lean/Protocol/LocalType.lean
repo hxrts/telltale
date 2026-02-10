@@ -4,13 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import Protocol.Basic
 
-/-!
-# MPST Local Types
+/-! # MPST Local Types
 
 Local types describe the communication protocol from a single participant's
 perspective. Unlike binary session types, actions are directed to/from
-specific roles.
--/
+specific roles. -/
 
 /-
 The Problem. We need a representation of local session types that supports

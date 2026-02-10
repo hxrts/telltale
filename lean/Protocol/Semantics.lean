@@ -1,10 +1,8 @@
 import Protocol.Typing
 
-/-!
-# MPST Operational Semantics
+/-! # MPST Operational Semantics
 
-This module defines the operational semantics for MPST processes.
--/
+This module defines the operational semantics for MPST processes. -/
 
 /-
 The Problem. We need an operational semantics for MPST that is asynchronous

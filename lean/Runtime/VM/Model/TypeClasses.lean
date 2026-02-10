@@ -9,8 +9,7 @@ set_option autoImplicit false
 
 universe u
 
-/-!
-# Domain Model Interfaces
+/-! # Domain Model Interfaces
 
 The VM is parameterized by six interfaces:
 `IdentityModel`, `GuardLayer`, `PersistenceModel`, `EffectRuntime`, `EffectSpec`,
@@ -21,8 +20,7 @@ and `VerificationModel`.
 - `EffectSpec` contains typing-level effect obligations (`handlerType`)
 
 This file also defines authenticated data structure interfaces (`AuthTree`,
-`AccumulatedSet`) and `ScopeId` used for scoped resource views.
--/
+`AccumulatedSet`) and `ScopeId` used for scoped resource views. -/
 
 /-
 The Problem. The VM needs to be instantiable with different identity, guard,

@@ -1,8 +1,7 @@
 import Std
 import Runtime.VM.Model.State
 
-/-!
-# Execution Helpers
+/-! # Execution Helpers
 
 Shared utility functions used by all per-instruction step functions. Organized into:
 
@@ -19,8 +18,7 @@ Shared utility functions used by all per-instruction step functions. Organized i
 - **Coroutine updates**: write-back of modified coroutine state into the VM state array.
 
 Every `Exec*.lean` file imports this module. The helpers are intentionally small and
-pure so that the per-instruction semantics files stay focused on control flow.
--/
+pure so that the per-instruction semantics files stay focused on control flow. -/
 
 /-
 The Problem. Per-instruction step functions share common operations: buffer access,

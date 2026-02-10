@@ -3,11 +3,9 @@ import Runtime.Proofs.Concurrency
 
 set_option autoImplicit false
 
-/-!
-# Scheduler API
+/-! # Scheduler API
 
-API types and definitions for scheduler reasoning in the VM runtime.
--/
+API types and definitions for scheduler reasoning in the VM runtime. -/
 
 /-
 The Problem. Different scheduling policies (round-robin, cooperative, priority,

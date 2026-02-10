@@ -19,8 +19,7 @@ Solution Structure.
 4. Build a decision procedure based on worklist exploration
 -/
 
-/-!
-# Async Subtyping for Session Types
+/-! # Async Subtyping for Session Types
 
 Defines async subtyping `S ≤ₐ T` which allows send operations to proceed
 asynchronously by buffering messages.
@@ -35,8 +34,7 @@ asynchronously by buffering messages.
 ## Main Results
 
 - `reachable_triples_finite` : For regular types, reachable set is finite
-- `async_subtype_decidable` : Existence of decision procedure
--/
+- `async_subtype_decidable` : Existence of decision procedure -/
 
 set_option linter.dupNamespace false
 

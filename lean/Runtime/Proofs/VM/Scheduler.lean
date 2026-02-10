@@ -2,12 +2,10 @@ import Runtime.VM.Runtime.Scheduler
 
 set_option autoImplicit false
 
-/-!
-# VM Scheduler Properties
+/-! # VM Scheduler Properties
 
 Proofs of scheduler correctness properties: confluence, cooperative refinement,
-and helper lemmas for queue operations.
--/
+and helper lemmas for queue operations. -/
 
 /-
 The Problem. The VM scheduler must satisfy confluence (order of ready coroutines

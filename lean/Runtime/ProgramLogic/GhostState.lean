@@ -2,7 +2,11 @@ import Runtime.Resources.SessionRA
 import Runtime.VM.Model.Knowledge
 import IrisExtractionInstance
 
-/- 
+/-! # Ghost State for Knowledge and Progress
+
+RA predicates for knowledge flow, progress tokens, and resource bundles. -/
+
+/-
 The Problem. Capture ghost resources for knowledge, progress, and transfer
 so that session proofs can reason about ownership and movement of state.
 

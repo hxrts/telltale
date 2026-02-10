@@ -1,10 +1,8 @@
 import Protocol.Coherence
 
-/-!
-# MPST Verified Monitor
+/-! # MPST Verified Monitor
 
-This module implements the proof-carrying runtime monitor for MPST.
--/
+This module implements the proof-carrying runtime monitor for MPST. -/
 
 /-
 The Problem. Untrusted code must interact with the session type system safely.

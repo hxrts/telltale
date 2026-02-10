@@ -1,7 +1,6 @@
 import Runtime.VM.Model.TypeClasses
 
-/-!
-# Domain Model Composition
+/-! # Domain Model Composition
 
 Unit, sum, and product instances for all five domain interfaces, plus the bridge
 classes that connect them. This is the Lean counterpart of `runtime.md` §20.
@@ -19,8 +18,7 @@ effects from either domain without either domain knowing about the other.
 `IdentityPersistenceBridge`, `IdentityVerificationBridge`) capture the cross-model
 obligations that domain instantiations must satisfy. Bridge composition instances
 automatically lift bridges over sums so that composed domains inherit their
-component bridges.
--/
+component bridges. -/
 
 /-
 The Problem. The VM is parameterized over five domain interfaces (identity, guard,

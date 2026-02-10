@@ -4,12 +4,10 @@ import Mathlib.Tactic
 import ClassicalAnalysisAPI
 import Choreography.Projection.Project
 
-/-!
-# Information-Theoretic Cost Measures
+/-! # Information-Theoretic Cost Measures
 
 Protocol-facing wrappers around `EntropyAPI`, plus blindness/erasure bridge
-lemmas used in projection reasoning.
--/
+lemmas used in projection reasoning. -/
 
 set_option autoImplicit false
 

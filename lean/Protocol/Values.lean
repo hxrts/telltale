@@ -1,10 +1,8 @@
 import Protocol.LocalType
 
-/-!
-# MPST Runtime Values
+/-! # MPST Runtime Values
 
-This module defines the runtime values for multiparty session types.
--/
+This module defines the runtime values for multiparty session types. -/
 
 /-
 The Problem. We need a value representation that supports base types, products,

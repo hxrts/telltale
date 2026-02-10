@@ -11,8 +11,7 @@ import SessionCoTypes.Coinductive.BisimHelpers
 
 set_option linter.dupNamespace false
 
-/-!
-# Decidable Bisimulation for Regular Types
+/-! # Decidable Bisimulation for Regular Types
 
 This module implements a decidable bisimulation check for regular coinductive types,
 following the approach in the Coq reference implementation (subject_reduction/theories/CoTypes/bisim.v).
@@ -34,8 +33,7 @@ following the approach in the Coq reference implementation (subject_reduction/th
 - `reachablePairs`: Cartesian product of reachable sets
 - `observableMatch`: Check if observables match
 - `bisim`: The decidable bisimulation check
-- `bisim_sound`: Soundness theorem
--/
+- `bisim_sound`: Soundness theorem -/
 
 /-
 The Problem. Bisimilarity is a coinductive relation, but we need a decidable

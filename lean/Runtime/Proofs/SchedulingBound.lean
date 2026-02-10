@@ -1,7 +1,6 @@
 import Runtime.Proofs.WeightedMeasure
 
-/-!
-# Deterministic Termination Bounds for Scheduled Protocol Execution
+/-! # Deterministic Termination Bounds for Scheduled Protocol Execution
 
 Formalizes deterministic termination bounds under k-fair scheduling.
 The main result: under a k-fair schedule with k ≥ numRoles, any execution
@@ -19,8 +18,7 @@ terminates within k * W₀ steps, where W₀ is the initial progress measure.
 - `block_progress`: Measure strictly decreases over k steps when non-terminal
 - `kfair_termination_bound`: k * W₀ steps suffice for termination
 - `roundrobin_termination_bound`: Corollary for n-fair (round-robin)
-- `bound_is_tight`: The k * W₀ bound is tight
--/
+- `bound_is_tight`: The k * W₀ bound is tight -/
 
 /-
 The Problem. We need concrete termination bounds for scheduled protocol execution

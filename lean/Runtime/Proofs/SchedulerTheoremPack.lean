@@ -3,11 +3,9 @@ import Runtime.Proofs.TheoremPack.API
 
 set_option autoImplicit false
 
-/-!
-# Scheduler Theorem Pack
+/-! # Scheduler Theorem Pack
 
-Packaged scheduler artifacts and policy-specific theorem bundles.
--/
+Packaged scheduler artifacts and policy-specific theorem bundles. -/
 
 /-
 The Problem. Scheduler correctness proofs involve multiple properties (confluence,

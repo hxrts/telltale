@@ -4,6 +4,10 @@ import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.Lemmas
 import Protocol.Typing.Framing.FramedPreUpdate
 
+/-! # MPST Pre-Update Typing Preservation
+
+Preservation of pre-out typing under runtime steps. -/
+
 /-
 The Problem. Show that pre-out typing survives a single runtime step, producing
 new post-environments and smaller footprints/domains as needed.

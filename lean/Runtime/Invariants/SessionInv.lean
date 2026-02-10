@@ -5,6 +5,10 @@ import Runtime.ProgramLogic.GhostState
 import Runtime.VM.Model.State
 import IrisExtractionInstance
 
+/-! # Session Cancelable Invariants
+
+Per-session cancelable invariant tying coherence, buffer typing, and progress. -/
+
 /-
 The Problem. The runtime needs a per-session cancelable invariant that
 ties session coherence, buffer typing, progress supply, and knowledge

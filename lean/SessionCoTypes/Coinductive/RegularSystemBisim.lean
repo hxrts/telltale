@@ -6,20 +6,18 @@ import SessionCoTypes.Coinductive.Bisim
 
 set_option linter.dupNamespace false
 
-/-!
-The Problem. We defined RegularSystem to extract a finite coalgebra from a
-regular coinductive type. We need to prove that reconstructing from this
-system via SystemToCoind yields a bisimilar (hence equal) type.
+/-! # Regular System Bisimulation
 
-The difficulty is constructing the bisimulation witness. We define RegularBisim
-which relates a reachable state `s` to its finite-system reconstruction, then
-prove this relation satisfies the IsBisimulation property.
+Bisimulation proof for regular coalgebra reconstruction. -/
 
-Solution Structure.
-1. get_StateIndex: StateIndex correctly retrieves the indexed state
-2. RegularSystem_at_index: the system at index i matches dest of state i
-3. RegularBisim: the relation connecting states to their reconstructions
-4. RegularBisim_isBisimulation: proof that this is a valid bisimulation
+/-
+The Problem. RegularSystem extracts a finite coalgebra from a regular coinductive
+type. We need to prove that reconstructing from this system via SystemToCoind
+yields a bisimilar (hence equal) type.
+
+Solution Structure. Proves get_StateIndex correctly retrieves indexed states,
+RegularSystem_at_index shows system matches dest of state, defines RegularBisim
+relating states to their reconstructions, and proves this satisfies IsBisimulation.
 -/
 
 /-! ## Core Development -/

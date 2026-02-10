@@ -1,11 +1,9 @@
 import Protocol.Environments
 
-/-!
-# MPST Spatial Type System
+/-! # MPST Spatial Type System
 
 This module defines spatial requirements, topologies, and the satisfaction judgment
-that determines whether a deployment topology satisfies a protocol's spatial needs.
--/
+that determines whether a deployment topology satisfies a protocol's spatial needs. -/
 
 /-
 The Problem. Protocols may have spatial constraints (co-location, separation,

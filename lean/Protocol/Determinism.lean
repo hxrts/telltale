@@ -1,10 +1,8 @@
 import Protocol.DeadlockFreedom
 
-/-!
-# MPST Determinism
+/-! # MPST Determinism
 
-This module provides determinism theorems for the Protocol MPST semantics.
--/
+This module provides determinism theorems for the Protocol MPST semantics. -/
 
 /-
 The Problem. We need to prove that MPST execution is deterministic: given the

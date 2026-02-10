@@ -4,8 +4,7 @@ import Runtime.VM.Model.CompileLocalTypeR
 import SessionTypes.LocalTypeR
 import Protocol.Process
 
-/-!
-# Program Images and Compilation
+/-! # Program Images and Compilation
 
 `Program`, `CodeImage`, and `UntrustedImage`, the program representation that the
 VM loads and executes. A `Program` is bytecode plus per-role entry points, local types,
@@ -17,8 +16,7 @@ the code loading pipeline (`runtime.md` §10).
 The `compile` function is a V1 stub that translates a `Process` (from `Protocol.Process`)
 into a flat bytecode block. It maps variables to registers by name length and emits a
 single basic block followed by `halt`. A real compiler would produce optimized bytecode
-with proper register allocation and branch targets.
--/
+with proper register allocation and branch targets. -/
 
 /-
 The Problem. The VM needs a program representation that bundles bytecode with type

@@ -11,8 +11,7 @@ Solution Structure. Define failure modes, a failure-aware step relation,
 and recovery predicates as lightweight stubs aligned with runtime.md §9.
 -/
 
-/-!
-# Task 24: Failure Model and Recovery
+/-! # Task 24: Failure Model and Recovery
 
 Failure-aware step relation and recovery predicates
 from runtime.md §9.
@@ -25,8 +24,7 @@ from runtime.md §9.
 - `Recoverable`, `crash_nonparticipant_preserves`
 - `participant_failover`, `crash_close_safe`
 
-Dependencies: Task 23, Scheduler.
--/
+Dependencies: Task 23, Scheduler. -/
 
 set_option autoImplicit false
 

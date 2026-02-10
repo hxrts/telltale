@@ -5,21 +5,19 @@ import SessionTypes.LocalTypeR
 
 set_option linter.dupNamespace false
 
-/-!
-The Problem. Given a regular coinductive type (one with finitely many reachable
-states), we want to construct an equivalent finite inductive type. This enables
-round-tripping between the two representations.
+/-! # Coinductive to Inductive Conversion
 
-The difficulty is handling cycles: a coinductive type can have recursive structure
-that requires mu-binders in the inductive representation. We need to:
-- Track visited nodes to detect back-edges
-- Generate fresh names for mu-binders that don't clash
-- Insert mu-binders only where needed (when a recursive reference occurs)
+Construct equivalent inductive types from regular coinductive types. -/
 
-Solution Structure.
-1. Fresh name generation: nameFor produces names longer than any existing name
-2. toInductiveAux: recursive traversal with visited set for cycle detection
-3. toInductive: entry point that initializes with the reachable set
+/-
+The Problem. Given a regular coinductive type (finitely many reachable states),
+we want to construct an equivalent finite inductive type. The difficulty is
+handling cycles requiring mu-binders, tracking visited nodes, and generating
+fresh names that do not clash.
+
+Solution Structure. Defines fresh name generation (nameFor), toInductiveAux for
+recursive traversal with visited set for cycle detection, and toInductive as
+entry point initializing with the reachable set.
 -/
 
 namespace SessionCoTypes.Coinductive

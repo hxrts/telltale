@@ -3,6 +3,10 @@ import Protocol.Typing.StepLemmas
 import Protocol.Typing.MergeLemmas
 import Protocol.Typing.Framing.GEnvFrameHelpers
 
+/-! # MPST Framing Lemmas
+
+Small framing lemmas for lookup, disjointness, and typing judgments. -/
+
 /-
 The Problem. Establish small framing lemmas for lookup, disjointness, and
 pre/pre-out typing so later preservation proofs can be assembled compositionally.

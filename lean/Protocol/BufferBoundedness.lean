@@ -4,11 +4,9 @@ import Protocol.Coherence.Preservation
 import Protocol.DeliveryModel
 import Mathlib
 
-/-!
-# Buffer Boundedness and Phase Transition
+/-! # Buffer Boundedness and Phase Transition
 
-This module formalizes the critical buffer size theorem for multiparty session types.
--/
+This module formalizes the critical buffer size theorem for multiparty session types. -/
 
 /-
 The Problem. Asynchronous multiparty session types use unbounded buffers in theory,

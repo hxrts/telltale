@@ -2,11 +2,9 @@ import Runtime.VM.Model.Config
 import Runtime.VM.Composition.DomainComposition
 import Runtime.Resources.BufferRA
 
-/-!
-# Unit Model
+/-! # Unit Model
 
-Minimal computable instances for the VM domain interfaces.
--/
+Minimal computable instances for the VM domain interfaces. -/
 
 /-
 The Problem. Testing the VM requires concrete implementations of all domain

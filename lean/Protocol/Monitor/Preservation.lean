@@ -4,11 +4,9 @@ import Protocol.Monitor.Core
 import Protocol.Typing.Core
 import Protocol.Typing.Compatibility
 
-/-!
-# MPST Monitor Preservation
+/-! # MPST Monitor Preservation
 
-This module proves preservation for the verified monitor.
--/
+This module proves preservation for the verified monitor. -/
 
 /-
 The Problem. The monitor must maintain well-typedness after every transition.

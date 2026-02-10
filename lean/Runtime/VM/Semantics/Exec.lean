@@ -1,8 +1,7 @@
 import Runtime.VM.Semantics.ExecHelpers
 import Runtime.VM.Semantics.ExecSteps
 
-/-!
-# Main Instruction Stepper
+/-! # Main Instruction Stepper
 
 `execInstr`, the top-level entry point for executing one instruction on a coroutine.
 The execution pipeline is:
@@ -17,8 +16,7 @@ The execution pipeline is:
 
 The scheduler calls `execInstr` in a loop. Each call produces an updated `VMState`
 and an `ExecResult` indicating whether the coroutine continued, yielded, blocked,
-halted, faulted, or triggered a structural change (spawn, transfer, fork, join, abort).
--/
+halted, faulted, or triggered a structural change (spawn, transfer, fork, join, abort). -/
 
 /-
 The Problem. The scheduler needs a single entry point for executing one instruction
