@@ -121,9 +121,10 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
                         have hcont : cont' = cont.substitute t repl := hbranches.1.2.symm
                         have hrest' : rest' = SessionTypes.GlobalType.substituteBranches rest t repl := hbranches.2.symm
                         subst hlabel hcont hrest'
-                        -- Need: rest'.all (fun p => decide (trans p.2 role = trans cont' role))
-                        -- Original: rest.all (fun p => decide (trans p.2 role = trans cont role)) = true
-                        have hrest_uniform : rest.all (fun p => decide (Trans.trans p.2 role = Trans.trans cont role)) = true := by
+                        -- Need: rest'.all (fun p => localTypeRBEq (trans p.2 role) (trans cont' role))
+                        -- Original: rest.all (fun p => localTypeRBEq (trans p.2 role) (trans cont role)) = true
+                        have hrest_uniform :
+                            rest.all (fun p => localTypeRBEq (Trans.trans p.2 role) (Trans.trans cont role)) = true := by
                           simpa [branchesUniformFor, horiginal_branches] using horiginal
                         -- For each p in rest, trans p.2 role = trans cont role
                         -- After substitution, for each p' in rest', trans p'.2 role = trans cont' role
@@ -138,10 +139,11 @@ theorem isBlind_substitute (g : GlobalType) (t : String) (repl : GlobalType)
                             simp only [SessionTypes.GlobalType.substituteBranches, List.all, Bool.and_eq_true]
                             simp only [List.all, Bool.and_eq_true] at hrest_uniform
                             constructor
-                            · -- decide (trans (rhd.2.substitute t repl) role = trans (cont.substitute t repl) role)
-                              rw [decide_eq_true_iff]
+                            · -- localTypeRBEq on substituted projections is true
+                              apply (localTypeRBEq_eq_true_iff _ _).2
                               -- From hrest_uniform.1: trans rhd.2 role = trans cont role
-                              have heq : Trans.trans rhd.2 role = Trans.trans cont role := of_decide_eq_true hrest_uniform.1
+                              have heq : Trans.trans rhd.2 role = Trans.trans cont role :=
+                                localTypeRBEq_eq_true hrest_uniform.1
                               -- Use proj_subst to show substitution commutes with trans
                               have h1 : Trans.trans (rhd.2.substitute t repl) role =
                                   (Trans.trans rhd.2 role).substitute t (Trans.trans repl role) :=
