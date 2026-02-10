@@ -72,6 +72,22 @@ jobs:
             exit 0
           }
 
+  benchmarks:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+      - name: Build benchmark targets
+        uses: actions-rs/cargo@v1
+        with:
+          command: bench
+          args: --workspace --no-run
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest

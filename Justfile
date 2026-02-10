@@ -31,6 +31,10 @@ lint:
 lint-quick:
     ./scripts/check-lint.sh --quick
 
+# Rust architecture/style-guide pattern checker
+check-arch:
+    ./scripts/check-arch.sh
+
 # Check WASM compilation for choreography and core crates
 wasm-check:
     cargo check --package telltale-choreography --target wasm32-unknown-unknown --features wasm
@@ -204,3 +208,64 @@ telltale-lean-check-failing: lean-init
     perl -0pi -e 's/"name": "Pong"/"name": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
     ! ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-failing-choreography.json --program lean/artifacts/lean-failing-program-chef.json --log lean/artifacts/runner-failing-chef.log --json-log lean/artifacts/runner-failing-chef.json
+
+# Emit protocol-bundle artifacts by running the bridge bundle tests.
+export-protocol-bundles:
+    cargo test -p telltale-lean-bridge --test invariant_verification_tests -- --nocapture
+
+# Rust/Lean VM trace correspondence checks.
+verify-vm-correspondence:
+    cargo test -p telltale-lean-bridge --test vm_correspondence_tests
+    cargo test -p telltale-lean-bridge --test vm_differential_step_tests
+
+# Track A gate: naming/API changes must preserve behavior.
+verify-track-a:
+    cargo test -p telltale-vm --test trace_corpus
+    cargo test -p telltale-vm --test strict_tick_equality
+    cargo test -p telltale-vm --test lean_vm_equivalence
+
+# Lean-side invariant verification checks for protocol bundles.
+verify-invariants:
+    cargo test -p telltale-lean-bridge --test invariant_verification_tests
+
+# Targeted protocol verification lane (fast CI).
+verify-protocols:
+    just verify-vm-correspondence
+    just verify-invariants
+    cargo test -p telltale-lean-bridge --test schema_version_tests
+
+# Track B gate: semantic-alignment acceptance, including cross-target checks.
+verify-track-b:
+    just verify-protocols
+    just verify-cross-target-matrix
+
+# Full Lean build gate for nightly/scheduled validation.
+verify-lean-full: lean-init
+    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build
+
+# Targeted Lean VM architecture modules for fast CI checks.
+verify-lean-vm-targets: lean-init
+    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build Runtime.VM.API Runtime.VM.Runtime
+
+# Cross-target runtime comparison lane.
+verify-cross-target-matrix:
+    cargo test -p telltale-vm --features multi-thread --test threaded_equivalence
+    cargo test -p telltale-vm --test lean_vm_equivalence
+    wasm-pack test --node rust/vm --features wasm -- --nocapture
+    cargo test -p telltale-lean-bridge --test vm_cross_target_matrix_tests
+
+# Composition/concurrency stress lane.
+verify-composition-stress:
+    cargo test -p telltale-vm --features multi-thread --test threaded_lane_runtime -- --nocapture
+    cargo test -p telltale-lean-bridge --test vm_composition_stress_tests -- --nocapture
+
+# Property-based verification lane.
+verify-properties:
+    cargo test -p telltale-lean-bridge --test property_tests
+    cargo test -p telltale-lean-bridge --test proptest_projection
+    cargo test -p telltale-lean-bridge --test proptest_json_roundtrip
+    cargo test -p telltale-lean-bridge --test proptest_async_subtyping
+
+# Generate normalized traces for bridge-level VM correspondence fixtures.
+generate-test-traces:
+    cargo test -p telltale-lean-bridge --test vm_correspondence_tests -- --nocapture

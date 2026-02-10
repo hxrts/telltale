@@ -44,6 +44,23 @@ just telltale-lean-check-failing
 
 These recipes expect `.choreo` inputs under `fixtures/choreo/` and write artifacts to `lean/artifacts`.
 
+## VM Correspondence
+
+Runtime correspondence checks live in the bridge and VM test suites:
+
+- `rust/lean-bridge/tests/vm_correspondence_tests.rs`
+  - runs Tier1 protocol fixtures through Rust VM execution
+  - compares normalized Rust traces against Lean VM runner traces via `VmRunner::compare_execution`
+- `rust/lean-bridge/tests/invariant_verification_tests.rs`
+  - validates protocol bundles against Lean verification entrypoints
+  - asserts structured error artifacts (`code`, `path`) for negative cases
+
+The bridge schema tests (`rust/lean-bridge/tests/schema_version_tests.rs`) also gate payload compatibility for:
+
+- `lean_bridge.v1`
+- `protocol_bundle.v1`
+- `vm_state.v1`
+
 ## Golden Equivalence Tests
 
 There are golden comparison tests in `telltale-lean-bridge` that check Rust and Lean outputs.

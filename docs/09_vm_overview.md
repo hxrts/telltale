@@ -8,15 +8,59 @@ The bytecode VM is the core execution engine used by the simulator. The VM compi
 
 The VM is located in `rust/vm/`. The crate depends on `telltale-types` and `telltale-theory` for type definitions and projection algorithms.
 
+Normative architecture reference for lanes, scheduler proofs, determinism profiles, and output-condition semantics:
+`work/docs/vm_instructions.md`.
+
 ## Design Principles
 
 The VM follows three core principles that enable formal verification.
+
+Canonical semantic authority is `VMKernel`. Runtime-specific engines (`VM`,
+`ThreadedVM`, and wasm drivers) are adapter surfaces and must not define
+instruction semantics independently.
 
 Session isolation ensures that coroutines in different sessions cannot interfere with each other. Each session has its own buffers, type state, and namespace. Cross-session operations are impossible by construction.
 
 Deterministic execution means that given the same inputs, the VM produces the same observable trace. The simulation clock provides deterministic timing. Random number generation requires explicit seeding through effect handlers.
 
 Effect separation keeps the VM core pure. All side effects flow through the `EffectHandler` trait. The handler contract requires deterministic, session-local behavior for N-invariance guarantees.
+The repository enforces this with a kernel guard test (`rust/vm/tests/kernel_nondeterminism_guard.rs`) that blocks direct host nondeterminism calls in core VM modules.
+
+## Cross-Target Contract
+
+The runtime defines this semantic contract:
+
+- `NativeThreaded ~= NativeSingleThreaded ~= WasmCooperative` modulo effect policy.
+- Equivalence surfaces:
+  - normalized VM observable trace
+  - normalized scheduler/step trace
+  - effect trace
+
+Cross-target matrix tests enforce this contract (`rust/lean-bridge/tests/vm_cross_target_matrix_tests.rs`).
+
+## Determinism Profiles
+
+`VMConfig` exposes a determinism profile:
+
+- `Full`
+- `ModuloEffects`
+- `ModuloCommutativity`
+
+The runtime uses this profile to classify equivalence checks and replay expectations. The profile is configuration-level, so native and wasm runs can be compared under the same declared determinism contract.
+
+## Output-Condition Commit Gate
+
+The VM applies a predicate gate before committing observable outputs.
+
+- Output-condition policy is configured via `VMConfig.output_condition_policy`.
+- Each output-producing commit path emits an `OutputConditionChecked` event with:
+  - `predicate_ref`
+  - `witness_ref` (optional)
+  - `output_digest`
+  - `passed`
+- If verification fails, the step faults with `Fault::OutputConditionFault` and the output is not committed.
+
+This provides a stable interface for future ZK predicate integration while preserving deterministic kernel ownership of final output acceptance.
 
 ## Architecture
 

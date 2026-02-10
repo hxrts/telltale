@@ -6,7 +6,7 @@ This document provides a complete reference for the VM instruction set.
 
 The bytecode instruction set is organized into four categories.
 
-Communication instructions handle message passing between session participants. These include `Send`, `Recv`, `Offer`, and `Choose`. Session instructions manage session lifecycle through `Open` and `Close`. Effect instructions invoke domain-specific behavior via `Invoke`. Control instructions handle program flow with `LoadImm`, `Mov`, `Jmp`, `Yield`, and `Halt`.
+Communication instructions handle message passing between session participants. These include `Send`, `Receive`, `Offer`, and `Choose`. Session instructions manage session lifecycle through `Open` and `Close`. Effect instructions invoke domain-specific behavior via `Invoke`. Control instructions handle program flow with `Set`, `Move`, `Jump`, `Spawn`, `Yield`, and `Halt`.
 
 ## Communication Instructions
 
@@ -22,35 +22,35 @@ Send { chan: Reg, val: Reg }
 
 The `chan` register identifies the endpoint register. The `val` register is reserved for payloads, but the current VM computes payloads via the `EffectHandler` instead of reading from registers. The instruction enqueues the handler-provided value into the appropriate buffer for the destination role.
 
-### Recv
+### Receive
 
-The `Recv` instruction receives a value from a partner role.
+The `Receive` instruction receives a value from a partner role.
 
 ```rust
-Recv { chan: Reg, dst: Reg }
+Receive { chan: Reg, dst: Reg }
 ```
 
 The `chan` register identifies the endpoint register. The `dst` register receives the incoming value. If no message is available, the coroutine blocks with status `RecvWait`.
 
 ### Offer
 
-The `Offer` instruction waits for a label and dispatches based on a jump table.
+The `Offer` instruction sends a selected label.
 
 ```rust
-Offer { chan: Reg, table: Vec<(String, PC)> }
+Offer { chan: Reg, label: String }
 ```
 
-For external choice, the instruction dequeues a label from the partner and jumps to the matching entry. For internal choice, the handler selects a label and the VM enqueues it before jumping. The `chan` register receives the label value.
+The VM checks the current local type is `Send`, verifies the label exists in the send branches, enqueues it, advances the local type continuation, and advances PC.
 
 ### Choose
 
-The `Choose` instruction selects a fixed label and jumps.
+The `Choose` instruction receives a label and dispatches via a branch table.
 
 ```rust
-Choose { chan: Reg, label: String, target: PC }
+Choose { chan: Reg, table: Vec<(String, PC)> }
 ```
 
-The instruction enqueues the provided label and jumps to the target PC. It is useful when the label is statically known.
+The VM checks the current local type is `Recv`, dequeues a label from the partner, validates that label against both session branches and the instruction table, then jumps to the selected PC.
 
 ## Session Instructions
 
@@ -97,35 +97,45 @@ The instruction calls `EffectHandler::step` and records an observable event. The
 
 Control instructions manage program flow and register state.
 
-### LoadImm
+### Set
 
-The `LoadImm` instruction loads an immediate value.
+The `Set` instruction loads an immediate value.
 
 ```rust
-LoadImm { dst: Reg, val: ImmValue }
+Set { dst: Reg, val: ImmValue }
 ```
 
 The value is written directly to the destination register.
 
-### Mov
+### Move
 
-The `Mov` instruction copies between registers.
+The `Move` instruction copies between registers.
 
 ```rust
-Mov { dst: Reg, src: Reg }
+Move { dst: Reg, src: Reg }
 ```
 
 The value in the source register is copied to the destination register.
 
-### Jmp
+### Jump
 
-The `Jmp` instruction performs an unconditional jump.
+The `Jump` instruction performs an unconditional jump.
 
 ```rust
-Jmp { target: PC }
+Jump { target: PC }
 ```
 
 The program counter is set to the target address. This implements loops via recursion variable unfolding.
+
+### Spawn
+
+The `Spawn` instruction reserves a coroutine-spawn opcode in the ISA.
+
+```rust
+Spawn { target: PC, args: Vec<Reg> }
+```
+
+Current status: this variant is modeled in the instruction set but not yet implemented in the cooperative or threaded runtime.
 
 ### Yield
 
@@ -154,13 +164,13 @@ The compiler translates `LocalTypeR` directly to bytecode instructions.
 | LocalTypeR | Instructions |
 |------------|--------------|
 | `Send(partner, [(label, sort, cont)])` | `Send`, `Invoke`, recurse on cont |
-| `Send(partner, branches)` | `Offer` with jump table, then branch blocks |
-| `Recv(partner, [(label, sort, cont)])` | `Recv`, `Invoke`, recurse on cont |
-| `Recv(partner, branches)` | `Offer` with jump table, then branch blocks |
+| `Send(partner, branches)` | deterministic `Offer` using first label, recurse on selected continuation |
+| `Recv(partner, [(label, sort, cont)])` | `Receive`, `Invoke`, recurse on cont |
+| `Recv(partner, branches)` | `Choose` with jump table, then branch blocks |
 | `Mu(var, body)` | Record loop target PC, recurse on body |
-| `Var(name)` | `Jmp` to loop target |
+| `Var(name)` | `Jump` to loop target |
 | `End` | `Halt` |
 
 The translation is straightforward. Single-branch send and receive compile to the primitive instructions. Multi-branch types compile to selection and branching. Recursive types use jump instructions for looping.
 
-The `compileLocalTypeR` function in `rust/vm/src/compiler.rs` implements this translation. Every compiled program ends with either `Halt` or `Jmp`.
+The `compileLocalTypeR` function in `rust/vm/src/compiler.rs` implements this translation. Every compiled program ends with either `Halt` or `Jump`.

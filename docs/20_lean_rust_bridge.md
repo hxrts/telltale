@@ -2,6 +2,9 @@
 
 The `telltale-lean-bridge` crate connects Rust implementations to Lean verification. It provides JSON export and import, cross validation utilities, and an optional runner for invoking the Lean binary.
 
+For the normative VM architecture and proof-contract model used by bridge artifacts, see
+`work/docs/vm_instructions.md`.
+
 ## Two Projection Implementations
 
 The project maintains two independent projections that should agree on the common subset.
@@ -14,6 +17,7 @@ Cross validation tests in `rust/lean-bridge/tests/projection_equivalence_tests.r
 ## JSON Format
 
 The bridge uses a discriminated union with a `kind` field. Recursion uses `kind: "rec"` and `var`.
+Top-level bridge payloads also carry a `schema_version` field (`lean_bridge.v1`) with backward-compatible defaulting for legacy payloads that omitted it.
 
 ```json
 { "kind": "end" }
@@ -53,6 +57,95 @@ Local types follow the same pattern.
 ```
 
 The payload sort supports `unit`, `nat`, `bool`, `string`, `real`, `vector`, and `prod`.
+
+## Bridge Schemas
+
+The bridge uses explicit versioned payload families. Current versions:
+
+- `lean_bridge.v1` for runner payloads (`VmRunInput`, `VmRunOutput`, `ReplayTraceBundle`)
+- `protocol_bundle.v1` for invariant verification bundles
+- `vm_state.v1` for VM state export payloads
+
+### VM State Export (`vm_state.v1`)
+
+Exported by `telltale_lean_bridge::vm_state_to_json`:
+
+```json
+{
+  "schema_version": "vm_state.v1",
+  "compatibility": {
+    "family": "vm_state",
+    "version": "vm_state.v1",
+    "backward_compatible_from": ["vm_state.v0"]
+  },
+  "clock": 7,
+  "nextCoroId": 3,
+  "nextSessionId": 2,
+  "coroutines": [],
+  "sessions": [],
+  "obsTrace": []
+}
+```
+
+Decoder compatibility in `vm_state_from_json` accepts legacy alias keys (for example
+`next_coro_id`, `obs_trace`) so one prior shape can be read during migration.
+
+### Protocol Bundle Export (`protocol_bundle.v1`)
+
+Exported by `telltale_lean_bridge::export_protocol_bundle`:
+
+```json
+{
+  "schema_version": "protocol_bundle.v1",
+  "global_type": { "kind": "end" },
+  "local_types": {},
+  "claims": {
+    "schema_version": "lean_bridge.v1",
+    "liveness": null,
+    "distributed": {},
+    "classical": {}
+  }
+}
+```
+
+Core claim fields are typed enums/structs in Rust (not required string parsing) and serialized to JSON for Lean-side validation entrypoints.
+
+### Trace Validation Payloads
+
+`VmRunner` currently exposes two Lean validation operations:
+
+- `validateTrace` request:
+  - `{ "trace": [VmTraceEvent...] }`
+- `verifyProtocolBundle` request:
+  - `ProtocolBundle` JSON payload (schema `protocol_bundle.v1`)
+
+Both responses are parsed into structured result types and include error objects with explicit `code` and `path` fields when validation fails.
+
+## Replay and Effect Trace Schema
+
+`telltale-lean-bridge` includes replay-oriented trace structures in `vm_trace`:
+
+- `EffectTraceEvent`
+  - `effect_id`
+  - `effect_kind`
+  - `inputs`
+  - `outputs`
+  - `handler_identity`
+  - `ordering_key`
+  - optional `topology` payload
+- `TopologyPerturbationEvent`
+  - `Crash`, `Partition`, `Heal`
+- `OutputConditionTraceEvent`
+  - `predicate_ref`
+  - `witness_ref`
+  - `output_digest`
+  - `passed`
+- `ReplayTraceBundle`
+  - normalized VM trace
+  - effect trace
+  - output-condition trace
+
+`VmRunOutput` accepts optional `effect_trace` and `output_condition_trace` arrays so runner integrations can carry deterministic replay artifacts without changing core VM event encoding.
 
 ## Test Suites
 

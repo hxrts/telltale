@@ -1,0 +1,93 @@
+name: Verify
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  fast-pr-lane:
+    if: github.event_name != 'schedule'
+    name: Fast PR Lane
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install just
+        run: cargo install just --locked
+
+      - name: Build targeted Lean VM modules
+        run: just verify-lean-vm-targets
+
+      - name: Run protocol verification lane
+        run: |
+          mkdir -p artifacts
+          just verify-protocols | tee artifacts/verify-protocols.log
+
+      - name: Run Track A gate
+        run: |
+          mkdir -p artifacts
+          just verify-track-a | tee artifacts/verify-track-a.log
+
+      - name: Upload fast-lane artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-pr-lane-artifacts
+          path: artifacts/
+          if-no-files-found: warn
+
+  scheduled-heavy-lane:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: Scheduled Heavy Lane
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install just
+        run: cargo install just --locked
+
+      - name: Setup Lean
+        uses: leanprover/lean4-action@v1
+
+      - name: Run full Lean build
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts
+          cd lean
+          lake build | tee ../artifacts/lean-full-build.log
+
+      - name: Run cross-target matrix lane
+        run: |
+          mkdir -p artifacts
+          just verify-cross-target-matrix | tee artifacts/verify-cross-target-matrix.log
+
+      - name: Run Track B gate
+        run: |
+          mkdir -p artifacts
+          just verify-track-b | tee artifacts/verify-track-b.log
+
+      - name: Run property-based lane
+        run: |
+          mkdir -p artifacts
+          just verify-properties | tee artifacts/verify-properties.log
+
+      - name: Run composition stress lane
+        run: |
+          mkdir -p artifacts
+          just verify-composition-stress | tee artifacts/verify-composition-stress.log
+
+      - name: Upload heavy-lane artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-heavy-lane-artifacts
+          path: artifacts/
+          if-no-files-found: warn

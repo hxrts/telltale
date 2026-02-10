@@ -141,6 +141,7 @@ lazy_static = "1.4"
 toml = "0.8"
 sha2 = "0.10"
 parking_lot = "0.12"
+fixed = { version = "1.27", default-features = false, features = ["std"] }
 
 # Parsing
 pest = "2.7"

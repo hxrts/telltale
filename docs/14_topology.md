@@ -22,6 +22,7 @@ Topology state holds role mappings, constraints, and optional mode shortcuts.
 pub struct Topology {
     pub mode: Option<TopologyMode>,
     pub locations: BTreeMap<RoleName, Location>,
+    pub channel_capacities: BTreeMap<(RoleName, RoleName), ChannelCapacity>,
     pub constraints: Vec<TopologyConstraint>,
     pub role_constraints: BTreeMap<String, RoleFamilyConstraint>,
 }
@@ -68,6 +69,11 @@ topology TwoPhaseCommit_Prod for TwoPhaseCommit {
         Participant: min = 2, max = 5
     }
 
+    channel_capacities {
+        Coordinator -> ParticipantA: 4
+        Coordinator -> ParticipantB: 4
+    }
+
     constraints {
         separated: Coordinator, ParticipantA
         separated: Coordinator, ParticipantB
@@ -76,7 +82,7 @@ topology TwoPhaseCommit_Prod for TwoPhaseCommit {
 }
 ```
 
-The `role_constraints` block controls acceptable family sizes. The `constraints` block encodes separation, pinning, and region requirements.
+The `role_constraints` block controls acceptable family sizes. The `channel_capacities` block sets per-edge capacity in bits (used for branching feasibility checks). The `constraints` block encodes separation, pinning, and region requirements.
 
 ## Rust API
 
