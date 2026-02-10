@@ -305,10 +305,10 @@ structure LowerBoundCertificate (P : LowerBoundProtocol) where
   fair : P.premises.FairRun run
   uncommitted : ∀ n, P.premises.Uncommitted (run n)
 
-/-- Materialize an explicit certificate from a certified protocol bundle. -/
-noncomputable def certify (P : LowerBoundProtocol) : LowerBoundCertificate P := by
+/-- Materialize a certificate witness from a certified protocol bundle. -/
+theorem certify (P : LowerBoundProtocol) : Nonempty (LowerBoundCertificate P) := by
   classical
-  refine ⟨Classical.choose P.lowerBound, ?_, ?_⟩
+  refine ⟨⟨Classical.choose P.lowerBound, ?_, ?_⟩⟩
   · exact (Classical.choose_spec P.lowerBound).1
   · exact (Classical.choose_spec P.lowerBound).2
 

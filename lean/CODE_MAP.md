@@ -30,15 +30,15 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
-| SessionTypes   |    31 |  ~8,290 | Global/local type definitions, de Bruijn, participation    |
-| SessionCoTypes |    66 | ~12,914 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    70 | ~16,251 | Projection, harmony, blindness, embedding, erasure         |
+| SessionTypes   |    31 |  ~8,572 | Global/local type definitions, de Bruijn, participation    |
+| SessionCoTypes |    67 | ~14,963 | Coinductive EQ2, bisimulation, duality, async subtyping    |
+| Choreography   |    70 | ~17,552 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |     8 |  ~2,171 | Operational semantics, determinism, deadlock freedom       |
-| Classical      |    11 |  ~2,800 | Transported theorems (queueing, large deviations, mixing)  |
-| Distributed    |    12 |  ~1,500 | Distributed assumptions, validation, FLP/CAP theorem packaging|
-| Protocol       |    74 | ~29,500 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |    62 | ~14,200 | VM, Iris backend via iris-lean, resource algebras, WP      |
-| **Total**      | **322** | **~86,126** |                                                      |
+| Classical      |    15 |  ~2,019 | Transported theorems (queueing, large deviations, mixing)  |
+| Distributed    |    19 |  ~3,509 | Distributed assumptions, validation, FLP/CAP theorem packaging|
+| Protocol       |    78 | ~37,474 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |    87 | ~19,179 | VM, Iris backend via iris-lean, resource algebras, WP      |
+| **Total**      | **375** | **~105,439** |                                                      |
 
 **Architectural Layers:**
 ```
@@ -432,7 +432,7 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Environments/Core.lean | 1,294 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init, DEnvUnion |
+| Environments/Core.lean | 1,338 | Store, SEnv, GEnv, DEnv, Buffers — lookup/update/init, DEnvUnion |
 | Environments/Renaming.lean | 493 | Session renaming with injectivity/commutativity |
 | Environments/RoleRenaming.lean | 83 | Role-based session renaming with correctness properties |
 
@@ -443,7 +443,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | File | Lines | Description |
 |------|------:|-------------|
 | Coherence/Consume.lean | 253 | `Consume`, `EdgeCoherent`, `Coherent`, `HasTypeVal` |
-| Coherence/EdgeCoherence.lean | 492 | `BufferTyped`, `StoreTyped`, `ActiveEdge` |
+| Coherence/EdgeCoherence.lean | 525 | `BufferTyped`, `StoreTyped`, `ActiveEdge` |
 | Coherence/StoreTyping.lean | 136 | `StoreTypedStrong`, irrelevance lemmas |
 | Coherence/Preservation.lean | 545 | `Coherent_send_preserved`, `Coherent_recv_preserved` |
 | Coherence/SelectPreservation.lean | 356 | `Coherent_select_preserved`, `Coherent_branch_preserved` |
@@ -456,7 +456,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Coherence/EdgeCoherenceM.lean | 115 | Model-parametric `EdgeCoherent` variants |
 | Coherence/HeadCoherenceM.lean | 28 | Model-parametric `HeadCoherent` |
 | Coherence/PreservationDeliveryModels.lean | 157 | Parametrized preservation lemmas for different delivery models |
-| Coherence/SubtypeReplacement.lean | 492 | `RecvCompatible`, `Consume_mono`, `Coherent_type_replacement`, liveness preservation |
+| Coherence/SubtypeReplacement.lean | 517 | `RecvCompatible`, `Consume_mono`, `Coherent_type_replacement`, liveness preservation |
 | Coherence/GraphDelta.lean | 547 | Higher-order `Consume` with graph deltas for channel delegation |
 | Coherence/Delegation.lean | 878 | `DelegationStep`, `DelegationWF`, `delegation_preserves_coherent` |
 | Coherence/RoleSwap.lean | 895 | Bijective role renaming within session, coherence preservation under role swap |
@@ -533,6 +533,8 @@ Central invariant replacing traditional duality for multiparty async settings.
 | File | Lines | Description |
 |------|------:|-------------|
 | Spatial.lean | 515 | `SpatialReq`, `Topology`, `Satisfies`, `spatial_le_sound`, `ConfusabilityGraph`, branching feasibility |
+| Symmetry.lean | 863 | Symmetry properties, role-symmetric protocols, symmetry-preserving operations |
+| BufferBoundedness.lean | 1,217 | Buffer boundedness analysis, depth bounds, capacity constraints |
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
@@ -542,7 +544,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | CoherenceM.lean | 15 | Model-parametric coherence re-export wrapper |
 | InformationCost.lean | 1050 | `ProjectionMap`, entropy, mutual information, blind projection |
 
-### Classical Regime (4 parts)
+### Classical Regime (5 parts)
 
 Protocol-specific instantiation of the classical transport framework.
 
@@ -551,6 +553,7 @@ Protocol-specific instantiation of the classical transport framework.
 | Classical/Regime.lean | 74 | Classical regime definition, totality, determinism, exchangeability |
 | Classical/Framework.lean | 126 | TransportFramework, step induction, classical regime instantiation |
 | Classical/TransportLedger.lean | 88 | Ledger bookkeeping for transported theorem discharge planning |
+| Classical/SpectralGap.lean | 97 | Spectral gap bounds, mixing time analysis, Cheeger inequality interface |
 | Classical/Instantiation.lean | 474 | Protocol-facing instantiation (Foster-Lyapunov, MaxWeight, Mean-field) |
 
 ---
@@ -566,46 +569,55 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 
 | File | Lines | Description |
 |------|------:|-------------|
-| IrisBridge.lean | 471 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
+| IrisBridge.lean | 545 | `TelltaleIris` typeclass, iProp, sep logic connectives, ghost_map/ghost_var, invariants, WP rules |
 
-### VM Core
-
-| File | Lines | Description |
-|------|-------|-------------|
-| VM/TypeClasses.lean | 247 | Identity, guard, persistence, effect, verification model typeclasses |
-| VM/Core.lean | 66 | Register file, instruction set, coroutine |
-| VM/Config.lean | 74 | VMConfig, VMState, ResourcePool |
-| VM/State.lean | 285 | Full machine state, session table, buffer management |
-| VM/Program.lean | 108 | Program representation and code segments |
-| VM/Definition.lean | 14 | Re-export wrapper for VM.State and VM.Exec |
-| VM/InstrSpec.lean | 1,525 | Denotational specs for all 8 instructions, preservation theorems |
-| VM/Knowledge.lean | 30 | Knowledge base and fact management |
-| VM/Violation.lean | 29 | Violation policy and fault types |
-| VM/SchedulerTypes.lean | 28 | Scheduler type definitions |
-| VM/UnitModel.lean | 181 | Minimal computable instances for all VM domain typeclasses |
-
-### VM Execution
+### VM Model (VM/Model/)
 
 | File | Lines | Description |
-|------|-------|-------------|
-| VM/Exec.lean | 89 | Top-level step function dispatch |
-| VM/ExecHelpers.lean | 421 | Register operations, buffer lookup, shared helpers |
-| VM/ExecComm.lean | 449 | Send/recv/select/branch execution |
-| VM/ExecSession.lean | 304 | Session open/close/fork/join |
-| VM/ExecOwnership.lean | 157 | Ownership transfer and capability operations |
-| VM/ExecControl.lean | 103 | Control flow (jump, call, return, halt) |
-| VM/ExecGuardEffect.lean | 111 | Guard chain evaluation and effect dispatch |
-| VM/ExecSpeculation.lean | 66 | Speculative execution (fork/join/abort) |
-| VM/ExecSteps.lean | 54 | Multi-step execution wrapper |
-| VM/CompileLocalTypeR.lean | 150 | Compiler from LocalTypeR to VM bytecode instructions |
+|------|------:|-------------|
+| Core.lean | 67 | Register file, instruction set, coroutine |
+| Config.lean | 85 | VMConfig, VMState, ResourcePool |
+| State.lean | 304 | Full machine state, session table, buffer management |
+| Program.lean | 137 | Program representation and code segments |
+| TypeClasses.lean | 251 | Identity, guard, persistence, effect, verification model typeclasses |
+| CompileLocalTypeR.lean | 190 | Compiler from LocalTypeR to VM bytecode instructions |
+| Knowledge.lean | 30 | Knowledge base and fact management |
+| Violation.lean | 29 | Violation policy and fault types |
+| SchedulerTypes.lean | 26 | Scheduler type definitions |
+| UnitModel.lean | 184 | Minimal computable instances for all VM domain typeclasses |
+| OutputCondition.lean | 54 | Output-condition model for commit gating |
 
-### VM Loading and Scheduling
+### VM Semantics (VM/Semantics/)
 
 | File | Lines | Description |
-|------|-------|-------------|
-| VM/LoadChoreography.lean | 140 | Dynamic choreography loading into running VM state |
-| VM/RunScheduled.lean | 104 | N-concurrent scheduler-driven execution loop |
-| VM/Json.lean | 145 | JSON serialization for runtime values and trace events |
+|------|------:|-------------|
+| Exec.lean | 127 | Top-level step function dispatch |
+| ExecHelpers.lean | 422 | Register operations, buffer lookup, shared helpers |
+| ExecComm.lean | 449 | Send/recv/select/branch execution |
+| ExecSession.lean | 304 | Session open/close/fork/join |
+| ExecOwnership.lean | 162 | Ownership transfer and capability operations |
+| ExecControl.lean | 103 | Control flow (jump, call, return, halt) |
+| ExecGuardEffect.lean | 111 | Guard chain evaluation and effect dispatch |
+| ExecSpeculation.lean | 66 | Speculative execution (fork/join/abort) |
+| ExecSteps.lean | 54 | Multi-step execution wrapper |
+| InstrSpec.lean | 324 | Denotational specs for 8 instruction types |
+
+### VM Runtime (VM/Runtime/)
+
+| File | Lines | Description |
+|------|------:|-------------|
+| Loader.lean | 109 | Dynamic choreography loading into running VM state |
+| Runner.lean | 104 | N-concurrent scheduler-driven execution loop |
+| Scheduler.lean | 294 | Process scheduler with fairness and priority |
+| Monitor.lean | 139 | SessionKind, WellTypedInstr judgment, unified session monitor |
+| Failure.lean | 290 | Failure modes (crash, partition, heal), FStep relation, recovery predicates |
+| Json.lean | 145 | JSON serialization for runtime values and trace events |
+
+### VM Composition (VM/Composition/)
+
+| File | Lines | Description |
+|------|------:|-------------|
+| DomainComposition.lean | 326 | Domain-specific composition and guard chain |
 
 ### Resources
 
@@ -630,22 +642,23 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | ProgramLogic/WPPipeline.lean | 25 | WP pipeline composition |
 | ProgramLogic/FinalizationWP.lean | 39 | Finalization and cleanup WP rules |
 
-### Invariants, Scheduling, Transport
+### Invariants and Transport
 
 | File | Lines | Description |
-|------|-------|-------------|
+|------|------:|-------------|
 | Invariants/SessionInv.lean | 256 | Session invariant: coherence, buffers, endpoint state |
-| VM/Scheduler.lean | 309 | Process scheduler with fairness and priority |
 | Transport/Transport.lean | 232 | Abstract transport layer with handler specs |
 | Cost/Credits.lean | 56 | Cost credit resource algebra |
 
-### Domain Composition and Monitoring
+### Proofs/VM (VM Instruction Proofs)
 
 | File | Lines | Description |
-|------|-------|-------------|
-| VM/DomainComposition.lean | 326 | Domain-specific composition and guard chain |
-| VM/Monitor.lean | 123 | SessionKind, WellTypedInstr judgment, unified session monitor |
-| VM/Failure.lean | 235 | Failure modes (crash, partition, heal), FStep relation, recovery predicates |
+|------|------:|-------------|
+| Proofs/VM/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
+| Proofs/VM/Scheduler.lean | 136 | Scheduler proof infrastructure |
+| Proofs/VM/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
+| Proofs/VM/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
+| Proofs/VM/LoadChoreography.lean | 37 | Choreography loading and verification |
 
 ### Adequacy and Proofs
 
@@ -658,7 +671,7 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
 | Proofs/Frame.lean | 128 | `session_local_op_preserves_other`, `disjoint_ops_preserve_unrelated` |
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
-| Proofs/Progress.lean | 324 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
+| Proofs/Progress.lean | 607 | `CoherentVMState`, `ProgressVMState`, `vm_progress`, instruction enablement |
 | Proofs/ProgressApi.lean | 181 | Bundle-oriented liveness API and optional progress hypothesis surface |
 | Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle for VM theorem derivation |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
@@ -667,8 +680,8 @@ Consolidated interface to iris-lean separation logic. Ghost maps use `Positive` 
 | Proofs/TheoremPack.lean | 499 | Unified VM theorem pack and theorem inventory summary |
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
 | Proofs/VMPotential.lean | 266 | VM potential integration and transported Foster bridge |
-| Proofs/WeightedMeasure.lean | 989 | Lyapunov measure infrastructure, step decrease theorems |
-| Proofs/SchedulingBound.lean | 536 | k-fair scheduler termination bounds, round-robin corollary |
+| Proofs/WeightedMeasure.lean | 1,198 | Lyapunov measure infrastructure, step decrease theorems |
+| Proofs/SchedulingBound.lean | 670 | k-fair scheduler termination bounds, round-robin corollary |
 | Proofs/Diamond.lean | 468 | Cross-session diamond lemmas and main confluence theorem |
 | Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end VM examples: profile attachment auto-materializes distributed theorem artifacts |
 | Proofs/Examples/InvariantBundle.lean | 74 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
@@ -785,9 +798,14 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **VM-level progress theorem?** → Runtime/Proofs/Progress.lean
 - **Lyapunov measure?** → Runtime/Proofs/Lyapunov.lean, Runtime/Proofs/WeightedMeasure.lean
 - **Scheduling bounds?** → Runtime/Proofs/SchedulingBound.lean
-- **VM bytecode compiler?** → Runtime/VM/CompileLocalTypeR.lean
-- **Dynamic choreography loading?** → Runtime/VM/LoadChoreography.lean
-- **N-concurrent scheduling?** → Runtime/VM/RunScheduled.lean, Runtime/Proofs/Concurrency.lean
-- **VM failure model?** → Runtime/VM/Failure.lean
+- **VM instruction specifications?** → Runtime/VM/Semantics/InstrSpec.lean
+- **VM instruction preservation proofs?** → Runtime/Proofs/VM/InstrSpec.lean
+- **VM bytecode compiler?** → Runtime/VM/Model/CompileLocalTypeR.lean
+- **Dynamic choreography loading?** → Runtime/VM/Runtime/Loader.lean
+- **N-concurrent scheduling?** → Runtime/VM/Runtime/Runner.lean, Runtime/Proofs/Concurrency.lean
+- **VM failure model?** → Runtime/VM/Runtime/Failure.lean
+- **Buffer boundedness?** → Protocol/BufferBoundedness.lean
+- **Protocol symmetry?** → Protocol/Symmetry.lean
+- **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean
 - **VM JSON runner?** → Runtime/Tests/VMRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)

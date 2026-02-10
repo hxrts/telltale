@@ -16,7 +16,7 @@ universe u
 structure OutputConditionClaim where
   -- Stable predicate identifier (id/hash string in V1).
   predicateRef : String
-  -- Optional witness payload reference (opaque in V1).
+  -- Optional witness payload reference (hidden in V1).
   witnessRef : Option String := none
   -- Opaque digest/summary of the candidate output.
   outputDigest : Value := .unit

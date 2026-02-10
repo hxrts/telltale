@@ -93,7 +93,7 @@ def stepEventToJson (tick : Nat) (ev : Option (StepEvent UnitEffect)) : Json :=
   | some (.obs obs) => obsEventToJson { tick := tick, event := obs }
   | _ => Json.null
 
-partial def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
+def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
     (stepIndex : Nat) (acc : List Json) : RunnerState × List Json :=
   match fuel with
   | 0 => (st, acc.reverse)
