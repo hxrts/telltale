@@ -30,6 +30,8 @@ section
 /-- Session renaming: an injective function on session IDs. -/
 structure SessionRenaming where
   f : SessionId → SessionId
+  inv : SessionId → SessionId
+  left_inv : ∀ s, inv (f s) = s
   inj : ∀ s1 s2, f s1 = f s2 → s1 = s2
 
 /-- Rename a value type by updating embedded session IDs. -/
@@ -97,24 +99,22 @@ def renameValue (ρ : SessionRenaming) : Value → Value
 def renameGEnv (ρ : SessionRenaming) (G : GEnv) : GEnv :=
   G.map fun (e, L) => (renameEndpoint ρ e, renameLocalType ρ L)
 
-/-- Choose a preimage edge under renaming (if it exists). -/
-def preimageEdgeImpl (_ρ : SessionRenaming) (_e : Edge) : Option Edge := none
-
-@[implemented_by preimageEdgeImpl]
+/-- Compute a preimage edge under renaming when the sid is in the image of `f`. -/
 def preimageEdge (ρ : SessionRenaming) (e : Edge) : Option Edge :=
-  if h : ∃ e', renameEdge ρ e' = e then
-    some (Classical.choose h)
+  let sid' := ρ.inv e.sid
+  if h : ρ.f sid' = e.sid then
+    some { sid := sid', sender := e.sender, receiver := e.receiver }
   else
     none
 
 theorem preimageEdge_spec {ρ : SessionRenaming} {e e' : Edge} :
     preimageEdge ρ e = some e' → renameEdge ρ e' = e := by
   intro h
-  by_cases hpre : ∃ e'', renameEdge ρ e'' = e
-  · simp [preimageEdge, hpre] at h
-    cases h
-    exact Classical.choose_spec hpre
-  · simp [preimageEdge, hpre] at h
+  unfold preimageEdge at h
+  dsimp at h
+  split_ifs at h with hs
+  · cases h
+    simp [renameEdge, hs]
 
 /-- Renaming preserves edge equality (injective). -/
 theorem renameEdge_inj (ρ : SessionRenaming) (e1 e2 : Edge) :
@@ -289,12 +289,8 @@ theorem renameEndpoint_inj (ρ : SessionRenaming) (e1 e2 : Endpoint) :
 
 theorem preimageEdge_rename (ρ : SessionRenaming) (e : Edge) :
     preimageEdge ρ (renameEdge ρ e) = some e := by
-  classical
-  have hpre : ∃ e', renameEdge ρ e' = renameEdge ρ e := ⟨e, rfl⟩
-  have hEq : Classical.choose hpre = e := by
-    apply renameEdge_inj ρ
-    simpa using (Classical.choose_spec hpre)
-  simp [preimageEdge, hpre, hEq]
+  unfold preimageEdge
+  simp [renameEdge, ρ.left_inv e.sid]
 
 /-! ## Renaming Lookup Lemmas -/
 
@@ -540,13 +536,9 @@ theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
   | none =>
       have hno : ∀ p ∈ D.list, renameEdge ρ p.1 ≠ e := by
         intro p hp hEq
-        have hex : ∃ e', renameEdge ρ e' = e := ⟨p.1, hEq⟩
-        have hsome : preimageEdge ρ e = some (Classical.choose hex) := by
-          simp [preimageEdge, hex]
-        have : (none : Option Edge) = some (Classical.choose hex) := by
-          rw [hpre] at hsome
-          exact hsome
-        cases this
+        have hsome : preimageEdge ρ e = some p.1 := by
+          simpa [hEq] using (preimageEdge_rename ρ p.1)
+        exact Option.noConfusion (hpre ▸ hsome)
       have hlookup :
           lookupD (renameDEnv ρ D) e = lookupD (∅ : DEnv) e := by
         simpa [renameDEnv] using
@@ -667,9 +659,8 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
     | none =>
         have hno_lhs : ∀ p ∈ (updateD D e ts).list, renameEdge ρ p.1 ≠ e' := by
           intro p hp hEq
-          have hex : ∃ e'', renameEdge ρ e'' = e' := ⟨p.1, hEq⟩
-          have hsome : preimageEdge ρ e' = some (Classical.choose hex) := by
-            simp [preimageEdge, hex]
+          have hsome : preimageEdge ρ e' = some p.1 := by
+            simpa [hEq] using (preimageEdge_rename ρ p.1)
           exact Option.noConfusion (hpre ▸ hsome)
         have hLhs : (renameDEnv ρ (updateD D e ts)).find? e' = none := by
           simpa [renameDEnv] using
@@ -677,9 +668,8 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
               (acc := (∅ : DEnv)) (edge := e') hno_lhs)
         have hno_rhs : ∀ p ∈ D.list, renameEdge ρ p.1 ≠ e' := by
           intro p hp hEq
-          have hex : ∃ e'', renameEdge ρ e'' = e' := ⟨p.1, hEq⟩
-          have hsome : preimageEdge ρ e' = some (Classical.choose hex) := by
-            simp [preimageEdge, hex]
+          have hsome : preimageEdge ρ e' = some p.1 := by
+            simpa [hEq] using (preimageEdge_rename ρ p.1)
           exact Option.noConfusion (hpre ▸ hsome)
         have hRhsBase : (renameDEnv ρ D).find? e' = none := by
           simpa [renameDEnv] using

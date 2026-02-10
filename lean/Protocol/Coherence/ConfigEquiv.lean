@@ -39,6 +39,8 @@ namespace SessionIso
 /-- Forward renaming from an isomorphism. -/
 def toRenaming (σ : SessionIso) : SessionRenaming :=
   { f := σ.fwd
+    inv := σ.bwd
+    left_inv := σ.left_inv
     inj := by
       -- Injectivity follows by applying the inverse to both sides.
       intro s1 s2 h
@@ -48,6 +50,8 @@ def toRenaming (σ : SessionIso) : SessionRenaming :=
 /-- Inverse renaming from an isomorphism. -/
 def invRenaming (σ : SessionIso) : SessionRenaming :=
   { f := σ.bwd
+    inv := σ.fwd
+    left_inv := σ.right_inv
     inj := by
       -- Injectivity follows by applying the forward map to both sides.
       intro s1 s2 h
@@ -94,6 +98,10 @@ namespace SessionRenaming
 /-- Identity session renaming. -/
 def id : SessionRenaming :=
   { f := fun s => s
+    inv := fun s => s
+    left_inv := by
+      intro s
+      rfl
     inj := by
       -- Identity is injective by reflexivity.
       intro s1 s2 h; simpa using h }
@@ -101,6 +109,10 @@ def id : SessionRenaming :=
 /-- Composition of renamings (ρ₂ ∘ ρ₁). -/
 def comp (ρ₂ ρ₁ : SessionRenaming) : SessionRenaming :=
   { f := fun s => ρ₂.f (ρ₁.f s)
+    inv := fun s => ρ₁.inv (ρ₂.inv s)
+    left_inv := by
+      intro s
+      simp [ρ₂.left_inv, ρ₁.left_inv]
     inj := by
       -- Injectivity comes from injectivity of each component.
       intro s1 s2 h
