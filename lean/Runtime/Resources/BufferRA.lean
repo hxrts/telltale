@@ -2,7 +2,7 @@ import Std
 import Protocol.Environments.Core
 import Runtime.VM.Model.Core
 import Runtime.VM.Model.TypeClasses
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-!
 # Task 14: Buffer Resource Algebra

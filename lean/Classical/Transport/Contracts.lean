@@ -1,4 +1,5 @@
 import Classical.Transport.Context
+import ClassicalAnalysisInstance
 import Classical.Families.FosterLyapunovHarris
 import Classical.Families.MaxWeightBackpressure
 import Classical.Families.LargeDeviationPrinciple
@@ -21,6 +22,8 @@ namespace Classical
 namespace Transport
 
 universe u
+
+variable [EntropyAPI.AnalysisLaws]
 
 /-- Foster-Lyapunov transport contract. -/
 structure FosterInput (State : Type u) (ctx : TransportCtx State) where

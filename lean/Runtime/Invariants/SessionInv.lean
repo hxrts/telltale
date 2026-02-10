@@ -3,7 +3,7 @@ import Protocol.Coherence.Consume
 import Runtime.Resources.SessionRA
 import Runtime.ProgramLogic.GhostState
 import Runtime.VM.Model.State
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-
 The Problem. The runtime needs a per-session cancelable invariant that

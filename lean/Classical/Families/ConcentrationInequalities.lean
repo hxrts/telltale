@@ -1,4 +1,5 @@
 import Mathlib
+import ClassicalAnalysisAPI
 
 /-!
 # Concentration Inequalities
@@ -103,20 +104,16 @@ namespace ConcentrationInequalities
     - t is the deviation threshold
 
     P(|X - μ| > t) ≤ subGaussianTail σ t gives the canonical tail bound. -/
-def subGaussianTailImpl (_σ _t : Real) : Real := 0
-
-@[implemented_by subGaussianTailImpl]
-def subGaussianTail (σ t : Real) : Real :=
-  2 * Real.exp (-(t ^ 2) / (2 * σ ^ 2))
+def subGaussianTail [EntropyAPI.AnalysisModel] (σ t : Real) : Real :=
+  EntropyAPI.exponentialTail σ t
 
 /-- Sub-Gaussian tails are non-negative.
 
     Probabilities are always in [0, 1], but sub-Gaussian bounds can exceed 1
     for small t. This theorem just confirms the bound is at least 0. -/
-theorem subGaussianTail_nonneg (σ t : Real) :
+theorem subGaussianTail_nonneg [EntropyAPI.AnalysisLaws] (σ t : Real) :
     0 ≤ subGaussianTail σ t := by
-  unfold subGaussianTail
-  positivity
+  simpa [subGaussianTail] using EntropyAPI.exponentialTail_nonneg σ t
 
 /-- A `ConcentrationWitness` certifies that a tail function has sub-Gaussian decay.
 
@@ -126,7 +123,7 @@ theorem subGaussianTail_nonneg (σ t : Real) :
 
     In the Telltale setting, this witnesses that an observable (like buffer
     deviation or completion time deviation) has sub-Gaussian concentration. -/
-structure ConcentrationWitness (p : Real → Real) where
+structure ConcentrationWitness [EntropyAPI.AnalysisModel] (p : Real → Real) where
   σ : Real
   sigma_pos : 0 < σ
   tail_upper : ∀ t, 0 ≤ t → p t ≤ subGaussianTail σ t
@@ -135,12 +132,14 @@ structure ConcentrationWitness (p : Real → Real) where
 
     For protocols: P(|X - μ| > 0) ≤ 2, which is vacuously true since
     probabilities are at most 1. The bound becomes meaningful for t > 0. -/
-theorem at_zero_bound {p : Real → Real} (h : ConcentrationWitness p) :
+theorem at_zero_bound [EntropyAPI.AnalysisLaws] {p : Real → Real}
+    (h : ConcentrationWitness p) :
     p 0 ≤ 2 := by
   have h0 := h.tail_upper 0 (le_rfl : (0 : Real) ≤ 0)
   calc
     p 0 ≤ subGaussianTail h.σ 0 := h0
-    _ = 2 := by simp [subGaussianTail]
+    _ = 2 := by
+      simpa [subGaussianTail] using EntropyAPI.exponentialTail_zero h.σ
 
 end ConcentrationInequalities
 end Classical

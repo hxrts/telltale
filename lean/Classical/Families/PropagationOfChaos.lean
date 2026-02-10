@@ -1,4 +1,5 @@
 import Mathlib
+import ClassicalAnalysisAPI
 
 /-!
 # Propagation of Chaos and Mean-Field Limits
@@ -120,11 +121,8 @@ def empiricalTotal (x : Fin n → Real) : Real :=
     - empiricalMean x = (1/n) Σᵢ x(i) is the average metric across sessions
 
     The empirical mean is the key observable for mean-field analysis. -/
-def empiricalMeanImpl (_x : Fin n → Real) : Real := 0
-
-@[implemented_by empiricalMeanImpl]
-def empiricalMean (x : Fin n → Real) : Real :=
-  if h : n = 0 then 0 else empiricalTotal x / (n : Real)
+def empiricalMean [EntropyAPI.AnalysisModel] (x : Fin n → Real) : Real :=
+  EntropyAPI.finiteAverage x
 
 /-- The total is invariant under permutation of indices.
 
@@ -145,9 +143,10 @@ theorem empiricalTotal_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
     For Coherence: this justifies analyzing "typical" session behavior
     without tracking which specific sessions we are examining. -/
 theorem empiricalMean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
+    [EntropyAPI.AnalysisLaws] →
     empiricalMean (fun i => x (σ i)) = empiricalMean x := by
-  unfold empiricalMean
-  split_ifs <;> simp [empiricalTotal_perm (σ := σ) (x := x), *]
+  intro _
+  simpa [empiricalMean] using EntropyAPI.finiteAverage_perm σ x
 
 /-- The empirical mean of a constant is that constant.
 
@@ -158,11 +157,10 @@ theorem empiricalMean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
     For protocols: if all sessions are in identical states, the
     aggregate behavior equals the individual behavior. -/
 theorem empiricalMean_const (c : Real) :
+    [EntropyAPI.AnalysisLaws] →
     ∀ hn : n ≠ 0, empiricalMean (fun _ : Fin n => c) = c := by
-  intro hn
-  unfold empiricalMean empiricalTotal
-  have hnR : (n : Real) ≠ 0 := by exact_mod_cast hn
-  simp [hn, hnR]
+  intro _ hn
+  simpa [empiricalMean] using EntropyAPI.finiteAverage_const c hn
 
 end PropagationOfChaos
 end Classical

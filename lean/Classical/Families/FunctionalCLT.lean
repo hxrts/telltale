@@ -1,4 +1,5 @@
 import Mathlib
+import ClassicalAnalysisAPI
 
 /-!
 # Functional Central Limit Theorem
@@ -121,12 +122,8 @@ def partialSum (x : Nat → Real) (μ : Real) (t : Nat) : Real :=
     - The √N scaling gives O(1) fluctuations as N → ∞
 
     This is the object that converges to Brownian motion. -/
-def scaledProcessImpl (x : Nat → Real) (μ : Real) (_N t : Nat) : Real :=
-  partialSum x μ t
-
-@[implemented_by scaledProcessImpl]
-def scaledProcess (x : Nat → Real) (μ : Real) (N t : Nat) : Real :=
-  partialSum x μ t / Real.sqrt N
+def scaledProcess [EntropyAPI.AnalysisModel] (x : Nat → Real) (μ : Real) (N t : Nat) : Real :=
+  EntropyAPI.normalizedCumulative x μ N t
 
 /-- Centered increments are additive.
 
@@ -152,9 +149,10 @@ theorem partialSum_const_zero (c : Real) (t : Nat) :
     This is the base case: no randomness means no Brownian component.
     For protocols, a perfectly predictable execution has zero fluctuations. -/
 theorem scaledProcess_const_zero (c : Real) (N t : Nat) (hN : N ≠ 0) :
+    [EntropyAPI.AnalysisLaws] →
     scaledProcess (fun _ => c) c N t = 0 := by
-  unfold scaledProcess
-  simp [partialSum_const_zero]
+  intro _
+  simpa [scaledProcess] using EntropyAPI.normalizedCumulative_const_zero c N t hN
 
 end FunctionalCLT
 end Classical

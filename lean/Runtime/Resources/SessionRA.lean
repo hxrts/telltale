@@ -1,5 +1,5 @@
 import Runtime.VM.Model.TypeClasses
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-!
 # Task 13: Session Resource Algebra
@@ -15,7 +15,7 @@ Ghost map for session endpoints from iris_runtime_2.md §5.1.
 
 Keys (Endpoint) are encoded to Positive via `encodeEndpoint`.
 
-Dependencies: IrisBridge, GhostMapSlot LocalType instance.
+Dependencies: IrisExtraction boundary, GhostMapSlot LocalType instance.
 -/
 
 set_option autoImplicit false

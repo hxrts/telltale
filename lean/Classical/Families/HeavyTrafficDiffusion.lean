@@ -1,4 +1,5 @@
 import Mathlib
+import ClassicalAnalysisAPI
 
 /-!
 # Heavy Traffic Diffusion Limits
@@ -101,31 +102,26 @@ def centered (x μ : Real) : Real :=
     This is the characteristic scaling of the central limit theorem: sums of
     n independent random variables have fluctuations of order √n. For protocols,
     after n steps, buffer deviations from the mean are typically of order √n. -/
-def diffusionScaleImpl (n : Nat) : Real := n
-
-@[implemented_by diffusionScaleImpl]
-def diffusionScale (n : Nat) : Real :=
-  Real.sqrt n
+def diffusionScale [EntropyAPI.AnalysisModel] (n : Nat) : Real :=
+  EntropyAPI.fluctuationScale n
 
 /-- The diffusion scale is positive for positive n.
 
     This ensures we can divide by the scale factor in normalization. -/
-theorem diffusionScale_pos {n : Nat} (hn : 0 < n) :
+theorem diffusionScale_pos [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) :
     0 < diffusionScale n := by
-  unfold diffusionScale
-  exact Real.sqrt_pos.2 (Nat.cast_pos.2 hn)
+  simpa [diffusionScale] using EntropyAPI.fluctuationScale_pos hn
 
 /-- Centering commutes with scaling.
 
     The normalized centered value equals the difference of normalized values.
     This allows us to compute scaled fluctuations either by centering then
     scaling, or by scaling then taking differences. -/
-theorem centered_div_scale {n : Nat} (hn : 0 < n) (x μ : Real) :
+theorem centered_div_scale [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) (x μ : Real) :
     centered x μ / diffusionScale n = x / diffusionScale n - μ / diffusionScale n := by
   unfold centered
   have hscale : diffusionScale n ≠ 0 := by
-    unfold diffusionScale
-    exact Real.sqrt_ne_zero'.2 (Nat.cast_pos.2 hn)
+    exact ne_of_gt (diffusionScale_pos hn)
   field_simp [hscale]
 
 /-- Variance under diffusion scaling.
@@ -136,13 +132,14 @@ theorem centered_div_scale {n : Nat} (hn : 0 < n) (x μ : Real) :
 
     For protocols: if per-step buffer fluctuation has variance σ², then after
     n steps the total buffer deviation has variance σ² · n. -/
-theorem variance_scaling (σ : Real) (n : Nat) :
+theorem variance_scaling [EntropyAPI.AnalysisLaws] (σ : Real) (n : Nat) :
     (σ * diffusionScale n) ^ 2 = σ ^ 2 * n := by
-  unfold diffusionScale
+  have hsq : (diffusionScale n) ^ 2 = n := by
+    simpa [diffusionScale] using EntropyAPI.fluctuationScale_sq n
   calc
-    (σ * Real.sqrt n) ^ 2 = σ ^ 2 * (Real.sqrt n) ^ 2 := by ring
+    (σ * diffusionScale n) ^ 2 = σ ^ 2 * (diffusionScale n) ^ 2 := by ring
     _ = σ ^ 2 * n := by
-      rw [Real.sq_sqrt (show 0 ≤ (n : Real) from by exact_mod_cast Nat.zero_le n)]
+      rw [hsq]
 
 end HeavyTrafficDiffusion
 end Classical

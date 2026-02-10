@@ -23,7 +23,7 @@ import Runtime.Proofs.DeterminismApi
 import Runtime.Proofs.TheoremPack
 import Runtime.Proofs.SchedulerTheoremPack
 import Runtime.Proofs.RuntimeContracts
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /- 
 The Problem. Provide a single entry point that re-exports the runtime spec

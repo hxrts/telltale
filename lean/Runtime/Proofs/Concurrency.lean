@@ -1,7 +1,7 @@
 import Runtime.VM.Runtime.Runner
 import Runtime.VM.Runtime.Scheduler
 import Runtime.ProgramLogic.LanguageInstance
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-
 The Problem. Show that per-session normalized traces are invariant under

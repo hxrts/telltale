@@ -1,5 +1,5 @@
 import Runtime.VM.Model.Config
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /- 
 The Problem. The runtime needs a lightweight credit resource for metering

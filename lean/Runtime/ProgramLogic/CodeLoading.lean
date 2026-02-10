@@ -2,7 +2,7 @@ import Protocol.Coherence.Consume
 import Protocol.DeadlockFreedom
 import Runtime.VM.API
 import Runtime.Invariants.SessionInv
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-
 The Problem. The VM needs a code loading interface with V1 hash checks

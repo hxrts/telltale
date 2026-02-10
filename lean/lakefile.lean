@@ -63,6 +63,15 @@ lean_lib ClassicalLayer where
 lean_lib Distributed where
   globs := #[`Distributed.*]
 
+/-- Analysis and extraction boundary layers. -/
+lean_lib Entropy where
+  globs := #[
+    `ClassicalAnalysisAPI,
+    `ClassicalAnalysisInstance,
+    `IrisExtractionAPI,
+    `IrisExtractionInstance
+  ]
+
 /-- Linker args to silence macOS deployment target warnings for test executables. -/
 def macosLinkArgs : Array String :=
   -- Match the toolchain's minimum macOS version for system libraries.

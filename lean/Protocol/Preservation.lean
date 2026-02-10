@@ -269,7 +269,8 @@ private theorem OwnedDisjoint_updateLeft
   · subst hxy
     have hNone : lookupSEnv (eraseSEnv Sown.right y) y = none := lookupSEnv_erase_eq (S:=Sown.right) (x:=y)
     have : (some Ty1 : Option ValType) = none := by
-      simpa [OwnedEnv.updateLeft, hNone] using hR
+      have hR' := hR
+      simp [OwnedEnv.updateLeft, hNone] at hR'
     cases this
   · have hR' : lookupSEnv Sown.right y = some Ty1 := by
       have hEq := lookupSEnv_erase_ne (S:=Sown.right) (x:=x) (y:=y) hxy
@@ -286,7 +287,9 @@ private theorem SEnvDomSubset_erase
   by_cases hxy : y = x
   · subst hxy
     have hNone : lookupSEnv (eraseSEnv S y) y = none := lookupSEnv_erase_eq (S:=S) (x:=y)
-    have : (some Ty : Option ValType) = none := by simpa [hNone] using hErase
+    have : (some Ty : Option ValType) = none := by
+      have hErase' := hErase
+      simp [hNone] at hErase'
     cases this
   · have hEq : lookupSEnv (eraseSEnv S x) y = lookupSEnv S y :=
       lookupSEnv_erase_ne (S:=S) (x:=x) (y:=y) hxy

@@ -2,7 +2,7 @@ import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Invariants.SessionInv
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.WPPair
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /- 
 The Problem. Provide uniform WP rules for VM instructions without repeating

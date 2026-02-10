@@ -1,6 +1,6 @@
 import Runtime.VM.Model.TypeClasses
 import Runtime.VM.Composition.DomainComposition
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-
 The Problem. Proof-only specifications (Iris pre/postconditions and namespace

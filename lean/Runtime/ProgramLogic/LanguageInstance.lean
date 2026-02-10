@@ -1,5 +1,5 @@
 import Runtime.VM.API
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-!
 # Task 12: Language Instance

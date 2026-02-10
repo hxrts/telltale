@@ -1,5 +1,5 @@
 import Runtime.VM.Model.Core
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /-
 The Problem. The runtime needs a unified monitor that tracks session

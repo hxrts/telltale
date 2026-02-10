@@ -1,5 +1,5 @@
 import Runtime.VM.Model.Core
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /- 
 The Problem. Many instruction WP rules share the same acquire/interact/release

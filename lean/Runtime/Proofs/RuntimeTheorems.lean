@@ -8,7 +8,7 @@ import Runtime.ProgramLogic.GhostState
 import Runtime.Proofs.Lyapunov
 import Runtime.Proofs.Delegation
 import Runtime.Proofs.Diamond
-import Protocol.InformationCost
+import ClassicalAnalysisAPI
 
 /-!
 # Runtime Theorems
@@ -262,6 +262,55 @@ Credit-based cost model theorems: soundness, budget bounds, and
 information-theoretic costs for branching decisions.
 -/
 
+/-! ### Local Entropy Naming
+
+This file keeps protocol-oriented names local by mapping them to the neutral
+entropy API at the point of use.
+-/
+
+/-- Local branch-entropy name used by runtime cost statements. -/
+private def branchEntropy {L : Type*} [Fintype L] [EntropyAPI.Model]
+    (labelDist : L → ℝ) : ℝ :=
+  EntropyAPI.shannonEntropy labelDist
+
+/-- Local speculation-divergence name used by runtime cost statements. -/
+private def speculationDivergence {L : Type*} [Fintype L] [EntropyAPI.Model]
+    (specDist commitDist : L → ℝ) : ℝ :=
+  EntropyAPI.klDivergence specDist commitDist
+
+/-- Local branch-entropy nonnegativity wrapper. -/
+private theorem branchEntropy_nonneg {L : Type*} [Fintype L] [EntropyAPI.Laws]
+    (d : EntropyAPI.Distribution L) :
+    0 ≤ branchEntropy d.pmf := by
+  -- Delegate to Shannon entropy nonnegativity through the local alias.
+  simpa [branchEntropy] using EntropyAPI.shannonEntropy_nonneg d
+
+/-- Local branch-entropy upper-bound wrapper. -/
+private theorem branchEntropy_le_log_card
+    {L : Type*} [Fintype L] [Nonempty L] [EntropyAPI.Laws]
+    (d : EntropyAPI.Distribution L) :
+    branchEntropy d.pmf ≤ Real.log (Fintype.card L) := by
+  -- Delegate to Shannon entropy max-entropy bound through the local alias.
+  simpa [branchEntropy] using EntropyAPI.shannonEntropy_le_log_card d
+
+/-- Local speculation-divergence nonnegativity wrapper. -/
+private theorem speculationDivergence_nonneg
+    {L : Type*} [Fintype L] [EntropyAPI.Laws]
+    (p q : EntropyAPI.Distribution L)
+    (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
+    0 ≤ speculationDivergence p.pmf q.pmf := by
+  -- Delegate to KL nonnegativity through the local alias.
+  simpa [speculationDivergence] using EntropyAPI.klDivergence_nonneg p q habs
+
+/-- Local speculation-divergence zero characterization wrapper. -/
+private theorem speculationDivergence_eq_zero_iff
+    {L : Type*} [Fintype L] [EntropyAPI.Laws]
+    (p q : EntropyAPI.Distribution L)
+    (habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0) :
+    speculationDivergence p.pmf q.pmf = 0 ↔ p.pmf = q.pmf := by
+  -- Delegate to KL zero characterization through the local alias.
+  simpa [speculationDivergence] using EntropyAPI.klDivergence_eq_zero_iff p q habs
+
 def cost_credit_sound : Prop :=
   -- Every non-halt instruction costs at least 1 credit.
   ∀ (γ ε : Type) [GuardLayer γ] [EffectRuntime ε] (cm : CostModel γ ε) (i : Instr γ ε),
@@ -314,17 +363,17 @@ theorem wp_lift_step_with_cost_holds : wp_lift_step_with_cost := by
       Nat.le_trans cfg.costModel.hMinPos (cfg.costModel.hMinCost i hNotHalt)
     omega
 
-def send_cost_plus_flow : Prop :=
+def send_cost_plus_flow [EntropyAPI.Laws] : Prop :=
   -- Information-theoretic send cost: branch entropy is nonnegative
   -- and bounded by log |L| for any label distribution.
-  ∀ {L : Type*} [Fintype L] [Nonempty L]
-    (d : InformationCost.Distribution L),
-    0 ≤ InformationCost.branchEntropy d.pmf ∧
-    InformationCost.branchEntropy d.pmf ≤ Real.log (Fintype.card L)
+  ∀ {L : Type} [Fintype L] [Nonempty L]
+    (d : EntropyAPI.Distribution L),
+    0 ≤ branchEntropy d.pmf ∧
+    branchEntropy d.pmf ≤ Real.log (Fintype.card L)
 
-theorem send_cost_plus_flow_holds : send_cost_plus_flow :=
-  fun d => ⟨InformationCost.branchEntropy_nonneg d,
-            InformationCost.branchEntropy_le_log_card d⟩
+theorem send_cost_plus_flow_holds [EntropyAPI.Laws] : send_cost_plus_flow := by
+  intro L _ _ d
+  exact ⟨branchEntropy_nonneg d, branchEntropy_le_log_card d⟩
 
 def cost_frame_preserving : Prop :=
   -- Credit consumption is frame-preserving: chargeCost only modifies
@@ -349,23 +398,26 @@ theorem cost_frame_preserving_holds : cost_frame_preserving := by
   · simp at h; subst h; exact ⟨rfl, rfl, rfl, rfl⟩
   · exact absurd h (by simp)
 
-def cost_speculation_bounded : Prop :=
-  -- Speculation cost bounded by KL divergence: nonnegative,
-  -- and zero iff speculative distribution matches committed.
-  (∀ {L : Type*} [Fintype L]
-    (p q : InformationCost.Distribution L)
+def cost_speculation_bounded [EntropyAPI.Laws] : Prop :=
+  -- Speculation divergence is nonnegative,
+  -- and zero iff speculative and committed distributions match.
+  (∀ {L : Type} [Fintype L]
+    (p q : EntropyAPI.Distribution L)
     (_habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0),
-    0 ≤ InformationCost.klDivergence p.pmf q.pmf) ∧
-  (∀ {L : Type*} [Fintype L]
-    (p q : InformationCost.Distribution L)
+    0 ≤ speculationDivergence p.pmf q.pmf) ∧
+  (∀ {L : Type} [Fintype L]
+    (p q : EntropyAPI.Distribution L)
     (_habs : ∀ a, p.pmf a ≠ 0 → q.pmf a ≠ 0),
-    InformationCost.klDivergence p.pmf q.pmf = 0 ↔ p.pmf = q.pmf)
+    Iff (speculationDivergence p.pmf q.pmf = 0)
+      (p.pmf = q.pmf))
 
-theorem cost_speculation_bounded_holds : cost_speculation_bounded :=
-  ⟨fun p q habs => InformationCost.klDivergence_nonneg p.pmf q.pmf
-      p.nonneg p.sum_one q.nonneg q.sum_one habs,
-   fun p q habs => InformationCost.klDivergence_eq_zero_iff p.pmf q.pmf
-      p.nonneg p.sum_one q.nonneg q.sum_one habs⟩
+theorem cost_speculation_bounded_holds [EntropyAPI.Laws] : cost_speculation_bounded :=
+  by
+    refine ⟨?_, ?_⟩
+    · intro L _ p q habs
+      exact speculationDivergence_nonneg p q habs
+    · intro L _ p q habs
+      exact speculationDivergence_eq_zero_iff p q habs
 
 /-! ## Aura Instantiation Placeholders
 

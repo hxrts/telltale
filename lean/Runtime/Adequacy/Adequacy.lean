@@ -3,7 +3,7 @@ import Runtime.VM.Model.Program
 import Runtime.VM.Model.State
 import Runtime.VM.Model.Violation
 import Runtime.ProgramLogic.SessionWP
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /- 
 The Problem. Define observable traces and adequacy statements that connect

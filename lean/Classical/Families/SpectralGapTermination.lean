@@ -1,4 +1,5 @@
 import Mathlib
+import ClassicalAnalysisAPI
 
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
@@ -18,25 +19,26 @@ structure MarkovChain (State : Type*) [Fintype State] where
   stochastic : ∀ s, ∑ s', transition s s' = 1
 
 variable {State : Type*} [Fintype State] [DecidableEq State]
+variable [EntropyAPI.AnalysisModel]
 
 /-- Transition matrix over `ℝ`. -/
 def transitionMatrix (mc : MarkovChain State) : Matrix State State ℝ :=
   Matrix.of mc.transition
 
 /-- Transition matrix cast to `ℂ` for spectral analysis. -/
-noncomputable def transitionMatrixC (mc : MarkovChain State) : Matrix State State ℂ :=
-  (transitionMatrix mc).map (algebraMap ℝ ℂ)
+def transitionMatrixC (mc : MarkovChain State) : Matrix State State ℂ :=
+  EntropyAPI.transitionMatrixComplex mc.transition
 
 /-- Absolute values of nontrivial eigenvalues (`λ ≠ 1`). -/
 def nontrivialEigenvalueModuli (mc : MarkovChain State) : Set ℝ :=
-  { r | ∃ z ∈ spectrum ℂ (transitionMatrixC mc), z ≠ (1 : ℂ) ∧ r = ‖z‖ }
+  EntropyAPI.nontrivialSpectrumModuli mc.transition
 
 /-- Second-largest eigenvalue in absolute value (real-valued by construction). -/
-noncomputable def secondLargestEigenvalue (mc : MarkovChain State) : ℝ :=
-  sSup (nontrivialEigenvalueModuli mc)
+def secondLargestEigenvalue (mc : MarkovChain State) : ℝ :=
+  EntropyAPI.secondSpectrumValue mc.transition
 
 /-- Spectral gap `γ = 1 - |λ₂|`. -/
-noncomputable def spectralGap (mc : MarkovChain State) : ℝ :=
+def spectralGap (mc : MarkovChain State) : ℝ :=
   1 - secondLargestEigenvalue mc
 
 /-- Side condition certifying the spectral gap is nonnegative. -/
@@ -153,21 +155,25 @@ theorem expected_termination_bound (mc : MarkovChain State)
 
 section IndependentSessions
 
-variable {State₁ State₂ : Type*}
+variable {State₁ : Type*}
 variable [Fintype State₁] [DecidableEq State₁]
-variable [Fintype State₂] [DecidableEq State₂]
+variable [EntropyAPI.AnalysisModel]
 
 /-- Witness for spectral-gap behavior under independent session composition. -/
 structure IndependentSessionsWitness
-    (mc₁ : MarkovChain State₁) (mc₂ : MarkovChain State₂) where
-  productChain : MarkovChain (State₁ × State₂)
+    [EntropyAPI.AnalysisModel]
+    (mc₁ : MarkovChain State₁) (mc₂ : MarkovChain State₁) where
+  productChain : MarkovChain (State₁ × State₁)
   gap_lower_bound :
-    min (spectralGap mc₁) (spectralGap mc₂) ≤ spectralGap productChain
+    min (spectralGap (State := State₁) mc₁) (spectralGap (State := State₁) mc₂) ≤
+      spectralGap (State := State₁ × State₁) productChain
 
 theorem independent_sessions_spectral_gap
-    (mc₁ : MarkovChain State₁) (mc₂ : MarkovChain State₂)
+    [EntropyAPI.AnalysisModel]
+    (mc₁ : MarkovChain State₁) (mc₂ : MarkovChain State₁)
     (w : IndependentSessionsWitness mc₁ mc₂) :
-    min (spectralGap mc₁) (spectralGap mc₂) ≤ spectralGap w.productChain := by
+    min (spectralGap (State := State₁) mc₁) (spectralGap (State := State₁) mc₂) ≤
+      spectralGap (State := State₁ × State₁) w.productChain := by
   exact w.gap_lower_bound
 
 end IndependentSessions

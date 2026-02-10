@@ -1,6 +1,6 @@
 import Runtime.Resources.SessionRA
 import Runtime.VM.Model.Knowledge
-import Runtime.IrisBridge
+import IrisExtractionInstance
 
 /- 
 The Problem. Capture ghost resources for knowledge, progress, and transfer

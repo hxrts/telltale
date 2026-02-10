@@ -1,6 +1,6 @@
 import Runtime.Proofs.VMPotential
 import Runtime.Resources.Arena
-import Protocol.InformationCost
+import ClassicalAnalysisAPI
 
 /-!
 # VM Observer/Projection Bridge
@@ -159,36 +159,32 @@ theorem topology_change_preserves_VMCEquiv {ι γ π ε ν : Type u} [IdentityMo
 
 /-! ## Information-Theoretic VM Bridge -/
 
-def vmViewProjectionMap (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- Joint label/observation distribution induced by VM observer projection. -/
+def vmViewJoint (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (states : L → VMState ι γ π ε ν) (cid : CoroutineId) :
-    InformationCost.ProjectionMap L (Option CoroutineView) :=
-  { proj := fun l => coroutineView (states l) cid }
+    [DecidableEq (Option CoroutineView)]
+    (states : L → VMState ι γ π ε ν) (cid : CoroutineId)
+    (labelDist : L → ℝ) : L × Option CoroutineView → ℝ :=
+  fun lo => if coroutineView (states lo.1) cid = lo.2 then labelDist lo.1 else 0
 
-theorem vm_mutualInfo_zero_of_constant_projection
-    {L : Type*} [Fintype L] [Fintype (Option CoroutineView)] [DecidableEq (Option CoroutineView)]
-    (p : InformationCost.ProjectionMap L (Option CoroutineView))
-    (hConst : p.isConstant)
+theorem vm_mutualInfo_zero_of_erasure
+    {L : Type} [Fintype L] [Fintype (Option CoroutineView)] [DecidableEq (Option CoroutineView)]
+    [EntropyAPI.Laws]
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (states : L → VMState ι γ π ε ν) (cid : CoroutineId)
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1) :
-    InformationCost.mutualInfo
-      (fun lt : L × Option CoroutineView => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0) = 0 := by
-  exact InformationCost.mutualInfo_zero_of_constant_projection p hConst labelDist h_nn h_sum
-
-theorem vm_projection_preserves_local_information
-    {L : Type*} [Fintype L]
-    (p : InformationCost.ProjectionMap L (Option CoroutineView))
-    (hConst : p.isConstant)
-    (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1)
-    (localInfo : Option CoroutineView → ℝ) :
-    ∑ l, labelDist l * localInfo (p.proj l) = localInfo (Classical.choose hConst) := by
-  exact InformationCost.projection_preserves_local_information
-    p hConst labelDist h_nn h_sum localInfo
-
-def vmBlindObservationCost : ℝ := InformationCost.blindObservationCost
-
-theorem vmBlindObservationCost_eq_zero : vmBlindObservationCost = 0 := by
-  simp [vmBlindObservationCost, InformationCost.blindObservationCost_eq_zero]
+    EntropyAPI.IsErasureKernel labelDist (vmViewJoint L states cid labelDist) →
+    EntropyAPI.mutualInfo (vmViewJoint L states cid labelDist) = 0 := by
+  intro hErase
+  exact EntropyAPI.Laws.mutualInfo_zero_of_erasure
+    (self := inferInstance) (L := L) (O := Option CoroutineView)
+    labelDist h_nn h_sum (vmViewJoint L states cid labelDist) hErase
