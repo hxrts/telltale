@@ -39,10 +39,11 @@ private lemma preserved_sub_left_frame_via_middle
     G = G₁ ++ G₂ →
     G' = G₁' ++ G₂ →
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    DisjointS Sown.right Sfin.left →
     HasTypeProcPreOut Ssh Sown G₁ P Sfin Gfin W Δ →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₁' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro hMiddle hStore hDisjShAll hOwnDisj hDisj hEq hEq' hTS hPre
+  intro hMiddle hStore hDisjShAll hOwnDisj hDisj hEq hEq' hTS hDisjRightFin hPre
   have hDisjG_left_mid : DisjointG ([] : GEnv) G₁ :=
     DisjointG_symm (DisjointG_right_empty G₁)
   have hDisjG_left_right : DisjointG ([] : GEnv) G₂ :=
@@ -57,7 +58,7 @@ private lemma preserved_sub_left_frame_via_middle
       (store:=store) (bufs:=bufs) (P:=P)
       (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
       hStore hDisjShAll hOwnDisj
-      hDisjG_left_mid hDisjG_left_right hDisj hEq_mid hTS hPre
+      hDisjG_left_mid hDisjG_left_right hDisj hEq_mid hTS hDisjRightFin hPre
   have hG₁' : G₁' = G₁_step' := by
     apply append_left_eq_of_eq
     calc
@@ -77,10 +78,11 @@ private lemma preserved_sub_right_frame_via_middle
     G = G₁ ++ G₂ →
     G' = G₁ ++ G₂' →
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    DisjointS Sown.right Sfin.left →
     HasTypeProcPreOut Ssh Sown G₂ P Sfin Gfin W Δ →
     ∃ W' Δ', HasTypeProcPreOut Ssh Sown' G₂' P' Sfin Gfin W' Δ' ∧
       FootprintSubset W' W ∧ SEnvDomSubset Δ' Δ := by
-  intro hMiddle hStore hDisjShAll hOwnDisj hDisj hEq hEq' hTS hPre
+  intro hMiddle hStore hDisjShAll hOwnDisj hDisj hEq hEq' hTS hDisjRightFin hPre
   have hDisjG_left_empty : DisjointG G₁ ([] : GEnv) := DisjointG_right_empty G₁
   have hDisjG_mid_empty : DisjointG G₂ ([] : GEnv) := DisjointG_right_empty G₂
   have hEq_mid : G = G₁ ++ G₂ ++ ([] : GEnv) := by
@@ -93,7 +95,7 @@ private lemma preserved_sub_right_frame_via_middle
       (store:=store) (bufs:=bufs) (P:=P)
       (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
       hStore hDisjShAll hOwnDisj
-      hDisj hDisjG_left_empty hDisjG_mid_empty hEq_mid hTS hPre
+      hDisj hDisjG_left_empty hDisjG_mid_empty hEq_mid hTS hDisjRightFin hPre
   have hG₂' : G₂' = G₂_step' := by
     apply append_right_eq_of_eq
     calc

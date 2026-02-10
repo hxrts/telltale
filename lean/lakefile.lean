@@ -26,6 +26,10 @@ require paco from git
 -- Iris separation logic framework (local checkout).
 require iris from "/Users/hxrts/projects/iris-lean"
 
+-- Lean 4 code formatter.
+require leanfmt from git
+  "https://github.com/toku-sa-n/leanfmt" @ "main"
+
 /-- Global and local session type definitions. -/
 lean_lib SessionTypes where
   globs := #[`SessionTypes.*]
