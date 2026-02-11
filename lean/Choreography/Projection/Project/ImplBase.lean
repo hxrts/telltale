@@ -1,7 +1,6 @@
 import Choreography.Projection.Projectb
 import Choreography.Projection.Project.Core
 import Choreography.Projection.Project.Muve
-import Choreography.Projection.Trans
 import SessionCoTypes.EQ2
 import SessionCoTypes.EQ2Props
 import SessionCoTypes.EQ2Paco
@@ -53,7 +52,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props

@@ -17,7 +17,7 @@ open SessionCoTypes.EQ2Paco
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
-open Choreography.Projection.Trans (trans_comm_sender trans_comm_receiver trans_comm_other)
+open Choreography.Projection.Project (trans_comm_sender trans_comm_receiver trans_comm_other)
 
 /-- Witness relation for trans_subst_comm: pairs arising from projection-substitution. -/
 private def ProjSubstRel (t : String) (G : GlobalType) (role : String) : Rel := fun a b =>
@@ -49,12 +49,12 @@ to `(trans inner role).substitute t (trans G role)`, then applies `EQ2_mu_self_u
 private theorem EQ2_mu_crossed_unfold_left
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
-    (hL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
-    (hR_pre : (Choreography.Projection.Trans.trans inner role).isGuarded s = true) :
-    EQ2 ((Choreography.Projection.Trans.trans (inner.substitute t G) role).substitute s
-           (.mu s (Choreography.Projection.Trans.trans (inner.substitute t G) role)))
-        (.mu s ((Choreography.Projection.Trans.trans inner role).substitute t
-                 (Choreography.Projection.Trans.trans G role))) :=
+    (hL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
+    (hR_pre : (Choreography.Projection.Project.trans inner role).isGuarded s = true) :
+    EQ2 ((Choreography.Projection.Project.trans (inner.substitute t G) role).substitute s
+           (.mu s (Choreography.Projection.Project.trans (inner.substitute t G) role)))
+        (.mu s ((Choreography.Projection.Project.trans inner role).substitute t
+                 (Choreography.Projection.Project.trans G role))) :=
   MuUnfoldLemmas.EQ2_mu_crossed_unfold_left' hGclosed hL hR_pre
 
 /-- Mu-mu crossed unfold: left mu relates to right unfold.
@@ -67,13 +67,13 @@ Symmetric to `EQ2_mu_crossed_unfold_left`.
 private theorem EQ2_mu_crossed_unfold_right
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
-    (hL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
-    (hR_pre : (Choreography.Projection.Trans.trans inner role).isGuarded s = true) :
-    EQ2 (.mu s (Choreography.Projection.Trans.trans (inner.substitute t G) role))
-        (((Choreography.Projection.Trans.trans inner role).substitute t
-           (Choreography.Projection.Trans.trans G role)).substitute s
-          (.mu s ((Choreography.Projection.Trans.trans inner role).substitute t
-                   (Choreography.Projection.Trans.trans G role)))) :=
+    (hL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
+    (hR_pre : (Choreography.Projection.Project.trans inner role).isGuarded s = true) :
+    EQ2 (.mu s (Choreography.Projection.Project.trans (inner.substitute t G) role))
+        (((Choreography.Projection.Project.trans inner role).substitute t
+           (Choreography.Projection.Project.trans G role)).substitute s
+          (.mu s ((Choreography.Projection.Project.trans inner role).substitute t
+                   (Choreography.Projection.Project.trans G role)))) :=
   MuUnfoldLemmas.EQ2_mu_crossed_unfold_right' hGclosed hL hR_pre
 
 /-- Mismatched guardedness: guarded mu unfold relates to end.
@@ -90,10 +90,10 @@ private theorem EQ2_mu_unguarded_to_end
     {s t : String} {inner G : GlobalType} {role : String}
     (hsne : s ≠ t)
     (hGclosed : G.isClosed = true)
-    (hL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
-    (hR_pre : (Choreography.Projection.Trans.trans inner role).isGuarded s = false) :
-    EQ2 ((Choreography.Projection.Trans.trans (inner.substitute t G) role).substitute s
-           (.mu s (Choreography.Projection.Trans.trans (inner.substitute t G) role)))
+    (hL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
+    (hR_pre : (Choreography.Projection.Project.trans inner role).isGuarded s = false) :
+    EQ2 ((Choreography.Projection.Project.trans (inner.substitute t G) role).substitute s
+           (.mu s (Choreography.Projection.Project.trans (inner.substitute t G) role)))
         .end :=
   MuUnfoldLemmas.EQ2_mu_unguarded_to_end' hsne hGclosed hL hR_pre
 
@@ -105,19 +105,19 @@ Symmetric to `EQ2_mu_unguarded_to_end`.
 private theorem EQ2_end_to_mu_unguarded
     {s t : String} {inner G : GlobalType} {role : String}
     (hGclosed : G.isClosed = true)
-    (hL_pre : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = false)
-    (hR : (Choreography.Projection.Trans.trans inner role).isGuarded s = true) :
+    (hL_pre : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = false)
+    (hR : (Choreography.Projection.Project.trans inner role).isGuarded s = true) :
     EQ2 .end
-        (((Choreography.Projection.Trans.trans inner role).substitute t
-          (Choreography.Projection.Trans.trans G role)).substitute s
-         (.mu s ((Choreography.Projection.Trans.trans inner role).substitute t
-                  (Choreography.Projection.Trans.trans G role)))) :=
+        (((Choreography.Projection.Project.trans inner role).substitute t
+          (Choreography.Projection.Project.trans G role)).substitute s
+         (.mu s ((Choreography.Projection.Project.trans inner role).substitute t
+                  (Choreography.Projection.Project.trans G role)))) :=
   MuUnfoldLemmas.EQ2_end_to_mu_unguarded' hGclosed hL_pre hR
 
 -- Aliases to avoid namespace issues
 private abbrev gSubstBranches := SessionTypes.GlobalType.substituteBranches -- global branch subst
 private abbrev lSubstBranches := SessionTypes.LocalTypeR.substituteBranches -- local branch subst
-private abbrev projTransBranches := Choreography.Projection.Trans.transBranches
+private abbrev projTransBranches := Choreography.Projection.Project.transBranches
 
 private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType)
     (rest : List (Label × GlobalType)) :
@@ -158,14 +158,14 @@ private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role :
   induction branches with
   | nil =>
       simp [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
-        Choreography.Projection.Trans.transBranches,
+        Choreography.Projection.Project.transBranches,
         SessionTypes.GlobalType.substituteBranches,
         SessionTypes.LocalTypeR.substituteBranches,
         -SessionTypes.LocalTypeR.substituteBranches_eq_map]
   | cons hd tl ih =>
       obtain ⟨label, cont⟩ := hd
       simp [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
-        Choreography.Projection.Trans.transBranches,
+        Choreography.Projection.Project.transBranches,
         SessionTypes.GlobalType.substituteBranches,
         SessionTypes.LocalTypeR.substituteBranches,
         -SessionTypes.LocalTypeR.substituteBranches_eq_map]
@@ -174,7 +174,7 @@ private theorem transBranches_ProjSubstRel (t : String) (G : GlobalType) (role :
         exact Or.inl ⟨cont, rfl, rfl⟩
       ·
         simpa [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
-          Choreography.Projection.Trans.transBranches,
+          Choreography.Projection.Project.transBranches,
           SessionTypes.GlobalType.substituteBranches,
           SessionTypes.LocalTypeR.substituteBranches,
           -SessionTypes.LocalTypeR.substituteBranches_eq_map] using ih
@@ -185,7 +185,7 @@ private theorem ProjSubstRel_EQ2F_end (t : String) (G : GlobalType) (role : Stri
       (projTrans (GlobalType.end.substitute t G) role)
       ((projTrans GlobalType.end role).substitute t (projTrans G role)) := by
   -- Both sides reduce to `.end`.
-  simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans, EQ2F]
+  simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, EQ2F]
 
 /-- Helper: EQ2F for projection-substitution on `.var`. -/
 private theorem ProjSubstRel_EQ2F_var (v t : String) (G : GlobalType) (role : String) :
@@ -195,10 +195,10 @@ private theorem ProjSubstRel_EQ2F_var (v t : String) (G : GlobalType) (role : St
   -- Split on whether the variable is the substitution target.
   by_cases hvt : v = t
   · subst hvt
-    simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans]
+    simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans]
     exact EQ2F.mono (fun _ _ h => Or.inr h) _ _ (EQ2.destruct (EQ2_refl _))
   · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
-    simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans, hvt']
+    simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, hvt']
     rfl
 
 /-- Helper: mu case with shadowed substitution (s = t). -/
@@ -210,18 +210,18 @@ private theorem ProjSubstRel_EQ2F_mu_shadow
   -- Substitution is shadowed; both sides project the same mu.
   have hst' : (s == t) = true := by
     simpa [beq_iff_eq] using hst
-  simp [GlobalType.substitute, hst', projTrans, Choreography.Projection.Trans.trans]
-  by_cases hguard : (Choreography.Projection.Trans.trans inner role).isGuarded s = true
+  simp [GlobalType.substitute, hst', projTrans, Choreography.Projection.Project.trans]
+  by_cases hguard : (Choreography.Projection.Project.trans inner role).isGuarded s = true
   ·
-    have hguard_t : (Choreography.Projection.Trans.trans inner role).isGuarded t = true := by
+    have hguard_t : (Choreography.Projection.Project.trans inner role).isGuarded t = true := by
       simpa [hst] using hguard
     have hF : EQ2F EQ2
-        (LocalTypeR.mu s (Choreography.Projection.Trans.trans inner role))
-        (LocalTypeR.mu s (Choreography.Projection.Trans.trans inner role)) :=
+        (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role))
+        (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role)) :=
       EQ2.destruct (EQ2_refl _)
     have hF' : EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
-        (LocalTypeR.mu s (Choreography.Projection.Trans.trans inner role))
-        (LocalTypeR.mu s (Choreography.Projection.Trans.trans inner role)) :=
+        (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role))
+        (LocalTypeR.mu s (Choreography.Projection.Project.trans inner role)) :=
       EQ2F.mono (fun _ _ h => Or.inr h) _ _ hF
     simpa [hguard_t, LocalTypeR.substitute, hst] using hF'
   · simp [hguard, EQ2F]
@@ -230,13 +230,13 @@ private theorem ProjSubstRel_EQ2F_mu_shadow
 private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded
     (s t : String) (inner G : GlobalType) (role : String)
     (hsne : s ≠ t) (hGclosed : G.isClosed = true)
-    (hguardL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
-    (hguardR : (Choreography.Projection.Trans.trans inner role).isGuarded s = true) :
+    (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
+    (hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s = true) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Both sides are guarded mu; relate via crossed unfold lemmas.
-  simp [projTrans, Choreography.Projection.Trans.trans, hguardL, hguardR]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
   simp [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
   constructor
   · exact Or.inr (EQ2_mu_crossed_unfold_left hGclosed hguardL hguardR)
@@ -246,26 +246,26 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded
 private theorem ProjSubstRel_EQ2F_mu_noshadow_guarded_end
     (s t : String) (inner G : GlobalType) (role : String)
     (hsne : s ≠ t) (hGclosed : G.isClosed = true)
-    (hguardL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = true)
-    (hguardR : (Choreography.Projection.Trans.trans inner role).isGuarded s = false) :
+    (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = true)
+    (hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s = false) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Guarded mu relates to end via the mismatched guardedness lemma.
-  simp [projTrans, Choreography.Projection.Trans.trans, hguardL, hguardR]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
   exact Or.inr (EQ2_mu_unguarded_to_end hsne hGclosed hguardL hguardR)
 
 /-- Helper: mu case, s ≠ t, LHS unguarded and RHS guarded. -/
 private theorem ProjSubstRel_EQ2F_mu_noshadow_end_guarded
     (s t : String) (inner G : GlobalType) (role : String)
     (hsne : s ≠ t) (hGclosed : G.isClosed = true)
-    (hguardL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = false)
-    (hguardR : (Choreography.Projection.Trans.trans inner role).isGuarded s = true) :
+    (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = false)
+    (hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s = true) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- End relates to guarded mu via the mismatched guardedness lemma.
-  simp [projTrans, Choreography.Projection.Trans.trans, hguardL, hguardR]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
   simp [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
   exact Or.inr (EQ2_end_to_mu_unguarded hGclosed hguardL hguardR)
 
@@ -273,13 +273,13 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow_end_guarded
 private theorem ProjSubstRel_EQ2F_mu_noshadow_end_end
     (s t : String) (inner G : GlobalType) (role : String)
     (_hsne : s ≠ t)
-    (hguardL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s = false)
-    (hguardR : (Choreography.Projection.Trans.trans inner role).isGuarded s = false) :
+    (hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s = false)
+    (hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s = false) :
     EQ2F (fun x y => ProjSubstRel t G role x y ∨ EQ2 x y)
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Both sides collapse to end.
-  simp [projTrans, Choreography.Projection.Trans.trans, hguardL, hguardR, EQ2F]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR, EQ2F]
 
 /-- Helper: mu case, s ≠ t, dispatch on guardedness. -/
 private theorem ProjSubstRel_EQ2F_mu_noshadow
@@ -292,15 +292,15 @@ private theorem ProjSubstRel_EQ2F_mu_noshadow
   have hst : (s == t) = false := by
     simpa [beq_eq_false_iff_ne] using hsne
   simp [GlobalType.substitute, hst]
-  cases hguardL : (Choreography.Projection.Trans.trans (inner.substitute t G) role).isGuarded s with
+  cases hguardL : (Choreography.Projection.Project.trans (inner.substitute t G) role).isGuarded s with
   | true =>
-      cases hguardR : (Choreography.Projection.Trans.trans inner role).isGuarded s with
+      cases hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s with
       | true =>
           exact ProjSubstRel_EQ2F_mu_noshadow_guarded s t inner G role hsne hGclosed hguardL hguardR
       | false =>
           exact ProjSubstRel_EQ2F_mu_noshadow_guarded_end s t inner G role hsne hGclosed hguardL hguardR
   | false =>
-      cases hguardR : (Choreography.Projection.Trans.trans inner role).isGuarded s with
+      cases hguardR : (Choreography.Projection.Project.trans inner role).isGuarded s with
       | true =>
           exact ProjSubstRel_EQ2F_mu_noshadow_end_guarded s t inner G role hsne hGclosed hguardL hguardR
       | false =>
@@ -481,7 +481,7 @@ private theorem trans_substitute_unfold_guarded
         ((projTrans (GlobalType.mu t body) role).unfold) := by
   -- Guarded case: both sides are the unfolded mu, use trans_subst_comm.
   have h_proj_mu : projTrans (.mu t body) role = LocalTypeR.mu t (projTrans body role) := by
-    simp [projTrans, Choreography.Projection.Trans.trans, hguard]
+    simp [projTrans, Choreography.Projection.Project.trans, hguard]
   rw [h_proj_mu, LocalTypeR.unfold_mu, ← h_proj_mu]
   exact trans_subst_comm body t (.mu t body) role hclosed
 
@@ -492,7 +492,7 @@ private theorem trans_substitute_unfold_unguarded
         ((projTrans (GlobalType.mu t body) role).unfold) := by
   -- Unguarded case: projection collapses to end, use subst_end_unguarded_eq2_end.
   have h_proj_end : projTrans (.mu t body) role = LocalTypeR.end := by
-    simp [projTrans, Choreography.Projection.Trans.trans, hguard]
+    simp [projTrans, Choreography.Projection.Project.trans, hguard]
   rw [h_proj_end]
   simp [LocalTypeR.unfold]
   have hproj_subst :

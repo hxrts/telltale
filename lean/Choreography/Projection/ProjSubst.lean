@@ -1,6 +1,6 @@
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
-import Choreography.Projection.Trans
+import Choreography.Projection.Project.Primitive
 import SessionCoTypes.EQ2
 
 set_option linter.unnecessarySimpa false
@@ -267,31 +267,31 @@ mutual
     | .comm sender receiver branches, t, G, role, hclosed => by
         by_cases hsender : role = sender
         · simp [GlobalType.substitute, projTrans, projTransBranches,
-            Choreography.Projection.Trans.trans_comm_sender sender receiver role
+            Choreography.Projection.Project.trans_comm_sender sender receiver role
               (SessionTypes.GlobalType.substituteBranches branches t G) hsender,
-            Choreography.Projection.Trans.trans_comm_sender sender receiver role branches hsender,
+            Choreography.Projection.Project.trans_comm_sender sender receiver role branches hsender,
             proj_subst_branches branches t G role hclosed]
         · by_cases hreceiver : role = receiver
           · have hs : role ≠ sender := hsender
             simp [GlobalType.substitute, projTrans, projTransBranches,
-              Choreography.Projection.Trans.trans_comm_receiver sender receiver role
+              Choreography.Projection.Project.trans_comm_receiver sender receiver role
                 (SessionTypes.GlobalType.substituteBranches branches t G) hreceiver hs,
-              Choreography.Projection.Trans.trans_comm_receiver sender receiver role branches hreceiver hs,
+              Choreography.Projection.Project.trans_comm_receiver sender receiver role branches hreceiver hs,
               proj_subst_branches branches t G role hclosed]
           · have hs : role ≠ sender := hsender
             have hr : role ≠ receiver := hreceiver
             cases branches with
             | nil =>
                 simp [GlobalType.substitute, SessionTypes.GlobalType.substituteBranches, projTrans,
-                  Choreography.Projection.Trans.trans_comm_other sender receiver role [] hs hr]
+                  Choreography.Projection.Project.trans_comm_other sender receiver role [] hs hr]
             | cons head tail =>
                 cases head with
                 | mk label cont =>
                     have hrec := proj_subst cont t G role hclosed
                     simp [GlobalType.substitute, SessionTypes.GlobalType.substituteBranches, projTrans,
-                      Choreography.Projection.Trans.trans_comm_other sender receiver role
+                      Choreography.Projection.Project.trans_comm_other sender receiver role
                         ((label, cont.substitute t G) :: SessionTypes.GlobalType.substituteBranches tail t G) hs hr,
-                      Choreography.Projection.Trans.trans_comm_other sender receiver role ((label, cont) :: tail) hs hr,
+                      Choreography.Projection.Project.trans_comm_other sender receiver role ((label, cont) :: tail) hs hr,
                       hrec]
     | .mu s body, t, G, role, hclosed => by
         by_cases hst : s = t
@@ -300,7 +300,7 @@ mutual
             simp [GlobalType.substitute, projTrans, Choreography.Projection.Trans.trans,
               LocalTypeR.substitute, hguard]
         · have hrepl_closed : (projTrans G role).isClosed = true :=
-            Choreography.Projection.Trans.trans_isClosed_of_isClosed G role hclosed
+            Choreography.Projection.Project.trans_isClosed_of_isClosed G role hclosed
           have hrepl_guarded : (projTrans G role).isGuarded s = true :=
             SessionTypes.LocalTypeR.isGuarded_of_closed (projTrans G role) s (by simpa using hrepl_closed)
           have hproj : projTrans (body.substitute t G) role =

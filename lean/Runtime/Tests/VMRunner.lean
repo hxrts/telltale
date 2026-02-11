@@ -7,7 +7,7 @@ import Runtime.VM.Runtime.Scheduler
 import Runtime.VM.Runtime.Monitor
 import Runtime.VM.Semantics.Exec
 import Choreography.Projection.Json
-import Choreography.Projection.Trans
+import Choreography.Projection.Project.Primitive
 
 /-!
 # VM Runner
@@ -73,7 +73,7 @@ def parseChoreo (j : Json) : Except String (GlobalType × List Role) := do
 
 /-- Build a CodeImage from a global type and role list. -/
 def buildImage (g : GlobalType) (roles : List Role) : CodeImage UnitGuard UnitEffect :=
-  let locals := roles.map (fun r => (r, Choreography.Projection.Trans.trans g r))
+  let locals := roles.map (fun r => (r, Choreography.Projection.Project.trans g r))
   CodeImage.fromLocalTypes locals g
 
 abbrev RunnerState :=

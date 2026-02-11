@@ -43,7 +43,7 @@ namespace Semantics.EnvStep
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open SessionCoTypes.Quotient
 
 /-! ## Basic Definitions -/

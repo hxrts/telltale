@@ -18,7 +18,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props

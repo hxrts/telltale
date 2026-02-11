@@ -1,7 +1,7 @@
 import Lean.Data.Json
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
-import Choreography.Projection.Trans
+import Choreography.Projection.Project.Primitive
 
 /-
 The Problem. Serialize GlobalType and LocalTypeR to/from JSON for the Lean-Rust

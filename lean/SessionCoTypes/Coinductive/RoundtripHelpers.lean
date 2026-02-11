@@ -111,9 +111,9 @@ lemma productive_toCoind (t : LocalTypeR) : ProductiveC (toCoind t) := by
 
 /-- Projection via `trans` yields a productive `toCoind` image. -/
 lemma productive_toCoind_of_projTrans (g : GlobalType) (role : String) :
-    ProductiveC (toCoind (Choreography.Projection.Trans.trans g role)) := by
+    ProductiveC (toCoind (Choreography.Projection.Project.trans g role)) := by
   -- Reduce to the generic toCoind productivity lemma.
-  exact productive_toCoind (Choreography.Projection.Trans.trans g role)
+  exact productive_toCoind (Choreography.Projection.Project.trans g role)
 
 /-! ## Size bounds for branch elements -/
 

@@ -250,7 +250,7 @@ theorem EQ2_end_to_mu_unguarded'
   rw [proj_subst inner t G role hGclosed] at hL_pre
   -- projTrans G role is closed (since G is closed)
   have hProjGclosed : (projTrans G role).isClosed = true :=
-    Choreography.Projection.Trans.trans_isClosed_of_isClosed G role hGclosed
+    Choreography.Projection.Project.trans_isClosed_of_isClosed G role hGclosed
   -- For closed local types, all variables are guarded
   have hProjGguarded : (projTrans G role).isGuarded s = true :=
     isGuarded_of_closed (projTrans G role) s hProjGclosed

@@ -230,14 +230,14 @@ theorem projection_preserves_local_information
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Blind
 
 /-- Projection map over branch indices for a fixed observer role. -/
 def branchProjectionMap (branches : List (Label × GlobalType)) (role : String) :
     ProjectionMap (Fin branches.length) LocalTypeR :=
   -- Each branch index selects a continuation and projects it to the role.
-  { proj := fun i => Choreography.Projection.Trans.trans (branches.get i).2 role }
+  { proj := fun i => Choreography.Projection.Project.trans (branches.get i).2 role }
 
 /-- Blind communication implies constant projected local behavior for non-participants. -/
 theorem branchProjectionMap_isConstant_of_commBlindFor
@@ -247,7 +247,7 @@ theorem branchProjectionMap_isConstant_of_commBlindFor
     (branchProjectionMap branches role).isConstant := by
   -- Uniform projection for non-participants follows from the blindness lemma.
   classical
-  refine ⟨Choreography.Projection.Trans.trans (branches.head!.2) role, ?_⟩
+  refine ⟨Choreography.Projection.Project.trans (branches.head!.2) role, ?_⟩
   intro i
   have hmem : branches.get i ∈ branches := by
     exact List.get_mem _ _

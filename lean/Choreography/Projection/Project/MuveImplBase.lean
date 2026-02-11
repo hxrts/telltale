@@ -1,6 +1,5 @@
 import Choreography.Projection.Project.Core
 import Choreography.Projection.Projectb
-import Choreography.Projection.Trans
 import SessionTypes.Participation
 import SessionCoTypes.EQ2
 import SessionCoTypes.EQ2Props
@@ -32,7 +31,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionTypes.Participation
 open SessionCoTypes.EQ2
@@ -404,22 +403,22 @@ private theorem wellFormed_comm_cont (sender receiver : String) (pair : Label ×
     This avoids the semantic gap where body.allVarsBound [] cannot be proven
     from (mu t body).wellFormed. -/
 private theorem trans_muve_of_not_part_of2_aux_base (g : GlobalType) (role : String) :
-    g = .end ∨ (∃ t, g = .var t) → isMuve (Trans.trans g role) = true := by
+    g = .end ∨ (∃ t, g = .var t) → isMuve (trans g role) = true := by
   -- Base cases follow directly from trans and isMuve definitions.
   intro h
   cases h with
-  | inl hEnd => cases hEnd; simp [Trans.trans, isMuve]
-  | inr hVar => rcases hVar with ⟨t, rfl⟩; simp [Trans.trans, isMuve]
+  | inl hEnd => cases hEnd; simp [trans, isMuve]
+  | inr hVar => rcases hVar with ⟨t, rfl⟩; simp [trans, isMuve]
 
 private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalType) (role : String)
     (_hnotpart : ¬ part_of2 role (.mu t body))
     (_hne : (GlobalType.mu t body).allCommsNonEmpty = true)
     (_hnsc : (GlobalType.mu t body).noSelfComm = true)
-    (hbody : isMuve (Trans.trans body role) = true) :
-    isMuve (Trans.trans (.mu t body) role) = true := by
+    (hbody : isMuve (trans body role) = true) :
+    isMuve (trans (.mu t body) role) = true := by
   -- The mu case reduces to the body when the projection is guarded.
-  rw [Trans.trans.eq_3]
-  by_cases hguard : (Trans.trans body role).isGuarded t
+  rw [trans.eq_3]
+  by_cases hguard : (trans body role).isGuarded t
   · simp only [hguard, ↓reduceIte, isMuve]
     exact hbody
   · simp only [hguard, Bool.false_eq_true, ↓reduceIte, isMuve]
@@ -427,7 +426,7 @@ private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalTyp
 private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g)
     (hne : g.allCommsNonEmpty = true) (hnsc : g.noSelfComm = true) :
-    isMuve (Trans.trans g role) = true := by
+    isMuve (trans g role) = true := by
   -- Dispatch on g and delegate to the focused helpers.
   match g with
   | .end => exact trans_muve_of_not_part_of2_aux_base .end role (Or.inl rfl)
@@ -440,7 +439,7 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
         simpa [GlobalType.allCommsNonEmpty] using hne
       have hnsc_body : body.noSelfComm = true := by
         simpa [GlobalType.noSelfComm] using hnsc
-      have hbody : isMuve (Trans.trans body role) = true :=
+      have hbody : isMuve (trans body role) = true :=
         trans_muve_of_not_part_of2_aux body role hnotpart_body hne_body hnsc_body
       exact trans_muve_of_not_part_of2_aux_mu t body role hnotpart hne hnsc hbody
   | .comm sender receiver branches =>
@@ -461,9 +460,9 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
           | false =>
               cases branches with
               | nil =>
-                  simp [Trans.trans, hrole_sender, hrole_receiver, isMuve]
+                  simp [trans, hrole_sender, hrole_receiver, isMuve]
               | cons first rest =>
-                  rw [Trans.trans.eq_5]
+                  rw [trans.eq_5]
                   simp only [hrole_sender, Bool.false_eq_true, ↓reduceIte, hrole_receiver]
                   have hnotpart_cont : ¬ part_of2 role first.2 := by
                     intro hcont
@@ -492,7 +491,7 @@ decreasing_by
 /-- Non-participant projection yields a muve local type under well-formedness. -/
 theorem trans_muve_of_not_part_of2 (g : GlobalType) (role : String)
     (hnotpart : ¬ part_of2 role g) (hwf : g.wellFormed = true) :
-    isMuve (Trans.trans g role) = true := by
+    isMuve (trans g role) = true := by
   -- Extract structural properties from wellFormed
   -- wellFormed = (((allVarsBound ∧ allCommsNonEmpty) ∧ noSelfComm) ∧ isProductive)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf

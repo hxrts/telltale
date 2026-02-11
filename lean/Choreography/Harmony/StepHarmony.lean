@@ -178,8 +178,8 @@ open SessionCoTypes.Quotient
 open Semantics.EnvStep
 
 -- Alias to avoid ambiguity with Trans typeclass
-abbrev projTrans := Choreography.Projection.Trans.trans
-open Choreography.Projection.Trans (trans_comm_sender trans_comm_receiver trans_comm_other
+abbrev projTrans := Choreography.Projection.Project.trans
+open Choreography.Projection.Project (trans_comm_sender trans_comm_receiver trans_comm_other
   transBranches lcontractive trans_wellFormed_of_wellFormed)
 
 /-! ## Claims Bundle -/

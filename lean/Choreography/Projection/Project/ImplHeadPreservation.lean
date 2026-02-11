@@ -16,7 +16,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -152,7 +152,7 @@ private theorem trans_unfold_EQ2_mu_guarded
       ((trans (.mu t body) role).unfold) := by
   -- Guarded trans produces a mu, so unfold is a substitution.
   have htrans_mu : trans (.mu t body) role = .mu t (trans body role) := by
-    simp [Trans.trans, hguard]
+    simp [trans, hguard]
   have hleft : trans (body.substitute t (.mu t body)) role =
       (trans body role).substitute t (.mu t (trans body role)) := by
     simpa [htrans_mu] using hproj'
@@ -172,7 +172,7 @@ private theorem trans_unfold_EQ2_mu_unguarded
       ((trans (.mu t body) role).unfold) := by
   -- Unguarded trans collapses to end; use the unguarded substitution lemma.
   have htrans_end : trans (.mu t body) role = .end := by
-    simp [Trans.trans, hguard]
+    simp [trans, hguard]
   have hleft : trans (body.substitute t (.mu t body)) role =
       (trans body role).substitute t .end := by
     simpa [htrans_end] using hproj'
@@ -211,15 +211,15 @@ private theorem trans_unfold_EQ2 (g : GlobalType) (role : String)
   | «end» =>
       -- unfold is identity; trans returns .end.
       have h := EQ2_unfold_right (EQ2_refl (trans (.end) role))
-      simpa [GlobalType.unfold, Trans.trans, LocalTypeR.unfold] using h
+      simpa [GlobalType.unfold, trans, LocalTypeR.unfold] using h
   | var t =>
       -- unfold is identity; trans returns .var t.
       have h := EQ2_unfold_right (EQ2_refl (trans (.var t) role))
-      simpa [GlobalType.unfold, Trans.trans, LocalTypeR.unfold] using h
+      simpa [GlobalType.unfold, trans, LocalTypeR.unfold] using h
   | comm sender receiver branches =>
       -- unfold is identity; trans never produces a mu for comm.
       have h := EQ2_unfold_right (EQ2_refl (trans (.comm sender receiver branches) role))
-      simpa [GlobalType.unfold, Trans.trans, LocalTypeR.unfold] using h
+      simpa [GlobalType.unfold, trans, LocalTypeR.unfold] using h
   | mu t body =>
       -- Delegate the mu case to the specialized helper.
       exact trans_unfold_EQ2_mu t body role hwf

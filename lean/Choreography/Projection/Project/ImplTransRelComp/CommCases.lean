@@ -18,7 +18,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -30,7 +30,7 @@ private theorem CProjectTransRel_postfix_comm_send_sender
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hrs : role = sender)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Sender case: lift BranchesProjRel to BranchesRel and wrap into the closure.
@@ -48,7 +48,7 @@ private theorem CProjectTransRel_postfix_comm_send_nonpart
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Non-participant send: use the extracted comm witness from CProject_send_implies_trans_send.
@@ -65,7 +65,7 @@ private theorem CProjectTransRel_postfix_comm_recv_receiver
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hrr : role = receiver) (hne : receiver ≠ sender)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
   -- Receiver case: lift BranchesProjRel to BranchesRel and wrap into the closure.
@@ -83,7 +83,7 @@ private theorem CProjectTransRel_postfix_comm_recv_nonpart
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
   -- Non-participant recv: use the extracted comm witness from CProject_recv_implies_trans_recv.
@@ -99,7 +99,7 @@ private theorem CProjectTransRel_postfix_comm_send
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs)) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
@@ -117,7 +117,7 @@ private theorem CProjectTransRel_postfix_comm_recv
     {sender receiver role partner : String}
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs)) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
@@ -136,7 +136,7 @@ private theorem CProjectTransRel_postfix_comm_end
     {gbs : List (Label × GlobalType)} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role LocalTypeR.end)
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role) :
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
   -- Non-participant projecting to .end via CProject_end_trans_end.
   have htrans_end := CProject_end_trans_end (GlobalType.comm sender receiver gbs) role hproj hne
@@ -149,7 +149,7 @@ private theorem CProjectTransRel_postfix_comm_var
     {gbs : List (Label × GlobalType)} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.var v))
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role) :
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.var v) t := by
   -- Non-participant projecting to .var via CProject_var_trans_var.
   have htrans_var := CProject_var_trans_var (GlobalType.comm sender receiver gbs) role v hproj hne
@@ -161,7 +161,7 @@ private theorem CProjectTransRel_postfix_comm_mu
     {sender receiver role ltvar : String} {gbs : List (Label × GlobalType)}
     {lbody t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.mu ltvar lbody))
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu ltvar lbody) t := by
@@ -172,11 +172,11 @@ private theorem CProjectTransRel_postfix_comm_mu
   subst htrans
   have hmu_rel :
       CProjectTransRel (LocalTypeR.mu ltvar lbody)
-        (LocalTypeR.mu ltvar (Trans.trans gbody role)) := by
+        (LocalTypeR.mu ltvar (trans gbody role)) := by
     -- Package CProject with the computed trans equality.
     have htrans_mu' :
-        Trans.trans (GlobalType.comm sender receiver gbs) role =
-          LocalTypeR.mu ltvar (Trans.trans gbody role) := by
+        trans (GlobalType.comm sender receiver gbs) role =
+          LocalTypeR.mu ltvar (trans gbody role) := by
       simpa using htrans_mu
     exact ⟨GlobalType.comm sender receiver gbs, role, hproj, htrans_mu'.symm, hwf⟩
   simpa [htrans_mu] using CProjectTransRel_postfix_mu_closure hmu_rel
@@ -185,7 +185,7 @@ private theorem CProjectTransRel_postfix_comm_mu
 private theorem CProjectTransRel_postfix_end_cases
     {role : String} {lt t : LocalTypeR}
     (hf : CProjectF CProject GlobalType.end role lt)
-    (htrans : t = Trans.trans GlobalType.end role) :
+    (htrans : t = trans GlobalType.end role) :
     EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   -- Only the .end candidate is possible.
   cases lt with
@@ -200,7 +200,7 @@ private theorem CProjectTransRel_postfix_end_cases
 private theorem CProjectTransRel_postfix_var_cases
     {vt : String} {role : String} {lt t : LocalTypeR}
     (hf : CProjectF CProject (GlobalType.var vt) role lt)
-    (htrans : t = Trans.trans (GlobalType.var vt) role) :
+    (htrans : t = trans (GlobalType.var vt) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   -- Only the .var candidate is possible.
   cases lt with
@@ -215,7 +215,7 @@ private theorem CProjectTransRel_postfix_var_cases
 private theorem CProjectTransRel_postfix_mu_cases
     {muvar : String} {gbody : GlobalType} {role : String} {lt t : LocalTypeR}
     (hproj : CProject (GlobalType.mu muvar gbody) role lt)
-    (htrans : t = Trans.trans (GlobalType.mu muvar gbody) role)
+    (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hwf : (GlobalType.mu muvar gbody).wellFormed = true)
     (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true)
     (hf : CProjectF CProject (GlobalType.mu muvar gbody) role lt) :
@@ -236,7 +236,7 @@ private theorem CProjectTransRel_postfix_mu_cases
 private theorem CProjectTransRel_postfix_comm_cases
     {sender receiver role : String} {gbs : List (Label × GlobalType)} {lt t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role lt)
-    (htrans : t = Trans.trans (GlobalType.comm sender receiver gbs) role)
+    (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role lt) :

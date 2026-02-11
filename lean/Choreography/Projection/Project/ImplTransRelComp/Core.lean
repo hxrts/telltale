@@ -18,7 +18,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -127,7 +127,7 @@ theorem BranchesRel_trans_chain {R : Rel}
     Pairs local type lt with trans output when lt is a valid CProject output.
     Uses GlobalType.wellFormed (Coq gInvPred analogue) to derive allCommsNonEmpty. -/
 def CProjectTransRel : Rel := fun lt t =>
-  ∃ g role, CProject g role lt ∧ t = Trans.trans g role ∧ g.wellFormed = true
+  ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.wellFormed = true
 
 /-- CProject preserves well-formedness under well-formed globals. -/
 theorem CProject_wellFormed_of_wellFormed {g : GlobalType} {role : String} {lt : LocalTypeR}
@@ -136,9 +136,9 @@ theorem CProject_wellFormed_of_wellFormed {g : GlobalType} {role : String} {lt :
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
-  have htrans : Trans.trans g role = lt := trans_eq_of_CProject g role lt hproj hne
-  have hWFtrans : LocalTypeR.WellFormed (Trans.trans g role) :=
-    Choreography.Projection.Trans.trans_wellFormed_of_wellFormed g role hwf
+  have htrans : trans g role = lt := trans_eq_of_CProject g role lt hproj hne
+  have hWFtrans : LocalTypeR.WellFormed (trans g role) :=
+    Choreography.Projection.Project.trans_wellFormed_of_wellFormed g role hwf
   simpa [htrans] using hWFtrans
 
 /-- Left endpoint of CProjectTransRel is well-formed. -/
@@ -246,43 +246,43 @@ theorem CProjectTransRel_postfix_mu_closure
 
 theorem CProjectTransRel_postfix_end
     {role : String} {t : LocalTypeR}
-    (htrans : t = Trans.trans GlobalType.end role) :
+    (htrans : t = trans GlobalType.end role) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
   -- Reduce by rewriting the trans target.
   subst htrans
-  simp [Trans.trans, EQ2F]
+  simp [trans, EQ2F]
 
 theorem CProjectTransRel_postfix_var
     {vt vlt : String} {role : String} {t : LocalTypeR}
     (hf : CProjectF CProject (GlobalType.var vt) role (LocalTypeR.var vlt))
-    (htrans : t = Trans.trans (GlobalType.var vt) role) :
+    (htrans : t = trans (GlobalType.var vt) role) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.var vlt) t := by
   -- Use CProjectF to identify the variable and reduce trans.
   simp [CProjectF] at hf
   subst htrans hf
-  simp [Trans.trans, EQ2F]
+  simp [trans, EQ2F]
 
 /-- Helper: guarded mu/mu case for CProjectTransRel_postfix_mu_mu. -/
 private theorem CProjectTransRel_postfix_mu_mu_guarded
     {muvar : String} {gbody : GlobalType} {lbody t : LocalTypeR} {role : String}
     (hbody_proj : CProject gbody role lbody)
     (hguard : lbody.isGuarded muvar = true)
-    (htrans : t = Trans.trans (GlobalType.mu muvar gbody) role)
+    (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hwf : (GlobalType.mu muvar gbody).wellFormed = true)
     (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu muvar lbody) t := by
   -- Compute trans for mu and wrap via the mu closure helper.
   have hwf_body : gbody.allCommsNonEmpty = true := by
     simpa [GlobalType.allCommsNonEmpty] using hne
-  have htrans_guard : (Trans.trans gbody role).isGuarded muvar = true :=
+  have htrans_guard : (trans gbody role).isGuarded muvar = true :=
     CProject_isGuarded_trans hbody_proj hwf_body hguard
   have htrans_mu :
-      Trans.trans (GlobalType.mu muvar gbody) role =
-        LocalTypeR.mu muvar (Trans.trans gbody role) := by
-    simp [Trans.trans, htrans_guard]
+      trans (GlobalType.mu muvar gbody) role =
+        LocalTypeR.mu muvar (trans gbody role) := by
+    simp [trans, htrans_guard]
   have hmu_rel :
       CProjectTransRel (LocalTypeR.mu muvar lbody)
-        (LocalTypeR.mu muvar (Trans.trans gbody role)) := by
+        (LocalTypeR.mu muvar (trans gbody role)) := by
     -- Package CProject with the concrete trans equality.
     have hmu_proj :
         CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu muvar lbody) :=
@@ -294,7 +294,7 @@ private theorem CProjectTransRel_postfix_mu_mu_guarded
 theorem CProjectTransRel_postfix_mu_mu
     {muvar ltvar : String} {gbody : GlobalType} {lbody t : LocalTypeR} {role : String}
     (hproj : CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu ltvar lbody))
-    (htrans : t = Trans.trans (GlobalType.mu muvar gbody) role)
+    (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hwf : (GlobalType.mu muvar gbody).wellFormed = true)
     (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true)
     (hf : CProjectF CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu ltvar lbody)) :
@@ -313,7 +313,7 @@ theorem CProjectTransRel_postfix_mu_mu
 theorem CProjectTransRel_postfix_mu_end
     {muvar : String} {gbody : GlobalType} {t : LocalTypeR} {role : String}
     (_hproj : CProject (GlobalType.mu muvar gbody) role LocalTypeR.end)
-    (htrans : t = Trans.trans (GlobalType.mu muvar gbody) role)
+    (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true)
     (hf : CProjectF CProject (GlobalType.mu muvar gbody) role LocalTypeR.end) :
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
@@ -326,11 +326,11 @@ theorem CProjectTransRel_postfix_mu_end
     exact this.elim
   ·
     cases hend_eq
-    have htrans_guard : (Trans.trans gbody role).isGuarded muvar = false :=
+    have htrans_guard : (trans gbody role).isGuarded muvar = false :=
       CProject_unguarded_trans hbody_proj
         (by simpa [GlobalType.allCommsNonEmpty] using hne) hguard
-    have htrans_end : Trans.trans (GlobalType.mu muvar gbody) role = LocalTypeR.end := by
-      simp [Trans.trans, htrans_guard]
+    have htrans_end : trans (GlobalType.mu muvar gbody) role = LocalTypeR.end := by
+      simp [trans, htrans_guard]
     subst htrans
     simpa [htrans_end, EQ2F]
 

@@ -18,7 +18,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -347,7 +347,7 @@ Uses EQ2_coind_upto which handles the EQ2 closure automatically.
 Requires `allCommsNonEmpty` assumption (matching Coq's `size_pred`) to handle
 non-participant cases which recurse through branches. -/
 theorem CProject_implies_EQ2_trans_thm (g : GlobalType) (role : String) (lt : LocalTypeR)
-    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (Trans.trans g role) := by
+    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) := by
   -- Apply coinduction up-to with witness relation CProjectTransRelCompWF
   -- EQ2_coind_upto says: if ∀ a b, R a b → EQ2F (EQ2_closure R) a b, then R ⊆ EQ2
   -- EQ2_closure R = fun a b => R a b ∨ EQ2 a b, which matches CProjectTransRelComp_postfix
@@ -356,7 +356,7 @@ theorem CProject_implies_EQ2_trans_thm (g : GlobalType) (role : String) (lt : Lo
     intro lt' t' hrel
     exact CProjectTransRelComp_postfix lt' t' hrel
   · -- Seed relation: CProjectTransRelCompWF holds by the base CProjectTransRel case.
-    have hrel : CProjectTransRel lt (Trans.trans g role) := ⟨g, role, h, rfl, hwf⟩
+    have hrel : CProjectTransRel lt (trans g role) := ⟨g, role, h, rfl, hwf⟩
     exact CProjectTransRelCompWF_of_CProjectTransRel hrel
 
 

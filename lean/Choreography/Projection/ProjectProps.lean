@@ -62,9 +62,9 @@ theorem project_deterministic {g : GlobalType} {role : String} {e1 e2 : LocalTyp
     have hwf' := hwf
     simp [GlobalType.wellFormed, Bool.and_eq_true] at hwf'
     exact hwf'.1.1.2
-  have htrans_eq : Trans.trans g role = e1 :=
+  have htrans_eq : trans g role = e1 :=
     trans_eq_of_CProject g role e1 hp1 hne
-  have htrans_eq2 : Trans.trans g role = e2 :=
+  have htrans_eq2 : trans g role = e2 :=
     trans_eq_of_CProject g role e2 hp2 hne
   have hEq : e1 = e2 := by
     exact htrans_eq.symm.trans htrans_eq2

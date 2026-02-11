@@ -3,7 +3,7 @@ import Runtime.VM.Semantics.ExecHelpers
 import Runtime.VM.Model.Program
 import Runtime.Resources.Arena
 import Protocol.Environments.Core
-import Choreography.Projection.Trans
+import Choreography.Projection.Project.Core
 
 /-!
 # Dynamic Choreography Loading
@@ -124,8 +124,11 @@ private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       match lookupLocalType image.program.localTypes role with
       | none => true
       | some claimed =>
-          let projected := Choreography.Projection.Trans.trans image.globalType role
-          reprStr (localTypeRToLocalType projected) != reprStr claimed) with
+          let projected? := Choreography.Projection.Project.projectR? image.globalType role
+          match projected? with
+          | none => true
+          | some projected =>
+              reprStr (localTypeRToLocalType projected.1) != reprStr claimed) with
     | some role => some s!"projection mismatch for role {role}"
     | none => none
 

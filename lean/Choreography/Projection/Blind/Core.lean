@@ -1,4 +1,4 @@
-import Choreography.Projection.Trans
+import Choreography.Projection.Trans.Core
 import Choreography.Projection.Projectb
 import Choreography.Projection.ProjSubst
 

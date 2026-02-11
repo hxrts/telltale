@@ -37,7 +37,7 @@ namespace Semantics.SubjectReduction
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Project
 open SessionCoTypes.EQ2
 open SessionCoTypes.Quotient

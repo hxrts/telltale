@@ -57,7 +57,7 @@ namespace Choreography.Harmony.StepProjection
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR (LocalTypeR)
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open SessionCoTypes.EQ2
 
 -- Alias to avoid confusion

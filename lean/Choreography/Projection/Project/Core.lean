@@ -1,5 +1,5 @@
 import Choreography.Projection.Projectb
-import Choreography.Projection.Trans
+import Choreography.Projection.Project.Primitive
 import Choreography.Projection.Blind
 import SessionCoTypes.EQ2
 
@@ -32,9 +32,13 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
+
+/-! ## Canonical Projection API (Non-legacy)
+Projection primitives (`trans`, `transBranches`, `lcontractive`, and shape/well-formedness
+lemmas) are re-exported from `Project/Primitive.lean`.
+-/
 
 /-! ## Projectability -/
 

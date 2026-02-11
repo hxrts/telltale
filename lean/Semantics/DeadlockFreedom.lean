@@ -49,7 +49,7 @@ namespace Semantics.DeadlockFreedom
 
 open SessionTypes.GlobalType
 open SessionCoTypes.Quotient
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Semantics.SubjectReduction
 
 /-! ## Progress Predicate: ReachesComm

@@ -2,7 +2,7 @@ import Lean.Data.Json
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
 import Choreography.Projection.Json
-import Choreography.Projection.Trans
+import Choreography.Projection.Project.Primitive
 
 /-! # Choreography.Projection.Validator
 
@@ -31,7 +31,7 @@ open Lean (Json)
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open Choreography.Projection.Json
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 
 /-- Program export payload: role plus expected local type. -/
 structure ProgramExport where

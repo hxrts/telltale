@@ -18,7 +18,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -71,7 +71,7 @@ private theorem CProject_mu_implies_trans_mu_mu (t : String) (gbody : GlobalType
     have htrans_guard : (trans gbody role).isGuarded t = true := by
       simpa using CProject_isGuarded_trans hbody_proj hwf_body hguard
     refine ⟨gbody, ?_, hguard, hbody_proj, hwf_body⟩
-    simp [Trans.trans, htrans_guard]
+    simp [trans, htrans_guard]
   · have : False := by simpa using hend_eq
     exact this.elim
 

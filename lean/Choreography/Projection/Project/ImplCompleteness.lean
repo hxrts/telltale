@@ -16,7 +16,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -124,7 +124,7 @@ We now proceed without this EQ2-closed projection setup and rely on the
 
 /-- CProject implies EQ2 between the candidate and `trans` (wrapper lemma). -/
 theorem CProject_implies_EQ2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
-    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (Trans.trans g role) :=
+    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) :=
   CProject_implies_EQ2_trans_thm g role lt h hwf
 
 /-- BranchesRel for EQ2 implies branch-wise EQ2.
@@ -143,7 +143,7 @@ private theorem BranchesProjRel_implies_BranchesRel_EQ2_cons
   -- Use head well-formedness to relate the head continuation via trans.
   have hwf_head : (gLabel, gCont).2.wellFormed = true := by
     exact hwf (gLabel, gCont) (by simp)
-  have heq : EQ2 lCont (Trans.trans gCont role) :=
+  have heq : EQ2 lCont (trans gCont role) :=
     CProject_implies_EQ2_trans _ _ _ hproj hwf_head
   have htail' :
       List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
@@ -196,7 +196,7 @@ private theorem AllBranchesProj_implies_EQ2_trans_cons
   have hproj : CProject first.2 role lt := hall first (by simp)
   have hwf_first : first.2.wellFormed = true :=
     GlobalType.wellFormed_comm_branches sender receiver (first :: rest) hwf first (by simp)
-  have heq : EQ2 lt (Trans.trans first.2 role) :=
+  have heq : EQ2 lt (trans first.2 role) :=
     CProject_implies_EQ2_trans _ _ _ hproj hwf_first
   -- Non-participants project to the first branch.
   have htrans : trans (GlobalType.comm sender receiver (first :: rest)) role =

@@ -286,11 +286,11 @@ private lemma embed_lcontractive_mu_case {t : String} {body' : LocalTypeR}
     {role : String} {t' : String} {gbody' : GlobalType}
     (hcontr : LocalTypeR.lcontractive (LocalTypeR.mu t body') = true)
     (hinner' : CEmbedF CEmbed body' role gbody') :
-    Choreography.Projection.Trans.lcontractive (GlobalType.mu t' gbody') = true := by
+    Choreography.Projection.Project.lcontractive (GlobalType.mu t' gbody') = true := by
   cases body' with
   | «end» =>
       cases gbody' with
-      | «end» => simp [Choreography.Projection.Trans.lcontractive]
+      | «end» => simp [Choreography.Projection.Project.lcontractive]
       | var _ => simp [CEmbedF] at hinner'
       | mu _ _ => simp [CEmbedF] at hinner'
       | comm _ _ _ => simp [CEmbedF] at hinner'
@@ -301,19 +301,19 @@ private lemma embed_lcontractive_mu_case {t : String} {body' : LocalTypeR}
       | «end» => simp [CEmbedF] at hinner'
       | var _ => simp [CEmbedF] at hinner'
       | mu _ _ => simp [CEmbedF] at hinner'
-      | comm _ _ _ => simp [Choreography.Projection.Trans.lcontractive]
+      | comm _ _ _ => simp [Choreography.Projection.Project.lcontractive]
   | recv _ _ =>
       cases gbody' with
       | «end» => simp [CEmbedF] at hinner'
       | var _ => simp [CEmbedF] at hinner'
       | mu _ _ => simp [CEmbedF] at hinner'
-      | comm _ _ _ => simp [Choreography.Projection.Trans.lcontractive]
+      | comm _ _ _ => simp [Choreography.Projection.Project.lcontractive]
 
 /-- If a local type body is contractive, then embedding preserves the contractiveness
     property in the global type. This is used in the mu case of localType_has_embed. -/
 private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {gbody : GlobalType}
     (hcontr : LocalTypeR.lcontractive body = true) (hembed : CEmbed body role gbody) :
-    Choreography.Projection.Trans.lcontractive gbody = true := by
+    Choreography.Projection.Project.lcontractive gbody = true := by
   -- Destructure the embedding by cases on body/gbody.
   have hF := CEmbed_destruct hembed
   cases body with
@@ -329,7 +329,7 @@ private lemma embed_lcontractive_of_local {body : LocalTypeR} {role : String} {g
   | «end» | var _ | send _ _ | recv _ _ =>
       cases gbody <;>
         simp [CEmbedF, LocalTypeR.lcontractive,
-          Choreography.Projection.Trans.lcontractive] at hF hcontr ⊢
+          Choreography.Projection.Project.lcontractive] at hF hcontr ⊢
 
 /-- When lcontractive body = true in the context of a mu, body.isGuarded t = true.
     This follows from the structure of lcontractive which requires send/recv/end at the top,

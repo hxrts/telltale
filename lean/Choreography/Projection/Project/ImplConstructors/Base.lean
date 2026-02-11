@@ -18,7 +18,7 @@ namespace Choreography.Projection.Project
 
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
 open Choreography.Projection.Projectb
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
@@ -119,7 +119,7 @@ theorem sizeOf_snd_lt_comm_head_mul3 (sender receiver : String)
 private theorem CProject_end_trans_end_end (role : String)
     (_ : CProject .end role .end) : trans .end role = .end := by
   -- Base case: trans .end is definitionally .end.
-  simp [Trans.trans]
+  simp [trans]
 
 /-- Helper: `.var` cannot project to `.end`. -/
 private theorem CProject_end_trans_end_var (v : String) (role : String)
@@ -142,7 +142,7 @@ private theorem CProject_end_trans_end_mu (t : String) (body : GlobalType) (role
   -- The .end candidate forces the unguarded branch.
   have htrans_guard : (trans body role).isGuarded t = false :=
     CProject_unguarded_trans hbody hne_body hguard
-  simp [Trans.trans, htrans_guard]
+  simp [trans, htrans_guard]
 
 /-- Helper: sender role cannot project a comm to .end. -/
 private theorem CProject_end_trans_end_comm_sender_contra
@@ -269,7 +269,7 @@ private theorem CProject_var_trans_var_var (v v' role : String)
   -- CProjectF forces v' = v, then trans is definitional.
   have hf := CProject_destruct h
   simp [CProjectF] at hf
-  simpa [Trans.trans, hf]
+  simpa [trans, hf]
 
 /-- Helper: `.mu` cannot project to `.var`. -/
 private theorem CProject_var_trans_var_mu (t : String) (body : GlobalType) (role v : String)

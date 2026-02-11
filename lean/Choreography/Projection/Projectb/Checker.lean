@@ -1,6 +1,6 @@
 import Mathlib.Order.FixedPoints
 import SessionCoTypes.CoinductiveRel
-import Choreography.Projection.Trans
+import Choreography.Projection.Trans.Core
 import SessionTypes.Participation
 
 /-!

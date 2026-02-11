@@ -273,17 +273,17 @@ theorem EQ2CE_to_EQ2C_projTrans {ρ : EnvPair}
     {g₁ g₂ : SessionTypes.GlobalType.GlobalType}
     {role₁ role₂ : String}
     (hce : EQ2CE ρ
-      (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-      (toCoind (Choreography.Projection.Trans.trans g₂ role₂)))
+      (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+      (toCoind (Choreography.Projection.Project.trans g₂ role₂)))
     (hEnvL : EnvResolvesL ρ) (hVarR : EnvVarR ρ) :
-    EQ2C (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-         (toCoind (Choreography.Projection.Trans.trans g₂ role₂)) := by
+    EQ2C (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+         (toCoind (Choreography.Projection.Project.trans g₂ role₂)) := by
   -- Projection outputs are inductive, so toCoind images are productive.
   have hprod₁ :
-      ProductiveC (toCoind (Choreography.Projection.Trans.trans g₁ role₁)) :=
+      ProductiveC (toCoind (Choreography.Projection.Project.trans g₁ role₁)) :=
     productive_toCoind_of_projTrans g₁ role₁
   have hprod₂ :
-      ProductiveC (toCoind (Choreography.Projection.Trans.trans g₂ role₂)) :=
+      ProductiveC (toCoind (Choreography.Projection.Project.trans g₂ role₂)) :=
     productive_toCoind_of_projTrans g₂ role₂
   -- Delegate to the general erasure lemma.
   exact EQ2CE_to_EQ2C' hce hEnvL hVarR hprod₁ hprod₂
@@ -293,10 +293,10 @@ theorem EQ2CE_resolved'_implies_EQ2C_projTrans
     {g₁ g₂ : SessionTypes.GlobalType.GlobalType}
     {role₁ role₂ : String}
     (h : EQ2CE_resolved'
-      (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-      (toCoind (Choreography.Projection.Trans.trans g₂ role₂))) :
-    EQ2C (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-         (toCoind (Choreography.Projection.Trans.trans g₂ role₂)) := by
+      (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+      (toCoind (Choreography.Projection.Project.trans g₂ role₂))) :
+    EQ2C (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+         (toCoind (Choreography.Projection.Project.trans g₂ role₂)) := by
   -- Discharge productivity for both projections.
   exact EQ2CE_resolved'_implies_EQ2C _ _ h
     (productive_toCoind_of_projTrans g₁ role₁)
@@ -307,10 +307,10 @@ theorem EQ2CE_resolved_to_EQ2C_projTrans
     {ρ : EnvPair} {g₁ g₂ : SessionTypes.GlobalType.GlobalType}
     {role₁ role₂ : String}
     (h : EQ2CE_resolved ρ
-      (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-      (toCoind (Choreography.Projection.Trans.trans g₂ role₂))) :
-    EQ2C (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-         (toCoind (Choreography.Projection.Trans.trans g₂ role₂)) := by
+      (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+      (toCoind (Choreography.Projection.Project.trans g₂ role₂))) :
+    EQ2C (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+         (toCoind (Choreography.Projection.Project.trans g₂ role₂)) := by
   -- Discharge productivity for both projections.
   exact EQ2CE_resolved_to_EQ2C ρ _ _ h
     (productive_toCoind_of_projTrans g₁ role₁)
@@ -321,10 +321,10 @@ theorem EQ2CE_to_EQ2C_paco_projTrans
     {g₁ g₂ : SessionTypes.GlobalType.GlobalType}
     {role₁ role₂ : String}
     (hR : EQ2CE_rel_paco
-      (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-      (toCoind (Choreography.Projection.Trans.trans g₂ role₂))) :
-    EQ2C_paco (toCoind (Choreography.Projection.Trans.trans g₁ role₁))
-              (toCoind (Choreography.Projection.Trans.trans g₂ role₂)) :=
+      (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+      (toCoind (Choreography.Projection.Project.trans g₂ role₂))) :
+    EQ2C_paco (toCoind (Choreography.Projection.Project.trans g₁ role₁))
+              (toCoind (Choreography.Projection.Project.trans g₂ role₂)) :=
   EQ2CE_to_EQ2C_paco hR
     (productive_toCoind_of_projTrans g₁ role₁)
     (productive_toCoind_of_projTrans g₂ role₂)

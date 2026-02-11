@@ -25,7 +25,7 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
-open Choreography.Projection.Trans (trans_wellFormed_of_wellFormed)
+open Choreography.Projection.Project (trans_wellFormed_of_wellFormed)
 open Choreography.Projection.Blind (isBlind isBlind_mu_body isBlind_substitute)
 
 private theorem proj_trans_other_step_mu_chain
@@ -79,7 +79,7 @@ theorem proj_trans_other_step_branches_nil (act : GlobalActionR) (role : String)
     (_hns : role ≠ act.sender) (_hnr : role ≠ act.receiver) :
     BranchesRel EQ2 (projTransBranches [] role) (projTransBranches [] role) := by
   -- Empty branch lists are trivially related.
-  simp [projTransBranches, Choreography.Projection.Trans.transBranches, BranchesRel]
+  simp [projTransBranches, Choreography.Projection.Project.transBranches, BranchesRel]
 
 private abbrev StepIH (g g' : GlobalType) (act : GlobalActionR) : Prop :=
   -- Branch-step head hypothesis type.
@@ -106,7 +106,7 @@ theorem proj_trans_other_step_branches_cons
     BranchesRel EQ2 (projTransBranches ((label, g') :: rest') role)
       (projTransBranches ((label, g) :: rest) role) := by
   -- Build the cons proof from the head IH and tail IH.
-  simp [projTransBranches, Choreography.Projection.Trans.transBranches, BranchesRel]
+  simp [projTransBranches, Choreography.Projection.Project.transBranches, BranchesRel]
   constructor
   · exact ih_step (hclosed (label, g) List.mem_cons_self)
       (hwf (label, g) List.mem_cons_self)

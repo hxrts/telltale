@@ -27,12 +27,12 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionCoTypes.EQ2
 open SessionCoTypes.EQ2Props
-open Choreography.Projection.Trans
+open Choreography.Projection.Project
   (trans_comm_sender trans_comm_receiver trans_comm_other trans_wellFormed_of_wellFormed)
 open Choreography.Projection.Project (ProjectableClosedWellFormed)
 open Choreography.Projection.Projectb (CProject)
 
-abbrev projTransBranches := Choreography.Projection.Trans.transBranches
+abbrev projTransBranches := Choreography.Projection.Project.transBranches
 
 private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
   -- Action matches the head comm of g, otherwise false.
@@ -52,10 +52,10 @@ private theorem mem_transBranches_of_mem (branches : List (Label × GlobalType))
       | mk label_hd cont_hd =>
         cases hmem with
         | head =>
-            simp [projTransBranches, Choreography.Projection.Trans.transBranches]
+            simp [projTransBranches, Choreography.Projection.Project.transBranches]
         | tail _ htl =>
             have ih' := ih htl
-            simp [projTransBranches, Choreography.Projection.Trans.transBranches, List.mem_cons, ih']
+            simp [projTransBranches, Choreography.Projection.Project.transBranches, List.mem_cons, ih']
 
 /-- Sender projection follows the head communication matching the action. -/
 private theorem proj_trans_sender_step_comm_head
@@ -256,7 +256,7 @@ private theorem proj_trans_other_step_comm_async_other_cons
       BranchesRel EQ2
         ((label', projTrans cont' role) :: projTransBranches rest' role)
         ((label, projTrans cont role) :: projTransBranches rest role) := by
-    simpa [projTransBranches, Choreography.Projection.Trans.transBranches] using hbranch_rel
+    simpa [projTransBranches, Choreography.Projection.Project.transBranches] using hbranch_rel
   cases hbranch_rel' with
   | cons hpair _ => exact hpair.2
 
