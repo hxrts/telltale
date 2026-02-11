@@ -197,6 +197,60 @@ def VMInvariantSpaceWithProfiles.withCoordination
   VMInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with coordination? := some p })
 
+/-- Attach a CRDT distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withCRDT
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.CRDTProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with crdt? := some p })
+
+/-- Attach a consensus-envelope distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withConsensusEnvelope
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.ConsensusEnvelopeProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with consensusEnvelope? := some p })
+
+/-- Attach a failure-envelope distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withFailureEnvelope
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.FailureEnvelopeProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with failureEnvelope? := some p })
+
+/-- Attach a VM-envelope-adherence distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withVMEnvelopeAdherence
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.VMEnvelopeAdherenceProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with vmEnvelopeAdherence? := some p })
+
+/-- Attach a VM-envelope-admission distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withVMEnvelopeAdmission
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.VMEnvelopeAdmissionProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with vmEnvelopeAdmission? := some p })
+
+/-- Attach a protocol-envelope-bridge distributed profile to a combined space. -/
+def VMInvariantSpaceWithProfiles.withProtocolEnvelopeBridge
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.ProtocolEnvelopeBridgeProfile) :
+    VMInvariantSpaceWithProfiles store₀ State :=
+  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with protocolEnvelopeBridge? := some p })
+
 /-- Attach a Foster profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withFoster
     {store₀ : SessionStore ν} {State : Type v}
@@ -322,6 +376,221 @@ structure CoordinationArtifact where
   characterization :
     Distributed.Coordination.CoordinationCharacterization protocol.model
 
+/-- Packaged CRDT theorem-family artifact. -/
+structure CRDTArtifact where
+  protocol : Distributed.CRDT.CRDTProtocol
+  exactEnvelope :
+    Distributed.CRDT.ExactEnvelopeCharacterization
+      protocol.model protocol.premises.RefRun protocol.premises.ImplRun
+  adequacy :
+    Distributed.CRDT.ObservationalAdequacyModuloEnvelope
+      protocol.model protocol.premises.RefRun protocol.premises.ImplRun
+  principalCapability :
+    Distributed.CRDT.PrincipalCapability
+      protocol.premises.inferredBudget protocol.premises.envelopeBudget
+  admissionSoundness :
+    Distributed.CRDT.AdmissionSoundness
+      protocol.premises.inferredBudget protocol.premises.envelopeBudget
+  admissionCompleteness :
+    Distributed.CRDT.AdmissionCompleteness
+      protocol.premises.inferredBudget protocol.premises.envelopeBudget
+  opStateEquivalence :
+    Distributed.CRDT.OpStateEquivalence
+      protocol.model protocol.premises.opRun protocol.premises.stateRun
+  gcSafetyIff :
+    Distributed.CRDT.GCSafetyIffCausalDominance
+      protocol.premises.GCSafe protocol.premises.CausalDominanceEstablished
+  boundedApproximation :
+    Distributed.CRDT.BoundedMetadataApproximation
+      protocol.model protocol.premises.approxPolicy protocol.premises.horizon
+      protocol.premises.epsilon protocol.premises.referenceRun protocol.premises.deployedRun
+  approximationMonotonicity :
+    Distributed.CRDT.ApproximationMonotoneUnderPolicyTightening
+      protocol.model protocol.premises.approxPolicy protocol.premises.approxPolicy
+      protocol.premises.horizon protocol.premises.epsilon
+      protocol.premises.referenceRun protocol.premises.deployedRun
+  exactSECAsLimit :
+    Distributed.CRDT.ExactSECRecoveryAsLimit
+      protocol.model protocol.premises.approxPolicy
+      protocol.premises.referenceRun protocol.premises.deployedRun
+  hcrdtCore : Distributed.CRDT.HcrdtCore protocol.model
+  hcrdtFoundation : Distributed.CRDT.HcrdtFoundation protocol.model
+  hcrdtDynamics : Distributed.CRDT.HcrdtDynamics protocol.model
+  hcrdtExtensions : Distributed.CRDT.HcrdtExtensions protocol.model
+  hcrdtLimits : Distributed.CRDT.HcrdtLimits protocol.model
+
+/-- Packaged consensus-envelope theorem-family artifact. -/
+structure ConsensusEnvelopeArtifact where
+  protocol : Distributed.ConsensusEnvelope.ConsensusEnvelopeProtocol
+  exactEnvelope :
+    Distributed.ConsensusEnvelope.ExactEnvelopeCharacterization_consensus
+      protocol.observe protocol.premises.RefRun protocol.premises.ImplRun
+  adequacy :
+    Distributed.ConsensusEnvelope.ObservationalAdequacyModuloEnvelope_consensus
+      protocol.observe protocol.premises.RefRun protocol.premises.ImplRun
+  principalCapability :
+    Distributed.ConsensusEnvelope.PrincipalCapability_consensus
+      protocol.premises.inferredBudget protocol.premises.envelopeBudget
+  admissionSoundness :
+    Distributed.ConsensusEnvelope.AdmissionSoundness_consensus
+      protocol.premises.inferredBudget protocol.premises.envelopeBudget
+  admissionCompleteness :
+    Distributed.ConsensusEnvelope.AdmissionCompleteness_consensus
+      protocol.premises.inferredBudget protocol.premises.envelopeBudget
+
+/-- Packaged failure-envelope theorem-family artifact. -/
+structure FailureEnvelopeArtifact where
+  protocol : Runtime.Adequacy.FailureEnvelopeProtocol
+  recoveryActionSafety :
+    Runtime.Adequacy.RecoveryActionSafety
+      protocol.premises.Safe protocol.premises.recoveryStep
+  noUnsafeReplay :
+    Runtime.Adequacy.NoUnsafeReplay
+      protocol.premises.Safe protocol.premises.replayPre protocol.premises.replay
+  checkpointRestartRefinement :
+    Runtime.Adequacy.CheckpointRestartRefinement
+      protocol.premises.Refines protocol.premises.checkpoint protocol.premises.restart
+  failureEnvelopeSoundness :
+    Runtime.Adequacy.FailureEnvelopeSoundnessExtension
+      protocol.premises.localEnvelope
+      protocol.premises.RefRun
+      protocol.premises.ImplRun
+      protocol.premises.injectFailure
+  failureEnvelopeMaximality :
+    Runtime.Adequacy.FailureEnvelopeMaximalityExtension
+      protocol.premises.localEnvelope
+      protocol.premises.RefRun
+      protocol.premises.ImplRun
+      protocol.premises.injectFailure
+
+/-- Packaged VM envelope-adherence theorem-family artifact. -/
+structure VMEnvelopeAdherenceArtifact where
+  protocol : Runtime.Adequacy.VMEnvelopeAdherenceProtocol
+  localAdherence :
+    Runtime.Adequacy.LocalEnvelopeSoundness
+      protocol.premises.localHypotheses.localEnvelope
+      protocol.premises.localHypotheses.refRun
+      protocol.premises.localHypotheses.vmRun
+  shardedAdherence :
+    Runtime.Adequacy.ShardedEnvelopeSoundness
+      protocol.premises.shardedHypotheses.shardedEnvelope
+      protocol.premises.shardedHypotheses.refRun
+      protocol.premises.shardedHypotheses.vmRun
+  schedulerDeterminismLocal :
+    Runtime.Adequacy.ExchangeNormalization
+      protocol.premises.localHypotheses.localEnvelope
+      protocol.premises.localHypotheses.certifiedExchange
+  schedulerDeterminismSharded :
+    Runtime.Adequacy.ShardedExchangeNormalization
+      protocol.premises.shardedHypotheses.shardedEnvelope
+      protocol.premises.shardedHypotheses.certifiedExchange
+  monotonicity :
+    Runtime.Adequacy.SpatialSubtypingMonotonicity
+      protocol.premises.subtype protocol.premises.obligation
+  localAdequacy :
+    Runtime.Adequacy.VMObservationalAdequacyModuloEnvelope
+      (Runtime.Adequacy.EqEnvLocal protocol.premises.localHypotheses.localEnvelope)
+      protocol.premises.localHypotheses.refRun
+      protocol.premises.localHypotheses.vmRun
+  shardedAdequacy :
+    Runtime.Adequacy.VMObservationalAdequacyModuloEnvelope
+      (Runtime.Adequacy.EqEnvShard protocol.premises.shardedHypotheses.shardedEnvelope)
+      protocol.premises.shardedHypotheses.refRun
+      protocol.premises.shardedHypotheses.vmRun
+  localFullAbstraction :
+    Runtime.Adequacy.EnvelopeFullAbstraction
+      protocol.premises.localHypotheses.localEnvelope.toEnvelope.observe
+      (Runtime.Adequacy.EqEnvLocal protocol.premises.localHypotheses.localEnvelope)
+  shardedFullAbstraction :
+    Runtime.Adequacy.EnvelopeFullAbstraction
+      protocol.premises.shardedHypotheses.shardedEnvelope.toEnvelope.observe
+      (Runtime.Adequacy.EqEnvShard protocol.premises.shardedHypotheses.shardedEnvelope)
+  capabilityMonotonicity :
+    protocol.premises.guarantee protocol.premises.weakCapability →
+    protocol.premises.guarantee protocol.premises.strongCapability
+
+/-- Packaged VM envelope-admission theorem-family artifact. -/
+structure VMEnvelopeAdmissionArtifact where
+  protocol : Runtime.Adequacy.VMEnvelopeAdmissionProtocol
+  localInferenceSoundness :
+    Runtime.Adequacy.DProgInferenceSoundness_local
+      protocol.premises.input protocol.premises.localHypotheses
+  shardedInferenceSoundness :
+    Runtime.Adequacy.DProgInferenceSoundness_shard
+      protocol.premises.input protocol.premises.shardedHypotheses
+  localPrincipalCapability :
+    Runtime.Adequacy.PrincipalCapabilityProperty
+      (Runtime.Adequacy.DProg_local protocol.premises.input)
+      (fun c =>
+        Runtime.Adequacy.CapabilityStrengthens
+          (Runtime.Adequacy.DProg_local protocol.premises.input) c ∧
+        Runtime.Adequacy.CapabilityStrengthens
+          c (Runtime.Adequacy.DProg_local protocol.premises.input))
+  shardedPrincipalCapability :
+    Runtime.Adequacy.PrincipalCapabilityProperty
+      (Runtime.Adequacy.DProg_shard protocol.premises.input)
+      (fun c =>
+        Runtime.Adequacy.CapabilityStrengthens
+          (Runtime.Adequacy.DProg_shard protocol.premises.input) c ∧
+        Runtime.Adequacy.CapabilityStrengthens
+          c (Runtime.Adequacy.DProg_shard protocol.premises.input))
+  localAdmissionSoundness :
+    Runtime.Adequacy.AdmissionSoundness
+      (Runtime.Adequacy.DProg_local protocol.premises.input)
+      protocol.premises.runtimeComplianceLocal
+  localAdmissionCompleteness :
+    Runtime.Adequacy.AdmissionCompleteness
+      (Runtime.Adequacy.DProg_local protocol.premises.input)
+      protocol.premises.runtimeComplianceLocal
+  shardedAdmissionSoundness :
+    Runtime.Adequacy.AdmissionSoundness
+      (Runtime.Adequacy.DProg_shard protocol.premises.input)
+      protocol.premises.runtimeComplianceSharded
+  shardedAdmissionCompleteness :
+    Runtime.Adequacy.AdmissionCompleteness
+      (Runtime.Adequacy.DProg_shard protocol.premises.input)
+      protocol.premises.runtimeComplianceSharded
+  decidability :
+    ∀ dUser, Runtime.Adequacy.InferenceAdmissionDecidable protocol.premises.input dUser
+  complexity :
+    Runtime.Adequacy.InferenceComplexityBound
+      protocol.premises.input protocol.premises.complexityBound
+  conservativeExtension :
+    ∀ baseline, Runtime.Adequacy.ConservativeExtension baseline protocol.premises.input
+  necessityMinimality :
+    Runtime.Adequacy.HypothesisNecessityMinimality
+
+/-- Packaged protocol-envelope-bridge theorem-family artifact. -/
+structure ProtocolEnvelopeBridgeArtifact where
+  profile : Adapters.ProtocolEnvelopeBridgeProfile
+  roleRenamingInvariant :
+    Runtime.Adequacy.ProtocolRoleRenamingEnvelopeInvariant
+      profile.bundle.premises.localEnvelope
+      profile.bundle.premises.roleRenaming
+  compositionalEnvelope :
+    Runtime.Adequacy.ProtocolCompositionalEnvelope
+      profile.bundle.premises.component₁
+      profile.bundle.premises.component₂
+      profile.bundle.premises.interaction
+      profile.bundle.premises.total
+      profile.bundle.premises.composition
+  delegationPreserves :
+    Runtime.Adequacy.ProtocolDelegationPreservesEnvelope
+      profile.bundle.premises.localEnvelope
+      profile.bundle.premises.delegation
+  spatialMonotonicity :
+    Runtime.Adequacy.ProtocolSpatialMonotonicity
+      profile.bundle.premises.spatial
+      profile.bundle.premises.obligation
+  exchangeNormalization :
+    Runtime.Adequacy.ProtocolExchangeNormalization
+      profile.bundle.premises.localEnvelope
+      profile.bundle.premises.exchange
+  shardCutPreservation :
+    Runtime.Adequacy.ProtocolShardCutPreservation
+      profile.bundle.premises.shardedEnvelope
+      profile.bundle.premises.shardCut
+
 /-- Packaged VM termination artifact (when liveness bundle is provided). -/
 structure TerminationArtifact {store₀ : SessionStore ν} where
   bundle : VMLivenessBundle store₀
@@ -355,6 +624,12 @@ structure VMTheoremPack
   failureDetectors? : Option FailureDetectorsArtifact
   dataAvailability? : Option DataAvailabilityArtifact
   coordination? : Option CoordinationArtifact
+  crdt? : Option CRDTArtifact
+  consensusEnvelope? : Option ConsensusEnvelopeArtifact
+  failureEnvelope? : Option FailureEnvelopeArtifact
+  vmEnvelopeAdherence? : Option VMEnvelopeAdherenceArtifact
+  vmEnvelopeAdmission? : Option VMEnvelopeAdmissionArtifact
+  protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeArtifact
   foster? : Option (Adapters.FosterArtifact State)
   maxWeight? : Option Adapters.MaxWeightArtifact
   ldp? : Option Adapters.LDPArtifact
@@ -492,6 +767,101 @@ def buildVMTheoremPack
           { protocol := p.protocol
           , characterization := p.protocol.characterization
           }
+  let crdt? :=
+    match space.distributed.crdt? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p.protocol
+          , exactEnvelope := p.protocol.exactEnvelope
+          , adequacy := p.protocol.adequacy
+          , principalCapability := p.protocol.principalCapability
+          , admissionSoundness := p.protocol.admissionSoundness
+          , admissionCompleteness := p.protocol.admissionCompleteness
+          , opStateEquivalence := p.protocol.opStateEquivalence
+          , gcSafetyIff := p.protocol.gcSafetyIffCausalDominance
+          , boundedApproximation := p.protocol.boundedApproximation
+          , approximationMonotonicity := p.protocol.approximationMonotonicity
+          , exactSECAsLimit := p.protocol.exactSECAsLimit
+          , hcrdtCore := p.protocol.hcrdtCore
+          , hcrdtFoundation := p.protocol.hcrdtFoundation
+          , hcrdtDynamics := p.protocol.hcrdtDynamics
+          , hcrdtExtensions := p.protocol.hcrdtExtensions
+          , hcrdtLimits := p.protocol.hcrdtLimits
+          }
+  let consensusEnvelope? :=
+    match space.distributed.consensusEnvelope? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p.protocol
+          , exactEnvelope := p.protocol.exactEnvelope
+          , adequacy := p.protocol.adequacy
+          , principalCapability := p.protocol.principalCapability
+          , admissionSoundness := p.protocol.admissionSoundness
+          , admissionCompleteness := p.protocol.admissionCompleteness
+          }
+  let failureEnvelope? :=
+    match space.distributed.failureEnvelope? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p.protocol
+          , recoveryActionSafety := p.protocol.recoveryActionSafety
+          , noUnsafeReplay := p.protocol.noUnsafeReplay
+          , checkpointRestartRefinement := p.protocol.checkpointRestartRefinement
+          , failureEnvelopeSoundness := p.protocol.failureEnvelopeSoundness
+          , failureEnvelopeMaximality := p.protocol.failureEnvelopeMaximality
+          }
+  let vmEnvelopeAdherence? :=
+    match space.distributed.vmEnvelopeAdherence? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p.protocol
+          , localAdherence := p.protocol.localAdherence
+          , shardedAdherence := p.protocol.shardedAdherence
+          , schedulerDeterminismLocal := p.protocol.schedulerDeterminismLocal
+          , schedulerDeterminismSharded := p.protocol.schedulerDeterminismSharded
+          , monotonicity := p.protocol.monotonicity
+          , localAdequacy := p.protocol.localAdequacy
+          , shardedAdequacy := p.protocol.shardedAdequacy
+          , localFullAbstraction := p.protocol.localFullAbstraction
+          , shardedFullAbstraction := p.protocol.shardedFullAbstraction
+          , capabilityMonotonicity := p.protocol.capabilityMonotonicity
+          }
+  let vmEnvelopeAdmission? :=
+    match space.distributed.vmEnvelopeAdmission? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p.protocol
+          , localInferenceSoundness := p.protocol.localInferenceSoundness
+          , shardedInferenceSoundness := p.protocol.shardedInferenceSoundness
+          , localPrincipalCapability := p.protocol.localPrincipalCapability
+          , shardedPrincipalCapability := p.protocol.shardedPrincipalCapability
+          , localAdmissionSoundness := p.protocol.localAdmissionSoundness
+          , localAdmissionCompleteness := p.protocol.localAdmissionCompleteness
+          , shardedAdmissionSoundness := p.protocol.shardedAdmissionSoundness
+          , shardedAdmissionCompleteness := p.protocol.shardedAdmissionCompleteness
+          , decidability := p.protocol.decidability
+          , complexity := p.protocol.complexity
+          , conservativeExtension := p.protocol.conservativeExtension
+          , necessityMinimality := p.protocol.necessityMinimality
+          }
+  let protocolEnvelopeBridge? :=
+    match space.distributed.protocolEnvelopeBridge? with
+    | none => none
+    | some p =>
+        some
+          { profile := p
+          , roleRenamingInvariant := p.bundle.roleRenamingInvariant
+          , compositionalEnvelope := p.bundle.compositionalEnvelope
+          , delegationPreserves := p.bundle.delegationPreserves
+          , spatialMonotonicity := p.bundle.spatialMonotonicity
+          , exchangeNormalization := p.bundle.exchangeNormalization
+          , shardCutPreservation := p.bundle.shardCutPreservation
+          }
   let classicalPack := Adapters.buildVMClassicalTheoremPack (space := space.toClassicalSpace)
   { termination? := termination?
   , outputCondition? := outputCondition?
@@ -508,6 +878,12 @@ def buildVMTheoremPack
   , failureDetectors? := failureDetectors?
   , dataAvailability? := dataAvailability?
   , coordination? := coordination?
+  , crdt? := crdt?
+  , consensusEnvelope? := consensusEnvelope?
+  , failureEnvelope? := failureEnvelope?
+  , vmEnvelopeAdherence? := vmEnvelopeAdherence?
+  , vmEnvelopeAdmission? := vmEnvelopeAdmission?
+  , protocolEnvelopeBridge? := protocolEnvelopeBridge?
   , foster? := classicalPack.foster?
   , maxWeight? := classicalPack.maxWeight?
   , ldp? := classicalPack.ldp?
@@ -540,6 +916,12 @@ def theoremInventory
   , ("failure_detector_boundaries", pack.failureDetectors?.isSome)
   , ("data_availability_retrievability", pack.dataAvailability?.isSome)
   , ("coordination_characterization", pack.coordination?.isSome)
+  , ("crdt_envelope_and_equivalence", pack.crdt?.isSome)
+  , ("consensus_envelope", pack.consensusEnvelope?.isSome)
+  , ("failure_envelope", pack.failureEnvelope?.isSome)
+  , ("vm_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)
+  , ("vm_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
+  , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   , ("classical_foster", pack.foster?.isSome)
   , ("classical_maxweight", pack.maxWeight?.isSome)
   , ("classical_ldp", pack.ldp?.isSome)

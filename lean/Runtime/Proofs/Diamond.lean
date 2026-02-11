@@ -25,7 +25,7 @@ The proof uses the frame rule from `Runtime.Proofs.Frame`:
    - `disjoint_ops_preserve_unrelated`: third sessions are unaffected by either operation
 
 This replaces the previous instruction-group approach (Groups A/B/C with 21 cases)
-with a uniform reasoning principle. -/
+with a uniform reasoning principle.
 
 ## Infrastructure Lemmas
 

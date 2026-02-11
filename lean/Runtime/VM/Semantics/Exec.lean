@@ -52,6 +52,105 @@ private def appendOutputConditionCheck {ι γ π ε ν : Type u} [IdentityModel 
     (st : VMState ι γ π ε ν) (check : OutputConditionCheck) : VMState ι γ π ε ν :=
   { st with outputConditionChecks := st.outputConditionChecks ++ [check] }
 
+private def endpointAtChanReg? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (coro : CoroutineState γ ε) (chan : Reg) : Option Endpoint :=
+  match coro.regs[chan]? with
+  | some (.chan ep) => some ep
+  | _ => none
+
+private def fallbackMonitorEndpoint? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (coro : CoroutineState γ ε) : Option Endpoint :=
+  match coro.ownedEndpoints with
+  | ep :: _ => some ep
+  | [] => none
+
+private def monitorEndpointForInstr? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (coro : CoroutineState γ ε) (instr : Instr γ ε) : Option Endpoint :=
+  match instr with
+  | .send chan _ | .receive chan _ | .offer chan _ | .choose chan _ =>
+      match endpointAtChanReg? coro chan with
+      | some ep => some ep
+      | none => fallbackMonitorEndpoint? coro
+  | .close session =>
+      match endpointAtChanReg? coro session with
+      | some ep => some ep
+      | none => fallbackMonitorEndpoint? coro
+  | _ => fallbackMonitorEndpoint? coro
+
+private def monitorInstrTag {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (instr : Instr γ ε) : String :=
+  match instr with
+  | .send _ _ => "send"
+  | .receive _ _ => "receive"
+  | .offer _ _ => "offer"
+  | .choose _ _ => "choose"
+  | .acquire _ _ => "acquire"
+  | .release _ _ => "release"
+  | .invoke _ => "invoke"
+  | .open _ _ _ _ => "open"
+  | .close _ => "close"
+  | .fork _ => "fork"
+  | .join => "join"
+  | .abort => "abort"
+  | .transfer _ _ _ => "transfer"
+  | .tag _ _ => "tag"
+  | .check _ _ _ => "check"
+  | .set _ _ => "set"
+  | .move _ _ => "move"
+  | .jump _ => "jump"
+  | .spawn _ _ => "spawn"
+  | .yield => "yield"
+  | .halt => "halt"
+
+private def monitorSessionShapeError? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
+    Option String :=
+  match instr with
+  | .send chan _ | .offer chan _ =>
+      match endpointAtChanReg? coro chan with
+      | none => some "[monitor] missing channel endpoint"
+      | some ep =>
+          match SessionStore.lookupType st.sessions ep with
+          | some (.send _ _ _) => none
+          | some (.select _ _) => none
+          | some _ => some "[monitor] expected Send state"
+          | none => some "[monitor] no type registered"
+  | .receive chan _ | .choose chan _ =>
+      match endpointAtChanReg? coro chan with
+      | none => some "[monitor] missing channel endpoint"
+      | some ep =>
+          match SessionStore.lookupType st.sessions ep with
+          | some (.recv _ _ _) => none
+          | some (.branch _ _) => none
+          | some _ => some "[monitor] expected Recv state"
+          | none => some "[monitor] no type registered"
+  | _ => none
+
+private def monitorPrecheckError? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
+    Option String :=
+  if monitorAllows st.monitor instr then
+    monitorSessionShapeError? st coro instr
+  else
+    some "[monitor] structural precheck failed"
+
+private def recordMonitorJudgment {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (instr : Instr γ ε) :
+    VMState ι γ π ε ν :=
+  match monitorEndpointForInstr? coro instr with
+  | none => st
+  | some ep =>
+      { st with monitor := SessionMonitor.record st.monitor ep (monitorInstrTag instr) st.clock }
+
 def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -84,21 +183,30 @@ def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (st : VMState ι γ π ε ν) (coroId : CoroutineId) (coro : CoroutineState γ ε)
     (instr : Instr γ ε) : VMState ι γ π ε ν × ExecResult γ ε :=
   -- Enforce monitor typing and cost budget before execution.
-  let monitorPasses :=
-    match st.config.monitorMode with
-    | .off => true
-    | .sessionTypePrecheck => monitorAllows st.monitor instr
-  if monitorPasses then
-    match chargeCost st.config coro instr with
-    | none =>
-        let pack' := faultPack st coro .outOfCredits "out of credits"
-        commitPack st coroId pack'
-    | some coro' =>
-        let pack' := stepInstr st coro' instr
-        commitPack st coroId pack'
-  else
-    let pack' := faultPack st coro (.specFault "monitor rejected") "monitor rejected"
-    commitPack st coroId pack'
+  match st.config.monitorMode with
+  | .off =>
+      match chargeCost st.config coro instr with
+      | none =>
+          let pack' := faultPack st coro .outOfCredits "out of credits"
+          commitPack st coroId pack'
+      | some coro' =>
+          let pack' := stepInstr st coro' instr
+          commitPack st coroId pack'
+  | .sessionTypePrecheck =>
+      match monitorPrecheckError? st coro instr with
+      | some msg =>
+          let st' := { st with monitor := SessionMonitor.reject st.monitor msg }
+          let pack' := faultPack st' coro (.typeViolation .unit .unit) msg
+          commitPack st' coroId pack'
+      | none =>
+          let st' := recordMonitorJudgment st coro instr
+          match chargeCost st'.config coro instr with
+          | none =>
+              let pack' := faultPack st' coro .outOfCredits "out of credits"
+              commitPack st' coroId pack'
+          | some coro' =>
+              let pack' := stepInstr st' coro' instr
+              commitPack st' coroId pack'
 
 def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

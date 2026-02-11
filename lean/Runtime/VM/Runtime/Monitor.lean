@@ -98,9 +98,32 @@ inductive WellTypedInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] [Ef
       -- Non-session instructions preserve local types.
       WellTypedInstr i sk L L
 
+structure MonitorJudgment where
+  -- Endpoint checked by the monitor.
+  endpoint : Endpoint
+  -- Instruction tag for this check.
+  instrTag : String
+  -- Tick at which the check occurred.
+  tick : Nat
+  deriving Repr, DecidableEq
+
 structure SessionMonitor (γ : Type u) where
   -- Monitor transition per session kind.
   step : SessionKind γ → Option (SessionKind γ)
+  -- Most recent successful monitor judgment.
+  lastJudgment : Option MonitorJudgment := none
+  -- Most recent monitor rejection message.
+  lastRejection : Option String := none
+
+def SessionMonitor.record {γ : Type u} (m : SessionMonitor γ)
+    (endpoint : Endpoint) (instrTag : String) (tick : Nat) : SessionMonitor γ :=
+  { m with
+      lastJudgment := some { endpoint := endpoint, instrTag := instrTag, tick := tick }
+      lastRejection := none }
+
+def SessionMonitor.reject {γ : Type u} (m : SessionMonitor γ) (msg : String) :
+    SessionMonitor γ :=
+  { m with lastRejection := some msg }
 
 /-- Monitor precheck mode aligned with Rust VM config. -/
 inductive MonitorMode where

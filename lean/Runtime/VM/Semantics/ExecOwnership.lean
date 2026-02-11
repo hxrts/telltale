@@ -67,7 +67,7 @@ def transferCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint)
-    (tid : Nat) (resources' : List (ScopeId × ResourceState ν)) : StepPack ι γ π ε ν :=
+    (tid : Nat) (resources' : Std.HashMap ScopeId (ResourceState ν)) : StepPack ι γ π ε ν :=
   -- Move ownership, tokens, and facts between coroutines.
   let (movedTokens, keptTokens) := splitTokens coro ep
   let (movedFacts, keptFacts) := splitKnowledge coro ep

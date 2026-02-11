@@ -40,10 +40,7 @@ structure RoundRobinPolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
 /-- Cooperative profile artifact. -/
 structure CooperativePolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
   pinned : SchedulerPolicyPinned st₀ .cooperative
-  normalization :
-    schedule { st₀ with sched := { st₀.sched with policy := .roundRobin } } =
-      (schedule st₀).map
-        (fun (cid, s) => (cid, { s with sched := { s.sched with policy := .roundRobin } }))
+  normalization : cooperative_refines_concurrent st₀
 
 /-- Priority profile artifact. -/
 structure PriorityPolicyArtifact (st₀ : VMState ι γ π ε ν) : Type where
@@ -88,7 +85,7 @@ def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
           simpa [SchedulerPolicyPinned, hpol] using bundle.policyPinned
         some
           { pinned := pinned
-          , normalization := (cooperative_refines_concurrent_holds st₀) pinned
+          , normalization := cooperative_refines_concurrent_holds st₀
           }
     | .priority _ => none
     | .progressAware => none

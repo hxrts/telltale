@@ -90,11 +90,11 @@ def send_transfers_knowledge : Prop :=
 
 def non_leakage (pol : FlowPolicy) : Prop :=
   -- Disallowed flows cannot become reachable.
-  ∀ k r, pol.allowed k r = false → ¬ KnowledgeReachable k
+  ∀ k r, pol.allowsKnowledge k r = false → ¬ KnowledgeReachable k
 
 def check_enforces_policy : Prop :=
   -- Successful checks imply the flow is permitted.
-  ∀ (pol : FlowPolicy) k r, pol.allowed k r = true → KnowledgeReachable k
+  ∀ (pol : FlowPolicy) k r, pol.allowsKnowledge k r = true → KnowledgeReachable k
 
 /-! ## Progress RA -/
 

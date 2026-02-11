@@ -18,7 +18,8 @@ Shared utility functions used by all per-instruction step functions. Organized i
 - **Coroutine updates**: write-back of modified coroutine state into the VM state array.
 
 Every `Exec*.lean` file imports this module. The helpers are intentionally small and
-pure so that the per-instruction semantics files stay focused on control flow. -/
+pure so that the per-instruction semantics files stay focused on control flow.
+-/
 
 /-
 The Problem. Per-instruction step functions share common operations: buffer access,
@@ -239,35 +240,20 @@ def reconstructSession {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
   PersistenceModel.derive st.persistent sid
 
 def updateResourceStates {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
-    (states : List (ScopeId × ResourceState ν)) (scope : ScopeId)
-    (f : ResourceState ν → ResourceState ν) : List (ScopeId × ResourceState ν) :=
+    (states : Std.HashMap ScopeId (ResourceState ν)) (scope : ScopeId)
+    (f : ResourceState ν → ResourceState ν) : Std.HashMap ScopeId (ResourceState ν) :=
   -- Update or insert the resource state for a scope.
-  match states with
-  | [] => [(scope, f (defaultResourceState scope))]
-  | (sid, st) :: rest =>
-      if sid = scope then
-        (sid, f st) :: rest
-      else
-        (sid, st) :: updateResourceStates rest scope f
+  let st := (states.getD scope (defaultResourceState scope))
+  states.insert scope (f st)
 
 def applyTransactionAtScope {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
-    (states : List (ScopeId × ResourceState ν)) (scope : ScopeId)
-    (tx : Transaction ν) : Option (List (ScopeId × ResourceState ν)) :=
+    (states : Std.HashMap ScopeId (ResourceState ν)) (scope : ScopeId)
+    (tx : Transaction ν) : Option (Std.HashMap ScopeId (ResourceState ν)) :=
   -- Apply a transaction to a scope, inserting default state if needed.
-  match states with
-  | [] =>
-      match applyTransaction tx (defaultResourceState scope) with
-      | some st' => some [(scope, st')]
-      | none => none
-  | (sid, st) :: rest =>
-      if sid = scope then
-        match applyTransaction tx st with
-        | some st' => some ((sid, st') :: rest)
-        | none => none
-      else
-        match applyTransactionAtScope rest scope tx with
-        | some rest' => some ((sid, st) :: rest')
-        | none => none
+  let st := states.getD scope (defaultResourceState scope)
+  match applyTransaction tx st with
+  | some st' => some (states.insert scope st')
+  | none => none
 
 def updateSessBuffers {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) (sid : SessionId)

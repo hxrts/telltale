@@ -175,6 +175,9 @@ def unitBufferConfig : BufferConfig :=
 def unitFlowPolicy : FlowPolicy :=
   .allowAll
 
+def unitGuardChainWf : GuardChain.wf unitGuardChain := by
+  simp [unitGuardChain, GuardChain.wf, GuardChain.layerIds]
+
 def unitConfig : VMConfig UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify :=
   { bufferConfig := fun _ => unitBufferConfig
   , schedPolicy := .cooperative
@@ -187,8 +190,7 @@ def unitConfig : VMConfig UnitIdentity UnitGuard UnitPersist UnitEffect UnitVeri
   , maxSessions := 256
   , monitorMode := .sessionTypePrecheck
   , guardChain := unitGuardChain
-  , guardChainWf := by
-      simp [GuardChain.wf, GuardChain.layerIds, unitGuardChain]
+  , proofConfig := { guardChainWf := unitGuardChainWf }
   , roleSigningKey := fun _ => ()
   , costModel := unitCostModel
   , speculationEnabled := false }

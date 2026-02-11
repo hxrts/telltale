@@ -37,11 +37,15 @@ theorem cooperative_refines_concurrent_holds {ι γ π ε ν : Type u} [Identity
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : cooperative_refines_concurrent st := by
   intro hcoop
-  have hRound :
-      pickRoundRobin { st with sched := { st.sched with policy := .roundRobin } } = pickRoundRobin st := by
-    simp [pickRoundRobin, isRunnable, getCoro]
-  simp [schedule, pickRunnable, hcoop, hRound]
-  cases hPick : pickRoundRobin st <;> simp
+  let st' : VMState ι γ π ε ν := { st with sched := syncLaneViews st.sched }
+  have hPolicy : st'.sched.policy = .cooperative := by
+    simpa [st', syncLaneViews] using hcoop
+  have hEq :
+      pickRunnableInQueue st'.sched.policy st' st'.sched.readyQueue =
+        pickRunnableInQueue .cooperative st' st'.sched.readyQueue := by
+    simp [hPolicy]
+  rw [hEq]
+  simp [st', pickRunnableInQueue]
 
 private theorem takeOut_some_of_mem (queue : SchedQueue) (p : CoroutineId → Bool)
     (cid : CoroutineId) (hmem : cid ∈ queue) (hp : p cid = true) :
@@ -100,6 +104,94 @@ private theorem pickBest_some_of_exists (queue : SchedQueue) (score : CoroutineI
   refine ⟨cid, removeFirst cid queue, ?_⟩
   simp [pickBest, hBest]
 
+private theorem pickRunnableInQueue_some_of_mem_runnable
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (queue : SchedQueue)
+    (cid : CoroutineId) (hmem : cid ∈ queue) (hrun : isRunnable st cid = true) :
+    ∃ found rest, pickRunnableInQueue policy st queue = some (found, rest) := by
+  cases policy with
+  | roundRobin =>
+      simpa [pickRunnableInQueue, pickRoundRobinInQueue] using
+        takeOut_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
+  | cooperative =>
+      simpa [pickRunnableInQueue, pickRoundRobinInQueue] using
+        takeOut_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
+  | priority f =>
+      have hExists : ∃ cid', cid' ∈ queue ∧ isRunnable st cid' = true := ⟨cid, hmem, hrun⟩
+      simpa [pickRunnableInQueue, pickPriorityInQueue] using
+        pickBest_some_of_exists queue f (fun cid' => isRunnable st cid') hExists
+  | progressAware =>
+      cases hTok : takeOut queue (fun cid' => isRunnable st cid' && hasProgress st cid') with
+      | none =>
+          obtain ⟨found, rest, hRR⟩ :=
+            takeOut_some_of_mem queue (fun cid' => isRunnable st cid') cid hmem hrun
+          refine ⟨found, rest, ?_⟩
+          simp [pickRunnableInQueue, pickProgressInQueue, hTok, hRR, pickRoundRobinInQueue]
+      | some pair =>
+          refine ⟨pair.1, pair.2, ?_⟩
+          simp [pickRunnableInQueue, pickProgressInQueue, hTok]
+
+private theorem pickRunnableFromSched_some_of_mem_runnable
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (policy : SchedPolicy) (st : VMState ι γ π ε ν) (sched : SchedState γ)
+    (cid : CoroutineId) (hmem : cid ∈ sched.readyQueue) (hrun : isRunnable st cid = true) :
+    ∃ found rest, pickRunnableFromSched policy st sched = some (found, rest) := by
+  have hQueue :
+      ∃ found rest, pickRunnableInQueue policy st sched.readyQueue = some (found, rest) :=
+    pickRunnableInQueue_some_of_mem_runnable policy st sched.readyQueue cid hmem hrun
+  unfold pickRunnableFromSched
+  set lanes : List LaneId := orderedLaneIds sched
+  set start : Nat := if lanes.isEmpty then 0 else (sched.stepCount + 1) % lanes.length
+  cases hLane : pickLaneAux policy st sched lanes start 0 lanes.length with
+  | none =>
+      rcases hQueue with ⟨found, rest, hQueueSome⟩
+      refine ⟨found, removeFirst found sched.readyQueue, ?_⟩
+      change
+        (match pickLaneAux policy st sched lanes start 0 lanes.length with
+        | some cid => some (cid, removeFirst cid sched.readyQueue)
+        | none =>
+            match pickRunnableInQueue policy st sched.readyQueue with
+            | some (cid, _) => some (cid, removeFirst cid sched.readyQueue)
+            | none => none) = some (found, removeFirst found sched.readyQueue)
+      simp [hLane, hQueueSome]
+  | some picked =>
+      refine ⟨picked, removeFirst picked sched.readyQueue, ?_⟩
+      change
+        (match pickLaneAux policy st sched lanes start 0 lanes.length with
+        | some cid => some (cid, removeFirst cid sched.readyQueue)
+        | none =>
+            match pickRunnableInQueue policy st sched.readyQueue with
+            | some (cid, _) => some (cid, removeFirst cid sched.readyQueue)
+            | none => none) = some (picked, removeFirst picked sched.readyQueue)
+      simp [hLane]
+
+private theorem pickRunnable_some_of_mem_runnable
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) (cid : CoroutineId)
+    (hmem : cid ∈ st.sched.readyQueue) (hrun : isRunnable st cid = true) :
+    ∃ found rest, pickRunnable st = some (found, rest) := by
+  let sched : SchedState γ := syncLaneViews st.sched
+  let st' : VMState ι γ π ε ν := { st with sched := sched }
+  have hmem' : cid ∈ sched.readyQueue := by
+    simpa [sched, syncLaneViews] using hmem
+  have hrun' : isRunnable st' cid = true := by
+    simp [st', isRunnable, getCoro] at hrun ⊢
+    exact hrun
+  obtain ⟨found, rest, hFromSched⟩ :=
+    pickRunnableFromSched_some_of_mem_runnable st'.sched.policy st' sched cid hmem' hrun'
+  refine ⟨found, rest, ?_⟩
+  unfold pickRunnable
+  simpa [sched, st'] using hFromSched
+
 theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -115,40 +207,14 @@ theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
       cases hstatus with
       | inl h => rw [h]
       | inr h => rw [h]
-    have hExistsRunnable : ∃ cid', cid' ∈ st.sched.readyQueue ∧ isRunnable st cid' = true :=
-      ⟨cid, hmem, hrun⟩
-    cases hPol : st.sched.policy with
-    | roundRobin =>
-      obtain ⟨found, rest, hTake⟩ :=
-        takeOut_some_of_mem _ _ _ hmem hrun
-      refine ⟨found, { st with sched := { st.sched with readyQueue := rest, stepCount := st.sched.stepCount + 1 } }, ?_⟩
-      simp [schedule, pickRunnable, hPol, pickRoundRobin, hTake]
-    | cooperative =>
-      obtain ⟨found, rest, hTake⟩ :=
-        takeOut_some_of_mem _ _ _ hmem hrun
-      refine ⟨found, { st with sched := { st.sched with readyQueue := rest, stepCount := st.sched.stepCount + 1 } }, ?_⟩
-      simp [schedule, pickRunnable, hPol, pickRoundRobin, hTake]
-    | progressAware =>
-      by_cases hToken :
-          ∃ found rest,
-            takeOut st.sched.readyQueue (fun cid' => isRunnable st cid' && hasProgress st cid') = some (found, rest)
-      · rcases hToken with ⟨found, rest, hTake⟩
-        refine ⟨found, { st with sched := { st.sched with readyQueue := rest, stepCount := st.sched.stepCount + 1 } }, ?_⟩
-        simp [schedule, pickRunnable, hPol, pickProgress, hTake]
-      · have hTokenNone :
-            takeOut st.sched.readyQueue (fun cid' => isRunnable st cid' && hasProgress st cid') = none := by
-          cases hTake :
-              takeOut st.sched.readyQueue (fun cid' => isRunnable st cid' && hasProgress st cid') with
-          | none => exact rfl
-          | some v =>
-            exfalso
-            exact hToken ⟨v.1, v.2, hTake⟩
-        obtain ⟨found, rest, hTakeRR⟩ :=
-          takeOut_some_of_mem _ _ _ hmem hrun
-        refine ⟨found, { st with sched := { st.sched with readyQueue := rest, stepCount := st.sched.stepCount + 1 } }, ?_⟩
-        simp [schedule, pickRunnable, hPol, pickProgress, hTokenNone, pickRoundRobin, hTakeRR]
-    | priority f =>
-      obtain ⟨found, rest, hPickBest⟩ :=
-        pickBest_some_of_exists st.sched.readyQueue f (fun cid' => isRunnable st cid') hExistsRunnable
-      refine ⟨found, { st with sched := { st.sched with readyQueue := rest, stepCount := st.sched.stepCount + 1 } }, ?_⟩
-      simp [schedule, pickRunnable, hPol, pickPriority, hPickBest]
+    let stNorm : VMState ι γ π ε ν := { st with sched := syncLaneViews st.sched }
+    have hmemNorm : cid ∈ stNorm.sched.readyQueue := by
+      simpa [stNorm, syncLaneViews] using hmem
+    have hrunNorm : isRunnable stNorm cid = true := by
+      simpa [stNorm, isRunnable, getCoro] using hrun
+    obtain ⟨found, rest, hPick⟩ := pickRunnable_some_of_mem_runnable stNorm cid hmemNorm hrunNorm
+    have hsched : ∃ st', schedule st = some (found, st') := by
+      unfold schedule
+      simp [stNorm, hPick]
+    rcases hsched with ⟨st', hs⟩
+    exact ⟨found, st', hs⟩

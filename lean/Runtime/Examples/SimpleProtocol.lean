@@ -94,7 +94,7 @@ def exampleSched : SchedState UnitGuard :=
   -- Minimal scheduler state with the single coroutine ready.
   { policy := unitConfig.schedPolicy
   , readyQueue := [0]
-  , blockedSet := []
+  , blockedSet := {}
   , timeslice := 1
   , stepCount := 0 }
 
@@ -114,7 +114,7 @@ def exampleState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVer
   , nextSessionId := 0
   , arena := exampleArena
   , sessions := []
-  , resourceStates := []
+  , resourceStates := {}
   , guardResources := []
   , sched := exampleSched
   , monitor := exampleMonitor

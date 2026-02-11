@@ -51,9 +51,9 @@ def emptyState : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerif
   , nextSessionId := 0
   , arena := emptyArena
   , sessions := []
-  , resourceStates := []
+  , resourceStates := {}
   , guardResources := []
-  , sched := { policy := unitConfig.schedPolicy, readyQueue := [], blockedSet := [], timeslice := 1, stepCount := 0 }
+  , sched := { policy := unitConfig.schedPolicy, readyQueue := [], blockedSet := {}, timeslice := 1, stepCount := 0 }
   , monitor := emptyMonitor
   , obsTrace := []
   , clock := 0

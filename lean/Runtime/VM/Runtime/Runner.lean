@@ -19,18 +19,16 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : VMState ι γ π ε ν :=
-  let step := fun (acc : SchedQueue × BlockedSet γ) (p : CoroutineId × BlockReason γ) =>
-    let (ready, blocked) := acc
+  let step := fun (sched : SchedState γ) (p : CoroutineId × BlockReason γ) =>
     let (cid, reason) := p
     match reason with
     | .recvWait edge _ =>
         if (signedBufferLookup st.buffers edge).isEmpty then
-          (ready, blocked ++ [(cid, reason)])
+          sched
         else
-          (ready ++ [cid], blocked)
-    | _ => (ready, blocked ++ [(cid, reason)])
-  let (ready', blocked') := st.sched.blockedSet.foldl step (st.sched.readyQueue, [])
-  let sched' := { st.sched with readyQueue := ready', blockedSet := blocked' }
+          unblockCoroutine sched cid
+    | _ => sched
+  let sched' := st.sched.blockedSet.toList.foldl step (syncLaneViews st.sched)
   { st with sched := sched' }
 
 /-- Execute one round: advance at most one ready coroutine.

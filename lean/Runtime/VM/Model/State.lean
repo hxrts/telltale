@@ -2,6 +2,7 @@ import Std
 import Runtime.VM.Model.Core
 import Runtime.VM.Model.OutputCondition
 import Runtime.VM.Model.Config
+import Runtime.VM.Model.Domain
 import Runtime.VM.Model.Knowledge
 import Runtime.VM.Model.Program
 import Runtime.VM.Runtime.Monitor
@@ -19,7 +20,7 @@ execution result containers, scheduler bookkeeping (`SchedState`), and the top-l
 `VMState` holds the configuration, loaded programs, coroutine array, signed buffers,
 persistent state, session store, scoped resource states, guard resources, the session
 monitor, the observable trace, failure model state (crashed sites, partitioned edges),
-and placeholder fields for ghost sessions and progress supply.
+and reserved fields for ghost sessions and progress supply.
 
 This is the Lean specification of state that will be reimplemented in Rust. The
 `WFVMState` predicate captures basic well-formedness (PC bounds, session id validity). -/
@@ -52,7 +53,7 @@ structure ProgressToken where
   deriving Repr, DecidableEq
 
 structure SpeculationState where
-  -- Minimal speculation metadata (placeholder for section 17).
+  -- Minimal speculation metadata for bounded speculative execution.
   ghostSid : GhostSessionId
   depth : Nat
   deriving Repr
@@ -240,41 +241,96 @@ structure ExecResult (γ ε : Type u) [EffectRuntime ε] where
 /-! ## Scheduler state -/
 
 abbrev SchedQueue := List CoroutineId -- FIFO queue of runnable coroutines.
-abbrev BlockedSet (γ : Type u) := List (CoroutineId × BlockReason γ) -- Blocked map stub.
+abbrev BlockedSet (γ : Type u) := Std.HashMap CoroutineId (BlockReason γ)
 abbrev LaneQueue := SchedQueue
-abbrev LaneBlockedSet (γ : Type u) := BlockedSet γ
+abbrev LaneOfMap := Std.HashMap CoroutineId LaneId
+abbrev LaneQueueMap := Std.HashMap LaneId LaneQueue
+abbrev LaneBlockedMap (γ : Type u) := Std.HashMap LaneId (BlockedSet γ)
 
 structure CrossLaneHandoff where
   -- Delegation/capability-transfer handoff metadata for scheduler/runtime tracking.
-  handoffId : Nat
-  sid : SessionId
-  endpoint : Endpoint
   fromCoro : CoroutineId
   toCoro : CoroutineId
   fromLane : LaneId
   toLane : LaneId
+  step : Nat
+  reason : String
   deriving Repr
+
+/-- Metadata for a persisted checkpoint used by deterministic restart/replay. -/
+structure CheckpointMeta where
+  checkpointId : Nat
+  tick : Nat
+  sessionAnchor : Option SessionId := none
+  digest : String := ""
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Restart anchor into a previously recorded checkpoint. -/
+structure RestartAnchor where
+  checkpointId : Nat
+  restartTick : Nat
+  reason : String := ""
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Deterministic trace tags for topology/failure/recovery ingress events. -/
+inductive FailureTraceTag where
+  | topology
+  | failure
+  | recovery
+  | reconciliation
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Deterministic ingress-trace event for topology/failure/recovery updates. -/
+structure FailureTraceEvent where
+  tick : Nat
+  seqNo : Nat
+  tag : FailureTraceTag
+  detail : String
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Commit certainty level used by structured error reporting. -/
+inductive ErrorCertainty where
+  | certain
+  | boundedDiff
+  | unknown
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Recovery-action tag used by structured error reporting. -/
+inductive ErrorActionTag where
+  | continue
+  | retryAfter
+  | closeSession
+  | quarantineEdge
+  | reconcileThenRetry
+  | abort
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Structured error event retained for deterministic cross-target diagnostics. -/
+structure StructuredErrorEvent where
+  tick : Nat
+  seqNo : Nat
+  faultClass : String
+  certainty : ErrorCertainty
+  action : ErrorActionTag
+  evidenceId : Nat
+  detail : String
+  deriving Repr, DecidableEq, Inhabited
 
 structure SchedState (γ : Type u) where
   -- Scheduler policy and bookkeeping queues.
   policy : SchedPolicy
   readyQueue : SchedQueue
   blockedSet : BlockedSet γ
-  laneOf : List (CoroutineId × LaneId) := []
-  laneQueues : List (LaneId × LaneQueue) := []
-  laneBlocked : List (LaneId × LaneBlockedSet γ) := []
+  laneOf : LaneOfMap := {}
+  laneQueues : LaneQueueMap := {}
+  laneBlocked : LaneBlockedMap γ := {}
   crossLaneHandoffs : List CrossLaneHandoff := []
   timeslice : Nat
   stepCount : Nat
 
 /-! ## VM state -/
 
-structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν] where
+structure VMState (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   -- Configuration and programs.
   config : VMConfig ι γ π ε ν
   code : Program γ ε
@@ -286,7 +342,7 @@ structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
   nextSessionId : SessionId
   arena : Arena
   sessions : SessionStore ν
-  resourceStates : List (ScopeId × ResourceState ν) -- Scoped resource views.
+  resourceStates : Std.HashMap ScopeId (ResourceState ν) -- Scoped resource views.
   guardResources : List (γ × GuardLayer.Resource γ)
   sched : SchedState γ
   monitor : SessionMonitor γ
@@ -295,20 +351,63 @@ structure VMState (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
   clock : Nat
   crashedSites : List (IdentityModel.SiteId ι)
   partitionedEdges : List Edge
+  checkpointLog : List CheckpointMeta := []
+  restartAnchor : Option RestartAnchor := none
+  nextEffectNonce : Nat := 0
+  usedEffectNonces : List Nat := []
+  needsReconciliation : Bool := false
+  failureTrace : List FailureTraceEvent := []
+  structuredErrorEvents : List StructuredErrorEvent := []
+  nextFailureSeqNo : Nat := 0
   mask : Unit
   ghostSessions : Unit
   progressSupply : Unit
 
+/-- Allocate a fresh externally-visible effect nonce. -/
+def allocEffectNonce {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) : Nat × VMState ι γ π ε ν :=
+  let nonce := st.nextEffectNonce
+  (nonce, { st with nextEffectNonce := nonce + 1 })
+
+/-- Check whether an externally-visible effect nonce was already used. -/
+def effectNonceUsed {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) (nonce : Nat) : Bool :=
+  nonce ∈ st.usedEffectNonces
+
+/-- Register an externally-visible effect nonce as consumed (idempotency key). -/
+def registerEffectNonce {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) (nonce : Nat) : VMState ι γ π ε ν :=
+  if nonce ∈ st.usedEffectNonces then
+    st
+  else
+    { st with usedEffectNonces := nonce :: st.usedEffectNonces }
+
+/-- Append checkpoint metadata deterministically to VM state. -/
+def recordCheckpointMeta {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) (checkpoint : CheckpointMeta) : VMState ι γ π ε ν :=
+  { st with checkpointLog := st.checkpointLog ++ [checkpoint] }
+
+/-- Install/update a restart anchor for replay/recovery entry. -/
+def setRestartAnchor {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) (anchor : RestartAnchor) : VMState ι γ π ε ν :=
+  { st with restartAnchor := some anchor }
+
 /-- Well-formedness: coroutine PCs are in range and sessions are bounded. -/
-def WFVMState {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
+def WFVMState {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
     (st : VMState ι γ π ε ν) : Prop :=
   -- Check PC bounds (per-coroutine program) and session ids against the next counter.
   (∀ i (h : i < st.coroutines.size),
     let c := st.coroutines[i]'h
     ∃ prog, st.programs[c.programId]? = some prog ∧ c.pc < prog.code.size) ∧
-  (∀ s ∈ st.sessions, s.fst < st.nextSessionId)
+  (∀ s ∈ st.sessions, s.fst < st.nextSessionId) ∧
+  -- Scheduler queue is duplicate-free and references known coroutines.
+  List.Nodup st.sched.readyQueue ∧
+  (∀ cid ∈ st.sched.readyQueue, cid < st.coroutines.size) ∧
+  -- Blocked entries are disjoint from the ready queue and point to known coroutines.
+  (∀ cid, st.sched.blockedSet.contains cid = true →
+      cid < st.coroutines.size ∧ cid ∉ st.sched.readyQueue) ∧
+  -- Lane mappings only reference known coroutines.
+  (∀ cid, st.sched.laneOf.contains cid = true → cid < st.coroutines.size) ∧
+  -- Scoped resource map keys match embedded scope ids.
+  (∀ sid, st.resourceStates.contains sid = true →
+      ∃ rs, st.resourceStates.get? sid = some rs ∧ rs.scope = sid)

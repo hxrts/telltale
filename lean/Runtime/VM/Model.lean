@@ -1,4 +1,5 @@
 import Runtime.VM.Model.TypeClasses
+import Runtime.VM.Model.Domain
 import Runtime.VM.Model.Core
 import Runtime.VM.Model.OutputCondition
 import Runtime.VM.Model.Violation

@@ -26,7 +26,7 @@ under fair scheduling.
 
 ## Proof Strategy
 
-The Protocol-level `progress_typed` theorem (Protocol/Typing/Progress.lean) already -/
+The Protocol-level `progress_typed` theorem (Protocol/Typing/Progress.lean) already
 proves progress for `WellFormedComplete` configurations. This module:
 
 1. Defines VM-level predicates that imply Protocol-level conditions

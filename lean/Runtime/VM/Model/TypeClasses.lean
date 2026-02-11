@@ -258,4 +258,4 @@ class AccumulatedSet (ν : Type u) [VerificationModel ν] where
 structure ScopeId where
   -- Scope identifier for local resource views.
   id : Nat
-  deriving Repr, DecidableEq
+  deriving Repr, DecidableEq, BEq, Hashable

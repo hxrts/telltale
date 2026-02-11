@@ -69,7 +69,7 @@ def vmCreditBank {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) : Nat :=
-  st.sched.readyQueue.length + st.sched.blockedSet.length
+  st.sched.readyQueue.length + st.sched.blockedSet.toList.length
 
 /-- Global VM potential = productive work + credit bank. -/
 def vmPotential {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]

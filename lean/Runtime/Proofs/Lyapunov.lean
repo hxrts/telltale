@@ -28,6 +28,7 @@ unfolding.
 | `HasDerivAt`         | `step s = some s'`             |
 | `energy_dissipation` | communication consumes measure | -/
 
+/-!
 ## Key Results
 
 - `progressMeasure_nonincreasing_wt`: well-typed instruction steps do not

@@ -106,11 +106,14 @@ def auraCostModel : CostModel AuraGuard AuraEffect :=
 
 def auraFlowPolicy : FlowPolicy :=
   -- V1 allows all knowledge flows.
-  { allowed := fun _ _ => true }
+  .allowAll
 
 def auraBufferConfig : BufferConfig :=
   -- Default FIFO buffers with blocking backpressure.
   { mode := .fifo, initialCapacity := 16, policy := .block }
+
+def auraGuardChainWf : GuardChain.wf auraGuardChain := by
+  simp [auraGuardChain, GuardChain.wf, GuardChain.layerIds]
 
 def auraConfig :
     VMConfig AuraIdentity AuraGuard AuraJournal AuraEffect AuraVerification :=
@@ -125,9 +128,7 @@ def auraConfig :
   , maxCoroutines := 128
   , maxSessions := 64
   , guardChain := auraGuardChain
-  , guardChainWf := by
-      -- Empty guard chain is trivially well-formed.
-      simp [GuardChain.wf, GuardChain.layerIds, auraGuardChain]
+  , proofConfig := { guardChainWf := auraGuardChainWf }
   , roleSigningKey := fun _ => ()
   , costModel := auraCostModel
   , speculationEnabled := false }

@@ -108,6 +108,12 @@ example (bundle : VMLivenessBundle store₀) (p : Adapters.CoordinationProfile) 
     ).coordination?.isSome = true := by
   rfl
 
+example (bundle : VMLivenessBundle store₀) (p : Adapters.CRDTProfile) :
+    (buildVMTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withCRDT p)
+    ).crdt?.isSome = true := by
+  rfl
+
 end
 
 end Examples

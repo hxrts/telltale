@@ -27,7 +27,6 @@ This measure strictly decreases under every productive step:
 - `branch_step_decreases`: Branch decreases W by at least 3
 - `total_measure_decreasing`: Any productive step decreases total W
 - `total_productive_steps_bounded`: At most W₀ productive steps -/
--/
 
 /-
 The Problem. To bound protocol execution time, we need a Lyapunov-like measure

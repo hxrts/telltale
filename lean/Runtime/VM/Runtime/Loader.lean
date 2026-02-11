@@ -3,6 +3,7 @@ import Runtime.VM.Semantics.ExecHelpers
 import Runtime.VM.Model.Program
 import Runtime.Resources.Arena
 import Protocol.Environments.Core
+import Choreography.Projection.Trans
 
 /-!
 # Dynamic Choreography Loading
@@ -18,6 +19,15 @@ private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
   roles.foldl
     (fun acc r1 => acc ++ roles.map (fun r2 => { sid := sid, sender := r1, receiver := r2 }))
     []
+
+private lemma foldl_max_ge_start (xs : List Nat) (start : Nat) :
+    start ≤ xs.foldl Nat.max start := by
+  induction xs generalizing start with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      simp [List.foldl]
+      exact Nat.le_trans (Nat.le_max_left start x) (ih (Nat.max start x))
 
 /-! ## Session disjointness (executable checks) -/
 
@@ -66,8 +76,61 @@ def nextFreshSessionId {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     let maxSeen := (existingSessionIds st).foldl Nat.max sid
     maxSeen + 1
 
-/-- Load a choreography into a running VM, returning the updated state and session id. -/
-def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+private lemma nextFreshSessionId_ge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    (st : VMState ι γ π ε ν) :
+    st.nextSessionId ≤ nextFreshSessionId st := by
+  unfold nextFreshSessionId
+  by_cases hAvail : sessionIdAvailable st st.nextSessionId
+  · simp [hAvail]
+  · simp [hAvail]
+    exact Nat.le_trans
+      (foldl_max_ge_start (existingSessionIds st) st.nextSessionId)
+      (Nat.le_succ _)
+
+/-- Outcome of choreography loading with explicit error categories. -/
+inductive ChoreographyLoadResult (ι γ π ε ν : Type u) [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν] where
+  | ok (state : VMState ι γ π ε ν) (sid : SessionId)
+  | validationFailed (reason : String)
+  | tooManySessions (max : Nat)
+  | tooManyCoroutines (max : Nat)
+
+private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (image : CodeImage γ ε) : Option String :=
+  let lookupLocalType :=
+    fun (roles : List (Role × LocalType)) (role : Role) =>
+      (roles.find? (fun p => p.1 = role)).map Prod.snd
+  let entryRoles := image.program.entryPoints.map Prod.fst
+  let localRoles := image.program.localTypes.map Prod.fst
+  if entryRoles.length ≠ localRoles.length then
+    some "entry/local role arity mismatch"
+  else if entryRoles.eraseDups.length ≠ entryRoles.length then
+    some "duplicate entry-point role"
+  else if localRoles.eraseDups.length ≠ localRoles.length then
+    some "duplicate local-type role"
+  else if !entryRoles.all (fun r => localRoles.contains r) then
+    some "entry/local role mismatch"
+  else
+    match entryRoles.find? (fun role =>
+      match lookupLocalType image.program.localTypes role with
+      | none => true
+      | some claimed =>
+          let projected := Choreography.Projection.Trans.trans image.globalType role
+          reprStr (localTypeRToLocalType projected) != reprStr claimed) with
+    | some role => some s!"projection mismatch for role {role}"
+    | none => none
+
+/-- Core trusted loader path used by checked and compatibility APIs. -/
+private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -127,6 +190,63 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
     nextCoroId := nextCoroId'
     nextSessionId := sid + 1 }
   (st', sid)
+
+/-- Load a choreography with explicit validation and capacity error results. -/
+def loadChoreographyResult {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
+    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
+    ChoreographyLoadResult ι γ π ε ν :=
+  match validateImage? image with
+  | some reason => .validationFailed reason
+  | none =>
+      if st.sessions.length >= st.config.maxSessions then
+        .tooManySessions st.config.maxSessions
+      else if st.coroutines.size + image.program.entryPoints.length > st.config.maxCoroutines then
+        .tooManyCoroutines st.config.maxCoroutines
+      else
+        let (st', sid) := loadChoreographyCore st image
+        .ok st' sid
+
+/-- Load a choreography into a running VM, returning the updated state and session id. -/
+def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
+    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
+    VMState ι γ π ε ν × SessionId :=
+  match loadChoreographyResult st image with
+  | .ok st' sid => (st', sid)
+  | _ => (st, st.nextSessionId)
+
+theorem loadChoreography_snd_ge_nextSessionId
+    {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
+    [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
+    [IdentityVerificationBridge ι ν]
+    [Inhabited (EffectRuntime.EffectCtx ε)]
+    (st : VMState ι γ π ε ν) (image : CodeImage γ ε) :
+    st.nextSessionId ≤ (loadChoreography st image).2 := by
+  unfold loadChoreography loadChoreographyResult
+  cases hVal : validateImage? image with
+  | some reason =>
+      simp
+  | none =>
+      by_cases hSess : st.sessions.length >= st.config.maxSessions
+      · simp [hSess]
+      · by_cases hCoros :
+            st.coroutines.size + image.program.entryPoints.length > st.config.maxCoroutines
+        · simp [hSess, hCoros]
+        · simp [hSess, hCoros, loadChoreographyCore, nextFreshSessionId_ge]
 
 /-!
 Proof-only disjointness lemmas for `loadChoreography` live in:

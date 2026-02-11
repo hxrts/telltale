@@ -32,7 +32,7 @@ variable [IdentityVerificationBridge ι ν]
 /-- Cross-lane handoffs must represent actual delegation/capability transfer and
 never a no-op self-handoff. -/
 def DelegationOnlyCrossLaneHandoff (st : VMState ι γ π ε ν) : Prop :=
-  ∀ h ∈ st.sched.crossLaneHandoffs, h.fromCoro ≠ h.toCoro ∧ h.endpoint.sid = h.sid
+  ∀ h ∈ st.sched.crossLaneHandoffs, h.fromCoro ≠ h.toCoro ∧ h.reason.length > 0
 
 /-- Proof-carrying protocol admission contract:
 requires scheduler evidence plus theorem-pack evidence in one proof space. -/

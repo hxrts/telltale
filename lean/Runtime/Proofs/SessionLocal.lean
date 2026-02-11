@@ -27,6 +27,7 @@ Therefore:
 2. Per-edge coherence only involves one session
 3. Hence global coherence = conjunction over sessions of per-session coherence -/
 
+/-!
 This decomposition enables the frame rule: an instruction that only affects
 session `s` preserves `SessionCoherent s'` for all `s' ≠ s`.
 

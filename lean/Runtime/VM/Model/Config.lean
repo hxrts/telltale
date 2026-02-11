@@ -1,4 +1,5 @@
 import Runtime.VM.Model.TypeClasses
+import Runtime.VM.Model.Domain
 import Runtime.VM.Model.Core
 import Runtime.VM.Model.OutputCondition
 import Runtime.VM.Model.Knowledge
@@ -6,7 +7,6 @@ import Runtime.Resources.ResourceModel
 import Runtime.VM.Model.SchedulerTypes
 import Runtime.VM.Model.Violation
 import Runtime.VM.Runtime.Monitor
-import Runtime.VM.Composition.DomainComposition
 import Runtime.Resources.BufferRA
 
 /-!
@@ -42,12 +42,7 @@ structure CostModel (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
 
 /-! ## VM configuration -/
 
-structure VMConfig (ι γ π ε ν : Type u)
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν] where
+structure VMRuntimeConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν] where
   -- Migration-safe config schema version.
   configVersion : Nat := 1
   -- VM configuration fields for policies and hooks.
@@ -62,19 +57,26 @@ structure VMConfig (ι γ π ε ν : Type u)
   maxSessions : Nat := 256
   monitorMode : MonitorMode := .sessionTypePrecheck
   guardChain : GuardChain γ
-  guardChainWf : GuardChain.wf guardChain
   roleSigningKey : Role → VerificationModel.SigningKey ν
   outputCondition : OutputConditionConfig := {}
   costModel : CostModel γ ε
   speculationEnabled : Bool
   maxSpeculationDepth : Nat := 16
 
+structure VMProofConfig (γ : Type u) [GuardLayer γ] (guardChain : GuardChain γ) where
+  -- Well-formedness witnesses kept separate from executable runtime fields.
+  guardChainWf : GuardChain.wf guardChain
+
+structure VMConfig (ι γ π ε ν : Type u) [VMDomain ι γ π ε ν]
+    extends VMRuntimeConfig ι γ π ε ν where
+  proofConfig : VMProofConfig γ toVMRuntimeConfig.guardChain
+
+def VMConfig.guardChainWf {ι γ π ε ν : Type u} [VMDomain ι γ π ε ν]
+    (cfg : VMConfig ι γ π ε ν) : GuardChain.wf cfg.guardChain :=
+  cfg.proofConfig.guardChainWf
+
 def deterministic_finalization_ok {ι γ π ε ν : Type u}
-    [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν]
+    [VMDomain ι γ π ε ν]
     (_cfg : VMConfig ι γ π ε ν) : Prop :=
   -- Safety violations halt execution deterministically.
   (∀ msg, _cfg.violationPolicy.allow (.safety msg) = false) ∧

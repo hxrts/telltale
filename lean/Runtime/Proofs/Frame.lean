@@ -26,7 +26,7 @@ The proof proceeds in two steps:
 
 ## VM Integration
 
-The VM-level instruction footprint and diamond proofs require resolving the -/
+The VM-level instruction footprint and diamond proofs require resolving the
 Store name collision between Protocol.Environments.Core and Iris.Std.Heap.
 Once resolved, the proofs here connect to VM execution via:
 
