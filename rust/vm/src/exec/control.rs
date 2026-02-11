@@ -42,8 +42,11 @@ pub(crate) fn step_halt(vm: &VM, ep: &Endpoint) -> Result<StepPack, Fault> {
 }
 
 /// Execute `spawn`.
-pub(crate) fn step_spawn() -> Result<StepPack, Fault> {
-    Err(Fault::SpecFault {
-        message: "spawn not implemented in cooperative VM".to_string(),
-    })
+pub(crate) fn step_spawn(
+    vm: &mut VM,
+    coro_idx: usize,
+    target: PC,
+    args: &[u16],
+) -> Result<StepPack, Fault> {
+    vm.step_spawn(coro_idx, target, args)
 }

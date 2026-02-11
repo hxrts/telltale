@@ -12,12 +12,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use helpers::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
-use telltale_vm::coroutine::Value;
 use telltale_vm::coroutine::Fault;
+use telltale_vm::coroutine::Value;
 use telltale_vm::determinism::{replay_consistent, DeterminismMode};
 use telltale_vm::effect::{EffectHandler, RecordingEffectHandler, SendDecision};
 use telltale_vm::threaded::ThreadedVM;
-use telltale_vm::vm::{ObsEvent, VMConfig, VM, VMError};
+use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use telltale_vm::OutputConditionPolicy;
 
 type Normalized = (String, String, String, String);
@@ -228,7 +228,9 @@ fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
 
     let mut coop = VM::new(deny_cfg.clone());
     coop.load_choreography(&image).expect("load image");
-    let coop_err = coop.run(&handler, 50).expect_err("cooperative run should fault");
+    let coop_err = coop
+        .run(&handler, 50)
+        .expect_err("cooperative run should fault");
 
     let mut threaded = ThreadedVM::with_workers(deny_cfg, 2);
     threaded.load_choreography(&image).expect("load image");

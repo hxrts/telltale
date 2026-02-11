@@ -219,4 +219,47 @@ mod tests {
         let result = image.validate();
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_trusted_and_untrusted_validated_images_match() {
+        let global = simple_global();
+        let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
+            .unwrap()
+            .into_iter()
+            .collect();
+
+        let trusted = CodeImage::from_local_types(&projected, &global);
+        let validated = UntrustedImage::from_local_types(&projected, &global)
+            .validate()
+            .expect("untrusted image should validate");
+
+        assert_eq!(trusted.global_type, validated.global_type);
+        assert_eq!(trusted.local_types, validated.local_types);
+        assert_eq!(trusted.programs, validated.programs);
+    }
+
+    #[test]
+    fn test_validate_ignores_untrusted_program_payload_and_recompiles() {
+        let global = simple_global();
+        let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
+            .unwrap()
+            .into_iter()
+            .collect();
+
+        let mut untrusted = UntrustedImage::from_local_types(&projected, &global);
+        untrusted
+            .programs
+            .insert("A".to_string(), vec![Instr::Halt, Instr::Halt]);
+        untrusted
+            .programs
+            .insert("B".to_string(), vec![Instr::Yield]);
+
+        let validated = untrusted
+            .validate()
+            .expect("validation should reproject and recompile");
+        let trusted = CodeImage::from_local_types(&projected, &global);
+
+        assert_eq!(validated.local_types, trusted.local_types);
+        assert_eq!(validated.programs, trusted.programs);
+    }
 }

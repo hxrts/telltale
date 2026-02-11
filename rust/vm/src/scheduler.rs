@@ -531,4 +531,40 @@ mod tests {
             Some(BlockReason::InvokeWait { .. })
         ));
     }
+
+    #[test]
+    fn test_scheduler_state_serde_roundtrip_preserves_lane_views() {
+        let mut sched = Scheduler::new(SchedPolicy::ProgressAware);
+        sched.assign_lane(0, 0);
+        sched.assign_lane(1, 1);
+        sched.assign_lane(2, 0);
+        sched.assign_lane(3, 1);
+        sched.add_ready(0);
+        sched.add_ready(1);
+        sched.add_ready(2);
+        sched.add_ready(3);
+        sched.mark_blocked(
+            2,
+            BlockReason::InvokeWait {
+                handler: "io".to_string(),
+            },
+        );
+        sched.record_cross_lane_handoff(0, 1, "transfer 7:A");
+        let _ = sched.schedule_with(|id| id == 3);
+
+        let encoded = serde_json::to_string(&sched).expect("serialize scheduler");
+        let decoded: Scheduler = serde_json::from_str(&encoded).expect("deserialize scheduler");
+
+        assert_eq!(decoded.policy(), sched.policy());
+        assert_eq!(decoded.ready_snapshot(), sched.ready_snapshot());
+        assert_eq!(decoded.blocked_snapshot(), sched.blocked_snapshot());
+        assert_eq!(decoded.lane_queues_snapshot(), sched.lane_queues_snapshot());
+        assert_eq!(
+            decoded.lane_blocked_snapshot(),
+            sched.lane_blocked_snapshot()
+        );
+        assert_eq!(decoded.cross_lane_handoffs(), sched.cross_lane_handoffs());
+        assert_eq!(decoded.step_count(), sched.step_count());
+        assert_eq!(decoded.timeslice(), sched.timeslice());
+    }
 }

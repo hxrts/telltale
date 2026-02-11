@@ -41,7 +41,8 @@ use crate::output_condition::{
 };
 use crate::persistence::{NoopPersistence, PersistenceModel};
 use crate::scheduler::{SchedPolicy, Scheduler};
-use crate::session::{unfold_if_var_with_scope, Edge, SessionId, SessionStore};
+use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
+use crate::session::{unfold_if_var_with_scope, Edge, SessionId, SessionStatus, SessionStore};
 use crate::verification::{DefaultVerificationModel, VerificationModel};
 
 fn default_instruction_cost() -> usize {
@@ -1401,6 +1402,39 @@ impl VM {
         &self.effect_trace
     }
 
+    /// Canonical replay/state fragment for deterministic diffing and snapshots.
+    #[must_use]
+    pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
+        let partitioned_edges = self
+            .partitioned_edges
+            .iter()
+            .map(|edge| (edge.sender.clone(), edge.receiver.clone()))
+            .collect();
+        let corrupted_edges = self
+            .corrupted_edges
+            .iter()
+            .map(|entry| {
+                (
+                    (entry.edge.sender.clone(), entry.edge.receiver.clone()),
+                    entry.corruption.clone(),
+                )
+            })
+            .collect();
+        let timed_out_sites = self
+            .timed_out_sites
+            .iter()
+            .map(|timeout| (timeout.site.clone(), timeout.until_tick))
+            .collect();
+        canonical_replay_fragment_v1(
+            &self.obs_trace,
+            &self.effect_trace,
+            self.crashed_sites.clone(),
+            partitioned_edges,
+            corrupted_edges,
+            timed_out_sites,
+        )
+    }
+
     /// Crashed sites currently active in topology state.
     #[must_use]
     pub fn crashed_sites(&self) -> &[SiteId] {
@@ -1514,7 +1548,11 @@ impl VM {
                         token.sid, coro.id
                     ));
                 };
-                if !session.roles.iter().any(|role| role == &token.endpoint.role) {
+                if !session
+                    .roles
+                    .iter()
+                    .any(|role| role == &token.endpoint.role)
+                {
                     return Err(format!(
                         "progress token role not in session {}:{}",
                         token.sid, token.endpoint.role
@@ -1538,8 +1576,15 @@ impl VM {
         }
 
         let mut active_sids = BTreeSet::new();
+        let mut monitor_required_sids = BTreeSet::new();
         for session in self.sessions.iter() {
             active_sids.insert(session.sid);
+            if !matches!(
+                session.status,
+                SessionStatus::Closed | SessionStatus::Cancelled | SessionStatus::Faulted { .. }
+            ) {
+                monitor_required_sids.insert(session.sid);
+            }
             for ep in session.local_types.keys() {
                 if ep.sid != session.sid {
                     return Err(format!("local type sid mismatch for role {}", ep.role));
@@ -1560,7 +1605,7 @@ impl VM {
                 return Err(format!("monitor tracks unknown session {sid}"));
             }
         }
-        for sid in &active_sids {
+        for sid in &monitor_required_sids {
             if !self.monitor.session_kinds.contains_key(sid) {
                 return Err(format!("monitor missing kind for active session {sid}"));
             }
@@ -1828,6 +1873,72 @@ impl VM {
         }
     }
 
+    fn normalize_topology_state(&mut self) {
+        self.crashed_sites.sort_unstable();
+        self.crashed_sites.dedup();
+
+        self.partitioned_edges
+            .sort_by(|lhs, rhs| (&lhs.sender, &lhs.receiver).cmp(&(&rhs.sender, &rhs.receiver)));
+        self.partitioned_edges.dedup();
+
+        self.corrupted_edges.sort_by(|lhs, rhs| {
+            (&lhs.edge.sender, &lhs.edge.receiver).cmp(&(&rhs.edge.sender, &rhs.edge.receiver))
+        });
+        self.corrupted_edges
+            .dedup_by(|lhs, rhs| lhs.edge == rhs.edge && lhs.corruption == rhs.corruption);
+
+        self.timed_out_sites
+            .sort_by(|lhs, rhs| (&lhs.site, lhs.until_tick).cmp(&(&rhs.site, rhs.until_tick)));
+    }
+
+    fn apply_site_failure(&mut self, site: &str) {
+        let reason = format!("site {site} crashed");
+
+        let session_ids = self.sessions.session_ids();
+        for sid in session_ids {
+            let should_fault = self
+                .sessions
+                .get(sid)
+                .is_some_and(|session| session.roles.iter().any(|role| role == site));
+            if !should_fault {
+                continue;
+            }
+            if let Some(session) = self.sessions.get_mut(sid) {
+                if matches!(
+                    session.status,
+                    SessionStatus::Closed
+                        | SessionStatus::Cancelled
+                        | SessionStatus::Faulted { .. }
+                ) {
+                    continue;
+                }
+                session.status = SessionStatus::Faulted {
+                    reason: reason.clone(),
+                };
+                self.monitor.remove_kind(sid);
+            }
+        }
+
+        let mut faulted = Vec::new();
+        for coro in &mut self.coroutines {
+            if coro.role == site && !coro.is_terminal() {
+                let fault = Fault::InvokeFault {
+                    message: reason.clone(),
+                };
+                coro.status = CoroStatus::Faulted(fault.clone());
+                faulted.push((coro.id, fault));
+            }
+        }
+        for (coro_id, fault) in faulted {
+            self.sched.mark_done(coro_id);
+            self.obs_trace.push(ObsEvent::Faulted {
+                tick: self.clock.tick,
+                coro_id,
+                fault,
+            });
+        }
+    }
+
     fn charge_instruction_cost(&mut self, coro_idx: usize) -> Result<(), Fault> {
         let cost = self.config.instruction_cost;
         let budget = self.coroutines[coro_idx].cost_budget;
@@ -1844,6 +1955,7 @@ impl VM {
                 if !self.crashed_sites.iter().any(|s| s == site) {
                     self.crashed_sites.push(site.clone());
                 }
+                self.apply_site_failure(site);
             }
             TopologyPerturbation::Partition { from, to } => {
                 let forward = Edge::new(TOPOLOGY_EDGE_SID, from.clone(), to.clone());
@@ -1861,8 +1973,10 @@ impl VM {
                         || !((edge.sender == *from && edge.receiver == *to)
                             || (edge.sender == *to && edge.receiver == *from))
                 });
-                self.corrupted_edges
-                    .retain(|entry| entry.edge.sender != *from || entry.edge.receiver != *to);
+                self.corrupted_edges.retain(|entry| {
+                    !((entry.edge.sender == *from && entry.edge.receiver == *to)
+                        || (entry.edge.sender == *to && entry.edge.receiver == *from))
+                });
             }
             TopologyPerturbation::Corrupt {
                 from,
@@ -1889,13 +2003,15 @@ impl VM {
                 });
             }
         }
+        self.normalize_topology_state();
     }
 
     fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
         let tick = self.clock.tick;
-        let events = handler
+        let mut events = handler
             .topology_events(tick)
             .map_err(VMError::HandlerError)?;
+        events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
             self.apply_topology_event(&event);
             self.effect_trace.push(EffectTraceEntry {
@@ -1963,7 +2079,10 @@ impl VM {
             .owned_endpoints
             .first()
             .cloned()
-            .ok_or(Fault::PcOutOfBounds)?;
+            .unwrap_or(Endpoint {
+                sid,
+                role: role.clone(),
+            });
         let program = self
             .programs
             .get(self.coroutines[idx].program_id)
@@ -2279,6 +2398,52 @@ impl VM {
         Ok(StepPack {
             coro_update: CoroUpdate::Halt,
             type_update: Some((ep.clone(), TypeUpdate::Remove)),
+            events: vec![],
+        })
+    }
+
+    /// Spawn: allocate a new ready coroutine with copied argument registers.
+    pub(crate) fn step_spawn(
+        &mut self,
+        coro_idx: usize,
+        target: PC,
+        args: &[u16],
+    ) -> Result<StepPack, Fault> {
+        if self.coroutines.len() >= self.config.max_coroutines {
+            return Err(Fault::SpecFault {
+                message: "max coroutines exceeded".to_string(),
+            });
+        }
+
+        let parent = self.coroutines[coro_idx].clone();
+        let new_id = self.next_coro_id;
+        self.next_coro_id = self.next_coro_id.saturating_add(1);
+
+        let mut child = Coroutine::new(
+            new_id,
+            parent.program_id,
+            parent.session_id,
+            parent.role.clone(),
+            self.config.num_registers,
+            self.config.initial_cost_budget,
+        );
+        child.pc = target;
+        child.effect_ctx = parent.effect_ctx.clone();
+        for (dst_idx, src_reg) in args.iter().enumerate() {
+            if dst_idx >= child.regs.len() {
+                break;
+            }
+            if let Some(value) = parent.regs.get(usize::from(*src_reg)).cloned() {
+                child.regs[dst_idx] = value;
+            }
+        }
+
+        self.sched.add_ready(new_id);
+        self.coroutines.push(child);
+
+        Ok(StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
             events: vec![],
         })
     }
@@ -3491,6 +3656,58 @@ mod tests {
         }
     }
 
+    struct CrashOnTickOneHandler;
+
+    impl EffectHandler for CrashOnTickOneHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Unit)
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn topology_events(&self, tick: u64) -> Result<Vec<TopologyPerturbation>, String> {
+            if tick == 1 {
+                Ok(vec![TopologyPerturbation::Crash {
+                    site: "A".to_string(),
+                }])
+            } else {
+                Ok(Vec::new())
+            }
+        }
+    }
+
     fn simple_send_recv_types() -> BTreeMap<String, LocalTypeR> {
         let mut m = BTreeMap::new();
         m.insert(
@@ -4612,6 +4829,24 @@ mod tests {
             .expect("session exists")
             .recv("A", "B");
         assert_eq!(received, Some(Value::Nat(11)));
+    }
+
+    #[test]
+    fn test_crash_event_faults_session_and_clears_monitor_kind() {
+        let local_types = simple_send_recv_types();
+        let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let image = CodeImage::from_local_types(&local_types, &global);
+        let mut vm = VM::new(VMConfig::default());
+        let sid = vm.load_choreography(&image).expect("load choreography");
+
+        assert!(vm.monitor.session_kinds.contains_key(&sid));
+        let _ = vm
+            .step(&CrashOnTickOneHandler)
+            .expect("crash topology ingress should not fault step");
+        let session = vm.sessions.get(sid).expect("session exists");
+        assert!(matches!(session.status, SessionStatus::Faulted { .. }));
+        assert!(!vm.monitor.session_kinds.contains_key(&sid));
+        assert!(vm.crashed_sites.contains(&"A".to_string()));
     }
 
     #[test]

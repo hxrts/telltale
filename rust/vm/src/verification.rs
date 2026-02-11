@@ -322,12 +322,18 @@ impl AuthTree {
             return false;
         }
         let mut current = leaf;
+        let mut index = proof.index;
         for (sibling, on_left) in proof.siblings.iter().zip(proof.sibling_on_left.iter()) {
+            let expected_on_left = index % 2 == 1;
+            if *on_left != expected_on_left {
+                return false;
+            }
             current = if *on_left {
                 merge_hash_pair(*sibling, current)
             } else {
                 merge_hash_pair(current, *sibling)
             };
+            index /= 2;
         }
         current == root
     }

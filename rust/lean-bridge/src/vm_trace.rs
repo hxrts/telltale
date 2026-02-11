@@ -175,6 +175,20 @@ where
     normalize_vm_trace(rust_trace) == normalize_vm_trace(lean_trace)
 }
 
+/// Minimal shared observational equivalence relation for Lean/Rust VM traces.
+///
+/// Equivalence is defined as equality after per-session tick normalization.
+#[must_use]
+pub fn observationally_equivalent<E>(
+    left: &[crate::vm_export::TickedObsEvent<E>],
+    right: &[crate::vm_export::TickedObsEvent<E>],
+) -> bool
+where
+    E: Serialize + Clone + PartialEq,
+{
+    traces_equivalent(left, right)
+}
+
 /// Extract per-session traces from a flat event list.
 #[must_use]
 pub fn partition_by_session(events: &[NormalizedEvent]) -> BTreeMap<usize, SessionTrace> {

@@ -72,6 +72,80 @@ pub enum TopologyPerturbation {
 }
 
 impl TopologyPerturbation {
+    /// Deterministic ordering key for batches received in the same tick.
+    #[must_use]
+    pub fn ordering_key(&self) -> (u8, String, String, u128) {
+        match self {
+            Self::Crash { site } => (0, site.clone(), String::new(), 0),
+            Self::Partition { from, to } => (1, from.clone(), to.clone(), 0),
+            Self::Heal { from, to } => (2, from.clone(), to.clone(), 0),
+            Self::Corrupt {
+                from,
+                to,
+                corruption,
+            } => {
+                let corruption_rank = match corruption {
+                    CorruptionType::BitFlip => 0,
+                    CorruptionType::Truncation => 1,
+                    CorruptionType::PayloadErase => 2,
+                };
+                (3, from.clone(), to.clone(), corruption_rank)
+            }
+            Self::Timeout { site, duration } => {
+                (4, site.clone(), String::new(), duration.as_nanos())
+            }
+        }
+    }
+
+    /// Return crashed site if this is a crash event.
+    #[must_use]
+    pub fn crashed_site(&self) -> Option<&str> {
+        match self {
+            Self::Crash { site } => Some(site.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Return partition endpoints if this is a partition event.
+    #[must_use]
+    pub fn partition_pair(&self) -> Option<(&str, &str)> {
+        match self {
+            Self::Partition { from, to } => Some((from.as_str(), to.as_str())),
+            _ => None,
+        }
+    }
+
+    /// Return healed endpoints if this is a heal event.
+    #[must_use]
+    pub fn healed_pair(&self) -> Option<(&str, &str)> {
+        match self {
+            Self::Heal { from, to } => Some((from.as_str(), to.as_str())),
+            _ => None,
+        }
+    }
+
+    /// Return corruption edge/policy if this is a corruption event.
+    #[must_use]
+    pub fn corruption_edge(&self) -> Option<(&str, &str, CorruptionType)> {
+        match self {
+            Self::Corrupt {
+                from,
+                to,
+                corruption,
+            } => Some((from.as_str(), to.as_str(), corruption.clone())),
+            _ => None,
+        }
+    }
+
+    /// Return timeout site/duration if this is a timeout event.
+    #[must_use]
+    pub fn timeout_site(&self) -> Option<(&str, Duration)> {
+        match self {
+            Self::Timeout { site, duration } => Some((site.as_str(), *duration)),
+            _ => None,
+        }
+    }
+
     /// Apply this perturbation to runtime topology state.
     pub fn apply_to(
         &self,

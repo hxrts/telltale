@@ -61,7 +61,7 @@ pub(crate) fn step_instr(
         Instr::Set { dst, val } => Ok(control::step_set(dst, val)),
         Instr::Move { dst, src } => Ok(control::step_move(vm, coro_idx, dst, src)),
         Instr::Jump { target } => Ok(control::step_jump(target)),
-        Instr::Spawn { .. } => control::step_spawn(),
+        Instr::Spawn { target, args } => control::step_spawn(vm, coro_idx, target, &args),
         Instr::Yield => Ok(control::step_yield()),
         Instr::Halt => control::step_halt(vm, ep),
     }

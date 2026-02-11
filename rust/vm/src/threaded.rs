@@ -12,6 +12,7 @@ use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock, TryLockError};
+use std::time::Duration;
 
 use telltale_types::LocalTypeR;
 
@@ -19,7 +20,8 @@ use crate::buffer::{BoundedBuffer, BufferConfig, EnqueueResult};
 use crate::clock::SimClock;
 use crate::coroutine::{BlockReason, CoroStatus, Coroutine, Fault, ProgressToken, Value};
 use crate::effect::{
-    EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision, TopologyPerturbation,
+    CorruptionType, EffectHandler, EffectTraceEntry, ReplayEffectHandler, SendDecision,
+    TopologyPerturbation,
 };
 use crate::instr::{Endpoint, Instr, PC};
 use crate::intern::{StringId, SymbolTable};
@@ -29,10 +31,11 @@ use crate::output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
 };
 use crate::scheduler::Scheduler;
+use crate::serialization::{canonical_replay_fragment_v1, CanonicalReplayFragmentV1};
 use crate::session::{
     unfold_if_var_with_scope, unfold_mu, Edge, SessionId, SessionState, SessionStatus, TypeEntry,
 };
-use crate::vm::{MonitorMode, ObsEvent, Program, StepResult, VMConfig, VMError};
+use crate::vm::{MonitorMode, ObsEvent, Program, ResourceState, StepResult, VMConfig, VMError};
 
 /// Lane identifier in the threaded runtime.
 pub type LaneId = usize;
@@ -127,11 +130,14 @@ pub struct ThreadedVM {
     workers: usize,
     lane_count: usize,
     guard_resources: Arc<Mutex<BTreeMap<String, Value>>>,
+    resource_states: Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
     effect_trace: Vec<EffectTraceEntry>,
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,
     crashed_sites: BTreeSet<String>,
     partitioned_edges: BTreeSet<(String, String)>,
+    corrupted_edges: BTreeMap<(String, String), CorruptionType>,
+    timed_out_sites: BTreeMap<String, u64>,
     lane_trace: Vec<LaneSelection>,
     pending_handoffs: VecDeque<LaneHandoff>,
     handoff_trace_log: Vec<LaneHandoff>,
@@ -378,11 +384,14 @@ impl ThreadedVM {
             workers: worker_count,
             lane_count: worker_count,
             guard_resources: Arc::new(Mutex::new(guard_resources)),
+            resource_states: Arc::new(Mutex::new(BTreeMap::new())),
             effect_trace: Vec::new(),
             next_effect_id: 0,
             output_condition_checks: Vec::new(),
             crashed_sites: BTreeSet::new(),
             partitioned_edges: BTreeSet::new(),
+            corrupted_edges: BTreeMap::new(),
+            timed_out_sites: BTreeMap::new(),
             lane_trace: Vec::new(),
             pending_handoffs: VecDeque::new(),
             handoff_trace_log: Vec::new(),
@@ -409,6 +418,11 @@ impl ThreadedVM {
             &self.config.buffer_config,
             &image.local_types,
         );
+        self.resource_states
+            .lock()
+            .expect("resource state lock poisoned")
+            .entry(sid)
+            .or_default();
 
         self.trace.push(ObsEvent::Opened {
             tick: self.clock.tick,
@@ -476,6 +490,7 @@ impl ThreadedVM {
         // Event ordering contract: topology effects ingress first each round,
         // before unblocking and scheduler selection.
         self.ingest_topology_events(handler)?;
+        self.prune_expired_timeouts();
         self.try_unblock_receivers();
 
         let mut progressed = false;
@@ -514,6 +529,11 @@ impl ThreadedVM {
                                 &self.programs,
                                 &self.config,
                                 &self.guard_resources,
+                                &self.resource_states,
+                                &self.crashed_sites,
+                                &self.partitioned_edges,
+                                &self.corrupted_edges,
+                                &self.timed_out_sites,
                                 handler,
                                 tick,
                             )
@@ -672,6 +692,29 @@ impl ThreadedVM {
         &self.effect_trace
     }
 
+    /// Canonical replay/state fragment for deterministic diffing and snapshots.
+    #[must_use]
+    pub fn canonical_replay_fragment(&self) -> CanonicalReplayFragmentV1 {
+        let corrupted_edges = self
+            .corrupted_edges
+            .iter()
+            .map(|(edge, corruption)| (edge.clone(), corruption.clone()))
+            .collect();
+        let timed_out_sites = self
+            .timed_out_sites
+            .iter()
+            .map(|(site, until_tick)| (site.clone(), *until_tick))
+            .collect();
+        canonical_replay_fragment_v1(
+            &self.trace,
+            &self.effect_trace,
+            self.crashed_sites.iter().cloned().collect(),
+            self.partitioned_edges.iter().cloned().collect(),
+            corrupted_edges,
+            timed_out_sites,
+        )
+    }
+
     /// Get recorded output-condition verification checks.
     #[must_use]
     pub fn output_condition_checks(&self) -> &[OutputConditionCheck] {
@@ -688,6 +731,18 @@ impl ThreadedVM {
     #[must_use]
     pub fn partitioned_edges(&self) -> &BTreeSet<(String, String)> {
         &self.partitioned_edges
+    }
+
+    /// Corruption policy by directed edge currently active in topology state.
+    #[must_use]
+    pub fn corrupted_edges(&self) -> &BTreeMap<(String, String), CorruptionType> {
+        &self.corrupted_edges
+    }
+
+    /// Active timeout horizon by site.
+    #[must_use]
+    pub fn timed_out_sites(&self) -> &BTreeMap<String, u64> {
+        &self.timed_out_sites
     }
 
     /// Get deterministic lane-selection trace.
@@ -785,15 +840,136 @@ impl ThreadedVM {
             .all(|coro| coro.lock().expect("coroutine lock poisoned").is_terminal())
     }
 
+    fn duration_to_ticks(&self, duration: Duration) -> u64 {
+        let tick_nanos = self.config.tick_duration.as_nanos();
+        if tick_nanos == 0 {
+            return 1;
+        }
+        let duration_nanos = duration.as_nanos();
+        let ticks = duration_nanos.div_ceil(tick_nanos);
+        u64::try_from(ticks).unwrap_or(u64::MAX).max(1)
+    }
+
+    fn prune_expired_timeouts(&mut self) {
+        let tick = self.clock.tick;
+        self.timed_out_sites
+            .retain(|_, until_tick| *until_tick > tick);
+    }
+
+    fn apply_site_failure(&mut self, site: &str) {
+        let reason = format!("site {site} crashed");
+
+        let sessions = self
+            .sessions
+            .sessions
+            .read()
+            .expect("session store lock poisoned");
+        for session in sessions.values() {
+            let mut session_guard = session.lock().expect("session lock poisoned");
+            if !session_guard.roles.iter().any(|role| role == site) {
+                continue;
+            }
+            if matches!(
+                session_guard.status,
+                SessionStatus::Closed | SessionStatus::Cancelled | SessionStatus::Faulted { .. }
+            ) {
+                continue;
+            }
+            session_guard.status = SessionStatus::Faulted {
+                reason: reason.clone(),
+            };
+        }
+
+        let mut faulted = Vec::new();
+        for coro in &self.coroutines {
+            let mut guard = coro.lock().expect("coroutine lock poisoned");
+            if guard.role == site && !guard.is_terminal() {
+                let fault = Fault::InvokeFault {
+                    message: reason.clone(),
+                };
+                guard.status = CoroStatus::Faulted(fault.clone());
+                faulted.push((guard.id, fault));
+            }
+        }
+        for (coro_id, fault) in faulted {
+            self.scheduler.mark_done(coro_id);
+            self.trace.push(ObsEvent::Faulted {
+                tick: self.clock.tick,
+                coro_id,
+                fault,
+            });
+        }
+    }
+
+    fn apply_corruption(value: Value, corruption: CorruptionType) -> Value {
+        match corruption {
+            CorruptionType::BitFlip => match value {
+                Value::Nat(v) => Value::Nat(v ^ 1),
+                Value::Bool(v) => Value::Bool(!v),
+                Value::Str(s) => {
+                    let mut bytes = s.into_bytes();
+                    if let Some(first) = bytes.first_mut() {
+                        *first ^= 0x01;
+                    }
+                    Value::Str(String::from_utf8_lossy(&bytes).to_string())
+                }
+                Value::Prod(left, right) => {
+                    Value::Prod(Box::new(Self::apply_corruption(*left, corruption)), right)
+                }
+                other => other,
+            },
+            CorruptionType::Truncation => match value {
+                Value::Str(s) => Value::Str(s.chars().take(s.chars().count() / 2).collect()),
+                _ => Value::Unit,
+            },
+            CorruptionType::PayloadErase => Value::Unit,
+        }
+    }
+
     fn apply_topology_event(&mut self, event: &TopologyPerturbation) {
-        event.apply_to(&mut self.crashed_sites, &mut self.partitioned_edges);
+        if let Some(site) = event.crashed_site() {
+            self.crashed_sites.insert(site.to_string());
+            self.apply_site_failure(site);
+            return;
+        }
+        if let Some((from, to)) = event.partition_pair() {
+            self.partitioned_edges
+                .insert((from.to_string(), to.to_string()));
+            self.partitioned_edges
+                .insert((to.to_string(), from.to_string()));
+            return;
+        }
+        if let Some((from, to)) = event.healed_pair() {
+            self.partitioned_edges
+                .remove(&(from.to_string(), to.to_string()));
+            self.partitioned_edges
+                .remove(&(to.to_string(), from.to_string()));
+            self.corrupted_edges
+                .remove(&(from.to_string(), to.to_string()));
+            self.corrupted_edges
+                .remove(&(to.to_string(), from.to_string()));
+            return;
+        }
+        if let Some((from, to, corruption)) = event.corruption_edge() {
+            self.corrupted_edges
+                .insert((from.to_string(), to.to_string()), corruption);
+            return;
+        }
+        if let Some((site, duration)) = event.timeout_site() {
+            let until_tick = self
+                .clock
+                .tick
+                .saturating_add(self.duration_to_ticks(duration));
+            self.timed_out_sites.insert(site.to_string(), until_tick);
+        }
     }
 
     fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), VMError> {
         let tick = self.clock.tick;
-        let events = handler
+        let mut events = handler
             .topology_events(tick)
             .map_err(VMError::HandlerError)?;
+        events.sort_by_key(TopologyPerturbation::ordering_key);
         for event in events {
             self.apply_topology_event(&event);
             self.effect_trace.push(EffectTraceEntry {
@@ -818,6 +994,14 @@ impl ThreadedVM {
     fn try_unblock_receivers(&mut self) {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {
+            let should_skip = self.coroutines.get(coro_id).is_some_and(|coro| {
+                let guard = coro.lock().expect("coroutine lock poisoned");
+                self.crashed_sites.contains(&guard.role)
+                    || self.timed_out_sites.contains_key(&guard.role)
+            });
+            if should_skip {
+                continue;
+            }
             let reason = self.scheduler.block_reason(coro_id).cloned();
             if let Some(BlockReason::RecvWait { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
@@ -841,6 +1025,8 @@ impl ThreadedVM {
         let mut used_footprints: BTreeSet<(SessionId, String)> = BTreeSet::new();
         let coros = &self.coroutines;
         let lane_count = self.lane_count.max(1);
+        let crashed_sites = &self.crashed_sites;
+        let timed_out_sites = &self.timed_out_sites;
 
         while picks.len() < n {
             let Some(coro_id) = VMKernel::select_ready_eligible(
@@ -853,6 +1039,11 @@ impl ThreadedVM {
                     let coro_guard = coro.lock().expect("coroutine lock poisoned");
                     let sid = coro_guard.session_id;
                     let lane = id % lane_count;
+                    if crashed_sites.contains(&coro_guard.role)
+                        || timed_out_sites.contains_key(&coro_guard.role)
+                    {
+                        return false;
+                    }
                     if used_sessions.contains(&sid) || used_lanes.contains(&lane) {
                         return false;
                     }
@@ -1352,6 +1543,11 @@ fn exec_instr(
     programs: &[Vec<Instr>],
     config: &VMConfig,
     guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
+    resource_states: &Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
+    crashed_sites: &BTreeSet<String>,
+    partitioned_edges: &BTreeSet<(String, String)>,
+    corrupted_edges: &BTreeMap<(String, String), CorruptionType>,
+    timed_out_sites: &BTreeMap<String, u64>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<(StepPack, Option<OutputConditionHint>), Fault> {
@@ -1387,6 +1583,10 @@ fn exec_instr(
                 &role,
                 chan,
                 val,
+                crashed_sites,
+                partitioned_edges,
+                corrupted_edges,
+                timed_out_sites,
                 handler,
                 tick,
             )
@@ -1429,6 +1629,7 @@ fn exec_instr(
             dst,
             config,
             guard_resources,
+            resource_states,
             handler,
             tick,
         ),
@@ -1441,6 +1642,7 @@ fn exec_instr(
             evidence,
             config,
             guard_resources,
+            resource_states,
             handler,
             tick,
         ),
@@ -1606,6 +1808,10 @@ fn step_send(
     role: &str,
     chan: u16,
     val_reg: u16,
+    crashed_sites: &BTreeSet<String>,
+    partitioned_edges: &BTreeSet<(String, String)>,
+    corrupted_edges: &BTreeMap<(String, String), CorruptionType>,
+    timed_out_sites: &BTreeMap<String, u64>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
@@ -1665,10 +1871,35 @@ fn step_send(
         )
         .map_err(|e| Fault::InvokeFault { message: e })?;
 
+    if crashed_sites.contains(role)
+        || crashed_sites.contains(&partner)
+        || timed_out_sites.contains_key(role)
+        || timed_out_sites.contains_key(&partner)
+        || partitioned_edges.contains(&(role.to_string(), partner.clone()))
+    {
+        return Ok(StepPack {
+            coro_update: CoroUpdate::Block(BlockReason::SendWait {
+                edge: Edge::new(sid, role.to_string(), partner.clone()),
+            }),
+            type_update: None,
+            events: vec![],
+        });
+    }
+
+    let maybe_corruption = corrupted_edges
+        .get(&(role.to_string(), partner.clone()))
+        .cloned();
     let enqueue = match decision {
-        SendDecision::Deliver(payload) => session
-            .send(role, &partner, payload)
-            .map_err(|e| Fault::InvokeFault { message: e })?,
+        SendDecision::Deliver(payload) => {
+            let payload = if let Some(corruption) = maybe_corruption {
+                ThreadedVM::apply_corruption(payload, corruption)
+            } else {
+                payload
+            };
+            session
+                .send(role, &partner, payload)
+                .map_err(|e| Fault::InvokeFault { message: e })?
+        }
         SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
     };
 
@@ -1774,8 +2005,13 @@ fn step_recv(
         });
     }
 
+    let edge = Edge::new(sid, partner.clone(), role.to_string());
     let val = session
-        .recv(&partner, role)
+        .recv_verified(&partner, role)
+        .map_err(|message| Fault::VerificationFailed {
+            edge: edge.clone(),
+            message,
+        })?
         .ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
         })?;
@@ -1796,7 +2032,7 @@ fn step_recv(
         type_update,
         events: vec![ObsEvent::Received {
             tick,
-            edge: Edge::new(sid, partner.clone(), role.to_string()),
+            edge,
             session: sid,
             from: partner,
             to: role.to_string(),
@@ -1884,6 +2120,7 @@ fn step_acquire(
     dst: u16,
     config: &VMConfig,
     guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
+    resource_states: &Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
@@ -1906,6 +2143,13 @@ fn step_acquire(
                 .lock()
                 .expect("guard resources lock poisoned");
             resources.insert(layer.to_string(), evidence.clone());
+            drop(resources);
+
+            let mut scoped_states = resource_states
+                .lock()
+                .expect("resource state lock poisoned");
+            let state = scoped_states.entry(sid).or_default();
+            let _ = state.commit(&evidence);
             Ok(StepPack {
                 coro_update: CoroUpdate::AdvancePcWriteReg {
                     reg: dst,
@@ -1940,6 +2184,7 @@ fn step_release(
     evidence: u16,
     config: &VMConfig,
     guard_resources: &Arc<Mutex<BTreeMap<String, Value>>>,
+    resource_states: &Arc<Mutex<BTreeMap<SessionId, ResourceState>>>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
@@ -1966,6 +2211,17 @@ fn step_release(
             .lock()
             .expect("guard resources lock poisoned");
         resources.insert(layer.to_string(), ev.clone());
+    }
+
+    if let Some(state) = resource_states
+        .lock()
+        .expect("resource state lock poisoned")
+        .get_mut(&sid)
+    {
+        state.consume(&ev).map_err(|message| Fault::AcquireFault {
+            layer: layer.to_string(),
+            message,
+        })?;
     }
     Ok(StepPack {
         coro_update: CoroUpdate::AdvancePc,
@@ -2238,8 +2494,13 @@ fn step_choose(
         });
     }
 
+    let edge = Edge::new(sid, partner.clone(), role.to_string());
     let val = session
-        .recv(&partner, role)
+        .recv_verified(&partner, role)
+        .map_err(|message| Fault::VerificationFailed {
+            edge: edge.clone(),
+            message,
+        })?
         .ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
         })?;
@@ -2287,7 +2548,7 @@ fn step_choose(
         events: vec![
             ObsEvent::Received {
                 tick,
-                edge: Edge::new(sid, partner.clone(), role.to_string()),
+                edge,
                 session: sid,
                 from: partner.clone(),
                 to: role.to_string(),
@@ -2483,11 +2744,76 @@ fn step_open(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::buffer::BufferConfig;
     use crate::coroutine::KnowledgeFact;
+    use crate::effect::{EffectHandler, SendDecision};
+    use crate::session::SessionStore;
+    use crate::verification::{Hash, Signature, VerifyingKey};
     use crate::vm::{FlowPolicy, FlowPredicate};
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
+    use telltale_types::{Label, LocalTypeR};
 
-    fn evaluate_check(policy: FlowPolicy, known_fact: &str, query_fact: &str, target: &str) -> bool {
+    #[derive(Debug, Clone, Copy)]
+    struct NoopHandler;
+
+    impl EffectHandler for NoopHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> Result<Value, String> {
+            Ok(Value::Unit)
+        }
+
+        fn send_decision(
+            &self,
+            _sid: usize,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+            payload: Option<Value>,
+        ) -> Result<SendDecision, String> {
+            Ok(SendDecision::Deliver(payload.unwrap_or(Value::Unit)))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> Result<String, String> {
+            labels
+                .first()
+                .cloned()
+                .ok_or_else(|| "no labels available".to_string())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    fn evaluate_check(
+        policy: FlowPolicy,
+        known_fact: &str,
+        query_fact: &str,
+        target: &str,
+    ) -> bool {
         let mut coro = Coroutine::new(0, 0, 1, "A".to_string(), 8, usize::MAX);
         let ep = Endpoint {
             sid: 1,
@@ -2568,5 +2894,50 @@ mod tests {
             "secret",
             "Blocked"
         ));
+    }
+
+    #[test]
+    fn threaded_recv_reports_verification_fault_for_tampered_signature() {
+        let mut local_types = BTreeMap::new();
+        local_types.insert(
+            "A".to_string(),
+            LocalTypeR::send("B", Label::new("m"), LocalTypeR::End),
+        );
+        local_types.insert(
+            "B".to_string(),
+            LocalTypeR::recv("A", Label::new("m"), LocalTypeR::End),
+        );
+
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".to_string(), "B".to_string()],
+            &BufferConfig::default(),
+            &local_types,
+        );
+        let session = store.get_mut(sid).expect("session exists");
+        let tampered = crate::buffer::SignedValue {
+            payload: Value::Nat(9),
+            signature: Signature {
+                signer: VerifyingKey([0_u8; 32]),
+                digest: Hash([7_u8; 32]),
+            },
+        };
+        session
+            .send_signed("A", "B", tampered)
+            .expect("inject signed payload");
+
+        let mut coro = Coroutine::new(0, 0, sid, "B".to_string(), 8, usize::MAX);
+        let endpoint = Endpoint {
+            sid,
+            role: "B".to_string(),
+        };
+        coro.owned_endpoints.push(endpoint.clone());
+        coro.regs[0] = Value::Endpoint(endpoint);
+
+        let err = match step_recv(&mut coro, session, "B", 0, 1, &NoopHandler, 1) {
+            Ok(_) => panic!("tampered signature must fault"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Fault::VerificationFailed { .. }));
     }
 }

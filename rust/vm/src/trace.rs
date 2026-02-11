@@ -5,8 +5,27 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::session::SessionId;
 use crate::vm::ObsEvent;
+
+fn default_trace_schema_version() -> u32 {
+    1
+}
+
+/// Version identifier for normalized trace payloads.
+pub const TRACE_NORMALIZATION_SCHEMA_VERSION: u32 = 1;
+
+/// Versioned normalized trace payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NormalizedTraceV1 {
+    /// Schema version for normalized trace encoding.
+    #[serde(default = "default_trace_schema_version")]
+    pub schema_version: u32,
+    /// Session-normalized observable events.
+    pub events: Vec<ObsEvent>,
+}
 
 /// Extract the session id from an observable event, if present.
 #[must_use]
@@ -216,6 +235,15 @@ pub fn normalize_trace(trace: &[ObsEvent]) -> Vec<ObsEvent> {
 #[must_use]
 pub fn strict_trace(trace: &[ObsEvent]) -> Vec<ObsEvent> {
     trace.to_vec()
+}
+
+/// Normalize a trace and wrap it in a versioned payload.
+#[must_use]
+pub fn normalize_trace_v1(trace: &[ObsEvent]) -> NormalizedTraceV1 {
+    NormalizedTraceV1 {
+        schema_version: TRACE_NORMALIZATION_SCHEMA_VERSION,
+        events: normalize_trace(trace),
+    }
 }
 
 #[cfg(test)]

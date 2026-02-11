@@ -28,7 +28,10 @@ fn flow_policy_json_roundtrip_for_serializable_variants() {
         let encoded = serde_json::to_string(&policy).expect("serialize flow policy to JSON");
         let decoded: FlowPolicy =
             serde_json::from_str(&encoded).expect("deserialize flow policy from JSON");
-        assert_eq!(decoded, policy, "roundtrip mismatch for JSON payload: {encoded}");
+        assert_eq!(
+            decoded, policy,
+            "roundtrip mismatch for JSON payload: {encoded}"
+        );
     }
 }
 
@@ -43,13 +46,18 @@ fn flow_policy_yaml_roundtrip_for_serializable_variants() {
     for policy in cases {
         // serde_yaml cannot directly serialize nested externally-tagged enums.
         // Roundtrip through JSON Value preserves the canonical config shape.
-        let json_value = serde_json::to_value(&policy).expect("serialize flow policy to JSON value");
-        let encoded = serde_yaml::to_string(&json_value).expect("serialize flow policy value to YAML");
+        let json_value =
+            serde_json::to_value(&policy).expect("serialize flow policy to JSON value");
+        let encoded =
+            serde_yaml::to_string(&json_value).expect("serialize flow policy value to YAML");
         let yaml_as_json: serde_json::Value =
             serde_yaml::from_str(&encoded).expect("deserialize YAML into JSON value");
         let decoded: FlowPolicy =
             serde_json::from_value(yaml_as_json).expect("deserialize flow policy from JSON value");
-        assert_eq!(decoded, policy, "roundtrip mismatch for YAML payload: {encoded}");
+        assert_eq!(
+            decoded, policy,
+            "roundtrip mismatch for YAML payload: {encoded}"
+        );
     }
 }
 
@@ -61,7 +69,8 @@ fn dynamic_flow_predicate_is_not_serializable() {
 
     let err = serde_json::to_string(&policy).expect_err("closure flow policy must not serialize");
     assert!(
-        err.to_string().contains("runtime closure predicate is not serializable"),
+        err.to_string()
+            .contains("runtime closure predicate is not serializable"),
         "unexpected serde error: {err}"
     );
 }
@@ -75,16 +84,19 @@ fn vm_config_with_dynamic_flow_predicate_is_not_serializable() {
         ..VMConfig::default()
     };
 
-    let err = serde_json::to_string(&cfg).expect_err("config with closure flow policy must not serialize");
+    let err = serde_json::to_string(&cfg)
+        .expect_err("config with closure flow policy must not serialize");
     assert!(
-        err.to_string().contains("runtime closure predicate is not serializable"),
+        err.to_string()
+            .contains("runtime closure predicate is not serializable"),
         "unexpected serde error: {err}"
     );
 }
 
 #[test]
 fn vm_config_schema_version_defaults_when_missing() {
-    let mut encoded = serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
+    let mut encoded =
+        serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
     let obj = encoded
         .as_object_mut()
         .expect("VM config JSON value should be an object");
@@ -97,7 +109,8 @@ fn vm_config_schema_version_defaults_when_missing() {
 
 #[test]
 fn vm_config_optional_hooks_have_deterministic_defaults() {
-    let mut encoded = serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
+    let mut encoded =
+        serde_json::to_value(VMConfig::default()).expect("serialize default VM config");
     let obj = encoded
         .as_object_mut()
         .expect("VM config JSON value should be an object");
@@ -114,7 +127,10 @@ fn vm_config_optional_hooks_have_deterministic_defaults() {
     assert_eq!(decoded.flow_policy, defaults.flow_policy);
     assert_eq!(decoded.instruction_cost, defaults.instruction_cost);
     assert_eq!(decoded.initial_cost_budget, defaults.initial_cost_budget);
-    assert_eq!(decoded.config_schema_version, defaults.config_schema_version);
+    assert_eq!(
+        decoded.config_schema_version,
+        defaults.config_schema_version
+    );
 }
 
 #[test]

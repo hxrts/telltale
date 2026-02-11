@@ -57,6 +57,7 @@ pub mod driver;
 pub mod effect;
 pub mod exec;
 pub mod exec_api;
+pub mod faults;
 pub mod guard;
 pub mod identity;
 pub mod instr;
@@ -67,6 +68,7 @@ pub mod nested;
 pub mod output_condition;
 pub mod persistence;
 pub mod scheduler;
+pub mod serialization;
 pub mod session;
 #[cfg(feature = "multi-thread")]
 pub mod threaded;
@@ -100,6 +102,7 @@ pub use effect::{
     TopologyPerturbation,
 };
 pub use exec_api::{ExecResult, ExecStatus, StepEvent, StepPack};
+pub use faults::{classify_fault, fault_code, fault_code_of, FaultClass};
 pub use guard::{GuardLayer, InMemoryGuardLayer, LayerId};
 pub use identity::{IdentityModel, ParticipantId, SiteId as IdentitySiteId, StaticIdentityModel};
 pub use instr::Instr;
@@ -115,12 +118,19 @@ pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,
     Scheduler, StepUpdate,
 };
+pub use serialization::{
+    canonical_effect_trace, canonical_replay_fragment_v1, canonical_trace_v1,
+    CanonicalReplayFragmentV1, CanonicalTraceV1,
+};
 pub use session::{decode_edge_json, Edge, HandlerId, SessionId, SessionStore};
 #[cfg(feature = "multi-thread")]
 pub use threaded::{
     ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedVM,
 };
-pub use trace::{normalize_trace, obs_session, strict_trace, with_tick};
+pub use trace::{
+    normalize_trace, normalize_trace_v1, obs_session, strict_trace, with_tick, NormalizedTraceV1,
+    TRACE_NORMALIZATION_SCHEMA_VERSION,
+};
 pub use verification::{
     signValue, sign_value, verifySignedValue, verify_signed_value, AuthProof, AuthTree, Commitment,
     DefaultVerificationModel, Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel,

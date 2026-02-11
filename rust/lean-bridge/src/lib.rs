@@ -94,9 +94,9 @@ pub use vm_export::{
     EndpointRef, SessionView, TickedObsEvent, VMState, VM_STATE_SCHEMA_VERSION,
 };
 pub use vm_trace::{
-    event_session, normalize_vm_trace, partition_by_session, traces_equivalent, EffectTraceEvent,
-    NormalizedEvent, OutputConditionTraceEvent, ReplayTraceBundle, SessionTrace,
-    TopologyPerturbationEvent, TopologyPerturbationKind,
+    event_session, normalize_vm_trace, observationally_equivalent, partition_by_session,
+    traces_equivalent, EffectTraceEvent, NormalizedEvent, OutputConditionTraceEvent,
+    ReplayTraceBundle, SessionTrace, TopologyPerturbationEvent, TopologyPerturbationKind,
 };
 
 #[cfg(feature = "runner")]
