@@ -82,8 +82,7 @@ def consensusFamilyAdmissible (p : ProtocolSpec) : Bool :=
 
 /-- Core consensus assumptions passed under the existing model validator. -/
 def consensusCoreAssumptionsPassed (p : ProtocolSpec) : Bool :=
-  let (_, _, ok) := runAssumptionValidation p coreAssumptions
-  ok
+  (runAssumptionValidation p coreAssumptions).allPassed
 
 /-- Capability budget domain for consensus profile admission checks. -/
 abbrev DiffBudget := Nat

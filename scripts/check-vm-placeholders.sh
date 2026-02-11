@@ -26,15 +26,18 @@ CURRENT_HITS="$({
     -g '*.lean' || true
 } | sed "s#${ROOT_DIR}/##" | sort -u)"
 
-BASELINE_HITS="$(sed '/^\s*#/d;/^\s*$/d' "${BASELINE_FILE}" | sort -u)"
+BASELINE_HITS="$(sed '/^\s*#/d;/^\s*$/d' "${BASELINE_FILE}")"
+if [[ -n "${BASELINE_HITS}" ]]; then
+  echo "error: ${BASELINE_FILE} must be empty in strict-conformance mode." >&2
+  echo "Remove allowlisted markers and clear the baseline file." >&2
+  exit 1
+fi
 
-NEW_HITS="$(comm -23 <(printf '%s\n' "${CURRENT_HITS}") <(printf '%s\n' "${BASELINE_HITS}") || true)"
-
-if [[ -n "${NEW_HITS}" ]]; then
-  echo "error: found new placeholder/todo/stub markers in executable VM modules:" >&2
-  printf '%s\n' "${NEW_HITS}" >&2
+if [[ -n "${CURRENT_HITS}" ]]; then
+  echo "error: found placeholder/todo/stub markers in executable VM modules:" >&2
+  printf '%s\n' "${CURRENT_HITS}" >&2
   echo "" >&2
-  echo "Add explicit implementation or update ${BASELINE_FILE} with justification." >&2
+  echo "Remove markers from executable VM modules." >&2
   exit 1
 fi
 
@@ -53,4 +56,4 @@ if [[ -n "${PROOF_IMPORT_HITS}" ]]; then
   exit 1
 fi
 
-echo "VM placeholder/todo baseline check passed."
+echo "VM placeholder/stub check passed with zero executable markers."

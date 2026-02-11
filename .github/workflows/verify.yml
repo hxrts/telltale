@@ -36,6 +36,11 @@ jobs:
           mkdir -p artifacts
           just check-parity-ledger | tee artifacts/check-parity-ledger.log
 
+      - name: Run VM differential parity suite
+        run: |
+          mkdir -p artifacts
+          just check-vm-parity-suite | tee artifacts/check-vm-parity-suite.log
+
       - name: Build targeted Lean VM modules
         run: just verify-lean-vm-targets
 
@@ -84,6 +89,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-parity-ledger | tee artifacts/check-parity-ledger.log
+
+      - name: Run VM differential parity suite
+        run: |
+          mkdir -p artifacts
+          just check-vm-parity-suite | tee artifacts/check-vm-parity-suite.log
 
       - name: Setup Lean
         uses: leanprover/lean4-action@v1

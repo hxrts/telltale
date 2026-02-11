@@ -95,7 +95,7 @@ def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (coro : CoroutineState γ ε)
     (action : EffectRuntime.EffectAction ε) : StepPack ι γ π ε ν :=
-  -- Execute an effect action via the bound handler (placeholder response model).
+  -- Execute an effect action via the bound handler.
   match SessionStore.defaultHandler st.sessions with
   | none =>
       faultPack st coro (.invokeFault "no handler bound") "no handler bound"

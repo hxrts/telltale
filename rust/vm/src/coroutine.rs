@@ -4,7 +4,7 @@
 //! register file, and status. Matches the Lean `Coroutine` structure.
 
 use serde::{Deserialize, Serialize};
-use telltale_types::{FixedQ32, ValType};
+use telltale_types::ValType;
 
 use crate::instr::{Endpoint, PC};
 use crate::session::{Edge, HandlerId, SessionId};
@@ -64,10 +64,6 @@ pub enum Value {
     Prod(Box<Value>, Box<Value>),
     /// Endpoint reference for ownership and guard operations.
     Endpoint(Endpoint),
-    /// Fixed-point Q32.32 number for deterministic simulation.
-    Q32(FixedQ32),
-    /// Vector of fixed-point Q32.32 numbers for deterministic simulation.
-    Q32Vec(Vec<FixedQ32>),
 }
 
 /// Coroutine execution status.

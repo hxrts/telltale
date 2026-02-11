@@ -18,6 +18,7 @@ ci-dry-run:
     just check-envelope-conformance
     just check-vm-placeholders
     just check-parity-ledger
+    just check-vm-parity-suite
     just check-lean-metrics
     # Benchmark target compilation checks
     just bench-check
@@ -61,6 +62,10 @@ check-vm-placeholders:
 # Lean/Rust VM parity-contract + deviation-ledger checks
 check-parity-ledger:
     ./scripts/check-parity-ledger.sh
+
+# Canonical Lean/Rust VM differential parity suite
+check-vm-parity-suite:
+    ./scripts/check-vm-parity-suite.sh
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:

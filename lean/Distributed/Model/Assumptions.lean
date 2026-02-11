@@ -385,11 +385,21 @@ def validateAssumptions (p : ProtocolSpec) (hs : List Assumption) : List Assumpt
 def allPassed (rs : List AssumptionResult) : Bool :=
   rs.all (fun r => r.passed)
 
+/-- Summary of assumption validation for one protocol spec. -/
+structure AssumptionSummary where
+  space : ProtocolSpace
+  results : List AssumptionResult
+  allPassed : Bool
+  deriving Repr, DecidableEq, Inhabited
+
 /-- Convenience API: validate and summarize. -/
 def runAssumptionValidation (p : ProtocolSpec) (hs : List Assumption) :
-    ProtocolSpace × List AssumptionResult × Bool :=
+    AssumptionSummary :=
   let space := classify p
   let results := validateAssumptions p hs
-  (space, results, allPassed results)
+  { space := space
+  , results := results
+  , allPassed := allPassed results
+  }
 
 end Distributed

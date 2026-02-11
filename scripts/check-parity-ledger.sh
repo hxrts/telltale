@@ -88,6 +88,68 @@ def parse_rust_enum_variants(path: Path, enum_name: str) -> list[str]:
     return variants
 
 
+def parse_lean_structure_fields(path: Path, structure_name: str) -> list[str]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    start_re = re.compile(rf"^\s*structure\s+{re.escape(structure_name)}\s+where\b")
+    field_re = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_']*)\s*:\s*")
+    stop_re = re.compile(
+        r"^\s*(?:(?:private|protected)\s+)?"
+        r"(def|theorem|lemma|structure|class|instance|abbrev|inductive|namespace|open|set_option|universe)\b"
+    )
+
+    in_block = False
+    fields: list[str] = []
+    for line in lines:
+        if not in_block:
+            if start_re.match(line):
+                in_block = True
+            continue
+
+        code = line.split("--", 1)[0].strip()
+        if not code:
+            continue
+        match = field_re.match(code)
+        if match:
+            fields.append(match.group(1))
+            continue
+
+        if fields and stop_re.match(code):
+            break
+
+    if not fields:
+        fail(f"could not parse Lean fields for {structure_name} in {path}")
+    return fields
+
+
+def parse_rust_struct_fields(path: Path, struct_name: str) -> list[str]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    start_re = re.compile(rf"^\s*pub\s+struct\s+{re.escape(struct_name)}(?:<[^>]+>)?\s*\{{")
+    field_re = re.compile(r"^\s*pub\s+([A-Za-z_][A-Za-z0-9_]*)\s*:")
+
+    in_block = False
+    brace_depth = 0
+    fields: list[str] = []
+    for line in lines:
+        if not in_block:
+            if start_re.match(line):
+                in_block = True
+                brace_depth = line.count("{") - line.count("}")
+            continue
+
+        brace_depth += line.count("{") - line.count("}")
+        code = line.split("//", 1)[0].strip()
+        match = field_re.match(code)
+        if match:
+            fields.append(match.group(1))
+
+        if brace_depth == 0:
+            break
+
+    if not fields:
+        fail(f"could not parse Rust fields for {struct_name} in {path}")
+    return fields
+
+
 def normalize_lean_variant(name: str, mapping: dict[str, str]) -> str:
     if name in mapping:
         return mapping[name]
@@ -96,7 +158,7 @@ def normalize_lean_variant(name: str, mapping: dict[str, str]) -> str:
     return name[0].upper() + name[1:]
 
 
-checks = [
+enum_checks = [
     {
         "label": "FlowPolicy",
         "lean_file": root / "lean/Runtime/VM/Model/Knowledge.lean",
@@ -139,6 +201,28 @@ checks = [
             "predicateAllowList": "PredicateAllowList",
         },
     },
+    {
+        "label": "Value",
+        "lean_file": root / "lean/Protocol/Values.lean",
+        "lean_type": "Value",
+        "rust_file": root / "rust/vm/src/coroutine.rs",
+        "rust_type": "Value",
+        "map": {
+            "string": "Str",
+            "chan": "Endpoint",
+        },
+    },
+]
+
+struct_checks = [
+    {
+        "label": "ProgressToken",
+        "lean_file": root / "lean/Runtime/VM/Model/State.lean",
+        "lean_type": "ProgressToken",
+        "rust_file": root / "rust/vm/src/coroutine.rs",
+        "rust_type": "ProgressToken",
+        "map": {},
+    },
 ]
 
 try:
@@ -160,6 +244,7 @@ active_coverage: set[str] = set()
 
 required_fields = {
     "id",
+    "owner",
     "status",
     "reason",
     "impact",
@@ -188,6 +273,10 @@ for idx, entry in enumerate(deviations):
     if status not in allowed_status:
         fail(f"deviation {entry_id}: status must be one of {sorted(allowed_status)}")
 
+    owner = entry["owner"]
+    if not isinstance(owner, str) or not owner.strip():
+        fail(f"deviation {entry_id}: owner must be a non-empty string")
+
     revisit = entry["revisit_date"]
     if not isinstance(revisit, str):
         fail(f"deviation {entry_id}: revisit_date must be a YYYY-MM-DD string")
@@ -214,8 +303,12 @@ for idx, entry in enumerate(deviations):
             fail(f"deviation {entry_id}: active deviation must cover at least one mismatch fingerprint")
         active_coverage.update(covers)
 
+verify_workflow = root / ".github/workflows/verify.yml"
+check_workflow = root / ".github/workflows/check.yml"
+justfile = root / "justfile"
+
 mismatches: list[str] = []
-for check in checks:
+for check in enum_checks:
     lean_variants = parse_lean_inductive_variants(check["lean_file"], check["lean_type"])
     rust_variants = parse_rust_enum_variants(check["rust_file"], check["rust_type"])
 
@@ -232,16 +325,49 @@ for check in checks:
     for variant in missing_in_rust:
         mismatches.append(f"{check['label']}:missing_in_rust:{variant}")
 
+for check in struct_checks:
+    lean_fields = parse_lean_structure_fields(check["lean_file"], check["lean_type"])
+    rust_fields = parse_rust_struct_fields(check["rust_file"], check["rust_type"])
+    lean_norm = {check["map"].get(name, name) for name in lean_fields}
+    rust_set = set(rust_fields)
+
+    missing_in_lean = sorted(rust_set - lean_norm)
+    missing_in_rust = sorted(lean_norm - rust_set)
+
+    print(f"[parity] {check['label']}: LeanFields={sorted(lean_norm)} RustFields={sorted(rust_set)}")
+
+    for field in missing_in_lean:
+        mismatches.append(f"{check['label']}:missing_field_in_lean:{field}")
+    for field in missing_in_rust:
+        mismatches.append(f"{check['label']}:missing_field_in_rust:{field}")
+
 if not mismatches:
-    print("[parity] enum shape parity check passed with no mismatches")
-    sys.exit(0)
+    print("[parity] policy/data shape parity check passed with no mismatches")
+else:
+    uncovered = [m for m in mismatches if m not in active_coverage]
+    if uncovered:
+        print("[parity] uncovered mismatches:")
+        for mismatch in uncovered:
+            print(f"  - {mismatch}")
+        fail("found Lean/Rust parity mismatches without active ledger coverage")
+    print("[parity] mismatches are fully covered by active ledger entries")
 
-uncovered = [m for m in mismatches if m not in active_coverage]
-if uncovered:
-    print("[parity] uncovered mismatches:")
-    for mismatch in uncovered:
-        print(f"  - {mismatch}")
-    fail("found Lean/Rust parity mismatches without active ledger coverage")
+verify_text = verify_workflow.read_text(encoding="utf-8")
+check_text = check_workflow.read_text(encoding="utf-8")
+just_text = justfile.read_text(encoding="utf-8")
 
-print("[parity] mismatches are fully covered by active ledger entries")
+required_ci_markers = [
+    ("verify workflow parity ledger gate", "just check-parity-ledger", verify_text),
+    ("verify workflow parity suite gate", "just check-vm-parity-suite", verify_text),
+    ("check workflow parity ledger gate", "./scripts/check-parity-ledger.sh", check_text),
+    ("check workflow parity suite gate", "./scripts/check-vm-parity-suite.sh", check_text),
+    ("ci-dry-run parity ledger gate", "just check-parity-ledger", just_text),
+    ("ci-dry-run parity suite gate", "just check-vm-parity-suite", just_text),
+]
+
+for desc, needle, haystack in required_ci_markers:
+    if needle not in haystack:
+        fail(f"missing {desc}: expected marker `{needle}`")
+
+print("[parity] CI parity-regression gates are present in workflows and ci-dry-run")
 PY

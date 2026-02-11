@@ -9,6 +9,8 @@ This matrix is required to be updated in every VM PR that changes behavior or en
 | FlowPolicy variants | `Runtime/VM/Model/Knowledge.lean` | `rust/vm/src/vm.rs` | Aligned | Includes dynamic predicate + serializable predicate expr |
 | FlowPredicate variants | `Runtime/VM/Model/Knowledge.lean` | `rust/vm/src/vm.rs` | Aligned | `targetRolePrefix`, `factContains`, `endpointRoleMatchesTarget`, `all`, `any` |
 | OutputConditionPolicy variants | `Runtime/VM/Model/OutputCondition.lean` | `rust/vm/src/output_condition.rs` | Aligned | `disabled`, `allowAll`, `denyAll`, `predicateAllowList` |
+| Core `Value` variants | `Protocol/Values.lean` | `rust/vm/src/coroutine.rs` | Aligned | Lean-compatible runtime value surface only |
+| `ProgressToken` field shape | `Runtime/VM/Model/State.lean` | `rust/vm/src/coroutine.rs` | Aligned | `{sid, endpoint}` |
 | Default observable predicate | `vm.observable_output` | `vm.observable_output` | Aligned | Default when host provides no explicit hint |
 
 ## Runtime Behavior Parity (Tracked)

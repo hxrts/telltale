@@ -45,6 +45,32 @@ This document defines the Lean/Rust parity contract for VM policy and data encod
   - `OutputConditionPolicy::DenyAll`
   - `OutputConditionPolicy::PredicateAllowList`
 
+### Core Runtime Values
+
+- Lean: `lean/Protocol/Values.lean`
+  - `Value.unit`
+  - `Value.bool`
+  - `Value.nat`
+  - `Value.string`
+  - `Value.prod`
+  - `Value.chan`
+- Rust: `rust/vm/src/coroutine.rs`
+  - `Value::Unit`
+  - `Value::Bool`
+  - `Value::Nat`
+  - `Value::Str`
+  - `Value::Prod`
+  - `Value::Endpoint`
+
+### Progress Tokens
+
+- Lean: `lean/Runtime/VM/Model/State.lean`
+  - `ProgressToken.sid`
+  - `ProgressToken.endpoint`
+- Rust: `rust/vm/src/coroutine.rs`
+  - `ProgressToken.sid`
+  - `ProgressToken.endpoint`
+
 ### Output-Condition Claim/Check Metadata
 
 - Lean `OutputConditionClaim`: `predicateRef`, `witnessRef`, `outputDigest : String`.
@@ -69,10 +95,10 @@ This document defines the Lean/Rust parity contract for VM policy and data encod
 
 1. Add a deviation entry in `docs/lean_vs_rust_deviations.json`.
 2. Fill the template in `docs/templates/justified_break.md`.
-3. Include mismatch fingerprints under `covers`.
-4. Keep a concrete revisit date.
+3. Assign an explicit owner and revisit date.
+4. Include mismatch fingerprints under `covers`.
 
 ## CI Enforcement
 
 - CI runs `scripts/check-parity-ledger.sh`.
-- The check compares selected Lean/Rust enum shapes and fails when an uncovered mismatch appears.
+- The check compares selected Lean/Rust policy/data shapes and fails when an uncovered mismatch appears.

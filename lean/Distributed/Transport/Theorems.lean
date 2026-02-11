@@ -13,8 +13,7 @@ namespace Distributed
 
 /-- Build an assumption summary for an arbitrary assumption bundle. -/
 def validateWithAssumptions (p : ProtocolSpec) (hs : List Assumption) : AssumptionSummary :=
-  let (space, results, ok) := runAssumptionValidation p hs
-  { space := space, results := results, allPassed := ok }
+  runAssumptionValidation p hs
 
 /-- Validate the protocol against the built-in BFT assumption bundle. -/
 def validateAsBFT (p : ProtocolSpec) : AssumptionSummary :=

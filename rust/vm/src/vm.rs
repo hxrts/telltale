@@ -1728,8 +1728,6 @@ impl VM {
                 sid: ep.sid,
                 role: ep.role.clone(),
             },
-            // Q32/Q32Vec are simulation-only values; map to Nat for typing purposes
-            Value::Q32(_) | Value::Q32Vec(_) => ValType::Nat,
         }
     }
 
