@@ -14,6 +14,8 @@ ci-dry-run:
     cargo test --workspace --all-targets --all-features
     just check-arch
     just check-arch-lean
+    just check-failure-capabilities
+    just check-envelope-conformance
     just check-vm-placeholders
     just check-parity-ledger
     just check-lean-metrics
@@ -43,6 +45,14 @@ check-arch-rust:
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     ./scripts/check-arch-lean.sh
+
+# Failure theorem-capability conformance checks
+check-failure-capabilities:
+    ./scripts/check-failure-capabilities.sh
+
+# Envelope theorem-capability and conformance checks
+check-envelope-conformance:
+    ./scripts/check-envelope-conformance.sh
 
 # Prevent new placeholder/stub/TODO markers in executable Lean VM modules.
 check-vm-placeholders:
