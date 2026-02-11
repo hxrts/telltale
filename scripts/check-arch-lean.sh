@@ -127,6 +127,82 @@ collect_file_metric_hits() {
   printf '%s\n' "${out}" | sed '/^$/d' || true
 }
 
+# Find code blocks (between section headers) exceeding a line threshold.
+# Counts non-comment, non-blank lines only.
+collect_long_code_blocks() {
+  local threshold="$1"
+  local out=""
+
+  while IFS= read -r file; do
+    # Exclude obvious test/example/debug modules from style checks.
+    if [[ "${file}" =~ /Tests/ ]] || [[ "${file}" =~ /Examples/ ]] || [[ "${file}" =~ MutualTest ]]; then
+      continue
+    fi
+
+    # Use awk to find code blocks > threshold lines (excluding comments/blanks)
+    local hits
+    hits="$(awk -v threshold="${threshold}" -v filename="${file}" '
+      BEGIN {
+        in_block_comment = 0
+        block_start = 1
+        code_lines = 0
+      }
+
+      # Section header: /-! ## ... (single or multi-line)
+      # Check FIRST before block comment handling since section headers are block comments
+      /\/-![[:space:]]*##/ {
+        if (code_lines > threshold) {
+          print filename ":" block_start ": code block has " code_lines " non-comment lines (threshold: " threshold ")"
+        }
+        block_start = NR + 1
+        code_lines = 0
+        # If section header spans multiple lines, enter block comment mode
+        if (!/-\/$/) {
+          in_block_comment = 1
+        }
+        next
+      }
+
+      # Handle block comments: /- ... -/ (includes /-! doc comments)
+      # Start of block comment (not closed on same line)
+      /\/-/ && !/-\// {
+        in_block_comment = 1
+        next
+      }
+      # Single-line block comment - skip entirely
+      /\/-.*-\// { next }
+      # End of block comment
+      /-\// {
+        in_block_comment = 0
+        next
+      }
+      # Inside block comment - skip
+      in_block_comment { next }
+
+      # Skip blank lines
+      /^[[:space:]]*$/ { next }
+
+      # Skip single-line comments
+      /^[[:space:]]*--/ { next }
+
+      # Count as code line
+      { code_lines++ }
+
+      END {
+        if (code_lines > threshold) {
+          print filename ":" block_start ": code block has " code_lines " non-comment lines (threshold: " threshold ")"
+        }
+      }
+    ' "${file}")"
+
+    if [[ -n "${hits}" ]]; then
+      out+="${hits}"$'\n'
+    fi
+  done < <(find "${LEAN_DIR}" -type f -name '*.lean' -not -path '*/.lake/*' -not -path '*/target/*' | sort)
+
+  printf '%s\n' "${out}" | sed '/^$/d' || true
+}
+
 print_section "Lean Escape Hatches"
 
 sorry_hits="$(scan_rg '\bsorry\b')"
@@ -177,6 +253,10 @@ print_hits "warning" "Non-trivial files include Problem/Solution prose headers" 
 section_header_hits="$(collect_file_metric_hits section_headers 120)"
 print_hits "warning" "Non-trivial files include section headers" "${section_header_hits}" \
   "Add /-! ## ... -/ section headers to organize long files."
+
+long_code_block_hits="$(collect_long_code_blocks 50)"
+print_hits "warning" "Code blocks stay within 50 non-comment lines" "${long_code_block_hits}" \
+  "Add /-! ## ... -/ section headers to break up long code blocks."
 
 module_doc_hits="$(collect_file_metric_hits module_doc 120)"
 print_hits "warning" "Non-trivial files include module docs" "${module_doc_hits}" \

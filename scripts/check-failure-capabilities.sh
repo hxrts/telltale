@@ -48,6 +48,12 @@ fi
 check "artifact-level cross-target error-code compatibility tests exist" \
   "rg -q 'error-code compatibility mismatch' '${TEST_FILE}'"
 
+check "cross-target failure-visible conformance regression tests exist" \
+  "rg -q 'cross-target failure-visible conformance mismatch' '${TEST_FILE}'"
+
+check "restart structured-error adequacy regression tests exist" \
+  "rg -q 'restart structured-error adequacy mismatch' '${TEST_FILE}'"
+
 check "phase-1 gate: structured error schema + mappings are present" \
   "rg -q 'structure StructuredErrorEvent' '${STATE_FILE}' && \
    rg -q 'def failureClassOfRustFaultTag' '${ENVELOPE_FILE}' && \
@@ -63,11 +69,19 @@ check "phase-3 gate: abstract failure proofs are bridged through adapters/theore
    rg -q 'failureEnvelope\\?' '${ADAPTER_FILE}' && \
    rg -q 'FailureEnvelopeArtifact' '${THEOREMPACK_FILE}'"
 
+check "phase-3.5 gate: cross-target failure conformance theorem is exposed" \
+  "rg -q 'def CrossTargetFailureConformance' '${ENVELOPE_FILE}' && \
+   rg -q 'crossTargetConformance' '${THEOREMPACK_FILE}'"
+
+check "phase-3.6 gate: restart-refinement + structured-error adequacy theorem is exposed" \
+  "rg -q 'def RestartRefinementStructuredErrorAdequacy' '${ENVELOPE_FILE}' && \
+   rg -q 'restartStructuredErrorAdequacy' '${THEOREMPACK_FILE}'"
+
 check "phase-4 gate: VM theorem-pack exposes failure-envelope capability" \
   "rg -q '\\(\"failure_envelope\", pack\\.failureEnvelope\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
 
 check "phase-5 gate: CI enforces failure conformance checks" \
-  "rg -q 'just check-failure-capabilities' '${ROOT_DIR}/justfile'"
+  "rg -q 'just check-failure-capabilities' '${ROOT_DIR}/Justfile'"
 
 echo ""
 echo "Summary: ${checks} checks, ${errors} failure(s)."
