@@ -1,7 +1,6 @@
 import Runtime.VM.Model.Core
 
-/-!
-# Knowledge and Flow Policy
+/-! # Runtime.VM.Model.Knowledge
 
 Definitions for the epistemic separation logic layer. A `Knowledge` binds a
 string payload to a specific endpoint, representing information that a
@@ -11,6 +10,15 @@ decides which knowledge may propagate to which roles.
 This module is deliberately small and import-cycle-free so that both `Config.lean`
 (which stores the flow policy) and the `Exec*.lean` files (which read/write knowledge
 sets) can depend on it.
+-/
+
+/-
+The Problem. The VM model needs a small, serializable vocabulary for knowledge
+facts and flow policies that can be used uniformly by state, semantics, and
+runtime conformance checks.
+
+Solution Structure. Define endpoint-bound knowledge atoms, predicate/policy
+interpreters, and serialization round-trips in one import-light module.
 -/
 
 set_option autoImplicit false

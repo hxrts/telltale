@@ -8,10 +8,22 @@ Consensus envelope forms that reuse `ProtocolSpec` classification and assumption
 validation from `Distributed.Model`.
 -/
 
+/-
+The Problem. Consensus-family theorem artifacts need a uniform envelope surface
+for soundness/completeness/maximality, compositional committee bounds, and
+interactive-distance (`d_int`) interfaces without duplicating model glue.
+
+Solution Structure. We introduce core envelope forms first, then committee/shard
+composition bounds, then `d_int` bounds and theorem-object packaging, and finally
+admission/capability extraction wrappers over the existing assumption validator.
+-/
+
 namespace Distributed
 namespace ConsensusEnvelope
 
 universe u v
+
+/-! ## Core Envelope Forms -/
 
 /-- Canonical run type used in consensus envelope statements. -/
 abbrev Run (State : Type u) := Nat → State
@@ -89,6 +101,8 @@ abbrev DiffBudget := Nat
 
 /-- Committee/shard identifier used in compositional consensus theorems. -/
 abbrev CommitteeId := Nat
+
+/-! ## Compositional Committee Bounds -/
 
 /-- Per-committee envelope-bound function. -/
 abbrev CommitteeEnvelopeBound {State : Type u} :=

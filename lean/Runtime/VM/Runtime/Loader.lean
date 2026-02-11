@@ -5,10 +5,19 @@ import Runtime.Resources.Arena
 import Protocol.Environments.Core
 import Choreography.Projection.Project.Core
 
-/-!
-# Dynamic Choreography Loading
+/-! # Runtime.VM.Runtime.Loader
 
 Pure state transformer that adds a session and its coroutines to a running VM.
+-/
+
+/-
+The Problem. Runtime choreography loading must validate images, allocate fresh
+session identifiers, and install new coroutines/session state without violating
+existing VM capacity and structural invariants.
+
+Solution Structure. This module builds executable checks and loader primitives,
+then packages result-typed and compatibility APIs plus monotonicity lemmas for
+the allocated session identifier.
 -/
 
 set_option autoImplicit false

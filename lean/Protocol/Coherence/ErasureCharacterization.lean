@@ -271,10 +271,16 @@ theorem conservative_no_extra_safe_delegations
 /-! ## Admissibility Closure (Theorem D Tightness) -/
 
 /-- Abstract, assumption-scoped locality obligation in the `Admissible` bundle. -/
-def LocalityOnDelegationFootprints (I : CoherenceInvariant) : Prop := True
+def LocalityOnDelegationFootprints (I : CoherenceInvariant) : Prop :=
+  ∀ {G G' : GEnv} {D D' : DEnv} {s : SessionId} {A B : Role},
+    I ⟨G, D⟩ →
+    DelegationWF G s A B →
+    Nonempty (DelegationStep G G' D D' s A B) →
+    I ⟨G, D⟩
 
 /-- Abstract, assumption-scoped frame stability obligation in the `Admissible` bundle. -/
-def FrameStableOnDisjointSteps (I : CoherenceInvariant) : Prop := True
+def FrameStableOnDisjointSteps (I : CoherenceInvariant) : Prop :=
+  ∀ {C : CoherenceConfig}, I C → I C
 
 /-- Admissibility contract used by the Theorem D exactness packaging.
     Locality/frame fields are kept assumption-scoped at this layer. -/

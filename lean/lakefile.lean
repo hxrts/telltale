@@ -68,8 +68,10 @@ lean_lib Entropy where
   globs := #[
     `ClassicalAnalysisAPI,
     `ClassicalAnalysisInstance,
+    `ClassicalAnalysisInstance.*,
     `IrisExtractionAPI,
-    `IrisExtractionInstance
+    `IrisExtractionInstance,
+    `IrisExtractionInstance.*
   ]
 
 /-- Linker args to silence macOS deployment target warnings for test executables. -/

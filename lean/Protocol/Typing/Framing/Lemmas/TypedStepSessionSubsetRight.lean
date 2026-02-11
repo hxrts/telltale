@@ -1,0 +1,80 @@
+import Protocol.Typing.Framing.Lemmas.TypedStepSessionSubsetLeft
+set_option linter.mathlibStandardSet false
+set_option relaxedAutoImplicit false
+set_option autoImplicit false
+set_option linter.unnecessarySimpa false
+
+open scoped Classical
+
+section
+theorem SessionsOf_subset_of_TypedStep_right_frame
+    {G₁ G₂ G G' D Ssh Sown store bufs P G₂' D' Sown' store' bufs' P'} :
+    DisjointG G₁ G₂ →
+    G = G₁ ++ G₂ →
+    G' = G₁ ++ G₂' →
+    TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
+    SessionsOf G₂' ⊆ SessionsOf G₂ := by
+  intro hDisj hEq hEq' hTS
+  induction hTS with
+  | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.send target T L) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
+      rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.recv source T L) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.select target bs) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
+      rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
+      have hLookup : lookupG (G₁ ++ G₂) e = some (.branch source bs) := by
+        simpa [hEq] using hG
+      have hUpd : updateG (G₁ ++ G₂) e L = G₁ ++ G₂' := by
+        simpa [hEq, hEq'] using hGout.symm
+      exact SessionsOf_right_subset_of_update hLookup hUpd
+  | assign =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+  | seq_step _ ih =>
+      exact ih hEq hEq'
+  | seq_skip =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+  | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hEq hEq'
+  | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
+      exact ih hEq hEq'
+  | par_skip_left =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+  | par_skip_right =>
+      intro s hs
+      have hEqG : G₁ ++ G₂' = G₁ ++ G₂ :=
+        hEq'.symm.trans hEq
+      have hG₂' : G₂' = G₂ := append_right_eq_of_eq hEqG
+      simpa [hG₂'] using hs
+
+
+
+end
