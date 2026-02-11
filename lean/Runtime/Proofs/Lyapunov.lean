@@ -280,6 +280,35 @@ theorem StrictProgressMeasureData.productive_steps_bounded {State : Type}
     simp [List.length_cons]
     omega
 
+/-- Witness object certifying productive-step bound tightness at initial state `s`:
+    the provided productive chain has length exactly the Lyapunov bound. -/
+structure ProductiveStepBoundTightnessWitness {State : Type}
+    (D : StrictProgressMeasureData State) (s : State) where
+  trace : List (State × State)
+  chainFrom : IsChainFrom s trace
+  productiveTrace : ∀ p ∈ trace, D.step p.1 = some p.2 ∧ D.is_productive p.1 p.2
+  saturatesBound : trace.length = D.measure s
+
+/-- Witness-based tightness proposition for the productive-step bound. -/
+def productiveStepBoundTight {State : Type}
+    (D : StrictProgressMeasureData State) (s : State) : Prop :=
+  Nonempty (ProductiveStepBoundTightnessWitness D s)
+
+/-- Tightness closure: a saturating witness upgrades the productive-step bound
+    from an upper bound to an exact bound at `s`. -/
+theorem StrictProgressMeasureData.productive_steps_bound_exact_of_tightWitness
+    {State : Type}
+    (D : StrictProgressMeasureData State) (s : State)
+    (hTight : productiveStepBoundTight D s) :
+    ∃ trace,
+      IsChainFrom s trace ∧
+      (∀ p ∈ trace, D.step p.1 = some p.2 ∧ D.is_productive p.1 p.2) ∧
+      trace.length ≤ D.measure s ∧
+      trace.length = D.measure s := by
+  rcases hTight with ⟨w⟩
+  refine ⟨w.trace, w.chainFrom, w.productiveTrace, ?_, w.saturatesBound⟩
+  exact D.productive_steps_bounded s w.trace w.chainFrom w.productiveTrace
+
 /-! ## Buffer Progress Measure -/
 
 /-- Buffer contribution to the progress measure: number of pending messages. -/

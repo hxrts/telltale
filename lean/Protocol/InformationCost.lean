@@ -306,4 +306,86 @@ theorem isBlind_implies_constant_local_type
   obtain ⟨t, ht⟩ := hConst
   simp [ht]
 
+/-! ## Exactness Wrappers (MI = 0 ↔ Erasure) -/
+
+/-- Reverse-direction oracle used to package exactness:
+    if mutual information is zero, the joint law is an erasure kernel. -/
+def MutualInfoZeroImpliesErasureKernel
+    {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
+    (labelDist : L → ℝ) (joint : L × O → ℝ) : Prop :=
+  mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint
+
+/-- Assumption-scoped exactness statement for projection erasure. -/
+theorem mutualInfo_zero_iff_erasureKernel_of_reverse
+    {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
+    (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1)
+    (joint : L × O → ℝ)
+    (hRev : MutualInfoZeroImpliesErasureKernel labelDist joint) :
+    mutualInfo joint = 0 ↔ EntropyAPI.IsErasureKernel labelDist joint := by
+  constructor
+  · exact hRev
+  · intro hErase
+    exact mutualInfo_zero_of_erasure labelDist h_nn h_sum joint hErase
+
+/-- Explicit boundary-witness interface for degenerate model classes where
+    reverse exactness may fail without additional assumptions. -/
+structure DegenerateMutualInfoBoundaryWitness
+    (L O : Type) [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws] where
+  labelDist : L → ℝ
+  joint : L × O → ℝ
+  nonneg : ∀ l, 0 ≤ labelDist l
+  sum_one : ∑ l, labelDist l = 1
+  mi_zero : mutualInfo joint = 0
+  not_erasure_kernel : ¬ EntropyAPI.IsErasureKernel labelDist joint
+
+/-- Any degenerate boundary witness certifies failure of the unscoped reverse implication. -/
+theorem reverse_exactness_fails_of_boundary_witness
+    {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
+    (w : DegenerateMutualInfoBoundaryWitness L O) :
+    ¬ (∀ labelDist joint, mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint) := by
+  intro hAll
+  exact w.not_erasure_kernel (hAll w.labelDist w.joint w.mi_zero)
+
+/-! ## Reverse-Assumption Sharpness Packaging -/
+
+/-- Assumptions appearing in the reverse-direction exactness bundle. -/
+inductive MutualInfoReverseAssumption where
+  | reverseKernelLaw
+  | labelNonneg
+  | labelNormalized
+  deriving DecidableEq, Repr
+
+/-- Assumption-indexed boundary witness for reverse-direction strictness. -/
+structure MutualInfoReverseAssumptionCounterexample
+    (L O : Type) [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws] where
+  droppedAssumption : MutualInfoReverseAssumption
+  witness : DegenerateMutualInfoBoundaryWitness L O
+
+/-- Any assumption-indexed witness certifies failure of the unscoped reverse implication. -/
+theorem reverse_exactness_fails_of_assumption_counterexample
+    {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
+    (cex : MutualInfoReverseAssumptionCounterexample L O) :
+    ¬ (∀ labelDist joint, mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint) :=
+  reverse_exactness_fails_of_boundary_witness cex.witness
+
+/-- Oracle packaging: each reverse-direction assumption has an explicit witness. -/
+def MutualInfoReverseAssumptionIndependence
+    (L O : Type) [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws] : Prop :=
+  ∀ a : MutualInfoReverseAssumption,
+    ∃ cex : MutualInfoReverseAssumptionCounterexample L O, cex.droppedAssumption = a
+
+/-- Sharpness theorem: every indexed dropped-assumption case yields strict failure
+    of the unscoped reverse implication. -/
+theorem mutualInfo_reverse_assumption_sharpness
+    {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
+    (hIndep : MutualInfoReverseAssumptionIndependence L O) :
+    ∀ a : MutualInfoReverseAssumption,
+      ∃ cex : MutualInfoReverseAssumptionCounterexample L O,
+        cex.droppedAssumption = a ∧
+          ¬ (∀ labelDist joint, mutualInfo joint = 0 →
+              EntropyAPI.IsErasureKernel labelDist joint) := by
+  intro a
+  rcases hIndep a with ⟨cex, hEq⟩
+  exact ⟨cex, hEq, reverse_exactness_fails_of_assumption_counterexample cex⟩
+
 end InformationCost

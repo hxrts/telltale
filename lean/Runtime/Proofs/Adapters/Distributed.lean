@@ -691,6 +691,24 @@ theorem failureEnvelope_checkpointRestartRefinement_of_profile (p : FailureEnvel
       p.protocol.premises.Refines p.protocol.premises.checkpoint p.protocol.premises.restart :=
   p.protocol.checkpointRestartRefinement
 
+/-- Cross-target failure-envelope conformance theorem extracted from a profile. -/
+theorem failureEnvelope_crossTargetConformance_of_profile (p : FailureEnvelopeProfile) :
+    Runtime.Adequacy.CrossTargetFailureConformance
+      p.protocol.premises.failureVisible
+      p.protocol.premises.singleThreadRun
+      p.protocol.premises.multiThreadRun
+      p.protocol.premises.shardedRun :=
+  p.protocol.crossTargetConformance
+
+/-- Restart-refinement + structured-error adequacy theorem extracted from a profile. -/
+theorem failureEnvelope_restartStructuredErrorAdequacy_of_profile (p : FailureEnvelopeProfile) :
+    Runtime.Adequacy.RestartRefinementStructuredErrorAdequacy
+      p.protocol.premises.Refines
+      p.protocol.premises.checkpoint
+      p.protocol.premises.restart
+      p.protocol.premises.structuredErrors :=
+  p.protocol.restartStructuredErrorAdequacy
+
 /-- Failure-envelope soundness extension extracted from a failure-envelope profile. -/
 theorem failureEnvelope_soundness_of_profile (p : FailureEnvelopeProfile) :
     Runtime.Adequacy.FailureEnvelopeSoundnessExtension

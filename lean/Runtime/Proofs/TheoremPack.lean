@@ -450,6 +450,18 @@ structure FailureEnvelopeArtifact where
   checkpointRestartRefinement :
     Runtime.Adequacy.CheckpointRestartRefinement
       protocol.premises.Refines protocol.premises.checkpoint protocol.premises.restart
+  crossTargetConformance :
+    Runtime.Adequacy.CrossTargetFailureConformance
+      protocol.premises.failureVisible
+      protocol.premises.singleThreadRun
+      protocol.premises.multiThreadRun
+      protocol.premises.shardedRun
+  restartStructuredErrorAdequacy :
+    Runtime.Adequacy.RestartRefinementStructuredErrorAdequacy
+      protocol.premises.Refines
+      protocol.premises.checkpoint
+      protocol.premises.restart
+      protocol.premises.structuredErrors
   failureEnvelopeSoundness :
     Runtime.Adequacy.FailureEnvelopeSoundnessExtension
       protocol.premises.localEnvelope
@@ -810,6 +822,8 @@ def buildVMTheoremPack
           , recoveryActionSafety := p.protocol.recoveryActionSafety
           , noUnsafeReplay := p.protocol.noUnsafeReplay
           , checkpointRestartRefinement := p.protocol.checkpointRestartRefinement
+          , crossTargetConformance := p.protocol.crossTargetConformance
+          , restartStructuredErrorAdequacy := p.protocol.restartStructuredErrorAdequacy
           , failureEnvelopeSoundness := p.protocol.failureEnvelopeSoundness
           , failureEnvelopeMaximality := p.protocol.failureEnvelopeMaximality
           }

@@ -175,6 +175,49 @@ theorem identityErasure_equiv (C : CoherenceConfig) :
     ConfigEquiv C (identityErasure C) := by
   simpa [identityErasure] using ConfigEquiv_refl C
 
+/-- Observable invariance under the quotient relation `ConfigEquiv`. -/
+def ConfigEquivInvariantObservable {α : Type} (F : CoherenceConfig → α) : Prop :=
+  ∀ {C₁ C₂}, ConfigEquiv C₁ C₂ → F C₁ = F C₂
+
+/-- Quotient-factorization property for observables:
+    `F` depends only on the `observationalErasure` class. -/
+def FactorsThroughObservationalErasure {α : Type} (F : CoherenceConfig → α) : Prop :=
+  ∃ Fq : Quotient ConfigEquivSetoid → α,
+    ∀ C, F C = Fq (observationalErasure C)
+
+/-- Any observable that factors through `observationalErasure`
+    is `ConfigEquiv`-invariant. -/
+theorem configEquivInvariant_of_factorsThroughObservationalErasure
+    {α : Type} {F : CoherenceConfig → α}
+    (hFactor : FactorsThroughObservationalErasure F) :
+    ConfigEquivInvariantObservable F := by
+  rcases hFactor with ⟨Fq, hFq⟩
+  intro C₁ C₂ hEq
+  have hQuot : observationalErasure C₁ = observationalErasure C₂ :=
+    Quotient.sound hEq
+  calc
+    F C₁ = Fq (observationalErasure C₁) := hFq C₁
+    _ = Fq (observationalErasure C₂) := by simp [hQuot]
+    _ = F C₂ := (hFq C₂).symm
+
+/-- Any `ConfigEquiv`-invariant observable factors through `observationalErasure`. -/
+theorem factorsThroughObservationalErasure_of_configEquivInvariant
+    {α : Type} {F : CoherenceConfig → α}
+    (hInv : ConfigEquivInvariantObservable F) :
+    FactorsThroughObservationalErasure F := by
+  refine ⟨Quotient.lift F (by intro C₁ C₂ hEq; exact hInv hEq), ?_⟩
+  intro C
+  rfl
+
+/-- Quotient universality for coherence observables:
+    factorization through `observationalErasure` iff `ConfigEquiv`-invariance. -/
+theorem factorsThroughObservationalErasure_iff_configEquivInvariant
+    {α : Type} (F : CoherenceConfig → α) :
+    FactorsThroughObservationalErasure F ↔ ConfigEquivInvariantObservable F := by
+  constructor
+  · exact configEquivInvariant_of_factorsThroughObservationalErasure
+  · exact factorsThroughObservationalErasure_of_configEquivInvariant
+
 /-- Empty edge snapshot used by out-of-session projections. -/
 def emptyEdgeTypeTrace : EdgeTypeTrace :=
   { senderType := none, receiverType := none, trace := [] }

@@ -107,6 +107,61 @@ def ShardedExactEnvelopeCharacterization {State : Type u} {Obs : Type v}
   ShardedEnvelopeRealizability E RefRun ImplRun ∧
   ShardedEnvelopeMaximality E RefRun ImplRun
 
+/-- Local/sharded collapse condition: both envelope views induce the same
+    erased-observation equivalence on runs. -/
+def LocalShardedCollapse {State : Type u} {Obs : Type v}
+    (ELocal : LocalEnvelope State Obs)
+    (EShard : ShardedEnvelope State Obs) : Prop :=
+  ∀ ref impl, EqEnvLocal ELocal ref impl ↔ EqEnvShard EShard ref impl
+
+/-- Transport local exactness into sharded exactness under collapse. -/
+theorem shardedExact_of_localExact_and_collapse
+    {State : Type u} {Obs : Type v}
+    {ELocal : LocalEnvelope State Obs} {EShard : ShardedEnvelope State Obs}
+    {RefRun ImplRun : Run State → Prop}
+    (hLocal : LocalExactEnvelopeCharacterization ELocal RefRun ImplRun)
+    (hCollapse : LocalShardedCollapse ELocal EShard) :
+    ShardedExactEnvelopeCharacterization EShard RefRun ImplRun := by
+  rcases hLocal with ⟨hSoundL, hRealL, hMaxL⟩
+  refine ⟨?_, ?_, ?_⟩
+  · intro ref impl hRef hImpl
+    exact (hCollapse ref impl).1 (hSoundL ref impl hRef hImpl)
+  · intro ref impl hRef hEqShard
+    exact hRealL ref impl hRef ((hCollapse ref impl).2 hEqShard)
+  · intro R hR ref impl hRef hImpl hRel
+    exact hR ref impl hRef hImpl hRel
+
+/-- Transport sharded exactness into local exactness under collapse. -/
+theorem localExact_of_shardedExact_and_collapse
+    {State : Type u} {Obs : Type v}
+    {ELocal : LocalEnvelope State Obs} {EShard : ShardedEnvelope State Obs}
+    {RefRun ImplRun : Run State → Prop}
+    (hShard : ShardedExactEnvelopeCharacterization EShard RefRun ImplRun)
+    (hCollapse : LocalShardedCollapse ELocal EShard) :
+    LocalExactEnvelopeCharacterization ELocal RefRun ImplRun := by
+  rcases hShard with ⟨hSoundS, hRealS, hMaxS⟩
+  refine ⟨?_, ?_, ?_⟩
+  · intro ref impl hRef hImpl
+    exact (hCollapse ref impl).2 (hSoundS ref impl hRef hImpl)
+  · intro ref impl hRef hEqLocal
+    exact hRealS ref impl hRef ((hCollapse ref impl).1 hEqLocal)
+  · intro R hR ref impl hRef hImpl hRel
+    exact hR ref impl hRef hImpl hRel
+
+/-- Exactness collapse equivalence between local and sharded views. -/
+theorem localExact_iff_shardedExact_of_collapse
+    {State : Type u} {Obs : Type v}
+    {ELocal : LocalEnvelope State Obs} {EShard : ShardedEnvelope State Obs}
+    {RefRun ImplRun : Run State → Prop}
+    (hCollapse : LocalShardedCollapse ELocal EShard) :
+    LocalExactEnvelopeCharacterization ELocal RefRun ImplRun ↔
+      ShardedExactEnvelopeCharacterization EShard RefRun ImplRun := by
+  constructor
+  · intro hLocal
+    exact shardedExact_of_localExact_and_collapse hLocal hCollapse
+  · intro hShard
+    exact localExact_of_shardedExact_and_collapse hShard hCollapse
+
 /-- Premises bundle for Phase E1 local/sharded exact-characterization extraction. -/
 structure EnvelopePhaseE1Premises (State : Type u) (Obs : Type v) where
   localEnvelope : LocalEnvelope State Obs
@@ -234,6 +289,28 @@ def CompositionalExactnessUnderNonInterference {State : Type u}
     (∀ ref impl, interaction ref impl = 0) →
       ∀ ref impl, total ref impl = component₁ ref impl + component₂ ref impl
 
+/-- Non-vacuous exactness conclusion used by strictness/counterexample statements. -/
+def CompositionalExactnessConclusion {State : Type u}
+    (component₁ component₂ total : EnvelopeBound State) : Prop :=
+  ∀ ref impl, total ref impl = component₁ ref impl + component₂ ref impl
+
+/-- Boundary witness for the non-interference converse:
+    a concrete pair where both components are active and exactness fails. -/
+structure NonInterferenceConverseWitness {State : Type u}
+    (component₁ component₂ interaction total : EnvelopeBound State) where
+  ref : Run State
+  impl : Run State
+  component₁_active : component₁ ref impl ≠ 0
+  component₂_active : component₂ ref impl ≠ 0
+  interaction_zero : interaction ref impl = 0
+  exactness_failure : total ref impl ≠ component₁ ref impl + component₂ ref impl
+
+/-- Oracle packaging: if non-interference is dropped, a strict witness can be produced. -/
+def NonInterferenceConverseOracle {State : Type u}
+    (component₁ component₂ interaction total : EnvelopeBound State) : Prop :=
+  ¬ NonInterference component₁ component₂ →
+    Nonempty (NonInterferenceConverseWitness component₁ component₂ interaction total)
+
 /-- Exactness follows when the composed bound is exact and interaction vanishes. -/
 theorem compositionalExactness_of_zeroInteraction
     {State : Type u}
@@ -242,6 +319,92 @@ theorem compositionalExactness_of_zeroInteraction
     CompositionalExactnessUnderNonInterference component₁ component₂ interaction total := by
   intro _hNI hZero ref impl
   simpa [hZero ref impl] using hComp ref impl
+
+/-- Any strict converse witness certifies that unconditional compositional exactness fails. -/
+theorem not_compositionalExactnessConclusion_of_nonInterferenceConverseWitness
+    {State : Type u}
+    {component₁ component₂ interaction total : EnvelopeBound State}
+    (w : NonInterferenceConverseWitness component₁ component₂ interaction total) :
+    ¬ CompositionalExactnessConclusion component₁ component₂ total := by
+  intro hExact
+  exact w.exactness_failure (hExact w.ref w.impl)
+
+/-- Converse strictness packaging used by S2:
+    if non-interference is absent and a witness oracle is available,
+    the exactness conclusion is not derivable. -/
+theorem nonInterference_converse_strictness_of_oracle
+    {State : Type u}
+    {component₁ component₂ interaction total : EnvelopeBound State}
+    (hOracle : NonInterferenceConverseOracle component₁ component₂ interaction total)
+    (hNotNI : ¬ NonInterference component₁ component₂) :
+    ¬ CompositionalExactnessConclusion component₁ component₂ total := by
+  rcases hOracle hNotNI with ⟨w⟩
+  exact not_compositionalExactnessConclusion_of_nonInterferenceConverseWitness w
+
+/-! ## Reconfiguration Harmony Side-Condition Necessity -/
+
+/-- Indexed side conditions for the reconfiguration-Harmony theorem shape. -/
+inductive HarmonySideCondition where
+  | typedState
+  | wellFormedReconfiguration
+  | enabledPostReconfigStep
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Generic reconfiguration-Harmony commutation contract. -/
+def ReconfigurationHarmony {State : Type u} {Obs : Type v}
+    (project : State → Obs)
+    (globalStep : State → State → Prop)
+    (localStep : Obs → Obs → Prop) : Prop :=
+  ∀ C C', globalStep C C' → localStep (project C) (project C')
+
+/-- Counterexample witness indexed by a dropped Harmony side condition. -/
+structure HarmonyDroppedConditionCounterexample {State : Type u} {Obs : Type v}
+    (project : State → Obs)
+    (globalStep : State → State → Prop)
+    (localStep : Obs → Obs → Prop)
+    (conditions : HarmonySideCondition → Prop) where
+  droppedCondition : HarmonySideCondition
+  source : State
+  target : State
+  conditionDropped : ¬ conditions droppedCondition
+  globalTransition : globalStep source target
+  localTransitionFailure : ¬ localStep (project source) (project target)
+
+/-- Oracle packaging: each dropped condition has a corresponding strict witness. -/
+def HarmonySideConditionNecessityOracle {State : Type u} {Obs : Type v}
+    (project : State → Obs)
+    (globalStep : State → State → Prop)
+    (localStep : Obs → Obs → Prop)
+    (conditions : HarmonySideCondition → Prop) : Prop :=
+  ∀ c : HarmonySideCondition, ¬ conditions c →
+    Nonempty (HarmonyDroppedConditionCounterexample project globalStep localStep conditions)
+
+/-- Any dropped-condition witness certifies Harmony failure. -/
+theorem not_reconfigurationHarmony_of_dropped_condition_counterexample
+    {State : Type u} {Obs : Type v}
+    {project : State → Obs}
+    {globalStep : State → State → Prop}
+    {localStep : Obs → Obs → Prop}
+    {conditions : HarmonySideCondition → Prop}
+    (w : HarmonyDroppedConditionCounterexample project globalStep localStep conditions) :
+    ¬ ReconfigurationHarmony project globalStep localStep := by
+  intro hHarmony
+  exact w.localTransitionFailure (hHarmony w.source w.target w.globalTransition)
+
+/-- Side-condition necessity decomposition for Harmony:
+    dropping any indexed condition yields a strict non-Harmony witness. -/
+theorem reconfigurationHarmony_side_condition_necessity
+    {State : Type u} {Obs : Type v}
+    {project : State → Obs}
+    {globalStep : State → State → Prop}
+    {localStep : Obs → Obs → Prop}
+    {conditions : HarmonySideCondition → Prop}
+    (hOracle : HarmonySideConditionNecessityOracle project globalStep localStep conditions) :
+    ∀ c : HarmonySideCondition, ¬ conditions c →
+      ¬ ReconfigurationHarmony project globalStep localStep := by
+  intro c hDropped
+  rcases hOracle c hDropped with ⟨w⟩
+  exact not_reconfigurationHarmony_of_dropped_condition_counterexample w
 
 /-- Delegation/handoff preserves local envelope equivalence. -/
 def DelegationPreservesEnvelope {State : Type u} {Obs : Type v}
@@ -930,6 +1093,109 @@ structure HypothesisCounterexample where
 def HypothesisNecessityMinimality : Prop :=
   ∀ h : EnvelopeMajorHypothesis, ∃ cex : HypothesisCounterexample, cex.explanation ≠ ""
 
+/-! ## Transport Assumption Necessity Tagging -/
+
+/-- Necessity status used to tag transport assumptions theorem-by-theorem. -/
+inductive AssumptionNecessityTag where
+  | provenNecessary
+  | sufficientOnly
+  deriving Repr, DecidableEq, Inhabited
+
+/-- A tagged transport assumption entry. -/
+structure TaggedTransportAssumption where
+  name : String
+  tag : AssumptionNecessityTag
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Necessity profile for one transported theorem statement. -/
+structure TransportNecessityProfile where
+  theoremName : String
+  assumptions : List TaggedTransportAssumption
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Profile-level hardening: all assumptions are marked proven-necessary. -/
+def profileNecessityHardened (p : TransportNecessityProfile) : Prop :=
+  ∀ a, a ∈ p.assumptions → a.tag = .provenNecessary
+
+/-- Catalog-level hardening: every profile is necessity-hardened. -/
+def transportCatalogNecessityHardened
+    (catalog : List TransportNecessityProfile) : Prop :=
+  ∀ p, p ∈ catalog → profileNecessityHardened p
+
+/-- Theorem-form tag semantics: if every assumption in a profile is tagged
+    `provenNecessary`, the profile is necessity-hardened. -/
+theorem profileNecessityHardened_of_allProvenNecessary
+    (p : TransportNecessityProfile)
+    (hAll : ∀ a, a ∈ p.assumptions → a.tag = .provenNecessary) :
+    profileNecessityHardened p :=
+  hAll
+
+/-- Catalog theorem-form lifting of profile hardening. -/
+theorem transportCatalogNecessityHardened_of_profiles
+    (catalog : List TransportNecessityProfile)
+    (hAll : ∀ p, p ∈ catalog → profileNecessityHardened p) :
+    transportCatalogNecessityHardened catalog :=
+  hAll
+
+/-- Dropped-assumption failure witness for one transport profile.
+    Intended reading: removing `dropped` invalidates the transported theorem. -/
+structure DroppedTransportAssumptionFailureWitness
+    (p : TransportNecessityProfile) where
+  dropped : TaggedTransportAssumption
+  droppedInProfile : dropped ∈ p.assumptions
+  witnessId : String
+  failureMode : String
+  failureMode_nonempty : failureMode ≠ ""
+  deriving Repr, DecidableEq
+
+/-- Oracle interface: every `provenNecessary` assumption has a dropped-assumption
+    strict-failure witness. -/
+def TransportProfileMinimalityOracle
+    (p : TransportNecessityProfile) : Prop :=
+  ∀ a, a ∈ p.assumptions → a.tag = .provenNecessary →
+    Nonempty { w : DroppedTransportAssumptionFailureWitness p // w.dropped = a }
+
+/-- Joint minimal-basis closure for one transport profile:
+    all assumptions are necessity-hardened, and each admits a dropped-assumption
+    strict-failure witness. -/
+def profileNecessityMinimalBasis
+    (p : TransportNecessityProfile) : Prop :=
+  profileNecessityHardened p ∧
+  ∀ a, a ∈ p.assumptions →
+    Nonempty { w : DroppedTransportAssumptionFailureWitness p // w.dropped = a }
+
+/-- Catalog-level minimal-basis closure for necessity-tagged transport profiles. -/
+def transportCatalogMinimalBasis
+    (catalog : List TransportNecessityProfile) : Prop :=
+  ∀ p, p ∈ catalog → profileNecessityMinimalBasis p
+
+/-- Build profile-level minimal-basis closure from hardened tags + dropped-assumption oracle. -/
+theorem profileNecessityMinimalBasis_of_hardened_and_oracle
+    (p : TransportNecessityProfile)
+    (hHard : profileNecessityHardened p)
+    (hOracle : TransportProfileMinimalityOracle p) :
+    profileNecessityMinimalBasis p := by
+  refine ⟨hHard, ?_⟩
+  intro a hIn
+  exact hOracle a hIn (hHard a hIn)
+
+/-- Any minimal-basis profile is necessity-hardened. -/
+theorem profileNecessityHardened_of_minimalBasis
+    (p : TransportNecessityProfile)
+    (hMin : profileNecessityMinimalBasis p) :
+    profileNecessityHardened p :=
+  hMin.1
+
+/-- Build catalog-level minimal-basis closure from profile-level hardening + oracles. -/
+theorem transportCatalogMinimalBasis_of_hardened_and_oracles
+    (catalog : List TransportNecessityProfile)
+    (hHard : transportCatalogNecessityHardened catalog)
+    (hOracle : ∀ p, p ∈ catalog → TransportProfileMinimalityOracle p) :
+    transportCatalogMinimalBasis catalog := by
+  intro p hIn
+  exact profileNecessityMinimalBasis_of_hardened_and_oracle
+    p (hHard p hIn) (hOracle p hIn)
+
 /-- E4: premise bundle for capability inference/admission theorem extraction. -/
 structure VMEnvelopeAdmissionPremises (State : Type u) (Obs : Type v) where
   input : ProgramCapabilityInput
@@ -1218,6 +1484,86 @@ def errorCodeOfLeanFault {γ : Type u} (f : _root_.Fault γ) : ErrorCode :=
 def errorCodeOfRustFaultTag (f : RustFaultTag) : ErrorCode :=
   errorCodeOfFailureClass (failureClassOfRustFaultTag f)
 
+/-- Decode fault-class tags used in structured error artifacts to stable error codes. -/
+def errorCodeOfFaultClassTag (faultClass : String) : ErrorCode :=
+  if faultClass = "type_violation" then .typeViolation else
+  if faultClass = "unknown_label" then .unknownLabel else
+  if faultClass = "channel_closed" then .channelClosed else
+  if faultClass = "invalid_signature" then .invalidSignature else
+  if faultClass = "verification_failed" then .verificationFailed else
+  if faultClass = "acquire_fault" then .acquireFault else
+  if faultClass = "invoke_fault" then .invokeFault else
+  if faultClass = "transfer_fault" then .transferFault else
+  if faultClass = "close_fault" then .closeFault else
+  if faultClass = "spec_fault" then .specFault else
+  if faultClass = "flow_violation" then .flowViolation else
+  if faultClass = "no_progress_token" then .noProgressToken else
+  if faultClass = "output_condition_fault" then .outputConditionFault else
+  if faultClass = "out_of_registers" then .outOfRegisters else
+  if faultClass = "pc_out_of_bounds" then .pcOutOfBounds else
+  if faultClass = "buffer_full" then .bufferFull else
+  if faultClass = "out_of_credits" then .outOfCredits else
+  if faultClass = "topology_mutation" then .topologyMutation else
+  if faultClass = "transport_corruption" then .transportCorruption else
+  if faultClass = "transport_timeout" then .transportTimeout else
+  .unknown
+
+/-- Failure-visible snapshot used for cross-target conformance theorems. -/
+structure FailureVisibleSnapshot where
+  errorCodes : List ErrorCode
+  faultClasses : List String
+  certainties : List ErrorCertainty
+  actions : List ErrorActionTag
+  terminalOutcome : Bool
+  safetyVerdict : Bool
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Build failure-visible snapshots from executable VM states. -/
+def vmFailureVisibleSnapshot
+    {ι γ π ε ν : Type u}
+    [VMDomain ι γ π ε ν]
+    (st : VMState ι γ π ε ν) : FailureVisibleSnapshot :=
+  let terminalOutcome :=
+    st.coroutines.toList.all (fun c =>
+      match c.status with
+      | .done => true
+      | .faulted _ => true
+      | _ => false)
+  let safetyVerdict :=
+    !(st.structuredErrorEvents.any (fun ev => ev.action = .abort))
+  { errorCodes := st.structuredErrorEvents.map (fun ev => errorCodeOfFaultClassTag ev.faultClass)
+  , faultClasses := st.structuredErrorEvents.map (fun ev => ev.faultClass)
+  , certainties := st.structuredErrorEvents.map (fun ev => ev.certainty)
+  , actions := st.structuredErrorEvents.map (fun ev => ev.action)
+  , terminalOutcome := terminalOutcome
+  , safetyVerdict := safetyVerdict
+  }
+
+/-- Failure-visible projection used by cross-target conformance theorems. -/
+abbrev FailureVisibleProjection (State : Type u) := State → FailureVisibleSnapshot
+
+/-- Failure-visible state equivalence. -/
+def EqFailVisible {State : Type u}
+    (project : FailureVisibleProjection State)
+    (s₁ s₂ : State) : Prop :=
+  project s₁ = project s₂
+
+/-- Failure-visible run equivalence. -/
+def EqFailVisibleRun {State : Type u}
+    (project : FailureVisibleProjection State)
+    (r₁ r₂ : Run State) : Prop :=
+  ∀ t, EqFailVisible project (r₁ t) (r₂ t)
+
+/-- Cross-target failure-envelope conformance theorem form (single/multi/sharded). -/
+def CrossTargetFailureConformance {State : Type u}
+    (project : FailureVisibleProjection State)
+    (SingleRun MultiRun ShardedRun : Run State → Prop) : Prop :=
+  ∀ single multi sharded,
+    SingleRun single → MultiRun multi → ShardedRun sharded →
+      EqFailVisibleRun project single multi ∧
+      EqFailVisibleRun project single sharded ∧
+      EqFailVisibleRun project multi sharded
+
 /-- Abstract state transformer used by recovery/action theorems. -/
 abbrev RecoveryStep (State : Type u) := State → RecoveryAction → State
 
@@ -1248,6 +1594,38 @@ def CheckpointRestartRefinement {State : Type u}
     (checkpoint restart : State → State) : Prop :=
   ∀ st, Refines (restart (checkpoint st)) st
 
+/-- Structured error projection used by restart/error-adequacy theorems. -/
+abbrev StructuredErrorProjection (State : Type u) := State → List StructuredErrorEvent
+
+/-- Structured error adequacy after restart/checkpoint replay. -/
+def StructuredErrorAdequacyAfterRestart {State : Type u}
+    (structuredErrors : StructuredErrorProjection State)
+    (checkpoint restart : State → State) : Prop :=
+  ∀ st, structuredErrors (restart (checkpoint st)) = structuredErrors st
+
+/-- Combined theorem form: restart refinement plus structured error adequacy. -/
+def RestartRefinementStructuredErrorAdequacy {State : Type u}
+    (Refines : State → State → Prop)
+    (checkpoint restart : State → State)
+    (structuredErrors : StructuredErrorProjection State) : Prop :=
+  CheckpointRestartRefinement Refines checkpoint restart ∧
+  StructuredErrorAdequacyAfterRestart structuredErrors checkpoint restart
+
+/-- Identity restart/checkpoint trivially satisfies restart+structured-error adequacy. -/
+theorem restartStructuredErrorAdequacy_identity
+    {State : Type u}
+    (structuredErrors : StructuredErrorProjection State) :
+    RestartRefinementStructuredErrorAdequacy
+      (fun s₁ s₂ => s₁ = s₂)
+      (fun s => s)
+      (fun s => s)
+      structuredErrors := by
+  refine ⟨?_, ?_⟩
+  · intro st
+    rfl
+  · intro st
+    rfl
+
 /-- Failure-envelope soundness extension over local envelopes. -/
 def FailureEnvelopeSoundnessExtension {State : Type u} {Obs : Type v}
     (E : LocalEnvelope State Obs)
@@ -1277,24 +1655,43 @@ structure FailureEnvelopePremises (State : Type u) (Obs : Type v) where
   localEnvelope : LocalEnvelope State Obs
   Safe : State → Prop
   recoveryStep : RecoveryStep State
+  failureVisible : FailureVisibleProjection State
+  singleThreadRun : Run State → Prop
+  multiThreadRun : Run State → Prop
+  shardedRun : Run State → Prop
   replayPre : ReplayPreconditions State
   replay : State → Nat → State
   Refines : State → State → Prop
   checkpoint : State → State
   restart : State → State
+  structuredErrors : StructuredErrorProjection State
   RefRun : Run State → Prop
   ImplRun : Run State → Prop
   injectFailure : Run State → Run State
+  crossTargetConformanceWitness :
+    CrossTargetFailureConformance
+      failureVisible singleThreadRun multiThreadRun shardedRun
   recoveryActionSafetyWitness :
     RecoveryActionSafety Safe recoveryStep
   noUnsafeReplayWitness :
     NoUnsafeReplay Safe replayPre replay
   checkpointRestartRefinementWitness :
     CheckpointRestartRefinement Refines checkpoint restart
+  restartStructuredErrorAdequacyWitness :
+    RestartRefinementStructuredErrorAdequacy
+      Refines checkpoint restart structuredErrors
   failureEnvelopeSoundnessWitness :
     FailureEnvelopeSoundnessExtension localEnvelope RefRun ImplRun injectFailure
   failureEnvelopeMaximalityWitness :
     FailureEnvelopeMaximalityExtension localEnvelope RefRun ImplRun injectFailure
+
+/-- Extract cross-target failure-envelope conformance theorem from failure premises. -/
+theorem crossTargetFailureConformance_of_failurePremises
+    {State : Type u} {Obs : Type v}
+    (p : FailureEnvelopePremises State Obs) :
+    CrossTargetFailureConformance
+      p.failureVisible p.singleThreadRun p.multiThreadRun p.shardedRun :=
+  p.crossTargetConformanceWitness
 
 /-- Extract abstract recovery-action safety theorem from failure premises. -/
 theorem recoveryActionSafety_of_failurePremises
@@ -1317,6 +1714,14 @@ theorem checkpointRestartRefinement_of_failurePremises
     CheckpointRestartRefinement p.Refines p.checkpoint p.restart :=
   p.checkpointRestartRefinementWitness
 
+/-- Extract restart-refinement + structured-error adequacy from failure premises. -/
+theorem restartStructuredErrorAdequacy_of_failurePremises
+    {State : Type u} {Obs : Type v}
+    (p : FailureEnvelopePremises State Obs) :
+    RestartRefinementStructuredErrorAdequacy
+      p.Refines p.checkpoint p.restart p.structuredErrors :=
+  p.restartStructuredErrorAdequacyWitness
+
 /-- Extract failure-envelope soundness extension theorem from failure premises. -/
 theorem failureEnvelopeSoundness_of_failurePremises
     {State : Type u} {Obs : Type v}
@@ -1338,6 +1743,13 @@ structure FailureEnvelopeProtocol where
   State : Type u
   Obs : Type v
   premises : FailureEnvelopePremises State Obs
+  crossTargetConformance :
+    CrossTargetFailureConformance
+      premises.failureVisible
+      premises.singleThreadRun
+      premises.multiThreadRun
+      premises.shardedRun :=
+      crossTargetFailureConformance_of_failurePremises premises
   recoveryActionSafety :
     RecoveryActionSafety premises.Safe premises.recoveryStep :=
       recoveryActionSafety_of_failurePremises premises
@@ -1348,6 +1760,10 @@ structure FailureEnvelopeProtocol where
     CheckpointRestartRefinement
       premises.Refines premises.checkpoint premises.restart :=
       checkpointRestartRefinement_of_failurePremises premises
+  restartStructuredErrorAdequacy :
+    RestartRefinementStructuredErrorAdequacy
+      premises.Refines premises.checkpoint premises.restart premises.structuredErrors :=
+      restartStructuredErrorAdequacy_of_failurePremises premises
   failureEnvelopeSoundness :
     FailureEnvelopeSoundnessExtension
       premises.localEnvelope premises.RefRun premises.ImplRun premises.injectFailure :=

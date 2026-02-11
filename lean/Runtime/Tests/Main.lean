@@ -356,3 +356,21 @@ def main : IO Unit := do
   let rejectReasons := Runtime.Adequacy.admissionRejectionReasons rejectedReq dProgLocal
   expect (decide (rejectReasons ≠ []))
     "admission regression: rejected request must produce diagnostics"
+
+  -- Test 17: failure-visible cross-target conformance snapshots agree.
+  let localFailureViewSingle := Runtime.Adequacy.vmFailureVisibleSnapshot localSingle
+  let localFailureViewMulti := Runtime.Adequacy.vmFailureVisibleSnapshot localMulti
+  expect (decide (localFailureViewSingle = localFailureViewMulti))
+    "cross-target failure-visible conformance mismatch (local single vs multi)"
+
+  let shardedFailureViewRef := Runtime.Adequacy.vmFailureVisibleSnapshot refFaultRun
+  let shardedFailureViewExec := Runtime.Adequacy.vmFailureVisibleSnapshot shardedFaultRun
+  expect (decide (shardedFailureViewRef = shardedFailureViewExec))
+    "cross-target failure-visible conformance mismatch (reference vs sharded)"
+
+  -- Test 18: restart/refinement preserves structured error adequacy (identity checkpoint/restart baseline).
+  let checkpointId := fun (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
+  let restartId := fun (st : VMState UnitIdentity UnitGuard UnitPersist UnitEffect UnitVerify) => st
+  let restarted := restartId (checkpointId refFaultRun)
+  expect (decide (restarted.structuredErrorEvents = refFaultRun.structuredErrorEvents))
+    "restart structured-error adequacy mismatch under identity refinement"

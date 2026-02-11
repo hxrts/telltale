@@ -253,6 +253,37 @@ theorem ConsumeHO_conservative (from_ receiver : Role) (L : LocalType)
       | none => simp [hRest] at ih ⊢; exact ih
       | some p => simp [hRest] at ih ⊢; exact ih
 
+/-- Converse (existence form): for channel-free traces, any successful FO consume
+    lifts to an HO consume run with the same residual local type. -/
+theorem ConsumeHO_conservative_converse_exists
+    (from_ receiver : Role) (L : LocalType) (ts : List ValType)
+    (hNoChans : hasNoChannels ts = true) {L' : LocalType}
+    (hConsume : Consume from_ L ts = some L') :
+    ∃ delta, ConsumeHO from_ receiver L ts = some (L', delta) := by
+  induction ts generalizing L L' with
+  | nil =>
+    simp [Consume] at hConsume
+    cases hConsume
+    refine ⟨GraphDelta.empty, ?_⟩
+    simp [ConsumeHO]
+  | cons t ts ih =>
+    simp [Consume] at hConsume
+    cases hOne : consumeOne from_ t L with
+    | none =>
+      simp [hOne] at hConsume
+    | some L1 =>
+      simp [hOne] at hConsume
+      have hNotChan : ∀ sid r, t ≠ ValType.chan sid r :=
+        hasNoChannels_no_chan (t :: ts) hNoChans t List.mem_cons_self
+      have hTsNoChans : hasNoChannels ts = true := by
+        cases t <;> simp [hasNoChannels] at hNoChans ⊢ <;> exact hNoChans
+      have hOneHO : consumeOneHO from_ receiver t L = some ⟨L1, GraphDelta.empty⟩ := by
+        rw [consumeOneHO_eq_consumeOne_non_channel from_ receiver t L hNotChan, hOne]
+        rfl
+      rcases ih L1 hTsNoChans hConsume with ⟨deltaTail, hTail⟩
+      refine ⟨GraphDelta.empty.compose deltaTail, ?_⟩
+      simp [ConsumeHO, hOneHO, hTail, GraphDelta.compose]
+
 /-! ## Empty Delta Property -/
 
 /-- Helper: consumeOneHO produces empty delta for non-channel types. -/
@@ -303,6 +334,20 @@ theorem ConsumeHO_no_channels_empty_delta (from_ receiver : Role) (L : LocalType
         have hDelta2 := ih res.residual hTsNoChans p.2 hRest
         simp [GraphDelta.isEmpty, GraphDelta.compose, hDelta1, GraphDelta.empty] at hDelta2 ⊢
         exact hDelta2
+
+/-- Converse (exactness form): for channel-free traces, FO success implies an HO run
+    with identical residual local type and an empty graph delta. -/
+theorem ConsumeHO_conservative_converse
+    (from_ receiver : Role) (L : LocalType) (ts : List ValType)
+    (hNoChans : hasNoChannels ts = true) {L' : LocalType}
+    (hConsume : Consume from_ L ts = some L') :
+    ∃ delta,
+      ConsumeHO from_ receiver L ts = some (L', delta) ∧
+      delta.isEmpty = true := by
+  rcases ConsumeHO_conservative_converse_exists from_ receiver L ts hNoChans hConsume with
+    ⟨delta, hHO⟩
+  refine ⟨delta, hHO, ?_⟩
+  exact ConsumeHO_no_channels_empty_delta from_ receiver L ts hNoChans L' delta hHO
 
 /-! ## Realizability Preservation -/
 

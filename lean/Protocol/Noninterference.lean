@@ -529,6 +529,59 @@ theorem blind_typed_step_preserves_CEquiv {n : SessionId}
     (blind_step_preserves_CEquiv (C:=C) (C':=C') hStep
       hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs)
 
+/-! ## Exactness Wrappers (Blindness ↔ Observational Invariance) -/
+
+/-- Forward observational-invariance form used in exactness packaging.
+    This is the existing theorem shape, factored as a named proposition. -/
+def BlindObservationalInvarianceSingle (s : SessionId) (r : Role) : Prop :=
+  ∀ {C C' : Config},
+    Step C C' →
+    (∀ ep target T L, lookupG C.G ep = some (.send target T L) →
+      ep.sid = s → BlindToSend r ep.role target) →
+    (∀ ep target branches, lookupG C.G ep = some (.select target branches) →
+      ep.sid = s → BlindToSend r ep.role target) →
+    (∀ ep source T L, lookupG C.G ep = some (.recv source T L) →
+      ep.sid = s → BlindToRecv r source ep.role) →
+    (∀ ep source branches, lookupG C.G ep = some (.branch source branches) →
+      ep.sid = s → BlindToRecv r source ep.role) →
+    (∀ sender receiver, lookupBuf C.bufs ⟨C.nextSid, sender, receiver⟩ = []) →
+    C ≈[s, r] C'
+
+/-- Forward direction is exactly `blind_step_preserves_CEquiv`. -/
+theorem blind_observational_invariance_single
+    {s : SessionId} {r : Role} :
+    BlindObservationalInvarianceSingle s r := by
+  intro C C' hStep hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
+  exact blind_step_preserves_CEquiv hStep hBlindSend hBlindSelect hBlindRecv hBlindBranch hFreshBufs
+
+/-- Strict counterexample witness interface for a non-blind step.
+    This packages the witness expected by reverse-direction exactness arguments. -/
+structure NonBlindStepCounterexample (C C' : Config) (s : SessionId) (r : Role) : Type where
+  step : Step C C'
+  sender : Role
+  receiver : Role
+  notBlind : ¬ BlindTo r sender receiver
+  breaksObservation : ¬ (C ≈[s, r] C')
+
+/-- Reverse-direction witness oracle: every observational failure is explained
+    by a non-blind step witness. -/
+def NonBlindCounterexampleOracle (s : SessionId) (r : Role) : Prop :=
+  ∀ {C C' : Config}, Step C C' → ¬ (C ≈[s, r] C') →
+    Nonempty (NonBlindStepCounterexample C C' s r)
+
+/-- Exactness package for single-step blindness reasoning:
+    forward invariance + strict non-blind counterexample oracle. -/
+def BlindnessExactnessSingle (s : SessionId) (r : Role) : Prop :=
+  BlindObservationalInvarianceSingle s r ∧ NonBlindCounterexampleOracle s r
+
+/-- Build single-step exactness from the existing forward theorem plus a supplied
+    strict counterexample oracle for the reverse direction. -/
+theorem blindness_exactness_single_of_counterexample_oracle
+    {s : SessionId} {r : Role}
+    (hOracle : NonBlindCounterexampleOracle s r) :
+    BlindnessExactnessSingle s r := by
+  exact ⟨blind_observational_invariance_single, hOracle⟩
+
 end
 
 /-!
