@@ -23,6 +23,7 @@ import SessionCoTypes.Coinductive.EQ2CProps
 import SessionCoTypes.Coinductive.EQ2CEnv
 import SessionCoTypes.Coinductive.FiniteSystem
 import SessionCoTypes.Coinductive.RegularSystemBisim
+import SessionCoTypes.Coinductive.RationalFragment
 import SessionCoTypes.Coinductive.WellFormed
 import SessionCoTypes.Coinductive.RegularityLemmas
 import SessionCoTypes.Coinductive.Congruence

@@ -24,12 +24,12 @@ open Classical
 /-! ## State Indexing -/
 
 /-- List of reachable states from a regular coinductive type. -/
-def ReachableList (t : LocalTypeC) (h : Regular t) : List LocalTypeC :=
+noncomputable def ReachableList (t : LocalTypeC) (h : Regular t) : List LocalTypeC :=
   (Set.Finite.toFinset h).toList
 
 /-- Index a reachable state in the list. Defaults to 0 if not found (which
     can't happen for truly reachable states). -/
-def StateIndex (t : LocalTypeC) (h : Regular t) (s : LocalTypeC) :
+noncomputable def StateIndex (t : LocalTypeC) (h : Regular t) (s : LocalTypeC) :
     Fin (ReachableList t h).length :=
   if h_in : s ∈ ReachableList t h then
     let p : Fin (ReachableList t h).length → Prop := fun i => (ReachableList t h).get i = s
@@ -55,7 +55,7 @@ def SystemToCoind {n : Nat} (sys : FiniteSystem n) (start : Fin n) : LocalTypeC 
 
 /-- Extract a finite coalgebra from a regular coinductive type.
     Each reachable state maps to its destructor with children indexed. -/
-def RegularSystem (t : LocalTypeC) (h : Regular t) :
+noncomputable def RegularSystem (t : LocalTypeC) (h : Regular t) :
     FiniteSystem (ReachableList t h).length :=
   fun i =>
     match PFunctor.M.dest ((ReachableList t h).get i) with
