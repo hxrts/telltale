@@ -52,6 +52,9 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
       exact hFind_renamed.2.symm
     have hG' := hSpec.type_updated branches L' hSender hFind
     rw [hG', renameGEnv_updateG, hL'_eq]
+
+  /-! ## Select Renaming Equivariance: Trace and Frame Clauses -/
+
   trace_extended := by
     have hD' := hSpec.trace_extended
     simp only at hD'
@@ -82,6 +85,8 @@ theorem SelectSpec_respects_renaming (ρ : SessionRenaming)
       ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [ValType.string]).map (renameValType ρ))
       hne.symm
 
+/-! ## Select ConfigEquiv Preservation -/
+
 /-- Select respects ConfigEquiv. -/
 theorem SelectSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
@@ -91,11 +96,17 @@ theorem SelectSpec_respects_ConfigEquiv
     (hSpec₂ : SelectSpec G₂ G₂' D₂ D₂'
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r chosen) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+
+  /-! ## Select ConfigEquiv Preservation: Shared Setup -/
+
   -- Use the same SessionIso that witnesses the input equivalence.
   let σ := hEquiv.choose
   let ρ := σ.toRenaming
   obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
   refine ⟨σ, ?_, ?_⟩
+
+  /-! ## Select ConfigEquiv Preservation: GEnv Component -/
+
   -- G condition
   · intro e'
     by_cases he : e' = ep
@@ -132,6 +143,9 @@ theorem SelectSpec_respects_ConfigEquiv
         intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
+
+  /-! ## Select ConfigEquiv Preservation: DEnv Component -/
+
   -- D condition
   · intro e'
     let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
@@ -154,6 +168,8 @@ theorem SelectSpec_respects_ConfigEquiv
       simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
+
+/-! ## Branch Renaming Equivariance -/
 
 /-- Branch is equivariant under session renaming. -/
 theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
@@ -192,6 +208,9 @@ theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
       exact hFind_renamed.2.symm
     have hG' := hSpec.type_updated branches L' hRecv hFind
     rw [hG', renameGEnv_updateG, hL'_eq]
+
+  /-! ## Branch Renaming Equivariance: Trace and Frame Clauses -/
+
   trace_consumed := by
     obtain ⟨rest, hBuffer, hD'⟩ := hSpec.trace_consumed
     use rest.map (renameValType ρ)
@@ -220,6 +239,8 @@ theorem BranchSpec_respects_renaming (ρ : SessionRenaming)
       { sid := ρ.f ep.sid, sender := r, receiver := ep.role } e
       (rest.map (renameValType ρ)) hne.symm
 
+/-! ## Branch ConfigEquiv Preservation -/
+
 /-- Branch respects ConfigEquiv. -/
 theorem BranchSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
@@ -229,11 +250,17 @@ theorem BranchSpec_respects_ConfigEquiv
     (hSpec₂ : BranchSpec G₂ G₂' D₂ D₂'
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r received) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+
+  /-! ## Branch ConfigEquiv Preservation: Shared Setup -/
+
   -- Use the same SessionIso that witnesses the input equivalence.
   let σ := hEquiv.choose
   let ρ := σ.toRenaming
   obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
   refine ⟨σ, ?_, ?_⟩
+
+  /-! ## Branch ConfigEquiv Preservation: GEnv Component -/
+
   -- G condition
   · intro e'
     by_cases he : e' = ep
@@ -270,6 +297,9 @@ theorem BranchSpec_respects_ConfigEquiv
         intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
+
+  /-! ## Branch ConfigEquiv Preservation: DEnv Component -/
+
   -- D condition
   · intro e'
     let recvEdge : Edge := { sid := ep.sid, sender := r, receiver := ep.role }
