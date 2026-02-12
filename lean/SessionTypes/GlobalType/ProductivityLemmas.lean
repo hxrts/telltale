@@ -56,6 +56,8 @@ theorem isProductive_swap (g : GlobalType) (x y : String) (unguarded : List Stri
 -- then body.isProductive (bound ++ extra) = true for any extra.
 -- This is because extra vars don't appear in body (due to allVarsBound).
 
+/-! ## Productivity Extension by Unguarded Supersets -/
+
 mutual
   /-- If a type has all its vars bound and is productive, adding extra elements to
       unguarded preserves productivity (since those vars don't appear in the type). -/
@@ -125,6 +127,8 @@ theorem mu_isProductive_forall (t : String) (body : GlobalType)
 -- var varName in g must be after a comm (which resets unguarded to []). So the replacement
 -- only needs to be productive with [].
 
+/-! ## Substitution Preserves Productivity -/
+
 mutual
   private theorem isProductive_substitute_var (t varName : String) (repl : GlobalType)
       (unguarded : List String)
@@ -155,6 +159,8 @@ mutual
     have heq' : t = varName := by simpa [beq_iff_eq] using heq
     subst heq'
     exact isProductive_cons_dedup inner t unguarded hg
+
+  /-! ## Substitution Preserves Productivity: Main Recursive Theorem -/
 
   /-- isProductive is preserved under substitution.
 
@@ -190,6 +196,8 @@ mutual
         -- delegate resets unguarded to [], so hg : cont.isProductive [] = true
         exact isProductive_substitute_any cont varName repl [] hg hrepl
 
+  /-! ## Substitution Preserves Productivity: Branch Form -/
+
   -- For branches, if replacement is always productive, substitution preserves productivity
   -- regardless of whether varName is in unguarded
   theorem isProductiveBranches_substitute_any (branches : List (Label × GlobalType))
@@ -203,6 +211,8 @@ mutual
         simp only [substituteBranches, isProductiveBranches, Bool.and_eq_true] at hg ⊢
         exact ⟨isProductive_substitute_any cont varName repl unguarded hg.1 hrepl,
                isProductiveBranches_substitute_any rest varName repl unguarded hg.2 hrepl⟩
+
+  /-! ## Substitution Preserves Productivity: General Form -/
 
   -- If replacement is always productive, substitution preserves productivity
   -- This is a more general version that doesn't require varName in unguarded
@@ -233,6 +243,8 @@ mutual
         exact isProductive_substitute_any cont varName repl [] hg hrepl
 end
 
+/-! ## μ-Unfold Well-Formedness Components -/
+
 /-- Mu-unfolding preserves well-formedness components that don't depend on variable binding.
 
 This is a simplified version that shows noSelfComm and allCommsNonEmpty are preserved.
@@ -250,6 +262,8 @@ theorem wellFormed_mu_unfold_partial (t : String) (body : GlobalType)
   simp only [GlobalType.allCommsNonEmpty, GlobalType.noSelfComm] at hne hns
   exact ⟨noSelfComm_substitute body t (GlobalType.mu t body) hns hns,
          allCommsNonEmpty_substitute body t (GlobalType.mu t body) hne hne⟩
+
+/-! ## μ-Unfold AllVarsBound Preservation -/
 
 /-- Mu-unfolding preserves allVarsBound for closed types.
 
@@ -275,6 +289,8 @@ theorem allVarsBound_mu_unfold (t : String) (body : GlobalType)
     exact hbound
   exact allVarsBound_substitute body t (GlobalType.mu t body) [] hbound hrepl
 
+/-! ## μ-Unfold Productivity Preservation -/
+
 /-- Mu-unfolding preserves isProductive.
 
 **Key insight**: If `mu t body` is productive AND has all vars bound,
@@ -295,6 +311,8 @@ theorem isProductive_mu_unfold (t : String) (body : GlobalType)
   have hrepl : ∀ ug, (GlobalType.mu t body).isProductive ug = true :=
     mu_isProductive_forall t body hbound hprod
   exact isProductive_substitute body t (GlobalType.mu t body) [] hprod hrepl
+
+/-! ## μ-Unfold Full Well-Formedness Preservation -/
 
 /-- Mu-unfolding preserves full well-formedness.
 
