@@ -51,6 +51,8 @@ private theorem Consume_branch_nonempty_isSome_false
   rcases (Option.isSome_iff_exists).1 hConsume with ⟨L', hEq⟩
   exact Consume_branch_nonempty_false (from_:=from_) (r:=r) (bs:=bs) (t:=t) (ts:=ts) (L':=L') hEq
 
+/-! ## Main Recv Preservation Theorem -/
+
 /-- HeadCoherent is preserved when receiving.
     Recv action removes trace HEAD, and receiver type advances from recv to continuation.
     The key insight is that Coherent implies the continuation can consume the remaining trace,
@@ -71,11 +73,12 @@ theorem HeadCoherent_recv_preserved
   have hActiveOrig : ActiveEdge G e :=
     ActiveEdge_updateG_inv (G:=G) (e:=e) (ep:=receiverEp) (L:=L) hActive (by simp [hG])
   -- Case split: is e the recv edge or not?
-  by_cases heq : e = recvEdge
-  · -- Case 1: e = recvEdge - type and trace both change
-    subst heq
-    -- Self-recv case: sender = receiver, handled by subst and lookup lemmas.
-    by_cases hSenderIsRecv : senderRole = receiverEp.role
+	  by_cases heq : e = recvEdge
+	  · -- Case 1: e = recvEdge - type and trace both change
+	    subst heq
+	    /-! ## Updated-Edge Subcase: Self-Recv -/
+	    -- Self-recv case: sender = receiver, handled by subst and lookup lemmas.
+	    by_cases hSenderIsRecv : senderRole = receiverEp.role
     · -- Self-recv: senderRole = receiverEp.role, sender/receiver endpoints coincide.
       subst hSenderIsRecv
       -- Receiver lookup after update gives the continuation L.
@@ -91,12 +94,13 @@ theorem HeadCoherent_recv_preserved
       | cons t ts =>
           -- Non-empty trace: head equals Trecv, tail is ts.
           rw [hTraceVal] at hTrace
-          have hHeadEq : t = Trecv := by
-            -- Head? on a cons returns the head value.
-            simpa [List.head?] using hTrace
-          simp [List.tail_cons]
-          -- Use coherence on the self-edge to get Consume success on the full trace.
-          have hActiveRecv : ActiveEdge G recvEdge := by
+	          have hHeadEq : t = Trecv := by
+	            -- Head? on a cons returns the head value.
+	            simpa [List.head?] using hTrace
+	          simp [List.tail_cons]
+	          /-! ## Updated-Edge Self-Recv: Coherence Transport -/
+	          -- Use coherence on the self-edge to get Consume success on the full trace.
+	          have hActiveRecv : ActiveEdge G recvEdge := by
             have hSender : lookupG G { sid := recvEdge.sid, role := recvEdge.sender } =
                 some (.recv receiverEp.role Trecv L) := by
               simpa [recvEdge] using hG
@@ -147,10 +151,11 @@ theorem HeadCoherent_recv_preserved
                   have hConsume' :
                       (Consume receiverEp.role (.branch source bs) (t' :: ts')).isSome := by
                     simpa [hL] using hConsumeTail
-                  exact (Consume_branch_nonempty_isSome_false
-                    (from_:=receiverEp.role) (r:=source) (bs:=bs) (t:=t') (ts:=ts') hConsume').elim
-    · -- Normal case: sender ≠ receiver
-      have hSenderNeq : receiverEp ≠ { sid := receiverEp.sid, role := senderRole } := by
+	                  exact (Consume_branch_nonempty_isSome_false
+	                    (from_:=receiverEp.role) (r:=source) (bs:=bs) (t:=t') (ts:=ts') hConsume').elim
+	    /-! ## Updated-Edge Subcase: Distinct Sender/Receiver -/
+	    · -- Normal case: sender ≠ receiver
+	      have hSenderNeq : receiverEp ≠ { sid := receiverEp.sid, role := senderRole } := by
         intro h; exact hSenderIsRecv (congrArg Endpoint.role h).symm
       -- Receiver lookup gives L
       have hRecvLookup : lookupG (updateG G receiverEp L) { sid := receiverEp.sid, role := receiverEp.role } = some L := by
@@ -163,12 +168,13 @@ theorem HeadCoherent_recv_preserved
         simp only [List.head?] at hTrace
         exact Option.noConfusion hTrace
       | cons t ts =>
-        rw [hTraceVal] at hTrace
-        simp only [List.head?, Option.some.injEq] at hTrace
-        have hHeadEq : t = Trecv := hTrace
-        simp only [List.tail_cons]
-        -- L is continuation, check structure
-        cases hL : L with
+	        rw [hTraceVal] at hTrace
+	        simp only [List.head?, Option.some.injEq] at hTrace
+	        have hHeadEq : t = Trecv := hTrace
+	        simp only [List.tail_cons]
+	        /-! ## Updated-Edge Distinct Roles: Continuation Analysis -/
+	        -- L is continuation, check structure
+	        cases hL : L with
         | end_ => trivial
         | send _ _ _ => trivial
         | select _ _ => trivial
@@ -214,11 +220,13 @@ theorem HeadCoherent_recv_preserved
             have hConsume' :
                 (Consume senderRole (.branch source bs) (t' :: ts')).isSome := by
               simpa [hL] using hConsumeTail
-            exact (Consume_branch_nonempty_isSome_false
-              (from_:=senderRole) (r:=source) (bs:=bs) (t:=t') (ts:=ts') hConsume').elim
-  · -- Case 2: e ≠ recvEdge
-    by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = receiverEp
-    · -- Receiver endpoint is receiverEp, type changed from .recv to L
+	            exact (Consume_branch_nonempty_isSome_false
+	              (from_:=senderRole) (r:=source) (bs:=bs) (t:=t') (ts:=ts') hConsume').elim
+	  /-! ## Unrelated-Edge Cases -/
+	  · -- Case 2: e ≠ recvEdge
+	    by_cases hRecvMatch : { sid := e.sid, role := e.receiver : Endpoint } = receiverEp
+	    /-! ## Unrelated-Edge Subcase: Receiver Endpoint Updated -/
+	    · -- Receiver endpoint is receiverEp, type changed from .recv to L
       subst hRecvMatch
       rw [lookupG_update_eq]
       have hNeSymm : recvEdge ≠ e := Ne.symm heq
@@ -274,11 +282,12 @@ theorem HeadCoherent_recv_preserved
                   simp only [hSidEq, hSenderEq, hRecvEq]
               _ = recvEdge := by rfl
           exact hEdgeEq
-        have hTraceEmpty := trace_empty_when_recv_other_sender hEdgeCoh hRecvType' hSenderNe
-        rw [hTraceEmpty]
-        trivial
-    · -- Receiver endpoint unchanged
-      have hRecvNoMatch : receiverEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
+	        have hTraceEmpty := trace_empty_when_recv_other_sender hEdgeCoh hRecvType' hSenderNe
+	        rw [hTraceEmpty]
+	        trivial
+	    /-! ## Unrelated-Edge Subcase: Receiver Unchanged -/
+	    · -- Receiver endpoint unchanged
+	      have hRecvNoMatch : receiverEp ≠ { sid := e.sid, role := e.receiver } := fun h => hRecvMatch h.symm
       rw [lookupG_update_neq _ _ _ _ hRecvNoMatch]
       have hNeSymm : recvEdge ≠ e := Ne.symm heq
       rw [lookupD_update_neq _ _ _ _ hNeSymm]
