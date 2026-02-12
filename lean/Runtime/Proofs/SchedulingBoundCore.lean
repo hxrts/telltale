@@ -141,6 +141,8 @@ theorem kfair_shift
     rw [this]
     exact hj₃
 
+/-! ## Execution Window and Monotonicity Lemmas -/
+
 /-- **Lemma**: If no enabled role is scheduled during [start, start + len),
     then the config doesn't change. -/
 theorem noop_steps_preserve
@@ -173,6 +175,8 @@ theorem measure_decreasing_mono
   rw [Nat.add_sub_cancel' h] at hsplit
   rw [hsplit]
   exact measure_nonincreasing sys _ _ _
+
+/-! ## Productive-Step Existence -/
 
 /-- In a k-window starting at a non-terminal config, there exists a productive step. -/
 theorem exists_productive_step
@@ -213,6 +217,8 @@ theorem exists_productive_step
     constructor
     · omega
     · simpa using ht₃
+
+/-! ## Block Progress -/
 
 /-- Measure decreases with a productive step. -/
 lemma measure_decreases_with_productive_step
@@ -267,6 +273,8 @@ theorem block_progress
     _ < sys.progressMeasure (execute sys c sched t) := h_decrease
     _ ≤ sys.progressMeasure (execute sys c sched block_start) := h_mono2
 
+/-! ## Terminal Persistence -/
+
 /-- **Lemma**: Once the system reaches a terminal config, it stays terminal. -/
 theorem terminal_persists
     (sys : ProgressSystem Config) (c : Config) (sched : Nat → Nat)
@@ -286,6 +294,74 @@ theorem terminal_persists
   have ht_eq : t = t₀ + (t - t₀) := by omega
   rw [ht_eq]
   exact h_aux (t - t₀)
+
+/-! ## K-Fair Termination Bounds -/
+
+/-! ### Base Case Helper -/
+
+/-- Base case helper: measure `0` implies terminality. -/
+private lemma kfair_measure_zero_terminal
+    (sys : ProgressSystem Config) (c : Config)
+    (hpm : sys.progressMeasure c = 0) :
+    sys.isTerminal c = true := by
+  by_cases hnt : sys.isTerminal c = false
+  · have hpos := sys.nonterminal_pos c hnt
+    rw [hpm] at hpos
+    omega
+  · cases htc : sys.isTerminal c with
+    | false => exact False.elim (hnt htc)
+    | true => simpa using htc
+
+/-! ### Successor Case Helper -/
+
+/-- Successor case helper for k-fair termination strong induction. -/
+private lemma kfair_termination_succ_step
+    (sys : ProgressSystem Config) (k : Nat) (hk : k ≥ sys.numRoles)
+    (m : Nat) (c' : Config) (sched' : Nat → Nat)
+    (hpm : sys.progressMeasure c' = Nat.succ m)
+    (hfair' : KFair sys sched' k)
+    (hnt0 : sys.isTerminal c' = false)
+    (ih :
+      ∀ m1, m1 < Nat.succ m → ∀ c1 : Config, ∀ sched1 : Nat → Nat,
+        sys.progressMeasure c1 = m1 →
+        KFair sys sched1 k →
+        sys.isTerminal (execute sys c1 sched1 (k * m1)) = true) :
+    sys.isTerminal (execute sys c' sched' (k * Nat.succ m)) = true := by
+  have hblock :
+      sys.progressMeasure (execute sys c' sched' k) <
+        sys.progressMeasure (execute sys c' sched' 0) := by
+    simpa [execute] using
+      (block_progress sys c' sched' 0 k hk hfair' (by simpa [execute] using hnt0))
+  have hm1_lt : sys.progressMeasure (execute sys c' sched' k) < Nat.succ m := by
+    simpa [hpm, execute] using hblock
+  let c1 : Config := execute sys c' sched' k
+  let m1 : Nat := sys.progressMeasure c1
+  have hm1_lt' : m1 < Nat.succ m := by simpa [c1, m1] using hm1_lt
+  have hfair_shifted : KFair sys (fun i => sched' (k + i)) k :=
+    kfair_shift sys sched' k k hfair'
+  have hrec :
+      sys.isTerminal (execute sys c1 (fun i => sched' (k + i)) (k * m1)) = true :=
+    ih m1 hm1_lt' c1 (fun i => sched' (k + i)) rfl hfair_shifted
+  have hterm_t0 : sys.isTerminal (execute sys c' sched' (k + k * m1)) = true := by
+    have hsplit := execute_split sys c' sched' k (k * m1)
+    calc
+      sys.isTerminal (execute sys c' sched' (k + k * m1))
+          = sys.isTerminal (execute sys (execute sys c' sched' k)
+              (fun i => sched' (k + i)) (k * m1)) := by rw [hsplit]
+      _ = sys.isTerminal (execute sys c1 (fun i => sched' (k + i)) (k * m1)) := by
+            simp [c1]
+      _ = true := hrec
+  have hm1_le : m1 ≤ m := Nat.lt_succ_iff.mp hm1_lt'
+  have ht_ge : k + k * m1 ≤ k * Nat.succ m := by
+    have hmul : k * m1 ≤ k * m := Nat.mul_le_mul_left _ hm1_le
+    calc
+      k + k * m1 ≤ k + k * m := Nat.add_le_add_left hmul k
+      _ = k * Nat.succ m := by simp [Nat.mul_succ, Nat.add_comm]
+  have hstay := terminal_persists sys c' sched' (k + k * m1) hterm_t0
+    (k * Nat.succ m) ht_ge
+  simpa [Nat.mul_succ, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hstay
+
+/-! ### Main Bound Theorem -/
 
 /-- **Theorem 5 (k-fair termination bound)**: Under a k-fair schedule with
     k ≥ numRoles, the system reaches a terminal configuration within
@@ -313,59 +389,27 @@ theorem kfair_termination_bound
       intro c' sched' hpm hfair'
       cases m with
       | zero =>
-        have hterm0 : sys.isTerminal c' = true := by
-          by_cases hnt : sys.isTerminal c' = false
-          · have hpos := sys.nonterminal_pos c' hnt
-            rw [hpm] at hpos
-            omega
-          · cases htc : sys.isTerminal c' with
-            | false => exact False.elim (hnt htc)
-            | true => simp
+        have hterm0 : sys.isTerminal c' = true :=
+          kfair_measure_zero_terminal sys c' hpm
         simpa [hpm, execute] using hterm0
       | succ m' =>
         by_cases hnt0 : sys.isTerminal c' = false
-        · have hblock :
-              sys.progressMeasure (execute sys c' sched' k) <
-                sys.progressMeasure (execute sys c' sched' 0) := by
-            simpa [execute] using
-              (block_progress sys c' sched' 0 k hk hfair' (by simpa [execute] using hnt0))
-          have hm1_lt : sys.progressMeasure (execute sys c' sched' k) < Nat.succ m' := by
-            simpa [hpm, execute] using hblock
-          let c1 : Config := execute sys c' sched' k
-          let m1 : Nat := sys.progressMeasure c1
-          have hm1_lt' : m1 < Nat.succ m' := by simpa [c1, m1] using hm1_lt
-          have hfair_shifted : KFair sys (fun i => sched' (k + i)) k :=
-            kfair_shift sys sched' k k hfair'
-          have hrec :
-              sys.isTerminal (execute sys c1 (fun i => sched' (k + i)) (k * m1)) = true :=
-            ih m1 hm1_lt' c1 (fun i => sched' (k + i)) rfl hfair_shifted
-          have hterm_t0 : sys.isTerminal (execute sys c' sched' (k + k * m1)) = true := by
-            have hsplit := execute_split sys c' sched' k (k * m1)
-            calc
-              sys.isTerminal (execute sys c' sched' (k + k * m1))
-                  = sys.isTerminal (execute sys (execute sys c' sched' k)
-                      (fun i => sched' (k + i)) (k * m1)) := by rw [hsplit]
-              _ = sys.isTerminal (execute sys c1 (fun i => sched' (k + i)) (k * m1)) := by
-                    simp [c1]
-              _ = true := hrec
-          have hm1_le : m1 ≤ m' := Nat.lt_succ_iff.mp hm1_lt'
-          have ht_ge : k + k * m1 ≤ k * Nat.succ m' := by
-            have hmul : k * m1 ≤ k * m' := Nat.mul_le_mul_left _ hm1_le
-            calc
-              k + k * m1 ≤ k + k * m' := Nat.add_le_add_left hmul k
-              _ = k * Nat.succ m' := by
-                    simp [Nat.mul_succ, Nat.add_comm]
-          have hstay := terminal_persists sys c' sched' (k + k * m1) hterm_t0
-            (k * Nat.succ m') ht_ge
-          simpa [Nat.mul_succ, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hstay
+        · exact
+            kfair_termination_succ_step
+              sys k hk m' c' sched' hpm hfair' hnt0
+              (fun m1 hm1 c1 sched1 hpm1 hfair1 =>
+                ih m1 hm1 c1 sched1 hpm1 hfair1)
         · have hterm0 : sys.isTerminal c' = true := by
             cases htc : sys.isTerminal c' with
             | false => exact False.elim (hnt0 htc)
-            | true => simp
-          have hstay := terminal_persists sys c' sched' 0 (by simpa [execute] using hterm0)
+            | true => simpa using htc
+          have hstay := terminal_persists sys c' sched' 0
+            (by simpa [execute] using hterm0)
             (k * Nat.succ m') (by omega)
           simpa [Nat.mul_succ, execute] using hstay
   exact hstrong (sys.progressMeasure c) c sched rfl hfair
+
+/-! ## Round-Robin Corollary -/
 
 /-- **Corollary (Round-robin termination)**: Under round-robin scheduling,
     termination occurs within numRoles * W₀ steps. -/
