@@ -113,6 +113,8 @@ Proofs of the information-theoretic laws from `ClassicalAnalysisAPI`. Each
 proof follows the standard argument from Cover & Thomas (2006).
 -/
 
+/-! ## Shannon Entropy Nonnegativity -/
+
 /-- Shannon entropy is nonnegative for distributions.
 
 **Proof strategy**: Each term p(a)·log(p(a)) is nonpositive on [0,1] because:
@@ -149,6 +151,8 @@ theorem shannonEntropy_nonneg {α : Type*} [Fintype α]
     simpa using
       (Finset.sum_nonpos (s := (Finset.univ : Finset α)) (fun a _ => hterm a))
   linarith
+
+/-! ## KL Divergence Nonnegativity -/
 
 /-- KL divergence is nonnegative (Gibbs' inequality).
 
@@ -207,6 +211,8 @@ theorem klDivergence_nonneg {α : Type*} [Fintype α]
     linarith [hsum, hsum_pq]
   simpa [klDivergence] using this
 
+/-! ## Uniform Bound Bridge -/
+
 /-- KL to uniform equals `log |α| - H(p)`. -/
 private theorem kl_uniform_eq {α : Type*} [Fintype α] [Nonempty α]
     (p : α → ℝ) (_hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
@@ -229,6 +235,8 @@ private theorem kl_uniform_eq {α : Type*} [Fintype α] [Nonempty α]
   simp_rw [hterms]
   rw [Finset.sum_add_distrib, ← Finset.sum_mul, hp_sum, one_mul, add_comm]
 
+/-! ## Shannon Entropy Upper Bound -/
+
 /-- Shannon entropy is bounded by `log |α|`. -/
 theorem shannonEntropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
     (p : α → ℝ) (hp_nn : ∀ a, 0 ≤ p a) (hp_sum : ∑ a, p a = 1) :
@@ -245,6 +253,8 @@ theorem shannonEntropy_le_log_card {α : Type*} [Fintype α] [Nonempty α]
   rw [kl_uniform_eq p hp_nn hp_sum] at hkl
   linarith
 
+/-! ## KL Zero Baseline -/
+
 /-- KL divergence of a distribution with itself is zero. -/
 private theorem klDivergence_self_eq_zero {α : Type*} [Fintype α]
     (p : α → ℝ) (_hp_nn : ∀ a, 0 ≤ p a) :
@@ -257,6 +267,8 @@ private theorem klDivergence_self_eq_zero {α : Type*} [Fintype α]
   by_cases hpa : p a = 0
   · simp [hpa]
   · simp [hpa]
+
+/-! ## KL Pointwise Lower Bound -/
 
 /-- Pointwise KL lower bound by linear difference. -/
 private theorem kl_term_ge_diff {α : Type*} [Fintype α]
@@ -279,6 +291,8 @@ private theorem kl_term_ge_diff {α : Type*} [Fintype α]
       ring
     simp only [hpa, ↓reduceIte]
     linarith
+
+/-! ## KL Term Characterization at Zero -/
 
 /-- If KL is zero, each term matches its linear lower bound. -/
 private theorem kl_term_eq_diff_of_zero {α : Type*} [Fintype α]
@@ -304,6 +318,8 @@ private theorem kl_term_eq_diff_of_zero {α : Type*} [Fintype α]
     fun b => by linarith [kl_term_ge_diff p q hp_nn hq_nn habs b]
   have hzero := (Finset.sum_eq_zero_iff_of_nonneg (fun b _ => hnn b)).mp hdiff
   linarith [hzero a (Finset.mem_univ a)]
+
+/-! ## KL Zero Implies Pointwise Equality -/
 
 /-- Zero KL divergence implies pointwise equality. -/
 private theorem klDivergence_eq_zero_imp_eq {α : Type*} [Fintype α]
@@ -336,6 +352,8 @@ private theorem klDivergence_eq_zero_imp_eq {α : Type*} [Fintype α]
     rw [div_eq_one_iff_eq (ne_of_gt hpa_pos)] at hqp
     linarith
 
+/-! ## KL Zero Characterization -/
+
 /-- KL divergence vanishes iff the two distributions are pointwise equal. -/
 theorem klDivergence_eq_zero_iff {α : Type*} [Fintype α]
     (p q : α → ℝ)
@@ -359,6 +377,8 @@ choreographic projection: non-participant roles learn nothing about branch choic
 the joint distribution P_{LO} factors as P_L × P_O, so I(L;O) = D(P_{LO} ‖ P_L × P_O) = 0.
 -/
 
+/-! ## Erasure Summation Helper -/
+
 /-- Helper: summing a Kronecker-delta-like finite family picks the single value. -/
 private theorem sum_ite_eq_single {α : Type*} [Fintype α] [DecidableEq α]
     {β : Type*} [AddCommMonoid β] (a0 : α) (c : β) :
@@ -378,6 +398,8 @@ private theorem sum_ite_eq_single {α : Type*} [Fintype α] [DecidableEq α]
     (∑ a, if a = a0 then c else 0) = if a0 = a0 then c else 0 := hsum'
     _ = c := by simp
 
+/-! ## Erasure First Marginal -/
+
 /-- Erasure form fixes the first marginal to the original label distribution. -/
 private theorem marginalFst_of_erasure
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O]
@@ -393,6 +415,8 @@ private theorem marginalFst_of_erasure
     marginalFst joint l = ∑ o, if o = o0 then labelDist l else 0 := by
       simp [marginalFst, hJoint, eq_comm]
     _ = labelDist l := sum_ite_eq_single o0 (labelDist l)
+
+/-! ## Erasure Second Marginal -/
 
 /-- Erasure form makes the second marginal a point mass. -/
 private theorem marginalSnd_of_erasure
@@ -410,6 +434,8 @@ private theorem marginalSnd_of_erasure
   · subst ho
     simp [marginalSnd, hJoint, h_sum]
   · simp [marginalSnd, hJoint, ho]
+
+/-! ## Erasure Product Factorization -/
 
 /-- Under erasure, joint equals product of its marginals. -/
 private theorem joint_eq_prod_of_erasure
@@ -432,6 +458,8 @@ private theorem joint_eq_prod_of_erasure
   · subst ho
     simp [hJoint, hfst, hsnd]
   · simp [hJoint, hfst, hsnd, ho]
+
+/-! ## Mutual Information Blindness -/
 
 /-- Erasure implies zero mutual information in the concrete model. -/
 theorem mutualInfo_zero_of_erasure
