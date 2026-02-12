@@ -46,6 +46,8 @@ theorem total_productive_steps_bounded [SessionSemantics]
 
 /-! ## Shared Participant Decomposition -/
 
+/-! ### Session Membership Helpers -/
+
 /-- Sessions a role participates in. -/
 def roleSessions (cfg : MultiConfig) (r : Role) : List SessionId :=
   cfg.sessions.filterMap fun s => if r ∈ s.roles then some s.sid else none
@@ -53,6 +55,8 @@ def roleSessions (cfg : MultiConfig) (r : Role) : List SessionId :=
 /-- A shared participant is a role in multiple sessions. -/
 def SharedParticipant (cfg : MultiConfig) (s1 s2 : SessionId) (r : Role) : Prop :=
   s1 ∈ roleSessions cfg r ∧ s2 ∈ roleSessions cfg r ∧ s1 ≠ s2
+
+/-! ### Unique-SID Permutation Helper -/
 
 /-- Pull a session to the front of a unique-sid list, filtering the rest by sid. -/
 lemma perm_cons_filter_sid
@@ -105,6 +109,8 @@ lemma perm_cons_filter_sid
         List.Perm.swap s hd _
       exact (List.Perm.cons hd hperm_tl).trans hswap
 
+/-! ### No-Overhead Decomposition Theorem -/
+
 /-- Measure additivity: the total measure is the sum of session measures.
     Shared participants do not introduce multiplicative overhead. -/
 theorem shared_participant_no_overhead_unique
@@ -119,6 +125,9 @@ theorem shared_participant_no_overhead_unique
   -- Key insight: with unique sids, s1 and s2 are distinct elements, and the
   -- filter captures everything else. Sum is invariant under this decomposition.
   have hne : s1.sid ≠ s2.sid := hshared.2.2
+
+  /-! #### Step 1: isolate the first shared session -/
+
   -- Pull s1 to front
   have hperm1 := perm_cons_filter_sid cfg.sessions s1 hs1 hunique
   -- The filtered list still contains s2 (since s2.sid ≠ s1.sid)
@@ -137,6 +146,9 @@ theorem shared_participant_no_overhead_unique
   have hfilter_eq : (cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid) =
       cfg.sessions.filter (fun s => s.sid != s1.sid && s.sid != s2.sid) := by
     simp only [List.filter_filter, Bool.and_comm]
+
+  /-! #### Step 2: express total measure with `s1` pulled out -/
+
   -- Decompose total measure by pulling s1, then s2, to the front.
   have hsum1 :
       totalWeightedMeasure cfg =
@@ -160,6 +172,9 @@ theorem shared_participant_no_overhead_unique
             rw [List.map_cons, List.foldl_cons, Nat.zero_add]
             rw [foldl_add_shift (l := (cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure)
               (n := weightedMeasure s1)]
+
+  /-! #### Step 3: express filtered measure with `s2` pulled out -/
+
   have hsum2 :
       List.foldl (· + ·) 0 ((cfg.sessions.filter (fun t => t.sid != s1.sid)).map weightedMeasure) =
         weightedMeasure s2 +
@@ -185,6 +200,9 @@ theorem shared_participant_no_overhead_unique
             rw [foldl_add_shift
               (l := ((cfg.sessions.filter (fun t => t.sid != s1.sid)).filter (fun t => t.sid != s2.sid)).map weightedMeasure)
               (n := weightedMeasure s2)]
+
+  /-! #### Step 4: combine decompositions -/
+
   have htotal_eq :
       totalWeightedMeasure cfg =
         weightedMeasure s1 + weightedMeasure s2 +
