@@ -59,6 +59,8 @@ If provided, it discharges the frontier premise of `vm_progress`. -/
 abbrev ProgressHypothesis (store : SessionStore ν) : Prop :=
   ¬ AllSessionsComplete store → ProgressFrontier store
 
+/-! ## Liveness Bundles -/
+
 /-- Concrete fairness witness for a specific termination model. -/
 structure FairnessWitness (model : VMTerminationModel (ν := ν)) where
   k : Nat
@@ -105,6 +107,8 @@ def vmLivenessCoreHypotheses : List VMLivenessHypothesis :=
 def vmLivenessWithProgressHypotheses : List VMLivenessHypothesis :=
   vmLivenessCoreHypotheses ++ [.progressHypothesis]
 
+/-! ## Hypothesis Validation -/
+
 /-- Validate one liveness hypothesis against a concrete bundle. -/
 def validateVMLivenessHypothesis {store₀ : SessionStore ν}
     (bundle : VMLivenessBundle store₀)
@@ -149,6 +153,8 @@ def validateVMLivenessCore {store₀ : SessionStore ν}
 def validateVMLivenessWithProgress {store₀ : SessionStore ν}
     (bundle : VMLivenessBundle store₀) : VMLivenessSummary :=
   validateVMLivenessWithHypotheses bundle vmLivenessWithProgressHypotheses
+
+/-! ## Theorem Wrappers -/
 
 /-- Termination theorem instantiated from a liveness bundle. -/
 theorem vm_termination_from_bundle {store₀ : SessionStore ν}
