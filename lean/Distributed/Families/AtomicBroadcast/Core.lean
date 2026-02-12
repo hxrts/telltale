@@ -71,6 +71,8 @@ def ConsensusAtomicBroadcastBridge
     (M : Model State Message Value) : Prop :=
   ConsensusAgreement M ∧ AtomicBroadcastCarriesDecision M
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core atomic-broadcast assumption bundle. -/
 structure Assumptions
     {State : Type u} {Message : Type v} {Value : Type w}
@@ -99,6 +101,8 @@ def coreAssumptions : List Assumption :=
   , .agreementPremise
   , .orderingPremise
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -148,6 +152,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## Theorem Premises and Derived Results -/
+
 /-- Additional premises used to derive atomic-broadcast theorem forms. -/
 structure Premises
     {State : Type u} {Message : Type v} {Value : Type w}
@@ -188,5 +194,4 @@ theorem bridge_of_assumptions
 
 end AtomicBroadcast
 end Distributed
-
 
