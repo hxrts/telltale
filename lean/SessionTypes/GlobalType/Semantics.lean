@@ -61,6 +61,8 @@ mutual
         BranchesCanStep ((label, g) :: rest) act
 end
 
+/-! ## Branch-Wise and Global Step Relations -/
+
 /-- Branch-wise step for async commutation. -/
 inductive BranchesStep (stepFn : GlobalType → GlobalActionR → GlobalType → Prop) :
     List (Label × GlobalType) → GlobalActionR → List (Label × GlobalType) → Prop where
@@ -221,6 +223,8 @@ theorem mem_of_mem_eraseDups {a : String} {l : List String}
     (h : a ∈ l.eraseDups) : a ∈ l :=
   mem_of_mem_eraseDups_aux a l h
 
+/-! ## eraseDups Membership: Forward Direction -/
+
 /-- Helper for mem_eraseDups_of_mem using termination_by. -/
 private def mem_eraseDups_of_mem_aux {α : Type*} [BEq α] [LawfulBEq α]
     (a : α) (l : List α) (h : a ∈ l) : a ∈ l.eraseDups :=
@@ -253,6 +257,8 @@ theorem mem_eraseDups_of_mem {a : String} {l : List String}
     (h : a ∈ l) : a ∈ l.eraseDups :=
   mem_eraseDups_of_mem_aux a l h
 
+/-! ## eraseDups Nodup Construction -/
+
 /-- Helper for nodup_eraseDups using termination_by. -/
 private def nodup_eraseDups_aux {α : Type*} [BEq α] [LawfulBEq α] (l : List α) :
     l.eraseDups.Nodup :=
@@ -278,6 +284,8 @@ decreasing_by
 theorem nodup_eraseDups {α : Type*} [BEq α] [LawfulBEq α] (l : List α) :
     l.eraseDups.Nodup :=
   nodup_eraseDups_aux l
+
+/-! ## roles_nodup Derivation -/
 
 /-- GlobalType.roles always produces a Nodup list. -/
 def GlobalType.roles_nodup : (g : GlobalType) → g.roles.Nodup
@@ -312,6 +320,8 @@ mutual
             left
             exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
         | inr hrepl => right; exact hrepl
+
+  /-! ## Substitution Role Containment: Global Types -/
 
   /-- Substitution can only introduce roles from the replacement type. -/
   theorem substitute_roles_subset (g : GlobalType) (t : String) (repl : GlobalType) :
@@ -348,6 +358,8 @@ mutual
                 left
                 exact mem_eraseDups_of_mem (List.mem_append.mpr (Or.inr horiginal))
             | inr hrepl => right; exact hrepl
+
+  /-! ## Substitution Role Containment: Branch Lists -/
 
   /-- Branch substitution preserves role containment. -/
   theorem substituteBranches_roles_subset (branches : List (Label × GlobalType))
