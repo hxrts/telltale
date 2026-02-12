@@ -94,6 +94,8 @@ def reachesCommDecide : LocalType → Bool
   | .var _ => false  -- Unbound or unguarded variable = stuck
   | .mu L => reachesCommDecide L  -- Check body directly (guarded types have comm prefix)
 
+/-! ## ReachesComm Stability Under Substitution -/
+
 /-- ReachesComm is preserved under unfolding. -/
 theorem reachesComm_unfold {L : LocalType} (h : ReachesComm (.mu L)) :
     ReachesComm L.unfold := by
@@ -105,6 +107,8 @@ theorem reachesComm_unfold {L : LocalType} (h : ReachesComm (.mu L)) :
 def muDepth : LocalType → Nat
   | .mu L => 1 + muDepth L
   | _ => 0
+
+/-! ## Substitution Decision Preservation -/
 
 /-- Substitution preserves reachesCommDecide.
 
@@ -151,6 +155,8 @@ theorem subst_preserves_reachesCommDecide (n : Nat) (replacement : LocalType) (L
     -- Use structural recursion (subst_preserves_reachesCommDecide is proved by structural recursion)
     exact subst_preserves_reachesCommDecide (n + 1) replacement L' hL
 
+/-! ## Constructor-Level Reachability Helpers -/
+
 /-- Helper: for non-mu comm types, ReachesComm holds directly. -/
 private theorem reachesComm_of_comm (L : LocalType) (h : reachesCommDecide L = true)
     (hNotMu : ∀ L', L ≠ .mu L') : ReachesComm L := by
@@ -186,6 +192,8 @@ private theorem reachesComm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
   | mu L' => exact absurd rfl (hNotMu L')
 
 /-! ## Unfold Soundness Helpers -/
+
+/-! ## muDepth and Non-mu Unfold Helpers -/
 
 /-- Substitution preserves muDepth for types that can reach communication. -/
 private theorem muDepth_subst_of_decide (n : Nat) (r L : LocalType)
@@ -228,6 +236,8 @@ private theorem reachesComm_unfold_nonmu (L : LocalType) (h : reachesCommDecide 
   | end_ => exact Bool.noConfusion h
   | var => exact Bool.noConfusion h
   | mu L' => exact (hNotMu L' rfl).elim
+
+/-! ## Mu-Case Unfold Reachability -/
 
 /-- Arithmetic helper: strip two leading mu constructors. -/
 private theorem muDepth_le_of_mu_mu_le {L : LocalType} {fuel : Nat} :
@@ -284,6 +294,8 @@ private theorem reachesComm_unfold_mu (fuel : Nat) (L : LocalType)
       have hMu : ReachesComm (.mu L1) := ReachesComm.mu hIH
       simpa [LocalType.unfold, LocalType.subst, L1] using hMu
 
+/-! ## Fuel-Based Unfold Reachability -/
+
 /-- Auxiliary: ReachesComm after unfolding, with explicit fuel for termination. -/
 private theorem reachesComm_body_implies_unfold_aux :
     ∀ fuel L, muDepth L ≤ fuel → reachesCommDecide L = true → ReachesComm L.unfold
@@ -326,6 +338,8 @@ private theorem reachesComm_body_implies_unfold_aux :
                   ∀ L, muDepth L ≤ fuel' → reachesCommDecide L = true → ReachesComm L.unfold :=
                 fun L hF hD => reachesComm_body_implies_unfold_aux fuel' L hF hD
               exact reachesComm_unfold_mu (fuel:=fuel') (L:=L') (by simpa using hFuel) hBody' ih
+
+/-! ## Public Unfold and Soundness Theorems -/
 
 /-- Helper: reachesCommDecide is monotonic under unfolding for guarded types. -/
 theorem reachesComm_body_implies_unfold (L : LocalType)
