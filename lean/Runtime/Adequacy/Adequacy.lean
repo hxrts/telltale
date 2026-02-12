@@ -42,6 +42,8 @@ universe u
 
 variable [Telltale.TelltaleIris]
 
+/-! ## Observational Equivalence Core -/
+
 -- Trace of observable events.
 abbrev ObsTrace (ε : Type u) [EffectRuntime ε] := List (Nat × ObsEvent ε)
 
@@ -78,6 +80,8 @@ private def listGet? {α : Type} : List α → Nat → Option α
   | x :: _, 0 => some x
   | _ :: xs, n + 1 => listGet? xs n
 
+/-! ## Differential Harness Contract -/
+
 /--
 Step-indexed differential harness contract for canonical scenarios.
 This is the Lean-side proposition consumed by Rust/Lean differential runners:
@@ -90,6 +94,8 @@ def StepDiffHarness {ε : Type u} [EffectRuntime ε]
     listGet? leanSteps i = some leanTrace →
     listGet? rustSteps i = some rustTrace →
     ObsEq leanTrace rustTrace
+
+/-! ## Trace Observation Utilities -/
 
 
 def obsWithSeqNo {ε : Type u} [EffectRuntime ε]
@@ -152,6 +158,8 @@ def FIFOConsistent {ε : Type u} [EffectRuntime ε]
   -- Receive order respects send order for each edge.
   ∀ e v1 v2, SendBeforeObs trace e v1 v2 → RecvBeforeObs trace e v1 v2
 
+/-! ## VM Adequacy Statement -/
+
 def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -182,6 +190,8 @@ theorem vm_adequacy_of_trace_consistency
     vm_adequacy (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
   intro st hWF
   exact ⟨hCausal st hWF, hFIFO st hWF⟩
+
+/-! ## No-Phantom-Events Bridge -/
 
 def no_phantom_events {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -215,6 +225,8 @@ theorem no_phantom_events_holds {ι γ π ε ν : Type} [IdentityModel ι] [Guar
     no_phantom_events (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
   intro st idx ev hmem
   exact go_mem hmem
+
+/-! ## Compilation Refinement Witness -/
 
 def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
