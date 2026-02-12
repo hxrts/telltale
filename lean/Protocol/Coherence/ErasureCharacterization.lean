@@ -177,6 +177,8 @@ structure DelegationWFClauseCounterexample
   postCoherent : Coherent G' D'
   notFootprintSafe : ¬ SafeDelegationFootprint G G' D D' s A B
 
+/-! ## Clause-Dropped Implications -/
+
 /-- If any single `DelegationWF` clause is dropped, `DelegationWF` itself fails. -/
 theorem not_delegationWF_of_clause_dropped
     {G : GEnv} {s : SessionId} {A B : Role}
@@ -212,6 +214,8 @@ theorem delegationWF_clause_counterexample_not_footprint_safe
     ¬ SafeDelegationFootprint G G' D D' s A B :=
   w.notFootprintSafe
 
+/-! ## Clause-Independence Oracle -/
+
 /-- Independence oracle: every `DelegationWF` clause has its own strictness witness. -/
 def DelegationWFClauseIndependence
     (G G' : GEnv) (D D' : DEnv) (s : SessionId) (A B : Role) : Prop :=
@@ -229,6 +233,8 @@ theorem delegationWF_clause_independence_strictness
   intro clause
   rcases hIndep clause with ⟨w, hw⟩
   exact ⟨w, hw, w.notFootprintSafe⟩
+
+/-! ## Invariant Minimality and Conservativity -/
 
 /-- Invariant families over coherence configurations. -/
 abbrev CoherenceInvariant := CoherenceConfig → Prop
@@ -368,6 +374,8 @@ theorem theoremDF_exact_boundary_duality
     { d_core_admissible := coherenceInvariantCore_admissible hLocality hFrameStable
       d_minimal := hDMinimal
       f_maximal := hFMax }
+
+/-! ## Phase 7 Theorem Bundle -/
 
 /-- Packaged theorem statements for downstream papers/modules. -/
 structure Phase7TheoremPackage : Prop where
