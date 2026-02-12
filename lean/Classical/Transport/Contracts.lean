@@ -32,6 +32,8 @@ universe u
 
 variable [EntropyAPI.AnalysisLaws]
 
+/-! ## Foster Contracts -/
+
 /-- Foster-Lyapunov transport contract. -/
 structure FosterInput (State : Type u) (ctx : TransportCtx State) where
   system : FosterLyapunovHarris.DriftSystem State
@@ -43,6 +45,8 @@ abbrev FosterAssumptions (State : Type u) (ctx : TransportCtx State) := FosterIn
 def FosterConclusion {State : Type u} {ctx : TransportCtx State}
     (input : FosterInput State ctx) : Prop :=
   ∀ s n, input.system.V (input.system.step^[n] s) ≤ input.system.V s
+
+/-! ## MaxWeight Contracts -/
 
 /-- MaxWeight transport contract. -/
 structure MaxWeightInput (ι : Type) [Fintype ι] where
@@ -58,6 +62,8 @@ def MaxWeightConclusion {ι : Type} [Fintype ι]
     MaxWeightBackpressure.weight input.q ν ≤
       MaxWeightBackpressure.weight input.q input.choice.sched
 
+/-! ## LDP Contracts -/
+
 /-- Large-deviation transport contract. -/
 structure LDPInput where
   p : Nat → Real
@@ -69,6 +75,8 @@ abbrev LDPAssumptions := LDPInput
 def LDPConclusion (input : LDPInput) : Prop :=
   ∀ n, input.p (n + 1) ≤
     LargeDeviationPrinciple.exponentialEnvelope input.witness.C input.witness.ρ n
+
+/-! ## Mean-Field Contracts -/
 
 /-- Mean-field transport contract. -/
 structure MeanFieldInput (n : Nat) where
@@ -82,6 +90,8 @@ def MeanFieldConclusion {n : Nat} (input : MeanFieldInput n) : Prop :=
     PropagationOfChaos.empiricalMean (fun i => input.x (σ i)) =
       PropagationOfChaos.empiricalMean input.x
 
+/-! ## Heavy-Traffic Contracts -/
+
 /-- Heavy-traffic transport contract. -/
 structure HeavyTrafficInput where
   σ : Real
@@ -92,6 +102,8 @@ abbrev HeavyTrafficAssumptions := HeavyTrafficInput
 
 def HeavyTrafficConclusion (input : HeavyTrafficInput) : Prop :=
   (input.σ * HeavyTrafficDiffusion.diffusionScale input.n) ^ 2 = input.σ ^ 2 * input.n
+
+/-! ## Mixing Contracts -/
 
 /-- Mixing-time transport contract. -/
 structure MixingInput where
@@ -104,6 +116,8 @@ abbrev MixingAssumptions := MixingInput
 def MixingConclusion (input : MixingInput) : Prop :=
   ∀ n, input.d (n + 1) ≤ MixingTimeBounds.geometricEnvelope input.witness.C input.witness.ρ n
 
+/-! ## Fluid Contracts -/
+
 /-- Fluid-limit transport contract. -/
 structure FluidInput where
   x : Nat → Real
@@ -114,6 +128,8 @@ abbrev FluidAssumptions := FluidInput
 
 def FluidConclusion (input : FluidInput) : Prop :=
   ∀ n, FluidLimitStability.energy input.x (n + 1) ≤ FluidLimitStability.energy input.x n
+
+/-! ## Concentration Contracts -/
 
 /-- Concentration transport contract. -/
 structure ConcentrationInput where
@@ -126,6 +142,8 @@ abbrev ConcentrationAssumptions := ConcentrationInput
 def ConcentrationConclusion (input : ConcentrationInput) : Prop :=
   input.p 0 ≤ 2
 
+/-! ## Little's Law Contracts -/
+
 /-- Little's law transport contract. -/
 abbrev LittlesLawInput := LittlesLaw.LittleInput
 
@@ -134,6 +152,8 @@ abbrev LittlesLawAssumptions := LittlesLawInput
 
 def LittlesLawConclusion (input : LittlesLawInput) : Prop :=
   input.L = input.lam * input.W
+
+/-! ## Functional CLT Contracts -/
 
 /-- Functional CLT transport contract. -/
 structure FunctionalCLTInput where
@@ -147,6 +167,8 @@ abbrev FunctionalCLTAssumptions := FunctionalCLTInput
 
 def FunctionalCLTConclusion (input : FunctionalCLTInput) : Prop :=
   FunctionalCLT.scaledProcess (fun _ => input.c) input.c input.N input.t = 0
+
+/-! ## Certificate Types -/
 
 /-- Uniform certificate container for transported theorem conclusions. -/
 structure Certificate (α : Type u) (Conclusion : α → Prop) where
