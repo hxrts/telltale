@@ -158,6 +158,7 @@ theorem SessionsOf_eq_of_TypedStep
   | par_skip_right =>
       simp
 
+/-! ## DEnv Consistency Preservation -/
 theorem DConsistent_preserved
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -186,6 +187,7 @@ theorem Coherent_rewriteD
   refine ⟨Lsender, hGsender, ?_⟩
   simpa [hEq e] using hConsume
 
+/-! ## Owned Environment Disjointness Update Lemma -/
 theorem OwnedDisjoint_updateLeft
     {Sown : OwnedEnv} {x : Var} {T : ValType} :
     OwnedDisjoint Sown →
@@ -206,6 +208,7 @@ theorem OwnedDisjoint_updateLeft
       simpa [OwnedEnv.updateLeft, hEq] using hL
     exact hOwn y Ty1 Ty2 hR' hL'
 
+/-! ## TypedStep Right-Domain Subset -/
 theorem TypedStep_right_domsubset
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -243,6 +246,7 @@ theorem TypedStep_right_domsubset
   | par_skip_right =>
       exact SEnvDomSubset_refl
 
+/-! ## Owned Disjointness Preservation across TypedStep -/
 theorem OwnedDisjoint_preserved_TypedStep
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' Sfin Gfin W Δ} :
     TypedStep G D Ssh Sown store bufs P G' D' Sown' store' bufs' P' →
@@ -275,6 +279,7 @@ theorem OwnedDisjoint_preserved_TypedStep
           exact ih hP hOwn hDisjRightMid
   | seq_skip =>
       simpa [OwnedDisjoint] using hOwn
+  /-! ## Owned Disjointness Preservation: Parallel Cases -/
   | par_left split hSlen hStep hDisjG hDisjD hDisjS ih =>
       rename_i Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG
       have hTS' :
@@ -308,6 +313,7 @@ theorem OwnedDisjoint_preserved_TypedStep
   | par_skip_right =>
       simpa [OwnedDisjoint] using hOwn
 
+/-! ## Coherence/ValidLabels Monotonicity -/
 theorem Coherent_mono {G G' : GEnv} {D : DEnv} :
     (∀ e, lookupG G e = lookupG G' e) →
     Coherent G D →
