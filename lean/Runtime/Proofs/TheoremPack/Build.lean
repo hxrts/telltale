@@ -88,6 +88,9 @@ def buildVMTheoremPack
           { witness := w
           , soundness := w.sound
           }
+
+  /-! ## Builder: Distributed Impossibility and Quorum -/
+
   let flpLowerBound? :=
     match space.distributed.flp? with
     | none => none
@@ -110,6 +113,9 @@ def buildVMTheoremPack
           , forkExclusion := p.protocol.forkExclusion
           , safeFinality := p.protocol.safeFinality
           }
+
+  /-! ## Builder: Liveness and Responsiveness -/
+
   let partialSynchrony? :=
     match space.distributed.partialSynchrony? with
     | none => none
@@ -158,6 +164,9 @@ def buildVMTheoremPack
           , logPrefixCompatibility := p.protocol.logPrefixCompatibility
           , consensusAtomicBroadcastBridge := p.protocol.consensusAtomicBroadcastBridge
           }
+
+  /-! ## Builder: Safety Boundaries and Availability -/
+
   let accountableSafety? :=
     match space.distributed.accountableSafety? with
     | none => none
@@ -192,6 +201,9 @@ def buildVMTheoremPack
           { protocol := p.protocol
           , characterization := p.protocol.characterization
           }
+
+  /-! ## Builder: CRDT and Consensus Envelope Families -/
+
   let crdt? :=
     match space.distributed.crdt? with
     | none => none
@@ -240,6 +252,9 @@ def buildVMTheoremPack
           , failureEnvelopeSoundness := p.protocol.failureEnvelopeSoundness
           , failureEnvelopeMaximality := p.protocol.failureEnvelopeMaximality
           }
+
+  /-! ## Builder: VM Envelope Families -/
+
   let vmEnvelopeAdherence? :=
     match space.distributed.vmEnvelopeAdherence? with
     | none => none
@@ -276,6 +291,9 @@ def buildVMTheoremPack
           , conservativeExtension := p.protocol.conservativeExtension
           , necessityMinimality := p.protocol.necessityMinimality
           }
+
+  /-! ## Builder: Protocol Bridge and Classical Pack -/
+
   let protocolEnvelopeBridge? :=
     match space.distributed.protocolEnvelopeBridge? with
     | none => none
