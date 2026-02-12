@@ -58,6 +58,8 @@ lemma old_lookup_of_new_role
   | some L0 =>
       exact ⟨L0, by simpa [hOld]⟩
 
+/-! ## Helper Case: Redirected Self-Edge `(B,B)` -/
+
 /-- Case: self-edge (B,B). Corresponds to old self-edge (A,A).
     Both sender and receiver underwent A→B renaming. -/
 lemma coherent_case_senderB_receiverB
@@ -75,6 +77,8 @@ lemma coherent_case_senderB_receiverB
       (s:=s) (A:=A) (B:=B) hCohOld hDeleg
   have hEq : e = ⟨s, B, B⟩ := edge_eq_of (e:=e) hSid hSenderB hReceiverB
   simpa [hEq] using hEdge
+
+/-! ## Helper Case: Redirected Sender `(B,C)` -/
 
 /-- Case: edge (B,C) where C ≠ B. Corresponds to old edge (A,C).
     Sender A became B; receiver C unchanged but type renamed. -/
@@ -104,11 +108,13 @@ lemma coherent_case_senderB_receiverNeB
         ActiveEdge_of_endpoints (e:=⟨s, A, receiver⟩) hDeleg.A_lookup hGrecv0
       have hCohOld : EdgeCoherent G D ⟨s, A, receiver⟩ :=
         Coherent_edge_any hCoh hActiveOld
-      have hEdge :=
-        delegate_redirected_edge_coherent (G:=G) (G':=G') (D:=D) (D':=D')
-          (s:=s) (A:=A) (B:=B) (C:=receiver)
-          (Ne.symm hReceiverNeA) (Ne.symm hReceiverB') hCohOld hDeleg
-      simpa [hSid', hSenderB'] using hEdge
+	      have hEdge :=
+	        delegate_redirected_edge_coherent (G:=G) (G':=G') (D:=D) (D':=D')
+	          (s:=s) (A:=A) (B:=B) (C:=receiver)
+	          (Ne.symm hReceiverNeA) (Ne.symm hReceiverB') hCohOld hDeleg
+	      simpa [hSid', hSenderB'] using hEdge
+
+/-! ## Helper Case: Redirected Receiver `(C,B)` -/
 
 /-- Case: edge (C,B) where C ≠ B. Corresponds to old edge (C,A).
     Receiver A became B; sender C unchanged but type renamed. -/
@@ -138,11 +144,13 @@ lemma coherent_case_senderNeB_receiverB
         ActiveEdge_of_endpoints (e:=⟨s, sender, A⟩) hGsender0 hDeleg.A_lookup
       have hCohOld : EdgeCoherent G D ⟨s, sender, A⟩ :=
         Coherent_edge_any hCoh hActiveOld
-      have hEdge :=
-        delegate_redirected_edge_coherent_receiver (G:=G) (G':=G') (D:=D) (D':=D')
-          (s:=s) (A:=A) (B:=B) (C:=sender)
-          hSenderNeA hSenderB' hCohOld hDeleg
-      simpa [hSid', hReceiverB'] using hEdge
+	      have hEdge :=
+	        delegate_redirected_edge_coherent_receiver (G:=G) (G':=G') (D:=D) (D':=D')
+	          (s:=s) (A:=A) (B:=B) (C:=sender)
+	          hSenderNeA hSenderB' hCohOld hDeleg
+	      simpa [hSid', hReceiverB'] using hEdge
+
+/-! ## Helper Case: Unrelated Session Edge `(C,D)` -/
 
 /-- Case: edge (C,D) where neither C nor D is A or B.
     Edge is unchanged but types/traces undergo A→B renaming. -/
@@ -172,6 +180,8 @@ lemma coherent_case_unrelated
   have hCohOld : EdgeCoherent G D e := Coherent_edge_any hCoh hActiveOld
   exact delegate_unrelated_edge_coherent (G:=G) (G':=G') (D:=D) (D':=D')
     (s:=s) (A:=A) (B:=B) (e:=e) hSid hSenderNeA hSenderB hReceiverNeA hReceiverB hCohOld hDeleg
+
+/-! ## Helper Case: Other Session Edge -/
 
 /-- Case: edge in a different session. Unchanged by delegation. -/
 lemma coherent_case_other_session
@@ -288,6 +298,8 @@ theorem DelegationWF_respects_renaming (ρ : SessionRenaming)
     exact hWF.B_not_in_session
   A_ne_B := hWF.A_ne_B
 
+/-! ## Session-Renaming Equivariance: Redirected Edges -/
+
 /-- IsRedirectedEdge is preserved under session renaming. -/
 theorem IsRedirectedEdge_respects_renaming (ρ : SessionRenaming)
     {e e' : Edge} {s : SessionId} {A B : Role}
@@ -305,6 +317,8 @@ theorem IsRedirectedEdge_respects_renaming (ρ : SessionRenaming)
     have hBeq : (e.sid == s) = false := beq_eq_false_iff_ne.mpr hSid
     have hBeqRen : (ρ.f e.sid == ρ.f s) = false := beq_eq_false_iff_ne.mpr hSidRen
     simp only [hBeq, hBeqRen, Bool.false_eq_true, ↓reduceIte]
+
+/-! ## Session-Renaming Equivariance: Preimage Helpers -/
 
 /-- Helper: construct edge preimage when we know the session ID maps. -/
 theorem edge_preimage_of_sid_eq (ρ : SessionRenaming) (e : Edge) (s : SessionId)
