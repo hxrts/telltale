@@ -68,7 +68,7 @@ lemma childRel_toCoind {t : LocalTypeR} {c : LocalTypeC}
         cases i
         simp [i', castFin]
       simpa [hchild, hidx] using hcont
-  -- Children of `toCoind`: recv case.
+  /-! ## childRel_toCoind: recv case -/
   | recv p bs =>
       rcases childRel_to_children h with ⟨i, hi⟩
       have hi' : children (mkRecv p (toCoindBranches bs)) i = c := by
@@ -201,7 +201,7 @@ lemma childRel_toCoind_size {t : LocalTypeR} {c : LocalTypeC}
         simpa [hchild, hidx] using hcont
       · have hlt : sizeOf (bs.get i').2.2 < sizeOf bs := sizeOf_get_lt_sizeOf_branches i'
         exact lt_trans hlt (sizeOf_branches_lt_sizeOf_send p bs)
-  -- childRel with size bound: recv case.
+  /-! ## childRel_toCoind_size: recv case -/
   | recv p bs =>
       rcases childRel_to_children h with ⟨i, hi⟩
       have hi' : children (mkRecv p (toCoindBranches bs)) i = c := by
@@ -372,7 +372,7 @@ lemma freeVars_subset_namesIn {t : LocalTypeR} {all : Finset LocalTypeC}
         childRel_toCoind_send (p := p) (bs := bs) i
       have hmem_child : toCoind (bs.get i).2.2 ∈ all := mem_of_closed_child h_closed hmem hchild
       exact freeVars_subset_namesIn (t := (bs.get i).2.2) (all := all) h_closed hmem_child v hvi
-  -- Free variable lemmas: recv case.
+  /-! ## freeVars_subset_namesIn: recv case -/
   | recv p bs =>
       intro v hv
       have hv' : v ∈ SessionTypes.LocalTypeR.freeVarsOfBranches bs := by
