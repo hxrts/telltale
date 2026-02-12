@@ -141,6 +141,7 @@ And produces:
 3. Updated buffers
 4. Updated linear context with new token -/
 inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → Prop where
+  /-! ## MonStep Send/Recv Rules -/
   /-- Send: enqueue value and advance sender's type. -/
   | send {ms e target T L v lin'} :
       lookupG ms.G e = some (.send target T L) →
@@ -171,6 +172,7 @@ inductive MonStep : MonitorState → ProtoAction → Value → MonitorState → 
           bufs := updateBuf ms.bufs (MonitorState.recvEdge e source) vs
           Lin := LinCtx.produceToken lin' e L }
 
+  /-! ## MonStep Select/Branch Rules -/
   /-- Select: send label and advance sender's type. -/
   | select {ms e target bs ℓ L lin'} :
       lookupG ms.G e = some (.select target bs) →
@@ -295,6 +297,7 @@ theorem mem_of_consumeToken (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalT
         | inl heqMem => exact Or.inl heqMem
         | inr hmemTl => exact Or.inr (ih result.1 hConsume' hmemTl)
 
+/-! ## consumeToken Preservation for Non-target Endpoints -/
 /-- consumeToken preserves other entries: if (e', S') was in ctx and e' ≠ e,
     then (e', S') is still in ctx' after consuming the token for e. -/
 theorem mem_consumeToken_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : LocalType)
@@ -380,6 +383,7 @@ theorem consumeToken_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
         | inr hmemTl =>
           exact ih result.1 hTlPairwise hConsume' S' hmemTl
 
+/-! ## Pairwise Preservation under consumeToken -/
 /-- consumeToken preserves the Pairwise property. -/
 theorem consumeToken_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
@@ -414,6 +418,7 @@ theorem consumeToken_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
           exact hAll a haInTl
         · exact ih result.1 hTlPairwise hConsume'
 
+/-! ## Pairwise Preservation under produceToken -/
 /-- produceToken preserves Pairwise if the new endpoint wasn't in the context. -/
 theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     (hPairwise : ctx.Pairwise (fun a b => a.1 ≠ b.1))
@@ -431,6 +436,7 @@ theorem produceToken_pairwise (ctx : LinCtx) (e : Endpoint) (S : LocalType)
     exact hNotIn a.2 haMem'
   · exact hPairwise
 
+/-! ## consumeToken Membership Recovery -/
 /-- If consumeToken succeeds, the endpoint was in the original context. -/
 theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
     (hConsume : LinCtx.consumeToken ctx e = some (ctx', S)) :
@@ -458,6 +464,7 @@ theorem consumeToken_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Loc
         have hInTl : (e, result.2) ∈ tl := ih result.1 hConsume'
         exact List.mem_cons_of_mem hd hInTl
 
+/-! ## Freshness Preservation for Token Operations -/
 /-- consumeToken preserves supply freshness: if all endpoints in ctx have sid < supply,
     then all endpoints in ctx' have sid < supply. -/
 theorem consumeToken_preserves_supply_fresh (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
