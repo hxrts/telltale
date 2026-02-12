@@ -38,6 +38,7 @@ theorem BuffersTyped_preserved_frame_left
     BuffersTyped (G' ++ G₂) (D' ++ D₂) bufs' := by
   intro hTS hDisj hCons hBT
   induction hTS generalizing G₂ D₂ with
+  /-! ## Left Frame Case: `send` -/
   | send =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
         hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut
@@ -57,6 +58,7 @@ theorem BuffersTyped_preserved_frame_left
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Left Frame Case: `recv` -/
   | recv =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
@@ -75,6 +77,7 @@ theorem BuffersTyped_preserved_frame_left
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Left Frame Case: `select` -/
   | select =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
         hk hG hFind hTargetReady hEdge hGout hDout hBufsOut
@@ -94,6 +97,7 @@ theorem BuffersTyped_preserved_frame_left
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Left Frame Case: `branch` -/
   | branch =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
         hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut
@@ -112,6 +116,7 @@ theorem BuffersTyped_preserved_frame_left
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Left Frame Structural Cases -/
   | assign =>
       rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       simpa using hBT
@@ -128,6 +133,8 @@ theorem BuffersTyped_preserved_frame_left
   | par_skip_right =>
       simpa using hBT
 
+/-! ## Buffer Preservation Under Right Framing -/
+
 set_option maxHeartbeats 2000000 in
 theorem BuffersTyped_preserved_frame_right
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
@@ -139,6 +146,7 @@ theorem BuffersTyped_preserved_frame_right
     BuffersTyped (G₁ ++ G') (D₁ ++ D') bufs' := by
   intro hTS hDisj hCons hBT
   induction hTS generalizing G₁ D₁ with
+  /-! ## Right Frame Case: `send` -/
   | send =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
         hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut
@@ -164,6 +172,7 @@ theorem BuffersTyped_preserved_frame_right
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Right Frame Case: `recv` -/
   | recv =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
@@ -188,6 +197,7 @@ theorem BuffersTyped_preserved_frame_right
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Right Frame Case: `select` -/
   | select =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
         hk hG hFind hTargetReady hEdge hGout hDout hBufsOut
@@ -213,6 +223,7 @@ theorem BuffersTyped_preserved_frame_right
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Right Frame Case: `branch` -/
   | branch =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
         hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut
@@ -237,6 +248,7 @@ theorem BuffersTyped_preserved_frame_right
       cases hDout
       cases hBufsOut
       simpa using hBT''
+  /-! ## Right Frame Structural Cases -/
   | assign =>
       simpa using hBT
   | seq_step hTS ih =>
@@ -251,6 +263,8 @@ theorem BuffersTyped_preserved_frame_right
       simpa using hBT
   | par_skip_right =>
       simpa using hBT
+
+/-! ## Empty-Trace Helpers and Unframed Corollary -/
 
 lemma SessionsOfD_empty : SessionsOfD (∅ : DEnv) = ∅ := by
   ext s; constructor
