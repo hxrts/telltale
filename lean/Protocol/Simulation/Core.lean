@@ -58,6 +58,7 @@ def stepBaseDecide (C : Config) : Option Config :=
   match C.proc with
   | .skip => none  -- Already terminated
 
+  /-! ## Base Decision: Send -/
   | .send k x =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -72,6 +73,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | _ => none
     | _ => none
 
+  /-! ## Base Decision: Receive -/
   | .recv k x =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -85,6 +87,7 @@ def stepBaseDecide (C : Config) : Option Config :=
         | _ => none
     | _ => none
 
+  /-! ## Base Decision: Select -/
   | .select k ℓ =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -97,6 +100,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | _ => none
     | _ => none
 
+  /-! ## Base Decision: Branch -/
   | .branch k bs =>
     match lookupStr C.store k with
     | some (.chan e) =>
@@ -116,6 +120,7 @@ def stepBaseDecide (C : Config) : Option Config :=
       | _ => none  -- No matching type in G
     | _ => none
 
+  /-! ## Base Decision: Structural Heads -/
   | .newSession roles f P =>
     some { (newSessionStep C roles f) with proc := P }
 
@@ -136,6 +141,8 @@ def stepBaseDecide (C : Config) : Option Config :=
       match Q with
       | .skip => some { C with proc := P }  -- par P skip → P
       | _ => none  -- Would need recursive step
+
+/-! ## Recursive Step Driver Helpers -/
 
 /-- Coarse size measure for well-founded recursion on processes. -/
 private def procSize : Process → Nat
@@ -165,6 +172,8 @@ private lemma procSize_lt_par_right (nS nG : Nat) (P Q : Process) :
   have hpos : 0 < procSize P + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_left (n := procSize Q) hpos
   simpa [procSize, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+
+/-! ## Recursive Contextual Step Decision -/
 
 /-- Attempt a full step with contextual closure.
 
