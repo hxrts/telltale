@@ -132,6 +132,7 @@ theorem MergeGEnv_inv {G₁ G₂ : GEnv} {e : Endpoint} {L : LocalType} :
         simpa [hLeft] using hLookup
       simpa [lookupG, hEq] using hLeft
 
+/-! ## Right-Side Witness Lemma -/
 /-- Right lookup in a merged GEnv always yields some entry. -/
 theorem MergeGEnv_some_of_right (G₁ G₂ : GEnv) (e : Endpoint) {L : LocalType} :
     lookupG G₂ e = some L →
@@ -174,6 +175,8 @@ theorem RoleComplete_mergeGEnv (G₁ G₂ : GEnv)
             simpa [RoleComplete, hTarget] using hC₂ e L hRight.2
           rcases hComp with ⟨L', hL'⟩
           exact MergeGEnv_some_of_right G₁ G₂ ⟨e.sid, r⟩ hL'
+
+/-! ## DEnv and Buffer Merge Lookup Lemmas -/
 theorem MergeDEnv_Left (D₁ D₂ : DEnv) (edge : Edge) :
     lookupD D₁ edge ≠ [] →
     lookupD (mergeDEnv D₁ D₂) edge = lookupD D₁ edge := by
@@ -207,6 +210,7 @@ theorem MergeBufs_Right (B₁ B₂ : Buffers) (edge : Edge) :
   intro h
   simp [lookupBuf, mergeBufs, List.lookup_append, h]
 
+/-! ## Session-Disjoint Lookup Transport Lemmas -/
 /-- Merged DEnv follows the left when the session is absent on the right. -/
 private theorem lookupD_merge_left_of_notin_right
     {G₂ : GEnv} {D₁ D₂ : DEnv} {e : Edge}
