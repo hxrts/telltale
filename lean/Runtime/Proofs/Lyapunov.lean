@@ -358,6 +358,8 @@ def compose (m₁ m₂ : SessionProgressMeasure) : SessionProgressMeasure where
 
 end SessionProgressMeasure
 
+/-! ## System Lyapunov Aggregation -/
+
 /-- System-level Lyapunov value: additive over composed session lists. -/
 def systemLyapunov (ms : List SessionProgressMeasure) : Nat :=
   (ms.map SessionProgressMeasure.lyapunov).foldl (· + ·) 0
@@ -398,6 +400,8 @@ theorem lyapunov_conserved_under_balanced_delegation
       SessionProgressMeasure.lyapunov mSender + SessionProgressMeasure.lyapunov mRecv := by
   simp [SessionProgressMeasure.lyapunov] at hType hBuf ⊢
   omega
+
+/-! ## Progress-Measure Admission Predicate -/
 
 /-- A VM configuration admits a progress measure when each session's
     monitored types satisfy the nonincreasing property under well-typed steps.
