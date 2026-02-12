@@ -33,6 +33,8 @@ open SessionTypes.LocalTypeR
 open Choreography.Projection.Json
 open Choreography.Projection.Project
 
+/-! ## Program Parsing -/
+
 /-- Program export payload: role plus expected local type. -/
 structure ProgramExport where
   role : String
@@ -44,6 +46,8 @@ def parseProgram (j : Json) : Except String ProgramExport := do
   let localJson := j.getObjValD "local_type"
   let localType ← localTypeRFromJson localJson
   .ok { role := role, localType := localType }
+
+/-! ## Structural Equality -/
 
 mutual
   /-- Structural equality on LocalTypeR. -/
@@ -66,6 +70,8 @@ mutual
     | (l1, v1, t1), (l2, v2, t2) =>
         decide (l1 = l2) && decide (v1 = v2) && localTypeREq t1 t2
 end
+
+/-! ## File and Log Utilities -/
 
 /-- Read and parse a JSON file. -/
 def readJsonFile (path : System.FilePath) : IO (Except String Json) := do
@@ -92,6 +98,8 @@ def writeLog (path : System.FilePath) (role : String) (ok : Bool) (msg : String)
 /-- Optional JSON log sink. -/
 def writeJsonLog (path : System.FilePath) (payload : Json) : IO Unit := do
   IO.FS.writeFile path (payload.pretty ++ "\n")
+
+/-! ## Validation Runner -/
 
 /-- Validate a program export against the projected local type. -/
 def runValidation (chPath progPath : System.FilePath)
@@ -136,6 +144,8 @@ def runValidation (chPath progPath : System.FilePath)
                     IO.eprintln s!"Projection mismatch for {program.role}"
                     pure 1
 
+/-! ## Projection Export Runners -/
+
 /-- Export a projection for a single role to a JSON file. -/
 def runExportProjection (inputPath : System.FilePath) (role : String)
     (outputPath : System.FilePath) : IO UInt32 := do
@@ -179,6 +189,8 @@ def runExportAllProjections (inputPath : System.FilePath)
               ], true)
   IO.FS.writeFile outputPath (payload.pretty ++ "\n")
   pure (if ok then 0 else 1)
+
+/-! ## CLI Entry -/
 
 /-- Usage message. -/
 def usage : String :=
