@@ -37,6 +37,8 @@ structure TransportFramework where
   finiteCoherentStateSpace :
     Set.Finite { C : CoherenceState | Coherent C.G C.D }
 
+/-! ## Step Relation and Basic Properties -/
+
 /-- Relational view of a function-style step. -/
 def stepRel (fw : TransportFramework) : CoherenceState → CoherenceState → Prop :=
   fun C C' => C' = fw.step C
@@ -48,6 +50,8 @@ theorem stepRel_total (fw : TransportFramework) : Total (stepRel fw) := by
 theorem stepRel_deterministic (fw : TransportFramework) : Deterministic (stepRel fw) := by
   intro C C₁ C₂ h₁ h₂
   rw [h₁, h₂]
+
+/-! ## Classical-Regime Induction -/
 
 /-- Function-style framework induces the Phase 6 classical-regime relation. -/
 theorem inducedClassicalRegime (fw : TransportFramework)
@@ -68,6 +72,8 @@ theorem inducedClassicalRegime (fw : TransportFramework)
   · intro C₁ C₂ hEq
     exact classicalCorrelations_default hEq
 
+/-! ## Transport Context Construction -/
+
 /-- Build the generic classical transport context from protocol data. -/
 def toTransportCtx (fw : TransportFramework) :
     Classical.Transport.TransportCtx CoherenceState :=
@@ -84,12 +90,16 @@ def mkFosterInput (fw : TransportFramework)
   { system := system
     step_agrees := hStep }
 
+/-! ## Foster-Lyapunov Transport -/
+
 theorem transport_fosterLyapunov (fw : TransportFramework)
     (system : Classical.FosterLyapunovHarris.DriftSystem CoherenceState)
     (hStep : system.step = fw.step) :
     Classical.Transport.FosterConclusion (mkFosterInput fw system hStep) := by
   exact Classical.Transport.transported_fosterLyapunov
     (input := mkFosterInput fw system hStep)
+
+/-! ## Transport Input Aliases -/
 
 abbrev MaxWeightInput := Classical.Transport.MaxWeightInput
 abbrev LDPInput := Classical.Transport.LDPInput
@@ -99,6 +109,8 @@ abbrev MixingInput := Classical.Transport.MixingInput
 abbrev FluidInput := Classical.Transport.FluidInput
 abbrev LittlesLawInput := Classical.Transport.LittlesLawInput
 abbrev FunctionalCLTInput := Classical.Transport.FunctionalCLTInput
+
+/-! ## Transport API Wrappers -/
 
 /-- Transport API wrappers re-exported from the protocol-facing framework. -/
 theorem transport_maxWeight {ι : Type} [Fintype ι] (input : MaxWeightInput ι) :
