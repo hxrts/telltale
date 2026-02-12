@@ -22,6 +22,8 @@ These types form the vocabulary for assumption validation.
 
 namespace Distributed
 
+/-! ## Timing and Certificate Axes -/
+
 /-- Timing assumptions for protocol execution. -/
 inductive TimingModel where
   | sync
@@ -57,6 +59,8 @@ inductive FinalizationWitnessRule where
   | coupledWitness
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Fault and Authentication Axes -/
+
 /-- Fault model for the protocol participants. -/
 inductive FaultModel where
   | crash
@@ -82,6 +86,8 @@ inductive PartitionPolicy where
   | livenessFirst
   | adaptive
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Protocol Specification Record -/
 
 /-- Coarse protocol specification for hypothesis validation. -/
 structure ProtocolSpec where
@@ -134,6 +140,8 @@ structure ProtocolSpec where
   /-- Whether a classical-transport assumption profile has been declared. -/
   classicalTransportProfileDeclared : Bool := false
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Coarse Protocol Spaces -/
 
 /-- Coarse protocol-space classification. -/
 inductive ProtocolSpace where
