@@ -61,6 +61,8 @@ theorem StoreTypedStrong_frame_assign
         (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂) (x:=x) (T:=T) hNoSh y)
     hStrongWhole
 
+/-! ## Recv Frame Preservation -/
+
 /-- Frame: receive updates S and G on the left under a right context. -/
 theorem StoreTypedStrong_frame_recv
     {G G₂ : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {S₂ : SEnv} {store : VarStore}
@@ -111,6 +113,8 @@ theorem StoreTypedStrong_frame_recv
         (Ssh:=Ssh) (Sown:=Sown) (S₂:=S₂) (x:=x) (T:=T) hNoSh y)
     hStrongG
 
+/-! ## Typed-Step Preservation With Left Frame -/
+
 /-- Store typing is preserved by a framed TypedStep. -/
 theorem StoreTypedStrong_preserved_frame_left
     {G D Ssh Sown store bufs P G' D' Sown' store' bufs' P'}
@@ -123,6 +127,7 @@ theorem StoreTypedStrong_preserved_frame_left
     StoreTypedStrong (G' ++ G₂) (SEnvAll Ssh (Sown' ++ S₂)) store' := by
   intro hTS hStore hPre hOwnDisj hDisjRightFin
   induction hTS generalizing G₂ S₂ Sfin Gfin W Δ with
+  /-! ### Communication Cases (Send/Recv/Select/Branch) -/
   | send =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
         hk hx hG hS hv hRecvReady hEdge hGout hDout hBufsOut
@@ -136,6 +141,7 @@ theorem StoreTypedStrong_preserved_frame_left
             updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
           updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.send target T L) (L':=L) hG
         simpa [hGout, hGrew] using hStore'
+  /-! #### Recv Case -/
   | recv =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
         hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut
@@ -152,6 +158,7 @@ theorem StoreTypedStrong_preserved_frame_left
               (store:=store) (e:=e) (source:=source) (L:=L) (x:=x) (v:=v) (T:=T)
               hStore hNoSh hv hG
           simpa [hGout, hSout, hStoreOut] using hStore'
+  /-! #### Select Case -/
   | select =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
         hk hG hFind hTargetReady hEdge hGout hDout hBufsOut
@@ -165,6 +172,7 @@ theorem StoreTypedStrong_preserved_frame_left
             updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
           updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.select target bs) (L':=L) hG
         simpa [hGout, hGrew] using hStore'
+  /-! #### Branch Case -/
   | branch =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
         hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut
@@ -178,6 +186,7 @@ theorem StoreTypedStrong_preserved_frame_left
             updateG (G ++ G₂) e L = updateG G e L ++ G₂ :=
           updateG_append_left_hit (G₁:=G) (G₂:=G₂) (e:=e) (L:=.branch source bs) (L':=L) hG
         simpa [hGout, hGrew] using hStore'
+  /-! ### Local Assignment and Sequencing Cases -/
   | assign =>
       rename_i G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut
       cases hPre with
@@ -199,6 +208,7 @@ theorem StoreTypedStrong_preserved_frame_left
           exact ih hStore hP hOwnDisj hDisjRightMid
   | seq_skip =>
       exact hStore
+  /-! ### Parallel Left Case -/
   | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh0 Sown0 store0 bufs0 store0' bufs0' P0 P0' Q0 G0 D₁0 D₂0 G₁0' D₁0' S₁0' nS0 nG0
       obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂, hSfin, hGfin, hW, hΔ,
@@ -235,6 +245,7 @@ theorem StoreTypedStrong_preserved_frame_left
           StoreTypedStrong (G0 ++ G₂)
             (SEnvAll Ssh0 (({ right := Sown0.right ++ split.S2, left := split.S1 } : OwnedEnv) ++ S₂)) store0 := by
         simpa [split.hG, List.append_assoc] using hStore'
+      /-! #### Left Subprocess Typing and IH Application -/
       have hP_full := by
         have hP_full_pre := HasTypeProcPreOut_frame_G_right_par (split:=split_pre) hDisjG_pre hP_pre
         have hP' :
@@ -254,6 +265,7 @@ theorem StoreTypedStrong_preserved_frame_left
         DisjointS_append_left hDisjRightS1' (DisjointS_symm hDisjS_left)
       have hStore'' :=
         ih (G₂:=G₂) (S₂:=S₂) hStore'_ih hP_full hOwnSubP hDisjOutP
+      /-! #### Reassemble Framed Store Typing -/
       have hSubS2 : SEnvDomSubset split.S2 (Sown0.right ++ split.S2) := by
         simpa using (SEnvDomSubset_append_right (S₁:=Sown0.right) (S₂:=split.S2))
       have hDisjS' : DisjointS split.S2 S₁0' :=
@@ -273,6 +285,7 @@ theorem StoreTypedStrong_preserved_frame_left
         StoreTypedStrong_swap_S_left_prefix (Ssh:=Ssh0 ++ Sown0.right)
           (S₁:=split.S2) (S₂:=S₁0') (S₃:=S₂) hDisjS' hStore''_pre'
       simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore_final
+  /-! ### Parallel Right Case -/
   | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh0 Sown0 store0 bufs0 store0' bufs0' P0 Q0 Q0' G0 D₁0 D₂0 G₂out0 D₂'0 S₂out0 nS0 nG0
       obtain ⟨pw, S₁_fin, S₂_fin, G₁_fin, G₂_fin, W₁, W₂, Δ₁, Δ₂, hSfin, hGfin, hW, hΔ,
@@ -316,6 +329,7 @@ theorem StoreTypedStrong_preserved_frame_left
           StoreTypedStrong (G0 ++ G₂)
             (SEnvAll Ssh0 (({ right := Sown0.right ++ split.S1, left := split.S2 } : OwnedEnv) ++ S₂)) store0 := by
         simpa [split.hG, List.append_assoc] using hStore''_swap
+      /-! #### Right Subprocess Typing and IH Application -/
       have hOwnLeftAll : DisjointS Sown0.right (split.S1 ++ split.S2) := by
         simpa [OwnedDisjoint, split.hS] using hOwnDisj
       have hDisjRightS2 : DisjointS Sown0.right split.S2 := DisjointS_split_right hOwnLeftAll
@@ -337,6 +351,7 @@ theorem StoreTypedStrong_preserved_frame_left
               { right := Sown0.right ++ split.S1, left := S₂_fin } (split_pre.G1 ++ G₂_fin) W₂ Δ₂ := by
           simpa [hS1eq, hS2eq] using hQ_full_pre
         exact hQ'
+      /-! #### Finish Parallel Right Reconstruction -/
       have hStore''' :=
         ih (G₂:=G₂) (S₂:=S₂) hStore''_ih hQ_full hOwnSubQ hDisjOutQ
       simpa [SEnvAll, OwnedEnv.frameLeft, List.append_assoc] using hStore'''
@@ -344,6 +359,8 @@ theorem StoreTypedStrong_preserved_frame_left
       exact hStore
   | par_skip_right =>
       exact hStore
+
+/-! ## Unframed Corollary -/
 
 /-- Store typing is preserved by TypedStep. -/
 theorem StoreTypedStrong_preserved
