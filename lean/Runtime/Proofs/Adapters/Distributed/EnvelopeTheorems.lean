@@ -183,6 +183,115 @@ theorem crdt_hcrdtLimits_of_profile (p : CRDTProfile) :
     Distributed.CRDT.HcrdtLimits p.protocol.model :=
   p.protocol.hcrdtLimits
 
+/-! ## Byzantine Safety Theorems -/
+
+/-- Byzantine-safety profile satisfies the model-level assumption gate. -/
+theorem byzantineSafety_assumptionsPassed_of_profile (p : ByzantineSafetyProfile) :
+    (Distributed.runAssumptionValidation
+      p.protocol.protocolSpec
+      (Distributed.byzantineSafetyAssumptionsFor p.protocol.protocolSpec)).allPassed = true := by
+  -- Reuse the API-level extraction theorem for assumption summary coherence.
+  simpa using Distributed.ByzantineSafety.byzantineAssumptions_allPassed p.protocol
+
+/-- Exact Byzantine safety characterization extracted from a profile. -/
+theorem byzantineSafety_exact_of_profile (p : ByzantineSafetyProfile) :
+    Distributed.ByzantineSafety.ExactByzantineSafetyCharacterization p.protocol.model :=
+  p.protocol.exactCharacterization
+
+/-- Byzantine committed-side safety theorem extracted from a profile. -/
+theorem byzantineSafety_safe_of_profile (p : ByzantineSafetyProfile) :
+    Distributed.ByzantineSafety.ByzantineSafety p.protocol.model :=
+  Distributed.ByzantineSafety.byzantineSafety_of_protocol p.protocol
+
+/-! ## Byzantine VM/Envelope Bridge Theorems -/
+
+/-- VM-level observation erasure induced by the Byzantine-safe observation map. -/
+def vmByzantineObservationErase
+    (p : ByzantineSafetyProfile)
+    (r : Runtime.Adequacy.Run p.protocol.State) :
+    Nat → p.protocol.Obs :=
+  Runtime.Adequacy.eraseObs
+    (fun s => Distributed.ByzantineSafety.Obs_safe_byz p.protocol.model s) r
+
+/-- Erasure equality implies pointwise Byzantine-safe equivalence. -/
+theorem vmByzantineEq_of_erasureEq
+    (p : ByzantineSafetyProfile)
+    {r₁ r₂ : Runtime.Adequacy.Run p.protocol.State}
+    (hEq : vmByzantineObservationErase p r₁ = vmByzantineObservationErase p r₂) :
+    ∀ n, Distributed.ByzantineSafety.Eq_safe_byz p.protocol.model (r₁ n) (r₂ n) := by
+  -- Pointwise projection of erased-run equality yields the required observation equality.
+  intro n
+  have hPoint := congrArg (fun f => f n) hEq
+  simpa [vmByzantineObservationErase, Distributed.ByzantineSafety.Eq_safe_byz,
+    Distributed.ByzantineSafety.Obs_safe_byz] using hPoint
+
+/-- Pointwise Byzantine-safe equivalence implies erasure equality. -/
+theorem erasureEq_of_vmByzantineEq
+    (p : ByzantineSafetyProfile)
+    {r₁ r₂ : Runtime.Adequacy.Run p.protocol.State}
+    (hEq : ∀ n, Distributed.ByzantineSafety.Eq_safe_byz p.protocol.model (r₁ n) (r₂ n)) :
+    vmByzantineObservationErase p r₁ = vmByzantineObservationErase p r₂ := by
+  -- Functional extensionality lifts pointwise equality back to erased-run equality.
+  funext n
+  simpa [vmByzantineObservationErase, Distributed.ByzantineSafety.Eq_safe_byz,
+    Distributed.ByzantineSafety.Obs_safe_byz] using hEq n
+
+/-! ### VM Envelope Adherence Contracts -/
+
+/-- VM-level adherence contract for Byzantine-safe envelopes. -/
+def VMByzantineEnvelopeAdherence
+    (p : ByzantineSafetyProfile)
+    (RefRun VMRun : Runtime.Adequacy.Run p.protocol.State → Prop) : Prop :=
+  ∀ ref vm, RefRun ref → VMRun vm →
+    Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref vm
+
+/-- Extract VM-level Byzantine envelope adherence from an explicit witness. -/
+theorem vmByzantineEnvelopeAdherence_of_witness
+    (p : ByzantineSafetyProfile)
+    {RefRun VMRun : Runtime.Adequacy.Run p.protocol.State → Prop}
+    (hEnvelope :
+      ∀ ref vm, RefRun ref → VMRun vm →
+        Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref vm) :
+    VMByzantineEnvelopeAdherence p RefRun VMRun :=
+  hEnvelope
+
+/-! ### Cross-Target Conformance Contracts -/
+
+/-- Cross-target conformance contract under the Byzantine-safe envelope. -/
+def ByzantineCrossTargetConformance
+    (p : ByzantineSafetyProfile)
+    (RefRun SingleRun MultiRun ShardedRun :
+      Runtime.Adequacy.Run p.protocol.State → Prop) : Prop :=
+  ∀ ref single multi shard,
+    RefRun ref →
+    SingleRun single →
+    MultiRun multi →
+    ShardedRun shard →
+      Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref single ∧
+      Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref multi ∧
+      Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref shard
+
+/-- Build cross-target conformance from per-target envelope-adherence witnesses. -/
+theorem byzantineCrossTargetConformance_of_witnesses
+    (p : ByzantineSafetyProfile)
+    {RefRun SingleRun MultiRun ShardedRun :
+      Runtime.Adequacy.Run p.protocol.State → Prop}
+    (hSingle :
+      ∀ ref single, RefRun ref → SingleRun single →
+        Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref single)
+    (hMulti :
+      ∀ ref multi, RefRun ref → MultiRun multi →
+        Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref multi)
+    (hSharded :
+      ∀ ref shard, RefRun ref → ShardedRun shard →
+        Distributed.ByzantineSafety.Envelope_byz p.protocol.model ref shard) :
+    ByzantineCrossTargetConformance p RefRun SingleRun MultiRun ShardedRun := by
+  -- Compose the three adherence witnesses into one cross-target conformance package.
+  intro ref single multi shard hRef hSingleRun hMultiRun hShardedRun
+  exact ⟨hSingle ref single hRef hSingleRun,
+    hMulti ref multi hRef hMultiRun,
+    hSharded ref shard hRef hShardedRun⟩
+
 /-! ## Consensus Envelope Theorems -/
 
 /-- Exact consensus envelope characterization extracted from a profile. -/
