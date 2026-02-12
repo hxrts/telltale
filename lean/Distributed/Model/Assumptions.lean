@@ -168,6 +168,8 @@ def classicalTransportEligibleCheck (p : ProtocolSpec) : Bool :=
 
 /-! ## Built-In Assumption Bundles -/
 
+/-! ## Bundles: Core and Space-Specific -/
+
 /-- Built-in core assumption set (general-purpose). -/
 def coreAssumptions : List Assumption :=
   [ .soundConsensus
@@ -195,6 +197,8 @@ def nakamotoAssumptions : List Assumption :=
   , .apBiased
   , .adversarialBudgetBounded
   ]
+
+/-! ## Bundles: Hybrid and Characterization -/
 
 /-- Built-in assumption set for hybrid availability/finality checks. -/
 def hybridAssumptions : List Assumption :=
@@ -224,12 +228,23 @@ def characterizationAssumptions : List Assumption :=
   , .classicalTransportEligible
   ]
 
+/-- Assumptions for Byzantine safety characterization and envelope admission. -/
+def byzantineSafetyAssumptions : List Assumption :=
+  [ .byzantineFaultModel
+  , .evidencePrimitiveConsistent
+  , .conflictExclusionPrimitiveConsistent
+  , .finalizationWitnessPrimitiveConsistent
+  , .quorumIntersectionWitnessed
+  , .timingAuthCompatible
+  , .adversarialBudgetBounded
+  ]
+
 /-! ## Assumption Validation -/
 
 /-- Validate one built-in assumption against a protocol spec. -/
 def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
   match h with
-  /-! ## Validation: Space and Finality Flags -/
+  -- Validation group: space and finality flags.
   | .soundConsensus =>
       { assumption := h
       , passed := isSoundConsensus p
@@ -275,7 +290,8 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := p.partitionPolicy = .livenessFirst
       , detail := "AP-leaning partition policy (liveness-first)."
       }
-  /-! ## Validation: Fault-Model Flags -/
+  /-! ## Validation Branches: Fault-Model Flags -/
+  -- Validation group: fault-model flags.
   | .byzantineFaultModel =>
       { assumption := h
       , passed := p.faultModel = .byzantine
@@ -286,7 +302,8 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := p.faultModel = .crash
       , detail := "Crash-only fault model assumption."
       }
-  /-! ## Validation: Primitive and Certificate Coherence -/
+  /-! ## Validation Branches: Primitive/Certificate Coherence -/
+  -- Validation group: primitive/certificate coherence.
   | .evidencePrimitiveConsistent =>
       { assumption := h
       , passed := evidencePrimitiveConsistentCheck p
@@ -327,7 +344,8 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := timingAuthCompatibleCheck p
       , detail := "Timing/authentication assumptions are explicit and compatible with threshold claims."
       }
-  /-! ## Validation: Pressure and Budget Preconditions -/
+  /-! ## Validation Branches: Pressure/Budget Preconditions -/
+  -- Validation group: pressure/budget preconditions.
   | .capPressureConsistent =>
       { assumption := h
       , passed := capPressureConsistentCheck p
@@ -348,7 +366,8 @@ def validateAssumption (p : ProtocolSpec) (h : Assumption) : AssumptionResult :=
       , passed := adversarialBudgetBoundedCheck p
       , detail := "Adversarial budget bounds are within declared count/weight regimes."
       }
-  /-! ## Validation: Declaration and Transport Gating -/
+  /-! ## Validation Branches: Declarations and Transport Gates -/
+  -- Validation group: declaration and transport gating.
   | .faultThresholdDeclared =>
       { assumption := h
       , passed := p.thresholdRegimeDeclared
@@ -416,5 +435,63 @@ def runAssumptionValidation (p : ProtocolSpec) (hs : List Assumption) :
   , results := results
   , allPassed := allPassed results
   }
+
+/-! ## Byzantine Bool-to-Prop Bridge Lemmas -/
+
+/-- Validator bridge: byzantine-fault-model check is exact. -/
+theorem validateAssumption_byzantineFaultModel_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .byzantineFaultModel).passed = true ↔
+      p.faultModel = .byzantine := by
+  -- Unfold the validator branch and normalize booleans.
+  simp [validateAssumption]
+
+/-- Validator bridge: evidence-primitive consistency check is exact. -/
+theorem validateAssumption_evidencePrimitiveConsistent_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .evidencePrimitiveConsistent).passed = true ↔
+      evidencePrimitiveConsistentCheck p = true := by
+  -- The branch is a direct projection of the internal checker.
+  simp [validateAssumption]
+
+/-- Validator bridge: conflict-exclusion primitive check is exact. -/
+theorem validateAssumption_conflictExclusionPrimitiveConsistent_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .conflictExclusionPrimitiveConsistent).passed = true ↔
+      conflictExclusionPrimitiveConsistentCheck p = true := by
+  -- The branch is a direct projection of the internal checker.
+  simp [validateAssumption]
+
+/-- Validator bridge: finalization-witness primitive check is exact. -/
+theorem validateAssumption_finalizationWitnessPrimitiveConsistent_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .finalizationWitnessPrimitiveConsistent).passed = true ↔
+      finalizationWitnessPrimitiveConsistentCheck p = true := by
+  -- The branch is a direct projection of the internal checker.
+  simp [validateAssumption]
+
+/-- Validator bridge: quorum-intersection witness check is exact. -/
+theorem validateAssumption_quorumIntersectionWitnessed_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .quorumIntersectionWitnessed).passed = true ↔
+      quorumIntersectionWitnessedCheck p = true := by
+  -- The branch is a direct projection of the internal checker.
+  simp [validateAssumption]
+
+/-- Validator bridge: timing/auth compatibility check is exact. -/
+theorem validateAssumption_timingAuthCompatible_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .timingAuthCompatible).passed = true ↔
+      timingAuthCompatibleCheck p = true := by
+  -- The branch is a direct projection of the internal checker.
+  simp [validateAssumption]
+
+/-- Validator bridge: adversarial-budget check is exact. -/
+theorem validateAssumption_adversarialBudgetBounded_passed_iff
+    (p : ProtocolSpec) :
+    (validateAssumption p .adversarialBudgetBounded).passed = true ↔
+      adversarialBudgetBoundedCheck p = true := by
+  -- The branch is a direct projection of the internal checker.
+  simp [validateAssumption]
 
 end Distributed
