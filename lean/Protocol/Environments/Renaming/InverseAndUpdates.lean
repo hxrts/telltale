@@ -56,6 +56,7 @@ theorem lookupG_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L :
       simp only [beq_eq_false_iff_ne.mpr hne]
       exact hLookup
 
+/-! ## Inverse DEnv Lookup under Renaming -/
 /-- If lookup succeeds (non-empty) in renamed DEnv, the preimage edge exists. -/
 theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
     lookupD (renameDEnv ρ D) e ≠ [] →
@@ -83,6 +84,7 @@ theorem lookupD_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
       refine ⟨e', heq, ?_⟩
       simpa [heq] using (lookupD_rename (ρ:=ρ) (D:=D) (e:=e'))
 
+/-! ## Inverse Buffer Lookup under Renaming -/
 /-- If lookup succeeds (non-empty) in renamed buffers, the preimage edge exists. -/
 theorem lookupBuf_rename_inv (ρ : SessionRenaming) (bufs : Buffers) (e : Edge) :
     lookupBuf (renameBufs ρ bufs) e ≠ [] →
@@ -141,6 +143,7 @@ theorem renameGEnv_updateG (ρ : SessionRenaming) (G : GEnv) (ep : Endpoint) (L 
       simp only [if_neg heq, if_neg hne, List.map, List.cons.injEq, true_and]
       exact ih
 
+/-! ## renameDEnv/updateD Commutation -/
 /-- Renaming commutes with DEnv update.
 
     This lemma handles the map-based DEnv structure. The proof relies on
@@ -157,6 +160,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
       updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ)) := by
   apply DEnv_eq_of_find?_eq
   intro e'
+  /-! ## DEnv Update Commutation: Target Edge Case -/
   by_cases heq : e' = renameEdge ρ e
   case pos =>
     subst heq
@@ -179,6 +183,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
           (renameEdge ρ e) = some (ts.map (renameValType ρ)) :=
       find?_updateD_eq (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))
     rw [hLhs, hRhs]
+  /-! ## DEnv Update Commutation: Non-target Edge Case -/
   case neg =>
     have hrhs :
         (updateD (renameDEnv ρ D) (renameEdge ρ e) (ts.map (renameValType ρ))).find? e' =
@@ -186,6 +191,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
       find?_updateD_neq (renameDEnv ρ D) (renameEdge ρ e) e' (ts.map (renameValType ρ))
         (fun h => heq h.symm)
     cases hpre : preimageEdge ρ e' with
+    /-! ## Non-target Edge: No Preimage Branch -/
     | none =>
         have hno_lhs : ∀ p ∈ (updateD D e ts).list, renameEdge ρ p.1 ≠ e' := by
           intro p hp hEq
@@ -206,6 +212,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
             (find?_foldl_update_neq (ρ := ρ) (l := D.list)
               (acc := (∅ : DEnv)) (edge := e') hno_rhs)
         rw [hLhs, hrhs, hRhsBase]
+    /-! ## Non-target Edge: Existing Preimage Branch -/
     | some e'' =>
         have he'_eq : e' = renameEdge ρ e'' :=
           (preimageEdge_spec (by simp [hpre])).symm
@@ -250,6 +257,7 @@ theorem renameDEnv_updateD (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Tr
           simpa [hR'] using hL''
         rw [hEqLR, hrhs]
 
+/-! ## Renamed updateG Lookup Corollaries -/
 /-- Lookup after updateG at the same endpoint (renamed version). -/
 theorem lookupG_updateG_rename_eq (ρ : SessionRenaming) (G : GEnv) (ep : Endpoint) (L : LocalType) :
     lookupG (renameGEnv ρ (updateG G ep L)) (renameEndpoint ρ ep) =
@@ -268,6 +276,7 @@ theorem lookupG_updateG_rename_neq (ρ : SessionRenaming) (G : GEnv) (ep ep' : E
   exact lookupG_update_neq (renameGEnv ρ G) (renameEndpoint ρ ep) (renameEndpoint ρ ep')
     (renameLocalType ρ L) hne'
 
+/-! ## Renamed updateD Lookup Corollaries -/
 /-- Lookup after updateD at the same edge (renamed version). -/
 theorem lookupD_updateD_rename_eq (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts : Trace) :
     lookupD (renameDEnv ρ (updateD D e ts)) (renameEdge ρ e) =
