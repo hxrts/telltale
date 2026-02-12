@@ -115,6 +115,8 @@ ownership erase to `emp` at runtime.
 /-- Type alias for ghost maps using iris-lean's finite map infrastructure. -/
 abbrev GhostMap (V : Type) [ti : Telltale.TelltaleIris] := ti.M (Iris.LeibnizO V)
 
+/-! ## Ghost Map Runtime Erasure Implementations -/
+
 open Telltale in
 /-- Runtime implementation: ghost map auth erases to `emp`. -/
 def ghost_map_authImpl {V : Type} [GhostMapSlot V]
@@ -129,6 +131,8 @@ def ghost_map_auth {V : Type} [GhostMapSlot V]
     (γ : GhostName) (m : GhostMap V) : iProp :=
   Iris.BaseLogic.ghost_map_auth (GF := ti.GF) (M := ti.M) (F := ti.F)
     (V := Iris.LeibnizO V) γ 1 m
+
+/-! ## Ghost Map Fragment Erasure and Ownership -/
 
 open Telltale in
 /-- Runtime implementation: ghost map elem erases to `emp`. -/
@@ -145,6 +149,8 @@ def ghost_map_elem {V : Type} [GhostMapSlot V]
     (γ : GhostName) (k : Iris.Positive) (v : V) : iProp :=
   Iris.BaseLogic.ghost_map_elem (GF := ti.GF) (M := ti.M) (F := ti.F)
     (V := Iris.LeibnizO V) ∅ γ k (Iris.DFrac.own 1) (Iris.LeibnizO.mk v)
+
+/-! ## Ghost Map Lookup and Update Laws -/
 
 open Telltale Iris.Std in
 /-- Lookup: auth + elem implies the key maps to the value. -/
@@ -167,6 +173,8 @@ theorem ghost_map_update {V : Type} [GhostMapSlot V]
         (ghost_map_elem γ k v'))) :=
   Iris.BaseLogic.ghost_map_update (GF := ti.GF) (M := ti.M) (F := ti.F)
     (V := Iris.LeibnizO V) γ m k (Iris.LeibnizO.mk v) (Iris.LeibnizO.mk v')
+
+/-! ## Ghost Map Insert/Delete Laws -/
 
 open Telltale Iris.Std in
 /-- Insert: add a new key-value pair (key must not exist). -/
