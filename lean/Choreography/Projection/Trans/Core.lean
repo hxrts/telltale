@@ -289,6 +289,7 @@ mutual
       ∀ g x, x ∈ (trans g role).freeVars → x ∈ g.freeVars := by
     intro g x hx
     match g with
+    /-! ## FreeVars Subset: Base Cases -/
     | .end =>
         have : False := by
           simp [trans, LocalTypeR.freeVars] at hx
@@ -309,7 +310,7 @@ mutual
           have : False := by
             simp [hguard, Bool.false_eq_true, ↓reduceIte, LocalTypeR.freeVars] at hx
           exact this.elim
-    /-! ## trans_freeVars_subset: Communication Cases -/
+    /-! ## FreeVars Subset: Communication Cases -/
     | .comm sender receiver branches =>
         cases hsender : role == sender with
         | true =>
@@ -327,7 +328,7 @@ mutual
                       SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
                     have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
                     simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
-        /-! ## trans_freeVars_subset: Receiver-Side Communication Case -/
+        /-! ## FreeVars Subset: Receiver Communication -/
         | false =>
             cases hreceiver : role == receiver with
             | true =>
@@ -346,7 +347,7 @@ mutual
                           LocalTypeR.freeVars, SessionTypes.LocalTypeR.freeVarsOfBranches_eq_flatMap] at hx
                         have hmem := transBranches_freeVars_subset role ((label, cont) :: tail) x hx
                         simpa [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap] using hmem
-            /-! ## trans_freeVars_subset: Non-Participant Communication Case -/
+            /-! ## FreeVars Subset: Non-Participant Communication -/
             | false =>
                 cases branches with
                 | nil =>
@@ -361,7 +362,7 @@ mutual
                         have hmem' : x ∈ cont.freeVars := trans_freeVars_subset role cont x hx
                         simp [GlobalType.freeVars, SessionTypes.GlobalType.freeVarsOfBranches_eq_flatMap,
                           List.flatMap_cons, List.mem_append, hmem']
-    /-! ## trans_freeVars_subset: Delegation Case -/
+    /-! ## FreeVars Subset: Delegation Case -/
     | .delegate p q sid r cont =>
         -- Delegate projects to continuation's freeVars
         simp only [trans] at hx
@@ -394,7 +395,7 @@ mutual
       | exact sizeOf_cont_lt_comm _ _ _ _ _
       | omega
 
-  /-! ## transBranches_freeVars_subset -/
+  /-! ## FreeVars Subset: Branch Fold Lemma -/
   theorem transBranches_freeVars_subset (role : String) :
       ∀ branches y,
         y ∈ (transBranches branches role).flatMap (fun (_, _, t) => t.freeVars) →
@@ -434,11 +435,12 @@ here we prove it explicitly from `trans_freeVars_subset`. -/
     This is the Coq-style theorem that sidesteps the allVarsBound semantic gap. -/
 theorem trans_closed_of_closed (g : GlobalType) (role : String)
     (h : g.freeVars = []) : (trans g role).freeVars = [] := by
-  have hsub := trans_freeVars_subset role g
-  rw [h] at hsub
-  -- hsub : (trans g role).freeVars ⊆ []
-  -- A subset of [] must be []
-  exact List.subset_nil.mp hsub
+  have hsub : (trans g role).freeVars ⊆ g.freeVars := by
+    intro x hx
+    exact trans_freeVars_subset role g x hx
+  have hsubNil : (trans g role).freeVars ⊆ [] := by
+    simpa [h] using hsub
+  exact List.subset_nil.mp hsubNil
 
 /-- Corollary using the isClosed predicate. -/
 theorem trans_isClosed_of_isClosed (g : GlobalType) (role : String)
