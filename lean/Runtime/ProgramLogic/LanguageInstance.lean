@@ -17,11 +17,23 @@ Connects VM execution to Iris program logic.
 Dependencies: Task 11, Shim.WeakestPre.
 -/
 
+/-
+The Problem. Iris reasoning requires a concrete `Language` instance for the VM
+so weakest-precondition rules can talk about VM expressions, values, and steps.
+
+Solution Structure. Define value conversions (`to_val`/`of_val`), encode VM
+small-step behavior as `prim_step`, then package the laws in the language mixin.
+-/
+
 set_option autoImplicit false
+
+/-! ## Core Language Carrier -/
 
 inductive SessionVM (ι γ π ε ν : Type) : Type where
   -- Tag type for the VM language instance.
   | mk
+
+/-! ## Value Conversion -/
 
 /-- Values are halted expressions. -/
 abbrev SessionVMVal := { e : Expr // e.halted = true }
@@ -33,6 +45,8 @@ def SessionVM.to_val (e : Expr) : Option SessionVMVal :=
 def SessionVM.of_val (v : SessionVMVal) : Expr :=
   -- Unwrap a halted expression.
   v.1
+
+/-! ## Primitive Step Relation -/
 
 def SessionVM.prim_step {ι γ π ε ν : Type}
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
@@ -53,6 +67,8 @@ def SessionVM.prim_step {ι γ π ε ν : Type}
         | some c => match c.status with | .done => true | _ => false
         | none => true
       e' = { cid := e.cid, halted := halted' } ∧ σ' = σ1 ∧ efs = []
+
+/-! ## Iris Language Instance -/
 
 def instLanguageSessionVM {ι γ π ε ν : Type}
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
@@ -85,6 +101,8 @@ def instLanguageSessionVM {ι γ π ε ν : Type}
         intro e σ κ e' σ' efs hstep
         rcases hstep with ⟨_, hhalted, _⟩
         simp [SessionVM.to_val, hhalted] }
+
+/-! ## Conversion Lemmas -/
 
 /-- `to_val` after `of_val` yields the halted expression. -/
 theorem to_of_val {ι γ π ε ν : Type}
