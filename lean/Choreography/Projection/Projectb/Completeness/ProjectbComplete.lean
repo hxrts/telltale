@@ -41,6 +41,8 @@ theorem projectbAllBranches_of_CProject_comm
   exact AllBranchesProj_to_projectbAllBranches gbs role cand hbranches
     (fun gb hmem hcp => ih gb hmem hcp)
 
+/-! ## Completeness Helper Cases -/
+
 /-- Helper: completeness for mu cases. -/
 theorem projectb_complete_mu_case
     (t : String) (body : GlobalType) (role : String) (cand : LocalTypeR)
@@ -59,6 +61,8 @@ theorem projectb_complete_mu_case
   have htrans_body : Trans.trans body role = candBody :=
     trans_eq_of_CProject body role candBody hbody hne_body
   exact projectb_complete_mu t body role cand candBody hcase hproj_body htrans_body
+
+/-! ## Completeness Helper Cases: Comm Participants -/
 
 /-- Helper: completeness for comm sender cases. -/
 theorem projectb_complete_comm_sender_case
@@ -97,6 +101,8 @@ theorem projectb_complete_comm_receiver_case
       exact projectb_complete_comm_receiver s r role gbs partner lbs hr hs hpartner hbranches_proj
   | _ => cases hF
 
+/-! ## Completeness Helper Cases: Comm Non-Participant -/
+
 /-- Helper: completeness for comm non-participant cases. -/
 theorem projectb_complete_comm_other_case
     (s r role : String) (gbs : List (Label × GlobalType)) (cand : LocalTypeR)
@@ -110,6 +116,8 @@ theorem projectb_complete_comm_other_case
   have hbranches_proj : projectbAllBranches gbs role cand = true :=
     projectbAllBranches_of_CProject_comm gbs role cand hF ih
   exact projectb_complete_comm_other s r role gbs cand hs hr hbranches_proj
+
+/-! ## Main Completeness Theorem -/
 
 /-- Completeness: every CProject witness satisfies the boolean checker. -/
 theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
@@ -125,6 +133,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       have ih_body : ∀ candBody, CProject body role candBody → projectb body role candBody = true :=
         fun candBody hbody => projectb_complete body role candBody hbody hne_body
       exact projectb_complete_mu_case t body role cand h hne ih_body
+  /-! ## projectb_complete: Comm Case -/
   | comm s r gbs =>
       have hne_branches : ∀ gb ∈ gbs, gb.2.allCommsNonEmpty = true :=
         GlobalType.allCommsNonEmpty_comm_branches _ _ gbs hne
@@ -139,6 +148,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
       · by_cases hr : role = r
         · exact projectb_complete_comm_receiver_case s r role gbs cand hr hs h hne_branches ih_branches
         · exact projectb_complete_comm_other_case s r role gbs cand hs hr h hne_branches ih_all
+  /-! ## projectb_complete: Delegate Case -/
   | delegate p q sid r cont =>
       have hne_cont : cont.allCommsNonEmpty = true := by
         simpa [GlobalType.allCommsNonEmpty] using hne
@@ -179,6 +189,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
             simp [CProjectF, hp] at hf
         | mu _ _ =>
             simp [CProjectF, hp] at hf
+      /-! ## projectb_complete: Delegate Receiver/Other Subcases -/
       · by_cases hq : role = q
         · have hnp : q ≠ p := by
             intro hqp
@@ -222,6 +233,7 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
               simp [CProjectF, hq, hnp] at hf
           | mu _ _ =>
               simp [CProjectF, hq, hnp] at hf
+        /-! ## projectb_complete: Delegate Non-Participant Subcase -/
         · -- non-participant: follow continuation
           have hf := CProject_destruct h
           simp [CProjectF, hp, hq] at hf
@@ -243,6 +255,8 @@ decreasing_by
     | (subst_vars; apply sizeOf_elem_snd_lt_comm; assumption)
     -- delegate case: sizeOf cont < sizeOf g
     | (subst_vars; simp only [sizeOf, GlobalType._sizeOf_1]; omega)
+
+/-! ## Completeness Corollary -/
 
 /-- projectb = true iff CProject holds (for non-empty comms). -/
 theorem projectb_iff_CProject (g : GlobalType) (role : String) (cand : LocalTypeR)
