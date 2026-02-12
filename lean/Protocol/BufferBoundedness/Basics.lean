@@ -136,6 +136,8 @@ theorem maxBufferOccupancy_ge_edge (C : Config) (e : Edge)
       exact ⟨(e, buf'), hmem, rfl⟩
     exact foldl_max_le_of_mem hmap 0
 
+/-! ## Buffer Occupancy Monotonicity Helpers -/
+
 /-- Any edge occupancy is bounded by the global max occupancy. -/
 theorem edgeBufferOccupancy_le_maxBufferOccupancy (C : Config) (e : Edge) :
     edgeBufferOccupancy C e ≤ maxBufferOccupancy C := by
@@ -147,6 +149,8 @@ theorem edgeBufferOccupancy_le_maxBufferOccupancy (C : Config) (e : Edge) :
     | some buf =>
       have : (e, buf) ∈ C.bufs := lookup_mem_buf hlook
       exact (False.elim (hmem ⟨buf, this⟩))
+
+/-! ## updateBuf Membership Cases -/
 
 /-- Membership in `updateBuf` comes either from the updated edge or from the old list. -/
 theorem mem_updateBuf_cases {bufs : Buffers} {e e' : Edge} {buf buf' : Buffer}
@@ -173,6 +177,8 @@ theorem mem_updateBuf_cases {bufs : Buffers} {e e' : Edge} {buf buf' : Buffer}
           · exact Or.inl hnew
           · exact Or.inr (List.mem_cons.mpr (Or.inr hold))
 
+/-! ## foldl-max Boundedness Helpers -/
+
 /-- Local helper: foldl max with bounded init and bounded elements stays bounded. -/
 theorem foldl_max_le_of_all_le_aux_local {l : List Nat} {B init : Nat}
     (hinit : init ≤ B) (h : ∀ n ∈ l, n ≤ B) : l.foldl max init ≤ B := by
@@ -190,6 +196,8 @@ theorem foldl_max_le_of_all_le_aux_local {l : List Nat} {B init : Nat}
 theorem foldl_max_le_of_all_le_local {l : List Nat} {B : Nat}
     (h : ∀ n ∈ l, n ≤ B) : l.foldl max 0 ≤ B :=
   foldl_max_le_of_all_le_aux_local (Nat.zero_le B) h
+
+/-! ## updateBuf Occupancy Bound -/
 
 /-- Updating one edge with a buffer no longer than before cannot increase max occupancy. -/
 theorem maxBufferOccupancy_updateBuf_le_of_le
@@ -214,6 +222,8 @@ theorem maxBufferOccupancy_updateBuf_le_of_le
       simp only [List.mem_map]
       exact ⟨(e', buf'), hold, rfl⟩
     exact foldl_max_le_of_mem hmap 0
+
+/-! ## Empty-Buffer Occupancy Base Case -/
 
 theorem maxBufferOccupancy_zero_of_empty (C : Config) (h : C.bufs = []) :
     maxBufferOccupancy C = 0 := by
@@ -318,6 +328,8 @@ theorem BoundedReachable_implies_UnboundedReachable {B : Nat} {C₀ C : Config}
     apply Relation.ReflTransGen.tail ih
     exact BoundedStep_implies_Step hstep
 
+/-! ## Reachability Closure under Safe Bound -/
+
 /-- Closure: if all unbounded-reachable states stay within `B`, then
     unbounded reachability implies bounded reachability at `B`. -/
 theorem bounded_reachability_closure (C₀ : Config) (B : Nat)
@@ -341,6 +353,8 @@ theorem bounded_reachability_of_unbounded_le (C₀ : Config) (B : Nat)
     BoundedReachable B C₀ C :=
   bounded_reachability_closure C₀ B hSafe C hreach
 
+/-! ## Critical-Buffer Upper Bounds -/
+
 /-- Any reachable configuration has buffer occupancy ≤ critical buffer size,
     assuming the occupancy set is bounded above. -/
 theorem maxBufferOccupancy_le_critical {C₀ C : Config}
@@ -349,6 +363,8 @@ theorem maxBufferOccupancy_le_critical {C₀ C : Config}
     maxBufferOccupancy C ≤ criticalBufferSize C₀ := by
   have hmem : maxBufferOccupancy C ∈ occupancySet C₀ := ⟨C, hreach, rfl⟩
   exact le_csSup hbdd hmem
+
+/-! ## Step-Level Bound Preservation -/
 
 /-- An unbounded step from a reachable config stays within critical buffer size. -/
 theorem unbounded_step_within_bound {C₀ C C' : Config}
