@@ -25,6 +25,9 @@ open SessionCoTypes.EQ2Props
 open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
+
+/-! ## Suffix Mu/Mu Case -/
+
 private theorem CProjectTransRelComp_postfix_suffix_mu_mu
     {v v' : String} {body_lt body_t b : LocalTypeR}
     (hrel_ab : CProjectTransRel (.mu v body_lt) b) (heq_bc : EQ2 b (.mu v' body_t))
@@ -42,6 +45,9 @@ private theorem CProjectTransRelComp_postfix_suffix_mu_mu
     CProjectTransRelCompWF_of_CProjectTransRel hrel_ab
   have hcomp_lt_t : CProjectTransRelCompWF (.mu v body_lt) (.mu v' body_t) :=
     CProjectTransRelCompWF_extend_right hcomp_ab heq_bc hWFa hWFb hWFc
+
+  /-! ## Suffix Mu/Mu Left Branch -/
+
   constructor
   · have hcomp_left : CProjectTransRelCompWF
         (body_lt.substitute v (.mu v body_lt)) (.mu v' body_t) :=
@@ -49,6 +55,9 @@ private theorem CProjectTransRelComp_postfix_suffix_mu_mu
         (EQ2_unfold_left (EQ2_refl (.mu v body_lt))) hcomp_lt_t
         hWF_unfold_lt hWFa hWFc
     exact Or.inl hcomp_left
+
+  /-! ## Suffix Mu/Mu Right Branch -/
+
   · have hcomp_right : CProjectTransRelCompWF
         (.mu v body_lt) (body_t.substitute v' (.mu v' body_t)) :=
       CProjectTransRelCompWF_extend_right hcomp_lt_t
@@ -77,8 +86,10 @@ private theorem CProjectTransRelComp_postfix_suffix_mu_nonmu
       exact CProjectTransRelComp_postfix_suffix_mu_mu
         (v := v) (v' := v') (body_lt := body_lt) (body_t := body_t)
         hrel_ab heq_bc hWFa hWFc
-  | _ =>
-      simpa [EQ2F] using (Or.inl hcomp_left)
+	  | _ =>
+	      simpa [EQ2F] using (Or.inl hcomp_left)
+
+/-! ## Suffix Non-Mu/Mu Case -/
 
 private theorem CProjectTransRelComp_postfix_suffix_nonmu_mu
     {lt b : LocalTypeR} {v' : String} {body_t : LocalTypeR}
@@ -102,8 +113,10 @@ private theorem CProjectTransRelComp_postfix_suffix_nonmu_mu
       exact CProjectTransRelComp_postfix_suffix_mu_mu
         (v := v) (v' := v') (body_lt := body_lt) (body_t := body_t)
         hrel_ab heq_bc hWFa hWFc
-  | _ =>
-      simpa [EQ2F] using (Or.inl hcomp_right)
+	  | _ =>
+	      simpa [EQ2F] using (Or.inl hcomp_right)
+
+/-! ## Suffix Var/Var Case -/
 
 private theorem CProjectTransRelComp_postfix_suffix_var_var
     {x y : String} {b : LocalTypeR}
@@ -121,9 +134,11 @@ private theorem CProjectTransRelComp_postfix_suffix_var_var
   | mu _ _ =>
       simpa only [EQ2F] using
         CProjectTransRel_EQ2_compose_through_mu_WF hrel_ab heq_bc hWFa hWFc
-  | «end» => simp only [EQ2F] at hbase_f
-  | send _ _ => simp only [EQ2F] at hbase_f
-  | recv _ _ => simp only [EQ2F] at hbase_f
+	  | «end» => simp only [EQ2F] at hbase_f
+	  | send _ _ => simp only [EQ2F] at hbase_f
+	  | recv _ _ => simp only [EQ2F] at hbase_f
+
+/-! ## Suffix Send/Send Case -/
 
 private theorem CProjectTransRelComp_postfix_suffix_send_send
     {p q : String} {bs cs : List BranchR} {b : LocalTypeR}
@@ -151,9 +166,11 @@ private theorem CProjectTransRelComp_postfix_suffix_send_send
           hbase_br heq_f.2 hWFbs hWFbbs hWFcs⟩
   | mu _ _ =>
       exact CProjectTransRel_EQ2_compose_through_mu_WF hrel_ab heq_bc hWFa hWFc
-  | «end» => simp only [EQ2F] at hbase_f
-  | var _ => simp only [EQ2F] at hbase_f
-  | recv _ _ => simp only [EQ2F] at hbase_f
+	  | «end» => simp only [EQ2F] at hbase_f
+	  | var _ => simp only [EQ2F] at hbase_f
+	  | recv _ _ => simp only [EQ2F] at hbase_f
+
+/-! ## Suffix Recv/Recv Case -/
 
 private theorem CProjectTransRelComp_postfix_suffix_recv_recv
     {p q : String} {bs cs : List BranchR} {b : LocalTypeR}
@@ -180,9 +197,11 @@ private theorem CProjectTransRelComp_postfix_suffix_recv_recv
           hbase_br heq_f.2 hWFbs hWFbbs hWFcs⟩
   | mu _ _ =>
       exact CProjectTransRel_EQ2_compose_through_mu_WF hrel_ab heq_bc hWFa hWFc
-  | «end» => simp only [EQ2F] at hbase_f
-  | var _ => simp only [EQ2F] at hbase_f
-  | send _ _ => simp only [EQ2F] at hbase_f
+	  | «end» => simp only [EQ2F] at hbase_f
+	  | var _ => simp only [EQ2F] at hbase_f
+	  | send _ _ => simp only [EQ2F] at hbase_f
+
+/-! ## Suffix End Dispatcher -/
 
 /- Helper: suffix case when lt is .end. -/
 private theorem CProjectTransRelComp_postfix_suffix_end
@@ -205,10 +224,12 @@ private theorem CProjectTransRelComp_postfix_suffix_end
       have hfalse : False := CProjectTransRelComp_end_not_send
         (Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))) LocalTypeR.WellFormed_end hWFc
       simpa [EQ2F] using hfalse
-  | recv p bs =>
-      have hfalse : False := CProjectTransRelComp_end_not_recv
-        (Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))) LocalTypeR.WellFormed_end hWFc
-      simpa [EQ2F] using hfalse
+	  | recv p bs =>
+	      have hfalse : False := CProjectTransRelComp_end_not_recv
+	        (Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))) LocalTypeR.WellFormed_end hWFc
+	      simpa [EQ2F] using hfalse
+
+/-! ## Suffix Var Dispatcher -/
 
 /- Helper: suffix case when lt is .var. -/
 private theorem CProjectTransRelComp_postfix_suffix_var
@@ -232,11 +253,13 @@ private theorem CProjectTransRelComp_postfix_suffix_var
         Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
       have hfalse : False := CProjectTransRelComp_var_not_send hcomp hWFa hWFc
       simpa [EQ2F] using hfalse
-  | recv p bs =>
-      have hcomp : CProjectTransRelComp (.var x) (.recv p bs) :=
-        Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
-      have hfalse : False := CProjectTransRelComp_var_not_recv hcomp hWFa hWFc
-      simpa [EQ2F] using hfalse
+	  | recv p bs =>
+	      have hcomp : CProjectTransRelComp (.var x) (.recv p bs) :=
+	        Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
+	      have hfalse : False := CProjectTransRelComp_var_not_recv hcomp hWFa hWFc
+	      simpa [EQ2F] using hfalse
+
+/-! ## Suffix Send Dispatcher -/
 
 /- Helper: suffix case when lt is .send. -/
 private theorem CProjectTransRelComp_postfix_suffix_send
@@ -260,11 +283,13 @@ private theorem CProjectTransRelComp_postfix_suffix_send
         Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
       have hfalse : False := CProjectTransRelComp_send_not_var hcomp hWFa hWFc
       simpa [EQ2F] using hfalse
-  | recv q cs =>
-      have hcomp : CProjectTransRelComp (.send p bs) (.recv q cs) :=
-        Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
-      have hfalse : False := CProjectTransRelComp_send_not_recv hcomp hWFa hWFc
-      simpa [EQ2F] using hfalse
+	  | recv q cs =>
+	      have hcomp : CProjectTransRelComp (.send p bs) (.recv q cs) :=
+	        Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
+	      have hfalse : False := CProjectTransRelComp_send_not_recv hcomp hWFa hWFc
+	      simpa [EQ2F] using hfalse
+
+/-! ## Suffix Recv Dispatcher -/
 
 /- Helper: suffix case when lt is .recv. -/
 private theorem CProjectTransRelComp_postfix_suffix_recv
@@ -288,11 +313,13 @@ private theorem CProjectTransRelComp_postfix_suffix_recv
         Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
       have hfalse : False := CProjectTransRelComp_recv_not_var hcomp hWFa hWFc
       simpa [EQ2F] using hfalse
-  | send q cs =>
-      have hcomp : CProjectTransRelComp (.recv p bs) (.send q cs) :=
-        Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
-      have hfalse : False := CProjectTransRelComp_recv_not_send hcomp hWFa hWFc
-      simpa [EQ2F] using hfalse
+	  | send q cs =>
+	      have hcomp : CProjectTransRelComp (.recv p bs) (.send q cs) :=
+	        Or.inr (Or.inr (Or.inl ⟨b, hrel_ab, heq_bc⟩))
+	      have hfalse : False := CProjectTransRelComp_recv_not_send hcomp hWFa hWFc
+	      simpa [EQ2F] using hfalse
+
+/-! ## Suffix Mu Dispatcher -/
 
 /- Helper: suffix case when lt is .mu. -/
 private theorem CProjectTransRelComp_postfix_suffix_mu
@@ -304,8 +331,10 @@ private theorem CProjectTransRelComp_postfix_suffix_mu
   cases t with
   | mu v' body_t =>
       exact CProjectTransRelComp_postfix_suffix_mu_mu hrel_ab heq_bc hWFa hWFc
-  | _ =>
-      exact CProjectTransRelComp_postfix_suffix_mu_nonmu hrel_ab heq_bc hWFa hWFc
+	  | _ =>
+	      exact CProjectTransRelComp_postfix_suffix_mu_nonmu hrel_ab heq_bc hWFa hWFc
+
+/-! ## Suffix Relation Dispatcher -/
 
 private theorem CProjectTransRelComp_postfix_suffix
     {lt t b : LocalTypeR}
@@ -320,8 +349,10 @@ private theorem CProjectTransRelComp_postfix_suffix
       exact CProjectTransRelComp_postfix_suffix_send (p := p) (bs := bs) hrel_ab heq_bc hWFa hWFc
   | recv p bs =>
       exact CProjectTransRelComp_postfix_suffix_recv (p := p) (bs := bs) hrel_ab heq_bc hWFa hWFc
-  | mu v body_lt =>
-      exact CProjectTransRelComp_postfix_suffix_mu (v := v) (body_lt := body_lt) hrel_ab heq_bc hWFa hWFc
+	  | mu v body_lt =>
+	      exact CProjectTransRelComp_postfix_suffix_mu (v := v) (body_lt := body_lt) hrel_ab heq_bc hWFa hWFc
+
+/-! ## Postfix Theorem -/
 
 /-- Postfix property for the well-formed composite relation. -/
 theorem CProjectTransRelComp_postfix :
@@ -336,8 +367,10 @@ theorem CProjectTransRelComp_postfix :
     exact CProjectTransRelComp_postfix_prefix heq_ab hrel_bb' hWFa hWFc
   · -- 2-hop suffix: ∃ b, CProjectTransRel lt b ∧ EQ2 b t
     exact CProjectTransRelComp_postfix_suffix hrel_ab heq_bc hWFa hWFc
-  · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
-    exact CProjectTransRelComp_postfix_chain heq_ab hrel_bb' heq_b'c hWFa hWFc
+	  · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
+	    exact CProjectTransRelComp_postfix_chain heq_ab hrel_bb' heq_b'c hWFa hWFc
+
+/-! ## Main EQ2 Theorem -/
 
 /-- CProject implies EQ2 with trans.
 
