@@ -25,6 +25,8 @@ open Lean (Json)
 
 /-! ## JSON Encoders -/
 
+/-! ### Value and edge encoders -/
+
 /-- Serialize a runtime Value to JSON. -/
 def valueToJson : Value → Json
   | .unit => Json.mkObj [("kind", Json.str "unit")]
@@ -42,6 +44,8 @@ def edgeToJson (e : Edge) : Json :=
     [ ("session", Json.num e.sid)
     , ("sender", Json.str e.sender)
     , ("receiver", Json.str e.receiver) ]
+
+/-! ### Observable event encoder -/
 
 /-- Serialize a ticked observable event to JSON (UnitEffect only). -/
 def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
@@ -78,6 +82,9 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
         , ("label", Json.str lbl) ]
+
+  /-! #### Session lifecycle events -/
+
   | .opened sid roles =>
       Json.mkObj
         [ ("kind", Json.str "opened")
@@ -95,6 +102,9 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("epoch", Json.num epoch) ]
+
+  /-! #### Runtime ownership/coroutine events -/
+
   | .transferred ep fromCoro toCoro =>
       Json.mkObj
         [ ("kind", Json.str "transferred")
@@ -119,6 +129,9 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         [ ("kind", Json.str "aborted")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
+
+  /-! #### Guard/effect and monitoring events -/
+
   | .acquired layer ep =>
       Json.mkObj
         [ ("kind", Json.str "acquired")
@@ -146,6 +159,8 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         [ ("kind", Json.str "checked")
         , ("tick", Json.num ev.tick)
         , ("permitted", Json.bool permitted) ]
+
+/-! ### Trace-level serializers -/
 
 /-- Serialize a list of observable events to JSON using session-local ticks. -/
 def traceToJson (trace : List (TickedObsEvent UnitEffect)) : Json :=
