@@ -71,6 +71,8 @@ theorem exists_first_overflow
       · exact ⟨Cmid, Cfinal, hreach, hstep, hpre, hOcc⟩
       · exact ih (lt_of_not_ge hpre)
 
+/-! ## Determinism and Overflow Helpers -/
+
 /-- Any bounded step equals the unique successor when Step is deterministic. -/
 theorem bounded_step_eq_succ
     (hDet : ∀ C C₁ C₂, Step C C₁ → Step C C₂ → C₁ = C₂)
@@ -80,6 +82,8 @@ theorem bounded_step_eq_succ
   intro C' hB
   have hStep' : Step Cpre C' := BoundedStep_implies_Step hB
   exact hDet _ _ _ hStep' hstep
+
+/-! ## Receive-Step Occupancy Monotonicity -/
 
 /-- A concrete recv step cannot increase the max buffer occupancy. -/
 theorem recv_step_nonincrease_maxBufferOccupancy
@@ -129,6 +133,8 @@ theorem recv_step_nonincrease_maxBufferOccupancy
   | par_right hProc _ =>
       exact False.elim (by simpa [hProcRecv] using hProc)
 
+/-! ## Base-Regime Step Determinism -/
+
 /-- Step determinism in a regime where every step is a base step and
     `par`-head processes are excluded. -/
 theorem step_deterministic_of_base_regime
@@ -169,6 +175,8 @@ theorem no_bounded_step_of_overflow
         simpa [hEq] using hSuccGt
       exact (not_lt_of_ge hleB hSuccGt')
 
+/-! ## Lower-Bound Existence Theorem -/
+
 /-- **Theorem 2 (Lower bound)**: For buffer size B < B_c, there exists a
     bounded-reachable configuration that gets stuck under bounded semantics.
     Note: Uses BoundedStuck (no bounded step) rather than Deadlocked (no step at all).
@@ -201,6 +209,8 @@ theorem bounded_stuck_below_critical (C₀ : Config)
         recv_step_nonincrease_maxBufferOccupancy (C := C) (C' := C') hstep hRecv)
       Csucc hstepPre hPreLe hSuccGt
   exact ⟨Cpre, hBreachPre, ⟨hNotTerm, hNoBounded⟩⟩
+
+/-! ## Sharp Phase-Transition Theorem -/
 
 /-- **Theorem 3 (Sharpness)**: The transition at B_c is sharp — there is a single
     threshold such that:
@@ -238,6 +248,8 @@ theorem phase_transition_sharp (C₀ : Config)
       exact hBoundedReach B C hreach hle
     exact bounded_stuck_below_critical C₀ B hB hInit'
       hBoundedReach' hDet hTerminalNoStep
+
+/-! ## Base-Regime Specialization -/
 
 /-- `phase_transition_sharp` specialized to a deterministic base-step regime. -/
 theorem phase_transition_sharp_of_base_regime (C₀ : Config)
@@ -354,6 +366,8 @@ theorem foldl_add_shift (l : List Nat) (n : Nat) :
         _ = n + (h + t.foldl (· + ·) 0) := by simp [Nat.add_assoc]
         _ = n + t.foldl (· + ·) h := by rw [← ih2]
 
+/-! ## Total-Depth Decomposition and Summation Bounds -/
+
 /-- Total depth for a non-empty GEnv is head depth plus tail depth. -/
 theorem totalTypeDepthG_cons (ep : Endpoint) (L : LocalType) (rest : GEnv) :
     totalTypeDepthG ((ep, L) :: rest) = L.depth + totalTypeDepthG rest := by
@@ -385,6 +399,8 @@ theorem foldl_add_le_of_all_le {l : List Nat} {B : Nat}
             B + tl.length * B = tl.length * B + B := by ac_rfl
             _ = (tl.length + 1) * B := by simpa [Nat.succ_mul, Nat.add_comm]
         _ = (hd :: tl).length * B := by simp
+
+/-! ## Total-Depth Bound from Endpoint Depth Bound -/
 
 /-- Bounded per-endpoint depth yields a bound on total depth. -/
 theorem totalTypeDepth_le_mul_of_depth_bound (C : Config) (d : Nat)
