@@ -176,6 +176,9 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
   intro e hSidNe hActive'
   let senderEp : Endpoint := { sid := e.sid, role := e.sender }
   let receiverEp : Endpoint := { sid := e.sid, role := e.receiver }
+
+  /-! ### Global Lookup Frame Equalities -/
+
   have hSenderEq : lookupG (SessionStore.toGEnv store') senderEp =
       lookupG (SessionStore.toGEnv store) senderEp := by
     calc
@@ -196,6 +199,9 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
             exact hFrame receiverEp (by simpa [receiverEp] using hSidNe)
       _ = lookupG (SessionStore.toGEnv store) receiverEp :=
             (store_lookupType_eq_lookupG (hWF := hWF)).symm
+
+  /-! ### Trace Lookup Equality -/
+
   have hTraceEq : lookupD (SessionStore.toDEnv store') e =
       lookupD (SessionStore.toDEnv store) e := by
     calc
@@ -206,6 +212,9 @@ theorem instr_preserves_HeadCoherent_other {store store' : SessionStore ν}
             exact hFrameD e hSidNe
       _ = lookupD (SessionStore.toDEnv store) e :=
             (store_lookupTrace_eq_lookupD (hWF := hWF)).symm
+
+  /-! ### ActiveEdge and HeadCoherent Transfer -/
+
   have hActive : ActiveEdge (SessionStore.toGEnv store) e := by
     unfold ActiveEdge at hActive' ⊢
     constructor
