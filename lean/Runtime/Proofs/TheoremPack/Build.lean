@@ -27,6 +27,8 @@ section
 variable {ν : Type u} [VerificationModel ν]
 
 
+/-! ## Theorem Pack Structure -/
+
 structure VMTheoremPack
     {store₀ : SessionStore ν} {State : Type v}
     (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) where
@@ -61,6 +63,8 @@ structure VMTheoremPack
   concentration? : Option Adapters.ConcentrationArtifact
   littlesLaw? : Option Adapters.LittlesLawArtifact
   functionalCLT? : Option Adapters.FunctionalCLTArtifact
+
+/-! ## Builder -/
 
 /-- Build theorem artifacts from one invariant space. -/
 def buildVMTheoremPack
