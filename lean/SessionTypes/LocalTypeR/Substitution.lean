@@ -42,6 +42,8 @@ theorem isFreeIn_false_of_closed (lt : LocalTypeR) (v : String) :
   | false =>
       simpa using hfree
 
+/-! ## Substitute-Not-Free Idempotence -/
+
 mutual
   theorem substitute_not_free (e : LocalTypeR) (x : String) (rx : LocalTypeR)
       (hnot_free : LocalTypeR.isFreeIn x e = false) :
@@ -82,6 +84,8 @@ mutual
           simp [LocalTypeR.substitute, hbeq, hbody']
   termination_by sizeOf e
 
+  /-! ## Substitute-Not-Free on Branch Lists -/
+
   theorem substituteBranches_not_free (bs : List BranchR) (x : String) (rx : LocalTypeR)
       (hnot_free : isFreeInBranches' x bs = false) :
       LocalTypeR.substituteBranches bs x rx = bs := by
@@ -97,6 +101,8 @@ mutual
         simp [LocalTypeR.substituteBranches, h1, h2, -substituteBranches_eq_map]
   termination_by sizeOf bs
 end
+
+/-! ## Environment Application on Closed Types -/
 
 theorem apply_env_of_closed (env : Env) (lt : LocalTypeR) :
     lt.isClosed → Env.apply env lt = lt := by
@@ -116,6 +122,8 @@ theorem applyActiveEnv_eq_of_closed (lt : LocalTypeR) :
     lt.isClosed → applyActiveEnv lt = lt := by
   intro hclosed
   simpa [applyActiveEnv] using apply_env_of_closed ActiveEnv lt hclosed
+
+/-! ## Full-Unfold Free-Variable Consequences -/
 
 /-- If `fullUnfold lt = .var v`, then `v` is free in `lt`. -/
 theorem fullUnfold_var_is_free (lt : LocalTypeR) (v : String) :
@@ -142,6 +150,8 @@ theorem LocalTypeR.fullUnfold_not_var_of_closed {lt : LocalTypeR}
   have : False := by
     simpa [hnil] using hmem
   exact this.elim
+
+/-! ## muHeight Under Guarded Substitution -/
 
 /-- Substituting a term for a guarded variable does not increase `muHeight`.
 
@@ -179,6 +189,8 @@ theorem muHeight_substitute_guarded (t : String) (body e : LocalTypeR) :
         have := Nat.add_le_add_left ih 1
         simpa [LocalTypeR.substitute, LocalTypeR.muHeight, hbeq_st] using this
 termination_by sizeOf body
+
+/-! ## Guardedness Under Substitution -/
 
 /-- Guardedness is preserved by substitution when the replacement is closed. -/
 theorem isGuarded_substitute (body : LocalTypeR) (t v : String) (e : LocalTypeR) :
@@ -224,6 +236,8 @@ theorem isGuarded_substitute_other (body : LocalTypeR) (t v : String) (e : Local
 
 -- NOTE: isContractive_substitute_mu is proved in LocalTypeRDBBridge.lean
 
+/-! ## Contractiveness Under Substitution -/
+
 mutual
   /-- Substitution preserves contractiveness when the replacement is closed and contractive.
       The mu case requires closedness to avoid introducing unguarded variables. -/
@@ -263,6 +277,8 @@ mutual
             isContractive_substitute body t e hbody_contr hcontr hclosed
           simp [LocalTypeR.substitute, LocalTypeR.isContractive, hbeq, hguard', hbody']
   termination_by sizeOf body
+
+  /-! ## Contractiveness on Branch Substitution -/
 
   theorem isContractiveBranches_substitute (bs : List BranchR) (t : String) (e : LocalTypeR) :
       isContractiveBranches bs = true → e.isContractive = true → e.isClosed →
@@ -306,6 +322,8 @@ theorem LocalTypeR.isClosed_substitute_mu {t : String} {body : LocalTypeR}
   -- Contradiction with hfilter_nil
   simpa [hfilter_nil] using hmem_filter
 
+/-! ## ClosedUnder Preservation Through Env.apply -/
+
 theorem closedUnder_substitute_closed {env : Env} {t : LocalTypeR}
     (v : String) (u : LocalTypeR) :
     u.isClosed → ClosedUnder ((v, u) :: env) t → ClosedUnder env (t.substitute v u) := by
@@ -319,6 +337,8 @@ theorem closedUnder_substitute_closed {env : Env} {t : LocalTypeR}
   cases hx_dom' with
   | inl hx_eq => exact (hxne hx_eq).elim
   | inr hx_rest => exact hx_rest
+
+/-! ## Closedness Through Env.apply -/
 
 theorem isClosed_apply_of_closed_env (env : Env) (t : LocalTypeR) :
     EnvWellFormed env → ClosedUnder env t → (Env.apply env t).isClosed := by
@@ -336,6 +356,8 @@ theorem isClosed_apply_of_closed_env (env : Env) (t : LocalTypeR) :
           have hclosed_apply := ih (t := t.substitute v u) hWF_rest hclosed_subst
           simpa [Env.apply] using hclosed_apply
 
+/-! ## Contractiveness Through Env.apply -/
+
 theorem isContractive_apply_of_closed_env (env : Env) (t : LocalTypeR) :
     EnvWellFormed env → t.isContractive = true → (Env.apply env t).isContractive = true := by
   intro hWF hcontr
@@ -350,6 +372,8 @@ theorem isContractive_apply_of_closed_env (env : Env) (t : LocalTypeR) :
             isContractive_substitute t v u hcontr hu_contr hu_closed
           have hcontr_apply := ih (t := t.substitute v u) hWF_rest hcontr_subst
           simpa [Env.apply] using hcontr_apply
+
+/-! ## Iterated Unfold Bound for Closed Contractive Types -/
 
 /-- Iterating `unfold` at least `muHeight` times on a closed, contractive type yields `muHeight = 0`. -/
 theorem iterate_unfold_bounded_contractive (k : Nat) (e : LocalTypeR)
@@ -397,6 +421,8 @@ theorem iterate_unfold_bounded_contractive (k : Nat) (e : LocalTypeR)
           have ih' := ih (e := body.substitute t (.mu t body)) hsubst_contr hsubst_closed hsubst_h
           -- unfold^[k+1] (.mu t body) = unfold^[k] (body.substitute t (.mu t body))
           simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using ih'
+
+/-! ## fullUnfold Non-Recursive Shape Corollary -/
 
 theorem LocalTypeR.fullUnfold_non_mu_of_contractive {lt : LocalTypeR}
     (hcontr : lt.isContractive = true) (hclosed : lt.isClosed) : lt.fullUnfold.muHeight = 0 := by
