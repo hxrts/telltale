@@ -20,6 +20,7 @@ open scoped Classical
 section
 /-! ## Linking Theorems -/
 
+/-! ## Merge Typing Infrastructure -/
 theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffers)
     (hTyped₁ : BuffersTyped G₁ D₁ B₁)
     (hTyped₂ : BuffersTyped G₂ D₂ B₂)
@@ -28,6 +29,7 @@ theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffe
     (hConsB₁ : BConsistent G₁ B₁)
     (hDom₁ : BufsDom B₁ D₁) :
     BuffersTyped (mergeGEnv G₁ G₂) (mergeDEnv D₁ D₂) (mergeBufs B₁ B₂) := by
+  /-! ## mergeBufs_typed: Case Split on Left Trace Presence -/
   intro e
   cases hFindD₁ : D₁.find? e with
   | none =>
@@ -67,6 +69,7 @@ theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffe
                 simpa [mergeGEnv] using
                   (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
             simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
+  /-! ## mergeBufs_typed: Left Trace Present Case -/
   | some ts₁ =>
       have hB₁_not_none : B₁.lookup e ≠ none := by
         intro hNone
@@ -93,6 +96,7 @@ theorem mergeBufs_typed (G₁ G₂ : GEnv) (D₁ D₂ : DEnv) (B₁ B₂ : Buffe
                 (lookupG_append_left (G₁ := G₁) (G₂ := G₂) (e := ep) (L := L) hLookup))
           simpa [BufferTyped, hTraceEq, hBufEq] using hBT₁'
 
+/-! ## Linear Context Merge Lemmas -/
 theorem mergeLin_valid (G₁ G₂ : GEnv) (L₁ L₂ : LinCtx)
     (hValid₁ : ∀ e S, (e, S) ∈ L₁ → lookupG G₁ e = some S)
     (hValid₂ : ∀ e S, (e, S) ∈ L₂ → lookupG G₂ e = some S)
@@ -126,6 +130,7 @@ theorem mergeLin_unique (L₁ L₂ : LinCtx)
   have hNo : (a.1, b.2) ∉ L₂ := hDisjoint a.1 ⟨a.2, ha⟩ b.2
   exact hNo hb'
 
+/-! ## Coherence Component Merge Lemmas -/
 private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
     (hHead₁ : HeadCoherent G₁ D₁)
     (hHead₂ : HeadCoherent G₂ D₂)
@@ -176,6 +181,7 @@ private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
           | _ => True := by
         simpa [HeadCoherent, hLeft] using hHeadLeft
       simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
+  /-! ## HeadCoherent_merge: Receiver-Origin in Right Component -/
   | inr hRight =>
       have hSid : e.sid ∈ SessionsOf G₂ :=
         ⟨{ sid := e.sid, role := e.receiver }, Lrecv, hRight.2, rfl⟩
@@ -213,6 +219,7 @@ private theorem HeadCoherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
         simpa [HeadCoherent, hRight.2] using hHeadRight
       simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadRight'
 
+/-! ## ValidLabels Merge Lemma -/
 private theorem ValidLabels_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {B₁ B₂ : Buffers}
     (hValid₁ : ValidLabels G₁ D₁ B₁)
     (hValid₂ : ValidLabels G₂ D₂ B₂)
@@ -262,6 +269,7 @@ private theorem ValidLabels_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {B₁ B�
         simp [lookupBuf, mergeBufs, List.lookup_append, hB₁none]
       simpa [ValidLabels, mergeGEnv, hBufEq] using hValid₂ e source bs hActive₂ hRight.2
 
+/-! ## WTMon Linking Preservation -/
 theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
     (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
@@ -285,6 +293,7 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
         p₁.initBufs p₂.initBufs
         hWT₁.buffers_typed hWT₂.buffers_typed
         hDisjG p₂.dConsistent_cert p₁.bConsistent_cert p₁.bufsDom_cert
+  /-! ## link_preserves_WTMon_full: Linear-Context Obligations -/
   · -- lin_valid
     intro e S hMem
     simpa [composeMonitorState] using
@@ -307,6 +316,7 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
               rw [← hEmpty]
               exact hInter
             exact this.elim)
+  /-! ## link_preserves_WTMon_full: Supply Freshness Obligations -/
   · -- supply_fresh (Lin)
     intro e S hMem
     have hMem' : (e, S) ∈ p₁.initMonitorState.Lin ++ p₂.initMonitorState.Lin := by
@@ -326,6 +336,7 @@ theorem link_preserves_WTMon_full (p₁ p₂ : DeployedProtocol)
     | inr hIn =>
         exact Nat.lt_of_lt_of_le (hWT₂.supply_fresh_G e S hIn) (Nat.le_max_right _ _)
 
+/-! ## WTMon Convenience Corollaries -/
 theorem link_preserves_WTMon (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
     (hDisjG : DisjointG p₁.initGEnv p₂.initGEnv)
@@ -352,6 +363,7 @@ theorem link_preserves_WTMon_complete_full (p₁ p₂ : DeployedProtocol)
     WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) :=
   link_preserves_WTMon_complete p₁ p₂ hLink hDisjG hWT₁ hWT₂
 
+/-! ## Composition and Delegation Story Theorems -/
 theorem disjoint_sessions_independent (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOK p₁ p₂) :
     p₁.sessionId ≠ p₂.sessionId := by
@@ -381,6 +393,7 @@ theorem compose_deadlock_free (p₁ p₂ : DeployedProtocol)
       · simpa [composeBundle, ProtocolBundle.fromDeployed, List.elem_eq_mem, hIn₁] using hDF₁ r hIn₁
       · simpa [composeBundle, ProtocolBundle.fromDeployed, List.elem_eq_mem, hIn₁, hIn₂] using hDF₂ r hIn₂
 
+/-! ## Harmony Preservation Corollary -/
 /-- Static compositional harmony: linking preserves complete monitor invariants. -/
 theorem link_harmony_through_link (p₁ p₂ : DeployedProtocol)
     (hLink : LinkOKFull p₁ p₂)
@@ -390,6 +403,7 @@ theorem link_harmony_through_link (p₁ p₂ : DeployedProtocol)
     WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) :=
   link_preserves_WTMon_complete p₁ p₂ hLink hDisjG hWT₁ hWT₂
 
+/-! ## Delegation Preservation in Composed Systems -/
 /-- Delegation inside one component of a composed system preserves composed coherence.
 
     Assumes delegation transforms the left component `(G₁,D₁)` into `(G₁',D₁')`
@@ -408,6 +422,7 @@ theorem delegation_within_composed_preserves_coherent
     delegation_preserves_coherent G₁ G₁' D₁ D₁' s A B hCoh₁ hDeleg
   exact link_preserves_coherent G₁' G₂ D₁' D₂ hCoh₁' hCoh₂ hDisjG' hCons₁' hCons₂
 
+/-! ## Flagship Delegation Composition Theorem -/
 /-- Flagship composed-system conservation theorem.
 
 If two components compose coherently before delegation, and one component performs
@@ -433,6 +448,7 @@ theorem flagship_composed_system_conservation
       G₁ G₁' G₂ D₁ D₁' D₂ s A B hDeleg hCoh₁ hCoh₂ hDisjG' hCons₁' hCons₂
   exact ⟨hPre, hPost⟩
 
+/-! ## Deployed Delegation Preservation -/
 /-- Paper 3 story-level theorem: delegation in composed systems (deployed form).
 
 Given two deployed protocols that link coherently, if the left protocol performs
@@ -455,7 +471,7 @@ theorem delegation_in_composed_systems
       p₁.initGEnv G₁' p₂.initGEnv p₁.initDEnv D₁' p₂.initDEnv s A B
       hDeleg p₁.coherence_cert p₂.coherence_cert hDisjG' hCons₁' p₂.dConsistent_cert
   exact ⟨hPre, hPost⟩
-
+/-! ## Consolidated Composition Story Theorem -/
 /-- Consolidated Paper 3 story theorem:
 linking harmony plus delegation preservation in composed systems. -/
 theorem delegation_composition_story_complete
