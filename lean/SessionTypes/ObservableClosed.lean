@@ -77,6 +77,8 @@ section
 
 universe u
 
+/-! ## Finite-Index Utilities -/
+
 inductive PFin2 : Nat → Type u
   | fz {n} : PFin2 (n + 1)
   | fs {n} : PFin2 n → PFin2 (n + 1)
@@ -114,6 +116,8 @@ macro_rules (kind := vec_notation)
   | `(![])              => `(Vec.nil)
   | `(![$x])            => `(Vec.append1 Vec.nil $x)
   | `(![$xs,*, $x])     => `(Vec.append1 ![$xs,*] $x)
+
+/-! ## Type-Vector and Functor Core -/
 
 def ITreeTypeVec (n : Nat) := PFin2 n → Type u
 
@@ -159,6 +163,8 @@ theorem ITreeMvPFunctor.map_id {n : Nat} {P : ITreeMvPFunctor.{u} n} {α : ITree
 theorem ITreeMvPFunctor.map_comp {n : Nat} {P : ITreeMvPFunctor.{u} n} {α β γ : ITreeTypeVec n} (f : α ⟹ β) (g : β ⟹ γ) (x : P.Obj α) :
     ITreeMvPFunctor.map g (ITreeMvPFunctor.map f x) = ITreeMvPFunctor.map (g ⊚ f) x := by
       exact rfl
+
+/-! ## QPF Construction Helpers -/
 
 class ITreeMvQPF {n : Nat} (F : ITreeTypeVec n → Type u) extends ITreeMvFunctor F where
   P : ITreeMvPFunctor.{u} n
@@ -208,6 +214,8 @@ def ITreeMvQPF.ofPolynomial {n : Nat} {F : ITreeTypeVec n → Type u} (P : ITree
     : ITreeMvQPF F :=
   ITreeMvQPF.ofIsomorphism P.Obj (q := ITreeMvQPF.instMvQPFObj P) box unbox box_unbox_id unbox_box_id map_eq
 
+/-! ## ITree Head/Child Polynomial Encoding -/
+
 inductive HeadT : Type 1
   | ret
   | tau
@@ -241,8 +249,12 @@ theorem box_unbox_id {α : ITreeTypeVec 2} (x : P.Obj α) : box (unbox x) = x :=
 
 theorem unbox_box_id {α : ITreeTypeVec 2} (x : F α) : unbox (box x) = x := rfl
 
+/-! ## Canonical ITree QPF Instance -/
+
 instance instMvQPF : ITreeMvQPF F :=
   ITreeMvQPF.ofPolynomial P box unbox box_unbox_id unbox_box_id (by intros; rfl)
+
+/-! ## Product and Projection Functors -/
 
 def ProdF : ITreeTypeVec.{u} 2 → Type u := fun α => α 0 × α 1
 
@@ -261,6 +273,8 @@ def box_Prj {n : Nat} {i : PFin2 n} {α : ITreeTypeVec n} (x : PrjF i α) : (P_P
 def unbox_Prj {n : Nat} {i : PFin2 n} {α : ITreeTypeVec n} (x : (P_Prj i).Obj α) : PrjF i α :=
   x.2 i (ULift.up (PLift.up rfl))
 
+/-! ## Projection QPF Instance -/
+
 def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
   ITreeMvQPF.ofPolynomial (P_Prj i) box_Prj unbox_Prj (by
   -- By definition of `box_Prj` and `unbox_Prj`, they are inverses of each other.
@@ -276,4 +290,3 @@ def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
   -- The identity function is its own inverse.
   simp [unbox_Prj, box_Prj]) (by
   exact fun α β f a => rfl)
-
