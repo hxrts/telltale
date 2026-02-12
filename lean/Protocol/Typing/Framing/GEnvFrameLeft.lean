@@ -61,6 +61,7 @@ private lemma eraseSEnv_domsubset {S : SEnv} {x : Var} :
               exact ⟨T', by simpa [lookupSEnv, List.lookup, hbeq] using hT'⟩
 
 /-- Pre-out typing only preserves or erases right-owned bindings. -/
+/-! ## Right-Owned Domain Monotonicity -/
 private lemma HasTypeProcPreOut_right_domsubset
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv} {P : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
@@ -94,6 +95,7 @@ private lemma HasTypeProcPreOut_right_domsubset
         (eraseSEnv_domsubset : SEnvDomSubset (eraseSEnv _ _) _)
 
 /-- Helper: reframe the left-par pre-out typing across an empty right frame. -/
+/-! ## Left-Par Framing: Reframe to Empty Right -/
 private lemma frame_left_par_reframe
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr Gleft Gleft' G₂ G₂' : GEnv} {P Q : Process}
     {S₁ S₂ S₁' S₂' : SEnv} {W₁ W₂ : Footprint} {Δ₁ Δ₂ : DeltaSEnv} :
@@ -120,6 +122,7 @@ private lemma frame_left_par_reframe
   exact ⟨hP0, hQ0⟩
 
 /-- Helper: assemble the par case with empty right frame. -/
+/-! ## Left-Par Framing: Apply Core Par Rule -/
 private lemma frame_left_par_apply
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process} {nS nG : Nat}
     {Sfin : OwnedEnv} {Gfin : GEnv} {Wfin : Footprint} {Δfin : DeltaSEnv}
@@ -166,6 +169,7 @@ private lemma frame_left_par_apply
     hQ hDisjEmpty_left hDisjEmpty_fin hDisjGfrG ihP
 
 /-- Helper: restore the right-owned frame after a par step. -/
+/-! ## Left-Par Framing: Restore Right-Owned Frame -/
 private lemma frame_left_par_restore
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process} {nS nG : Nat}
     {S₁' S₂' : SEnv} {Gfin : GEnv} {Wfin : Footprint} {Δfin : DeltaSEnv} :
@@ -182,6 +186,7 @@ private lemma frame_left_par_restore
     (G:=Gfr ++ G) (P:=.par nS nG P Q) hDisjIn hDisjOut hPar0
 
 /-- Frame on the left: par (constructive). -/
+/-! ## Left-Par Framing: Constructive Assembly -/
 private lemma HasTypeProcPreOut_frame_G_left_par
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process} {nS nG : Nat}
     {Sfin : OwnedEnv} {Gfin : GEnv} {Wfin : Footprint} {Δfin : DeltaSEnv}
@@ -225,6 +230,7 @@ private lemma HasTypeProcPreOut_frame_G_left_par
   simpa [hSfin] using hPar1
 
 /-- Frame a disjoint GEnv on the left of pre-out typing. -/
+/-! ## Main Left-Frame Theorem -/
 lemma HasTypeProcPreOut_frame_G_left
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv} :
@@ -236,9 +242,11 @@ lemma HasTypeProcPreOut_frame_G_left
   -- Dispatch by constructor, extending lookups and updates across the frame.
   intro hDisj hDisjRightIn h hDisjRightOut
   induction h with
+  /-! ## Left-Frame Case: skip -/
   | skip =>
       rename_i Sown G
       simpa using (HasTypeProcPreOut.skip (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G))
+  /-! ## Left-Frame Case: send -/
   | send hk hG hx =>
       rename_i Sown G k x e q T L
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -248,6 +256,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
         (HasTypeProcPreOut.send (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hx)
+  /-! ## Left-Frame Case: recv_new -/
   | recv_new hk hG hNoSh hNoOwnL =>
       rename_i Sown G k x e p T L
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -257,6 +266,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
         (HasTypeProcPreOut.recv_new (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hNoSh hNoOwnL)
+  /-! ## Left-Frame Case: recv_old -/
   | recv_old hk hG hNoSh hOwn =>
       rename_i Sown G k x e p T L T'
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -266,6 +276,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
         (HasTypeProcPreOut.recv_old (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hNoSh hOwn)
+  /-! ## Left-Frame Case: select -/
   | select hk hG hbs =>
       rename_i Sown G k l e q bs L
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -275,6 +286,7 @@ lemma HasTypeProcPreOut_frame_G_left
       have hUpd := updateG_append_left (G₁:=Gfr) (G₂:=G) (e:=e) (L:=L) hNone
       simpa [hUpd] using
         (HasTypeProcPreOut.select (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G) hk hG'' hbs)
+  /-! ## Left-Frame Case: branch -/
   | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight ihOutLbl =>
       rename_i Sown G k procs e p bs Sfin Gfin W Δ
       have hNone := lookupG_none_of_disjoint hDisj hG
@@ -328,6 +340,7 @@ lemma HasTypeProcPreOut_frame_G_left
             exact SessionsOf_append_right (G₁:=Gfr) (hSess hsR)
       exact HasTypeProcPreOut.branch (Ssh:=Ssh) (Sown:=Sown) (G:=Gfr ++ G)
         hk hG'' hLen hLabels hBodies' hOutLbl' hSess' hDom hRight
+  /-! ## Left-Frame Case: seq -/
   | seq hP hQ ihP ihQ =>
       rename_i Sown G P Q S₁ G₁ S₂ G₂ W₁ W₂ Δ₁ Δ₂
       have hDomQ : SEnvDomSubset S₁.left S₂.left := HasTypeProcPreOut_domsubset hQ
@@ -347,6 +360,7 @@ lemma HasTypeProcPreOut_frame_G_left
         exact DisjointG_symm hDisj'
       have hQ' := ihQ hDisjG1fr hDisjMidIn hDisjMidOut
       exact HasTypeProcPreOut.seq hP' hQ'
+  /-! ## Left-Frame Case: par -/
   | par split hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
       hDisjW hDisjΔ hP hQ ihP ihQ =>
       rename_i Sown G P Q Sfin Gfin W Δ S₁' S₂' G₁' G₂' W₁ W₂ Δ₁ Δ₂ nS nG
@@ -378,16 +392,19 @@ lemma HasTypeProcPreOut_frame_G_left
       exact HasTypeProcPreOut_frame_G_left_par (Ssh:=Ssh) (Gfr:=Gfr) (split:=split)
         hSlen hSfin hGfin hW hΔ hDisjG hDisjS hDisjS_left hDisjS_right hDisjS'
         hDisjRightIn hDisjRightOut' hDisjW hDisjΔ hP' hQ hDisjGfrG1 hDisjGfrG2
+  /-! ## Left-Frame Case: assign_new -/
   | assign_new hNoSh hNoOwnL hv =>
       rename_i Sown G x v T
       have hv' := HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv
       exact HasTypeProcPreOut.assign_new hNoSh hNoOwnL hv'
+  /-! ## Left-Frame Case: assign_old -/
   | assign_old hNoSh hOwn hv =>
       rename_i Sown G x v T T'
       have hv' := HasTypeVal_frame_left (G₁:=Gfr) (G₂:=G) hDisj hv
       exact HasTypeProcPreOut.assign_old hNoSh hOwn hv'
 
 /-- Regression lemma: left G-framing is independent of the ambient par `nG` index. -/
+/-! ## Left-Par Framing Regression -/
 lemma HasTypeProcPreOut_frame_G_left_par_nG_irrel
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfr G : GEnv} {P Q : Process}
     {Sfin : OwnedEnv} {Gfin : GEnv} {W : Footprint} {Δ : DeltaSEnv}
