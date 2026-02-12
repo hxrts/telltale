@@ -58,6 +58,7 @@ theorem HasTypeProcPreOut_par_nG_irrel
     **Compositionality**: Parallel processes have disjoint resources -/
 inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffers → Process →
                       GEnv → DEnv → OwnedEnv → VarStore → Buffers → Process → Prop
+  /-! ## Communication Constructors -/
   | send {G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'} :
       -- Pre-conditions (resources consumed)
       lookupStr store k = some (.chan e) →
@@ -100,6 +101,8 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       TypedStep G D Ssh Sown store bufs (.recv k x)
                 G' D' Sown' store' bufs' .skip
 
+  /-! ## Choice Constructors -/
+
   | select {G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'} :
       -- Pre-conditions (resources consumed)
       lookupStr store k = some (.chan e) →
@@ -139,6 +142,8 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       TypedStep G D Ssh Sown store bufs (.branch k procs)
                 G' D' Sown store bufs' P
 
+  /-! ## Assignment And Sequential Constructors -/
+
   | assign {G D Ssh Sown store bufs x v T S' store'} :
       -- Pre-condition: value is well-typed
       HasTypeVal G v T →
@@ -163,6 +168,8 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       -- Skip elimination (identity transition)
       TypedStep G D Ssh Sown store bufs (.seq .skip Q)
                 G D Sown store bufs Q
+
+  /-! ## Parallel Constructors -/
 
   | par_left {Ssh Sown store bufs store' bufs' P P' Q G D₁ D₂ G₁' D₁' S₁' nS nG}
       (split : ParSplit Sown.left G) :
@@ -216,6 +223,8 @@ inductive TypedStep : GEnv → DEnv → SEnv → OwnedEnv → VarStore → Buffe
       TypedStep G D Ssh Sown store bufs (.par nS nG P .skip)
                 G D Sown store bufs P
 
+/-! ## Parallel Inversion View -/
+
 /-- Inversion view for `TypedStep` on parallel processes. -/
 theorem TypedStep_par_inv
     {G D Ssh Sown store bufs P Q nS nG G' D' Sown' store' bufs' P'} :
@@ -258,6 +267,7 @@ theorem TypedStep_par_inv
       left
       exact ⟨⟨split, hSlen⟩, _, _, _, _, _, _, rfl, hInner, hDisjG, hDisjD, hDisjS,
         rfl, rfl, rfl, rfl⟩
+  /-! ## Parallel Skip Inversion Cases -/
   | par_skip_left =>
       right
       right
