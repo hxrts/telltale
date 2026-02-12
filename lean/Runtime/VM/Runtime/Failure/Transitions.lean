@@ -39,6 +39,8 @@ theorem decideRecovery_deterministic
   intro a₁ a₂ h₁ h₂
   simpa [h₁] using h₂
 
+/-! ### Recovery action application -/
+
 /-- Apply a concrete recovery action to state. -/
 def applyRecoveryAction {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -62,6 +64,8 @@ def applyRecoveryAction {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     | .quarantineEdge edge => s!"recovery:quarantine sid={edge.sid}"
     | .reconcileThenRetry ticks => s!"recovery:reconcile_then_retry ticks={ticks}"
   appendFailureTraceEvent st' .recovery detail
+
+/-! ### Single-failure transition with deterministic evidence -/
 
 /-- Apply one failure event, including deterministic recovery action selection. -/
 def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -109,6 +113,9 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       let act : RecoveryAction := .continue
       let st'' := applyRecoveryAction st' act
       emitStructuredErrorEvent st'' (faultClassOfFailure f) evidence.certainty act evidence.evidenceId evidence.detail
+
+  /-! #### Corruption and timeout branches -/
+
   | .corrupt edge _seqNo =>
       let st' := reconcileBeforeReplay st0 edge.sid
       let evidence : RecoveryEvidence :=
@@ -138,6 +145,8 @@ def applyFailure {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       let st'' := applyRecoveryAction st' act
       emitStructuredErrorEvent st'' (faultClassOfFailure f) evidence.certainty act evidence.evidenceId evidence.detail
 
+/-! ### Batched failure ingress -/
+
 /-- Apply a failure-event batch in deterministic arrival order. -/
 def applyFailureEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -148,6 +157,8 @@ def applyFailureEvents {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     (st : VMState ι γ π ε ν) (events : List (Failure ι)) :
     VMState ι γ π ε ν :=
   events.foldl applyFailure st
+
+/-! ### Tick-level ingress orchestration -/
 
 /-- Deterministic ingress for one runtime tick.
     Topology/environment events are applied first, then failure events, then scheduling. -/
@@ -166,6 +177,8 @@ def ingressTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | some st''' => st'''
   | none => st''
 
+/-! ### Failure-aware scheduler fallback tick -/
+
 /-- Execute one failure-aware tick: consume at most one failure event, otherwise schedule. -/
 def failureTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -180,6 +193,8 @@ def failureTick {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       match schedStep st with
       | some st' => st'
       | none => st
+
+/-! ### Relational failure-step semantics -/
 
 inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -200,4 +215,3 @@ inductive FStep {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | closeOnCrash (st : VMState ι γ π ε ν) (sid : SessionId) :
       -- Surviving participants can close sessions after a crash.
       FStep st (closeSession st sid)
-
