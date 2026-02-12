@@ -84,6 +84,8 @@ inductive StepResult where
 
 Given a triple, compute its successors according to AsyncStep rules. -/
 
+/-! ### Local head/label utilities -/
+
 /-- Get children of a type at given head. -/
 def getChildren (t : LocalTypeC) : List LocalTypeC :=
   match PFunctor.M.dest t with
@@ -103,6 +105,8 @@ def getLabels (t : LocalTypeC) : List Label :=
 def findLabelIdx (labels : List Label) (msg : Label) : Option (Fin labels.length) :=
   labels.findIdx? (· == msg) |>.bind fun idx =>
     if h : idx < labels.length then some ⟨idx, h⟩ else none
+
+/-! ### Bounded successor computation -/
 
 /-- Compute async step successors for a triple.
 
@@ -133,6 +137,8 @@ def checkAsyncStep (unfoldBound : Nat) (t : AsyncTriple) : StepResult :=
         let childrenS := getChildren S
         let labels := getLabels S
         .continue (childrenS.zipWith (fun s lbl => ⟨s, T, buf ++ [lbl]⟩) labels)
+
+  /-! #### Receive/terminal mismatch handling -/
 
   -- Both recv: check label match, continue with children
   | .recv pS labelsS, .recv pT labelsT, _ =>
