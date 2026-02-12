@@ -35,6 +35,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
     G' D' Sown' store' bufs' P' Sfin Gfin W Δ
     hStore hDisjShAll hOwn hDisjLM hDisjLR hDisjMR hEqG hTS hDisjRightFin hPre
   induction hTS generalizing Gstore Gleft Gmid Gright Sfin Gfin W Δ with
+  /-! ## Communication Constructors -/
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       exact preserved_sub_middle_send hStore hOwn hDisjLM hEqG hk hG hGout
@@ -51,6 +52,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
       exact preserved_sub_middle_branch hStore hOwn hDisjLM hEqG hk hG hFindP hFindT hGout
         (TypedStep.branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut) hPre
+  /-! ## Assignment Constructor -/
   | assign hv hSout hStoreOut =>
       rename_i G D Ssh Sown store bufs x v Tstep Sown' store'
       exact preserved_sub_middle_assign
@@ -60,6 +62,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
         hDisjLM hEqG rfl hSout hv
         (TypedStep.assign (D:=D) (bufs:=bufs) hv hSout hStoreOut) hPre
+  /-! ## Sequential Constructors -/
   | seq_step hStep ih =>
       rename_i G D Ssh Sown G' D' Sown' store bufs store' bufs' P P' Q
       have hMiddle : MiddleFrameGoal (hTS := hStep) := by
@@ -75,6 +78,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
         (G:=G) (Ssh:=Ssh) (Sown:=Sown) (Q:=Q)
         (Sfin:=Sfin) (Gfin:=Gfin) (W:=W) (Δ:=Δ)
         hEqG (TypedStep.seq_skip (D:=D) (store:=store) (bufs:=bufs) (Q:=Q)) hPre
+  /-! ## Parallel-Left Constructor -/
   | par_left split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh0 Sown0 store0 bufs0 store0' bufs0' P0 P0' Q0
         G0 D₁0 D₂0 G₁_step D₁_step S₁_step nS0 nG0
@@ -90,6 +94,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hSidesEq := ParSplit.sides_eq_of_len (split₁:=split) (split₂:=splitMid) hSlenEq
       have hS1Eq : split.S1 = splitMid.S1 := hSidesEq.1
       have hS2Eq : split.S2 = splitMid.S2 := hSidesEq.2
+      /-! ## `par_left`: Build Inner Framing Context -/
       have hStoreInner :
           StoreTyped Gstore (SEnvAll Ssh0 { right := Sown0.right ++ split.S2, left := split.S1 }) store0 :=
         StoreTyped_par_left_inner (split:=split) hDisjS hStore
@@ -112,6 +117,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hOwnInner :
           OwnedDisjoint ({ right := Sown0.right ++ split.S2, left := split.S1 } : OwnedEnv) :=
         DisjointS_append_left hDisjRightS1 (DisjointS_symm hDisjS)
+      /-! ## `par_left`: Session/Disjointness Projections -/
       have hSubG1 : SessionsOf splitMid.G1 ⊆ SessionsOf Gmid := by
         intro s hs
         simpa [splitMid, splitMid.hG] using
@@ -152,6 +158,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S2, left := split.S1 } splitMid.G1 P0
             { right := Sown0.right ++ split.S2, left := S₁_fin } G₁_fin W₁ Δ₁ := by
         simpa [splitMid, hS1Eq, hS2Eq] using hP_pre
+      /-! ## `par_left`: Apply IH On Left Branch -/
       obtain ⟨G₁_mid', W₁', Δ₁', hEqShape, hSubSess1, hP', hSubW1, hSubΔ1⟩ :=
         ih (Gstore:=Gstore) (Gleft:=Gleft) (Gmid:=splitMid.G1) (Gright:=splitMid.G2 ++ Gright)
           (Sfin:={ right := Sown0.right ++ split.S2, left := S₁_fin })
@@ -189,10 +196,12 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
             (L:=split.S2) (L':=S₂_fin) (G:=splitMid.G2) (P:=Q0)
             hDisjInQNew hDisjOutQNew hQ0
         simpa [splitMid, hS2Eq] using hTmp
+      /-! ## `par_left`: Reconstruct Combined Result -/
       have hP1 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ splitMid.S2, left := S₁_step } G₁_mid' P0'
             { right := Sown0.right ++ splitMid.S2, left := S₁_fin } G₁_fin W₁' Δ₁' := by
         simpa [splitMid, hS2Eq] using hP'
+      /-! ## `par_left`: Final Packing And Subsets -/
       have hDisjGFinal : DisjointG G₁_mid' splitMid.G2 :=
         DisjointG_of_subset_left hSubSess1 hDisjG_mid
       have hStepS2mid : DisjointS S₁_step splitMid.S2 := by
@@ -240,6 +249,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       refine ⟨G₁_mid' ++ splitMid.G2, W₁' ++ W₂, Δ₁' ++ Δ₂, ?_, hSubSessFinal, ?_, hSubWFinal, hSubΔFinal⟩
       · simpa [hEqGFinal]
       · simpa [splitMid, hS2Eq, List.append_assoc] using hParMid
+  /-! ## Parallel-Right Constructor -/
   | par_right split hSlen hTS hDisjG hDisjD hDisjS ih =>
       rename_i Ssh0 Sown0 store0 bufs0 store0' bufs0' P0 Q0 Q0'
         G0 D₁0 D₂0 G₂_step D₂_step S₂_step nS0 nG0
@@ -255,6 +265,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hSidesEq := ParSplit.sides_eq_of_len (split₁:=split) (split₂:=splitMid) hSlenEq
       have hS1Eq : split.S1 = splitMid.S1 := hSidesEq.1
       have hS2Eq : split.S2 = splitMid.S2 := hSidesEq.2
+      /-! ## `par_right`: Build Inner Framing Context -/
       have hStoreInner :
           StoreTyped Gstore (SEnvAll Ssh0 { right := Sown0.right ++ split.S1, left := split.S2 }) store0 := by
         simpa [SEnvAll, split.hS, List.append_assoc] using hStore
@@ -271,6 +282,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       have hOwnInner :
           OwnedDisjoint ({ right := Sown0.right ++ split.S1, left := split.S2 } : OwnedEnv) :=
         DisjointS_append_left hDisjRightS2 hDisjS
+      /-! ## `par_right`: Session/Disjointness Projections -/
       have hSubG1 : SessionsOf splitMid.G1 ⊆ SessionsOf Gmid := by
         intro s hs
         simpa [splitMid, splitMid.hG] using
@@ -312,6 +324,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ split.S1, left := split.S2 } splitMid.G2 Q0
             { right := Sown0.right ++ split.S1, left := S₂_fin } G₂_fin W₂ Δ₂ := by
         simpa [splitMid, hS1Eq, hS2Eq] using hQ_pre
+      /-! ## `par_right`: Apply IH On Right Branch -/
       obtain ⟨G₂_mid', W₂', Δ₂', hEqShape, hSubSess2, hQ', hSubW2, hSubΔ2⟩ :=
         ih (Gstore:=Gstore) (Gleft:=Gleft ++ splitMid.G1) (Gmid:=splitMid.G2) (Gright:=Gright)
           (Sfin:={ right := Sown0.right ++ split.S1, left := S₂_fin })
@@ -349,10 +362,12 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
             (L:=split.S1) (L':=S₁_fin) (G:=splitMid.G1) (P:=P0)
             hDisjInPNew hDisjOutPNew hP0
         simpa [splitMid, hS1Eq] using hTmp
+      /-! ## `par_right`: Reconstruct Combined Result -/
       have hQ1 :
           HasTypeProcPreOut Ssh0 { right := Sown0.right ++ splitMid.S1, left := S₂_step } G₂_mid' Q0'
             { right := Sown0.right ++ splitMid.S1, left := S₂_fin } G₂_fin W₂' Δ₂' := by
         simpa [splitMid, hS1Eq] using hQ'
+      /-! ## `par_right`: Final Packing And Subsets -/
       have hDisjGFinal : DisjointG splitMid.G1 G₂_mid' := by
         have hTmp : DisjointG G₂_mid' splitMid.G1 :=
           DisjointG_of_subset_left hSubSess2 (DisjointG_symm hDisjG_mid)
@@ -402,6 +417,7 @@ theorem HasTypeProcPreOut_preserved_sub_middle_frame :
       refine ⟨splitMid.G1 ++ G₂_mid', W₁ ++ W₂', Δ₁ ++ Δ₂', ?_, hSubSessFinal, ?_, hSubWFinal, hSubΔFinal⟩
       · simpa [hEqGFinal]
       · simpa [splitMid, hS1Eq, List.append_assoc] using hParMid
+  /-! ## Parallel Skip Constructors -/
   | par_skip_left split hSlen hS1Nil =>
       rename_i G0 D0 Ssh0 Sown0 store0 bufs0 Q0 nS0 nG0
       exact preserved_sub_middle_par_skip_left
