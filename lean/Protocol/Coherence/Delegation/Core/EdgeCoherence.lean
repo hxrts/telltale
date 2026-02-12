@@ -20,6 +20,8 @@ open scoped Classical
 
 section
 
+/-! ## Unrelated-Edge Coherence -/
+
 theorem delegate_unrelated_edge_coherent
     (G G' : GEnv) (D D' : DEnv) (s : SessionId)
     (A B : Role) (e : Edge)
@@ -58,11 +60,12 @@ theorem delegate_unrelated_edge_coherent
         have hGsender0' : lookupG G ⟨s, e.sender⟩ = some Lsender0 := by
           simpa [hSid] using hGsender0
         simpa [hSenderOther, hGsender0']
-      have hSenderLookup' : lookupG G' ⟨e.sid, e.sender⟩ =
-          some (renameLocalTypeRole s A B Lsender0) := by
-        simpa [hSid] using hSenderLookup
-      -- Trace is preserved under renaming (edge unchanged).
-      have hRedir : IsRedirectedEdge e e s A B := by
+	      have hSenderLookup' : lookupG G' ⟨e.sid, e.sender⟩ =
+	          some (renameLocalTypeRole s A B Lsender0) := by
+	        simpa [hSid] using hSenderLookup
+	      /-! ## Unrelated-Edge Coherence: Trace and Consume Transport -/
+	      -- Trace is preserved under renaming (edge unchanged).
+	      have hRedir : IsRedirectedEdge e e s A B := by
         have hEq' := redirectEdge_no_A e s A B hSid hSenderA hReceiverA
         simp [IsRedirectedEdge, hEq']
       have hTrace :
