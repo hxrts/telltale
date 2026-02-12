@@ -34,6 +34,8 @@ structure Model (State : Type u) (Party : Type v) where
   /-- Partition tolerance assumption for the model. -/
   partitionTolerant : Prop
 
+/-! ## Assumption Atoms and Contracts -/
+
 /-- Reusable core CAP assumption bundle. -/
 structure Assumptions
     {State : Type u} {Party : Type v}
@@ -59,6 +61,8 @@ def coreAssumptions : List Assumption :=
   [ .asynchronous
   , .partitionTolerant
   ]
+
+/-! ## Assumption Validation API -/
 
 /-- Validate one CAP assumption against an assumption bundle. -/
 def validateAssumption
@@ -103,6 +107,8 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
+/-! ## CAP Guarantee Targets -/
+
 /-- Availability guarantee under partition runs. -/
 def AvailabilityUnderPartition
     {State : Type u} {Party : Type v}
@@ -126,6 +132,8 @@ def CAPGuarantee
     (PartitionRun : (Nat → State) → Prop) : Prop :=
   AvailabilityUnderPartition M PartitionRun ∧
   StrongConsistencyUnderPartition M PartitionRun
+
+/-! ## Impossibility Premises and Theorems -/
 
 /-- Premises that capture the core CAP contradiction shape. -/
 structure ImpossibilityPremises
@@ -175,5 +183,4 @@ theorem consistency_impossible_with_availability
 
 end CAP
 end Distributed
-
 
