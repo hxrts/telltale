@@ -210,6 +210,8 @@ theorem not_part_of_all2_var (role : String) (t : String) : ¬ part_of_all2 role
   cases h with
   | intro _ hf => cases hf
 
+/-! ## Size-Measure Helpers for Structural Recursion -/
+
 private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
@@ -238,6 +240,8 @@ private theorem sizeOf_elem_snd_lt_comm (sender receiver : String)
   have h1 := sizeOf_elem_snd_lt_list gbs gb h
   have h2 := sizeOf_bs_lt_comm sender receiver gbs
   omega
+
+/-! ## Mu-Body Size Helper -/
 
 private theorem sizeOf_body_lt_mu (t : String) (body : GlobalType) :
     sizeOf body < sizeOf (GlobalType.mu t body) := by
