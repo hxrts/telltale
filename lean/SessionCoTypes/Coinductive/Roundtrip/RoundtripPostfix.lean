@@ -44,9 +44,13 @@ lemma roundtrip_hpost
     rcases hR with ⟨visited, h_visited, h_current, hcase, hsub⟩
     have hsub' : EnvOfSub all ρ := hsub
     have hmem_env : b ∈ envL ρ (nameOf b all) := EnvOfSub_mem hsub' h_current
+    /-! ## `roundtrip_hpost`: Wrap vs Body Cases -/
     cases hcase with
+    /-! ## `roundtrip_hpost`: Wrap Case (`toInductiveAux`) -/
     | inl hwrap =>
+        /-! ## `roundtrip_hpost` Wrap: Back-Edge vs Fresh -/
         by_cases hmem : b ∈ visited
+        /-! ## `roundtrip_hpost` Wrap: Back-Edge Variable -/
         · -- back-edge: emit var
           have hvar_body :
               toInductiveAux t all visited b h_closed h_visited h_current =
@@ -60,11 +64,13 @@ lemma roundtrip_hpost
             simp [hvar]
           have hb : b ∈ envL ρ (nameOf b all) := hmem_env
           exact EQ2CE_step.var_left ha hb
+        /-! ## `roundtrip_hpost` Wrap: Fresh Node Unfolding -/
         · -- fresh node: unfold body
           have haux : a = toCoind (toInductiveAux t all visited b h_closed h_visited h_current) := hwrap
           cases hdest : PFunctor.M.dest b with
           | mk hhead f =>
               cases hhead with
+              /-! ## Fresh Wrap: `end` Head -/
               | «end» =>
                   have hb : head b = .end := by
                     exact head_of_dest hdest
@@ -77,6 +83,7 @@ lemma roundtrip_hpost
                   have ha : head a = .end := by
                     simp [haux, haux_end]
                   exact EQ2CE_step.end ha hb
+              /-! ## Fresh Wrap: `var` Head -/
               | var x =>
                   have hb : head b = .var x := by
                     exact head_of_dest hdest
@@ -89,6 +96,7 @@ lemma roundtrip_hpost
                   have ha : head a = .var x := by
                     simp [haux, haux_var]
                   exact EQ2CE_step.var ha hb
+              /-! ## Fresh Wrap: `mu` Head -/
               | mu x =>
                   have hb : head b = .mu x := by
                     exact head_of_dest hdest
@@ -112,6 +120,7 @@ lemma roundtrip_hpost
                     refine ⟨visited, h_visited, h_current, ?_, EnvOfSub_insertL x b hsub'⟩
                     exact Or.inr ⟨hmem, rfl⟩
                   exact EQ2CE_step.mu_left ha hmem' hcore
+              /-! ## Fresh Wrap: `send` Head -/
               | send p labels =>
                   have hb : head b = .send p labels := by
                     exact head_of_dest hdest
@@ -122,8 +131,10 @@ lemma roundtrip_hpost
                     (labels[i],
                       toInductiveAux t all (Insert.insert b visited) child h_closed
                         (subset_insert_of_mem h_current h_visited) hchild_mem)
+                  /-! ## Fresh Wrap Send: Mu Wrapper vs Plain Send -/
                   by_cases hfv : nameOf b all ∈
                       (toInductiveBody t all visited b h_closed h_visited h_current).freeVars
+                  /-! ## Fresh Wrap Send: Mu Wrapper Present -/
                   · -- mu wrapper present
                     have haux_mu :
                         toInductiveAux t all visited b h_closed h_visited h_current =
@@ -166,6 +177,7 @@ lemma roundtrip_hpost
                       dsimp [fR] at hcond
                       unfold toInductiveAux
                       simp [hmem, head, PFunctor.M.dest_mk, nameOf, hcond, toInductiveBody]
+                    /-! ## Fresh Wrap Send Mu: Construct Left `mu` Step -/
                     have ha : PFunctor.M.dest a = ⟨LocalTypeHead.mu (nameOf b all),
                         fun _ => toCoind (toInductiveBody t all visited b h_closed h_visited h_current)⟩ := by
                       simp [haux, haux_mu, toCoind_mu, mkMu, PFunctor.M.dest_mk]
@@ -176,6 +188,7 @@ lemma roundtrip_hpost
                         EnvOfSub_insertL (nameOf b all) b hsub'⟩
                       exact Or.inr ⟨hmem, rfl⟩
                     exact EQ2CE_step.mu_left ha hmem' hcore
+                  /-! ## Fresh Wrap Send: Plain Send -/
                   · -- no mu wrapper
                     have haux_send :
                         toInductiveAux t all visited b h_closed h_visited h_current =
@@ -220,6 +233,7 @@ lemma roundtrip_hpost
                       simp [head, PFunctor.M.dest_mk]
                       rw [if_neg hcond]
                       simp [fR]
+                    /-! ## Fresh Wrap Send Plain: Build Send Observables -/
                     have haux_send_coind : a = toCoind (.send p (List.ofFn fR)) := by
                       simpa [haux_send] using haux
                     have hlabels : List.ofFn (fun i => (fR i).1) = labels := by
@@ -232,6 +246,7 @@ lemma roundtrip_hpost
                         branchesOf a =
                           List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
                       simpa [haux_send_coind] using (branchesOf_toCoind_send_ofFn (p := p) fR)
+                    /-! ## Fresh Wrap Send Plain: Branch Relation Construction -/
                     have hbr' :
                         BranchesRelCE R ρ
                           (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
@@ -250,6 +265,7 @@ lemma roundtrip_hpost
                       rw [hbranches_a]
                       simpa [branchesOf, hdest] using hbr'
                     exact EQ2CE_step.send ha hb hbr
+              /-! ## Fresh Wrap: `recv` Head -/
               | recv p labels =>
                   have hb : head b = .recv p labels := by
                     exact head_of_dest hdest
@@ -260,8 +276,10 @@ lemma roundtrip_hpost
                     (labels[i],
                       toInductiveAux t all (Insert.insert b visited) child h_closed
                         (subset_insert_of_mem h_current h_visited) hchild_mem)
+                  /-! ## Fresh Wrap Recv: Mu Wrapper vs Plain Recv -/
                   by_cases hfv : nameOf b all ∈
                       (toInductiveBody t all visited b h_closed h_visited h_current).freeVars
+                  /-! ## Fresh Wrap Recv: Mu Wrapper Present -/
                   · have ha : PFunctor.M.dest a = ⟨LocalTypeHead.mu (nameOf b all),
                         fun _ => toCoind (toInductiveBody t all visited b h_closed h_visited h_current)⟩ := by
                       have haux_mu :
@@ -295,6 +313,7 @@ lemma roundtrip_hpost
                                           (mem_of_closed_child h_closed h_current
                                             ⟨.recv p labels, k, i, hdest, rfl⟩)))).freeVars := by
                           simpa [nameOf, hb, toInductiveBody, hdest] using hfv
+                        /-! ## Fresh Wrap Recv Mu: Materialize Mu-Wrapped Auxiliary Form -/
                         have hb_eq : b = PFunctor.M.mk ⟨LocalTypeHead.recv p labels, f⟩ := mk_of_dest hdest
                         subst hb_eq
                         have hfv'' :
@@ -313,6 +332,7 @@ lemma roundtrip_hpost
                         simp [nameOf, head, PFunctor.M.dest_mk]
                         rw [if_pos hcond]
                         simp [toInductiveBody_eq_match, PFunctor.M.dest_mk]
+                      /-! ## Fresh Wrap Recv Mu: Construct Left `mu` Step -/
                       simp [haux, haux_mu, toCoind_mu, mkMu, PFunctor.M.dest_mk]
                     have hmem' : b ∈ envL ρ (nameOf b all) := hmem_env
                     have hcore : R (envInsertL ρ (nameOf b all) b)
@@ -321,6 +341,7 @@ lemma roundtrip_hpost
                         EnvOfSub_insertL (nameOf b all) b hsub'⟩
                       exact Or.inr ⟨hmem, rfl⟩
                     exact EQ2CE_step.mu_left ha hmem' hcore
+                  /-! ## Fresh Wrap Recv: Plain Recv -/
                   · have haux_recv :
                         toInductiveAux t all visited b h_closed h_visited h_current =
                           LocalTypeR.recv p (List.ofFn fR) := by
@@ -364,6 +385,7 @@ lemma roundtrip_hpost
                       simp [head, PFunctor.M.dest_mk]
                       rw [if_neg hcond]
                       simp [fR]
+                    /-! ## Fresh Wrap Recv Plain: Build Recv Observables -/
                     have haux_recv_coind : a = toCoind (.recv p (List.ofFn fR)) := by
                       simpa [haux_recv] using haux
                     have ha : head a = .recv p labels := by
@@ -376,6 +398,7 @@ lemma roundtrip_hpost
                         branchesOf a =
                           List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
                       simpa [haux_recv_coind] using (branchesOf_toCoind_recv_ofFn (p := p) fR)
+                    /-! ## Fresh Wrap Recv Plain: Branch Relation Construction -/
                     have hbr' :
                         BranchesRelCE R ρ
                           (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
@@ -394,6 +417,7 @@ lemma roundtrip_hpost
                       rw [hbranches_a]
                       simpa [branchesOf, hdest] using hbr'
                     exact EQ2CE_step.recv ha hb hbr
+    /-! ## `roundtrip_hpost`: Body Case Delegation -/
     | inr hcore =>
         have hbody : EQ2CE_step (roundtripRel t all h_closed) ρ a b :=
           roundtrip_hpost_body_case (t := t) (all := all) (h_closed := h_closed)
