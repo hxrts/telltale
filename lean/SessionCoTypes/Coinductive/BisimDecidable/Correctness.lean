@@ -78,6 +78,8 @@ def bisim (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) (bound : Nat) : B
 
 /-! ## Soundness via Paco Coinduction -/
 
+/-! ## Soundness Helpers: Observable Extraction -/
+
 /-- Helper: obsMatch true with end kind implies both unfold to end. -/
 lemma obsMatch_end_implies_UnfoldsToEndC {bound : Nat} {a b : LocalTypeC}
     (hobs : obsMatch bound a b = true)
@@ -123,6 +125,8 @@ lemma fullUnfoldN_recv_implies_CanRecvC {bound : Nat} {t : LocalTypeC}
   have hhead := obsKindOf_recv_iff.mp hk
   exact ⟨fullUnfoldN bound t, labels, fullUnfoldN_UnfoldsToC bound t, hhead, rfl⟩
 
+/-! ## Soundness Helpers: Matching Labels from `obsMatch` -/
+
 /-- obsMatch with send implies same participant and labels (needed for BranchesRelC).
 
     **Justification**: When obsMatch returns true for send types, the ObsKind equality
@@ -167,6 +171,8 @@ lemma obsMatch_var_implies_UnfoldsToVarC {bound : Nat} {a b : LocalTypeC} {v : S
   · exact ⟨fullUnfoldN bound a, fullUnfoldN_UnfoldsToC bound a, hhead_a⟩
   · exact ⟨fullUnfoldN bound b, fullUnfoldN_UnfoldsToC bound b, hhead_b⟩
 
+/-! ## Soundness Helpers: Post-Fixpoint Lifting -/
+
 /-- EQ2C is a post-fixpoint of EQ2CMono.F (needed for BisimRel_postfixpoint). -/
 lemma EQ2C_postfixpoint : ∀ a b, EQ2C a b → EQ2CMono.F EQ2C a b := by
   intro a b heq
@@ -193,6 +199,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
   simp only [Paco.Rel.sup_bot]
   -- Case split on BisimRel disjunction
   rcases h with hcore | heq
+  /-! ## `BisimRel_postfixpoint`: EQ2C Branch -/
   -- Case 1: EQ2C (including visited pairs via hvisited)
   case inr =>
     -- EQ2C is a post-fixpoint, lift to BisimRel by monotonicity
@@ -202,6 +209,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
     -- EQ2C ⊆ BisimRel (right disjunct)
     have hEQ2C_le : EQ2C ≤ BisimRel bound := fun x y hxy => Or.inr hxy
     exact ObservableRelC_mono hEQ2C_le hrel
+  /-! ## `BisimRel_postfixpoint`: Core Checker Branch -/
   -- Case 2: BisimRelCore (bisimAux returns true)
   case inl =>
     rcases hcore with ⟨fuel, visited, hvisited, hbisim⟩
@@ -226,6 +234,7 @@ theorem BisimRel_postfixpoint (bound : Nat) :
           simp only [hmem, ↓reduceIte] at hbisim
           have ⟨hobs, hchildren⟩ := Bool.and_eq_true_iff.mp hbisim
           have ⟨k, hk1, hk2⟩ := obsMatch_true_implies_same_kind hobs
+          /-! ## `BisimRel_postfixpoint`: Observable Kind Split -/
           -- Case split on observable kind k
           match k with
           | .obs_end =>
@@ -301,6 +310,8 @@ def maxUnfoldDepth (t : LocalTypeC) : Nat := by
   else
     0
 
+/-! ## Maximum Depth: Stability and Head Agreement -/
+
 lemma hasNonMuHead_fullUnfoldN_maxUnfoldDepth {t : LocalTypeC} (hobs : ObservableC t) :
     hasNonMuHead (fullUnfoldN (maxUnfoldDepth t) t) = true := by
   unfold maxUnfoldDepth
@@ -323,12 +334,15 @@ lemma head_fullUnfoldN_eq_of_unfoldsToC {t u : LocalTypeC} {bound : Nat}
     fullUnfoldN_eq_of_ge hbound hmax
   simpa [hge] using hdet.symm
 
+/-! ## `obsMatch` Soundness from EQ2C -/
+
 lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
     (heq : EQ2C a b) (hbound : bound ≥ maxUnfoldDepth a ∧ bound ≥ maxUnfoldDepth b) :
     obsMatch bound a b = true := by
   rcases heq with ⟨R, hR, hab⟩
   obtain ⟨obs_a, obs_b, hrel⟩ := hR a b hab
   cases hrel with
+  /-! ## `obsMatch_of_EQ2C`: End Case -/
   | is_end ha hb =>
       rcases ha with ⟨ua, hunf_a, hhead_a⟩
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
@@ -341,6 +355,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
         have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
+  /-! ## `obsMatch_of_EQ2C`: Var Case -/
   | is_var v ha hb =>
       rcases ha with ⟨ua, hunf_a, hhead_a⟩
       rcases hb with ⟨ub, hunf_b, hhead_b⟩
@@ -353,6 +368,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
         have := head_fullUnfoldN_eq_of_unfoldsToC (bound := bound) hunf_b hnomu obs_b hbound.2
         simpa [hhead_b] using this
       simp [obsMatch, obsKindOf, hhead_a', hhead_b']
+  /-! ## `obsMatch_of_EQ2C`: Send Case -/
   | is_send p bs cs ha hb hbr =>
       rcases ha with ⟨ua, labels_a, hunf_a, hhead_a, hbs_a⟩
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
@@ -374,6 +390,7 @@ lemma obsMatch_of_EQ2C {a b : LocalTypeC} {bound : Nat}
           _ = labelsOfBranches cs := labelsOfBranches_eq_of_BranchesRelC hbr
           _ = labels_b := hlabels_b
       simp [obsMatch, obsKindOf, hhead_a', hhead_b', hlabels_eq]
+  /-! ## `obsMatch_of_EQ2C`: Recv Case -/
   | is_recv p bs cs ha hb hbr =>
       rcases ha with ⟨ua, labels_a, hunf_a, hhead_a, hbs_a⟩
       rcases hb with ⟨ub, labels_b, hunf_b, hhead_b, hbs_b⟩
