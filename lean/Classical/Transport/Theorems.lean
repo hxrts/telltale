@@ -96,6 +96,8 @@ theorem heavyTraffic_conclusion_ofInput (input : HeavyTrafficInput) :
     HeavyTrafficConclusion input :=
   transported_heavyTraffic input
 
+/-! ### Naming-Normalized Wrappers (Mixing Through Functional CLT) -/
+
 /-- Canonical mixing-time theorem wrapper: derive a conclusion from its input assumptions. -/
 theorem mixing_conclusion_ofInput (input : MixingInput) :
     MixingConclusion input :=
@@ -120,6 +122,8 @@ theorem littlesLaw_conclusion_ofInput (input : LittlesLawInput) :
 theorem functionalCLT_conclusion_ofInput (input : FunctionalCLTInput) :
     FunctionalCLTConclusion input :=
   transported_functionalCLT input
+
+/-! ## Certificate Builders -/
 
 /-- Build a Foster certificate from input assumptions. -/
 def foster_certificate {State : Type u} {ctx : TransportCtx State}
@@ -157,6 +161,8 @@ def heavyTraffic_certificate (input : HeavyTrafficInput) :
   { input := input
   , proof := heavyTraffic_conclusion_ofInput input
   }
+
+/-! ### Certificate Builders (Mixing Through Functional CLT) -/
 
 /-- Build a mixing certificate from input assumptions. -/
 def mixing_certificate (input : MixingInput) :
