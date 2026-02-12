@@ -49,6 +49,8 @@ private theorem buffer_empty_of_typed_trace_empty
         simpa [hTrace, hBuf] using hLen
       exact (False.elim (Nat.succ_ne_zero _ hLen'))
 
+/-! ## GEnv Weakening Helpers -/
+
 private theorem HasTypeVal_updateG_weaken {G : GEnv} {ep : Endpoint} {Lnew : LocalType}
     {v : Value} {T : ValType} :
     HasTypeVal G v T →
@@ -81,6 +83,8 @@ private theorem BuffersTyped_updateG_weaken {G : GEnv} {D : DEnv} {bufs : Buffer
   intro i hi
   exact HasTypeVal_updateG_weaken (hTyping i hi)
 
+/-! ## Local Buffer Update Preservations -/
+
 private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers}
     {e : Edge} {v : Value} {T : ValType}
     (hBT : BuffersTyped G D bufs)
@@ -100,6 +104,7 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
       omega
     refine ⟨hNewLen, ?_⟩
     intro i hi
+    /-! ## enqueue_local: Old Indices vs Appended Index -/
     by_cases hOld : i < (lookupBuf bufs a).length
     · -- i < old length: use original typing
       have hTrace : i < (lookupD D a).length := hLen ▸ hOld
@@ -137,6 +142,7 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
       have hGoal' : HasTypeVal G (lookupBuf bufs a ++ [v])[i] (lookupD D a ++ [T])[i] := by
         simpa [hBufGet, hTraceGet] using hv
       simpa [lookupBuf_update_eq, lookupD_update_eq] using hGoal'
+  /-! ## enqueue_local: Unaffected Edge Case -/
   · -- a ≠ e: unaffected edge
     have hOrig := hBT a
     have hBufEq : lookupBuf (updateBuf bufs e (lookupBuf bufs e ++ [v])) a = lookupBuf bufs a := by
@@ -144,6 +150,8 @@ private theorem BuffersTyped_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffers
     have hTraceEq : lookupD (updateD D e (lookupD D e ++ [T])) a = lookupD D a := by
       exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq, enqueueBuf] using hOrig
+
+/-! ## Local Buffer Dequeue Preservation -/
 
 private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers}
     {recvEdge : Edge} {v : Value} {vs : List Value} {T : ValType} :
@@ -191,6 +199,8 @@ private theorem BuffersTyped_dequeue_local {G : GEnv} {D : DEnv} {bufs : Buffers
         lookupD (updateD D recvEdge (lookupD D recvEdge).tail) a = lookupD D a := by
       exact lookupD_update_neq _ _ _ _ (Ne.symm ha)
     simpa [BufferTyped, hBufEq, hTraceEq] using hOrig
+
+/-! ## BuffersTyped Step Preservation -/
 
 /-- BuffersTyped is preserved when sending.
     Send appends v to buffer and T to trace at the send edge.
@@ -243,6 +253,8 @@ theorem BuffersTyped_recv_preserved
         (updateBuf bufs recvEdge vs) :=
     BuffersTyped_updateG_weaken (e:=receiverEp) (L:=L) hBT'
   exact hBT''
+
+/-! ## BuffersTyped Label-Step Preservation -/
 
 /-- BuffersTyped is preserved when selecting (sending a label).
     Select appends label string to buffer and .string to trace.
@@ -346,6 +358,8 @@ theorem ValidLabels_recv_preserved
       exact lookupBuf_update_neq _ _ _ _ (Ne.symm hNe)
     have hValidOld := hValid e source bs hActiveOrig hBranchOld
     simpa [hBufEq] using hValidOld
+
+/-! ## ValidLabels Preservation (branch) -/
 
 theorem ValidLabels_branch_preserved
     (G : GEnv) (D : DEnv) (bufs : Buffers)
