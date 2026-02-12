@@ -18,6 +18,8 @@ universe u v
 
 variable {ν : Type u} [VerificationModel ν]
 
+/-! ## Construction and Inventory Aliases -/
+
 /-- API alias: build theorem-pack artifacts from a profile space. -/
 abbrev mk
     {store₀ : SessionStore ν} {State : Type v}
@@ -39,6 +41,8 @@ abbrev capabilitiesWithDeterminism
     (pack : VMTheoremPack (space := space))
     (determinism : VMDeterminismArtifacts) : List (String × Bool) :=
   theoremInventoryWithDeterminism (space := space) pack determinism
+
+/-! ## Runtime Capability Gates -/
 
 /-- Runtime gate: shard-placement admission requires protocol-envelope bridge evidence. -/
 def canAdmitShardPlacement
@@ -81,6 +85,8 @@ def canAutoscaleOrRepartition
     {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : VMTheoremPack (space := space)) : Bool :=
   pack.protocolEnvelopeBridge?.isSome
+
+/-! ## Inventory Conformance Helpers -/
 
 /-- CI helper: claimed capability tags must be supported by theorem-pack inventory. -/
 def claimedCapabilitiesWithinInventory
