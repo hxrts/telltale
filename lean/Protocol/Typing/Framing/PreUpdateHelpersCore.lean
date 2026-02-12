@@ -65,6 +65,7 @@ lemma lookupSEnv_all_of_visible
           lookupSEnv ((Ssh ++ Sown.right) ++ Sown.left) x = some Tsh :=
         lookupSEnv_append_left (S₁:=Ssh ++ Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tsh) hPrefixSh
       simpa [SEnvAll, List.append_assoc, hEqT] using hAllSh
+  /-! ## Visible Lookup Bridge: Owned-Left Branch -/
   | none =>
       have hLeftSome : lookupSEnv Sown.left x = some T := by
         have hVisRight := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
@@ -84,6 +85,8 @@ lemma lookupSEnv_all_of_visible
             simpa [SEnvAll_all] using hAllRight
           _ = some T := hOwnSome
       exact hAll
+
+/-! ## Store Typing Visibility Bridges -/
 
 /-- Bridge full store typing (`SEnvAll`) to visible store typing (`SEnvVisible`). -/
 lemma StoreTypedVisible_of_all
@@ -108,6 +111,8 @@ lemma StoreTypedStrongVisible_of_allStrong
   refine ⟨hStrong.sameDomain, ?_⟩
   exact StoreTypedVisible_of_all (G:=G) (Ssh:=Ssh) (Sown:=Sown) (store:=store)
     hStrong.typeCorr hDisjShAll hOwnDisj
+
+/-! ## Disjointness Projection Helpers -/
 
 /-- Disjointness is stable when appending on the right. -/
 lemma DisjointS_append_right_pu {S₁ S₂ S₃ : SEnv} :
@@ -157,6 +162,8 @@ lemma DisjointS_split_right_pu {Ssh S₁ S₂ : SEnv} :
     simpa using (SEnvDomSubset_append_right (S₁:=S₁) (S₂:=S₂))
   exact DisjointS_of_domsubset_right hSub hDisj
 
+/-! ## Split/Repack Helpers -/
+
 /-- If shared is disjoint from full owned env, it is disjoint from both split parts. -/
 lemma DisjointS_split_from_owned_left_pu
     {Ssh : SEnv} {Sown : OwnedEnv} {G : GEnv}
@@ -181,6 +188,8 @@ lemma DisjointS_owned_repack_pu
   have hAll : DisjointS Ssh ((Sright ++ Smid) ++ Sleft) :=
     DisjointS_append_right_pu hRight' hLeft
   simpa [OwnedEnv.all, List.append_assoc] using hAll
+
+/-! ## Owned Disjointness Under Split Framing -/
 
 /-- Owned right/left disjointness after framing split.S2 on the right and split.S1 on the left. -/
 lemma OwnedDisjoint_sub_left_pu
@@ -210,6 +219,8 @@ lemma OwnedDisjoint_sub_right_pu
   have hAll : DisjointS (Sown.right ++ split.S1) split.S2 :=
     DisjointS_append_left hR2 hDisjS
   simpa [OwnedDisjoint, OwnedEnv.all] using hAll
+
+/-! ## Endpoint Alignment Via Store Typing -/
 
 /-- Helper: align endpoints via store typing. -/
 lemma endpoint_eq_of_store
@@ -245,6 +256,8 @@ lemma endpoint_eq_of_store_visible
   cases e'
   cases hValEq
   rfl
+
+/-! ## Left-Frame Update Extraction -/
 
 /-- Helper: pull a left update out of a right-framed G. -/
 lemma updateG_left_of_step
