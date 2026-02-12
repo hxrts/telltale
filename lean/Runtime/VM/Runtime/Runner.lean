@@ -11,6 +11,8 @@ set_option autoImplicit false
 
 universe u
 
+/-! ## Receiver Unblocking -/
+
 /-- Move blocked receivers to the ready queue when their buffer has a message. -/
 def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
@@ -31,6 +33,8 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
   let sched' := st.sched.blockedSet.toList.foldl step (syncLaneViews st.sched)
   { st with sched := sched' }
 
+/-! ## Round Execution -/
+
 /-- Execute one round: advance at most one ready coroutine.
     Concurrency is abstracted away in the canonical runner. -/
 def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -46,6 +50,8 @@ def schedRound {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     match schedStep st with
     | none => st
     | some st' => st'
+
+/-! ## Termination Predicates -/
 
 /-- Check if all coroutines have reached a terminal state. -/
 def allTerminal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -77,6 +83,8 @@ def sessionTerminal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       | _ => false
     else
       true)
+
+/-! ## Fuel-Bounded Scheduled Runner -/
 
 /-- Run rounds until fuel is exhausted, all coroutines are terminal, or stuck. -/
 def runScheduled {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
