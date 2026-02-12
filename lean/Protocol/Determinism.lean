@@ -178,6 +178,7 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
     (hStep₂ : StepBase C C₂)
     (hInd : IndependentConfigs C C) :
     C₁ = C₂ ∨ ∃ C₃, ∃ (_ : StepBase C₁ C₃) (_ : StepBase C₂ C₃), True := by
+  /-! ## Diamond Case Split: Communication Prefixes -/
   cases hStep₁ with
   | send hProc hk _ =>
     -- Communication step: IndependentConfigs C C = (s ≠ s) = False
@@ -195,6 +196,7 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
   | newSession hProc =>
     simp only [IndependentConfigs, stepSessionId, hProc] at hInd
     exact absurd rfl hInd
+  /-! ## Diamond Case Split: Deterministic Structural Steps -/
   | assign hProc =>
     -- Non-communication: deterministic, so C₁ = C₂
     -- Both steps match on same C.proc, so x and v are the same
@@ -217,6 +219,7 @@ theorem diamond_independent_sessions {C C₁ C₂ : Config}
       obtain ⟨_, hQ_eq⟩ := heq
       simp only [hQ_eq]
     | _ => simp_all
+  /-! ## Diamond Case Split: Parallel Skip Cases -/
   | par_skip_left hProc =>
     left
     cases hStep₂ with
