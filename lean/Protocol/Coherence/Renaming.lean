@@ -72,6 +72,7 @@ section
 /-- Coherence is preserved under session renaming.
     This is the key lemma for protocol composition: renaming sessions
     doesn't break the coherence invariant. -/
+/-! ## Coherence Under Session Renaming -/
 theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
     (hCoh : Coherent G D) :
     Coherent (renameGEnv ρ G) (renameDEnv ρ D) := by
@@ -124,6 +125,7 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
         have hEq : (⟨e'.sid, e'.sender⟩ : Endpoint) = ⟨sid, role⟩ := by
           simp [e', hSidEq'.symm, hSenderRole']
         simpa [hEq] using hGsender'
+  /-! ## CoherentRenaming: Rebuild Coherence Witness on Preimage Edge -/
   -- Apply original coherence at e'.
   have hActive' : ActiveEdge G e' :=
     ActiveEdge_of_endpoints (G:=G) (e:=e') hGsender'' hGrecv'
@@ -142,6 +144,7 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
           (lookupG G senderEp').map (renameLocalType ρ) := by
       simpa [hSenderEq] using hLookupRen
     simpa [hGsender', senderEp'] using hLookupRen'
+  /-! ## CoherentRenaming: Transport Consume Through Renaming -/
   -- Rename preservation for Consume.
   have hConsumeRen :
       (Consume e.sender (renameLocalType ρ Lrecv') ((lookupD D e').map (renameValType ρ))).isSome := by
@@ -157,6 +160,8 @@ theorem CoherentRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv)
         simp [hEq, hCons]
   refine ⟨renameLocalType ρ Lsender', hSenderLookup, ?_⟩
   simpa [e', hLrecvEq, hTraceEq] using hConsumeRen
+
+/-! ## Value Typing Under Renaming -/
 
 /-- HasTypeVal is preserved under session renaming. -/
 theorem HasTypeVal_rename (ρ : SessionRenaming) (G : GEnv) (v : Value) (T : ValType) :
@@ -175,6 +180,8 @@ theorem HasTypeVal_rename (ρ : SessionRenaming) (G : GEnv) (v : Value) (T : Val
       have hLookupRen := lookupG_rename (ρ:=ρ) (G:=G) (e:=e)
       simpa [hLookup] using hLookupRen
     exact HasTypeVal.chan hLookup'
+
+/-! ## Buffer Typing Under Renaming -/
 
 /-- BuffersTyped is preserved under session renaming. -/
 theorem BuffersTypedRenaming (ρ : SessionRenaming) (G : GEnv) (D : DEnv) (bufs : Buffers)
@@ -284,6 +291,8 @@ inductive Dual : LocalType → LocalType → Prop where
       Dual L1 L2 → Dual (.recv r T L1) (.send r T L2)
   -- Note: select/branch cases would need matching labels
 
+/-! ## Dual Inversion and Empty-Trace Coherence Bridge -/
+
 /-- If L1 is a send to r with continuation L1', and L2 is dual to L1,
     then L2 is a recv from r and their continuations are dual. -/
 theorem Dual_send_inv (L1 L2 : LocalType) (r : Role) (T : ValType) (L1' : LocalType)
@@ -296,6 +305,8 @@ theorem Dual_send_inv (L1 L2 : LocalType) (r : Role) (T : ValType) (L1' : LocalT
     exact ⟨L2', rfl, hCont⟩
   | recv_send r' T' L1'' L2' _ =>
     cases hL1  -- .recv ≠ .send, contradiction
+
+/-! ## Dual Empty-Trace Coherence Bridge -/
 
 /-- Dual types with empty trace are coherent (the bridge initialization lemma).
     Note: The proof actually works for any types with empty trace; duality ensures
