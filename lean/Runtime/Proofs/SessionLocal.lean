@@ -227,6 +227,8 @@ theorem delegation_recv_preserves_other_sessions
   -- Extract per-session coherence
   exact Coherent_implies_SessionCoherent hCoh'
 
+/-! ## Delegation Boundary Blindness -/
+
 /-- Blindness for delegation at the session boundary:
     endpoints in sessions other than the delegated one are unchanged. -/
 theorem delegation_blind_endpoint_lookup
@@ -259,6 +261,8 @@ theorem delegation_blind_trace_lookup
       _ = s := hEq
   exact hDeleg.other_sessions_D e hSidNe
 
+/-! ## Delegation Active-Edge Transport -/
+
 /-- For non-delegated sessions, active-edge membership is unchanged by delegation. -/
 theorem delegation_blind_activeEdge_iff
     {G G' : GEnv} {D D' : DEnv} {s sOther : SessionId} {A B : Role}
@@ -288,6 +292,8 @@ theorem delegation_blind_activeEdge_iff
           (ep:=⟨e.sid, e.receiver⟩) hSid
       simpa [hLookup] using hActive.2
 
+/-! ## Delegation Harmony and Exchangeability -/
+
 /-- Harmony split for delegation:
     delegated session remains coherent and all other sessions are preserved. -/
 theorem delegation_harmony_split
@@ -313,6 +319,8 @@ theorem delegation_preserves_exchangeability
     Coherent (swapGEnvRoleList s pairs G') (swapDEnvRoleList s pairs D') := by
   exact Coherent_exchangeable (s:=s) (pairs:=pairs) (G:=G') (D:=D')
     (delegation_preserves_coherent G G' D D' s A B hCoh hDeleg)
+
+/-! ## Delegation Footprint Growth -/
 
 /-- Receiving a delegated endpoint preserves coherence and extends footprint safely.
 
