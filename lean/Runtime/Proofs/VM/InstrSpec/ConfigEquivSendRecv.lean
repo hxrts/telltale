@@ -62,6 +62,9 @@ theorem SendSpec_respects_renaming (ρ : SessionRenaming)
       rfl
     have hG' := hSpec.type_updated L' hSender
     rw [hG', renameGEnv_updateG, hL'_eq]
+
+  /-! ## Send Renaming Equivariance: Trace and Frame Clauses -/
+
   trace_extended := by
     have hD' := hSpec.trace_extended
     simp only at hD'
@@ -92,6 +95,8 @@ theorem SendSpec_respects_renaming (ρ : SessionRenaming)
       ((lookupD D { sid := ep.sid, sender := ep.role, receiver := r } ++ [T]).map (renameValType ρ))
       hne.symm
 
+/-! ## Send ConfigEquiv Preservation -/
+
 /-- Send respects ConfigEquiv: equivalent configs produce equivalent results. -/
 theorem SendSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
@@ -102,12 +107,18 @@ theorem SendSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (renameValType hEquiv.choose.toRenaming T)) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+
+  /-! ## Send ConfigEquiv Preservation: Shared Setup -/
+
   -- Use the same SessionIso that witnesses the input equivalence.
   let σ := hEquiv.choose
   let ρ := σ.toRenaming
   obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
   -- Witness: the same σ works for the output.
   refine ⟨σ, ?_, ?_⟩
+
+  /-! ## Send ConfigEquiv Preservation: GEnv Component -/
+
   -- G condition: lookupG G₂' (rename e') = (lookupG G₁' e').map rename
   · intro e'
     by_cases he : e' = ep
@@ -140,6 +151,9 @@ theorem SendSpec_respects_ConfigEquiv
         exact he (renameEndpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
+
+  /-! ## Send ConfigEquiv Preservation: DEnv Component -/
+
   -- D condition: lookupD D₂' (rename e') = (lookupD D₁' e').map rename
   · intro e'
     let sendEdge : Edge := { sid := ep.sid, sender := ep.role, receiver := r }
@@ -166,6 +180,8 @@ theorem SendSpec_respects_ConfigEquiv
       simp only [renameEdge] at hne₂
       rw [hSpec₁.frame_D e' he, hSpec₂.frame_D (renameEdge ρ e') hne₂]
       exact hD_equiv e'
+
+/-! ## Recv Renaming Equivariance -/
 
 /-- Receive is equivariant under session renaming. -/
 theorem RecvSpec_respects_renaming (ρ : SessionRenaming)
@@ -197,6 +213,9 @@ theorem RecvSpec_respects_renaming (ρ : SessionRenaming)
       rfl
     have hG' := hSpec.type_updated L' hRecv
     rw [hG', renameGEnv_updateG, hL'_eq]
+
+  /-! ## Recv Renaming Equivariance: Trace and Frame Clauses -/
+
   trace_consumed := by
     obtain ⟨rest, hBuffer, hD'⟩ := hSpec.trace_consumed
     use rest.map (renameValType ρ)
@@ -225,6 +244,8 @@ theorem RecvSpec_respects_renaming (ρ : SessionRenaming)
       { sid := ρ.f ep.sid, sender := r, receiver := ep.role } e
       (rest.map (renameValType ρ)) hne.symm
 
+/-! ## Recv ConfigEquiv Preservation -/
+
 /-- Receive respects ConfigEquiv. -/
 theorem RecvSpec_respects_ConfigEquiv
     {G₁ G₁' G₂ G₂' : GEnv} {D₁ D₁' D₂ D₂' : DEnv}
@@ -235,11 +256,17 @@ theorem RecvSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (renameValType hEquiv.choose.toRenaming T)) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+
+  /-! ## Recv ConfigEquiv Preservation: Shared Setup -/
+
   -- Use the same SessionIso that witnesses the input equivalence.
   let σ := hEquiv.choose
   let ρ := σ.toRenaming
   obtain ⟨hG_equiv, hD_equiv⟩ := hEquiv.choose_spec
   refine ⟨σ, ?_, ?_⟩
+
+  /-! ## Recv ConfigEquiv Preservation: GEnv Component -/
+
   -- G condition
   · intro e'
     by_cases he : e' = ep
@@ -270,6 +297,9 @@ theorem RecvSpec_respects_ConfigEquiv
         intro heq; exact he (renameEndpoint_inj ρ e' ep heq)
       rw [hSpec₁.frame_G e' he, hSpec₂.frame_G (renameEndpoint ρ e') hne₂]
       exact hG_equiv e'
+
+  /-! ## Recv ConfigEquiv Preservation: DEnv Component -/
+
   -- D condition
   · intro e'
     let recvEdge : Edge := { sid := ep.sid, sender := r, receiver := ep.role }
