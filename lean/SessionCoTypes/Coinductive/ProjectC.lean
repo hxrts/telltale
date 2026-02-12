@@ -221,6 +221,8 @@ private lemma UnfoldsToC_total {l l1 l2 : LocalTypeC} (h1 : UnfoldsToC l l1) (h2
 
 /-! ## Unfolding stability -/
 
+/-! ## ProjectC Stability under Global Unfolding -/
+
 theorem ProjectC_unfoldG {g g' : GlobalType} {role : String} {l : LocalTypeC}
     (hproj : ProjectC g role l) (hg : UnfoldsToG g g') : ProjectC g' role l := by
   rcases ProjectC_destruct hproj with ⟨g1, l1, hg1, hl1, hmatch⟩
@@ -240,6 +242,8 @@ theorem ProjectC_unfoldG {g g' : GlobalType} {role : String} {l : LocalTypeC}
         UnfoldsToG_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
       exact ProjectC_fold ⟨.comm sender receiver gbs, l1, hcomp, hl1, by simpa using hmatch⟩
 
+/-! ## ProjectC Stability under Local Unfolding -/
+
 theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
     (hproj : ProjectC g role l) (hl : UnfoldsToC l l') : ProjectC g role l' := by
   let R : ProjRelC := fun g role cand => ∃ l, ProjectC g role l ∧ UnfoldsToC l cand
@@ -252,6 +256,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
     rcases ProjectC_destruct hproj0 with ⟨g1, l1, hg1, hl1, hmatch⟩
     have hcomp := UnfoldsToC_total hl1 hstep0
     cases hcomp with
+    /-! ## Local Unfolding: Candidate Already Unfolds to Witness -/
     | inr h_cand_l1 =>
         refine ⟨g1, l1, hg1, h_cand_l1, ?_⟩
         cases g1 with
@@ -263,6 +268,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             simpa using hmatch
         | comm sender receiver gbs =>
             exact ProjectC_comm_mono hinc hmatch
+    /-! ## Local Unfolding: Witness Unfolds to Candidate -/
     | inl h_l1_cand =>
         cases g1 with
         | mu t body =>
@@ -281,6 +287,7 @@ theorem ProjectC_unfoldC {g : GlobalType} {role : String} {l l' : LocalTypeC}
             have hEq : cand = l1 := UnfoldsToC_eq_of_head_ne_mu h_l1_cand hne
             subst cand
             exact ⟨.var t, l1, hg1, Relation.ReflTransGen.refl, by simpa using hmatch⟩
+        /-! ## Local Unfolding: Communication Subcases -/
         | comm sender receiver gbs =>
             cases hmatch with
             | inl hsender =>
