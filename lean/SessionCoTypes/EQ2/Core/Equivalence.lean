@@ -24,7 +24,7 @@ open SessionCoTypes.CoinductiveRel
 
 /-! ## Equivalence Properties -/
 
-/-! ## Equivalence Properties -/
+/-! ## BranchesRel Structural Helpers -/
 
 /-- BranchesRel is reflexive when the underlying relation is. -/
 private theorem BranchesRel_refl {R : Rel} (hrefl : ∀ t, R t t) :
@@ -76,6 +76,8 @@ private def ReflRel : Rel := fun a b =>
 
 private def NonMu (a : LocalTypeR) : Prop := ∀ t body, a ≠ .mu t body
 
+/-! ## Non-μ Shape Helpers -/
+
 private theorem nonmu_end : NonMu (.end : LocalTypeR) := by
   intro t body h; cases h
 
@@ -89,6 +91,8 @@ private theorem nonmu_send (p : String) (bs : List BranchR) :
 private theorem nonmu_recv (p : String) (bs : List BranchR) :
     NonMu (.recv p bs : LocalTypeR) := by
   intro t body h; cases h
+
+/-! ## Reflexive Relation Unfolding Helpers -/
 
 private theorem unfold_iter_eq_of_nonmu (a : LocalTypeR) (h : NonMu a) :
     ∀ n, (LocalTypeR.unfold^[n]) a = a := by
@@ -141,6 +145,8 @@ private theorem ReflRel_eq_of_nonmu {a b : LocalTypeR} (ha : NonMu a) (hb : NonM
       have hfix : (LocalTypeR.unfold^[k]) b = b := unfold_iter_eq_of_nonmu b hb k
       have ha'''' : a = b := by simpa [hfix] using ha'''
       exact ha''''
+
+/-! ## ReflRel Postfixpoint -/
 
 /-- ReflRel is a post-fixpoint of EQ2F.
 
@@ -195,6 +201,9 @@ private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := b
           cases hEq
       | mu t body =>
           simpa [EQ2F] using (ReflRel_unfold_right h)
+
+/-! ## ReflRel Postfixpoint: Send/Recv Cases -/
+
   | send p bs =>
       cases b with
       | «end» =>
@@ -233,6 +242,9 @@ private theorem ReflRel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := b
           exact ⟨rfl, hbr⟩
       | mu t body =>
           simpa [EQ2F] using (ReflRel_unfold_right h)
+
+/-! ## ReflRel Postfixpoint: μ Cases -/
+
   | mu t body =>
       cases b with
       | «end» =>
@@ -259,6 +271,8 @@ theorem EQ2_refl : ∀ t, EQ2 t t := by
 
 /-- Coinductive relation for symmetry: swap arguments of EQ2. -/
 private def SymmRel : Rel := fun a b => EQ2 b a
+
+/-! ## Symmetry Relation Helpers -/
 
 /-- Convert BranchesRel EQ2 cs bs to BranchesRel SymmRel bs cs.
     Note: SymmRel a b = EQ2 b a, so BranchesRel SymmRel bs cs requires EQ2 c.2 b.2
