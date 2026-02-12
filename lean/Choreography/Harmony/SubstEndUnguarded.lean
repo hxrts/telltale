@@ -99,6 +99,8 @@ theorem isFreeIn_subst_other (e : LocalTypeR) (v t : String) (repl : LocalTypeR)
           exact isFreeIn_subst_other body v t repl hvt hfree
 termination_by sizeOf e
 
+/-! ## Free Variables in Branch Lists -/
+
 /-- Free variables in branches preserved through substitution. -/
 
 
@@ -214,6 +216,8 @@ private theorem substitute_end_unguarded_unfolds_to_end_mu
   simp only [LocalTypeR.substitute, hbeq_tv]
   exact mu_preserves_unfolds_to_end t (body.substitute v .end) ih_body
 
+/-! ## UnfoldsToEnd Construction -/
+
 /-- When `v` is unguarded in `lt`, substituting `.end` for `v` produces a type
     that unfolds to `.end`. -/
 
@@ -242,6 +246,8 @@ theorem substitute_end_unguarded_unfolds_to_end (lt : LocalTypeR) (v : String)
         have ih_body : UnfoldsToEnd (body.substitute v .end) :=
           substitute_end_unguarded_unfolds_to_end body v hnotguard
         exact substitute_end_unguarded_unfolds_to_end_mu t body v hbeq_tv ih_body
+
+/-! ## EQ2 Corollary -/
 
 /-- Substituting `.end` for an unguarded variable produces something EQ2 to `.end`.
 
