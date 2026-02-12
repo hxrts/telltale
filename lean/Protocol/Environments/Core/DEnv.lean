@@ -296,7 +296,7 @@ theorem list_eq_of_subset_pairwise {l₁ l₂ : List (Edge × Trace)}
                 exact False.elim ((edgeCmpLT_asymm ha_lt_b) hb_lt_a)
           subst hab
 
-          -- Canonical list extensionality: tail subset transfer.
+          /-! ## Canonical List Extensionality: Tail Subset Transfer -/
           -- Tails are mutually subset.
           have h₁₂' : l₁ ⊆ l₂ := by
             intro x hx
