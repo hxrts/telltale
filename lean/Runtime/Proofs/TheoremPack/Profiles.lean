@@ -39,6 +39,8 @@ structure VMInvariantSpaceWithProfiles
     extends Adapters.VMInvariantSpaceWithDistributed (ν := ν) store₀ State where
   classical : Adapters.ClassicalProfiles State := {}
 
+/-! ## Space Views and Generic Updaters -/
+
 /-- Forget classical profiles and view the space as distributed-only. -/
 def VMInvariantSpaceWithProfiles.toDistributedSpace
     {store₀ : SessionStore ν} {State : Type v}
@@ -89,6 +91,8 @@ def VMInvariantSpaceWithProfiles.updateClassicalProfiles
     VMInvariantSpaceWithProfiles store₀ State :=
   { space with classical := update space.classical }
 
+/-! ## Distributed Profile Setters: Impossibility and Liveness -/
+
 /-- Attach an FLP distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withFLP
     {store₀ : SessionStore ν} {State : Type v}
@@ -133,6 +137,8 @@ def VMInvariantSpaceWithProfiles.withResponsiveness
     VMInvariantSpaceWithProfiles store₀ State :=
   VMInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with responsiveness? := some p })
+
+/-! ## Distributed Profile Setters: Chain and Commit Safety -/
 
 /-- Attach a Nakamoto distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withNakamoto
@@ -179,6 +185,8 @@ def VMInvariantSpaceWithProfiles.withFailureDetectors
   VMInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with failureDetectors? := some p })
 
+/-! ## Distributed Profile Setters: Data and Coordination -/
+
 /-- Attach a data-availability distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withDataAvailability
     {store₀ : SessionStore ν} {State : Type v}
@@ -205,6 +213,8 @@ def VMInvariantSpaceWithProfiles.withCRDT
     VMInvariantSpaceWithProfiles store₀ State :=
   VMInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with crdt? := some p })
+
+/-! ## Distributed Profile Setters: Envelope Families -/
 
 /-- Attach a consensus-envelope distributed profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withConsensusEnvelope
@@ -250,6 +260,8 @@ def VMInvariantSpaceWithProfiles.withProtocolEnvelopeBridge
     VMInvariantSpaceWithProfiles store₀ State :=
   VMInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with protocolEnvelopeBridge? := some p })
+
+/-! ## Classical Profile Setters -/
 
 /-- Attach a Foster profile to a combined space. -/
 def VMInvariantSpaceWithProfiles.withFoster
