@@ -30,6 +30,8 @@ The key insight is that substitutions commute when:
 This generalized form is needed because in the mu case, the "mu t body" term
 gets transformed to "mu t (body.substitute var repl)" under var-substitution. -/
 
+/-! ## General Commutation Mutual Proofs -/
+
 mutual
   /-- General substitution commutation lemma.
 
@@ -86,6 +88,8 @@ mutual
           exact subst_subst_comm_general inner x y rx ry ry' hxy hx_not_bound_inner hrx_closed hry_rel
   termination_by sizeOf e
 
+  /-! ## General Commutation: Branch Lists -/
+
   /-- Branch version of subst_subst_comm_general. -/
   theorem subst_subst_comm_branches_general (bs : List BranchR) (x y : String)
       (rx ry ry' : LocalTypeR)
@@ -111,6 +115,8 @@ mutual
     all_goals simp only [sizeOf, List._sizeOf_1, Prod._sizeOf_1]
     all_goals omega
 end
+
+/-! ## μ-Substitution Commutation Corollary -/
 
 /-- Key substitution commutation lemma.
 
