@@ -101,6 +101,8 @@ lemma indexOf_eq_some_of_mem {ctx : Context} {v : String} (hmem : v ∈ ctx) :
     | none => exact (hnone hidx).elim
     | some i => exact ⟨i, rfl⟩
 
+/-! ## IndexOf Injectivity Helpers -/
+
 
 lemma get?_inj_of_nodup {ctx : NameContext} (hnd : ctx.Nodup) {i j : Nat} {v : String}
     (hi : NameContext.get? ctx i = some v) (hj : NameContext.get? ctx j = some v) : i = j := by
@@ -144,6 +146,8 @@ lemma indexOf_inj {ctx : Context} {x y : String} {i : Nat}
   have heq : some x = some y := hx'.symm.trans hy'
   exact Option.some.inj heq
 
+/-! ## Context Append Helpers -/
+
 
 lemma get?_append_right (xs ys : NameContext) (n : Nat) :
     NameContext.get? (xs ++ ys) (xs.length + n) = NameContext.get? ys n := by
@@ -170,6 +174,8 @@ lemma empty_append_eq (suffix : NameOnlyContext) :
   show TypeContext.mk _ = TypeContext.mk _
   congr 1
 
+/-! ## Appended-Context Index Bounds -/
+
 lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
     ∃ k, Context.indexOf (pref ++ NameOnlyContext.cons x ctx) x = some k ∧ k ≤ pref.length := by
   induction pref using NameOnlyContext.induction with
@@ -192,6 +198,8 @@ lemma indexOf_append_x_le (pref ctx : Context) (x : String) :
           rw [NameOnlyContext.indexOf_cons_ne _ hax, hk]
           rfl
         · exact Nat.succ_le_succ hkle
+
+/-! ## Appended-Context Suffix Extraction -/
 
 /-- If v ≠ x and j > pref.length, then v was found in ctx and we can extract its index -/
 lemma indexOf_append_suffix {pref ctx : Context} {x v : String} {j : Nat}
@@ -263,6 +271,8 @@ lemma digitChar_inj_of_lt_10 {n m : Nat} (hn : n < 10) (hm : m < 10) :
   revert h
   interval_cases n <;> interval_cases m <;> trivial
 
+/-! ## Decimal Digit Expansion Helpers -/
+
 lemma toDigits_eq_reverse_digits_map (n : Nat) (h : n > 0) :
   Nat.toDigits 10 n = (Nat.digits 10 n).reverse.map Nat.digitChar := by
   -- strong recursion on n to align toDigits with little-endian digits
@@ -305,6 +315,8 @@ lemma toDigits_eq_reverse_digits_map (n : Nat) (h : n > 0) :
     -- rewrite and simplify
     simp [htd, ihq, htd_d, hdigits, List.map_append, List.reverse_cons, List.map_reverse]
 
+/-! ## Digit-List Injectivity -/
+
 lemma digits_10_map_digitChar_inj {l1 l2 : List Nat}
   (h1 : ∀ d ∈ l1, d < 10) (h2 : ∀ d ∈ l2, d < 10)
   (h_eq : l1.map Nat.digitChar = l2.map Nat.digitChar) :
@@ -330,6 +342,8 @@ lemma digits_10_map_digitChar_inj {l1 l2 : List Nat}
       · intros d hd; apply h1; simp [hd]
       · intros d hd; apply h2; simp [hd]
       · exact h_eq.2
+
+/-! ## Nat.toString Injectivity via Digits -/
 
 lemma toDigits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ n = 0 := by
   constructor
@@ -362,6 +376,8 @@ lemma toDigits_ne_zero_of_pos (n : Nat) (h : n > 0) : Nat.toDigits 10 n ≠ ['0'
   intro h_eq
   have hzero : n = 0 := (toDigits_eq_singleton_zero_iff n).1 h_eq
   exact (Nat.ne_of_gt h) hzero
+
+/-! ## Nat.toString Injectivity -/
 
 theorem Nat_toString_inj (n m : Nat) : toString n = toString m → n = m := by
   intro h
@@ -398,6 +414,8 @@ theorem Nat_toString_inj (n m : Nat) : toString n = toString m → n = m := by
       have hdigits' : Nat.digits 10 n = Nat.digits 10 m := by
         simpa using congrArg List.reverse hrev'
       exact (Nat.digits_inj_iff (b := 10) (n := n) (m := m)).1 hdigits'
+
+/-! ## Generated Context Invariants -/
 
 inductive GeneratedContext : NameContext → Prop where
   | empty : GeneratedContext TypeContext.empty
