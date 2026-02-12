@@ -187,6 +187,8 @@ theorem closedUnder_nil_iff_isClosed (lt : LocalTypeR) :
 /-! ## Free Vars under Substitution (subset lemma) -/
 
 mutual
+  /-! ## Free Vars Substitution: Local-Type Auxiliary -/
+
   private def freeVars_substitute_subset_aux
       (lt : LocalTypeR) (varName : String) (repl : LocalTypeR)
       (x : String) (hx : x ∈ (lt.substitute varName repl).freeVars) :
@@ -213,6 +215,7 @@ mutual
         -- Send/recv cases share the same branch substitution behavior.
         simp [LocalTypeR.substitute, LocalTypeR.freeVars, -substituteBranches_eq_map] at hx
         exact freeVars_substituteBranches_subset_aux bs varName repl x hx
+    /-! ## Free Vars Substitution: Local-Type Mu Case -/
     | .mu t body => by
         by_cases h : t = varName
         · -- Shadowed case
@@ -245,6 +248,8 @@ mutual
               · exact hpair.2
   termination_by sizeOf lt
 
+  /-! ## Free Vars Substitution: Branch Auxiliary -/
+
   private def freeVars_substituteBranches_subset_aux
       (branches : List BranchR) (varName : String) (repl : LocalTypeR)
       (x : String) (hx : x ∈ freeVarsOfBranches (substituteBranches branches varName repl)) :
@@ -274,10 +279,14 @@ mutual
   termination_by sizeOf branches
 end
 
+/-! ## Free Vars Substitution: Public Subset Lemmas -/
+
 theorem freeVars_substitute_subset (lt : LocalTypeR) (varName : String) (repl : LocalTypeR) :
     ∀ x, x ∈ (lt.substitute varName repl).freeVars →
          x ∈ repl.freeVars ∨ (x ∈ lt.freeVars ∧ x ≠ varName) :=
   fun x hx => freeVars_substitute_subset_aux lt varName repl x hx
+
+/-! ## Free Vars Substitution: Closed Replacement Lemmas -/
 
 theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTypeR) :
     e.isClosed → ∀ v, v ∈ (body.substitute t e).freeVars → v ∈ body.freeVars ∧ v ≠ t := by
@@ -294,7 +303,6 @@ theorem freeVars_substitute_closed (body : LocalTypeR) (t : String) (e : LocalTy
       exact this.elim
   | inr hpair =>
       exact hpair
-
 
 theorem freeVars_substituteBranches_closed (bs : List BranchR) (t : String) (e : LocalTypeR) :
     e.isClosed → ∀ v, v ∈ freeVarsOfBranches (substituteBranches bs t e) →
