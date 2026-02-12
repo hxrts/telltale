@@ -12,6 +12,8 @@ This is intentionally lightweight and proof-facing (not runtime-facing).
 
 namespace ProtocolClassical
 
+/-! ## Ledger Types -/
+
 inductive LedgerPlacement where
   | mainText
   | appendixD
@@ -31,6 +33,8 @@ structure TransportLedgerEntry where
   status : LedgerStatus
   notes : String
   deriving DecidableEq, Repr
+
+/-! ## Canonical Entries -/
 
 /-- Main-text discharged exemplar (SLA tails via LDP). -/
 def mainTextExemplar : TransportLedgerEntry :=
@@ -67,6 +71,8 @@ def appendixDDischargeSet : List TransportLedgerEntry :=
       placement := .appendixD
       status := .discharged
       notes := "Discharged by appendixD_meanField_discharge." } ]
+
+/-! ## Aggregated Ledger and Basic Facts -/
 
 def transportLedger : List TransportLedgerEntry :=
   mainTextExemplar :: appendixDDischargeSet
