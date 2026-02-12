@@ -104,6 +104,8 @@ private theorem sizeOf_head_snd_lt_cons (pair : Label × GlobalType) (rest : Lis
   have h2 : sizeOf pair < sizeOf (pair :: rest) := sizeOf_head_lt_cons pair rest
   exact Nat.lt_trans h1 h2
 
+/-! ## Size-Of Lemmas for Comm Cases -/
+
 private theorem sizeOf_bs_lt_comm (sender receiver : String) (bs : List (Label × GlobalType)) :
     sizeOf bs < sizeOf (GlobalType.comm sender receiver bs) := by
   simp only [GlobalType.comm.sizeOf_spec]
@@ -215,6 +217,8 @@ end
 
 /-! ## Shape Lemmas for Communications -/
 
+/-! ## Shape Lemmas: Sender -/
+
 /-- Sender shape lemma for `trans` on communications. -/
 theorem trans_comm_sender
     (sender receiver role : String) (branches : List (Label × GlobalType))
@@ -232,6 +236,8 @@ theorem trans_comm_sender
       | mk label cont =>
           rw [trans.eq_5]
           simp [hsender]
+
+/-! ## Shape Lemmas: Receiver -/
 
 /-- Receiver shape lemma for `trans` on communications. -/
 theorem trans_comm_receiver
@@ -252,6 +258,8 @@ theorem trans_comm_receiver
       | mk label cont =>
           rw [trans.eq_5]
           simp [hsender, hreceiver]
+
+/-! ## Shape Lemmas: Non-Participant -/
 
 /-- Non-participant shape lemma for `trans` on communications. -/
 theorem trans_comm_other
