@@ -35,6 +35,8 @@ universe u
 
 /-! ## Step assembly helpers -/
 
+/-! ### Output-condition helper plumbing -/
+
 private def outputConditionClaimOfEvent {ε : Type u} [EffectRuntime ε]
     (ev : StepEvent ε) : Option OutputConditionClaim :=
   match ev with
@@ -51,6 +53,8 @@ private def appendOutputConditionCheck {ι γ π ε ν : Type u} [IdentityModel 
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (check : OutputConditionCheck) : VMState ι γ π ε ν :=
   { st with outputConditionChecks := st.outputConditionChecks ++ [check] }
+
+/-! ### Monitor endpoint/tag extraction -/
 
 private def endpointAtChanReg? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (coro : CoroutineState γ ε) (chan : Reg) : Option Endpoint :=
@@ -102,6 +106,8 @@ private def monitorInstrTag {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
   | .yield => "yield"
   | .halt => "halt"
 
+/-! ### Monitor precheck and recording helpers -/
+
 private def monitorSessionShapeError? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -151,6 +157,8 @@ private def recordMonitorJudgment {ι γ π ε ν : Type u} [IdentityModel ι] [
   | some ep =>
       { st with monitor := SessionMonitor.record st.monitor ep (monitorInstrTag instr) st.clock }
 
+/-! ### Step-pack commit assembly -/
+
 def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -175,6 +183,8 @@ def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
         let st' := updateCoro stBase coroId coro'
         let st'' := appendOutputConditionCheck st' check
         (st'', mkRes (.faulted err) (some StepEvent.internal))
+
+/-! ### Instruction execution with monitor+cost gates -/
 
 def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -204,9 +214,11 @@ def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
           | none =>
               let pack' := faultPack st' coro .outOfCredits "out of credits"
               commitPack st' coroId pack'
-          | some coro' =>
-              let pack' := stepInstr st' coro' instr
-              commitPack st' coroId pack'
+	          | some coro' =>
+	              let pack' := stepInstr st' coro' instr
+	              commitPack st' coroId pack'
+
+/-! ### PC/status dispatch wrapper -/
 
 def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
