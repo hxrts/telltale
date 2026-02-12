@@ -257,6 +257,7 @@ def updateBuf (bufs : Buffers) (e : Edge) (buf : Buffer) : Buffers :=
     if e = e' then (e, buf) :: rest
     else (e', buf') :: updateBuf rest e buf
 
+/-! ## Buffer Queue Operations -/
 /-- Enqueue a value at a directed edge buffer. -/
 def enqueueBuf (bufs : Buffers) (e : Edge) (v : Value) : Buffers :=
   updateBuf bufs e (lookupBuf bufs e ++ [v])
@@ -267,6 +268,7 @@ def dequeueBuf (bufs : Buffers) (e : Edge) : Option (Buffers × Value) :=
   | [] => none
   | v :: vs => some (updateBuf bufs e vs, v)
 
+/-! ## Buffer Lookup Preservation Lemmas -/
 /-- Lookup at the updated edge returns the new buffer. -/
 @[simp] theorem lookupBuf_updateBuf_eq {bufs : Buffers} {e : Edge} {buf : Buffer} :
     lookupBuf (updateBuf bufs e buf) e = buf := by
@@ -299,6 +301,7 @@ theorem lookupBuf_updateBuf_ne {bufs : Buffers} {e e' : Edge} {buf : Buffer}
           simp [updateBuf, lookupBuf, List.lookup, h, hbeq', Option.getD]
           simpa [lookupBuf] using ih
 
+/-! ## Buffer Non-target Edge Corollaries -/
 /-- Enqueue at a different edge doesn't change lookup. -/
 theorem lookupBuf_enqueueBuf_ne {bufs : Buffers} {e e' : Edge} {v : Value}
     (hne : e' ≠ e) :
