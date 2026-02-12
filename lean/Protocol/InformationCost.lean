@@ -175,6 +175,7 @@ theorem mutualInfo_zero_of_constant_projection
     simpa [ht0 lt.1, eq_comm]
   exact mutualInfo_zero_of_erasure labelDist h_nn h_sum _ hErase
 
+/-! ## Constant-Projection Expectation Invariants -/
 /-- Constant local quantity has expectation equal to that constant. -/
 theorem blind_projection_entropy_unchanged
     {L : Type*} [Fintype L] [Nonempty L]
@@ -201,6 +202,7 @@ theorem blind_projection_entropy_unchanged
     _ = localEntropy l0 := by
             rw [h_sum, mul_one]
 
+/-! ## Projection-Preserved Local Information -/
 /-- Constant projection preserves expected local information. -/
 theorem projection_preserves_local_information
     {L T : Type*} [Fintype L]
@@ -269,6 +271,7 @@ theorem branchProjectionMap_isConstant_of_isBlind_comm
     exact hblind'.1
   exact branchProjectionMap_isConstant_of_commBlindFor hcomm hns hnr hne
 
+/-! ## Blindness Cost Normalization -/
 /-- Information cost of blind observation is zero by definition. -/
 def blindObservationCost : ℝ := 0
 
@@ -293,6 +296,7 @@ theorem isBlind_preserves_local_information
   exact projection_preserves_local_information
     (branchProjectionMap branches role) hConst labelDist _h_nn h_sum localInfo
 
+/-! ## Blindness Implies Deterministic Local Projection -/
 /-- Corollary: blindness implies deterministic projected local type. -/
 theorem isBlind_implies_constant_local_type
     {sender receiver role : String} {branches : List (Label × GlobalType)}
