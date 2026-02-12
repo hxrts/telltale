@@ -33,6 +33,7 @@ private def primaryEndpoint {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
   | e :: _ => some e
   | [] => none
 
+/-! ## Acquire -/
 
 def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -60,6 +61,7 @@ def stepAcquire {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
                   | none => StepEvent.internal
                 continuePack st { coro with regs := regs' } (some ev)
 
+/-! ## Release -/
 
 def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -88,6 +90,7 @@ def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
                   | none => StepEvent.internal
                 continuePack st' coro (some ev)
 
+/-! ## Invoke -/
 
 def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
