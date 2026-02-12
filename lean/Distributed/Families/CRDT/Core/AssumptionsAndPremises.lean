@@ -44,6 +44,8 @@ structure Assumptions
   gcCausalDominanceClass : M.gcCausalDominanceClass
   stabilizationLowerBoundClass : M.stabilizationLowerBoundClass
 
+/-! ## Assumption Labels -/
+
 /-- Built-in assumption labels for summary/validation APIs. -/
 inductive Assumption where
   | semilatticeCoreClass
@@ -62,12 +64,16 @@ inductive Assumption where
   | stabilizationLowerBoundClass
   deriving Repr, DecidableEq, Inhabited
 
+/-! ## Validation Result Types -/
+
 /-- Validation result for one assumption atom. -/
 structure AssumptionResult where
   assumption : Assumption
   passed : Bool
   detail : String
   deriving Repr, DecidableEq, Inhabited
+
+/-! ## Core Assumption Catalog -/
 
 /-- Core reusable CRDT assumption set. -/
 def coreAssumptions : List Assumption :=
@@ -86,6 +92,8 @@ def coreAssumptions : List Assumption :=
   , .gcCausalDominanceClass
   , .stabilizationLowerBoundClass
   ]
+
+/-! ## Validation Functions -/
 
 /-- Validate one assumption against an assumption bundle. -/
 def validateAssumption
@@ -118,6 +126,7 @@ def validateAssumption
       , passed := true
       , detail := "Mixing-time control premise is provided."
       }
+  /-! ## Validation Cases: Dynamics and Limits -/
   | .hotspotSlowModesClass =>
       { assumption := h
       , passed := true
@@ -171,6 +180,8 @@ def validateAssumptions
     (a : Assumptions M) (hs : List Assumption) : List AssumptionResult :=
   hs.map (validateAssumption a)
 
+/-! ## Validation Summary -/
+
 /-- True iff every validation atom passed. -/
 def allAssumptionsPassed (rs : List AssumptionResult) : Bool :=
   rs.all (fun r => r.passed)
@@ -188,6 +199,8 @@ def runAssumptionValidation
     (a : Assumptions M) (hs : List Assumption) : AssumptionSummary :=
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
+
+/-! ## Theorem Premises Bundle -/
 
 /-- Additional premises used to derive CRDT theorem forms. -/
 structure Premises
@@ -224,6 +237,8 @@ structure Premises
   exactSECAsLimitWitness :
     ExactSECRecoveryAsLimit M approxPolicy referenceRun deployedRun
 
+/-! ## Envelope and Adequacy Derivations -/
+
 /-- Exact envelope characterization follows from assumptions + premises. -/
 theorem exactEnvelope_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -250,6 +265,8 @@ theorem principalCapability_of_assumptions
     (p : Premises M) :
     PrincipalCapability p.inferredBudget p.envelopeBudget :=
   p.principalCapabilityWitness
+
+/-! ## Admission and Equivalence Derivations -/
 
 /-- Admission soundness theorem follows from assumptions + premises. -/
 theorem admissionSoundness_of_assumptions
@@ -287,6 +304,8 @@ theorem gcSafetyIff_of_assumptions
     GCSafetyIffCausalDominance p.GCSafe p.CausalDominanceEstablished :=
   p.gcSafetyIffWitness
 
+/-! ## Approximation and Limit Derivations -/
+
 /-- Bounded-metadata approximation bound follows from assumptions + premises. -/
 theorem boundedApproximation_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
@@ -315,6 +334,8 @@ theorem exactSECAsLimit_of_assumptions
     (p : Premises M) :
     ExactSECRecoveryAsLimit M p.approxPolicy p.referenceRun p.deployedRun :=
   p.exactSECAsLimitWitness
+
+/-! ## Derived Bundle Projections -/
 
 /-- `H_crdt_core` from CRDT assumptions. -/
 theorem hcrdtCore_of_assumptions
