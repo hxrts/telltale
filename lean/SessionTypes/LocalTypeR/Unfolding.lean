@@ -98,6 +98,8 @@ This is because:
 2. Guarded variables only appear inside send/recv
 3. So fullUnfold reaches send/recv/end (not var since closed) -/
 
+/-! ## Observable-Form Classification -/
+
 /-- Classification of fully unfolded types. -/
 inductive FullUnfoldResult where
   | is_end : FullUnfoldResult
@@ -128,6 +130,8 @@ theorem LocalTypeR.muHeight_non_mu :
   | send _ _ => rfl
   | recv _ _ => rfl
   | mu t body => exact absurd rfl (h t body)
+
+/-! ## freeVars/isFreeIn Bridge for Unfolding -/
 
 /- For closed types (no free variables), fullUnfold cannot produce a variable.
 
@@ -186,6 +190,8 @@ mutual
     all_goals
       simp [*] <;> omega
 
+  /-! ## Branch freeVars/isFreeIn Bridge -/
+
   theorem isFreeInBranches'_mem_freeVarsOfBranches (bs : List BranchR) (v : String) :
       isFreeInBranches' v bs = true → v ∈ freeVarsOfBranches bs := by
     intro h
@@ -212,6 +218,8 @@ mutual
     all_goals
       simp [*] <;> omega
 end
+
+/-! ## Guardedness from Non-Freeness -/
 
 /-- If `v` is not free in `lt`, then `v` is guarded in `lt`. -/
 theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
@@ -241,6 +249,8 @@ theorem isGuarded_of_isFreeIn_false (lt : LocalTypeR) (v : String) :
         have hbody' := isGuarded_of_isFreeIn_false body v hbody
         simp [LocalTypeR.isGuarded, hvne, hbody']
 termination_by sizeOf lt
+
+/-! ## Guardedness from Closedness -/
 
 /-- Closed types have all variables guarded (vacuously, since they have no free variables). -/
 theorem isGuarded_of_closed (lt : LocalTypeR) (v : String) :
