@@ -25,6 +25,8 @@ section
 
 /-! ## Acquire Renaming Equivariance -/
 
+/-! ## AcquireSpec Renaming Preservation -/
+
 def AcquireSpec_respects_renaming (ρ : SessionRenaming)
     {G G' : GEnv} {D D' : DEnv}
     {ep : Endpoint} {r : Role} {delegatedSession : SessionId} {delegatedRole : Role}
@@ -46,6 +48,9 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
       simp only [renameEndpoint, renameEdge]
     rw [hEdge, lookupD_rename, hLookup]
     simp only [List.map_cons, renameValType]
+
+  /-! ## AcquireSpec Renaming: Type-Update Case -/
+
   type_updated := by
     intro L' hLookup'
     -- L' is the continuation in the renamed space
@@ -85,6 +90,9 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
       | end_ => simp only [renameLocalType] at hEq; nomatch hEq
       | var _ => simp only [renameLocalType] at hEq; nomatch hEq
       | mu _ => simp only [renameLocalType] at hEq; nomatch hEq
+
+  /-! ## AcquireSpec Renaming: Delegation Step -/
+
   delegation_applied :=
     DelegationStep_respects_renaming ρ hSpec.delegation_applied
 
@@ -98,6 +106,9 @@ theorem AcquireSpec_respects_ConfigEquiv
               (renameEndpoint (hEquiv.choose.toRenaming) ep) r
               (hEquiv.choose.fwd delegatedSession) delegatedRole) :
     ConfigEquiv ⟨G₁', D₁'⟩ ⟨G₂', D₂'⟩ := by
+
+  /-! ## ConfigEquiv Preservation: Shared Setup -/
+
   let σ := hEquiv.choose
   let ρ := σ.toRenaming
   obtain ⟨hG, hD⟩ := hEquiv.choose_spec
@@ -113,6 +124,9 @@ theorem AcquireSpec_respects_ConfigEquiv
     have hLookupEq' : some hDeleg₂.A_type = (some hDeleg₁.A_type).map (renameLocalType ρ) := by
       rw [← hAlookup₂, hLookupEq, hDeleg₁.A_lookup]
     simpa using Option.some.inj hLookupEq'
+
+  /-! ## ConfigEquiv Preservation: GEnv Component -/
+
   refine ⟨σ, ?_, ?_⟩
   · intro e
     by_cases hSid : e.sid = delegatedSession
@@ -158,6 +172,9 @@ theorem AcquireSpec_respects_ConfigEquiv
         exact hSid (ρ.inj _ _ hEq)
       rw [hDeleg₁.other_sessions_G e hSid, hDeleg₂.other_sessions_G (renameEndpoint ρ e) hSidRen]
       exact hG e
+
+  /-! ## ConfigEquiv Preservation: DEnv Component -/
+
   · intro e
     by_cases hSid : e.sid = delegatedSession
     · by_cases hInc : e.sender = r ∨ e.receiver = r
@@ -170,6 +187,9 @@ theorem AcquireSpec_respects_ConfigEquiv
           hDeleg₂.A_incident_empty (renameEdge ρ e) hSidRen hIncRen
         rw [hEmpty₁, hEmpty₂]
         simp
+
+      /-! ## ConfigEquiv Preservation: DEnv Non-Incident Edge Case -/
+
       · have hSenderNe : e.sender ≠ r := by
           intro hEq
           exact hInc (Or.inl hEq)
