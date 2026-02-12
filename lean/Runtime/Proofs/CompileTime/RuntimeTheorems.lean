@@ -320,6 +320,8 @@ private theorem speculationDivergence_eq_zero_iff
   -- Delegate to KL zero characterization through the local alias.
   simpa [speculationDivergence] using EntropyAPI.klDivergence_eq_zero_iff p q habs
 
+/-! ## Credit Soundness And Budget Bounds -/
+
 def cost_credit_sound : Prop :=
   -- Every non-halt instruction costs at least 1 credit.
   ∀ (γ ε : Type) [GuardLayer γ] [EffectRuntime ε] (cm : CostModel γ ε) (i : Instr γ ε),
@@ -336,6 +338,8 @@ def cost_budget_bounds_steps : Prop :=
 theorem cost_budget_bounds_steps_holds : cost_budget_bounds_steps :=
   fun _ _ _ _ cm n h =>
     Nat.le_trans (Nat.le_mul_of_pos_right n cm.hMinPos) h
+
+/-! ## Cost-Aware WP Lift -/
 
 def wp_lift_step_with_cost : Prop :=
   -- Cost-aware WP lifting: each non-halt instruction step strictly decreases
@@ -372,6 +376,8 @@ theorem wp_lift_step_with_cost_holds : wp_lift_step_with_cost := by
       Nat.le_trans cfg.costModel.hMinPos (cfg.costModel.hMinCost i hNotHalt)
     omega
 
+/-! ## Entropy-Weighted Send Cost -/
+
 def send_cost_plus_flow [EntropyAPI.Laws] : Prop :=
   -- Information-theoretic send cost: branch entropy is nonnegative
   -- and bounded by log |L| for any label distribution.
@@ -383,6 +389,8 @@ def send_cost_plus_flow [EntropyAPI.Laws] : Prop :=
 theorem send_cost_plus_flow_holds [EntropyAPI.Laws] : send_cost_plus_flow := by
   intro L _ _ d
   exact ⟨branchEntropy_nonneg d, branchEntropy_le_log_card d⟩
+
+/-! ## Cost Frame Preservation -/
 
 def cost_frame_preserving : Prop :=
   -- Credit consumption is frame-preserving: chargeCost only modifies
@@ -406,6 +414,8 @@ theorem cost_frame_preserving_holds : cost_frame_preserving := by
   split at h
   · simp at h; subst h; exact ⟨rfl, rfl, rfl, rfl⟩
   · exact absurd h (by simp)
+
+/-! ## Speculation Cost Bounds -/
 
 def cost_speculation_bounded [EntropyAPI.Laws] : Prop :=
   -- Speculation divergence is nonnegative,
