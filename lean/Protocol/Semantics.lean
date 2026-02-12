@@ -172,6 +172,7 @@ inductive Step : Config → Config → Prop where
 theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : StepBase C C₂) :
     C₁ = C₂ ∨ (∃ nS nG P Q, C.proc = .par nS nG P Q) := by
   cases h₁ with
+  /-! ## Determinism: send head step -/
   | send hProc₁ hk₁ hx₁ hG₁ =>
     cases h₂ with
     | send hProc₂ hk₂ hx₂ hG₂ =>
@@ -191,6 +192,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       subst htgt hT hL
       rfl
     | _ => simp_all
+  /-! ## Determinism: recv head step -/
   | recv hProc₁ hk₁ hG₁ hBuf₁ =>
     cases h₂ with
     | recv hProc₂ hk₂ hG₂ hBuf₂ =>
@@ -214,6 +216,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       subst hv
       rfl
     | _ => simp_all
+  /-! ## Determinism: select head step -/
   | select hProc₁ hk₁ hG₁ hFind₁ =>
     cases h₂ with
     | select hProc₂ hk₂ hG₂ hFind₂ =>
@@ -235,6 +238,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       subst hL
       rfl
     | _ => simp_all
+  /-! ## Determinism: branch head step -/
   | branch hProc₁ hk₁ hG₁ hBuf₁ hFindP₁ hFindT₁ hDq₁ =>
     cases h₂ with
     | branch hProc₂ hk₂ hG₂ hBuf₂ hFindP₂ hFindT₂ hDq₂ =>
@@ -272,6 +276,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       subst hbufs_eq
       rfl
     | _ => simp_all
+  /-! ## Determinism: newSession head step -/
   | newSession hProc₁ =>
     cases h₂ with
     | newSession hProc₂ =>
@@ -281,6 +286,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       obtain ⟨hr_eq, hf_eq, hP_eq⟩ := heq
       simp only [hr_eq, hf_eq, hP_eq]
     | _ => simp_all
+  /-! ## Determinism: assign head step -/
   | assign hProc₁ =>
     cases h₂ with
     | assign hProc₂ =>
@@ -290,6 +296,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       obtain ⟨hx_eq, hv_eq⟩ := heq
       simp only [hx_eq, hv_eq]
     | _ => simp_all
+  /-! ## Determinism: seq-skip head step -/
   | seq2 hProc₁ =>
     cases h₂ with
     | seq2 hProc₂ =>
@@ -299,6 +306,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       rcases heq with ⟨_, hQ_eq⟩
       simp [hQ_eq]
     | _ => simp_all
+  /-! ## Determinism: par-skip-left head step -/
   | par_skip_left hProc₁ =>
     cases h₂ with
     | par_skip_left hProc₂ =>
@@ -311,6 +319,7 @@ theorem stepBase_deterministic {C C₁ C₂} (h₁ : StepBase C C₁) (h₂ : St
       right
       exact ⟨_, _, _, _, hProc₁⟩
     | _ => simp_all
+  /-! ## Determinism: par-skip-right head step -/
   | par_skip_right hProc₁ =>
     cases h₂ with
     | par_skip_right hProc₂ =>
