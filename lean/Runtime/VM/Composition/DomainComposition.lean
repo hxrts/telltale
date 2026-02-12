@@ -120,6 +120,8 @@ instance : AccumulatedSet Unit where
 
 /-! ## Composed instances -/
 
+/-! ### Identity-model sum helpers -/
+
 private def sumSites (ι₁ ι₂ : Type u) [IdentityModel ι₁] [IdentityModel ι₂] :
     (Sum (IdentityModel.ParticipantId ι₁) (IdentityModel.ParticipantId ι₂) → List (Sum (IdentityModel.SiteId ι₁) (IdentityModel.SiteId ι₂))) :=
   -- Lift sites into the sum identity model.
@@ -185,6 +187,8 @@ instance instIdentityModelSum (ι₁ ι₂ : Type u)
   decEqP := sumDecEqP ι₁ ι₂
   decEqS := sumDecEqS ι₁ ι₂
 
+/-! ### Effect-runtime sum/product composition -/
+
 instance instEffectRuntimeSum (ε₁ ε₂ : Type u) [EffectRuntime ε₁] [EffectRuntime ε₂] :
     EffectRuntime (Sum ε₁ ε₂) where
   -- Sum effects dispatch to the corresponding component model.
@@ -218,6 +222,8 @@ instance instEffectSpecProd (ε₁ ε₂ : Type u)
     EffectSpec (ε₁ × ε₂) where
   -- V1 product handlers are conservatively typed as terminal.
   handlerType := fun _ => LocalType.end_
+
+/-! ### Guard and persistence product composition -/
 
 instance instGuardLayerProd (γ₁ γ₂ : Type u) [GuardLayer γ₁] [GuardLayer γ₂] :
     GuardLayer (γ₁ × γ₂) where
