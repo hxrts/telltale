@@ -61,6 +61,7 @@ lemma lookupSEnv_all_of_visible_prog
           lookupSEnv ((Ssh ++ Sown.right) ++ Sown.left) x = some Tsh :=
         lookupSEnv_append_left (S₁:=Ssh ++ Sown.right) (S₂:=Sown.left) (x:=x) (T:=Tsh) hPrefixSh
       simpa [SEnvAll, List.append_assoc, hEqT] using hAllSh
+  /-! ## Visible-to-Full Lookup: Shared-Miss Case -/
   | none =>
       have hLeftSome : lookupSEnv Sown.left x = some T := by
         have hVisRight := lookupSEnv_append_right (S₁:=Ssh) (S₂:=Sown.left) (x:=x) hSh
@@ -81,6 +82,8 @@ lemma lookupSEnv_all_of_visible_prog
           _ = some T := hOwnSome
       exact hAll
 
+/-! ## Store Lookup Bridge -/
+
 lemma store_lookup_of_visible_lookup
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
     {x : Var} {T : ValType}
@@ -95,6 +98,8 @@ lemma store_lookup_of_visible_lookup
   simpa [SEnvVisible] using
     (store_lookup_of_visible_lookup_strongVisible (G:=G) (Ssh:=Ssh) (Sown:=Sown)
       (store:=store) (x:=x) (T:=T) hStoreVis hVis)
+
+/-! ## Owned-Environment Disjointness Reframing -/
 
 lemma OwnedDisjoint_sub_left
     {Sown : OwnedEnv} {G : GEnv} (split : ParSplit Sown.left G) :
@@ -123,6 +128,8 @@ lemma OwnedDisjoint_sub_right
   have hAll : DisjointS (Sown.right ++ split.S1) split.S2 :=
     DisjointS_append_left hR2 hS1S2
   simpa [OwnedDisjoint, OwnedEnv.all] using hAll
+
+/-! ## Endpoint Equality from Store Typing -/
 
 lemma channel_endpoint_eq_of_store_visible
     {G : GEnv} {Ssh : SEnv} {Sown : OwnedEnv} {store : VarStore}
@@ -191,6 +198,8 @@ lemma HasTypeProcPreOut_branch_inv
   cases h with
   | branch hk hG hLen hLabels hBodies hOutLbl hSess hDom hRight => exact ⟨_, _, _, hk, hG⟩
 
+/-! ## GEnv Update Framing -/
+
 lemma updateG_full_eq_updateG_mid
     {Gfull Gleft Gmid Gright : GEnv} {e : Endpoint} {L L' : LocalType} {G' : GEnv} :
     Gfull = Gleft ++ Gmid ++ Gright →
@@ -216,6 +225,8 @@ lemma updateG_full_eq_updateG_mid
     _ = Gleft ++ updateG Gmid e L' ++ Gright := by
       simp [hUpdLeft, List.append_assoc]
 
+/-! ## Typed-Step Frame Preservation (Communication Cases) -/
+
 lemma TypedStep_preserves_frames_send
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}
@@ -238,6 +249,8 @@ lemma TypedStep_preserves_frames_send
   subst hEq
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
   exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
+
+/-! ## Typed-Step Frame Preservation (Receive Case) -/
 
 lemma TypedStep_preserves_frames_recv
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
@@ -262,6 +275,8 @@ lemma TypedStep_preserves_frames_recv
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
   exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
 
+/-! ## Typed-Step Frame Preservation (Select Case) -/
+
 lemma TypedStep_preserves_frames_select
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
     {store : VarStore}
@@ -284,6 +299,8 @@ lemma TypedStep_preserves_frames_select
   subst hEq
   refine ⟨updateG Gmid eStep Lstep, ?_⟩
   exact updateG_full_eq_updateG_mid hGfull hDisjL hG hGout
+
+/-! ## Typed-Step Frame Preservation (Branch Case) -/
 
 lemma TypedStep_preserves_frames_branch
     {Ssh : SEnv} {Sown : OwnedEnv} {Gfull Gleft Gmid Gright : GEnv}
