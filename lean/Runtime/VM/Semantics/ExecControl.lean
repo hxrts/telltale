@@ -34,6 +34,7 @@ private def copyArgs (src : RegFile) (size : Nat) (args : List Reg) : RegFile :=
               regs
   go 0 initRegs args
 
+/-! ## Spawn -/
 
 def stepSpawn {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -54,6 +55,7 @@ def stepSpawn {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   let coro' := advancePc { coro with status := .ready }
   pack coro' st' (mkRes (.spawned newId) none)
 
+/-! ## Register Updates -/
 
 def stepSet {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -66,6 +68,7 @@ def stepSet {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | some regs' => continuePack st { coro with regs := regs' } none
   | none => faultPack st coro .outOfRegisters "out of registers"
 
+/-! ### Register Move -/
 
 def stepMove {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -81,6 +84,7 @@ def stepMove {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       | none => faultPack st coro .outOfRegisters "bad dst reg"
       | some regs' => continuePack st { coro with regs := regs' } none
 
+/-! ## Control Transfer -/
 
 def stepJump {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -92,6 +96,7 @@ def stepJump {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   let coro' := { coro with pc := target, status := .ready }
   pack coro' st (mkRes .continue none)
 
+/-! ### Cooperative Yield -/
 
 def stepYield {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
