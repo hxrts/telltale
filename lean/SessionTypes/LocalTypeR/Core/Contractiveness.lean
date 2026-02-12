@@ -23,8 +23,6 @@ namespace SessionTypes.LocalTypeR
 
 /-! ## Lightweight Contractiveness and Partner Occurrence -/
 
-/-! ## Lightweight Contractiveness and Partner Occurrence -/
-
 /-- Local contractiveness check for mu bodies (vars are non-contractive). -/
 def LocalTypeR.lcontractive : LocalTypeR → Bool
   | .end => true
@@ -69,6 +67,8 @@ inductive LocalTypeR.hasRecvFrom : LocalTypeR → String → Prop where
   | noncontractive {t : String} {body : LocalTypeR} {partner : String} :
       LocalTypeR.lcontractive body = false → hasRecvFrom (.mu t body) partner
 
+/-! ## Mu Lifting Helpers -/
+
 /-- Lift send partner occurrence through mu. -/
 theorem LocalTypeR.hasSendTo_mu {t : String} {body : LocalTypeR} {partner : String}
     (h : body.hasSendTo partner) : (LocalTypeR.mu t body).hasSendTo partner :=
@@ -79,6 +79,8 @@ theorem LocalTypeR.hasRecvFrom_mu {t : String} {body : LocalTypeR} {partner : St
     (h : body.hasRecvFrom partner) : (LocalTypeR.mu t body).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.mu h
 
+/-! ## Direct Constructor Helpers -/
+
 /-- Direct send partner occurrence. -/
 theorem LocalTypeR.hasSendTo_send {partner : String} {branches : List BranchR} :
     (LocalTypeR.send partner branches).hasSendTo partner :=
@@ -88,6 +90,8 @@ theorem LocalTypeR.hasSendTo_send {partner : String} {branches : List BranchR} :
 theorem LocalTypeR.hasRecvFrom_recv {partner : String} {branches : List BranchR} :
     (LocalTypeR.recv partner branches).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.recv
+
+/-! ## Branch Propagation Helpers -/
 
 /-- Propagate send partner occurrence through send branches. -/
 theorem LocalTypeR.hasSendTo_send_branch {receiver partner : String} {branches : List BranchR}
@@ -113,6 +117,8 @@ theorem LocalTypeR.hasRecvFrom_recv_branch {sender partner : String} {branches :
     (LocalTypeR.recv sender branches).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.recv_branch hmem h
 
+/-! ## Noncontractive Fallback Helpers -/
+
 /-- Any noncontractive mu counts as sending to every partner. -/
 theorem LocalTypeR.hasSendTo_noncontractive {t : String} {body : LocalTypeR} {partner : String}
     (h : LocalTypeR.lcontractive body = false) : (LocalTypeR.mu t body).hasSendTo partner :=
@@ -122,7 +128,4 @@ theorem LocalTypeR.hasSendTo_noncontractive {t : String} {body : LocalTypeR} {pa
 theorem LocalTypeR.hasRecvFrom_noncontractive {t : String} {body : LocalTypeR} {partner : String}
     (h : LocalTypeR.lcontractive body = false) : (LocalTypeR.mu t body).hasRecvFrom partner :=
   LocalTypeR.hasRecvFrom.noncontractive h
-
-
-
 end SessionTypes.LocalTypeR
