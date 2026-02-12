@@ -126,6 +126,8 @@ structure Transaction (ν : Type u) [VerificationModel ν] [AccumulatedSet ν] w
   complianceProofs : List (ComplianceProof ν) -- Membership/non-membership proofs.
   authorizedImbalance : Bool -- Whether a non-zero delta is authorized.
 
+/-! ## Transaction Validity Checks -/
+
 /-- Delta balance predicate for a transaction (stub). -/
 def txBalanced {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) : Prop :=
@@ -169,6 +171,8 @@ def Transaction.validB {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
 def Transaction.valid {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) (st : ResourceState ν) : Prop :=
   Transaction.validB tx st = true
+
+/-! ## Transaction Application -/
 
 def applyTransaction {ν : Type u} [VerificationModel ν] [AccumulatedSet ν]
     (tx : Transaction ν) (st : ResourceState ν) : Option (ResourceState ν) :=
